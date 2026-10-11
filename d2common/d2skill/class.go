@@ -929,16 +929,26 @@ func doFireWallFn(c *cast) {
 	}
 }
 
-// doTwisterFn is SRVDO_118_Twister (Twister, Tornado): calc1 twisters fanned 20
-// degrees apart (U).
+// doTwisterFn is SRVDO_118_Twister (Twister, Tornado; 0x5c52c0 / SRVDO_TwisterSpawnChain 0x5c5000, VERIFIED,
+// batch 9): calc1 missiles (none when calc1 is below one) are created at the caster toward the target position, ALL
+// of them through the shared per-missile hook (0x5c7340): the seed is the destination x plus the index and the path
+// becomes type 10, the scattering stepper, with the lifetime clamped to 77 frames (not modelled here). There is no
+// straight first missile (the chain's flag is 0) and no fan. The scatter width is UNVERIFIED (FirestormJitter).
 func doTwisterFn(c *cast) {
 	n := c.calc(1)
 	if n < 1 {
-		n = 1
+		c.fail(ReasonMissile)
+		return
 	}
 
-	for _, a := range fanAngles(n, 20) {
-		c.castM(c.missileName(), castOpts{angle: a})
+	ax, _ := c.aim()
+
+	for i := 0; i < n; i++ {
+		c.castM(c.missileName(), castOpts{angle: FirestormJitter(ax, i)})
+	}
+
+	if len(c.res.Missiles) == 0 {
+		c.fail(ReasonMissile)
 	}
 }
 
@@ -1340,29 +1350,27 @@ func maxInt(a, b int) int {
 	return b
 }
 
-// doFirestormFn is SRVDO_117_Firestorm (U): fire bursts in a line from the caster
-// towards the aim, 2 subtiles apart, 2 frames apart.
+// doFirestormFn is SRVDO_117_Firestorm (0x5c5130, VERIFIED, batch 9): calc1 emitters (the skill's srvmissilea,
+// firestormmaker, whose SrvDoFunc 23 drops the firestorm fire along its path) are cast: the first straight at the
+// target, the other calc1 - 1 from the caster toward the same destination, each re-seeded by the shared hook
+// (FirestormJitter; its scatter width is UNVERIFIED). A calc1 below one casts nothing.
 func doFirestormFn(c *cast) {
-	ax, ay := c.aim()
-	hx, hy := c.u.Pos()
-	dx, dy := float64(ax-hx), float64(ay-hy)
-
-	d := math.Hypot(dx, dy)
-	if d == 0 {
-		d, dx = 1, 1
+	n := c.calc(1)
+	if n < 1 {
+		c.fail(ReasonMissile)
+		return
 	}
 
-	n := 5 + c.calc(1)
-	desc := c.desc()
+	ax, _ := c.aim()
 
-	var strikes []Strike
-
-	for i := 1; i <= n; i++ {
-		t := math.Min(float64(i)*2, d+4)
-		strikes = append(strikes, Strike{Delay: i * 2, X: hx + int(math.Round(dx/d*t)), Y: hy + int(math.Round(dy/d*t)), Radius: 2})
+	if c.castM(c.missileName(), castOpts{}) == nil {
+		c.fail(ReasonMissile)
+		return
 	}
 
-	c.effect(Effect{Kind: "strikes", Origin: "self", Desc: desc, Strikes: strikes})
+	for i := 0; i < n-1; i++ {
+		c.castM(c.missileName(), castOpts{angle: FirestormJitter(ax, i)})
+	}
 }
 
 // doVolcanoFn is SRVDO_123_Volcano (0x5c60c0, VERIFIED): the skill's srvmissile
@@ -1399,7 +1407,7 @@ func doStormFn(c *cast) {
 	case 29:
 		e.Mode, e.Interval, e.Radius = "nearest", maxInt(sk.Params[3], 12), 20
 	default:
-		e.Interval, e.Radius = maxInt(sk.Params[4], 10), maxInt(c.env.eval(sk.AuraRangeCalc), 6)
+		e.Interval, e.Radius = StormInterval(sk.Params[4]), c.env.eval(sk.AuraRangeCalc) // 0x5c65b0 / 0x5c63f0: Param4 frames, the radius as is
 		e.Mode = "scatter"
 
 		if sk.EType == "cold" {
@@ -1564,6 +1572,10 @@ func doSummonFn(c *cast) {
 	case 31, 56, 57:
 		// VERIFIED (SKILL_ComputeSummonLevel 0x5c2850, called by SRVDO_031 / 056 / 057 with no fixed level)
 		o.Level = SummonLevel(c.u.Level(), c.lvl)
+	}
+
+	if sk.SrvDoFunc == 56 && sk.Name == "BloodGolem" {
+		o.OwnerDamagePct, o.HealSharePct = sk.Params[5], sk.Params[6]
 	}
 
 	switch {

@@ -194,6 +194,18 @@ func (d *Director) AttackTarget(b *d2monster.Brain) (d2monster.Target, int, bool
 		return d.nearestEnemy(b)
 	}
 
+	if u := d.unitOf(b); u != nil && u.siegeTarget != 0 {
+		// a siege weapon keeps the unit its scan stored (MONAI_KeepNearerTargetIdInAiData, 0x5e0650)
+		if tu := d.units[u.siegeTarget]; tu != nil && livingMode(tu) {
+			x, y := tu.m.SubtilePos()
+
+			return d2monster.Target{ID: unitTargetBase + tu.b.ID, X: x, Y: y, Size: 1},
+				d2monster.EdgeDistance(b.X-x, b.Y-y, b.Size), true
+		}
+
+		u.siegeTarget = 0
+	}
+
 	t, dist, ok := d.Nearest(b)
 
 	return t, dist, ok && dist <= b.Profile.Aggro()

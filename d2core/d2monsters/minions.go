@@ -47,6 +47,9 @@ type MinionOptions struct {
 	// DrawsAggro puts the summon in the hostile monsters' target list (Dopplezon, Valkyrie: the exe calls
 	// TARGETS_AddEntryToList for them, SRVDO_015/016).
 	DrawsAggro bool
+	// OwnerDamagePct and HealSharePct are the Blood Golem's shares (VERIFIED 0x5c4600 / 0x5c4800): the percent of
+	// a blow that the owner's life pays instead, and the percent of the owner's healing the golem receives.
+	OwnerDamagePct, HealSharePct int
 	// Tag is free for the caller (the skill name).
 	Tag string
 	// Stats, when set, replace the monstats-derived life, defense, attack

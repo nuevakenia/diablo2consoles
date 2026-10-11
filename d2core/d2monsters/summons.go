@@ -403,6 +403,10 @@ func (d *Director) FBXScan(b *d2monster.Brain, q d2monster.FBXScanQuery) d2monst
 		return d.scanOverseer(b, q)
 	case d2monster.FBXScanPriestAlly:
 		return d.scanPriestAlly(b, q.Radius2)
+	case d2monster.FBXScanSiegeTarget:
+		return d.scanSiege(b, q)
+	case d2monster.FBXScanRegurgitate:
+		return d.scanRegurgitate(b, q)
 	}
 
 	if q.Kind != d2monster.FBXScanLinkedClass || q.Class < 0 {
