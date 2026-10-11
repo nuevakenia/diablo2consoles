@@ -145,7 +145,7 @@ func (f *MapEntityFactory) NewMissile(x, y int, record *d2records.MissileRecord)
 		animation.SetSubLoop(record.Animation.SubStartingFrame, record.Animation.SubEndingFrame)
 	}
 
-	animation.SetEffect(d2enum.DrawEffectModulate)
+	animation.SetEffect(MissileDrawEffect(record.TransparencyMode))
 	animation.SetPlayLoop(record.Animation.LoopAnimation)
 	animation.PlayForward()
 	entity := NewAnimatedEntity(x, y, animation)
