@@ -97,3 +97,40 @@ func (e *Engine) totemClear(p *d2mapentity.Player, name string) {
 		e.monsters.SetAuraBoost(pet, d2monsters.AuraBoost{})
 	}
 }
+
+// allyAuraPulse extends a hero's friendly aura (SRVDO_065, aurafilter 73731 = players, monsters, allied; Meditation's
+// 73729 is players only) to the mercenary and the summoned minions inside aurarangecalc, the same reach rule the
+// druid totems use (SKILL_UnitMatchesTargetFilter 0x569100 + SKILL_ForEachUnitInRadius 0x569510, VERIFIED). The
+// ones inside get the state (a minion turns damagepercent / item_tohit_percent / item_maxhp_percent into an
+// AuraBoost), the ones outside lose it. UNVERIFIED: that a minion reads only those three stats; hitpoints healing
+// of Prayer is not given to minions.
+func (e *Engine) allyAuraPulse(p *d2mapentity.Player, hx, hy int, ef *d2skill.Effect, mods []d2state.StatMod, until int, on bool) {
+	inst := d2state.Instance{Name: ef.State, Until: until, Mods: mods, Source: p.ID(), SkillID: ef.SkillID, Level: ef.Level}
+
+	reach := func(x, y int) bool {
+		if ef.Radius > 0 && !inAuraRange(hx, hy, x, y, ef.Radius) {
+			return false
+		}
+
+		return d2skill.FilterMatch(ef.Filter, d2skill.FilterFacts{Kind: d2skill.KindMonster, Allied: true})
+	}
+
+	for _, pet := range e.pets[p.ID()] {
+		if !pet.Alive() {
+			continue
+		}
+
+		if kind, _ := e.monsters.MinionKind(pet); kind != "minion" {
+			continue
+		}
+
+		px, py := pet.SubtilePos()
+		if on && reach(px, py) {
+			e.setOf(pet.ID()).Apply(e.frame, inst)
+			e.monsters.SetAuraBoost(pet, boostOf(mods))
+		} else {
+			e.setOf(pet.ID()).Remove(ef.State)
+			e.monsters.SetAuraBoost(pet, d2monsters.AuraBoost{})
+		}
+	}
+}

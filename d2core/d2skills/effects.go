@@ -597,6 +597,9 @@ func (e *Engine) endAura(key string, a *auraRun) {
 
 	if a.u != nil {
 		e.setOf(a.u.ID()).Remove(a.ef.State)
+	} else if a.ef.Mode == "friendly" && a.ef.Filter&d2skill.FilterAllied != 0 {
+		hx, hy := e.hero(a.p).Pos()
+		e.allyAuraPulse(a.p, hx, hy, &a.ef, nil, 0, false)
 	}
 
 	delete(e.auras, key)
@@ -672,6 +675,10 @@ func (e *Engine) pulseAura(a *auraRun) {
 			e.setOf(a.p.ID()).Remove(ef.State)
 			e.emit("state", "STATE aura upkeep short skill=%q mana=%d need=%d/256", ef.SkillName, mana, upkeep)
 		}
+	}
+
+	if ef.Mode == "friendly" && a.u == nil && ef.Filter&d2skill.FilterAllied != 0 && ef.State != "" {
+		e.allyAuraPulse(a.p, hx, hy, ef, statMods(ef.Stats), until, paid)
 	}
 
 	if paid && (len(ef.Stats) > 0 || ef.State != "" && ef.Mode == "friendly") {
