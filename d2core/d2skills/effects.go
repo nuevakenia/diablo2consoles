@@ -623,6 +623,15 @@ func (e *Engine) aurasTick() {
 	}
 }
 
+// auraPeriodOf is the pulse period of an aura effect (perdelay, floor 5; 25 when the effect carries none).
+func auraPeriodOf(ef *d2skill.Effect) int {
+	if ef.Interval > 0 {
+		return ef.Interval
+	}
+
+	return auraPulse
+}
+
 // auraUpkeepPay is the mana rule of a friendly aura pulse: upkeep and the owed fraction are 24.8 fixed point
 // (1/256 mana). With less mana than the upkeep nothing is paid and ok is false; otherwise the whole mana points
 // the upkeep adds up to leave the pool and the rest is carried to the next pulse.
@@ -642,7 +651,8 @@ func auraUpkeepPay(mana, frac, upkeep int) (newMana, newFrac int, ok bool) {
 }
 
 func (e *Engine) pulseAura(a *auraRun) {
-	a.next = e.frame + auraPulse
+	period := auraPeriodOf(&a.ef)
+	a.next = d2skill.NextPeriodicTick(e.frame, period)
 	ef := &a.ef
 	u := a.u
 
@@ -656,7 +666,7 @@ func (e *Engine) pulseAura(a *auraRun) {
 	}
 
 	hx, hy := u.Pos()
-	until := e.frame + auraPulse + 3
+	until := a.next + 3
 
 	// VERIFIED (SRVDO_065 0x5cd4b0): a player's friendly aura applies its stats only while the mana covers the
 	// upkeep, (lvlmana*(lvl-1)+mana)<<manashift in 24.8, and pays it after a pulse that applied; a pulse
