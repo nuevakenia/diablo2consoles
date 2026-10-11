@@ -4,9 +4,9 @@
 // potion out of the player's belt: the item is cloned to the ground next to
 // the player and removed from the belt, then the belt column is compacted.
 //
-// The package is pure and not yet wired into the combat code
-// (d2core/d2monsters/combat.go has no hit callback table); a caller supplies
-// the roll and the belt.
+// The package is pure. It is wired into the PvP hit path: the victim's client
+// runs Steal on its belt for every hostile hit that connects
+// (d2game/d2player/belt_steal.go, d2gamescreen/belt_steal.go).
 package d2steal
 
 // Belt geometry: sixteen cells, four columns; cell = row*4 + column.

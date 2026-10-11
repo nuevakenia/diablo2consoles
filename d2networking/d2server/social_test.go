@@ -84,6 +84,7 @@ func lastRoster(t *testing.T, c *fakeConn) d2netpacket.RosterUpdatePacket {
 
 func TestServerPartyAndPvP(t *testing.T) {
 	g, a, b := testServer()
+	g.soc.hitQueueOn = true
 
 	// by name, accept, the roster reaches both
 	party(t, g, a, d2netpacket.PartyInvite, "Bob")

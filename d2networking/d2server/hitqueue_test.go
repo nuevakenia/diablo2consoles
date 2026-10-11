@@ -23,6 +23,7 @@ func pvpCount(c *fakeConn) int {
 // yet delivered are removed when he leaves (N16), the others stay in order.
 func TestAttackerLeavingPurgesPendingHits(t *testing.T) {
 	g, a, b := testServer()
+	g.soc.hitQueueOn = true
 	g.socialArea("a", 2)
 	g.socialArea("b", 2)
 

@@ -2,6 +2,7 @@ package d2server
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
@@ -19,12 +20,13 @@ import (
 // heroes' saved containers); the clients resolve their own combat like they do
 // against monsters.
 type social struct {
-	mu      sync.Mutex
-	roster  *d2party.Roster
-	trades  map[string]*d2playertrade.Session // by player id; both traders map to the session
-	portals *d2portal.Registry                // open town portal pairs, one per owner
-	idle    *idleTracker                      // last message time per client (idle.go)
-	hits    *hitQueue                         // PvP hits waiting for the next flush (hitqueue.go)
+	mu         sync.Mutex
+	roster     *d2party.Roster
+	trades     map[string]*d2playertrade.Session // by player id; both traders map to the session
+	portals    *d2portal.Registry                // open town portal pairs, one per owner
+	hitQueueOn bool                              // tests: queue PvP hits without OD2_HITQUEUE
+	idle       *idleTracker                      // last message time per client (idle.go)
+	hits       *hitQueue                         // PvP hits waiting for the next flush (hitqueue.go)
 	// size replaces the item size lookup of the game data (tests).
 	size d2playertrade.Sizer
 }
@@ -291,7 +293,8 @@ func (g *GameServer) onPvPHit(client ClientConnection, packet d2netpacket.NetPac
 		return err
 	}
 
-	if p.Kill { // a death report is not part of the hit sequence
+	// N16 is opt-in (OD2_HITQUEUE=1) until 9f-pvp-skills-ear is green with it
+	if p.Kill || (os.Getenv("OD2_HITQUEUE") == "" && !g.soc.hitQueueOn) { // a death report is not part of the hit sequence
 		return target.SendPacketToClient(pkt)
 	}
 
