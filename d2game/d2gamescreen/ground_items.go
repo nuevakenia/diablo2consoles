@@ -434,9 +434,11 @@ func (v *Game) areaLevel() int {
 		return n
 	}
 
-	if det := v.asset.Records.GetLevelDetails(v.currentLevel()); det != nil {
-		if n := areaMonsterLevel(det, v.difficulty(), v.heroExpansion()); n > 0 {
-			return n
+	if v.asset != nil && v.asset.Records != nil {
+		if det := v.asset.Records.GetLevelDetails(v.currentLevel()); det != nil {
+			if n := areaMonsterLevel(det, v.difficulty(), v.heroExpansion()); n > 0 {
+				return n
+			}
 		}
 	}
 
@@ -449,18 +451,21 @@ func (v *Game) areaLevel() int {
 
 // areaMonsterLevel is the monster level of an area for a difficulty (0 normal,
 // 1 nightmare, 2 hell); 0 when the difficulty is out of range or the table has
-// no level for it (the caller falls back).
+// no level for it (the caller falls back). An expansion game whose Ex column is
+// blank reads the classic column.
 func areaMonsterLevel(l *d2records.LevelDetailRecord, difficulty int, expansion bool) int {
 	if l == nil || difficulty < 0 || difficulty > 2 {
 		return 0
 	}
 
-	by := [3]int{l.MonsterLevelNormal, l.MonsterLevelNightmare, l.MonsterLevelHell}
+	classic := [3]int{l.MonsterLevelNormal, l.MonsterLevelNightmare, l.MonsterLevelHell}
 	if expansion {
-		by = [3]int{l.MonsterLevelNormalEx, l.MonsterLevelNightmareEx, l.MonsterLevelHellEx}
+		if n := [3]int{l.MonsterLevelNormalEx, l.MonsterLevelNightmareEx, l.MonsterLevelHellEx}[difficulty]; n > 0 {
+			return n
+		}
 	}
 
-	return by[difficulty]
+	return classic[difficulty]
 }
 
 // itemFactory returns the item factory of the map engine.

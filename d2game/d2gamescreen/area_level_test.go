@@ -26,6 +26,11 @@ func TestAreaMonsterLevel(t *testing.T) {
 		}
 	}
 
+	blank := &d2records.LevelDetailRecord{MonsterLevelNormal: 5}
+	if got := areaMonsterLevel(blank, 0, true); got != 5 {
+		t.Errorf("blank Ex column: got %d, want the classic 5", got)
+	}
+
 	if got := areaMonsterLevel(nil, 0, false); got != 0 {
 		t.Errorf("nil record: got %d, want 0", got)
 	}
