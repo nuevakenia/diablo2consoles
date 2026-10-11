@@ -371,8 +371,9 @@ type GameControls struct {
 	lastMouseY            int
 	lastLeftBtnActionTime float64
 	watchLog              func(format string, args ...interface{})
-	heroWatch             heroWatch // armed by the test-only heromoved/herostill commands (hero_watch.go)
-	autoHold              *autoHold // a button held by an OD2_AUTOSCRIPT hold: step (synthetic_input.go)
+	heroWatch             heroWatch                 // armed by the test-only heromoved/herostill commands (hero_watch.go)
+	autoHold              *autoHold                 // a button held by an OD2_AUTOSCRIPT hold: step (synthetic_input.go)
+	injector              d2interface.InputInjector // set by the game screen: scripted input goes through the input manager
 	// heldLeftWalk is true while the left button is held down on a click that began as a plain
 	// ground click (a walk or a skill use). Only such a hold repeats; a click that began on an NPC,
 	// object or item interacts once.
@@ -659,6 +660,8 @@ func (g *GameControls) worldClick(button d2enum.MouseButton, mod d2enum.KeyMod, 
 	}
 
 	g.Infof("INPUT world-click button=%d mod=%d action=%s left_skill=%d", button, mod, act, in.LeftSkillID)
+
+	g.watchLogf("WATCH world-click action=%s", act)
 
 	switch act {
 	case WorldAttack:
@@ -977,15 +980,27 @@ func (g *GameControls) onCloseHeroStatsPanel() {
 
 func (g *GameControls) toggleLeftSkillPanel() {
 	if !g.HelpOverlay.IsOpen() {
+		// clearScreen closes the popups too: remember whether this one was open, or the click that should close it reopens it
+		wasOpen := g.hud.skillSelectMenu.LeftPanel.IsOpen()
+
 		g.clearScreen()
-		g.hud.skillSelectMenu.ToggleLeftPanel()
+
+		if !wasOpen {
+			g.hud.skillSelectMenu.OpenLeftPanel()
+		}
 	}
 }
 
 func (g *GameControls) toggleRightSkillPanel() {
 	if !g.HelpOverlay.IsOpen() {
+		// clearScreen closes the popups too: remember whether this one was open, or the click that should close it reopens it
+		wasOpen := g.hud.skillSelectMenu.RightPanel.IsOpen()
+
 		g.clearScreen()
-		g.hud.skillSelectMenu.ToggleRightPanel()
+
+		if !wasOpen {
+			g.hud.skillSelectMenu.OpenRightPanel()
+		}
 	}
 }
 
@@ -1076,7 +1091,9 @@ func (g *GameControls) AutoPanel(name string) error {
 	}
 
 	if !panel.IsOpen() {
-		return fmt.Errorf("panel %q did not open", name)
+		// openLeftPanel/openRightPanel do nothing while the help overlay or the escape menu is showing: say which
+		return fmt.Errorf("panel %q did not open (help=%t escape_menu=%t)", name, g.HelpOverlay.IsOpen(),
+			g.escapeMenu.IsOpen())
 	}
 
 	if name == "character" {
