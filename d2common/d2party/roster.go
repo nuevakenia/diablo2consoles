@@ -578,6 +578,10 @@ type Info struct {
 	Party     int         `json:"party,omitempty"`
 	Hostile   []string    `json:"hostile,omitempty"`
 	InvitedBy string      `json:"invitedBy,omitempty"`
+	// Rel is this player's relation list: one node per other player (id) with
+	// the "other is in a party" bit, which the server sends to this player's
+	// client as packet 0x8B (PLAYER_SendPartyRelationUpdate 0x559210).
+	Rel map[string]bool `json:"rel,omitempty"`
 }
 
 // Snapshot is the whole roster as it travels from the server to the clients.
@@ -603,6 +607,14 @@ func (r *Roster) Snapshot() Snapshot {
 
 		for h := range e.hostile {
 			in.Hostile = append(in.Hostile, h)
+		}
+
+		for other, n := range e.rel {
+			if in.Rel == nil {
+				in.Rel = map[string]bool{}
+			}
+
+			in.Rel[other] = n.OtherInParty
 		}
 
 		sort.Strings(in.Hostile)

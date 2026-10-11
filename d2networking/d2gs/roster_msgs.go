@@ -321,3 +321,37 @@ func ParseEventMessage(b []byte) (EventMessage, error) {
 
 	return m, nil
 }
+
+// S2CPartyState is the id of the party relation update (see PartyState).
+const S2CPartyState byte = 0x8b // size 6, handler 0x45a1b0 -> ROSTER_SetPartyStateFromPacket 0x476040
+
+// PartyState is S2C 0x8b (6 bytes): u32 unit id @1 of the OTHER player, u8
+// state @5. Verified in Game.exe: the sender PLAYER_SendPartyRelationUpdate
+// (0x559210) looks up the owner's relation node for the other unit, and the
+// builder (0x53bb90) writes the other unit's id and the byte at node+0xc (the
+// "other is in a party" bit, d2party.Relation.OtherInParty) to the OWNER's
+// client; the handler stores the byte in the roster entry of that unit
+// (dwPartyState) and rebuilds the party list UI. The bit's meaning beyond
+// 0/1 is UNVERIFIED.
+type PartyState struct {
+	UnitID uint32
+	State  uint8
+}
+
+// Marshal returns the packet.
+func (m PartyState) Marshal() []byte {
+	b := newW(S2CPartyState, 6)
+	b.u32(1, m.UnitID)
+	b[5] = m.State
+
+	return b
+}
+
+// ParsePartyState decodes a 0x8b packet.
+func ParsePartyState(b []byte) (PartyState, error) {
+	if len(b) != 6 || b[0] != S2CPartyState {
+		return PartyState{}, ErrWrongSize
+	}
+
+	return PartyState{UnitID: rbuf(b).u32(1), State: b[5]}, nil
+}
