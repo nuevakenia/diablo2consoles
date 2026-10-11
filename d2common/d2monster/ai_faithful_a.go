@@ -126,9 +126,10 @@ func (c *Ctx) setState(state int, on bool) {
 	}
 }
 
-// walkNoTarget is MONAI_WalkNoTarget 0x5ddac0: queue a walk with neither
-// coordinates nor a unit to path to. The port walks to the target (UNVERIFIED).
-func (c *Ctx) walkNoTarget(t Target) bool { return c.WalkTo(t, 0) }
+// walkNoTarget is MONAI_WalkNoTarget 0x5ddac0 (VERIFIED w20): a queued move
+// command of type 2 to the given unit with distance limit 1 and flags 0, i.e.
+// WalkToTargetWithin(target, 1).
+func (c *Ctx) walkNoTarget(t Target) bool { return c.WalkTo(t, 1) }
 
 // pre runs a pre-hook once, at the first think after SetAI (the exe runs it
 // from MONAI_SetAiState).

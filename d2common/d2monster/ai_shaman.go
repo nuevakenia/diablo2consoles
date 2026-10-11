@@ -24,6 +24,19 @@ type CorpseFinder interface {
 	NearestCorpse(b *Brain, classes []int, maxDist int) (Target, bool)
 }
 
+// ShamanCorpseScanner is the exe corpse scan of the Fallen Shaman (w20, VERIFIED
+// in 0x5f04d0 / 0x5f0420 / 0x5dbae0 / 0x5dbda0). radiusSq is aip4 squared. The
+// host returns the LAST qualifying unit of its walk and the number of all
+// qualifying units. The exe picks the family scan (Fallen and Fallen Shaman
+// corpses anywhere in the radius, no unique or champion corpse) only when the
+// shaman itself is a unique and not a champion; every other shaman scans the
+// group of its leader for dead followers whose leader is the shaman, by EDGE
+// distance compared with the squared radius (a quirk of the exe: one block holds
+// the squared value for both callbacks).
+type ShamanCorpseScanner interface {
+	ShamanCorpseScan(b *Brain, radiusSq int) (Target, int)
+}
+
 // thinkFallenShaman is MONAI_Think_FallenShaman 0x5f04d0 (VERIFIED, re-read:
 // the roll order below is the decompiled one). aip1 resurrect%, aip2 fire%,
 // aip3 melee%, aip4 corpse search radius, aip5 fire range. Slots: Skill1
@@ -45,7 +58,12 @@ func thinkFallenShaman(c *Ctx) {
 
 	var corpse *Target
 
-	if cf, ok := c.W.(CorpseFinder); ok {
+	// w20: the exe scan (squared aip4, last unit of the walk wins) when the host has it.
+	if sc, ok := c.W.(ShamanCorpseScanner); ok {
+		if ct, n := sc.ShamanCorpseScan(b, b.AIP(4)*b.AIP(4)); n > 0 {
+			corpse = &ct
+		}
+	} else if cf, ok := c.W.(CorpseFinder); ok {
 		if ct, found := cf.NearestCorpse(b, shamanCorpseClasses, b.AIP(4)); found {
 			corpse = &ct
 		}

@@ -108,7 +108,7 @@ func TestFaithfulAActions(t *testing.T) {
 		{name: "scimitar approaches by range", ai: "FlyingScimitar", aip: []int{100, 0, 3, 0}, dist: 6, log: "walk-to(104,100)"},
 		{name: "scimitar attacks", ai: "FlyingScimitar", aip: []int{0, 100, 3, 0}, dist: 1, inRange: true, log: "attack4"},
 		{name: "scimitar stalls aip3", ai: "FlyingScimitar", aip: []int{0, 0, 3, 0}, dist: 1, inRange: true, wake: 3},
-		{name: "blood lord approaches", ai: "BloodLord", aip: []int{0, 100, 0, 4}, dist: 6, log: "walk-target/0"},
+		{name: "blood lord approaches", ai: "BloodLord", aip: []int{0, 100, 0, 4}, dist: 6, log: "walk-target/1"},
 		{name: "blood lord casts skill", ai: "BloodLord", skills: []int{0}, aip: []int{100, 0, 100, 4}, dist: 1, inRange: true, log: "cast0"},
 		{name: "blood lord attacks", ai: "BloodLord", aip: []int{100, 0, 0, 4}, dist: 1, inRange: true, log: "attack4"},
 		{name: "clawviper in range stalls aip5", ai: "ClawViper", aip: []int{0, 0, 0, 0, 6}, dist: 1, inRange: true, wake: 6},

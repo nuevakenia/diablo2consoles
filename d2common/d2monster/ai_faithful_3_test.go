@@ -369,7 +369,7 @@ func TestDruidBear(t *testing.T) {
 	w.inRange, w.log, b.Wake = false, nil, 0
 	Tick(w, b)
 
-	if w.last() != "walk-target/0" {
+	if w.last() != "walk-target/1" {
 		t.Fatalf("approach: %v", w.log)
 	}
 
