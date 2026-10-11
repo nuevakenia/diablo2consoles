@@ -821,6 +821,19 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 		opt.Tag = stat.Key // the tag petworld.go gives such minions
 	}
 
+	for _, m := range o.Passives { // the summon's passive monster skills (Valkyrie)
+		switch m.Stat {
+		case "passive_dodge":
+			opt.Dodge += m.Value
+		case "passive_avoid":
+			opt.Avoid += m.Value
+		case "passive_evade":
+			opt.Evade += m.Value
+		case "passive_critical_strike":
+			opt.Crit += m.Value
+		}
+	}
+
 	for _, m := range o.Stats {
 		switch m.Stat {
 		case "damagepercent":

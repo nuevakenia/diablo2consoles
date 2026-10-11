@@ -94,10 +94,12 @@ type Skill struct {
 
 	// Summons (class skills): the monstats key, pet type group, mode and the
 	// monster skills the summon uses.
-	Summon       string
-	PetType      string
-	SumMode      string
-	SumSkill     [6]string // 1-based
+	Summon   string
+	PetType  string
+	SumMode  string
+	SumSkill [6]string // 1-based
+	// SumSkCalc is the level each monster skill is given (sumsk1calc..sumsk5calc, 1-based).
+	SumSkCalc    [6]*d2calc.Program
 	TargetCorpse bool
 	Periodic     bool
 	PerDelay     *d2calc.Program

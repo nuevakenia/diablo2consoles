@@ -39,7 +39,9 @@ func skillFromRow(r row) *Skill {
 	}
 	s.SrvMissileB, s.SrvMissileC = r["srvmissileb"], r["srvmissilec"]
 	s.CharClass, s.Summon, s.PetType, s.SumMode = r["charclass"], r["summon"], r["pettype"], r["summode"]
-	s.SumSkill[1] = r["sumskill1"]
+	for i := 1; i <= 5; i++ {
+		s.SumSkill[i], s.SumSkCalc[i] = r["sumskill"+strconv.Itoa(i)], r.calc("sumsk"+strconv.Itoa(i)+"calc")
+	}
 	s.TargetCorpse, s.Aura, s.PetMax = r.num("TargetCorpse") > 0, r.num("aura") > 0, r.calc("petmax")
 
 	for i := 1; i <= 8; i++ {
