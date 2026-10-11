@@ -453,6 +453,13 @@ func (c *Ctx) diabloMelee(t Target) bool {
 
 // diabloCandidates returns the candidates, scored.
 func (c *Ctx) diabloPick(anchor *Command) (best *Target, score, count int, bestStats DiaStats) {
+	return c.pickAway(anchor, diabloAway)
+}
+
+// pickAway is the scorer shared by Diablo (leash 0x55) and the Baal crab
+// (MONAI_BaalCrab_ScoreTargetResists 0x5fac60, the same formula with leash
+// 0x4b, VERIFIED w20).
+func (c *Ctx) pickAway(anchor *Command, away int) (best *Target, score, count int, bestStats DiaStats) {
 	b := c.B
 
 	var cands []DiaCandidate
@@ -468,7 +475,7 @@ func (c *Ctx) diabloPick(anchor *Command) (best *Target, score, count int, bestS
 		cands = []DiaCandidate{{Target: *c.Target, Stats: st}}
 	}
 
-	selfAway := anchor != nil && b.DistanceTo(anchor.X, anchor.Y) > diabloAway
+	selfAway := anchor != nil && b.DistanceTo(anchor.X, anchor.Y) > away
 
 	for i := range cands {
 		cd := cands[i]
@@ -479,7 +486,7 @@ func (c *Ctx) diabloPick(anchor *Command) (best *Target, score, count int, bestS
 		if !cd.Dead {
 			leash := false
 			if anchor != nil && selfAway {
-				leash = EdgeDistance(cd.Target.X-anchor.X, cd.Target.Y-anchor.Y, cd.Target.Size) < diabloAway
+				leash = EdgeDistance(cd.Target.X-anchor.X, cd.Target.Y-anchor.Y, cd.Target.Size) < away
 			}
 
 			s = DiabloScore(cd.Stats, c.diabloMelee(cd.Target), !c.lineBlocked(cd.Target, 4), leash)

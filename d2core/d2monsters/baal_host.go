@@ -55,7 +55,7 @@ func (d *Director) BaalSituation(b *d2monster.Brain, s *d2monster.BaalSituation)
 
 	s.Clones = d.liveSummons(b.ID, baalCloneKey)
 
-	var heroes, near int
+	var near int
 
 	ax, ay, hasAnchor := baalAnchor(b)
 
@@ -64,8 +64,6 @@ func (d *Director) BaalSituation(b *d2monster.Brain, s *d2monster.BaalSituation)
 		if p == nil || !d.targetable(p) {
 			continue
 		}
-
-		heroes++
 
 		x, y := playerSubtile(p)
 		if d2monster.Distance(b.X-x, b.Y-y) <= d2monster.BaalFarDist {
@@ -81,12 +79,9 @@ func (d *Director) BaalSituation(b *d2monster.Brain, s *d2monster.BaalSituation)
 		s.Targets = near
 	}
 
-	s.Nearby = heroes
-
-	if hasAnchor {
-		s.Far, s.VeryFar = d2monster.BaalHomeFlags(d2monster.Distance(b.X-ax, b.Y-ay))
-	}
-
+	// w20: Nearby (the difficulty clamped to 2) and Far / VeryFar (the TARGET's
+	// edge distance to the anchor) are computed by the AI itself (baalDecide),
+	// VERIFIED against 0x5fb830 / 0x5fb630; the host no longer overrides them.
 	if b.HasTarget {
 		if p := d.playerFor(b.TargetID); p != nil {
 			s.Flag1 = heroDangerous(p)

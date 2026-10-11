@@ -1484,9 +1484,27 @@ func (c *Ctx) ancientBusy() bool {
 	return false
 }
 
-// ancientTarget is MONAI_Diablo_FindBestTarget (callback 0x5edc20): the port
-// uses the shared attack-target scan (UNVERIFIED filter).
-func ancientTarget(c *Ctx) (Target, int, bool) {
+// ancientTarget is MONAI_Diablo_FindBestTarget 0x5e7ec0 with the callback at
+// 0x5edc20 (VERIFIED w20): the callback accepts a hero standing on the same
+// level as the Ancient, the scan keeps the best MONAI_Diablo_ScoreTargetResists
+// score (0x5e7420, ported as DiabloScore) and no anchor leash applies (the
+// anchor argument is 0). State A tries the attack target first (preferTick);
+// states B and C always scan. Without a DiabloTargetSource the shared
+// attack-target lookup stands in (UNVERIFIED filter and scoring).
+func ancientTarget(c *Ctx, preferTick bool) (Target, int, bool) {
+	if preferTick && c.Target != nil {
+		return *c.Target, c.Dist, true
+	}
+
+	if _, ok := c.W.(DiabloTargetSource); ok {
+		best, _, _, _ := c.pickAway(nil, diabloAway)
+		if best == nil {
+			return Target{}, 0, false
+		}
+
+		return *best, c.B.DistanceTo(best.X, best.Y), true
+	}
+
 	if c.Target != nil {
 		return *c.Target, c.Dist, true
 	}
@@ -1519,7 +1537,7 @@ func ancientStateA(c *Ctx) {
 		return
 	}
 
-	t, d, ok := ancientTarget(c)
+	t, d, ok := ancientTarget(c, true)
 	if !ok {
 		c.Sleep(25)
 
@@ -1569,7 +1587,7 @@ func ancientStateA(c *Ctx) {
 func ancientStateB(c *Ctx) {
 	b := c.B
 
-	t, d, ok := ancientTarget(c)
+	t, d, ok := ancientTarget(c, false)
 	if c.ancientBusy() || !ok {
 		c.Sleep(25)
 
@@ -1584,7 +1602,9 @@ func ancientStateB(c *Ctx) {
 		return
 	}
 
-	if c.skill(slotA) && b.Roll(100) < b.AIP(3) && c.Cast(slotA, c.self()) {
+	// The skill's aurastate on the caster and auratargetstate on the target
+	// are tested first (VERIFIED w20, state ids from 1), then the aip3 roll.
+	if c.skill(slotA) && c.skillStatesFree(slotA, t, 1) && b.Roll(100) < b.AIP(3) && c.Cast(slotA, c.self()) {
 		return
 	}
 
@@ -1608,7 +1628,7 @@ func ancientStateC(c *Ctx) {
 		return
 	}
 
-	t, d, ok := ancientTarget(c)
+	t, d, ok := ancientTarget(c, false)
 	if !ok {
 		c.Sleep(25)
 
