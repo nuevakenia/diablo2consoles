@@ -66,6 +66,9 @@ type Event struct {
 	// Wielded is the item code of the weapon in the hero's hand (the Compelling Orb wants Khalim's Will wielded,
 	// VERIFIED 0x5b9550: INV_GetSelectedWeapon, item code "qf2 ").
 	Wielded string
+	// Freed is the number of barbarians a destroyed prison door freed (Rescue on Mount Arreat); 0 means a full
+	// group of five.
+	Freed int
 }
 
 // EffectKind says what the engine has to do.

@@ -79,6 +79,9 @@ type rewardCase struct {
 	// instant marks a quest the exe pays and completes in one step: the claim sets the done bits and never leaves reward
 	// pending in the record (Lam Esen's Tome, VERIFIED 0x5b53e0 + 0x5b5220).
 	instant bool
+	// held marks a quest whose thanks line keeps the reward pending until an NPC acts on an item (Siege: Larzuk's
+	// sockets, VERIFIED 0x584d60 + 0x5856a0); afterClaim then completes it.
+	held bool
 }
 
 func claimBy(npc int) func(g *Game) []Effect {
@@ -164,23 +167,28 @@ func rewardCases() []rewardCase {
 			claim: func(g *Game) []Effect { return g.Hear(NPCTyrael2, 676) },
 		},
 		{
-			name: "Prison of Ice", id: QuestPrison, town: LevelHarrogath,
+			name: "Prison of Ice (Malah's scroll + Anya's item, then the scroll pays the resistances)", id: QuestPrison, town: LevelHarrogath,
 			want: rewardTally{},
 			drive: func(g *Game) {
 				moveTo(g, 1, LevelHarrogath)
 				talk(g, NPCMalah)
 				moveTo(g, LevelHarrogath, LevelFrozenRiver)
 				talk(g, NPCAnyaFrozen)
-				pickup(g, ItemMalahScroll)
-				g.Dispatch(Event{Kind: EvItemRemoved, Item: ItemMalahScroll})
+				pickup(g, ItemDefrostPotion)
+				g.Dispatch(Event{Kind: EvObjectOperated, Object: ObjectFrozenAnya, Level: LevelFrozenRiver})
 				moveTo(g, LevelFrozenRiver, LevelHarrogath)
 			},
-			claim:      claimBy(NPCMalah),
+			claim: func(g *Game) []Effect {
+				_, eff := talk(g, NPCMalah)
+				_, eff2 := talk(g, NPCDrehya)
+
+				return append(eff, eff2...)
+			},
 			afterClaim: func(g *Game) []Effect { return g.ReadScrollOfResistance() },
 			afterWant:  rewardTally{"resist-bonus": 10},
 		},
 		{
-			name: "Siege (sockets, no points)", id: QuestSiege, town: LevelHarrogath,
+			name: "Siege (sockets, no points)", id: QuestSiege, town: LevelHarrogath, held: true,
 			want: rewardTally{"socket-quest": 1},
 			drive: func(g *Game) {
 				moveTo(g, 1, LevelHarrogath)
@@ -189,7 +197,8 @@ func rewardCases() []rewardCase {
 				g.Dispatch(Event{Kind: EvMonsterKilled, Monster: 999, Super: "Shenk the Overseer", Level: LevelBloodyFoothills})
 				moveTo(g, LevelBloodyFoothills, LevelHarrogath)
 			},
-			claim: claimBy(NPCLarzuk),
+			claim:      claimBy(NPCLarzuk),
+			afterClaim: func(g *Game) []Effect { return g.ClaimSocket() },
 		},
 	}
 }
@@ -224,7 +233,11 @@ func TestRewardOnceAtClaim(t *testing.T) {
 				t.Fatalf("claim paid %v, want %v", got, c.want)
 			}
 
-			if !g.get(q, FlagRewardGranted) || g.get(q, FlagRewardPending) {
+			if c.held {
+				if g.get(q, FlagRewardGranted) || !g.get(q, FlagRewardPending) {
+					t.Fatalf("a held thanks line must keep the reward pending: %s", g.Describe(q))
+				}
+			} else if !g.get(q, FlagRewardGranted) || g.get(q, FlagRewardPending) {
 				t.Fatalf("after the claim: %s", g.Describe(q))
 			}
 
@@ -241,6 +254,10 @@ func TestRewardOnceAtClaim(t *testing.T) {
 				if got := tally(c.afterClaim(g)); len(got) != 0 {
 					t.Errorf("after-claim grant repeated: %v", got)
 				}
+			}
+
+			if !g.get(q, FlagRewardGranted) || g.get(q, FlagRewardPending) {
+				t.Fatalf("after the whole reward: %s", g.Describe(q))
 			}
 		})
 	}
@@ -313,6 +330,10 @@ func TestRewardSurvivesDeathBeforeClaim(t *testing.T) {
 
 			if got := tally(c.claim(g)); !got.equal(c.want) {
 				t.Fatalf("claim after reload paid %v, want %v (%s)", got, c.want, g.Describe(q))
+			}
+
+			if c.held {
+				c.afterClaim(g)
 			}
 
 			if !g.get(q, FlagRewardGranted) || g.get(q, FlagRewardPending) {

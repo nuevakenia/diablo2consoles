@@ -53,6 +53,8 @@ func (v *Game) applyQuestReward(e d2quest.Effect) {
 			note += fmt.Sprintf(" now fire=%d cold=%d light=%d poison=%d",
 				st.Totals.ResistShown[0], st.Totals.ResistShown[1], st.Totals.ResistShown[2], st.Totals.ResistShown[3])
 		}
+	case o.Experience != 0:
+		note = v.grantQuestExperience(o.Experience)
 	case o.PendingSocket:
 		note = "Larzuk waits for an item (click him with an item on the cursor, or the Add Sockets row)"
 
@@ -75,6 +77,31 @@ func (v *Game) applyQuestReward(e d2quest.Effect) {
 	}
 
 	v.Infof("QUEST EFFECT reward %s value=%d (%s) %s", e.Code, e.Value, e.Note, note)
+}
+
+// grantQuestExperience adds a quest's experience reward the way Rite of Passage does (VERIFIED Game.exe
+// 0x58a3d0): the amount is capped to the experience span of the hero's current level, so the reward is at most one
+// level; the level-up itself follows in advanceHeroLevel.
+func (v *Game) grantQuestExperience(amount int) string {
+	st := v.localPlayer.Stats
+	recs := v.asset.Records
+	class := v.localPlayer.Class
+
+	maxLevel := recs.GetMaxLevelByHero(class)
+	if st.Level >= maxLevel {
+		return "already at the maximum level"
+	}
+
+	span := recs.GetExperienceBreakpoint(class, st.Level) - recs.GetExperienceBreakpoint(class, st.Level-1)
+	if span > 0 && amount > span {
+		amount = span
+	}
+
+	before := st.Experience
+	st.Experience += amount
+	v.advanceHeroLevel()
+
+	return fmt.Sprintf("experience %d -> %d (+%d, level %d)", before, st.Experience, amount, st.Level)
 }
 
 // recalcHero recomputes the hero's derived stats after a permanent bonus; it
@@ -129,7 +156,7 @@ func (v *Game) applyItemRewardTo(kind string, target *diablo2item.Item) (string,
 
 	switch kind {
 	case "socket":
-		if r.rewards.SocketPending <= 0 {
+		if !v.itemRewardOwed(d2reward.KindSocket) {
 			return "", fmt.Errorf("Larzuk owes no sockets")
 		}
 
@@ -146,13 +173,18 @@ func (v *Game) applyItemRewardTo(kind string, target *diablo2item.Item) (string,
 
 		n, _ := d2reward.LarzukSockets(it.SocketInfo(), rand.Intn)
 		it.SetNumSockets(n)
-		r.rewards.SocketPending--
+
+		if r.rewards.SocketPending > 0 {
+			r.rewards.SocketPending--
+		}
+
+		v.applyQuestEffects(r.g.ClaimSocket()) // VERIFIED 0x5856a0: the action completes the Siege quest
 		v.gameControls.SaveItems()
 		v.Infof("REWARD socket item=%s sockets=%d difficulty=%d pending=%d", it.CommonCode, n, diff, r.rewards.SocketPending)
 
 		return fmt.Sprintf("%s now has %d sockets", it.CommonCode, n), nil
 	case "personalize":
-		if r.rewards.PersonalizePending <= 0 {
+		if !v.itemRewardOwed(d2reward.KindPersonalize) {
 			return "", fmt.Errorf("Anya owes no personalisation")
 		}
 
@@ -166,7 +198,12 @@ func (v *Game) applyItemRewardTo(kind string, target *diablo2item.Item) (string,
 		}
 
 		it.SetPersonalName(v.localPlayer.Name())
-		r.rewards.PersonalizePending--
+
+		if r.rewards.PersonalizePending > 0 {
+			r.rewards.PersonalizePending--
+		}
+
+		v.applyQuestEffects(r.g.ClaimPersonalize())
 		v.gameControls.SaveItems()
 		v.Infof("REWARD personalize item=%s name=%q pending=%d", it.CommonCode, it.Label(), r.rewards.PersonalizePending)
 

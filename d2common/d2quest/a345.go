@@ -281,92 +281,10 @@ func newSiege() *Quest {
 			{ev: EvMonsterKilled, super: "Shenk the Overseer", goal: true},
 		},
 		// VERIFIED (Game.exe 0x584d60, msg 20090 = 0x4e7a): the ack clears the progress bits and sets bit 5; it
-		// does not set RG or clear RP itself (UNRESOLVED: where the socketing action sets RG; kept at the claim).
+		// does not set RG or clear RP itself. VERIFIED (0x5856a0, called by Larzuk's item action): the socketing
+		// sets bit 0 and clears bit 1 of slot 35 (Game.ClaimSocket); the action needs only RP (SocketOwed).
+		hold:    true,
 		claimFx: fxs(reward("socket-quest", 1, "Larzuk adds sockets to one item")),
-	})
-}
-
-// A5Q2 Rescue on Mount Arreat (Qual-Kehk): free the barbarian groups by
-// killing the demons at their prison doors (class 434, three groups).
-// UNVERIFIED: the count and the Frigid Highlands level.
-func newRescue() *Quest {
-	return newSpecQuest(&spec{
-		id: QuestRescue, slot: 36, act: 4, logIndex: 2, name: "Rescue on Mount Arreat", label: "A5Q2",
-		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
-		steps: []step{{from: 1, npc: NPCQualKehk, msg: 20096, to: 2}},
-		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelFrigidHighlands, max: 3, to: 3},
-			{ev: EvMonsterKilled, monster: NPCPrisonDoor, count: 3, goal: true},
-		},
-		claimFx: fxs(reward("hire-barbarians", 0, "Qual-Kehk's barbarian mercenaries become hirable")),
-	})
-}
-
-// A5Q3 Prison of Ice (Malah): find the frozen Anya, get Malah's scroll, read
-// it. Reading the scroll (it leaves the inventory) completes the goal.
-// UNVERIFIED: level 114 and the scroll flow.
-func newPrison() *Quest {
-	give := func(g *Game, q *Quest) []Effect {
-		return []Effect{{Kind: EffectSpawn, Quest: q.ID, Code: ItemMalahScroll, Note: "Malah's Scroll of Resistance"}}
-	}
-
-	return newSpecQuest(&spec{
-		id: QuestPrison, slot: 37, act: 4, logIndex: 3, name: "Prison of Ice", label: "A5Q3",
-		start: 1, goal: 6, tbl: map[int]int{1: 0, 2: 1, 3: 2, 4: 3, 5: 4}, rp: 5, done: 6,
-		steps: []step{
-			{from: 1, npc: NPCMalah, msg: 20116, to: 2},
-			{from: 4, npc: NPCMalah, msg: 20127, to: 5, fx: give},
-			{from: 4, npc: NPCAnyaFrozen, msg: 20131, to: 5, fx: give},
-		},
-		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelFrozenRiver, max: 3, to: 4},
-			{ev: EvItemRemoved, item: ItemMalahScroll, min: 5, max: 5, goal: true},
-		},
-		// VERIFIED (Game.exe 0x587460): the claim pays no resistance; Malah's line gives the Scroll of Resistance
-		// (tr2) and sets bit 8; the +10 comes from reading it (ReadScrollOfResistance). UNRESOLVED: the original
-		// needs both Malah's scroll and Anya's item (msg 20136) before RG is set, and Malah's "ice" potion
-		// (msg 20127) thaws Anya; this flow still follows the earlier approximation.
-		claimFx: func(g *Game, q *Quest) []Effect {
-			g.set(q, FlagCustom4, "Malah's scroll given")
-
-			return []Effect{{Kind: EffectSpawn, Quest: q.ID, Code: ItemMalahScroll, Note: "Malah gives the Scroll of Resistance"}}
-		},
-	})
-}
-
-// A5Q4 Betrayal of Harrogath (Anya): Nihlathak in his temple. UNVERIFIED:
-// level 121 and class 526; the reward is Anya personalising an item.
-func newBetrayal() *Quest {
-	return newSpecQuest(&spec{
-		id: QuestBetrayal, slot: 38, act: 4, logIndex: 4, name: "Betrayal of Harrogath", label: "A5Q4",
-		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
-		steps: []step{{from: 1, npc: NPCDrehya, msg: 20137, to: 2}},
-		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelNihlathakTemple, max: 3, to: 3},
-			{ev: EvMonsterKilled, monster: NPCNihlathakBoss, goal: true},
-		},
-		claimFx: fxs(reward("personalize", 1, "Anya personalises one item")),
-	})
-}
-
-// A5Q5 Rite of Passage (Qual-Kehk): the three Ancients on Mount Arreat; the
-// statues speak when the quest reached the summit. UNVERIFIED: classes 540-542.
-func newRite() *Quest {
-	return newSpecQuest(&spec{
-		id: QuestRite, slot: 39, act: 4, logIndex: 5, name: "Rite of Passage", label: "A5Q5",
-		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 5, done: 3,
-		steps: []step{{from: 1, npc: NPCQualKehk, msg: 20153, to: 2}},
-		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelArreatSummit, max: 3, to: 3},
-			{ev: EvMonsterKilled, monsters: []int{NPCAncient1, NPCAncient2, NPCAncient3}, count: 3, goal: true},
-		},
-		extra: func(g *Game, q *Quest, npc int) []Speech {
-			if q.State == 3 && npc >= NPCAncientStatue1 && npc <= NPCAncientStatue3 {
-				return q.pick(npc, 4)
-			}
-
-			return nil
-		},
 	})
 }
 

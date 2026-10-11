@@ -32,7 +32,18 @@ func (v *Game) itemRewardOwed(k d2reward.ItemKind) bool {
 		return false
 	}
 
-	return d2reward.OwedFrom(&r.rewards, v.imbueOwed()).Of(k)
+	owed := d2reward.OwedFrom(&r.rewards, v.imbueOwed())
+
+	// the quest record is the truth: Larzuk and Anya act while Siege / Betrayal are reward pending (VERIFIED
+	// 0x577b70: only that record bit is tested), also after a reload when the session counters are gone
+	switch k {
+	case d2reward.KindSocket:
+		return owed.Of(k) || (r.g != nil && r.g.SocketOwed())
+	case d2reward.KindPersonalize:
+		return owed.Of(k) || (r.g != nil && r.g.PersonalizeOwed())
+	}
+
+	return owed.Of(k)
 }
 
 // withRewardRows adds the reward rows of the NPC to its menu: Akara's reset

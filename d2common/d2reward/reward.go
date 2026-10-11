@@ -31,6 +31,7 @@ type Outcome struct {
 	Hire               string // "ironwolves" or "barbarians": the mercenaries become hirable
 	UnlockDifficulty   bool
 	GameComplete       bool
+	Experience         int // experience to add, capped by the engine to the span of the current level (Rite of Passage)
 	Log                string
 }
 
@@ -74,6 +75,8 @@ func (s *State) Apply(e d2quest.Effect) Outcome {
 
 		s.Hired[who] = true
 		o.Hire = who
+	case "experience":
+		o.Experience = e.Value
 	case "unlock-difficulty":
 		s.DifficultyUnlocked = true
 		o.UnlockDifficulty = true

@@ -673,147 +673,341 @@ func TestAct4QuestLine(t *testing.T) {
 	}
 }
 
+func giveCodes(effects []Effect) []string {
+	var out []string
+
+	for _, e := range effects {
+		if e.Kind == EffectGiveItem {
+			out = append(out, e.Code)
+		}
+	}
+
+	return out
+}
+
 func TestAct5QuestLine(t *testing.T) {
 	g, _ := newGame(t)
 
 	moveTo(g, 1, LevelHarrogath)
 
-	type stage struct {
-		id      int
-		giver   int
-		area    int
-		kills   []int
-		claimBy int
-		reward  string
+	// Siege on Harrogath: the thanks (20090) leave the reward pending; Larzuk's sockets complete it
+	siege := g.Quest(QuestSiege)
+
+	if msgs, _ := talk(g, NPCLarzuk); !contains2(msgs, 20077) || siege.State != 2 {
+		t.Fatalf("Larzuk: %v %s", msgs, g.Describe(siege))
 	}
 
-	stages := []stage{
-		{QuestSiege, NPCLarzuk, LevelBloodyFoothills, nil, NPCLarzuk, "socket-quest"},
-		{QuestRescue, NPCQualKehk, LevelFrigidHighlands, []int{NPCPrisonDoor, NPCPrisonDoor, NPCPrisonDoor}, NPCQualKehk,
-			"hire-barbarians"},
-		{QuestBetrayal, NPCDrehya, LevelNihlathakTemple, []int{NPCNihlathakBoss}, NPCDrehya, "personalize"},
-		{QuestRite, NPCQualKehk, LevelArreatSummit, []int{NPCAncient1, NPCAncient2, NPCAncient3}, NPCMalah, ""},
+	moveTo(g, LevelHarrogath, LevelBloodyFoothills)
+
+	if siege.State != 3 || !g.get(siege, FlagEnterArea) {
+		t.Fatalf("foothills %s", g.Describe(siege))
 	}
 
-	for _, s := range stages {
-		q := g.Quest(s.id)
+	g.Dispatch(Event{Kind: EvMonsterKilled, Monster: 999, Super: "Shenk the Overseer", Level: LevelBloodyFoothills})
 
-		// the giver may already have been talked to by an earlier claim
-		msgs, _ := talk(g, s.giver)
-		if q.State < 2 || (q.State == 2 && len(msgs) == 0 && !g.get(q, FlagStarted)) {
-			t.Fatalf("%s giver: %v %s", q.Label, msgs, g.Describe(q))
-		}
-
-		if !g.get(q, FlagStarted) {
-			t.Fatalf("%s: %s", q.Label, g.Describe(q))
-		}
-
-		moveTo(g, LevelHarrogath, s.area)
-
-		if q.State != 3 || !g.get(q, FlagEnterArea) {
-			t.Fatalf("%s area: %s", q.Label, g.Describe(q))
-		}
-
-		if s.id == QuestSiege {
-			g.Dispatch(Event{Kind: EvMonsterKilled, Monster: 999, Super: "Shenk the Overseer", Level: s.area})
-		}
-
-		for i, k := range s.kills {
-			if i < len(s.kills)-1 && g.get(q, FlagRewardPending) {
-				t.Fatalf("%s: goal after %d kills", q.Label, i)
-			}
-
-			kill(g, k, s.area)
-		}
-
-		if !g.get(q, FlagRewardPending) || !g.get(q, FlagPrimaryGoal) {
-			t.Fatalf("%s goal: %s", q.Label, g.Describe(q))
-		}
-
-		moveTo(g, s.area, LevelHarrogath)
-
-		if !g.Marker(s.claimBy) {
-			t.Errorf("%s: no marker on NPC %d", q.Label, s.claimBy)
-		}
-
-		_, eff := talk(g, s.claimBy)
-		if !g.get(q, FlagRewardGranted) || g.get(q, FlagRewardPending) {
-			t.Fatalf("%s claim: %s", q.Label, g.Describe(q))
-		}
-
-		if s.reward != "" && !effectCode(eff, EffectReward, s.reward) {
-			t.Errorf("%s: no reward %s in %+v", q.Label, s.reward, eff)
-		}
+	if !g.get(siege, FlagRewardPending) || !g.SocketOwed() {
+		t.Fatalf("Shenk %s", g.Describe(siege))
 	}
 
-	// Eve of Destruction opened with the Rite of Passage
-	eve := g.Quest(QuestEve)
-	if eve.State != 1 {
-		t.Fatalf("eve %s", g.Describe(eve))
+	moveTo(g, LevelBloodyFoothills, LevelHarrogath)
+
+	if !g.Marker(NPCLarzuk) {
+		t.Error("no marker on Larzuk")
 	}
 
-	moveTo(g, LevelHarrogath, LevelWorldstone1)
-	moveTo(g, LevelWorldstone1, LevelThrone)
-	// Baal's death counts only in the Worldstone Chamber (exe 0x58bae0); in the throne room it changes nothing
-	if eff := kill(g, NPCBaalCrab, LevelThrone); g.get(eve, FlagRewardGranted) || effectCode(eff, EffectReward, "unlock-difficulty") {
-		t.Fatalf("baal killed in the throne room: %s", g.Describe(eve))
+	_, eff := talk(g, NPCLarzuk)
+	if g.get(siege, FlagRewardGranted) || !g.get(siege, FlagRewardPending) || !g.get(siege, FlagCustom1) || g.get(siege, FlagStarted) ||
+		!g.SocketOwed() {
+		t.Fatalf("Larzuk's thanks must keep the reward pending (VERIFIED 0x584d60): %s", g.Describe(siege))
 	}
 
-	moveTo(g, LevelThrone, LevelWorldstoneChamber)
-
-	eff := kill(g, NPCBaalCrab, LevelWorldstoneChamber)
-	if g.get(eve, FlagRewardPending) || !g.get(eve, FlagRewardGranted) || !g.get(eve, FlagPrimaryGoal) ||
-		!effectCode(eff, EffectReward, "unlock-difficulty") {
-		t.Fatalf("baal %s %+v", g.Describe(eve), eff)
+	if !effectCode(eff, EffectReward, "socket-quest") {
+		t.Errorf("no socket notice: %+v", eff)
 	}
 
-	moveTo(g, LevelWorldstoneChamber, LevelHarrogath)
-	talk(g, NPCTyrael3)
-}
+	// VERIFIED 0x5856a0: the item action sets bit 0 and clears bit 1
+	g.ClaimSocket()
 
-func TestPrisonOfIce(t *testing.T) {
-	g, _ := newGame(t)
-	q := g.Quest(QuestPrison)
+	if !g.get(siege, FlagRewardGranted) || g.get(siege, FlagRewardPending) || g.SocketOwed() {
+		t.Fatalf("sockets added %s", g.Describe(siege))
+	}
 
-	moveTo(g, 1, LevelHarrogath)
-	talk(g, NPCMalah)
+	if g.ClaimSocket() != nil {
+		t.Error("a second socketing completed the quest again")
+	}
 
-	if q.State != 2 {
-		t.Fatalf("%s", g.Describe(q))
+	// Rescue on Mount Arreat: three doors, runes by the number of freed barbarians
+	rescue := g.Quest(QuestRescue)
+	talk(g, NPCQualKehk)
+	moveTo(g, LevelHarrogath, LevelFrigidHighlands)
+
+	if rescue.State != 3 || !g.get(rescue, FlagEnterArea) {
+		t.Fatalf("highlands %s", g.Describe(rescue))
+	}
+
+	kill(g, NPCPrisonDoor, LevelFrigidHighlands)
+	kill(g, NPCPrisonDoor, LevelFrigidHighlands)
+
+	if g.get(rescue, FlagRewardPending) {
+		t.Fatal("goal before the third door")
+	}
+
+	kill(g, NPCPrisonDoor, LevelFrigidHighlands)
+
+	if !g.get(rescue, FlagRewardPending) || !g.get(rescue, FlagCustom1) {
+		t.Fatalf("doors %s", g.Describe(rescue))
+	}
+
+	moveTo(g, LevelFrigidHighlands, LevelHarrogath)
+
+	_, eff = talk(g, NPCQualKehk)
+	if !g.get(rescue, FlagRewardGranted) || g.get(rescue, FlagRewardPending) {
+		t.Fatalf("Qual-Kehk %s", g.Describe(rescue))
+	}
+
+	if got := giveCodes(eff); len(got) != 3 || got[0] != "r07" || got[1] != "r08" || got[2] != "r09" {
+		t.Errorf("15 freed barbarians pay Tal, Ral and Ort: %v", got)
+	}
+
+	if effectCode(eff, EffectReward, "hire-barbarians") {
+		t.Error("Qual-Kehk's reward is not a mercenary unlock")
+	}
+
+	// Prison of Ice
+	prison := g.Quest(QuestPrison)
+
+	if msgs, _ := talk(g, NPCMalah); !contains2(msgs, 20116) || prison.State != 2 {
+		t.Fatalf("Malah: %v %s", msgs, g.Describe(prison))
 	}
 
 	moveTo(g, LevelHarrogath, LevelFrozenRiver)
 
-	if q.State != 4 {
-		t.Fatalf("river %s", g.Describe(q))
+	if prison.State != 3 {
+		t.Fatalf("river %s", g.Describe(prison))
 	}
 
-	// the frozen Anya and Malah both speak at this stage
 	if l := g.Activate(NPCAnyaFrozen).Lines; len(l) != 1 || l[0].Msg != 20131 {
-		t.Fatalf("Anya %+v", l)
+		t.Fatalf("frozen Anya %+v", l)
 	}
 
-	_, eff := talk(g, NPCAnyaFrozen)
-	if q.State != 5 || !effectCode(eff, EffectSpawn, ItemMalahScroll) {
-		t.Fatalf("scroll %s %+v", g.Describe(q), eff)
+	talk(g, NPCAnyaFrozen)
+
+	if prison.State != 4 {
+		t.Fatalf("20131 %s", g.Describe(prison))
 	}
 
-	pickup(g, ItemMalahScroll)
-	g.Dispatch(Event{Kind: EvItemRemoved, Item: ItemMalahScroll})
+	// Malah gives the potion; without it the block does nothing
+	g.Dispatch(Event{Kind: EvObjectOperated, Object: ObjectFrozenAnya, Level: LevelFrozenRiver})
 
-	if !g.get(q, FlagRewardPending) {
-		t.Fatalf("read %s", g.Describe(q))
+	if prison.State != 4 || g.get(prison, FlagRewardPending) {
+		t.Fatalf("the block melted without the potion: %s", g.Describe(prison))
 	}
 
 	moveTo(g, LevelFrozenRiver, LevelHarrogath)
 
 	_, eff = talk(g, NPCMalah)
-	if !g.get(q, FlagRewardGranted) || !effectCode(eff, EffectSpawn, ItemMalahScroll) || effectCode(eff, EffectReward, "resist-bonus") {
-		t.Fatalf("claim %s %+v", g.Describe(q), eff)
+	if got := giveCodes(eff); len(got) != 1 || got[0] != ItemDefrostPotion {
+		t.Fatalf("Malah's potion: %v", got)
 	}
 
-	if eff = g.ReadScrollOfResistance(); !effectCode(eff, EffectReward, "resist-bonus") || g.ResistBonus() != 10 || g.ReadScrollOfResistance() != nil {
+	pickup(g, ItemDefrostPotion)
+	moveTo(g, LevelHarrogath, LevelFrozenRiver)
+
+	eff = g.Dispatch(Event{Kind: EvObjectOperated, Object: ObjectFrozenAnya, Level: LevelFrozenRiver})
+	if prison.State != 5 || !g.get(prison, FlagRewardPending) || !g.get(prison, FlagPrimaryGoal) ||
+		!effectCode(eff, EffectDeleteItem, ItemDefrostPotion) {
+		t.Fatalf("thawing %s %+v", g.Describe(prison), eff)
+	}
+
+	moveTo(g, LevelFrozenRiver, LevelHarrogath)
+
+	// Malah's scroll (20132) and Anya's item (20136) in either order; the quest is rewarded after both
+	_, eff = talk(g, NPCMalah)
+	if got := giveCodes(eff); len(got) != 1 || got[0] != ItemMalahScroll || !g.get(prison, FlagCustom4) || g.get(prison, FlagRewardGranted) {
+		t.Fatalf("Malah's scroll: %v %s", got, g.Describe(prison))
+	}
+
+	_, eff = talk(g, NPCDrehya)
+	if got := giveCodes(eff); len(got) != 1 || got[0][:2] != "ob" || !g.get(prison, FlagRewardGranted) || g.get(prison, FlagRewardPending) {
+		t.Fatalf("Anya's item (a sorceress orb): %v %s", got, g.Describe(prison))
+	}
+
+	// Betrayal of Harrogath: Anya's first line came in the same talk and opened the portal to the temple
+	betrayal := g.Quest(QuestBetrayal)
+	if betrayal.State != 2 || !hasEffectPortal(eff, LevelNihlathakTemple) {
+		t.Fatalf("Anya %s %+v", g.Describe(betrayal), eff)
+	}
+
+	if eff = g.ReadScrollOfResistance(); !effectCode(eff, EffectReward, "resist-bonus") || g.ResistBonus() != 10 {
 		t.Fatalf("scroll %+v", eff)
+	}
+
+	moveTo(g, LevelHarrogath, LevelNihlathakTemple)
+	kill(g, NPCNihlathakBoss, LevelNihlathakTemple)
+
+	if !g.get(betrayal, FlagRewardPending) || !g.PersonalizeOwed() {
+		t.Fatalf("Nihlathak %s", g.Describe(betrayal))
+	}
+
+	moveTo(g, LevelNihlathakTemple, LevelHarrogath)
+	talk(g, NPCDrehya)
+
+	if g.get(betrayal, FlagRewardGranted) || !g.PersonalizeOwed() || !g.get(betrayal, FlagEnterArea) {
+		t.Fatalf("Anya's thanks pay nothing yet: %s", g.Describe(betrayal))
+	}
+
+	g.ClaimPersonalize()
+
+	if !g.get(betrayal, FlagRewardGranted) || g.get(betrayal, FlagRewardPending) {
+		t.Fatalf("personalised %s", g.Describe(betrayal))
+	}
+
+	// Rite of Passage: the hero must be level 20 in Normal; the last Ancient pays experience at once
+	rite := g.Quest(QuestRite)
+	talk(g, NPCQualKehk)
+	moveTo(g, LevelHarrogath, LevelArreatSummit)
+
+	for _, a := range []int{NPCAncient1, NPCAncient2, NPCAncient3} {
+		kill(g, a, LevelArreatSummit)
+	}
+
+	if g.get(rite, FlagRewardGranted) {
+		t.Fatalf("a level 10 hero finished the Rite: %s", g.Describe(rite))
+	}
+
+	g2, _ := newGame(t)
+	g2.Hero.Level = 20
+	moveTo(g2, 1, LevelHarrogath)
+	talk(g2, NPCQualKehk)
+	moveTo(g2, LevelHarrogath, LevelArreatSummit)
+	kill(g2, NPCAncient1, LevelArreatSummit)
+	kill(g2, NPCAncient2, LevelArreatSummit)
+
+	eff = kill(g2, NPCAncient3, LevelArreatSummit)
+	r2 := g2.Quest(QuestRite)
+
+	if !g2.get(r2, FlagRewardGranted) || g2.get(r2, FlagRewardPending) || !g2.get(r2, FlagPrimaryGoal) {
+		t.Fatalf("rite %s", g2.Describe(r2))
+	}
+
+	var exp int
+
+	for _, e := range eff {
+		if e.Kind == EffectReward && e.Code == "experience" {
+			exp = e.Value
+		}
+	}
+
+	if exp != 1400000 || RiteExperience(Nightmare) != 20000000 || RiteExperience(Hell) != 40000000 {
+		t.Errorf("experience %d", exp)
+	}
+
+	if RiteLevelGate(Normal) != 20 || RiteLevelGate(Nightmare) != 40 || RiteLevelGate(Hell) != 60 {
+		t.Error("level gates")
+	}
+
+	// Eve of Destruction opened with the Rite of Passage
+	eve := g2.Quest(QuestEve)
+	if eve.State != 1 {
+		t.Fatalf("eve %s", g2.Describe(eve))
+	}
+
+	moveTo(g2, LevelArreatSummit, LevelWorldstone1)
+	moveTo(g2, LevelWorldstone1, LevelThrone)
+	// Baal's death counts only in the Worldstone Chamber (exe 0x58bae0); in the throne room it changes nothing
+	if eff := kill(g2, NPCBaalCrab, LevelThrone); g2.get(eve, FlagRewardGranted) || effectCode(eff, EffectReward, "unlock-difficulty") {
+		t.Fatalf("baal killed in the throne room: %s", g2.Describe(eve))
+	}
+
+	moveTo(g2, LevelThrone, LevelWorldstoneChamber)
+
+	eff = kill(g2, NPCBaalCrab, LevelWorldstoneChamber)
+	if g2.get(eve, FlagRewardPending) || !g2.get(eve, FlagRewardGranted) || !g2.get(eve, FlagPrimaryGoal) ||
+		!effectCode(eff, EffectReward, "unlock-difficulty") {
+		t.Fatalf("baal %s %+v", g2.Describe(eve), eff)
+	}
+
+	moveTo(g2, LevelWorldstoneChamber, LevelHarrogath)
+	talk(g2, NPCTyrael3)
+}
+
+func hasEffectPortal(effects []Effect, level int) bool {
+	for _, e := range effects {
+		if e.Kind == EffectPortal && e.Value == level {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Rescue on Mount Arreat: the reward follows the number of freed barbarians (D2MOO ACT5Q2_Callback11_ScrollMessage);
+// fewer than twelve leave the goal open.
+func TestRescueRunesFollowTheFreedBarbarians(t *testing.T) {
+	for _, c := range []struct {
+		freed   [3]int
+		runes   int
+		reached bool
+	}{{[3]int{5, 5, 5}, 3, true}, {[3]int{5, 5, 4}, 2, true}, {[3]int{5, 4, 3}, 1, true}, {[3]int{4, 4, 4}, 1, true}, {[3]int{5, 4, 2}, 0, false}} {
+		g, _ := newGame(t)
+		q := g.Quest(QuestRescue)
+
+		moveTo(g, 1, LevelHarrogath)
+		talk(g, NPCQualKehk)
+		moveTo(g, LevelHarrogath, LevelFrigidHighlands)
+
+		for _, n := range c.freed {
+			g.Dispatch(Event{Kind: EvMonsterKilled, Monster: NPCPrisonDoor, Level: LevelFrigidHighlands, Freed: n})
+		}
+
+		if g.get(q, FlagRewardPending) != c.reached {
+			t.Fatalf("%v: %s", c.freed, g.Describe(q))
+		}
+
+		if !c.reached {
+			continue
+		}
+
+		moveTo(g, LevelFrigidHighlands, LevelHarrogath)
+
+		_, eff := talk(g, NPCQualKehk)
+		if got := giveCodes(eff); len(got) != c.runes {
+			t.Errorf("%v: %d runes, want %d", c.freed, len(got), c.runes)
+		}
+	}
+}
+
+// Anya's reward is a rare item of the hero's class; the tier follows the difficulty and the hero level.
+func TestAnyaRewardTiers(t *testing.T) {
+	if got := AnyaRewardCodes(ClassAmazon, Normal, 99); got[0] != "am1" {
+		t.Errorf("normal amazon %v", got)
+	}
+
+	if got := AnyaRewardCodes(ClassBarbarian, Nightmare, 46); got[0] != "ba6" || AnyaRewardCodes(ClassBarbarian, Nightmare, 45)[0] != "ba1" {
+		t.Errorf("nightmare barbarian tier: %v", got)
+	}
+
+	if got := AnyaRewardCodes(ClassAssassin, Hell, 66); len(got) != 7 || got[0] != "7ar" || AnyaRewardCodes(ClassAssassin, Hell, 65)[0] != "ktr" {
+		t.Errorf("hell assassin tier: %v", got)
+	}
+
+	if AnyaRewardCodes(9, Normal, 10) != nil {
+		t.Error("unknown class")
+	}
+}
+
+// Betrayal of Harrogath: Nihlathak's death pays only with Prison of Ice done or reward pending.
+func TestBetrayalNeedsThePrison(t *testing.T) {
+	g, _ := newGame(t)
+	q := g.Quest(QuestBetrayal)
+
+	moveTo(g, 1, LevelHarrogath)
+	talk(g, NPCDrehya)
+	moveTo(g, LevelHarrogath, LevelNihlathakTemple)
+	kill(g, NPCNihlathakBoss, LevelNihlathakTemple)
+
+	if g.get(q, FlagRewardPending) {
+		t.Fatalf("Nihlathak counted without the Prison: %s", g.Describe(q))
 	}
 }
 

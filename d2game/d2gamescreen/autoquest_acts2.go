@@ -361,29 +361,6 @@ func (a *autoQuest) stageHellforge() {
 
 // ---- Act 5 ----
 
-func (a *autoQuest) stagePrison() {
-	const id = d2quest.QuestPrison
-
-	a.once("prison: Malah and the frozen Anya", func(h autoHost, a *autoQuest) {
-		a.move(h, d2quest.LevelHarrogath)
-		a.says(h, "Malah offers the quest", d2quest.NPCMalah, 20116)
-		a.move(h, d2quest.LevelFrozenRiver)
-		a.expect(h, "state 4 in the Frozen River", a.quest(h, id).State == 4)
-		a.says(h, "the frozen Anya speaks", d2quest.NPCAnyaFrozen, 20131)
-		a.expect(h, "Malah's scroll handed out, state 5", a.quest(h, id).State == 5)
-	})
-	a.once("prison: the scroll", func(h autoHost, a *autoQuest) {
-		a.pickup(h, d2quest.ItemMalahScroll)
-		h.Dispatch(d2quest.Event{Kind: d2quest.EvItemRemoved, Item: d2quest.ItemMalahScroll})
-		a.state(h, id, "scroll read")
-		a.expect(h, "reward pending + primary goal", a.bit(h, id, d2quest.FlagRewardPending) &&
-			a.bit(h, id, d2quest.FlagPrimaryGoal))
-		a.move(h, d2quest.LevelHarrogath)
-		a.says(h, "Malah's thanks", d2quest.NPCMalah, 20132)
-		a.expect(h, "reward granted", a.bit(h, id, d2quest.FlagRewardGranted))
-	})
-}
-
 func (a *autoQuest) stageEve() {
 	const id = d2quest.QuestEve
 
