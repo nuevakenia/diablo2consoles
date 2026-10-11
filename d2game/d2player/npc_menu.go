@@ -119,16 +119,22 @@ func (m *NPCMenu) SetAnchor(x, y int) {
 // dialog is centred on it and starts 0x15 above it (one non-selectable line; UNVERIFIED: the original takes
 // height/3 when the dialog has no title line).
 func (m *NPCMenu) bounds() (left, top, right, bottom int) {
-	height := npcMenuTitleAdvance + npcMenuRowAdvance*len(m.rows) + npcMenuHeightPad
-	left = m.x - m.width/2
-	top = m.y - npcMenuTitleAdvance
+	return NPCMenuBounds(m.x, m.y, m.width, len(m.rows))
+}
+
+// NPCMenuBounds is the pure geometry of the dialog: anchor, box width (widest text + 20) and number of menu rows
+// (including Cancel) give the box. See the constants above for the sources.
+func NPCMenuBounds(anchorX, anchorY, width, rows int) (left, top, right, bottom int) {
+	height := npcMenuTitleAdvance + npcMenuRowAdvance*rows + npcMenuHeightPad
+	left = anchorX - width/2
+	top = anchorY - npcMenuTitleAdvance
 
 	if left < npcMenuEdge {
 		left = npcMenuEdge
 	}
 
-	if left+m.width > npcMenuScreenW-npcMenuEdge {
-		left = npcMenuScreenW - npcMenuEdge - m.width
+	if left+width > npcMenuScreenW-npcMenuEdge {
+		left = npcMenuScreenW - npcMenuEdge - width
 	}
 
 	if top+height > npcMenuScreenH-npcMenuBottomEdge {
@@ -139,14 +145,17 @@ func (m *NPCMenu) bounds() (left, top, right, bottom int) {
 		top = npcMenuEdge
 	}
 
-	return left, top, left + m.width, top + height
+	return left, top, left + width, top + height
 }
+
+// NPCMenuRowBottom is the bottom y of the text line of menu row i for a box starting at top.
+func NPCMenuRowBottom(top, i int) int { return top + npcMenuTitleAdvance + npcMenuRowAdvance*(i+1) }
 
 // rowBottom is the y of the bottom of the text line of menu row i (the running sum of the advances).
 func (m *NPCMenu) rowBottom(i int) int {
 	_, top, _, _ := m.bounds()
 
-	return top + npcMenuTitleAdvance + npcMenuRowAdvance*(i+1)
+	return NPCMenuRowBottom(top, i)
 }
 
 func (m *NPCMenu) rowAt(mx, my int) int {

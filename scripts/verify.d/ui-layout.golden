@@ -182,3 +182,8 @@ trade tab3 320 60 79 31
 # waypoint act tab 1 (x 5 + 80, bottom 94, expwaygatetabs frame 0 63x31) and the 32x32 close button (0x111 + 80, bottom 0x1a1 + 60)
 waypoint tab1 85 63 63 31
 waypoint close 353 445 32 32
+# waypoint row hit boxes from the row table at 0x721860 (left 17+80, top 60/96/../205 +60, height 29; the pitch is 36 except 37 after row 3)
+waypoint row0 97 120 283 29
+waypoint row3 97 228 283 29
+waypoint row4 97 265 283 29
+waypoint row8 97 409 283 29
