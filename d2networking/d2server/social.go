@@ -352,6 +352,16 @@ func (g *GameServer) onPartyHeal(client ClientConnection, packet d2netpacket.Net
 	return target.SendPacketToClient(pkt)
 }
 
+// syncPositionsLocked gives the roster the heroes' positions (tiles to subtiles)
+// for the experience range test. Call with soc.mu held.
+func (g *GameServer) syncPositionsLocked() {
+	for id, c := range g.connections {
+		if st := c.GetPlayerState(); st != nil {
+			g.soc.roster.SetPos(id, int(st.X*5), int(st.Y*5))
+		}
+	}
+}
+
 // partyMaxLevel is the character level at which kills stop giving experience.
 const partyMaxLevel = 99
 
@@ -365,6 +375,8 @@ func (g *GameServer) onPartyXP(client ClientConnection, packet d2netpacket.NetPa
 	p.Killer = client.GetUniqueID()
 
 	g.soc.mu.Lock()
+	g.syncPositionsLocked()
+
 	var shares []d2party.XPShare
 	if p.MonsterLevel > 0 {
 		shares = g.soc.roster.ShareKillXP(p.Killer, p.XP, p.MonsterLevel, partyMaxLevel)

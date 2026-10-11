@@ -45,6 +45,8 @@ type entry struct {
 	// hostileReady is the earliest moment of the next declaration.
 	hostileReady time.Time
 	body         bool // state 7 (relations.go)
+	posKnown     bool // x, y (subtiles) were reported (SetPos)
+	x, y         int
 	rel          map[string]*Relation
 }
 
@@ -501,12 +503,41 @@ func (r *Roster) killGroup(k *entry) []*entry {
 	var group []*entry
 
 	for _, o := range r.players {
-		if o.party == k.party && o.Area == k.Area {
+		if o.party == k.party && o.Area == k.Area && (o == k || r.inXPRange(k, o)) {
 			group = append(group, o)
 		}
 	}
 
 	return group
+}
+
+// SetPos records where a player stands, in subtiles (5 per tile). Positions
+// are optional: while they are unknown the area alone decides.
+func (r *Roster) SetPos(id string, x, y int) {
+	if e, ok := r.players[id]; ok {
+		e.x, e.y, e.posKnown = x, y, true
+	}
+}
+
+// inXPRange is the recipient test of the callback 0x57c5a0 that
+// PARTY_ForEachMemberInSameLevel runs for EXP_ServerShareExperienceWithParty
+// (0x57c6b0): a member that 0x552230 reports (UNVERIFIED: dead, here the
+// player-body state 7) is skipped, and the squared distance to the reference
+// unit must not exceed 0x1900 (VERIFIED compare). Which unit is the reference
+// (the monster or the credited killer) and the unit of the positions are
+// UNVERIFIED: here the killer's position in subtiles (path coordinates).
+func (r *Roster) inXPRange(k, o *entry) bool {
+	if o.body {
+		return false
+	}
+
+	if !k.posKnown || !o.posKnown {
+		return true
+	}
+
+	dx, dy := o.x-k.x, o.y-k.y
+
+	return dx*dx+dy*dy <= RecipientRadiusSq
 }
 
 // ShareKillXP is the VERIFIED party split of the exe (0x0057c6b0, see
