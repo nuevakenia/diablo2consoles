@@ -697,3 +697,25 @@ func (m *EscapeMenu) OnKeyDown(event d2interface.KeyEvent) bool {
 func (m *EscapeMenu) SaveAndExit() {
 	m.navigator.ToCharacterSelect(d2clientconnectiontype.Local, "")
 }
+
+// AutoShow opens the escape menu on a page (OD2_AUTOFLOW escmenu:<page>, for screenshots): main, options, sound,
+// video, automap or accessibility. It reports whether the page exists.
+func (m *EscapeMenu) AutoShow(page string) bool {
+	pages := map[string]layoutID{
+		"main": mainLayoutID, "options": optionsLayoutID, "sound": soundOptionsLayoutID,
+		"video": videoOptionsLayoutID, "automap": automapOptionsLayoutID, "accessibility": accessibilityLayoutID,
+	}
+
+	id, ok := pages[page]
+	if !ok {
+		return false
+	}
+
+	if !m.isOpen {
+		m.open()
+	}
+
+	m.setLayout(id)
+
+	return true
+}

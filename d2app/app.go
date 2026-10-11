@@ -343,6 +343,9 @@ func (a *App) Run() (err error) {
 	// OD2_AUTOGAME=<save file> skips the menus and starts that character directly.
 	// It exists so changes can be tested without clicking through the UI.
 	a.autoShot = newAutoShot()
+	d2gamescreen.AutoFlowShot = func(path string) { // OD2_AUTOFLOW shot:<path.png>
+		a.captureState, a.capturePath, a.captureFrames = captureStateFrame, path, nil
+	}
 
 	if os.Getenv("OD2_AUTOSCRIPT") != "" && os.Getenv("OD2_AUTOGAME") == "" && os.Getenv("OD2_AUTOFLOW") == "" {
 		a.Warning("OD2_AUTOSCRIPT needs OD2_AUTOGAME: the script only runs inside a game")
@@ -564,7 +567,14 @@ func (a *App) doCaptureFrame(target d2interface.Surface) error {
 		return err
 	}
 
-	screenshot := target.Screenshot()
+	var screenshot image.Image = target.Screenshot()
+
+	// a menu is drawn at 800x600 and scaled to the window by the renderer: the screenshot shows what the player
+	// sees (the picture scaled to fit, on black bars), like the game's frame does
+	if win := d2display.WindowSize(); d2display.CurrentAnchor() == d2display.AnchorCenter && win.W > 0 {
+		screenshot = d2display.FrameInWindow(screenshot, win.W, win.H)
+	}
+
 	if err := png.Encode(fp, screenshot); err != nil {
 		return err
 	}
@@ -785,8 +795,13 @@ func (a *App) useHeroMapSeed(filePath string) {
 	}
 
 	state := factory.LoadHeroState(filePath)
-	if state == nil || state.MapSeed == 0 {
+	if state == nil {
 		return
+	}
+
+	// a hero without a seed would play the seed of the hero before it (or a random one): it gets its own
+	if factory.EnsureMapSeed(state) {
+		a.Infof("new map seed for %s", state.HeroName)
 	}
 
 	d2mapgen.HeroMapSeed = state.MapSeed

@@ -3,6 +3,7 @@ package d2hero
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
@@ -40,7 +41,8 @@ func NewCharacterD2S(state *HeroState, created time.Time) ([]byte, error) {
 	}
 
 	return d2s.NewCharacter(state.HeroName, class,
-		d2s.NewCharacterFlags{Expansion: state.Expansion, Hardcore: state.Hardcore, Ladder: state.Ladder, Created: created},
+		d2s.NewCharacterFlags{Expansion: state.Expansion, Hardcore: state.Hardcore, Ladder: state.Ladder, Created: created,
+			MapSeed: state.MapSeed},
 		d2s.DefaultAppearance(class))
 }
 
@@ -64,6 +66,9 @@ func (f *HeroStateFactory) CreateNewHero(name string, hero d2enum.Hero, expansio
 	}
 
 	state.Expansion, state.Hardcore, state.Ladder = expansion, hardcore, ladder
+	// every character gets its own level generator seed, stored in the .od2 and in the .d2s header: the
+	// town and the levels are then the same every time this character is played
+	state.MapSeed = NewMapSeed(rand.Uint32)
 
 	res := &D2SExport{Path: newD2SPath(state)}
 
@@ -113,4 +118,32 @@ func writeNewFile(path string, data []byte) error {
 	}
 
 	return file.Close()
+}
+
+// NewMapSeed draws a level generator seed that is never 0 (0 means "no seed yet").
+func NewMapSeed(draw func() uint32) uint32 {
+	for i := 0; i < 8; i++ {
+		if n := draw(); n != 0 {
+			return n
+		}
+	}
+
+	return 1
+}
+
+// EnsureMapSeed gives a hero that has no level generator seed (a character made before heroes
+// had one) a new seed and saves it, so that its maps are the same from now on. It reports
+// whether the hero got a seed now.
+func (f *HeroStateFactory) EnsureMapSeed(state *HeroState) bool {
+	if state == nil || state.MapSeed != 0 {
+		return false
+	}
+
+	state.MapSeed = NewMapSeed(rand.Uint32)
+
+	if state.FilePath != "" {
+		_ = f.Save(state)
+	}
+
+	return true
 }

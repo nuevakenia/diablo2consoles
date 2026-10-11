@@ -151,13 +151,47 @@ var (
 	inputOff [2]int
 	anchor   = AnchorBottom
 	fixed    bool
+	pinned   = Base // the logical size OD2_DISPLAY pinned
+	outside  Size   // the window size the renderer reported last (device independent pixels)
 )
+
+// Pinned is the logical size OD2_DISPLAY pinned (meaningful when Fixed).
+func Pinned() Size {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	return pinned
+}
+
+// SetOutside records the size of the window (the renderer's Layout call).
+func SetOutside(s Size) {
+	mu.Lock()
+	outside = s
+	mu.Unlock()
+}
+
+// WindowSize is the size of the window the player sees: the pinned size with OD2_DISPLAY (the window of a test
+// run), else the size the renderer reported (0x0 before the first frame).
+func WindowSize() Size {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	if fixed {
+		return pinned
+	}
+
+	return outside
+}
 
 // SetFixed pins the logical size (OD2_DISPLAY): the window may then have any size, the picture is scaled to
 // fit it. Tests rely on this to get the same logical screen on every monitor.
 func SetFixed(f bool) {
 	mu.Lock()
 	fixed = f
+
+	if f {
+		pinned = cur
+	}
 	mu.Unlock()
 }
 

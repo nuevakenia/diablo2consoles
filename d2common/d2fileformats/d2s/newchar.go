@@ -59,6 +59,9 @@ type NewCharacterFlags struct {
 	Ladder    bool
 	// Created is the creation time; the zero value means time.Now().
 	Created time.Time
+	// MapSeed is the level generator seed stored at 0xAB; 0 leaves the field empty (the original game
+	// fills it at the first game).
+	MapSeed uint32
 }
 
 // Appearance is the composite look stored at 0x88 (graphics) and 0x98 (colours).
@@ -171,6 +174,7 @@ func NewCharacter(name string, class Class, flags NewCharacterFlags, look Appear
 	out[0x29] = defaultUnknown29
 	out[skillCountPos] = defaultSkills
 	out[levelOffset] = 1
+	le.PutUint32(out[mapSeedOffset:], flags.MapSeed)
 	le.PutUint32(out[createdOffset:], uint32(created.Unix()))
 	le.PutUint32(out[lastPlayedOffset:], uint32(created.Unix()))
 	copy(out[appearanceStart:], look.Graphics[:])

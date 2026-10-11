@@ -33,6 +33,9 @@ import (
 //	wait:Seconds                 in game: wait
 //	saveexit                     in game: Save and Exit (back to character select)
 //	exit                         anywhere: quit the program
+//	escmenu:Page                 in game: open the escape menu on a page (main, options, sound, video, automap, accessibility)
+//	mainmenu                   main menu: leave the trademark screen, wait for the real main menu
+//	shot:/path/x.png             anywhere: save a screenshot of the window (what the player sees)
 //
 // Every step is logged as "AUTOFLOW step <n> <step>".
 const autoFlowSettleSeconds = 1.5
@@ -48,6 +51,11 @@ type autoFlowState struct {
 
 //nolint:gochecknoglobals // the one flow of the process, set from the environment
 var autoFlow autoFlowState
+
+// AutoFlowShot is set by the app: it saves a screenshot of the window to the path (the shot: step).
+//
+//nolint:gochecknoglobals // set once at start
+var AutoFlowShot func(path string)
 
 func (f *autoFlowState) load() {
 	if f.loaded {
@@ -88,6 +96,21 @@ func autoFlowNext(elapsed float64, verbs ...string) (args []string, ok bool) {
 	}
 
 	parts := strings.Split(autoFlow.steps[autoFlow.index], ":")
+
+	if parts[0] == "shot" && len(parts) > 1 {
+		// any screen takes the shot, then the next step waits for the settle time
+		log.Printf("AUTOFLOW step %d %s", autoFlow.index+1, autoFlow.steps[autoFlow.index])
+
+		autoFlow.index++
+		autoFlow.settle = 0
+		autoFlow.waiting = 0
+
+		if AutoFlowShot != nil {
+			AutoFlowShot(strings.Join(parts[1:], ":"))
+		}
+
+		return nil, false
+	}
 
 	for _, v := range verbs {
 		if parts[0] == v {
@@ -178,7 +201,7 @@ func (v *CharacterSelect) advanceFlow(elapsed float64) {
 
 // advanceFlow performs the steps that belong to the main menu.
 func (v *MainMenu) advanceFlow(elapsed float64) {
-	args, ok := autoFlowNext(elapsed, "single", "host", "join", "exit")
+	args, ok := autoFlowNext(elapsed, "single", "host", "join", "exit", "mainmenu")
 	if !ok {
 		return
 	}
@@ -190,6 +213,8 @@ func (v *MainMenu) advanceFlow(elapsed float64) {
 	}
 
 	switch args[0] {
+	case "mainmenu":
+		autoFlowDone() // the real main menu is on screen now
 	case "exit":
 		autoFlowExit(0)
 	case "host", "join":
@@ -291,12 +316,18 @@ func (v *Game) advanceFlow(elapsed float64) {
 		return
 	}
 
-	args, ok := autoFlowNext(elapsed, "gold", "wait", "saveexit", "exit", "difficulty")
+	args, ok := autoFlowNext(elapsed, "gold", "wait", "saveexit", "exit", "difficulty", "escmenu")
 	if !ok {
 		return
 	}
 
 	switch args[0] {
+	case "escmenu":
+		autoFlowDone()
+
+		if len(args) < 2 || !v.escapeMenu.AutoShow(args[1]) {
+			v.Warningf("AUTOFLOW escmenu: unknown page %q", strings.Join(args[1:], ":"))
+		}
 	case "difficulty":
 		autoFlowDone() // the hero had no difficulty to choose: the game is already running
 	case "gold":

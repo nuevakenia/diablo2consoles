@@ -90,6 +90,15 @@ covers every screen corner at all those sizes and for panel-shifted views.
 Scenarios (`scripts/verify.d/`): `a1-display-1512x982`, `a1-display-1920x1080`, `a1-display-3440x1440` boot the game at that
 size, check the logged display model (column origin, bar span `hud_x=`), the screenshot size, and click far right / far left
 of the world: the picked world point must agree with the camera at the screen edge and the hero must walk to that side.
+`a2-menu-flow-1512x982` / `a2-menu-flow-1920x1080` go through the real menu flow (OD2_AUTOFLOW: main menu, character select,
+hero creation, then in the game the escape menu, options and video options) and take a screenshot at every stop (`shot:<png>`,
+`escmenu:<page>` flow steps). `scripts/shotcheck.go` checks them: window size, and for the menu screens that the non-black
+content is exactly the centred 4:3 region (`d2display.MenuRegion` / `CheckMenuCentred`, unit tested). Menus are drawn at 800x600
+and scaled to the window by the renderer, also with `OD2_DISPLAY` pinned; a menu screenshot is composed the same way
+(`d2display.FrameInWindow`) so it shows what the player sees, with the bars. `a2-seed-sample-hero` and `a2-seed-new-hero` check
+that a hero played from the menus logs `map seed of <name>: <seed>`, that the seed is the one of the .d2s header, and that the
+town built (TownE1 for the sample hero) is the same on a second load; a new character gets its own non-zero seed at creation
+(`d2hero.NewMapSeed`, written to the .od2 and the .d2s header), and a hero without one gets one when it is first played.
 `a1-display-panels` opens the panels at 1920x1080 and `a1-display-menus` shows the character select (look at the
 screenshots in the run directory). `9f-ui-layout` is pinned to `OD2_DISPLAY=800x600` (the golden of rectangles is in
 column coordinates).

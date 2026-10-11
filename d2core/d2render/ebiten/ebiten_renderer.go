@@ -111,20 +111,23 @@ func (r *Renderer) Draw(screen *ebiten.Image) {
 // Layout returns the logical screen size: the window (or full screen) size divided by the integer UI
 // scale, never below 800x600 (see d2display). At an 800x600 window it is the original fixed size.
 func (r *Renderer) Layout(outsideWidth, outsideHeight int) (width, height int) {
-	if d2display.Fixed() {
-		s := d2display.Get()
-
-		return s.W, s.H
-	}
+	d2display.SetOutside(d2display.Size{W: outsideWidth, H: outsideHeight})
 
 	// Menus (main menu, character select, difficulty, loading) are the original 800x600 interface: they use the
 	// 800x600 logical size, which Ebiten scales up to fit the window (a 4:3 picture with bars on the sides), instead
 	// of standing as a small 800x600 column in the middle of a large window. In the game the logical size is the
-	// whole window (the world fills it).
+	// whole window (the world fills it), or the size OD2_DISPLAY pinned.
 	if d2display.CurrentAnchor() == d2display.AnchorCenter {
 		d2display.Set(d2display.Base)
 
 		return d2display.BaseW, d2display.BaseH
+	}
+
+	if d2display.Fixed() {
+		s := d2display.Pinned()
+		d2display.Set(s)
+
+		return s.W, s.H
 	}
 
 	s := d2display.Logical(outsideWidth, outsideHeight, d2display.Scale())
