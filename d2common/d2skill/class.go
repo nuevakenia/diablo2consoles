@@ -1302,6 +1302,9 @@ func doAuraFn(c *cast) {
 		}
 	}
 
+	// the passive stats that ride on the caster's aura state (SRVDO_065 / 066 / 081, VERIFIED)
+	e.Stats = append(e.Stats, auraPassiveStats(c.env, sk)...)
+
 	if sk.SrvDoFunc == 65 { // friendly aura: the upkeep is the aura parameter (VERIFIED 0x5cd4b0 + 0x645ed0)
 		e.Cost = int(sk.calcMana(c.lvl, false))
 	}
