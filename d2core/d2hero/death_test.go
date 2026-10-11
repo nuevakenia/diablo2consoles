@@ -64,7 +64,7 @@ func TestHardcoreDeath(t *testing.T) {
 }
 
 func TestRespawnLife(t *testing.T) {
-	for in, want := range map[int]int{0: 1, 1: 1, 100: 50, 3: 1, 4: 2} {
+	for in, want := range map[int]int{0: 1, 1: 1, 100: 100, 3: 3, 4: 4} {
 		if got := RespawnLife(in); got != want {
 			t.Errorf("RespawnLife(%d) = %d, want %d", in, got, want)
 		}

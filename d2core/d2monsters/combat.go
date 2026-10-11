@@ -191,9 +191,10 @@ func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.
 	blocked, note := false, ""
 
 	if hit && blockPct > 0 {
-		// shield block comes after the to-hit roll (COMBAT_RollAttackOutcome); the hero
-		// is not moving while she is struck here (the running /3 rule is not applied)
-		if blocked = d2combat.RollShieldBlock(u.b.Seed, blockPct, false); blocked {
+		// shield block comes after the to-hit roll (COMBAT_RollAttackOutcome). VERIFIED
+		// (0x57bfa0, helper 0x622ef0): a hero in mode 3 (running) blocks with a third
+		// of her chance (walking, mode 2, is excluded); the same hero is auto-hit.
+		if blocked = d2combat.RollShieldBlock(u.b.Seed, blockPct, heroAutoHit(p)); blocked {
 			hit = false
 
 			// VERIFIED (0x57ae50): the block animation replays only after

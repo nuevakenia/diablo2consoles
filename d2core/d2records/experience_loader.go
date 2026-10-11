@@ -3,6 +3,7 @@ package d2records
 import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2txt"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2herostats"
 )
 
 /*	first column of experience.txt
@@ -47,6 +48,9 @@ func experienceLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 		d2enum.HeroSorceress:   d.Number("Sorceress"),
 	}
 
+	shift := d.Number("ExpRatio")
+	ratios := []int{}
+
 	for d.Next() {
 		record := &ExperienceBreakpointRecord{
 			Level: d.Number("Level"),
@@ -62,6 +66,12 @@ func experienceLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 			Ratio: d.Number("ExpRatio"),
 		}
 		breakpoints[record.Level] = record
+
+		for len(ratios) <= record.Level {
+			ratios = append(ratios, 0)
+		}
+
+		ratios[record.Level] = record.Ratio
 	}
 
 	if d.Err != nil {
@@ -69,6 +79,14 @@ func experienceLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 	}
 
 	r.Debugf("Loaded %d ExperienceBreakpoint records", len(breakpoints))
+
+	// Kill experience is scaled by the recipient's ExpRatio (0x57c3a0). Only
+	// patch_d2's table has the column; without it nothing is installed.
+	if shift > 0 && len(ratios) > 1 && ratios[1] > 0 {
+		d2herostats.SetExpRatio(&d2herostats.ExpRatio{Shift: shift, ByLevel: ratios})
+	} else {
+		d2herostats.SetExpRatio(nil)
+	}
 
 	r.Character.MaxLevel = maxLevels
 	r.Character.Experience = breakpoints

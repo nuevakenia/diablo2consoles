@@ -8,7 +8,7 @@ type AttackInput struct {
 	// BlockChance is the defender's block percent (0 = cannot block); the
 	// shield roll is skipped without consuming a step when it is below 1.
 	BlockChance int
-	// DefenderMoving divides a player's block chance by 3 (inferred meaning).
+	// DefenderMoving divides a player's block chance by 3: the defender runs (mode 3) or walks in town (mode 6). VERIFIED 0x57bfa0.
 	DefenderMoving bool
 	Avoid          AvoidInput
 	// AutoHit: VERIFIED in 0x57cc10. When the defender is a player whose mode
