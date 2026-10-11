@@ -22,6 +22,9 @@ const (
 	CtlTunnel byte = 0x6c
 )
 
+// MaxSaveChunk is the exclusive upper bound of a 0x6c save-upload chunk length (VERIFIED, Game.exe).
+const MaxSaveChunk = 0x2000
+
 const (
 	maxTunnelChunk        = 0x1f0
 	tunnelHeader          = 2 // [type][flags] inside the payload

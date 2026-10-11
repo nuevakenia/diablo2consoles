@@ -134,7 +134,12 @@ func ClientPacketLength(b []byte) (int, error) {
 			return 0, nil
 		}
 
-		return 3 + (int(b[1]) | int(b[2])<<8), nil
+		n := int(b[1]) | int(b[2])<<8
+		if n >= MaxSaveChunk { // lobby opcode 0x6c: a chunk of 0x2000 or more is fatal (Game.exe, N19)
+			return 0, fmt.Errorf("%w: save upload chunk of %#x bytes", ErrBadLength, n)
+		}
+
+		return 3 + n, nil
 	}
 
 	n, kind := ExpectedSize(b[0], ClientToServer)
@@ -143,6 +148,13 @@ func ClientPacketLength(b []byte) (int, error) {
 	}
 
 	return n, nil
+}
+
+// SaveChunkFatal reports whether the bytes SplitClient left over begin with a
+// save-upload (0x6c) packet whose length reaches MaxSaveChunk: the exe treats
+// that as fatal, so the server drops the connection instead of skipping it.
+func SaveChunkFatal(rest []byte) bool {
+	return len(rest) >= 3 && rest[0] == CtlTunnel && int(rest[1])|int(rest[2])<<8 >= MaxSaveChunk
 }
 
 // SplitClient splits a decompressed client blob into packets. A packet of an

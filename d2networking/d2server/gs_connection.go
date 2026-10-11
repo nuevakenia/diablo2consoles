@@ -24,6 +24,9 @@ type gsClientConnection struct {
 	playerState *d2hero.HeroState
 }
 
+// Close closes the connection (the idle kick).
+func (c *gsClientConnection) Close() error { return c.conn.Close() }
+
 func (c *gsClientConnection) GetUniqueID() string { return c.id }
 
 func (c *gsClientConnection) GetConnectionType() d2clientconnectiontype.ClientConnectionType {

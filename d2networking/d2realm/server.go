@@ -227,6 +227,12 @@ func (ss *session) readLoop() {
 		pkts, ignored := d2gs.SplitClient(plain)
 		if ignored > 0 {
 			ss.srv.cfg.Logf("realm: %s: dropped %d bytes of unframable data", ss.name(), ignored)
+
+			if d2gs.SaveChunkFatal(plain[len(plain)-ignored:]) {
+				ss.srv.cfg.Logf("realm: %s: save upload chunk >= 0x2000, closing (fatal in the exe)", ss.name())
+
+				return
+			}
 		}
 
 		for _, p := range pkts {

@@ -252,6 +252,22 @@ func TestMoveCastChatLeave(t *testing.T) {
 	}
 }
 
+// N19: a save-upload (0x6c) chunk length of 0x2000 or more is fatal in the exe;
+// the server's decoder returns an error (closing the connection) for it, while
+// the largest legal chunk still frames.
+func TestSaveChunkCapIsFatal(t *testing.T) {
+	mk := func(n int) []byte { return append([]byte{d2gs.CtlTunnel, byte(n), byte(n >> 8)}, make([]byte, 5)...) }
+
+	s := &ServerSide{IDs: NewIDs()}
+	if _, _, err := s.Decode(mk(d2gs.MaxSaveChunk)); err == nil {
+		t.Fatal("0x2000 chunk accepted")
+	}
+
+	if _, _, err := s.Decode(mk(0x1fff)); err != nil {
+		t.Fatalf("0x1fff chunk: %v", err) // short buffer: ignored, not fatal
+	}
+}
+
 func TestUnknownPacketsAreSkippedBySize(t *testing.T) {
 	c, s := newPair()
 

@@ -94,7 +94,7 @@ func TestPartyFull(t *testing.T) {
 }
 
 func TestHostility(t *testing.T) {
-	r := game()
+	r := afield()
 
 	tests := []struct {
 		from, to string
@@ -139,7 +139,7 @@ func TestHostility(t *testing.T) {
 }
 
 func TestNoFriendlyFire(t *testing.T) {
-	r := game()
+	r := afield()
 
 	if err := r.Invite("a", "b"); err != nil {
 		t.Fatal(err)

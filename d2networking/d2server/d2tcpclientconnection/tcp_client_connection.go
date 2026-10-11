@@ -43,6 +43,9 @@ func (t *TCPClientConnection) SendPacketToClient(p d2netpacket.NetPacket) error 
 	return nil
 }
 
+// Close closes the socket (the idle kick).
+func (t *TCPClientConnection) Close() error { return t.tcpConnection.Close() }
+
 // SetPlayerState sets the game client player state
 func (t *TCPClientConnection) SetPlayerState(playerState *d2hero.HeroState) {
 	t.playerState = playerState

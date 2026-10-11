@@ -425,6 +425,8 @@ func (v *Game) onPvPHit(p d2netpacket.PvPHitPacket) {
 	v.Infof("PVP HIT attacker=%q raw=%d scaled=%d taken=%d hp %d->%d/%d skill=%q", attacker, p.Raw, p.Damage, taken, before,
 		st.Health, st.MaxHealth, p.Skill)
 
+	v.pvpBeltSteal(attacker) // N23: the connecting hit may take a potion from the belt
+
 	if before > 0 && st.Health == 0 {
 		// the hero dies like to a monster (corpse, experience loss); the victim
 		// also tells the killer, who gets an ear for a hardcore victim

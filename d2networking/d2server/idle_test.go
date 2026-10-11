@@ -1,6 +1,9 @@
 package d2server
 
 import (
+	"context"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket/d2netpackettype"
 	"testing"
 	"time"
 )
@@ -32,6 +35,64 @@ func TestIdleTrackerStamp(t *testing.T) {
 
 	if _, ok := tr.Last("a"); ok {
 		t.Fatal("forgotten")
+	}
+}
+
+// TestIdleSweepKicksSilentClient is the wiring: the sweep's victims come from
+// the tracker the packet path stamps, the kick saves/forgets the client and
+// reports its departure like a client that said goodbye.
+func TestIdleSweepKicksSilentClient(t *testing.T) {
+	g, a, b := testServer()
+	g.ctx, g.cancel = context.WithCancel(context.Background())
+	g.packetManagerChan = make(chan ReceivedPacket, 4)
+
+	defer g.cancel()
+
+	clock := time.Unix(1000, 0)
+	g.soc.idle = newIdleTracker(func() time.Time { return clock })
+
+	g.soc.idle.Stamp("a")
+
+	clock = clock.Add(8 * time.Second)
+	g.soc.idle.Stamp("b") // b spoke later
+
+	now := clock.Add(3 * time.Second) // a silent for 11 s, b for 3 s
+
+	if v := g.idleVictims(now, 10*time.Second); len(v) != 1 || v[0].GetUniqueID() != "a" {
+		t.Fatalf("victims %v", v)
+	}
+
+	if v := g.idleVictims(now, IdleKickAfter); len(v) != 0 {
+		t.Fatalf("45 s limit kicked %v", v)
+	}
+
+	g.kickIdle(a)
+
+	select {
+	case p := <-g.packetManagerChan:
+		if p.Client != ClientConnection(a) || p.Packet.PacketType != d2netpackettype.PlayerDisconnectionNotification {
+			t.Fatalf("kick packet %+v", p)
+		}
+	default:
+		t.Fatal("no departure reported")
+	}
+
+	if _, ok := g.soc.idle.Last("a"); ok {
+		t.Fatal("kicked client still tracked")
+	}
+
+	_ = b
+}
+
+func TestIdleLimitEnv(t *testing.T) {
+	if _, on := idleLimit(); on {
+		t.Fatal("sweep must be off by default")
+	}
+
+	t.Setenv("OD2_IDLE_KICK_MS", "1500")
+
+	if d, on := idleLimit(); !on || d != 1500*time.Millisecond {
+		t.Fatalf("%v %v", d, on)
 	}
 }
 

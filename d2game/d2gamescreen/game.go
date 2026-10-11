@@ -263,6 +263,8 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 			[]string{"op", "arg"}, v.commandTrade},
 		{"pvp", "swings at another player (melee, needs hostility)", []string{"name"}, v.commandPvP},
 		{"giveitem", "puts a new item into the inventory", []string{"code"}, v.commandGiveItem},
+		{"givebelt", "puts a new potion on the belt (scripts)", []string{"code"}, v.commandGiveBelt},
+		{"beltlist", "logs the belt contents (scripts)", nil, v.commandBeltList},
 		{"dropinv", "removes the first inventory item with this base code (debug)", []string{"code"}, v.commandDropInv},
 		{"autobuy", "opens a vendor's trade window and buys the cheapest affordable item (OD2_AUTOTRADE_KEEP=1 keeps it)",
 			[]string{"vendor"}, v.commandAutoBuy},
@@ -327,7 +329,7 @@ func (v *Game) OnUnload() error {
 	}
 
 	if err := v.terminal.Unbind("spawnitemat", "spawnitem", "spawnmon", "spawnchest", "setgold", "spawnportal", "setwaypoint", "players", "chat",
-		"party", "hostile", "roster", "trade", "pvp", "giveitem", "dropinv", "autobuy", "spawnrank", "killleader", "killnear", "rewarditem", "transmute", "setexp", "cubeput", "pickground",
+		"party", "hostile", "roster", "trade", "pvp", "giveitem", "givebelt", "beltlist", "dropinv", "autobuy", "spawnrank", "killleader", "killnear", "rewarditem", "transmute", "setexp", "cubeput", "pickground",
 		"questpending", "pickitem", "putitem", "giveitemq", "freeinv",
 		"townportal", "closeportal", "portals", "useportal", "pvpcast", "pvpwalk", "sethp"); err != nil {
 		return err
