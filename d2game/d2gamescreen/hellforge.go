@@ -103,7 +103,8 @@ func (v *Game) advanceHellforge(elapsed float64) {
 }
 
 // isHellforgeSmash reports whether a quest effect is the smashing of the forge
-// (the soulstone is destroyed on it).
+// (the third hammer blow on the opened forge destroys the hammer, VERIFIED 0x5b3820; the soulstone is consumed
+// by the first operation, which only opens the forge).
 func isHellforgeSmash(e d2quest.Effect) bool {
-	return e.Kind == d2quest.EffectDeleteItem && e.Quest == d2quest.QuestHellforge && e.Code == d2quest.ItemMephistoSoulstone
+	return e.Kind == d2quest.EffectDeleteItem && e.Quest == d2quest.QuestHellforge && e.Code == d2quest.ItemHellforgeHammer
 }

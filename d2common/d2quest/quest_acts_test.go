@@ -648,8 +648,20 @@ func TestAct4QuestLine(t *testing.T) {
 
 	talk(g, NPCCain4)
 
-	// without the hammer the forge does nothing
-	obj(g, ObjectHellforge, LevelRiverOfFlame)
+	// VERIFIED 0x5b3820: the soulstone opens the forge (and is consumed); the hammer must be in the pack AND wielded, and the
+	// third blow smashes it
+	eff = obj(g, ObjectHellforge, LevelRiverOfFlame)
+	if g.get(hf, FlagRewardPending) || !effectCode(eff, EffectDeleteItem, ItemMephistoSoulstone) {
+		t.Fatalf("the soulstone must only open the forge: %s %+v", g.Describe(hf), eff)
+	}
+
+	forge := func(wielded string) []Effect {
+		return g.Dispatch(Event{Kind: EvObjectOperated, Object: ObjectHellforge, Level: LevelRiverOfFlame, Wielded: wielded})
+	}
+
+	for i := 0; i < 5; i++ {
+		forge(ItemHellforgeHammer)
+	}
 
 	if g.get(hf, FlagRewardPending) {
 		t.Fatal("forge worked without the hammer")
@@ -657,8 +669,23 @@ func TestAct4QuestLine(t *testing.T) {
 
 	pickup(g, ItemHellforgeHammer)
 
-	eff = obj(g, ObjectHellforge, LevelRiverOfFlame)
-	if !g.get(hf, FlagRewardPending) || !effectCode(eff, EffectDeleteItem, ItemMephistoSoulstone) {
+	for i := 0; i < 5; i++ { // in the pack only
+		forge("")
+	}
+
+	if g.get(hf, FlagRewardPending) {
+		t.Fatal("forge worked with the hammer unwielded")
+	}
+
+	forge(ItemHellforgeHammer)
+	forge(ItemHellforgeHammer)
+
+	if g.get(hf, FlagRewardPending) {
+		t.Fatal("forge broke before the third blow")
+	}
+
+	eff = forge(ItemHellforgeHammer)
+	if !g.get(hf, FlagRewardPending) || !g.get(hf, FlagPrimaryGoal) || !effectCode(eff, EffectDeleteItem, ItemHellforgeHammer) || hf.State != 4 {
 		t.Fatalf("forge %s %+v", g.Describe(hf), eff)
 	}
 

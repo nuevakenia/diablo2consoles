@@ -228,7 +228,14 @@ func (v *Game) rewardSteps() []uberStep {
 
 			r.g.Items["hfh"], r.g.Items["mss"] = 1, 1
 
+			// VERIFIED 0x5b3820: the soulstone opens the forge, then three blows of the wielded hammer smash it
 			v.questDispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: d2quest.ObjectHellforge, Level: 107})
+			t.expect(v, "the soulstone only opens the Hellforge", !r.g.Rec.Get(q.Slot, d2quest.FlagPrimaryGoal))
+
+			for i := 0; i < 3; i++ {
+				v.questDispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: d2quest.ObjectHellforge, Level: 107,
+					Wielded: d2quest.ItemHellforgeHammer})
+			}
 
 			t.expect(v, "the smashed Hellforge completes its quest", r.g.Rec.Get(q.Slot, d2quest.FlagPrimaryGoal))
 

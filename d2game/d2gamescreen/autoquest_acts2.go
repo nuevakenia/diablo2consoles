@@ -349,7 +349,14 @@ func (a *autoQuest) stageHellforge() {
 		a.says(h, "Cain talks about the soulstone", d2quest.NPCCain4, 678)
 		a.pickup(h, d2quest.ItemHellforgeHammer)
 		a.move(h, d2quest.LevelRiverOfFlame)
+		// VERIFIED 0x5b3820: the soulstone opens the forge, then the wielded hammer breaks it on the third blow
 		a.object(h, d2quest.ObjectHellforge)
+		a.expect(h, "the soulstone only opens the forge", !a.bit(h, id, d2quest.FlagRewardPending))
+
+		for i := 0; i < 3; i++ {
+			a.objectWielding(h, d2quest.ObjectHellforge, d2quest.ItemHellforgeHammer)
+		}
+
 		a.state(h, id, "forge used")
 		a.expect(h, "reward pending + primary goal", a.bit(h, id, d2quest.FlagRewardPending) &&
 			a.bit(h, id, d2quest.FlagPrimaryGoal))

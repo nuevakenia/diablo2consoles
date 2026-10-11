@@ -203,46 +203,6 @@ func newTerrorsEnd() *Quest {
 	})
 }
 
-// A4Q3 The Hellforge (Cain): smash the Mephisto Soulstone on the Hellforge
-// with the Hellforge Hammer. Cain's first line depends on the soulstone.
-// VERIFIED: the object (376, OperateFn 49 = 0x5b3820 asks for the hammer "hfh "), the hammer drop by Hephasto (see below).
-func newHellforge() *Quest {
-	return newSpecQuest(&spec{
-		id: QuestHellforge, slot: 27, act: 3, logIndex: 3, name: "The Hellforge", label: "A4Q3",
-		start: 1, goal: 3, tbl: map[int]int{1: 0}, rp: 2, done: 3,
-		tableFn: func(g *Game, q *Quest, def int) int {
-			if q.State == 1 && !g.hasItem(ItemMephistoSoulstone) {
-				return 1
-			}
-
-			return def
-		},
-		steps: []step{
-			{from: 1, npc: NPCCain4, msg: 678, to: 2},
-			{from: 1, npc: NPCCain4, msg: 679, to: 2},
-		},
-		trigs: []trig{
-			{ev: EvObjectOperated, object: ObjectHellforge, req: []string{ItemMephistoSoulstone, ItemHellforgeHammer},
-				goal: true, fx: func(g *Game, q *Quest) []Effect {
-					g.dropItem(ItemMephistoSoulstone)
-
-					return []Effect{{Kind: EffectDeleteItem, Quest: q.ID, Code: ItemMephistoSoulstone,
-						Note: "the soulstone is smashed on the Hellforge"}}
-				}},
-			// Hephasto's kill drops the hammer (unless Game.LegacyBossBits). VERIFIED (QUEST_A4_TheHellforge_OnMonsterKilled 0x5b4190, attached to
-			// class 0x199 by 0x5af8c0): while the node is active the dying unit's item code (+0xb8) is stamped "hfh " and dropped through
-			// 0x557980; no check of the quest state beyond the node being active, no bit is set.
-			{ev: EvMonsterKilled, monster: NPCHephasto, names: []string{"hephasto"}, min: 1, bit: -1,
-				cond: func(g *Game, q *Quest) bool { return !g.LegacyBossBits },
-				fx: func(g *Game, q *Quest) []Effect {
-					return []Effect{{Kind: EffectGiveItem, Quest: q.ID, Code: ItemHellforgeHammer,
-						Note: "Hephasto drops the hammer (exe: unit code override \"hfh \", 0x5b4190)"}}
-				}},
-		},
-		noLeaveRule: true,
-	})
-}
-
 // A4Q4 Malachai's gossip (slot 33): the angel comments on the Mephisto
 // Soulstone, and on its destruction.
 func newMalachai() *Quest {
