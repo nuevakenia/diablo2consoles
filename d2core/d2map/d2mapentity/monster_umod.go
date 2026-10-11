@@ -25,7 +25,8 @@ type UModBonus struct {
 	// SpeedPct is the velocity percent (stat 0x43) of Fast / Fanatic / the champion kit.
 	SpeedPct int
 	// Skills are the skills granted by Teleportation (184) and Aura Enchanted; AIFlag20 is the AI data flag
-	// Teleportation sets and TimerEvent the event of modifier 41. They are recorded, the AI does not read them yet.
+	// Teleportation sets and TimerEvent the event of modifier 41. AIFlag20 opens the wounded teleport (Brain.CanTeleport) and the aura stats of
+	// Aura Enchanted are applied to the monster (wave 21); the timer event is still only recorded.
 	Skills     []UModSkill
 	AIFlag20   bool
 	TimerEvent bool

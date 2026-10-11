@@ -5,6 +5,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2difficulty"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monreg"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 )
 
@@ -185,13 +186,41 @@ func (u *fxUnit) HalfDamage() bool {
 	return u.m.Stat != nil && strings.EqualFold(u.m.Stat.BaseKey, "willowisp1")
 }
 
-// GrantSkill is not wired to the monster's skill list yet: the grant is logged (Teleportation and the aura of an
-// Aura Enchanted monster need the monster skill slots; UNVERIFIED how the AI picks them).
-func (u *fxUnit) GrantSkill(skill, level int, active bool) {
-	u.m.UMod.Skills = append(u.m.UMod.Skills, d2mapentity.UModSkill{Skill: skill, Level: level, Active: active})
+// auraStatIDs maps the stat names the aura skills put on their own state (SRVDO_065 / 066 / 081 passive stats) to the
+// stat ids finish() reads.
+var auraStatIDs = map[string]int{
+	"firemindam": 0x30, "firemaxdam": 0x31, "lightmindam": 0x32, "lightmaxdam": 0x33,
+	"coldmindam": 0x36, "coldmaxdam": 0x37, "damagepercent": 0x19, "item_tohit_percent": 0x77,
 }
 
-func (u *fxUnit) SetAIFlag20()        { u.m.UMod.AIFlag20 = true }
+// GrantSkill records the grant (UMod.Skills) and puts the passive stats of an aura skill on the monster, the way the
+// exe's aura state does for its caster (d2skill.MonsterAuraStats: Might and Fanaticism damage percent, the elemental
+// damage of Holy Fire, Holy Freeze and Holy Shock, Blessed Aim to-hit). The effect on allies in the aura range, the
+// Thorns and Conviction effects and the upkeep are not modelled (UNVERIFIED for monsters). Teleport (0xb8) is no
+// aura: SetAIFlag20 opens the wounded teleport (0x5aedc0) for the unit.
+func (u *fxUnit) GrantSkill(skill, level int, active bool) {
+	u.m.UMod.Skills = append(u.m.UMod.Skills, d2mapentity.UModSkill{Skill: skill, Level: level, Active: active})
+
+	if !active || u.d == nil || u.d.asset == nil || u.d.asset.Records == nil {
+		return
+	}
+
+	reg := u.d.asset.Records.SkillTable()
+
+	for _, sm := range d2skill.MonsterAuraStats(reg, reg.ByID(skill), level, u.m.Vitals.Level) {
+		if id, ok := auraStatIDs[sm.Stat]; ok {
+			u.AddStat(id, sm.Value)
+		}
+	}
+}
+
+func (u *fxUnit) SetAIFlag20() {
+	u.m.UMod.AIFlag20 = true
+
+	if u.m.Brain != nil { // 0x5aedc0 tests this flag on the unit's brain
+		u.m.Brain.CanTeleport = true
+	}
+}
 func (u *fxUnit) ScheduleTimerEvent() { u.m.UMod.TimerEvent = true }
 
 // finish turns the stats the callbacks left in extra into the engine's fields.
