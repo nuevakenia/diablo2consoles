@@ -375,6 +375,9 @@ type SummonOrder struct {
 	Passives []StatMod
 	// TrapSkill is the monster skill a trap or totem uses (sumskill1).
 	TrapSkill string
+	// TrapLevel is the level of the trap's monster skill (sumsk1calc) and TrapLife the shots the sentry may fire
+	// (calc4 of that skill at that level, MONAI_Sentry_FollowLeaderOrIdle 0x5e9360); 0 = not known.
+	TrapLevel, TrapLife int
 	// Stats from the skill's aurastat columns (damagepercent, tohit, armorclass).
 	Stats []StatMod
 	// HP is an extra life bonus (percent for golems/walls, flat for walls).

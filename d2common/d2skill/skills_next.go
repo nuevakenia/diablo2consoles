@@ -166,7 +166,11 @@ func doPsychicHammerFn(c *cast) {
 // caster's level) is the one of Conversion.
 func doMindBlastFn(c *cast) {
 	ax, ay := c.aim()
-	radius := c.env.eval(c.sk.AuraRangeCalc)
+	radius := c.calcOrState()
+	if radius == 0 {
+		radius = c.env.eval(c.sk.AuraRangeCalc)
+	}
+
 	chance := Diminishing(c.lvl, c.sk.Params[5], c.sk.Params[6])
 	d := c.desc()
 

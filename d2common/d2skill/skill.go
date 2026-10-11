@@ -70,6 +70,8 @@ type Skill struct {
 
 	Params [9]int
 	Calc   [5]*d2calc.Program
+	// PrgCalc are prgcalc1..3 (1-based), read by SRVDO_EvalSkillCalcOrStateValue 0x5d4c80-ish (see calcOrState).
+	PrgCalc [4]*d2calc.Program
 
 	DamageSpec
 
