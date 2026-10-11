@@ -97,6 +97,22 @@ func (d *Director) KillMonster(m *d2mapentity.Monster) bool {
 	return true
 }
 
+// ExtraDrops rolls the treasure class of a dead monster n more times, as a
+// kill by a player would (the endgame trio reward, d2uber.Trio). It returns the
+// number of rolls made.
+func (d *Director) ExtraDrops(m *d2mapentity.Monster, n int) int {
+	u := d.byEntity[m.ID()]
+	if u == nil {
+		return 0
+	}
+
+	for i := 0; i < n; i++ {
+		d.dropLoot(u, true)
+	}
+
+	return n
+}
+
 // BrainOf returns the AI brain of a monster (nil for unknown monsters).
 func (d *Director) BrainOf(m *d2mapentity.Monster) *d2monster.Brain {
 	if u := d.byEntity[m.ID()]; u != nil {

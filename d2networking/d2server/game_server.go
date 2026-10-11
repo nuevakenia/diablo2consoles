@@ -196,6 +196,7 @@ func (g *GameServer) Start() error {
 
 	go g.packetManager()
 	go g.idleLoop()
+	go g.hitLoop()
 
 	go func() {
 		for {

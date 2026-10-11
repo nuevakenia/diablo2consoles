@@ -24,13 +24,14 @@ type social struct {
 	trades  map[string]*d2playertrade.Session // by player id; both traders map to the session
 	portals *d2portal.Registry                // open town portal pairs, one per owner
 	idle    *idleTracker                      // last message time per client (idle.go)
+	hits    *hitQueue                         // PvP hits waiting for the next flush (hitqueue.go)
 	// size replaces the item size lookup of the game data (tests).
 	size d2playertrade.Sizer
 }
 
 func newSocial() *social {
 	return &social{roster: d2party.New(), trades: map[string]*d2playertrade.Session{}, portals: d2portal.NewRegistry(),
-		idle: newIdleTracker(nil)}
+		idle: newIdleTracker(nil), hits: newHitQueue()}
 }
 
 // socialAddPlayer enters a player into the roster.
@@ -61,6 +62,11 @@ func (g *GameServer) socialRemovePlayer(id string) {
 
 	g.soc.roster.Remove(id)
 	g.soc.mu.Unlock()
+
+	// the hits of a player who leaves die with him (N16, 0x57a900)
+	if n := g.soc.hits.PurgeAttacker(id); n > 0 {
+		g.Infof("PVP purged %d pending hit(s) of %q (left the game)", n, name)
+	}
 
 	g.broadcastRoster(fmt.Sprintf("%s left the game", name))
 
@@ -285,7 +291,13 @@ func (g *GameServer) onPvPHit(client ClientConnection, packet d2netpacket.NetPac
 		return err
 	}
 
-	return target.SendPacketToClient(pkt)
+	if p.Kill { // a death report is not part of the hit sequence
+		return target.SendPacketToClient(pkt)
+	}
+
+	g.soc.hits.Add(p.Attacker, p.Target, pkt) // delivered by the next flush (hitLoop)
+
+	return nil
 }
 
 // partyMaxLevel is the character level at which kills stop giving experience.

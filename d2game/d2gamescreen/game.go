@@ -18,6 +18,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2gui"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2uber"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
 
@@ -181,6 +182,8 @@ type Game struct {
 	aiTest               *aiAutoTest
 	bossTest             *bossAutoTest
 	uber                 *uberRuntime
+	forge                *forgeShower // N22: the running Hellforge reward shower
+	trio                 d2uber.Trio  // N24: which of the three endgame bosses died in this game
 	chaos                *chaosRuntime
 	act3                 act3State
 	uberTest             *uberAutoTest

@@ -153,6 +153,19 @@ func TestServerPartyAndPvP(t *testing.T) {
 
 	var relayed d2netpacket.PvPHitPacket
 
+	// N16: the hit waits in the defender's list until the flush
+	if g.soc.hits.Pending("b") != 1 {
+		t.Fatalf("pending hits %d, want 1", g.soc.hits.Pending("b"))
+	}
+
+	for _, p := range b.got {
+		if p.PacketType == d2netpackettype.PvPHit {
+			t.Fatal("the hit was delivered before the flush")
+		}
+	}
+
+	g.flushHits()
+
 	for _, p := range b.got {
 		if p.PacketType == d2netpackettype.PvPHit {
 			relayed, _ = d2netpacket.UnmarshalPvPHit(p.PacketData)
