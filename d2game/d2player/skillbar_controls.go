@@ -147,7 +147,7 @@ func (g *GameControls) SelectSkill(left bool, id int) error {
 
 	g.bar()
 	g.playClick()
-	g.Infof("SKILLBAR select hand=%s skill=%q id=%d level=%d", handName(left), s.Skill, id, s.SkillPoints)
+	g.watchLogf("SKILLBAR select hand=%s skill=%q id=%d level=%d", handName(left), s.Skill, id, s.SkillPoints)
 	g.logSkillState("select")
 	g.saveHero()
 

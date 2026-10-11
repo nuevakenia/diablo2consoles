@@ -83,6 +83,9 @@ func (l *Label) render(target d2interface.Surface) {
 	target.Render(l.surface)
 }
 
+// GetSize returns the size of the label in pixels.
+func (l *Label) GetSize() (width, height int) { return l.getSize() }
+
 func (l *Label) getSize() (width, height int) {
 	return l.surface.GetSize()
 }

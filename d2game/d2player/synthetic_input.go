@@ -111,6 +111,21 @@ func (g *GameControls) parseClick(spec string) (d2enum.MouseButton, d2enum.KeyMo
 
 		hx, hy := d2display.ToScreen(ux, uy)
 		spec = fmt.Sprintf("%s@%d,%d", spec[:i], hx, hy)
+	} else if i := strings.Index(spec, "@menu:"); i >= 0 {
+		// a row of the escape menu page that is showing (its gui labels know their place)
+		var row int
+		if _, e := fmt.Sscanf(spec[i+len("@menu:"):], "%d", &row); e != nil {
+			return 0, 0, 0, 0, fmt.Errorf("click position %q: want @menu:row", spec[i:])
+		}
+
+		mx, my, ok := g.escapeMenu.RowCenter(row)
+		if !ok {
+			return 0, 0, 0, 0, fmt.Errorf("click @menu:%d: the escape menu has no such row", row)
+		}
+
+		g.watchLogf("CLICK target kind=menu row=%d at=(%d,%d) screen=%dx%d", row, mx, my, d2display.W(), d2display.H())
+		sx, sy := d2display.ToScreen(mx, my) // the gui lays out the menu in the interface column
+		spec = fmt.Sprintf("%s@%d,%d", spec[:i], sx, sy)
 	} else if !strings.Contains(spec, "@") {
 		spec = fmt.Sprintf("%s@%d,%d", spec, sx, sy)
 	}
@@ -468,7 +483,7 @@ func (g *GameControls) AutoKey(spec string) error {
 
 // logPanelState logs which panels are open after a synthetic input, and the other state a click or key can change.
 func (g *GameControls) logPanelState(after string) {
-	g.Infof("INPUT panels after %s: inventory=%t character=%t skills=%t quest=%t automap=%t menu=%t stash=%t cube=%t "+
+	g.watchLogf("INPUT panels after %s: inventory=%t character=%t skills=%t quest=%t automap=%t menu=%t stash=%t cube=%t "+
 		"running=%t cursor_item=%t skillmenu=%t", after,
 		g.inventory.IsOpen(), g.heroStatsPanel.IsOpen(), g.skilltree.IsOpen(), g.questLog.IsOpen(),
 		g.automap.On(), g.escapeMenu.IsOpen(), g.stash.IsOpen(), g.cube.IsOpen(),

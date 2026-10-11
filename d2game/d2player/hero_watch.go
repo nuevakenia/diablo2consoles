@@ -80,7 +80,12 @@ func (g *GameControls) advanceHeroWatch(elapsed float64) {
 
 // SetWatchLog sets where the watch lines go. The scenario runner only sees the log of the game screen, not the
 // one of this package, so the game screen passes its own.
-func (g *GameControls) SetWatchLog(f func(format string, args ...interface{})) { g.watchLog = f }
+func (g *GameControls) SetWatchLog(f func(format string, args ...interface{})) {
+	g.watchLog = f
+	if g.escapeMenu != nil {
+		g.escapeMenu.SetWatchLog(f)
+	}
+}
 
 func (g *GameControls) watchLogf(format string, args ...interface{}) {
 	if g.watchLog != nil {

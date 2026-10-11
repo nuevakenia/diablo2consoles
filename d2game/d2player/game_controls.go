@@ -980,15 +980,27 @@ func (g *GameControls) onCloseHeroStatsPanel() {
 
 func (g *GameControls) toggleLeftSkillPanel() {
 	if !g.HelpOverlay.IsOpen() {
+		// clearScreen closes the popups too: remember whether this one was open, or the click that should close it reopens it
+		wasOpen := g.hud.skillSelectMenu.LeftPanel.IsOpen()
+
 		g.clearScreen()
-		g.hud.skillSelectMenu.ToggleLeftPanel()
+
+		if !wasOpen {
+			g.hud.skillSelectMenu.OpenLeftPanel()
+		}
 	}
 }
 
 func (g *GameControls) toggleRightSkillPanel() {
 	if !g.HelpOverlay.IsOpen() {
+		// clearScreen closes the popups too: remember whether this one was open, or the click that should close it reopens it
+		wasOpen := g.hud.skillSelectMenu.RightPanel.IsOpen()
+
 		g.clearScreen()
-		g.hud.skillSelectMenu.ToggleRightPanel()
+
+		if !wasOpen {
+			g.hud.skillSelectMenu.OpenRightPanel()
+		}
 	}
 }
 
