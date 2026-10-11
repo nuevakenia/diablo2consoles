@@ -239,7 +239,7 @@ func (d *Director) DyingNear(b *d2monster.Brain, radius int) bool {
 // general; the forced conditions answer for the unit state their skill applies
 // (terror 56, dim vision 23, taunt 27, confuse 59, attract 57, conversion 53).
 func (d *Director) HasState(b *d2monster.Brain, state int) bool {
-	return b.Forced != d2monster.ForcedNone && b.Forced.UnitStateID() == state
+	return (b.Forced != d2monster.ForcedNone && b.Forced.UnitStateID() == state) || d.unitHasState(b, state)
 }
 
 // ---- d2monster.Actor ----

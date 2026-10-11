@@ -252,30 +252,28 @@ func bigheadHealthy(c *Ctx, t Target) {
 }
 
 // corruptRogueRunDistance is the distance beyond which a Corrupt Rogue runs
-// at the target: 20 - 3*s where s is the second output of
-// MONSTER_CalcPlayerCountScaling (0x571760), the PlayerScaler host (VERIFIED
-// in batch 7: the exe computes 0x14 - 3*s; s is taken as 0 without a host).
+// at the target in Normal: 20 - 3*s where s is element 3 of the block
+// MONSTER_CalcPlayerCountScaling (0x571760) fills, which is the difficulty
+// clamped to 2 (VERIFIED in batch 8 from the stack offsets of 0x5efbf0 and the
+// callee's stores): 20 / 17 / 14. No host is needed.
 const corruptRogueRunDistance = 20
 
-// thinkCorruptRogue is MONAI_Think_CorruptRogue 0x5efbf0 (VERIFIED flow,
-// the group-info term UNVERIFIED). aip1 approach%, aip2 stall, aip3 attack%,
-// aip4 run velocity, aip5 run%. Also drives The Countess (class 45) whose six
-// followers come from the spawn plan, not from this function.
+// thinkCorruptRogue is MONAI_Think_CorruptRogue 0x5efbf0 (VERIFIED flow).
+// aip1 approach%, aip2 stall, aip3 attack%, aip4 run velocity, aip5 run%. Also
+// drives The Countess (class 45) whose six followers come from the spawn plan,
+// not from this function. The exe never sleeps after a failed walk or run
+// request (the tick just ends).
 func thinkCorruptRogue(c *Ctx) {
 	b, t := c.B, *c.Target
 
-	scale := 0
-	if ps, ok := c.W.(PlayerScaler); ok {
-		scale = ps.PlayerScaling(b)
+	scale := int(b.Diff)
+	if scale > 2 {
+		scale = 2
 	}
 
 	if c.Dist > corruptRogueRunDistance-3*scale {
 		c.SetSpeed(b.AIP(4))
-
-		// the exe ends the tick here whether or not the run was queued
-		if !c.RunTo(t, 3) {
-			c.Sleep(b.AIP(2))
-		}
+		c.RunTo(t, 3)
 
 		return
 	}
@@ -297,16 +295,11 @@ func thinkCorruptRogue(c *Ctx) {
 	}
 
 	if b.Roll(100) >= b.AIP(5) {
-		if !c.WalkTo(t, meleeReach) {
-			c.Sleep(b.AIP(2))
-		}
+		c.WalkTo(t, meleeReach)
 
 		return
 	}
 
 	c.SetSpeed(b.AIP(4))
-
-	if !c.RunTo(t, 3) {
-		c.Sleep(b.AIP(2))
-	}
+	c.RunTo(t, 3)
 }

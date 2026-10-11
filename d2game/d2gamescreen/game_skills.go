@@ -168,6 +168,16 @@ func (v *Game) skillEngine() *d2skills.Engine {
 				out[k] += v
 			}
 
+			if v.monsters != nil {
+				for k, n := range v.monsters.TimedHeroStats(v.localPlayer) {
+					if out == nil {
+						out = map[string]int{}
+					}
+
+					out[k] += n
+				}
+			}
+
 			return out
 		}
 	}
