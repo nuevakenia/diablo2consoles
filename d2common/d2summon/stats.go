@@ -27,12 +27,14 @@ type Mods struct {
 	// SKILL_ComputeSummonLevel (0x5c2850) adds as stats 0x1f / 0x13 from the
 	// MonLvl row of the summon's level (VERIFIED); see Templates.LevelBonus.
 	LevelAC, LevelAR int
+	// SummonResist is the owner's passive_summon_resist: resistances for the minion (d2skill.SummonResistMods).
+	SummonResist int
 }
 
 // FromOrder takes the modifiers of a d2skill summon order plus the skill's
 // evaluated passive stats.
 func FromOrder(o *d2skill.SummonOrder, passive []d2skill.StatMod) Mods {
-	return Mods{HPPct: o.HPPct, Aura: o.Stats, Passive: passive}
+	return Mods{HPPct: o.HPPct, Aura: o.Stats, Passive: passive, SummonResist: o.SummonResist}
 }
 
 // Stats are the combat numbers of one minion.
@@ -127,6 +129,21 @@ func Compute(t *Template, diff Difficulty, m Mods, r *d2rand.Seed) Stats {
 			} else {
 				s.Other[name] += st.Value
 			}
+		}
+	}
+
+	// SKILL_AttachSummonMasteryStatList 0x5c1f20 (VERIFIED): resistances from Summon Resist, set on a separate
+	// stat list after the minion exists, so they add to the template's and the skill's.
+	for _, rm := range d2skill.SummonResistMods(m.SummonResist, func(n string) int { return s.Absorb[n] }) {
+		switch rm.Stat {
+		case "fireresist":
+			s.Res[ResFire] += rm.Value
+		case "lightresist":
+			s.Res[ResLightning] += rm.Value
+		case "coldresist":
+			s.Res[ResCold] += rm.Value
+		case "poisonresist":
+			s.Res[ResPoison] += rm.Value
 		}
 	}
 
