@@ -131,6 +131,7 @@ type EscapeMenu struct {
 	keyBindingMenu *KeyBindingMenu
 
 	onCloseCb func()
+	watchLog  func(format string, args ...interface{})
 
 	// exeLayout (OD2_EXE_MENU_LAYOUT=1) puts the pentagrams where the original puts them (GameMenuPlan: row pitch
 	// 50, centred in H-0x50) instead of beside the gui element; off by default, the rows stay with the gui engine.
@@ -439,6 +440,37 @@ func (m *EscapeMenu) OnEscKey() {
 	}
 }
 
+// SetWatchLog sets where the menu's WATCH lines go (the scenario runner only reads the log of the game screen).
+func (m *EscapeMenu) SetWatchLog(f func(format string, args ...interface{})) { m.watchLog = f }
+
+func (m *EscapeMenu) watchLogf(format string, args ...interface{}) {
+	if m.watchLog != nil {
+		m.watchLog(format, args...)
+	}
+}
+
+// RowCenter is the centre, in the coordinates of mouse events, of row i of the page of the menu that is showing
+// (scripted clicks: click:left@menu:<i>).
+func (m *EscapeMenu) RowCenter(i int) (x, y int, ok bool) {
+	rows := m.layouts[m.currentLayout].actionableElements
+	if !m.isOpen || i < 0 || i >= len(rows) {
+		return 0, 0, false
+	}
+
+	r, isWidget := rows[i].(interface {
+		ScreenPos() (int, int)
+		GetSize() (int, int)
+	})
+	if !isWidget {
+		return 0, 0, false
+	}
+
+	sx, sy := r.ScreenPos()
+	w, h := r.GetSize()
+
+	return sx + w/2, sy + h/2, true
+}
+
 // SetOnCloseCb sets the callback that is run when close() is called
 func (m *EscapeMenu) SetOnCloseCb(cb func()) {
 	m.onCloseCb = cb
@@ -446,6 +478,7 @@ func (m *EscapeMenu) SetOnCloseCb(cb func()) {
 
 func (m *EscapeMenu) close() {
 	m.isOpen = false
+	m.watchLogf("MENU closed")
 
 	m.guiManager.SetLayout(nil)
 	m.onCloseCb()
@@ -463,6 +496,7 @@ func (m *EscapeMenu) playSound() {
 
 func (m *EscapeMenu) showLayout(id layoutID) {
 	m.playSound()
+	m.watchLogf("MENU show layout=%d", id)
 
 	if id == noLayoutID {
 		m.close()

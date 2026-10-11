@@ -103,7 +103,7 @@ func (g *GameControls) OpenStash() {
 	g.inventory.Open()
 	g.stash.Open()
 	g.updateLayout()
-	g.Infof("stash opened: items=%d", len(g.stash.grid.items))
+	g.watchLogf("stash opened: items=%d", len(g.stash.grid.items))
 }
 
 // OpenCube opens the Horadric Cube panel next to the inventory.
@@ -150,7 +150,7 @@ func (g *GameControls) UseBeltColumnNoSave(col int) bool {
 	}
 
 	if it, isItem := item.(*diablo2item.Item); isItem {
-		g.Infof("BELT use slot=%d code=%s name=%q", col+1, it.GetItemCode(), itemName(it))
+		g.watchLogf("BELT use slot=%d code=%s name=%q", col+1, it.GetItemCode(), itemName(it))
 		g.drink(it)
 	}
 
