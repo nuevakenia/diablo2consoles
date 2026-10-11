@@ -45,6 +45,7 @@ func (v *Game) hookNetwork() {
 	v.gameClient.OnTrade = v.onTrade
 	v.gameClient.OnPvPHit = v.onPvPHit
 	v.gameClient.OnPartyXP = v.onPartyXP
+	v.gameClient.OnPartyHeal = v.onPartyHeal
 	v.gameClient.OnRoster = v.onRoster
 	v.hookPortals()
 	v.hookRealm()
@@ -360,6 +361,55 @@ func (v *Game) skillRivals() []*d2mapentity.Player {
 	}
 
 	return out
+}
+
+// skillParty lists the heroes of the local hero's party (the targets of Holy
+// Bolt's heal, batch5_party.go).
+func (v *Game) skillParty() []*d2mapentity.Player {
+	if v.localPlayer == nil || v.gameClient.IsSinglePlayer() {
+		return nil
+	}
+
+	var out []*d2mapentity.Player
+
+	for id, p := range v.gameClient.Players {
+		if id == v.me() || p == nil || !v.gameClient.Roster.SameParty(v.me(), id) {
+			continue
+		}
+
+		out = append(out, p)
+	}
+
+	return out
+}
+
+// sendPartyHeal tells the server a Holy Bolt healed a party member.
+func (v *Game) sendPartyHeal(dst *d2mapentity.Player, amount int) {
+	pkt, err := d2netpacket.CreatePartyHealPacket(d2netpacket.PartyHealPacket{Healer: v.me(), Target: dst.ID(), Amount: amount})
+	if err == nil {
+		err = v.gameClient.SendPacketToServer(pkt)
+	}
+
+	if err != nil {
+		v.Errorf("party heal packet: %v", err)
+	}
+}
+
+// onPartyHeal applies a Holy Bolt heal of a party member to the local hero.
+func (v *Game) onPartyHeal(p d2netpacket.PartyHealPacket) {
+	if p.Target != v.me() || v.localPlayer == nil || v.localPlayer.IsDead() || v.localPlayer.Stats == nil {
+		return
+	}
+
+	st := v.localPlayer.Stats
+	before := st.Health
+
+	st.Health += p.Amount >> 8
+	if st.Health > st.MaxHealth {
+		st.Health = st.MaxHealth
+	}
+
+	v.Infof("PARTYHEAL healed healer=%q hp %d->%d/%d", p.Healer, before, st.Health, st.MaxHealth)
 }
 
 // sendSkillPvP announces a scaled skill hit on a hostile hero to the server,

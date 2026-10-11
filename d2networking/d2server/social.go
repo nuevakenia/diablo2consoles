@@ -233,6 +233,18 @@ func (g *GameServer) setHostileLocked(me, target string, hostile bool) error {
 	return nil
 }
 
+// pvpTownLocked is the town safe zone: UNIT_IsHostileToUnit (0x461460,
+// verified) tests the room of the ATTACKER with ROOM_IsTownRoom and, in a town,
+// answers "not hostile" for two players, whatever the relation flags say. The
+// server keeps the area of every hero (socialArea). Call with soc.mu held.
+func (g *GameServer) pvpTownLocked(attacker string) string {
+	if m, ok := g.soc.roster.Member(attacker); ok && d2level.IsTown(m.Area) {
+		return "the attacker is in a town"
+	}
+
+	return ""
+}
+
 // pvpBlocked is why a hit is refused, "" when it is allowed. Call with soc.mu held.
 func (g *GameServer) pvpBlockedLocked(attacker, target string) string {
 	r := g.soc.roster
@@ -265,6 +277,8 @@ func (g *GameServer) onPvPHit(client ClientConnection, packet d2netpacket.NetPac
 
 	if p.Kill { // the victim reports its death to the killer, who must have been allowed to hit it
 		reason = g.pvpBlockedLocked(p.Target, p.Attacker)
+	} else if reason == "" {
+		reason = g.pvpTownLocked(p.Attacker)
 	}
 
 	an, tn := g.nameOf(p.Attacker), g.nameOf(p.Target)
@@ -293,7 +307,7 @@ func (g *GameServer) onPvPHit(client ClientConnection, packet d2netpacket.NetPac
 		return err
 	}
 
-	// N16 is opt-in (OD2_HITQUEUE=1) until 9f-pvp-skills-ear is green with it
+	// N16 is opt-in (OD2_HITQUEUE=1): 9f-pvp-skills-ear passed once with it on (after a load flake) but the final rerun gave no result
 	if p.Kill || (os.Getenv("OD2_HITQUEUE") == "" && !g.soc.hitQueueOn) { // a death report is not part of the hit sequence
 		return target.SendPacketToClient(pkt)
 	}
@@ -301,6 +315,51 @@ func (g *GameServer) onPvPHit(client ClientConnection, packet d2netpacket.NetPac
 	g.soc.hits.Add(p.Attacker, p.Target, pkt) // delivered by the next flush (hitLoop)
 
 	return nil
+}
+
+// onPartyHeal relays a Holy Bolt heal to the healed party member. The sender is
+// the healer whatever the packet says; healer and target must share a party.
+func (g *GameServer) onPartyHeal(client ClientConnection, packet d2netpacket.NetPacket) error {
+	p, err := d2netpacket.UnmarshalPartyHeal(packet.PacketData)
+	if err != nil {
+		return err
+	}
+
+	p.Healer = client.GetUniqueID()
+
+	g.soc.mu.Lock()
+	same := p.Healer != p.Target && g.soc.roster.SameParty(p.Healer, p.Target)
+	hn, tn := g.nameOf(p.Healer), g.nameOf(p.Target)
+	g.soc.mu.Unlock()
+
+	if !same || p.Amount <= 0 {
+		g.Infof("PARTYHEAL BLOCKED healer=%q target=%q (not in the same party)", hn, tn)
+		return nil
+	}
+
+	target := g.connByID(p.Target)
+	if target == nil {
+		return nil
+	}
+
+	g.Infof("PARTYHEAL healer=%q target=%q amount=%d", hn, tn, p.Amount>>8)
+
+	pkt, err := d2netpacket.CreatePartyHealPacket(p)
+	if err != nil {
+		return err
+	}
+
+	return target.SendPacketToClient(pkt)
+}
+
+// syncPositionsLocked gives the roster the heroes' positions (tiles to subtiles)
+// for the experience range test. Call with soc.mu held.
+func (g *GameServer) syncPositionsLocked() {
+	for id, c := range g.connections {
+		if st := c.GetPlayerState(); st != nil {
+			g.soc.roster.SetPos(id, int(st.X*5), int(st.Y*5))
+		}
+	}
 }
 
 // partyMaxLevel is the character level at which kills stop giving experience.
@@ -316,6 +375,8 @@ func (g *GameServer) onPartyXP(client ClientConnection, packet d2netpacket.NetPa
 	p.Killer = client.GetUniqueID()
 
 	g.soc.mu.Lock()
+	g.syncPositionsLocked()
+
 	var shares []d2party.XPShare
 	if p.MonsterLevel > 0 {
 		shares = g.soc.roster.ShareKillXP(p.Killer, p.XP, p.MonsterLevel, partyMaxLevel)
@@ -604,6 +665,8 @@ func (g *GameServer) socialPacket(client ClientConnection, packet d2netpacket.Ne
 		return true, g.onPvPHit(client, packet)
 	case d2netpackettype.PartyXP:
 		return true, g.onPartyXP(client, packet)
+	case d2netpackettype.PartyHeal:
+		return true, g.onPartyHeal(client, packet)
 	case d2netpackettype.PortalOpen:
 		return true, g.onPortalOpen(client, packet)
 	}

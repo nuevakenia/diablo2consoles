@@ -189,6 +189,30 @@ func CreatePvPHitPacket(p PvPHitPacket) (NetPacket, error) {
 	return social(d2netpackettype.PvPHit, p)
 }
 
+// PartyHealPacket is a Holy Bolt that healed a party member (missile hit
+// function 7, 0x5a7a40, verified): the caster's client announces it, the server
+// checks that both are in the same party and relays it to the healed player,
+// whose client applies the life (the real game does this on the server and
+// tells the client with the 0x95 life update; the relay is UNVERIFIED).
+type PartyHealPacket struct {
+	Healer string `json:"healer"`
+	Target string `json:"target"`
+	// Amount is the life in 8.8 fixed point, as the missile computes it.
+	Amount int `json:"amount"`
+}
+
+// CreatePartyHealPacket builds a PartyHeal packet.
+func CreatePartyHealPacket(p PartyHealPacket) (NetPacket, error) {
+	return social(d2netpackettype.PartyHeal, p)
+}
+
+// UnmarshalPartyHeal decodes a PartyHeal packet's data.
+func UnmarshalPartyHeal(b []byte) (p PartyHealPacket, err error) {
+	err = json.Unmarshal(b, &p)
+
+	return
+}
+
 // CreatePartyXPPacket builds a PartyXP packet.
 func CreatePartyXPPacket(p PartyXPPacket) (NetPacket, error) {
 	return social(d2netpackettype.PartyXP, p)

@@ -101,6 +101,19 @@ func (g *GameClient) handlePartyXPPacket(packet d2netpacket.NetPacket) error {
 	return nil
 }
 
+func (g *GameClient) handlePartyHealPacket(packet d2netpacket.NetPacket) error {
+	p, err := d2netpacket.UnmarshalPartyHeal(packet.PacketData)
+	if err != nil {
+		return err
+	}
+
+	if g.OnPartyHeal != nil {
+		g.OnPartyHeal(p)
+	}
+
+	return nil
+}
+
 // ResolvePlayer returns the id of a player given by id or by hero name.
 func (g *GameClient) ResolvePlayer(nameOrID string) (string, error) {
 	if g.Roster.Has(nameOrID) {

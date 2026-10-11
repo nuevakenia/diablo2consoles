@@ -108,11 +108,12 @@ type GameClient struct {
 	// Roster is this client's copy of the server's roster (players, parties,
 	// hostility, invitations); the hooks are set by the game screen and run on
 	// the game loop (Drain).
-	Roster    *d2party.Roster
-	OnTrade   func(d2netpacket.TradeUpdatePacket)
-	OnPvPHit  func(d2netpacket.PvPHitPacket)
-	OnPartyXP func(d2netpacket.PartyXPPacket)
-	OnRoster  func(notice string)
+	Roster      *d2party.Roster
+	OnTrade     func(d2netpacket.TradeUpdatePacket)
+	OnPvPHit    func(d2netpacket.PvPHitPacket)
+	OnPartyXP   func(d2netpacket.PartyXPPacket)
+	OnPartyHeal func(d2netpacket.PartyHealPacket)
+	OnRoster    func(notice string)
 	// OnPortals receives the server's list of open town portal pairs.
 	OnPortals func(pairs []d2portal.Pair, notice string)
 	// OnRealmUnit receives the monsters of a game played through the realm
@@ -384,6 +385,8 @@ func (g *GameClient) handlePacket(packet d2netpacket.NetPacket) error {
 		return g.handlePvPPacket(packet)
 	case d2netpackettype.PartyXP:
 		return g.handlePartyXPPacket(packet)
+	case d2netpackettype.PartyHeal:
+		return g.handlePartyHealPacket(packet)
 	case d2netpackettype.PortalUpdate:
 		return g.handlePortalPacket(packet)
 	case d2netpackettype.ServerClosed:
@@ -391,7 +394,12 @@ func (g *GameClient) handlePacket(packet d2netpacket.NetPacket) error {
 		g.Infof("Server has been closed")
 		os.Exit(0)
 	case d2netpackettype.ServerFull:
-		g.Infof("Server is full") // need to be verified
+		if sf, err := d2netpacket.UnmarshalServerFull(packet.PacketData); err == nil && sf.Reason != "" {
+			g.Infof("Join refused (code %d): %s", sf.Code, sf.Reason)
+		} else {
+			g.Infof("Server is full") // need to be verified
+		}
+
 		os.Exit(0)
 	default:
 		g.Fatalf("Invalid packet type: %d", packet.PacketType)

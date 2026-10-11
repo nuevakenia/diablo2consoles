@@ -324,13 +324,15 @@ type JoinGame struct {
 	Class      uint8
 	Level      uint8
 	Difficulty uint8
+	// Version is byte 20 (GameVersion, 14; the exe compares its field with 0xE).
+	Version uint8
 }
 
 // Marshal returns the packet.
 func (m JoinGame) Marshal() []byte {
 	b := newW(CtlJoinGame, joinGameSize)
 	putName(b[1:], m.Name)
-	b[17], b[18], b[19] = m.Class, m.Level, m.Difficulty
+	b[17], b[18], b[19], b[20] = m.Class, m.Level, m.Difficulty, m.Version
 
 	return b
 }
@@ -341,7 +343,7 @@ func ParseJoinGame(b []byte) (JoinGame, error) {
 		return JoinGame{}, ErrWrongSize
 	}
 
-	return JoinGame{Name: getName(b[1:]), Class: b[17], Level: b[18], Difficulty: b[19]}, nil
+	return JoinGame{Name: getName(b[1:]), Class: b[17], Level: b[18], Difficulty: b[19], Version: b[20]}, nil
 }
 
 // LeaveGame returns the 0x69 packet (1 byte, size unverified).

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"sync"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
@@ -180,6 +181,20 @@ func (s *ServerSide) Encode(np d2netpacket.NetPacket) ([][]byte, error) {
 			}
 
 			out = append(out, d2gs.RosterUpdate{UnitID: s.IDs.Assign(in.ID), PartyID: party, Level: clampU16(in.Level)}.Marshal())
+
+			// 0x8B goes to the owner of a relation list only: this client's own nodes
+			if in.ID == s.PlayerID {
+				others := make([]string, 0, len(in.Rel))
+				for o := range in.Rel {
+					others = append(others, o)
+				}
+
+				sort.Strings(others)
+
+				for _, o := range others {
+					out = append(out, d2gs.PartyState{UnitID: s.IDs.Assign(o), State: boolByte(in.Rel[o])}.Marshal())
+				}
+			}
 		}
 
 		return append(out, tunnelNP(d2gs.S2CMetaAE, np)...), nil
@@ -375,7 +390,7 @@ func (c *ClientSide) Encode(np d2netpacket.NetPacket) ([][]byte, error) {
 
 		c.PlayerID = req.ID
 
-		j := d2gs.JoinGame{}
+		j := d2gs.JoinGame{Version: d2gs.GameVersion}
 		if st := req.PlayerState; st != nil {
 			j.Name, j.Class, j.Difficulty = st.HeroName, uint8(st.HeroType), uint8(st.Difficulty)
 
@@ -481,6 +496,25 @@ func (c *ClientSide) Decode(plain []byte) (out []d2netpacket.NetPacket, ignored 
 			}
 
 			c.updatePeer(rp.UnitID, func(pi *PeerInfo) { pi.PartyID, pi.partyKnown = rp.PartyID, true })
+		case d2gs.S2CJoinReject:
+			jr, perr := d2gs.ParseJoinReject(p)
+			if perr != nil {
+				return out, ignored, perr
+			}
+
+			sf, serr := d2netpacket.CreateServerFullPacketWithReason(jr.Code, jr.Reason())
+			if serr != nil {
+				return out, ignored, serr
+			}
+
+			out = append(out, sf)
+		case d2gs.S2CPartyState:
+			ps, perr := d2gs.ParsePartyState(p)
+			if perr != nil {
+				return out, ignored, perr
+			}
+
+			c.updatePeer(ps.UnitID, func(pi *PeerInfo) { pi.PartyState = ps.State })
 		case d2gs.S2CRosterKills:
 			rk, perr := d2gs.ParseRosterKills(p)
 			if perr != nil {
@@ -621,6 +655,8 @@ type PeerInfo struct {
 	Level   uint16
 	PartyID uint16 // d2gs.NoParty when none
 	Kills   int16
+	// PartyState is the byte of the last 0x8B for the unit (the relation bit).
+	PartyState uint8
 
 	partyKnown bool // a 0x75 or 0x8d told us the party id
 }
@@ -719,3 +755,11 @@ func (c *ClientSide) patchRoster(ru *d2netpacket.RosterUpdatePacket, data []byte
 }
 
 func regionFromAux(aux uint32) d2enum.RegionIdType { return d2enum.RegionIdType(aux) }
+
+func boolByte(b bool) uint8 {
+	if b {
+		return 1
+	}
+
+	return 0
+}
