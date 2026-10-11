@@ -337,8 +337,12 @@ func absInt(a int) int {
 // EffectiveNoDrop is the NoDrop weight with the multi-player correction of
 // ITEMGEN_RollTreasureClassDrops: for n > 1 players it becomes
 // total*f^n/(1-f^n) with f = nodrop/(nodrop+total), truncated. The structure
-// is VERIFIED, the exact rounding is UNVERIFIED (the float math is in x87
-// registers). For one player it is the NoDrop column.
+// and the math are VERIFIED from the x87 instructions at 0x5587e7..0x558852:
+// f = nodrop/(nodrop+total) in extended precision, f^n by repeated
+// multiplication, then ftol(total*f^n/(1-f^n)) truncating toward zero; 0 when
+// 1-f^n is exactly 0. Go uses float64 instead of the 80-bit stack, which can
+// only differ when the product lands within 1e-12 of an integer. For one
+// player it is the NoDrop column.
 func EffectiveNoDrop(noDrop, total, players int) int {
 	if noDrop <= 0 || players <= 1 {
 		return noDrop

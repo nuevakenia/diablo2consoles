@@ -48,6 +48,13 @@ func loadReal(t *testing.T) *real {
 func (r *real) run(t *testing.T, ctx *Context, items ...Item) *Result {
 	t.Helper()
 
+	items = append([]Item(nil), items...)
+	for i := range items {
+		if b, ok := r.cat.Base(items[i].Code); ok && b.Quest && items[i].QuestDifficulty == 0 {
+			items[i].QuestDifficulty = ctx.Difficulty // found in this difficulty
+		}
+	}
+
 	m := r.cat.Find(r.tab, ctx, items)
 	if m == nil {
 		t.Fatalf("no recipe for %v", items)
@@ -349,8 +356,16 @@ func TestRealPotionsAndAmmo(t *testing.T) {
 		t.Errorf("3 rings: %+v", res.Products)
 	}
 
-	res = r.run(t, lodCtx, Item{Code: "aqv", Quantity: 40})
-	_ = res
+	// two arrows -> bolts takes two quiver units (units are counted, not the
+	// stack quantity)
+	res = r.run(t, lodCtx, Item{Code: "aqv", Quantity: 40}, Item{Code: "aqv", Quantity: 40})
+	if res.Products[0].Item.Code != "cqv" {
+		t.Errorf("arrows: %+v", res.Products)
+	}
+
+	if m := r.cat.Find(r.tab, lodCtx, []Item{{Code: "aqv", Quantity: 40}}); m != nil {
+		t.Errorf("one quiver matched %q", m.Recipe.Description)
+	}
 }
 
 func TestRealUpgradeRepairUnsocket(t *testing.T) {
@@ -547,5 +562,21 @@ func TestRealGemSocketing(t *testing.T) {
 
 	if len(it.Socketed) != 2 {
 		t.Fatalf("socketed %v", it.Socketed)
+	}
+}
+
+// Op 28 recipes only take quest items found in the current difficulty or a
+// higher one (CUBE_CheckRecipeInputSlot 0x562e40, questdiffcheck).
+func TestRealQuestDifficultyCheck(t *testing.T) {
+	r := loadReal(t)
+
+	old := []Item{{Code: "msf", QuestDifficulty: 0}, {Code: "vip", QuestDifficulty: 0}}
+	if m := r.cat.Find(r.tab, lodCtx, old); m != nil {
+		t.Errorf("normal-difficulty staff parts matched in hell: %s", m.Recipe.Description)
+	}
+
+	ok := []Item{{Code: "msf", QuestDifficulty: 2}, {Code: "vip", QuestDifficulty: 2}}
+	if m := r.cat.Find(r.tab, lodCtx, ok); m == nil {
+		t.Error("hell staff parts did not match")
 	}
 }

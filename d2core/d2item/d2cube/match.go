@@ -2,6 +2,7 @@ package d2cube
 
 import (
 	"strings"
+	"time"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop"
 )
@@ -34,7 +35,33 @@ type Item struct {
 	Recharged  bool
 	Identified bool
 	Crafted    bool
+
+	// FileIndex is the unique/set row index (-1 or 0 when none); used by the
+	// recipe input condition op 27.
+	FileIndex int
+	// QuestDifficulty is the difficulty a quest item was found in (stat
+	// 0x164), checked by the quest recipes (op 28).
+	QuestDifficulty int
+	// Stat returns a stat of the item for the per-item recipe conditions
+	// (ops 15 to 26); nil means no stats are known.
+	Stat StatFunc
 }
+
+// StatKind selects which value of a stat a recipe condition reads.
+type StatKind int
+
+// Stat kinds: the total (STATS_GetUnitStat), the base value
+// (STATS_GetUnitBaseStat) and the bonus (STATS_GetUnitStatBonus).
+const (
+	StatTotal StatKind = iota
+	StatBase
+	StatBonus
+)
+
+// StatFunc reads a stat. shift is ItemStatCost valshift: the exe compares the
+// stat with value >> shift. known is false for a stat without a row, which
+// fails the condition.
+type StatFunc func(kind StatKind, id int) (value int, shift uint, known bool)
 
 // RolledMod is a recipe property with its value rolled.
 type RolledMod struct {
@@ -60,6 +87,12 @@ type Context struct {
 	Ladder      bool   // ladder / realm game
 	Expansion   bool   // Lord of Destruction
 	Class       string // class code: ama sor nec pal bar dru ass
+
+	// Now is the date the day conditions (ops 1 and 2) read; zero means
+	// time.Now().
+	Now time.Time
+	// Stat reads a hero stat for the player conditions (ops 3 to 14).
+	Stat StatFunc
 }
 
 // Match is a recipe together with the cube items that satisfy its inputs.
@@ -98,12 +131,61 @@ func (c *Context) allows(r *Recipe) bool {
 	return c.condition(r)
 }
 
-// condition evaluates op/param/value. UNVERIFIED: the 1.14b table only uses op
-// 28 (the quest recipes: staff, Khalim's flail, Cow portal, Pandemonium keys),
-// which is always true here; no other operator appears in the table, so any
-// other op makes the recipe unusable instead of guessing its meaning.
+// condition evaluates the recipe's op/param/value the way CUBE_ServerTransmute
+// (0x5642d0) does: op 1 passes on a day of month in [param, value], op 2 on
+// the weekday (1 = Sunday) value, ops 3 to 14 compare a hero stat (four
+// comparisons per kind: at least, at most, differs, equals; kinds total, base,
+// bonus). Other ops (15 to 28 belong to the inputs, 0 and unknown ones to
+// nobody) pass here. A stat without a row fails. The comparison names for ops
+// 5/6 follow the decompile; none of ops 1 to 14 is used by the shipped table.
 func (c *Context) condition(r *Recipe) bool {
-	return r.Op == 0 || r.Op == 28
+	switch {
+	case r.Op == 1:
+		d := c.Now
+		if d.IsZero() {
+			d = time.Now()
+		}
+
+		return d.Day() >= r.Param && d.Day() <= r.Value
+	case r.Op == 2:
+		d := c.Now
+		if d.IsZero() {
+			d = time.Now()
+		}
+
+		return int(d.Weekday())+1 == r.Value
+	case r.Op >= 3 && r.Op <= 14:
+		return statCondition(c.Stat, r.Op-3, r.Param, r.Value)
+	}
+
+	return true
+}
+
+// statCondition checks one stat condition; idx is 0..11: kind = idx/4, compare
+// = idx%4 (0 at least, 1 at most, 2 differs, 3 equals). A nil reader passes
+// (the caller has no stats), an unknown stat fails.
+func statCondition(fn StatFunc, idx, id, value int) bool {
+	if fn == nil {
+		return true
+	}
+
+	v, shift, known := fn(StatKind(idx/4), id)
+	if !known {
+		return false
+	}
+
+	want := value >> shift
+
+	switch idx % 4 {
+	case 0:
+		return v >= want
+	case 1:
+		return v <= want
+	case 2:
+		return v != want
+	}
+
+	return v == want
 }
 
 // IsIngredient reports whether an item is a recipe ingredient rather than the
@@ -133,7 +215,7 @@ func (cat *Catalog) Matches(in *Input, it *Item) bool {
 	switch {
 	case in.Any:
 	case in.Code != "":
-		if it.Code != in.Code {
+		if it.Code != in.Code && !(in.Upgrade && sameOrHigherTier(in.Code, b)) {
 			return false
 		}
 	case in.Type != "":
@@ -162,8 +244,63 @@ func (cat *Catalog) Matches(in *Input, it *Item) bool {
 		return false
 	}
 
-	if in.Upgrade && !(b.Tier == TierBasic || b.Tier == TierExceptional) {
+	// upg (0x5636e0 region): the item may be the input's base item or a higher
+	// tier of the same family (normal, exceptional, elite).
+	if in.Upgrade && in.Code != "" && !sameOrHigherTier(in.Code, b) {
 		return false
+	}
+
+	if in.NoRuneword && it.Runeword != "" {
+		return false
+	}
+
+	return true
+}
+
+// sameOrHigherTier reports whether the item base b is the base item code or a
+// higher tier of its family: normal item code only equals; exceptional also
+// accepts the normal one; elite accepts all three.
+func sameOrHigherTier(code string, b *Base) bool {
+	switch {
+	case b.Code == code:
+		return true
+	case b.Code == b.Norm:
+		return false
+	case b.Code == b.Uber:
+		return code == b.Norm
+	case b.Code == b.Ultra:
+		return code == b.Norm || code == b.Uber
+	}
+
+	return false
+}
+
+// matchInput adds the recipe-level input rules to Matches: the quest
+// difficulty check of op 28 and, for the first input, the item conditions of
+// ops 15 to 27.
+func (cat *Catalog) matchInput(ctx *Context, r *Recipe, slot int, in *Input, it *Item) bool {
+	if !cat.Matches(in, it) {
+		return false
+	}
+
+	if r.Op == 28 {
+		if b := cat.bases[it.Code]; b != nil && b.Quest && b.QuestDiffCheck && it.QuestDifficulty < ctx.Difficulty {
+			return false
+		}
+	}
+
+	if slot == 0 {
+		switch {
+		case r.Op >= 15 && r.Op <= 26:
+			if !statCondition(it.Stat, r.Op-15, r.Param, r.Value) {
+				return false
+			}
+		case r.Op == 27:
+			// The exe rejects an item whose unique/set row equals value.
+			if it.FileIndex == r.Value {
+				return false
+			}
+		}
 	}
 
 	return true
@@ -190,7 +327,7 @@ func (cat *Catalog) Find(tab *Table, ctx *Context, items []Item) *Match {
 			continue
 		}
 
-		if m := cat.assign(r, items); m != nil {
+		if m := cat.assign(ctx, r, items); m != nil {
 			return m
 		}
 	}
@@ -200,13 +337,15 @@ func (cat *Catalog) Find(tab *Table, ctx *Context, items []Item) *Match {
 
 // assign searches an assignment of cube items to the inputs such that every
 // cube item is used exactly once.
-func (cat *Catalog) assign(r *Recipe, items []Item) *Match {
-	// quick count check: the number of items must equal the sum of the inputs'
-	// item counts (a stackable input of qty N is one item holding N)
-	need := 0
-
-	for k := range r.Inputs {
-		need += cat.itemCount(&r.Inputs[k])
+func (cat *Catalog) assign(ctx *Context, r *Recipe, items []Item) *Match {
+	// The exe requires the number of items in the cube to equal the recipe's
+	// numinputs column (CUBE_ServerTransmute 0x5642d0); fall back to the sum of
+	// the input counts when the column is blank.
+	need := r.NumInputs
+	if need == 0 {
+		for k := range r.Inputs {
+			need += cat.itemCount(&r.Inputs[k])
+		}
 	}
 
 	if need != len(items) {
@@ -234,7 +373,7 @@ func (cat *Catalog) assign(r *Recipe, items []Item) *Match {
 			}
 
 			for i := start; i < len(items); i++ {
-				if used[i] || !cat.Matches(in, &items[i]) || !cat.quantityOK(in, &items[i]) {
+				if used[i] || !cat.matchInput(ctx, r, k, in, &items[i]) || !cat.quantityOK(in, &items[i]) {
 					continue
 				}
 
@@ -262,30 +401,10 @@ func (cat *Catalog) assign(r *Recipe, items []Item) *Match {
 	return &Match{Recipe: r, Assigned: asg}
 }
 
-// itemCount is how many cube items an input takes: qty items, or a single
-// stack when the item is stackable and a quantity is asked for.
-func (cat *Catalog) itemCount(in *Input) int {
-	if in.Qty > 1 && cat.stackableInput(in) {
-		return 1
-	}
+// itemCount is how many cube items an input takes. The exe counts item units
+// only: a stackable input asks for qty separate stacks (2 arrows -> bolts
+// needs two quivers in the cube), the stack quantity is never read
+// (CUBE_CheckRecipeInputSlot 0x562e40).
+func (cat *Catalog) itemCount(in *Input) int { return in.Qty }
 
-	return in.Qty
-}
-
-func (cat *Catalog) stackableInput(in *Input) bool {
-	if in.Code == "" {
-		return false
-	}
-
-	b := cat.bases[in.Code]
-
-	return b != nil && b.Stackable
-}
-
-func (cat *Catalog) quantityOK(in *Input, it *Item) bool {
-	if in.Qty > 1 && cat.stackableInput(in) {
-		return it.Quantity >= in.Qty
-	}
-
-	return true
-}
+func (cat *Catalog) quantityOK(in *Input, it *Item) bool { return true }

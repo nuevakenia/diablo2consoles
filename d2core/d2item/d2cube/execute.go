@@ -24,6 +24,10 @@ type Product struct {
 	// rolled item keeps besides the recipe's mods.
 	CraftAffixes int
 
+	// Returned are the codes of the items taken out of the sockets of a
+	// "rem" result; the game puts them in the inventory.
+	Returned []string
+
 	// Portal is set for the named portal results ("Cow Portal", ...): no item
 	// is created, the game opens that portal.
 	Portal string
@@ -38,22 +42,23 @@ type Result struct {
 	Products []Product
 }
 
-// OutputLevel is the item level of a recipe result. UNVERIFIED (table
-// semantics): lvl + plvl% of the player level + ilvl% of the main input's item
-// level; when all three are blank the main input's level is kept.
+// OutputLevel is the item level of a recipe result, as CUBE_ServerCreateRecipeOutputs
+// (0x5638a0) computes it: a fixed lvl wins; otherwise plvl percent of the hero
+// level plus ilvl percent of the first input's item level (each product
+// truncated by 100). The result is at least 1 and at most the highest hero
+// level (99). With all three blank the level is 1 (not the input's level).
 func OutputLevel(o *Output, playerLevel, mainILvl int) int {
-	lvl := o.Level + o.PLevel*playerLevel/100 + o.ILevel*mainILvl/100
-	if o.Level == 0 && o.PLevel == 0 && o.ILevel == 0 {
-		lvl = mainILvl
-		if lvl <= 0 {
-			lvl = playerLevel
-		}
+	lvl := o.Level
+
+	if lvl == 0 {
+		lvl = o.PLevel * playerLevel / 100 //nolint:gomnd // percent
+		lvl += o.ILevel * mainILvl / 100   //nolint:gomnd
 	}
 
 	switch {
 	case lvl < 1:
 		return 1
-	case lvl > 99: //nolint:gomnd // the item level cap
+	case lvl > 99: //nolint:gomnd // the highest hero level
 		return 99
 	}
 
@@ -83,24 +88,22 @@ func CraftedAffixCount(rng d2drop.RNG, ilvl int) int {
 }
 
 // MainItem returns the cube item a "useitem" or "usetype" result is based on:
-// the first consumed item that is not an ingredient (gem, rune, jewel, scroll,
-// potion), or the first consumed item.
+// the item matched by the recipe's first input (the last one when it takes
+// several), which is what the exe records in the output slots while checking
+// input 0 (CUBE_CheckRecipeInputSlot 0x562e40).
 func (cat *Catalog) MainItem(m *Match, items []Item) int {
-	first := -1
+	if len(m.Assigned) > 0 && len(m.Assigned[0]) > 0 {
+		l := m.Assigned[0]
+		return l[len(l)-1]
+	}
 
 	for _, list := range m.Assigned {
-		for _, i := range list {
-			if first < 0 {
-				first = i
-			}
-
-			if !cat.IsIngredient(&items[i]) {
-				return i
-			}
+		if len(list) > 0 {
+			return list[0]
 		}
 	}
 
-	return first
+	return -1
 }
 
 // Execute runs a matched recipe.
@@ -150,11 +153,22 @@ func (cat *Catalog) makeProduct(o *Output, ctx *Context, items []Item, main int,
 			p.Item.ILvl = ilvl
 		}
 
+		if o.Remove {
+			p.Returned = append(p.Returned, src.Socketed...)
+		}
+
 		if err := cat.modifyInPlace(o, &p.Item); err != nil {
 			return p, err
 		}
 	case o.UseType:
 		p.Item = Item{Code: src.Code, ILvl: ilvl, Seed: newSeed(rng), Quality: o.Quality}
+		if o.Regrade {
+			// "reg": the quality, the item level and the unique/set row come
+			// from the input (the exe reads them off the item).
+			p.Item.Quality, p.Item.ILvl = src.Quality, src.ILvl
+			p.Item.Unique, p.Item.SetItem, p.Item.Set = src.Unique, src.SetItem, src.Set
+			ilvl = src.ILvl
+		}
 	case o.Code != "":
 		p.Item = Item{Code: o.Code, ILvl: ilvl, Seed: newSeed(rng), Quality: o.Quality}
 	case o.Type != "":
@@ -187,8 +201,8 @@ func (cat *Catalog) makeProduct(o *Output, ctx *Context, items []Item, main int,
 
 	cat.applyMods(o, &p.Item, rng)
 
-	if o.Sockets > 0 {
-		p.Item.Sockets = minInt(o.Sockets, cat.MaxSockets(p.Item.Code, p.Item.ILvl))
+	if o.Sockets > 0 && p.Item.Sockets == 0 {
+		p.Item.Sockets = RecipeSockets(p.Item.quality(), minInt(o.Sockets, cat.MaxSockets(p.Item.Code, p.Item.ILvl)))
 	}
 
 	return p, nil
@@ -217,13 +231,22 @@ func (cat *Catalog) modifyInPlace(o *Output, it *Item) error {
 		it.Recharged = true
 	}
 
-	if o.Unsocket {
+	if o.Unsocket || o.Remove {
 		it.Socketed = nil
 		it.Runeword = ""
 	}
 
 	if o.Ethereal {
 		it.Ethereal = true
+	}
+
+	// qty= on a stackable result sets the stack, limited by maxstack (the
+	// exe does this for repair results: arrows and throwing weapons refill).
+	if b := cat.bases[it.Code]; o.Qty > 0 && b != nil && b.Stackable {
+		it.Quantity = o.Qty
+		if b.MaxStack > 0 && it.Quantity > b.MaxStack {
+			it.Quantity = b.MaxStack
+		}
 	}
 
 	return nil
@@ -249,7 +272,10 @@ func (cat *Catalog) forceAffixes(o *Output, p *Product) {
 // others are kept for the game to turn into item properties.
 func (cat *Catalog) applyMods(o *Output, it *Item, rng d2drop.RNG) {
 	for _, m := range o.Mods {
-		if m.Chance < 100 && int(rng.Roll(100)) >= m.Chance {
+		// Exe: a chance of 0 or 100 and above always applies; otherwise the
+		// property is skipped when chance < roll%100, so it applies with
+		// (chance+1)/100 (0x5638a0, seed % 100).
+		if m.Chance > 0 && m.Chance < 100 && m.Chance < int(rng.Roll(100)) {
 			continue
 		}
 
@@ -265,6 +291,25 @@ func (cat *Catalog) applyMods(o *Output, it *Item, rng d2drop.RNG) {
 
 		it.Mods = append(it.Mods, RolledMod{Code: m.Code, Param: m.Param, Min: m.Min, Max: m.Max, Value: v})
 	}
+}
+
+// RecipeSockets limits the sockets a recipe result gets by its quality, as
+// CUBE_ServerCreateRecipeOutputs (0x5638a0) does after the base limit: magic
+// and tempered items keep up to 3 (4 or more become 3), set, rare, unique and
+// crafted items get at most 1.
+func RecipeSockets(q d2drop.Quality, n int) int {
+	switch q {
+	case d2drop.QualityMagic, QualityTempered:
+		if n >= 4 { //nolint:gomnd
+			return 3
+		}
+	case d2drop.QualitySet, d2drop.QualityRare, d2drop.QualityUnique, d2drop.QualityCrafted:
+		if n > 1 {
+			return 1
+		}
+	}
+
+	return n
 }
 
 func minInt(a, b int) int {
