@@ -60,6 +60,8 @@ func (s *Sim) doFunc(m *Missile) bool {
 		return s.followOwner(m)
 	case 30:
 		return s.contagionStep(m)
+	case 31:
+		return s.wakeSpread(m)
 	case 35:
 		s.chaosIceTurn(m)
 	}

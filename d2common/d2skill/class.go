@@ -1461,6 +1461,7 @@ func doDragonFn(c *cast) {
 	}
 
 	hits := 1
+	lastHit := false
 
 	switch c.sk.SrvDoFunc {
 	case 42:
@@ -1478,10 +1479,16 @@ func doDragonFn(c *cast) {
 		}
 
 		o.skillElem = false
-		c.addMelee(c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o))
+		lastHit = false
+
+		m := c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o)
+		lastHit = m.Hit
+		c.addMelee(m)
 	}
 
-	if c.sk.SrvDoFunc == 42 && c.knockRoll(c.tgt.Unit, 100) { // 0x5d4370: the last kick may knock back
+	// VERIFIED 0x5d4190 / 0x5d4370: the knockback bits (0xc) are added to the hit result only for the last
+	// kick AND only when that kick's attack roll hit.
+	if c.sk.SrvDoFunc == 42 && lastHit && c.knockRoll(c.tgt.Unit, 100) {
 		c.knock(c.tgt.Unit)
 	}
 
@@ -1572,6 +1579,14 @@ func doSummonFn(c *cast) {
 	case 31, 56, 57:
 		// VERIFIED (SKILL_ComputeSummonLevel 0x5c2850, called by SRVDO_031 / 056 / 057 with no fixed level)
 		o.Level = SummonLevel(c.u.Level(), c.lvl)
+	case 45:
+		// VERIFIED (SKILL_SummonSentryUnit 0x5d4790, via SRVDO_045 0x5d4b20): the
+		// sentry's level comes from SKILL_ComputeSummonLevel with no fixed level.
+		o.Level = SummonLevel(c.u.Level(), c.lvl)
+	case 44:
+		// VERIFIED (SRVDO_044 0x5d49c0): the same, then the caster's own level
+		// (stat 0xc) is written over it.
+		o.Level = c.u.Level()
 	}
 
 	if sk.SrvDoFunc == 56 && sk.Name == "BloodGolem" {

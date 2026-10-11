@@ -258,6 +258,12 @@ func (e *Engine) shield(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 			return false
 		}
 
+		// VERIFIED SRVDO_054 0x5d6880: the periodic damage call (SRVDO_142 0x5d6750) is skipped in a town room
+		// (the state itself stays on).
+		if u.InTown() {
+			return true
+		}
+
 		hx, hy := u.Pos()
 		n := 0
 

@@ -88,18 +88,18 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 |---|---|---|---|---|---|---|
 | 251 | Fire Trauma | -/- | -/- | fully simulated | fully simulated |  |
 | 252 | Claw Mastery | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
-| 253 | Psychic Hammer | 22/33 | 5/3 | partial | partial | fixed radius 3 area hit; the knockback missile is not simulated (srvdo 33 is U) |
+| 253 | Psychic Hammer | 22/33 | 5/3 | partial | fully simulated | VERIFIED SRVDO_033 0x5d17f0 (batch next): one target, class knockback roll; no-target stand-in is U |
 | 254 | Tiger Strike | 23/34 | -/- | fully simulated | fully simulated |  |
-| 255 | Dragon Talon | 24/42 | 6/4 | partial | partial | kick count and charge release are U (srvdo 42) |
+| 255 | Dragon Talon | 24/42 | 6/4 | partial | fully simulated | VERIFIED SRVDO_042 0x5d4370, SRVST_024 0x5d42a0, 0x5d4190: calc1 kicks, only the last kick that hits may carry knockback (w20); the kicks run in one cast here |
 | 256 | Shock Field | -/43 | -/5 | fully simulated | fully simulated |  |
-| 257 | Blade Sentinel | -/44 | -/- | partial | partial | summon works; the creeper missile (do function 20, hit function 37) path is not simulated |
+| 257 | Blade Sentinel | -/44 | -/- | partial | fully simulated | VERIFIED SRVDO_044 0x5d49c0: level = caster level (w20); creeper do function 20 and hit function 37 are in d2missile |
 | 258 | Quickness | -/18 | -/- | fully simulated | fully simulated |  |
 | 259 | Fists of Fire | 23/35 | -/- | fully simulated | fully simulated |  |
 | 260 | Dragon Claw | 25/46 | -/- | partial | fully simulated | VERIFIED SRVDO_046 0x5d4cf0 / 0x5d4ba0: one blow per action frame (two per cast here), to-hit bonus plus stat 0x145, calc1 damage bonus, charges released |
 | 261 | Charged Bolt Sentry | -/45 | -/- | fully simulated | fully simulated |  |
-| 262 | Wake of Fire Sentry | -/45 | -/- | partial | partial | sentry works; wake of destruction maker (do function 31) is not simulated |
+| 262 | Wake of Fire Sentry | -/45 | -/- | partial | fully simulated | VERIFIED SRVDO_125 0x5cf700 + missile do function 31 0x5addd0 (w20): the maker drops two flames per new cell along +-(quarter turn of the line of fire); sentry fires on the generic trap cadence (U) |
 | 263 | Weapon Block | -/- | -/- | partial | partial | passive stat is keyed to the weapon type, so it is left out of PassiveTotals; the block rule lives in d2combat/avoid.go |
-| 264 | Cloak of Shadows | -/47 | 7/- | partial | partial | timed state that ends on hit; the blinding of nearby enemies is not simulated |
+| 264 | Cloak of Shadows | -/47 | 7/- | partial | fully simulated | VERIFIED SRVDO_047 0x5d4fe0 / 0x5d4ec0 (batch next): aura on caster, target state + AI state 10 for monsters |
 | 265 | Cobra Strike | 23/34 | -/- | fully simulated | fully simulated |  |
 | 266 | Blade Fury | 26/48 | 8/6 | missing | partial | one bladefragment1 per do, repeat gate prgcalc1-1 frames (SRVDO_048 0x5d5260); the fragment flight/bounce rules of the missile are the generic ones |
 | 267 | Fade | -/18 | -/- | fully simulated | fully simulated |  |
@@ -108,11 +108,11 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 270 | Dragon Tail | 27/50 | 9/7 | partial | fully simulated | VERIFIED SRVDO_050 0x5d5b90: the kick is the plain kick; the explosion is kick damage x (calc1 + fire mastery) percent in radius par3 around the target with the knockback bit (the damage field, +0x10 = fire, is U) |
 | 271 | Lightning Sentry | -/45 | -/- | fully simulated | fully simulated |  |
 | 272 | Inferno Sentry | -/45 | -/- | fully simulated | fully simulated |  |
-| 273 | Mind Blast | -/51 | -/8 | partial | partial | area damage; stun/convert of the real function (srvdo 51) is U |
+| 273 | Mind Blast | -/51 | -/8 | partial | fully simulated | VERIFIED SRVDO_051 0x5d6120 (batch next): convert (dm56 chance) else damage; radius ignores the prgcalc1 override (U) |
 | 274 | Blades of Ice | 23/35 | -/- | fully simulated | fully simulated |  |
 | 275 | Dragon Flight | 12/52 | 5/- | missing | fully simulated | VERIFIED SRVDO_052 0x5d6290: needs a target unit; the branch is the animation frame (first: teleport when levels.txt Teleport != 0, 2 refuses a blocked line; second: the kick with the skill bonus + stat 0x145 and the charge release); the port lands next to the target (the exe goes to its position) |
 | 276 | Death Sentry | -/45 | -/- | fully simulated | fully simulated |  |
-| 277 | Blade Shield | 28/54 | -/- | stub | partial | was a bare self state; now hurts enemies within par4 every perdelay frames while it lasts (SRVDO_054 0x5d6880 only starts the periodic effect; attachment missile hit rule U) |
+| 277 | Blade Shield | 28/54 | -/- | stub | partial | SRVDO_054 0x5d6880 + SRVDO_142 0x5d6750 area tick every perdelay, skipped in town (w20); hit-roll rule U |
 | 278 | Venom | -/18 | -/- | fully simulated | fully simulated |  |
 | 279 | Shadow Master | -/49 | -/- | fully simulated | fully simulated |  |
 | 280 | Royal Strike | 23/34 | -/- | partial | partial | charge strike works; the chaos ice missile (do function 35) is not simulated |

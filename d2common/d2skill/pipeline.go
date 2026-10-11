@@ -825,6 +825,12 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 		}
 	}
 
+	// SrvDoFunc 31 (wake maker): SRVDO_125 0x5cf700 puts the quarter turn of the
+	// line of fire into the data fields (see d2missile.WakeVector).
+	if ms.SrvDoFunc == 31 && o.data28 == 0 && o.data2C == 0 {
+		o.data28, o.data2C = d2missile.WakeVector(int(sx), int(sy), int(dx), int(dy))
+	}
+
 	own := p.owner(u)
 	if o.owner != nil {
 		own = *o.owner
