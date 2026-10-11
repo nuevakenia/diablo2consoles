@@ -2,6 +2,7 @@ package d2server
 
 import (
 	"bufio"
+	"errors"
 	"net"
 	"sync"
 
@@ -112,6 +113,14 @@ func (g *GameServer) handleConnectionD2GS(conn net.Conn) {
 
 		for _, packet := range packets {
 			if client == nil {
+				// the exe compares the version field of the join with 0xE (0x53cd50)
+				if j := side.Joined(); j.Name != "" && j.Version != d2gs.GameVersion {
+					g.Infof("JOIN refused: version %d, want %d", j.Version, d2gs.GameVersion)
+					g.rejectJoin(conn, d2gs.JoinErrVersion)
+
+					return
+				}
+
 				if packet.PacketType != d2netpackettype.PlayerConnectionRequest {
 					g.Infof("Closing connection with %s: did not receive new player connection request...", conn.RemoteAddr())
 					return
@@ -124,6 +133,8 @@ func (g *GameServer) handleConnectionD2GS(conn net.Conn) {
 					return gs
 				})
 				if err != nil {
+					g.rejectJoin(conn, joinErrCode(err))
+
 					return
 				}
 
@@ -150,3 +161,34 @@ func (g *GameServer) handleConnectionD2GS(conn net.Conn) {
 // refreshInfo keeps the game info of a session in step with the host's
 // (written once, when the host's hero connects).
 func (g *GameServer) refreshInfo(side *d2gsnet.ServerSide) { side.Info = g.hostInfo }
+
+// joinErrCode maps a registration error to the exe's refusal code (0 for
+// errors that have none: bad request, no hero).
+func joinErrCode(err error) uint32 {
+	switch {
+	case errors.Is(err, errServerFull):
+		return d2gs.JoinErrFull
+	case errors.Is(err, errNameInUse), errors.Is(err, errPlayerAlreadyExists):
+		return d2gs.JoinErrNameOrGame
+	}
+
+	return 0
+}
+
+// rejectJoin tells a refused client why (packet 0xB4) before the connection
+// is closed, as the exe does (SCMD_SendOpB4 then a disconnect).
+func (g *GameServer) rejectJoin(conn net.Conn, code uint32) {
+	if code == 0 {
+		return
+	}
+
+	blob, err := d2gs.EncodeStream(d2gs.JoinReject{Code: code}.Marshal())
+	if err != nil {
+		g.Errorf("join reject: %v", err)
+		return
+	}
+
+	if _, err := conn.Write(blob); err != nil {
+		g.Debugf("join reject write: %v", err)
+	}
+}

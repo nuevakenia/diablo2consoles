@@ -154,6 +154,8 @@ func (v *Game) skillEngine() *d2skills.Engine {
 	})
 	v.skills.Rivals = v.skillRivals
 	v.skills.OnPvPHit = v.sendSkillPvP
+	v.skills.Party = v.skillParty
+	v.skills.OnPartyHeal = v.sendPartyHeal
 
 	if st := v.localPlayer.Stats; st != nil {
 		id, eng := v.localPlayer.ID(), v.skills

@@ -390,7 +390,7 @@ func (c *ClientSide) Encode(np d2netpacket.NetPacket) ([][]byte, error) {
 
 		c.PlayerID = req.ID
 
-		j := d2gs.JoinGame{}
+		j := d2gs.JoinGame{Version: d2gs.GameVersion}
 		if st := req.PlayerState; st != nil {
 			j.Name, j.Class, j.Difficulty = st.HeroName, uint8(st.HeroType), uint8(st.Difficulty)
 
@@ -496,6 +496,18 @@ func (c *ClientSide) Decode(plain []byte) (out []d2netpacket.NetPacket, ignored 
 			}
 
 			c.updatePeer(rp.UnitID, func(pi *PeerInfo) { pi.PartyID, pi.partyKnown = rp.PartyID, true })
+		case d2gs.S2CJoinReject:
+			jr, perr := d2gs.ParseJoinReject(p)
+			if perr != nil {
+				return out, ignored, perr
+			}
+
+			sf, serr := d2netpacket.CreateServerFullPacketWithReason(jr.Code, jr.Reason())
+			if serr != nil {
+				return out, ignored, serr
+			}
+
+			out = append(out, sf)
 		case d2gs.S2CPartyState:
 			ps, perr := d2gs.ParsePartyState(p)
 			if perr != nil {

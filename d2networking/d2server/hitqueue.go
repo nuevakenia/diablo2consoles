@@ -146,7 +146,14 @@ func (g *GameServer) flushHits() {
 	}
 
 	for _, h := range g.soc.hits.drain() {
-		if c := g.connByID(h.to); c != nil {
+		// hitLoop runs beside the packet manager, which adds and removes connections:
+		// look the defender up under the server lock (an unlocked map read is a
+		// fatal "concurrent map read and map write")
+		g.RLock()
+		c := g.connByID(h.to)
+		g.RUnlock()
+
+		if c != nil {
 			if err := c.SendPacketToClient(h.pkt); err != nil {
 				g.Errorf("PVP hit delivery to %s: %v", h.to, err)
 			}

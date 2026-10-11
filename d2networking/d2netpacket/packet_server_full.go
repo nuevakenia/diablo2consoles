@@ -8,7 +8,18 @@ import (
 
 // ServerFullPacket is sent by the server to inform a client that the
 // server has reached the max number of allowed connections.
-type ServerFullPacket struct{}
+type ServerFullPacket struct {
+	// Code and Reason say why a join was refused (d2gs 0xB4; zero for a plain full server).
+	Code   uint32 `json:"code,omitempty"`
+	Reason string `json:"reason,omitempty"`
+}
+
+// CreateServerFullPacketWithReason is the refusal of a join with the exe's code.
+func CreateServerFullPacketWithReason(code uint32, reason string) (NetPacket, error) {
+	b, err := json.Marshal(ServerFullPacket{Code: code, Reason: reason})
+
+	return NetPacket{PacketType: d2netpackettype.ServerFull, PacketData: b}, err
+}
 
 // CreateServerFullPacket returns a NetPacket which declares a ServerFullPacket.
 func CreateServerFullPacket() (NetPacket, error) {
