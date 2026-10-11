@@ -5,7 +5,7 @@ scenario_name="Quest walkthrough, Act 2: Radament's Lair in the real world (Atma
 source scripts/quest_walk_lib.zsh
 scenario_warnings_ok=1
 scenario_env() {
-  local s="$(qw_begin 2)$(qw_panel 2 1)$(qw_talk Atma)$(qw_panel 2 1)$(qw_go 47 48 49)kill:all,200;$(qw_panel 2 1)loot:30,40;say:useitem ass;"
+  local s="$(qw_begin 2)$(qw_panel 2 1)$(qw_talk Atma)$(qw_panel 2 1)$(qw_go 47 48 49)kill:all,200;$(qw_panel 2 1)say:lootquest 200 90;say:useitem ass;"
   s+="$(qw_go 48 47 40)$(qw_talk Atma 10)$(qw_panel 2 1)exit"
   qw_env radament "$s"
 }
