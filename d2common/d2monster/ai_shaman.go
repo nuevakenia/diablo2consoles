@@ -55,7 +55,8 @@ func thinkFallenShaman(c *Ctx) {
 		b.Broadcast(Command{Type: CmdAlert, Count: 1})
 	}
 
-	if corpse != nil && b.Roll(100) < b.AIP(1) && p.Skills[slot1].Used() {
+	// batch 8: the exe asks MONAI_CanCastSkillAtTarget after the roll
+	if corpse != nil && b.Roll(100) < b.AIP(1) && p.Skills[slot1].Used() && c.otherCanCast(slot1, *corpse) {
 		c.Cast(slot1, *corpse)
 
 		return

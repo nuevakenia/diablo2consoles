@@ -128,7 +128,17 @@ func (c *Ctx) toRange(t Target, maxStep, desired int, run bool) bool {
 // WalkAway is MONAI_WalkAwayFromTarget(target, n): the destination is the
 // monster's position plus n*sign(own-target) per axis (VERIFIED: a diagonal
 // flee). It returns false when the request fails.
-func (c *Ctx) WalkAway(t Target, n int) bool { return c.away(t, n, false) }
+//
+// For n above 5 the exe first calls MONAI_SetMoveSpeedOverride(0, n), which
+// replaces any speed override the caller just set (VERIFIED in batch 8 from
+// 0x5dddc0).
+func (c *Ctx) WalkAway(t Target, n int) bool {
+	if n > 5 {
+		c.SetSpeed(0)
+	}
+
+	return c.away(t, n, false)
+}
 
 // RunAway is MONAI_RunAwayFromTarget.
 func (c *Ctx) RunAway(t Target, n int) bool { return c.away(t, n, true) }

@@ -336,11 +336,15 @@ const (
 	maggotCount = 2
 )
 
-// thinkSandMaggot is MONAI_Think_SandMaggot 0x5f0860 (VERIFIED flow). It runs
-// without a target too. aip1 burrow%, aip2 spit%, aip3 spit budget, aip4
-// bite%, aip5 skill cooldown frames. Slots: 1 = emerge/surface, 2 = spit
-// burst, 3 = lay eggs (names UNVERIFIED). FUN_005dbfc0 < 25 is read as
-// hp% < 25 (UNVERIFIED). Waits use ScheduleWait via Sleep.
+// thinkSandMaggot is MONAI_Think_SandMaggot 0x5f0860 (VERIFIED flow, rewritten
+// in batch 8). It runs without a target too. aip1 spit-burst%, aip2 A2%, aip3
+// spit budget, aip4 A1%, aip5 skill cooldown frames. Slots: 1 surfaces and
+// hits (phase 3 -> 1), 2 burrows with no target or when wounded (-> phase 3),
+// 3 is the spit. Scratch: phase (0x14), cooldown-until-frame (0x18), spit
+// count (0x1c). Batch 8 corrections: the spit is Skill3 (+0x174), not the
+// fourth slot; the wounded burrow tests the attack-target distance, not the
+// tick distance, and needs no tick target; skill casts leave their waits
+// (0x1e, 0x19, 0x14); without a tick target the circle roll is still drawn.
 func thinkSandMaggot(c *Ctx) {
 	b, t := c.B, c.Target
 	p := b.Profile
@@ -350,47 +354,61 @@ func thinkSandMaggot(c *Ctx) {
 	phase := b.Scratch[maggotPhase]
 	near := haveAtt && d < 16
 
-	cast := func(slot int, at Target, nextPhase int) {
-		if c.Cast(slot, at) {
-			b.Scratch[maggotCool] = b.AIP(5) + now
-			b.Scratch[maggotPhase] = nextPhase
-		}
+	tick := Target{}
+	if t != nil {
+		tick = *t
 	}
 
-	// target-less surfacing (phase < 3 only)
-	if phase < 3 && t == nil && (!haveAtt || d > 10) && b.Scratch[maggotCool] < now && p.Skills[slot2].Used() {
-		cast(slot2, Target{}, 3)
+	cast := func(slot int, at Target, wait, nextPhase int) {
+		c.Cast(slot, at)
+		c.Sleep(wait)
 
-		return
+		b.Scratch[maggotCool] = b.AIP(5) + now
+		b.Scratch[maggotPhase] = nextPhase
 	}
 
-	if phase == 3 && (t != nil || near) {
-		at := att
-		if t != nil {
-			at = *t
-		}
+	// the first gate: where the exe goes to 0x5f0922 (the surfacing test)
+	surface := false
 
-		if b.Scratch[maggotCool] < now && p.Skills[slot1].Used() {
-			cast(slot1, at, 1)
+	switch {
+	case phase < 3 && t != nil:
+		surface = true
+	case phase < 3:
+		if (!haveAtt || d > 10) && b.Scratch[maggotCool] < now && p.Skills[slot2].Used() {
+			cast(slot2, Target{}, 0x1e, 3)
 
 			return
 		}
-	}
 
-	if phase == 3 {
-		c.Sleep(20)
+		surface = near
+	case t != nil || near:
+		surface = true
+	default:
+		c.Sleep(0x14)
 
 		return
 	}
 
-	if t != nil && b.HPPercent < 25 && p.Skills[slot2].Used() && c.Dist < 7 && b.Scratch[maggotCool] < now &&
+	if surface && phase == 3 {
+		if b.Scratch[maggotCool] < now && p.Skills[slot1].Used() {
+			cast(slot1, tick, 0x19, 1)
+
+			return
+		}
+
+		c.Sleep(0x14)
+
+		return
+	}
+
+	if b.HPPercent < 25 && p.Skills[slot2].Used() && haveAtt && d < 7 && b.Scratch[maggotCool] < now &&
 		b.Roll(100) < 20 {
-		cast(slot2, *t, 3)
+		cast(slot2, tick, 0x1e, 3)
 
 		return
 	}
 
-	if t != nil && c.InRange && b.Chance(b.AIP(4)) {
+	if c.InRange && t != nil && b.Chance(b.AIP(4)) {
 		c.Attack(ModeAttack1, *t)
 
 		return
@@ -402,21 +420,20 @@ func thinkSandMaggot(c *Ctx) {
 		return
 	}
 
-	if t == nil {
-		c.Sleep(12)
-
-		return
-	}
-
 	if b.Roll(100) < 20 {
-		c.Circle(*t, 6)
+		if t != nil {
+			c.Circle(*t, 6)
+		}
 
 		return
 	}
 
 	if b.Scratch[maggotCount] < b.AIP(3) && b.Roll(100) < b.AIP(1) {
-		if phase != 2 || !p.Skills[slot4].Used() {
-			c.Circle(*t, 6)
+		if phase != 2 || !p.Skills[slot3].Used() {
+			if t != nil {
+				c.Circle(*t, 6)
+			}
+
 			b.Scratch[maggotPhase] = 2
 
 			return
@@ -424,7 +441,8 @@ func thinkSandMaggot(c *Ctx) {
 
 		b.Scratch[maggotCount]++
 		b.Scratch[maggotPhase] = 1
-		c.Cast(slot4, *t)
+		c.Cast(slot3, tick)
+		c.Sleep(0x14)
 
 		return
 	}
@@ -432,13 +450,12 @@ func thinkSandMaggot(c *Ctx) {
 	c.Sleep(12)
 }
 
-// thinkGreaterMummy is MONAI_Think_GreaterMummy 0x5f1b00 (VERIFIED flow;
-// Radament and the Unravelers). aip1 attack%, aip2 skill1 (resurrect) %, aip3
-// skill2 %, aip4 skill3 %, aip5 corpse search radius. The exe scans for a
-// corpse with FUN_005dbe00(filter 0x5f1a00) - here the CorpseFinder with the
-// Mummy classes is not available, so the corpse is any corpse of the unit's
-// own class family (UNVERIFIED filter). In hell the radius is aip5+10
-// (the exe's difficulty-0 / game-id quirk is not reproduced).
+// thinkGreaterMummy is MONAI_Think_GreaterMummy 0x5f1b00 (Radament and the
+// Unravelers; flow VERIFIED in batch 8 including the scan callback 0x5f1a00).
+// aip1 attack %, aip2 Skill1 (raise a corpse) %, aip3 Skill2 (cast with no
+// target while a wounded neighbour is in reach) %, aip4 Skill3 at the attack
+// target %, aip5 scan radius (Radament: +10). The scan is MummyScanner; without
+// the host it falls back to the old corpse-only approximation.
 func thinkGreaterMummy(c *Ctx) {
 	b, t := c.B, *c.Target
 	p := b.Profile
@@ -455,21 +472,33 @@ func thinkGreaterMummy(c *Ctx) {
 		return
 	}
 
-	var corpse *Target
+	radius, radament := b.AIP(5), b.Class == radamentClass
+	if radament {
+		radius += 10
+	}
 
-	if cf, ok := c.W.(CorpseFinder); ok {
-		if ct, found := cf.NearestCorpse(b, []int{b.Class}, b.AIP(5)); found {
-			corpse = &ct
+	var (
+		corpse  *Target
+		wounded bool
+		near    int
+	)
+
+	if ms, ok := c.W.(MummyScanner); ok {
+		sc := ms.MummyScan(b, radius, radament)
+		corpse, wounded, near = sc.Corpse, sc.Wounded, sc.InReach
+	} else if cf, ok := c.W.(CorpseFinder); ok {
+		if ct, found := cf.NearestCorpse(b, []int{b.Class}, radius); found {
+			corpse, near = &ct, 1
 		}
 	}
 
-	if corpse != nil && p.Skills[slot2].Used() && b.Roll(100) < b.AIP(3) {
-		c.Cast(slot2, *corpse)
+	if p.Skills[slot2].Used() && wounded && b.Roll(100) < b.AIP(3) {
+		c.Cast(slot2, c.self())
 
 		return
 	}
 
-	if corpse != nil && b.Roll(100) < b.AIP(2) && p.Skills[slot1].Used() {
+	if corpse != nil && b.Roll(100) < b.AIP(2) && c.otherCanCast(slot1, *corpse) {
 		c.Cast(slot1, *corpse)
 
 		return
@@ -483,12 +512,11 @@ func thinkGreaterMummy(c *Ctx) {
 		}
 	}
 
-	if corpse == nil {
+	if near < 1 {
 		c.SetSpeed(50)
+		c.WalkTo(t, 3)
 
-		if c.WalkTo(t, 3) {
-			return
-		}
+		return
 	}
 
 	if b.Roll(100) > 49 {
@@ -716,6 +744,13 @@ func thinkFetishBlowgun(c *Ctx) {
 	}
 }
 
+// inferno is unit state 0xc (STATE_INFERNO in states.txt), which the casts of
+// the Fetish Shaman's and the Megademon's Skill1 leave on the caster until
+// their next think clears it. That the cast (not the AI) sets it is
+// UNVERIFIED; the hosts that keep unit states answer it, the others fall back
+// on the Scratch flag below.
+const inferno = 0xc
+
 // shamanStateFlag is Scratch[2] standing in for unit state 0xc, which the
 // Fetish Shaman's Skill1 sets and its next think clears. The real state is
 // consulted too when the world answers it.
@@ -754,6 +789,7 @@ func thinkFetishShaman(c *Ctx) {
 	if p.Skills[slot1].Used() && c.Dist < lvl && !stateOn {
 		b.Broadcast(Command{Type: CmdAlert, Target: t.ID, Count: 6})
 		b.Scratch[shamanStateFlag] = 1
+		c.setState(inferno, true)
 		c.Cast(slot1, t)
 
 		return
@@ -1044,6 +1080,7 @@ func thinkMegademon(c *Ctx) {
 		if c.InRange {
 			if skill && b.Scratch[0] < now && b.Roll(100) < b.AIP(2) {
 				b.Scratch[0] = b.AIP(6) + now
+				c.setState(inferno, true)
 				c.Cast(slot1, t)
 
 				return
@@ -1067,6 +1104,7 @@ func thinkMegademon(c *Ctx) {
 		clearState()
 	} else if b.Scratch[0] < now && b.Roll(100) < b.AIP(1) {
 		b.Scratch[0] = b.AIP(6) + now
+		c.setState(inferno, true)
 		c.Cast(slot1, t)
 
 		return

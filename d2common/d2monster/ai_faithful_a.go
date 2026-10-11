@@ -671,7 +671,8 @@ func thinkBloodHawk(c *Ctx) {
 
 // thinkBloodLord is MONAI_Think_BloodLord 0x5e25e0 (VERIFIED). aip1 act %,
 // aip2 approach %, aip3 skill %, aip4 stall ticks. The skill is cast with the
-// fixed mode 5 in the exe (the port uses the slot's own mode, UNVERIFIED).
+// fixed mode 5 in the exe; every Blood Lord's Sk1mode in monstats.txt is A2
+// (5), so the slot's own mode is the same (checked in batch 8).
 func thinkBloodLord(c *Ctx) {
 	b, t := c.B, *c.Target
 
@@ -1079,10 +1080,12 @@ func thinkFoulCrowNest(c *Ctx) {
 
 // ------------------------------------------------------------- FrozenHorror
 
-// thinkFrozenHorror is MONAI_Think_FrozenHorror 0x5e2430 (VERIFIED).
-// Scratch[0] is the freeze counter the Skill1 uses (it is compared with the
-// skill level, Profile.Skills[0].Level here), state 0xc the freeze aura state.
-// aip1 attack %, aip2 approach %, aip3 skill %, aip4 stall.
+// thinkFrozenHorror is MONAI_Think_FrozenHorror 0x5e2430 (VERIFIED, corrected
+// in batch 8). Skill1 is cast when the DISTANCE (params +0x14, not a counter)
+// is below the skill's total level (never below 0), a roll of aip3 passes and
+// unit state 0xc is down; the cast leaves the state up and the next think
+// clears it (same pattern as the Fetish Shaman and the Megademon). aip1 attack
+// %, aip2 approach %, aip3 skill %, aip4 stall.
 func thinkFrozenHorror(c *Ctx) {
 	b, t := c.B, *c.Target
 
@@ -1091,7 +1094,8 @@ func thinkFrozenHorror(c *Ctx) {
 		lvl = b.Profile.Skills[slotA].Level
 	}
 
-	if c.skill(slotA) && b.Scratch[0] < lvl && b.Chance(b.AIP(3)) && !c.W.HasState(b, 0xc) {
+	if c.skill(slotA) && c.Dist < lvl && b.Chance(b.AIP(3)) && !c.W.HasState(b, 0xc) {
+		c.setState(inferno, true)
 		c.Cast(slotA, t)
 
 		return
@@ -1275,8 +1279,9 @@ func thinkMaggotEgg(c *Ctx) {
 	}
 
 	if s[0] == 1 {
-		// COMBAT_ServerHandleUnitDeath(PATH_GetTargetUnitExcludingSelf(..), 1);
-		// the unit it kills is taken to be the egg itself (UNVERIFIED)
+		// COMBAT_ServerHandleUnitDeath(game, self, PATH_GetTargetUnitExcludingSelf
+		// (self), 1): the signature is (game, victim, killer, flag), so the egg is
+		// the victim (checked in batch 8)
 		c.die()
 	}
 

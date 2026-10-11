@@ -139,11 +139,13 @@ type unit struct {
 	fleeUntil           int
 	slowPct             int
 	lastFlee, lastThink int
-	lastLabel           string    // the AI state last traced (forced.go)
-	raising             bool      // a corpse a shaman is raising (corpses.go)
-	skill               *monSkill // the monstats skill of the attack in progress (skilldmg.go), nil = plain attack
-	summoner            uint32    // brain id of the monster that summoned this unit (summons.go), 0 = natural
-	mirror              bool      // a realm unit drawn here: no AI, no local damage (mirror.go)
+	lastLabel           string       // the AI state last traced (forced.go)
+	raising             bool         // a corpse a shaman is raising (corpses.go)
+	skill               *monSkill    // the monstats skill of the attack in progress (skilldmg.go), nil = plain attack
+	summoner            uint32       // brain id of the monster that summoned this unit (summons.go), 0 = natural
+	mirror              bool         // a realm unit drawn here: no AI, no local damage (mirror.go)
+	states              map[int]bool // AI-driven unit states (unitstate.go)
+	stats               map[int]int  // AI-scaled monster stats (unitstate.go)
 }
 
 type moveIntent struct {
@@ -181,7 +183,8 @@ type Director struct {
 	seenNPC    map[string]bool
 	statByID   map[int]*d2records.MonStatRecord
 	targets    map[uint32]*d2mapentity.Player
-	grid       mapGrid // static map flags (line of sight)
+	blessings  map[*d2mapentity.Player]map[int]timedStat // timed hero stats (wispbless.go)
+	grid       mapGrid                                   // static map flags (line of sight)
 	fp         *footprints
 	fpPlayer   map[uint32]bool
 	launcher   Launcher
