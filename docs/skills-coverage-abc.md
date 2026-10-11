@@ -38,11 +38,11 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 25 | Plague Javelin | 4/- | 11/- | partial | partial | javelin and poison work; the plague cloud (plaguejavcloud, do function 3) is not simulated |
 | 26 | Strafe | 8/12 | 13/20 | fully simulated | fully simulated |  |
 | 27 | Immolation Arrow | 4/- | 11/- | partial | partial | arrow and explosion work; the burning ground (immolationfire, do function 5, hit function 9) is not simulated |
-| 28 | Dopplezon | -/15 | -/- | missing | partial | summon with life = calc3 percent of the owner, lifetime calc2 frames (SRVDO_015 0x5dad10); the decoy AI that copies the owner is the monster AI of "dopplezon", not checked |
+| 28 | Dopplezon | -/15 | -/- | missing | fully simulated | summon (SRVDO_015 0x5dad10): life calc3 percent of the owner, lifetime calc2 frames; the decoy AI is monstats "Idle" (MONAI_Think_Idle 0x5ae8a0 only waits), so it stands still and draws aggro (VERIFIED, wave 20); the client look copy is not checked |
 | 29 | Evade | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 30 | Fend | 9/13 | 14/21 | fully simulated | fully simulated |  |
 | 31 | Freezing Arrow | 4/- | 11/- | fully simulated | fully simulated |  |
-| 32 | Valkyrie | -/16 | -/- | missing | partial | summon (SRVDO_016 0x5daf10, player only, petmax 1, life bonus calc1); the pet's Dodge/Avoid/Evade/Critical Strike monster skills (sumskill1..4) are not wired |
+| 32 | Valkyrie | -/16 | -/- | missing | fully simulated | summon (SRVDO_016 0x5daf10 + SKILL_SpawnSummonedMinion); sumskill1..4 Dodge/Avoid/Evade/Critical Strike are given at sumskNcalc levels and roll in the summon blows (wave 20; the monster side of the passive stats is UNVERIFIED) |
 | 33 | Pierce | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 34 | Lightning Strike | 10/14 | -/22 | fully simulated | fully simulated |  |
 | 35 | Lightning Fury | 4/- | 11/- | partial | partial | missile flies; its hit function 20 (periodic effect) is not in the missile simulation |

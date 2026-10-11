@@ -368,6 +368,11 @@ type SummonOrder struct {
 	// DrawsAggro lists the summon in the monsters' target list (TARGETS_AddEntryToList, VERIFIED for Dopplezon
 	// and Valkyrie only), so hostile monsters hunt it.
 	DrawsAggro bool
+	// Passives are the passivestat values of the passive monster skills the summon is given (sumskill1..5 at the
+	// level of sumsk1calc..sumsk5calc when positive; VERIFIED SKILL_SpawnSummonedMinion loop over
+	// SKILL_AddSkillToUnit; Valkyrie's Dodge, Avoid, Evade and Critical Strike). That the passive stats of a monster
+	// skill take effect exactly like a player's is UNVERIFIED (AddSkillToUnit was not read).
+	Passives []StatMod
 	// TrapSkill is the monster skill a trap or totem uses (sumskill1).
 	TrapSkill string
 	// Stats from the skill's aurastat columns (damagepercent, tohit, armorclass).

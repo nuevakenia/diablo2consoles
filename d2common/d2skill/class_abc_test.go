@@ -17,7 +17,10 @@ func init() {
 		row{"skill": "Valkyrie", "Id": "501", "charclass": "ama", "srvdofunc": "16", "summon": "valkyrie",
 			"pettype": "valkyrie", "petmax": "1", "summode": "NU", "calc1": "par1 * (lvl - 1) + skill('Dopplezon'.blvl) * par8",
 			"calc2": "ln56", "Param1": "20", "Param8": "20", "aurastat1": "strength", "aurastatcalc1": "lvl * par2",
-			"Param2": "25", "manashift": "8", "delay": "150"},
+			"Param2": "25", "manashift": "8", "delay": "150",
+			"sumskill1": "Dodge", "sumsk1calc": "skill('Dodge'.blvl)", "sumskill2": "Evade", "sumsk2calc": "skill('Evade'.blvl)"},
+		row{"skill": "Evade", "Id": "509", "passive": "1", "passivestat1": "passive_evade", "passivecalc1": "dm12",
+			"Param1": "10", "Param2": "65", "manashift": "8"},
 		row{"skill": "Blade Fury", "Id": "502", "charclass": "ass", "srvstfunc": "26", "srvdofunc": "48",
 			"srvmissilea": "bladefragment1", "Param3": "3", "Param4": "5", "usemanaondo": "1", "HitShift": "8", "manashift": "8"},
 		row{"skill": "Dragon Flight", "Id": "503", "charclass": "ass", "srvstfunc": "12", "srvdofunc": "52", "Kick": "1",
@@ -220,6 +223,11 @@ func TestDopplezonAndValkyrie(t *testing.T) {
 		t.Error("valkyrie is not in the monsters' target list")
 	}
 
+	// sumskill1..2 give the pet Dodge and Evade at the owner's skill levels (0 here: none)
+	if len(o.Passives) != 0 {
+		t.Errorf("passives without Dodge / Evade levels: %v", o.Passives)
+	}
+
 	if v, ok := statOf(o.Stats, "strength"); !ok || v != 75 {
 		t.Errorf("valkyrie stats %v", o.Stats)
 	}
@@ -362,5 +370,32 @@ func TestABCSkillsAreImplemented(t *testing.T) {
 
 	if n != 90 {
 		t.Errorf("%d skills of the three classes, want 90", n)
+	}
+}
+
+func TestValkyriePassives(t *testing.T) {
+	cf := abcFixture(map[string]int{"Valkyrie": 3, "Dodge": 5, "Evade": 1})
+
+	_, r := cf.cast("Valkyrie", 5, 5)
+	if !r.OK {
+		t.Fatal(r.Reason)
+	}
+
+	o := effectOf(t, r, "summon").Summon
+
+	dodge, evade := 0, 0
+
+	for _, m := range o.Passives {
+		switch m.Stat {
+		case "passive_dodge":
+			dodge = m.Value
+		case "passive_evade":
+			evade = m.Value
+		}
+	}
+
+	// dm12 diminishing-returns value of Param1..Param2: Evade 1 gives 18, Dodge 5 gives 37 (same as the hero path)
+	if evade != 18 || dodge != 37 {
+		t.Errorf("passives %v", o.Passives)
 	}
 }

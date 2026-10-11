@@ -155,6 +155,7 @@ func (s *SkillRecord) PipelineSkill() *d2skill.Skill {
 		PetMax: s.Petmax, Skpoints: s.Skpoints,
 		Summon: s.Summon, PetType: s.Pettype, SumMode: s.Summode,
 		SumSkill:     [6]string{"", s.Sumskill1, s.Sumskill2, s.Sumskill3, s.Sumskill4, s.Sumskill5},
+		SumSkCalc:    [6]*d2calc.Program{nil, s.Sumsk1calc, s.Sumsk2calc, s.Sumsk3calc, s.Sumsk4calc, s.Sumsk5calc},
 		TargetCorpse: s.TargetCorpse, Periodic: s.Periodic, PerDelay: s.Perdelay, Range: s.Range,
 	}
 

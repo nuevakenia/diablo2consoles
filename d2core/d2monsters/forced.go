@@ -265,6 +265,16 @@ func (d *Director) strikeUnit(u, tu *unit, atk d2mapentity.MonsterAttack, mode d
 
 	hit, chance, roll := d2combat.RollToHit(u.b.Seed, in)
 	dmg := 0
+	avoided := false
+
+	// dodge / avoid / evade of a summon's passive skills (Valkyrie), rolled after the to-hit and before the damage
+	// like the hero's (VERIFIED order for players, COMBAT_RollDodgeAvoidEvade 0x57bd60; for monsters UNVERIFIED)
+	if hit && tu.ally != nil {
+		moving := tu.m.Mode() == d2monster.ModeWalk || tu.m.Mode() == d2monster.ModeRun
+		if summonAvoids(tu.b.Seed, tu.ally.opt, moving, attackIsRanged(u.m.Stat, mode)) {
+			hit, avoided = false, true
+		}
+	}
 
 	if hit {
 		span := atk.Max - atk.Min + 1
@@ -281,8 +291,8 @@ func (d *Director) strikeUnit(u, tu *unit, atk d2mapentity.MonsterAttack, mode d
 	}
 
 	d.Counters.UnitFights++
-	d.emit("attack", "MONSTER attack name=%s id=%d mode=%s target=%s(%d) hit=%v chance=%d roll=%d dmg=%d target_hp=%d/%d",
-		u.m.Label(), u.b.ID, mode, tu.m.Label(), tu.b.ID, hit, chance, roll, dmg, maxInt(tu.m.Vitals.HP-dmg, 0), tu.m.Vitals.MaxHP)
+	d.emit("attack", "MONSTER attack name=%s id=%d mode=%s target=%s(%d) hit=%v chance=%d roll=%d dmg=%d target_hp=%d/%d avoided=%v",
+		u.m.Label(), u.b.ID, mode, tu.m.Label(), tu.b.ID, hit, chance, roll, dmg, maxInt(tu.m.Vitals.HP-dmg, 0), tu.m.Vitals.MaxHP, avoided)
 
 	if !hit {
 		return
@@ -302,4 +312,19 @@ func (d *Director) strikeUnit(u, tu *unit, atk d2mapentity.MonsterAttack, mode d
 	dmg = d.shareGolemDamage(tu, dmg)
 
 	d.damage(tu, credit, dmg)
+}
+
+// summonAvoids rolls the dodge / avoid / evade of a summon's passive skills (MinionOptions.Dodge, Avoid, Evade).
+func summonAvoids(r d2combat.Roller, o MinionOptions, moving, ranged bool) bool {
+	if o.Dodge <= 0 && o.Avoid <= 0 && o.Evade <= 0 {
+		return false
+	}
+
+	switch d2combat.RollAvoid(r, d2combat.AvoidInput{Moving: moving, EvadeChance: o.Evade, DodgeChance: o.Dodge,
+		AvoidChance: o.Avoid, IsMissile: ranged}) {
+	case d2combat.AvoidAvoided, d2combat.AvoidDodged, d2combat.AvoidEvaded:
+		return true
+	}
+
+	return false
 }

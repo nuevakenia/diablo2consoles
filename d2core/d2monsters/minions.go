@@ -3,6 +3,7 @@ package d2monsters
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
@@ -50,6 +51,10 @@ type MinionOptions struct {
 	// OwnerDamagePct and HealSharePct are the Blood Golem's shares (VERIFIED 0x5c4600 / 0x5c4800): the percent of
 	// a blow that the owner's life pays instead, and the percent of the owner's healing the golem receives.
 	OwnerDamagePct, HealSharePct int
+	// Dodge, Avoid, Evade and Crit are the passive chances (percent) of the summon's passive monster skills
+	// (Valkyrie: sumskill1..4). Dodge applies to melee blows, Avoid to missiles, Evade while moving, Crit doubles
+	// the physical damage of its blows (d2combat.RollAvoid / RollStrike).
+	Dodge, Avoid, Evade, Crit int
 	// Tag is free for the caller (the skill name).
 	Tag string
 	// Stats, when set, replace the monstats-derived life, defense, attack
@@ -385,6 +390,13 @@ func (d *Director) allyStep(u *unit) {
 		return
 	}
 
+	// the Dopplezon decoy has the monstats AI "Idle", whose think function only waits 200 ticks
+	// (MONAI_Think_Idle 0x5ae8a0, VERIFIED): it stands where it appeared, draws the monsters' attacks and never moves
+	// or strikes.
+	if isIdleAI(u) {
+		return
+	}
+
 	sx, sy := m.SubtilePos()
 
 	if a.target == nil || !a.target.m.Alive() || d.frame-a.thought >= minionThink {
@@ -477,6 +489,12 @@ func (d *Director) allyStrike(u *unit, _ d2monster.Mode) {
 		dmg = atk.Min + int(u.b.Seed.Roll(int32(atk.Max-atk.Min+1)))
 		dmg += dmg * (a.opt.DamagePct + a.boost.DamagePct) / 100
 
+		// critical strike of the summon's passive skill doubles the blow (UNVERIFIED for monsters: the roll
+		// order and the double are those of the player path, 0x5794e0)
+		if a.opt.Crit > 0 && d2combat.RollStrike(u.b.Seed, d2combat.StrikeInput{SkipWeapon: true, CriticalChance: a.opt.Crit}) {
+			dmg *= 2
+		}
+
 		if dmg < 1 {
 			dmg = 1
 		}
@@ -528,4 +546,9 @@ func (d *Director) IsAlly(m *d2mapentity.Monster) bool {
 	u := d.byEntity[m.ID()]
 
 	return u != nil && (u.friendly() || u.b.Allied)
+}
+
+// isIdleAI reports a summon whose monstats AI is "Idle" (the Dopplezon decoy).
+func isIdleAI(u *unit) bool {
+	return u.b != nil && u.b.Def != nil && strings.EqualFold(u.b.Def.Name, "Idle")
 }

@@ -84,8 +84,35 @@ func doValkyrieFn(c *cast) {
 	doSummonFn(c)
 
 	if n := len(c.res.Effects); n > 0 && c.res.Effects[n-1].Summon != nil {
-		c.res.Effects[n-1].Summon.DrawsAggro = true
+		o := c.res.Effects[n-1].Summon
+		o.DrawsAggro = true
+		o.Passives = c.summonPassives()
 	}
+}
+
+// summonPassives evaluates sumskill1..5 for a summon (SKILL_SpawnSummonedMinion, VERIFIED): each monster skill
+// whose sumskNcalc (evaluated for the caster) is positive is added to the minion at that level; for the passive
+// ones (Valkyrie: Dodge, Avoid, Evade, Critical Strike) the passivestat columns at that level are returned.
+func (c *cast) summonPassives() []StatMod {
+	var out []StatMod
+
+	for i := 1; i <= 5; i++ {
+		name := c.sk.SumSkill[i]
+		if name == "" || c.sk.SumSkCalc[i] == nil {
+			continue
+		}
+
+		ms := c.p.Skills.ByName(name)
+		lvl := c.env.eval(c.sk.SumSkCalc[i])
+
+		if ms == nil || !ms.Passive || lvl < 1 {
+			continue
+		}
+
+		out = append(out, c.p.passiveStats(c.u, ms, lvl)...)
+	}
+
+	return out
 }
 
 // ---- Blade Fury ----
