@@ -269,6 +269,15 @@ func (f *HeroStateFactory) CreateHeroSkillsState(classStats *d2records.CharStatR
 
 	baseSkills[skillRecord.ID] = skillRecord
 
+	// the class's start skill (CharStats StartSkill; the new Sorceress throws Fire Bolt)
+	if name := startSkillName(classStats, heroType); name != "" {
+		if skill, err := f.CreateHeroSkill(1, name); err == nil {
+			if have, ok := baseSkills[skill.ID]; !ok || have.SkillPoints < 1 {
+				baseSkills[skill.ID] = skill
+			}
+		}
+	}
+
 	return baseSkills, nil
 }
 
@@ -444,4 +453,23 @@ func (f *HeroStateFactory) DeleteHero(state *HeroState) error {
 	}
 
 	return nil
+}
+
+// startSkillName is the skill a new hero begins with: the StartSkill column of
+// CharStats when it names a skill, else the Sorceress's Fire Bolt. UNVERIFIED:
+// how the exe turns StartSkill (a property key in the table) into a skill is not
+// recorded, so a value that is not a skill name is ignored and only the Sorceress
+// gets the documented default.
+func startSkillName(classStats *d2records.CharStatRecord, heroType d2enum.Hero) string {
+	if classStats != nil {
+		if n := strings.TrimSpace(classStats.StartSkillBonus); n != "" && !strings.EqualFold(n, "Attack") {
+			return n
+		}
+	}
+
+	if heroType == d2enum.HeroSorceress {
+		return "Fire Bolt"
+	}
+
+	return ""
 }
