@@ -64,6 +64,9 @@ type allyState struct {
 	strikeAt *unit
 	thought  int
 	trap     *TrapSpec // set by ArmTrap (see trapfire.go)
+
+	boost     AuraBoost // friendly aura boost (auraboost.go)
+	baseMaxHP int       // maximum life before the aura's life percent
 }
 
 // SpawnMinion creates an allied unit near a subtile.
@@ -460,6 +463,7 @@ func (d *Director) allyStrike(u *unit, _ d2monster.Mode) {
 	}
 
 	ar := d2combat.MonsterAttackRating(atk.ToHit, 0, 0) + a.opt.ToHit
+	ar += ar * a.boost.ToHitPct / 100
 	hit, chance, roll := d2combat.RollToHit(u.b.Seed, d2combat.ToHitInput{
 		AttackRating: ar, Defense: t.m.Vitals.Defense, AttackerLevel: u.m.Vitals.Level, DefenderLevel: t.m.Vitals.Level,
 	})
@@ -468,7 +472,7 @@ func (d *Director) allyStrike(u *unit, _ d2monster.Mode) {
 
 	if hit {
 		dmg = atk.Min + int(u.b.Seed.Roll(int32(atk.Max-atk.Min+1)))
-		dmg += dmg * a.opt.DamagePct / 100
+		dmg += dmg * (a.opt.DamagePct + a.boost.DamagePct) / 100
 
 		if dmg < 1 {
 			dmg = 1

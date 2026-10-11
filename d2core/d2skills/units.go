@@ -479,6 +479,11 @@ func (w *world) Targets(x, y int) []d2missile.Target {
 		out = append(out, w.e.rivalTarget(p))
 	}
 
+	// party heroes: no enemies, only Holy Bolt style missiles act on them (batch5_party.go)
+	for _, p := range w.e.partyNear(x, y, 1) {
+		out = append(out, w.e.rivalTarget(p))
+	}
+
 	// the hero's allies (minions, mercenary, converted monsters): only missiles
 	// that act on friends read them (Holy Bolt heals), every other missile
 	// ignores a unit IsEnemy rejects

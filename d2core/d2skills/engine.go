@@ -126,6 +126,11 @@ type Engine struct {
 	// the defender's client.
 	OnPvPHit func(PvPHit)
 
+	// Party lists the heroes of the local hero's party other than itself (see batch5_party.go); nil means none.
+	Party func() []*d2mapentity.Player
+	// OnPartyHeal receives each Holy Bolt heal of a party hero (8.8 fixed point) so the game can tell its client.
+	OnPartyHeal func(dst *d2mapentity.Player, amount int)
+
 	rivalTargets map[string]*playerTarget
 	pvpCarry     map[string]*d2combat.PvPCarry // defender id -> fraction of a point the PvP scale cut off
 
@@ -180,6 +185,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	monsters.HeroDefense = e.heroDefense
 	monsters.HeroAvoid = e.heroAvoid
 	e.installMercHooks()
+	e.monsters.SetSkillFirer(e)
 
 	return e
 }
@@ -449,7 +455,13 @@ func (e *Engine) targetAt(sx, sy int) d2skill.Target {
 			tg.Corpse, tg.CX, tg.CY, tg.CorpseID, tg.CorpseHP, tg.CorpseKey = true, mx, my, m.ID(), m.Vitals.MaxHP, m.Stat.Key
 			tg.CorpseLevel = m.Vitals.Level
 			tg.CorpseLooted = e.isLooted(m.ID())
+			tg.CorpseInfo = e.corpseFacts(m)
 		}
+	}
+
+	tg.GroundItem = e.groundItemNear(sx, sy)
+	if g := tg.GroundItem; g != nil {
+		tg.Item = &d2skill.ItemTarget{OnGround: true, GolemItem: g.Valid, FlagOK: true, InRoom: true}
 	}
 
 	best := pickRadius + 1

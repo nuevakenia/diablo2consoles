@@ -14,7 +14,7 @@ scenario_env() {
   local list="Dopplezon,3;Valkyrie,3;Blade Fury,3;Dragon Flight,2!!;Whirlwind,3;Blade Shield,3;Find Potion,5;Find Item,5"
   list+=";Bash,1!!;War Cry,3;Battle Orders,1"
   list+=";Poison Javelin,4;Multiple Shot,1"
-  list+=";Amplify Damage,2;Iron Maiden,1;Poison Dagger,1;Bone Armor,1;Corpse Explosion,1;Raise Skeleton,1"
+  list+=";Amplify Damage,2;Iron Maiden,1;Poison Dagger,1;Bone Armor,1;Corpse Explosion,1;Raise Skeleton,1;Raise Skeletal Mage,1;Oak Sage,1"
   list+=";Sacrifice,2!!;Might,1"
   list+=";Fire Ball,1;Frost Nova,1;Chain Lightning,2!;Teleport,1;Energy Shield,1;Blizzard,1"
   list+=";Raven,1;Firestorm,1"
@@ -29,7 +29,7 @@ scenario_check() {
   grep -E "AUTOCAST (skill_done|summary)|MINION spawn|SUMMON|TRAP armed|LOOT|WARD|WHIRL|SHIELD" $log.txt | cut -c1-210 | head -60
   # every listed skill ran its cast to the end
   for s in "Bash" "War Cry" "Battle Orders" "Poison Javelin" "Multiple Shot" "Amplify Damage" \
-           "Iron Maiden" "Poison Dagger" "Bone Armor" "Corpse Explosion" "Raise Skeleton" "Sacrifice" "Might" "Holy Fire" \
+           "Iron Maiden" "Poison Dagger" "Bone Armor" "Corpse Explosion" "Raise Skeleton" "Raise Skeletal Mage" "Oak Sage" "Sacrifice" "Might" "Holy Fire" \
            "Fire Ball" "Frost Nova" "Chain Lightning" "Teleport" "Energy Shield" "Blizzard" "Raven" "Firestorm" "Hurricane" \
            "Dim Vision" "Confuse" "Attract" "Poison Nova" "Hydra" "Plague Poppy" "Telekinesis" "Conversion" "Hunger" \
            "Fists of Fire" "Dragon Talon" "Lightning Sentry" "Shadow Warrior" "Thunder Storm" \
@@ -47,6 +47,9 @@ scenario_check() {
   grep -qE "STATE apply skill=\"Amplify Damage\" unit=Zombie state=amplifydamage .*damageresist=-100" $log.txt || { echo "FAIL: Amplify Damage"; fail=1; }
   grep -qE "MINION spawn name=Necroskeleton .*kind=minion" $log.txt || { echo "FAIL: no skeleton was raised"; fail=1; }
   grep -qE "MINION attack name=Necroskeleton" $log.txt || { echo "FAIL: the skeleton never attacked"; fail=1; }
+  grep -qE "MINION spawn name=.*Mage.* kind=minion|SUMMON skill=\"Raise Skeletal Mage\" key=necromage kind=minion created=1" $log.txt || { echo "FAIL: no skeletal mage was raised"; fail=1; }
+  grep -qE "CASTER armed skill=\"Raise Skeletal Mage\" missile=necromage1" $log.txt || { echo "FAIL: the skeletal mage is not armed with its missile"; fail=1; }
+  grep -qE "STATE totem skill=\"Oak Sage\"" $log.txt || { echo "FAIL: Oak Sage totem aura"; fail=1; }
   grep -qE "STATE apply skill=\"Bone Armor\" .*bonearmor=" $log.txt || { echo "FAIL: Bone Armor"; fail=1; }
   grep -qE "SKILL area skill=\"Corpse Explosion\" .*targets=" $log.txt || { echo "FAIL: Corpse Explosion"; fail=1; }
   # Paladin: aura states, sacrifice

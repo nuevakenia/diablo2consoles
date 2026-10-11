@@ -133,15 +133,33 @@ func doVineFn(c *cast) {
 	c.effect(Effect{Kind: "summon", Summon: o})
 }
 
-// doIronGolemFn is SRVDO_057_IronGolem (0x5c3100). VERIFIED: the start function
-// (SRVST_020) validates the item target; the golem is created next to the
-// caster, the item is taken out of the world (it becomes the golem's body)
-// and SKILL_SummonGolemCommon scales it. This port raises the golem like the
-// other golems (hp from calc1, aurastat thorns / fade, the Golem Mastery
-// passives through SummonPassives); consuming the item and the item-derived
-// stats are not simulated (U).
+// doIronGolemFn is SRVDO_057_IronGolem (0x5c3100). VERIFIED flow: the start
+// function SRVST_020 (0x5c1070) needs the targeted unit to be an item lying on
+// the ground (mode 3) whose base row passes the golem flag test and the item
+// flag mask 0x10 / 0x100, with no owner. The do function then spawns the golem
+// at the item's own position (not the caster's), takes the item out of its
+// room (mode 4, collision footprint cleared) and equips it on the golem in the
+// body location the item belongs to, and finishes through
+// SKILL_SummonGolemCommon (summon level, SKILL_SpawnSummonedMinion, mastery
+// stats). Here the target is Target.GroundItem; the order carries the item id
+// so the engine removes the entity, and the golem is raised like the other
+// golems. The item-derived stats of the golem (its equipped item changing its
+// numbers) are not simulated (U).
 func doIronGolemFn(c *cast) {
+	g := c.tgt.GroundItem
+	if g == nil || !g.Valid {
+		c.fail(ReasonTarget)
+
+		return
+	}
+
 	doSummonFn(c)
+
+	for i := range c.res.Effects {
+		if o := c.res.Effects[i].Summon; o != nil && c.res.Effects[i].Kind == "summon" {
+			o.ItemID, o.X, o.Y, o.AtPoint = g.ID, g.X, g.Y, true
+		}
+	}
 }
 
 // doTelekinesisFn is SRVDO_Telekinesis (0x5c79f0). VERIFIED: the caster must be

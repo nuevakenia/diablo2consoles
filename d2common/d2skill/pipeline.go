@@ -80,6 +80,11 @@ type Target struct {
 	TownRoom bool
 	Item     *ItemTarget
 	Revive   *ReviveTarget
+	// GroundItem is the ground item nearest the aim point (Iron Golem, batch 5), nil when none lies there.
+	GroundItem *GroundItem
+	// CorpseFacts describes the corpse in Corpse for the raise and revive tests (corpse.go); the zero value
+	// (all false) is treated as "unknown" and refuses nothing.
+	CorpseInfo *CorpseFacts
 }
 
 // Options tune the pipeline.
@@ -373,6 +378,11 @@ type SummonOrder struct {
 	X, Y int
 	// Corpse to consume (id), "" if none.
 	CorpseID string
+	// ItemID is the ground item an Iron Golem consumes (its entity id), "" if none; the golem then stands at
+	// (X, Y) which is the item's position (SRVDO_057, 0x5c3100). AtPoint makes a minion appear at (X, Y) instead
+	// of beside its owner.
+	ItemID  string
+	AtPoint bool
 	// UseCorpseType summons the corpse's own monster type (Revive).
 	UseCorpseType bool
 	// Damage descriptor for traps (the trap skill's own damage).

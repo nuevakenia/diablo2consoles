@@ -809,6 +809,12 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 		}
 	}
 
+	if o.ItemID != "" && !e.takeGroundItem(o.ItemID) {
+		e.emit("summon", "SUMMON skill=%q key=%s refused=item_gone", sk.Name, key)
+
+		return
+	}
+
 	corpseLevel := 0
 
 	if o.CorpseID != "" {
@@ -828,7 +834,7 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 	hx, hy := u.Pos()
 	x, y := o.X, o.Y
 
-	if o.Kind == "minion" && o.CorpseID == "" {
+	if o.Kind == "minion" && o.CorpseID == "" && !o.AtPoint {
 		x, y = hx, hy
 	}
 
@@ -884,6 +890,8 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 			e.registerTrap(u, sk, ef, o, m)
 		case "totem":
 			e.registerTotem(p, u, sk, ef, o, m)
+		case "minion":
+			e.armCaster(sk, o, m)
 		}
 	}
 
@@ -1119,25 +1127,12 @@ func (e *Engine) registerTotem(p *d2mapentity.Player, u *heroUnit, sk *d2skill.S
 
 	apply := func() bool {
 		if !m.Alive() {
-			e.setOf(p.ID()).Remove(name)
+			e.totemClear(p, name)
+
 			return false
 		}
 
-		// the totem's aura reaches only the units inside its circle
-		// (aurarangecalc, SRVDO_065 / 0x569510: squared distance <= radius squared)
-		if radius > 0 {
-			tx, ty := m.SubtilePos()
-			hx, hy := u.Pos()
-
-			if !inAuraRange(tx, ty, hx, hy, radius) {
-				e.setOf(p.ID()).Remove(name)
-
-				return true
-			}
-		}
-
-		e.setOf(p.ID()).Apply(e.frame, d2state.Instance{Name: name, Until: e.frame + auraPulse + 3, Mods: mods,
-			Source: p.ID(), SkillID: sk.ID, Level: ef.Level})
+		e.totemPulse(p, u, sk, ef, ts.AuraFilter, name, radius, mods, m)
 
 		return true
 	}

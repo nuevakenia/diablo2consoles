@@ -402,6 +402,22 @@ func (c *cast) meleeOpt() strikeOpt {
 	return o
 }
 
+// corpseOK applies the corpse tests of the exe to the corpse in the target when the engine described it
+// (Target.CorpseInfo): Raise Skeleton and Raise Skeletal Mage use MONSTER_IsCorpseUsableForRaise (0x6468b0), the
+// other corpse skills SKILL_CanReviveOrExplodeCorpse (0x646a10).
+func (c *cast) corpseOK() bool {
+	f := c.tgt.CorpseInfo
+	if f == nil {
+		return true
+	}
+
+	if c.sk.SrvDoFunc == 31 {
+		return CorpseRaisable(*f, false)
+	}
+
+	return CorpseExplodable(*f)
+}
+
 func (c *cast) needTarget() bool {
 	if c.tgt.Unit == nil || !c.tgt.Unit.Alive() {
 		c.fail(ReasonTarget)
@@ -1545,6 +1561,9 @@ func doSummonFn(c *cast) {
 		if !sk.Calc[2].Empty() {
 			o.Level = maxInt(c.calc(2), 1)
 		}
+	case 31, 56, 57:
+		// VERIFIED (SKILL_ComputeSummonLevel 0x5c2850, called by SRVDO_031 / 056 / 057 with no fixed level)
+		o.Level = SummonLevel(c.u.Level(), c.lvl)
 	}
 
 	switch {
@@ -1568,6 +1587,11 @@ func doSummonFn(c *cast) {
 
 	if sk.TargetCorpse || sk.SrvDoFunc == 58 {
 		if !c.tgt.Corpse {
+			c.fail(ReasonNoCorpse)
+			return
+		}
+
+		if !c.corpseOK() {
 			c.fail(ReasonNoCorpse)
 			return
 		}
@@ -1628,7 +1652,7 @@ func doWallFn(c *cast) {
 // physical was not read). Poison Explosion releases the skill's poison damage
 // instead.
 func doCorpseExplosionFn(c *cast) {
-	if !c.tgt.Corpse {
+	if !c.tgt.Corpse || !c.corpseOK() {
 		c.fail(ReasonNoCorpse)
 		return
 	}

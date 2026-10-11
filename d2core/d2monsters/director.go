@@ -354,6 +354,7 @@ func (d *Director) spawn(stat *d2records.MonStatRecord, subX, subY int, ally *al
 
 	b := d2monster.NewBrain(d.nextID, stat.ID, d.opt.Difficulty, prof, d.opt.Seed)
 	b.X, b.Y = subX, subY
+	b.Scratch[0] = petCasterFlag(ally, prof)
 	b.CanTeleport = d.opt.CanTeleport != nil && d.opt.CanTeleport(stat.ID)
 
 	m, err := d.engine.NewMonster(subX, subY, stat, 0, b)
