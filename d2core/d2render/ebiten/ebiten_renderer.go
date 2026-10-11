@@ -117,6 +117,16 @@ func (r *Renderer) Layout(outsideWidth, outsideHeight int) (width, height int) {
 		return s.W, s.H
 	}
 
+	// Menus (main menu, character select, difficulty, loading) are the original 800x600 interface: they use the
+	// 800x600 logical size, which Ebiten scales up to fit the window (a 4:3 picture with bars on the sides), instead
+	// of standing as a small 800x600 column in the middle of a large window. In the game the logical size is the
+	// whole window (the world fills it).
+	if d2display.CurrentAnchor() == d2display.AnchorCenter {
+		d2display.Set(d2display.Base)
+
+		return d2display.BaseW, d2display.BaseH
+	}
+
 	s := d2display.Logical(outsideWidth, outsideHeight, d2display.Scale())
 	d2display.Set(s)
 

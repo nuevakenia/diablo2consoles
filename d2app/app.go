@@ -739,6 +739,11 @@ func (a *App) ToCreateGame(filePath string, connType d2clientconnectiontype.Clie
 		return
 	}
 
+	// The map seed of the chosen hero drives the town layout and every level (like the original game, where
+	// the seed is part of the character). Only the autogame import used to set it, so a hero picked in the
+	// menus got the maps of a random time-based seed. OD2_AUTOMAPSEED (a test aid) keeps priority.
+	a.useHeroMapSeed(filePath)
+
 	gameClient, err := d2client.Create(connType, a.asset, *a.Options.LogLevel, a.scriptEngine)
 	if err != nil {
 		a.Error(err.Error())
@@ -764,6 +769,28 @@ func (a *App) ToCreateGame(filePath string, connType d2clientconnectiontype.Clie
 
 		a.screen.SetNextScreen(game)
 	}
+}
+
+// useHeroMapSeed sets the level generator seed to the map seed stored in the hero's save.
+func (a *App) useHeroMapSeed(filePath string) {
+	if os.Getenv("OD2_AUTOMAPSEED") != "" {
+		return
+	}
+
+	factory, err := d2hero.NewHeroStateFactory(a.asset)
+	if err != nil {
+		a.Warningf("map seed: %v", err)
+
+		return
+	}
+
+	state := factory.LoadHeroState(filePath)
+	if state == nil || state.MapSeed == 0 {
+		return
+	}
+
+	d2mapgen.HeroMapSeed = state.MapSeed
+	a.Infof("map seed of %s: %d", state.HeroName, state.MapSeed)
 }
 
 // startAutoGame starts the OD2_AUTOGAME hero. With OD2_AUTODIFFICULTY=0|1|2 the
