@@ -23,7 +23,8 @@ scenario_env() {
     s+=";walkto:object=404;kill:near=18,200;kill:near=1,1;say:pickground qf1;wait:2;loot:1,5;say:capframe $tmp/act3m-council.png"
     s+=";say:giveitem qey;say:giveitem qhr;say:giveitem qbr"
     s+=";say:cubeput qf1 qey qhr qbr;say:transmute"
-    s+=";walkto:object=404;wait:2;say:capframe $tmp/act3m-orb.png"
+    # the orb only reacts to a WIELDED Khalim's Will (exe 0x5b9550); the first hit shakes it, the second breaks it
+    s+=";say:wield qf2;walkto:object=404;wait:2;walkto:object=404;wait:2;say:capframe $tmp/act3m-orb.png"
     s+=";walkto:exit=100;expect:level=100;wait:2;walkto:exit=101;expect:level=101;wait:2;walkto:exit=102;expect:level=102;wait:2"
     s+=";kill:all,300;kill:all,300;kill:all,300;kill:near=1,1;wait:14;say:capframe $tmp/act3m-lair.png"
     s+=";walkto:object=342;expect:level=103;wait:3;say:capframe $tmp/act3m-fortress.png"
@@ -50,6 +51,7 @@ scenario_check() {
   grep -q "ACT3 .* drops Khalim's Flail" $log.txt || { echo "FAIL: no Khalim's Flail"; fail=1; }
   grep -q "ACT3 Compelling Orb placed" $log.txt || { echo "FAIL: no Compelling Orb"; fail=1; }
   grep -q "CUBE .*qf2\|ITEMGEN.*qf2\|Khalim's Will" $log.txt || { echo "FAIL: the cube made no Khalim's Will"; fail=1; }
+  grep -q "WIELD qf2 is in the weapon hand" $log.txt || { echo "FAIL: Khalim's Will was not wielded"; fail=1; }
   grep -q "ACT3 the Compelling Orb is smashed" $log.txt || { echo "FAIL: the orb was not smashed"; fail=1; }
   grep -qE "QUEST A3Q2 slot=18 bits .*Compelling Orb" $log.txt || { echo "FAIL: Khalim's Will quest did not see the orb"; fail=1; }
   grep -q "warp refused level 83 -> 100" $log.txt && echo "(the Durance stairs were refused at least once before the orb was smashed)"

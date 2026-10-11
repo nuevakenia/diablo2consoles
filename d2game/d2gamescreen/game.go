@@ -295,6 +295,8 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 		{"giveitemq", "puts a new item of a quality (1 low .. 4 magic, 6 rare) into the inventory",
 			[]string{"code", "quality"}, v.commandGiveItemQ},
 		{"freeinv", "removes up to n items from the inventory to make room (debug)", []string{"n"}, v.commandFreeInv},
+		{"wield", "puts the first inventory or cube item with this base code into the weapon hand (scripts)",
+			[]string{"code"}, v.commandWield},
 		{"putitem", "puts the cursor item back into the inventory", nil, v.commandPutItem},
 		{"transmute", "transmutes the quest recipes in the Horadric Cube (Staff, Khalim's Will, Pandemonium portals)",
 			nil, v.commandTransmute},
@@ -336,7 +338,7 @@ func (v *Game) OnUnload() error {
 
 	if err := v.terminal.Unbind("spawnitemat", "spawnitem", "spawnmon", "spawnchest", "setgold", "spawnportal", "setwaypoint", "players", "chat",
 		"party", "hostile", "roster", "trade", "pvp", "giveitem", "givebelt", "beltlist", "dropinv", "autobuy", "spawnrank", "killleader", "killnear", "rewarditem", "transmute", "setexp", "cubeput", "pickground",
-		"questpending", "pickitem", "putitem", "giveitemq", "freeinv",
+		"questpending", "pickitem", "wield", "putitem", "giveitemq", "freeinv",
 		"townportal", "closeportal", "portals", "useportal", "pvpcast", "pvpwalk", "sethp"); err != nil {
 		return err
 	}

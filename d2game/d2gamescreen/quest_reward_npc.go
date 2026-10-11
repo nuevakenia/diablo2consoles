@@ -305,3 +305,14 @@ func (v *Game) commandFreeInv(args []string) error {
 
 	return nil
 }
+
+// commandWield is "wield <code>": the item goes from the pack or the cube into the weapon hand (scripts).
+func (v *Game) commandWield(args []string) error {
+	if err := v.gameControls.WieldFromPack(strings.ToLower(args[0])); err != nil {
+		return err
+	}
+
+	v.Infof("WIELD %s is in the weapon hand", args[0])
+
+	return nil
+}
