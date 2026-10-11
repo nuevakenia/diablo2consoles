@@ -16,7 +16,9 @@ const (
 )
 
 // MonStats flag bits (record byte +0xc) that stop the monster level upgrade of
-// its treasure class. 0x04 is "NoRatio"; the column behind 0x40 is UNVERIFIED.
+// its treasure class. 0x04 is "NoRatio"; both bits are tested by
+// ITEMGEN_DropFromTreasureClass (0x558d80, VERIFIED), only the column behind
+// 0x40 is unnamed.
 const (
 	MonStatsNoRatio      = 0x04
 	monStatsNoUpgradeBit = 0x40
