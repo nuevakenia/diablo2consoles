@@ -11,6 +11,11 @@ scenario_env() {
   mkdir -p $a1/new $a1/wb; rm -f $a1/new/*.d2s(N) $a1/wb/*.d2s(N)
   # a brand new hero (a Sorceress unless OD2_HERO names a class) through the hero creation path (a 335 byte .d2s without items)
   local cls=$(hero_class_name)
+  # The Den pack is lethal for a level 1 hero with a plain attack since the monster modifiers are applied (leader
+  # +300% life, followers +100%, ported from the exe; wave 20): a player comes to the Den with a few levels. The
+  # Sorceress takes 4 levels from the console and puts the points into Fire Bolt before she enters the cave.
+  local den_prep=""
+  [ "$cls" = Sorceress ] && den_prep="say:levelup 4;skill:spend=Fire Bolt;skill:spend=Fire Bolt;skill:spend=Fire Bolt;skill:spend=Fire Bolt;"
   {
     echo '#!/bin/zsh'
     echo "export OD2_PORT=$OD2_PORT OD2_AUTONEWCHAR=$cls OD2_AUTONEWCHAR_NAME=Playtest OD2_D2S_WRITEBACK=$a1/new OD2_AUTOEXIT=1"
@@ -18,7 +23,7 @@ scenario_env() {
   } > $a1/newchar.command
   chmod +x $a1/newchar.command; launch_game $a1/newchar.command; wait_run
   echo "export OD2_POPULATE_DENSITY=25 OD2_AUTOGAME=\"$a1/new/Playtest.d2s\" OD2_D2S_WRITEBACK=\"$a1/wb\" OD2_AUTOSPEED=3"
-  echo "export OD2_AUTOSCRIPT='wait:1;say:capframe $tmp/act1-town.png;move:npc=Akara;until:NPC menu opened: npc=\"Akara\",60;menu:Talk;until:QUEST intro flag set,10;move:npc=Akara;until:NPC menu opened: npc=\"Akara\",30;menu:Talk;until:A1Q1 slot=1 bits 0x0000->0x0004,10;move:npc=Akara;until:NPC menu opened: npc=\"Akara\",30;menu:Talk;until:QUEST TOPICS,10;say:capframe $tmp/act1-topics.png;menu:Den of Evil;until:msg=65 mode=2,10;walkto:exit=2;expect:level=2;say:capframe $tmp/act1-bloodmoor.png;kill:near=30,45;loot:30,40;walkto:exit=8;expect:level=8;kill:all,200;until:Den of Evil cleared,10;say:capframe $tmp/act1-den.png;loot:40,40;walkto:exit=2;expect:level=2;walkto:exit=1;expect:level=1;move:npc=Akara;until:NPC menu opened: npc=\"Akara\",60;menu:Talk;until:QUEST EFFECT skill-point,15;say:capframe $tmp/act1-reward.png;exit'"
+  echo "export OD2_AUTOSCRIPT='wait:1;say:capframe $tmp/act1-town.png;move:npc=Akara;until:NPC menu opened: npc=\"Akara\",60;menu:Talk;until:QUEST intro flag set,10;move:npc=Akara;until:NPC menu opened: npc=\"Akara\",30;menu:Talk;until:A1Q1 slot=1 bits 0x0000->0x0004,10;move:npc=Akara;until:NPC menu opened: npc=\"Akara\",30;menu:Talk;until:QUEST TOPICS,10;say:capframe $tmp/act1-topics.png;menu:Den of Evil;until:msg=65 mode=2,10;walkto:exit=2;expect:level=2;say:capframe $tmp/act1-bloodmoor.png;kill:near=30,45;loot:30,40;${den_prep}walkto:exit=8;expect:level=8;kill:all,200;until:Den of Evil cleared,10;say:capframe $tmp/act1-den.png;loot:40,40;walkto:exit=2;expect:level=2;walkto:exit=1;expect:level=1;move:npc=Akara;until:NPC menu opened: npc=\"Akara\",60;menu:Talk;until:QUEST EFFECT skill-point,15;say:capframe $tmp/act1-reward.png;exit'"
 }
 scenario_check() {
   grep -E "NEWCHAR parse|LEVEL CHANGE|POPULATE|KILL (start|done)|LOOT (start|done)|HERO (LEVEL UP|state)|QUEST EFFECT|AUTOSCRIPT RESULT|D2S EXPORT reparse" $log.txt | cut -c1-260 | tail -40
