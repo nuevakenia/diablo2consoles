@@ -64,24 +64,28 @@ var (
 // TownOf is the town of the act a level lies in.
 func TownOf(level int) int { return d2level.ActStartLevel(d2level.ActOfLevel(level)) }
 
+// UberTristramLevel is levels.txt id 0x88 (136), where a cast is refused like in town.
+const UberTristramLevel = 0x88
+
+// ErrCastRefused is the refusal of a cast in town or in level 0x88.
+var ErrCastRefused = errors.New("portal: a town portal cannot be opened here")
+
 // PlanOpen decides the pair a cast makes. level is the level the hero stands
-// in at (x, y), existing the hero's open pair or nil. Cast in a field level the
-// pair is that spot and the town of the act. Cast in town it needs an open
-// pair: the town end moves to the hero and the field end stays where it was.
+// in at (x, y); existing is the hero's open pair or nil and is replaced.
+//
+// VERIFIED (PLAYER_TeleportToTownOnTownPortalUse 0x5bbe10): the cast is refused
+// in a town room and in level 0x88; otherwise the hero's old pair is destroyed
+// (both ends, 0x532e50) and a new portal (object class 0x3b) is placed at the
+// nearest free cell of the hero. The field end is that spot, the other end the
+// town of the act. Earlier code let a cast in town move the town end of the
+// pair; the exe does not allow that.
 func PlanOpen(owner, name string, level int, x, y float64, existing *Pair) (Pair, error) {
-	if level < 1 || level > 132 {
+	if level < 1 || level > UberTristramLevel {
 		return Pair{}, fmt.Errorf("%w: %d", ErrBadLevel, level)
 	}
 
-	if d2level.IsTown(level) {
-		if existing == nil {
-			return Pair{}, ErrNoDestination
-		}
-
-		p := *existing
-		p.Town = End{Level: level, X: x, Y: y}
-
-		return p, nil
+	if d2level.IsTown(level) || level == UberTristramLevel {
+		return Pair{}, fmt.Errorf("%w: level %d", ErrCastRefused, level)
 	}
 
 	return Pair{Owner: owner, OwnerName: name, Field: End{Level: level, X: x, Y: y}, Town: End{Level: TownOf(level), Auto: true}}, nil

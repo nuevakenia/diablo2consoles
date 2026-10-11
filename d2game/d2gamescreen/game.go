@@ -166,6 +166,7 @@ type Game struct {
 	autoSoundElapsed     float64
 	autoSoundDone        bool
 	ground               groundState
+	groundExp            groundExpiry
 	frameBase            int        // frames of the directors already dropped (level_persist.go)
 	levelStore           levelStore // state of the levels the hero has left (level_persist.go)
 	populated            int        // levels.changes+1 of the level that was populated with monsters
@@ -458,6 +459,7 @@ func (v *Game) advanceStep(elapsed, total float64, last bool) error {
 	v.advanceAutosave(elapsed)
 	v.advanceGroundInteraction(elapsed)
 	v.advanceObjects(elapsed)
+	v.advanceGroundExpiry()
 	if last {
 		v.advanceAutoObject(total)
 	}

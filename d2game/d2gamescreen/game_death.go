@@ -234,7 +234,7 @@ func (v *Game) takeGold(amount, x, y int) {
 }
 
 // respawnHero stands the softcore hero up in town at the start point. The
-// equipment stays on the corpse; life is RespawnLife (unverified).
+// equipment stays on the corpse; life, mana and stamina are full (VERIFIED 0x549f10).
 func (v *Game) respawnHero() {
 	p, st := v.localPlayer, &v.death
 
@@ -274,7 +274,7 @@ func (v *Game) respawnHero() {
 	p.ApplyEquipment()
 	p.SetIsInTown(true)
 	p.Stats.Health = d2hero.RespawnLife(p.Stats.MaxHealth)
-	p.Stats.Mana = p.Stats.MaxMana // 0x549f10: life, mana and stamina are refilled
+	p.Stats.Mana = p.Stats.MaxMana // 0x549f10: life, mana and stamina to their maximum
 	p.Stats.Stamina = float64(p.Stats.MaxStamina)
 	st.dead = false
 
@@ -379,9 +379,20 @@ func (v *Game) advanceCorpseRecovery() {
 func (v *Game) recoverCorpse() {
 	p, st := v.localPlayer, &v.death
 
+	corpseExp := 0
+	if p.Death.Corpse != nil {
+		corpseExp = p.Death.Corpse.Experience
+	}
+
 	eq := p.Death.Recover()
 	if eq == nil {
 		return
+	}
+
+	// 0x57db90: the owner's loot gives back the corpse's experience stat (75% of what the penalty took)
+	if corpseExp > 0 {
+		p.Stats.Experience += corpseExp
+		v.Infof("DEATH corpse experience returned: %d", corpseExp)
 	}
 
 	if p.Equipment == nil {

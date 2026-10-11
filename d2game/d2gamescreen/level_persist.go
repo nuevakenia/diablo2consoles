@@ -37,6 +37,8 @@ type savedLevel struct {
 	parked   *d2monsters.ParkedLevel
 	opened   map[savedObject]bool
 	items    []*d2mapentity.Item
+	wells    map[savedObject]savedWell
+	shrines  map[savedObject]savedShrine
 	visits   int
 	monsters int
 }
@@ -100,6 +102,7 @@ func (v *Game) saveLevel(level int) {
 	}
 
 	sl := &savedLevel{opened: map[savedObject]bool{}, visits: 1}
+	v.stampGround(v.gameFrame())
 
 	if v.monsters != nil { // no director yet means nothing was ever spawned
 		sl.parked = v.monsters.ParkLevel(v.gameFrame())
@@ -117,6 +120,7 @@ func (v *Game) saveLevel(level int) {
 		}
 	}
 
+	v.saveObjectStates(sl)
 	v.levelStore.put(level, sl)
 
 	v.Infof("PERSIST saved level %d (%s): %d monsters, %d opened objects, %d ground items", level, v.levelName(level),
@@ -169,12 +173,23 @@ func (v *Game) restoreLevel(level int) {
 		}
 	}
 
+	live := sl.items[:0]
+
 	for _, it := range sl.items {
+		if v.groundExpired(it) { // 0x5407e0: saved entries past their stamp are gone
+			continue
+		}
+
+		live = append(live, it)
 		engine.AddEntity(it)
 	}
 
-	v.Infof("PERSIST restored level %d (%s) visit %d: %d monsters back (%d placements dropped), %d of %d opened objects restored, %d ground items",
-		level, v.levelName(level), sl.visits, restored, discarded, objects, len(sl.opened), len(sl.items))
+	sl.items = live
+
+	wells, shrines := v.restoreObjectStates(sl)
+
+	v.Infof("PERSIST restored level %d (%s) visit %d: %d monsters back (%d placements dropped), %d of %d opened objects restored, %d ground items, %d wells and %d shrines with state",
+		level, v.levelName(level), sl.visits, restored, discarded, objects, len(sl.opened), len(sl.items), wells, shrines)
 }
 
 // terrorsEndSet is the quest predicate of the level-108 restore rule
