@@ -26,10 +26,11 @@ var meteorOffsets = [18][2]int{
 func (s *Sim) hitFunc(m *Missile, t Target) (ret int, ok bool) {
 	switch m.Spec.SrvHitFunc {
 	case 1, 13:
-		// STAND-IN for 13 (Glacial Spike, 0x5a8360, body not read): skills.txt
-		// gives the splash a radius (Param1 "radius" + Param2 per level) and the
-		// missile ExplosionMissile/ClientHit the freeze art, so it is modelled as
-		// the area hit of function 1 (UNVERIFIED which of both the exe uses).
+		// 13 (Glacial Spike, 0x5a8360, read): builds the damage struct with the
+		// elemental length of the skill (sHitPar2 else auralencalc), then the
+		// same area-damage call (0x569830) as function 1 at the missile; the
+		// radius is sHitPar1 else aurarangecalc. Returns 1, or 3 when the call
+		// answers 0 (here: always 1, the call's answer is not modelled).
 		s.areaDamage(m)
 		return resKill, true
 	case 2:
