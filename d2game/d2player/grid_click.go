@@ -46,10 +46,9 @@ func (g *ItemGrid) ClickWith(cursor InventoryItem, mx, my int, ctrl bool) (held 
 	}
 
 	w, h := cursor.InventoryGridSize()
-	ax, ay := CursorAnchor(mx, my, g.originX, g.originY, g.slotSize, w, h, g.width, g.height)
-
-	if ax+w > g.width || ay+h > g.height {
-		return cursor, ClickRefused, ax, ay // the item is bigger than the grid
+	ax, ay, ok := CursorAnchor(mx, my, g.originX, g.originY, g.slotSize, w, h, g.width, g.height)
+	if !ok {
+		return cursor, ClickRefused, ax, ay // the footprint leaves the grid: the exe does nothing
 	}
 
 	switch over := g.Overlapping(ax, ay, w, h); len(over) {

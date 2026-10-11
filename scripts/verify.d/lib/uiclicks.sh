@@ -23,7 +23,8 @@ ui_clicks_env() {
   s="$s;say:spawnchest 267 267 267;until:AUTOGROUND chest-spawn id=267,30;click:left@object:267;until:stash opened,120;wait:0.5;click:left@ui:352,464;until:stash=false,60"
   # 4 the belt (the stash opened the inventory with it): a click on a potion picks it up, a second click puts it back
   s="$s;click:left@ui:437,576;until:cursor_item=true,60;click:left@ui:437,576;until:cursor_item=false,60"
-  s="$s;click:left@ui:357,540;until:inventory=false,60"
+  # the strip follows the exe (Game.exe 0x47b510): with only the inventory open it stands 131 pixels to the left
+  s="$s;click:left@ui:226,540;until:inventory=false,60"
   echo "export OD2_AUTOSCRIPT='$s;say:heropos;exit'"
 }
 ui_clicks_check() {

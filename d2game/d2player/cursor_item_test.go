@@ -25,18 +25,22 @@ func TestCursorAnchor(t *testing.T) {
 		mx, my       int
 		w, h         int
 		wantX, wantY int
+		reject       bool
 	}{
-		{"1x1 inside cell", 100 + 29*3 + 5, 200 + 29*2 + 5, 1, 1, 3, 2},
-		{"2x3 held by the middle", 100 + 29*3 + 5, 200 + 29*2 + 5, 2, 3, 2, 1},
-		{"2x2 between cells rounds", 100 + 29*4, 200 + 29*2, 2, 2, 3, 1},
-		{"clamped at the left/top", 100, 200, 2, 3, 0, 0},
-		{"clamped at the right/bottom", 100 + 29*9 + 10, 200 + 29*3 + 10, 2, 2, 8, 2},
+		{"1x1 inside cell", 100 + 29*3 + 5, 200 + 29*2 + 5, 1, 1, 3, 2, false},
+		{"2x3 held by the middle", 100 + 29*3 + 5, 200 + 29*2 + 5, 2, 3, 2, 1, false},
+		{"2x2 between cells rounds", 100 + 29*4, 200 + 29*2, 2, 2, 3, 1, false},
+		{"clamped at the left/top", 100, 200, 2, 3, 0, 0, false},
+		{"fits at the right/bottom", 100 + 29*9 + 10, 200 + 29*3 + 10, 2, 2, 8, 2, false},
+		{"2x2 past the right edge is rejected", 100 + 29*9 + 20, 200 + 29*2, 2, 2, 9, 1, true},
+		{"2x3 past the bottom edge is rejected", 100 + 29*3, 200 + 29*3 + 20, 2, 3, 2, 2, true},
+		{"1x1 is never rejected", 100 + 29*9 + 5, 200 + 29*3 + 5, 1, 1, 9, 3, false},
 	}
 
 	for _, tt := range tests {
-		x, y := CursorAnchor(tt.mx, tt.my, 100, 200, 29, tt.w, tt.h, 10, 4)
-		if x != tt.wantX || y != tt.wantY {
-			t.Errorf("%s: got (%d,%d) want (%d,%d)", tt.name, x, y, tt.wantX, tt.wantY)
+		x, y, ok := CursorAnchor(tt.mx, tt.my, 100, 200, 29, tt.w, tt.h, 10, 4)
+		if ok == tt.reject || x != tt.wantX || y != tt.wantY {
+			t.Errorf("%s: got (%d,%d,ok=%v) want (%d,%d,reject=%v)", tt.name, x, y, ok, tt.wantX, tt.wantY, tt.reject)
 		}
 	}
 }

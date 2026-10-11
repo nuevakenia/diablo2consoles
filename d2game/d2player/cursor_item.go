@@ -1,8 +1,6 @@
 package d2player
 
 import (
-	"math"
-
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 )
 
@@ -58,43 +56,51 @@ func (g *ItemGrid) Contains(mx, my int) bool {
 		mx < g.originX+g.width*g.slotSize && my < g.originY+g.height*g.slotSize
 }
 
-// CursorAnchor is INV_ConvertMouseToGridAnchor: the top-left cell of a w x h
-// item held at the pixel (mx, my). The item is held by its middle: for an even
-// width the hot spot sits between two cells (rounded), for an odd one inside a
-// cell; the result is clamped to the grid.
-func CursorAnchor(mx, my, originX, originY, cell, w, h, gridW, gridH int) (ax, ay int) {
-	fx := float64(mx-originX) / float64(cell)
-	fy := float64(my-originY) / float64(cell)
+// CursorAnchor ports INV_ConvertMouseToGridAnchor (0x482d40) together with the bounds test of
+// INV_UpdateHoverCell (0x483170): the top-left cell of a w x h item held at the pixel (mx, my).
+// The cell under the mouse is shifted by a quarter of the item's picture (an even size puts the
+// hot spot between cells), an item as large as the grid takes the middle, and for a size above 1
+// half the size is taken off (negative results become 0). The exe does NOT clamp on the far side:
+// an anchor whose footprint leaves the grid is rejected (ok false) and nothing happens.
+func CursorAnchor(mx, my, originX, originY, cell, w, h, gridW, gridH int) (ax, ay int, ok bool) {
+	ax, okx := anchorAxis(mx-originX, cell, w, gridW)
+	ay, oky := anchorAxis(my-originY, cell, h, gridH)
 
-	if w%2 == 0 {
-		ax = int(math.Round(fx)) - w/2
-	} else {
-		ax = int(math.Floor(fx)) - w/2
-	}
-
-	if h%2 == 0 {
-		ay = int(math.Round(fy)) - h/2
-	} else {
-		ay = int(math.Floor(fy)) - h/2
-	}
-
-	return clampInt(ax, 0, gridW-w), clampInt(ay, 0, gridH-h)
+	return ax, ay, okx && oky
 }
 
-func clampInt(v, lo, hi int) int {
-	if hi < lo {
-		hi = lo
+func anchorAxis(d, cell, size, gridSize int) (int, bool) {
+	u := floorDiv(d, cell)
+
+	if size%2 == 0 {
+		u = floorDiv(d+(size*cell)>>2, cell)
 	}
 
-	if v < lo {
-		return lo
+	if size == gridSize {
+		u = gridSize >> 1
 	}
 
-	if v > hi {
-		return hi
+	if size > 1 {
+		u -= size >> 1
+		if u < 0 {
+			u = 0
+		}
+
+		if gridSize < size+u {
+			return u, false
+		}
 	}
 
-	return v
+	return u, true
+}
+
+func floorDiv(a, b int) int {
+	q := a / b
+	if a%b != 0 && (a < 0) != (b < 0) {
+		q--
+	}
+
+	return q
 }
 
 // CursorItem returns the item held on the cursor, or nil.
