@@ -16,6 +16,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2ground"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
 )
 
@@ -425,11 +426,18 @@ func (v *Game) heroGoldFind() int {
 }
 
 // areaLevel is the item level of object drops: OD2_AUTOGROUND_ILVL if set,
-// else the hero's level (the real game uses the area's level, via 0x61dc00;
-// levels.txt monster levels are not wired in yet).
+// else the monster level of the current area for the game difficulty (Levels.txt
+// MonLvl1..3, the Ex columns in an expansion game; the real game uses the area's
+// level, via 0x61dc00), else the hero's level when the area is unknown.
 func (v *Game) areaLevel() int {
 	if n, err := envInt("OD2_AUTOGROUND_ILVL"); err == nil && n > 0 {
 		return n
+	}
+
+	if det := v.asset.Records.GetLevelDetails(v.currentLevel()); det != nil {
+		if n := areaMonsterLevel(det, v.difficulty(), v.heroExpansion()); n > 0 {
+			return n
+		}
 	}
 
 	if v.localPlayer != nil && v.localPlayer.Stats.Level > 0 {
@@ -437,6 +445,22 @@ func (v *Game) areaLevel() int {
 	}
 
 	return 1
+}
+
+// areaMonsterLevel is the monster level of an area for a difficulty (0 normal,
+// 1 nightmare, 2 hell); 0 when the difficulty is out of range or the table has
+// no level for it (the caller falls back).
+func areaMonsterLevel(l *d2records.LevelDetailRecord, difficulty int, expansion bool) int {
+	if l == nil || difficulty < 0 || difficulty > 2 {
+		return 0
+	}
+
+	by := [3]int{l.MonsterLevelNormal, l.MonsterLevelNightmare, l.MonsterLevelHell}
+	if expansion {
+		by = [3]int{l.MonsterLevelNormalEx, l.MonsterLevelNightmareEx, l.MonsterLevelHellEx}
+	}
+
+	return by[difficulty]
 }
 
 // itemFactory returns the item factory of the map engine.

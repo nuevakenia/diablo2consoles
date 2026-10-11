@@ -14,7 +14,8 @@
 // Bash/Stun/Jab and the other plain melee skills (do 1, 2, 7), Throw (do 3),
 // Frozen Armor and the other timed self states (do 18, 25, 47, 54, 116), Static
 // Field (do 20), Inner Sight (do 6), the Nova rings (do 22) and Warmth
-// (passive). Telekinesis and Find Item are not implemented.
+// (passive). Telekinesis (do 21, damage on a targeted monster only) is in
+// skills_npsd.go; Find Item is run by the engine (d2skills).
 //
 // Class skills (class.go): a table maps each srvdofunc to a handler that reads
 // the skills.txt columns, so skills sharing a function share code. Barbarian:
