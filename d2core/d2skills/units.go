@@ -212,6 +212,21 @@ func (h *heroUnit) AttackRating() int {
 	return d2combat.PlayerAttackRating(0, h.p.Stats.Dexterity, st.ToHitFactor)
 }
 
+// DualWielding is SKILL_IsDualWieldingTypeWeapons (0x5d7d90): both hands hold
+// a weapon of the melee type (UNVERIFIED: the exe's item type 0x2e is taken
+// as ItemTypes "mele"). Whirlwind hits twice per tick then.
+func (h *heroUnit) DualWielding() bool {
+	if h.merc != nil || h.p.Equipment == nil || h.p.Equipment.RightHand == nil || h.p.Equipment.LeftHand == nil {
+		return false
+	}
+
+	melee := func(code string) bool {
+		return d2skill.TypeIs(h.e.equivOf, h.e.weaponType(code), "mele")
+	}
+
+	return melee(h.p.Equipment.RightHand.GetItemCode()) && melee(h.p.Equipment.LeftHand.GetItemCode())
+}
+
 // WeaponDamage is the right hand weapon's range, or 1-2 bare handed (the
 // game's fallback min>=1, max>=2).
 func (h *heroUnit) WeaponDamage() (min, max int) {

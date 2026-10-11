@@ -320,6 +320,8 @@ type WhirlOrder struct {
 	// the 0x5d8010 scan radius); Delay the frames between two hits (10 bare
 	// handed, see WhirlDelay) and MaxSteps the longest run in subtiles.
 	X, Y, Radius, Delay, MaxSteps int
+	// Dual is set when both hands hold melee weapons: two hits per tick.
+	Dual bool
 	// Pct is calc1: the damage percent bonus.
 	Pct int
 	// State is the aurastate kept while it lasts.
@@ -375,7 +377,12 @@ func doWhirlwindFn(c *cast) {
 	wmin, wmax := c.u.WeaponDamage()
 	armed := wmax > 0 && (wmin > 2 || wmax > 2)
 
-	c.effect(Effect{Kind: "whirl", Whirl: &WhirlOrder{X: x, Y: y, Radius: whirlRadius, MaxSteps: whirlMaxRun,
+	dual := false
+	if d, ok := c.u.(DualWielder); ok {
+		dual = d.DualWielding()
+	}
+
+	c.effect(Effect{Kind: "whirl", Whirl: &WhirlOrder{X: x, Y: y, Radius: whirlRadius, MaxSteps: whirlMaxRun, Dual: dual,
 		Delay: WhirlDelay(14, armed), Pct: c.calc(1), State: c.sk.AuraState}})
 }
 
