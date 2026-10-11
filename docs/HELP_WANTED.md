@@ -1,6 +1,6 @@
 # Where help is needed
 
-Status handoff (2026-10-10, integration c93982b3). The fork is a native Apple-Silicon macOS Diablo II built on OpenDiablo2 (Go + Ebiten),
+Status handoff (2026-10-10, integration 694b5da0). The fork is a native Apple-Silicon macOS Diablo II built on OpenDiablo2 (Go + Ebiten),
 using the owner's own 1.14b + Lord of Destruction files. Nothing in this repository contains game data or Blizzard
 code. Every number in the engine comes from reading the original executable (read-only, in Ghidra) or from public
 format documentation; items marked UNVERIFIED in code or in `docs/KNOWN_GAPS.md` are guesses.
@@ -52,6 +52,6 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
 
 ## Wave 20 notes (2026-10-11)
 
-- `feat/w20-quests` (on the fork, not landed): Act 1-5 quest-rule fixes read from the exe; the quest scenarios `9k-quest-blade/siege/rescue/lamesen` still carry the old expectations and must be updated before merging.
-- The class matrix needs a re-run (only barbarian 9b/9e/9g were run; barbarian 9h ran 22 minutes without finishing, check whether it is stuck).
+- Quest rules from the exe are landed (Act 1-5); freed barbarians (Rescue) and the frozen Anya object are not modelled in the world.
+- The class matrix (docs/class-matrix.md) passes 35/35; the walk give-up clock was fixed (it used to reset every cycle).
 - Exe monster modifiers are now applied: super-unique/champion life bonuses made the Den of Evil lethal to a level-1 hero without Fire Bolt.
