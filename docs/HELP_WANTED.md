@@ -1,6 +1,6 @@
 # Where help is needed
 
-Status handoff (2026-10-10, integration caa70b0a). The fork is a native Apple-Silicon macOS Diablo II built on OpenDiablo2 (Go + Ebiten),
+Status handoff (2026-10-10, integration c93982b3). The fork is a native Apple-Silicon macOS Diablo II built on OpenDiablo2 (Go + Ebiten),
 using the owner's own 1.14b + Lord of Destruction files. Nothing in this repository contains game data or Blizzard
 code. Every number in the engine comes from reading the original executable (read-only, in Ghidra) or from public
 format documentation; items marked UNVERIFIED in code or in `docs/KNOWN_GAPS.md` are guesses.
@@ -23,12 +23,12 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
 
 ## Engine fidelity (needs a Ghidra reader)
 
-- Skills with approximate behaviour: 171 of 210 have engine behaviour. Open: Blood Golem, Fire Golem, Armageddon
+- Skills with approximate behaviour: 177 of 210 have engine behaviour. Open: Blood Golem, Fire Golem, Armageddon
   meteors, Conversion flag bits, Holy Bolt healing remote party members (needs a packet), Charged Strike aim and
   Fend/Zeal hit cadence (8-frame guess), Strafe/Lightning Strike extras on the client.
-- Monster AI: 128 of 148 are ported faithfully. Open: Shadow Master feed, Zealot fear gate, Regurgitator and Siege
+- Monster AI: 134 of 148 are ported faithfully. Open: Shadow Master feed, Zealot fear gate, Regurgitator and Siege
   Tower scan filters, FallenShaman scan, Diablo's second output, BatDemon flight boost (no monster regeneration).
-- UI panels: 11 of 14 match the original; move-gold dialog and the NPC menu golden are open; the party panel is
+- UI panels: 12 of 14 match the original; move-gold dialog and the NPC menu golden are open; the party panel is
   missing one toggle.
 - The summon caps (MinionSpawner 10, Hydra 9, Overseer/Impregnate, DiabPrison 4) are safety bounds, not exe values.
 - Lava levels 107/108 make about 8x fewer monster groups than the density rolls predict; probably the estimate, not
@@ -49,3 +49,9 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
   scenarios; it made the party/PvP scenario fail (`panel "party" did not open`), so it was left out. Start there.
 - Hit-queue purge (N16, `OD2_HITQUEUE=1`) is default off because `9f-pvp-skills-ear` fails with it on.
 - The in-repo Bink tables credit FFmpeg (LGPL-2.1-or-later); pin a release tag if provenance matters.
+
+## Wave 20 notes (2026-10-11)
+
+- `feat/w20-quests` (on the fork, not landed): Act 1-5 quest-rule fixes read from the exe; the quest scenarios `9k-quest-blade/siege/rescue/lamesen` still carry the old expectations and must be updated before merging.
+- The class matrix needs a re-run (only barbarian 9b/9e/9g were run; barbarian 9h ran 22 minutes without finishing, check whether it is stuck).
+- Exe monster modifiers are now applied: super-unique/champion life bonuses made the Den of Evil lethal to a level-1 hero without Fire Bolt.
