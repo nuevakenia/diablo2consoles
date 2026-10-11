@@ -12,9 +12,11 @@ package d2monster
 // MephScanner is MONAI_FindBestUnitByModeScan 0x5f6850: a scan of the units
 // near Mephisto (squared distance <= 0x400, alive, flag 4 set in the unit
 // flags, hostile by 0x552270) that reports the one with the lowest current
-// life and, when Mephisto's own unit is a monster, the nearest one. UNVERIFIED
-// which units those are in practice (the unit-mode list it walks was not
-// identified); absent, the burst never retargets and draws no extra roll.
+// life and, only when the scanning unit is a player (type 0, never for
+// Mephisto), the nearest one. Callback 0x5f67a0 decoded in wave 20 (alive,
+// unit flag 4, hostile, squared distance <= 1024). UNVERIFIED which unit
+// types the walk of list index 1 visits; absent, the burst never retargets
+// and draws no extra roll. Hosted by Director.MephScan.
 type MephScanner interface {
 	MephScan(b *Brain) (weakest *Target, nearest *Target)
 }
