@@ -25,7 +25,7 @@ const (
 	wpRowW               = 283 // UNVERIFIED
 	wpTextBottom0        = 84
 	wpTextPitch          = 35
-	wpTextX              = 60 // UNVERIFIED: the text column
+	wpTextX              = 80 // UNVERIFIED: field 2 of the row record (waypoint_layout.go)
 	wpHeaderBottom       = 0x30
 	wpTabX, wpTabPitch   = 5, 62 // wpTabPitch is only the fallback; the table wpTabXs is the original's
 	wpTabBottom          = 94
@@ -193,7 +193,14 @@ func (p *WaypointPanel) bounds() (left, top, right, bottom int) {
 
 // rowBox is the hit rectangle of row i on the screen.
 func rowBox(i int) (x, y, w, h int) {
-	return wpPanelX + wpRowX, wpPanelY + wpRowTop + i*wpRowPitch, wpRowW, wpRowH
+	rs, ok := Mode800.WaypointRowRects(i)
+	if !ok {
+		return wpPanelX + wpRowX, wpPanelY + wpRowTop + i*wpRowPitch, wpRowW, wpRowH
+	}
+
+	r := rs[0]
+
+	return r.X, r.Y, r.W, r.H
 }
 
 func (p *WaypointPanel) rowAt(mx, my int) int {
@@ -315,7 +322,14 @@ func (p *WaypointPanel) place() {
 
 	for i, l := range p.labels {
 		_, h := l.GetTextMetrics(l.GetText())
-		l.SetPosition(wpPanelX+wpTextX, wpPanelY+wpTextBottom0+i*wpTextPitch-h)
+
+		x, bottom := wpPanelX+wpTextX, wpPanelY+wpTextBottom0+i*wpTextPitch
+
+		if rs, ok := Mode800.WaypointRowRects(i); ok {
+			x, bottom = rs[1].X, rs[1].Y
+		}
+
+		l.SetPosition(x, bottom-h)
 	}
 }
 

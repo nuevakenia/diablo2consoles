@@ -52,6 +52,7 @@ const (
 	// widget tops from the original's row widgets (party_layout.go PartyRowRects, 800x600): bottom 0x5a + 60 minus 20
 	relationshipSwitcherX, baseRelationshipSwitcherY = 80 + partyRowRelationX, partyRowFirstY + 60 - partyRowBtnH + partyRowHostileDY
 	listeningSwitcherX, baseListeningSwitcherY       = 80 + partyRowListenX, partyRowFirstY + 60 - partyRowBtnH
+	lootSwitcherX, baseLootSwitcherY                 = 80 + partyRowBit01X, partyRowFirstY + 60 - partyRowBtnH
 	seeingSwitcherX, baseSeeingSwitcherY             = 80 + partyRowSeeX, partyRowFirstY + 60 - partyRowBtnH
 	nameLabelX, baseNameLabelY                       = 115, 144 + panelShiftY
 	nameTooltipX, baseNameTooltipY                   = 100, 120 + panelShiftY
@@ -74,6 +75,12 @@ type PartyHooks struct {
 	Op func(p *d2mapentity.Player) string
 	// OnButton runs when the row's button is pressed (op as above).
 	OnButton func(p *d2mapentity.Player, op string)
+	// GameInfoFlag4 reports the game-info flag that the original tests (UI_IsGameInfoFlag4Set) before it draws the
+	// relation bit 01 toggle (x 325, frames 12/14). Nil means not set, so the toggle stays hidden. Which game
+	// mode sets the flag is UNVERIFIED.
+	GameInfoFlag4 func() bool
+	// OnLoot runs when the bit 01 toggle is pressed (on = the face for "allowed").
+	OnLoot func(p *d2mapentity.Player, on bool)
 	// OnHostile runs when the hostility switch is pressed.
 	OnHostile func(p *d2mapentity.Player, hostile bool)
 }
@@ -221,6 +228,19 @@ func (s *PartyPanel) newPartyIndex() *partyIndex {
 
 	result.seeingSwitcher = seeing
 
+	// relation bit 01 toggle (frames 12/14); texts strParty20/21 are UNVERIFIED guesses (the exe's ids are not read)
+	loot := s.createSwitcher(d2enum.PartyButtonCorpsLootingFrame)
+
+	result.lootActiveTooltip = s.uiManager.NewTooltip(d2resource.Font16, d2resource.PaletteSky, d2ui.TooltipXCenter, d2ui.TooltipYTop)
+	result.lootActiveTooltip.SetText(s.asset.TranslateString("strParty20"))
+	loot.SetActiveTooltip(result.lootActiveTooltip)
+
+	result.lootInactiveTooltip = s.uiManager.NewTooltip(d2resource.Font16, d2resource.PaletteSky, d2ui.TooltipXCenter, d2ui.TooltipYTop)
+	result.lootInactiveTooltip.SetText(s.asset.TranslateString("strParty21"))
+	loot.SetInactiveTooltip(result.lootInactiveTooltip)
+
+	result.lootSwitcher = loot
+
 	listening := s.createSwitcher(d2enum.PartyButtonListeningFrame)
 
 	result.listeningActiveTooltip = s.uiManager.NewTooltip(d2resource.Font16, d2resource.PaletteSky, d2ui.TooltipXCenter, d2ui.TooltipYTop)
@@ -261,6 +281,9 @@ type partyIndex struct {
 	relationshipsActiveTooltip   *d2ui.Tooltip
 	relationshipsInactiveTooltip *d2ui.Tooltip
 	seeingSwitcher               *d2ui.SwitchableButton
+	lootSwitcher                 *d2ui.SwitchableButton
+	lootActiveTooltip            *d2ui.Tooltip
+	lootInactiveTooltip          *d2ui.Tooltip
 	seeingActiveTooltip          *d2ui.Tooltip
 	seeingInactiveTooltip        *d2ui.Tooltip
 	listeningSwitcher            *d2ui.SwitchableButton
@@ -340,6 +363,12 @@ func (pi *partyIndex) setPositions(idx int) {
 	_, h = pi.seeingInactiveTooltip.GetSize()
 	pi.seeingInactiveTooltip.SetPosition(seeingSwitcherX+buttonSize, baseSeeingSwitcherY+idx*indexOffset-h)
 
+	pi.lootSwitcher.SetPosition(lootSwitcherX, baseLootSwitcherY+idx*indexOffset)
+	_, h = pi.lootActiveTooltip.GetSize()
+	pi.lootActiveTooltip.SetPosition(lootSwitcherX+buttonSize, baseLootSwitcherY+idx*indexOffset-h)
+	_, h = pi.lootInactiveTooltip.GetSize()
+	pi.lootInactiveTooltip.SetPosition(lootSwitcherX+buttonSize, baseLootSwitcherY+idx*indexOffset-h)
+
 	pi.listeningSwitcher.SetPosition(listeningSwitcherX, baseListeningSwitcherY+idx*indexOffset)
 	_, h = pi.listeningActiveTooltip.GetSize()
 	pi.listeningActiveTooltip.SetPosition(listeningSwitcherX+buttonSize, baseListeningSwitcherY+idx*indexOffset-h)
@@ -401,6 +430,7 @@ func (s *PartyPanel) Load() {
 		s.indexes[n].AddWidget(i.class)
 		s.indexes[n].AddWidget(i.relationshipSwitcher)
 		s.indexes[n].AddWidget(i.seeingSwitcher)
+		s.indexes[n].AddWidget(i.lootSwitcher)
 		s.indexes[n].AddWidget(i.listeningSwitcher)
 		s.indexes[n].AddWidget(i.level)
 		s.indexes[n].AddWidget(i.inviteAcceptButton)
@@ -522,6 +552,16 @@ func (s *PartyPanel) wireIndex(pi *partyIndex) {
 	pi.inviteAcceptButton.OnActivated(press)
 	pi.acceptButton.OnActivated(press)
 	pi.leaveButton.OnActivated(press)
+	pi.lootSwitcher.OnActivated(func() {
+		if s.hooks.OnLoot != nil && pi.hero != nil {
+			s.hooks.OnLoot(pi.hero, true)
+		}
+	})
+	pi.lootSwitcher.OnDeactivated(func() {
+		if s.hooks.OnLoot != nil && pi.hero != nil {
+			s.hooks.OnLoot(pi.hero, false)
+		}
+	})
 	pi.relationshipSwitcher.OnActivated(func() { // the active (peaceful) face was pressed: go hostile
 		if s.hooks.OnHostile != nil && pi.hero != nil {
 			s.hooks.OnHostile(pi.hero, true)
@@ -559,6 +599,7 @@ func (s *PartyPanel) refreshRows() {
 			pi.op = s.hooks.Op(pi.hero)
 		}
 
+		pi.lootSwitcher.SetVisible(PartyLootToggleShown(s.hooks.GameInfoFlag4))
 		pi.inviteAcceptButton.SetVisible(pi.op == "invite")
 		pi.acceptButton.SetVisible(pi.op == "accept")
 		pi.leaveButton.SetVisible(pi.op == "leave")

@@ -10,15 +10,10 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
 )
 
+// Positions come from the original's dialog (move_gold_layout.go, UI_OpenPanelByIndex 0x44f7b0). The values
+// below are the layout of GoldDialog for the drop kind with the real picture size filled in at Load.
 const (
-	moveGoldX, moveGoldY                       = 300, 350
-	moveGoldCloseButtonX, moveGoldCloseButtonY = moveGoldX + 140, moveGoldY - 42
-	moveGoldOkButtonX, moveGoldOkButtonY       = moveGoldX + 35, moveGoldY - 42
-	moveGoldValueX, moveGoldValueY             = moveGoldX + 29, moveGoldY - 90
-	moveGoldActionLabelX, moveGoldActionLabelY = moveGoldX + 105, moveGoldY - 150
-	moveGoldActionLabelOffsetY                 = 25
-	moveGoldUpArrowX, moveGoldUpArrowY         = moveGoldX + 14, moveGoldY - 91
-	moveGoldDownArrowX, moveGoldDownArrowY     = moveGoldX + 14, moveGoldY - 76
+	moveGoldActionLabelOffsetY = goldDlgTextRowAdvance
 )
 
 const goldValueFilter = "0123456789"
@@ -77,18 +72,22 @@ func (s *MoveGoldPanel) Load() {
 		s.Error(err.Error())
 	}
 
-	s.panel.SetPosition(moveGoldX, moveGoldY)
+	fw, fh := s.panel.GetCurrentFrameSize()
+	lay := GoldDialog(GoldDlgDrop, fw, fh)
+
+	// pictures stand on their bottom edge
+	s.panel.SetPosition(lay.Frame.X, lay.Frame.Y+lay.Frame.H)
 	s.panelGroup.AddWidget(s.panel)
 
 	closeButton := s.uiManager.NewButton(d2ui.ButtonTypeSquareClose, "")
 	closeButton.SetVisible(false)
-	closeButton.SetPosition(moveGoldCloseButtonX, moveGoldCloseButtonY)
+	closeButton.SetPosition(lay.Cancel.X, lay.Cancel.Y)
 	closeButton.OnActivated(func() { s.Close() })
 	s.panelGroup.AddWidget(closeButton)
 
 	okButton := s.uiManager.NewButton(d2ui.ButtonTypeSquareOk, "")
 	okButton.SetVisible(false)
-	okButton.SetPosition(moveGoldOkButtonX, moveGoldOkButtonY)
+	okButton.SetPosition(lay.Ok.X, lay.Ok.Y)
 	okButton.OnActivated(func() { s.action() })
 	s.panelGroup.AddWidget(okButton)
 
@@ -97,27 +96,30 @@ func (s *MoveGoldPanel) Load() {
 	s.value.SetText(fmt.Sprintln(s.gold))
 	s.value.Activate()
 	s.value.SetNumberOnly(s.gold)
-	s.value.SetPosition(moveGoldValueX, moveGoldValueY)
+	s.value.SetPosition(lay.Edit.X, lay.Edit.Y+lay.Edit.H)
 	s.panelGroup.AddWidget(s.value)
 
 	s.actionLabel1 = s.uiManager.NewLabel(d2resource.Font16, d2resource.PaletteStatic)
 	s.actionLabel1.Alignment = d2ui.HorizontalAlignCenter
-	s.actionLabel1.SetPosition(moveGoldActionLabelX, moveGoldActionLabelY)
+	// text x is a register argument in the exe (UNVERIFIED): centred on the picture
+	labelX := lay.Frame.X + lay.Frame.W/2
+	labelY := lay.TextBaseline0 - 16
+	s.actionLabel1.SetPosition(labelX, labelY)
 	s.panelGroup.AddWidget(s.actionLabel1)
 
 	s.actionLabel2 = s.uiManager.NewLabel(d2resource.Font16, d2resource.PaletteStatic)
 	s.actionLabel2.Alignment = d2ui.HorizontalAlignCenter
-	s.actionLabel2.SetPosition(moveGoldActionLabelX, moveGoldActionLabelY+moveGoldActionLabelOffsetY)
+	s.actionLabel2.SetPosition(labelX, labelY+moveGoldActionLabelOffsetY)
 	s.panelGroup.AddWidget(s.actionLabel2)
 
 	increase := s.uiManager.NewButton(d2ui.ButtonTypeUpArrow, d2resource.PaletteSky)
-	increase.SetPosition(moveGoldUpArrowX, moveGoldUpArrowY)
+	increase.SetPosition(lay.Spinner.X, lay.Spinner.Y+15)
 	increase.SetVisible(false)
 	increase.OnActivated(func() { s.increase() })
 	s.panelGroup.AddWidget(increase)
 
 	decrease := s.uiManager.NewButton(d2ui.ButtonTypeDownArrow, d2resource.PaletteSky)
-	decrease.SetPosition(moveGoldDownArrowX, moveGoldDownArrowY)
+	decrease.SetPosition(lay.Spinner.X, lay.Spinner.Y+30)
 	decrease.SetVisible(false)
 	decrease.OnActivated(func() { s.decrease() })
 	s.panelGroup.AddWidget(decrease)

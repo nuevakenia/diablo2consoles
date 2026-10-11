@@ -68,4 +68,13 @@ func TestPartyRowGeometry(t *testing.T) {
 	if baseInviteAcceptButtonY != 130 || baseListeningSwitcherY != 130 || baseSeeingSwitcherY != 130 || baseRelationshipSwitcherY != 137 {
 		t.Errorf("go widget tops: %d %d %d %d", baseInviteAcceptButtonY, baseListeningSwitcherY, baseSeeingSwitcherY, baseRelationshipSwitcherY)
 	}
+
+	// the fourth toggle (relation bit 01, frames 12/14) stands at x 325 and only shows with game-info flag 4
+	if lootSwitcherX != 325 || baseLootSwitcherY != 130 {
+		t.Errorf("go loot toggle: %d %d", lootSwitcherX, baseLootSwitcherY)
+	}
+
+	if PartyLootToggleShown(nil) || PartyLootToggleShown(func() bool { return false }) || !PartyLootToggleShown(func() bool { return true }) {
+		t.Error("loot toggle must follow the flag")
+	}
 }

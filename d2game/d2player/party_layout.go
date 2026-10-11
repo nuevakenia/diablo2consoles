@@ -88,3 +88,7 @@ func (m Mode) PartyHeaderHover() UIRect {
 
 	return UIRect{"party", "header_hover", ox + partyHeaderX, oy + partyHeaderTop, partyHeaderHoverX - partyHeaderX, partyHeaderBottom - partyHeaderTop}
 }
+
+// PartyLootToggleShown reports whether the relation bit 01 toggle (x 325) is drawn: the original draws and
+// tooltips it only when the game-info flag 4 is set (UI_IsGameInfoFlag4Set), so a nil test means hidden.
+func PartyLootToggleShown(flag4 func() bool) bool { return flag4 != nil && flag4() }
