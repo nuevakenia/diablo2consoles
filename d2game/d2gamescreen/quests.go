@@ -231,6 +231,7 @@ func (v *Game) advanceQuests(elapsed float64) {
 
 	v.advanceBarks(elapsed)
 	v.advanceUber(elapsed)
+	v.advanceHellforge(elapsed)
 	v.advanceChaos(elapsed)
 	v.advanceAct3(elapsed)
 
@@ -314,6 +315,7 @@ func (v *Game) onMonsterKilled(ev d2monsters.KillEvent) {
 	v.questKillDrops(ev.Label, ev.Class)
 	v.act3Killed(ev)
 	v.uberKilled(ev)
+	v.trioKilled(ev)
 	v.chaosKilled(ev)
 }
 
@@ -402,6 +404,10 @@ func (v *Game) applyQuestEffects(effects []d2quest.Effect) {
 		case d2quest.EffectDeleteItem:
 			ok := v.gameControls.RemoveItemByCode(e.Code)
 			v.Infof("QUEST EFFECT delete-item code=%s removed=%v", e.Code, ok)
+
+			if isHellforgeSmash(e) {
+				v.startHellforgeShower()
+			}
 		case d2quest.EffectSpawn:
 			if e.Code != "" {
 				v.Infof("QUEST EFFECT spawn-item code=%s (%s)", e.Code, e.Note)

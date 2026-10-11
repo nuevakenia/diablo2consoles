@@ -84,6 +84,7 @@ func lastRoster(t *testing.T, c *fakeConn) d2netpacket.RosterUpdatePacket {
 
 func TestServerPartyAndPvP(t *testing.T) {
 	g, a, b := testServer()
+	g.soc.hitQueueOn = true
 
 	// by name, accept, the roster reaches both
 	party(t, g, a, d2netpacket.PartyInvite, "Bob")
@@ -102,6 +103,19 @@ func TestServerPartyAndPvP(t *testing.T) {
 	// the party (VERIFIED Game.exe 0x5a3870); an open town portal of the
 	// declarer is destroyed
 	g.soc.portals.Open(d2portal.Pair{Owner: "a", OwnerName: "Ann"})
+
+	// N21: in town (everybody starts in the Rogue Encampment) the declaration is refused
+	party(t, g, a, d2netpacket.PartyHostile, "b")
+
+	if g.soc.roster.Hostile("a", "b") || !g.soc.roster.SameParty("a", "b") {
+		t.Fatal("hostility declared in town")
+	}
+
+	if u := lastRoster(t, a); !strings.Contains(u.Notice, "town") {
+		t.Fatalf("no town refusal notice: %+v", u)
+	}
+
+	g.socialArea("a", 2)
 	party(t, g, a, d2netpacket.PartyHostile, "b")
 
 	if u := lastRoster(t, a); !strings.Contains(u.Notice, "hostile") || u.Player != "" && u.Player != "a" || !g.soc.roster.Hostile("a", "b") {
@@ -139,6 +153,19 @@ func TestServerPartyAndPvP(t *testing.T) {
 	}
 
 	var relayed d2netpacket.PvPHitPacket
+
+	// N16: the hit waits in the defender's list until the flush
+	if g.soc.hits.Pending("b") != 1 {
+		t.Fatalf("pending hits %d, want 1", g.soc.hits.Pending("b"))
+	}
+
+	for _, p := range b.got {
+		if p.PacketType == d2netpackettype.PvPHit {
+			t.Fatal("the hit was delivered before the flush")
+		}
+	}
+
+	g.flushHits()
 
 	for _, p := range b.got {
 		if p.PacketType == d2netpackettype.PvPHit {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2herostats"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
 )
 
 // Errors of the roster operations.
@@ -21,6 +22,7 @@ var (
 	ErrLevelTooLow   = errors.New("both players need the hostile level")
 	ErrHostile       = errors.New("hostile players cannot party")
 	ErrHostileWait   = errors.New("hostility was declared less than a minute ago")
+	ErrHostileTown   = errors.New("hostility cannot be declared in town")
 )
 
 // Member is one player of the game.
@@ -335,14 +337,20 @@ func (d Declared) PortalsToClose() bool { return d.Changed }
 // stored time is left alone). On success the cooldown restarts, the pending
 // invitations of both are dropped, and a declarer who shared a party with the
 // target leaves it (VERIFIED 0x5a3870; that the declarer is the one leaving is
-// unverified). The exe also wants the declarer in a town room; the polarity of
-// that test is unresolved, so it is not enforced.
+// unverified). The exe tests the declarer's room with ROOM_IsTownRoom; the
+// raw decompile reads as "refuse unless the room is a town" but that polarity
+// contradicts the game (no hostility in town), so a declarer standing in a
+// town level is refused with ErrHostileTown (polarity decided by the game
+// rule, not resolved in the exe).
 func (r *Roster) DeclareHostile(from, to string) (Declared, error) {
 	if err := r.CanGoHostile(from, to); err != nil {
 		return Declared{}, err
 	}
 
 	f := r.players[from]
+	if d2level.IsTown(f.Area) {
+		return Declared{}, ErrHostileTown
+	}
 	if f.hostile[to] {
 		return Declared{}, nil
 	}

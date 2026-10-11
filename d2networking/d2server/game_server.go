@@ -195,6 +195,8 @@ func (g *GameServer) Start() error {
 	g.listener = l
 
 	go g.packetManager()
+	go g.idleLoop()
+	go g.hitLoop()
 
 	go func() {
 		for {

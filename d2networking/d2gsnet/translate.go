@@ -2,6 +2,7 @@ package d2gsnet
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"sync"
 
@@ -227,6 +228,10 @@ func (s *ServerSide) Encode(np d2netpacket.NetPacket) ([][]byte, error) {
 // the number of bytes skipped because their packet id has no known size.
 func (s *ServerSide) Decode(plain []byte) (out []d2netpacket.NetPacket, ignored int, err error) {
 	pkts, ignored := d2gs.SplitClient(plain)
+
+	if ignored > 0 && d2gs.SaveChunkFatal(plain[len(plain)-ignored:]) {
+		return nil, ignored, fmt.Errorf("save upload chunk of 0x2000 bytes or more (fatal in the exe)")
+	}
 
 	for _, p := range pkts {
 		switch p[0] {

@@ -13,6 +13,18 @@ scenario_check() {
   grep -qE "QUEST DROP hfh from \"Hephasto the Armorer\"" $log.txt || { echo "FAIL: Hellforge Hammer drop"; fail=1; }
   grep -qE "QUEST DROP mss from \"Mephisto\"" $log.txt || { echo "FAIL: Mephisto Soulstone drop"; fail=1; }
 
+  # N22: smashing the forge starts the reward shower: stages 4..1 each drop a gem or skull, then an expansion game gets a rune
+  grep -q "HELLFORGE shower starts stage=4" $log.txt || { echo "FAIL: smashing the Hellforge did not start the shower"; fail=1; }
+  for st in 4 3 2 1; do
+    grep -qE "HELLFORGE pulse stage=$st dropped=\[[a-z0-9]+\]" $log.txt || { echo "FAIL: no Hellforge pulse at stage $st"; fail=1; }
+  done
+  grep -qE "HELLFORGE rune r[0-9]+ dropped" $log.txt || { echo "FAIL: no Hellforge end rune"; fail=1; }
+  grep -q "HELLFORGE shower over after 4 pulses" $log.txt || { echo "FAIL: the Hellforge shower did not end"; fail=1; }
+
+  # N24: the three endgame bosses dead -> the charm with maximum charges, then standard drops
+  grep -q "TRIO reward: cm2 with maximum charges dropped" $log.txt || { echo "FAIL: no trio charm"; fail=1; }
+  grep -qE "TRIO reward: [1-9][0-9]* standard drop" $log.txt || { echo "FAIL: no trio standard drops"; fail=1; }
+
   # act travel reaches the quest system
   for t in "1 -> 2 via=act:npc" "2 -> 3 via=act:npc" "3 -> 4 via=portal" "4 -> 5 via=act:talk"; do
     grep -q "QUEST travel act $t" $log.txt || { echo "FAIL: no quest travel line for $t"; fail=1; }

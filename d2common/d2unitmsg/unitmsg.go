@@ -10,9 +10,9 @@
 // first clears unit state 0x12) and the hit-sequence purge
 // (0x57a900). UNVERIFIED: the exact flush point and the 0x23 layout.
 //
-// The package is pure and NOT wired: the Go simulation (d2networking/d2mp,
-// d2core/d2monsters) emits its events immediately. It gives that code the
-// ordering and cleanup rules to adopt.
+// The package is pure. The HitList is wired into the game server's PvP hit
+// relay (d2networking/d2server/hitqueue.go: hits wait for the next flush and
+// are purged when the attacker leaves); the message Dirty queue is not used.
 package d2unitmsg
 
 // Message types.
