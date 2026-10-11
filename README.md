@@ -202,3 +202,7 @@ legitimate copy of the game. Reverse-engineering notes cover interoperability on
   patterns, quantisation matrices) come from the open [FFmpeg](https://ffmpeg.org) Bink decoder (libavcodec `bink.c` /
   `binkdata.h`, LGPL-2.1-or-later); the decoding code itself is original Go. No Blizzard or RAD code, and no game video or
   audio, is in this repository. The feature is off by default (`OD2_PLAY_VIDEOS=1`).
+
+## Where help is needed
+
+See [docs/HELP_WANTED.md](docs/HELP_WANTED.md): what is verified, what is guessed, what is parked, and where a Mac player or a Ghidra reader can help most. The latest landing is `integration` 47989eb2 (headline about 88.6% on the v1 bars; the human play-through and human listen bars are tracked under v2 in `docs/progress.json`).
