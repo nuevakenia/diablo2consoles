@@ -64,6 +64,10 @@ func (v *Game) applyQuestReward(e d2quest.Effect) {
 
 		v.gameControls.Speech.Notice("Anya can personalize an item: click her with an item", questNoticeSeconds)
 	case o.Hire != "":
+		if o.Hire == "ironwolves" {
+			v.grantQuestMerc(d2quest.NPCAsheara)
+		}
+
 		v.gameControls.Speech.Notice("Mercenaries of "+o.Hire+" can now be hired", questNoticeSeconds)
 		note = "mercenaries of " + o.Hire + " are hirable"
 	case o.UnlockDifficulty:

@@ -3,11 +3,12 @@ package d2difficulty
 import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s"
 
 // Progression: the d2s header keeps, in the status word bits 8..12 (byte
-// 0x25), how far the character got. UNVERIFIED encoding (agrees with the real
-// level-94 sample, progression 13): one step per act boss killed, 5 steps per
-// difficulty in the expansion (4 in classic). The menus gate a difficulty on a
-// minimum progression (error codes 0xd/0xe in SAVE_ValidateD2sHeader, verified
-// to exist; the thresholds are this reading).
+// 0x25), how far the character got. VERIFIED (Game.exe CHARINFO_RaiseProgression 0x5360d0, called by the boss quests
+// with the act number, e.g. 0x58bb13 for Baal): progression = 5 * difficulty + act in the expansion (4 * difficulty
+// + act in classic), kept only if it is not lower than the stored value; the quest kills raise it (Andariel 1,
+// Duriel 2, Mephisto 3, Diablo 4, Baal 5). VERIFIED (SAVE_CheckCharFlagsAgainstGameMode 0x567a40): Nightmare needs
+// a progression of at least 5 (classic 4), Hell at least 10 (classic 8); the errors are 0xd and 0xe. The
+// character level plays no part in the gate.
 
 // Progression reads the progression out of the header status word.
 func Progression(status uint32) int { return int(status>>8) & 0x1f }
@@ -23,6 +24,26 @@ func WithProgression(status uint32, p int) uint32 {
 	}
 
 	return status&^(0x1f<<8) | uint32(p)<<8
+}
+
+// RaiseProgression is CHARINFO_RaiseProgression (VERIFIED 0x5360d0): the progression becomes 5 * difficulty + act
+// (4 * difficulty + act in classic) unless the stored one is higher.
+func RaiseProgression(stored, act, difficulty int, expansion bool) int {
+	if v := ActsPerDifficulty(expansion)*difficulty + act; stored <= v {
+		return v
+	}
+
+	return stored
+}
+
+// GateProgression is the minimum progression the menus want for a difficulty (VERIFIED 0x567a40): Normal none,
+// Nightmare one difficulty of acts (5, classic 4), Hell two (10, classic 8).
+func GateProgression(l Level, expansion bool) int {
+	if l <= Normal {
+		return 0
+	}
+
+	return ActsPerDifficulty(expansion) * int(Clamp(int(l)))
 }
 
 // ActsPerDifficulty is 5 in the expansion, 4 in classic.

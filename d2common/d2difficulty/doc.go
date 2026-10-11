@@ -20,8 +20,11 @@
 //	VERIFIED   socket caps by difficulty 3/4/6 (ITEMGEN_RollSockets) and the
 //	           treasure class upgrade only for monsters in the expansion above
 //	           Normal (ITEMGEN_DropFromTreasureClass 0x558d80).
-//	UNVERIFIED the progression byte of the .d2s header (status bits 8..12):
-//	           5 per difficulty in the expansion (4 in classic); the real
-//	           sample has 13 for a hero who finished Normal and Nightmare and
-//	           three Hell acts, which agrees.
+//	VERIFIED   the progression byte of the .d2s header (status bits 8..12):
+//	           CHARINFO_RaiseProgression 0x5360d0 sets 5 * difficulty + act
+//	           (4 * difficulty + act in classic), never lowering it, and
+//	           SAVE_CheckCharFlagsAgainstGameMode 0x567a40 gates Nightmare on 5
+//	           (classic 4) and Hell on 10 (classic 8); the real sample has 13
+//	           for a hero who finished Normal and Nightmare and three Hell
+//	           acts, which agrees.
 package d2difficulty
