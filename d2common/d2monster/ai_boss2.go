@@ -422,7 +422,7 @@ func pickWeighted(b *Brain, w []int) int {
 // thinkIzual is MONAI_Think_Izual 0x5f7b30 (VERIFIED). Slot: Skill1 Frost
 // Nova. aip1 melee%, aip2 hold%, aip3 nova% when closing in, aip4 nova% when
 // in reach, aip5 stall frames after a nova, aip6 melee swings that follow a
-// nova. Scratch[0] first-tick flag (FUN_005b1fb0, UNVERIFIED), Scratch[1] the
+// nova. Scratch[0] first-tick flag (+0x14, set before the quest hook; VERIFIED wave 20), Scratch[1] the
 // pending stall, Scratch[2] the swings left. The stall uses aidel (the sleep
 // after a failed attack roll).
 func thinkIzual(c *Ctx) {
