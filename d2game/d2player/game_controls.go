@@ -283,6 +283,8 @@ func NewGameControls(
 
 	gc.heroStatsPanel.SetOnCloseCb(gc.onCloseHeroStatsPanel)
 	gc.mercPanel.SetOnCloseCb(gc.updateLayout)
+	gc.stash.SetOnClose(gc.updateLayout) // closing the stash or cube moves the mini panel strip back
+	gc.cube.SetOnClose(gc.updateLayout)
 	gc.questLog.SetOnCloseCb(gc.onCloseQuestLog)
 	gc.inventory.SetOnCloseCb(gc.onCloseInventory)
 	gc.skilltree.SetOnCloseCb(gc.onCloseSkilltree)
@@ -849,6 +851,12 @@ func (g *GameControls) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 		return true
 	}
 
+	if event.Button() == d2enum.MouseButtonLeft && g.shiftClickToBelt(event.KeyMod(), mx, my) {
+		g.lastLeftBtnActionTime = d2util.Now()
+
+		return true
+	}
+
 	if event.Button() == d2enum.MouseButtonLeft && g.handleContainerClick(mx, my, event.KeyMod() == d2enum.KeyModControl) {
 		g.lastLeftBtnActionTime = d2util.Now()
 
@@ -1237,18 +1245,18 @@ func (g *GameControls) Advance(elapsed float64) error {
 }
 
 func (g *GameControls) updateLayout() {
-	isRightPanelOpen := g.isLeftPanelOpen()
-	isLeftPanelOpen := g.isRightPanelOpen()
+	// the strip follows the exe's panel groups (the stash, cube and trade panels count for both sides)
+	g.hud.miniPanel.Place(MiniPanelPlacement(g.panelGroups()))
+
+	leftOpen := g.isLeftPanelOpen()
+	rightOpen := g.isRightPanelOpen()
 
 	switch {
-	case isRightPanelOpen == isLeftPanelOpen:
-		g.hud.miniPanel.ResetPosition()
+	case leftOpen == rightOpen:
 		g.mapRenderer.ViewportDefault()
-	case isRightPanelOpen:
-		g.hud.miniPanel.SetMovedRight(true)
+	case leftOpen:
 		g.mapRenderer.ViewportToLeft()
-	case isLeftPanelOpen:
-		g.hud.miniPanel.SetMovedLeft(true)
+	case rightOpen:
 		g.mapRenderer.ViewportToRight()
 	}
 }

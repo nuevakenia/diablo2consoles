@@ -70,6 +70,7 @@ type miniPanel struct {
 	isOpen           bool
 	tempIsOpen       bool
 	disabled         bool
+	hidden           bool // both panel groups open: the exe does not draw the strip
 	isSinglePlayer   bool
 	movedLeft        bool
 	movedRight       bool
@@ -268,7 +269,7 @@ func (m *miniPanel) Toggle() {
 }
 
 func (m *miniPanel) Open() {
-	if !(m.movedRight && m.movedLeft) {
+	if !(m.movedRight && m.movedLeft) && !m.hidden {
 		m.panelGroup.SetVisible(true)
 	}
 
@@ -335,6 +336,25 @@ func (m *miniPanel) SetMovedLeft(moveLeft bool) {
 	}
 
 	m.movedLeft = moveLeft
+}
+
+// Place puts the strip where UI_DrawMiniPanel does for the open panel groups (see MiniPanelPlacement).
+func (m *miniPanel) Place(slot MiniPanelSlot) {
+	if m.panelGroup == nil {
+		return
+	}
+
+	m.ResetPosition()
+
+	switch slot {
+	case MiniPanelShiftRight:
+		m.SetMovedRight(true)
+	case MiniPanelShiftLeft:
+		m.SetMovedLeft(true)
+	}
+
+	m.hidden = slot == MiniPanelHidden
+	m.panelGroup.SetVisible(m.isOpen && !m.hidden)
 }
 
 func (m *miniPanel) ResetPosition() {
