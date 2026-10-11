@@ -105,7 +105,7 @@ screen centre.
 
 * Cinematics: `d2video` decodes Bink 1 revision `i` (the Diablo II videos) in pure Go and `VideoPlayer` plays them
   letterboxed with `VideoRect` (Esc/Space/Enter/click skips). Off by default: set `OD2_PLAY_VIDEOS=1` to play the intro
-  before the main menu and the cinematics menu entries. No audio yet (the Bink audio track is not decoded).
+  before the main menu and the cinematics menu entries. The Bink audio track (RDFT or DCT, 44.1 kHz stereo) is decoded in pure Go (`d2video.BinkAudioDecoder`) and streamed to the sound device; the audio clock drives the picture (`d2video.Cinematic`). `OD2_VIDEO_SECONDS=n` ends a video after n seconds (with `OD2_AUTOEXIT` the game quits then).
 * The tile range is a rectangle around the isometric diamond of the screen; `VisibleTileRows` cuts it per row to the
   tiles whose origin is within 400 px of the screen sides (and 200 above / 450 below), all four passes use it. At
   5120x1440 the rectangle has 2352 tiles and 1629 are drawn (69%); 1920x1080 960 -> 687. Measured at 5120x1440

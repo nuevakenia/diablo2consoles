@@ -3,6 +3,7 @@ package d2gamescreen
 import (
 	"image/color"
 	"os"
+	"strconv"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2video"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2display"
@@ -14,7 +15,9 @@ import (
 )
 
 // PlayVideosEnabled reports whether OD2_PLAY_VIDEOS=1: cinematics are played from the user's Bink files.
-// It is off by default; the decoder has no audio yet, so videos play silent.
+// It is off by default. The soundtrack (Bink audio) is streamed to the sound device and is the clock of the picture;
+// without a sound device or under OD2_AUTOTEST_MUTE the clock still runs from the (silent) device, and without audio
+// support in the provider the video follows the wall clock.
 func PlayVideosEnabled() bool { return os.Getenv("OD2_PLAY_VIDEOS") == "1" }
 
 // VideoPlayer is a game screen that plays one Bink cinematic letterboxed on a black screen. Esc, Space, Enter or
@@ -23,21 +26,30 @@ type VideoPlayer struct {
 	asset    *d2asset.AssetManager
 	renderer d2interface.Renderer
 	input    d2interface.InputManager
+	audio    d2interface.AudioProvider
 	path     string
 	onDone   func()
 
+	cin     *d2video.Cinematic
 	player  *d2video.Player
+	stream  d2interface.PCMStream
 	surface d2interface.Surface
 	done    bool
 	bound   bool
+
+	// OD2_VIDEO_SECONDS=<n> ends the video after n seconds of playback (an automated test); with OD2_AUTOEXIT the
+	// game then quits instead of going on to the next screen.
+	limit float64
+	wall  float64
+	maxDt float64 // longest update step seen: a stall of the game loop longer than the queued audio underruns
 
 	*d2util.Logger
 }
 
 // CreateVideoPlayer creates a screen that plays the Bink file at the asset path, then calls onDone.
 func CreateVideoPlayer(asset *d2asset.AssetManager, renderer d2interface.Renderer, input d2interface.InputManager,
-	path string, l d2util.LogLevel, onDone func()) *VideoPlayer {
-	v := &VideoPlayer{asset: asset, renderer: renderer, input: input, path: path, onDone: onDone}
+	audio d2interface.AudioProvider, path string, l d2util.LogLevel, onDone func()) *VideoPlayer {
+	v := &VideoPlayer{asset: asset, renderer: renderer, input: input, audio: audio, path: path, onDone: onDone}
 	v.Logger = d2util.NewLogger()
 	v.Logger.SetPrefix("Video")
 	v.Logger.SetLevel(l)
@@ -63,10 +75,37 @@ func (v *VideoPlayer) OnLoad(_ d2screen.LoadingState) {
 		return
 	}
 
-	v.player = d2video.NewPlayer(dec)
+	var sink d2video.AudioSink
+
+	if streamer, ok := v.audio.(d2interface.PCMStreamer); ok && len(dec.AudioTracks) > 0 {
+		if ad, aerr := dec.NewAudioDecoder(0); aerr != nil {
+			v.Warningf("no audio: %v", aerr)
+		} else if st, serr := streamer.NewPCMStream(ad.SampleRate(), ad.Channels()); serr != nil {
+			v.Warningf("no audio: %v", serr)
+		} else {
+			v.stream, sink = st, st
+		}
+	}
+
+	v.cin, err = d2video.NewCinematic(dec, sink, 44100)
+	if err != nil {
+		v.Errorf("cannot start %s: %v", v.path, err)
+		v.closeStream()
+
+		v.done = true
+
+		return
+	}
+
+	v.player = v.cin.Player()
 	w, h := v.player.Size()
 	v.surface = v.renderer.NewSurface(w, h)
-	v.Infof("playing %s (%dx%d, revision %c, %d frames)", v.path, w, h, dec.Revision(), dec.NumFrames())
+	v.Infof("playing %s (%dx%d, revision %c, %d frames, %d audio track(s), clock: %s)", v.path, w, h, dec.Revision(),
+		dec.NumFrames(), len(dec.AudioTracks), map[bool]string{true: "audio", false: "wall"}[v.stream != nil])
+
+	if s, perr := strconv.ParseFloat(os.Getenv("OD2_VIDEO_SECONDS"), 64); perr == nil && s > 0 {
+		v.limit = s
+	}
 
 	if err := v.input.BindHandler(v); err == nil {
 		v.bound = true
@@ -75,6 +114,8 @@ func (v *VideoPlayer) OnLoad(_ d2screen.LoadingState) {
 
 // OnUnload releases the input handler.
 func (v *VideoPlayer) OnUnload() error {
+	v.closeStream()
+
 	if v.bound {
 		v.bound = false
 
@@ -84,12 +125,43 @@ func (v *VideoPlayer) OnUnload() error {
 	return nil
 }
 
+func (v *VideoPlayer) closeStream() {
+	if v.stream != nil {
+		v.stream.Close()
+		v.stream = nil
+	}
+}
+
+// logStats writes the line the video scenario of scripts/verify.d checks.
+func (v *VideoPlayer) logStats() {
+	if v.cin == nil {
+		return
+	}
+
+	st := v.stream
+	if st == nil {
+		v.Infof("VIDEO end audio=none frames=%d clock=%.2fs", v.player.Decoder().FrameIndex(), v.cin.Clock())
+
+		return
+	}
+
+	v.Infof("VIDEO end audio_decoded=%d written=%d played=%d underruns=%d bad_packets=%d max_update_gap=%.0fms frames=%d clock=%.2fs",
+		v.cin.DecodedFrames, st.Written(), st.Played(), st.Underruns(), v.cin.BadPackets, v.maxDt*1000,
+		v.player.Decoder().FrameIndex(), v.cin.Clock())
+}
+
 func (v *VideoPlayer) finish() {
 	if v.done {
 		return
 	}
 
 	v.done = true
+	v.logStats()
+	v.closeStream()
+
+	if v.limit > 0 && os.Getenv("OD2_AUTOEXIT") != "" {
+		os.Exit(0)
+	}
 
 	if v.onDone != nil {
 		v.onDone()
@@ -107,7 +179,12 @@ func (v *VideoPlayer) Advance(elapsed float64) error {
 		return nil
 	}
 
-	changed, err := v.player.Advance(elapsed)
+	v.wall += elapsed
+	if elapsed > v.maxDt {
+		v.maxDt = elapsed
+	}
+
+	changed, err := v.cin.Advance(elapsed)
 	if err != nil {
 		v.Errorf("playback stopped: %v", err)
 		v.finish()
@@ -119,7 +196,7 @@ func (v *VideoPlayer) Advance(elapsed float64) error {
 		v.surface.ReplacePixels(v.player.Frame())
 	}
 
-	if v.player.Done() {
+	if v.cin.Done() || (v.limit > 0 && v.cin.Clock() >= v.limit) {
 		v.finish()
 	}
 
