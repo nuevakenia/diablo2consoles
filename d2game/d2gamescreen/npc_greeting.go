@@ -43,6 +43,9 @@ type dayClock struct {
 	env    *d2daynight.Env
 	acc    float64
 	frozen bool // OD2_AUTOTIME holds the clock at a forced phase
+
+	// Act 4 has no sun cycle: its ambient eases 1 per tick toward a per-level constant (d2daynight.Act4Step).
+	act4Level, act4Value int
 }
 
 // newDayClock starts a new game's clock at the beginning of the day (phase 2);
@@ -57,14 +60,29 @@ func newDayClock() *dayClock {
 
 // Advance converts elapsed seconds into environment ticks.
 func (c *dayClock) Advance(elapsed float64) {
+	c.acc += elapsed * d2daynight.TicksPerSecond
+	n := int(c.acc)
+	c.acc -= float64(n)
+
+	c.act4Value = d2daynight.Act4Step(c.act4Value, c.act4Level, n)
+
 	if c.frozen {
 		return
 	}
 
-	c.acc += elapsed * d2daynight.TicksPerSecond
-	n := int(c.acc)
-	c.acc -= float64(n)
 	c.env.Advance(n)
+}
+
+// act4Intensity is the Act 4 ambient for a level (initialised on first use).
+func (c *dayClock) act4Intensity(level int) int {
+	if c.act4Value == 0 {
+		// UNVERIFIED: the exe's start value is unknown; start settled instead of ramping up from black.
+		c.act4Value = d2daynight.Act4Target(level)
+	}
+
+	c.act4Level = level
+
+	return c.act4Value
 }
 
 // Phase implements dayPhaseSource.

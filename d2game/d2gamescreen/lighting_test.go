@@ -62,6 +62,24 @@ func TestBaseLight(t *testing.T) {
 	}
 }
 
+func TestBaseLightAct4UsesLevelConstant(t *testing.T) {
+	t.Setenv("OD2_AUTOTIME", "day")
+	c := newDayClock()
+
+	// Plains of Despair (0x67): 0x80 at once, not the sun cycle
+	if l := baseLight(0, 0, 0, 0, act4Index, 0x67, c); l.Intensity != 0x80 {
+		t.Errorf("plains %v", l)
+	}
+
+	// moving to the City of the Damned (0x68, target 0x40) eases 1 per tick (25 ticks = 1 s)
+	baseLight(0, 0, 0, 0, act4Index, 0x68, c)
+	c.Advance(1)
+
+	if l := baseLight(0, 0, 0, 0, act4Index, 0x68, c); l.Intensity != 0x80-25 {
+		t.Errorf("after 1 s %v", l)
+	}
+}
+
 // The Act 2 outdoors (town 40, desert 41-46) have no Levels.txt colour and follow the day/night
 // ambient. They used to be looked up through the level TYPE (12, 16) and read the dark white-lit
 // cave rows of levels 12 and 16 (Pit Level 1/2).

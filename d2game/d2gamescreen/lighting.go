@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	act4Index        = 3
 	act5Index        = 4
 	act5MaxIntensity = 0xaa // ENVIRON_UpdateAmbientIntensity caps Act 5 at 0xaa
 	levelFixedLight  = 0x78 // level 0x78 has a fixed intensity 200
@@ -95,6 +96,10 @@ func baseLight(intensity, r, g, b, act, levelID int, env *dayClock) d2lightmap.C
 	}
 
 	i := env.Intensity()
+	if act == act4Index {
+		i = env.act4Intensity(levelID)
+	}
+
 	if act == act5Index && i > act5MaxIntensity {
 		i = act5MaxIntensity
 	}
