@@ -105,6 +105,8 @@ func (s *Sim) hitFunc(m *Missile, t Target) (ret int, ok bool) {
 		return s.boulderHit(m, t), true
 	case 48:
 		return s.emergeHit(m), true
+	case 50:
+		return vineTrailHit(m, t), true
 	case 51:
 		return s.debrisHit(m), true
 	case 56:

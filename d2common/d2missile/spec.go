@@ -89,6 +89,9 @@ type Owner struct {
 	// owner expires on, if it has it (STATS_GetStatListExpireFrame, used by
 	// SrvDoFunc 30 to hand Rabies' remaining time to its contagion).
 	StateExpire func(state string) (frame int, ok bool)
+	// Restore gives the owner pct percent of its maximum life (or mana) and
+	// reports whether anything was restored (SrvDoFunc 29 / 33).
+	Restore func(mana bool, pct int) bool
 }
 
 // Target is a unit a missile can hit.

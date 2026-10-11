@@ -81,6 +81,8 @@ type Missile struct {
 	// HealMin, HealMax are Holy Bolt's calc1 / calc2 of the casting skill in
 	// 8.8 fixed point (hit function 7).
 	HealMin, HealMax int
+	// RestorePct is the percent of the owner's life or mana SrvDoFunc 29 / 33 give back (calc1 of the skill).
+	RestorePct int
 	// PulseEvery is the damage period of SrvDoFunc 27 (Tornado) when the
 	// table's Param1 is empty (the skill's calc4, minimum 1).
 	PulseEvery int
@@ -215,6 +217,13 @@ type CreateParams struct {
 	Mark      Target
 	MarkOwner *Owner
 	OnEffect  func(Event)
+	// PathType10 gives the missile the wobbling path of the hook 0x5c7340 (Firestorm's extra emitters,
+	// Twister, Tornado): the lifetime is capped at 77 frames and the missile walks PathType10Nodes seeded
+	// with PathSeed (the destination x plus the index of the missile in its cast).
+	PathType10 bool
+	PathSeed   uint32
+	// RestorePct is the percent of the owner's life or mana SrvDoFunc 29 / 33 restore (calc1 of the skill).
+	RestorePct int
 	// HomeMode overrides the Guided Arrow mode (default: 1 when Home is set
 	// else 2, for SrvDoFunc 7 / hit func 10 missiles).
 	HomeMode int
@@ -296,6 +305,10 @@ func (s *Sim) Create(p CreateParams) (*Missile, error) {
 			uint8(sp.SubStart), uint8(sp.SubStop), p.SubLoops, p.SubLoops > 0)
 	}
 
+	if p.PathType10 && life > pathType10MaxLife {
+		life = pathType10MaxLife
+	}
+
 	s.nextID++
 
 	m := &Missile{
@@ -310,6 +323,7 @@ func (s *Sim) Create(p CreateParams) (*Missile, error) {
 	m.AreaRadius, m.HitSubRange = p.AreaRadius, p.HitSubRange
 	m.ChainLeft, m.FuryCount = p.ChainLeft, p.FuryCount
 	m.HealMin, m.HealMax, m.PulseEvery = p.HealMin, p.HealMax, p.PulseEvery
+	m.RestorePct = p.RestorePct
 	m.ChildDamage = p.ChildDamage
 	m.DiscRadius, m.DiscLife = p.DiscRadius, p.DiscLife
 
@@ -361,6 +375,13 @@ func (s *Sim) Create(p CreateParams) (*Missile, error) {
 
 	if p.ClampToDest {
 		m.ClampDist = dist
+	}
+
+	if p.PathType10 {
+		if nodes := PathType10Nodes(int(math.Floor(p.X)), int(math.Floor(p.Y)), int(math.Floor(p.DestX)),
+			int(math.Floor(p.DestY)), p.PathSeed, life); nodes != nil {
+			m.spiral = newWalkPath(p.X, p.Y, nodes)
+		}
 	}
 
 	if s.stepping {

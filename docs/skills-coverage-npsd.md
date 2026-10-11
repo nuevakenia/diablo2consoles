@@ -10,7 +10,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | | F | P | S | M | T |
 |---|---|---|---|---|---|
 | before (start of feat/skills-npsd) | 59 | 42 | 3 | 8 | 8 |
-| after | 91 | 21 | 0 | 0 | 8 |
+| after | 97 | 15 | 0 | 0 | 8 |
 
 
 ## Necromancer
@@ -123,16 +123,16 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | id | skill | do | before | after | note |
 |---|---|---|---|---|---|
 | 221 | Raven | 114 | P | F | summon level (calc2) now set through the order; stats from d2summon + MonLvl AC/AR (verified 0x5c2850) |
-| 222 | Plague Poppy | 115 | M | P | do 115 added: vine shooter with calc1 life, calc2 level |
+| 222 | Plague Poppy | 115 | M | F | VERIFIED wave 20 (w20-skills-druid.md): the Poppy casts Vine Attack (SRVDO_130 0x5d02d0 / 0x5d0220) at the sumskill level: calc1 vines (min(24, ln12)) start under the target and head the four cardinal steps on path type 10, the vine missile (SrvDoFunc 26 0x5ad4e0) drops its trail every 9 frames and the trail (hit function 50 0x5aa340) hurts for all but its last 15 frames; do 115 itself: vine monster with calc1 life percent, calc2 level. The trail takes the damage of the summoning skill (its Skill column names Plague Poppy, UNVERIFIED for Cycle of Life / Vines) |
 | 223 | Wearwolf | 116 | P | F | VERIFIED 0x5c4e80 + 0x56a480: casting a form again (or the other one) only takes the shape back (group clear includes itself), free of mana while shapeshifted; the form attack skills are not rebound (restrict/State1) |
 | 224 | Shape Shifting | - | T | T |  |
-| 225 | Firestorm | 117 | P | P | VERIFIED 0x5c5130 (batch 9): calc1 firestormmaker emitters, the first straight at the target, the others from the caster through the shared hook 0x5c7340 (seed destX+index, path type 10, life clamped to 77); the path-type-10 stepper is decoded in skills-ai-batch9.md but not wired (heading offset U), so the emitters still use a +-90 degree scatter |
+| 225 | Firestorm | 117 | P | F | VERIFIED 0x5c5130: calc1 firestormmaker emitters, the first straight at the target, the others from the caster through the shared hook 0x5c7340 (seed destX+index, path type 10, life clamped to 77). Wave 20: the path type 10 stepper is PATH_ApplyDirectionStepVelocity 0x67d160 (the earlier 0x5d2df0 is an unused skill callback): life/2 steps of two subtiles along the 8-way direction to the destination, each turned by -1, 0 or +1 eighth through a 32-entry table (d2missile.PathType10Nodes) |
 | 226 | Oak Sage | 119 | P | F | VERIFIED (batch 5) aurafilter 0x10103 through filter 0x569100: the totem aura reaches the hero, the mercenary and the summoned minions inside aurarangecalc (minions through d2monsters.AuraBoost: damage, attack rating and life percent; thorns on minions not applied) |
 | 227 | Summon Spirit Wolf | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied; resist / armor / damage stats from the order |
 | 228 | Wearbear | 116 | P | F | VERIFIED like Wearwolf (0x5c4e80): toggle and free recast in the form |
 | 229 | Molten Boulder | - | P | P | emerge (hit 48) -> boulder (do 6 trail, hit 47) -> moltenboulderfirepath fire; bodies read, hit 47 monster-class bit UNVERIFIED |
 | 230 | Arctic Blast | 19 | F | F | stream (do 19) |
-| 231 | Cycle of Life | 115 | M | P | do 115 added (attack only; the corpse cycler heal is not simulated) |
+| 231 | Cycle of Life | 115 | M | F | VERIFIED wave 20: the cycleoflife monster only has CorpseCycler (no Vine Attack, monstats). SRVST_063 0x5d1090 + recycler delay SrvDoFunc 29 0x5ad910: each corpse (state 0x76) feeds one cycle, 45 frames later the owner gets calc1 (dm12 over 3..12) percent of its maximum life; engine host after the AI gate of thinkCycleOfLife (gap aip1 50, idle aip3 25). UNVERIFIED: the vine does not walk to its corpse, every corpse within aurarangecalc 10 counts |
 | 232 | Feral Rage | 120 | P | F | VERIFIED 0x5c57c0: count = min(calc2, count+1), aura stats evaluated with the count as level, applies on a miss too, keeps the wolf form (no group clear) |
 | 233 | Maul | 120 | P | F | VERIFIED 0x5c57c0: same stacking rule as Feral Rage (damagepercent = count * par3, stunlength at the count) |
 | 234 | Eruption | 28 | P | P | SRVDO_028 creates erruption center; SrvDoFunc 25 scatter (calc1/calc2) read; the crack and fire sub missiles are not read |
@@ -141,12 +141,12 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 237 | Summon Fenris | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied |
 | 238 | Rabies | 121 | P | P | VERIFIED bite + infection + plague (0x5c6b70 / 0x5c5dc0), do 30 plague and hit 53 contagion (d2missile/gaps.go); the plague only spreads between units that implement d2missile.Ownable and Stateful (the engine monsters do not yet) |
 | 239 | Fire Claws | 2 | F | F | do 2 melee with fire |
-| 240 | Twister | 118 | P | P | VERIFIED 0x5c52c0 / 0x5c5000 (batch 9): calc1 twisters, ALL through the shared per-missile hook (no straight first one, no fan); path type 10 stepper decoded but not wired, scatter width U |
-| 241 | Vines | 115 | M | P | do 115 added (attack only; the vine cycler is not simulated) |
+| 240 | Twister | 118 | P | F | VERIFIED 0x5c52c0 / 0x5c5000: calc1 twisters, ALL through the shared per-missile hook (no straight first one, no fan); wave 20: path type 10 wired (PathType10Nodes, 0x67d160), the twister pulses are SrvDoFunc 27 |
+| 241 | Vines | 115 | M | F | VERIFIED wave 20: like Cycle of Life but the VineCycler restores mana (SrvDoFunc 33 0x5ada80, dm12 over 1..8 percent of maximum mana); the vinecreature monster has VineCycler only |
 | 242 | Hunger | 122 | M | F | do 122 added: melee roll, calc1 damage percent, life and mana steal (verified 0x5c5f40) |
 | 243 | Shock Wave | 8 | P | P | missile fan with stun |
 | 244 | Volcano | 123 | P | P | SRVDO_123 creates volcano with a random data byte; SrvDoFunc 28 lobs debris, hit 51 spawns the fire; bodies read |
-| 245 | Tornado | 118 | P | P | same do function as Twister (calc1 = 1); the tornado missile (SrvDoFunc 27) is modelled; path type 10 stepper not wired |
+| 245 | Tornado | 118 | P | F | same do function as Twister (calc1 = 1); the tornado missile (SrvDoFunc 27) is modelled and wave 20 wired its path type 10 (0x67d160) |
 | 246 | Spirit of Barbs | 119 | P | F | VERIFIED (batch 5) aurafilter 0x10103 through filter 0x569100: the totem aura reaches the hero, the mercenary and the summoned minions inside aurarangecalc (minions through d2monsters.AuraBoost: damage, attack rating and life percent; thorns on minions not applied) |
 | 247 | Summon Grizzly | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied |
 | 248 | Fury | 13 | F | F | multi hit (do 13) |

@@ -933,7 +933,7 @@ func doFireWallFn(c *cast) {
 // batch 9): calc1 missiles (none when calc1 is below one) are created at the caster toward the target position, ALL
 // of them through the shared per-missile hook (0x5c7340): the seed is the destination x plus the index and the path
 // becomes type 10, the scattering stepper, with the lifetime clamped to 77 frames (not modelled here). There is no
-// straight first missile (the chain's flag is 0) and no fan. The scatter width is UNVERIFIED (FirestormJitter).
+// straight first missile (the chain's flag is 0) and no fan. The wobbling path is d2missile.PathType10Nodes (0x67d160, VERIFIED wave 20).
 func doTwisterFn(c *cast) {
 	n := c.calc(1)
 	if n < 1 {
@@ -944,7 +944,7 @@ func doTwisterFn(c *cast) {
 	ax, _ := c.aim()
 
 	for i := 0; i < n; i++ {
-		c.castM(c.missileName(), castOpts{angle: FirestormJitter(ax, i)})
+		c.castM(c.missileName(), castOpts{pathType10: true, pathSeed: ChargedBoltSeed(ax, i)})
 	}
 
 	if len(c.res.Missiles) == 0 {
@@ -1353,7 +1353,7 @@ func maxInt(a, b int) int {
 // doFirestormFn is SRVDO_117_Firestorm (0x5c5130, VERIFIED, batch 9): calc1 emitters (the skill's srvmissilea,
 // firestormmaker, whose SrvDoFunc 23 drops the firestorm fire along its path) are cast: the first straight at the
 // target, the other calc1 - 1 from the caster toward the same destination, each re-seeded by the shared hook
-// (FirestormJitter; its scatter width is UNVERIFIED). A calc1 below one casts nothing.
+// (path type 10 through d2missile.PathType10Nodes, VERIFIED wave 20). A calc1 below one casts nothing.
 func doFirestormFn(c *cast) {
 	n := c.calc(1)
 	if n < 1 {
@@ -1369,7 +1369,7 @@ func doFirestormFn(c *cast) {
 	}
 
 	for i := 0; i < n-1; i++ {
-		c.castM(c.missileName(), castOpts{angle: FirestormJitter(ax, i)})
+		c.castM(c.missileName(), castOpts{pathType10: true, pathSeed: ChargedBoltSeed(ax, i)})
 	}
 }
 
