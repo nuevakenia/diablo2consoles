@@ -207,6 +207,8 @@ func (v *Game) spawnPlannedPopulation(level int, plan []d2mapengine.PlannedMonst
 		}
 	}
 
+	v.applyPlannedUMods(plan, made)
+
 	removed := v.removeUnreachableMonsters()
 	v.logPopulateRanks(level)
 

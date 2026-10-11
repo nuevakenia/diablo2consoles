@@ -83,6 +83,8 @@ type Monster struct {
 	// Modifiers are the monumod.txt ids the monster carries (super unique
 	// Mod1..3, rolled champion / unique modifiers, or copied from the leader).
 	Modifiers []int
+	// UMod is what the modifiers changed besides life and level (monster_umod.go).
+	UMod UModBonus
 	// LeaderID is the Brain id of the leader of a minion, 0 when none.
 	LeaderID uint32
 	name     string
@@ -98,8 +100,10 @@ type Monster struct {
 	// overridePct is the AI move speed override (MONAI_SetMoveSpeedOverride 0x5dcf80, applied as velocity
 	// stat 0x43 by 0x5a3d70): a percent added to the base speed, in -126..126.
 	overridePct int
-	selectable  bool
-	cskill      *clientScript // bound client skill, see monster_clientskill.go
+	// umodSpeedPct is the velocity percent the monster modifiers add (monster_umod.go).
+	umodSpeedPct int
+	selectable   bool
+	cskill       *clientScript // bound client skill, see monster_clientskill.go
 
 	// Blocker, if set, is asked before the monster enters a new subtile; true
 	// refuses the step and the monster stays where it was (unit-vs-unit
@@ -269,7 +273,7 @@ func (m *Monster) MoveAlong(path []d2vector.Position, run bool) bool {
 }
 
 func (m *Monster) slowed(speed float64) float64 {
-	pct := m.slowPct + m.overridePct
+	pct := m.slowPct + m.overridePct + m.umodSpeedPct
 	if pct == 0 {
 		return speed
 	}
