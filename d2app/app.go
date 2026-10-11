@@ -849,7 +849,7 @@ func (a *App) ToCredits() {
 
 // ToVideo plays a Bink cinematic from the game data (letterboxed, skippable) and then calls next.
 func (a *App) ToVideo(path string, next func()) {
-	a.screen.SetNextScreen(d2gamescreen.CreateVideoPlayer(a.asset, a.renderer, a.inputManager, path,
+	a.screen.SetNextScreen(d2gamescreen.CreateVideoPlayer(a.asset, a.renderer, a.inputManager, a.audio, path,
 		*a.Options.LogLevel, next))
 }
 
