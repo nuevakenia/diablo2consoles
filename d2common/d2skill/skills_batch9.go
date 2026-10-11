@@ -1,11 +1,5 @@
 package d2skill
 
-import (
-	"math"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2rand"
-)
-
 // ArmageddonSeedBound is the bound of the one roll SRVDO_124 (0x5c6200) makes
 // on the caster's seed when the skill starts; the result is stored in the
 // skill's "target type" slot (VERIFIED).
@@ -115,15 +109,4 @@ func BloodGolemHealShare(heal, pct, golemLife, golemMax int) (gain int) {
 	}
 
 	return gain
-}
-
-// FirestormJitter is the per-missile hook of Firestorm's extra emitters (SRVDO_117, 0x5c5130, VERIFIED): the
-// skill casts its first firestormmaker straight at the target, then calc1 - 1 more from the caster's position
-// toward the same destination, each re-seeded with the destination x plus its index (the hook 0x5c7340 shared
-// with Charged Strike) before the path stepper scatters it. It returns the heading offset in radians. The
-// scatter width of that stepper is not decoded (UNVERIFIED), the same +-90 degrees as ChargedBoltAim.
-func FirestormJitter(destX, index int) float64 {
-	seed := d2rand.New(ChargedBoltSeed(destX, index))
-
-	return float64(int(seed.Roll(181))-90) * math.Pi / 180
 }

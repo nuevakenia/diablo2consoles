@@ -58,6 +58,9 @@ type trapRun struct {
 	missile   string
 	skillName string
 	next      int
+	// cycler is the cycler skill (CorpseCycler, VineCycler) of a Cycle of Life or Vines vine: such a vine cycles
+	// corpses for its owner and never shoots (druid_w20.go).
+	cycler string
 }
 
 // ---- helpers ----
@@ -1071,7 +1074,12 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 		return
 	}
 
-	e.traps = append(e.traps, &trapRun{m: m, u: u, skillID: sk.ID, missile: missile, skillName: sk.Name, next: e.frame + trapPeriod})
+	t := &trapRun{m: m, u: u, skillID: sk.ID, missile: missile, skillName: sk.Name, next: e.frame + trapPeriod}
+	if sk.SrvDoFunc == 115 && sk.SumSkill[2] != "" {
+		t.cycler = sk.SumSkill[2]
+	}
+
+	e.traps = append(e.traps, t)
 	e.emit("summon", "TRAP armed skill=%q missile=%s period=%d range=%d", sk.Name, missile, trapPeriod, trapRange)
 }
 
@@ -1127,6 +1135,12 @@ func (e *Engine) trapsTick() {
 		live = append(live, t)
 
 		if e.frame < t.next {
+			continue
+		}
+
+		if t.cycler != "" {
+			e.cycleTick(t)
+
 			continue
 		}
 

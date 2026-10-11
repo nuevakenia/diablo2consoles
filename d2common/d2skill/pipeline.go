@@ -631,6 +631,12 @@ type castOpts struct {
 	hasStart bool
 	onHit    func(m *d2missile.Missile, t d2missile.Target)
 
+	// pathSeed (with pathType10) is the seed value of the hook 0x5c7340: the destination x plus the
+	// missile's index in the cast; the missile then walks path type 10 (d2missile.PathType10Nodes).
+	pathType10 bool
+	pathSeed   uint32
+	restorePct int // percent of the owner's life or mana SrvDoFunc 29 / 33 restore
+
 	stationary bool
 	hitEvery   int
 	scalePct   int
@@ -669,6 +675,13 @@ func (p *Pipeline) owner(u Unit) d2missile.Owner {
 		x, y := u.Pos()
 
 		return float64(x), float64(y)
+	}
+
+	// SrvDoFunc 29 / 33 (the recycler delays) restore the owner's life or mana.
+	if h, ok := u.(interface {
+		RestorePct(mana bool, pct int) bool
+	}); ok {
+		o.Restore = h.RestorePct
 	}
 
 	// SrvDoFunc 30 hands Rabies' expiry frame to its contagion.
@@ -874,6 +887,7 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 		// the missile rolls its pierce charges (stat 0x148) from skill_pierce +
 		// item_pierce at creation (0x59d4e0, verified)
 		PierceChance: u.Stat("skill_pierce") + u.Stat("item_pierce"), OnHit: o.onHit,
+		PathType10: o.pathType10, PathSeed: o.pathSeed, RestorePct: o.restorePct,
 		Stationary: o.stationary, HitEvery: o.hitEvery, ScalePct: o.scalePct, Home: o.home, Range: o.rangeLife,
 	})
 	if err != nil {
@@ -893,7 +907,7 @@ func needsSkillInfo(ms *d2missile.Spec) bool {
 		return true
 	}
 
-	return ms.SrvDoFunc == 30
+	return ms.SrvDoFunc == 30 || ms.SrvDmgFunc == 7
 }
 
 // effectHook turns the states the missile functions apply (Howl, Shout, Battle
@@ -1013,6 +1027,14 @@ func (p *Pipeline) CastTrap(u Unit, skillID int, missile string, fromX, fromY in
 	}
 
 	lvl := u.SkillLevel(skillID)
+
+	// The vines of the Druid summons (SrvDoFunc 26) come up under the target
+	// (SRVDO_130 Vine Attack) instead of flying from the vine.
+	if ms := p.Missiles.ByName(missile); ms != nil && ms.SrvDoFunc == 26 {
+		if vs := p.CastVineAttack(u, skillID, missile, tgt); len(vs) > 0 {
+			return vs[0]
+		}
+	}
 
 	return p.castMissile(u, sk, lvl, p.env(sk, lvl, u), missile, tgt,
 		castOpts{hasStart: true, startX: float64(fromX) + 0.5, startY: float64(fromY) + 0.5})

@@ -24,19 +24,19 @@ func TestFirestormCastsCalc1Emitters(t *testing.T) {
 	}
 }
 
-func TestFirestormJitterIsDeterministicAndBounded(t *testing.T) {
-	for i := 0; i < 20; i++ {
-		a, b := FirestormJitter(40, i), FirestormJitter(40, i)
-		if a != b {
-			t.Fatalf("index %d not deterministic", i)
-		}
+func TestFirestormExtraEmittersWalkPathType10(t *testing.T) {
+	cf := newClassFixture(map[string]int{"Firestorm9": 5})
+	_, r := cf.cast("Firestorm9", 12, 5)
 
-		if a < -1.5708 || a > 1.5708 {
-			t.Fatalf("index %d out of +-90 degrees: %f", i, a)
-		}
+	if len(r.Missiles) != 4 {
+		t.Fatalf("want 4 emitters, got %d", len(r.Missiles))
 	}
 
-	if FirestormJitter(40, 0) == FirestormJitter(40, 1) && FirestormJitter(40, 1) == FirestormJitter(40, 2) {
-		t.Fatal("the index must change the seed")
+	// SRVDO_117 casts the first emitter straight (SKILL_ServerCastMissile),
+	// only the other calc1 - 1 go through the path type 10 hook 0x5c7340.
+	for i, m := range r.Missiles {
+		if got := m.OnWalkPath(); got != (i > 0) {
+			t.Errorf("emitter %d on a walk path = %v", i, got)
+		}
 	}
 }

@@ -58,6 +58,12 @@ func (s *Sim) doFunc(m *Missile) bool {
 		s.novaTurn(m)
 	case 20:
 		return s.followOwner(m)
+	case 26:
+		return s.vineTrail(m)
+	case 29:
+		return s.ownerRestore(m, false)
+	case 33:
+		return s.ownerRestore(m, true)
 	case 30:
 		return s.contagionStep(m)
 	case 31:
