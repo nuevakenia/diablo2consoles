@@ -32,7 +32,7 @@ How to test: [PLAYTEST.md](PLAYTEST.md). If you find something not on this list,
 
 | Gap | What you may see | Detail |
 |---|---|---|
-| Unique and champion packs | You never meet a named unique or a coloured champion pack in the field, no bonus modifiers (fast, extra strong, cursed, ...) | Natural champion and unique packs and the `monumod` modifiers are not spawned or ported. Only fixed bosses and super-uniques placed by the level data appear. Their flags are used in combat rules only. |
+| Unique and champion packs | Natural champion and rare packs appear with their modifiers; some modifier effects are missing | The init callbacks of the exe (life bonus per rank, +3 levels, Extra Strong/Fast, Fire/Lightning/Cold/Poison Enchanted, Mana Burn, resist caps, Stone Skin, Ghostly, Fanatic, Possessed, Berserk) are ported and applied (`d2monreg/umodfx.go`, `d2monsters/umodfx.go`). Not yet: the skills of Teleportation and Aura Enchanted are recorded but the AI does not use them, Cursed and Multishot, the random name, and the timer event of modifier 41. |
 | Monsters with no AI | Monsters that stand still and never attack (Quill Rats and a few others) | Printed in the log as `AI not ported: stands still`. Tentacle, Frog Demon and some other behaviours are simple stand-ins. |
 | Monsters in some levels | Empty or nearly empty levels | Kurast Causeway (82) has none; Arreat Plateau on Normal and Bloody Foothills have none or only preset monsters; Swampy Pits and Flayer Dungeons (86-91) skip their blocks; Travincal only has the council monsters its data names. Packs in other Act 3 levels were thin until recently. |
 | Summons and their caster | Monster-cast summons (nest spawn, minion spawner, Hydra) stay alive when their caster dies; player summons follow or are dropped when the owner changes level | Verified against the exe: a monster leader's death hands its minions to the first minion or detaches them, nothing is killed (0x58d4a0). Player minions, totems, traps and Hydras vanish when the owner dies (0x57dcc0 -> 0x573980) and on an act change; inside an act, pets that warp follow the owner and range-type pets farther than 40 subtiles are dropped (0x5732b0; the `warp` column is flag bit 0 and `range` bit 1, VERIFIED from the table loader 0x618a30). The rule is in `d2summon.LevelChangeFate` and `Director.OwnerChangedLevel`, and the game screen applies it on a level change inside an act (`pet_levelchange.go`: `TakePetsForLevelChange` / `AdoptPets`; warp pets are placed next to the hero, others released; a range pet within 40 subtiles cannot stay behind because pets are not parked, so it is released too). Wired statically, not yet run in a live scenario. |
@@ -85,10 +85,11 @@ the preset and outdoor levels), the monster scaling tables, and the packet size 
 
 ## Open items
 
-- Lava levels under-populated (unresolved). River of Flame (107) and the Chaos Sanctuary (108) make 84 and 44 groups
-  at MonDen 800, about 8x fewer than their density rolls predict (51315 rolls give 410.5 and 38025 give 304.2;
-  the neighbouring Act 4 levels 104-106 land near their prediction: 57, 78 and 81 groups against 82.4, 82.2 and 79.3).
-  The engine's walkable-ground estimate (45.8 and 22.4) is below the groups made, so the checker passes.
+- Lava levels still thin (partly fixed in w20). The placement test used a square of half-width SizeX around the spot
+  (3x3 to 7x7); the exe tests the spot, a cross or a 3x3 square by SizeX 1, 2, 3 (`d2monreg.Footprint`). River of
+  Flame (107) now makes 104 groups (was 84) and the Chaos Sanctuary (108) 49 (was 44) from 393 and 303 density hits
+  (the `population diag` log line has the causes: 269 and 245 hits found none of their 20 spots free). Whether the
+  original also treats lava subtiles as walk-blocked at population time is not checked (needs a collision oracle).
 - The `auto` minimum of `scripts/pop_check.py` is derived from the engine's own rolls and walkability, so it cannot
   catch a real under-population like the one above. Compare with the oracle for golden group counts when available.
 - Levels 73, 110 and 120 keep a minimum of 0 (no natural monsters). Level 73 passed again with 0 after the rebase; 110 and 120

@@ -20,7 +20,7 @@ poplevel_check() {
     row=$(grep "^$lvl " scripts/verify.d/lib/pop_rolls.txt | head -1)
     if [ -n "$row" ]; then rooms=${rooms:-$(echo $row | cut -d' ' -f2)}; rolls=$(echo $row | cut -d' ' -f3); fi
   fi
-  grep -E "POPULATE (level|types|packs|supers|groups)|AUTOSCRIPT RESULT|density rolls" $log.txt | cut -c1-260
+  grep -E "POPULATE (level|types|packs|supers|groups)|AUTOSCRIPT RESULT|density rolls|population diag" $log.txt | cut -c1-260
   grep -q "AUTOSCRIPT RESULT PASS" $log.txt || { echo "FAIL: population scenario for level $lvl did not pass"; fail=1; }
   if [ -n "$rolls" ]; then
     grep -E "population: [0-9]+ rooms" $log.txt | grep -q " $rolls density rolls at" || { echo "FAIL: level $lvl density rolls are not $rolls (the real game's logic regions)"; fail=1; }

@@ -23,9 +23,22 @@ type Game struct {
 	// change the rest of the stream; the oracle test leaves this off.
 	FullPacks bool
 	superMade map[int]bool
+	// Diag counts what became of the density hits (diagnostics only, no effect on the stream).
+	Diag Diag
 	// RoomCount returns the number of rooms of a level the game populates
 	// (FUN_00644070); called once per level.
 	RoomCount func(level int) int
+}
+
+// Diag counts the outcomes of the density hits of a population.
+type Diag struct {
+	Hits        int // density rolls that passed
+	PackHits    int // hits that made a unique / champion pack attempt
+	Sparse      int // plain groups dropped by the sparsePopulate roll
+	NoSpot      int // plain groups for which none of the 20 spots was free
+	NoPlace     int // plain groups whose leader placement failed after a spot was found
+	Groups      int // plain groups made
+	NoGroupSize int // plain groups with min or max 0
 }
 
 // SuperMade says whether the super unique with this hcIdx was made in this game already.
@@ -234,6 +247,8 @@ func (g *Game) PopulateNatural(w World, room *Room, pop *Population) {
 				continue
 			}
 
+			g.Diag.Hits++
+
 			class, ok := g.pickType(r, room, 0x14, false)
 			if !ok {
 				return
@@ -242,6 +257,8 @@ func (g *Game) PopulateNatural(w World, room *Room, pop *Population) {
 			kind := g.packKind(r, room)
 
 			if kind == 0 {
+				g.Diag.PackHits++
+
 				if g.makeUnique(w, room, r, c, pop) {
 					placed = true
 				}
@@ -258,6 +275,8 @@ func (g *Game) PopulateNatural(w World, room *Room, pop *Population) {
 
 			if mon.Sparse != 0 {
 				if int(g.Seed.Step()%100) > mon.Sparse {
+					g.Diag.Sparse++
+
 					continue
 				}
 			}
@@ -316,18 +335,26 @@ func (g *Game) pickPos(w World, room *Room, c *Cell, class int, nearExit bool) (
 // min-1 .. max-1 followers around it (rolled with the leader's own seed).
 func (g *Game) spawnGroup(w World, room *Room, c *Cell, class, lo, hi int, pop *Population) *Unit {
 	if lo == 0 || hi == 0 || hi < lo {
+		g.Diag.NoGroupSize++
+
 		return nil
 	}
 
 	x, y, ok := g.pickPos(w, room, c, class, true)
 	if !ok {
+		g.Diag.NoSpot++
+
 		return nil
 	}
 
 	px, py, ok := g.Tables.Place(w, Placement{Room: room, Cell: c, Class: class, X: x, Y: y, Ring: -1, Param4: 1})
 	if !ok {
+		g.Diag.NoPlace++
+
 		return nil
 	}
+
+	g.Diag.Groups++
 
 	leader := g.create(pop, room, class, px, py)
 	g.partyPack(w, room, c, leader, class, pop) // flags 0: MONSTER_SpawnMinionPackForLeader runs
