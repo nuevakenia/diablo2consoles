@@ -33,3 +33,26 @@ func TestBodySlotLocation(t *testing.T) {
 		}
 	}
 }
+
+func TestStarterBodyItems(t *testing.T) {
+	// the Paladin row of CharStats.txt: sword and buckler worn, potions and scrolls not
+	codes := []string{"ssd", "buc", "hp1", "tsc", "isc", "0"}
+	locs := []string{"rarm", "larm", "", "", "", ""}
+
+	got := starterBodyItems(codes, locs)
+	want := []starterBodyItem{{"ssd", 4}, {"buc", 5}}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("item %d: got %v, want %v", i, got[i], want[i])
+		}
+	}
+
+	if got := starterBodyItems([]string{"sst", "hp1"}, []string{"rarm"}); len(got) != 1 || got[0].Code != "sst" {
+		t.Errorf("a short location list must not panic or invent items: %v", got)
+	}
+}

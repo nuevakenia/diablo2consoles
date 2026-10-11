@@ -139,6 +139,11 @@ type exitWalk struct {
 	warp       *d2mapengine.WarpTile
 	best       float64 // smallest distance to the candidate so far (0: not measured yet)
 	bestCand   int
+	// defKill is the defensive fight now in progress, and noDefendUntil the game clock before which no new one
+	// starts (set when a fight ended at once without a kill, see defendOnTheWay).
+	defKill       *killState
+	noDefendUntil float64
+	fruitless     int // defensive fights in a row without a kill
 }
 
 // exitCandidates lists local positions from which the hero leaves towards
@@ -268,6 +273,28 @@ func (e *exitWalk) resume() { e.best, e.elapsed = 0, 0 }
 // walking hero turn round and fight, like a player who is attacked on the way.
 const threatRadius = 5.0
 
+// quickFight says whether a defensive fight ended at once without a kill.
+func quickFight(kills int, elapsed float64) bool { return kills == 0 && elapsed < quickFightSeconds }
+
+// nextFruitless is the count of defensive fights in a row without a kill after a fight with that many kills.
+func nextFruitless(count, kills int) int {
+	if kills > 0 {
+		return 0
+	}
+
+	return count + 1
+}
+
+const (
+	// fruitlessLimit fights in a row without a kill pause the defence for fruitlessPauseSeconds.
+	fruitlessLimit        = 3
+	fruitlessPauseSeconds = 12.0
+	// quickFightSeconds: a defensive fight that ends sooner than this without a kill was no fight.
+	quickFightSeconds = 1.0
+	// defendPauseSeconds is how long the walk goes on in peace after such a fight.
+	defendPauseSeconds = 3.0
+)
+
 // defendOnTheWay pauses the walk and fights when a monster is close, and
 // resumes the walk when the fight is over. It reports that the walk is paused.
 func (v *Game) defendOnTheWay(e *exitWalk) bool {
@@ -285,10 +312,34 @@ func (v *Game) defendOnTheWay(e *exitWalk) bool {
 		e.standStill = 0
 		e.resume()
 
+		// A fight that ended at once without a kill (the monster hovers at the edge of the threat radius: in range
+		// when the walk looks, out of range a tick later), or a few fights in a row without a kill (a catapult behind a
+		// wall that fire balls cannot reach), must not start again at the very next tick: the walk then never moved,
+		// and resume() above restarted its give-up clock every time, so it never gave up either (9h, w21: barb 22
+		// minutes and a 200 MB log at one spot, sorc the same with a Catapult). The walk gets a few game seconds in peace.
+		if k := e.defKill; k != nil {
+			e.fruitless = nextFruitless(e.fruitless, k.kills)
+
+			if quickFight(k.kills, k.elapsed) {
+				e.noDefendUntil = v.levels.clock + defendPauseSeconds
+			}
+
+			if e.fruitless >= fruitlessLimit {
+				e.noDefendUntil = v.levels.clock + fruitlessPauseSeconds
+				e.fruitless = 0
+			}
+		}
+
+		e.defKill = nil
+
 		hx, hy := v.heroTilePos()
 		e.lastX, e.lastY = hx, hy
 		v.stepExitWalk(e)
 
+		return false
+	}
+
+	if v.levels.clock < e.noDefendUntil {
 		return false
 	}
 
@@ -297,7 +348,7 @@ func (v *Game) defendOnTheWay(e *exitWalk) bool {
 		return false
 	}
 
-	v.levels.kill, e.paused = k, true
+	v.levels.kill, e.paused, e.defKill = k, true, k
 	v.Infof("KILL defending against %d monster(s) near the hero on the way to level %d", k.start, e.level)
 
 	return true
