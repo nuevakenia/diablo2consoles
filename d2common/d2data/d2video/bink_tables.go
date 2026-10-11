@@ -1,5 +1,11 @@
-// Code generated from the public Bink format constants (scan order, Huffman trees, patterns,
-// quantisation matrices) as documented by the open FFmpeg Bink decoder. Numeric tables only.
+// Numeric tables (scan order, Huffman trees, patterns, quantisation matrices) for the Bink 1 decoder.
+//
+// Attribution: these constants are the format constants listed in the FFmpeg Bink video decoder
+// (libavcodec, files bink.c / binkdata.h), which is licensed LGPL-2.1-or-later (https://ffmpeg.org). The
+// FFmpeg release the values were read from was not recorded when they were transcribed; if provenance
+// matters, re-derive the tables from a pinned FFmpeg tag and note the tag here. Only numeric data is used;
+// the decoding logic in this package is original Go code. bink_audio.go uses the same constants where
+// the audio codec shares them. This notice is kept for LGPL attribution and the project's GPLv3 licence.
 
 package d2video
 

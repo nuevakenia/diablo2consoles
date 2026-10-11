@@ -195,3 +195,10 @@ Command line and `OD2_*` variable workflows are unchanged. `OD2_CONFIG_DIR=<dir>
 
 OpenDiablo2 is GPLv3. Diablo II is © Blizzard Entertainment; this project is unaffiliated and needs your own
 legitimate copy of the game. Reverse-engineering notes cover interoperability only.
+
+## Credits and third-party notices
+
+- **Bink 1 video and audio decoder (`d2common/d2data/d2video`)**: the numeric format tables (scan orders, Huffman trees,
+  patterns, quantisation matrices) come from the open [FFmpeg](https://ffmpeg.org) Bink decoder (libavcodec `bink.c` /
+  `binkdata.h`, LGPL-2.1-or-later); the decoding code itself is original Go. No Blizzard or RAD code, and no game video or
+  audio, is in this repository. The feature is off by default (`OD2_PLAY_VIDEOS=1`).
