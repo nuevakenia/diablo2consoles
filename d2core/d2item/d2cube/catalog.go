@@ -21,23 +21,26 @@ const (
 // Base is what the cube needs to know about a base item (a row of weapons.txt,
 // armor.txt or misc.txt).
 type Base struct {
-	Code         string
-	Name         string
-	Type, Type2  string
-	Types        []string // Type, Type2 and every ancestor type
-	Norm         string   // normcode, ubercode and ultracode of the item family
-	Uber, Ultra  string
-	Tier         Tier
-	Stackable    bool
-	MaxStack     int
-	Weapon       bool
-	Armor        bool
-	GemSockets   int // most sockets the base item can have
-	Level        int
-	Spawnable    bool
-	Quest        bool
-	NoDurability bool
-	Durability   int
+	Code        string
+	Name        string
+	Type, Type2 string
+	Types       []string // Type, Type2 and every ancestor type
+	Norm        string   // normcode, ubercode and ultracode of the item family
+	Uber, Ultra string
+	Tier        Tier
+	Stackable   bool
+	MaxStack    int
+	Weapon      bool
+	Armor       bool
+	GemSockets  int // most sockets the base item can have
+	Level       int
+	Spawnable   bool
+	Quest       bool
+	// QuestDiffCheck is the questdiffcheck column: the quest item only works
+	// in the difficulty it was found in (recipe op 28).
+	QuestDiffCheck bool
+	NoDurability   bool
+	Durability     int
 }
 
 // HasType reports whether the base item is of the type (or a descendant of it).
@@ -119,7 +122,7 @@ func (c *Catalog) loadBases(raw []byte, weapon bool) {
 			Stackable: t.b(r, "stackable"), MaxStack: t.n(r, "maxstack"),
 			Weapon: weapon, Armor: !weapon,
 			GemSockets: t.n(r, "gemsockets"), Level: t.n(r, "level"),
-			Spawnable: t.b(r, "spawnable"), Quest: t.n(r, "quest") != 0,
+			Spawnable: t.b(r, "spawnable"), Quest: t.n(r, "quest") != 0, QuestDiffCheck: t.n(r, "questdiffcheck") != 0,
 			NoDurability: t.b(r, "nodurability"), Durability: t.n(r, "durability"),
 		}
 		c.add(b)
@@ -139,7 +142,7 @@ func (c *Catalog) loadMisc(raw []byte) {
 			Code: code, Name: t.s(r, "name"), Type: t.s(r, "type"), Type2: t.s(r, "type2"),
 			Stackable: t.b(r, "stackable"), MaxStack: t.n(r, "maxstack"),
 			GemSockets: t.n(r, "gemsockets"), Level: t.n(r, "level"),
-			Spawnable: t.b(r, "spawnable"), Quest: t.n(r, "quest") != 0,
+			Spawnable: t.b(r, "spawnable"), Quest: t.n(r, "quest") != 0, QuestDiffCheck: t.n(r, "questdiffcheck") != 0,
 			NoDurability: true,
 		}
 		c.add(b)

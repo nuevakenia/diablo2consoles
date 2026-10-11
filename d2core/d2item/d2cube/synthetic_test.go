@@ -151,8 +151,8 @@ func TestSyntheticSocketAndLevel(t *testing.T) {
 		t.Errorf("%+v", p)
 	}
 
-	// lvl 10 + 100% of the player level + 100% of the item level
-	if want := 10 + 50 + 30; p.Item.ILvl != want {
+	// a fixed lvl wins over plvl/ilvl (CUBE_ServerCreateRecipeOutputs 0x5638a0)
+	if want := 10; p.Item.ILvl != want {
 		t.Errorf("ilvl %d want %d", p.Item.ILvl, want)
 	}
 
@@ -269,9 +269,10 @@ func TestOutputLevelAndCrafted(t *testing.T) {
 	}{
 		{Output{PLevel: 50, ILevel: 50}, 80, 40, 60},
 		{Output{Level: 30}, 80, 99, 30},
-		{Output{}, 80, 45, 45},
-		{Output{}, 80, 0, 80},
-		{Output{Level: 90, PLevel: 100}, 80, 0, 99},
+		{Output{}, 80, 45, 1}, // all blank: level 1 in the exe
+		{Output{Level: 90, PLevel: 100}, 80, 0, 90},
+		{Output{Level: 120}, 80, 0, 99},
+		{Output{PLevel: 100, ILevel: 100}, 80, 40, 99}, // sum capped at the highest hero level
 	}
 	for i, c := range cases {
 		if got := OutputLevel(&c.o, c.player, c.main); got != c.want {

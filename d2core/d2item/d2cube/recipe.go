@@ -21,12 +21,13 @@ type Input struct {
 	Unique string // a unique item by name ("The Stone of Jordan")
 	Qty    int    // how many (default 1)
 
-	Quality   d2drop.Quality // 0 = any quality
-	Ethereal  triState       // eth / noe
-	Socketed  triState       // sock / nos
-	Tier      Tier           // bas / exc / eli, TierNone = any
-	Upgrade   bool           // upg: the item has a higher tier to upgrade to
-	IsGemTier bool           // the token was a gem tier type (gem0 ... gem4)
+	Quality    d2drop.Quality // 0 = any quality
+	Ethereal   triState       // eth / noe
+	Socketed   triState       // sock / nos
+	Tier       Tier           // bas / exc / eli, TierNone = any
+	Upgrade    bool           // upg: the item has a higher tier to upgrade to
+	IsGemTier  bool           // the token was a gem tier type (gem0 ... gem4)
+	NoRuneword bool           // nru: the item must not be a runeword item
 }
 
 type triState int
@@ -66,7 +67,9 @@ type Output struct {
 	Suffix   []int
 	Repair   bool // rep
 	Recharge bool // rch
-	Unsocket bool // uns
+	Unsocket bool // uns: unsocket, the socketed items are destroyed
+	Remove   bool // rem: unsocket, the socketed items are returned
+	Regrade  bool // reg: a new item of the main input's base keeping its quality and level
 	Upgrade  bool // mod: keep the item's modifiers while changing its tier
 	Tier     Tier // exc / eli: the tier mod upgrades to
 	Mods     []Mod
@@ -188,11 +191,13 @@ func parseInput(raw string, cat *Catalog) (Input, error) {
 	switch {
 	case first == "any":
 		in.Any = true
-	case cat != nil && cat.bases[first] != nil:
-		in.Code = first
+	// The exe tries the item type table first and the base item code second
+	// (DATATBL_ParseCubeMainInputExpression 0x66b210).
 	case cat != nil && cat.IsType(first):
 		in.Type = first
 		in.IsGemTier = len(first) == 4 && strings.HasPrefix(first, "gem") && first[3] >= '0' && first[3] <= '4'
+	case cat != nil && cat.bases[first] != nil:
+		in.Code = first
 	case strings.ContainsAny(first, " ") || (first != "" && first[0] >= 'A' && first[0] <= 'Z'):
 		in.Unique = first
 	default:
@@ -221,6 +226,8 @@ func parseInput(raw string, cat *Catalog) (Input, error) {
 			in.Tier = TierElite
 		case tk == "upg":
 			in.Upgrade = true
+		case tk == "nru":
+			in.NoRuneword = true
 		case strings.HasPrefix(tk, "qty="):
 			n, err := strconv.Atoi(tk[4:])
 			if err != nil || n < 1 {
@@ -269,6 +276,10 @@ func parseOutput(t *table, r []string, pre string, cat *Catalog) (Output, error)
 			o.Recharge = true
 		case tk == "uns":
 			o.Unsocket = true
+		case tk == "rem":
+			o.Remove = true
+		case tk == "reg":
+			o.Regrade = true
 		case tk == "mod":
 			o.Upgrade = true
 		case tk == "exc":

@@ -170,7 +170,13 @@ func (g *GameControls) cubeItems() (items []*diablo2item.Item, cube []d2cube.Ite
 	for _, it := range g.cube.grid.items {
 		if item, ok := it.(*diablo2item.Item); ok {
 			items = append(items, item)
-			cube = append(cube, toCubeItem(item))
+			ci := toCubeItem(item)
+			// The exe compares the difficulty a quest item was found in (stat
+			// 0x164) with the game difficulty; the engine does not record it,
+			// so quest items count as found in the current difficulty
+			// (UNVERIFIED simplification).
+			ci.QuestDifficulty = g.hero.QuestDifficulty
+			cube = append(cube, ci)
 		}
 	}
 
