@@ -31,6 +31,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2drlg"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	ebiten2 "github.com/OpenDiablo2/OpenDiablo2/d2core/d2audio/ebiten"
@@ -386,6 +387,9 @@ func (a *App) Run() (err error) {
 	} else if os.Getenv("OD2_AUTOSCREEN") == "charselect" {
 		// OD2_AUTOSCREEN=charselect opens the character select screen directly (for OD2_AUTOSHOT)
 		a.ToCharacterSelect(d2clientconnectiontype.Local, "")
+	} else if d2gamescreen.PlayVideosEnabled() {
+		// OD2_PLAY_VIDEOS=1: play the intro cinematic first (Esc or a click skips it)
+		a.ToVideo(d2resource.Act1Intro, func() { a.ToMainMenu() })
 	} else {
 		a.ToMainMenu()
 	}
@@ -841,6 +845,12 @@ func (a *App) ToMapEngineTest(region, level int) {
 // ToCredits forces the game to transition to the credits screen
 func (a *App) ToCredits() {
 	a.screen.SetNextScreen(d2gamescreen.CreateCredits(a, a.asset, a.renderer, *a.Options.LogLevel, a.ui))
+}
+
+// ToVideo plays a Bink cinematic from the game data (letterboxed, skippable) and then calls next.
+func (a *App) ToVideo(path string, next func()) {
+	a.screen.SetNextScreen(d2gamescreen.CreateVideoPlayer(a.asset, a.renderer, a.inputManager, path,
+		*a.Options.LogLevel, next))
 }
 
 // ToCinematics forces the game to transition to the cinematics menu

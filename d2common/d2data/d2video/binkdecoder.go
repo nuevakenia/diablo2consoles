@@ -2,7 +2,6 @@ package d2video
 
 import (
 	"errors"
-	"log"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2datautils"
 )
@@ -62,6 +61,11 @@ type BinkDecoder struct {
 	FrameIndexTable       []uint32
 	streamReader          *d2datautils.StreamReader
 	fileSize              uint32
+	source                []byte
+	codec                 *videoCodec
+	rgbaBuf               []byte
+	FPSNum, FPSDen        uint32
+	LastAudio             [][]byte // audio packets of the last decoded frame, one per track
 	numberOfFrames        uint32
 	largestFrameSizeBytes uint32
 	VideoWidth            uint32
@@ -78,37 +82,24 @@ type BinkDecoder struct {
 
 }
 
-// CreateBinkDecoder returns a new instance of the bink decoder
+// CreateBinkDecoder returns a new instance of the bink decoder. The container header is parsed immediately;
+// video frames are decoded on demand with DecodeFrame/NextFrame. Only Bink 1 (magic "BIK" + revision letter)
+// is handled; Diablo II's videos are revision 'i' ("BIKi").
 func CreateBinkDecoder(source []byte) (*BinkDecoder, error) {
 	result := &BinkDecoder{
 		streamReader: d2datautils.CreateStreamReader(source),
+		source:       source,
 	}
 
-	err := result.loadHeaderInformation()
-
-	return result, err
-}
-
-// GetNextFrame gets the next frame
-func (v *BinkDecoder) GetNextFrame() error {
-	//nolint:gocritic // v.streamReader.SetPosition(uint64(v.FrameIndexTable[i] & 0xFFFFFFFE))
-	lengthOfAudioPackets, err := v.streamReader.ReadUInt32()
-	if err != nil {
-		return err
+	if err := result.loadHeaderInformation(); err != nil {
+		return result, err
 	}
 
-	samplesInPacket, err := v.streamReader.ReadUInt32()
-	if err != nil {
-		return err
+	if err := result.initVideo(); err != nil {
+		return result, err
 	}
 
-	v.streamReader.SkipBytes(int(lengthOfAudioPackets) - 4) //nolint:gomnd // decode magic
-
-	log.Printf("Frame %d:\tSamp: %d", v.frameIndex, samplesInPacket)
-
-	v.frameIndex++
-
-	return nil
+	return result, nil
 }
 
 //nolint:gomnd,funlen,gocyclo // Decoder magic, can't help the long function length for now
@@ -170,8 +161,13 @@ func (v *BinkDecoder) loadHeaderInformation() error {
 		return err
 	}
 
-	v.FPS = uint32(float32(fpsDividend) / float32(fpsDivider))
-	v.FrameTimeMS = 1000 / v.FPS
+	if fpsDivider == 0 || fpsDividend == 0 {
+		return errors.New("bink: bad frame rate")
+	}
+
+	v.FPSNum, v.FPSDen = fpsDividend, fpsDivider
+	v.FPS = fpsDividend / fpsDivider
+	v.FrameTimeMS = 1000 * fpsDivider / fpsDividend
 
 	videoFlags, err := v.streamReader.ReadUInt32()
 	if err != nil {
@@ -185,6 +181,10 @@ func (v *BinkDecoder) loadHeaderInformation() error {
 	numberOfAudioTracks, err := v.streamReader.ReadUInt32()
 	if err != nil {
 		return err
+	}
+
+	if numberOfAudioTracks > 256 || v.numberOfFrames > 1<<24 {
+		return errors.New("bink: implausible header")
 	}
 
 	v.AudioTracks = make([]BinkAudioTrack, numberOfAudioTracks)

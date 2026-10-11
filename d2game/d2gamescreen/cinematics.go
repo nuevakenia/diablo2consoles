@@ -170,6 +170,14 @@ func (v *Cinematics) onEndCreditExpBtnClicked() {
 }
 
 func (v *Cinematics) playVideo(path string) {
+	// with OD2_PLAY_VIDEOS=1 the app plays the cinematic and returns to this menu afterwards
+	if vn, ok := v.navigator.(interface {
+		ToVideo(path string, next func())
+	}); ok && PlayVideosEnabled() {
+		vn.ToVideo(path, v.navigator.ToCinematics)
+		return
+	}
+
 	videoBytes, err := v.asset.LoadFile(path)
 	if err != nil {
 		v.Error(err.Error())
