@@ -336,11 +336,15 @@ const (
 	maggotCount = 2
 )
 
-// thinkSandMaggot is MONAI_Think_SandMaggot 0x5f0860 (VERIFIED flow). It runs
-// without a target too. aip1 burrow%, aip2 spit%, aip3 spit budget, aip4
-// bite%, aip5 skill cooldown frames. Slots: 1 = emerge/surface, 2 = spit
-// burst, 3 = lay eggs (names UNVERIFIED). FUN_005dbfc0 < 25 is read as
-// hp% < 25 (UNVERIFIED). Waits use ScheduleWait via Sleep.
+// thinkSandMaggot is MONAI_Think_SandMaggot 0x5f0860 (VERIFIED flow, rewritten
+// in batch 8). It runs without a target too. aip1 spit-burst%, aip2 A2%, aip3
+// spit budget, aip4 A1%, aip5 skill cooldown frames. Slots: 1 surfaces and
+// hits (phase 3 -> 1), 2 burrows with no target or when wounded (-> phase 3),
+// 3 is the spit. Scratch: phase (0x14), cooldown-until-frame (0x18), spit
+// count (0x1c). Batch 8 corrections: the spit is Skill3 (+0x174), not the
+// fourth slot; the wounded burrow tests the attack-target distance, not the
+// tick distance, and needs no tick target; skill casts leave their waits
+// (0x1e, 0x19, 0x14); without a tick target the circle roll is still drawn.
 func thinkSandMaggot(c *Ctx) {
 	b, t := c.B, c.Target
 	p := b.Profile
@@ -350,47 +354,61 @@ func thinkSandMaggot(c *Ctx) {
 	phase := b.Scratch[maggotPhase]
 	near := haveAtt && d < 16
 
-	cast := func(slot int, at Target, nextPhase int) {
-		if c.Cast(slot, at) {
-			b.Scratch[maggotCool] = b.AIP(5) + now
-			b.Scratch[maggotPhase] = nextPhase
-		}
+	tick := Target{}
+	if t != nil {
+		tick = *t
 	}
 
-	// target-less surfacing (phase < 3 only)
-	if phase < 3 && t == nil && (!haveAtt || d > 10) && b.Scratch[maggotCool] < now && p.Skills[slot2].Used() {
-		cast(slot2, Target{}, 3)
+	cast := func(slot int, at Target, wait, nextPhase int) {
+		c.Cast(slot, at)
+		c.Sleep(wait)
 
-		return
+		b.Scratch[maggotCool] = b.AIP(5) + now
+		b.Scratch[maggotPhase] = nextPhase
 	}
 
-	if phase == 3 && (t != nil || near) {
-		at := att
-		if t != nil {
-			at = *t
-		}
+	// the first gate: where the exe goes to 0x5f0922 (the surfacing test)
+	surface := false
 
-		if b.Scratch[maggotCool] < now && p.Skills[slot1].Used() {
-			cast(slot1, at, 1)
+	switch {
+	case phase < 3 && t != nil:
+		surface = true
+	case phase < 3:
+		if (!haveAtt || d > 10) && b.Scratch[maggotCool] < now && p.Skills[slot2].Used() {
+			cast(slot2, Target{}, 0x1e, 3)
 
 			return
 		}
-	}
 
-	if phase == 3 {
-		c.Sleep(20)
+		surface = near
+	case t != nil || near:
+		surface = true
+	default:
+		c.Sleep(0x14)
 
 		return
 	}
 
-	if t != nil && b.HPPercent < 25 && p.Skills[slot2].Used() && c.Dist < 7 && b.Scratch[maggotCool] < now &&
+	if surface && phase == 3 {
+		if b.Scratch[maggotCool] < now && p.Skills[slot1].Used() {
+			cast(slot1, tick, 0x19, 1)
+
+			return
+		}
+
+		c.Sleep(0x14)
+
+		return
+	}
+
+	if b.HPPercent < 25 && p.Skills[slot2].Used() && haveAtt && d < 7 && b.Scratch[maggotCool] < now &&
 		b.Roll(100) < 20 {
-		cast(slot2, *t, 3)
+		cast(slot2, tick, 0x1e, 3)
 
 		return
 	}
 
-	if t != nil && c.InRange && b.Chance(b.AIP(4)) {
+	if c.InRange && t != nil && b.Chance(b.AIP(4)) {
 		c.Attack(ModeAttack1, *t)
 
 		return
@@ -402,21 +420,20 @@ func thinkSandMaggot(c *Ctx) {
 		return
 	}
 
-	if t == nil {
-		c.Sleep(12)
-
-		return
-	}
-
 	if b.Roll(100) < 20 {
-		c.Circle(*t, 6)
+		if t != nil {
+			c.Circle(*t, 6)
+		}
 
 		return
 	}
 
 	if b.Scratch[maggotCount] < b.AIP(3) && b.Roll(100) < b.AIP(1) {
-		if phase != 2 || !p.Skills[slot4].Used() {
-			c.Circle(*t, 6)
+		if phase != 2 || !p.Skills[slot3].Used() {
+			if t != nil {
+				c.Circle(*t, 6)
+			}
+
 			b.Scratch[maggotPhase] = 2
 
 			return
@@ -424,7 +441,8 @@ func thinkSandMaggot(c *Ctx) {
 
 		b.Scratch[maggotCount]++
 		b.Scratch[maggotPhase] = 1
-		c.Cast(slot4, *t)
+		c.Cast(slot3, tick)
+		c.Sleep(0x14)
 
 		return
 	}

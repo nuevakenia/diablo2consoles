@@ -678,8 +678,11 @@ func thinkPriestB(c *Ctx) {
 				shift = 2
 			}
 
-			dx, dy := b.X-t.X, b.Y-t.Y
-			p := Point{b.X + dx<<shift, b.Y + dy<<shift}
+			// batch 8 (disassembled 0x5f63e3..0x5f6431): the destination is
+			// the target position plus (target - self) << shift, i.e. past
+			// the target, not away from it.
+			dx, dy := t.X-b.X, t.Y-b.Y
+			p := Point{t.X + dx<<shift, t.Y + dy<<shift}
 
 			ok := true
 			if cc, has := c.W.(FBXCanCast); has {
@@ -757,7 +760,8 @@ type FBXKnightHost interface {
 }
 
 // thinkOblivionKnightB is MONAI_Think_OblivionKnight 0x5fa060 (VERIFIED flow,
-// filter of the ally scan UNVERIFIED). aip1 close range, aip2 attack range,
+// batch 8: ally scan callback 0x5f9fb0 decoded - nearest other knight of base
+// class 0x136 within squared distance 2500). aip1 close range, aip2 attack range,
 // aip3 cool-down, aip4 skill7 %, aip5 cast gate, aip6 skill3 %, aip7 reposition
 // %, aip8 reposition distance. Scratch[0] next skill7/curse frame.
 func thinkOblivionKnightB(c *Ctx) {
@@ -783,7 +787,10 @@ func thinkOblivionKnightB(c *Ctx) {
 			}
 		}
 
-		if ally.Found && fbxDistSq(b.X, b.Y, ally.T.X, ally.T.Y) > d1*d1 && c.WalkTo(ally.T, 4) {
+		// batch 8: the exe compares the ally's squared distance to the TARGET
+		// (UNIT_DistanceSquaredBetweenUnits(ally, target)) with this knight's
+		// own distance squared, not its distance to the ally.
+		if ally.Found && fbxDistSq(ally.T.X, ally.T.Y, t.X, t.Y) > c.Dist*c.Dist && c.WalkTo(ally.T, 4) {
 			return
 		}
 
@@ -802,8 +809,9 @@ func thinkOblivionKnightB(c *Ctx) {
 
 	at, d, ok := c.W.AttackTarget(b)
 	if ok && d < b.AIP(2) {
-		if fbxSkill(b, 6) && b.Scratch[0] < now && b.Roll(100) < b.AIP(4) {
-			castCurse(6, t)
+		// batch 8: the sixth slot (+0x17a, mode byte +0x185), index 5, not 6
+		if fbxSkill(b, 5) && b.Scratch[0] < now && b.Roll(100) < b.AIP(4) {
+			castCurse(5, t)
 
 			return
 		}
@@ -815,7 +823,9 @@ func thinkOblivionKnightB(c *Ctx) {
 				return
 			}
 
-			if fbxSkill(b, 0) && (host == nil || host.FBXSummonsBelow4(b)) {
+			// batch 8: the exe's extra test is a byte of the caster's monster data
+			// (+0xe) below 4, which holds for every class; it is not a summon count
+			if fbxSkill(b, 0) {
 				c.Cast(0, at)
 
 				return
@@ -844,9 +854,11 @@ type FBXOverseerHost interface {
 	FBXLinkedTarget(b *Brain) (Target, bool)
 }
 
-// thinkOverseerB is MONAI_Think_Overseer 0x5e1640 (VERIFIED flow; the scan
-// callback 0x5e1570 is UNVERIFIED: ally in T, enemy in T2, Count of
-// candidates). aip1 skill1 cool-down, aip2 skill2 %, aip3 skill3 %, aip4/aip5
+// thinkOverseerB is MONAI_Think_Overseer 0x5e1640 (VERIFIED flow; batch 8
+// decoded the scan callback 0x5e1570: friendly living monsters of base class
+// 0x1c5 not in state 0x8d; T the first below 50 percent life within squared
+// distance 576, T2 the first within 400, Count all that pass; the query's
+// Radius2 is not used). aip1 skill1 cool-down, aip2 skill2 %, aip3 skill3 %, aip4/aip5
 // preferred distance and slack, aip6 melee %, aip7 A1/A2 split. Scratch[0] is
 // the skill1 ready frame.
 func thinkOverseerB(c *Ctx) {
@@ -890,7 +902,9 @@ func thinkOverseerB(c *Ctx) {
 		return
 	}
 
-	if fbxSkill(b, 2) && r.Found2 && b.Roll(100) < b.AIP(3) && fbxHasSkill(c, r.T2, 2) {
+	// batch 8: the exe also requires the caster's alignment to differ from 2
+	// (not converted), checked after the roll
+	if fbxSkill(b, 2) && r.Found2 && b.Roll(100) < b.AIP(3) && !b.Allied && fbxHasSkill(c, r.T2, 2) {
 		c.Cast(2, r.T2)
 
 		return
