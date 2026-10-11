@@ -293,7 +293,7 @@ func (e *Engine) applyMonsterState(m *d2mapentity.Monster, inst d2state.Instance
 
 	// VERIFIED (0x5c1300): resist penalties on a monster that is immune to the element are cut to a fifth
 	if m.Stat != nil && len(inst.Mods) > 0 {
-		res := d2monsters.MonsterResists(m.Stat, m.Vitals.Difficulty)
+		res := d2monsters.MonsterResistsOf(m)
 		inst.Mods = d2state.ReduceCurseMods(inst.Mods, false, func(i int) int { return res[i] })
 	}
 
@@ -1529,7 +1529,7 @@ func curseableMonster(m *d2mapentity.Monster, stats []d2skill.StatMod) bool {
 		return true
 	}
 
-	res := d2monsters.MonsterResists(m.Stat, m.Vitals.Difficulty)
+	res := d2monsters.MonsterResistsOf(m)
 	orig := statMods(stats)
 	reduced := d2state.ReduceCurseMods(orig, false, func(i int) int { return res[i] })
 

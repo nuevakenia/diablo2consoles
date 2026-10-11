@@ -224,6 +224,7 @@ func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.
 		// percent; no floor per component, the Total is only subtracted when > 0.
 		dmg = heroPhysicalDamage(dmg, reduce, physResist)
 		dmg += d.elementalHit(u, p, atk)
+		dmg += d.uModHit(u, p)
 
 		// skill defenses run after the to-hit and shield block steps and the
 		// armor reductions: Energy Shield, Bone Armor, Thorns

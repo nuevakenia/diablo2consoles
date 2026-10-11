@@ -356,6 +356,12 @@ func (p *popLevel) run() {
 		p.stats.density = rg.Density
 	}
 
+	defer func() {
+		d := game.Diag
+		g.Infof("population diag level %d: hits=%d packHits=%d groups=%d noSpot=%d noPlace=%d sparse=%d noGroupSize=%d",
+			p.level, d.Hits, d.PackHits, d.Groups, d.NoSpot, d.NoPlace, d.Sparse, d.NoGroupSize)
+	}()
+
 	ctx := &drlgpop.Ctx{LevelID: p.level, Difficulty: int(p.diff), Counter: new(int)}
 
 	for _, r := range p.rooms {
@@ -555,20 +561,20 @@ func (w *engineWorld) walkShareRect(x, y, wd, ht int) float64 {
 	return float64(ok) / float64(total)
 }
 
-func (w *engineWorld) Blocked(_ *d2monreg.Room, x, y, radius, mask int) bool {
+// Blocked is FUN_0064ec70: the terrain test of the monster's footprint (d2monreg.Footprint, by monstats2 SizeX).
+func (w *engineWorld) Blocked(_ *d2monreg.Room, x, y, size, mask int) bool {
 	if mask == 0 {
 		return false
 	}
 
-	if radius < 0 {
-		radius = 0
+	cells, all := d2monreg.Footprint(size)
+	if all {
+		return true
 	}
 
-	for dy := -radius; dy <= radius; dy++ {
-		for dx := -radius; dx <= radius; dx++ {
-			if w.g.engine.WalkBlocked(x+dx, y+dy) {
-				return true
-			}
+	for _, c := range cells {
+		if w.g.engine.WalkBlocked(x+c[0], y+c[1]) {
+			return true
 		}
 	}
 

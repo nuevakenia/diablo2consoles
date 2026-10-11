@@ -21,7 +21,7 @@ func (d *Director) Resists(t d2monster.Target) (fire, cold, lightning int) {
 	}
 
 	if tu := d.units[t.ID-unitTargetBase]; tu != nil && tu.m != nil && tu.m.Stat != nil {
-		r := MonsterResists(tu.m.Stat, tu.m.Vitals.Difficulty)
+		r := MonsterResistsOf(tu.m)
 
 		return r[2], r[4], r[3]
 	}
