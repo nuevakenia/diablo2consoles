@@ -119,8 +119,9 @@ type World interface {
 // CellMarker is optionally implemented by a World: SrvDoFunc 3 and 5 OR the
 // "missile here" bit 0x40 into the collision cell under the missile
 // (0x5abfb0 / 0x5ac050 -> 0x64fdd0, verified); size is the missile's Size
-// column, which picks the footprint (1 one cell, 3 the 3x3 block around it,
-// 2 the shape of 0x64ef40, UNVERIFIED).
+// column, which picks the footprint (see CellFootprint: 1 one cell, 2 the
+// plus of 0x64ef40, 3 the 3x3 block; VERIFIED). No production World
+// implements this yet.
 type CellMarker interface {
 	MarkCell(x, y, size int, flag uint16)
 }

@@ -1278,7 +1278,7 @@ func doAuraFn(c *cast) {
 	sk := c.sk
 	stats := statsOf(c.env, sk)
 	e := Effect{Kind: "aura", State: sk.AuraState, Radius: c.env.eval(sk.AuraRangeCalc), Filter: sk.AuraFilter,
-		Interval: 25, Mode: "friendly"}
+		Interval: AuraPeriod(c.env, sk), Mode: "friendly"}
 
 	if enemyFilter(sk.AuraFilter) {
 		e.Mode = "enemy"
