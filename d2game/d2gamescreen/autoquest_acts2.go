@@ -136,23 +136,27 @@ func (a *autoQuest) stageTombs() {
 func (a *autoQuest) stageLamEsen() {
 	const id = d2quest.QuestLamEsen
 
-	a.once("lamesen: Alkor", func(h autoHost, a *autoQuest) {
+	a.once("lamesen: Lower Kurast and Alkor", func(h autoHost, a *autoQuest) {
+		a.move(h, d2quest.LevelKurastDocktown)
+		// VERIFIED 0x5b52c0: the quest is offered once Lower Kurast was entered
+		a.expect(h, "dormant before Lower Kurast", a.quest(h, id).State == 0)
+		a.move(h, d2quest.LevelLowerKurast)
 		a.move(h, d2quest.LevelKurastDocktown)
 		a.says(h, "Alkor offers the quest", d2quest.NPCAlkor, 549)
 		a.expect(h, "STARTED bit, state 2", a.bit(h, id, d2quest.FlagStarted) && a.quest(h, id).State == 2)
 		a.move(h, d2quest.LevelRuinedTemple)
-		a.expect(h, "ENTERAREA bit, state 3", a.bit(h, id, d2quest.FlagEnterArea) && a.quest(h, id).State == 3)
+		a.expect(h, "left town: state 3", a.quest(h, id).State == 3)
 	})
 	a.once("lamesen: the tome", func(h autoHost, a *autoQuest) {
 		a.pickup(h, d2quest.ItemLamEsenTome)
 		a.state(h, id, "tome picked up")
-		a.expect(h, "reward pending + primary goal", a.bit(h, id, d2quest.FlagRewardPending) &&
-			a.bit(h, id, d2quest.FlagPrimaryGoal))
+		a.expect(h, "state 4, nothing pending (the exe pays at Alkor's line)", a.quest(h, id).State == 4 &&
+			!a.bit(h, id, d2quest.FlagRewardPending) && !a.bit(h, id, d2quest.FlagRewardGranted))
 		a.move(h, d2quest.LevelKurastDocktown)
 		a.says(h, "Alkor's thanks", d2quest.NPCAlkor, 564)
 		a.state(h, id, "reward claimed")
 		a.expect(h, "reward granted, the tome is gone", a.bit(h, id, d2quest.FlagRewardGranted) &&
-			h.Q().Items[d2quest.ItemLamEsenTome] == 0)
+			a.bit(h, id, d2quest.FlagPrimaryGoal) && h.Q().Items[d2quest.ItemLamEsenTome] == 0)
 	})
 }
 
@@ -160,6 +164,10 @@ func (a *autoQuest) stageKhalim() {
 	const id = d2quest.QuestKhalim
 
 	a.once("khalim: Cain and the parts", func(h autoHost, a *autoQuest) {
+		a.move(h, d2quest.LevelKurastDocktown)
+		// D2MOO ACT3Q2_Callback03_ChangedLevel: the Great Marsh makes the quest available
+		a.expect(h, "dormant before the Great Marsh", a.quest(h, id).State == 0)
+		a.move(h, d2quest.LevelGreatMarsh)
 		a.move(h, d2quest.LevelKurastDocktown)
 		a.says(h, "Cain explains the Will", d2quest.NPCCain3, 543)
 		a.expect(h, "STARTED bit set", a.bit(h, id, d2quest.FlagStarted))
@@ -169,8 +177,8 @@ func (a *autoQuest) stageKhalim() {
 			msg  int
 			bit  int
 		}{
-			{d2quest.ItemKhalimEye, 545, d2quest.FlagCustom1}, {d2quest.ItemKhalimHeart, 544, d2quest.FlagCustom1 + 1},
-			{d2quest.ItemKhalimBrain, 546, d2quest.FlagCustom1 + 2}, {d2quest.ItemKhalimWill, 547, d2quest.FlagCustom1 + 3},
+			{d2quest.ItemKhalimEye, 545, d2quest.FlagLeaveTown}, {d2quest.ItemKhalimHeart, 544, d2quest.FlagCustom2},
+			{d2quest.ItemKhalimBrain, 546, d2quest.FlagEnterArea}, {d2quest.ItemKhalimFlail, 547, d2quest.FlagCustom1},
 		} {
 			a.pickup(h, p.item)
 			a.says(h, "Cain reports "+p.item, d2quest.NPCCain3, p.msg)
@@ -178,38 +186,47 @@ func (a *autoQuest) stageKhalim() {
 		}
 	})
 	a.once("khalim: the Compelling Orb", func(h autoHost, a *autoQuest) {
+		for _, c := range []string{d2quest.ItemKhalimEye, d2quest.ItemKhalimHeart, d2quest.ItemKhalimBrain, d2quest.ItemKhalimFlail} {
+			h.Dispatch(d2quest.Event{Kind: d2quest.EvItemRemoved, Item: c}) // the cube consumed them
+		}
+
+		a.pickup(h, d2quest.ItemKhalimWill)
+		a.says(h, "Cain: the cube made the Will", d2quest.NPCCain3, 548)
 		a.move(h, d2quest.LevelTravincal)
-		a.object(h, d2quest.ObjectCompellingOrb)
+		// VERIFIED 0x5b9550: the Will must be wielded and the second hit breaks the orb, at once and without a reward step
+		a.objectWielding(h, d2quest.ObjectCompellingOrb, "")
+		a.objectWielding(h, d2quest.ObjectCompellingOrb, d2quest.ItemKhalimWill)
+		a.expect(h, "one hit does not break the orb", !a.bit(h, id, d2quest.FlagRewardGranted))
+		a.objectWielding(h, d2quest.ObjectCompellingOrb, d2quest.ItemKhalimWill)
 		a.state(h, id, "orb smashed")
-		a.expect(h, "reward pending + primary goal", a.bit(h, id, d2quest.FlagRewardPending) &&
-			a.bit(h, id, d2quest.FlagPrimaryGoal))
-		a.move(h, d2quest.LevelKurastDocktown)
-		a.says(h, "Cain's last line", d2quest.NPCCain3, 548)
-		a.expect(h, "reward granted", a.bit(h, id, d2quest.FlagRewardGranted))
+		a.expect(h, "done + primary goal at once, no reward pending", a.bit(h, id, d2quest.FlagRewardGranted) &&
+			a.bit(h, id, d2quest.FlagPrimaryGoal) && !a.bit(h, id, d2quest.FlagRewardPending))
 	})
 }
 
 func (a *autoQuest) stageBlade() {
 	const id = d2quest.QuestBlade
 
-	a.once("blade: Hratli and the Flayer Dungeon", func(h autoHost, a *autoQuest) {
+	a.once("blade: Hratli and the Flayer Jungle", func(h autoHost, a *autoQuest) {
+		a.move(h, d2quest.LevelKurastDocktown)
+		a.expect(h, "dormant before the Flayer Jungle", a.quest(h, id).State == 0)
+		a.move(h, d2quest.LevelFlayerJungle)
 		a.move(h, d2quest.LevelKurastDocktown)
 		a.says(h, "Hratli offers the quest", d2quest.NPCHratli, 571)
-		a.move(h, d2quest.LevelFlayerDungeon1)
-		a.expect(h, "ENTERAREA bit, state 3", a.bit(h, id, d2quest.FlagEnterArea) && a.quest(h, id).State == 3)
+		a.move(h, d2quest.LevelFlayerJungle)
+		a.expect(h, "left town: state 3", a.quest(h, id).State == 3)
 		a.pickup(h, d2quest.ItemGidbinn)
 		a.expect(h, "Gidbinn found, state 4", a.quest(h, id).State == 4)
 		a.move(h, d2quest.LevelKurastDocktown)
 	})
 	a.once("blade: Ormus, Asheara", func(h autoHost, a *autoQuest) {
-		a.says(h, "Ormus takes the blade", d2quest.NPCOrmus, 587)
+		// VERIFIED 0x5b6ea0: Ormus takes the blade (587) and gives the rare ring (593) at once; Asheara's wolves (589)
+		// are the other half, either order; the quest is done when both happened
+		a.says(h, "Ormus takes the blade and pays the ring", d2quest.NPCOrmus, 587, 593)
+		a.expect(h, "ring given, wolves still owed", a.bit(h, id, d2quest.FlagCustom4) && !a.bit(h, id, d2quest.FlagRewardGranted))
 		a.says(h, "Asheara's line", d2quest.NPCAsheara, 589)
 		a.state(h, id, "Asheara")
-		a.expect(h, "reward pending + primary goal", a.bit(h, id, d2quest.FlagRewardPending) &&
-			a.bit(h, id, d2quest.FlagPrimaryGoal))
-		a.says(h, "Ormus pays out", d2quest.NPCOrmus, 593)
-		a.expect(h, "reward granted", a.bit(h, id, d2quest.FlagRewardGranted))
-		a.expect(h, "the Blackened Temple quest opened", a.quest(h, d2quest.QuestBlackenedTemple).State >= 1)
+		a.expect(h, "reward granted", a.bit(h, id, d2quest.FlagRewardGranted) && a.bit(h, id, d2quest.FlagPrimaryGoal))
 	})
 }
 
@@ -237,20 +254,23 @@ func (a *autoQuest) stageTemple() {
 
 	a.once("temple: Ormus and Travincal", func(h autoHost, a *autoQuest) {
 		a.move(h, d2quest.LevelKurastDocktown)
+		// D2MOO ACT3Q5_Callback03_ChangedLevel: the Kurast Causeway makes the quest available
+		a.expect(h, "dormant before the Causeway", a.quest(h, id).State == 0)
+		a.move(h, d2quest.LevelKurastCauseway)
+		a.move(h, d2quest.LevelKurastDocktown)
 		a.offer(h, id, d2quest.NPCOrmus, 594)
 		a.move(h, d2quest.LevelTravincal)
-		a.expect(h, "ENTERAREA bit, state 3", a.bit(h, id, d2quest.FlagEnterArea) && a.quest(h, id).State == 3)
+		a.expect(h, "the Council appeared: LEAVETOWN bit", a.bit(h, id, d2quest.FlagLeaveTown))
 
 		for i, c := range []int{d2quest.NPCCouncilA, d2quest.NPCCouncilB, d2quest.NPCCouncilC} {
 			a.kill(h, d2quest.Event{Monster: c})
-			a.expect(h, "council member killed", (i < 2) != a.bit(h, id, d2quest.FlagRewardPending))
+			a.expect(h, "council member killed", (i < 2) != a.bit(h, id, d2quest.FlagPrimaryGoal))
 		}
 
-		a.move(h, d2quest.LevelKurastDocktown)
-		a.says(h, "Cain's line", d2quest.NPCCain3, 626)
-		a.state(h, id, "reward claimed")
+		// the orb was smashed first (the Khalim stage runs before): done at once, no reward step (VERIFIED 0x5b97d0)
+		a.state(h, id, "council dead")
 		a.expect(h, "reward granted; the Guardian opened", a.bit(h, id, d2quest.FlagRewardGranted) &&
-			a.quest(h, d2quest.QuestGuardian).State >= 1)
+			!a.bit(h, id, d2quest.FlagRewardPending) && a.quest(h, d2quest.QuestGuardian).State >= 1)
 	})
 }
 

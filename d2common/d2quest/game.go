@@ -20,6 +20,7 @@ const (
 	FlagCustom2        = 6
 	FlagCustom3        = 7
 	FlagCustom4        = 8
+	FlagCustom5        = 9
 	FlagCustom6        = 10
 	FlagUpdateLog      = d2s.QuestBitClosed // 12
 	FlagPrimaryGoal    = d2s.QuestBitUpdated
@@ -62,6 +63,9 @@ type Event struct {
 	Level              int    // level where the monster died / the object was operated
 	Item               string // item code without padding ("hdm")
 	Object             int    // objects.txt row
+	// Wielded is the item code of the weapon in the hero's hand (the Compelling Orb wants Khalim's Will wielded,
+	// VERIFIED 0x5b9550: INV_GetSelectedWeapon, item code "qf2 ").
+	Wielded string
 }
 
 // EffectKind says what the engine has to do.
@@ -207,6 +211,10 @@ type Game struct {
 
 	denSpawned, denKilled int
 	denKnown              bool
+
+	// orbSmashed is the Compelling Orb of Travincal being broken (the Blackened Temple node's private byte +0xc in the
+	// exe; the Durance of Hate stairs are sealed without it). Restored on join from the Khalim's Will record bit 0.
+	orbSmashed bool
 
 	dialog *Dialog
 }

@@ -108,7 +108,7 @@ var chainAfter = map[int][]int{
 	QuestArcane:          {QuestSevenTombs},
 	QuestTaintedSun:      {QuestArcane},
 	QuestHoradricStaff:   {QuestArcane},
-	QuestBlade:           {QuestBlackenedTemple},
+	QuestGoldenBird:      {QuestKhalim, QuestBlade}, // VERIFIED shape: the Golden Bird's SeqCallback (D2MOO ACT3Q4_SeqCallback) kicks Khalim (16) and the Blade (17)
 	QuestBlackenedTemple: {QuestGuardian},
 	QuestRite:            {QuestEve},
 }

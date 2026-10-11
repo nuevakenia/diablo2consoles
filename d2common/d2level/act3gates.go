@@ -21,12 +21,11 @@ var ErrDuranceSealed = errors.New("warp: the stairs to the Durance of Hate are s
 // slotKhalim is the quest slot of Khalim's Will (act 3, quest 2 = quest id 16).
 var slotKhalim = mustSlot(3, 2)
 
-// OrbSmashed reports whether the Compelling Orb is broken. Smashing it with
-// Khalim's Will sets the primary-goal and reward-pending bits of the quest
-// (quest engine, quests-2.md); Cain's last line turns them into "done".
-// A nil record reports false.
+// OrbSmashed reports whether the Compelling Orb is broken. VERIFIED (Game.exe 0x5b9550): smashing it with
+// Khalim's Will sets bits 0 (done) and 0xd (primary goal) of the quest at once; there is no reward-pending
+// step. A nil record reports false.
 func OrbSmashed(q *d2s.QuestRecord) bool {
-	return q != nil && (q.Get(slotKhalim, d2s.QuestBitDone) || q.Get(slotKhalim, d2s.QuestBitRewardPending))
+	return q != nil && q.Get(slotKhalim, d2s.QuestBitDone)
 }
 
 // CheckActThreeWarp applies the Act 3 progression rules to a stair or warp
@@ -35,8 +34,7 @@ func OrbSmashed(q *d2s.QuestRecord) bool {
 // handler SERVER_EnterWarpTile (0x553140) calls 0x5b9b60, which refuses the warp
 // into level 100 while the Blackened Temple node (quest id 19, slot 21) has its
 // private byte +0xc clear and the player is not coming from level 101. That byte
-// is restored on join from slot 18 (Khalim's Will) bit 0 = done only, so a record
-// with just "reward pending" (OrbSmashed's second test) is a live-session state.
+// is restored on join from slot 18 (Khalim's Will) bit 0 = done only.
 func CheckActThreeWarp(from, to int, q *d2s.QuestRecord) error {
 	if from == LevelTravincal && to == LevelDurance1 && !OrbSmashed(q) {
 		return ErrDuranceSealed

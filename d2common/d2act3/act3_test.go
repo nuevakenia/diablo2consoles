@@ -42,11 +42,8 @@ func TestQuestObjectsGiveTheirItems(t *testing.T) {
 }
 
 func TestOrbNeedsTheWill(t *testing.T) {
-	none := func(string) bool { return false }
-	will := func(c string) bool { return c == d2quest.ItemKhalimWill }
-
-	if CanSmashOrb(none) || !CanSmashOrb(will) {
-		t.Fatal("the orb is smashed with Khalim's Will and nothing else")
+	if CanSmashOrb("") || CanSmashOrb("qf1") || !CanSmashOrb(d2quest.ItemKhalimWill) {
+		t.Fatal("the orb is smashed with Khalim's Will in the hand and nothing else")
 	}
 }
 

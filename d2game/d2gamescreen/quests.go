@@ -346,7 +346,7 @@ func (v *Game) questObjectOperated(ob *d2mapentity.Object) {
 
 	v.Infof("QUEST object operated id=%d name=%q", id, ob.Label())
 	v.syncQuestItems()
-	v.questDispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: id, Level: v.quests().area})
+	v.questDispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: id, Level: v.quests().area, Wielded: v.wieldedCode()})
 }
 
 // syncQuestItems raises the quest system's count of every quest item to what the inventory holds: items that

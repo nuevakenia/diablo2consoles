@@ -60,6 +60,17 @@ func (g *Game) TravelToAct3() []Effect {
 // TravelToAct4 is the hero stepping through Mephisto's portal to the
 // Pandemonium Fortress after The Guardian (UNVERIFIED word slot 23).
 func (g *Game) TravelToAct4() []Effect {
+	// QUESTS_HellPortalActChange (D2MOO Quests.cpp, the exe's 0x5449c0 destroys the Khalim items the same way): the
+	// first time the portal is taken an unfinished Khalim's Will completes itself and its items vanish.
+	if !g.Rec.Get(slotAct3Finished, FlagRewardGranted) {
+		if k := g.byID[QuestKhalim]; k != nil && !g.get(k, FlagRewardGranted) {
+			g.set(k, FlagRewardGranted, "the Hell portal completes Khalim's Will")
+			g.set(k, FlagPrimaryGoal, "the Hell portal completes Khalim's Will")
+			g.globalDone(k)
+			g.deleteKhalimItems(k)
+		}
+	}
+
 	g.finishAct(slotAct3Finished, act3Return)
 	g.emit(Effect{Kind: EffectUnlockAct, Value: 4})
 

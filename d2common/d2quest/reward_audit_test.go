@@ -76,6 +76,9 @@ type rewardCase struct {
 	// afterClaim is a grant that happens outside the claim (the Radament Book of Skill).
 	afterClaim func(g *Game) []Effect
 	afterWant  rewardTally
+	// instant marks a quest the exe pays and completes in one step: the claim sets the done bits and never leaves reward
+	// pending in the record (Lam Esen's Tome, VERIFIED 0x5b53e0 + 0x5b5220).
+	instant bool
 }
 
 func claimBy(npc int) func(g *Game) []Effect {
@@ -120,10 +123,12 @@ func rewardCases() []rewardCase {
 			afterWant:  rewardTally{"skill-points": 1},
 		},
 		{
-			name: "Lam Esen's Tome", id: QuestLamEsen, town: LevelKurastDocktown,
+			name: "Lam Esen's Tome", id: QuestLamEsen, town: LevelKurastDocktown, instant: true,
 			want: rewardTally{"stat-points": 5},
 			drive: func(g *Game) {
 				moveTo(g, 1, LevelKurastDocktown)
+				moveTo(g, LevelKurastDocktown, LevelLowerKurast)
+				moveTo(g, LevelLowerKurast, LevelKurastDocktown)
 				talk(g, NPCAlkor)
 				moveTo(g, LevelKurastDocktown, LevelRuinedTemple)
 				pickup(g, ItemLamEsenTome)
@@ -207,7 +212,7 @@ func TestRewardOnceAtClaim(t *testing.T) {
 			c.drive(g)
 
 			q := g.Quest(c.id)
-			if !g.get(q, FlagRewardPending) || g.get(q, FlagRewardGranted) {
+			if (!g.get(q, FlagRewardPending) && !c.instant) || g.get(q, FlagRewardGranted) {
 				t.Fatalf("before the claim: %s", g.Describe(q))
 			}
 
@@ -292,7 +297,7 @@ func TestRewardSurvivesDeathBeforeClaim(t *testing.T) {
 			g = newGameOn(&body, Normal)
 
 			q := g.Quest(c.id)
-			if !g.get(q, FlagRewardPending) {
+			if !g.get(q, FlagRewardPending) && !c.instant {
 				t.Fatalf("reward-pending lost on load: %s", g.Describe(q))
 			}
 

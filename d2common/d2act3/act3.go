@@ -96,9 +96,10 @@ func Object(id int) (QuestObject, bool) {
 // Objects lists all quest objects (for tests and logs).
 func Objects() []QuestObject { return append([]QuestObject(nil), questObjects...) }
 
-// CanSmashOrb says whether the Compelling Orb can be smashed: the hero must have Khalim's Will.
-// (The original wants the Will in the hand; the engine accepts it in the inventory. UNVERIFIED.)
-func CanSmashOrb(has func(code string) bool) bool { return has(d2quest.ItemKhalimWill) }
+// CanSmashOrb says whether the Compelling Orb reacts: the weapon in the hero's hand must be Khalim's Will.
+// VERIFIED (Game.exe 0x5b9550): INV_GetSelectedWeapon, item code "qf2 "; carrying it in the pack is not enough, and
+// the orb breaks on the second operation (the quest keeps the hit counter).
+func CanSmashOrb(wielded string) bool { return wielded == d2quest.ItemKhalimWill }
 
 // The three Council members of Travincal (SuperUniques.txt, Normal; Bremm Sparkfist, Wyand Voidfinger
 // and Maffer Dragonhand guard the Durance of Hate 3).

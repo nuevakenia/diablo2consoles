@@ -38,7 +38,7 @@ var actStageSlots = map[string][2][]int{
 	"khalim":    {{18}, nil},
 	"blade":     {{19}, nil},
 	"bird":      {{20}, nil},
-	"temple":    {{21}, {19}},
+	"temple":    {{21}, {19, 18}},
 	"guardian":  {{22}, {19, 21}},
 	"fallen":    {{25}, nil},
 	"terror":    {{26}, nil},

@@ -360,7 +360,14 @@ func TestAct3QuestLine(t *testing.T) {
 
 	moveTo(g, 1, LevelKurastDocktown)
 
-	// Lam Esen's Tome: 5 stat points
+	// Lam Esen's Tome: available after Lower Kurast was entered (VERIFIED 0x5b52c0), 5 stat points at Alkor's line
+	if msgs, _ := talk(g, NPCAlkor); len(msgs) != 0 {
+		t.Fatalf("Alkor before Lower Kurast: %v", msgs)
+	}
+
+	moveTo(g, LevelKurastDocktown, LevelLowerKurast)
+	moveTo(g, LevelLowerKurast, LevelKurastDocktown)
+
 	msgs, _ := talk(g, NPCAlkor)
 	if len(msgs) == 0 || msgs[0] != 549 || lam.State != 2 {
 		t.Fatalf("Alkor: %v %s", msgs, g.Describe(lam))
@@ -368,20 +375,20 @@ func TestAct3QuestLine(t *testing.T) {
 
 	moveTo(g, LevelKurastDocktown, LevelRuinedTemple)
 
-	if lam.State != 3 || !g.get(lam, FlagEnterArea) {
+	if lam.State != 3 {
 		t.Fatalf("temple %s", g.Describe(lam))
 	}
 
 	pickup(g, ItemLamEsenTome)
 
-	if !g.get(lam, FlagRewardPending) {
+	if lam.State != 4 || g.get(lam, FlagRewardPending) || g.get(lam, FlagRewardGranted) {
 		t.Fatalf("tome %s", g.Describe(lam))
 	}
 
 	moveTo(g, LevelRuinedTemple, LevelKurastDocktown)
 
 	msgs, eff := talk(g, NPCAlkor)
-	if len(msgs) != 1 || msgs[0] != 564 || !g.get(lam, FlagRewardGranted) {
+	if len(msgs) != 1 || msgs[0] != 564 || !g.get(lam, FlagRewardGranted) || g.get(lam, FlagRewardPending) {
 		t.Fatalf("Alkor reward: %v %s", msgs, g.Describe(lam))
 	}
 
@@ -389,7 +396,14 @@ func TestAct3QuestLine(t *testing.T) {
 		t.Errorf("effects %+v", eff)
 	}
 
-	// Khalim's Will
+	// Khalim's Will: Cain offers it after the Great Marsh was entered
+	if msgs, _ = talk(g, NPCCain3); len(msgs) != 0 {
+		t.Fatalf("Cain before the Great Marsh: %v", msgs)
+	}
+
+	moveTo(g, LevelKurastDocktown, LevelGreatMarsh)
+	moveTo(g, LevelGreatMarsh, LevelKurastDocktown)
+
 	msgs, _ = talk(g, NPCCain3)
 	if len(msgs) != 1 || msgs[0] != 543 || !g.get(khalim, FlagStarted) {
 		t.Fatalf("Cain: %v %s", msgs, g.Describe(khalim))
@@ -398,54 +412,95 @@ func TestAct3QuestLine(t *testing.T) {
 	for _, p := range []struct {
 		item string
 		msg  int
-	}{{ItemKhalimEye, 545}, {ItemKhalimHeart, 544}, {ItemKhalimBrain, 546}, {ItemKhalimWill, 547}} {
+		bit  int
+	}{{ItemKhalimEye, 545, FlagLeaveTown}, {ItemKhalimHeart, 544, FlagCustom2}, {ItemKhalimBrain, 546, FlagEnterArea},
+		{ItemKhalimFlail, 547, FlagCustom1}} {
 		pickup(g, p.item)
 
-		if msgs, _ = talk(g, NPCCain3); len(msgs) != 1 || msgs[0] != p.msg {
-			t.Fatalf("%s: %v", p.item, msgs)
+		if msgs, _ = talk(g, NPCCain3); len(msgs) != 1 || msgs[0] != p.msg || !bit(g, QuestKhalim, p.bit) {
+			t.Fatalf("%s: %v %s", p.item, msgs, g.Describe(khalim))
 		}
 	}
 
-	obj(g, ObjectCompellingOrb, LevelTravincal)
-
-	if !g.get(khalim, FlagRewardPending) {
-		t.Fatalf("orb %s", g.Describe(khalim))
+	// the cube makes the Will (the engine's cube): Cain tells the hero to smash the orb (548, CUSTOM3)
+	for _, c := range []string{ItemKhalimEye, ItemKhalimHeart, ItemKhalimBrain, ItemKhalimFlail} {
+		g.dropItem(c)
 	}
 
-	if msgs, _ = talk(g, NPCCain3); len(msgs) != 1 || msgs[0] != 548 || !g.get(khalim, FlagRewardGranted) {
+	pickup(g, ItemKhalimWill)
+
+	if msgs, _ = talk(g, NPCCain3); len(msgs) != 1 || msgs[0] != 548 || !bit(g, QuestKhalim, FlagCustom3) {
 		t.Fatalf("Cain 548: %v %s", msgs, g.Describe(khalim))
 	}
 
-	// The Blade of the Old Religion
+	// VERIFIED 0x5b9550: the Will must be wielded, the first hit does nothing, the second completes the quest at once
+	g.Dispatch(Event{Kind: EvObjectOperated, Object: ObjectCompellingOrb, Level: LevelTravincal})
+	g.Dispatch(Event{Kind: EvObjectOperated, Object: ObjectCompellingOrb, Level: LevelTravincal, Wielded: "ort"})
+	g.Dispatch(Event{Kind: EvObjectOperated, Object: ObjectCompellingOrb, Level: LevelTravincal, Wielded: ItemKhalimWill})
+
+	if g.OrbSmashed() || g.get(khalim, FlagRewardGranted) {
+		t.Fatalf("the first hit must do nothing: %s", g.Describe(khalim))
+	}
+
+	eff = g.Dispatch(Event{Kind: EvObjectOperated, Object: ObjectCompellingOrb, Level: LevelTravincal, Wielded: ItemKhalimWill})
+	if !g.OrbSmashed() || !g.get(khalim, FlagRewardGranted) || !g.get(khalim, FlagPrimaryGoal) || g.get(khalim, FlagRewardPending) ||
+		!effectCode(eff, EffectDeleteItem, ItemKhalimWill) {
+		t.Fatalf("orb %s %+v", g.Describe(khalim), eff)
+	}
+
+	// The Blade of the Old Religion: Hratli offers it once the Flayer Jungle was entered
+	talk(g, NPCHratli)
+
+	if blade.State != 0 {
+		t.Fatalf("blade before the Flayer Jungle %s", g.Describe(blade))
+	}
+
+	moveTo(g, LevelKurastDocktown, LevelFlayerJungle)
+	moveTo(g, LevelFlayerJungle, LevelKurastDocktown)
 	talk(g, NPCHratli)
 
 	if blade.State != 2 {
 		t.Fatalf("blade %s", g.Describe(blade))
 	}
 
-	moveTo(g, LevelKurastDocktown, LevelFlayerDungeon1)
+	moveTo(g, LevelKurastDocktown, LevelFlayerJungle)
+
+	if blade.State != 3 {
+		t.Fatalf("leaving the Docks %s", g.Describe(blade))
+	}
+
 	pickup(g, ItemGidbinn)
 
-	if blade.State != 4 {
+	if blade.State != 4 || !g.get(blade, bladeCarry) {
 		t.Fatalf("gidbinn %s", g.Describe(blade))
 	}
 
-	moveTo(g, LevelFlayerDungeon1, LevelKurastDocktown)
-	talk(g, NPCOrmus)
+	moveTo(g, LevelFlayerJungle, LevelKurastDocktown)
 
-	if blade.State != 5 || g.Items[ItemGidbinn] != 0 {
-		t.Fatalf("Ormus %s", g.Describe(blade))
+	// Ormus takes the blade (587) and offers the ring at once (593); Asheara's wolves (589) may come before or after
+	if msgs, eff = talk(g, NPCOrmus); !contains2(msgs, 587) || !contains2(msgs, 593) || g.Items[ItemGidbinn] != 0 {
+		t.Fatalf("Ormus %v %s", msgs, g.Describe(blade))
 	}
 
-	talk(g, NPCAsheara)
+	var ring *Effect
 
-	if !g.get(blade, FlagRewardPending) {
-		t.Fatalf("Asheara %s", g.Describe(blade))
+	for i := range eff {
+		if eff[i].Kind == EffectGiveItem && eff[i].Code == ItemReward {
+			ring = &eff[i]
+		}
 	}
 
-	_, eff = talk(g, NPCOrmus)
+	if ring == nil || ring.Quality != 2 || ring.Value != 21 {
+		t.Fatalf("Ormus's ring (rare, item level 21 in Normal): %+v", eff)
+	}
+
+	if g.get(blade, FlagRewardGranted) {
+		t.Fatalf("the Blade needs the wolves too: %s", g.Describe(blade))
+	}
+
+	_, eff = talk(g, NPCAsheara)
 	if !g.get(blade, FlagRewardGranted) || !effectCode(eff, EffectReward, "hire-ironwolves") {
-		t.Fatalf("Ormus reward %s %+v", g.Describe(blade), eff)
+		t.Fatalf("Asheara %s %+v", g.Describe(blade), eff)
 	}
 
 	// The Golden Bird starts with the figurine
@@ -471,9 +526,16 @@ func TestAct3QuestLine(t *testing.T) {
 		t.Fatalf("potion %+v", eff)
 	}
 
-	// Blackened Temple (opened by the Blade) and the Guardian
-	if temple.State < 1 || guardian.State != 0 {
+	// The Blackened Temple: Ormus offers it once the Kurast Causeway was entered; it has no reward step
+	if temple.State != 0 || guardian.State != 0 {
 		t.Fatalf("chain %d %d", temple.State, guardian.State)
+	}
+
+	moveTo(g, LevelKurastDocktown, LevelKurastCauseway)
+	moveTo(g, LevelKurastCauseway, LevelKurastDocktown)
+
+	if temple.State != 1 {
+		t.Fatalf("temple not offered: %s", g.Describe(temple))
 	}
 
 	talk(g, NPCOrmus)
@@ -483,21 +545,15 @@ func TestAct3QuestLine(t *testing.T) {
 		kill(g, c, LevelTravincal)
 	}
 
-	if g.get(temple, FlagRewardPending) {
+	if g.get(temple, FlagPrimaryGoal) {
 		t.Fatal("goal before the third council member")
 	}
 
 	kill(g, NPCCouncilC, LevelTravincal)
 
-	if !g.get(temple, FlagRewardPending) {
-		t.Fatalf("council %s", g.Describe(temple))
-	}
-
-	moveTo(g, LevelTravincal, LevelKurastDocktown)
-	talk(g, NPCCain3)
-
-	if !g.get(temple, FlagRewardGranted) || guardian.State != 1 {
-		t.Fatalf("temple done %s; guardian %d", g.Describe(temple), guardian.State)
+	// the orb is already smashed: the quest is done at once, no reward pending (VERIFIED 0x5b97d0 + D2MOO)
+	if !g.get(temple, FlagRewardGranted) || g.get(temple, FlagRewardPending) || guardian.State != 1 {
+		t.Fatalf("council %s; guardian %d", g.Describe(temple), guardian.State)
 	}
 
 	talk(g, NPCOrmus)
