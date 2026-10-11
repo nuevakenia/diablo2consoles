@@ -165,7 +165,10 @@ type Bank struct {
 	sfxVol   float64
 	musicVol float64
 	duck     int
-	lastTick int64
+	// panelDuck (0..100) is the game-menu duck of DAT_0072658c; panelOpen is the target.
+	panelDuck int
+	panelOpen bool
+	lastTick  int64
 
 	// OnReport, if set, receives every notable decision.
 	OnReport func(Report)
@@ -178,7 +181,7 @@ func NewBank(t *Table, n int, load Loader, clock Clock, rnd func(int) int) *Bank
 	}
 
 	return &Bank{table: t, load: load, clock: clock, rnd: rnd, voices: make([]*Instance, n),
-		history: map[int][2]int{}, sfxVol: 1, musicVol: 1, duck: duckMax, lastTick: -1}
+		history: map[int][2]int{}, sfxVol: 1, musicVol: 1, duck: duckMax, panelDuck: duckMax, lastTick: -1}
 }
 
 // Table returns the bank's sound table.
@@ -459,6 +462,7 @@ func (b *Bank) process(now int64) {
 
 	if now != b.lastTick { // ducking moves once per tick (shape verified: +/-2 within 70..100)
 		b.lastTick = now
+		b.panelDuck = PanelDuckStep(b.panelDuck, b.panelOpen)
 
 		if solo {
 			b.duck -= soloDuckStep
@@ -720,16 +724,22 @@ func (b *Bank) Mix(q *Instance) (vol, pan float64) {
 	}
 
 	level = level * percent(b.sfxVol) / 100
+
+	// 4. panel duck, 5. solo duck: integer math like the original (0x4dcb30)
+	if !PanelDuckExempt(row.Index) {
+		level = level * b.panelDuck / duckMax
+	}
+
+	if !row.Solo {
+		level = level * b.duck / duckMax
+	}
+
 	vol = float64(level) / 255
 
 	// A per-request volume (MonSounds weapon volume) is not a parameter of the
 	// original request function (unverified where it applies); kept as a 0..255 scale.
 	if q.req.Volume > 0 {
 		vol *= float64(q.req.Volume) / 255
-	}
-
-	if !row.Solo {
-		vol *= float64(b.duck) / duckMax
 	}
 
 	if q.req.HasPos {
@@ -745,6 +755,13 @@ func (b *Bank) Mix(q *Instance) (vol, pan float64) {
 
 	return vol, pan
 }
+
+// SetPanelOpen tells the bank that the game menu or the key configuration
+// panel is open: everything but speech and UI sounds ducks (see PanelDuckStep).
+func (b *Bank) SetPanelOpen(open bool) { b.panelOpen = open }
+
+// PanelDuck returns the current panel duck factor, 0..100.
+func (b *Bank) PanelDuck() int { return b.panelDuck }
 
 // percent converts a 0..1 master volume to the original's whole 0..100 scale.
 func percent(v float64) int {

@@ -212,6 +212,13 @@ func (s *SoundEngine) syncVolumes() {
 	}
 }
 
+// MusicEnabled says whether level music may play: neither the music nor the
+// sound volume is 0 (VERIFIED for music, see StepMusic for the other flag).
+// Before the first volume sync both count as on.
+func (s *SoundEngine) MusicEnabled() bool {
+	return !s.volSet || (s.bgmVol > 0 && s.sfxVol > 0)
+}
+
 // mutePlayer stands in for audio under OD2_AUTOTEST_MUTE: it occupies a voice
 // like a real player (one-shots end after one second) but makes no sound.
 type mutePlayer struct {
@@ -298,6 +305,10 @@ func (s *SoundEngine) Advance(elapsed float64) {
 func (s *SoundEngine) UnbindTerminalCommands(term d2interface.Terminal) error {
 	return term.Unbind("playsoundid", "playsound", "activesounds", "killsounds")
 }
+
+// SetPanelOpen tells the engine whether the game menu (or key configuration
+// panel) is open, which ducks ordinary sounds (see d2sfx.PanelDuckStep).
+func (s *SoundEngine) SetPanelOpen(open bool) { s.Bank().SetPanelOpen(open) }
 
 // Reset stop all sounds and reset state
 func (s *SoundEngine) Reset() {
