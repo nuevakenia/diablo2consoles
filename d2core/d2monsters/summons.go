@@ -400,7 +400,7 @@ func (d *Director) FBXScan(b *d2monster.Brain, q d2monster.FBXScanQuery) d2monst
 	case d2monster.FBXScanKnightAlly:
 		return d.scanKnightAlly(b)
 	case d2monster.FBXScanOverseer:
-		return d.scanOverseer(b)
+		return d.scanOverseer(b, q)
 	case d2monster.FBXScanPriestAlly:
 		return d.scanPriestAlly(b, q.Radius2)
 	}

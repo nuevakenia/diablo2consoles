@@ -857,8 +857,8 @@ type FBXOverseerHost interface {
 // thinkOverseerB is MONAI_Think_Overseer 0x5e1640 (VERIFIED flow; batch 8
 // decoded the scan callback 0x5e1570: friendly living monsters of base class
 // 0x1c5 not in state 0x8d; T the first below 50 percent life within squared
-// distance 576, T2 the first within 400, Count all that pass; the query's
-// Radius2 is not used). aip1 skill1 cool-down, aip2 skill2 %, aip3 skill3 %, aip4/aip5
+// distance 576, T2 the first within 400, Count all that pass; the radii and
+// the 50 percent bound travel in the query). aip1 skill1 cool-down, aip2 skill2 %, aip3 skill3 %, aip4/aip5
 // preferred distance and slack, aip6 melee %, aip7 A1/A2 split. Scratch[0] is
 // the skill1 ready frame.
 func thinkOverseerB(c *Ctx) {
@@ -894,7 +894,7 @@ func thinkOverseerB(c *Ctx) {
 		return
 	}
 
-	r := fbxScan(c, FBXScanQuery{Kind: FBXScanOverseer, Radius2: 50})
+	r := fbxScan(c, FBXScanQuery{Kind: FBXScanOverseer, LifeBelow: 50, AllyRadius2: 576, EnemyRadius2: 400})
 
 	if fbxSkill(b, 1) && r.Found && b.Roll(100) < b.AIP(2) && fbxHasSkill(c, r.T, 1) {
 		c.Cast(1, r.T)

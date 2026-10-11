@@ -526,7 +526,18 @@ func thinkNihlathak(c *Ctx) {
 	}
 
 	if sk[1].Used() && b.Roll(100) < b.AIP(4) {
-		if sc, ok := c.W.(FB1Scanner); ok {
+		// batch 8: callback 0x5e1570 with the block (0, 625, 50): the result the
+		// think function reads is the "enemy" slot - the first friendly living
+		// unit of base class 0x1c5 within squared distance 625 - not a wounded
+		// ally. The FB1Scanner reading is kept only for worlds without the scan.
+		if _, has := c.W.(FBXScanner); has {
+			if r := fbxScan(c, FBXScanQuery{Kind: FBXScanOverseer, LifeBelow: 50, AllyRadius2: 0,
+				EnemyRadius2: 625}); r.Found2 {
+				c.Cast(1, r.T2)
+
+				return
+			}
+		} else if sc, ok := c.W.(FB1Scanner); ok {
 			if ally, found := sc.ScanWounded(b, 625, 50); found {
 				c.Cast(1, ally)
 
@@ -593,8 +604,8 @@ func nihOffset(c *Ctx, slot int) {
 // until which the cast cooldown lasts (calc/3+18), Scratch[2] the skill level
 // the Pre-hook 0x5ea4f0 stores (>=1; the Pre-hook's skill copy is the host's).
 // The skill record work (levels, copies, animation type) is FB1ShadowBook.Copy.
-// UNVERIFIED: the aip8 cap reads the Hell column of the exe at a fixed
-// offset; the port uses the current difficulty's column.
+// The aip8 cap reads the Hell column at the fixed offset +0x84 (VERIFIED in
+// batch 8).
 func thinkShadowWarrior(c *Ctx) {
 	b := c.B
 
@@ -612,7 +623,9 @@ func thinkShadowWarrior(c *Ctx) {
 		return
 	}
 
-	limit := b.AIP(8)
+	// batch 8: the exe reads the word at monstats +0x84, which is the aip8
+	// Hell column whatever the game difficulty (VERIFIED from the offset).
+	limit := shadowWord(b, 8, 2)
 	if limit < 1 {
 		limit = 1
 	} else if limit > 256 {

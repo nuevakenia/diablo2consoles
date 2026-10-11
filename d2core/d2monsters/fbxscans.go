@@ -88,11 +88,11 @@ func (d *Director) scanKnightAlly(b *d2monster.Brain) d2monster.FBXScanResult {
 }
 
 // scanOverseer is callback 0x5e1570: friendly living monsters of base class
-// 0x1c5 not in state 0x8d. Count is how many pass; the first one below 50
-// percent life within squared distance 576 is T ("ally"), the first within
-// squared distance 400 is T2 ("enemy", the exe also skips units whose monster
-// data flag 8 is set; that flag is not decoded).
-func (d *Director) scanOverseer(b *d2monster.Brain) d2monster.FBXScanResult {
+// 0x1c5 not in state 0x8d. Count is how many pass; the first one below
+// LifeBelow percent life within squared distance AllyRadius2 is T ("ally"), the
+// first within squared distance EnemyRadius2 is T2 ("enemy", the exe also skips
+// units whose monster data flag 8 is set; that flag is not decoded).
+func (d *Director) scanOverseer(b *d2monster.Brain, q d2monster.FBXScanQuery) d2monster.FBXScanResult {
 	var res d2monster.FBXScanResult
 
 	for _, u := range d.sortedUnits() {
@@ -105,11 +105,11 @@ func (d *Director) scanOverseer(b *d2monster.Brain) d2monster.FBXScanResult {
 		dx, dy := b.X-u.b.X, b.Y-u.b.Y
 		dd := dx*dx + dy*dy
 
-		if !res.Found && dd <= 576 && u.b.HPPercent < 50 {
+		if !res.Found && dd <= q.AllyRadius2 && u.b.HPPercent < q.LifeBelow {
 			res.Found, res.T = true, targetOf(u)
 		}
 
-		if !res.Found2 && dd <= 400 {
+		if !res.Found2 && dd <= q.EnemyRadius2 {
 			res.Found2, res.T2 = true, targetOf(u)
 		}
 	}
@@ -117,13 +117,13 @@ func (d *Director) scanOverseer(b *d2monster.Brain) d2monster.FBXScanResult {
 	return res
 }
 
-// scanPriestAlly is MONAI_ZakarumPriest_AllyFilter: living same-side monsters
-// of base class 0xeb or 0xee within the squared radius and below 61 percent
-// life; the lowest percent wins and Count counts them.
+// scanPriestAlly is MONAI_ZakarumPriest_AllyFilter (0x5f62c0): living same-side
+// monsters of base class 0xeb or 0xee within the squared radius and below 61
+// percent life, counted. The exe never stores the best percent it compares
+// against (the word stays 0x7fffffff), so every qualifying unit overwrites the
+// result: the LAST one visited wins, not the weakest.
 func (d *Director) scanPriestAlly(b *d2monster.Brain, radius2 int) d2monster.FBXScanResult {
 	var res d2monster.FBXScanResult
-
-	best := 61
 
 	for _, u := range d.sortedUnits() {
 		if !d.scanSide(b, u) || !livingMode(u) || !(d.inClassFamily(u, priestAllyA) || d.inClassFamily(u, priestAllyB)) {
@@ -136,10 +136,7 @@ func (d *Director) scanPriestAlly(b *d2monster.Brain, radius2 int) d2monster.FBX
 		}
 
 		res.Count++
-
-		if u.b.HPPercent < best {
-			best, res.Found, res.T = u.b.HPPercent, true, targetOf(u)
-		}
+		res.Found, res.T = true, targetOf(u)
 	}
 
 	return res

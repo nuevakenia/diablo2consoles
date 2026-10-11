@@ -34,7 +34,8 @@ const (
 	// FBXScanPriestAlly is MONAI_ZakarumPriest_AllyFilter (VERIFIED filter): a
 	// living monster of classes 0xEB or 0xEE (the priest's zealot allies) that
 	// is allied to the caster, within the squared radius, below 61 percent
-	// life; the one with the lowest life percent wins and Count counts all.
+	// life; Count counts all and the last unit visited is the result (the exe
+	// never updates the best percent it compares with; batch 8).
 	FBXScanPriestAlly
 	// FBXScanLinkedClass counts the units of Query.Class (a class linked to
 	// the caster by the spawn chain) within radius 25 in mode DD (0xc), the
@@ -51,8 +52,13 @@ type FBXScanQuery struct {
 	Kind    FBXScanKind
 	Radius2 int // squared radius when the filter has one
 	Class   int // monster class for FBXScanLinkedClass
-	// LifeBelow is the life percent bound of FBXScanWoundedAlly.
+	// LifeBelow is the life percent bound of FBXScanWoundedAlly and of the
+	// ally slot of FBXScanOverseer.
 	LifeBelow int
+	// AllyRadius2 and EnemyRadius2 are the two squared radii of
+	// FBXScanOverseer (callback 0x5e1570, argument block words 0 and 1): the
+	// Overseer passes 576 and 400, Nihlathak 0 and 625.
+	AllyRadius2, EnemyRadius2 int
 }
 
 // FBXScanResult is what a scan found.

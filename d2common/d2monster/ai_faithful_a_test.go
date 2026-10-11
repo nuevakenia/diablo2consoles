@@ -240,7 +240,7 @@ func TestFaithfulAActions(t *testing.T) {
 			pre: func(b *Brain, _ *faWorld) { b.Scratch[0] = 7 }},
 		{name: "gargoyle stalls aip4", ai: "GargoyleTrap", skills: []int{0}, aip: []int{20, 0, 7, 3}, dist: 6, wake: 3},
 		{name: "frozen horror casts", ai: "FrozenHorror", skills: []int{0}, aip: []int{0, 0, 100, 5}, dist: 6, log: "cast0",
-			pre: func(b *Brain, _ *faWorld) { b.Profile.Skills[0].Level = 3 }},
+			pre: func(b *Brain, _ *faWorld) { b.Profile.Skills[0].Level = 8 }},
 		{name: "frozen horror drops its aura and attacks", ai: "FrozenHorror", aip: []int{100, 0, 0, 5}, dist: 1, inRange: true, log: "attack4",
 			pre: func(b *Brain, w *faWorld) { w.states[0xc] = true },
 			check: func(t *testing.T, b *Brain, w *faWorld) {
