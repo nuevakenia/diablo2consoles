@@ -699,6 +699,20 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 	desc.DamagePct = int32(u.Stat("damagepercent") + missileMastery(u, sk))
 	desc.Crit = missileCrit(u, sk, ms)
 
+	// Hit function 13 (Glacial Spike, 0x5a8360, read): the elemental length of
+	// its damage struct is sHitPar2 when > 0, else auralencalc (record +0x60),
+	// not the skill's ELen columns; the radius is sHitPar1 else aurarangecalc
+	// (+0x64) (see areaRadius below). The 0x5a6930 mapping of that length onto
+	// the cold chill/freeze fields is UNVERIFIED.
+	if ms.SrvHitFunc == 13 {
+		l := ms.SHitPar[1]
+		if l < 1 {
+			l = env.eval(sk.AuraLenCalc)
+		}
+
+		desc.Cold.Len = int32(l)
+	}
+
 	x, y := u.Pos()
 	sx, sy := float64(x)+0.5, float64(y)+0.5
 
@@ -722,19 +736,13 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 		switch ms.SrvHitFunc {
 		case 1:
 			areaRadius = env.eval(sk.Calc[1])
-		case 3, 12, 14, 20, 22, 36, 47, 56:
+		case 3, 12, 13, 14, 20, 22, 36, 47, 56:
 			// hit function 12 (Chain Lightning, 0x5a81c0), 20 (Lightning Fury,
 			// 0x5a8e60) and 22 (Fist of the Heavens, 0x5ab7f0) take their scan
-			// radius from aurarangecalc (verified)
+			// radius from aurarangecalc (verified); so does 13 (Glacial Spike,
+			// 0x5a8360: sHitPar1 else aurarangecalc, verified)
 			areaRadius = env.eval(sk.AuraRangeCalc)
 		}
-	}
-
-	// STAND-IN: hit function 13 (Glacial Spike) splash radius = Param1 +
-	// Param2*(lvl-1) subtiles, the skills.txt "radius" / "radius per level"
-	// columns; the exe body (0x5a8360) was not read.
-	if ms.SHitPar[0] < 1 && ms.SrvHitFunc == 13 {
-		areaRadius = sk.Params[1] + sk.Params[2]*(lvl-1)
 	}
 
 	furyCount := 0
