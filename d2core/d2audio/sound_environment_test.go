@@ -382,3 +382,21 @@ func TestMusicWaitsForSwapDelayAndStopsWhenDisabled(t *testing.T) {
 		t.Fatalf("music did not resume: %v", sink.loops)
 	}
 }
+
+// The game calls SetEnv with the current environment every frame; that must not restart the music swap delay.
+func TestRepeatedSetEnvDoesNotRestartMusicSwapClock(t *testing.T) {
+	sink := &fakeSink{}
+	e := newTestEnv(sink)
+
+	e.SetEnv(2)
+	e.SetEnv(5)
+
+	for i := 0; i < 100; i++ { // 4 s of frames, SetEnv every frame
+		e.Advance(0.04)
+		e.SetEnv(5)
+	}
+
+	if sink.loops[len(sink.loops)-1] != 4673 {
+		t.Fatalf("town song never started while SetEnv repeated: %v", sink.loops)
+	}
+}

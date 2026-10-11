@@ -227,12 +227,12 @@ func (s *SoundEnvironment) SetEnv(environmentIdx int) {
 		return
 	}
 
-	s.levelChangeAt = s.ticks
-
+	// the game re-sends the current environment every frame: only a real change restarts the swap clock
 	if s.started && s.environment.Index == environmentIdx {
 		return
 	}
 
+	s.levelChangeAt = s.ticks
 	s.environment = newEnv
 	s.apply("env change")
 }
