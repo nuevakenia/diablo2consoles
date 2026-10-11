@@ -5,6 +5,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 )
 
 // corpseTargetBase offsets the target ids of corpses a shaman can raise. It is
@@ -148,4 +149,54 @@ func (d *Director) WispFormation(b *d2monster.Brain) []d2monster.WispMate {
 	}
 
 	return out
+}
+
+// ShamanCorpseScan implements d2monster.ShamanCorpseScanner (w20, Fallen Shaman
+// scan 0x5f04d0). See the interface for the two exe modes. Not modelled: the
+// state masks 0x150 / 0xd4 and the unit flag bit 1 (unit flag word undecoded);
+// a present corpse stands for them.
+func (d *Director) ShamanCorpseScan(b *d2monster.Brain, radiusSq int) (d2monster.Target, int) {
+	me := d.unitOf(b)
+	if me == nil {
+		return d2monster.Target{}, 0
+	}
+
+	const unique, champion = d2mapentity.MonTypeUnique, d2mapentity.MonTypeChampion
+
+	family := me.m.TypeFlags&unique != 0 && me.m.TypeFlags&champion == 0
+
+	var (
+		last d2monster.Target
+		n    int
+	)
+
+	for _, u := range d.sortedUnits() {
+		if u.b == b || u.merc != nil || u.ally != nil || u.mirror || u.raising || u.m.Alive() {
+			continue
+		}
+
+		if u.b.Mode != d2monster.ModeDead && u.m.CorpseAge() < 1 {
+			continue
+		}
+
+		x, y := u.m.SubtilePos()
+		dx, dy := b.X-x, b.Y-y
+
+		if family {
+			k := strings.ToLower(u.m.Stat.BaseKey)
+			if k != d.baseKeyOfClass(19) && k != d.baseKeyOfClass(58) {
+				continue
+			}
+
+			if u.m.TypeFlags&(unique|champion) != 0 || dx*dx+dy*dy > radiusSq {
+				continue
+			}
+		} else if u.b.Leader != b || d2monster.EdgeDistance(dx, dy, b.Size) > radiusSq {
+			continue
+		}
+
+		last, n = d2monster.Target{ID: corpseTargetBase + u.b.ID, X: x, Y: y, Size: 1}, n+1
+	}
+
+	return last, n
 }
