@@ -4,7 +4,7 @@ package d2hireling
 const maxSkillLevel = 32
 
 // SkillLevel is the level of skill slot i at merc level mlvl:
-// clamp(LevelN + (LvlPerLvlN*d >> 5), 1..32) with d = mlvl - row.Level
+// LevelN + (LvlPerLvlN*d >> 5), capped at 32; below 1 the merc does not have the skill (0) with d = mlvl - row.Level
 // (V formula; the grouping was checked against the table: rogue Fire Arrow
 // Level 1 at row level 3 and 7 at row level 25 with LvlPerLvl 10).
 func (r *Record) SkillLevel(i, mlvl int) int {
@@ -13,7 +13,7 @@ func (r *Record) SkillLevel(i, mlvl int) int {
 	l := s.Level + (s.LvlPerLvl*d)>>5
 
 	if l < 1 {
-		l = 1
+		l = 0 // V (0x570690): a computed level below 1 means the skill is not added at all
 	}
 
 	if l > maxSkillLevel {
@@ -74,6 +74,10 @@ func (r *Record) ChooseSkill(mlvl int, env SkillEnv, roll func(n int) int) Choic
 		}
 
 		lvl := r.SkillLevel(i, mlvl)
+		if lvl < 1 {
+			continue // V: not in the unit's skill list
+		}
+
 		if env.StateActive != nil && env.StateActive(s.Name) {
 			continue
 		}

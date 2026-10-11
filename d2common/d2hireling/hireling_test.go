@@ -267,3 +267,28 @@ func TestChooseSkill(t *testing.T) {
 		t.Errorf("SkillLevel = %d", got)
 	}
 }
+
+func TestSkillLevelBelowOneIsAbsent(t *testing.T) {
+	r := &Record{Level: 10}
+	r.Skills[0] = SkillSlot{Name: "x", Level: 0, LvlPerLvl: 0, Chance: 10}
+
+	if got := r.SkillLevel(0, 20); got != 0 {
+		t.Errorf("level = %d, want 0 (skill not added)", got)
+	}
+
+	c := r.ChooseSkill(20, SkillEnv{}, func(n int) int { return n - 1 })
+	if !c.Default {
+		t.Errorf("an absent skill was chosen: %+v", c)
+	}
+
+	r.Skills[0].Level = 40
+	if got := r.SkillLevel(0, 20); got != 32 {
+		t.Errorf("cap = %d, want 32", got)
+	}
+}
+
+func TestLifeRegenStat(t *testing.T) {
+	if LifeRegenStat(1000) != 128 || LifeRegenStat(-5) != 0 {
+		t.Error("LifeRegenStat")
+	}
+}
