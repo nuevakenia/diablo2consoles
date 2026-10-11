@@ -27,8 +27,9 @@ func TestCheckActThreeWarp(t *testing.T) {
 		{"sealed without a record", LevelTravincal, LevelDurance1, nil, ErrDuranceSealed},
 		{"sealed with a fresh record", LevelTravincal, LevelDurance1, &d2s.QuestRecord{}, ErrDuranceSealed},
 		{"sealed when only the goal bit is set", LevelTravincal, LevelDurance1, with(slotKhalim, d2s.QuestBitProgressFirst), ErrDuranceSealed},
-		{"open after the orb (reward pending)", LevelTravincal, LevelDurance1, with(slotKhalim, d2s.QuestBitRewardPending), nil},
-		{"open after Cain's last line (done)", LevelTravincal, LevelDurance1, with(slotKhalim, d2s.QuestBitDone), nil},
+		// VERIFIED 0x5b9550 / 0x5b9b60: only bit 0 of the Khalim slot opens the stairs; the smash sets it at once
+		{"sealed with reward pending only", LevelTravincal, LevelDurance1, with(slotKhalim, d2s.QuestBitRewardPending), ErrDuranceSealed},
+		{"open after the orb (done)", LevelTravincal, LevelDurance1, with(slotKhalim, d2s.QuestBitDone), nil},
 		{"back up is never gated", LevelDurance1, LevelTravincal, nil, nil},
 		{"durance 1 to 2", LevelDurance1, LevelDurance2, nil, nil},
 		{"durance 2 to 3 (lair)", LevelDurance2, LevelDurance3, nil, nil},

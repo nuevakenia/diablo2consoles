@@ -38,7 +38,7 @@ var actStageSlots = map[string][2][]int{
 	"khalim":    {{18}, nil},
 	"blade":     {{19}, nil},
 	"bird":      {{20}, nil},
-	"temple":    {{21}, {19}},
+	"temple":    {{21}, {19, 18}},
 	"guardian":  {{22}, {19, 21}},
 	"fallen":    {{25}, nil},
 	"terror":    {{26}, nil},
@@ -148,21 +148,15 @@ func (a *autoQuest) addActStage(name string) {
 	case "hellforge":
 		a.stageHellforge()
 	case "siege":
-		a.stageSimple(d2quest.QuestSiege, d2quest.LevelHarrogath, d2quest.NPCLarzuk, 20077, d2quest.LevelBloodyFoothills,
-			[]d2quest.Event{{Monster: 999, Super: "Shenk the Overseer"}}, d2quest.NPCLarzuk, "socket-quest")
+		a.stageSiege()
 	case "rescue":
-		a.stageSimple(d2quest.QuestRescue, d2quest.LevelHarrogath, d2quest.NPCQualKehk, 20096, d2quest.LevelFrigidHighlands,
-			[]d2quest.Event{{Monster: d2quest.NPCPrisonDoor}, {Monster: d2quest.NPCPrisonDoor}, {Monster: d2quest.NPCPrisonDoor}},
-			d2quest.NPCQualKehk, "hire-barbarians")
+		a.stageRescue()
 	case "prison":
 		a.stagePrison()
 	case "betrayal":
-		a.stageSimple(d2quest.QuestBetrayal, d2quest.LevelHarrogath, d2quest.NPCDrehya, 20137, d2quest.LevelNihlathakTemple,
-			[]d2quest.Event{{Monster: d2quest.NPCNihlathakBoss}}, d2quest.NPCDrehya, "personalize")
+		a.stageBetrayal()
 	case "rite":
-		a.stageSimple(d2quest.QuestRite, d2quest.LevelHarrogath, d2quest.NPCQualKehk, 20153, d2quest.LevelArreatSummit,
-			[]d2quest.Event{{Monster: d2quest.NPCAncient1}, {Monster: d2quest.NPCAncient2}, {Monster: d2quest.NPCAncient3}},
-			d2quest.NPCMalah, "")
+		a.stageRite()
 	case "eve":
 		a.stageEve()
 	}

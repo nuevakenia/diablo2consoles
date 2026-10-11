@@ -53,7 +53,8 @@ func TestLaterQuestObjectsAreQuestObjects(t *testing.T) {
 	}
 }
 
-// Lam Esen's Tome: operating the tome object on the altar of the Ruined Temple gives the item; picking it up is the goal.
+// Lam Esen's Tome: operating the tome object on the altar of the Ruined Temple gives the item; picking it up moves the
+// quest to state 4 (the hand-over to Alkor). VERIFIED 0x5b53e0: the goal and the reward come only with Alkor's line.
 func TestLamEsenTomeObjectGivesTheItem(t *testing.T) {
 	g, _ := newGame(t)
 	q := g.Quest(QuestLamEsen)
@@ -65,7 +66,7 @@ func TestLamEsenTomeObjectGivesTheItem(t *testing.T) {
 
 	pickup(g, ItemLamEsenTome)
 
-	if !g.get(q, FlagPrimaryGoal) {
-		t.Errorf("taking the tome is not the goal: %s", g.Describe(q))
+	if q.State != 4 || g.get(q, FlagPrimaryGoal) || g.get(q, FlagRewardPending) || g.get(q, FlagRewardGranted) {
+		t.Errorf("taking the tome must only reach state 4: %s", g.Describe(q))
 	}
 }

@@ -67,6 +67,9 @@ type spec struct {
 	steps                   []step
 	trigs                   []trig
 	claimMsgs               []int // messages that claim the reward (none: every spoken line of the rp table)
+	holdBit                 int   // bit set by the held claim line (default CUSTOM1)
+	holdKeep                bool  // the held claim line keeps the progress bits (default: they are cleared)
+	hold                    bool  // the claim line does not complete the quest: the reward stays pending until an NPC action (Larzuk's sockets, Anya's personalisation)
 	claimFx                 func(g *Game, q *Quest) []Effect
 	noLeaveRule             bool // do not turn "left town in state 2" into state 3
 	tableFn                 func(g *Game, q *Quest, def int) int
@@ -108,7 +111,7 @@ var chainAfter = map[int][]int{
 	QuestArcane:          {QuestSevenTombs},
 	QuestTaintedSun:      {QuestArcane},
 	QuestHoradricStaff:   {QuestArcane},
-	QuestBlade:           {QuestBlackenedTemple},
+	QuestGoldenBird:      {QuestKhalim, QuestBlade}, // VERIFIED shape: the Golden Bird's SeqCallback (D2MOO ACT3Q4_SeqCallback) kicks Khalim (16) and the Blade (17)
 	QuestBlackenedTemple: {QuestGuardian},
 	QuestRite:            {QuestEve},
 }
@@ -188,6 +191,83 @@ func (g *Game) claimReward(q *Quest, s *spec) {
 	q.LastState = 13
 	g.emit(Effect{Kind: EffectLogUpdate, Quest: q.ID, Value: 13})
 	g.chainFrom(q)
+}
+
+// holdClaim is the thanks line of a quest whose reward is an NPC action on an item (VERIFIED 0x584d60, Larzuk's
+// message 20090): the progress bits are cleared, bit 5 is set and the quest moves on (the next quest opens), but the
+// record keeps "reward pending" until the NPC acts on an item (ClaimSocket, ClaimPersonalize).
+func (g *Game) holdClaim(q *Quest, s *spec) {
+	if !s.holdKeep {
+		g.resetProgress(q, "thanks heard, the NPC action is still owed")
+	}
+
+	g.set(q, s.heldBit(), "thanks heard")
+
+	if g.get(q, FlagPrimaryGoal) && q.State != s.goal+1 {
+		g.setState(q, s.goal+1)
+	}
+
+	if d, ok := q.data.(*genData); ok {
+		d.rewarded = true
+	}
+
+	q.LastState = 13
+	g.emit(Effect{Kind: EffectLogUpdate, Quest: q.ID, Value: 13})
+	g.chainFrom(q)
+}
+
+// heldBit is the record bit that marks the held thanks line as heard.
+func (s *spec) heldBit() int {
+	if s.holdBit == 0 {
+		return FlagCustom1
+	}
+
+	return s.holdBit
+}
+
+// claimNpcAction completes a held reward after the NPC acted on an item.
+func (g *Game) claimNpcAction(id int, why string) []Effect {
+	q := g.byID[id]
+	if q == nil || !g.get(q, FlagRewardPending) || g.get(q, FlagRewardGranted) {
+		return nil
+	}
+
+	g.set(q, FlagRewardGranted, why)
+	g.clear(q, FlagRewardPending, why)
+
+	if d, ok := q.data.(*genData); ok {
+		d.rewarded = true
+	}
+
+	g.globalDone(q)
+	g.chainFrom(q)
+
+	return g.TakeEffects()
+}
+
+// SocketOwed reports Larzuk owing the hero sockets: the Siege on Harrogath is reward pending (VERIFIED
+// SUnitNpc Larzuk handler / 0x577b70: only that record bit is tested, the thanks line is not needed).
+func (g *Game) SocketOwed() bool {
+	q := g.byID[QuestSiege]
+
+	return q != nil && g.get(q, FlagRewardPending) && !g.get(q, FlagRewardGranted)
+}
+
+// ClaimSocket is Larzuk adding sockets to an item (ACT5Q1_SetRewardGranted): the quest is rewarded.
+func (g *Game) ClaimSocket() []Effect {
+	return g.claimNpcAction(QuestSiege, "Larzuk added the sockets")
+}
+
+// PersonalizeOwed reports Anya owing the hero a personalisation (Betrayal of Harrogath reward pending).
+func (g *Game) PersonalizeOwed() bool {
+	q := g.byID[QuestBetrayal]
+
+	return q != nil && g.get(q, FlagRewardPending) && !g.get(q, FlagRewardGranted)
+}
+
+// ClaimPersonalize is Anya personalising an item (ACT5Q4_SetRewardGranted).
+func (g *Game) ClaimPersonalize() []Effect {
+	return g.claimNpcAction(QuestBetrayal, "Anya personalised the item")
 }
 
 // hasGiverLine reports whether npc has a spoken line (mode 0 or 1) in table idx.
@@ -348,7 +428,15 @@ func newSpecQuest(s *spec) *Quest {
 		}
 
 		if g.get(q, FlagRewardPending) && !g.get(q, FlagRewardGranted) && s.isClaim(q, g, e.NPC, e.Msg) {
-			g.claimReward(q, s)
+			if s.hold {
+				if d.rewarded || g.get(q, s.heldBit()) {
+					return
+				}
+
+				g.holdClaim(q, s)
+			} else {
+				g.claimReward(q, s)
+			}
 
 			if s.claimFx != nil {
 				for _, f := range s.claimFx(g, q) {

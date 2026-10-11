@@ -69,13 +69,13 @@ func TestForgeShowerEndsSilentlyWithoutItems(t *testing.T) {
 }
 
 func TestIsHellforgeSmash(t *testing.T) {
-	yes := d2quest.Effect{Kind: d2quest.EffectDeleteItem, Quest: d2quest.QuestHellforge, Code: d2quest.ItemMephistoSoulstone}
+	yes := d2quest.Effect{Kind: d2quest.EffectDeleteItem, Quest: d2quest.QuestHellforge, Code: d2quest.ItemHellforgeHammer}
 	if !isHellforgeSmash(yes) {
-		t.Fatal("the soulstone deletion is the smash")
+		t.Fatal("the hammer deletion is the smash")
 	}
 
 	no := yes
-	no.Code = "hfh"
+	no.Code = d2quest.ItemMephistoSoulstone
 
 	if isHellforgeSmash(no) {
 		t.Fatal("other deletions are not")

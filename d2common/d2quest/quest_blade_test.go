@@ -11,8 +11,16 @@ func TestGidbinnObjectsGiveTheBlade(t *testing.T) {
 
 		moveTo(g, 1, LevelKurastDocktown)
 
+		// VERIFIED shape (D2MOO ACT3Q3_Callback03_ChangedLevel): Hratli offers the quest after the Flayer Jungle was entered
+		if msgs, _ := talk(g, NPCHratli); contains2(msgs, 571) {
+			t.Fatalf("Hratli offered the Blade before the Flayer Jungle: %v", msgs)
+		}
+
+		moveTo(g, LevelKurastDocktown, LevelFlayerJungle)
+		moveTo(g, LevelFlayerJungle, LevelKurastDocktown)
+
 		msgs, _ := talk(g, NPCHratli)
-		if len(msgs) == 0 || msgs[0] != 571 {
+		if !contains2(msgs, 571) {
 			t.Fatalf("Hratli: %v %s", msgs, g.Describe(q))
 		}
 

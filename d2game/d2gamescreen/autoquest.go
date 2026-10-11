@@ -361,6 +361,11 @@ func (a *autoQuest) object(h autoHost, id int) {
 	h.Dispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: id, Level: h.Area()})
 }
 
+// objectWielding operates a quest object with the given weapon in the hero's hand (the Compelling Orb).
+func (a *autoQuest) objectWielding(h autoHost, id int, wielded string) {
+	h.Dispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: id, Level: h.Area(), Wielded: wielded})
+}
+
 func (a *autoQuest) pickup(h autoHost, code string) {
 	h.Dispatch(d2quest.Event{Kind: d2quest.EvItemPickedUp, Item: code})
 }

@@ -474,7 +474,11 @@ func (v *Game) hireGateOpen(seller int) bool {
 // hireOffer pays for and spawns the merc of an offer slot (HIRE_ProcessHireOffer:
 // the previous merc and its items are discarded). The quest gate of Kashya for
 // low levels is not modelled.
-func (v *Game) hireOffer(seller, slot int) error {
+func (v *Game) hireOffer(seller, slot int) error { return v.hireOfferFor(seller, slot, false) }
+
+// hireOfferFor is hireOffer; free hires without paying (a quest reward: Kashya's Sisters' Burial Grounds, Asheara's
+// Blade of the Old Religion, D2MOO D2GAME_NPC_AssignMercenary, called by the exe at 0x5b6ea0 for Asheara).
+func (v *Game) hireOfferFor(seller, slot int, free bool) error {
 	o := v.offerTable(seller)
 	p := v.localPlayer
 
@@ -491,6 +495,10 @@ func (v *Game) hireOffer(seller, slot int) error {
 	offer, ok := tab.MakeOffer(o.table, slot, p.Stats.Level)
 	if !ok {
 		return errors.New("no such offer")
+	}
+
+	if free {
+		offer.Cost = 0
 	}
 
 	if p.Gold < offer.Cost {
@@ -523,6 +531,34 @@ func (v *Game) hireOffer(seller, slot int) error {
 		save.Type, offer.Stats.Level, offer.Cost, before, p.Gold)
 
 	return v.OnPlayerSave()
+}
+
+// grantQuestMerc is the free mercenary a quest gives a hero who has none: the first one the seller offers. UNVERIFIED
+// which of the offers the original picks (D2MOO: the first available record of the vendor).
+func (v *Game) grantQuestMerc(seller int) {
+	p := v.localPlayer
+	if p == nil || v.monsters == nil || p.Merc != nil {
+		return
+	}
+
+	o := v.offerTable(seller)
+	if o == nil || v.hirelingTable() == nil {
+		return
+	}
+
+	for slot := range o.table.Slots {
+		if !o.table.Slots[slot].Offered || o.table.Slots[slot].Hired {
+			continue
+		}
+
+		if err := v.hireOfferFor(seller, slot, true); err != nil {
+			v.Infof("MERC quest reward not given: %v", err)
+		} else {
+			v.Infof("MERC quest reward: seller %d gives a mercenary for free", seller)
+		}
+
+		return
+	}
 }
 
 // deadMerc describes the hero's dead merc: the corpse in this level, or the

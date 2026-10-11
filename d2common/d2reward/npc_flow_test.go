@@ -19,11 +19,11 @@ func TestRewardNPCsClaimThroughTalk(t *testing.T) {
 		quest int // quest number inside the act (1..)
 		npc   int
 		items map[string]int
-		want  func(t *testing.T, effects []d2quest.Effect, s *State)
+		want  func(t *testing.T, effects []d2quest.Effect, s *State, g *d2quest.Game)
 	}{
 		{
 			name: "Akara: Den of Evil skill point and the reset", act: 1, quest: 1, npc: d2quest.NPCAkara,
-			want: func(t *testing.T, effects []d2quest.Effect, s *State) {
+			want: func(t *testing.T, effects []d2quest.Effect, s *State, g *d2quest.Game) {
 				if !has(effects, d2quest.EffectSkillPoint, "") || !has(effects, d2quest.EffectRespec, "") {
 					t.Errorf("effects %+v", effects)
 				}
@@ -31,7 +31,7 @@ func TestRewardNPCsClaimThroughTalk(t *testing.T) {
 		},
 		{
 			name: "Kashya: the rogues become hirable", act: 1, quest: 2, npc: d2quest.NPCKashya,
-			want: func(t *testing.T, effects []d2quest.Effect, s *State) {
+			want: func(t *testing.T, effects []d2quest.Effect, s *State, g *d2quest.Game) {
 				if !has(effects, d2quest.EffectHireRogues, "") {
 					t.Errorf("effects %+v", effects)
 				}
@@ -39,32 +39,32 @@ func TestRewardNPCsClaimThroughTalk(t *testing.T) {
 		},
 		{
 			name: "Charsi: the imbue", act: 1, quest: 3, npc: d2quest.NPCCharsi, items: map[string]int{d2quest.ItemHoradricMalus: 1},
-			want: func(t *testing.T, effects []d2quest.Effect, s *State) {
+			want: func(t *testing.T, effects []d2quest.Effect, s *State, g *d2quest.Game) {
 				if !has(effects, d2quest.EffectImbue, "") {
 					t.Errorf("effects %+v", effects)
 				}
 			},
 		},
 		{
-			name: "Larzuk: sockets owed", act: 5, quest: 1, npc: d2quest.NPCLarzuk,
-			want: func(t *testing.T, effects []d2quest.Effect, s *State) {
-				if s.SocketPending != 1 || !OwedFrom(s, false).Of(KindSocket) {
-					t.Errorf("socket pending %d effects %+v", s.SocketPending, effects)
+			name: "Larzuk: sockets owed (the record keeps the reward pending until he acts)", act: 5, quest: 1, npc: d2quest.NPCLarzuk,
+			want: func(t *testing.T, effects []d2quest.Effect, s *State, g *d2quest.Game) {
+				if s.SocketPending != 1 || !OwedFrom(s, false).Of(KindSocket) || !g.SocketOwed() {
+					t.Errorf("socket pending %d owed %v effects %+v", s.SocketPending, g.SocketOwed(), effects)
 				}
 			},
 		},
 		{
-			name: "Qual-Kehk: the barbarians become hirable", act: 5, quest: 2, npc: d2quest.NPCQualKehk,
-			want: func(t *testing.T, effects []d2quest.Effect, s *State) {
-				if !s.Hired["barbarians"] {
+			name: "Qual-Kehk: the runes (Tal, Ral, Ort for fifteen freed barbarians; no mercenary unlock)", act: 5, quest: 2, npc: d2quest.NPCQualKehk,
+			want: func(t *testing.T, effects []d2quest.Effect, s *State, g *d2quest.Game) {
+				if s.Hired["barbarians"] || !has(effects, d2quest.EffectGiveItem, "r07") || !has(effects, d2quest.EffectGiveItem, "r09") {
 					t.Errorf("hired %v effects %+v", s.Hired, effects)
 				}
 			},
 		},
 		{
-			name: "Anya: personalisation owed", act: 5, quest: 4, npc: d2quest.NPCDrehya,
-			want: func(t *testing.T, effects []d2quest.Effect, s *State) {
-				if s.PersonalizePending != 1 {
+			name: "Anya: personalisation owed (from the record)", act: 5, quest: 4, npc: d2quest.NPCDrehya,
+			want: func(t *testing.T, effects []d2quest.Effect, s *State, g *d2quest.Game) {
+				if !g.PersonalizeOwed() {
 					t.Errorf("personalize pending %d effects %+v", s.PersonalizePending, effects)
 				}
 			},
@@ -119,7 +119,7 @@ func TestRewardNPCsClaimThroughTalk(t *testing.T) {
 				}
 			}
 
-			tt.want(t, effects, &state)
+			tt.want(t, effects, &state, g)
 		})
 	}
 }

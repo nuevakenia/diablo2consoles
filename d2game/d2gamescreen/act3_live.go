@@ -310,19 +310,36 @@ func (v *Game) act3Operate(ob *d2mapentity.Object) bool {
 	return true
 }
 
-// smashOrb is the hero using the Compelling Orb: it breaks with Khalim's Will in the inventory and the
-// stairs to the Durance of Hate open (the quest system sets the bits that d2level.CheckActThreeWarp reads).
+// smashOrb is the hero using the Compelling Orb: with Khalim's Will in the hand the second operation breaks it
+// and the stairs to the Durance of Hate open (the quest system keeps the hit counter and sets the bits that
+// d2level.CheckActThreeWarp reads; VERIFIED Game.exe 0x5b9550).
 func (v *Game) smashOrb(ob *d2mapentity.Object) {
-	if !d2act3.CanSmashOrb(v.questItemInHand) {
-		v.Infof("ACT3 the Compelling Orb does not break: the hero has no Khalim's Will")
+	if !d2act3.CanSmashOrb(v.wieldedCode()) {
+		v.Infof("ACT3 the Compelling Orb does not break: the hero does not wield Khalim's Will")
+
+		return
+	}
+
+	v.questObjectOperated(ob)
+
+	if r := v.questRT; r != nil && !r.g.OrbSmashed() {
+		v.Infof("ACT3 the Compelling Orb shakes (the first hit with Khalim's Will)")
 
 		return
 	}
 
 	v.Infof("ACT3 the Compelling Orb is smashed with Khalim's Will")
-	v.questObjectOperated(ob)
 	v.gameClient.MapEngine.RemoveEntity(ob)
 	v.act3.orb = nil
+}
+
+// wieldedCode is the item code of the weapon in the hero's hand.
+func (v *Game) wieldedCode() string {
+	if v.gameControls == nil {
+		return ""
+	}
+
+	return v.gameControls.WieldedCode()
 }
 
 // operateHellgate is the hero using the red portal: the act change to the Pandemonium Fortress (the rule

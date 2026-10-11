@@ -7,6 +7,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2act3"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2hireling"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2reward"
@@ -346,7 +347,7 @@ func (v *Game) questObjectOperated(ob *d2mapentity.Object) {
 
 	v.Infof("QUEST object operated id=%d name=%q", id, ob.Label())
 	v.syncQuestItems()
-	v.questDispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: id, Level: v.quests().area})
+	v.questDispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: id, Level: v.quests().area, Wielded: v.wieldedCode()})
 }
 
 // syncQuestItems raises the quest system's count of every quest item to what the inventory holds: items that
@@ -395,6 +396,7 @@ func (v *Game) applyQuestEffects(effects []d2quest.Effect) {
 		case d2quest.EffectHireRogues:
 			r.rogueHire = true
 			v.Infof("QUEST EFFECT hire-rogues (%s)", e.Note)
+			v.grantQuestMerc(d2hireling.SellerKashya)
 		case d2quest.EffectImbue:
 			r.imbuePending = true
 			v.Infof("QUEST EFFECT imbue-available (%s)", e.Note)
