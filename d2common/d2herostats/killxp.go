@@ -1,5 +1,7 @@
 package d2herostats
 
+import "sync"
+
 // Kill experience scaling, from the exe (see ~/git/d2-re-notes/verify-xp-gain.md):
 // 0x0057c300 (level difference), 0x0057c490 (full per-recipient pipeline),
 // 0x0057c3a0 (ExpRatio), 0x0047f2c0 (mul/div helper).
@@ -77,24 +79,70 @@ func LevelScaleXP(xp, monsterLevel, charLevel int) int {
 	return mulDiv(xp, mult, 256)
 }
 
-// ExpRatioScale is 0x0057c3a0: xp * ratio >> shift, where ratio is the
-// Experience.txt ExpRatio of the recipient's level and shift is the ratio of
-// level 0 (the MaxLvl row). A non-positive xp is returned as is; a shift outside
-// 1..31 returns xp. VERIFIED code, but the ratio DATA is not in the extracted
-// table (UNVERIFIED values), so the engine does not apply it.
+// ExpRatioScale is 0x0057c3a0: xp scaled by the recipient's ExpRatio. ratio is
+// the ExpRatio column at the recipient's level and shift is the ratio of the
+// MaxLvl row (10 in patch_d2; the d2exp copy of the file lacks the column).
+// VERIFIED by disassembly. A non-positive xp is returned as is; a shift outside
+// 1..31 returns xp. The exe guards against 32-bit overflow: with
+// limit = 0x7fffffff >> ((ratio>>shift)+shift) (the count taken modulo 32, as
+// the x86 shift does), an xp above limit is computed as (xp>>shift)*ratio
+// (dropping the low bits first), otherwise as (xp*ratio)>>shift. For the stock
+// ratio 1024 with shift 10 every xp above 1048575 is therefore rounded down to
+// a multiple of 1024.
 func ExpRatioScale(xp, ratio, shift int) int {
 	if xp <= 0 || shift < 1 || shift > 31 {
 		return xp
 	}
 
-	return int((int64(xp) * int64(ratio)) >> uint(shift))
+	limit := int32(0x7fffffff) >> uint(((int32(ratio)>>uint(shift&31))+int32(shift))&31)
+	if int32(xp) > limit {
+		return int(int32(int32(xp)>>uint(shift)) * int32(ratio))
+	}
+
+	return int(int32(int32(ratio)*int32(xp)) >> uint(shift))
+}
+
+// ExpRatio is the loaded ExpRatio column of Experience.txt: ByLevel[l] is the
+// ratio of row l, Shift the ratio of the MaxLvl row.
+type ExpRatio struct {
+	Shift   int
+	ByLevel []int
+}
+
+var (
+	expRatioMu sync.RWMutex
+	expRatio   *ExpRatio
+)
+
+// SetExpRatio installs the ratio table KillXP applies (nil removes it, the
+// state when the loaded Experience.txt has no ExpRatio column). It is set once
+// by the record loader.
+func SetExpRatio(r *ExpRatio) {
+	expRatioMu.Lock()
+	expRatio = r
+	expRatioMu.Unlock()
+}
+
+// ExpRatioAt scales xp by the installed ratio of the recipient's level
+// (0x0057c3a0 as called from 0x0057c490). Without a table, or for a level
+// outside it, xp is returned unchanged.
+func ExpRatioAt(xp, level int) int {
+	expRatioMu.RLock()
+	r := expRatio
+	expRatioMu.RUnlock()
+
+	if r == nil || level < 0 || level >= len(r.ByLevel) {
+		return xp
+	}
+
+	return ExpRatioScale(xp, r.ByLevel[level], r.Shift)
 }
 
 // KillXP is the per-recipient pipeline of 0x0057c490 up to (not including)
 // the final add: clamp to 0x7fffff, a non-positive xp counts as 1, a
 // recipient at or above maxLevel gets 0, then the level difference scaling and
-// the item "+% experience" bonus (stat 0x55): xp += xp*itemPct/100. The ExpRatio
-// step is omitted (see ExpRatioScale). VERIFIED.
+// the ExpRatio of the recipient's level (ExpRatioAt, when a table is installed)
+// and the item "+% experience" bonus (stat 0x55): xp += xp*itemPct/100. VERIFIED.
 func KillXP(xp, monsterLevel, charLevel, maxLevel, itemPct int) int {
 	if xp > killXPCap {
 		xp = killXPCap
@@ -106,7 +154,7 @@ func KillXP(xp, monsterLevel, charLevel, maxLevel, itemPct int) int {
 		return 0
 	}
 
-	xp = LevelScaleXP(xp, monsterLevel, charLevel)
+	xp = ExpRatioAt(LevelScaleXP(xp, monsterLevel, charLevel), charLevel)
 	if itemPct != 0 {
 		xp += mulDiv(xp, itemPct, 100)
 	}

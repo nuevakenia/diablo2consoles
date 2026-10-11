@@ -17,3 +17,18 @@ func (st *HeroStatsState) ClampVitalsToMax() {
 		st.Health = st.MaxHealth
 	}
 }
+
+// FinalizeLoadedVitals is the vitals part of the save loader's finishing step
+// (SAVE_FinalizeLoadedPlayerStats 0x568c90, VERIFIED by disassembly): after the
+// items are attached the current stamina is set to the maximum stamina total (the
+// saved current stamina is ignored); life and mana keep the saved values (the
+// caller's two arguments), then the gold limits (see d2inventory.SanitizeLoadedGold)
+// and the speed percents 0x43..0x45 = 100 apply. Call it after RecalcStats.
+func (st *HeroStatsState) FinalizeLoadedVitals() {
+	if st == nil {
+		return
+	}
+
+	st.Stamina = float64(st.MaxStamina)
+	st.ClampVitalsToMax()
+}

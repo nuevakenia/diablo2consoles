@@ -63,8 +63,9 @@ func capBlock(c int) int {
 // RollShieldBlock rolls a shield block. Verified in COMBAT_RollShieldBlock
 // (0x57bfa0): a chance below 1 means no block and NO step is consumed; a
 // player who is moving (and not in mode 2) has the chance divided by 3
-// (integer division). The meaning of that condition (running) is inferred, so
-// the caller supplies it as playerMoving. Blocked iff roll < chance.
+// (integer division). The condition is VERIFIED to be a player whose mode is 3
+// (run) or 6 (walk in town) and whose unit mode is not 2 (helper 0x622ef0 and
+// 0x621390); the caller supplies it as playerMoving. Blocked iff roll < chance.
 func RollShieldBlock(r Roller, chance int, playerMoving bool) (blocked bool) {
 	if chance < 1 {
 		return false

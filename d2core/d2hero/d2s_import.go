@@ -103,6 +103,7 @@ func (f *HeroStateFactory) ImportD2S(data []byte) (*HeroState, error) {
 	applyD2SSkillBar(state, header)
 
 	f.RecalcStats(state)
+	state.Stats.FinalizeLoadedVitals()
 	fmt.Printf("stats: %s %s\n", state.HeroName, StatsSummary(state.Stats))
 
 	return state, nil

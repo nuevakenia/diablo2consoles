@@ -274,7 +274,8 @@ func (v *Game) respawnHero() {
 	p.ApplyEquipment()
 	p.SetIsInTown(true)
 	p.Stats.Health = d2hero.RespawnLife(p.Stats.MaxHealth)
-	p.Stats.Mana = 0
+	p.Stats.Mana = p.Stats.MaxMana // 0x549f10: life, mana and stamina are refilled
+	p.Stats.Stamina = float64(p.Stats.MaxStamina)
 	st.dead = false
 
 	v.Infof("DEATH respawn pos=(%d,%d) town_start=(%d,%d) hp=%d/%d mana=%d gold=%d equipment=%s corpse_at=(%d,%d) corpse_items=%s",

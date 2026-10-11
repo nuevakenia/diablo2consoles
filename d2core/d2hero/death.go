@@ -30,13 +30,16 @@ import (
 //	  (recoverable experience?) is not known;
 //	- the dead flag is cleared again when a softcore hero respawns (hardcore:
 //	  the character stays dead and the loader refuses it);
-//	- the life a respawned hero starts with (RespawnLifeFraction);
 //	VERIFIED too: more than 15 corpses make the game drop the items on the
 //	  ground instead (MaxCorpses; DeathInput.CorpseCount, DeathOutcome.DropToFloor).
 
 // RespawnLifeFraction is the share of the maximum life a respawned hero has.
-// UNVERIFIED: the binary was not searched for the respawn code.
-const RespawnLifeFraction = 0.5
+// VERIFIED (server respawn handler SERVER_HandleC2S41_RespawnPlayer 0x549f10):
+// the handler sets current life, mana and stamina (stats 6, 8, 10) to the
+// maximum totals (stats 7, 9, 11) and clears the timed states, for a hero in
+// mode 0x11 (dead). Nothing in that handler halves them. Not read: code that
+// might run after the arrival in town.
+const RespawnLifeFraction = 1.0
 
 // DeathExpPenaltyPercent returns the penalty percentage of a difficulty (the
 // DeathExpPenalty column, see d2difficulty).
@@ -204,7 +207,8 @@ func (s *DeathState) Recover() *d2inventory.CharacterEquipment {
 	return &eq
 }
 
-// RespawnLife returns the life points of a respawned hero (at least 1).
+// RespawnLife returns the life points of a respawned hero (at least 1); mana and
+// stamina are restored to their maxima as well (see RespawnLifeFraction).
 func RespawnLife(maxLife int) int {
 	if n := int(float64(maxLife) * RespawnLifeFraction); n > 1 {
 		return n

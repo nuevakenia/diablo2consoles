@@ -25,3 +25,14 @@ func TestClampVitalsToMax(t *testing.T) {
 		}
 	}
 }
+
+func TestFinalizeLoadedVitals(t *testing.T) {
+	st := &HeroStatsState{Health: 80, MaxHealth: 300, Mana: 20, MaxMana: 150, Stamina: 12, MaxStamina: 100}
+	st.FinalizeLoadedVitals()
+
+	if st.Stamina != 100 || st.Health != 80 || st.Mana != 20 {
+		t.Errorf("stamina %v life %d mana %d, want 100/80/20", st.Stamina, st.Health, st.Mana)
+	}
+
+	(*HeroStatsState)(nil).FinalizeLoadedVitals()
+}

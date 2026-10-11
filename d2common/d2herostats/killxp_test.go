@@ -53,3 +53,57 @@ func TestMercKillShareAndRatio(t *testing.T) {
 		t.Error("ratio")
 	}
 }
+
+func TestExpRatioScale(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		xp, ratio, shft int
+		want            int
+	}{
+		{"1024>>10 small xp is exact", 1000, 1024, 10, 1000},
+		{"limit edge uses multiply path", 1048575, 1024, 10, 1048575},
+		{"above limit drops low bits", 1048576 + 1023, 1024, 10, 1048576},
+		{"big xp multiple of 1024 kept", 8388607, 1024, 10, 8387584},
+		{"level 70 ratio 976", 100000, 976, 10, 95312},
+		{"level 99 ratio 5", 100000, 5, 10, 488},
+		{"zero stays", 0, 976, 10, 0},
+		{"bad shift returns xp", 500, 5, 0, 500},
+		{"shift 32 returns xp", 500, 5, 32, 500},
+	} {
+		if got := ExpRatioScale(tc.xp, tc.ratio, tc.shft); got != tc.want {
+			t.Errorf("%s: got %d want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestKillXPUsesInstalledRatio(t *testing.T) {
+	defer SetExpRatio(nil)
+
+	by := make([]int, 100)
+	for i := range by {
+		by[i] = 1024
+	}
+
+	by[85] = 256
+
+	SetExpRatio(&ExpRatio{Shift: 10, ByLevel: by})
+
+	if got := KillXP(4000, 85, 85, 99, 0); got != 1000 {
+		t.Errorf("level 85 ratio 256: got %d want 1000", got)
+	}
+
+	if got := KillXP(4000, 50, 50, 99, 0); got != 4000 {
+		t.Errorf("level 50 ratio 1024: got %d want 4000", got)
+	}
+
+	// the item bonus is added after the ratio
+	if got := KillXP(4000, 85, 85, 99, 50); got != 1500 {
+		t.Errorf("ratio then +50%%: got %d want 1500", got)
+	}
+
+	SetExpRatio(nil)
+
+	if got := KillXP(4000, 85, 85, 99, 0); got != 4000 {
+		t.Errorf("no table: got %d want 4000", got)
+	}
+}
