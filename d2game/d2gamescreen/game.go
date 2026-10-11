@@ -858,8 +858,9 @@ func (v *Game) openIdentify(npc d2interface.MapEntity) {
 	v.npcTarget, v.tradeActive = npc, true
 }
 
-// openTrade opens the vendor window for an Act 1 vendor. Other NPCs have a
-// Trade row but no stock model yet.
+// openTrade opens the vendor window of a modelled vendor (d2vendor.All: every
+// act's merchants). An NPC with a Trade row but no vendor model (Nihlathak,
+// Greiz, Qual-Kehk...) only logs.
 func (v *Game) openTrade(npc d2interface.MapEntity, seed uint32) bool {
 	vendor, ok := d2vendor.ByClassID(v.npcClassID(npc))
 	if !ok {
