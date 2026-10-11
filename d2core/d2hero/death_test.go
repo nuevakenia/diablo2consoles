@@ -64,9 +64,32 @@ func TestHardcoreDeath(t *testing.T) {
 }
 
 func TestRespawnLife(t *testing.T) {
-	for in, want := range map[int]int{0: 1, 1: 1, 100: 50, 3: 1, 4: 2} {
+	for in, want := range map[int]int{0: 1, 1: 1, 100: 100, 3: 3, 4: 4} {
 		if got := RespawnLife(in); got != want {
 			t.Errorf("RespawnLife(%d) = %d, want %d", in, got, want)
 		}
+	}
+}
+
+func TestDeathPenaltyValue(t *testing.T) {
+	cases := []struct{ percent, level, exp, start, next, want int }{
+		{5, 10, 5000, 4000, 6000, 100}, // nominal loss
+		{5, 1, 50, 0, 100, 0},          // level 1 loses nothing
+		{0, 10, 5000, 4000, 6000, 0},   // normal difficulty
+		{10, 10, 4050, 4000, 6000, 50}, // clamped: exp - start
+		{10, 10, 4000, 4000, 6000, 0},  // already at the start
+	}
+
+	for _, c := range cases {
+		if got := DeathPenaltyValue(c.percent, c.level, c.exp, c.start, c.next); got != c.want {
+			t.Errorf("%+v: got %d", c, got)
+		}
+	}
+
+	var s DeathState
+
+	out := s.Die(DeathInput{Difficulty: 1, Level: 10, Experience: 5000, ExpStart: 4000, ExpNext: 6000})
+	if out.Corpse == nil || out.Corpse.Experience != 75 {
+		t.Fatalf("corpse experience %+v", out.Corpse)
 	}
 }

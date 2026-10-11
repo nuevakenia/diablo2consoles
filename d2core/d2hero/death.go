@@ -30,13 +30,41 @@ import (
 //	  (recoverable experience?) is not known;
 //	- the dead flag is cleared again when a softcore hero respawns (hardcore:
 //	  the character stays dead and the loader refuses it);
-//	- the life a respawned hero starts with (RespawnLifeFraction);
+//	  RESOLVED by the second gap pass (w20): the stat is the experience that looting the corpse gives back
+//	  (PLAYER_ServerLootCorpse 0x57db90: owner touching the corpse with stat 0xd set zeroes it and awards it),
+//	  and the stored value is the experience the penalty took (0x533410, DeathPenaltyValue below);
 //	VERIFIED too: more than 15 corpses make the game drop the items on the
 //	  ground instead (MaxCorpses; DeathInput.CorpseCount, DeathOutcome.DropToFloor).
 
 // RespawnLifeFraction is the share of the maximum life a respawned hero has.
-// UNVERIFIED: the binary was not searched for the respawn code.
-const RespawnLifeFraction = 0.5
+// VERIFIED (SERVER_HandleC2S41_RespawnPlayer 0x549f10): life, mana and stamina (stats 6, 8, 10) are all set to
+// their maximum; the hero is moved to the town of the act he is in (mode 1, state 0x36 toggled on and off).
+const RespawnLifeFraction = 1.0
+
+// DeathPenaltyValue is the number the exe stores with CLIENT_SetDeathPenaltyValue in the penalty routine
+// (0x533410, VERIFIED from the disassembly): the nominal loss percent*span/100 and, when the hero would fall
+// to or below the start of his level, exp-start (0 when negative). The hero is then put at start+1, so the
+// value can be one more than the experience really lost. Level 1 and a zero loss store nothing (0).
+func DeathPenaltyValue(percent, level, exp, start, next int) int {
+	if level <= 1 || next <= start || percent <= 0 {
+		return 0
+	}
+
+	nominal := percent * (next - start) / 100
+	if nominal == 0 {
+		return 0
+	}
+
+	if exp-nominal <= start {
+		if v := exp - start; v > 0 {
+			return v
+		}
+
+		return 0
+	}
+
+	return nominal
+}
 
 // DeathExpPenaltyPercent returns the penalty percentage of a difficulty (the
 // DeathExpPenalty column, see d2difficulty).
@@ -171,6 +199,10 @@ func (s *DeathState) Die(in DeathInput) DeathOutcome {
 		return out
 	}
 
+	if in.PenaltyValue == 0 {
+		in.PenaltyValue = DeathPenaltyValue(DeathExpPenaltyPercent(in.Difficulty), in.Level, in.Experience, in.ExpStart, in.ExpNext)
+	}
+
 	s.Corpse = &Corpse{X: in.X, Y: in.Y, Equipment: in.Equipment, ExpLost: lost, GoldDropped: in.Gold,
 		Experience: CorpseExperience(in.PenaltyValue)}
 	out.Corpse = s.Corpse
@@ -204,7 +236,7 @@ func (s *DeathState) Recover() *d2inventory.CharacterEquipment {
 	return &eq
 }
 
-// RespawnLife returns the life points of a respawned hero (at least 1).
+// RespawnLife returns the life points of a respawned hero (at least 1): the maximum.
 func RespawnLife(maxLife int) int {
 	if n := int(float64(maxLife) * RespawnLifeFraction); n > 1 {
 		return n

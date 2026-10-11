@@ -24,14 +24,11 @@ func TestPlanOpen(t *testing.T) {
 		}
 	}
 
-	// cast in town without a pair is refused; with one the town end moves
-	if _, err := PlanOpen("a", "Ann", 1, 5, 5, nil); !errors.Is(err, ErrNoDestination) {
-		t.Fatalf("town cast without pair: %v", err)
-	}
-
-	moved, err := PlanOpen("a", "Ann", 1, 5, 6, &p)
-	if err != nil || moved.Field != p.Field || moved.Town.X != 5 || moved.Town.Auto {
-		t.Fatalf("moved %+v %v", moved, err)
+	// cast in town or in level 136 is refused (0x5bbe10), with or without a pair
+	for _, lvl := range []int{1, 40, 136} {
+		if _, err := PlanOpen("a", "Ann", lvl, 5, 5, &p); !errors.Is(err, ErrCastRefused) {
+			t.Fatalf("cast in %d: %v", lvl, err)
+		}
 	}
 
 	if _, err := PlanOpen("a", "Ann", 0, 0, 0, nil); !errors.Is(err, ErrBadLevel) {
@@ -69,14 +66,6 @@ func TestRegistry(t *testing.T) {
 	sa2, old, had := r.Open(a2)
 	if !had || old.ID != 1 || sa2.ID != 3 || len(r.In(3)) != 0 || len(r.In(5)) != 1 {
 		t.Fatalf("replace: new %+v old %+v had %v", sa2, old, had)
-	}
-
-	// casting in town keeps the id and the field end
-	mv, _ := PlanOpen("a", "Ann", 1, 7, 7, &sa2)
-	mv.ID = sa2.ID
-
-	if got, _, _ := r.Open(mv); got.ID != sa2.ID || len(r.Pairs()) != 2 {
-		t.Fatalf("move town end: %+v pairs %d", got, len(r.Pairs()))
 	}
 
 	if _, ok := r.Close("a"); !ok || len(r.Pairs()) != 1 {
