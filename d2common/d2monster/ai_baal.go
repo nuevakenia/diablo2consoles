@@ -80,10 +80,11 @@ type ThroneHost interface {
 }
 
 // WaveGate is optional: WaveCleared reports that the monsters of the last wave
-// are dead. UNVERIFIED: the exe throne itself has no such gate (it is purely
-// timed in its think function); the gating of the waves on the previous wave
-// being killed, if it exists, would live in the skill functions 285/286 which
-// were not read. The engine uses it so a wave is never piled on the previous.
+// are dead. VERIFIED (w20, MONAI_BaalThrone_CastSummon 0x5ee2f0 read): the exe
+// throne has NO such gate; it is purely timed (250 frames after the
+// announcement, 100 after a wave) and the cast only bumps the counter. The
+// host keeps the gate so a wave is never piled on the previous one in this
+// engine; it is a deliberate deviation, not exe behaviour.
 type WaveGate interface {
 	WaveCleared(b *Brain) bool
 }
@@ -106,10 +107,11 @@ type TargetModer interface {
 	TargetMode(b *Brain, t Target) Mode
 }
 
-// Puller moves a target to the monster's position (SERVER_MoveUnitToLevelPosition
-// in BaalTaunt; UNVERIFIED which position, see thinkBaalTaunt).
-type Puller interface {
-	PullTarget(b *Brain, t Target) bool
+// SelfMover places the monster itself on the free cell nearest the target
+// (SERVER_MoveUnitToLevelPosition with the target's room and position, used by
+// BaalTaunt, VERIFIED w20). It reports whether the unit was placed.
+type SelfMover interface {
+	MoveSelfToTarget(b *Brain, t Target) bool
 }
 
 // OwnerChecker reports that the unit's owner (FUN_00551030) is missing or dead
@@ -129,8 +131,8 @@ type Cloner interface{ SpawnBaalClone(b *Brain) bool }
 // next step (+0x1c). aip1 is the chance to attack an intruder with Skill1.
 //
 // A hero within 64 subtiles makes the throne attack (Skill1, aip1%) or wait 10
-// instead of advancing the waves (VERIFIED order; two line-of-sight / state
-// checks on the hero before the roll are not ported). Otherwise the cycle is:
+// instead of advancing the waves (VERIFIED order, w20: skill gates through
+// skillStatesFree, then the roll). Otherwise the cycle is:
 // announce wave n + cast Baal Corpse Explode (flag bit 0, next step in 250
 // frames); then spawn the wave, counter+1, next step in 100 frames, flag bit 0
 // cleared; after the fifth wave the next step morphs the throne into Baal.
@@ -148,7 +150,11 @@ func thinkBaalThrone(c *Ctx) {
 	}
 
 	if c.Target != nil && c.Dist <= ThroneSightRadius {
-		if b.Profile.Skills[slot1].Used() && b.Roll(100) < b.AIP(1) {
+		// Exe order (VERIFIED, w20): Skill1 exists, an attack target exists,
+		// neither the skill's aurastate on the throne nor its auratargetstate
+		// on the target is up (both tested from state id 0), then the aip1
+		// roll. Any miss waits 10; the roll is only drawn when the gates pass.
+		if b.Profile.Skills[slot1].Used() && c.skillStatesFree(slot1, *c.Target, 0) && b.Roll(100) < b.AIP(1) {
 			c.Cast(slot1, *c.Target)
 
 			return
@@ -208,18 +214,22 @@ func thinkBaalThrone(c *Ctx) {
 
 // ---------------------------------------------------------------- BaalTaunt
 
-// thinkBaalTaunt is MONAI_Think_BaalTaunt 0x5ee810 (VERIFIED control flow). The
-// invisible taunter follows the hero and mocks him: aip1 the distance beyond
-// which it walks up to the hero, aip2 the idle count after which it taunts,
-// aip3 the distance beyond which the hero is pulled back.
+// thinkBaalTaunt is MONAI_Think_BaalTaunt 0x5ee810 (VERIFIED control flow, w20
+// disassembly). The invisible taunter follows the hero and mocks him: aip1 the
+// distance beyond which it walks up to the hero, aip2 the idle count after
+// which it taunts, aip3 the distance beyond which it hops onto the hero.
 //
-// Scratch[0] counts consecutive thinks in which the hero stands still (mode
-// neutral); when the count exceeds aip2 it is reset and Baal Taunt (284, mode
-// 4) is cast at the hero. A moving hero resets the count. If the hero is
-// farther than aip3 the exe calls SERVER_MoveUnitToLevelPosition on him with a
-// position from the taunter's own accessors (UNVERIFIED reading: the hero is
-// pulled to the taunter); when that fails and he is farther than aip1 the
-// taunter walks to him. Always sleeps 25.
+// The target is the attack target (none: wait 25). Scratch[0] counts
+// consecutive thinks in which the hero (a player or a monster) is in mode 1
+// (neutral); a moving hero resets it. The count is bumped first; when it
+// exceeds aip2 it is reset and Baal Taunt (284, mode 4) is cast at the hero,
+// and the think ends there whether or not the cast was accepted.
+//
+// Distance beyond aip3: SERVER_MoveUnitToLevelPosition(game, TAUNTER, room of
+// the hero, hero x, hero y, 0, 0) - the taunter itself is placed on the free
+// cell nearest the hero (w20: the earlier reading, "the hero is pulled", was
+// wrong). Success waits 25; failure falls through to the walk test: farther
+// than aip1 walks to the hero (WalkNoTarget), otherwise waits 25.
 func thinkBaalTaunt(c *Ctx) {
 	b := c.B
 
@@ -241,20 +251,21 @@ func thinkBaalTaunt(c *Ctx) {
 		if b.Scratch[0] > b.AIP(2) {
 			b.Scratch[0] = 0
 
+			// The exe queues the cast and returns without testing the result.
 			if r, ok := c.W.(RawCaster); ok {
-				if r.CastSkillID(b, SkillBaalTaunt, ModeAttack1, &t, nil) {
-					c.busy()
-
-					return
-				}
+				r.CastSkillID(b, SkillBaalTaunt, ModeAttack1, &t, nil)
 			}
+
+			c.busy()
+
+			return
 		}
 	} else {
 		b.Scratch[0] = 0
 	}
 
 	if b.AIP(3) < c.Dist {
-		if p, ok := c.W.(Puller); ok && p.PullTarget(b, t) {
+		if p, ok := c.W.(SelfMover); ok && p.MoveSelfToTarget(b, t) {
 			c.Sleep(25)
 
 			return
@@ -295,6 +306,12 @@ func thinkBaalToStairs(c *Ctx) {
 	}
 
 	if dist < b.AIP(1) {
+		// QUEST_A5_EveOfDestruction_OnBaalToStairs runs first (VERIFIED w20),
+		// then state 0x92 is toggled on, the path and think event cleared and
+		// the unit removed from its room.
+		c.questHook("BaalToStairs")
+		c.setState(0x92, true)
+
 		if l, ok := c.W.(Leaver); ok {
 			l.LeaveLevel(b)
 		}
@@ -582,9 +599,18 @@ type BaalSituationHook interface {
 	BaalSituation(b *Brain, s *BaalSituation)
 }
 
-// baalDecide is FUN_005fb830: the continuing action in Scratch[0], the
-// no-target action and the three tables.
-func baalDecide(c *Ctx) int {
+// baalDecide is MONAI_BaalCrabChooseAction 0x5fb830: the continuing action in
+// Scratch[0], the no-target action and the three tables. score and count are
+// what the target scan returned (best threat score, candidates counted).
+//
+// VERIFIED (w20): "engaged" (the exe's MONAI_IsNotImmune 0x5dbfd0) is "the
+// line trace to the target is clear" (COLLISION_CanTraceLineBetweenUnits mask
+// 4 returns 0), not the Aggressive flag; Far / VeryFar are the TARGET's edge
+// distance to the anchor above 0x4b / 100; the "nearby" input of the engaged
+// table is the difficulty clamped to 2 (element 3 of the
+// MONSTER_CalcPlayerCountScaling block), so the Buff weight is only zeroed in
+// Normal and Nightmare when fewer than two candidates are counted.
+func baalDecide(c *Ctx, score, count int) int {
 	b := c.B
 	if b.Scratch[0] != 0 {
 		return b.Scratch[0]
@@ -605,9 +631,23 @@ func baalDecide(c *Ctx) int {
 		return baalWait
 	}
 
+	nearby := int(b.Diff)
+	if nearby > 2 {
+		nearby = 2
+	}
+
+	targets := 1
+	if count > 0 {
+		targets = count
+	}
+
 	s := BaalSituation{
-		InReach: c.InRange, Engaged: b.Aggressive, SelfHP: b.HPPercent, TargetHP: 100,
-		Targets: 1, Dist: c.Dist, Nearby: 99,
+		InReach: c.InRange, Engaged: !c.lineBlocked(*c.Target, 4), SelfHP: b.HPPercent, TargetHP: 100,
+		Targets: targets, Score: score, Dist: c.Dist, Nearby: nearby,
+	}
+
+	if a := b.FindCommand(CmdAnchor); a != nil {
+		s.Far, s.VeryFar = BaalHomeFlags(EdgeDistance(c.Target.X-a.X, c.Target.Y-a.Y, c.Target.Size))
 	}
 
 	if h, ok := c.W.(BaalSituationHook); ok {
@@ -624,27 +664,40 @@ func baalDecide(c *Ctx) int {
 // BaalSituation); the weights are exact.
 func thinkBaalCrab(c *Ctx) { baalThink(c, false) }
 
-// thinkBaalCrabClone is MONAI_Think_BaalCrabClone 0x5fc440: dismissed when the
-// leader is dead or it has no live target; actions 7, 9, 14 and 15 (wait,
-// tentacles, teleport, clone) are replaced by 2 (walk); with no target it
-// sleeps 15.
+// thinkBaalCrabClone is MONAI_Think_BaalCrabClone 0x5fc440 (VERIFIED w20): it
+// dies (COMBAT_ServerHandleUnitDeath, no killer) when its leader is dead or
+// its owner is missing or dead; actions 7, 9, 14 and 15 (unused, tentacles,
+// teleport, clone) are replaced by 2 (walk); with no target it sleeps 15
+// AFTER the decision rolls were drawn.
 func thinkBaalCrabClone(c *Ctx) { baalThink(c, true) }
+
+// crabAway is the leash distance of the crab's scorer (0x5fac60): 0x4b.
+const crabAway = 0x4b
 
 func baalThink(c *Ctx, clone bool) {
 	b := c.B
 
-	// Table mode 0: the tick hands over no target; the exe scans for one
-	// itself (0x5faf40 with filter 0x5fb1c0, UNVERIFIED), read here as the
-	// attack-target lookup.
-	if c.Target == nil {
-		c.genericTarget()
-	}
-
 	if clone {
-		if b.Leader != nil && !b.Leader.Mode.IsAlive() || c.Target == nil && b.Leader == nil {
+		if b.Leader != nil && !b.Leader.Mode.IsAlive() {
 			dismiss(c)
 
 			return
+		}
+
+		if o, ok := c.W.(OwnerChecker); ok {
+			if o.OwnerGone(b) {
+				dismiss(c)
+
+				return
+			}
+		} else if b.Leader == nil && c.Target == nil {
+			// No owner host: a clone with neither leader nor target is
+			// treated as orphaned (the exe's owner lookup would fail).
+			if _, _, found := c.W.AttackTarget(b); !found {
+				dismiss(c)
+
+				return
+			}
 		}
 	}
 
@@ -652,10 +705,37 @@ func baalThink(c *Ctx, clone bool) {
 		b.AppendCommand(Command{Type: CmdAnchor, X: b.X, Y: b.Y})
 	}
 
-	act := baalDecide(c)
+	// Table mode 0: the tick hands over no target; the exe scans for one
+	// itself (MONAI_BaalCrab_FindBestTarget 0x5faf40: heroes passing 0x5fb1c0,
+	// scored like Diablo's with leash 0x4b). The score and count feed the
+	// weight tables. Without a candidate source the attack-target lookup stands
+	// in (UNVERIFIED filter), with score 0 and count 1.
+	score, count := 0, 0
+
+	if c.Target == nil {
+		if _, ok := c.W.(DiabloTargetSource); ok {
+			best, sc, n, _ := c.pickAway(b.FindCommand(CmdAnchor), crabAway)
+			if best != nil {
+				c.Target, c.Dist = best, b.DistanceTo(best.X, best.Y)
+				c.InRange = c.W.InRange(b, *best, c.Dist)
+			}
+
+			score, count = sc, n
+		} else {
+			c.genericTarget()
+		}
+	}
+
+	act := baalDecide(c, score, count)
 
 	if clone && (act == baalUnused || act == baalTentacles || act == baalTeleport || act == baalClone) {
 		act = baalWalk
+	}
+
+	if clone && c.Target == nil {
+		c.Sleep(15)
+
+		return
 	}
 
 	if c.Target == nil && act != baalWander && act != baalHome && act != baalTentacles && act != baalWait {

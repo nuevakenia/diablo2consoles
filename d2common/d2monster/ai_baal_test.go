@@ -60,7 +60,7 @@ func (f *fakeBaal) TargetMode(*Brain, Target) Mode {
 	return ModeWalk
 }
 
-func (f *fakeBaal) PullTarget(*Brain, Target) bool { f.pulled = true; return true }
+func (f *fakeBaal) MoveSelfToTarget(*Brain, Target) bool { f.pulled = true; return true }
 
 func TestBaalRegistered(t *testing.T) {
 	for _, n := range []string{"BaalThrone", "BaalTaunt", "BaalToStairs", "BaalTentacle", "BaalCrab", "BaalCrabClone", "FallenShaman"} {

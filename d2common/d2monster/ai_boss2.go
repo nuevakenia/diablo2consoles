@@ -530,7 +530,9 @@ func thinkBaalMinion(c *Ctx) {
 	p := b.Profile
 
 	if t == nil || !c.InRange {
-		if t != nil && b.Roll(100) < b.AIP(2) {
+		// The approach roll is drawn even without a target (VERIFIED w20:
+		// the exe rolls first, then WalkNoTarget(0) does nothing).
+		if b.Roll(100) < b.AIP(2) && t != nil {
 			c.WalkTo(*t, 1)
 		}
 	} else if b.Roll(100) < b.AIP(1) {

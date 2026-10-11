@@ -207,16 +207,76 @@ func (d *Director) liveSummons(casterID uint32, class string) int {
 	return n
 }
 
-// CountMinions implements d2monster.MinionCounter (MinionSpawner): its live
-// summons of the class its `spawn` column names.
+// CountMinions implements d2monster.MinionCounter (MinionSpawner): the exe
+// callback 0x5e1a50 counts every other living monster of base class family
+// 0x1c5 (minion1) or 0x1cd (suicideminion1) with alignment 0 (not converted,
+// not a hero's ally), VERIFIED w20. It walks the room units; the room scope is
+// not reproduced, so the whole level counts (UNVERIFIED).
 func (d *Director) CountMinions(b *d2monster.Brain) int {
-	u := d.unitOf(b)
-	if u == nil {
+	u0 := d.unitOf(b)
+	if u0 == nil {
 		return 0
 	}
 
-	return d.liveSummons(b.ID, u.m.Stat.SpawnKey)
+	n := 0
+
+	famA, famB := d.minionFamilies()
+
+	for _, u := range d.sortedUnits() {
+		if u.b == b || u.merc != nil || u.ally != nil || u.mirror || u.b.Allied || !livingMode(u) {
+			continue
+		}
+
+		key := strings.ToLower(u.m.Stat.BaseKey)
+		if famA != "" && key == famA || famB != "" && key == famB {
+			n++
+		}
+	}
+
+	// Classes outside the two exe families the spawner may name in its `spawn`
+	// column (test data, modded tables) still count their own live summons, so
+	// the cap holds for them (the exe would not count them at all).
+	if own := d.liveSummons(b.ID, u0.m.Stat.SpawnKey); own > 0 {
+		sk := strings.ToLower(u0.m.Stat.SpawnKey)
+		if base := d.statBaseOf(sk); base == "" || base != famA && base != famB {
+			n += own
+		}
+	}
+
+	return n
 }
+
+// minionFamilies resolves the two families of the exe scan (empty without
+// tables).
+func (d *Director) minionFamilies() (a, b string) {
+	if d.asset == nil || d.asset.Records == nil {
+		return "", ""
+	}
+
+	return d.baseKeyOfClass(minionSpawnerClassA), d.baseKeyOfClass(minionSpawnerClassB)
+}
+
+// statBaseOf is the lower-case base id of a monstats key ("" when unknown).
+func (d *Director) statBaseOf(key string) string {
+	if d.asset == nil || d.asset.Records == nil {
+		return ""
+	}
+
+	for _, st := range d.asset.Records.Monster.Stats {
+		if strings.EqualFold(st.Key, key) {
+			return strings.ToLower(st.BaseKey)
+		}
+	}
+
+	return ""
+}
+
+// Base classes the MinionSpawner scan matches (0x5e1a50): minion1 and
+// suicideminion1 (exe class = monstats row - 1 after the Expansion row).
+const (
+	minionSpawnerClassA = 0x1c5
+	minionSpawnerClassB = 0x1cd
+)
 
 // SpawnerCellsFree implements d2monster.SpawnSpace: the cell a nest lays its
 // spawn on has room (UNVERIFIED: the exe tests the spawner cells around the
