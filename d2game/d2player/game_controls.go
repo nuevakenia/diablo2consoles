@@ -329,6 +329,7 @@ type GameControls struct {
 	inventory         *Inventory
 	hud               *HUD
 	questItemUse      func(code string) bool // Book of Skill, Potion of Life, Scroll of Resistance
+	healShare         func(heal int) int     // Blood Golem share of potion healing (SetHealShare)
 	skilltree         *skillTree
 	heroStatsPanel    *HeroStatsPanel
 	mercPanel         *MercPanel

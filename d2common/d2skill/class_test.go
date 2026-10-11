@@ -105,6 +105,13 @@ func classMissiles() missileTable {
 	m["meteorcenter"] = &d2missile.Spec{ID: 101, Name: "meteorcenter", SrvDoFunc: 1, SrvHitFunc: 14, Range: 60,
 		LastCollide: true, AlwaysExplode: true, SHitPar: [3]int{0, 1}, HitSubMissile: [4]string{"meteorfire"}}
 
+	// missiles.txt (patch_d2): armageddoncontrol pSrvHitFunc 56 sHitPar1 3 Range 25 HitSubMissile1 armageddonfire
+	m["armageddoncontrol"] = &d2missile.Spec{ID: 577, Name: "armageddoncontrol", SrvDoFunc: 1, SrvHitFunc: 56, Range: 25,
+		SHitPar: [3]int{3}, HitSubMissile: [4]string{"armageddonfire"}}
+	// missiles.txt (patch_d2): firestormmaker pSrvDoFunc 23 Vel 8 Range 40 SubMissile1 firestorm
+	m["firestormmaker"] = &d2missile.Spec{ID: 458, Name: "firestormmaker", SrvDoFunc: 23, Vel: 8, MaxVel: 8, Range: 40,
+		Size: 2, SubMissile: [3]string{"firestorm"}}
+
 	return m
 }
 

@@ -10,7 +10,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | | F | P | S | M | T |
 |---|---|---|---|---|---|
 | before (start of feat/skills-npsd) | 59 | 42 | 3 | 8 | 8 |
-| after | 88 | 24 | 0 | 0 | 8 |
+| after | 91 | 21 | 0 | 0 | 8 |
 
 
 ## Necromancer
@@ -36,7 +36,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 82 | Life Tap | 30 | F | F | heal via afterHit |
 | 83 | Poison Explosion | 63 | P | F | VERIFIED 0x5c3dc0 / 0x5a6d70: eight stationary poisonexplosioncloud missiles on the radius-2 square ring around the corpse (d2skill.PoisonExplosionCells), the corpse is consumed |
 | 84 | Bone Spear | - | F | F | generic missile path |
-| 85 | BloodGolem | 56 | P | P | golem; life-leech-to-owner behaviour not checked against the exe |
+| 85 | BloodGolem | 56 | P | F | VERIFIED 0x5c4600 / 0x5c4800 (batch 9): Param5 percent of every blow the golem takes is paid from the owner life instead (owner never below one point, golem reduced by the full share), Param6 percent of the healing the owner receives goes to the golem (clamped to its missing life) and is taken from the heal; wired through d2monsters.shareGolemDamage / ShareHealWithGolem and the potion hook. Event 23 (damage the golem deals) has no handler body and is not modelled |
 | 86 | Attract | 59 | S | F | before: state only; now forces attract (list 9, alignment 1) |
 | 87 | Decrepify | 30 | F | F | state, slow and damage stats |
 | 88 | Bone Prison | 62 | P | F | VERIFIED 0x5c3c50: 12 pieces on the offset tables 0x6e45e0 / 0x6e4610 (d2skill.BonePrisonOffsets); the leader link of the pieces is not modelled |
@@ -45,7 +45,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 91 | Lower Resist | 30 | F | F | state with resist stats |
 | 92 | Poison Nova | 22 | F | F | nova missile ring (do 22) |
 | 93 | Bone Spirit | 10 | F | F | homing missile (do 10) |
-| 94 | FireGolem | 56 | P | P | golem; the fire absorb / damage aura stats come from the order only |
+| 94 | FireGolem | 56 | P | P | golem; the fire absorb / damage aura stats come from the order only. READ (batch 9): sumskill1 Holy Fire at level min(ln56,30) is added to the golem as a skill; how a monster activates an aura skill was not found, so the burning aura is not simulated |
 | 95 | Revive | 58 | P | F | VERIFIED 0x5c35a0: life rolled between the level-scaled min and max of the corpse class at the corpse level (Director.LifeRangeAt), then the caster-level cap |
 
 ## Paladin
@@ -72,7 +72,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 113 | Concentration | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
 | 114 | Holy Freeze | 81 | F | F | enemy aura, cold damage + slow |
 | 115 | Vigor | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 116 | Conversion | 79 | M | P | do 79 added (roll, state, level/life scale, charm AI); VERIFIED 0x56c0a0/0x5dc1e0: unique and super unique monsters are no valid target (skills-batch3.md); act-boss exclusion U |
+| 116 | Conversion | 79 | M | P | do 79 added (roll, state, level/life scale, charm AI); VERIFIED 0x56c0a0/0x5dc1e0: unique and super unique monsters are no valid target (skills-batch3.md); act-boss exclusion U. Batch 9 re-read SRVDO_079 0x5ce8c0 + SRVDO_ConversionRollSuccess 0x5ce820: the success test is not a hireling, a monster, alignment 0, the 0x56c0a0 candidate test (the Revive corpse test, flag bits still unnamed) and a roll below calc1 on the CASTER seed; the target must also come from a landed melee hit; the base class 0x1ec with state 0x8f is refused; the revert callback 0x5ce710 restores level and life ratio |
 | 117 | Holy Shield | 18 | F | F | self state (do 18) |
 | 118 | Holy Shock | 66 | F | F | damage aura |
 | 119 | Sanctuary | 66 | P | F | VERIFIED 0x5cd880 + filter 0x569100: aurafilter 59270 reaches hostile undead non-boss monsters only, the hit carries result flag 8 (knockback) |
@@ -126,7 +126,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 222 | Plague Poppy | 115 | M | P | do 115 added: vine shooter with calc1 life, calc2 level |
 | 223 | Wearwolf | 116 | P | F | VERIFIED 0x5c4e80 + 0x56a480: casting a form again (or the other one) only takes the shape back (group clear includes itself), free of mana while shapeshifted; the form attack skills are not rebound (restrict/State1) |
 | 224 | Shape Shifting | - | T | T |  |
-| 225 | Firestorm | 117 | P | P | fire bursts in a line approximated |
+| 225 | Firestorm | 117 | P | P | VERIFIED 0x5c5130 (batch 9): calc1 firestormmaker emitters, the first straight at the target, the others from the caster through the shared hook 0x5c7340 (seed destX+index, path type 10, life clamped to 77); the path-type-10 stepper is decoded in skills-ai-batch9.md but not wired (heading offset U), so the emitters still use a +-90 degree scatter |
 | 226 | Oak Sage | 119 | P | F | VERIFIED (batch 5) aurafilter 0x10103 through filter 0x569100: the totem aura reaches the hero, the mercenary and the summoned minions inside aurarangecalc (minions through d2monsters.AuraBoost: damage, attack rating and life percent; thorns on minions not applied) |
 | 227 | Summon Spirit Wolf | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied; resist / armor / damage stats from the order |
 | 228 | Wearbear | 116 | P | F | VERIFIED like Wearwolf (0x5c4e80): toggle and free recast in the form |
@@ -141,17 +141,17 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 237 | Summon Fenris | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied |
 | 238 | Rabies | 121 | P | P | VERIFIED bite + infection + plague (0x5c6b70 / 0x5c5dc0), do 30 plague and hit 53 contagion (d2missile/gaps.go); the plague only spreads between units that implement d2missile.Ownable and Stateful (the engine monsters do not yet) |
 | 239 | Fire Claws | 2 | F | F | do 2 melee with fire |
-| 240 | Twister | 118 | P | P | missile chain approximated |
+| 240 | Twister | 118 | P | P | VERIFIED 0x5c52c0 / 0x5c5000 (batch 9): calc1 twisters, ALL through the shared per-missile hook (no straight first one, no fan); path type 10 stepper decoded but not wired, scatter width U |
 | 241 | Vines | 115 | M | P | do 115 added (attack only; the vine cycler is not simulated) |
 | 242 | Hunger | 122 | M | F | do 122 added: melee roll, calc1 damage percent, life and mana steal (verified 0x5c5f40) |
 | 243 | Shock Wave | 8 | P | P | missile fan with stun |
 | 244 | Volcano | 123 | P | P | SRVDO_123 creates volcano with a random data byte; SrvDoFunc 28 lobs debris, hit 51 spawns the fire; bodies read |
-| 245 | Tornado | 118 | P | P | missile without the wander path |
+| 245 | Tornado | 118 | P | P | same do function as Twister (calc1 = 1); the tornado missile (SrvDoFunc 27) is modelled; path type 10 stepper not wired |
 | 246 | Spirit of Barbs | 119 | P | F | VERIFIED (batch 5) aurafilter 0x10103 through filter 0x569100: the totem aura reaches the hero, the mercenary and the summoned minions inside aurarangecalc (minions through d2monsters.AuraBoost: damage, attack rating and life percent; thorns on minions not applied) |
 | 247 | Summon Grizzly | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied |
 | 248 | Fury | 13 | F | F | multi hit (do 13) |
-| 249 | Armageddon | 124 | P | P | random meteors approximated |
-| 250 | Hurricane | 124 | P | P | area ticks |
+| 249 | Armageddon | 124 | P | F | VERIFIED 0x5c6200 + state active function 0x5c65b0 (batch 9): every Param4 frames the caster generator is re-seeded from the skill slot, up to five square-random points within Param3 are tried (clear line and empty cell), armageddoncontrol is created there (hit function 56 area damage + armageddonfire) |
+| 250 | Hurricane | 124 | P | F | VERIFIED state active function 0x5c63f0 (batch 9): every Param4 frames an area damage around the caster of radius aurarangecalc with the skill physical and elemental roll; the PvP part of aurafilter 42883 is not modelled |
 
 ## Not in this list
 

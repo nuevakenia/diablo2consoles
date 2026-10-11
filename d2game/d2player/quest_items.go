@@ -41,6 +41,19 @@ func (g *GameControls) RemoveItemByCode(code string) bool {
 // of Resistance) their effect: it gets the item code and reports whether the item took effect and is consumed.
 func (g *GameControls) SetQuestItemUse(use func(code string) bool) { g.questItemUse = use }
 
+// SetHealShare installs the Blood Golem's share of the healing the hero drinks (ITEM_ShareHealingWithPlayerGolem,
+// 0x5c4800): it receives the points about to be healed and returns what the hero still receives.
+func (g *GameControls) SetHealShare(share func(heal int) int) { g.healShare = share }
+
+// shareHeal passes a heal through the share hook and returns the points the hero keeps.
+func (g *GameControls) shareHeal(heal int) int {
+	if g.healShare == nil || heal <= 0 {
+		return heal
+	}
+
+	return g.healShare(heal)
+}
+
 // useQuestItem runs the hook for an inventory item; it reports whether the item was consumed.
 func (g *GameControls) useQuestItem(from *ItemGrid, item InventoryItem) bool {
 	if g.questItemUse == nil || !g.questItemUse(item.GetItemCode()) {

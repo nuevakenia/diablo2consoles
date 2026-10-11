@@ -48,6 +48,7 @@ type stormRun struct {
 	until int
 	next  int
 	last  string // Thunder Storm: id of the unit struck last (the skill's target type slot)
+	slot  uint32 // Armageddon: the skill's target type slot, the seed of the next rock (0x5c65b0)
 }
 
 type trapRun struct {
@@ -474,7 +475,12 @@ func (e *Engine) startStorm(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skil
 			SkillID: sk.ID, Level: ef.Level})
 	}
 
-	e.storms = append(e.storms, &stormRun{p: p, u: u, ef: *ef, until: e.frame + frames, next: e.frame + ef.Interval})
+	st := &stormRun{p: p, u: u, ef: *ef, until: e.frame + frames, next: e.frame + ef.Interval}
+	if ef.Mode == "scatter" && u.seed != nil {
+		st.slot = u.seed.Roll(d2skill.ArmageddonSeedBound) // SRVDO_124 (0x5c6200): one roll starts the slot
+	}
+
+	e.storms = append(e.storms, st)
 	e.emit("state", "STATE storm skill=%q mode=%s frames=%d interval=%d radius=%d", sk.Name, ef.Mode, frames, ef.Interval,
 		ef.Radius)
 }
@@ -520,9 +526,26 @@ func (e *Engine) stormsTick() {
 			bx, by := best.SubtilePos()
 			e.hitArea(s.p, s.u, s.ef.SkillName, bx, by, 2, s.ef.Desc, "")
 		case "scatter":
-			a := float64(s.u.seed.Roll(360)) * math.Pi / 180
-			r := math.Sqrt(float64(s.u.seed.Roll(1000))/1000) * float64(s.ef.Radius)
-			e.hitArea(s.p, s.u, s.ef.SkillName, hx+int(math.Round(math.Cos(a)*r)), hy+int(math.Round(math.Sin(a)*r)), 3, s.ef.Desc, "")
+			// Armageddon, active function 0x5c65b0 (VERIFIED): the caster's generator is re-seeded from the
+			// skill's slot, one roll below a million becomes the next slot, then up to five square-random points
+			// within the radius are tried (the exe also needs a clear trace and empty cell flags: Walkable here).
+			if s.u.seed == nil {
+				break
+			}
+
+			s.u.seed.Init(s.slot)
+			s.slot = s.u.seed.Roll(d2skill.ArmageddonSlotBound)
+
+			x, y, ok := d2skill.ArmageddonPoint(func(n int) int { return int(s.u.seed.Roll(int32(n))) }, s.ef.Radius, hx, hy,
+				e.pipe.Walkable)
+			if ok {
+				// the rock is the skill's control missile created at the point (SKILL_ServerCreateMissileAtTarget):
+				// it lands after its own range, hits an area (hit function 56) and lights the ground fire
+				if sk := e.pipe.Skills.ByID(s.ef.SkillID); sk == nil || sk.SrvMissileA == "" ||
+					e.pipe.CastAtPoint(s.u, sk.ID, sk.SrvMissileA, x, y) == nil {
+					e.hitArea(s.p, s.u, s.ef.SkillName, x, y, 3, s.ef.Desc, "")
+				}
+			}
 		default:
 			e.hitArea(s.p, s.u, s.ef.SkillName, hx, hy, s.ef.Radius, s.ef.Desc, "")
 		}
@@ -793,7 +816,7 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 	}
 
 	opt := d2monsters.MinionOptions{Owner: p, Kind: o.Kind, HPPct: o.HPPct, HPFlat: o.HPFlat, Frames: o.Frames, Tag: o.PetType,
-		Level: o.Level, DrawsAggro: o.DrawsAggro}
+		Level: o.Level, DrawsAggro: o.DrawsAggro, OwnerDamagePct: o.OwnerDamagePct, HealSharePct: o.HealSharePct}
 	if opt.Tag == "" || opt.Tag == "none" {
 		opt.Tag = stat.Key // the tag petworld.go gives such minions
 	}

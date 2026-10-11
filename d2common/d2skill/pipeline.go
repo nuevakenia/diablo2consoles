@@ -397,6 +397,10 @@ type SummonOrder struct {
 	// OwnerHPPct, when > 0, sets the minion's life to that percent of the
 	// owner's maximum life (Dopplezon, SRVDO_015).
 	OwnerHPPct int
+	// OwnerDamagePct and HealSharePct are the Blood Golem's two shares (skills.txt Param5 and Param6 of its own
+	// skill, VERIFIED 0x5c4600 / 0x5c4800): that percent of every blow the golem would take is taken from its
+	// owner's life instead, and that percent of every healing the owner receives goes to the golem.
+	OwnerDamagePct, HealSharePct int
 	// Makers, set on the first wall of Bone Wall (SrvDoFunc 60), asks the
 	// consumer to launch the two perpendicular wall-maker missiles once the
 	// first piece stands (see WallMakers).
@@ -990,6 +994,22 @@ func (p *Pipeline) CastTrap(u Unit, skillID int, missile string, fromX, fromY in
 
 	return p.castMissile(u, sk, lvl, p.env(sk, lvl, u), missile, tgt,
 		castOpts{hasStart: true, startX: float64(fromX) + 0.5, startY: float64(fromY) + 0.5})
+}
+
+// CastAtPoint creates one stationary missile of a skill at the subtile (x, y): the helper behind the exe's
+// create-at-target call SKILL_ServerCreateMissileAtTarget (0x56cbf0) that Armageddon's active function uses for every
+// rock (VERIFIED, batch 9). The missile uses the skill's damage at the caster's level of it. nil when the skill or the
+// missile is unknown.
+func (p *Pipeline) CastAtPoint(u Unit, skillID int, missile string, x, y int) *d2missile.Missile {
+	sk := p.Skills.ByID(skillID)
+	if sk == nil {
+		return nil
+	}
+
+	lvl := u.SkillLevel(skillID)
+
+	return p.castMissile(u, sk, lvl, p.env(sk, lvl, u), missile, Target{X: x, Y: y},
+		castOpts{hasStart: true, startX: float64(x) + 0.5, startY: float64(y) + 0.5, stationary: true})
 }
 
 // CastWallMaker launches one bonewallmaker missile (SrvDoFunc 13) from the

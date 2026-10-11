@@ -88,6 +88,9 @@ type Options struct {
 	// OnOverlay, if set, receives the SandRaider overlay request (brain id,
 	// overlay id).
 	OnOverlay func(brainID uint32, overlay int)
+	// ZealotAfraid, if set, says whether a Zakarum Zealot fears the hero (Act III and the Blackened Temple quest
+	// slot done, see afraid.go). nil = no fear.
+	ZealotAfraid func(p *d2mapentity.Player) bool
 }
 
 // Counters tally what happened, for autotest summaries.
@@ -128,8 +131,9 @@ type unit struct {
 	nextIdle     int // frame of the next idle vocal, 0 = not scheduled
 	nextStep     int // frame of the next footstep, 0 = not walking
 	attackTarget uint32
-	aimX, aimY   int // ground point of the last attack request (Target ID 0)
-	blocked      int // consecutive refused steps
+	siegeTarget  uint32 // AiGeneral +0x14 of the siege weapons (fbxscans.go)
+	aimX, aimY   int    // ground point of the last attack request (Target ID 0)
+	blocked      int    // consecutive refused steps
 	removeAt     float64
 
 	// ally marks a summoned minion (see minions.go); stunUntil and fleeUntil

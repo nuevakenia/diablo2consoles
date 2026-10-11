@@ -299,5 +299,7 @@ func (d *Director) strikeUnit(u, tu *unit, atk d2mapentity.MonsterAttack, mode d
 		credit = d.targets[u.b.OwnerID]
 	}
 
+	dmg = d.shareGolemDamage(tu, dmg)
+
 	d.damage(tu, credit, dmg)
 }

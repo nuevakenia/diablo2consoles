@@ -141,3 +141,85 @@ func (d *Director) scanPriestAlly(b *d2monster.Brain, radius2 int) d2monster.FBX
 
 	return res
 }
+
+// siegeTargetClass is the base class the siege weapons' scan accepts (0x5e05a0 compares MONSTER_GetBaseClassId
+// with 0x1ec; the same code falls back to -1 when the table is shorter, which no monster matches).
+const siegeTargetClass = 0x1ec
+
+// scanSiege is the callback 0x5e05a0 of the Siege Tower and the Siege Beast (VERIFIED, batch 9): the FIRST unit of
+// the walk that is another monster, not dead or dying, of base class 0x1ec, on the caster's side (the state/AC
+// relation test: both alignment 0), of alignment 0, without an owner (not a hero summon), whose AI has no target
+// yet (AiGeneral +0x14 is -1) and that lies within the squared radius. The callback returns the unit, which ends
+// the walk, so this is the first match in walk order and not the nearest.
+func (d *Director) scanSiege(b *d2monster.Brain, q d2monster.FBXScanQuery) d2monster.FBXScanResult {
+	if b.Allied {
+		return d2monster.FBXScanResult{}
+	}
+
+	for _, u := range d.sortedUnits() {
+		if u.b == b || u.merc != nil || u.ally != nil || u.mirror || u.b.Allied || !livingMode(u) || u.attackTarget != 0 {
+			continue
+		}
+
+		if !d.inClassFamily(u, siegeTargetClass) {
+			continue
+		}
+
+		dx, dy := b.X-u.b.X, b.Y-u.b.Y
+		if dx*dx+dy*dy <= q.Radius2 {
+			return d2monster.FBXScanResult{Found: true, T: targetOf(u)}
+		}
+	}
+
+	return d2monster.FBXScanResult{}
+}
+
+// scanRegurgitate is MONAI_Regurgitator_TargetFilter (0x5f9820, VERIFIED, batch 9): every other monster that is
+// dead or dying, not in the state mask 0x150, of alignment 0 and whose monstats2 row has bit 0xc (the "soft"
+// column, read from the table loader 0x658ee0) is a candidate; the unit flag tests (bit 1 set, bit 9 clear) are
+// not decoded and not modelled. The callback never stops the walk: it keeps the candidate with the smallest
+// squared distance, and a candidate at the same distance as the best so far replaces it (the test is <=), so the
+// LAST of equally distant corpses wins. The block starts with the squared radius as its best distance.
+func (d *Director) scanRegurgitate(b *d2monster.Brain, q d2monster.FBXScanQuery) d2monster.FBXScanResult {
+	best := q.Radius2
+
+	var res d2monster.FBXScanResult
+
+	for _, u := range d.sortedUnits() {
+		if u.b == b || u.merc != nil || u.ally != nil || u.mirror || u.b.Allied || u.m.Alive() || u.raising {
+			continue
+		}
+
+		if u.m.StatEx == nil || !u.m.StatEx.IsSoft {
+			continue
+		}
+
+		dx, dy := b.X-u.b.X, b.Y-u.b.Y
+		if dd := dx*dx + dy*dy; dd <= best {
+			best, res = dd, d2monster.FBXScanResult{Found: true, T: targetOf(u)}
+		}
+	}
+
+	return res
+}
+
+// FBXSiegeUpdate implements d2monster.FBXSiegeTargetStore, MONAI_KeepNearerTargetIdInAiData (0x5e0650, VERIFIED
+// batch 9): the weapon keeps the id of the unit stored in its AI data unless that unit still exists and is
+// strictly nearer than the new candidate; otherwise the candidate's id replaces it.
+func (d *Director) FBXSiegeUpdate(b *d2monster.Brain, t d2monster.Target) {
+	u := d.unitOf(b)
+	if u == nil {
+		return
+	}
+
+	if cur := d.units[u.siegeTarget]; cur != nil && u.siegeTarget != 0 {
+		cx, cy := b.X-cur.b.X, b.Y-cur.b.Y
+		nx, ny := b.X-t.X, b.Y-t.Y
+
+		if cx*cx+cy*cy < nx*nx+ny*ny {
+			return
+		}
+	}
+
+	u.siegeTarget = t.ID
+}

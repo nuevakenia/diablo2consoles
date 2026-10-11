@@ -204,7 +204,8 @@ func (g *GameControls) drink(it *diablo2item.Item) {
 	beforeMana := st.Mana
 
 	if e.InstantHPPercent > 0 {
-		st.Health = d2inventory.ApplyInstant(st.Health, st.MaxHealth, e.InstantHPPercent)
+		healed := d2inventory.ApplyInstant(st.Health, st.MaxHealth, e.InstantHPPercent)
+		st.Health += g.shareHeal(healed - st.Health) // a Blood Golem takes its share of the heal
 	}
 
 	if e.InstantManaPercent > 0 {
@@ -231,7 +232,7 @@ func (g *GameControls) advancePotions(elapsed float64) {
 	g.regenMana += mana
 
 	if whole := int(g.regenHP); whole > 0 {
-		st.Health += whole
+		st.Health += g.shareHeal(whole)
 		g.regenHP -= float64(whole)
 
 		if st.Health > st.MaxHealth {
