@@ -1,14 +1,16 @@
 scenario_name="Quest walkthrough, Act 5: Siege on Harrogath in the real world (Larzuk, Bloody Foothills, Shenk the Overseer, Larzuk's reward, quest log, .d2s)"
 # The sample hero (quests reset, Normal monsters) arrives in Harrogath, takes the quest from Larzuk, walks into the Bloody
 # Foothills, finds and kills Shenk the Overseer (the super unique of the DS1: the boss carries his own name now) and
-# returns to Larzuk for the reward (the socket reward itself is the reward dialog, not tested here).
+# returns to Larzuk for the thanks (reward pending), then has him socket a sword, which completes the quest.
 # Needs D2_TABLES + D2S_SAMPLE_BODY.
 source scripts/quest_walk_lib.zsh
 scenario_warnings_ok=1
 scenario_env() {
   # (the Bloody Foothills are no waypoint level: the hero walks across the border and back)
   local s="$(qw_begin 5)$(qw_panel 5 1)$(qw_talk Larzuk)$(qw_panel 5 1)$(qw_go 110)kill:name=Shenk,300;$(qw_panel 5 1)"
-  s+="$(qw_go 109)$(qw_talk Larzuk)$(qw_panel 5 1)exit"
+  # the thanks (20090) only keeps the reward pending (exe 0x584d60); the quest completes when Larzuk sockets an item
+  s+="$(qw_go 109)$(qw_talk Larzuk)$(qw_panel 5 1)"
+  s+="say:giveitemq lsd 2;say:pickitem lsd;move:npc=Larzuk;until:REWARD socket done,60;say:putitem;wait:2;$(qw_panel 5 1)exit"
   qw_env siege "$s"
 }
 scenario_check() {
@@ -27,6 +29,7 @@ scenario_check() {
     grep -q "QUEST A5Q1 state $t" $log.txt || { echo "FAIL: no state change $t of A5Q1"; fail=1; }
   done
   grep -q "QUEST EFFECT reward socket-quest" $log.txt || { echo "FAIL: Larzuk's socket reward"; fail=1; }
+  grep -qE "REWARD socket item=lsd sockets=[1-6]" $log.txt || { echo "FAIL: Larzuk did not socket the sword"; fail=1; }
   # the quest log: the title only (the game's string table has no page text for this quest), then the completed text
   grep -q 'QUESTPANEL act=5 quest=1 status=0 title="Siege on Harrogath"' $log.txt || { echo "FAIL: panel before the quest"; fail=1; }
   grep -q "QUESTPANEL act=5 quest=1 status=-1 .*completed" $log.txt || { echo "FAIL: panel completed text"; fail=1; }

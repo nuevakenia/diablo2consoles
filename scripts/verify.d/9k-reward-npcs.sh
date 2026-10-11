@@ -68,8 +68,10 @@ scenario_check() {
   chk 'NPC menu opened: npc="Larzuk" .*Add Sockets' "Larzuk's sockets row"
   chk 'REWARD socket item=lsd sockets=[1-6]' "Larzuk did not socket the sword"
   chk 'MERC hire refused: quest gate of seller 515|NPC menu opened: npc="Qual-Kehk"' "Qual-Kehk"
-  chk 'QUEST EFFECT reward hire-barbarians' "Qual-Kehk's reward"
-  chk 'QUEST EFFECT reward personalize' "Anya's reward"
+  # (exe-derived, w20: Qual-Kehk pays runes (Tal, Ral, Ort by the freed count), there is no barbarian-hire reward)
+  chk 'QUEST EFFECT give-item code=r07 ' "Qual-Kehk's rune reward"
+  # (exe-derived, w20: Anya's thanks only keeps the reward pending (bit 5 set); the personalisation itself is checked below)
+  chk 'QUEST A5Q4 slot=38 bits .* \(thanks heard\)' "Anya's thanks line"
   chk 'REWARD personalize item=skp name=' "Anya did not personalise"
   chk 'QUEST SPEECH npc="Larzuk"' "Larzuk's speech"
   chk 'NPC menu opened: npc="Deckard Cain" .*[Ii]dentify' "Cain's menu"

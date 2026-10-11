@@ -753,7 +753,11 @@ func TestAct5QuestLine(t *testing.T) {
 	}
 
 	// VERIFIED 0x5856a0: the item action sets bit 0 and clears bit 1
-	g.ClaimSocket()
+	// the game screen only refreshes the quest log on a log-update effect: the claim must emit one (w21 fix: the log
+	// stayed on the pending page after the sockets were added)
+	if claim := g.ClaimSocket(); !hasLogUpdate(claim) {
+		t.Errorf("socketing emitted no log-update: %+v", claim)
+	}
 
 	if !g.get(siege, FlagRewardGranted) || g.get(siege, FlagRewardPending) || g.SocketOwed() {
 		t.Fatalf("sockets added %s", g.Describe(siege))
@@ -1080,4 +1084,14 @@ func TestLogCoversAllActs(t *testing.T) {
 			t.Errorf("act %d has %d log entries, want %d", act, perAct[act], want)
 		}
 	}
+}
+
+func hasLogUpdate(eff []Effect) bool {
+	for _, e := range eff {
+		if e.Kind == EffectLogUpdate {
+			return true
+		}
+	}
+
+	return false
 }

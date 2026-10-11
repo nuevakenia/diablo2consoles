@@ -1,11 +1,14 @@
 scenario_name="Quest walkthrough, Act 3: Lam Esen's Tome in the real world (Alkor, Kurast Bazaar, Ruined Temple, tome on the altar, Alkor's reward, quest log, .d2s)"
-# The sample hero (quests reset) arrives in Kurast Docktown, takes the quest from Alkor, goes to Kurast Bazaar by
+# The sample hero (quests reset) arrives in Kurast Docktown (Alkor has nothing yet), visits Lower Kurast (the quest opens), takes
+# the quest from Alkor, goes to Kurast Bazaar by
 # waypoint and through the temple entrance into the Ruined Temple, operates the tome on its altar, picks up Lam Esen's
 # Tome, walks back to the waypoint and hands the tome to Alkor (+5 stat points). Needs D2_TABLES + D2S_SAMPLE_BODY.
 source scripts/quest_walk_lib.zsh
 scenario_warnings_ok=1
 scenario_env() {
-  local s="$(qw_begin 3)say:setwaypoint 80 1;say:setwaypoint 75 1;$(qw_panel 3 1)$(qw_talk Alkor)$(qw_panel 3 1)"
+  local s="$(qw_begin 3)say:setwaypoint 80 1;say:setwaypoint 79 1;say:setwaypoint 75 1;$(qw_panel 3 1)$(qw_talk Alkor)$(qw_panel 3 1)"
+  # (the quest opens when Lower Kurast is entered (exe-derived, w20): a visit by waypoint and back, then Alkor asks for the tome)
+  s+="wait:11;$(qw_wp 79)wait:11;$(qw_wp 75)$(qw_talk Alkor)$(qw_panel 3 1)"
   s+="wait:11;$(qw_wp 80)$(qw_go 94)$(qw_chest 193)$(qw_panel 3 1)$(qw_go 80)wait:11;$(qw_wp 75)$(qw_talk Alkor 10)$(qw_panel 3 1)exit"
   qw_env lamesen "$s"
 }
@@ -27,6 +30,9 @@ scenario_check() {
   grep -q 'QUESTPANEL act=3 quest=1 status=0 .*text=""' $log.txt || { echo "FAIL: panel before the quest"; fail=1; }
   grep -qE "QUESTPANEL act=3 quest=1 status=[1-9][0-9]* .*text=\"[A-Za-z]" $log.txt || { echo "FAIL: panel shows no page text"; fail=1; }
   grep -q "QUESTPANEL act=3 quest=1 status=-1 .*completed" $log.txt || { echo "FAIL: panel completed text"; fail=1; }
+  for t in "0->1" "1->2" "2->3" "3->4" "4->5"; do
+    grep -q "QUEST A3Q1 state $t" $log.txt || { echo "FAIL: no state change $t of A3Q1"; fail=1; }
+  done
   qw_laterquests
   qw_slot_has 17 0x1001 || { echo "FAIL: quest slot 17 is not saved as done in the .d2s"; fail=1; }
   grep -E "AUTOSCRIPT step [0-9]+ FAIL" $log.txt | cut -c1-200

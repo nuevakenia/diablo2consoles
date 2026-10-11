@@ -240,6 +240,7 @@ func (g *Game) claimNpcAction(id int, why string) []Effect {
 	}
 
 	g.globalDone(q)
+	g.emit(Effect{Kind: EffectLogUpdate, Quest: q.ID, Value: 13}) // the game screen re-reads the log on this effect
 	g.chainFrom(q)
 
 	return g.TakeEffects()
