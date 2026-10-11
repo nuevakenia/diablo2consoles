@@ -141,6 +141,7 @@ func (s *SkillRecord) PipelineSkill() *d2skill.Skill {
 		ResultFlags: s.ResultFlags, HitFlags: s.HitFlags, HitClass: s.HitClass,
 		Params:     [9]int{0, s.Param1, s.Param2, s.Param3, s.Param4, s.Param5, s.Param6, s.Param7, s.Param8},
 		Calc:       [5]*d2calc.Program{nil, s.Calc1, s.Calc2, s.Calc3, s.Calc4},
+		PrgCalc:    [4]*d2calc.Program{nil, s.Prgcalc1, s.Prgcalc2, s.Prgcalc3},
 		AuraFilter: s.Aurafilter, AuraState: s.Aurastate, AuraTargetState: s.Auratargetstate,
 		AuraLenCalc: s.Auralencalc, AuraRangeCalc: s.Aurarangecalc,
 		AuraStat: [7]string{"", s.Aurastat1, s.Aurastat2, s.Aurastat3, s.Aurastat4, s.Aurastat5, s.Aurastat6},

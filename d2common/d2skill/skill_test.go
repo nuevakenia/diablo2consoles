@@ -52,6 +52,10 @@ func skillFromRow(r row) *Skill {
 		s.Calc[i] = r.calc("calc" + strconv.Itoa(i))
 	}
 
+	for i := 1; i <= 3; i++ {
+		s.PrgCalc[i] = r.calc("prgcalc" + strconv.Itoa(i))
+	}
+
 	for i := 1; i <= 6; i++ {
 		s.AuraStat[i] = r["aurastat"+strconv.Itoa(i)]
 		s.AuraStatCalc[i] = r.calc("aurastatcalc" + strconv.Itoa(i))

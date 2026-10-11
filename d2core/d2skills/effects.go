@@ -1080,6 +1080,14 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 	}
 
 	e.traps = append(e.traps, t)
+
+	if o.TrapLife > 0 && t.cycler == "" {
+		// MONAI_Think_AssassinSentry drives the cadence, range and shot budget (sentry_ai_test.go)
+		e.monsters.SetSkillFirer(e)
+		e.monsters.ArmTrap(m, d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile,
+			Level: o.TrapLevel, Life: o.TrapLife})
+	}
+
 	e.emit("summon", "TRAP armed skill=%q missile=%s period=%d range=%d", sk.Name, missile, trapPeriod, trapRange)
 }
 
@@ -1141,6 +1149,10 @@ func (e *Engine) trapsTick() {
 		if t.cycler != "" {
 			e.cycleTick(t)
 
+			continue
+		}
+
+		if e.monsters.TrapAIDriven(t.m) {
 			continue
 		}
 

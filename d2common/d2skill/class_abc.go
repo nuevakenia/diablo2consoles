@@ -126,6 +126,10 @@ func (c *cast) summonPassives() []StatMod {
 // makes the do fail.
 func doBladeFuryFn(c *cast) {
 	interval := c.sk.Params[4]
+	if !c.sk.PrgCalc[1].Empty() {
+		interval = c.calcOrState()
+	}
+
 	if interval-1 <= 0 {
 		c.fail(ReasonMissile)
 		return

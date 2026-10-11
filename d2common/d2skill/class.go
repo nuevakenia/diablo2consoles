@@ -1607,6 +1607,7 @@ func doSummonFn(c *cast) {
 
 		// the trap fires its own skill with the damage of the trap skill
 		o.Desc = c.desc()
+		o.TrapLevel, o.TrapLife = c.sentryLife()
 	case sk.PetType == "totem":
 		o.Kind = "totem"
 		ax, ay := c.aim()

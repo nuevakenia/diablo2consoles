@@ -43,6 +43,9 @@ type TrapSpec struct {
 	SkillID   int
 	SkillName string
 	Missile   string
+	// Level is the level of the sentry's monster skill and Life the shots it may take (calc4 at that level);
+	// see d2skill.SummonOrder.TrapLevel. Life 0 = unknown: the AI is then not used (TrapAIDriven false).
+	Level, Life int
 }
 
 // SkillFirer is implemented by the skill engine. It returns whether a missile
@@ -94,4 +97,42 @@ func (d *Director) trapTick(u *unit) bool {
 	d2monster.Tick(d, u.b)
 
 	return true
+}
+
+// TrapAIDriven reports whether m is an armed sentry whose cadence the ported
+// monster AI (MONAI_Think_AssassinSentry 0x5e9480) decides, so the skill
+// engine must not fire it on its own timer. It needs a known shot budget; an
+// unarmed sentry or one of another AI keeps the old driver.
+func (d *Director) TrapAIDriven(m *d2mapentity.Monster) bool {
+	u := d.byEntity[m.ID()]
+	if d.firer == nil || u == nil || u.ally == nil || u.ally.trap == nil || u.ally.trap.Life <= 0 {
+		return false
+	}
+
+	return u.b.Def != nil && u.b.Def.Implemented && u.b.Profile != nil && u.b.Profile.AI == "AssassinSentry"
+}
+
+// SkillLevel implements d2monster.SkillCalc: the level of the monster skill
+// in a slot. An armed sentry has the level its placing skill gave it; every
+// other unit keeps the fallback the AI used before (1 when the slot is used).
+func (d *Director) SkillLevel(b *d2monster.Brain, slot int) int {
+	if u := d.unitOf(b); u != nil && u.ally != nil && u.ally.trap != nil && u.ally.trap.Level > 0 {
+		return u.ally.trap.Level
+	}
+
+	if b.Profile.Skills[slot].Used() {
+		return 1
+	}
+
+	return 0
+}
+
+// SkillCalc4 implements d2monster.SkillCalc: the shots of an armed sentry; the
+// AI's own fallback (a long life) for every other unit.
+func (d *Director) SkillCalc4(b *d2monster.Brain, _, _ int) int {
+	if u := d.unitOf(b); u != nil && u.ally != nil && u.ally.trap != nil && u.ally.trap.Life > 0 {
+		return u.ally.trap.Life
+	}
+
+	return 1000
 }
