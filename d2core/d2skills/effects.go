@@ -344,15 +344,30 @@ func (e *Engine) areaState(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 			continue
 		}
 
+		if curse && m.Stat != nil && !d2skill.CurseAlignmentOK(sk.SrvDoFunc, ef.State, int(m.Stat.Alignment)) {
+			e.emit("state", "STATE curse refused skill=%q unit=%s (alignment)", sk.Name, m.Label())
+
+			continue
+		}
+
 		n++
 
-		e.applyMonsterState(m, d2state.Instance{Name: ef.State, Until: e.frame + frames, Mods: statMods(ef.Stats),
+		mf := frames
+		if curse { // VERIFIED 0x5c1590 / 0x5c1990 / 0x5c1d60: the length is divided by AiCurseDivisor
+			mf = d2skill.CurseFrames(sk.SrvDoFunc, ef.State, frames, e.curseDivisor(m))
+		}
+
+		e.applyMonsterState(m, d2state.Instance{Name: ef.State, Until: e.frame + mf, Mods: statMods(ef.Stats),
 			Source: p.ID(), SkillID: sk.ID, Level: ef.Level})
-		e.emit("state", "STATE apply skill=%q unit=%s state=%s frames=%d stats=%s", sk.Name, m.Label(), ef.State, frames,
+		e.emit("state", "STATE apply skill=%q unit=%s state=%s frames=%d stats=%s", sk.Name, m.Label(), ef.State, mf,
 			describeMods(ef.Stats))
 	}
 
 	for _, rv := range e.rivalsNear(cx, cy, ef.Radius) {
+		if curse && d2skill.CurseMonstersOnly(ef.State) { // 0x5c1380: Dim Vision and Terror refuse non-monsters
+			continue
+		}
+
 		n++
 
 		e.setOf(rv.ID()).Apply(e.frame, d2state.Instance{Name: ef.State, Until: e.frame + frames, Mods: statMods(ef.Stats),
@@ -808,6 +823,10 @@ func (e *Engine) alivePets(heroID, petType string) []*d2mapentity.Monster {
 func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect) {
 	o := ef.Summon
 	key := o.Key
+
+	if d2skill.AttachesSummonMastery(sk.SrvDoFunc) { // 0x5c1f20: Summon Resist reaches the new minion
+		o.SummonResist = u.Stat(d2skill.SummonResistStat)
+	}
 
 	stat := e.monsters.FindStat(key)
 	if stat == nil {

@@ -870,6 +870,20 @@ func (e *Engine) coldDivisors(m *d2mapentity.Monster) (chill, freeze int) {
 	return divisorsFor(e.asset.Records.DifficultyLevels, int(m.Vitals.Difficulty))
 }
 
+// curseDivisor is DifficultyLevels AiCurseDivisor of the monster's difficulty (0x5c1570, VERIFIED); 0 when the
+// table is not loaded (no division).
+func (e *Engine) curseDivisor(m *d2mapentity.Monster) int {
+	if e.asset == nil || e.asset.Records == nil {
+		return 0
+	}
+
+	if rec := e.asset.Records.DifficultyLevels[d2enum.DifficultyType(int(m.Vitals.Difficulty))]; rec != nil {
+		return rec.AiCurseDivisor
+	}
+
+	return 0
+}
+
 // staticFieldFloor is the StaticFieldMin column of the monster's difficulty
 // (0, 33, 50 in the 1.14b table); def when the table has no row for it.
 func (e *Engine) staticFieldFloor(m *d2mapentity.Monster, def int) int {

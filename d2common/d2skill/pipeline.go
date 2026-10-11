@@ -406,6 +406,9 @@ type SummonOrder struct {
 	// skill, VERIFIED 0x5c4600 / 0x5c4800): that percent of every blow the golem would take is taken from its
 	// owner's life instead, and that percent of every healing the owner receives goes to the golem.
 	OwnerDamagePct, HealSharePct int
+	// SummonResist is the owner's passive_summon_resist (stat 0x15d, Summon Resist) for the skills that call
+	// SKILL_AttachSummonMasteryStatList (AttachesSummonMastery); the engine fills it at the cast.
+	SummonResist int
 	// Makers, set on the first wall of Bone Wall (SrvDoFunc 60), asks the
 	// consumer to launch the two perpendicular wall-maker missiles once the
 	// first piece stands (see WallMakers).
