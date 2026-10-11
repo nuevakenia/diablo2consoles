@@ -912,6 +912,8 @@ func (s *Sim) process(m *Missile, t Target) {
 			dmg.Cold = dmg.Cold * int32(m.ScalePct) / 100
 		}
 
+		s.dmgFunc(m, &dmg)
+
 		s.emit(Event{Kind: EventHit, Missile: m, Target: t, Damage: dmg, Chance: chance, Roll: roll})
 	}
 

@@ -134,7 +134,7 @@ var CoverageNPSD = []CoverageRow{
 	{240, "Twister", "Druid", "118", "P", "F", "VERIFIED 0x5c52c0 / 0x5c5000: calc1 twisters, ALL through the shared per-missile hook (no straight first one, no fan); wave 20: path type 10 wired (PathType10Nodes, 0x67d160), the twister pulses are SrvDoFunc 27"},
 	{241, "Vines", "Druid", "115", "M", "F", "VERIFIED wave 20: like Cycle of Life but the VineCycler restores mana (SrvDoFunc 33 0x5ada80, dm12 over 1..8 percent of maximum mana); the vinecreature monster has VineCycler only"},
 	{242, "Hunger", "Druid", "122", "M", "F", "do 122 added: melee roll, calc1 damage percent, life and mana steal (verified 0x5c5f40)"},
-	{243, "Shock Wave", "Druid", "8", "P", "P", "missile fan with stun"},
+	{243, "Shock Wave", "Druid", "8", "P", "P", "missile fan (do 8, calc1 = 5 shockwave missiles; the fan geometry is still the 8 degree stand-in of Multiple Shot). Wave 20: the stun is the exe rule, SrvDmgFunc 7 0x5aaef0: Param1 + (level-1) * Param2 frames (40 + 15 per level) and hit class 0x60 on every hit of the shockwave missile (d2missile.StunLength)"},
 	{244, "Volcano", "Druid", "123", "P", "P", "SRVDO_123 creates volcano with a random data byte; SrvDoFunc 28 lobs debris, hit 51 spawns the fire; bodies read"},
 	{245, "Tornado", "Druid", "118", "P", "F", "same do function as Twister (calc1 = 1); the tornado missile (SrvDoFunc 27) is modelled and wave 20 wired its path type 10 (0x67d160)"},
 	{246, "Spirit of Barbs", "Druid", "119", "P", "F", "VERIFIED (batch 5) aurafilter 0x10103 through filter 0x569100: the totem aura reaches the hero, the mercenary and the summoned minions inside aurarangecalc (minions through d2monsters.AuraBoost: damage, attack rating and life percent; thorns on minions not applied)"},

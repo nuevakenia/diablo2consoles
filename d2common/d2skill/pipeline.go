@@ -885,7 +885,7 @@ func needsSkillInfo(ms *d2missile.Spec) bool {
 		return true
 	}
 
-	return ms.SrvDoFunc == 30
+	return ms.SrvDoFunc == 30 || ms.SrvDmgFunc == 7
 }
 
 // effectHook turns the states the missile functions apply (Howl, Shout, Battle
