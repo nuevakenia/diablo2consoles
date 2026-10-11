@@ -14,8 +14,19 @@ scenario_env() {
   # The Den pack is lethal for a level 1 hero with a plain attack since the monster modifiers are applied (leader
   # +300% life, followers +100%, ported from the exe; wave 20): a player comes to the Den with a few levels. The
   # Sorceress takes 4 levels from the console and puts the points into Fire Bolt before she enters the cave.
-  local den_prep=""
-  [ "$cls" = Sorceress ] && den_prep="say:levelup 4;skill:spend=Fire Bolt;skill:spend=Fire Bolt;skill:spend=Fire Bolt;skill:spend=Fire Bolt;"
+  local den_prep="" den_skill=""
+  # every class does the same: the best level 1 attack skill of the class (skills.txt, no prerequisites) gets the
+  # points (6 levels); the Sorceress casts it by the legacy "any spell with points" path, the others also put it on the left
+  # button like a player would
+  case $cls in
+    Sorceress) den_skill="Fire Bolt" ;; Amazon) den_skill="Jab" ;;  # she starts with a javelin, no bow
+ Necromancer) den_skill="Teeth" ;;
+    Paladin) den_skill="Smite" ;; Barbarian) den_skill="Bash" ;; Druid) den_skill="Firestorm" ;; Assassin) den_skill="Tiger Strike" ;;
+  esac
+  # 6 levels (a level 7 hero, 6 points): with 4 the Sorceress still died once in the Den (w21 run, flake log kept)
+  den_prep="say:levelup 6;"
+  repeat 6 den_prep+="skill:spend=$den_skill;"
+  [ "$cls" = Sorceress ] || den_prep+="skill:left=$den_skill;"
   {
     echo '#!/bin/zsh'
     echo "export OD2_PORT=$OD2_PORT OD2_AUTONEWCHAR=$cls OD2_AUTONEWCHAR_NAME=Playtest OD2_D2S_WRITEBACK=$a1/new OD2_AUTOEXIT=1"

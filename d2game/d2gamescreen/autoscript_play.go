@@ -292,6 +292,12 @@ func (v *Game) advanceKill(elapsed float64) {
 	alive := v.killAlive(k)
 
 	if alive == 0 || k.elapsed >= k.deadline {
+		// the last target died in the tick the count reached zero: that is a kill too
+		if k.target != nil && !k.target.Alive() {
+			k.kills++
+			k.target = nil
+		}
+
 		v.Infof("KILL done: kills=%d of %d remaining=%d skipped=%d elapsed=%.1fs potions=%d",
 			k.kills, k.start, alive, len(k.skip), k.elapsed, k.potions)
 

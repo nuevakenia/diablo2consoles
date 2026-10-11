@@ -5,30 +5,68 @@ Act 1 to 5 chain one scenario at a time through `scripts/verify.sh` with `OD2_HE
 `d2core/d2hero/herogen` (`scripts/verify.d/lib/hero.sh`), except 9b, which starts a brand new level 1 hero of the class.
 The scripted fights cast the class' left skill (`d2game/d2gamescreen/fightskill.go`), real combat, no god mode.
 
-Last update 2026-10-10 11:58, commit `b442a50b`, 35 run(s) in the table. A cell is *result runtime deaths*:
+Last update 2026-10-11 16:26, commit `e76a4bce`, 35 run(s) in the table. A cell is *result runtime deaths*:
 `PASS` / `PASS*` (passed on the second attempt that verify.sh makes) / `FAIL`, wall clock, deaths of the hero (`d`).
 
-| class | 9e Act 2 | total | deaths | passed |
-|---|---|---|---|---|
-| amazon | PASS 3m10s d0 | 3m10s | 0 | 1/1 |
-| sorc | PASS 3m51s d0 | 3m51s | 0 | 1/1 |
-| necro | PASS 3m29s d0 | 3m29s | 0 | 1/1 |
-| paladin | PASS 3m21s d0 | 3m21s | 0 | 1/1 |
-| barb | PASS 3m26s d0 | 3m26s | 0 | 1/1 |
-| druid | PASS 3m56s d0 | 3m56s | 0 | 1/1 |
-| assassin | PASS 3m23s d0 | 3m23s | 0 | 1/1 |
+| class | 9b Act 1 (fresh) | 9e Act 2 | 9g Act 3 | 9h Acts 4+5 | 9i Act 5 caves | total | deaths | passed |
+|---|---|---|---|---|---|---|---|---|
+| amazon | PASS 2m35s d0 | PASS 0m36s d0 | PASS 1m14s d0 | PASS 1m15s d0 | PASS 1m06s d0 | 6m46s | 0 | 5/5 |
+| sorc | PASS 2m44s d0 | PASS 1m02s d0 | PASS 1m50s d0 | PASS 1m01s d0 | PASS 1m20s d0 | 7m57s | 0 | 5/5 |
+| necro | PASS 2m38s d0 | PASS 0m41s d0 | PASS 1m16s d0 | PASS 1m16s d0 | PASS 1m17s d0 | 7m08s | 0 | 5/5 |
+| paladin | PASS 2m45s d0 | PASS 0m59s d0 | PASS 2m48s d0 | PASS 1m17s d0 | PASS 0m48s d0 | 8m37s | 0 | 5/5 |
+| barb | PASS 2m55s d0 | PASS 0m34s d0 | PASS 1m11s d0 | PASS 0m58s d0 | PASS 0m47s d0 | 6m25s | 0 | 5/5 |
+| druid | PASS 2m33s d0 | PASS 0m42s d0 | PASS 1m46s d0 | PASS 1m59s d0 | PASS 1m25s d0 | 8m25s | 0 | 5/5 |
+| assassin | PASS 2m34s d0 | PASS 1m18s d0 | PASS 1m14s d0 | PASS 1m08s d0 | PASS 1m02s d0 | 7m16s | 0 | 5/5 |
 
 ## First anomaly of every run
 
 | class | scenario | result | runtime | deaths | first anomaly |
 |---|---|---|---|---|---|
-| amazon | 9e-act2-playthrough | PASS | 3m10s | 0 | [Game Server][WARNING] D2S export: container item "dr2": 1 stat(s) the save cannot hold were left out |
-| sorc | 9e-act2-playthrough | PASS | 3m51s | 0 | [Game Server][WARNING] D2S export: container item "ywn": 2 stat(s) the save cannot hold were left out |
-| necro | 9e-act2-playthrough | PASS | 3m29s | 0 | [Game Server][WARNING] D2S export: container item "tax": 6 stat(s) the save cannot hold were left out |
-| paladin | 9e-act2-playthrough | PASS | 3m21s | 0 | [Game Server][WARNING] D2S export: container item "flc": 2 stat(s) the save cannot hold were left out |
-| barb | 9e-act2-playthrough | PASS | 3m26s | 0 | [Game Server][WARNING] D2S export: container item "ba1": 1 stat(s) the save cannot hold were left out |
-| druid | 9e-act2-playthrough | PASS | 3m56s | 0 | none |
-| assassin | 9e-act2-playthrough | PASS | 3m23s | 0 | [Game Server][WARNING] D2S export: container item "tax": 1 stat(s) the save cannot hold were left out |
+| amazon | 9b-act1-playthrough | PASS | 2m35s | 0 | [Game Server][WARNING] D2S export: container item "dgr": 4 stat(s) the save cannot hold were left out |
+| amazon | 9e-act2-playthrough | PASS | 0m36s | 0 | [Game Screen][WARNING] gave up walking to "Amulet" |
+| amazon | 9g-act3-playthrough | PASS | 1m14s | 0 | none |
+| amazon | 9h-act45-playthrough | PASS | 1m15s | 0 | none |
+| amazon | 9i-act5-caves-playthrough | PASS | 1m06s | 0 | none |
+| sorc | 9b-act1-playthrough | PASS | 2m44s | 0 | none |
+| sorc | 9e-act2-playthrough | PASS | 1m02s | 0 | [Game Screen][WARNING] gave up walking to "Scroll of Identify" |
+| sorc | 9g-act3-playthrough | PASS | 1m50s | 0 | none |
+| sorc | 9h-act45-playthrough | PASS | 1m01s | 0 | none |
+| sorc | 9i-act5-caves-playthrough | PASS | 1m20s | 0 | none |
+| necro | 9b-act1-playthrough | PASS | 2m38s | 0 | none |
+| necro | 9e-act2-playthrough | PASS | 0m41s | 0 | [Game Server][WARNING] D2S export: container item "ob2": 1 stat(s) the save cannot hold were left out |
+| necro | 9g-act3-playthrough | PASS | 1m16s | 0 | none |
+| necro | 9h-act45-playthrough | PASS | 1m16s | 0 | none |
+| necro | 9i-act5-caves-playthrough | PASS | 1m17s | 0 | none |
+| paladin | 9b-act1-playthrough | PASS | 2m45s | 0 | [Game Server][WARNING] D2S export: container item "hax" (page 1) not written: quality 6 of hax cannot be written (rare/crafted names are not modelled) |
+| paladin | 9e-act2-playthrough | PASS | 0m59s | 0 | [Game Server][WARNING] D2S export: container item "tax": 3 stat(s) the save cannot hold were left out |
+| paladin | 9g-act3-playthrough | PASS | 2m48s | 0 | none |
+| paladin | 9h-act45-playthrough | PASS | 1m17s | 0 | none |
+| paladin | 9i-act5-caves-playthrough | PASS | 0m48s | 0 | [Game Screen][WARNING] KILL giving up for now on "Dark Lancer" at (49.6,124.2): hero at (52.8,126.8) cannot get closer than 2.9 tiles |
+| barb | 9b-act1-playthrough | PASS | 2m55s | 0 | none |
+| barb | 9e-act2-playthrough | PASS | 0m34s | 0 | [Game Server][WARNING] D2S export: container item "ba1": 2 stat(s) the save cannot hold were left out |
+| barb | 9g-act3-playthrough | PASS | 1m11s | 0 | none |
+| barb | 9h-act45-playthrough | PASS | 0m58s | 0 | none |
+| barb | 9i-act5-caves-playthrough | PASS | 0m47s | 0 | [Game Screen][WARNING] KILL giving up for now on "Dark Lancer" at (49.2,124.2): hero at (52.6,126.6) cannot get closer than 2.8 tiles |
+| druid | 9b-act1-playthrough | PASS | 2m33s | 0 | none |
+| druid | 9e-act2-playthrough | PASS | 0m42s | 0 | [Game Server][WARNING] D2S export: container item "scm": 3 stat(s) the save cannot hold were left out |
+| druid | 9g-act3-playthrough | PASS | 1m46s | 0 | none |
+| druid | 9h-act45-playthrough | PASS | 1m59s | 0 | none |
+| druid | 9i-act5-caves-playthrough | PASS | 1m25s | 0 | none |
+| assassin | 9b-act1-playthrough | PASS | 2m34s | 0 | [Game Screen][WARNING] KILL giving up for now on "Zombie" at (26.6,19.8): hero at (32.4,40.4) cannot get closer than 13.6 tiles |
+| assassin | 9e-act2-playthrough | PASS | 1m18s | 0 | none |
+| assassin | 9g-act3-playthrough | PASS | 1m14s | 0 | none |
+| assassin | 9h-act45-playthrough | PASS | 1m08s | 0 | none |
+| assassin | 9i-act5-caves-playthrough | PASS | 1m02s | 0 | none |
+
+## First pass before the fixes (w21), seconds
+
+Cells above are the final runs. In the first pass (3 games in parallel) these cells were different:
+sorc 9b PASS* 302 (first attempt: hero died in the Den), paladin 9b FAIL 312 (d1), barb 9h PASS* 1340 (first attempt reaped, stuck),
+sorc 9h FAIL 1788 (both attempts reaped), paladin 9i FAIL 1759 (both attempts reaped), barb 9i FAIL 2129 (both attempts reaped).
+After the fixes: paladin 9b 165, paladin 9i 48, sorc 9b 164, sorc 9h 61, barb 9h 58, barb 9i 47, all PASS first attempt.
+Causes: a new hero wore nothing of its starting kit (Smite needs a shield), 9b levels the class' best level 1 attack skill
+before the Den, and a defensive fight of the exit walk that ended at once without a kill restarted every tick and froze the walk
+(`level_edges.go`: pause after a quick or three fruitless fights). Failure logs: `/tmp/od2-flake-logs`-style folders `/tmp/w21/flake*`.
 
 ## How to run
 

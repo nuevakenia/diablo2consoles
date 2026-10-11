@@ -75,6 +75,7 @@ func (f *HeroStateFactory) ImportD2S(data []byte) (*HeroState, error) {
 		state.Stats.Level = clampLevel(int(header.Level))
 		state.Stats.NextLevelExp = f.asset.Records.GetExperienceBreakpoint(hero, state.Stats.Level)
 		state.Containers = f.StartingContainers(hero)
+		f.wearStartingEquipment(state, hero)
 
 		return state, nil
 	}

@@ -126,4 +126,52 @@ func (f *HeroStateFactory) giveStartingItemsToFreshHero(state *HeroState, hero d
 	if c := f.StartingContainers(hero); c != nil && len(c.Items) > 0 {
 		state.Containers = c
 	}
+
+	f.wearStartingEquipment(state, hero)
+}
+
+// starterBodyItem is a starting item of CharStats.txt that is worn (location rarm, larm, tors, ...).
+type starterBodyItem struct {
+	Code string
+	Slot int // the .d2s equipment slot
+}
+
+// starterBodyItems lists the worn starting items of a class from the item1..item10 columns, in order.
+func starterBodyItems(codes, locs []string) []starterBodyItem {
+	var out []starterBodyItem
+
+	for i, code := range codes {
+		code = strings.TrimSpace(code)
+		if code == "" || code == "0" || i >= len(locs) {
+			continue
+		}
+
+		if slot := starterSlot(locs[i]); slot > 0 {
+			out = append(out, starterBodyItem{Code: code, Slot: slot})
+		}
+	}
+
+	return out
+}
+
+// wearStartingEquipment puts the worn starting items of the class (the Paladin's sword and buckler, the
+// Sorceress' short staff, ...) on the body of a brand new hero. The lobby's 335 byte .d2s has no items, and the
+// game hands out the kit at the first game (StartingContainers does the potions and scrolls); without it a new
+// Paladin could not cast Smite (a shield is its requirement) and every new hero fought bare-handed. Only the
+// combat model (state.Equipment) is filled: the item-less file stays item-less, so the first save exports no
+// worn item that "is not from the save".
+func (f *HeroStateFactory) wearStartingEquipment(state *HeroState, hero d2enum.Hero) {
+	rec := f.asset.Records.Character.Stats[hero]
+	if rec == nil {
+		return
+	}
+
+	for _, it := range starterBodyItems(rec.StartItem[:], rec.StartItemLocation[:]) {
+		switch {
+		case f.asset.Records.Item.Armors[it.Code] != nil:
+			f.equipArmor(&state.Equipment, uint8(it.Slot), it.Code)
+		case f.asset.Records.Item.Weapons[it.Code] != nil:
+			f.equipWeapon(&state.Equipment, uint8(it.Slot), it.Code)
+		}
+	}
 }
