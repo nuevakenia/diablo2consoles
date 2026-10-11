@@ -1091,7 +1091,9 @@ func (g *GameControls) AutoPanel(name string) error {
 	}
 
 	if !panel.IsOpen() {
-		return fmt.Errorf("panel %q did not open", name)
+		// openLeftPanel/openRightPanel do nothing while the help overlay or the escape menu is showing: say which
+		return fmt.Errorf("panel %q did not open (help=%t escape_menu=%t)", name, g.HelpOverlay.IsOpen(),
+			g.escapeMenu.IsOpen())
 	}
 
 	if name == "character" {
