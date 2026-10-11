@@ -168,41 +168,47 @@ func mercDecideAttack(c *Ctx, w MercWorld, t Target, dist int) {
 		b.Scratch[0] = 0
 	}
 
-	inRange := w.InRange(b, t, dist)
-
-	if w.IsRanged(b) {
-		switch {
-		case dist <= 3 && inRange:
+	if mercCloseBranch(b.Class) {
+		// monstats AIParam1 != 0 (desert guard, barbarians): fight at arm's
+		// length; edge distance < 3 and in melee reach: wait on a bump, else
+		// cast; otherwise run at the target (VERIFIED, 0x5e3fa0).
+		if dist < 3 && w.InRange(b, t, dist) {
 			if bump {
 				c.Sleep(10)
 
 				return
 			}
-		case inRange: // UNVERIFIED: the exe walks to range with FUN_005ddae0; shooting from where it stands is the safe reading
-		default:
-			if c.WalkTo(t, meleeReach) {
-				return
-			}
 
-			c.Sleep(10)
+			finishCast(c, w.ChooseAndCast(b, t, dist))
 
+			return
+		}
+
+		if c.RunTo(t, 1) {
+			return
+		}
+
+		c.Sleep(10)
+
+		return
+	}
+
+	// AIParam1 == 0 (rogue archer, Iron Wolf; VERIFIED): within 3 tiles half
+	// of the time step to a random spot near the target, else away from it; if
+	// neither works fall through to the skill choice. The skill chooser itself
+	// walks into reach.
+	if dist < 4 && b.Roll(100) < 0x32 {
+		if c.WalkNearRandom(t, 4) {
+			return
+		}
+
+		if c.WalkAway(t, 4) {
 			return
 		}
 
 		finishCast(c, w.ChooseAndCast(b, t, dist))
 
 		return
-	}
-
-	if dist < 4 && b.Chance(50) {
-		// UNVERIFIED which of "near" and "away" is taken: alternate on the RNG
-		if b.Chance(50) {
-			if c.WalkNearRandom(t, 4) {
-				return
-			}
-		} else if c.WalkAway(t, 4) {
-			return
-		}
 	}
 
 	if bump {
@@ -213,6 +219,12 @@ func mercDecideAttack(c *Ctx, w MercWorld, t Target, dist int) {
 
 	finishCast(c, w.ChooseAndCast(b, t, dist))
 }
+
+// mercCloseBranch reports the classes whose monstats AIParam1 is non-zero
+// (desert guard 338, barbarians 560/561): VERIFIED against the data, not the
+// "ranged" flag the first notes assumed (verify-merc.md item 7, re-read from
+// 0x5e3fa0 in wave 20).
+func mercCloseBranch(class int) bool { return class == 338 || class == 560 || class == 561 }
 
 // WalkNearRandom is MONAI_WalkNearTargetRandom(target, n): walk to a random
 // point within n subtiles of the target (U: the notes only say the offsets

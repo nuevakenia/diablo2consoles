@@ -176,8 +176,7 @@ func TestAuditCosts(t *testing.T) {
 }
 
 // TestAuditSkills: skill slots are contiguous (the choice stops at the first
-// empty slot), modes are the known ones, skill levels stay within 1..32 at
-// every merc level.
+// empty slot), modes are the known ones, skill levels stay within 0..32 (1..32 from the row's base level).
 func TestAuditSkills(t *testing.T) {
 	tab := loadReal(t)
 
@@ -202,7 +201,7 @@ func TestAuditSkills(t *testing.T) {
 			}
 
 			for l := 1; l <= MaxLevel; l++ {
-				if got := r.SkillLevel(i, l); got < 1 || got > 32 {
+				if got := r.SkillLevel(i, l); got < 0 || got > 32 || (l >= r.Level && got < 1) { // absent (0) only below the base level
 					t.Fatalf("id %d skill %q level %d -> %d", r.ID, s.Name, l, got)
 				}
 			}
@@ -218,7 +217,7 @@ func TestAuditSkills(t *testing.T) {
 		}
 
 		for _, lvl := range []int{3, 10, 24} {
-			if got, want := r.SkillLevel(i, lvl), maxInt(1, s.Level+(s.LvlPerLvl*(lvl-r.Level))>>5); got != want {
+			if got, want := r.SkillLevel(i, lvl), maxInt(0, s.Level+(s.LvlPerLvl*(lvl-r.Level))>>5); got != want {
 				t.Errorf("Fire Arrow at %d = %d, want %d", lvl, got, want)
 			}
 		}

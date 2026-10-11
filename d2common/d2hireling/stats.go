@@ -153,3 +153,16 @@ func (t *Table) StartExp(id, level int) uint32 {
 
 	return uint32(ExpThreshold(level, r.ExpPerLvl))
 }
+
+// LifeRegenStat is stat 0x4a that MERC_SetLevelStats 0x570690 sets: the base
+// maximum life stat (the 256-fixed value) divided by 2000, never negative (V
+// formula). UNVERIFIED: how the unit regeneration code spends the stat (rate
+// per frame), so the port does not apply it yet.
+func LifeRegenStat(maxHP int) int {
+	v := maxHP * 256 / 2000
+	if v < 0 {
+		return 0
+	}
+
+	return v
+}

@@ -72,7 +72,7 @@ func TestHireableAttackAndIdle(t *testing.T) {
 	// enemy in sight: the skill chooser runs
 	f, b := newMerc(8)
 	f.hasTarget, f.attackOK = true, true
-	f.dist = 6
+	f.dist = 2
 
 	Tick(f, b)
 
@@ -83,7 +83,7 @@ func TestHireableAttackAndIdle(t *testing.T) {
 	// a failed cast sleeps 10 frames instead of spinning
 	f, b = newMerc(8)
 	f.hasTarget, f.attackOK, f.cast = true, true, CastFailed
-	f.dist = 6
+	f.dist = 2
 
 	Tick(f, b)
 
@@ -117,7 +117,7 @@ func TestHireablePressureThreshold(t *testing.T) {
 	// the desert guard (338) uses the fixed threshold 0x62 = 98: almost every
 	// roll is below it, so the pressure counter stays 0 and it casts
 	f, b := newMerc(8)
-	f.hasTarget, f.attackOK, f.dist = true, true, 6
+	f.hasTarget, f.attackOK, f.dist = true, true, 2
 	casts := 0
 
 	for i := 0; i < 200; i++ {
@@ -159,5 +159,52 @@ func TestHireablePressureThreshold(t *testing.T) {
 
 	if casts < 60 || casts > 330 {
 		t.Errorf("level-1 archer casts = %d of 400, want a minority", casts)
+	}
+}
+
+// The desert guard (AIParam1 != 0) runs at a target farther than 2 edge tiles
+// instead of casting; the rogue (AIParam1 == 0) casts from range (the chooser
+// walks in) and only shuffles within 3 tiles (VERIFIED 0x5e3fa0, wave 20).
+func TestHireableBranchByAIParam(t *testing.T) {
+	f, b := newMerc(8)
+	f.hasTarget, f.attackOK, f.dist = true, true, 6
+	Tick(f, b)
+
+	if f.casts != 0 || f.last() != "run-target/1" {
+		t.Errorf("guard far target: casts=%d log=%v", f.casts, f.log)
+	}
+
+	f, b = newMerc(8)
+	b.Class = 271
+	f.level = 98
+	f.hasTarget, f.attackOK, f.dist = true, true, 8
+	Tick(f, b)
+
+	if f.casts != 1 {
+		t.Errorf("rogue far target: casts=%d log=%v", f.casts, f.log)
+	}
+
+	shuffled := 0
+
+	f, b = newMerc(8)
+	b.Class = 271
+	f.level = 98
+	f.hasTarget, f.attackOK, f.dist = true, true, 2
+
+	for i := 0; i < 200; i++ {
+		b.Wake = 0
+		f.frame = i
+		f.log = nil
+
+		before := f.casts
+		Tick(f, b)
+
+		if f.casts == before && len(f.log) > 0 {
+			shuffled++
+		}
+	}
+
+	if shuffled < 50 || shuffled > 150 {
+		t.Errorf("rogue shuffled %d of 200 within 3 tiles, want about half", shuffled)
 	}
 }
