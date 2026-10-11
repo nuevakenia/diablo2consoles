@@ -205,4 +205,4 @@ legitimate copy of the game. Reverse-engineering notes cover interoperability on
 
 ## Where help is needed
 
-See [docs/HELP_WANTED.md](docs/HELP_WANTED.md): what is verified, what is guessed, what is parked, and where a Mac player or a Ghidra reader can help most. The latest landing is `integration` 47989eb2 (headline about 88.6% on the v1 bars; the human play-through and human listen bars are tracked under v2 in `docs/progress.json`).
+See [docs/HELP_WANTED.md](docs/HELP_WANTED.md): what is verified, what is guessed, what is parked, and where a Mac player or a Ghidra reader can help most. The latest landing is `integration` caa70b0a (headline about 88.6% on the v1 bars; the human play-through and human listen bars are tracked under v2 in `docs/progress.json`).

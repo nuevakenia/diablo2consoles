@@ -1,6 +1,6 @@
 # Where help is needed
 
-Status handoff (2026-10-10, integration 47989eb2). The fork is a native Apple-Silicon macOS Diablo II built on OpenDiablo2 (Go + Ebiten),
+Status handoff (2026-10-10, integration caa70b0a). The fork is a native Apple-Silicon macOS Diablo II built on OpenDiablo2 (Go + Ebiten),
 using the owner's own 1.14b + Lord of Destruction files. Nothing in this repository contains game data or Blizzard
 code. Every number in the engine comes from reading the original executable (read-only, in Ghidra) or from public
 format documentation; items marked UNVERIFIED in code or in `docs/KNOWN_GAPS.md` are guesses.
@@ -19,9 +19,11 @@ playthroughs run in turbo mode (`OD2_TURBO`, `~/git/d2-re-notes/turbo-mode.md` i
   under v2.
 - **Sound and music** have never been confirmed by a human listen.
 
+Recent fixes you can verify by hand: menus scale to the window at any size; a character created in the menu keeps its own map seed (town layout stays the same on reload).
+
 ## Engine fidelity (needs a Ghidra reader)
 
-- Skills with approximate behaviour: 168 of 210 have engine behaviour. Open: Blood Golem, Fire Golem, Armageddon
+- Skills with approximate behaviour: 171 of 210 have engine behaviour. Open: Blood Golem, Fire Golem, Armageddon
   meteors, Conversion flag bits, Holy Bolt healing remote party members (needs a packet), Charged Strike aim and
   Fend/Zeal hit cadence (8-frame guess), Strafe/Lightning Strike extras on the client.
 - Monster AI: 128 of 148 are ported faithfully. Open: Shadow Master feed, Zealot fear gate, Regurgitator and Siege
