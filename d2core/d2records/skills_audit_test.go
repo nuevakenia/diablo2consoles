@@ -186,7 +186,9 @@ func castOnce(reg *d2skill.Registry, mt *MissileTable, id, lvl int) (out castOut
 
 	u := &auditUnit{reg: reg, self: id, lvl: lvl, player: true, rng: d2rand.New(1), mana: 5000 << 8, cd: map[int]int{}}
 	tg := d2skill.Target{X: 55, Y: 50, Unit: w.foe, UX: 55, UY: 50, Corpse: true, CX: 55, CY: 50,
-		CorpseID: "c1", CorpseHP: 200, CorpseKey: "zombie", CorpseLevel: 5}
+		CorpseID: "c1", CorpseHP: 200, CorpseKey: "zombie", CorpseLevel: 5,
+		// Iron Golem needs a usable ground weapon or armor item (SRVST_020, batch 5)
+		GroundItem: &d2skill.GroundItem{ID: "item1", X: 55, Y: 50, Valid: true}}
 
 	st := p.Start(u, id, tg)
 	out.StartOK, out.Reason = st.OK, st.Reason
