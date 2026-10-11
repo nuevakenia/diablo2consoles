@@ -400,3 +400,34 @@ func TestFxStockConstants(t *testing.T) {
 		}
 	}
 }
+
+// TestFxDenPackLife pins the cause of the 9b Act 1 playthrough failures of wave 20: a super unique pack (the Den of
+// Evil's) now gets the full init loop, so on Normal the leader has 4x and each follower 2x its base life
+// (monumod.txt constants rows 1 and 7). A level 1 hero with a plain attack no longer clears the Den; the scenario
+// brings a levelled Sorceress with Fire Bolt (scripts/verify.d/9b-act1-playthrough.sh).
+func TestFxDenPackLife(t *testing.T) {
+	leader := newStub()
+	leader.stats[7], leader.stats[6] = 40<<8, 40<<8
+
+	members := make([]FxUnit, 0, 5)
+	stubs := make([]*fxStub, 0, 5)
+
+	for i := 0; i < 5; i++ {
+		m := newStub()
+		m.stats[7], m.stats[6] = 20<<8, 20<<8
+		members = append(members, m)
+		stubs = append(stubs, m)
+	}
+
+	stockCtx(0).ApplyInit(leader, nil, members)
+
+	if got := leader.stats[7] >> 8; got != 160 {
+		t.Errorf("leader life %d, want 160 (+300%%)", got)
+	}
+
+	for i, m := range stubs {
+		if got := m.stats[7] >> 8; got != 40 {
+			t.Errorf("follower %d life %d, want 40 (+100%%)", i, got)
+		}
+	}
+}
