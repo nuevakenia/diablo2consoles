@@ -409,6 +409,9 @@ type SkillResource struct {
 }
 
 // OnKeyRepeat is called to handle repeated key presses
+// IsEscapeMenuOpen says whether the game menu is showing.
+func (g *GameControls) IsEscapeMenuOpen() bool { return g.escapeMenu != nil && g.escapeMenu.IsOpen() }
+
 func (g *GameControls) OnKeyRepeat(event d2interface.KeyEvent) bool {
 	if g.FreeCam {
 		var moveSpeed float64 = 8

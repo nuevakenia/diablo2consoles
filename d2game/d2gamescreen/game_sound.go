@@ -65,6 +65,7 @@ func (v *Game) advanceSound(elapsed float64) {
 	pos := v.localPlayer.GetPosition()
 	v.soundEngine.SetListenerSubtile(pos.X(), pos.Y())
 	v.soundEnv.SetDayPhase(v.currentDayPhase().Phase())
+	v.soundEngine.SetPanelOpen(v.gameControls != nil && v.gameControls.IsEscapeMenuOpen())
 	v.advanceHeroFootsteps(elapsed)
 }
 

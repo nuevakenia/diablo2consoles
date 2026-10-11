@@ -424,7 +424,7 @@ func TestSoloDucksOthers(t *testing.T) {
 		h.b.Advance()
 	}
 
-	if v := h.players[0].vol; math.Abs(v-0.7) > 1e-9 {
+	if v := h.players[0].vol; math.Abs(v-178.0/255) > 1e-9 {
 		t.Errorf("non-solo ducks to 70%%, got %v", v)
 	}
 
