@@ -25,7 +25,7 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 12 | Multiple Shot | 4/8 | 11/17 | fully simulated | fully simulated |  |
 | 13 | Dodge | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 14 | Power Strike | 6/2 | -/- | fully simulated | fully simulated |  |
-| 15 | Poison Javelin | 4/- | 11/- | partial | partial | poison over time and the javelin work; the lingering poison cloud (poisonjavcloud, missile do function 3) is not simulated (wave 20 audit: d2missile now simulates it, row not re-graded) |
+| 15 | Poison Javelin | 4/- | 11/- | partial | partial | poison over time and the javelin work; the lingering poison cloud (poisonjavcloud, missile do function 3) is not simulated |
 | 16 | Exploding Arrow | 4/- | 11/- | fully simulated | fully simulated |  |
 | 17 | Slow Missiles | -/6 | -/- | fully simulated | fully simulated |  |
 | 18 | Avoid | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
@@ -35,9 +35,9 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 22 | Guided Arrow | 4/10 | 11/18 | fully simulated | fully simulated |  |
 | 23 | Penetrate | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 24 | Charged Strike | 6/11 | -/19 | fully simulated | fully simulated |  |
-| 25 | Plague Javelin | 4/- | 11/- | partial | partial | javelin and poison work; the plague cloud (plaguejavcloud, do function 3) is not simulated (wave 20 audit: d2missile now simulates it, row not re-graded) |
+| 25 | Plague Javelin | 4/- | 11/- | partial | partial | javelin and poison work; the plague cloud (plaguejavcloud, do function 3) is not simulated |
 | 26 | Strafe | 8/12 | 13/20 | fully simulated | fully simulated |  |
-| 27 | Immolation Arrow | 4/- | 11/- | partial | partial | arrow and explosion work; the burning ground (immolationfire, do function 5, hit function 9) is not simulated (wave 20 audit: d2missile now simulates it, row not re-graded) |
+| 27 | Immolation Arrow | 4/- | 11/- | partial | partial | arrow and explosion work; the burning ground (immolationfire, do function 5, hit function 9) is not simulated |
 | 28 | Dopplezon | -/15 | -/- | missing | fully simulated | summon (SRVDO_015 0x5dad10): life calc3 percent of the owner, lifetime calc2 frames; the decoy AI is monstats "Idle" (MONAI_Think_Idle 0x5ae8a0 only waits), so it stands still and draws aggro (VERIFIED, wave 20); the client look copy is not checked |
 | 29 | Evade | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 30 | Fend | 9/13 | 14/21 | fully simulated | fully simulated |  |
@@ -92,14 +92,14 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 254 | Tiger Strike | 23/34 | -/- | fully simulated | fully simulated |  |
 | 255 | Dragon Talon | 24/42 | 6/4 | partial | partial | kick count and charge release are U (srvdo 42) |
 | 256 | Shock Field | -/43 | -/5 | fully simulated | fully simulated |  |
-| 257 | Blade Sentinel | -/44 | -/- | partial | partial | summon works; the creeper missile (do function 20, hit function 37) path is not simulated (wave 20 audit: d2missile now simulates it, row not re-graded) |
+| 257 | Blade Sentinel | -/44 | -/- | partial | partial | summon works; the creeper missile (do function 20, hit function 37) path is not simulated |
 | 258 | Quickness | -/18 | -/- | fully simulated | fully simulated |  |
 | 259 | Fists of Fire | 23/35 | -/- | fully simulated | fully simulated |  |
 | 260 | Dragon Claw | 25/46 | -/- | partial | fully simulated | VERIFIED SRVDO_046 0x5d4cf0 / 0x5d4ba0: one blow per action frame (two per cast here), to-hit bonus plus stat 0x145, calc1 damage bonus, charges released |
 | 261 | Charged Bolt Sentry | -/45 | -/- | fully simulated | fully simulated |  |
-| 262 | Wake of Fire Sentry | -/45 | -/- | partial | partial | sentry works; wake of destruction maker (do function 31) is not simulated (wave 20 audit: d2missile now simulates it, row not re-graded) |
+| 262 | Wake of Fire Sentry | -/45 | -/- | partial | partial | sentry works; wake of destruction maker (do function 31) is not simulated |
 | 263 | Weapon Block | -/- | -/- | partial | partial | passive stat is keyed to the weapon type, so it is left out of PassiveTotals; the block rule lives in d2combat/avoid.go |
-| 264 | Cloak of Shadows | -/47 | 7/- | partial | partial | timed state that ends on hit; the blinding of nearby enemies is not simulated (wave 20 audit: d2missile now simulates it, row not re-graded) |
+| 264 | Cloak of Shadows | -/47 | 7/- | partial | partial | timed state that ends on hit; the blinding of nearby enemies is not simulated |
 | 265 | Cobra Strike | 23/34 | -/- | fully simulated | fully simulated |  |
 | 266 | Blade Fury | 26/48 | 8/6 | missing | partial | one bladefragment1 per do, repeat gate prgcalc1-1 frames (SRVDO_048 0x5d5260); the fragment flight/bounce rules of the missile are the generic ones |
 | 267 | Fade | -/18 | -/- | fully simulated | fully simulated |  |
@@ -115,7 +115,7 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 277 | Blade Shield | 28/54 | -/- | stub | partial | was a bare self state; now hurts enemies within par4 every perdelay frames while it lasts (SRVDO_054 0x5d6880 only starts the periodic effect; attachment missile hit rule U) |
 | 278 | Venom | -/18 | -/- | fully simulated | fully simulated |  |
 | 279 | Shadow Master | -/49 | -/- | fully simulated | fully simulated |  |
-| 280 | Royal Strike | 23/34 | -/- | partial | partial | charge strike works; the chaos ice missile (do function 35) is not simulated (wave 20 audit: d2missile now simulates it, row not re-graded) |
+| 280 | Royal Strike | 23/34 | -/- | partial | partial | charge strike works; the chaos ice missile (do function 35) is not simulated |
 
 ## What was added
 
