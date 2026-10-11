@@ -174,6 +174,7 @@ func (e *Engine) whirl(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef
 	}
 
 	steps, hits, last := 0, 0, ""
+	sched := &d2skill.WhirlSched{}
 
 	finish := func(why string) bool {
 		delete(e.abc.whirling, p.ID())
@@ -208,28 +209,35 @@ func (e *Engine) whirl(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef
 
 		steps++
 
-		if o.Delay > 0 && (steps-1)%o.Delay == 0 {
-			var best d2skillFoe
+		// SKILL_WhirlwindComputeNextStepDelay: the scheduler says how many hits this frame
+		for n := sched.Step(e.frame, o.Delay, o.Dual); n > 0; n-- {
+			// SKILL_ScanRadiusForTargets: euclidean radius, victims rotate in id order
+			var in []d2skill.Foe
 
 			for _, f := range e.pipe.Foes(nx, ny, o.Radius) {
-				if f.Target.ID() == last {
-					continue
-				}
-
-				if d := chebyshev(f.X-nx, f.Y-ny); !best.ok || d < best.d {
-					best = d2skillFoe{ok: true, d: d, f: f}
+				dx, dy := f.X-nx, f.Y-ny
+				if dx*dx+dy*dy <= d2skill.WhirlRadius2 {
+					in = append(in, f)
 				}
 			}
 
-			if best.ok {
-				last = best.f.Target.ID()
+			ids := make([]string, len(in))
+			for i, f := range in {
+				ids[i] = f.Target.ID()
+			}
 
-				if r := e.pipe.WhirlStrike(u, sk.ID, best.f.Target); r != nil {
-					hits++
-					e.meleeResult(p, sk, r)
-				}
-			} else {
+			i := d2skill.WhirlNext(ids, last)
+			if i < 0 {
 				last = ""
+
+				break
+			}
+
+			last = ids[i]
+
+			if r := e.pipe.WhirlStrike(u, sk.ID, in[i].Target); r != nil {
+				hits++
+				e.meleeResult(p, sk, r)
 			}
 		}
 
@@ -282,12 +290,6 @@ func (e *Engine) shield(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 
 		return true
 	}})
-}
-
-type d2skillFoe struct {
-	ok bool
-	d  int
-	f  d2skill.Foe
 }
 
 func sign(v int) int {
