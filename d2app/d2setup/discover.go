@@ -3,6 +3,7 @@ package d2setup
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -143,6 +144,31 @@ func gameDirCandidates(home string) []string {
 		}
 	}
 
+	return append(out, windowsGameDirs()...)
+}
+
+// windowsGameDirs lists the usual Windows install folders (Blizzard installer, Battle.net, Steam). UNVERIFIED on a real
+// Windows machine; it is empty on other systems.
+func windowsGameDirs() []string {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	var out []string
+
+	for _, drive := range []string{"C:", "D:", "E:", "F:"} {
+		for _, pf := range []string{"Program Files (x86)", "Program Files"} {
+			out = append(out,
+				filepath.Join(drive+`\`, pf, "Diablo II"),
+				filepath.Join(drive+`\`, pf, "Diablo II Classic"),
+				filepath.Join(drive+`\`, pf, "Steam", "steamapps", "common", "Diablo II"),
+				filepath.Join(drive+`\`, pf, "Battle.net", "Diablo II"),
+			)
+		}
+
+		out = append(out, filepath.Join(drive+`\`, "Games", "Diablo II"), filepath.Join(drive+`\`, "Diablo II"))
+	}
+
 	return out
 }
 
@@ -189,6 +215,7 @@ func SaveDirCandidates(home, gameDir string) []string {
 		filepath.Join(home, "Library", "Application Support", "Diablo II*", "Save"),
 		filepath.Join(home, "Library", "Application Support", "Blizzard", "Diablo II*"),
 		filepath.Join(home, "Library", "Application Support", "Blizzard", "Diablo II*", "Save"),
+		filepath.Join(home, "Saved Games", "Diablo II*"), // Windows
 		filepath.Join(home, ".wine*", "drive_c", "users", "*", "Saved Games", "Diablo II*"),
 		filepath.Join(home, ".wine*", "drive_c", "Program Files*", "Diablo II", "Save"),
 		filepath.Join(home, "Library", "Application Support", "CrossOver", "Bottles", "*",
