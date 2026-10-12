@@ -29,13 +29,16 @@ func kinds(as []d2boss.Action, k d2boss.ActionKind) []d2boss.Action {
 }
 
 func TestKeyPortalAreas(t *testing.T) {
+	// the exe tries the areas from a random start (0, 1 or 2) and takes the first one not opened yet; the fourth
+	// portal of a game fails
 	tests := []struct {
 		name string
 		pick func(int) int
 		want []int
 	}{
-		{"default walks the areas in order", nil, []int{133, 134, 135, 135}},
-		{"injected choice", func(n int) int { return 2 }, []int{135, 135}},
+		{"start 0 (default)", nil, []int{133, 134, 135}},
+		{"start 1", func(int) int { return 1 }, []int{134, 135, 133}},
+		{"start 2", func(int) int { return 2 }, []int{135, 133, 134}},
 	}
 
 	for _, tt := range tests {
@@ -50,10 +53,37 @@ func TestKeyPortalAreas(t *testing.T) {
 				if len(p) != 1 || p[0].Level != want {
 					t.Fatalf("portal %d: %+v, want level %d", i, as, want)
 				}
+			}
 
-				m.Enter(p[0].Level) // entering marks the area
+			if p := kinds(e.OpenKeyPortal(m), d2boss.ActPortal); len(p) != 0 {
+				t.Fatalf("a fourth area portal opened: %+v", p)
 			}
 		})
+	}
+}
+
+// Both portals open only in Harrogath on Hell, and the Tristram portal once per game (VERIFIED shape, D2MOO).
+func TestCubePortalsNeedHarrogathOnHell(t *testing.T) {
+	for _, c := range []struct {
+		level, diff int
+		ok          bool
+	}{{LevelHarrogath, 2, true}, {LevelHarrogath, 1, false}, {LevelHarrogath, 0, false}, {1, 2, false}, {LevelTristram, 2, false}} {
+		m, e, _ := newEvent()
+		e.Where = func() (int, int) { return c.level, c.diff }
+
+		keys := len(kinds(e.OpenKeyPortal(m), d2boss.ActPortal)) == 1
+		finale := len(kinds(e.OpenFinalePortal(m), d2boss.ActPortal)) == 1
+
+		if keys != c.ok || finale != c.ok {
+			t.Errorf("level %d difficulty %d: keys portal %v, finale portal %v, want %v", c.level, c.diff, keys, finale, c.ok)
+		}
+	}
+
+	m, e, _ := newEvent()
+	e.Where = func() (int, int) { return LevelHarrogath, 2 }
+
+	if len(kinds(e.OpenFinalePortal(m), d2boss.ActPortal)) != 1 || len(kinds(e.OpenFinalePortal(m), d2boss.ActPortal)) != 0 {
+		t.Error("the Tristram portal must open once per game")
 	}
 }
 
@@ -96,22 +126,15 @@ func TestFinaleTristram(t *testing.T) {
 		t.Fatalf("finale portal %+v", p)
 	}
 
-	sp := kinds(m.Enter(LevelTristram), d2boss.ActSpawnMonster)
-	if len(sp) != 1 || sp[0].Key != "ubermephisto" {
-		t.Fatalf("first spawn %+v", sp)
-	}
-
-	// Diablo and Baal arrive on their timers
+	// VERIFIED shape (D2MOO SUNIT_SpawnPresetUnitsInRoom): the three arrive together
 	var got []string
 
-	for i := 0; i < 200; i++ {
-		for _, a := range kinds(m.Tick(1), d2boss.ActSpawnMonster) {
-			got = append(got, a.Key)
-		}
+	for _, a := range kinds(m.Enter(LevelTristram), d2boss.ActSpawnMonster) {
+		got = append(got, a.Key)
 	}
 
-	if strings.Join(got, ",") != "uberdiablo,uberbaal" {
-		t.Fatalf("timed spawns %v", got)
+	if strings.Join(got, ",") != "ubermephisto,uberbaal,uberdiablo" {
+		t.Fatalf("spawns %v", got)
 	}
 
 	// killing Mephisto and Diablo is not enough
@@ -172,14 +195,14 @@ func TestFinaleAfterAreaBosses(t *testing.T) {
 	}
 }
 
-func TestKilledEarlyBeforeAllArrived(t *testing.T) {
+func TestOneKilledIsNotEnough(t *testing.T) {
 	m, e, _ := newEvent()
 	m.Enter(LevelTristram)
 	m.Killed(d2boss.Kill{Class: ClassUberMephisto, Super: -1})
 	m.Tick(10)
 
 	if e.State() != "tristram" {
-		t.Fatalf("event ended with Diablo and Baal still to come: %s", e.State())
+		t.Fatalf("event ended with Diablo and Baal alive: %s", e.State())
 	}
 }
 

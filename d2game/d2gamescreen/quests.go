@@ -35,7 +35,7 @@ var questItemCodes = []string{
 	d2quest.ItemHoradricCube, d2quest.ItemStaffOfKingsShaft, d2quest.ItemViperAmulet, d2quest.ItemHoradricStaff,
 	d2quest.ItemLamEsenTome, d2quest.ItemKhalimEye, d2quest.ItemKhalimHeart, d2quest.ItemKhalimBrain,
 	d2quest.ItemKhalimFlail, d2quest.ItemKhalimWill, d2quest.ItemGidbinn, d2quest.ItemJadeFigurine,
-	d2quest.ItemGoldenBird, d2quest.ItemMephistoSoulstone, d2quest.ItemHellforgeHammer, d2quest.ItemMalahScroll,
+	d2quest.ItemGoldenBird, d2quest.ItemMephistoSoulstone, d2quest.ItemHellforgeHammer, d2quest.ItemMalahScroll, d2quest.ItemDefrostPotion,
 }
 
 // questRuntime joins the pure quest system (d2quest) to the running game.
@@ -350,6 +350,10 @@ func (v *Game) questObjectOperated(ob *d2mapentity.Object) {
 	}
 
 	id := ob.Record().Index
+
+	if v.anyaOperate(ob) {
+		return
+	}
 
 	// the chests, the altar and the tome give their item once: they open (animation) and a second click
 	// does nothing, like the original's object state

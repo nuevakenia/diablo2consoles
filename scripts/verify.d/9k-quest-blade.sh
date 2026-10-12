@@ -4,6 +4,7 @@ scenario_name="Quest walkthrough, Act 3: The Blade of the Old Religion in the re
 # Kurast and takes Hratli's quest line, goes back (state 3), picks up Gidbinn, walks into the Flayer Dungeon and back,
 # hands the blade to Ormus (587, takes it; ring 593), talks to Asheara (589, Iron Wolves) and gets the reward
 # (rare ring from Ormus, both done = complete, in either order). Needs D2_TABLES + D2S_SAMPLE_BODY.
+# Gidbinn is not on the altar: operating the object wakes the fetish boss, whose death drops the blade (D2MOO ACT3Q3).
 source scripts/quest_walk_lib.zsh
 scenario_warnings_ok=1
 scenario_env() {
@@ -12,14 +13,15 @@ scenario_env() {
   # generated jungle, see docs/PLAYTEST.md), then out of the Flayer Dungeon hole and back to the waypoint from there
   # first visit of the jungle (the quest becomes available), back by portal, Hratli's line, and in again
   s+="wait:11;$(qw_wp 78)wait:2;say:spawnportal 75;use:Portal;expect:level=75;wait:3;$(qw_talk Hratli)$(qw_panel 3 3)$(qw_wp 78)"
-  s+="kill:all,100;$(qw_chest 252)$(qw_chest 252)$(qw_chest 252)$(qw_panel 3 3)$(qw_go 88)$(qw_go 78)wait:2;say:spawnportal 75;use:Portal;expect:level=75;wait:3;"
+  # (operating the Gidbinn object wakes the fetish boss; its death drops the blade where it fell, D2MOO ACT3Q3)
+  s+="kill:all,100;$(qw_chest 252 4)kill:all,100;say:lootquest 15 30;wait:2;say:lootquest 15 30;$(qw_panel 3 3)$(qw_go 88)$(qw_go 78)wait:2;say:spawnportal 75;use:Portal;expect:level=75;wait:3;"
   # (the way back to Kurast is the act travel: the Flayer Dungeon hole leaves the hero at a spot of the generated jungle
   # from which no walk reaches the waypoint on every build; verify runs failed at 'use:Waypoint' with 30+ tiles to go)
   s+="$(qw_talk Ormus 10)$(qw_panel 3 3)$(qw_talk Asheara 10)$(qw_panel 3 3)$(qw_talk Ormus 10)$(qw_panel 3 3)exit"
   qw_env blade "$s"
 }
 scenario_check() {
-  grep -E "AUTOSCRIPT RESULT|QUEST A3Q3|QUEST SPEECH npc=\"(Hratli|Ormus|Asheara)\"|QUESTPANEL act=3 quest=3|quest object|QUEST EFFECT" $log.txt | grep -v "log-update" | cut -c1-200
+  grep -E "AUTOSCRIPT RESULT|QUEST A3Q3|QUEST SPEECH npc=\"(Hratli|Ormus|Asheara)\"|QUESTPANEL act=3 quest=3|quest object|QUEST EFFECT|ACT3 Gidbinn" $log.txt | grep -v "log-update" | cut -c1-200
   qw_sample blade || { echo "SKIP: no revived sample hero in this run"; return; }
   grep -q "AUTOSCRIPT RESULT PASS" $log.txt || { echo "FAIL: the Blade of the Old Religion walkthrough did not pass"; fail=1; }
   # the NPC lines with message ids and Sounds.txt rows: Hratli's quest line, Ormus (takes the blade) and Asheara
@@ -28,7 +30,9 @@ scenario_check() {
   done
   grep -q "LEVEL quest object id=252 name=\"Gidbinn\"" $log.txt || { echo "FAIL: no Gidbinn in the Flayer Jungle"; fail=1; }
   grep -qE "QUEST object operated id=252|ACT3 .* operated \(id 252\)" $log.txt || { echo "FAIL: Gidbinn was not operated"; fail=1; }
-  grep -qE "QUEST EFFECT spawn-item code=g33|ACT3 .* operated \(id 252\): gives \"g33\"" $log.txt || { echo "FAIL: the altar gave no Gidbinn"; fail=1; }
+  grep -q "QUEST EFFECT spawn-boss code=boss:fetish11" $log.txt || { echo "FAIL: the Gidbinn object did not wake the fetish boss"; fail=1; }
+  grep -q "ACT3 Gidbinn's fetish boss wakes" $log.txt || { echo "FAIL: the fetish boss was not spawned"; fail=1; }
+  grep -q "QUEST EFFECT spawn-drop code=g33" $log.txt || { echo "FAIL: the boss's death did not drop the blade"; fail=1; }
   grep -q 'LOOT stored "g33"' $log.txt || { echo "FAIL: Gidbinn was not picked up"; fail=1; }
   grep -q "QUEST EFFECT delete-item code=g33" $log.txt || { echo "FAIL: Ormus kept no blade"; fail=1; }
   grep -qE "QUEST EFFECT give-item code=rin quality=2 ilvl/count=(21|35|75) " $log.txt || { echo "FAIL: Ormus gave no rare ring (ilvl 21, 35 or 75 by difficulty)"; fail=1; }

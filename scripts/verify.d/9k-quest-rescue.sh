@@ -7,11 +7,12 @@ scenario_name="Quest walkthrough, Act 5: the first steps of Rescue on Mount Arre
 source scripts/quest_walk_lib.zsh
 scenario_warnings_ok=1
 scenario_env() {
-  local s="$(qw_begin 5)$(qw_panel 5 2)$(qw_talk Qual-Kehk)$(qw_talk Qual-Kehk)$(qw_panel 5 2)say:setwaypoint 111 1;wait:11;$(qw_wp 111)$(qw_panel 5 2)kill:name=prison door,300;$(qw_panel 5 2)$(qw_wp 109)$(qw_talk Qual-Kehk)$(qw_panel 5 2)exit"
+  # (the Act 5 quests open one after the other, exe sequence filters: the Siege on Harrogath is done first)
+  local s="$(qw_begin 5)say:completequest 5 1;$(qw_panel 5 2)$(qw_talk Qual-Kehk)$(qw_talk Qual-Kehk)$(qw_panel 5 2)say:setwaypoint 111 1;wait:11;$(qw_wp 111)$(qw_panel 5 2)kill:name=prison door,300;$(qw_panel 5 2)$(qw_wp 109)$(qw_talk Qual-Kehk)$(qw_panel 5 2)exit"
   qw_env rescue "$s"
 }
 scenario_check() {
-  grep -E "AUTOSCRIPT RESULT|PRISONDOOR|MONSTER death name=Prison|QUEST EFFECT give-item|QUEST A5Q2|QUEST SPEECH npc=\"Qual-Kehk\"|QUESTPANEL act=5 quest=2|LEVEL objects: .*Cage" $log.txt | cut -c1-220
+  grep -E "AUTOSCRIPT RESULT|PRISONDOOR|MONSTER death name=Prison|QUEST EFFECT give-item|QUEST A5Q2|QUEST SPEECH npc=\"Qual-Kehk\"|QUESTPANEL act=5 quest=2|LEVEL objects: .*Cage|RESCUE" $log.txt | cut -c1-220
   qw_sample rescue || { echo "SKIP: no revived sample hero in this run"; return; }
   grep -q "AUTOSCRIPT RESULT PASS" $log.txt || { echo "FAIL: the Rescue on Mount Arreat walkthrough did not pass"; fail=1; }
   for m in 20153 20096; do
@@ -25,6 +26,9 @@ scenario_check() {
   grep -q "LEVEL objects: .*Cage x3" $log.txt || { echo "FAIL: no barbarian cages in the Frigid Highlands"; fail=1; }
   grep -q "PRISONDOOR placed 3 prison door" $log.txt || { echo "FAIL: no prison doors on the barbarian cages"; fail=1; }
   [ "$(grep -c 'MONSTER death name=Prison Door' $log.txt)" -ge 3 ] || { echo "FAIL: the three prison doors were not destroyed"; fail=1; }
+  [ "$(grep -c 'RESCUE door died: 5 prisoner(s) freed' $log.txt)" -ge 3 ] || { echo "FAIL: the three prison doors did not free five barbarians each"; fail=1; }
+  grep -q "RESCUE door died: .* (total 15 of 15)" $log.txt || { echo "FAIL: the freed count did not reach 15 of 15 barbarians"; fail=1; }
+  [ "$(grep -c 'RESCUE prisoner [0-9]* reached the portal and left' $log.txt)" -ge 3 ] || { echo "FAIL: the freed barbarians did not walk to the portal and leave"; fail=1; }
   # (no barbarian-hire reward exists, the hire gate is slot 36 bit 0 (exe); Qual-Kehk pays runes by the freed count, 15 = Tal, Ral, Ort)
   for r in r07 r08 r09; do
     grep -q "QUEST EFFECT give-item code=$r " $log.txt || { echo "FAIL: Qual-Kehk paid no rune $r"; fail=1; }

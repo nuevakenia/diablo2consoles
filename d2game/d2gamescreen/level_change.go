@@ -349,6 +349,7 @@ func (v *Game) afterLevelBuilt(from, to int, via string) {
 	v.questArea(to) // the quest system follows the hero between areas
 	v.uberEnter(to)
 	v.act3Enter(to)
+	v.anyaEnter(to)
 	v.enterSoundEnv(to)
 	v.chaosEnter(to)
 	v.restoreCorpse()
