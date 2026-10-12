@@ -58,6 +58,7 @@ type trapRun struct {
 	missile   string
 	skillName string
 	next      int
+	ownLevel  int // monster-skill level for a missile with its own damage columns (Skeletal Mage)
 	// cycler is the cycler skill (CorpseCycler, VineCycler) of a Cycle of Life or Vines vine: such a vine cycles
 	// corpses for its owner and never shoots (druid_w20.go).
 	cycler string
@@ -1197,6 +1198,12 @@ func (e *Engine) fireTrapAt(c trapCaster, t *trapRun, tx, ty int, best *d2mapent
 	bx, by := best.SubtilePos()
 	tg := d2skill.Target{X: bx, Y: by, Unit: e.target(best), UX: bx, UY: by}
 
+	if oc, ok := c.(interface {
+		CastTrapOwn(u d2skill.Unit, skillID int, missile string, ownLevel, fromX, fromY int, tgt d2skill.Target) *d2missile.Missile
+	}); ok && t.ownLevel > 0 {
+		return oc.CastTrapOwn(t.u, t.skillID, t.missile, t.ownLevel, tx, ty, tg) != nil
+	}
+
 	return c.CastTrap(t.u, t.skillID, t.missile, tx, ty, tg) != nil
 }
 
@@ -1207,7 +1214,8 @@ func (e *Engine) FireTrap(s d2monsters.TrapShot) bool {
 		return false
 	}
 
-	t := &trapRun{m: s.Trap, u: e.hero(s.Owner), skillID: s.Spec.SkillID, missile: s.Spec.Missile, skillName: s.Spec.SkillName}
+	t := &trapRun{m: s.Trap, u: e.hero(s.Owner), skillID: s.Spec.SkillID, missile: s.Spec.Missile, skillName: s.Spec.SkillName,
+		ownLevel: s.Spec.OwnLevel}
 	if !e.fireTrapAt(e.trapCaster(), t, s.FromX, s.FromY, s.Target) {
 		return false
 	}
@@ -1469,6 +1477,8 @@ func (e *Engine) heroDefense(p *d2mapentity.Player, attacker *d2mapentity.Monste
 		e.monsters.Damage(attacker, back, p)
 		note += fmt.Sprintf(" thorns=%d", back)
 	}
+
+	note += ironMaidenNote(e.ironMaidenBack(attacker, p, melee, dmg))
 
 	if dmg < 0 {
 		dmg = 0

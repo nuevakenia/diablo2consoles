@@ -187,6 +187,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	monsters.HeroDefense = e.heroDefense
 	monsters.HeroDefenseParts = e.heroDefenseParts
 	monsters.HeroAvoid = e.heroAvoid
+	monsters.SummonSlow = e.applySlowTarget
 	e.installMercHooks()
 	e.monsters.SetSkillFirer(e)
 
@@ -1013,6 +1014,7 @@ func (e *Engine) AreaChanged(md *d2monsters.Director) {
 		md.HeroDefense = e.heroDefense
 		md.HeroDefenseParts = e.heroDefenseParts
 		md.HeroAvoid = e.heroAvoid
+		md.SummonSlow = e.applySlowTarget
 		e.installMercHooks()
 	}
 }
@@ -1038,20 +1040,16 @@ func (e *Engine) afterHit(m *d2mapentity.Monster, src *d2mapentity.Player, dmg i
 
 	set := e.setOf(m.ID())
 
-	if pct := set.ReflectPct(e.frame); pct > 0 {
-		back := dmg * pct / 100
-		src.Stats.Health -= back
-
-		if src.Stats.Health < 0 {
-			src.Stats.Health = 0
+	// Iron Maiden is NOT here: the exe event (auraevent domeleedamage, function 4, 0x5c3ec0) fires when the CURSED
+	// unit deals melee damage and hurts the cursed unit itself; see ironMaidenBack (necro_w23.go).
+	if pct := set.LifeTapPct(e.frame); pct > 0 {
+		// event function 5 (0x5c4180, VERIFIED wave 23): life + dmg * calc1 / 100 clamped to 1..max, nothing for a dead attacker
+		before := src.Stats.Health
+		if nl, ok := d2skill.LifeTapHeal(dmg, pct, before, src.Stats.MaxHealth); ok {
+			src.Stats.Health = nl
 		}
 
-		e.emit("damage", "DAMAGE iron_maiden hero=%s dmg=%d hero_hp=%d/%d", src.Name(), back, src.Stats.Health, src.Stats.MaxHealth)
-	}
-
-	if pct := set.LifeTapPct(e.frame); pct > 0 {
-		heal := dmg * pct / 100
-		src.Stats.Health = minInt(src.Stats.Health+heal, src.Stats.MaxHealth)
+		heal := src.Stats.Health - before
 		e.emit("damage", "HEAL life_tap hero=%s heal=%d hero_hp=%d/%d", src.Name(), heal, src.Stats.Health, src.Stats.MaxHealth)
 	}
 }

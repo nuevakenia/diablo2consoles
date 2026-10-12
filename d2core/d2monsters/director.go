@@ -251,6 +251,10 @@ type Director struct {
 	// returns a log note. Reflected damage (thorns) is the hook's own business.
 	HeroDefenseParts func(p *d2mapentity.Player, attacker *d2mapentity.Monster, melee bool, parts *HitParts) string
 
+	// SummonSlow, if set, is called with the monster that landed a melee hit on a summon whose item_slow stat is
+	// pct (Clay Golem, 0x5c46d0): the skill engine slows it.
+	SummonSlow func(attacker *d2mapentity.Monster, pct int)
+
 	// HeroAvoid, if set, rolls the hero's dodge / avoid / evade for a landed
 	// hit BEFORE the damage roll (the exe's order). It reports whether the hit
 	// was avoided, with a log note. melee is false for projectiles.

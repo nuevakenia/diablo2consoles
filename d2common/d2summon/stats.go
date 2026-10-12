@@ -147,10 +147,23 @@ func Compute(t *Template, diff Difficulty, m Mods, r *d2rand.Seed) Stats {
 		}
 	}
 
-	s.MaxHP = hp*(100+m.HPPct)/100 + flatHP/256
+	// SKILL_SpawnSummonedMinion 0x5c22c0 (VERIFIED, wave 23): the passive and aura stats go on the unit first
+	// (maxhp is 8.8 fixed point), then the unit's maximum life as it stands, flat bonus included, grows by
+	// calc1 percent (MulDiv on the 8.8 value) and is written to both stat 7 (max) and stat 6 (current). So the
+	// life bonus of Skeleton Mastery is multiplied by the Raise Skeleton percent too.
+	total := hp<<8 + flatHP
+	total += total * m.HPPct / 100
+	s.MaxHP = total >> 8
 	if s.MaxHP < 1 {
 		s.MaxHP = 1
 	}
+
+	// item_normaldamage (stat 0x6f, Skeleton Mastery's passivestat2) is a flat amount added to both ends of the
+	// physical roll (COMBAT_BuildAttackerDamage, skills-combat.md). The order against damagepercent is UNVERIFIED
+	// (the percent is applied by a later step of the combat code that was not read): flat first.
+	flat := s.Other["item_normaldamage"]
+	s.DmgMin += flat
+	s.DmgMax += flat
 
 	s.DmgMin = s.DmgMin * (100 + dmgPct) / 100
 	s.DmgMax = s.DmgMax * (100 + dmgPct) / 100

@@ -107,7 +107,21 @@ func (e *Engine) armCaster(sk *d2skill.Skill, o *d2skill.SummonOrder, m *d2mapen
 		return
 	}
 
-	if e.monsters.ArmTrap(m, d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile}) {
-		e.emit("summon", "CASTER armed skill=%q missile=%s", sk.Name, missile)
+	// Wave 23 (VERIFIED): the mage type 0..3 is the low two bits of a roll of the unit's seed taken when the mage is
+	// raised (SKILL_RaiseSkeleton_ApplyMasteryTable 0x5c1fd0, data bytes +0xf / +0x10) and SRVDO_149 0x5cc400 adds
+	// it to srvmissilea: necromage1..4. The damage is the missile's own, at the level sumsk1calc.
+	if o.TrapLevel < 1 {
+		return // sumsk1calc <= 0: SKILL_AddSkillToUnit is not called (0x5c22c0), the mage has no spell
+	}
+
+	kind := 0
+	if e.monSeed != nil {
+		kind = int(e.monSeed.Step() & 3)
+	}
+
+	missile = d2skill.MageMissile(e.pipe.Missiles, missile, kind)
+
+	if e.monsters.ArmTrap(m, d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile, OwnLevel: o.TrapLevel}) {
+		e.emit("summon", "CASTER armed skill=%q missile=%s type=%d level=%d", sk.Name, missile, kind, o.TrapLevel)
 	}
 }

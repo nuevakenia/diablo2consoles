@@ -46,6 +46,9 @@ type TrapSpec struct {
 	// Level is the level of the sentry's monster skill and Life the shots it may take (calc4 at that level);
 	// see d2skill.SummonOrder.TrapLevel. Life 0 = unknown: the AI is then not used (TrapAIDriven false).
 	Level, Life int
+	// OwnLevel, when > 0, makes the shot take its damage from the missile record at this level (monster skills with
+	// a Skill-less missile: the Skeletal Mage, level sumsk1calc).
+	OwnLevel int
 	// Hydra marks a Hydra head: its cadence is MONAI_Think_Hydra (0x5e8f10): every 10 ticks, a target nearer
 	// than 25 and a 60 percent roll fire the skill (no shot budget).
 	Hydra bool

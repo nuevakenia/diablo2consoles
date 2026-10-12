@@ -311,6 +311,10 @@ func (d *Director) strikeUnit(u, tu *unit, atk d2mapentity.MonsterAttack, mode d
 
 	dmg = d.shareGolemDamage(tu, dmg)
 
+	// Clay Golem (auraevent damagedinmelee, function 27 = 0x5c46d0, VERIFIED wave 23): the attacker of a melee hit
+	// is slowed by the golem's item_slow stat (its aurastat1).
+	d.slowMeleeAttacker(u, tu, dmg, attackIsRanged(u.m.Stat, mode))
+
 	d.damage(tu, credit, dmg)
 }
 

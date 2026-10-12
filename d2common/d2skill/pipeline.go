@@ -683,6 +683,11 @@ type castOpts struct {
 	pathSeed   uint32
 	restorePct int // percent of the owner's life or mana SrvDoFunc 29 / 33 restore
 
+	// ownLevel, when > 0, builds the damage from the missile record's own columns at this level (monster skills).
+	ownLevel int
+	// addDmgPct is added to the missile's damage percent (SRVDO_010's calc1 callback).
+	addDmgPct int
+
 	stationary bool
 	hitEvery   int
 	scalePct   int
@@ -765,6 +770,18 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 	desc := sk.Descriptor(env, lvl, wmin, wmax, u.Stat(masteryStat[sk.EType]))
 	desc.DamagePct = int32(u.Stat("damagepercent") + missileMastery(u, sk))
 	desc.Crit = missileCrit(u, sk, ms)
+	desc.DamagePct += int32(o.addDmgPct)
+
+	// A monster skill whose missile has no Skill column (the Skeletal Mage's necromage1..4) takes the damage from
+	// the missile record's own columns at the missile level, which is the level of the monster's skill
+	// (MISSILE_BuildDamageDescriptor 0x64ca60, VERIFIED wave 23; sumsk1calc gives that level).
+	if o.ownLevel > 0 {
+		if own, ok := ms.Own.(*DamageSpec); ok && own != nil {
+			lvl = o.ownLevel
+			tmp := &Skill{DamageSpec: *own, HitClass: ms.HitClass}
+			desc = tmp.Descriptor(env, lvl, wmin, wmax, 0)
+		}
+	}
 
 	// Hit function 13 (Glacial Spike, 0x5a8360, read): the elemental length of
 	// its damage struct is sHitPar2 when > 0, else auralencalc (record +0x60),
@@ -1089,6 +1106,37 @@ func (p *Pipeline) CastTrap(u Unit, skillID int, missile string, fromX, fromY in
 
 	return p.castMissile(u, sk, lvl, p.env(sk, lvl, u), missile, tgt,
 		castOpts{hasStart: true, startX: float64(fromX) + 0.5, startY: float64(fromY) + 0.5})
+}
+
+// CastTrapOwn is CastTrap for a monster skill whose missile carries its own damage columns (the Skeletal Mage's
+// necromage1..4): the damage is built from the missile record at ownLevel, the level of the monster's skill.
+// A missile without own damage columns falls back to the casting skill's descriptor like CastTrap.
+func (p *Pipeline) CastTrapOwn(u Unit, skillID int, missile string, ownLevel, fromX, fromY int, tgt Target) *d2missile.Missile {
+	sk := p.Skills.ByID(skillID)
+	if sk == nil {
+		return nil
+	}
+
+	lvl := u.SkillLevel(skillID)
+
+	return p.castMissile(u, sk, lvl, p.env(sk, lvl, u), missile, tgt,
+		castOpts{hasStart: true, startX: float64(fromX) + 0.5, startY: float64(fromY) + 0.5, ownLevel: ownLevel})
+}
+
+// MageMissile is the missile SRVDO_149_NecromageMissile 0x5cc400 fires: the record that stands kind places after
+// srvmissilea in missiles.txt (kind is the mage type 0..3 kept in the monster's data byte +0xf, rolled when the mage
+// is raised; necromage1 poison, 2 cold, 3 fire, 4 lightning). base is returned when the table has no such row.
+func MageMissile(t d2missile.Table, base string, kind int) string {
+	b := t.ByName(base)
+	if b == nil || kind <= 0 {
+		return base
+	}
+
+	if m := t.ByID(b.ID + kind); m != nil && m.Name != "" {
+		return m.Name
+	}
+
+	return base
 }
 
 // CastAtPoint creates one stationary missile of a skill at the subtile (x, y): the helper behind the exe's

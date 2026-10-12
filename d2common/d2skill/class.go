@@ -730,7 +730,9 @@ func doFanFn(c *cast) {
 // doHomingFn is SRVDO_010_GuidedArrow (Guided Arrow, Bone Spirit): a missile
 // that steers onto the aimed unit.
 func doHomingFn(c *cast) {
-	if c.castM(c.missileName(), castOpts{home: c.tgt.Unit}) == nil {
+	// SRVDO_010 0x5da2f0 (VERIFIED wave 23): a non-zero calc1 installs the post-create callback 0x5da2c0 which adds
+	// calc1 to the missile's damage-percent stat (0x19); it does not switch homing on (Bone Spirit's calc1 is 0).
+	if c.castM(c.missileName(), castOpts{home: c.tgt.Unit, addDmgPct: c.calc(1)}) == nil {
 		c.fail(ReasonMissile)
 	}
 }
@@ -1634,6 +1636,12 @@ func doSummonFn(c *cast) {
 
 	if sk.SrvDoFunc == 56 {
 		o.AuraSkill, o.AuraLevel = c.minionAura()
+	}
+
+	// The Skeletal Mage's monster skill (sumskill1) gets the level sumsk1calc (SKILL_SpawnSummonedMinion 0x5c22c0,
+	// VERIFIED); the shots take their damage from the missile record at that level.
+	if sk.SrvDoFunc == 31 && sk.SumSkill[1] != "" && sk.SumSkCalc[1] != nil {
+		o.TrapLevel = c.env.eval(sk.SumSkCalc[1]) // <= 0: the exe adds no skill, the mage then only melees
 	}
 
 	if sk.SrvDoFunc == 56 && sk.Name == "BloodGolem" {

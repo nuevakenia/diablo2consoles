@@ -65,6 +65,8 @@ func (e *Engine) heroDefenseParts(p *d2mapentity.Player, attacker *d2mapentity.M
 		note += fmt.Sprintf(" thorns=%d", back)
 	}
 
+	note += ironMaidenNote(e.ironMaidenBack(attacker, p, melee, dmg))
+
 	if note != "" {
 		e.emit("damage", "DEFENSE hero=%s%s dmg_through=%d", p.Name(), note, dmg)
 	}

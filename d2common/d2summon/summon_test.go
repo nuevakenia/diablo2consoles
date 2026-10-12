@@ -76,12 +76,13 @@ func TestComputeSkeleton(t *testing.T) {
 		hp, def, ar int
 		dmin, dmax  int
 	}{
-		// 21*300/100 + 24 = 87 ; defense 5+40 ; AR 5+150 ; damage 1,2 * 128% = 1,2
-		{"normal", Normal, 87, 45, 155, 1, 2},
-		// 30*3 + 24
-		{"nightmare", Nightmare, 114, 45, 154, 1, 2},
-		// 42*3 + 24
-		{"hell", Hell, 150, 46, 156, 1, 2},
+		// wave 23 (0x5c22c0): (21 + 24) * 300 / 100 = 135, the mastery life is multiplied by the percent too ;
+		// defense 5+40 ; AR 5+150 ; damage 1,2 * 128% = 1,2
+		{"normal", Normal, 135, 45, 155, 1, 2},
+		// (30 + 24) * 3
+		{"nightmare", Nightmare, 162, 45, 154, 1, 2},
+		// (42 + 24) * 3
+		{"hell", Hell, 198, 46, 156, 1, 2},
 	} {
 		s := Compute(sk, tc.diff, m, nil)
 		if s.MaxHP != tc.hp || s.Defense != tc.def || s.AR != tc.ar || s.DmgMin != tc.dmin || s.DmgMax != tc.dmax {
