@@ -53,6 +53,7 @@ var (
 	errPlayerAlreadyExists = errors.New("player already exists")
 	errServerFull          = errors.New("server full") // Server currently at maximum TCP connections
 	errNoPlayerState       = errors.New("connection request without a hero")
+	errUnknownSender       = errors.New("packet from a client that is not in the game")
 	errNameInUse           = errors.New("a player with that character name is already in the game")
 )
 
@@ -79,6 +80,10 @@ type GameServer struct {
 	unitIDs    *d2gsnet.IDs
 	hostInfo   d2gsnet.GameInfo // difficulty of the first hero (the host)
 	hostInfoOK bool
+
+	// joinMu serialises the join and leave sequences (their packets and roster changes), so two
+	// heroes arriving at once see each other once and in a consistent order.
+	joinMu sync.Mutex
 
 	soc *social // party roster, trades, player versus player
 
@@ -222,6 +227,8 @@ func (g *GameServer) Start() error {
 // Stop stops the game server
 func (g *GameServer) Stop() {
 	g.Lock()
+	defer g.Unlock()
+
 	g.cancel()
 	g.connections = make(map[string]ClientConnection)
 
@@ -249,7 +256,7 @@ func (g *GameServer) packetManager() {
 }
 
 func (g *GameServer) sendPacketToClients(packet d2netpacket.NetPacket) {
-	for _, c := range g.connections {
+	for _, c := range g.connList() {
 		if err := c.SendPacketToClient(packet); err != nil {
 			g.Errorf("GameServer: error sending packet: %s to client %s: %s", packet.PacketType, c.GetUniqueID(), err)
 		}
@@ -266,6 +273,7 @@ func (g *GameServer) handleConnection(conn net.Conn) {
 
 	var (
 		connected int
+		left      bool
 		client    ClientConnection
 	)
 
@@ -278,6 +286,25 @@ func (g *GameServer) handleConnection(conn net.Conn) {
 	}()
 
 	decoder := json.NewDecoder(conn)
+
+	// a client that vanishes without saying goodbye is removed like one that left,
+	// otherwise its name and id stay taken and it cannot reconnect
+	defer func() {
+		if client == nil {
+			return
+		}
+
+		select {
+		case <-g.ctx.Done():
+		default:
+			if bye, err := d2netpacket.CreatePlayerDisconnectRequestPacket(client.GetUniqueID()); err == nil && !left {
+				select {
+				case g.packetManagerChan <- ReceivedPacket{Client: client, Packet: bye}:
+				case <-g.ctx.Done():
+				}
+			}
+		}
+	}()
 
 	for {
 		var packet d2netpacket.NetPacket
@@ -300,6 +327,7 @@ func (g *GameServer) handleConnection(conn net.Conn) {
 		if connected == 0 {
 			if packet.PacketType != d2netpackettype.PlayerConnectionRequest {
 				g.Infof("Closing connection with %s: did not receive new player connection request...", conn.RemoteAddr().String())
+				return
 			}
 
 			if client, err = g.registerConnection(packet.PacketData, conn, nil); err != nil {
@@ -309,14 +337,14 @@ func (g *GameServer) handleConnection(conn net.Conn) {
 			connected = 1
 		}
 
+		if packet.PacketType == d2netpackettype.PlayerDisconnectionNotification {
+			left = true
+		}
+
 		select {
 		case <-g.ctx.Done():
 			return
-		default:
-			g.packetManagerChan <- ReceivedPacket{
-				Client: client,
-				Packet: packet,
-			}
+		case g.packetManagerChan <- ReceivedPacket{Client: client, Packet: packet}:
 		}
 	}
 }
@@ -332,8 +360,26 @@ func (g *GameServer) handleConnection(conn net.Conn) {
 func (g *GameServer) registerConnection(b []byte, conn net.Conn, mk func(id string) ClientConnection) (ClientConnection, error) {
 	var client ClientConnection
 
+	// the checks and the insert are one step under the lock (two joins with one name cannot both
+	// pass); the join packets go out after the lock is released, so the broadcast helpers can read
+	// the map under the read lock like everything else
 	g.Lock()
-	defer g.Unlock()
+
+	client, err := g.checkAndInsertLocked(b, conn, mk)
+
+	g.Unlock()
+
+	if err != nil {
+		return nil, err
+	}
+
+	g.OnClientConnected(client)
+
+	return client, nil
+}
+
+func (g *GameServer) checkAndInsertLocked(b []byte, conn net.Conn, mk func(id string) ClientConnection) (ClientConnection, error) {
+	var client ClientConnection
 
 	// check to see if the server is full
 	if len(g.connections) >= g.maxConnections {
@@ -392,10 +438,31 @@ func (g *GameServer) registerConnection(b []byte, conn net.Conn, mk func(id stri
 	}
 
 	client.SetPlayerState(packet.PlayerState)
-
-	g.OnClientConnected(client)
+	g.connections[packet.ID] = client
 
 	return client, nil
+}
+
+// connList is a copy of the connection map taken under the read lock.
+func (g *GameServer) connList() map[string]ClientConnection {
+	g.RLock()
+	defer g.RUnlock()
+
+	out := make(map[string]ClientConnection, len(g.connections))
+	for id, c := range g.connections {
+		out[id] = c
+	}
+
+	return out
+}
+
+// connByIDLocked looks a connection up under the read lock (for the packet path, which runs
+// beside the accept goroutines that register connections).
+func (g *GameServer) connByIDLocked(id string) ClientConnection {
+	g.RLock()
+	defer g.RUnlock()
+
+	return g.connections[id]
 }
 
 // charNameLen is the size of the exe's character name field (16 bytes, so 15
@@ -441,9 +508,15 @@ func nameInUse(conns map[string]ClientConnection, name string) bool {
 //
 // For more information, see d2networking.d2netpacket.
 func (g *GameServer) OnClientConnected(client ClientConnection) {
+	g.joinMu.Lock()
+	defer g.joinMu.Unlock()
+
 	// Temporary position hack --------------------------------------------
 	// https://github.com/OpenDiablo2/OpenDiablo2/issues/829
-	sx, sy := g.mapEngines[0].GetStartPosition()
+	var sx, sy float64
+	if len(g.mapEngines) > 0 { // none in the unit tests
+		sx, sy = g.mapEngines[0].GetStartPosition()
+	}
 	clientPlayerState := client.GetPlayerState()
 	clientPlayerState.X = sx
 	clientPlayerState.Y = sy
@@ -451,16 +524,22 @@ func (g *GameServer) OnClientConnected(client ClientConnection) {
 
 	g.Infof("Client connected with an id of %s", client.GetUniqueID())
 
+	g.Lock()
 	if !g.hostInfoOK { // the first hero is the host: its difficulty rules the game
 		g.hostInfoOK = true
 		g.hostInfo.Difficulty = uint8(clientPlayerState.Difficulty)
 		g.hostInfo.Hardcore = clientPlayerState.Hardcore
 		g.hostInfo.Expansion = true
 	}
+	g.Unlock()
+
+	g.Lock()
+	g.connections[client.GetUniqueID()] = client // already there when registerConnection did it
+	n := len(g.connections)
+	g.Unlock()
 
 	g.Infof("PLAYER JOIN name=%q id=%s level=%d players=%d proto=%s", clientPlayerState.HeroName, client.GetUniqueID(),
-		heroLevel(clientPlayerState), len(g.connections)+1, g.protoName())
-	g.connections[client.GetUniqueID()] = client
+		heroLevel(clientPlayerState), n, g.protoName())
 
 	g.handleClientConnection(client, sx, sy)
 	g.socialAddPlayer(client)
@@ -520,7 +599,7 @@ func (g *GameServer) handleClientConnection(client ClientConnection, x, y float6
 		g.Errorf("AddPlayerPacket: %v", err)
 	}
 
-	for _, connection := range g.connections {
+	for _, connection := range g.connList() {
 		err := connection.SendPacketToClient(createPlayerPacket)
 		if err != nil {
 			g.Errorf("GameServer: error sending %T to client %s: %s", createPlayerPacket, connection.GetUniqueID(), err)
@@ -567,14 +646,27 @@ func (g *GameServer) handleClientConnection(client ClientConnection, x, y float6
 // of client connections.
 // If this client was the host, disconnects all clients and kills GameServer.
 func (g *GameServer) OnClientDisconnected(client ClientConnection) {
-	g.Infof("Client disconnected with an id of %s", client.GetUniqueID())
-	g.Infof("PLAYER LEAVE name=%q id=%s players=%d", playerName(client), client.GetUniqueID(), len(g.connections)-1)
+	g.Lock()
+	_, ok := g.connections[client.GetUniqueID()]
 	delete(g.connections, client.GetUniqueID())
+	left := len(g.connections)
+	g.Unlock()
+
+	if !ok {
+		return // already gone (a drop and a goodbye both arrived)
+	}
+
+	g.joinMu.Lock()
+
+	g.Infof("Client disconnected with an id of %s", client.GetUniqueID())
+	g.Infof("PLAYER LEAVE name=%q id=%s players=%d", playerName(client), client.GetUniqueID(), left)
 	g.socialRemovePlayer(client.GetUniqueID())
 
 	if g.soc != nil {
 		g.soc.idle.Forget(client.GetUniqueID())
 	}
+
+	g.joinMu.Unlock()
 
 	if client.GetConnectionType() == d2clientconnectiontype.Local {
 		g.Info("Host disconnected, game server shuting down")
@@ -598,6 +690,12 @@ func (g *GameServer) OnPacketReceived(client ClientConnection, packet d2netpacke
 		return errors.New("game server is nil")
 	}
 
+	// a packet from a connection the server does not hold (a late packet after the
+	// hero left, or a made up one) has no hero state to act on
+	if client == nil || g.connByIDLocked(client.GetUniqueID()) == nil {
+		return errUnknownSender
+	}
+
 	if g.soc != nil && client != nil {
 		g.soc.idle.Stamp(client.GetUniqueID()) // last-message time, as the exe does for every in-game message
 	}
@@ -609,7 +707,7 @@ func (g *GameServer) OnPacketReceived(client ClientConnection, packet d2netpacke
 			return err
 		}
 
-		playerState := g.connections[client.GetUniqueID()].GetPlayerState()
+		playerState := g.connByIDLocked(client.GetUniqueID()).GetPlayerState()
 		playerState.X = movePacket.DestX
 		playerState.Y = movePacket.DestY
 
@@ -622,7 +720,7 @@ func (g *GameServer) OnPacketReceived(client ClientConnection, packet d2netpacke
 			return err
 		}
 
-		playerState := g.connections[client.GetUniqueID()].GetPlayerState()
+		playerState := g.connByIDLocked(client.GetUniqueID()).GetPlayerState()
 		playerState.LeftSkill = savePacket.Player.LeftSkill.Shallow.SkillID
 		playerState.RightSkill = savePacket.Player.RightSkill.Shallow.SkillID
 
@@ -737,7 +835,7 @@ func (g *GameServer) onChangeLevel(client ClientConnection, packet d2netpacket.N
 		return err
 	}
 
-	state := g.connections[client.GetUniqueID()].GetPlayerState()
+	state := g.connByIDLocked(client.GetUniqueID()).GetPlayerState()
 	state.X, state.Y = p.X, p.Y
 	g.socialArea(client.GetUniqueID(), p.Level)
 
@@ -748,7 +846,7 @@ func (g *GameServer) onChangeLevel(client ClientConnection, packet d2netpacket.N
 	// packets, so one that changed level later would still be seen at its old place (start == dest
 	// means "stands here" to the client)
 	if mp, err := d2netpacket.CreateMovePlayerPacket(client.GetUniqueID(), p.X, p.Y, p.X, p.Y); err == nil {
-		for id, c := range g.connections {
+		for id, c := range g.connList() {
 			if id == client.GetUniqueID() {
 				continue
 			}
@@ -797,7 +895,7 @@ func (g *GameServer) onSetWaypoint(client ClientConnection, packet d2netpacket.N
 		return fmt.Errorf("level %d has no waypoint", p.Level)
 	}
 
-	state := g.connections[client.GetUniqueID()].GetPlayerState()
+	state := g.connByIDLocked(client.GetUniqueID()).GetPlayerState()
 	progress := state.EnsureProgress()
 	diff := int(state.Difficulty)
 

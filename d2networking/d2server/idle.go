@@ -111,12 +111,9 @@ func idleLimit() (time.Duration, bool) {
 
 // idleVictims lists the clients (not the local host) silent for longer than limit.
 func (g *GameServer) idleVictims(now time.Time, limit time.Duration) []ClientConnection {
-	g.RLock()
-	defer g.RUnlock()
-
 	var out []ClientConnection
 
-	for id, c := range g.connections {
+	for id, c := range g.connList() {
 		if c.GetConnectionType() == d2clientconnectiontype.Local {
 			continue
 		}

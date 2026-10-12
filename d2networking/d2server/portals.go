@@ -59,9 +59,10 @@ func (g *GameServer) broadcastPortals(notice string) {
 		return
 	}
 
-	conns := make([]ClientConnection, 0, len(g.connections))
+	list := g.connList()
+	conns := make([]ClientConnection, 0, len(list))
 
-	for _, c := range g.connections {
+	for _, c := range list {
 		conns = append(conns, c)
 	}
 

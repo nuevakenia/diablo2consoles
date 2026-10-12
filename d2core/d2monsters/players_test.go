@@ -77,3 +77,31 @@ func TestPlayersOnlyAffectLaterSpawns(t *testing.T) {
 		t.Errorf("forced 3: %d %d", hp, xp)
 	}
 }
+
+// "/players X" (0x533190): 0..8 stored, larger ignored; the larger of real and forced counts.
+func TestSetForcedPlayers(t *testing.T) {
+	d := difficultyDirector(d2monster.Normal, 1)
+	n := 2
+	d.opt.PlayersFunc = func() int { return n }
+
+	for _, c := range []struct {
+		set    int
+		ok     bool
+		wantPC int
+	}{{5, true, 5}, {9, false, 5}, {-1, false, 5}, {1, true, 2}, {0, true, 2}, {8, true, 8}} {
+		if got := d.SetForcedPlayers(c.set); got != c.ok {
+			t.Errorf("set %d: ok=%v", c.set, got)
+		}
+
+		if got := d.PlayerCount(); got != c.wantPC {
+			t.Errorf("after set %d: count %d, want %d", c.set, got, c.wantPC)
+		}
+	}
+
+	n = 0 // everybody dead: still one player
+	d.SetForcedPlayers(0)
+
+	if d.PlayerCount() != 1 {
+		t.Errorf("empty game count %d", d.PlayerCount())
+	}
+}
