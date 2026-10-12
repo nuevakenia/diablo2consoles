@@ -185,7 +185,11 @@ func CheckActTravel(from, to int, q *d2s.QuestRecord, expansion, free bool) (Act
 
 // actFinishedSlot is the "act finished" slot set when the trip starts
 // (QUESTS_OnActChangeNpcTravel): Warriv 7, Meshif 15, Tyrael 28.
-var actFinishedSlot = map[int]int{1: d2s.QuestSlotAct1Finished, 2: d2s.QuestSlotAct2Finished, 4: d2s.QuestSlotAct3Finished}
+// The Mephisto portal (act 3) sets slot 23 too: VERIFIED in QUESTS_OnHellPortalActChange (flags RG and PGD of slot 0x17,
+// then packet 0x61 with movie 4); the port used to skip it.
+const questSlotAct3PortalFinished = 23
+
+var actFinishedSlot = map[int]int{1: d2s.QuestSlotAct1Finished, 2: d2s.QuestSlotAct2Finished, 3: questSlotAct3PortalFinished, 4: d2s.QuestSlotAct3Finished}
 
 // MarkActFinished records the trip's server-side quest effect on the record:
 // the act-finished slot gets RG (bit 0) and PGD (bit 13). It returns the slot
@@ -200,4 +204,13 @@ func MarkActFinished(q *d2s.QuestRecord, from int) int {
 	q.Set(slot, d2s.QuestBitUpdated)
 
 	return slot
+}
+
+// FinishedSlot is the "act finished" quest slot a trip out of act from sets (-1: none).
+func FinishedSlot(from int) int {
+	if slot, ok := actFinishedSlot[from]; ok {
+		return slot
+	}
+
+	return -1
 }

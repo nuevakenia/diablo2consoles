@@ -335,6 +335,11 @@ func (v *Game) onMonsterKilled(ev d2monsters.KillEvent) {
 
 	v.questDispatch(d2quest.Event{Kind: d2quest.EvMonsterKilled, Monster: d2act3.QuestKillClass(class, isSuper), Super: super, Name: ev.Label, Level: r.area, Freed: freed})
 	v.questKillDrops(ev.Label, ev.Class)
+
+	if ev.ByHero && d2quest.KillForcesSave(ev.Class) {
+		v.Infof("SAVE forced by the kill of %s (act boss save point)", ev.Label)
+		v.saveBeforeExit()
+	}
 	v.act3Killed(ev)
 	v.uberKilled(ev)
 	v.trioKilled(ev)

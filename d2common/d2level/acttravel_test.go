@@ -81,7 +81,7 @@ func TestMarkActFinished(t *testing.T) {
 		t.Fatalf("act 1: slot %d", got)
 	}
 
-	if MarkActFinished(q, 2) != 15 || MarkActFinished(q, 4) != 28 || MarkActFinished(q, 3) != -1 {
+	if MarkActFinished(q, 2) != 15 || MarkActFinished(q, 4) != 28 || MarkActFinished(q, 3) != 23 || MarkActFinished(q, 5) != -1 {
 		t.Fatal("finished slots")
 	}
 }

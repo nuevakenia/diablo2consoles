@@ -22,8 +22,9 @@ import (
 // log lines the autotest reads.
 
 type travelState struct {
-	free      bool // debug: skip the quest and NPC rules
-	savedDone bool // the hero was moved to the act he was saved in
+	free        bool // debug: skip the quest and NPC rules
+	savedDone   bool // the hero was moved to the act he was saved in
+	moviePlayed bool // the player's play flag (PlayerData+0x4c): an act movie was already sent this session
 }
 
 func (v *Game) currentAct() int { return d2level.ActOfLevel(v.currentLevel()) }
@@ -71,8 +72,11 @@ func (v *Game) travelToAct(to int, via string) error {
 	}
 
 	// the server marks the act just left as finished for a forward trip made
-	// by the travel NPC or by talking (not for the Mephisto portal)
-	v.levels.trans.actFinished = forward && (via == "npc" || via == "talk")
+	// by the travel NPC, by talking, and by the Mephisto portal (VERIFIED:
+	// QUESTS_OnHellPortalActChange sets slot 23; earlier code excluded it)
+	v.levels.trans.actFinished = forward && (via == "npc" || via == "talk" || via == "portal")
+
+	v.logActMovie(from, to, via)
 
 	return nil
 }
