@@ -60,6 +60,8 @@ type Options struct {
 // Counters tally what happened, for scenario summaries.
 type Counters struct {
 	Casts, Refused, Missiles, Hits, Misses, Walls, Expired, Kills, Melee int
+	// Blocks are hits a shield block took (monster blocks of melee strikes and missiles; also counted in Misses).
+	Blocks int
 	// AreaHits are targets reached by area effects and splash, DotDamage the
 	// poison and burn damage dealt.
 	AreaHits, DotDamage int
@@ -187,6 +189,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	monsters.HeroDefense = e.heroDefense
 	monsters.HeroDefenseParts = e.heroDefenseParts
 	monsters.HeroAvoid = e.heroAvoid
+	monsters.HeroBlockAnim = e.heroBlockAnim
 	monsters.SummonSlow = e.applySlowTarget
 	monsters.HeroHitByMissile = e.heroHitByMissile
 	e.installMercHooks()
@@ -383,6 +386,7 @@ func (e *Engine) CastAt(p *d2mapentity.Player, skillID, sx, sy int) bool {
 	}
 
 	e.lastRefusal = ""
+	u.usedSkill, u.usedBits4 = true, sk.Bits4
 
 	e.Counters.ManaSpent += st.ManaPaid
 	p.SetDirection(p.Position.DirectionTo(*d2vector.NewVector(float64(sx), float64(sy))))
@@ -431,6 +435,22 @@ func (e *Engine) mayInterrupt(p *d2mapentity.Player, sk *d2skill.Skill, rec *d2r
 	ok, _ := d2skill.CanInterrupt(d2skill.InterruptInput{
 		CurrentMode: int(p.GetAnimationMode()), NewMode: int(rec.Anim), Flag: true, HasUsedSkill: true,
 		SkillBits4: sk.Bits4, ActionDue: p.ActionDueSoon(),
+	})
+
+	return ok
+}
+
+// heroBlockAnim is the Director's HeroBlockAnim hook: whether the hero may enter the block mode (9) from what she
+// is doing (PLRMODE_ServerStartMode 0x57e9b0 -> PLRMODE_CanInterruptCurrentMode 0x57ceb0, VERIFIED; the block
+// animation is started with the interrupt check on). With a used skill that does not hold (dwBits4 bit 31 clear)
+// the block animation only plays from the neutral mode: walking, running, attacking and casting heroes take the
+// block without the animation. The hold states 0x2a / 0xf are not modelled (UNVERIFIED which skills set them).
+func (e *Engine) heroBlockAnim(p *d2mapentity.Player) bool {
+	u := e.hero(p)
+
+	ok, _ := d2skill.CanInterrupt(d2skill.InterruptInput{
+		CurrentMode: int(p.GetAnimationMode()), NewMode: int(d2enum.PlayerAnimationModeBlock), Flag: true,
+		HasUsedSkill: u.usedSkill, SkillBits4: u.usedBits4, ActionDue: p.ActionDueSoon(),
 	})
 
 	return ok
@@ -650,7 +670,13 @@ func (e *Engine) meleeResult(p *d2mapentity.Player, sk *d2skill.Skill, r *d2skil
 
 	if !r.Hit {
 		e.Counters.Misses++
-		e.emit("hit", "SKILL melee skill=%q target=%s hit=false chance=%d roll=%d", sk.Name, name, r.Chance, r.Roll)
+
+		if r.Blocked {
+			e.Counters.Blocks++
+		}
+
+		e.emit("hit", "SKILL melee skill=%q target=%s hit=false chance=%d roll=%d blocked=%v", sk.Name, name, r.Chance, r.Roll,
+			r.Blocked)
 
 		return
 	}
@@ -1228,7 +1254,12 @@ func (e *Engine) onSim(ev d2missile.Event) {
 		}
 	case d2missile.EventMiss:
 		e.Counters.Misses++
-		e.emit("hit", "MISSILE miss name=%s id=%d target=%s chance=%d roll=%d", name, m.ID, ev.Target.ID(), ev.Chance, ev.Roll)
+		if ev.Blocked {
+			e.Counters.Blocks++
+		}
+
+		e.emit("hit", "MISSILE miss name=%s id=%d target=%s chance=%d roll=%d blocked=%v", name, m.ID, ev.Target.ID(), ev.Chance,
+			ev.Roll, ev.Blocked)
 	case d2missile.EventPierce:
 		e.emit("missile", "MISSILE pierce name=%s id=%d", name, m.ID)
 	case d2missile.EventWall:

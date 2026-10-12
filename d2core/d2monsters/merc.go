@@ -659,6 +659,10 @@ func (d *Director) mercStrike(u *unit, mode d2monster.Mode) {
 	}
 
 	hit, chance, roll := d2combat.RollToHit(u.b.Seed, in)
+	if hit && d.MonsterBlock(tu.m, false) { // shield block of the target (0x57cc10)
+		hit = false
+	}
+
 	if !hit {
 		d.emit("merc", "MERC attack name=%s id=%08x target=%s mode=%s hit=false chance=%d roll=%d", u.m.Label(), mu.save.ID,
 			tu.m.Label(), mode, chance, roll)

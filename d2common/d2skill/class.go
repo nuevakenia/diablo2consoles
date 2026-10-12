@@ -290,6 +290,15 @@ func (p *Pipeline) strike(u Unit, sk *Skill, lvl int, t d2missile.Target, env *E
 		})
 	}
 
+	// shield block: COMBAT_RollAttackOutcome (0x57cc10) rolls it after a successful to-hit roll, on the
+	// DEFENDER's seed (the target's own); a blocked blow clears the hit bit. Only after a rolled to-hit (the
+	// autohit and kick paths here roll none; whether the exe still blocks them is UNVERIFIED).
+	if mr.Hit && !sk.Kick && !o.autoHit {
+		if b, ok := t.(d2missile.Blocker); ok && b.RollBlock(false) {
+			mr.Hit, mr.Blocked = false, true
+		}
+	}
+
 	if !mr.Hit {
 		return mr
 	}

@@ -216,6 +216,7 @@ var modeFallback = map[d2monster.Mode][]d2enum.MonsterAnimationMode{
 	d2monster.ModeWalk:        {d2enum.MonsterAnimationModeWalk},
 	d2monster.ModeRun:         {d2enum.MonsterAnimationModeRun, d2enum.MonsterAnimationModeWalk},
 	d2monster.ModeGetHit:      {d2enum.MonsterAnimationModeGetHit},
+	d2monster.ModeBlock:       {d2enum.MonsterAnimationModeBlock},
 	d2monster.ModeAttack1:     {d2enum.MonsterAnimationModeAttack1},
 	d2monster.ModeAttack2:     {d2enum.MonsterAnimationModeAttack2, d2enum.MonsterAnimationModeAttack1},
 	d2monster.ModeSkill1:      {d2enum.MonsterAnimationModeSkill1, d2enum.MonsterAnimationModeAttack1},
@@ -448,10 +449,11 @@ func (m *Monster) checkEvents(tickTime float64) {
 			m.SetMode(d2monster.ModeNeutral)
 			m.events = append(m.events, MonsterEvent{MonsterEventModeDone, done})
 		}
-	case d2monster.ModeGetHit:
+	case d2monster.ModeGetHit, d2monster.ModeBlock:
 		if played {
+			done := m.mode
 			m.SetMode(d2monster.ModeNeutral)
-			m.events = append(m.events, MonsterEvent{MonsterEventModeDone, d2monster.ModeGetHit})
+			m.events = append(m.events, MonsterEvent{MonsterEventModeDone, done})
 		}
 	case d2monster.ModeDying:
 		if played {

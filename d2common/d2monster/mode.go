@@ -21,13 +21,16 @@ const (
 	ModeDead        Mode = 12 // DD
 	ModeCast        Mode = 14 // SQ
 	ModeRun         Mode = 15 // RN
+	// ModeBlock is the monster block animation (BL; the exe plays it for a shield block, 0x57ae50). The Go
+	// numbering gives it its own slot: 16 is not an exe mode value.
+	ModeBlock Mode = 16
 )
 
 var modeNames = map[string]Mode{
 	"DT": ModeDying, "NU": ModeNeutral, "WL": ModeWalk, "A1": ModeAttack1,
 	"A2": ModeAttack2, "GH": ModeGetHit, "S1": ModeSkill1, "S2": ModeSkill2,
 	"S3": ModeSkill3, "S4": ModeSkill4, "DD": ModeDead, "SQ": ModeCast, "SC": ModeSpecialCast,
-	"RN": ModeRun,
+	"RN": ModeRun, "BL": ModeBlock,
 }
 
 // ParseMode converts a monstats mode token ("A1", "S2", "SQ"...) to a Mode.

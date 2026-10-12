@@ -879,8 +879,19 @@ func (s *Sim) process(m *Missile, t Target) {
 		hit, chance, roll = d2combat.RollToHit(m.Owner.Roller, in)
 	}
 
+	// shield block (COMBAT_RollAttackOutcome 0x57cc10: after a successful to-hit roll, on the defender's seed);
+	// a blocked hit clears the hit bit, so it ends like a miss. UNVERIFIED: that a missile without the ToHit
+	// flag skips the outcome (and so the block) altogether.
+	blocked := false
+
+	if hit && sp.ToHit {
+		if b, ok := t.(Blocker); ok && b.RollBlock(true) {
+			hit, blocked = false, true
+		}
+	}
+
 	if !hit {
-		s.emit(Event{Kind: EventMiss, Missile: m, Target: t, Chance: chance, Roll: roll})
+		s.emit(Event{Kind: EventMiss, Missile: m, Target: t, Chance: chance, Roll: roll, Blocked: blocked})
 
 		// verified (0x5aba10): a missed to-hit roll destroys the missile
 		// (return 2), ignoring CollideKill and pierce; only AlwaysExplode runs

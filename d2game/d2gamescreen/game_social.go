@@ -441,6 +441,17 @@ func (v *Game) onPvPHit(p d2netpacket.PvPHitPacket) {
 		return
 	}
 
+	// shield block of the defender (0x57cc10: after the to-hit roll the attacker's client passed, on the defender's own
+	// seed, before the damage). Wave 24; melee swings only: a skill hit may be an area function (Meteor, Blizzard)
+	// that never goes through the to-hit/block outcome, and the packet does not say which (UNVERIFIED, so no block).
+	if d := v.monsters; d != nil && p.Skill == "" {
+		if blocked, note := d.HeroPvPBlock(v.localPlayer); blocked {
+			v.Infof("PVP BLOCK attacker=%q skill=%q blocked=true%s", p.Attacker, p.Skill, note)
+
+			return
+		}
+	}
+
 	st := v.localPlayer.Stats
 	physResist, reduce := 0, 0
 	def := d2combat.PvPDefender{}

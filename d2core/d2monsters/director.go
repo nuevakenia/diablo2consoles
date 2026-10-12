@@ -110,6 +110,8 @@ type Counters struct {
 	// BlockAnims counts hero block animations that played (cooldown rule).
 	BlockAnims int
 
+	// MonsterBlocks counts hits a monster's shield block took; BlockAnimsMonster the BL animations that started.
+	MonsterBlocks, BlockAnimsMonster int
 	// Raised counts corpses revived by Fallen Shaman / Greater Mummy casts.
 	Raised int
 	// Packs is natural groups spawned; BlockedSteps counts steps refused
@@ -260,6 +262,8 @@ type Director struct {
 	// HeroAvoid, if set, rolls the hero's dodge / avoid / evade for a landed
 	// hit BEFORE the damage roll (the exe's order). It reports whether the hit
 	// was avoided, with a log note. melee is false for projectiles.
+	HeroBlockAnim func(p *d2mapentity.Player) bool // wave 24: may the hero enter the block mode now (0x57ceb0)? nil: always
+
 	HeroAvoid func(p *d2mapentity.Player, attacker *d2mapentity.Monster, melee bool) (bool, string)
 
 	// HeroHitByMissile, if set, is called when a monster's missile reaches a hero, before the to-hit roll

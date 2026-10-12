@@ -492,6 +492,11 @@ func (d *Director) allyStrike(u *unit, _ d2monster.Mode) {
 		AttackRating: ar, Defense: t.m.Vitals.Defense, AttackerLevel: u.m.Vitals.Level, DefenderLevel: t.m.Vitals.Level,
 	})
 
+	// shield block of the target (0x57cc10: after the to-hit roll, on the defender's seed)
+	if hit && d.MonsterBlock(t.m, false) {
+		hit = false
+	}
+
 	dmg := 0
 
 	if hit {

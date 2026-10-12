@@ -115,6 +115,15 @@ type Target interface {
 	Defense(missile bool) int
 }
 
+// Blocker is optionally implemented by a Target that can block a landed hit with a shield (COMBAT_RollShieldBlock
+// 0x57bfa0, called by the attack outcome 0x57cc10 after the to-hit roll succeeded, VERIFIED). RollBlock rolls
+// one step of the TARGET's own seed (the exe rolls the defender's) and reports whether the hit was blocked;
+// missile says whether the hit is a missile's (the exe passes it on to the dodge/avoid step; the block chance
+// itself does not depend on it). Targets without it never block.
+type Blocker interface {
+	RollBlock(missile bool) bool
+}
+
 // World is the environment a Sim runs in.
 type World interface {
 	d2path.Grid
@@ -195,11 +204,13 @@ type Event struct {
 	// Damage is the rolled damage (EventHit), before resists, 8.8 fixed point.
 	Damage d2combat.Damage
 	Chance int // to-hit chance (EventHit / EventMiss), 0 when no roll
-	Roll   int
-	Name   string // explosion missile name (EventExplode)
-	Heal   int    // EventHeal: life healed, 8.8 fixed point
-	Radius int    // EventArea: radius in subtiles
-	Helper int    // EventPeriodic: index of the periodic helper (missile Param2)
+	// Blocked is set on an EventMiss that the target's shield block caused (the to-hit roll itself succeeded).
+	Blocked bool
+	Roll    int
+	Name    string // explosion missile name (EventExplode)
+	Heal    int    // EventHeal: life healed, 8.8 fixed point
+	Radius  int    // EventArea: radius in subtiles
+	Helper  int    // EventPeriodic: index of the periodic helper (missile Param2)
 	// Frames, Distance: EventState duration and flee distance.
 	Frames, Distance int
 }
