@@ -193,6 +193,23 @@ func TestExeRecipeSockets(t *testing.T) {
 	}
 }
 
+// A "useitem" result is a clone of the input (CUBE_ServerCreateRecipeOutputs
+// 0x5638a0): lvl/plvl/ilvl and a non-crafted quality token do not change it.
+func TestExeUseItemCloneKeepsLevelAndQuality(t *testing.T) {
+	cat, _, _ := synth()
+	src := Item{Code: "ssd", ILvl: 40, Quality: d2drop.QualityRare}
+	m := &Match{Recipe: &Recipe{Outputs: []Output{{UseItem: true, Level: 90, Quality: d2drop.QualityMagic}}}, Assigned: [][]int{{0}}}
+
+	res, err := cat.Execute(m, &Context{PlayerLevel: 10}, []Item{src}, d2rand.New(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if p := res.Products[0]; p.Item.ILvl != 40 || p.Item.Quality != d2drop.QualityRare {
+		t.Errorf("clone changed: ilvl %d quality %d", p.Item.ILvl, p.Item.Quality)
+	}
+}
+
 func TestExeRemReturnsGems(t *testing.T) {
 	cat, _, _ := synth()
 	src := Item{Code: "ssd", Sockets: 2, Socketed: []string{"gcv", "r01"}, Quality: d2drop.QualityNormal}

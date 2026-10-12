@@ -149,10 +149,9 @@ func (cat *Catalog) makeProduct(o *Output, ctx *Context, items []Item, main int,
 		p.Item = *src
 		p.Source = main
 
-		if o.Level != 0 || o.PLevel != 0 || o.ILevel != 0 {
-			p.Item.ILvl = ilvl
-		}
-
+		// The exe clones the input and only swaps its base (0x5638a0): lvl,
+		// plvl and ilvl are not read for a "useitem" result, the item keeps
+		// its own item level. No shipped recipe sets them on one.
 		if o.Remove {
 			p.Returned = append(p.Returned, src.Socketed...)
 		}
@@ -219,7 +218,10 @@ func (cat *Catalog) modifyInPlace(o *Output, it *Item) error {
 		it.Code = code
 	}
 
-	if o.Quality != 0 {
+	// A clone keeps its quality; only a crafted token changes it (the exe
+	// then gives the clone a rare prefix and suffix name, 0x5638a0). A
+	// "useitem" with any other quality token is not in the shipped table.
+	if o.Quality == d2drop.QualityCrafted {
 		it.Quality = o.Quality
 	}
 

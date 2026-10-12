@@ -74,10 +74,20 @@ type UniqueTables struct {
 type GameState struct {
 	// Ladder is set for ladder games (ladder-only uniques may drop).
 	Ladder bool
+	// Hardcore is the game's hardcore flag (game+0x74). VERIFIED (5547d0): the
+	// exe lets ladder-only uniques drop when the game type byte (+0x6a, the
+	// Ladder field here: UNVERIFIED that it is the ladder flag rather than a
+	// "not single player" kind) OR the +0x74 word is non-zero. UNVERIFIED: that
+	// +0x74 is hardcore (game-net.md says so).
+	Hardcore bool
 	// Spawned is the bitmask at game+0x1b24: one bit per UniqueItems row
 	// that has been created in this game (4096 bits).
 	Spawned [128]uint32
 }
+
+// allowsLadderOnly is the exe's gate for ladder-only UniqueItems rows
+// (5547d0, both the classic and the Lord of Destruction loop).
+func (g *GameState) allowsLadderOnly() bool { return g != nil && (g.Ladder || g.Hardcore) }
 
 // spawned is the test the game does with the bit of a unique row (5545d0); a
 // row beyond the mask counts as spawned.
@@ -133,7 +143,7 @@ func (c *Creator) pickUnique(st *itemState) bool {
 	}
 
 	t := c.Uniques
-	ladder := game != nil && game.Ladder
+	ladder := game.allowsLadderOnly()
 
 	if ver == 0 {
 		for row := range t.Uniques {
