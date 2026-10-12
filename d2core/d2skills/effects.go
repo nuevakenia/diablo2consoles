@@ -1690,7 +1690,7 @@ func (e *Engine) areaDamage(ev d2missile.Event) {
 		d := ev.Damage
 		n++
 
-		e.hurtPlayer(o, h.p, &d, e.skillName(m.SkillID)+" area")
+		e.hurtPlayerRate(o, h.p, &d, e.skillName(m.SkillID)+" area", m.Spec.DamageRate)
 	}
 
 	if n > 0 {
@@ -1727,7 +1727,7 @@ func (e *Engine) splash(m *d2missile.Missile, primary *d2mapentity.Monster, dmg 
 		d := *dmg
 		n++
 
-		e.hurtPlayer(o, e.owner(m), &d, e.skillName(m.SkillID)+" splash")
+		e.hurtPlayerRate(o, e.owner(m), &d, e.skillName(m.SkillID)+" splash", m.Spec.DamageRate)
 	}
 
 	if n > 0 {
@@ -1758,7 +1758,7 @@ func (e *Engine) splashAt(m *d2missile.Missile) {
 		d := m.Damage.Roll(m.Owner.Roller)
 		n++
 
-		e.hurtPlayer(o, h.p, &d, e.skillName(m.SkillID)+" splash")
+		e.hurtPlayerRate(o, h.p, &d, e.skillName(m.SkillID)+" splash", m.Spec.DamageRate)
 	}
 
 	if n > 0 {

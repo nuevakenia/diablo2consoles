@@ -1301,7 +1301,7 @@ func (e *Engine) onSim(ev d2missile.Event) {
 		}
 
 		if pt, ok := ev.Target.(*playerTarget); ok && ev.Damage.SumTotal(true) > 0 {
-			e.hurtPlayer(pt.p, e.owner(m), &ev.Damage, e.skillName(m.SkillID))
+			e.hurtPlayerRate(pt.p, e.owner(m), &ev.Damage, e.skillName(m.SkillID), m.Spec.DamageRate)
 		}
 	case d2missile.EventMiss:
 		e.Counters.Misses++

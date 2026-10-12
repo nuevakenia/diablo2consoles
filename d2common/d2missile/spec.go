@@ -36,6 +36,12 @@ type Spec struct {
 	NextHit    bool
 	NextDelay  int
 	Size       int
+	// DamageRate is the missiles.txt DamageRate column (missile stat 0x147, copied into the damage struct at
+	// +0x54 by 0x5ab220; VERIFIED wave 31): COMBAT_ApplyResistsToDamageStruct 0x579ef0 scales the defender's flat
+	// damage reduction (stats 0x22 and 0x23) by DamageRate / 1024 per hit when it is above 0. Standing fires set it
+	// (Fire Wall and Armageddon fire 41, Inferno flames 82, Wake of Fire 205) so the reduction is paid once per
+	// second, not once per frame.
+	DamageRate int
 
 	SubLoop            bool
 	SubStart, SubStop  int

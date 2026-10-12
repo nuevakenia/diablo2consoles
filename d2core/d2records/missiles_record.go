@@ -165,9 +165,9 @@ type MissileRecord struct {
 	// apparently this value is no longer needed in D2
 	LocalBlood int // blood effects?
 	// 0 = no blood, 1 = blood, 2 = blood and affected by open wounds
-	DamageReductionRate int // how many frames between applications of the
-	// magic_damage_reduced stat, so for instance on a 0 this stat applies every frame
-	// on a 3, only every 4th frame has damage reduced
+	// DamageReductionRate is the DamageRate column. VERIFIED (wave 31, 0x579ef0): it is not a frame period; the
+	// defender's flat damage reduction (stats 34 and 35) is scaled by DamageRate / 1024 on every hit when it is above 0.
+	DamageReductionRate int
 
 	DestroyedByTP bool // if true, destroyed when source player teleports to town
 	CanDestroy    bool // unknown

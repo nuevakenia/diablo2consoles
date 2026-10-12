@@ -26,6 +26,9 @@ type PvPHit struct {
 	Skill          string
 	Raw            int // whole points before the PvP scale and the defender's resists
 	Parts          d2combat.PvPParts
+	// Rate is the DamageRate of the missile that hit (0 for a hit without a missile): the defender scales its
+	// flat damage reductions by Rate / 1024 (0x579ef0, wave 31).
+	Rate int
 }
 
 // playerTarget adapts a rival hero to d2missile.Target.
@@ -109,6 +112,11 @@ func (e *Engine) rivalsNear(x, y, r int) []*d2mapentity.Player {
 // hurtPlayer scales a rolled damage struct for PvP and sends it to the
 // defender through OnPvPHit.
 func (e *Engine) hurtPlayer(dst, src *d2mapentity.Player, d *d2combat.Damage, what string) {
+	e.hurtPlayerRate(dst, src, d, what, 0)
+}
+
+// hurtPlayerRate is hurtPlayer for a hit of a missile with the given DamageRate.
+func (e *Engine) hurtPlayerRate(dst, src *d2mapentity.Player, d *d2combat.Damage, what string, rate int) {
 	if src == nil || dst == nil {
 		return
 	}
@@ -145,7 +153,7 @@ func (e *Engine) hurtPlayer(dst, src *d2mapentity.Player, d *d2combat.Damage, wh
 	}
 
 	if e.OnPvPHit != nil {
-		e.OnPvPHit(PvPHit{Source: src, Target: dst, Skill: what, Raw: raw.Total(), Parts: scaled})
+		e.OnPvPHit(PvPHit{Source: src, Target: dst, Skill: what, Raw: raw.Total(), Parts: scaled, Rate: rate})
 	}
 }
 
