@@ -739,15 +739,18 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 	// Hit function 13 (Glacial Spike, 0x5a8360, read): the elemental length of
 	// its damage struct is sHitPar2 when > 0, else auralencalc (record +0x60),
 	// not the skill's ELen columns; the radius is sHitPar1 else aurarangecalc
-	// (+0x64) (see areaRadius below). The 0x5a6930 mapping of that length onto
-	// the cold chill/freeze fields is UNVERIFIED.
+	// (+0x64) (see areaRadius below). VERIFIED wave 23: 0x5a6930 maps the length by the
+	// missile's own EType column, which is frze (12) for glacialspike: it lands in the
+	// freeze length of the damage struct (offset 0x34), not the chill length.
 	if ms.SrvHitFunc == 13 {
 		l := ms.SHitPar[1]
 		if l < 1 {
 			l = env.eval(sk.AuraLenCalc)
 		}
 
-		desc.Cold.Len = int32(l)
+		if l > 0 {
+			desc.FreezeLen = int32(l)
+		}
 	}
 
 	x, y := u.Pos()

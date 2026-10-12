@@ -37,3 +37,9 @@ func (p *Pipeline) SrvMissileA(skillID int) string {
 
 	return sk.SrvMissileA
 }
+
+// BlazeTrailStep reports whether the player has moved to a new subtile since
+// the last trail check: the stand-in for the path's reached-node flag that
+// SKILL_SpawnTrailMissileWhileMoving (0x5c7eb0) waits for before it drops the
+// Blaze fire (VERIFIED: nothing is dropped while the player stands still).
+func BlazeTrailStep(lastX, lastY, x, y int) bool { return lastX != x || lastY != y }

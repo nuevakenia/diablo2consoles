@@ -107,6 +107,13 @@ func stunFor(m *Missile) int {
 // dmgFunc runs the missile's pSrvDmgFunc on the rolled damage.
 func (s *Sim) dmgFunc(m *Missile, t Target, d *d2combat.Damage) {
 	switch m.Spec.SrvDmgFunc {
+	case 4:
+		// 0x5aadb0 (V, wave 23; Ice Blast): the chill length of the hit becomes its freeze length and the
+		// chill length is cleared
+		d.FreezeLen, d.ColdLen = d.ColdLen, 0
+	case 10:
+		// 0x5aadd0 (V, wave 23; Blades of Ice cubes): the freeze length is a copy of the chill length
+		d.FreezeLen = d.ColdLen
 	case 7:
 		d.StunLen = int32(stunFor(m))
 		d.HitClass = dmgFuncHitClassStun

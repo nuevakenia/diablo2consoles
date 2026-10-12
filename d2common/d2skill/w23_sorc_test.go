@@ -68,3 +68,13 @@ func TestPipelineCalc1FrozenArmorFreeze(t *testing.T) {
 		t.Fatal("unknown skill")
 	}
 }
+
+func TestBlazeTrailOnlyWhileMoving(t *testing.T) {
+	if BlazeTrailStep(5, 5, 5, 5) {
+		t.Fatal("a standing player leaves no fire")
+	}
+
+	if !BlazeTrailStep(5, 5, 6, 5) || !BlazeTrailStep(5, 5, 5, 4) {
+		t.Fatal("a step leaves fire")
+	}
+}
