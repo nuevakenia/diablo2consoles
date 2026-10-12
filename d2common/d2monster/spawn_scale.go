@@ -12,7 +12,8 @@ type ScaleTable interface {
 	// Level is the monstats Level column (normal difficulty) of a class.
 	Level(class int) int
 	// ChainSteps is the step bound the exe reads from monstats record bytes
-	// +0x4a (MONSTATS_GetRecordBytes4A4B 0x652550). UNVERIFIED: the column
+	// +0x4a (MONSTATS_GetRecordBytes4A4B 0x652550). VERIFIED w37: the two bytes are
+	// plain record bytes at +0x4a/+0x4b (record stride 0x1a8; 0x652550 returns them, 0,0 for a bad class). UNVERIFIED: the column
 	// is computed at load time and its meaning is taken to be the number of
 	// NextInClass links behind the class.
 	ChainSteps(class int) int
