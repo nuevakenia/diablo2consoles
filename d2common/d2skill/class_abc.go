@@ -71,7 +71,9 @@ func doDopplezonFn(c *cast) {
 
 	if n := len(c.res.Effects); n > 0 && c.res.Effects[n-1].Summon != nil {
 		o := c.res.Effects[n-1].Summon
-		o.HPPct = 0
+		// calc1 stays in HPPct: SKILL_SpawnSummonedMinion (0x5c22c0, called by SRVDO_015 after the life is set) grows
+		// the maximum life by calc1 percent for every summon (wave 30 wiki cross check; 55 / 100 / 150 percent of
+		// the owner's half life at levels 1 / 10 / 20).
 		o.OwnerHPPct = c.calc(3)
 		o.Frames = c.calc(2)
 		o.DrawsAggro = true
