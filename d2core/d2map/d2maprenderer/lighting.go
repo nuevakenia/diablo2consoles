@@ -37,6 +37,8 @@ type LightInput struct {
 	// RadiusSubtiles is the hero's light radius target in subtiles (0 = the
 	// default d2lightmap.HeroRadiusSubtiles).
 	RadiusSubtiles int
+	// HeroColor is the hero light colour (item_lightcolor); the zero value means white.
+	HeroColor [3]uint8
 	// Extra are the static lights near the hero (objects such as torches and fires).
 	Extra []LightPoint
 }
@@ -99,7 +101,16 @@ func (mr *MapRenderer) SetLightInput(in LightInput) {
 		radius = d2lightmap.HeroRadiusSubtiles
 	}
 
-	l.hero.SetTargetRadius(radius)
+	// the stat callback sets the radius at once (LIGHT_SetLightRadius 0x46ff10), no ramp
+	if l.hero.Target != radius<<3 {
+		l.hero.SetRadiusNow(radius)
+	}
+
+	if in.HeroColor == [3]uint8{} {
+		l.hero.R, l.hero.G, l.hero.B = 255, 255, 255
+	} else {
+		l.hero.R, l.hero.G, l.hero.B = in.HeroColor[0], in.HeroColor[1], in.HeroColor[2]
+	}
 }
 
 // loadShadeTable derives the shade factors from the act's PL2.
