@@ -1571,6 +1571,12 @@ func doSummonFn(c *cast) {
 		o.Level = c.u.Level()
 	}
 
+	if sk.SrvDoFunc == 49 {
+		// VERIFIED (shadow.go): bonuses only above level 1, every slot at aurastatcalc2, life (lvl-1)*Param1 percent
+		o.Stats, _ = shadowBonuses(c.env, sk, c.lvl)
+		o.HPPct = shadowHPPct(sk, c.lvl)
+	}
+
 	if sk.SrvDoFunc == 56 {
 		o.AuraSkill, o.AuraLevel = c.minionAura()
 	}

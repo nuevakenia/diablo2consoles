@@ -1440,7 +1440,11 @@ func (e *Engine) heroAvoid(p *d2mapentity.Player, _ *d2mapentity.Monster, melee 
 		Moving:      !vel.IsZero(),
 		EvadeChance: u.Stat("passive_evade"), DodgeChance: u.Stat("passive_dodge"), AvoidChance: u.Stat("passive_avoid"),
 		IsMissile: !melee,
+		// Weapon Block (w23, 0x57bcb0 / 0x57bd60): the chance is only non-zero with a claw in both hands
+		AnimBlockChance: e.weaponBlockChance(u), AnimIsBlock: true,
 	}); out {
+	case d2combat.AvoidMonBlock:
+		return true, fmt.Sprintf(" avoided=%d weapon_block=true", out)
 	case d2combat.AvoidAvoided, d2combat.AvoidDodged, d2combat.AvoidEvaded:
 		return true, fmt.Sprintf(" avoided=%d", out)
 	}

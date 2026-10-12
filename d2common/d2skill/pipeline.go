@@ -587,6 +587,12 @@ func (p *Pipeline) SummonPassives(u Unit, skillID int) []StatMod {
 		return nil
 	}
 
+	if sk.SrvDoFunc == 49 { // Shadow Warrior / Master: shadow.go
+		_, pas := shadowBonuses(p.env(sk, lvl, u), sk, lvl)
+
+		return pas
+	}
+
 	return p.passiveStats(u, sk, lvl)
 }
 

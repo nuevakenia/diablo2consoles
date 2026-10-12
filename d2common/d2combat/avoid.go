@@ -22,8 +22,10 @@ type AvoidInput struct {
 	// AnimBlockChance is the value of 0x57bcb0 (VERIFIED: NOT a monster stat:
 	// the largest value among the entries of the layered stat 0x15c whose item
 	// type matches the weapon in either hand, i.e. the Weapon Block passive;
-	// 0 without a match) and AnimIsBlock says the unit's current animation
-	// action is 0xd (block). Both must hold to roll. Applies to players and
+	// 0 without a match) and AnimIsBlock says the weapon class of the unit's
+	// current mode is 0xd (w23 correction: this is the weapon class, "ht2",
+	// two claws on an Assassin, NOT a block animation; see
+	// d2skill/weaponblock.go). Both must hold to roll. Applies to players and
 	// monsters alike (the same code path); evade uses mode 3 or 2 for players
 	// and 15 or 2 for monsters (VERIFIED), returns code 8 and has no result bit.
 	AnimBlockChance int
