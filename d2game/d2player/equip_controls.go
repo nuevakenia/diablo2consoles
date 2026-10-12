@@ -815,13 +815,13 @@ func (g *GameControls) compareWithWorn(item *diablo2item.Item) []string {
 
 		var out []string
 
-		if newDef > 0 || oldDef > 0 {
+		if newDef > 0 && oldDef > 0 { // only armour against armour
 			if l := compareLine("Defense:", float64(newDef), float64(oldDef)); l != "" {
 				out = append(out, l)
 			}
 		}
 
-		if newDmg > 0 || oldDmg > 0 {
+		if newDmg > 0 && oldDmg > 0 { // only weapons against weapons
 			if l := compareLine("Damage:", newDmg, oldDmg); l != "" {
 				out = append(out, l)
 			}
