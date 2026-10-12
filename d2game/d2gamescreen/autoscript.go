@@ -135,7 +135,20 @@ func (v *Game) advanceAutoScript(elapsed float64) {
 		return
 	}
 
+	v.autoScriptHeal()
 	s.runner.Advance(elapsed)
+}
+
+// autoScriptHeal is the "scripted strong hero" of the Hell scenarios: with OD2_AUTOSCRIPT_HEAL=1 the hero's life and
+// mana are topped up on every update while the script runs (a test aid like the console command restorevitals; the hero
+// still dies from a hit stronger than his whole life, and a hero that is already dead stays dead).
+func (v *Game) autoScriptHeal() {
+	p := v.localPlayer
+	if os.Getenv("OD2_AUTOSCRIPT_HEAL") != "1" || p == nil || p.Stats == nil || p.Stats.Health <= 0 {
+		return
+	}
+
+	p.Stats.Health, p.Stats.Mana = p.Stats.MaxHealth, p.Stats.MaxMana
 }
 
 func (v *Game) autoScriptExit(pass bool) {

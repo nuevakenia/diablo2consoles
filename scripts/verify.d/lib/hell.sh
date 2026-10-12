@@ -52,15 +52,15 @@ w36_play_env() {
     w36_s="wait:1;say:resetquests;refuse:2;panel:character;wait:1;panel:close;automap:on;automap:stats;wait:1;automap:off"
     # Blood Moor: a fight at the difficulty's monster level
     w36_s+=";walkto:exit=2;expect:level=2;wait:2;kill:near=30,45;loot:30,40;walkto:exit=1;expect:level=1"
-    # Andariel: the portal to the Catacombs, the stairs down, a boss fight in bursts (the hero's vitals are restored between
-    # the bursts: the scripted strong hero); the corpse portal leads back to the camp
+    # Andariel: the portal to the Catacombs, the stairs down, the boss fight (OD2_AUTOSCRIPT_HEAL=1 tops the hero's life
+    # up on every update: the scripted strong hero); the corpse portal leads back to the camp
     w36_s+=";wait:8;say:spawnportal 36;use:Portal;expect:level=36;walkto:exit=37;expect:level=37;wait:3"
-    repeat 25 w36_s+=";kill:near=25,4;say:restorevitals"
-    w36_s+=";until:MONSTER death name=Andariel,5;wait:2;use:Portal;expect:level=1;wait:2"
+    w36_s+=";kill:name=Andariel,120"
+    w36_s+=";wait:2;use:Portal;expect:level=1;wait:2"
     # act travel of this difficulty: Warriv (Andariel is dead), then the quest flags of the later acts are forced
     w36_s+=";travel:2;expect:level=40;wait:2;refuse:4;say:completequest 2 6;travel:3;expect:level=75;wait:2"
     w36_s+=";say:completequest 3 6;travel:4;expect:level=103;wait:2;refuse:3;say:completequest 4 2;travel:5;expect:level=109;wait:2;exit"
-    echo "export OD2_AUTOGAME=\"$w36_dir/s94/Hero.d2s\" OD2_D2S_WRITEBACK=\"$w36_dir/wb94\" OD2_AUTOSPEED=4 OD2_AUTODIFFICULTY=$w36_d"
+    echo "export OD2_AUTOGAME=\"$w36_dir/s94/Hero.d2s\" OD2_D2S_WRITEBACK=\"$w36_dir/wb94\" OD2_AUTOSPEED=4 OD2_AUTODIFFICULTY=$w36_d OD2_AUTOSCRIPT_HEAL=1"
     echo "export OD2_AUTOSCRIPT='$w36_s'"
   else
     echo "# no hero (D2_TABLES unset or the tool failed)" >&2
