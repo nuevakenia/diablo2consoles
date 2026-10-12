@@ -100,6 +100,18 @@ func ResolveWorldClick(in WorldClickInput) WorldAction {
 	return WorldCastLeft
 }
 
+// IgnoredWhileCasting says whether a click that resolved to act is dropped while the hero is casting: movement and
+// melee orders are (the exe's server does not queue them, see GameControls.ignoredWhileCasting), skill orders go on
+// to the skill engine, which decides with the interrupt rule.
+func IgnoredWhileCasting(act WorldAction) bool {
+	switch act {
+	case WorldCastLeft, WorldCastRight, WorldStandStill:
+		return false
+	}
+
+	return true
+}
+
 // leftHoldInterval is how often a held left button re-sends its order (seconds): short, so the
 // hero follows the cursor smoothly like the original.
 const leftHoldInterval = 0.1
