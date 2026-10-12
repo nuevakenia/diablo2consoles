@@ -25,7 +25,13 @@ func (h *heroUnit) Shapeshifted() bool {
 	return false
 }
 
+// HasFormState implements d2skill.FormStateHolder.
+func (h *heroUnit) HasFormState(name string) bool {
+	return h.e.setOf(h.p.ID()).Active(h.e.frame, name)
+}
+
 var _ d2skill.StateHolder = (*heroUnit)(nil)
+var _ d2skill.FormStateHolder = (*heroUnit)(nil)
 
 // toggleForm is the first step of SRVDO_116 (0x5c4e80): the States.txt group of
 // the form state is cleared with the include-self flag (0x56a480); when that

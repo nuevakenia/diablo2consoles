@@ -32,6 +32,12 @@ type Plan struct {
 // Roster tracks the minions of one owner and enforces the pettype limits.
 type Roster struct {
 	pets []Pet
+	// Group gives the PetType.txt group id of a pettype (nil: no groups).
+	// Pet types that share a group above zero exclude each other: a new pet
+	// of one releases every pet of the others (PETS_ReleaseSharedLimitTypePets
+	// 0x573520, called first by PETS_ServerRegisterSummonedPet 0x573b50;
+	// VERIFIED, the group data itself comes from the loaded PetType.txt).
+	Group func(petType string) int
 }
 
 // Pets returns a copy of the living minions, oldest first.
@@ -72,6 +78,35 @@ func counted(petType string) bool {
 //     creates nothing when it is already full;
 //   - a single summon at the limit removes the oldest minion of the type.
 func (r *Roster) Plan(o *d2skill.SummonOrder) Plan {
+	p := r.plan(o)
+	p.Evict = append(r.sharedGroup(o.PetType), p.Evict...)
+
+	return p
+}
+
+// sharedGroup lists the pets of the other pet types in the group of petType.
+func (r *Roster) sharedGroup(petType string) []uint32 {
+	if r.Group == nil || !counted(petType) {
+		return nil
+	}
+
+	g := r.Group(petType)
+	if g <= 0 {
+		return nil
+	}
+
+	var ids []uint32
+
+	for _, p := range r.pets {
+		if !sameType(p.Type, petType) && counted(p.Type) && r.Group(p.Type) == g {
+			ids = append(ids, p.ID)
+		}
+	}
+
+	return ids
+}
+
+func (r *Roster) plan(o *d2skill.SummonOrder) Plan {
 	want := o.Count
 	if want < 1 {
 		want = 1

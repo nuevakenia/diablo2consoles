@@ -302,6 +302,10 @@ func (v *Game) startCastItem(eng *d2skills.Engine, t *castTest, it *castItem) {
 
 	p.Stats.Health = p.Stats.MaxHealth
 
+	if form := eng.PrepareShape(p, it.id); form != "" { // restrict 2 skills need their form (0x645450)
+		v.Infof("AUTOCAST shape skill=%q form=%s", it.skill, form)
+	}
+
 	if os.Getenv("OD2_AUTOCAST_MANA") != "" || len(t.items) > 1 {
 		p.Stats.Mana = p.Stats.MaxMana
 	}

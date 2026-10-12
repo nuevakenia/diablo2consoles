@@ -338,9 +338,9 @@ func TestSummons(t *testing.T) {
 		t.Errorf("skeleton stats %v", e.Summon.Stats)
 	}
 
-	// Raven fills up to min(lvl, 5) = 4 at once
+	// Raven: one per cast, limit min(lvl, 5) = 4 (the oldest leaves at the limit)
 	_, r = cf.cast("Raven", 5, 5)
-	if e = effectOf(t, r, "summon"); e.Summon.Count != 4 || e.Summon.Kind != "minion" {
+	if e = effectOf(t, r, "summon"); e.Summon.Count != 1 || e.Summon.Max != 4 || e.Summon.Kind != "minion" {
 		t.Errorf("raven order %+v", e.Summon)
 	}
 

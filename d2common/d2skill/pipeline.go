@@ -208,6 +208,10 @@ func (p *Pipeline) Start(u Unit, skillID int, tgt Target) StartResult {
 		return StartResult{Reason: ReasonTown, Level: lvl}
 	}
 
+	if !RestrictOK(u, sk) {
+		return StartResult{Reason: ReasonRestricted, Level: lvl}
+	}
+
 	if until := u.Cooldown(skillID); until > p.frame() {
 		return StartResult{Reason: ReasonCooldown, Level: lvl}
 	}

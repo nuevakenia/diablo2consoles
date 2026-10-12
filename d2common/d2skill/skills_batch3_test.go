@@ -310,6 +310,7 @@ func TestFormIsASwitchAndFreeInTheForm(t *testing.T) {
 	}
 
 	// the pipeline lets a hero without mana switch back
+	sk.Restrict = 1 // the form skills are castable in any shape (skills.txt)
 	cf.u.cooldowns = map[int]int{}
 	free.mana = 0
 	cf.u.mana = 0
