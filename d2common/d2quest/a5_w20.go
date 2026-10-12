@@ -17,9 +17,13 @@ package d2quest
 //	  pending) and pays experience: 1,400,000 / 20,000,000 / 40,000,000, capped to the experience span of the
 //	  current level.
 //
-// UNVERIFIED in the exe (D2MOO sources): the Rescue rune reward (Tal, Ral, Ort for 15, 14 and fewer freed
-// barbarians, at least 12 needed), the class item lists of Anya's reward, the availability triggers, the
-// Betrayal precondition (Prison of Ice done or reward pending when Nihlathak dies).
+// VERIFIED in w25 (Game.exe 1.14b): Qual-Kehk's 20110 (0x5859d0) needs RP, gives r07/r08/r09 (table 0x731780) by
+// slot-36 bit 6 (two runes), bit 7 (one rune), else three, and only then sets RG / clears RP; Anya's item tables
+// (0x733404 Nightmare above clvl 45, 0x73343c Hell above clvl 65, 0x733474 otherwise; per class, rare, ilvl = hero
+// level) match anyaRewards; Malah hands the potion out once per game (0x587460); the Betrayal kill (lambda 0x589300)
+// sets RP + goal only for heroes near the corpse whose Prison of Ice is rewarded or pending, others get bit 14.
+// UNVERIFIED: the "game type == 3" test that gives the higher Anya tier at any level (D2MOO nGameType, meaning
+// unknown), the availability triggers.
 
 // ObjectFrozenAnya is the frozen Anya block (objects.txt row 558, OperateFn 67): operating it with Malah's
 // potion thaws her.
@@ -176,6 +180,7 @@ func AnyaRewardCodes(class, difficulty, heroLevel int) []string {
 
 type prisonData struct {
 	scrollRegiven bool
+	potionGiven   bool // Malah hands the potion out once per game (VERIFIED 0x587460: counter at node data +0xd8)
 	malahIntro    bool
 	rewarded      bool // heard the closing lines in this session (the player GUID list)
 }
@@ -296,7 +301,9 @@ func newPrison() *Quest {
 			g.set(q, FlagStarted, "Malah asked for Anya")
 		case e.NPC == NPCMalah && e.Msg == 20127:
 			// the potion is given once (the original refuses when the hero or a party member carries one)
-			if !g.hasItem(ItemDefrostPotion) {
+			if !g.hasItem(ItemDefrostPotion) && !d.potionGiven {
+				d.potionGiven = true
+
 				g.emit(Effect{Kind: EffectGiveItem, Quest: q.ID, Code: ItemDefrostPotion, Note: "Malah's potion thaws Anya"})
 			}
 		case e.Msg == 20131 && q.NotIntro:

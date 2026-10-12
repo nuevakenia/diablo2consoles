@@ -4,8 +4,8 @@ import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s"
 
 // The "act finished" words of the record (quests.md section 2). Slot 15 is
 // set by boarding Meshif and slot 28 by Tyrael (both verified in the binary,
-// 0x5446e0); slot 23 (the end of Act 3) is only known from the community
-// layout and UNVERIFIED. d2s.QuestSlotAct3Finished (28) is the Act 4 word.
+// 0x5446e0); slot 23 (the end of Act 3) is set by the Hell portal change
+// (QUESTS_OnHellPortalActChange 0x5449c0, slot 0x17, VERIFIED in quests-2.md). d2s.QuestSlotAct3Finished (28) is the Act 4 word.
 const (
 	slotAct2Finished = d2s.QuestSlotAct2Finished
 	slotAct3Finished = 23
@@ -58,7 +58,7 @@ func (g *Game) TravelToAct3() []Effect {
 }
 
 // TravelToAct4 is the hero stepping through Mephisto's portal to the
-// Pandemonium Fortress after The Guardian (UNVERIFIED word slot 23).
+// Pandemonium Fortress after The Guardian (word slot 23, VERIFIED 0x5449c0).
 func (g *Game) TravelToAct4() []Effect {
 	// QUESTS_HellPortalActChange (D2MOO Quests.cpp, the exe's 0x5449c0 destroys the Khalim items the same way): the
 	// first time the portal is taken an unfinished Khalim's Will completes itself and its items vanish.

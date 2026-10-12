@@ -76,11 +76,23 @@ func ActBossDefeated(q *d2s.QuestRecord, act int) bool {
 }
 
 // ActsDefeated counts the acts whose boss is defeated, in order: counting stops
-// at the first act that is not.
+// at the first act that is not. In the expansion Diablo's death does NOT raise
+// the progression (VERIFIED: QUEST_A4_TerrorsEnd_CompleteQuest 0x5b2950 calls
+// CHARINFO_RaiseProgression only when the game is classic; D2MOO A4Q2 agrees),
+// so after Mephisto the next raise is Baal's (act 5) and the count jumps from
+// 3 to 5.
 func ActsDefeated(q *d2s.QuestRecord, expansion bool) int {
 	n := 0
 
 	for act := 1; act <= ActsPerDifficulty(expansion); act++ {
+		if expansion && act == 4 {
+			if n == 3 && ActBossDefeated(q, 5) {
+				return 5
+			}
+
+			return n
+		}
+
 		if !ActBossDefeated(q, act) {
 			break
 		}
