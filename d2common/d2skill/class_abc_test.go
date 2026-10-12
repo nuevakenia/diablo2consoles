@@ -230,7 +230,7 @@ func TestDopplezonAndValkyrie(t *testing.T) {
 
 	o := effectOf(t, r, "summon").Summon
 	// calc2 ln12 = 250 + 3*125 frames of life, calc3 par3 = 50 percent of the owner's life
-	if o.Key != "dopplezon" || o.Frames != 625 || o.OwnerHPPct != 50 || o.HPPct != 0 || o.Max != 1 || o.Kind != "minion" {
+	if o.Key != "dopplezon" || o.Frames != 625 || o.OwnerHPPct != 50 || o.HPPct != 40 || o.Max != 1 || o.Kind != "minion" {
 		t.Errorf("dopplezon order %+v", o)
 	}
 

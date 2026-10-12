@@ -1066,6 +1066,7 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 
 		if o.OwnerHPPct > 0 { // Dopplezon: life is a percent of the owner's maximum life
 			hp := maxInt(p.Stats.MaxHealth*o.OwnerHPPct/100, 1)
+			hp += hp * o.HPPct / 100 // calc1, SKILL_SpawnSummonedMinion 0x5c22c0
 			m.Vitals.MaxHP, m.Vitals.HP = hp, hp
 		}
 
