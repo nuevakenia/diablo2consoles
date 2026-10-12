@@ -14,8 +14,10 @@ const (
 )
 
 // IsBroken is the broken state (item flag 0x100) as far as the engine models
-// it: a durable item with no durability left. UNVERIFIED that the flag is set
-// exactly then.
+// it: a durable item with no durability left. The exe sets flag 0x100 only in
+// ITEM_BreakEquippedItem (0x55d660, when a worn item runs out) and clears it
+// in ITEM_RestoreBrokenItem (0x55d710), so a loose item at 0 without the saved
+// flag is UNVERIFIED as broken (the engine treats it as broken).
 func (i *Item) IsBroken() bool {
 	cur, maxDur := i.Durability()
 

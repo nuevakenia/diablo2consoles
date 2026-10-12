@@ -5,14 +5,21 @@ package d2player
 const statReplenishQuantity = 253
 
 // replenishSeconds is the time it takes a thrown weapon with the property to regain one piece, for the
-// property's value. UNVERIFIED against the exe: it is taken to work like "repairs durability" (one in
-// 100/value seconds); a value of 30 gives one javelin every 3.3 seconds.
+// property's value. VERIFIED (ITEMMODE_ServerReplenishStatStep 0x560a70, ITEM_ScheduleReplenishQuantity
+// 0x5565e0): after each piece the next step is scheduled 2500/value + 1 frames away (25 frames per second,
+// integer division), but never less than 125 frames (5 seconds). So a value of 30 gives one javelin every
+// 5 seconds, not every 3.3.
 func replenishSeconds(value int64) float64 {
 	if value <= 0 {
 		return 0
 	}
 
-	return 100 / float64(value)
+	frames := 2500/value + 1
+	if frames < 125 {
+		frames = 125
+	}
+
+	return float64(frames) / 25
 }
 
 // advanceAmmo gives a thrown weapon with "replenishes quantity" its pieces back, up to the stack limit of the

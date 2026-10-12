@@ -521,11 +521,13 @@ func (r *Roster) SetPos(id string, x, y int) {
 
 // inXPRange is the recipient test of the callback 0x57c5a0 that
 // PARTY_ForEachMemberInSameLevel runs for EXP_ServerShareExperienceWithParty
-// (0x57c6b0): a member that 0x552230 reports (UNVERIFIED: dead, here the
-// player-body state 7) is skipped, and the squared distance to the reference
-// unit must not exceed 0x1900 (VERIFIED compare). Which unit is the reference
-// (the monster or the credited killer) and the unit of the positions are
-// UNVERIFIED: here the killer's position in subtiles (path coordinates).
+// (0x57c6b0). VERIFIED (read in the exe): a member is skipped when 0x552230
+// (UNIT_IsPlayerDeathMode: player mode 0 = death or 0x11 = dead, or unit flag
+// 0x10000) reports true, which the roster models as "body"; a member whose x
+// is 0 is skipped; the squared distance to the reference unit must not exceed
+// 0x1900; both coordinates are the whole part of the path's precise position
+// (PATH_GetXPos), i.e. subtiles, 5 per tile. UNVERIFIED: which unit is the
+// reference (the dead monster is the likelier, the killer is used here).
 func (r *Roster) inXPRange(k, o *entry) bool {
 	if o.body {
 		return false

@@ -108,8 +108,9 @@ func (cat *Catalog) Socket(it *Item, filler string, rw *Runewords, ladder bool) 
 }
 
 // runewordQuality: a runeword can only form in an item of low, normal or
-// superior quality (UNVERIFIED; the usual rule of the game, not traced in the
-// binary).
+// superior quality. VERIFIED in ITEM_FindRunewordForSockets (0x62c010): an item
+// whose quality is 4..9 (magic to tempered) never yields a runeword; quest
+// items do not either.
 func runewordQuality(q d2drop.Quality) bool {
 	return q == 0 || q == d2drop.QualityLow || q == d2drop.QualityNormal || q == d2drop.QualitySuperior
 }

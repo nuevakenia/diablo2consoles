@@ -48,8 +48,11 @@ type Item struct {
 	// Charm marks an inventory charm: active while it is in the inventory.
 	Charm    bool
 	Ethereal bool
-	// Broken: durability 0. A broken item gives nothing (UNVERIFIED for the
-	// base defense, community knowledge for the bonuses).
+	// Broken: durability 0. VERIFIED: ITEM_BreakEquippedItem (0x55d660) sets
+	// item flag 0x100, removes the item's whole stat list from the hero
+	// (INV_ServerRemoveEquippedItemEffects, base defense included) and refreshes
+	// the set bonuses; ITEM_IsNotBrokenAndEquippable (0x62a650) also fails for
+	// flag 0x4000. Which weapons get the flag is UNVERIFIED (see d2equip).
 	Broken bool
 
 	// Defense is the base defense of an armor piece: the rolled value a .d2s

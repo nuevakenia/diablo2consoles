@@ -12,8 +12,10 @@ const (
 	// skill id = param >> ParamShift, level = param & ParamMask. The exe reads
 	// the shift from a table-derived global (0x9648dc, set by the ItemStatCost
 	// loader from a Save Param Bits column, 6 when that is outside 1..8) and
-	// the mask from the word after the table header. UNVERIFIED that the mask
-	// is (1<<shift)-1; the shipped values are 6 and 0x3f.
+	// the mask from the word after the table header. VERIFIED in
+	// DATATBL_LoadItemStatCostTable (0x6387e0): shift = the "stuff"-field word at
+	// +0x140 of the table header (6 when outside 1..8) and the mask is stored in
+	// 0x9648e0 as (1<<shift)-1; the shipped values are 6 and 0x3f.
 	ParamShift = 6
 	ParamMask  = 0x3f
 
