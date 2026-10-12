@@ -147,5 +147,6 @@ func (e *Engine) mercStatHook(owner *d2mapentity.Player, name string) int {
 func (e *Engine) installMercHooks() {
 	e.monsters.SetMercSkills(d2monsters.MercSkillHooks{
 		Supported: e.mercSupported, Cast: e.castMerc, Defense: e.mercDefense, Stat: e.mercStatHook,
+		State: e.shadowState, Delay: e.shadowDelay,
 	})
 }

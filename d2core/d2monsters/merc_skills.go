@@ -41,6 +41,21 @@ type MercSkillHooks struct {
 	// Stat returns a stat the merc's states (auras, Frozen Armor...) add,
 	// by ItemStatCost name (armorclass, item_armor_percent, damagepercent).
 	Stat func(owner *d2mapentity.Player, name string) int
+	// State answers the engine's state list for the Assassin's shadows (w25): the unit is the shadow whose
+	// MercCast token is token, or the monster m when it is not nil. Optional.
+	State func(owner *d2mapentity.Player, token uint32, m *d2mapentity.Monster, state string) MercStateView
+	// Delay is the skills.txt delay calc of the skill of a cast, in frames (0 none). Optional.
+	Delay func(c MercCast) int
+}
+
+// MercStateView is what the shadows' AI reads of one state of a unit.
+type MercStateView struct {
+	// Active says the state is in force.
+	Active bool
+	// OtherInGroup says another active state shares the states.txt group of the asked state.
+	OtherInGroup bool
+	// Stats are the stat values the active state carries, by ItemStatCost name.
+	Stats map[string]int
 }
 
 // SetMercSkills installs the skill engine hooks.

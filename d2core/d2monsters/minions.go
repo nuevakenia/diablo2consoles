@@ -73,8 +73,9 @@ type allyState struct {
 	thought  int
 	trap     *TrapSpec // set by ArmTrap (see trapfire.go)
 
-	boost     AuraBoost // friendly aura boost (auraboost.go)
-	baseMaxHP int       // maximum life before the aura's life percent
+	shadow    *shadowBook // skill list of an Assassin's shadow (shadowskills.go)
+	boost     AuraBoost   // friendly aura boost (auraboost.go)
+	baseMaxHP int         // maximum life before the aura's life percent
 }
 
 // SpawnMinion creates an allied unit near a subtile.
@@ -121,6 +122,10 @@ func (d *Director) SpawnMinion(stat *d2records.MonStatRecord, subX, subY int, op
 
 	v.Experience = 0
 	v.TreasureClass = ""
+
+	if su := d.byEntity[m.ID()]; isShadowAI(su) { // velocity 0 in monstats: the shadow moves like a hero
+		m.UseHeroSpeeds()
+	}
 
 	d.Counters.Minions++
 	d.emit("minion", "MINION spawn name=%s key=%s kind=%s owner=%s level=%d hp=%d pos=(%d,%d) tag=%s", m.Label(), stat.Key,
@@ -467,6 +472,10 @@ func (d *Director) nearestHostile(x, y int) *unit {
 // allyStrike resolves a minion attack at its hit frame.
 func (d *Director) allyStrike(u *unit, _ d2monster.Mode) {
 	a := u.ally
+
+	if d.shadowFire(u) { // a skill of an Assassin's shadow (shadowskills.go)
+		return
+	}
 	t := a.strikeAt
 
 	if t == nil || !t.m.Alive() {

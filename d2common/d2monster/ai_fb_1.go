@@ -609,6 +609,8 @@ func nihOffset(c *Ctx, slot int) {
 func thinkShadowWarrior(c *Ctx) {
 	b := c.B
 
+	shadowPre(c)
+
 	pet, ok := shadowPetOf(c)
 	if !ok {
 		c.Sleep(100)
@@ -710,6 +712,9 @@ func thinkShadowWarrior(c *Ctx) {
 // exe reads at fixed per-difficulty offsets.
 func thinkShadowMaster(c *Ctx) {
 	b := c.B
+
+	shadowPre(c)
+
 	book, hasBook := c.W.(FB1ShadowBook)
 
 	if hasBook && !book.HasSkills(b) {
