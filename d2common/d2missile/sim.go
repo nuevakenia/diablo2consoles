@@ -868,8 +868,9 @@ func (s *Sim) process(m *Missile, t Target) {
 			AttackerLevel: m.Owner.Level,
 			DefenderLevel: t.Level(),
 		}
-		// the skill's to-hit is a percent bonus for players, a flat bonus for
-		// monsters (COMBAT_RollToHit; the percent reading is UNVERIFIED)
+		// players: Damage.ToHit carries stat 0x77 (percent) only, the flat argument of COMBAT_RollToHit
+		// 0x57b9c0 is ignored for them (VERIFIED w28); monsters add the missile's stat 0x13 flat, which
+		// 0x64be80 never sets from the descriptor, so the skill ToHit used here is UNVERIFIED for them
 		if m.Owner.IsPlayer {
 			in.AttackRatingPct = m.Damage.ToHit
 		} else {
@@ -879,19 +880,8 @@ func (s *Sim) process(m *Missile, t Target) {
 		hit, chance, roll = d2combat.RollToHit(m.Owner.Roller, in)
 	}
 
-	// shield block (COMBAT_RollAttackOutcome 0x57cc10: after a successful to-hit roll, on the defender's seed);
-	// a blocked hit clears the hit bit, so it ends like a miss. UNVERIFIED: that a missile without the ToHit
-	// flag skips the outcome (and so the block) altogether.
-	blocked := false
-
-	if hit && sp.ToHit {
-		if b, ok := t.(Blocker); ok && b.RollBlock(true) {
-			hit, blocked = false, true
-		}
-	}
-
 	if !hit {
-		s.emit(Event{Kind: EventMiss, Missile: m, Target: t, Chance: chance, Roll: roll, Blocked: blocked})
+		s.emit(Event{Kind: EventMiss, Missile: m, Target: t, Chance: chance, Roll: roll})
 
 		// verified (0x5aba10): a missed to-hit roll destroys the missile
 		// (return 2), ignoring CollideKill and pierce; only AlwaysExplode runs
@@ -936,10 +926,21 @@ func (s *Sim) process(m *Missile, t Target) {
 
 		s.dmgFunc(m, t, &dmg)
 
-		s.emit(Event{Kind: EventHit, Missile: m, Target: t, Damage: dmg, Chance: chance, Roll: roll})
-	}
+		// shield block: MISSILE_BuildHitFlagsAndRollBlock 0x5ab220 runs COMBAT_RollShieldBlock (0x57bfa0) AFTER the
+		// hit function and the damage build, for any missile (to-hit flag or not) and only attempts the block when
+		// the damage struct has physical damage (its third argument); a blocked hit clears the hit bit, so no
+		// damage and no hit effects land, but the hit function already ran and the missile ends by the normal
+		// rules below (VERIFIED w28; wave 24 had the block right after the to-hit roll).
+		if b, ok := t.(Blocker); ok && m.Damage.PhysMax > 0 && b.RollBlock(true) {
+			s.emit(Event{Kind: EventMiss, Missile: m, Target: t, Chance: chance, Roll: roll, Blocked: true})
+		} else {
+			s.emit(Event{Kind: EventHit, Missile: m, Target: t, Damage: dmg, Chance: chance, Roll: roll})
 
-	if m.OnHit != nil {
+			if m.OnHit != nil {
+				m.OnHit(m, t)
+			}
+		}
+	} else if m.OnHit != nil {
 		m.OnHit(m, t)
 	}
 

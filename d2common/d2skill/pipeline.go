@@ -885,9 +885,10 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 	// COMBAT_RollToHit (0x57b9c0, VERIFIED) adds the player's stat 0x77 (item_tohit_percent: Penetrate, Blessed
 	// Aim, gear) to the skill's to-hit percent for melee and missile hits alike; only the weapon mastery term
 	// is left out for missiles.
-	if u.IsPlayer() {
-		desc.ToHit += u.Stat("item_tohit_percent")
-	}
+	// The skill's own ToHit column is NOT part of that roll for a missile: MISSILE_BuildDamageDescriptor 0x64ca60
+	// has no to-hit field, 0x64be80 never stores stat 0x13 on the missile, and the player branch of COMBAT_RollToHit
+	// does not read its flat argument (VERIFIED wave 28), so a player's missile rolls with the stat 0x77 percent only.
+	desc.ToHit = missileToHit(u, desc.ToHit)
 
 	// Hit function 13 (Glacial Spike, 0x5a8360, read): the elemental length of
 	// its damage struct is sHitPar2 when > 0, else auralencalc (record +0x60),
@@ -1356,4 +1357,14 @@ func (p *Pipeline) ownDamages(u Unit, sk *Skill, lvl int, env *Env, root *d2miss
 	}
 
 	return out
+}
+
+// missileToHit is the to-hit term a missile's damage descriptor carries: a player's missile rolls with the owner's
+// stat 0x77 percent only (the skill's ToHit column is dropped, see castMissile); other casters keep the skill value.
+func missileToHit(u Unit, skillToHit int) int {
+	if u.IsPlayer() {
+		return u.Stat("item_tohit_percent")
+	}
+
+	return skillToHit
 }

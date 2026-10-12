@@ -860,7 +860,7 @@ func TestArrowSkills(t *testing.T) {
 	}
 
 	d := do.Missiles[0].Damage
-	if d.PhysMin != (5+1+2)<<8 || d.PhysMax != (9+1+2)<<8 || d.ToHit != 10+9*2 {
+	if d.PhysMin != (5+1+2)<<8 || d.PhysMax != (9+1+2)<<8 || d.ToHit != 0 { // skill ToHit is dropped for player missiles (w28)
 		t.Fatalf("magic arrow %+v", d)
 	}
 

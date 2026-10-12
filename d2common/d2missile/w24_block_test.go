@@ -38,10 +38,15 @@ func blockWorldWrap(bt *blockTarget) *blockWorld {
 }
 
 func runBlock(w *blockWorld, frames int, owner Owner) []Event {
+	return runBlockDmg(w, frames, owner, DamageDesc{PhysMin: 256, PhysMax: 512}, true)
+}
+
+// runBlockDmg runs the bolt with the given damage and ToHit flag.
+func runBlockDmg(w *blockWorld, frames int, owner Owner, dd DamageDesc, toHit bool) []Event {
 	sp := fireBolt()
-	sp.ToHit = true
+	sp.ToHit = toHit
 	s := NewSim(w, nil)
-	_, _ = s.Create(CreateParams{Spec: sp, Level: 1, DestX: 30, Owner: owner})
+	_, _ = s.Create(CreateParams{Spec: sp, Level: 1, DestX: 30, Owner: owner, Damage: dd})
 
 	var evs []Event
 
@@ -55,8 +60,8 @@ func runBlock(w *blockWorld, frames int, owner Owner) []Event {
 	return evs
 }
 
-// A blocked hit ends like a miss (EventMiss with Blocked), no damage, and the block is rolled once, after the
-// to-hit roll (0x57cc10).
+// A blocked hit reports an EventMiss with Blocked and deals no damage; the block is rolled once, after the damage
+// is built (MISSILE_BuildHitFlagsAndRollBlock, w28).
 func TestMissileShieldBlock(t *testing.T) {
 	bt := &blockTarget{fakeTarget: newTarget("m", 6, 0), blocks: true}
 	evs := runBlock(blockWorldWrap(bt), 20, Owner{Level: 10, AttackRating: 5000, Roller: fakeRoller{0}})
@@ -91,5 +96,25 @@ func TestMissileNoBlockAndMissSkipsBlock(t *testing.T) {
 	evs = runBlock(blockWorldWrap(bt2), 60, Owner{Level: 1, AttackRating: 10, Roller: fakeRoller{99}})
 	if k := kinds(evs); k[EventMiss] != 1 || bt2.rolls != 0 {
 		t.Fatalf("events %v rolls %d (a missed to-hit must not roll the block)", k, bt2.rolls)
+	}
+}
+
+// The block is only attempted when the damage struct holds physical damage, and it does not depend on the
+// to-hit flag (MISSILE_BuildHitFlagsAndRollBlock passes "physical max != 0" to COMBAT_RollShieldBlock).
+func TestMissileBlockNeedsPhysicalDamage(t *testing.T) {
+	owner := Owner{Level: 10, AttackRating: 5000, Roller: fakeRoller{0}}
+
+	bt := &blockTarget{fakeTarget: newTarget("m", 6, 0), blocks: true}
+	evs := runBlockDmg(blockWorldWrap(bt), 20, owner, DamageDesc{Fire: Elem{Min: 256, Max: 512}}, true)
+
+	if k := kinds(evs); k[EventHit] != 1 || bt.rolls != 0 {
+		t.Fatalf("elemental-only missile: events %v rolls %d, want a hit and no block roll", k, bt.rolls)
+	}
+
+	bt = &blockTarget{fakeTarget: newTarget("m", 6, 0), blocks: true}
+	evs = runBlockDmg(blockWorldWrap(bt), 20, owner, DamageDesc{PhysMin: 256, PhysMax: 512}, false)
+
+	if k := kinds(evs); k[EventMiss] != 1 || k[EventHit] != 0 || bt.rolls != 1 {
+		t.Fatalf("physical missile without the to-hit flag: events %v rolls %d, want a block", k, bt.rolls)
 	}
 }
