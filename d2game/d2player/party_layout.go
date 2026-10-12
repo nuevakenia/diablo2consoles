@@ -3,8 +3,8 @@ package d2player
 // Layout of the party screen of the original (Game.exe 1.14b), pure numbers so they can be tested.
 // Sources (see d2-re-notes ui-panels-next.md): UI_InitPartyRowWidgets 0x496540 (the x of every
 // button of a row, as panel-relative numbers) and UI_DrawPartyScreenCloseButton 0x496dd0.
-// The row y is a register argument the decompiler lost (UNVERIFIED), so only the x values
-// and the close button are taken from the original here; row y keeps the earlier tuned numbers.
+// The row y is a register argument the decompiler lost; it is VERIFIED from the disassembly of
+// UI_DrawPartyScreenMemberRows 0x498a40 (EBX starts at 0x5a, +0x26 per row, at most 8 rows), see the row geometry below.
 
 // Panel-relative x of the row buttons in the original table (add the panel offset, 80 at 800x600).
 const (

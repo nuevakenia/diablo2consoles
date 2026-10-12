@@ -28,9 +28,12 @@ import (
 // count*100; the per item rows of this window are an addition for
 // the engine's click UI and charge the same 100 per item.
 //
-// UNVERIFIED: the scroll/tome use (packet 0x27 identifies one item, packet
-// 0x29 merges scrolls into a tome) follows the common game behaviour, not a
-// decompiled path. The quest bit is not wired: the quest record is not
+// VERIFIED (w37, INV_PktIdentifyItem 0x549180 and ITEMACT_ServerIdentifyItem 0x55fd10): the scroll/tome use is packet
+// 0x27 of 9 bytes: [+1] the target item id, [+5] the scroll or tome id. The server refuses (cancels the pending use)
+// unless the target is stored or worn (mode 0 or 1); a scroll carried in the belt (mode 2) is removed from the belt
+// and a scroll in the inventory is deleted after ITEM_ServerUseItemEffect succeeds; a tome (type 0x12) with no
+// scrolls left (stat 0x46 below 1) is refused and otherwise loses one scroll (stat 0x46 minus 1). Packet 0x29 merges
+// a scroll into a tome. The quest bit is not wired: the quest record is not
 // reachable from the game screen, so the fee is always charged.
 
 const (

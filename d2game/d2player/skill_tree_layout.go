@@ -11,11 +11,14 @@ import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 //	panel pictures      four pictures at x = W - e0 - 0x140 and W - e0 - 0x40, bottoms H + e4 - 0xe0 and H + e4 - 0x30
 //	                    (frames 0..3 common, frames 4*(tab+1)+0..3 the selected tab); the class picture has 7 sets
 //	icons               column x = W - e0 - {0x131, 0xec, 0xa7}; bottom y = H + e4 - {0x1a2, 0x15e, 0x11a, 0xd6,
-//	                    0x91, 0x4d}; 48x48; the level number is drawn at the icon bottom + 0xc (x lost, UNVERIFIED)
+//	                    0x91, 0x4d}; 48x48; the level number (UI_DrawSkillTreeIcon 0x4a86b0, VERIFIED) is
+//	                    drawn left aligned at x = icon left + 0x30 (minus 4 and font 4 above level 9, else font 1), bottom
+//	                    icon bottom + 0xc; colour 3 (blue) when the bonus levels are positive, 1 (red) when negative, else 0
 //	tab titles          text centred in the box [W - e0 - 0x5a, W - e0], bottom y = H + e4 + c (table below), the
-//	                    box width is the argument pair of UI_DrawTextLine (centring is UNVERIFIED: GetTextWidth feeds it)
-//	points number       UI_DrawText at x = W - e0 - 0x34, bottom H + e4 - 400 (alignment UNVERIFIED), UI_DrawSkillPointsRemaining
-//	                    draws "0" at W - e0 - 0x19 when no points are left
+//	                    box is the argument pair of UI_DrawTextLine; VERIFIED centred: 0x4a3750 puts x1 + ((box + 1 - width) >> 1) when
+//	                    the text is narrower than x2 - x1 + 1, else x1
+//	points number       UI_DrawText at x = W - e0 - 0x34, bottom H + e4 - 400 (VERIFIED left aligned, 0x4a8a47; colour 1 when the player has state 0x36, else 0), UI_DrawSkillPointsRemaining
+//	                    draws "0" centred in the box [W - e0 - 0x41, W - e0 - 0x19] when no points are left (VERIFIED, 0x4a8cdf)
 //	close button        32x32 (buy/sell button frame 10, 11 when pressed) at x = W - e0 + closeX(class, tab), bottom y H + e4 - 0x3f
 //	tab hit spans       [H + e4 - 0x174, -0x108, -0x9c, -0x30] (existing, verified)
 const (
@@ -172,4 +175,22 @@ func (m Mode) SkillTreeLayoutRects(class int) []UIRect {
 	px, py, _ := m.SkillTreePoints()
 
 	return append(rs, UIRect{"skills", "points", px, py, 0, 0})
+}
+
+// SkillTreeLevelNumber is where UI_DrawSkillTreeIcon (0x4a86b0) draws the level number under the icon: the left x and
+// the bottom y of the text and whether the small font 4 (levels above 9, moved 4 to the left) is used instead of font 1.
+// VERIFIED against the disassembly (the text call has the alignment argument 0 = left).
+func (m Mode) SkillTreeLevelNumber(row, column, level int) (x, bottom int, bigFont bool) {
+	ix, iy, w, h := m.SkillTreeIconRect(row, column)
+	if w == 0 {
+		return 0, 0, false
+	}
+
+	x = ix + 0x30
+	if level > 9 {
+		x -= 4
+		bigFont = true
+	}
+
+	return x, iy + h + 0xc, bigFont
 }

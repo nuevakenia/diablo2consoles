@@ -98,3 +98,15 @@ func TestSkillTreeTitlesGolden(t *testing.T) {
 		t.Fatal("rect count")
 	}
 }
+
+func TestSkillTreeLevelNumber(t *testing.T) {
+	x, b, big := Mode800.SkillTreeLevelNumber(1, 1, 5)
+	if x != 415+0x30 || b != 540-0x1a2+0xc || big {
+		t.Errorf("level 5: %d %d %v", x, b, big)
+	}
+
+	x, b, big = Mode800.SkillTreeLevelNumber(6, 3, 12)
+	if x != 800-80-0xa7+0x30-4 || b != 540-0x4d+0xc || !big {
+		t.Errorf("level 12: %d %d %v", x, b, big)
+	}
+}

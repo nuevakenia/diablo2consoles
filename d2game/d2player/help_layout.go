@@ -10,8 +10,8 @@ import "fmt"
 //	UI_HandleHelpScreenClick 0x492b60.
 //
 // Every picture is placed by its BOTTOM-left corner (x, bottom y) in screen pixels; the help screen does not use the
-// panel offset. The text x positions of the labels are register arguments that the decompiler dropped (UNVERIFIED),
-// only their y (the baseline argument) is known, see HelpTextBaselines800.
+// panel offset. The text x positions (register arguments the decompiler dropped) are VERIFIED from the disassembly of
+// UI_DrawHelpScreenColumnA 0x491930, see HelpTextAnchors800.
 
 // HelpFrame is one frame of the border picture: frame index and the bottom-left corner.
 type HelpFrame struct{ Frame, X, Bottom int }
@@ -91,7 +91,7 @@ func (m Mode) HelpCloseRect() UIRect {
 	return UIRect{"help", "close", x, helpCloseY - helpCloseSize, helpCloseSize, helpCloseSize}
 }
 
-// HelpTextBaselines800 are the y arguments of the text calls of UI_DrawHelpScreenColumnA (the x is lost, UNVERIFIED):
+// HelpTextBaselines800 are the y arguments of the text calls of UI_DrawHelpScreenColumnA (the x is in HelpTextAnchors800, VERIFIED):
 // the title line, the rows of the bulleted list and the callout texts, in the order of the calls.
 var HelpTextBaselines800 = []int{ //nolint:gochecknoglobals // data
 	0x11, 0x49, 0x4e, 0x62, 0x76, 0x8a, 0x9e, 0xb2, 0xc6, 0xda,
@@ -135,4 +135,25 @@ func HelpLayoutLines() []string {
 	}
 
 	return out
+}
+
+// HelpTextAnchor is one text call of UI_DrawHelpScreenColumnA (VERIFIED from the disassembly): the string table id, the
+// x (the centre of the text when Centered, else the left edge), and the baseline y, in the order of HelpTextBaselines800.
+// A centred text starts at x - width/2 (the width halved with an arithmetic shift).
+type HelpTextAnchor struct {
+	StrID, X, Y int
+	Centered    bool
+}
+
+// HelpTextAnchors800 lists the 30 text calls of UI_DrawHelpScreenColumnA; the eight bulleted rows are left aligned at 0x75,
+// everything else is centred on x.
+var HelpTextAnchors800 = []HelpTextAnchor{ //nolint:gochecknoglobals // data
+	{0x1066, 0x17c, 0x11, true}, {0x1030, 0x2bd, 0x49, true},
+	{0x1067, 0x75, 0x4e, false}, {0x1068, 0x75, 0x62, false}, {0x1069, 0x75, 0x76, false}, {0x106a, 0x75, 0x8a, false},
+	{0x106b, 0x75, 0x9e, false}, {0x106c, 0x75, 0xb2, false}, {0x106d, 0x75, 0xc6, false}, {0x106e, 0x75, 0xda, false},
+	{0x106f, 0x3b, 0x1e1, true}, {0x1070, 0x86, 0x19a, true}, {0x1071, 0x86, 0x1a9, true}, {0x1072, 0x86, 0x1b8, true},
+	{0xf92, 0xde, 0x177, true}, {0x1074, 0x108, 0x1fa, true}, {0x1075, 0x108, 0x209, true}, {0x1076, 0x13a, 0x1e1, true},
+	{0x1077, 0x171, 0x1f9, true}, {0x1078, 0x171, 0x208, true}, {0x1079, 0x1c1, 0x191, true}, {0x107a, 0x1c1, 0x1a0, true},
+	{0x107b, 0x1c1, 0x1af, true}, {0x107c, 0x1c1, 0x1be, true}, {0x107d, 0x216, 0x208, true}, {0xf93, 0x23c, 0x177, true},
+	{0x1073, 0x2a2, 0x19a, true}, {0x1071, 0x2a2, 0x1a9, true}, {0x1072, 0x2a2, 0x1b8, true}, {0x107e, 0x2e8, 0x1e1, true},
 }

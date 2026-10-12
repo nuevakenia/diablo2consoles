@@ -43,7 +43,7 @@ const (
 	questLogCloseButtonX, questLogCloseButtonY = 358, 450 // 32x32 standing at y 482 (0x49fc00)
 	questLogDescrButtonX, questLogDescrButtonY = 306, 450
 	questNameLabelX, questNameLabelY           = 240, 297 + panelShiftY
-	questDescrLabelX, questDescrLabelY         = 90, 317 + panelShiftY
+	questDescrLabelX, questDescrLabelY         = 96, 317 + panelShiftY
 )
 
 // The act tabs of the expansion (UI_DrawQuestLogPanel 0x49fc00): x = 5, 0x43, 0x81, 0xbf, 0xfd of the panel plus 80; the

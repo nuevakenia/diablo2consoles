@@ -12,10 +12,11 @@ import (
 //
 //	four panel pictures   as every left panel (UI_DrawCharacterStatsPanel layout)
 //	act tabs (expansion)  x 5, 0x43, 0x81, 0xbf, 0xfd; bottom y H - 60 - 0x1c0 + 1 = 93 (the +1 is the expansion flag)
-//	                      the classic branch has 4 tabs at 5, 0x52, 0x9f, 0xec (UNVERIFIED which state selects it)
+//	                      the classic branch has 4 tabs at 5, 0x52, 0x9f, 0xec (VERIFIED same selector as the 5 tab table: MAIN_CheckExpansionMpq() and the expansion global 0x79857c; the
+//	                      classic loop draws tabs 0..3)
 //	quest slots           x 26, 123, 220; bottoms 121 and 218 (six slots, 2 rows)
-//	name line             bottom 248 (table 0x723518), x lost with the register (centred in Go, UNVERIFIED)
-//	description           wrapped at 270 px (0x10e), first line bottom 270 (table 0x723510), pitch 0x14 (20)
+//	name line             bottom 248 (table 0x723518), VERIFIED centred on panel x 0xa0 (x = 0xa0 - width/2, 0x4a03c8)
+//	description           wrapped at 270 px (0x10e), x 16 (table 0x723514, VERIFIED 0x4a0422), first line bottom 270 (table 0x723510), pitch 0x14 (20)
 //	close button          32x32, x 0x116, bottom H - 60 - 0x3a = 482; hover x 0x116 wide 0x24, y 0x188 high 0x22, text 0x1030
 //	"description" button  x 0xe2, same bottom (frame 0, 1 when toggled); hover x 0xe6 wide 0x1e, y 0x187 high 0x21, text 0xe88
 //	tooltips              y H - 60 - 0x5f
@@ -23,6 +24,7 @@ const (
 	questNameBottom     = 248
 	questDescrBottom0   = 270
 	questDescrPitch     = 0x14
+	questDescrX         = 16 // table 0x723514
 	questDescrWrapWidth = 0x10e
 	questCloseDX        = 0x116
 	questCloseBottomY   = 0x3a // H - e4 - 0x3a
@@ -56,7 +58,7 @@ func (m Mode) QuestLayoutRects() []UIRect {
 		UIRect{"quest", "descr_button", ox + questDescrBtnDX, bottom - 32, 32, 32},
 		UIRect{"quest", "descr_hover", ox + 0xe6, oy + 0x187, 0x1e, 0x21},
 		UIRect{"quest", "name_bottom", ox, oy + questNameBottom, 0, 0},
-		UIRect{"quest", "descr_bottom0", ox, oy + questDescrBottom0, questDescrWrapWidth, questDescrPitch},
+		UIRect{"quest", "descr_bottom0", ox + questDescrX, oy + questDescrBottom0, questDescrWrapWidth, questDescrPitch},
 	)
 
 	return rs

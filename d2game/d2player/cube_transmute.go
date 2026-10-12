@@ -371,7 +371,7 @@ func (g *GameControls) buildCubeProduct(p *d2cube.Product, src *diablo2item.Item
 	// a cube product is rebuilt from the cube's fields (the legacy item model),
 	// not from the creator's roll, which no longer describes it
 	spec.Rolled, spec.Socketed = nil, nil
-	spec.Identified = true // UNVERIFIED: cube results are shown identified
+	spec.Identified = true // VERIFIED: CUBE_ServerCreateRecipeOutputs 0x5638a0 sets item flag 0x10 (identified) on every output (and kept input) it places in the cube
 	spec.CubeMods = spec.CubeMods[:0:0]
 
 	for _, m := range ci.Mods {
