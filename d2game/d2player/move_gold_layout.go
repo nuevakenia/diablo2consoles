@@ -74,6 +74,17 @@ type GoldDlgSizes struct {
 	OkW, OkH, CancelW, CancelH, SpinnerW, SpinnerH int
 }
 
+// DialogLineX is the x of a dialog text line of width textW in a dialog at nX with picture width w (VERIFIED,
+// UI_DialogMeasureEntryWidthSimple 0x4b4cd0 + UI_DrawDialog 0x4b4a10): (w - textW + 1)/2 + 1 from the left edge when
+// the text is narrower than the dialog, else the left edge.
+func DialogLineX(nX, w, textW int) int {
+	if w <= textW {
+		return nX
+	}
+
+	return nX + (w-textW+1)/2 + 1
+}
+
 // GoldDialogSized is GoldDialog with the real sizes of the button and spinner frames. The buttons stand on their bottom
 // edge y = goldDlgOkY (0x11f), so the top is that minus the frame height. The edit box height stays a placeholder
 // (the edit box class takes it from the font; UNVERIFIED).

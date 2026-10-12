@@ -9,7 +9,7 @@ package d2player
 // stays unverified.
 //
 // y values are screen pixels; the text y is the baseline argument of the text call, the button picture stands on
-// its bottom edge (button bottom - 2, plus 1 while pressed). The text x is a register argument (UNVERIFIED).
+// its bottom edge (button bottom - 2, plus 1 while pressed). The text x was a register argument; it is VERIFIED from the disassembly of 0x484250 (TextX below).
 
 // GoldKind selects the variant (the function's argument).
 type GoldKind int
@@ -24,6 +24,9 @@ const (
 // GoldLayout is the result for one variant.
 type GoldLayout struct {
 	TextY       int // baseline argument of the amount text
+	TextX       int // x of the amount text: its left edge, or its RIGHT edge when TextRight (trade); VERIFIED 0x484250
+	TextRight   bool
+	LabelX      int // left x of the "gold" caption (string 0xcf3) drawn next to the trade amount (0 otherwise)
 	ButtonX     int // left edge of the coin button (0 for GoldTrade, which draws no button)
 	ButtonY     int // bottom edge of the coin button picture before the pressed shift
 	TooltipY    int // y of the "gold" tooltip (string 0x101c), only for GoldStash
@@ -39,7 +42,7 @@ func (m Mode) Gold(kind GoldKind, otherPanelOpen bool) GoldLayout {
 	switch kind {
 	case GoldStash:
 		g := GoldLayout{
-			TextY: e4 - 0xf4 + m.H, ButtonY: e4 - 0xf2 + m.H - 2, TooltipY: e4 - 0x106 + m.H,
+			TextY: e4 - 0xf4 + m.H, TextX: ox + 0xa5, ButtonY: e4 - 0xf2 + m.H - 2, TooltipY: e4 - 0x106 + m.H,
 			ButtonX: ox + 0x49 + 2, HitW: 0x14, HitH: 0x12, TooltipText: 0x101c,
 		}
 		if otherPanelOpen {
@@ -48,8 +51,8 @@ func (m Mode) Gold(kind GoldKind, otherPanelOpen bool) GoldLayout {
 
 		return g
 	case GoldCarried:
-		return GoldLayout{TextY: e4 - 0x48 + m.H, ButtonY: e4 - 0x45 + m.H - 2, ButtonX: m.W - ox - 0xed + 1}
+		return GoldLayout{TextY: e4 - 0x48 + m.H, TextX: m.W - ox - 0xd4, ButtonY: e4 - 0x45 + m.H - 2, ButtonX: m.W - ox - 0xed + 1}
 	default:
-		return GoldLayout{TextY: e4 - 0x6a + m.H}
+		return GoldLayout{TextY: e4 - 0x6a + m.H, TextX: ox + 0xc6, TextRight: true, LabelX: ox + 0x15}
 	}
 }

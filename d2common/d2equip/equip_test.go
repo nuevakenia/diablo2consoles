@@ -351,16 +351,12 @@ func TestRollLoss(t *testing.T) {
 }
 
 func TestWeaponSets(t *testing.T) {
-	pairs := map[Loc]Loc{LocRightHand: LocSwapRight, LocLeftHand: LocSwapLeft, LocSwapRight: LocRightHand,
-		LocSwapLeft: LocLeftHand, LocHead: LocHead}
-
-	for in, want := range pairs {
-		if got := EffectiveLoc(in, 1); got != want {
-			t.Errorf("EffectiveLoc(%v,1)=%v want %v", in, got, want)
-		}
-
-		if got := EffectiveLoc(in, 0); got != in {
-			t.Errorf("EffectiveLoc(%v,0)=%v", in, got)
+	// VERIFIED against the exe: the hands are always the items at 4/5, the header field does not remap anything
+	for _, in := range []Loc{LocRightHand, LocLeftHand, LocSwapRight, LocSwapLeft, LocHead} {
+		for arms := 0; arms < 2; arms++ {
+			if got := EffectiveLoc(in, arms); got != in {
+				t.Errorf("EffectiveLoc(%v,%d)=%v", in, arms, got)
+			}
 		}
 	}
 
@@ -371,12 +367,10 @@ func TestWeaponSets(t *testing.T) {
 	a, b := weapon("a", "swor", false), weapon("b", "axe", false)
 	body := map[Loc]*Item{LocRightHand: a, LocSwapRight: b}
 
-	if r, _ := HandsOf(body, 0); r != a {
-		t.Error("set I hands")
-	}
-
-	if r, _ := HandsOf(body, 1); r != b {
-		t.Error("set II hands")
+	for arms := 0; arms < 2; arms++ {
+		if r, _ := HandsOf(body, arms); r != a {
+			t.Errorf("hands with arms=%d", arms)
+		}
 	}
 }
 

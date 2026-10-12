@@ -9,11 +9,11 @@ func TestGoldLayout(t *testing.T) {
 		open bool
 		want GoldLayout
 	}{
-		{Mode800, GoldStash, false, GoldLayout{TextY: 296, ButtonX: 155, ButtonY: 296, TooltipY: 278, HitW: 20, HitH: 18, TooltipText: 0x101c}},
-		{Mode800, GoldStash, true, GoldLayout{TextY: 600 - 60 - 0x1b8, ButtonX: 155, ButtonY: 600 - 60 - 0x1b6 - 2, TooltipY: 600 - 60 - 0x1ca, HitW: 20, HitH: 18, TooltipText: 0x101c}},
-		{Mode800, GoldCarried, false, GoldLayout{TextY: 468, ButtonX: 484, ButtonY: 469}},
-		{Mode640, GoldCarried, false, GoldLayout{TextY: 480 - 0x48, ButtonX: 640 - 0xed + 1, ButtonY: 480 - 0x45 - 2}},
-		{Mode800, GoldTrade, false, GoldLayout{TextY: 600 - 60 - 0x6a}},
+		{Mode800, GoldStash, false, GoldLayout{TextY: 296, TextX: 80 + 0xa5, ButtonX: 155, ButtonY: 296, TooltipY: 278, HitW: 20, HitH: 18, TooltipText: 0x101c}},
+		{Mode800, GoldStash, true, GoldLayout{TextY: 600 - 60 - 0x1b8, TextX: 80 + 0xa5, ButtonX: 155, ButtonY: 600 - 60 - 0x1b6 - 2, TooltipY: 600 - 60 - 0x1ca, HitW: 20, HitH: 18, TooltipText: 0x101c}},
+		{Mode800, GoldCarried, false, GoldLayout{TextY: 468, TextX: 800 - 80 - 0xd4, ButtonX: 484, ButtonY: 469}},
+		{Mode640, GoldCarried, false, GoldLayout{TextY: 480 - 0x48, TextX: 640 - 0xd4, ButtonX: 640 - 0xed + 1, ButtonY: 480 - 0x45 - 2}},
+		{Mode800, GoldTrade, false, GoldLayout{TextY: 600 - 60 - 0x6a, TextX: 80 + 0xc6, TextRight: true, LabelX: 80 + 0x15}},
 	}
 
 	for _, c := range tests {

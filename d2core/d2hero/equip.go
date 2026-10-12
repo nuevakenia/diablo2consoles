@@ -12,8 +12,8 @@ import (
 )
 
 // PageEquipped is the Page of a StoredItem that is worn: its X is the body
-// location as the .d2s numbers it (d2equip.Loc, physical: weapon set II in 11
-// and 12, see HeroContainers.ActiveArms).
+// location as the .d2s numbers it (d2equip.Loc; the other weapon set is in 11
+// and 12, the hands always at 4 and 5, see d2equip/sets.go).
 const PageEquipped = 0
 
 const (
@@ -121,8 +121,8 @@ func EquipItemOf(s *StoredItem, bases d2equip.Bases) d2equip.Item {
 	return it
 }
 
-// LogicalLoc maps the physical body location of a stored item to the one the
-// game treats it as given the active weapon set.
+// LogicalLoc maps the body location of a stored item to the one the game treats it as: the same one (VERIFIED, the
+// weapon swap of the exe moves the items, see d2equip/sets.go).
 func (c *HeroContainers) LogicalLoc(x int) d2equip.Loc {
 	return d2equip.EffectiveLoc(d2equip.Loc(x), c.ActiveArms)
 }
