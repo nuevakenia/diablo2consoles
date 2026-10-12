@@ -21,6 +21,9 @@ type SkillInfo struct {
 	AuraTargetState string
 	// AuraLen is auralencalc in frames (the time of the applied state).
 	AuraLen int
+	// Calc4 is skills.txt calc4 (record +0x144) at the missile's level; hit
+	// function 16 uses it (minimum 5) as the time of the aura state.
+	Calc4 int
 	// Filtered is aurafilter != 0: hit function 21 then tests the target with
 	// the enemy filter 0xa783.
 	Filtered bool

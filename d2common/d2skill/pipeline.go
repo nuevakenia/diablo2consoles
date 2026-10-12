@@ -804,6 +804,7 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 		copy(info.Param[:], sk.Params[:7])
 		info.AuraTargetState = sk.AuraTargetState
 		info.AuraLen = env.eval(sk.AuraLenCalc)
+		info.Calc4 = env.eval(sk.Calc[4])
 		info.Filtered = sk.AuraFilter != 0
 		info.ElemLen = sk.ElemLen(env, lvl)
 	}
@@ -923,7 +924,7 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 // record numbers (d2missile.SkillInfo).
 func needsSkillInfo(ms *d2missile.Spec) bool {
 	switch ms.SrvHitFunc {
-	case 17, 18, 21, 53:
+	case 16, 17, 18, 19, 21, 38, 53:
 		return true
 	}
 

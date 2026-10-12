@@ -43,15 +43,29 @@ func (s *Sim) doFunc(m *Missile) bool {
 		s.markCell(m)
 		s.fireFrame(m)
 	case 10:
-		s.spawnRandomSub(m, spawnMaskBlizzard)
+		s.spawnRandomSub(m, spawnMaskBlizzard, m.SpawnEvery, m.SpawnRadius)
 	case 25:
-		s.spawnRandomSub(m, spawnMaskEruption)
+		s.spawnRandomSub(m, spawnMaskEruption, m.SpawnEvery, m.SpawnRadius)
 	case 14:
 		return s.periodicHelper(m)
 	case 23, 24:
 		return s.spawnAtOwnCell(m)
 	case 28:
 		s.volcanoSpread(m)
+	case 8:
+		s.monsterBlizzard(m)
+	case 9:
+		return s.subAtOwnPos(m, false)
+	case 12:
+		return s.subAtOwnPos(m, true)
+	case 11:
+		s.homingNudge(m)
+	case 21:
+		return s.castAtPos(m)
+	case 22:
+		return s.reflectPair(m)
+	case 32:
+		return s.subAtOwnPos(m, false)
 	case 13:
 		return s.boneWallStep(m)
 	case 16:
@@ -117,9 +131,9 @@ func (s *Sim) fireFrame(m *Missile) {
 // (x + dx - (r-1), y + dy - (r-1)) has none of the mask bits, creates its
 // SubMissile1 there with the owner, skill and level of the parent. r is
 // SpawnRadius; the roll for n < 1 does not advance the seed.
-func (s *Sim) spawnRandomSub(m *Missile, mask uint16) {
+func (s *Sim) spawnRandomSub(m *Missile, mask uint16, every, radius int) {
 	sp := m.Spec
-	if m.SpawnEvery == 0 || m.Elapsed()%m.SpawnEvery != 0 || (m.Owner.Gone != nil && m.Owner.Gone()) {
+	if every == 0 || m.Elapsed()%every != 0 || (m.Owner.Gone != nil && m.Owner.Gone()) {
 		return
 	}
 
@@ -131,7 +145,7 @@ func (s *Sim) spawnRandomSub(m *Missile, mask uint16) {
 	cx, cy := int(math.Floor(m.X)), int(math.Floor(m.Y))
 	m.seed.Init(uint32(cx + m.Elapsed()))
 
-	r := m.SpawnRadius - 1
+	r := radius - 1
 	x := cx + int(m.seed.Roll(int32(r*2))) - r
 	y := cy + int(m.seed.Roll(int32(r*2))) - r
 

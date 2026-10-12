@@ -92,6 +92,9 @@ type Owner struct {
 	// Restore gives the owner pct percent of its maximum life (or mana) and
 	// reports whether anything was restored (SrvDoFunc 29 / 33).
 	Restore func(mana bool, pct int) bool
+	// Heal adds life points (8.8 fixed point) to the owner, clamped to its
+	// maximum (hit function 31, 0x5a98c0).
+	Heal func(amount int)
 }
 
 // Target is a unit a missile can hit.
