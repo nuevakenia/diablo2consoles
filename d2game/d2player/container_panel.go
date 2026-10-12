@@ -71,6 +71,9 @@ type ContainerPanel struct {
 	ui    *d2ui.UIManager
 	kind  containerKind
 
+	// lastClick is what the latest HandleClick did (the keyboard cell cursor logs it).
+	lastClick ClickAction
+
 	panelGroup *d2ui.WidgetGroup
 	art        *d2ui.Sprite
 	title      *d2ui.Label
@@ -332,6 +335,7 @@ func (p *ContainerPanel) HandleClick(mx, my int, ctrl bool) bool {
 	}
 
 	held, act, x, y := p.grid.ClickWith(cur, mx, my, ctrl)
+	p.lastClick = act
 
 	switch act {
 	case ClickPickup:

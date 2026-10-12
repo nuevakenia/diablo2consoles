@@ -468,7 +468,9 @@ func (g *GameControls) AutoKey(spec string) error {
 		return err
 	}
 
-	if g.injector != nil {
+	if g.injector != nil && (k == d2enum.KeyMouseWheelUp || k == d2enum.KeyMouseWheelDown) {
+		g.injector.InjectWheel(k == d2enum.KeyMouseWheelUp, 1, mod) // press:WheelUp / WheelDown: one notch
+	} else if g.injector != nil {
 		g.injector.InjectKey(true, k, mod)
 		g.injector.InjectKey(false, k, mod)
 	} else {

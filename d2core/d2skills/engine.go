@@ -626,7 +626,12 @@ func (e *Engine) runDo(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, tg
 			n = 1
 		}
 
-		e.after(n, func() { p.EndAction() })
+		e.emit("cast", "CHANNEL do skill=%q frame=%d infernolen=%d action_end=%d", sk.Name, e.frame, n, e.frame+n)
+
+		e.after(n, func() {
+			ended := p.EndAction()
+			e.emit("cast", "CHANNEL action-end skill=%q frame=%d ended=%v", sk.Name, e.frame, ended)
+		})
 	}
 
 	e.emit("cast", "CAST do skill=%q level=%d ok=%v reason=%s missiles=%d melee=%v effects=%d mana_paid=%.2f cooldown=%d mana=%s",

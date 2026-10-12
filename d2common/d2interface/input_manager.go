@@ -18,4 +18,6 @@ type InputInjector interface {
 	InjectMouseButton(down bool, b d2enum.MouseButton, mod d2enum.KeyMod, x, y int)
 	InjectMouseRepeat(b d2enum.MouseButton, mod d2enum.KeyMod, x, y int)
 	InjectKey(down bool, k d2enum.Key, mod d2enum.KeyMod)
+	// InjectWheel sends wheel notches (up = away from the user) as presses of KeyMouseWheelUp / KeyMouseWheelDown.
+	InjectWheel(up bool, notches int, mod d2enum.KeyMod)
 }
