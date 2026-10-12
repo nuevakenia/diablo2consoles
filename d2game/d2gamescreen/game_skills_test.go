@@ -123,3 +123,46 @@ func TestOwnHitIgnoresAreaPulses(t *testing.T) {
 		t.Errorf("parse: %q %d %v", s, n, must)
 	}
 }
+
+// w29: "!!" counts what the skill ITSELF landed (Engine.Landed) plus missile states, not the global Hits: a late hit
+// of the previous skill's missile must not hide a miss.
+func TestOwnHitUsesTheSkillsOwnLandedCount(t *testing.T) {
+	landed := 4
+	start := d2skills.Counters{Hits: 1, States: 2}
+	it := &castItem{mustHit: true, ownHit: true, c0: start, landed: func() int { return landed }, landed0: 4, states0: 2}
+
+	if !it.missedHit(d2skills.Counters{Hits: 2, AreaHits: 1, States: 2}) {
+		t.Error("a hit of another skill's missile is no hit of this skill")
+	}
+
+	landed = 5
+	if it.missedHit(d2skills.Counters{Hits: 3, States: 2}) {
+		t.Error("the skill's own landing is a hit")
+	}
+
+	landed = 4
+	if it.missedHit(d2skills.Counters{Hits: 1, States: 3}) {
+		t.Error("a state a missile ring put on a monster counts (Battle Cry)")
+	}
+
+	it.landedKey = "#explode"
+	if !it.missedHit(d2skills.Counters{Hits: 1, States: 3}) {
+		t.Error("a keyed item (corpse explosion) ignores states")
+	}
+}
+
+func TestSplitEntrySuffixes(t *testing.T) {
+	part, key := splitLandedKey("Death Sentry,1!!~explode")
+	if part != "Death Sentry,1!!" || key != "#explode" {
+		t.Errorf("landed key: %q %q", part, key)
+	}
+
+	part, eng := splitEngage("Battle Cry,1!!@3")
+	if part != "Battle Cry,1!!" || eng != 3 {
+		t.Errorf("engage: %q %d", part, eng)
+	}
+
+	if part, eng = splitEngage("Bash,1!"); part != "Bash,1!" || eng != 0 {
+		t.Errorf("no suffix: %q %d", part, eng)
+	}
+}

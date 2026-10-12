@@ -522,6 +522,7 @@ func (e *Engine) hitAreaEx(p *d2mapentity.Player, u *heroUnit, name string, cx, 
 	}
 
 	e.Counters.AreaHits += n
+	e.noteLanded(name, n)
 	e.emit("hit", "SKILL area skill=%q at=(%d,%d) radius=%d targets=%d", name, cx, cy, radius, n)
 
 	return n
@@ -1304,6 +1305,7 @@ func (e *Engine) explodeCorpse(s d2monsters.TrapShot) bool {
 		e.effect(s.Owner, u, ts, &res.Effects[i])
 	}
 
+	e.noteLanded(s.Spec.SkillName+"#explode", 1)
 	e.emit("summon", "TRAP explode skill=%q monster_skill=%q level=%d effects=%d", s.Spec.SkillName, ts.Name, maxInt(s.Spec.Level, 1), len(res.Effects))
 
 	return true
@@ -1691,6 +1693,7 @@ func (e *Engine) areaDamage(ev d2missile.Event) {
 
 	if n > 0 {
 		e.Counters.AreaHits += n
+		e.noteLanded(e.skillName(m.SkillID), n)
 		e.emit("hit", "SKILL area skill=%q at=(%d,%d) radius=%d targets=%d", e.skillName(m.SkillID), int(m.X), int(m.Y), ev.Radius, n)
 	}
 }

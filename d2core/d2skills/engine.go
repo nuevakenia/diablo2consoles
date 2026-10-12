@@ -75,7 +75,9 @@ type Counters struct {
 	// are not Refused: nothing was wrong with the skill, the caller only has to ask again once the action ends.
 	Busy int
 	// PvPHits are skill hits on hostile heroes.
-	PvPHits   int
+	PvPHits int
+	// States are the timed states a missile (ring) put on a monster (Battle Cry, Howl): they are no Hits.
+	States    int
 	ManaSpent int // 8.8
 	Damage    int // whole points dealt after resists
 }
@@ -151,6 +153,8 @@ type Engine struct {
 
 	// Counters are updated as events happen.
 	Counters Counters
+
+	landed map[string]int // per skill name: targets reached by its own strikes, missiles and areas (landed.go)
 	// OnEvent receives every log line as a structured event (kind cast, mana,
 	// missile, hit, damage, state...).
 	OnEvent func(kind, line string)
@@ -715,6 +719,7 @@ func (e *Engine) meleeResult(p *d2mapentity.Player, sk *d2skill.Skill, r *d2skil
 
 	if mt != nil {
 		e.Counters.Hits++
+		e.noteLanded(sk.Name, 1)
 		e.hurt(mt.m, p, &r.Damage, sk.Name)
 		e.leech(p, mt.m, &r.Damage)
 		e.itemEvents(mt.m, p, true) // crushing blow, open wounds: after the base damage
@@ -789,6 +794,7 @@ func (e *Engine) applyMissileState(owner d2skill.Unit, t d2missile.Target, state
 
 	if mt, ok := t.(*monsterTarget); ok {
 		name = mt.m.Label()
+		e.Counters.States++
 		e.applyMonsterState(mt.m, d2state.Instance{Name: state, Until: e.frame + frames, Source: owner.ID()})
 	} else {
 		e.setOf(t.ID()).Apply(e.frame, d2state.Instance{Name: state, Until: e.frame + frames, Source: owner.ID()})
@@ -882,6 +888,8 @@ func (e *Engine) hurt(m *d2mapentity.Monster, src *d2mapentity.Player, d *d2comb
 	}{{"phys", d.Physical}, {"fire", d.Fire}, {"ltng", d.Lightning}, {"mag", d.Magic}, {"cold", d.Cold}}
 
 	var total int
+
+	e.noteLanded(what, 1) // any damage a skill deals (psychic hammer and mind blast hurt through effects, not missiles)
 
 	for _, p := range parts {
 		if p.v > 0 {
@@ -1257,6 +1265,7 @@ func (e *Engine) onSim(ev d2missile.Event) {
 			name, m.ID, m.SkillID, m.Level, m.X, m.Y, m.DX, m.DY, float64(m.Velocity)/256, m.Life, describeDesc(&m.Damage))
 	case d2missile.EventHit:
 		e.Counters.Hits++
+		e.noteLanded(e.skillName(m.SkillID), 1)
 		tname := ev.Target.ID()
 
 		mt, _ := ev.Target.(*monsterTarget)

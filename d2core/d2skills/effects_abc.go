@@ -324,6 +324,7 @@ func (e *Engine) shield(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 
 		if n > 0 {
 			e.Counters.AreaHits += n
+			e.noteLanded(sk.Name, n)
 			e.emit("hit", "SKILL area skill=%q at=(%d,%d) radius=%d targets=%d", sk.Name, hx, hy, ef.Radius, n)
 		}
 

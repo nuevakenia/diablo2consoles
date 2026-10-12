@@ -17,6 +17,13 @@ func (e *Engine) PrepareShape(p *d2mapentity.Player, skillID int) string {
 		set.Remove(s)
 	}
 
+	// Maul and Feral Rage share the forms' States.txt group 3: a still-active one of an earlier skill makes the
+	// toggle of Wearwolf / Wearbear (ClearGroup, 0x56a480) end that state and count as the switch back to human
+	// shape, so the form was never entered (w29: the 86i Wearbear cast reverted instead of applying the bear).
+	for _, s := range formGroupStates {
+		set.Remove(s)
+	}
+
 	sk := e.pipe.Skills.ByID(skillID)
 	if sk == nil || sk.Restrict != 2 || sk.FormStates[0] == "" {
 		return ""
