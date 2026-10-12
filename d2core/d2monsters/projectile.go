@@ -47,7 +47,7 @@ type Launcher interface {
 	InFlight() int
 }
 
-// Defaults of the built-in launcher (engine choices, UNVERIFIED).
+// Defaults of the built-in launcher (engine choices, no exe equivalent).
 const (
 	DefaultShotVelocity = 1.5 // subtiles per frame
 	shotOvershoot       = 8

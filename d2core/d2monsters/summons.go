@@ -147,7 +147,7 @@ var selfLimitedSummoners = map[string]bool{"foulcrownest": true, "mosquitonest":
 // count), MinionSpawner (0x5e1ab0) casts while its cast counter is below aip1
 // (100) and its live minions are below aip2 (25), the Hydra handler makes
 // three per cast and DiabPrison four per cast with no check at all. So the
-// numbers below stay UNVERIFIED host choices (the DiabPrison 4 equals one
+// numbers below stay host choices (engine choice, the exe has no cap) (the DiabPrison 4 equals one
 // cast, the Nest 10 equals EvilHole's aip1 on every difficulty). A
 // self-limited AI never gets near them (largest aip live limit in the 1.14b
 // tables is 27); any other AI that casts a summoning skill (the EvilHole and

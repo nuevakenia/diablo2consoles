@@ -316,9 +316,12 @@ type FBXBrood interface {
 	FBXCellFreeAt(b *Brain, p Point) bool
 }
 
-// fbxRing is the eight compass steps the VileMother tries, in the order of
-// rotating direction (UNVERIFIED mapping of the exe's direction table).
-var fbxRing = [8]Point{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}}
+// fbxRing is the step table of MONAI_VileMotherSpawnSkillInDirection 0x5f8f90 (VERIFIED w37): the mapped direction
+// index 0..7 (DIR_GetMappedDirectionByte 0x741da0) picks the entry {6,4,2,2,2,0,6,6} of the one-ring offset tables
+// (0x6ebf48 x, 0x6ebf28 y), which gives only the four axis steps below. The loop tries the index, then index+1 ...
+// (eight tries, mod 8). Only the start index (the direction to the target, orientation of the 64-way direction 0
+// from PATH_ComputeDirectionVector) is still approximated when the host has no DirectionMapper.
+var fbxRing = [8]Point{{1, 0}, {0, 1}, {-1, 0}, {-1, 0}, {-1, 0}, {0, -1}, {1, 0}, {1, 0}}
 
 // thinkVileMotherB is MONAI_Think_VileMother 0x5f9190 (VERIFIED flow). aip1
 // brood limit, aip2 young alive limit, aip3 spawn %, aip4 melee %, aip5 hover
@@ -380,9 +383,13 @@ func fbxVileSpawn(c *Ctx, t Target) bool {
 	start := 0
 	best := -1 << 30
 
-	for i, d := range fbxRing {
-		if s := d.X*sign(t.X-b.X) + d.Y*sign(t.Y-b.Y); s > best {
-			best, start = s, i
+	if m, ok := c.W.(DirectionMapper); ok {
+		start = m.MappedDirection(b, t.X, t.Y) & 7
+	} else {
+		for i, d := range fbxRing {
+			if s := d.X*sign(t.X-b.X) + d.Y*sign(t.Y-b.Y); s > best {
+				best, start = s, i
+			}
 		}
 	}
 
@@ -755,7 +762,8 @@ type FBXKnightHost interface {
 	// FBXTargetHasState reports a state on another unit.
 	FBXTargetHasState(b *Brain, t Target, state int) bool
 	// FBXSummonsBelow4 is the unit-data byte test before Skill1 (fewer than
-	// four of something; UNVERIFIED). Fallback true.
+	// four of something). VERIFIED w37 at 0x5fa060: the byte at monster data +0xe is below 4 (and the unit is a monster
+	// with data); what that byte counts stays UNVERIFIED. Fallback true.
 	FBXSummonsBelow4(b *Brain) bool
 }
 

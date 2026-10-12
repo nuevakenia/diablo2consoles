@@ -53,7 +53,8 @@ type Healer interface {
 
 // LevelThreatSource is an optional Senses extension: the byte at +0x2f of the
 // levels.txt record of the unit's room (0x619ef0 -> 0x6xxxxx levels lookup),
-// 0 when the unit has no room. UNVERIFIED: which levels.txt column that is.
+// 0 when the unit has no room. UNVERIFIED: which levels.txt column that is (w37: 0x619ef0 only maps a room to its level
+// id, 0 without a room; the byte at +0x2f of the level record is read by the callers).
 type LevelThreatSource interface {
 	LevelThreat(b *Brain) int
 }
@@ -62,7 +63,9 @@ type LevelThreatSource interface {
 // three collision probes (mask 0x805) around the target (its tile and two
 // offsets of 2..4 subtiles chosen by the edge distance). The polarity is
 // inferred from the callback 0x5dba10, which accepts a candidate only when it
-// is non-zero: UNVERIFIED, true here means "reachable".
+// is non-zero. w37: 0x5db3a0 itself returns nothing (it only issues three trace probes and picks a chase offset from a
+// small table indexed by edge distance: 2 for 0..2, 3 for 3..10, 4 beyond), so the polarity of the reachability
+// result is still UNVERIFIED; true here means "reachable".
 type TargetReachability interface {
 	Reachable(b *Brain, t Target) bool
 }
@@ -72,13 +75,15 @@ type TargetReachability interface {
 // players with callback 0x5dba10). The callback takes the nearest candidate
 // other than the current target that is a living player or monster (type 0/1),
 // has unit flag bit 2 (+0xc4), passes the 0x552270 relation test, is within 48
-// (edge distance <= 0x30), passes 0x5db690 > 1 (UNVERIFIED) and is reachable.
+// (edge distance <= 0x30), passes 0x5db690 > 1 (VERIFIED w37: 0x5db690 returns the monstats Threat byte of the candidate, 0xe for a player, 0 for
+// other units) and is reachable.
 type ThreatRetargeter interface {
 	ThreatTarget(b *Brain, current Target) (Target, int, bool)
 }
 
 // TileFlagger is an optional Senses extension: the collision test at the
-// unit's own tile with mask 0x40 (0x64ebc0). UNVERIFIED: what the bit means.
+// unit's own tile with mask 0x40 (0x64ebc0). UNVERIFIED: what the bit means (0x64ebc0 is a footprint-mask test that dispatches on the unit's footprint kind; the
+// bit meaning is not named in the exe).
 type TileFlagger interface {
 	OwnTileFlagged(b *Brain) bool
 }

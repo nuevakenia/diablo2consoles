@@ -30,7 +30,7 @@ const (
 	adoptInterval  = 0.5        // seconds between scans for DS1 monster placements
 	replanDistance = 5          // the target moved this far since planning: re-plan (VERIFIED, notes)
 	meleeInRange   = 7          // edge distance at which melee attacks connect (reach, VERIFIED value 7)
-	rangedInRange  = 20         // ranged attack distance (engine choice, UNVERIFIED)
+	rangedInRange  = 20         // ranged attack distance (engine choice, no exe constant: the AI primitives carry their own ranges)
 	heroReach      = 7          // hero melee reach, subtiles (engine choice)
 )
 
@@ -90,7 +90,7 @@ type Options struct {
 	// 0x20 (the wounded MonTeleport). No class is known to set it: nil = off.
 	CanTeleport func(class int) bool
 	// LevelThreat, if set, returns the levels.txt byte +0x2f of a level (the
-	// level-threat re-target; column UNVERIFIED). nil = 0 = off.
+	// level-threat re-target; the column is MonSpcWalk, VERIFIED w37 in the loader 0x61c210). nil = 0 = off.
 	LevelThreat func(levelID int) int
 	// IsTownLevel, if set, keeps teleports out of town levels.
 	IsTownLevel func(levelID int) bool
@@ -768,7 +768,7 @@ func (d *Director) moveTo(u *unit, dest d2monster.Point, target *d2monster.Targe
 		mask = d2path.MaskMonsterOpensDoors
 	}
 
-	// units block (UNVERIFIED mask), except the mover's own cell and the cell
+	// units block (engine choice mask: d2path.MaskUnits), except the mover's own cell and the cell
 	// it walks to (the target stands there)
 	route, ok := d2path.FindPath(d.fp.ignoring(from, to), mask|d2path.MaskUnits, from, to)
 	if !ok || len(route.Nodes) == 0 {

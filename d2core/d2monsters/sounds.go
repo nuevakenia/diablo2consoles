@@ -149,7 +149,7 @@ func footstepPlans(r *d2records.MonsterSoundRecord, rnd func(int) int) []soundPl
 
 // footstepPeriod is the frames between footsteps: FsCnt steps per walk
 // animation of animFrames frames, at one animation frame per game frame
-// (UNVERIFIED), never faster than every 3 frames.
+// (engine choice, no exe equivalent), never faster than every 3 frames.
 func footstepPeriod(r *d2records.MonsterSoundRecord, animFrames int) int {
 	if r == nil || r.FootstepCount <= 0 {
 		return 0

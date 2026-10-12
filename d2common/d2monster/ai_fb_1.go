@@ -44,8 +44,8 @@ type FB1Unit interface {
 }
 
 // FB1Scanner is the MONAI_ForEachUnitByModeCallback scan at 0x5e1570 used by
-// Overseer and Nihlathak (UNVERIFIED: the callback is not a defined function
-// in the database). The argument block holds a squared radius and a 0x32 (50)
+// Overseer and Nihlathak (callback is a bare label in the database, UNVERIFIED filter; the Nihlathak call site
+// 0x5ed6d0 passes the block {0, 625, 50, ...} and mode 1, VERIFIED w37). The argument block holds a squared radius and a 0x32 (50)
 // threshold; the callback fills a target. It is read here as "the nearest
 // ally within radius2 whose life is at most pct percent".
 type FB1Scanner interface {
@@ -64,9 +64,8 @@ type FB1Spawn interface {
 	SpawnCellsFree(b *Brain) bool
 }
 
-// FB1OffsetCaster is MONAI_QueueRandomOffsetSkillCast (UNVERIFIED offset
-// scheme): cast a slot at a random point near the monster. Fallback: cast at
-// the monster's own tile.
+// FB1OffsetCaster is MONAI_QueueRandomOffsetSkillCast 0x5de650 (VERIFIED w37): cast a slot at a random point within
+// aip2 subtiles of the monster (uniform square, x then y). Fallback: the same roll in nihOffset.
 type FB1OffsetCaster interface {
 	CastAtRandomOffset(b *Brain, slot int) bool
 }
@@ -472,8 +471,9 @@ func thinkSuccubusWitch(c *Ctx) {
 // slot2 %, aip3 corpse-raise %, aip4 help %, aip5 keep-away distance. Slots
 // (monstats Skill1..5): 1 teleport (cast at a random offset), 2 helper cast,
 // 3 raise, 4 close-range, 5 summon. The exe finds its skills with
-// SKILL_FindUnitSkillByIdFwd (id hidden by the decompiler): UNVERIFIED, read
-// as "the slot is used". It also clears state 0xc and refreshes the Act 5
+// SKILL_FindUnitSkillByIdFwd (id hidden by the decompiler, so the id tested stays UNVERIFIED; read as "the slot
+// is used"). The think flow, the aip1..aip5 offsets (+0x56,+0x5c,+0x62,+0x68,+0x6e per difficulty) and every roll
+// were compared with the decompile (VERIFIED w37). It also clears state 0xc and refreshes the Act 5
 // quest log (host business).
 func thinkNihlathak(c *Ctx) {
 	b := c.B
@@ -580,7 +580,10 @@ func thinkNihlathak(c *Ctx) {
 	c.Sleep(5)
 }
 
-func nihOffset(c *Ctx, slot int) {
+func nihOffset(c *Ctx, slot int) { nihOffsetAIP(c, slot, 2) }
+
+// nihOffsetAIP is nihOffset with the radius read from aip<n>.
+func nihOffsetAIP(c *Ctx, slot, aip int) {
 	if oc, ok := c.W.(FB1OffsetCaster); ok {
 		if oc.CastAtRandomOffset(c.B, slot) {
 			c.busy()
@@ -591,7 +594,18 @@ func nihOffset(c *Ctx, slot int) {
 		return
 	}
 
-	c.Cast(slot, Target{X: c.B.X, Y: c.B.Y})
+	// MONAI_QueueRandomOffsetSkillCast 0x5de650 (VERIFIED w37): radius r = aip2; x = X + roll(2r) - r, then
+	// y = Y + roll(2r) - r (two seed steps; r <= 0 gives -r + 0), cast at that point.
+	r := c.B.AIP(aip)
+	span := 2 * r
+
+	dx, dy := -r, -r
+	if span > 0 {
+		dx += c.B.Roll(span)
+		dy += c.B.Roll(span)
+	}
+
+	c.Cast(slot, Target{X: c.B.X + dx, Y: c.B.Y + dy})
 }
 
 // ---------------------------------------------------------------- ShadowWarrior

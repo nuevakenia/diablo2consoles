@@ -20,8 +20,9 @@ func Distance(dx, dy int) int {
 
 // EdgeDistance is Distance after subtracting a unit size from each axis,
 // clamped at zero (VERIFIED for the "first subtracts the unit's size" part of
-// MONAI_GetEdgeDistanceBetweenUnits; which unit's size is subtracted, and how
-// size is derived, is UNVERIFIED, so a single size is taken here).
+// MONAI_GetEdgeDistanceBetweenUnits 0x5db0d0; VERIFIED w37: it subtracts UNIT_GetSizeX of the FIRST unit only, from
+// both axes, clamps at zero and returns (min + 2*max)/2, i.e. this Distance; the second unit's size is not used, so a
+// single size is right).
 func EdgeDistance(dx, dy, size int) int {
 	if dx < 0 {
 		dx = -dx

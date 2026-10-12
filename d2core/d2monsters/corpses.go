@@ -130,7 +130,9 @@ func (d *Director) raiseCorpse(caster *unit, id uint32) {
 // WispFormation implements d2monster.WispFormer: the living Gloam (base class
 // 0x76, the only class the exe's filter 0x5f2920 accepts) within 0x20 subtiles
 // of the searching wisp, itself included, in the director's stable unit order.
-// The radius unit and the result order of the exe's search are UNVERIFIED.
+// VERIFIED w37 (MONAI_Think_WillOWisp 0x5f2970): the filter is 0x5f2920 (living, base class 0x76) and the search
+// radius field holds 0x20; the think acts only when the search finds 4 or 5 wisps. The radius unit (subtile
+// square here) and the result order of the exe's search stay UNVERIFIED.
 func (d *Director) WispFormation(b *d2monster.Brain) []d2monster.WispMate {
 	var out []d2monster.WispMate
 

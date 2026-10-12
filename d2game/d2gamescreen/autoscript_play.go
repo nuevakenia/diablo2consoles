@@ -362,8 +362,7 @@ func (v *Game) advanceKill(elapsed float64) {
 	// give up on a target only when nothing happens: the hero neither gets
 	// closer nor stands in reach and swings
 	hsx, hsy := v.localPlayer.Position.X(), v.localPlayer.Position.Y()
-	msx, msy := k.target.SubtilePos()
-	inReach := v.heroInSwingReach(int(hsx), int(hsy), msx, msy)
+	inReach := v.heroInSwingReachOf(int(hsx), int(hsy), k.target)
 	// a caster that stands and casts at the target is not stuck
 	casting := k.elapsed-k.lastCast < killStuckSeconds/2
 
@@ -466,9 +465,8 @@ func (v *Game) castAtTarget(k *killState, dist float64) {
 // targetInReach says whether a monster is within the hero's melee reach.
 func (v *Game) targetInReach(m *d2mapentity.Monster) bool {
 	hsx, hsy := v.localPlayer.Position.X(), v.localPlayer.Position.Y()
-	msx, msy := m.SubtilePos()
 
-	return v.heroInSwingReach(int(hsx), int(hsy), msx, msy)
+	return v.heroInSwingReachOf(int(hsx), int(hsy), m)
 }
 
 // castLeftSkill casts the hero's left skill at the fight's target. A refused cast is tried again after a

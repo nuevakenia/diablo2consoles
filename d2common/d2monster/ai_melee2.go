@@ -22,7 +22,7 @@ func clamp(v, lo, hi int) int {
 // thinkBrute is MONAI_Think_Brute 0x5eecb0 (VERIFIED code, including a quirk).
 //
 // Out of range: the move speed override is 100-clamp(hp%,40,100) (the more
-// hurt, the more it "rages"; the override's meaning is UNVERIFIED so engines
+// hurt, the more it "rages"; the override call is MONAI_SetMoveSpeedOverride(value, 0) (VERIFIED w37; what it does to the speed stays UNVERIFIED) so engines
 // ignore it), then it walks to the target. aip1 is unused.
 //
 // In range (VERIFIED again in batch 7): chance(aip3) gates the attack and the
@@ -35,7 +35,7 @@ func thinkBrute(c *Ctx) {
 	if !c.InRange {
 		c.SetSpeed(100 - clamp(b.HPPercent, 40, 100))
 
-		// reach 7 is UNVERIFIED for this primitive (WalkToTargetResetSpeed)
+		// reach 7 is the literal fourth argument of MONAI_WalkToTargetResetSpeed in 0x5eecb0 (VERIFIED w37)
 		if !c.WalkTo(t, meleeReach) {
 			c.Sleep(10)
 		}

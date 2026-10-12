@@ -8,7 +8,7 @@
 //
 //   - Units occupy one collision cell each (monster flag 0x100, player 0x80,
 //     corpse 0x8000) and block each other through d2path.MaskUnits. Which mask
-//     the original uses for unit blocking is not recorded (UNVERIFIED).
+//     the original uses for unit blocking is not recorded (engine choice, exe mask not read).
 //   - Monster attacks resolve at the animation's halfway frame. Melee connects
 //     within the reach of the mode (7 subtiles); ranged attacks (a missile
 //     column for the mode) launch a Shot through the Launcher hook: the

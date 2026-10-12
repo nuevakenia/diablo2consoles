@@ -229,23 +229,47 @@ func abs(v int) int {
 // VERIFIED constant: the think returns the class AI as soon as it is gone).
 const ImpStateID = 0x8f
 
-// thinkState16 is MONAI_State16_Think 0x5e1c60, the AI of an imp-class monster
-// right after its teleport (the skill Imp Teleport puts the state 0x8f on it;
-// the Pre hook 0x5e1bc0 rolls a coin and picks one of two (skill, count) pairs
-// from a table at 0x6e4a70 into Scratch[1]/Scratch[2], or zeroes both when the
-// coin's candidates are not available; the table contents are UNVERIFIED).
-//
-// VERIFIED: without the state or without a living target the class AI is
-// restored (SetAiState(0)) and the think sleeps 1. With both, within 25
-// subtiles and while the pre-chosen skill (Scratch[1]) is set, a roll under
-// the chosen record's aip2 casts it at the target; otherwise a 50% strike
-// (mode 8) or a 20-frame wait. Farther than that, the monster casts its
-// first skill and drops the Scratch marker. The record whose profile is read
-// is the imp row of the exe (class 0x1ed); here the monster's own profile.
+// state16Slots is the table at 0x6e4a70 (VERIFIED w37): two (skill slot, extra) pairs {2, 0} and {4, 0}; the slot is
+// the zero-based monstats Skill index (Skill3 at +0x174, Skill5 at +0x178 of the row).
+var state16Slots = [2]int{2, 4}
+
+// state16Pre is MONAI_State16_Pre 0x5e1bc0 (VERIFIED w37): a coin flip (one seed step, low bit) picks the first of the
+// two table entries; when the unit does not hold that skill the other entry is tried; with neither skill both
+// AiGeneral words +0x18/+0x1c (Scratch[1], Scratch[2]) are zeroed, else Scratch[1] is the chosen slot index (2 or 4)
+// and Scratch[2] the table's second word (0).
+func state16Pre(c *Ctx) {
+	b := c.B
+	u := b.Roll(2)
+
+	for tries := 0; tries < 2; tries++ {
+		u = (u + 1) & 1
+
+		if b.Profile.Skills[state16Slots[u]].Used() {
+			b.Scratch[1] = state16Slots[u]
+			b.Scratch[2] = 0
+
+			return
+		}
+	}
+
+	b.Scratch[1], b.Scratch[2] = 0, 0
+}
+
+// thinkState16 is MONAI_State16_Think 0x5e1c60, the AI of an imp-class monster right after its teleport (the skill
+// Imp Teleport puts the state 0x8f on it). VERIFIED w37 flow: the Pre hook runs first (state16Pre). Without the state
+// (or without the flagged owner/target) the class AI is restored (SetAiState(0)) and the think sleeps 1. Within 25
+// subtiles of a living, hostile target: with a pre-chosen slot (Scratch[1] != 0), a distance below aip2 and a roll
+// under aip3 cast that slot at the target (Skill id < 0: wait 20), else a 50% strike (mode 8) or a 20-tick wait;
+// without a pre-chosen slot, or farther away, the unit casts Skill1 at a random point within aip2 of itself
+// (MONAI_QueueRandomOffsetSkillCast, nihOffset) and sets Scratch[0] = -1. The exe reads the profile of the imp rows
+// 0x1ec (skills) and 0x1ed (aips); the port reads the monster's own profile (UNVERIFIED which class that is in this
+// engine). The owner test (UNIT_FindOwnerUnitIfFlagged) and the hostility test are the host's (c.Target stands in).
 func thinkState16(c *Ctx) {
 	b := c.B
 	p := b.Profile
 	t := c.Target
+
+	state16Pre(c)
 
 	if t == nil || !c.W.HasState(b, ImpStateID) {
 		b.ClearForced(c.W.Frame())
@@ -255,9 +279,15 @@ func thinkState16(c *Ctx) {
 	}
 
 	if c.Dist < 25 && b.Scratch[1] != 0 {
-		slot := b.Scratch[1] - 1
-		if slot >= 0 && slot < NumSkills && p.Skills[slot].Used() && c.Dist < b.AIP(1) && b.Roll(100) < b.AIP(2) {
-			c.Cast(slot, *t)
+		slot := b.Scratch[1]
+		if c.Dist < b.AIP(2) && b.Roll(100) < b.AIP(3) {
+			if slot >= 0 && slot < NumSkills && p.Skills[slot].Used() {
+				c.Cast(slot, *t)
+
+				return
+			}
+
+			c.Sleep(20)
 
 			return
 		}
@@ -273,12 +303,6 @@ func thinkState16(c *Ctx) {
 		return
 	}
 
-	if p.Skills[slot1].Used() {
-		b.Scratch[1] = 0
-		c.Cast(slot1, *t)
-
-		return
-	}
-
-	c.Sleep(20)
+	nihOffsetAIP(c, slot1, 2)
+	b.Scratch[0] = -1
 }

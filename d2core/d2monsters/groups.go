@@ -12,7 +12,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 )
 
-// Group placement parameters (engine choices, UNVERIFIED: the notes do not
+// Group placement parameters (engine choices, no exe equivalent read: the notes do not
 // record how the original places a group inside a room).
 const (
 	packSpacing   = 2  // subtiles between group members

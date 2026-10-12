@@ -15,22 +15,35 @@ var tableDistanceRows = [8][8]int{
 	{8, 8, 8, 8, 9, 9, 10, 11},
 }
 
-// TableDistanceSized is the whole of UNIT_GetTableDistance 0x642980 (VERIFIED) with the unit sizes
-// (UNIT_GetSizeX of both units; 1 for a player and a normal monster, 2 or 3 for large ones). Inside 8 subtiles on
-// both axes and with both sizes below 4 it reads the table: -1 is 0, a size 3 unit takes 1 off, and the +1 is only
-// added when one of the units has a size below 2. In every other case the half sizes (size / 2 each) come off the
-// axis distances, both are floored at 0 and the result is the smaller axis plus twice the larger one. The size
-// parameters are not wired: the callers of this port pass no unit sizes (TableDistance stands for sizes 1).
-func TableDistanceSized(dx, dy, sizeA, sizeB int) int {
+// UnitSizer is implemented by targets that know their UNIT_GetSizeX (monstats2 SizeX for monsters).
+type UnitSizer interface{ UnitSize() int }
+
+// HeroUnitSize is UNIT_GetSizeX of a player (2, read at 0x6207a0 w37).
+const HeroUnitSize = 2
+
+// UnitSizeOf returns the size of a target (1 when it does not say).
+func UnitSizeOf(t interface{}) int {
+	if s, ok := t.(UnitSizer); ok && s.UnitSize() > 0 {
+		return s.UnitSize()
+	}
+
+	return 1
+}
+
+// TableDistanceSized is UNIT_GetTableDistance 0x642980 (VERIFIED w37) with the unit sizes sa, sb (UNIT_GetSizeX):
+// offsets below 8 on both axes and sizes below 4 read the table (touching reads 0 and ends there), minus 1 when a size
+// is 3 (not below 0), plus 1 only when one of the sizes is below 2; otherwise each axis loses (sa/2 + sb/2), is floored
+// at 0 and the result is 2*max+min.
+func TableDistanceSized(dx, dy, sa, sb int) int {
 	dx, dy = absInt(dx), absInt(dy)
 
-	if dx < 8 && dy < 8 && sizeA < 4 && sizeB < 4 {
+	if dx < 8 && dy < 8 && sa < 4 && sb < 4 {
 		v := tableDistanceRows[dy][dx]
 		if v < 0 {
 			return 0
 		}
 
-		if sizeA == 3 || sizeB == 3 {
+		if sa == 3 || sb == 3 {
 			v--
 		}
 
@@ -38,21 +51,33 @@ func TableDistanceSized(dx, dy, sizeA, sizeB int) int {
 			v = 0
 		}
 
-		if sizeA < 2 || sizeB < 2 {
+		if sa < 2 || sb < 2 {
 			return v + 1
 		}
 
 		return v
 	}
 
-	half := sizeA/2 + sizeB/2
-	dx, dy = maxInt(dx-half, 0), maxInt(dy-half, 0)
+	h := sa/2 + sb/2
+	dx, dy = absInt(dx-h+absInt(dx-h))/2, absInt(dy-h+absInt(dy-h))/2
 
 	if dx <= dy {
 		return dx + dy*2
 	}
 
 	return dy + dx*2
+}
+
+// AttackInReachSized is AttackInReach with the unit sizes of the exe's table distance (hero attacker: HeroUnitSize).
+func AttackInReachSized(monsterAttacker bool, meleeRange, dx, dy, sa, sb int) bool {
+	extra := 1
+	if monsterAttacker {
+		extra = 3
+	}
+
+	d := TableDistanceSized(dx, dy, sa, sb)
+
+	return d < 1 || d <= meleeRange+1+extra
 }
 
 // TableDistance returns the engine's melee distance metric for a subtile offset.
@@ -110,7 +135,8 @@ func WithinMeleeRangeOfClass(dx, dy, meleeRange, extra, targetClass int) bool {
 // range argument (every melee skill SRVST/SRVDO, the stack argument is 0): COMBAT_IsTargetWithinMeleeRange with
 // nExtra = 1 for a player attacker and 3 for a monster attacker (the attacker's unit type is 1), so a blow lands when the
 // table distance is below 1 or at most meleeRange + 2 (players) / meleeRange + 4 (monsters). The line trace of 0x622e40
-// is not modelled (UNVERIFIED).
+// is not modelled (UNVERIFIED: needs the collision grid). The special classes 0x102/0x105 get range + 8 in 0x622e40
+// (VERIFIED w37, not ported: the engine has no such ids). AttackInReachSized adds the unit sizes.
 func AttackInReach(monsterAttacker bool, meleeRange, dx, dy int) bool {
 	extra := 1
 	if monsterAttacker {

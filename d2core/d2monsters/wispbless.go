@@ -21,8 +21,9 @@ var wispStatNames = map[int]string{0x50: "item_magicbonus"}
 // WispBless implements d2monster.WispBlesser: the finished dance puts a timed
 // stat list on the player (stat 0x50, (difficulty+1)*50, 0x1a5e00 frames). The
 // hero's SkillStats merge reads it through TimedHeroStats, so RecalcStats adds
-// it to the totals. A second blessing of the same stat replaces the first
-// (UNVERIFIED: the exe may stack a separate list).
+// it to the totals. A second blessing STACKS: every dance allocates its own stat list with its own expiry
+// (VERIFIED w37, MONAI_Think_WillOWisp 0x5f2970 allocates a new list per blessing, no lookup of an older one). The
+// map key is stat | sequence<<16 so each blessing keeps its own entry.
 func (d *Director) WispBless(_ *d2monster.Brain, t d2monster.Target, stat, value, frames int) {
 	p := d.playerFor(t.ID)
 	if p == nil || p.Stats == nil || wispStatNames[stat] == "" {
@@ -37,7 +38,7 @@ func (d *Director) WispBless(_ *d2monster.Brain, t d2monster.Target, stat, value
 		d.blessings[p] = map[int]timedStat{}
 	}
 
-	d.blessings[p][stat] = timedStat{value: value, until: d.frame + frames}
+	d.blessings[p][stat|(len(d.blessings[p])+1)<<16] = timedStat{value: value, until: d.frame + frames}
 
 	if p.Stats.Recalc != nil {
 		p.Stats.Recalc()
@@ -58,7 +59,7 @@ func (d *Director) TimedHeroStats(p *d2mapentity.Player) map[string]int {
 			out = map[string]int{}
 		}
 
-		out[wispStatNames[stat]] += ts.value
+		out[wispStatNames[stat&0xffff]] += ts.value
 	}
 
 	for k, v := range d.cursedStats(p) { // Cursed monsters (umodhooks.go)

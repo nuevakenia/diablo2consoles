@@ -6,7 +6,7 @@ import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
 // static map grid: monsters set 0x100, players 0x80 and dead monsters 0x8000
 // (VERIFIED flag values, d2path). The footprint bits are in no block mask
 // (VERIFIED), so what blocks movement between units is an engine choice
-// (UNVERIFIED): d2path.MaskUnits is added to the monster mask for path
+// (engine choice; the exe collision-mask pick per unit not read): d2path.MaskUnits is added to the monster mask for path
 // planning and for the per-step test.
 type footprints struct {
 	grid  *d2path.LayeredGrid

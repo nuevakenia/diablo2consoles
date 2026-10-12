@@ -99,7 +99,7 @@ func PvPReceiveFlat(scaled, resist, flat, rate int) int {
 		return 0
 	}
 
-	// the exe keeps life in 8.8; the whole-point API rounds to the nearest point (UNVERIFIED rounding)
+	// the exe keeps life in 8.8; the whole-point API rounds to the nearest point (UNVERIFIED rounding; engine choice, the exe never rounds a stored value to whole points)
 	return (out + 1<<(FixedShift-1)) >> FixedShift
 }
 

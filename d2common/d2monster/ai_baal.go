@@ -138,13 +138,13 @@ type Cloner interface{ SpawnBaalClone(b *Brain) bool }
 // cleared; after the fifth wave the next step morphs the throne into Baal.
 //
 // The announcement message (id from a game table by the counter, plus an extra
-// message for two special entries 0x3e/0x69) is UNVERIFIED and left to the host.
+// message for two special entries 0x3e/0x69) is left to the host: 0x5ee400 queues it through SUNITMSG_QueueMsgA4 with the superunique class of a table entry (VERIFIED w37 shape, text UNVERIFIED).
 func thinkBaalThrone(c *Ctx) {
 	b := c.B
 	now := c.W.Frame()
 
 	if b.Scratch[2] > now {
-		c.Sleep(b.Scratch[2] - now) // the exe passes frame-next (negative); UNVERIFIED which way it clamps
+		c.Sleep(b.Scratch[2] - now) // the exe passes frame-next (negative); MONAI_ScheduleWaitTicks 0x5dce70 only maps 0 to 1 and schedules at frame+n, so a past time fires at the next tick, same as the clamp to 1 here (VERIFIED w37)
 
 		return
 	}
@@ -408,7 +408,8 @@ type BaalSituation struct {
 
 	SelfHP, TargetHP int // life percent of Baal and of the target
 	TargetBlocked    bool
-	// TargetBlocked is state 0xb on the target (UNVERIFIED which state it is).
+	// TargetBlocked is state 0xb on the target: STATE_COLD in states.txt (VERIFIED w37, the scorers read the same
+	// state with +100 weight).
 
 	Targets    int  // number of candidate targets in range (FUN_005faf40's count)
 	Score      int  // threat score of the best target (FUN_005fac60), > 60 raises Buff
@@ -416,8 +417,8 @@ type BaalSituation struct {
 	VeryFar    bool // anchor farther than 100
 	Worldstone bool // a hero is in the Worldstone Chamber (level 0x84) near the anchor
 	Clones     int  // clones alive (general +0x18)
-	Nearby     int  // FUN_00571760's out value (UNVERIFIED), 2 or more disables nothing
-	Flag1      bool // FUN_005fb280 (UNVERIFIED predicate)
+	Nearby     int  // MONSTER_CalcPlayerCountScaling 0x571760 out[4], the effective player count (VERIFIED w37), 2 or more disables nothing
+	Flag1      bool // MONAI_Baal_CheckSkillAvailable 0x5fb280 (VERIFIED w37): the target's right skill is Blizzard, Meteor, Fire Wall (level > 3) or Immolation Arrow (level > 7), else the left skill by record
 	Dist       int  // edge distance to the target
 	// Target is the unit the decision is about (the tick's target or the scan's best), set before the host hook
 	// runs so the host can answer the per-target inputs (life percent, state 0xb, the last town portal).
@@ -665,8 +666,9 @@ func baalDecide(c *Ctx, score, count int) int {
 // thinkBaalCrab is MONAI_Think_BaalCrab 0x5fc200 (VERIFIED structure): an anchor
 // command at the spawn point, the decision, the action, then a 25-frame
 // sleep that replaces the action's own wake-up (VERIFIED, FUN_005dcee0(0x19)).
-// The exact threat scoring and the room-population test are UNVERIFIED (see
-// BaalSituation); the weights are exact.
+// The threat scoring is MONAI_BaalCrab_ScoreTargetResists 0x5fac60 (VERIFIED w37, CrabScore); the candidate
+// list is 0x5faf40 (VERIFIED shape w37: the 8 player buckets filtered by the callback, then two unit lists
+// restricted to the same byte at unit +0x18; UNVERIFIED which lists those are); the weights are exact.
 func thinkBaalCrab(c *Ctx) { baalThink(c, false) }
 
 // thinkBaalCrabClone is MONAI_Think_BaalCrabClone 0x5fc440 (VERIFIED w20): it
@@ -714,7 +716,7 @@ func baalThink(c *Ctx, clone bool) {
 	// itself (MONAI_BaalCrab_FindBestTarget 0x5faf40: heroes passing 0x5fb1c0,
 	// scored like Diablo's with leash 0x4b). The score and count feed the
 	// weight tables. Without a candidate source the attack-target lookup stands
-	// in (UNVERIFIED filter), with score 0 and count 1.
+	// in (host without a candidate list), with score 0 and count 1.
 	score, count := 0, 0
 
 	if c.Target == nil {

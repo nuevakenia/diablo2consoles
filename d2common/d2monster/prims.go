@@ -62,7 +62,8 @@ func (c *Ctx) Cast(slot int, t Target) bool {
 	return true
 }
 
-// SetSpeed is MONAI_SetMoveSpeedOverride (UNVERIFIED semantics).
+// SetSpeed is MONAI_SetMoveSpeedOverride 0x5dcf80 (VERIFIED w37: a fatal error unless the speed is
+// in -126..126, then a queued move command is stored with the speed and the second argument).
 func (c *Ctx) SetSpeed(v int) { c.W.SetSpeed(c.B, v) }
 
 // WalkTo is MONAI_WalkToTarget(target, reach): reach 7 is the usual melee
@@ -250,7 +251,7 @@ func (c *Ctx) WalkNearTarget(t *Target, n int) bool {
 // extra flag 4 (cancel event 2 on failure) when its last argument is set. There
 // is no sideways step in the exe: the "circle" is a plain approach. The n of
 // the Go signature is the exe's third argument (0, 3, 4 or 6 at the callers),
-// stored in the move record's second field, whose use is UNVERIFIED, so it is
+// stored in the move record's second field, whose use is UNVERIFIED (w37: not read by the walk setup 0x5dcf80, only stored), so it is
 // not modelled. An earlier port strafed n subtiles perpendicular to the target.
 func (c *Ctx) Circle(t Target, n int) bool {
 	_ = n

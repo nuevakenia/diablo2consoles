@@ -488,7 +488,8 @@ func thinkRavenB(c *Ctx) {
 }
 
 // fbnRunSpeed is the pet speed boost: run*100/walk - 100 (record shorts
-// +0x34/+0x32, UNVERIFIED columns), 100 when walk < 1 or the value exceeds 99.
+// +0x34/+0x32 of the monstats row = Run and Velocity, VERIFIED formula and clamp in MONAI_Pet_ThinkMelee 0x5e3770),
+// 100 when walk < 1 or the value exceeds 99.
 func fbnRunSpeed(p *Profile) int {
 	if p.Walk < 1 {
 		return 100

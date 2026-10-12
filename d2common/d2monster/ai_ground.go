@@ -190,7 +190,7 @@ const (
 )
 
 // Unit states the Sand Raider toggles (VERIFIED ids in 0x5ef800 through
-// FUN_0063aef0; the colour meaning is UNVERIFIED).
+// FUN_0063aef0): 0x5a is STATE_BLUE and 0x5b is STATE_RED in states.txt (VERIFIED w37).
 const (
 	raiderStateA = 0x5a
 	raiderStateB = 0x5b
@@ -984,8 +984,8 @@ func thinkDoomKnight(c *Ctx) {
 
 // thinkAbyssKnight is MONAI_Think_AbyssKnight 0x5f9cf0 (VERIFIED flow).
 // Scratch[0] is the skill cooldown. aip1 low-hp% for the self buff (skill 2,
-// only when its state is not up: unit states are not modelled so the buff is
-// always considered down, UNVERIFIED), aip2 buff%, aip3 attack%, aip4 stall,
+// only when its state is not up: the host answers HasState through the skill's
+// aurastate, VERIFIED w37 as ported below), aip2 buff%, aip3 attack%, aip4 stall,
 // aip5 skill1 distance, aip6 cooldown, aip7 approach%, aip8 circle distance.
 func thinkAbyssKnight(c *Ctx) {
 	b, t := c.B, *c.Target
