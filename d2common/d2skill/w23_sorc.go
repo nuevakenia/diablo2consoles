@@ -1,5 +1,7 @@
 package d2skill
 
+import "math"
+
 // StaticFieldResistComp is the tail of the Static Field callback (0x5c7750,
 // VERIFIED wave 23). After the damage is known (8.8 fixed point), the callback
 // reads the target's resistance of the skill's damage type; when it is below
@@ -43,3 +45,14 @@ func (p *Pipeline) SrvMissileA(skillID int) string {
 // SKILL_SpawnTrailMissileWhileMoving (0x5c7eb0) waits for before it drops the
 // Blaze fire (VERIFIED: nothing is dropped while the player stands still).
 func BlazeTrailStep(lastX, lastY, x, y int) bool { return lastX != x || lastY != y }
+
+// NovaRingOffset is the i-th destination offset of SKILL_ServerCreateNovaRing (0x56b170, VERIFIED wave 23): the
+// two 64 entry tables at 0x6e2580 (x) and 0x6e2680 (y) hold a circle of radius 30 subtiles in steps of 5.625
+// degrees, each coordinate truncated toward zero (entry 1 is (29, 2), entry 16 is (0, 30), entry 32 is (-30, 0)).
+// Every missile of the ring starts on the caster and flies toward its offset (create kind 3: explicit start,
+// destination relative to it).
+func NovaRingOffset(i int) (dx, dy int) {
+	a := 2 * math.Pi * float64(((i%novaCount)+novaCount)%novaCount) / novaCount
+
+	return int(30 * math.Cos(a)), int(30 * math.Sin(a))
+}

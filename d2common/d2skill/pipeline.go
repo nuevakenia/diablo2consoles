@@ -2,7 +2,6 @@ package d2skill
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2missile"
@@ -46,7 +45,6 @@ const (
 	doStatic   = 20
 	doNova     = 22 // Frost Nova, Nova, Poison Nova, Howl
 	novaCount  = 64
-	novaRadius = 10.0
 )
 
 // los masks for skills.txt LineOfSight (verified).
@@ -225,6 +223,18 @@ func (p *Pipeline) Start(u Unit, skillID int, tgt Target) StartResult {
 		x, y := u.Pos()
 		if clear, _ := d2path.TraceLine(p.Grid, losMask[sk.LineOfSight], d2path.Point{X: x, Y: y},
 			d2path.Point{X: tgt.X, Y: tgt.Y}); !clear {
+			return StartResult{Reason: ReasonLOS, Level: lvl}
+		}
+	}
+
+	// SRVST_TelekinesisRangeCheck (0x5c70e0): a live unit target inside the aurarangecalc radius
+	if sk.SrvDoFunc == 21 && u.IsPlayer() {
+		if tgt.Unit == nil || !tgt.Unit.Alive() {
+			return StartResult{Reason: ReasonTarget, Level: lvl}
+		}
+
+		x, y := u.Pos()
+		if !TelekinesisRangeOK(x, y, tgt.UX, tgt.UY, p.env(sk, lvl, u).eval(sk.AuraRangeCalc)) {
 			return StartResult{Reason: ReasonLOS, Level: lvl}
 		}
 	}
@@ -1013,8 +1023,8 @@ func (p *Pipeline) doNovaRing(u Unit, sk *Skill, lvl int, _ Target, env *Env, re
 	}
 
 	for i := 0; i < novaCount; i++ {
-		a := 2 * math.Pi * float64(i) / novaCount
-		tg := Target{X: x + int(math.Round(math.Cos(a)*novaRadius)), Y: y + int(math.Round(math.Sin(a)*novaRadius))}
+		dx, dy := NovaRingOffset(i)
+		tg := Target{X: x + dx, Y: y + dy}
 
 		if m := p.castMissile(u, sk, lvl, env, name, tg, castOpts{velocity: vel, onHit: hook}); m != nil {
 			res.Missiles = append(res.Missiles, m)

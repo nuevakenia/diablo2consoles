@@ -847,27 +847,31 @@ func (p *Pipeline) castFrom(u Unit, sk *Skill, lvl int, env *Env, name string, t
 	return p.castMissile(u, sk, lvl, env, name, tg, castOpts{hasStart: true, startX: sx, startY: sy, onHit: hook})
 }
 
-// doStreamFn is SRVDO_019_Inferno (Inferno, Arctic Blast): a burst of flame
-// missiles along the aim line. In the game the skill is channelled (start
-// function 11 re-runs it while the button is held); one cast here is a burst of
-// six flames three frames apart whose range is aurarangecalc yards (U).
+// InfernoFlameLife is the lifetime in frames SRVDO_InfernoSpawnFlameMissile (0x5c6d40, VERIFIED wave 23) gives
+// each flame: calc1 of the skill (ln12/2 for Inferno), at least 1; the create kind 0x8020 takes the life from the
+// params instead of the missile's Range column. The old port used aurarangecalc (ln12/4-2) converted to frames.
+func InfernoFlameLife(calc1 int) int {
+	if calc1 < 1 {
+		return 1
+	}
+
+	return calc1
+}
+
+// doStreamFn is SRVDO_019_Inferno (Inferno, Arctic Blast): in the exe every run of the do function
+// creates ONE flame missile at the caster toward the target position (0x5c6d40, VERIFIED) and the channel
+// start function (SRVST_011 0x5c7050, mana gate: startmana unless state 12 is on) repeats the do while the
+// button is held. The engine has no channel, so one cast is still a burst of six flames three frames apart (U);
+// each flame lives InfernoFlameLife frames.
 func doStreamFn(c *cast) {
 	name := c.missileName()
-	ms := c.p.Missiles.ByName(name)
 
-	if ms == nil {
+	if c.p.Missiles.ByName(name) == nil {
 		c.fail(ReasonMissile)
 		return
 	}
 
-	rng := 0
-
-	if y := c.env.eval(c.sk.AuraRangeCalc); y > 0 {
-		step := float64(d2combat.MissileStep(d2combat.MissileVelocity(uint8(ms.Vel), uint8(ms.VelLev), c.lvl, false, 0))) / 4096
-		if step > 0 {
-			rng = int(math.Ceil(float64(y) / step))
-		}
-	}
+	rng := InfernoFlameLife(c.calc(1))
 
 	for i := 0; i < 6; i++ {
 		if i == 0 || c.p.After == nil {
