@@ -24,8 +24,8 @@ func retryAllowed(class int) bool {
 func (g *Game) Wanderer(room *Room) { room.Seed.Step() }
 
 // PlacePreset creates one monster of a preset node at (x, y) (level subtiles)
-// of the room. It returns nil when no spot was found.
-func (g *Game) PlacePreset(w World, room *Room, class, x, y int, pop *Population) *Unit {
+// of the room (exact: no retry on the ring of 4, the tentacle nodes). It returns nil when no spot was found.
+func (g *Game) PlacePreset(w World, room *Room, class, x, y int, exact bool, pop *Population) *Unit {
 	flags := 0
 
 	if class >= 0 && class < len(g.Tables.Mons) && g.Tables.Mons[class].Has(18) {
@@ -35,7 +35,7 @@ func (g *Game) PlacePreset(w World, room *Room, class, x, y int, pop *Population
 	p := Placement{Room: room, Class: class, X: x, Y: y, Ring: -1, Flags: uint16(flags)}
 
 	px, py, ok := g.Tables.Place(w, p)
-	if !ok && retryAllowed(class) {
+	if !ok && !exact && retryAllowed(class) {
 		p.Ring = 4
 		px, py, ok = g.Tables.Place(w, p)
 	}

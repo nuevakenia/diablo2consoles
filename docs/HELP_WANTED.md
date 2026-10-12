@@ -38,8 +38,9 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
   shows for hardcore heroes (game-info flag 4); its effect (a packet) and a party golden (needs two players) are open.
 - The summon caps: the Hydra bound is the exe pet limit (skills.txt petmax, 99) and EvilHole is bounded by its aip1; DiabPrison
   (4 per cast) and the Nest / MinionSpawner stand-in bound of 10 stay host choices because the exe has no live count for them.
-- Lava levels 107/108 make about 8x fewer monster groups than the density rolls predict; probably the estimate, not
-  verified against the original.
+- Lava levels 107/108 make about 8x fewer monster groups than the density rolls predict: checked against the exe's
+  pop code in wave 26, it is the estimate (rolls match, 20 spot tries per hit as in the exe, most spots are lava);
+  not an engine bug. Only the collision flags of the lava floor in the original were not compared.
 - Ubers (UberDiablo, UberMephisto) stand still as in the exe in this build; restore the two `register` lines in
   `ai_boss2.go` if fighting Ubers are wanted.
 - The ranked gap list from the source-file study lives in the author's notes (`gaps-from-study.md`); items N1-N25.

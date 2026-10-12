@@ -23,15 +23,15 @@ const maxUnitMods = 9
 // assignMods is FUN_0059e330 with its flag set (natural unique packs). With the
 // monumod table loaded the picks are the exe's (weights, eligibility, the
 // champion row); without it each pick only takes its one seed step.
-func (g *Game) assignMods(u *Unit) (champion bool) {
+func (g *Game) assignMods(u *Unit, allowChampion bool) (champion bool) {
 	if ut := g.Tables.UMods; ut != nil {
-		u.Mods, champion = ut.Roll(g.Tables, &u.Seed, g.Difficulty, u.Class, g.Expansion, true, u.Mods)
+		u.Mods, champion = ut.Roll(g.Tables, &u.Seed, g.Difficulty, u.Class, g.Expansion, allowChampion, u.Mods)
 		u.Champion = champion
 
 		return champion
 	}
 
-	if int(u.Seed.Roll(100)) < ChampionChance {
+	if allowChampion && int(u.Seed.Roll(100)) < ChampionChance {
 		u.Champion = true
 		u.Seed.Roll(2) // FUN_0059e0e0: one pick over the champion mods (the weight total is not modelled; any total > 0 takes one step)
 
@@ -142,6 +142,13 @@ func (g *Game) partyPack(w World, room *Room, c *Cell, u *Unit, class int, pop *
 
 // uniquePack creates one unique or champion pack leader in the cell.
 func (g *Game) uniquePack(w World, room *Room, r *Region, c *Cell, pop *Population) bool {
+	return g.uniquePackWith(w, room, r, c, pop, true)
+}
+
+// uniquePackWith is the body of uniquePack. c is nil for the preset unique pack (the position search then covers the
+// room) and allowChampion is the second argument of MONSTER_RollUniqueModifiers (1 for the natural pack, 0 for the
+// preset one: no champion roll, no seed step for it).
+func (g *Game) uniquePackWith(w World, room *Room, r *Region, c *Cell, pop *Population, allowChampion bool) bool {
 	class, ok := g.pickType(r, room, 0, true)
 	if !ok {
 		return false
@@ -162,7 +169,7 @@ func (g *Game) uniquePack(w World, room *Room, r *Region, c *Cell, pop *Populati
 	u.Unique = true
 	r.Uniques++ // FUN_0059df00
 
-	g.assignMods(u)
+	g.assignMods(u, allowChampion)
 
 	if u.Champion {
 		pop.Log = append(pop.Log, Event{Kind: "champ", Class: class})
