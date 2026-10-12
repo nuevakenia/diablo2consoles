@@ -19,9 +19,9 @@ import (
 const (
 	wpPanelX, wpPanelY   = 80, 60
 	wpPanelW, wpPanelH   = 320, 432
-	wpRowX, wpRowTop     = 17, 60 // top-left of row 0 inside the panel: UNVERIFIED (inferred from the icon bottom)
+	wpRowX, wpRowTop     = 17, 60 // row 0 record fields 4, 5 of the table 0x721860 (VERIFIED values; that the click box is exactly this is inferred)
 	wpRowPitch           = 36
-	wpRowH               = 29  // UNVERIFIED
+	wpRowH               = 29  // icon bottom 89 minus hit top 60 (table values)
 	wpRowW               = 283 // UNVERIFIED
 	wpTextBottom0        = 84
 	wpTextPitch          = 35
@@ -46,6 +46,7 @@ var (
 	wpWhite      = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 	wpGrey       = color.RGBA{R: 110, G: 110, B: 110, A: 255}
 	wpGold       = color.RGBA{R: 255, G: 215, B: 0, A: 255}
+	wpBlue       = color.RGBA{R: 105, G: 105, B: 255, A: 255} // font colour 3 of the exe's row text (hovered / current level)
 )
 
 // WaypointRow is one line of the waypoint panel.
@@ -105,9 +106,14 @@ func (p *WaypointPanel) Open(act, current int, rows []WaypointRow, onChoose func
 
 		l.SetText(text)
 
-		if r.Enabled() {
+		// VERIFIED 0x499190: inactive rows use text colour 5 (grey), active rows 0 (white), the row of the level the hero
+		// stands in and the hovered row colour 3 (blue)
+		switch {
+		case r.Level == current:
+			l.Color[0] = wpBlue
+		case r.Enabled():
 			l.Color[0] = wpWhite
-		} else {
+		default:
 			l.Color[0] = wpGrey
 		}
 
@@ -312,6 +318,13 @@ func (p *WaypointPanel) Render(target d2interface.Surface) {
 			target.PushTranslation(x, y)
 			target.DrawRect(w, h, wpHighlight)
 			target.Pop()
+
+			saved := l.Color[0]
+			l.Color[0] = wpBlue
+			l.Render(target)
+			l.Color[0] = saved
+
+			continue
 		}
 
 		l.Render(target)

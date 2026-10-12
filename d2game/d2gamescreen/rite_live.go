@@ -13,14 +13,17 @@ import (
 // the town-portal reset and the reward of the third Ancient's death. The rules are d2quest.AncientsFight (exe
 // facts in d2quest/w27_quests2.go); this file feeds it with the engine's events.
 //
-// UNVERIFIED: where the altar, the statues and the Ancients stand (the Ancients appear next to the statue monsters
-// when the level has them, else next to the hero), and the Ancients returning after a portal closes.
+// VERIFIED (0x589f10, 0x589e50): each statue wakes the Ancient of its own slot at its own coordinates, the statue
+// then cannot be used again until the reset. UNVERIFIED: the altar is a level object, the harness places one when the
+// map has none; the Ancients returning after a portal closes (the exe clears the armed flags 0x10/0x11 and the
+// re-arm test is not decoded).
 
 // riteLive is the Rite state of the game screen.
 type riteLive struct {
 	fight    d2quest.AncientsFight
 	ancients []*d2mapentity.Monster // the Ancients woken in the current level
 	gateOpen bool
+	slotUsed [d2quest.AncientCount]bool // the statue of the slot was spoken to (VERIFIED 0x589f10: it goes to mode 4)
 }
 
 const (
@@ -36,6 +39,7 @@ const (
 func (v *Game) riteEnter(level int) {
 	f := &v.rite.fight
 	v.rite.ancients = nil
+	v.rite.slotUsed = [d2quest.AncientCount]bool{}
 
 	if level != d2quest.LevelSummit {
 		return
@@ -56,7 +60,7 @@ func (v *Game) riteEnter(level int) {
 	if len(v.objectsOf(d2quest.AncientsAltar)) == 0 {
 		x, y := v.heroTilePos()
 		if v.newObjectAt(d2quest.AncientsAltar, int(x*subtilesInTile)+riteAltarOffset, int(y*subtilesInTile)) != nil {
-			v.Infof("RITE the level has no altar: one is placed next to the hero (UNVERIFIED place)")
+			v.Infof("RITE the level has no altar: one is placed next to the hero (fallback: the exe has no code that creates it, UNVERIFIED place)")
 		}
 	}
 
@@ -64,7 +68,9 @@ func (v *Game) riteEnter(level int) {
 		len(v.objectsOf(d2quest.AncientsDoor)), f.Done, f.Portals)
 }
 
-// riteStart is the statues' introduction: each statue wakes its Ancient while no town portal is open and fewer than
+// riteStart is the statues' introduction (VERIFIED 0x58a0c0 / 0x589d90: message 20002 with no portal open and no statue
+// awake sets all three statue objects to mode 3 and arms the fight; 20 frames later each wakes its Ancient at its own
+// place, 0x589f10; the 20 frame delay is not modelled here, UNVERIFIED as harmless): each statue wakes its Ancient while no town portal is open and fewer than
 // three are out (AncientsMayStart), and the fight starts.
 func (v *Game) riteStart() {
 	f := &v.rite.fight
@@ -85,26 +91,34 @@ func (v *Game) riteStart() {
 		return
 	}
 
-	sx, sy := v.riteSpot()
+	// VERIFIED 0x589f10: every statue wakes the Ancient of its own slot at the statue's own coordinates.
+	for _, st := range v.riteStatues() {
+		if !f.MayStart() {
+			break
+		}
 
-	for i := 0; i < d2quest.AncientCount && f.MayStart(); i++ {
-		stat := v.monsters.FindStat(strconv.Itoa(d2quest.NPCAncient1 + i))
+		if st.slot < 0 || v.rite.slotUsed[st.slot] {
+			continue
+		}
+
+		stat := v.monsters.FindStat(strconv.Itoa(d2quest.NPCAncient1 + st.slot))
 		if stat == nil {
-			v.Warningf("RITE no monstats row for class %d", d2quest.NPCAncient1+i)
+			v.Warningf("RITE no monstats row for class %d", d2quest.NPCAncient1+st.slot)
 
 			continue
 		}
 
-		m, err := v.monsters.SpawnNear(stat, sx, sy, riteSpawnRing)
+		m, err := v.monsters.SpawnNear(stat, st.x, st.y, riteSpawnRing)
 		if err != nil {
-			v.Warningf("RITE Ancient %d: %v", i, err)
+			v.Warningf("RITE Ancient slot %d: %v", st.slot, err)
 
 			continue
 		}
 
 		f.Wake()
+		v.rite.slotUsed[st.slot] = true
 		v.rite.ancients = append(v.rite.ancients, m)
-		v.Infof("RITE Ancient %d wakes (%s, class %d)", i+1, m.Label(), stat.ID)
+		v.Infof("RITE Ancient slot %d wakes at its statue (%s, class %d)", st.slot, m.Label(), stat.ID)
 	}
 
 	v.monsters.RiteSetPortals(f.Portals)
@@ -112,19 +126,41 @@ func (v *Game) riteStart() {
 	v.Infof("RITE the fight starts: ancients=%d started=%v", len(v.rite.ancients), started)
 }
 
-// riteSpot is where the Ancients appear: the first statue monster of the level, else the hero.
-func (v *Game) riteSpot() (x, y int) {
-	if v.monsters != nil {
+// riteStatue is one statue of the summit: where it stands (subtiles) and the Ancient slot it wakes.
+type riteStatue struct{ x, y, slot int }
+
+// riteStatues lists the statues in the order slot 0, 1, 2 would wake: the statue objects (rows 474-476) of the map,
+// else the statue NPCs of the harness; with neither, the three Ancients stand next to the hero (UNVERIFIED fallback,
+// the exe has no statue-less spawn).
+func (v *Game) riteStatues() []riteStatue {
+	var out []riteStatue
+
+	for _, row := range []int{d2quest.StatueObject1, d2quest.StatueObject2, d2quest.StatueObject3} {
+		slot, _ := d2quest.AncientSlotForStatueObject(row)
+
+		for _, ob := range v.objectsOf(row) {
+			ox, oy := ob.GetPositionF()
+			out = append(out, riteStatue{int(ox * subtilesInTile), int(oy * subtilesInTile), slot})
+		}
+	}
+
+	if len(out) == 0 && v.monsters != nil {
 		for _, m := range v.monsters.Monsters() {
-			if id := m.MonstatID(); id >= riteStatueFirst && id <= riteStatueLast {
-				return m.SubtilePos()
+			if slot, ok := d2quest.AncientSlotForStatueMonster(m.MonstatID()); ok {
+				x, y := m.SubtilePos()
+				out = append(out, riteStatue{x, y, slot})
 			}
 		}
 	}
 
-	hx, hy := v.heroTilePos()
+	if len(out) == 0 {
+		hx, hy := v.heroTilePos()
+		for slot := 0; slot < d2quest.AncientCount; slot++ {
+			out = append(out, riteStatue{int(hx * subtilesInTile), int(hy * subtilesInTile), slot})
+		}
+	}
 
-	return int(hx * subtilesInTile), int(hy * subtilesInTile)
+	return out
 }
 
 // riteSyncPortals follows the town portals open in level 120 (VERIFIED 0x58ace0 rules in AncientsFight).
@@ -153,6 +189,7 @@ func (v *Game) riteSyncPortals() {
 		}
 
 		v.rite.ancients = nil
+		v.rite.slotUsed = [d2quest.AncientCount]bool{}
 
 		v.monsters.RiteReset()
 		v.Infof("RITE a town portal opened in the summit: the Ancients are reset")

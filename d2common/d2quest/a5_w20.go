@@ -23,7 +23,10 @@ package d2quest
 // level) match anyaRewards; Malah hands the potion out once per game (0x587460); the Betrayal kill (lambda 0x589300)
 // sets RP + goal only for heroes near the corpse whose Prison of Ice is rewarded or pending, others get bit 14.
 // w27: the "game type == 3" Anya test is explained in w27_quests2.go (AnyaTier); the Cain rescue, the Ancients and the
-// Baal gold are there too. UNVERIFIED: the availability triggers.
+// Baal gold are there too. w37 VERIFIED for Rite of Passage: OnAreaChange 0x58a9a0 (entering Harrogath, level 0x6d, with
+// state 2 and bit 0 clear moves it to state 3; entering the summit 0x78 raises it to state 3), OnNpcMessageHeard 0x58a0c0
+// (message 0x4eb9 from NPC 0x203 moves state 1 to 2; message 0x4e22 starts the Ancients). UNVERIFIED: the availability
+// triggers of the other Act 5 quests.
 
 // ObjectFrozenAnya is the frozen Anya block (objects.txt row 558, OperateFn 67): operating it with Malah's
 // potion thaws her.

@@ -89,7 +89,10 @@ func (v *Game) townSlot(pairID, level int) int {
 
 // portalSpot is where a portal end stands in the map of its level, in
 // sub-tiles: the cast spot, or for a town end without one the place beside the
-// town waypoint (UNVERIFIED: the original's town portal spot).
+// town waypoint. VERIFIED w37 (0x56ac70, 0x61ad90, 0x66dfe0, 0x66dae0): the exe puts the town end at the level's entry
+// point (entry kind 0xb), which for a town is the cell of the room's waypoint object (objects.txt SubClass bit 0x40),
+// then at the nearest free cell (mask 0xbe11, search up to 50 subtiles). The slot spacing below only imitates that
+// nearest-free-cell spreading for several owners (a harness choice, UNVERIFIED as a distance).
 func (v *Game) portalSpot(m *d2mapengine.MapEngine, end d2portal.End, pairID int) (sx, sy int) {
 	x, y := end.X, end.Y
 
@@ -259,6 +262,14 @@ func (v *Game) operateTownPortal(ob *d2mapentity.Object) bool {
 	if err := d2portal.CanUse(p, v.me(), inParty, !v.gameClient.IsSinglePlayer()); err != nil {
 		v.Infof("PORTAL refused: %v (owner %q)", err, p.OwnerName)
 		return true
+	}
+
+	if p.Owner != v.me() && !v.travel.free {
+		// VERIFIED 0x582700: another hero's town portal needs bit 0 of the destination's QuestFlag in our record
+		if err := d2level.CheckPortalGate(v.currentLevel(), p.Dest.Level, v.heroExpansion(), false, v.heroQuests()); err != nil {
+			v.Infof("PORTAL refused: %v", err)
+			return true
+		}
 	}
 
 	if v.startLevelChange(p.Dest.Level, d2level.StartPortal, "portal") {
