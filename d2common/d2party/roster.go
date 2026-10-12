@@ -588,9 +588,10 @@ func (r *Roster) inXPRange(k, o *entry) bool {
 // the member's client). A killer without a party gets exactly
 // d2herostats.KillXP(xp, ...), the solo rule.
 //
-// UNVERIFIED and not modelled (the roster has no positions or life): the
-// "alive" and "squared distance <= 6400" recipient tests, and the unit of that
-// distance; the area stands in for them.
+// The recipient tests (not dead, x != 0, squared subtile distance <= 0x1900
+// from the dead monster) are VERIFIED at 0x57c5a0 (w27/w28) and modelled by
+// ShareKillXPAt through inRangeOf; a member with no known position counts (the
+// area stands in).
 func (r *Roster) ShareKillXP(killer string, xp, monsterLevel, maxLevel int) []XPShare {
 	return r.ShareKillXPAt(killer, xp, monsterLevel, maxLevel, nil)
 }

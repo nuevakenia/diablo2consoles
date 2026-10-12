@@ -168,11 +168,26 @@ func (v *Game) commandKillNear(_ []string) error {
 // partyXP is the monster director's hook: with party members around, the
 // experience of the hero's kill goes to the server, which splits it.
 func (v *Game) partyXP(src *d2mapentity.Player, xp, monsterLevel int, monster string) bool {
+	return v.sendPartyXP(src, xp, monsterLevel, monster, nil)
+}
+
+// partyXPAt carries the dead monster's subtile position, so the server measures
+// the recipients from it (VERIFIED 0x57c990).
+func (v *Game) partyXPAt(src *d2mapentity.Player, xp, monsterLevel int, monster string, subX, subY int) bool {
+	return v.sendPartyXP(src, xp, monsterLevel, monster, &[2]int{subX, subY})
+}
+
+func (v *Game) sendPartyXP(src *d2mapentity.Player, xp, monsterLevel int, monster string, at *[2]int) bool {
 	if src != v.localPlayer || v.gameClient.IsSinglePlayer() || len(v.gameClient.Roster.PartyMembers(v.me())) < 2 {
 		return false
 	}
 
-	pkt, err := d2netpacket.CreatePartyXPPacket(d2netpacket.PartyXPPacket{Killer: v.me(), Monster: monster, XP: xp, MonsterLevel: monsterLevel})
+	out := d2netpacket.PartyXPPacket{Killer: v.me(), Monster: monster, XP: xp, MonsterLevel: monsterLevel}
+	if at != nil {
+		out.MonsterX, out.MonsterY, out.HasMonsterPos = at[0], at[1], true
+	}
+
+	pkt, err := d2netpacket.CreatePartyXPPacket(out)
 	if err != nil || v.gameClient.SendPacketToServer(pkt) != nil {
 		return false
 	}

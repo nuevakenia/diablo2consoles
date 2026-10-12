@@ -829,8 +829,21 @@ func (d *Director) awardKillXP(src *d2mapentity.Player, xp int, _ string) int {
 // d2party.Roster.ShareKillXP); otherwise the hero is scaled and credited here.
 // It returns the amount the killer got, or the offered amount for a party kill.
 func (d *Director) creditKill(src *d2mapentity.Player, baseXP, monsterLevel int, label string) int {
+	return d.creditKillAt(src, baseXP, monsterLevel, label, nil)
+}
+
+// creditKillAt is creditKill with the dead monster's whole-subtile position
+// (VERIFIED w36: 0x57c990 passes the monster as the range reference of the
+// 0x57c5a0 callback). The position goes to PartyXPAt when that hook is set.
+func (d *Director) creditKillAt(src *d2mapentity.Player, baseXP, monsterLevel int, label string, at *[2]int) int {
 	if baseXP > d2herostats.KillXPCap {
 		baseXP = d2herostats.KillXPCap
+	}
+
+	if d.PartyXPAt != nil && at != nil {
+		if offered := d.shrineXP(baseXP); d.PartyXPAt(src, offered, monsterLevel, label, at[0], at[1]) {
+			return offered
+		}
 	}
 
 	if d.PartyXP != nil {
@@ -884,7 +897,8 @@ func (d *Director) kill(u *unit, src *d2mapentity.Player) {
 	if src != nil {
 		by = src.Name()
 		base := xp
-		xp = d.creditKill(src, base, u.m.Vitals.Level, u.m.Label())
+		kx, ky := u.m.SubtilePos()
+		xp = d.creditKillAt(src, base, u.m.Vitals.Level, u.m.Label(), &[2]int{kx, ky})
 		d.creditOwnerMerc(src, u, base)
 	}
 

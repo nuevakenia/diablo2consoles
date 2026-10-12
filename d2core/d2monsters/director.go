@@ -239,6 +239,11 @@ type Director struct {
 	// it back as a packet); false leaves the kill to the killer alone.
 	PartyXP func(src *d2mapentity.Player, xp, monsterLevel int, monster string) bool
 
+	// PartyXPAt is PartyXP plus the dead monster's subtile position, which the
+	// party range test is measured from (VERIFIED 0x57c990/0x57c5a0). Preferred
+	// over PartyXP when set.
+	PartyXPAt func(src *d2mapentity.Player, xp, monsterLevel int, monster string, subX, subY int) bool
+
 	// HeroPortal, if set, answers PLAYER_GetLastPortalUnitId for a hero: the level id and the subtile position
 	// of the town portal she opened last in a field level (the portal object Diablo and Baal look for).
 	// HeroHasState, if set, says whether a hero has the states.txt state (Diablo and Baal read state 0xb, cold).
