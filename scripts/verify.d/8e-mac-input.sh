@@ -1,4 +1,4 @@
-scenario_name="mac input (click: left on ground = move, left on monster = left skill, right, Control+click and Cmd+click = right skill, Shift = stand still; press: Tab/I/C/T/Q/Esc; bindkey saved in config.json)"
+scenario_name="mac input (click: left on ground = move, left on monster = left skill, right, Control+click and Cmd+click = right skill, Shift = stand still; press: Tab/I/C/T/L (quest log; Q drinks a potion)/Esc; bindkey saved in config.json)"
 cfg=$tmp/input-config
 scenario_env() {
   mkdir -p $cfg
@@ -10,7 +10,7 @@ scenario_env() {
   local s='wait:2;click:left@hero:-280,-180;click:right@hero:-280,-180;click:left+ctrl@hero:-280,-180;click:left+cmd@hero:-280,-180;click:left+shift@hero:-280,-180'
   s="$s;skill:left=Fire Bolt;click:left@hero:-280,-180;click:left+shift@hero:-280,-180;skill:left=Attack"
   s="$s;automap:off;press:Tab;press:Tab"
-  s="$s;press:I;press:I;press:C;press:C;press:T;press:T;press:Q;press:Q;press:Escape;press:Escape"
+  s="$s;press:I;press:I;press:C;press:C;press:T;press:T;press:L;press:L;press:Escape;press:Escape"
   s="$s;say:bindkey ToggleInventoryPanel X;press:X;press:X;exit"
   echo "export OD2_AUTOSCRIPT='$s'"
 }
@@ -29,7 +29,7 @@ scenario_check() {
   grep -q "INPUT panels after I: inventory=true" $log.txt || { echo "FAIL: I did not open the inventory"; fail=1; }
   grep -q "INPUT panels after C: .* character=true" $log.txt || { echo "FAIL: C did not open the character panel"; fail=1; }
   grep -q "INPUT panels after T: .* skills=true" $log.txt || { echo "FAIL: T did not open the skill tree"; fail=1; }
-  grep -q "INPUT panels after Q: .* quest=true" $log.txt || { echo "FAIL: Q did not open the quest log"; fail=1; }
+  grep -q "INPUT panels after L: .* quest=true" $log.txt || { echo "FAIL: L did not open the quest log"; fail=1; }
   grep -q "INPUT panels after Escape: .* menu=true" $log.txt || { echo "FAIL: Esc did not open the game menu"; fail=1; }
 
   # rebinding: the new key works and is in config.json

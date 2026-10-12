@@ -177,7 +177,7 @@ func (a *App) loadEngine() error {
 	a.renderer = renderer
 	d2display.Set(d2display.Base) // the error screens use the legacy size
 	renderer.SetFullscreenHook(func(full bool) {
-		a.config.FullScreen = full
+		a.config.SetFullscreenChoice(full)
 		a.saveConfig()
 	})
 

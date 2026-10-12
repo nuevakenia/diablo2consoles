@@ -78,7 +78,7 @@ func (a *App) evalJS(args []string) error {
 func (a *App) toggleFullScreen([]string) error {
 	fullscreen := !a.renderer.IsFullScreen()
 	a.renderer.SetFullScreen(fullscreen)
-	a.config.FullScreen = fullscreen
+	a.config.SetFullscreenChoice(fullscreen)
 	a.saveConfig()
 	a.terminal.Infof("fullscreen is now: %v (saved)", fullscreen)
 

@@ -38,6 +38,7 @@ var optionKeys = map[optionID]string{
 	optVideoPerspective:          d2config.OptPerspective,
 	optVideoGamma:                d2config.OptGamma,
 	optVideoContrast:             d2config.OptContrast,
+	optVideoFullscreen:           d2config.OptFullscreen,
 	optAutomapSize:               d2config.OptAutomapSize,
 	optAutomapFade:               d2config.OptAutomapFade,
 	optAutomapCenterWhenCleared:  d2config.OptAutomapCenter,

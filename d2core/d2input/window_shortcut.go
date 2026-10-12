@@ -15,11 +15,15 @@ const (
 )
 
 // ResolveWindowShortcut maps a key that was just pressed, with the state of the
-// Command and Option/Alt keys, to a window action. On macOS: Cmd+Enter and
+// Command and Option/Alt keys, to a window action. On macOS: Cmd+Enter, Cmd+F and
 // Option+Enter toggle full screen, Cmd+Q and Cmd+W quit. Elsewhere only
 // Alt+Enter toggles full screen (Cmd does not exist).
 func ResolveWindowShortcut(goos string, cmd, alt bool, key d2enum.Key) WindowAction {
 	if key == d2enum.KeyEnter && (alt || (goos == "darwin" && cmd)) {
+		return WindowToggleFullscreen
+	}
+
+	if key == d2enum.KeyF && goos == "darwin" && cmd {
 		return WindowToggleFullscreen
 	}
 
