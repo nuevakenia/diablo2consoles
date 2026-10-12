@@ -11,7 +11,13 @@ package d2monster
 
 // FBNPetStepper is MONAI_FollowLeaderStep(unit, mode, ?, boost, maxDist):
 // modes 0 follow, 1 hover, 2 shuffle, 3 teleport next to the leader, 4/5 nudge.
-// It returns true when it issued a move. UNVERIFIED mode meanings beyond that.
+// It returns true when it issued a move. Mode meanings read from the decompile of MONAI_FollowLeaderStep (VERIFIED
+// w37): 0 walk or run to a point 8 subtiles along the direction of the leader's path destination, trying eight
+// directions in the same DRLG region, then the midpoint to the leader; 1 retrace the leader's 20-entry position
+// history (player data) newest first, else step toward the leader (only after a walk to the leader's destination
+// when the pet is in mode 2); 2 idle shuffle (10 percent: a short step of 3..5 toward the leader, else a walk to
+// the leader's destination, then wait 15 ticks); 3 teleport to a random free point in the room of the leader and
+// wait 5 ticks; 4 if another pet stands adjacent walk away from the leader, else nothing; 5 nudge near the target.
 type FBNPetStepper interface {
 	FBNFollowLeader(b *Brain, mode, boost, maxDist int) bool
 }

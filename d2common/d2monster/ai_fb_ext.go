@@ -20,10 +20,12 @@ const (
 	// mode 0 / radius 25: a living unit it can bite; UNVERIFIED filter).
 	FBXScanDefilerCorpse
 	// FBXScanKnightAlly is the OblivionKnight's scan (callback 0x5f9fb0, no
-	// radius limit: the ally it heals/buffs; UNVERIFIED filter).
+	// call site 0x5fa060 VERIFIED w37: mode 1, query block {out unit, 0, 2500, 0x7fffffff, 0x7fffffff}, i.e. a
+	// radius field of 2500; the ally it heals/buffs; callback filter UNVERIFIED).
 	FBXScanKnightAlly
 	// FBXScanOverseer is the Overseer/Nihlathak scan (callback 0x5e1570, radius
-	// 0x50, results: one ally and one enemy; UNVERIFIED filter).
+	// 0x50 here; the Nihlathak call site 0x5ed6d0 VERIFIED w37 passes mode 1 and block {0, 625, 50, 0, 0, 0}
+	// and reads the result slot at block+0x10; callback filter UNVERIFIED).
 	FBXScanOverseer
 	// FBXScanRegurgitate is MONAI_Regurgitator_TargetFilter (VERIFIED filter,
 	// read from the decompilation): the nearest monster (not the caster) that
@@ -174,7 +176,7 @@ func fbxWalk(c *Ctx, t Target, reach int) {
 
 // fbxRunSpeed is the movement speed boost the exe derives from monstats
 // (record shorts at +0x32 and +0x34, read here as the walk and run
-// velocities: UNVERIFIED which columns): run*100/walk - 100. clampLow selects
+// velocities, i.e. Velocity and Run: the pet formula is VERIFIED in 0x5e3770 w37): run*100/walk - 100. clampLow selects
 // the Zealot/Vampire clamp (below 1 becomes 0, above 119 becomes 120) over
 // the pet clamp (above 99 becomes 100, negative kept; 100 when walk < 1).
 func fbxRunSpeed(p *Profile, zealotClamp bool) int {

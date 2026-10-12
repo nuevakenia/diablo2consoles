@@ -15,7 +15,7 @@ const (
 	petMeleeReach   = 6  // edge distance at which the pet stops walking up to a foe
 	petRunPercent   = 14 // VERIFIED: roll > this -> run, else walk
 	petAttackChance = 80 // VERIFIED: percent chance to attack when in range
-	petIdleFollow   = 8  // UNVERIFIED: closer than this to the owner the pet stands still
+	petIdleFollow   = 8  // placeholder (superseded by ai_pet_fb2.go, whose leash is the VERIFIED 7/8 of 0x5e3770)
 )
 
 // PetWorld extends World with what summoned minions need.
@@ -37,7 +37,7 @@ func init() {
 	register("Vines", TargetNone, thinkStationary)
 }
 
-// thinkStationary (UNVERIFIED): rooted plants strike the nearest enemy with
+// thinkStationary (placeholder, superseded in w37 by thinkVinesB): rooted plants strike the nearest enemy with
 // skill 1 whenever one is in reach. Only the placeholder behind Vines, which
 // ai_pet_fb2.go overrides.
 func thinkStationary(c *Ctx) {
@@ -55,7 +55,7 @@ func thinkStationary(c *Ctx) {
 // thinkNecroPet is MONAI_Think_NecroPet. Scratch[0] != 0 marks a casting pet
 // (Valkyrie, Skeleton Mage, golems with a skill): FUN_5e3a00 is not ported, so
 // it shares the melee flow and casts slot 0 instead of the A1 attack
-// (UNVERIFIED).
+// (placeholder; thinkNecroPetB 0x5e3c30 is the VERIFIED port).
 func thinkNecroPet(c *Ctx) {
 	w, ok := c.W.(PetWorld)
 	if !ok {
@@ -153,7 +153,7 @@ func petEngage(c *Ctx, w PetWorld, owner OwnerInfo, d int, caster bool) {
 	}
 }
 
-// thinkRaven (UNVERIFIED): ravens stay around the owner and peck enemies of
+// thinkRaven (placeholder, superseded in w37 by thinkRavenB 0x5ebd20): ravens stay around the owner and peck enemies of
 // the owner; monstats aip1 is the percent chance to attack when in range, aip2
 // the sleep in frames when idle.
 func thinkRaven(c *Ctx) {
