@@ -233,3 +233,18 @@ func RechargeCost(t *Tables, charged []StatEntry) int {
 
 	return total
 }
+
+// HasMissingCharges is the charged-skill test of ITEM_GetRepairParamEntries
+// (0x62a9b0, VERIFIED) as TRADE_CheckItemRepairable (0x62e770) uses it: some
+// stat 0xcc entry has fewer current charges (low byte of Value) than its
+// maximum (the byte above). Such an item can be recharged, so it is repairable
+// whatever the ItemTypes repair column says.
+func HasMissingCharges(charged []StatEntry) bool {
+	for _, e := range charged {
+		if e.Value&0xff < e.Value>>8 {
+			return true
+		}
+	}
+
+	return false
+}

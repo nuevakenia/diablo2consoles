@@ -128,9 +128,11 @@ func (r Rules) shoots(itemType string) string {
 }
 
 // twoHanded reports whether the weapon occupies both hands for this class. A
-// Barbarian may wield the swords marked 1or2handed in one hand (UNVERIFIED in
-// the binary: INV_CheckHandItemsCompatible special-cases class 4, the column
-// is community knowledge).
+// Barbarian may wield the swords marked 1or2handed in one hand. VERIFIED:
+// INV_CheckHandItemsCompatible (0x63ec50) refuses a two-handed item unless
+// INV_PlayerCanUseOneOrTwoHanded (0x62a350) holds, and that is true only for a
+// player (record kind 0) of class 4 (Barbarian) whose base row has the
+// 1or2handed byte set.
 func twoHanded(class string, it *Item) bool {
 	if !it.Weapon || !it.TwoHanded {
 		return false

@@ -86,8 +86,10 @@ func (t *TradeWindow) generateGamble(v d2vendor.Vendor, seed uint32) *d2vendor.S
 }
 
 // gamblePrice is TRADE_CalcItemPrice mode 2 (VERIFIED formula, d2trade).
-// UNVERIFIED: the "flat gamble cost" switch (itemData word +0x30 == 0) is
-// never taken here, so only rings and amulets use the gamble cost column.
+// VERIFIED (0x62f100, mode 2): the flat switch (item format word 0, the old
+// pre-expansion item format) returns the gamble cost column of the normal row
+// undiscounted; stock items are always generated in the current format, so it
+// is never taken here and only rings and amulets use the gamble cost column.
 func (t *TradeWindow) gamblePrice(item *diablo2item.Item) int {
 	p := t.params(d2trade.ModeGamble)
 	p.Gamble = item.GambleBase()

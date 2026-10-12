@@ -135,8 +135,11 @@ func (it *Item) DefenseOf(clvl int) int {
 
 // EtherealDefense is the defense roll of a generated ethereal armor:
 // minac..maxac raised by 50% (rounded down). itemgen.md section 3 notes the
-// 3/2 factor in the item parser; whether a saved item already contains it is
-// UNVERIFIED, so saved items are used as stored.
+// 3/2 factor in the item parser. VERIFIED: ITEM_ApplyEtherealFlagAndDamageBonus
+// (0x660a40) sets stat 0x1f to base*3/2 (integer division) on the generated
+// item, so a saved ethereal armor already holds the raised value and is used as
+// stored; the same function scales damage stats 0x15-0x18 and 0x9f/0xa0 for
+// weapons.
 func EtherealDefense(roll int) int { return roll * 3 / 2 }
 
 // EtherealDamage applies the ethereal +50% to a weapon's table damage.

@@ -137,11 +137,17 @@ func (i *Item) TradeItem() *d2trade.Item {
 		// TRADE_CheckItemRepairable 0x62e770 / ITEM_IsRepairableStackedThrowable
 		// 0x62e6e0: identified, not ethereal, the type repairs, and the item has
 		// durability or is a stacked throwing weapon (its quantity is restored).
-		// The charged-skill entry branch of 0x62e770 is not modelled (UNVERIFIED).
 		it.Repairable = typ.Repair && (maxDur > 0 || (rec.Throwable && rec.Stackable)) && it.Identified && !it.Ethereal
 	}
 
 	i.fillPriceExtras(it, rec.Type)
+
+	// TRADE_CheckItemRepairable (0x62e770, VERIFIED): an identified, non
+	// ethereal item with a charged skill that is not full is repairable
+	// (rechargeable) without the type or durability test.
+	if it.Identified && !it.Ethereal && d2trade.HasMissingCharges(entriesOf(it.Stats, d2trade.StatChargedSkill)) {
+		it.Repairable = true
+	}
 
 	if !it.Identified {
 		return it

@@ -74,8 +74,9 @@ func TotalArmorWeight(candidate func(Loc) bool) int {
 // in [0, len(ArmorWeights)) and roll one in [0, TotalArmorWeight): the game
 // walks the table from start, wrapping, subtracting the weight of each candidate
 // from the roll until it falls inside one (the ranges of the two random calls
-// are UNVERIFIED, the caller decompiles to RAND_RollSeedModulo with hidden
-// arguments). It returns false when no piece can be damaged.
+// are VERIFIED at 0x57b380: start is RAND_RollSeedModulo(seed, 7) = table size
+// and roll RAND_RollSeedModulo(seed, total weight), drawn in that order from the
+// player's seed; candidates are the worn items of type Any Armor). It returns false when no piece can be damaged.
 func PickArmorPiece(start, roll int, candidate func(Loc) bool) (Loc, bool) {
 	total := TotalArmorWeight(candidate)
 	if total <= 0 {
@@ -154,8 +155,12 @@ func RollWear(it *Item, percent, chance, amount int) (dur int, broke, lost bool)
 // condition. VERIFIED for armor: when the next point would bring it below 1
 // the game sets the broken flag (0x100) and removes the item's stat list
 // (0x55d660), and the activation pass never switches a broken item on again.
-// For weapons the same function takes the other branch (0x557d90 only zeroes
-// the stat and sends the update, no broken flag), so a weapon at 0 durability
-// may keep its properties: UNVERIFIED, the damage code was not read. We treat broken weapons like broken armor (the
-// conservative choice, matching the community statement that nothing works).
+// For weapons 0x557d90 takes the other branch: only armor (not type 0x2d) is
+// passed to the break function there. A weapon at 0 durability gets the flag
+// only through PLRMODE_ServerHandleDepletedStackItem (0x57e020), and only when
+// it is a stackable or throwable magical-or-better weapon whose quantity ran
+// out. So a plain weapon at 0 keeps its stat list in the exe; whether its
+// damage is then reduced elsewhere is UNVERIFIED (the damage code was not
+// read). We still treat broken weapons like broken armor (the conservative
+// choice, matching the community statement that nothing works).
 func PropertiesOff(it *Item) bool { return it.Broken() }
