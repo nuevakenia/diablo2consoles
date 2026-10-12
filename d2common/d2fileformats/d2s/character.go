@@ -166,7 +166,8 @@ func (c *Character) readMercenary(data []byte, pos int, tables *ItemTables) (int
 
 	pos += 2
 
-	if c.Header.Mercenary.ID == 0 {
+	// the exe reads the list when the header produced a merc unit (id, experience or name id set)
+	if !c.Header.Mercenary.Exists() {
 		return pos, nil
 	}
 
