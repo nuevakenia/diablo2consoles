@@ -142,12 +142,14 @@ type popLevel struct {
 	// population to their place in it (leaders are referenced by index)
 	plan []d2mapengine.PlannedMonster
 	idx  map[*d2monreg.Unit]int
+	// preset is set while the units of a preset pack node are added
+	preset bool
 }
 
 type popStats struct {
 	preset, super, natural, skipped, unique int
 	// packNodes counts the preset unique pack / champion / group nodes that made a pack
-	packNodes int
+	packNodes, presetUnits int
 	// trials is the number of density rolls the level's populated rooms get (PopulateNatural: one per 3x3 subtile
 	// of every room cell) and density the MonDen they are rolled against; the population scenarios compare the
 	// planned monsters with trials * density / 100000 groups.
@@ -175,6 +177,8 @@ func (p *popLevel) addUnits(pop *d2monreg.Population, superKey string) {
 
 		pm := d2mapengine.PlannedMonster{Key: st.Key, X: u.X, Y: u.Y, Leader: -1, Unique: u.Unique, Champion: u.Champion,
 			Minion: u.Minion && u.Leader != nil && (u.Leader.Unique || u.Leader.Super > 0), Mods: u.Mods}
+
+		pm.Preset = p.preset
 
 		if u.Super > 0 {
 			pm.SuperKey, pm.SuperIdx = superKey, u.Super-1
@@ -484,8 +488,15 @@ func (p *popLevel) createPack(game *d2monreg.Game, w d2monreg.World, room *d2mon
 		return
 	}
 
+	before := len(p.plan)
+
+	p.preset = true
 	p.addUnits(&pop, "")
+	p.preset = false
+	p.stats.natural -= len(p.plan) - before // counted apart from the natural monsters, as the supers are
+	p.stats.unique -= countUnique(p.plan[before:])
 	p.stats.packNodes++
+	p.stats.presetUnits += len(p.plan) - before
 }
 
 // createSuper makes a super unique of a preset node with its followers and
@@ -538,10 +549,23 @@ func (p *popLevel) createSuper(game *d2monreg.Game, w d2monreg.World, room *d2mo
 	p.stats.super++
 }
 
+// countUnique counts the planned units addUnits counted as packs with modifiers.
+func countUnique(pl []d2mapengine.PlannedMonster) int {
+	n := 0
+
+	for _, pm := range pl {
+		if pm.Unique {
+			n++
+		}
+	}
+
+	return n
+}
+
 func (p *popLevel) logSummary(kind string) {
 	p.g.Infof("%s: population: %d rooms, %d preset monsters, %d super uniques, %d natural monsters planned (%d packs with modifiers), %d skipped, %d density rolls at MonDen %d (%d on walkable ground)",
 		kind, len(p.rooms), p.stats.preset, p.stats.super, p.stats.natural, p.stats.unique, p.stats.skipped, p.stats.trials, p.stats.density, p.stats.walkTrials)
-	p.g.Infof("%s: population preset packs level %d: %d unique pack / champion / group nodes made a pack", kind, p.level, p.stats.packNodes)
+	p.g.Infof("%s: population preset packs level %d: %d unique pack / champion / group nodes made a pack of %d units", kind, p.level, p.stats.packNodes, p.stats.presetUnits)
 	p.g.Infof("%s: population ranks level %d diff %d: champions=%d rares=%d minions=%d supers=%d", kind, p.level, int(p.diff),
 		p.stats.champions, p.stats.rares, p.stats.minions, p.stats.super)
 }

@@ -29,6 +29,9 @@ type PlannedMonster struct {
 	// Leader it is kept for the followers the original does not link (party packs without SetBoss, unlinked extras of
 	// a super unique), so ranks and group counts can follow the whole tree of a pack.
 	Origin int
+	// Preset marks the units of a DS1 preset pack (place_unique_pack, place_champion, place_impgroup / miniongroup):
+	// legal whatever the level's MonDen and monster rows say, so the natural-population checks leave them out.
+	Preset bool
 }
 
 // SetPopulation stores the natural population of the loaded level. It is

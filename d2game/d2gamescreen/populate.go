@@ -169,8 +169,9 @@ func (v *Game) populateLevel() {
 func (v *Game) spawnPlannedPopulation(level int, plan []d2mapengine.PlannedMonster) {
 	made := make([]*d2mapentity.Monster, len(plan))
 	natural := map[*d2mapentity.Monster]bool{}
-	packs := map[*d2mapentity.Monster]bool{}  // unique / champion packs: their types are logged apart (umon list, not the level's drawn types)
-	supers := map[*d2mapentity.Monster]bool{} // super uniques with every follower they came with (superuniques.txt class, not the level's types)
+	packs := map[*d2mapentity.Monster]bool{}   // unique / champion packs: their types are logged apart (umon list, not the level's drawn types)
+	presets := map[*d2mapentity.Monster]bool{} // DS1 preset packs (unique pack, champion, imp / minion group nodes)
+	supers := map[*d2mapentity.Monster]bool{}  // super uniques with every follower they came with (superuniques.txt class, not the level's types)
 	kinds := classifyPlan(plan)
 	units := 0
 
@@ -197,6 +198,8 @@ func (v *Game) spawnPlannedPopulation(level int, plan []d2mapengine.PlannedMonst
 			supers[mon] = true
 		case planPack:
 			packs[mon] = true
+		case planPreset:
+			presets[mon] = true
 		default:
 			natural[mon] = true
 		}
@@ -226,6 +229,7 @@ func (v *Game) spawnPlannedPopulation(level int, plan []d2mapengine.PlannedMonst
 	v.logPopulateTypes(level, natural)
 	v.logPopulateClasses("packs", level, packs)
 	v.logPopulateClasses("supers", level, supers)
+	v.logPopulateClasses("presetpacks", level, presets)
 
 	v.Infof("POPULATE groups level %d: %d", level, countPlanGroups(plan, kinds))
 
@@ -239,6 +243,7 @@ const (
 	planNatural planKind = iota // plain groups of the level's drawn types (and their party packs)
 	planPack                    // rare / champion leaders and everything created around them
 	planSuper                   // super uniques and everything created around them
+	planPreset                  // preset (DS1) unique pack / champion / group nodes and everything created around them
 )
 
 // classifyPlan sorts the planned monsters by the kind of pack they belong to. A follower takes the kind of the unit it
@@ -249,6 +254,8 @@ func classifyPlan(plan []d2mapengine.PlannedMonster) []planKind {
 
 	for i, pm := range plan {
 		switch {
+		case pm.Preset:
+			kinds[i] = planPreset
 		case pm.SuperKey != "":
 			kinds[i] = planSuper
 		case pm.Unique || pm.Champion:
@@ -269,7 +276,7 @@ func countPlanGroups(plan []d2mapengine.PlannedMonster, kinds []planKind) int {
 	n := 0
 
 	for i, pm := range plan {
-		if pm.Leader < 0 && pm.Origin == 0 && kinds[i] != planSuper {
+		if pm.Leader < 0 && pm.Origin == 0 && kinds[i] != planSuper && kinds[i] != planPreset {
 			n++
 		}
 	}
