@@ -151,6 +151,9 @@ type Engine struct {
 	Party func() []*d2mapentity.Player
 	// OnPartyHeal receives each Holy Bolt heal of a party hero (8.8 fixed point) so the game can tell its client.
 	OnPartyHeal func(dst *d2mapentity.Player, amount int)
+	// OnTelekinesisPickup takes the ground item (map entity id) into the hero's inventory (Telekinesis, w37);
+	// nil means the pickup is only logged.
+	OnTelekinesisPickup func(p *d2mapentity.Player, itemID string)
 
 	rivalTargets map[string]*playerTarget
 	pvpCarry     map[string]*d2combat.PvPCarry // defender id -> fraction of a point the PvP scale cut off
@@ -544,6 +547,30 @@ func (e *Engine) targetAt(sx, sy int) d2skill.Target {
 			best = d
 			tg.Unit, tg.UX, tg.UY = e.rivalTarget(p), px, py
 		}
+	}
+
+	// the nearest ally (Enchant's target, w37)
+	abest := pickRadius + 1
+
+	for _, m := range e.monsters.Allies() {
+		if !m.Alive() {
+			continue
+		}
+
+		mx, my := m.SubtilePos()
+		if d := chebyshev(mx-sx, my-sy); d < abest {
+			abest = d
+			tg.Ally = e.target(m)
+		}
+	}
+
+	// Telekinesis: an item nearer to the click than any unit is what the cursor is on (UNVERIFIED pick)
+	if it, d := e.telekinesisItemNear(sx, sy); it != nil && d < best {
+		tg.TKItem = it
+	}
+
+	if abest > best { // an enemy lies nearer to the click: that is the unit under the cursor (UNVERIFIED pick)
+		tg.Ally = nil
 	}
 
 	return tg

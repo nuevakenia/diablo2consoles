@@ -771,7 +771,7 @@ func (s *Sim) testUnits(m *Missile, cx, cy int) bool {
 		return false
 	}
 
-	for _, t := range s.World.Targets(cx, cy) {
+	for _, t := range s.hitCandidates(m, cx, cy) {
 		if (t.IsPlayer() && !players) || (!t.IsPlayer() && !monsters) {
 			// CollideType 1 (0x5a6210, verified) also takes a monster whose
 			// alignment state 105 / stat 172 is 2 as if it were a player

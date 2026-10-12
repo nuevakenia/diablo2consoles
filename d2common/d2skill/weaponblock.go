@@ -8,7 +8,7 @@ package d2skill
 //     entry with param 0 counts unconditionally (and replaces the running value, even a larger one).
 //   - The roll (rand(100) < chance) happens only when the unit is not moving and the weapon class of its current
 //     mode is 0xd. COMPOSIT_ResolveWeaponClassCode 0x650480 gives that class for the Assassin (character class 6)
-//     when BOTH hands hold an item of item type 0x2d (the claw type, the same test Fists of Fire makes). So the
+//     when BOTH hands hold an item of item type 0x2d (item type table row 45, code "weap" = any weapon; w37 corrected an older "claw" guess; the same test Fists of Fire makes). So the
 //     block needs two claws; with a single claw or any other weapon it never rolls.
 //   - A successful roll returns outcome 0x10 (d2combat.AvoidMonBlock) and ends the chain (no dodge or avoid roll).
 //   - The earlier note in d2combat/avoid.go called the weapon-class test an "animation is block" test; the

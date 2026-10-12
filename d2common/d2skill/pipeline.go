@@ -63,6 +63,9 @@ type Target struct {
 	Unit d2missile.Target
 	// UX, UY are its subtile position.
 	UX, UY int
+	// Ally is the nearest allied unit (pet, mercenary, converted monster) around the aim point, or nil; Enchant
+	// (SRVDO_025 0x5c8180) gives its state to such a unit instead of the caster (w37).
+	Ally d2missile.Target
 	// Corpse is set when a corpse lies near the aim point (corpse skills:
 	// Raise Skeleton, Corpse Explosion, Revive...). CX, CY is its subtile,
 	// CorpseID an engine handle, CorpseHP its maximum life and CorpseKey its
@@ -90,6 +93,8 @@ type Target struct {
 	Revive   *ReviveTarget
 	// GroundItem is the ground item nearest the aim point (Iron Golem, batch 5), nil when none lies there.
 	GroundItem *GroundItem
+	// TKItem is the ground item (gold included) nearest the aim point for Telekinesis (w37), nil when none.
+	TKItem *TKItem
 	// CorpseFacts describes the corpse in Corpse for the raise and revive tests (corpse.go); the zero value
 	// (all false) is treated as "unknown" and refuses nothing.
 	CorpseInfo *CorpseFacts
@@ -264,12 +269,16 @@ func (p *Pipeline) Start(u Unit, skillID int, tgt Target) StartResult {
 
 	// SRVST_TelekinesisRangeCheck (0x5c70e0): a live unit target inside the aurarangecalc radius
 	if sk.SrvDoFunc == 21 && u.IsPlayer() {
-		if tgt.Unit == nil || !tgt.Unit.Alive() {
+		tx, ty := tgt.UX, tgt.UY
+
+		if tgt.TKItem != nil { // an item on the ground is the target when it is what the cursor is on (w37)
+			tx, ty = tgt.TKItem.X, tgt.TKItem.Y
+		} else if tgt.Unit == nil || !tgt.Unit.Alive() {
 			return StartResult{Reason: ReasonTarget, Level: lvl}
 		}
 
 		x, y := u.Pos()
-		if !TelekinesisRangeOK(x, y, tgt.UX, tgt.UY, p.env(sk, lvl, u).eval(sk.AuraRangeCalc)) {
+		if !TelekinesisRangeOK(x, y, tx, ty, p.env(sk, lvl, u).eval(sk.AuraRangeCalc)) {
 			return StartResult{Reason: ReasonLOS, Level: lvl}
 		}
 	}
@@ -327,6 +336,8 @@ type Effect struct {
 	State  string
 	Frames int
 	Stats  []StatMod
+	// ItemID is the ground item entity of a "pickup_item" effect (Telekinesis, w37).
+	ItemID string
 	// PassiveStats ride on the caster's own aura state only, and only while the unit's mana is STRICTLY above the
 	// upkeep (SRVDO_065 0x5cd4b0, VERIFIED wave 23; the stat gathering itself needs only mana >= upkeep).
 	PassiveStats []StatMod

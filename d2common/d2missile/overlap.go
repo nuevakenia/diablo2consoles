@@ -8,11 +8,10 @@ package d2missile
 // 1/3 and 3/1 the 3x3 block; 2/2 a diamond (|dx|+|dy| <= 2); 2/3 and 3/2 the 3x3 block grown by one cell on each
 // edge (a 5x5 without its corners); 3/3 the 5x5 block.
 //
-// The Sim still finds targets through World.Targets (one cell per node, with the engine's own radius), so this
-// function is not wired: replacing the lookup would change the reach of every size 1 missile, and the sizes
-// 2 and 3 (lightning, blizzard shards, the erruption cracks, volcano fire, molten boulder) would need the
-// engine to hand over unit positions. UNVERIFIED: which path nodes the move scans (all nodes of the frame, V in
-// the standard move) against the engine's per-frame step.
+// w37: the Sim applies it to missiles of Size 2 and 3 when the World implements NearWorld (footprint_hit.go);
+// size 1 missiles keep the engine's own one-cell lookup (World.Targets with its own radius).
+// UNVERIFIED: which path nodes the move scans (all nodes of the frame, V in the standard move) against the
+// engine's per-frame step.
 func FootprintOverlap(missileSize, unitSize, mx, my, ux, uy int) bool {
 	if missileSize < 1 || missileSize > 3 || unitSize < 1 {
 		return false

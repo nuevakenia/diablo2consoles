@@ -336,6 +336,12 @@ func doChargeFn(c *cast) {
 	hx, hy := c.u.Pos()
 	t, tx, ty := c.tgt.Unit, c.tgt.UX, c.tgt.UY
 
+	// VERIFIED (w37, SRVST_031 0x5cdbb0): a target out of melee range that holds state 0x36 (uninterruptable) is
+	// dropped (target type 6, none); the do function then scans radius 3 for any unit, like the no-target case.
+	if st, ok := t.(d2missile.Stateful); ok && t != nil && cheb(tx-hx, ty-hy) > 1 && st.HasStateNamed(StateUninterruptable) {
+		t = nil
+	}
+
 	if t == nil || !t.Alive() {
 		best := -1
 
@@ -439,3 +445,7 @@ func doTauntFn(c *cast) {
 
 // tauntSearchRadius is the radius of SKILL_FindTauntTarget's scan (0x14).
 const tauntSearchRadius = 20
+
+// StateUninterruptable is state 0x36 of states.txt: Charge does not take such a target from afar (SRVST_031
+// 0x5cdbb0) and Conversion refuses it (MONAI_IsCorpseReviveCandidate 0x5dc1e0), both VERIFIED in w37.
+const StateUninterruptable = "uninterruptable"
