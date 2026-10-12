@@ -595,9 +595,17 @@ func (h *HUD) renderExperienceBar(target d2interface.Surface) {
 	target.PushTranslation(experienceBarOffsetX, experienceBarOffsetY)
 	defer target.Pop()
 
-	expPercent := float64(h.hero.Stats.Experience) / float64(h.hero.Stats.NextLevelExp)
+	st := h.hero.Stats
+	rec := h.asset.Records
 
-	target.DrawRect(int(expPercent*expBarWidth), 2, d2util.Color(whiteAlpha100))
+	// width follows UI_DrawExperienceBar 0x495380 (see exp_bar.go): progress inside the current level only
+	w := ExpBarWidth(st.Experience, rec.GetExperienceBreakpoint(h.hero.Class, st.Level-1), st.NextLevelExp, st.Level,
+		rec.GetMaxLevelByHero(h.hero.Class))
+	if w <= 0 {
+		return
+	}
+
+	target.DrawRect(w, 2, d2util.Color(whiteAlpha100))
 }
 
 func (h *HUD) renderPotions(x, _ int, target d2interface.Surface) error {
