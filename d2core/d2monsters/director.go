@@ -30,7 +30,7 @@ const (
 	adoptInterval  = 0.5        // seconds between scans for DS1 monster placements
 	replanDistance = 5          // the target moved this far since planning: re-plan (VERIFIED, notes)
 	meleeInRange   = 7          // edge distance at which melee attacks connect (reach, VERIFIED value 7)
-	rangedInRange  = 20         // ranged attack distance (engine choice, UNVERIFIED)
+	rangedInRange  = 20         // ranged attack distance (engine choice, no exe constant: the AI primitives carry their own ranges)
 	heroReach      = 7          // hero melee reach, subtiles (engine choice)
 )
 
@@ -761,7 +761,7 @@ func (d *Director) moveTo(u *unit, dest d2monster.Point, target *d2monster.Targe
 		mask = d2path.MaskMonsterOpensDoors
 	}
 
-	// units block (UNVERIFIED mask), except the mover's own cell and the cell
+	// units block (engine choice mask: d2path.MaskUnits), except the mover's own cell and the cell
 	// it walks to (the target stands there)
 	route, ok := d2path.FindPath(d.fp.ignoring(from, to), mask|d2path.MaskUnits, from, to)
 	if !ok || len(route.Nodes) == 0 {

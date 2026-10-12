@@ -868,7 +868,7 @@ func (d *Director) creditOwnerMerc(src *d2mapentity.Player, victim *unit, baseXP
 func (d *Director) kill(u *unit, src *d2mapentity.Player) {
 	d.bindDeathClientSkill(u)
 	u.m.Die()
-	d.fp.Remove(u.b.ID) // a dying monster stops blocking (UNVERIFIED); the corpse flag is set when DT ends
+	d.fp.Remove(u.b.ID) // a dying monster stops blocking (engine choice); the corpse flag is set when DT ends
 	d.Counters.Deaths++
 	d.playPlans(u, deathPlans(d.soundRecord(u)))
 	d.playPlans(u, impactPlans(u.m.StatEx))
