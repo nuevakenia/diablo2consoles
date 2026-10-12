@@ -42,6 +42,7 @@ type ebitenSurface struct {
 	image          *ebiten.Image
 	colorMCache    map[colorMCacheKey]*colorMCacheEntry
 	monotonicClock int64
+	scratchOpts    ebiten.DrawImageOptions
 }
 
 func createEbitenSurface(r *Renderer, img *ebiten.Image, currentState ...surfaceState) *ebitenSurface {
@@ -154,7 +155,7 @@ func (s *ebitenSurface) RenderSprite(sprite *d2ui.Sprite) {
 
 // Render renders the given surface
 func (s *ebitenSurface) Render(sfc d2interface.Surface) {
-	opts := s.createDrawImageOptions()
+	opts := s.scratchDrawImageOptions()
 
 	if s.stateCurrent.brightness != 1 || s.stateCurrent.saturation != 1 {
 		s.applyHSV(opts)
@@ -167,7 +168,7 @@ func (s *ebitenSurface) Render(sfc d2interface.Surface) {
 
 // Renders the section of the surface, given the bounds
 func (s *ebitenSurface) RenderSection(sfc d2interface.Surface, bound image.Rectangle) {
-	opts := s.createDrawImageOptions()
+	opts := s.scratchDrawImageOptions()
 
 	if s.stateCurrent.brightness != 0 {
 		s.applyHSV(opts)
@@ -191,12 +192,45 @@ var (
 
 const hsvCacheMax = 256
 
+// tintHSVKey identifies a (draw colour, saturation, brightness) combination.
+type tintHSVKey struct {
+	r, g, b, a  uint32
+	sat, bright float64
+}
+
+const tintHSVCacheMax = 4096
+
+//nolint:gochecknoglobals // render-thread cache, guarded by hsvMu
+var tintHSVCache = map[tintHSVKey]ebiten.ColorM{}
+
 // applyHSV applies the surface's saturation and brightness to opts.ColorM.
 func (s *ebitenSurface) applyHSV(opts *ebiten.DrawImageOptions) {
 	sat, bright := s.stateCurrent.saturation, s.stateCurrent.brightness
 
-	if s.stateCurrent.color != nil { // the matrix already holds the draw colour: no shortcut
-		opts.ColorM.ChangeHSV(0, sat, bright)
+	if s.stateCurrent.color != nil { // the matrix already holds the draw colour
+		// ChangeHSV on a colour matrix allocates ~10 objects; the matrix is a pure function of
+		// (colour, saturation, brightness) and every lit shadow draws with the same few dozen
+		// light tints, so the result is memoised (same value, shared immutable matrix)
+		cr, cg, cb, ca := s.stateCurrent.color.RGBA()
+		ck := tintHSVKey{cr, cg, cb, ca, sat, bright}
+
+		hsvMu.Lock()
+		defer hsvMu.Unlock()
+
+		m, ok := tintHSVCache[ck]
+		if !ok {
+			m = opts.ColorM
+			m.ChangeHSV(0, sat, bright)
+
+			if len(tintHSVCache) >= tintHSVCacheMax {
+				tintHSVCache = map[tintHSVKey]ebiten.ColorM{}
+			}
+
+			tintHSVCache[ck] = m
+		}
+
+		opts.ColorM = m
+
 		return
 	}
 
@@ -220,7 +254,19 @@ func (s *ebitenSurface) applyHSV(opts *ebiten.DrawImageOptions) {
 }
 
 func (s *ebitenSurface) createDrawImageOptions() *ebiten.DrawImageOptions {
-	opts := &ebiten.DrawImageOptions{}
+	return s.fillDrawImageOptions(&ebiten.DrawImageOptions{})
+}
+
+// scratchDrawImageOptions returns the surface's reusable options, reset and filled from the current state.
+// For the draw calls that use the options immediately and do not call back into the surface (ebiten reads
+// them synchronously); it saves one allocation per draw call.
+func (s *ebitenSurface) scratchDrawImageOptions() *ebiten.DrawImageOptions {
+	s.scratchOpts = ebiten.DrawImageOptions{}
+
+	return s.fillDrawImageOptions(&s.scratchOpts)
+}
+
+func (s *ebitenSurface) fillDrawImageOptions(opts *ebiten.DrawImageOptions) *ebiten.DrawImageOptions {
 
 	if s.stateCurrent.skewX != 0 || s.stateCurrent.skewY != 0 {
 		opts.GeoM.Skew(s.stateCurrent.skewX, s.stateCurrent.skewY)

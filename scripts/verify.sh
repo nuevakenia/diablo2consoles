@@ -172,6 +172,8 @@ if [ -n "${D2S_SAMPLE_BODY:-}" ]; then
         turbo_v="${OD2_TURBO:-$scenario_turbo}"
         [ -n "$turbo_v" ] && [ "$turbo_v" != 0 ] && [ -z "$scenario_realtime" ] && echo "export OD2_TURBO=$turbo_v"
         scenario_env
+        # OD2_VERIFY_EXTRA_ENV: extra `export` words for the game (e.g. profiling: "OD2_PPROF_CPU=/tmp/x.prof OD2_AUTOPERF=1")
+        [ -n "${OD2_VERIFY_EXTRA_ENV:-}" ] && echo "export $OD2_VERIFY_EXTRA_ENV"
         echo "$tmp/od2 2>&1 | tee $log"
       } > $cmd
       chmod +x $cmd; rm -f $log
