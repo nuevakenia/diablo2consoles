@@ -48,7 +48,7 @@ scenario_check() {
   grep -qE "MINION spawn name=Necroskeleton .*kind=minion" $log.txt || { echo "FAIL: no skeleton was raised"; fail=1; }
   grep -qE "MINION attack name=Necroskeleton" $log.txt || { echo "FAIL: the skeleton never attacked"; fail=1; }
   grep -qE "MINION spawn name=.*Mage.* kind=minion|SUMMON skill=\"Raise Skeletal Mage\" key=necromage kind=minion created=1" $log.txt || { echo "FAIL: no skeletal mage was raised"; fail=1; }
-  grep -qE "CASTER armed skill=\"Raise Skeletal Mage\" missile=necromage1" $log.txt || { echo "FAIL: the skeletal mage is not armed with its missile"; fail=1; }
+  grep -qE "CASTER armed skill=\"Raise Skeletal Mage\" missile=necromage[1-4] type=[0-3] level=[1-9]" $log.txt || { echo "FAIL: the skeletal mage is not armed with its missile"; fail=1; }
   grep -qE "STATE totem skill=\"Oak Sage\"" $log.txt || { echo "FAIL: Oak Sage totem aura"; fail=1; }
   grep -qE "STATE apply skill=\"Bone Armor\" .*bonearmor=" $log.txt || { echo "FAIL: Bone Armor"; fail=1; }
   grep -qE "SKILL area skill=\"Corpse Explosion\" .*targets=" $log.txt || { echo "FAIL: Corpse Explosion"; fail=1; }
