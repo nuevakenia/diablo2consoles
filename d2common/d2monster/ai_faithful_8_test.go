@@ -99,22 +99,21 @@ func TestCorruptRogueFailedRunUsesIdleWait(t *testing.T) {
 	}
 }
 
-func TestWalkAwayOverFiveResetsSpeed(t *testing.T) {
-	w := &mummyWorld{fakeWorld: newFake(9, false)}
-	b := brainAt(profile("Vampire", 0))
-	c := &Ctx{B: b, W: w}
-	c.SetSpeed(80)
-	c.WalkAway(Target{X: 110, Y: 100}, 8)
+// TestWalkAwayKeepsQueuedSpeed: 0x5ddedb calls the speed setter with EDX 0 and
+// a zero percent, and 0x5a3c60 ignores zero arguments, so a walk-away of any
+// length leaves the speed percent the caller queued (w23; batch 8 had this
+// the other way round).
+func TestWalkAwayKeepsQueuedSpeed(t *testing.T) {
+	for _, n := range []int{1, 4, 5, 6, 8, 15, 16} {
+		w := &mummyWorld{fakeWorld: newFake(9, false)}
+		b := brainAt(profile("Vampire", 0))
+		c := &Ctx{B: b, W: w}
+		c.SetSpeed(80)
+		c.WalkAway(Target{X: 110, Y: 100}, n)
 
-	if len(w.speeds) != 2 || w.speeds[1] != 0 {
-		t.Fatalf("speed requests %v, want the walk-away to reset to 0", w.speeds)
-	}
-
-	w.speeds = nil
-	c.WalkAway(Target{X: 110, Y: 100}, 4)
-
-	if len(w.speeds) != 0 {
-		t.Fatalf("a short walk-away must leave the speed alone: %v", w.speeds)
+		if len(w.speeds) != 1 || w.speeds[0] != 80 {
+			t.Errorf("n=%d: speed requests %v, want only the caller's 80", n, w.speeds)
+		}
 	}
 }
 

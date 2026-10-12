@@ -129,14 +129,15 @@ func (c *Ctx) toRange(t Target, maxStep, desired int, run bool) bool {
 // monster's position plus n*sign(own-target) per axis (VERIFIED: a diagonal
 // flee). It returns false when the request fails.
 //
-// For n above 5 the exe first calls MONAI_SetMoveSpeedOverride(0, n), which
-// replaces any speed override the caller just set (VERIFIED in batch 8 from
-// 0x5dddc0).
+// For n above 5 the exe first calls MONAI_SetMoveSpeedOverride(0, n) (asm
+// 0x5ddedb: EDX 0, first argument 0, second argument n). VERIFIED in w23 from
+// 0x5dcf80 and 0x5a3c60: the setter writes only its NON-ZERO arguments into the
+// queued-command record (+0x18 from EDX, +0x1c the speed percent, +0x20 the
+// second argument clamped to 0x4d), so this call changes only the +0x20 byte
+// and leaves a speed percent the caller queued just before (Baboon rage,
+// Mosquito retreat, BloodHawk) in place. Batch 8 read it as "resets the speed
+// to 0"; that was wrong. The +0x20 byte is not modelled.
 func (c *Ctx) WalkAway(t Target, n int) bool {
-	if n > 5 {
-		c.SetSpeed(0)
-	}
-
 	return c.away(t, n, false)
 }
 

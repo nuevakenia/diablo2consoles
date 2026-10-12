@@ -351,6 +351,16 @@ func clawViperToggle(c *Ctx, on bool) {
 	}
 }
 
+// clawViperCast is the buff cast of both ClawViper AIs. The exe ignores the
+// result of MONAI_QueueSkillCast (w23, decompile of 0x5f0bd0 and 0x5f0e40): the
+// buff state is switched on and Scratch[0] set whether or not the cast was
+// accepted.
+func clawViperCast(c *Ctx, t Target) {
+	c.Cast(slotA, t)
+	clawViperToggle(c, true)
+	c.B.Scratch[0] = 1
+}
+
 // thinkClawViper is MONAI_Think_ClawViper 0x5f0bd0 (VERIFIED). Scratch[0] is
 // "buff cast". aip1 cast %, aip2 cast range, aip3 attack %, aip4 A1-vs-A2 %,
 // aip5 stall ticks, aip6 buff state (1: 0x5a, 2: 0x5b).
@@ -363,10 +373,7 @@ func thinkClawViper(c *Ctx) {
 
 	if !c.InRange {
 		if c.skill(slotA) && c.Dist < b.AIP(2) && b.Chance(b.AIP(1)) && c.otherCanCast(slotA, t) {
-			if c.Cast(slotA, t) {
-				clawViperToggle(c, true)
-				b.Scratch[0] = 1
-			}
+			clawViperCast(c, t)
 
 			return
 		}
@@ -427,10 +434,7 @@ func thinkClawViperEx(c *Ctx) {
 	}
 
 	if c.skill(slotA) && c.Dist < b.AIP(2) && b.Chance(b.AIP(1)) && c.otherCanCast(slotA, t) {
-		if c.Cast(slotA, t) {
-			clawViperToggle(c, true)
-			b.Scratch[0] = 1
-		}
+		clawViperCast(c, t)
 
 		return
 	}
@@ -757,18 +761,29 @@ func thinkCatapult(c *Ctx) {
 
 // ------------------------------------------------------------ CorruptLancer
 
+// lancerReach is the "within" distance of MONAI_RunToTargetWithin 0x5ddd90: the
+// byte as given, 1 when it is 0.
+func lancerReach(b *Brain) int {
+	if b.Profile.ChaseReach < 1 {
+		return 1
+	}
+
+	return b.Profile.ChaseReach
+}
+
 // thinkCorruptLancer is MONAI_Think_CorruptLancer 0x5f4e50 (VERIFIED).
 // Scratch[0] is "charging". aip1 approach %, aip2 attack %, aip3 stall,
 // aip4 walk-vs-run %, aip5 charge distance, aip6/7/8 Skill1/2/3 %. The stop
-// distance of the "run to target within" is the monstats2 byte +0xe
-// (Profile.ChaseReach, UNVERIFIED meaning).
+// distance of the "run to target within" is the monstats2 byte +0xe, the
+// MeleeRng column (VERIFIED w23; Profile.ChaseReach). MONAI_RunToTargetWithin
+// 0x5ddd90 turns a zero distance into 1.
 func thinkCorruptLancer(c *Ctx) {
 	b, t := c.B, *c.Target
 	s := &b.Scratch
 
 	if c.Dist > b.AIP(5) {
 		c.SetSpeed(100)
-		c.RunTo(t, b.Profile.ChaseReach)
+		c.RunTo(t, lancerReach(b))
 
 		s[0] = 1
 
@@ -820,7 +835,7 @@ func thinkCorruptLancer(c *Ctx) {
 	}
 
 	c.SetSpeed(100)
-	c.RunTo(t, b.Profile.ChaseReach)
+	c.RunTo(t, lancerReach(b))
 }
 
 // -------------------------------------------------------------- DeathMauler
