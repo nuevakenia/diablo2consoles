@@ -228,10 +228,11 @@ func (h *HUD) loadCustomWidgets() {
 		return
 	}
 
-	// default: tile (the bar art continued beside the 800 wide bar on a wide screen); OD2_BAR_FILL=none turns it off
+	// default: none (the world shows beside the 800 wide bar on a wide screen, like D2 mods and Resurrected);
+	// OD2_BAR_FILL=tile repeats the bar art there, which looks stretched on very wide screens
 	fillEnv := os.Getenv("OD2_BAR_FILL")
 	if fillEnv == "" {
-		fillEnv = "tile"
+		fillEnv = "none"
 	}
 
 	if mode, ok := d2display.ParseBarFill(fillEnv); !ok {

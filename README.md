@@ -107,7 +107,7 @@ Settings need no file editing: press the console key (`` ` ``) in game and type 
 |---|---|
 | `OD2_DISPLAY=WxH` | pin the logical screen size, e.g. `1920x1080`, `3440x1440`, `5120x1440`; `800x600` is the legacy original. Default is 1512x982 (a MacBook). |
 | `OD2_UI_SCALE=1..4` | integer interface scale (2 on a 4K screen shows the 1920x1080 layout doubled) |
-| `OD2_BAR_FILL=none\|black\|tile` | what to draw beside the 800-px-wide bottom bar on a wide screen (default: tile, the bar art continued) |
+| `OD2_BAR_FILL=none\|black\|tile` | what to draw beside the 800-px-wide bottom bar on a wide screen (default: none, the world shows there; tile repeats the bar art) |
 | `OD2_CONFIG_DIR=<dir>` | move `config.json` and the saves folder (useful for testing) |
 | `OD2_D2S_DIR=<dir>` | where to import your `.d2s` characters from |
 | `OD2_NO_SETUP=1` | skip the first-run dialogs |

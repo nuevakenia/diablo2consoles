@@ -50,7 +50,7 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
 - Windows build: a zig cross-compile worked once (needs the Unix-only `autoperf.go` split); not committed.
 - Cinematics: Bink video and audio decode exist (`d2common/d2data/d2video`, off by default `OD2_PLAY_VIDEOS=1`);
   audio sync was only checked by clock, not by ear; the Cinematics menu path is untested.
-- Widescreen: the bar side fill is now `tile` by default (`OD2_BAR_FILL=none` to turn off); the subtitle box is centred on the column (golden numbers); ultrawide not looked at by eye.
+- Widescreen: the bar side fill is `none` by default (the world shows beside the bar; `OD2_BAR_FILL=tile` repeats the bar art, which looks wrong on very wide screens); the subtitle box is centred on the column (golden numbers); ultrawide not looked at by eye.
 - Scenario hardening: `scripts/verify.d/wip/8g-click-dungeon.sh` (Jail Level 1 click matrix) does not pass yet;
   three real-input scenarios need a retry on first attempt (a click that lands mid-cast becomes a walk).
 - `test/real-input-3` (on the fork, not landed): scripted input through the input manager plus new UI/keyboard/click
