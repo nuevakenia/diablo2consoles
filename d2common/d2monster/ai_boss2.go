@@ -344,7 +344,7 @@ func mephIdleChoice(c *Ctx, t Target) {
 	}
 
 	if b.Roll(100) > 0x40 && c.Dist < 6 {
-		c.SetSpeed(4)
+		c.SetSpeed(0) // MONAI_SetMoveSpeedOverride(0, 4): the speed value is 0, 4 is the second argument (w38 fix)
 
 		if c.WalkTo(t, meleeReach) {
 			return
