@@ -45,6 +45,7 @@ const (
 	RealmUnit                                            // Sent by the realm connection: a monster of the authoritative simulation appeared, moved, was hit or died
 	PartyHeal                                            // Sent by a client (Holy Bolt on a party member), the server relays it to that member
 	PartyGold                                            // Sent by a client (a gold pickup), the server answers every sharing member with its part
+	JoinSync                                             // Sent by the server to a hero that entered: the quest/act sync of 0x544140 and 0x536ef0
 
 	UnknownPacketType = 666
 )
@@ -78,6 +79,7 @@ func (n NetPacketType) String() string {
 		RealmUnit:                       "RealmUnit",
 		PartyHeal:                       "PartyHeal",
 		PartyGold:                       "PartyGold",
+		JoinSync:                        "JoinSync",
 	}
 
 	return strings[n]

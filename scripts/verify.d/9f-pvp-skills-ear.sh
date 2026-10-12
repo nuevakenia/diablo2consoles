@@ -87,6 +87,11 @@ scenario_check() {
   grep -q "AUTOSCRIPT RESULT PASS" $log.txt || { echo "FAIL: host script did not pass"; fail=1; }
   grep -q "AUTOSCRIPT RESULT PASS" $j || { echo "FAIL: joiner script did not pass"; fail=1; }
 
+  # join-time sync (QUEST_SyncPlayerOnGameEnter 0x544140 / SERVER_PlacePlayerInAct 0x536ef0): the host sends every hero
+  # the 37 quest active bytes, the 96-byte record and the act start level to reveal
+  grep -qE "JOINSYNC player=.* act=[1-5] reveal=[0-9]+ active=37 record=96" $log.txt || { echo "FAIL: host did not receive its join sync"; fail=1; }
+  grep -qE "JOINSYNC player=.* act=[1-5] reveal=[0-9]+ active=37 record=96" $j || { echo "FAIL: joiner did not receive its join sync"; fail=1; }
+
   # 1 a cast at a hero who is not hostile hurts nobody
   local hostile_line first_skill
   hostile_line=$(grep -n "$hn is now hostile toward $jn" $log.txt | head -1 | cut -d: -f1)

@@ -17,6 +17,11 @@ type Item struct {
 	// Gold is the amount of a gold pile (0 for real items).
 	Gold      int
 	goldLabel string
+	// DropOwner names the hero that dropped the pile (gold linked to a player,
+	// flag-ex bit 10 of the unit in ITEMMODE_PickupGoldFromGround 0x55a5f0); empty for
+	// gold from the world (monsters, chests). A player-owned pile is not shared with the
+	// party: it goes to the picker alone.
+	DropOwner string
 	// DropSound is the Sounds.txt handle played when the item lands.
 	DropSound string
 }

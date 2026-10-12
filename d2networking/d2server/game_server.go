@@ -464,6 +464,7 @@ func (g *GameServer) OnClientConnected(client ClientConnection) {
 
 	g.handleClientConnection(client, sx, sy)
 	g.socialAddPlayer(client)
+	g.sendJoinSync(client)
 }
 
 func (g *GameServer) handleClientConnection(client ClientConnection, x, y float64) {

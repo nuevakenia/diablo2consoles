@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2party"
@@ -30,11 +31,15 @@ type social struct {
 	hits       *hitQueue                         // PvP hits waiting for the next flush (hitqueue.go)
 	// size replaces the item size lookup of the game data (tests).
 	size d2playertrade.Sizer
+	// lastTrade is when a hero's last trade finished (0x565750), by player id.
+	lastTrade map[string]time.Time
+	// now replaces the clock (tests).
+	now func() time.Time
 }
 
 func newSocial() *social {
 	return &social{roster: d2party.New(), trades: map[string]*d2playertrade.Session{}, portals: d2portal.NewRegistry(),
-		idle: newIdleTracker(nil), hits: newHitQueue()}
+		idle: newIdleTracker(nil), hits: newHitQueue(), lastTrade: map[string]time.Time{}}
 }
 
 // socialAddPlayer enters a player into the roster.
@@ -524,6 +529,10 @@ func (g *GameServer) onTradeCommand(client ClientConnection, packet d2netpacket.
 			return fail(fmt.Errorf("a trade is already open"))
 		}
 
+		if err := g.checkTradeRequestLocked(me, target); err != nil {
+			return fail(err)
+		}
+
 		ns := d2playertrade.NewSession(me, target)
 		g.soc.trades[me], g.soc.trades[target] = ns, ns
 		g.Infof("TRADE request from=%q to=%q", myName, g.nameOf(target))
@@ -627,6 +636,7 @@ func (g *GameServer) commitTrade(s *d2playertrade.Session) {
 	}
 
 	s.Finish()
+	g.soc.lastTrade[ida], g.soc.lastTrade[idb] = g.soc.clock(), g.soc.clock()
 
 	codes := func(items []d2hero.StoredItem) []string {
 		out := make([]string, len(items))
@@ -773,4 +783,35 @@ func (g *GameServer) onPartyGold(client ClientConnection, packet d2netpacket.Net
 	}
 
 	return nil
+}
+
+func (s *social) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+
+	return time.Now()
+}
+
+// checkTradeRequestLocked applies the request rules of TRADE_ServerHandleTradeRequest
+// (0x564b60): both heroes in a town, neither in a trade, none with a trade that
+// finished under 5 seconds ago. Call with soc.mu held.
+func (g *GameServer) checkTradeRequestLocked(asker, target string) error {
+	inTown := func(id string) bool {
+		m, ok := g.soc.roster.Member(id)
+		return !ok || m.Area == 0 || d2level.IsTown(m.Area) // an unknown area counts as the start town
+	}
+	since := func(id string) time.Duration {
+		if t, ok := g.soc.lastTrade[id]; ok {
+			return g.soc.clock().Sub(t)
+		}
+
+		return time.Hour
+	}
+
+	return d2playertrade.CheckRequest(d2playertrade.RequestCtx{
+		AskerInTown: inTown(asker), TargetInTown: inTown(target),
+		AskerBusy: g.soc.trades[asker] != nil, TargetBusy: g.soc.trades[target] != nil,
+		SinceAsker: since(asker), SinceTarget: since(target),
+	})
 }

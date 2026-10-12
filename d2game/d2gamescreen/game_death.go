@@ -235,6 +235,7 @@ func (v *Game) takeGold(amount, x, y int) {
 		return
 	}
 
+	ent.DropOwner = p.Name() // a pile the hero dropped: not shared with the party (0x55a5f0)
 	v.gameClient.MapEngine.AddEntity(ent)
 }
 
