@@ -182,7 +182,7 @@ func newFallenAngel() *Quest {
 		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
 		steps: []step{{from: 1, npc: NPCTyrael2, msg: 670, to: 2}},
 		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelPlainsDespair, max: 3, to: 3},
+			{ev: EvAreaChanged, level: LevelPlainsDespair, max: 3, to: 3, page: -1}, // exe 0x5b1d60: page 1 when none yet
 			{ev: EvMonsterKilled, monsters: []int{NPCIzual, NPCIzualGhost}, goal: true},
 		},
 		claimMsgs: []int{676},
@@ -198,7 +198,7 @@ func newTerrorsEnd() *Quest {
 		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 1}, rp: 2, done: 3, rpExp: 4, doneExp: 5, kill: terrorSpeech(),
 		steps: []step{{from: 1, npc: NPCTyrael2, msg: 681, to: 2}},
 		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelChaosSanctum, max: 3, to: 3},
+			{ev: EvAreaChanged, level: LevelChaosSanctum, max: 3, to: 3, page: -1}, // exe 0x5b2ad0: page 1 when none yet
 			{ev: EvMonsterKilled, monster: NPCDiablo, names: []string{"diablo"}, min: -1, goal: true, exe: &exeKill{classicBits: []int{6, 7}}},
 		},
 	})
@@ -238,7 +238,7 @@ func newSiege() *Quest {
 		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
 		steps: []step{{from: 1, npc: NPCLarzuk, msg: 20077, to: 2}},
 		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelBloodyFoothills, max: 3, to: 3},
+			{ev: EvAreaChanged, level: LevelBloodyFoothills, max: 3, to: 3, page: -1}, // exe 0x5852c0: page 1 when none yet
 			{ev: EvMonsterKilled, super: "Shenk the Overseer", goal: true},
 		},
 		// VERIFIED (Game.exe 0x584d60, msg 20090 = 0x4e7a): the ack clears the progress bits and sets bit 5; it

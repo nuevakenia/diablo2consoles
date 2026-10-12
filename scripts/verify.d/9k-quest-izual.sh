@@ -30,6 +30,9 @@ scenario_check() {
   grep -q "QUESTPANEL act=4 quest=1 status=1 .*Look for Izual" $log.txt || { echo "FAIL: panel page 1 text"; fail=1; }
   grep -q "QUESTPANEL act=4 quest=1 status=3 .*See Tyrael" $log.txt || { echo "FAIL: panel page 3 text"; fail=1; }
   grep -q "QUESTPANEL act=4 quest=1 status=-1 .*completed" $log.txt || { echo "FAIL: panel completed text"; fail=1; }
+  # w37: the Plains of Despair keep page 1 (VERIFIED 0x5b1d60); page 2 only comes from Izual's think hook, which the
+  # port does not push yet (notes w37-acts45.md), so the "Destroy the demon" panel must not show before the kill
+  grep -q "QUESTPANEL act=4 quest=1 status=2 " $log.txt && { echo "FAIL: page 2 shown without Izual's think hook"; fail=1; }
   qw_laterquests
   qw_slot_has 25 0x1001 || { echo "FAIL: quest slot 25 is not saved as done in the .d2s"; fail=1; }
   grep -E "AUTOSCRIPT step [0-9]+ FAIL" $log.txt | cut -c1-200

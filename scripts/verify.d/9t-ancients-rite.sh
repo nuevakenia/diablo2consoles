@@ -45,6 +45,9 @@ scenario_check() {
   grep -qE "RITE Ancient 1 wakes .*class 540" $log.txt || { echo "FAIL: the first Ancient is not class 540"; fail=1; }
   grep -qE "RITE Ancient 3 wakes .*class 542" $log.txt || { echo "FAIL: the third Ancient is not class 542"; fail=1; }
   grep -qE "QUEST A5Q5 slot=39 bits 0x[0-9a-f]+->0x[0-9a-f]+" $log.txt || { echo "FAIL: no quest bit change for Rite of Passage"; fail=1; }
+  # w37: the third death pays at once (VERIFIED 0x58a7b0): the record ends with bit 0 (done) set and bit 1 (pending) clear
+  last=$(grep -E "QUEST A5Q5 slot=39 bits" $log.txt | tail -1 | sed -E 's/.*->(0x[0-9a-f]+).*/\1/')
+  [ -n "$last" ] && [ $(( last & 1 )) -eq 1 ] && [ $(( last & 2 )) -eq 0 ] || { echo "FAIL: Rite record $last is not done without a pending reward"; fail=1; }
   # the fight armed again after the reset: six Ancients woke in all (three, reset, three)
   [ "$(grep -c 'RITE Ancient [123] wakes' $log.txt)" -ge 6 ] || { echo "FAIL: the Ancients did not wake again after the portal closed"; fail=1; }
   if grep -E "\[ERROR\]|panic" $log.txt | grep -v "skipping missing"; then echo "FAIL: errors in the Rite log"; fail=1; fi

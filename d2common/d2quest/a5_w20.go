@@ -76,7 +76,9 @@ func newRescue() *Quest {
 		start: 0, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
 		steps: []step{{from: 1, npc: NPCQualKehk, msg: 20096, to: 2}},
 		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelFrigidHighlands, max: 3, to: 3},
+			// exe 0x5860f0: levels 111 and 112 both count, page 1 when none yet
+			{ev: EvAreaChanged, level: LevelFrigidHighlands, max: 3, to: 3, page: -1},
+			{ev: EvAreaChanged, level: LevelArreatPlateau, max: 3, to: 3, page: -1},
 			{ev: EvMonsterKilled, monster: NPCPrisonDoor, count: 3, goal: true,
 				cond: func(g *Game, q *Quest) bool { return d.doors < 3 || (d.freed >= 12 && d.killed < 5) },
 				fx: func(g *Game, q *Quest) []Effect {
@@ -270,14 +272,21 @@ func newPrison() *Quest {
 			g.setState(q, 1)
 		}
 
-		if (e.NewLevel == LevelCrystallinePassage || e.NewLevel == LevelFrozenRiver) && q.NotIntro && q.State <= 2 {
-			g.setState(q, 3)
-			g.set(q, FlagLeaveTown, "entered the ice caves")
+		// VERIFIED (0x587c70): entering level 0x71/0x72 moves the state to 3 when it was below, and an unset log page
+		// becomes 1 (LastState 1 "Look for Anya", sent to the client)
+		if (e.NewLevel == LevelCrystallinePassage || e.NewLevel == LevelFrozenRiver) && q.NotIntro {
+			if q.State <= 2 {
+				g.setState(q, 3)
+				g.set(q, FlagLeaveTown, "entered the ice caves")
+			}
+
+			prisonFirstPage(g, q)
 		}
 
 		if e.OldLevel == LevelHarrogath && q.State == 2 && !g.grantedOrPending(q) {
 			g.setState(q, 3)
 			g.set(q, FlagLeaveTown, "left town")
+			prisonFirstPage(g, q)
 		}
 	}
 
@@ -296,6 +305,11 @@ func newPrison() *Quest {
 		case e.Msg == 20131 && q.NotIntro:
 			if q.State <= 3 {
 				g.setState(q, 4)
+			}
+
+			// VERIFIED (0x587460, message 0x4ea3): below page 3 the log goes to page 3 (the potion is next)
+			if q.LastState < 3 {
+				g.cycle(q, 3, true)
 			}
 		case e.NPC == NPCMalah && e.Msg == 20132:
 			g.malahLine(q, d, complete)
@@ -367,6 +381,14 @@ func newPrison() *Quest {
 	}
 
 	return q
+}
+
+// prisonFirstPage is the log page 1 the exe sets when the hero goes to the Crystalline Passage / Frozen River, or comes
+// back to Harrogath with the quest at state 2, while no page is pushed yet (0x587c70).
+func prisonFirstPage(g *Game, q *Quest) {
+	if q.LastState == 0 && !g.grantedOrPending(q) {
+		g.cycle(q, 1, true)
+	}
 }
 
 // malahLine is Malah's 20132: the Scroll of Resistance. The quest is rewarded when Anya's item was given too.
@@ -479,7 +501,7 @@ func newRite() *Quest {
 		start: 0, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 5, done: 3,
 		steps: []step{{from: 1, npc: NPCQualKehk, msg: 20153, to: 2}},
 		trigs: []trig{
-			{ev: EvAreaChanged, level: LevelArreatSummit, max: 3, to: 3},
+			{ev: EvAreaChanged, level: LevelArreatSummit, max: 3, to: 3, page: -1}, // exe 0x58a9a0: page 1 when below 2
 			{ev: EvMonsterKilled, monsters: []int{NPCAncient1, NPCAncient2, NPCAncient3}, count: 3, goal: true, direct: true,
 				cond: func(g *Game, q *Quest) bool { return g.Hero.Level >= RiteLevelGate(g.Difficulty) },
 				fx: func(g *Game, q *Quest) []Effect {
