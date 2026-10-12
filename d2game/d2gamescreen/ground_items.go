@@ -3,6 +3,7 @@ package d2gamescreen
 import (
 	"fmt"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2act3"
@@ -268,6 +269,15 @@ func (v *Game) pickUp(it *d2mapentity.Item) {
 	v.playSoundAt("item_pickup", it.GetPosition(), "pickup") // row 0xeb: item enters the cursor (ITEM_InitClientItem 0x4be1f0)
 	v.Infof("AUTOGROUND pickup name=%q quality=%s -> cursor", plainLabel(it.Label()), it.Item.QualityName())
 	v.questItemPickedUp(it.Item.GetItemCode())
+
+	// Quick pickup (OD2 choice, the original keeps the item on the cursor): with an empty cursor the item goes straight
+	// into the inventory when it fits, and stays on the cursor when it does not. Scripted runs (autoscript, autopickup)
+	// and OD2_PICKUP=cursor keep the original behaviour.
+	if quickPickup() {
+		if x, y, ok := v.gameControls.AutoPlaceCursor(); ok {
+			v.Infof("QUICKPICKUP name=%q slot=(%d,%d)", plainLabel(it.Label()), x, y)
+		}
+	}
 
 	if v.ground.onPickup != nil {
 		v.ground.onPickup(it)
@@ -675,3 +685,15 @@ func (v *Game) commandSpawnChest(args []string) error {
 }
 
 var _ d2interface.MapEntity = (*d2mapentity.Item)(nil)
+
+// quickPickup reports whether a ground item click puts the item straight into the inventory.
+func quickPickup() bool {
+	switch os.Getenv("OD2_PICKUP") {
+	case "cursor":
+		return false
+	case "quick":
+		return true // also under a script (the scenarios of the quick pickup)
+	}
+
+	return os.Getenv("OD2_AUTOSCRIPT") == "" && os.Getenv("OD2_AUTOPICKUP") == "" && os.Getenv("OD2_AUTOGROUND") == ""
+}
