@@ -409,7 +409,7 @@ func (d *Director) missileVelocity(name string) float64 {
 // is the weapon's damage (or 1-2 bare handed). Returns true on a hit.
 func (d *Director) HeroStrike(p *d2mapentity.Player, m *d2mapentity.Monster) bool {
 	u := d.byEntity[m.ID()]
-	if u == nil || !m.Alive() {
+	if u == nil || !m.Alive() || d.refuseFriendly(m, "strike") {
 		return false
 	}
 
@@ -682,6 +682,10 @@ func (d *Director) heroDamage(p *d2mapentity.Player) (min, max int) {
 
 // Damage applies damage to a monster from a source hero (nil if unknown).
 func (d *Director) Damage(m *d2mapentity.Monster, dmg int, src *d2mapentity.Player) {
+	if src != nil && d.refuseFriendly(m, "damage") { // a hero never hurts its own units (UNIT_AreUnitsHostile 0x552270)
+		return
+	}
+
 	if u := d.byEntity[m.ID()]; u != nil {
 		d.damage(u, src, dmg)
 	}
@@ -702,7 +706,7 @@ func (d *Director) staggerSuppressed(u *unit, dmg int) bool {
 // not interrupted (hit recovery) by the tick.
 func (d *Director) DamageOverTime(m *d2mapentity.Monster, dmg int, src *d2mapentity.Player) {
 	u := d.byEntity[m.ID()]
-	if u == nil || !m.Alive() || dmg <= 0 {
+	if u == nil || !m.Alive() || dmg <= 0 || (src != nil && d.refuseFriendly(m, "dot")) {
 		return
 	}
 

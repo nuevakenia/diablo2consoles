@@ -346,6 +346,10 @@ func (e *Engine) trail(p *d2mapentity.Player, sk *d2skill.Skill, ef *d2skill.Eff
 // applyMonsterState puts a state on a monster and makes the monster react to
 // it (terror flees, stun/freeze hold, chill slows).
 func (e *Engine) applyMonsterState(m *d2mapentity.Monster, inst d2state.Instance) {
+	if e.sparesOwnUnit(m, "state "+inst.Name) {
+		return
+	}
+
 	e.target(m)
 
 	// VERIFIED (0x5c1300): resist penalties on a monster that is immune to the element are cut to a fifth
@@ -1532,6 +1536,10 @@ func (e *Engine) tick() {
 // dot applies one frame of poison and burn damage, ignoring resists (they
 // were applied to the stream when it started).
 func (e *Engine) dot(m *d2mapentity.Monster, poison, burn int) {
+	if e.sparesOwnUnit(m, "dot") {
+		return
+	}
+
 	whole := poison + burn
 	src := e.firstHero()
 

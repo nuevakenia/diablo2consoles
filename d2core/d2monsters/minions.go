@@ -177,7 +177,7 @@ func (d *Director) Corpses() []*d2mapentity.Monster {
 	var out []*d2mapentity.Monster
 
 	for _, u := range d.sortedUnits() {
-		if !u.friendly() && !u.m.Alive() {
+		if !u.friendly() && !u.b.Allied && !u.m.Alive() { // not the corpse of a summon or a converted monster
 			out = append(out, u.m)
 		}
 	}

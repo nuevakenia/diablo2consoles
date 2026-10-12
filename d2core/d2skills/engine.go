@@ -68,6 +68,8 @@ type Counters struct {
 	// AreaHits are targets reached by area effects and splash, DotDamage the
 	// poison and burn damage dealt.
 	AreaHits, DotDamage int
+	// FriendlySpared counts hero skill effects on the hero's own units that the friendly fire guard stopped.
+	FriendlySpared int
 	// EmptyArea counts area states (curses) that landed on nobody: the target
 	// died or moved away between the aim and the effect.
 	EmptyArea int
@@ -884,6 +886,10 @@ func (e *Engine) resistFrom(m *d2mapentity.Monster, src *d2mapentity.Player, kin
 // hurt applies a rolled damage struct to a monster: resists per type, then
 // whole hit points through the monster director.
 func (e *Engine) hurt(m *d2mapentity.Monster, src *d2mapentity.Player, d *d2combat.Damage, what string) {
+	if e.sparesOwnUnit(m, what) {
+		return
+	}
+
 	parts := []struct {
 		kind string
 		v    int32
