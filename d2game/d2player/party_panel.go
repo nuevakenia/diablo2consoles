@@ -228,15 +228,15 @@ func (s *PartyPanel) newPartyIndex() *partyIndex {
 
 	result.seeingSwitcher = seeing
 
-	// relation bit 01 toggle (frames 12/14); texts strParty20/21 are UNVERIFIED guesses (the exe's ids are not read)
+	// relation bit 01 toggle (frames 12/14); texts per party_tooltips.go (exe ids 0x100e..0x1011)
 	loot := s.createSwitcher(d2enum.PartyButtonCorpsLootingFrame)
 
 	result.lootActiveTooltip = s.uiManager.NewTooltip(d2resource.Font16, d2resource.PaletteSky, d2ui.TooltipXCenter, d2ui.TooltipYTop)
-	result.lootActiveTooltip.SetText(s.asset.TranslateString("strParty20"))
+	result.lootActiveTooltip.SetText(partyLootClear.text(s.asset.TranslateString))
 	loot.SetActiveTooltip(result.lootActiveTooltip)
 
 	result.lootInactiveTooltip = s.uiManager.NewTooltip(d2resource.Font16, d2resource.PaletteSky, d2ui.TooltipXCenter, d2ui.TooltipYTop)
-	result.lootInactiveTooltip.SetText(s.asset.TranslateString("strParty21"))
+	result.lootInactiveTooltip.SetText(partyLootSet.text(s.asset.TranslateString))
 	loot.SetInactiveTooltip(result.lootInactiveTooltip)
 
 	result.lootSwitcher = loot
@@ -244,11 +244,11 @@ func (s *PartyPanel) newPartyIndex() *partyIndex {
 	listening := s.createSwitcher(d2enum.PartyButtonListeningFrame)
 
 	result.listeningActiveTooltip = s.uiManager.NewTooltip(d2resource.Font16, d2resource.PaletteSky, d2ui.TooltipXCenter, d2ui.TooltipYTop)
-	result.listeningActiveTooltip.SetText(s.asset.TranslateString("strParty17") + "\n" + s.asset.TranslateString("strParty18"))
+	result.listeningActiveTooltip.SetText(partyHearClear.text(s.asset.TranslateString))
 	listening.SetActiveTooltip(result.listeningActiveTooltip)
 
 	result.listeningInactiveTooltip = s.uiManager.NewTooltip(d2resource.Font16, d2resource.PaletteSky, d2ui.TooltipXCenter, d2ui.TooltipYTop)
-	result.listeningInactiveTooltip.SetText(s.asset.TranslateString("strParty11") + "\n" + s.asset.TranslateString("strParty16"))
+	result.listeningInactiveTooltip.SetText(partyHearSet.text(s.asset.TranslateString))
 	listening.SetInactiveTooltip(result.listeningInactiveTooltip)
 
 	result.listeningSwitcher = listening
