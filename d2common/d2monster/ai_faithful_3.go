@@ -352,14 +352,16 @@ func (c *Ctx) impAIP(class, n int) int {
 	return c.B.AIP(n)
 }
 
-func (c *Ctx) impOffsetCast(rng int) bool {
+// impOffsetCast is MONAI_QueueRandomOffsetSkillCast 0x5de650: the Imp think returns right after it whatever the
+// result (w40, VERIFIED at both call sites); a refused cast leaves a short sleep instead of a spin.
+func (c *Ctx) impOffsetCast(rng int) {
 	if h, ok := c.W.(ImpHost); ok && h.RandomOffsetCast(c.B, slotA, rng) {
 		c.busy()
 
-		return true
+		return
 	}
 
-	return false
+	c.Sleep(10)
 }
 
 // thinkImp is MONAI_Think_Imp (pre: S0 = -1). S0 holds a remembered unit id.
@@ -403,9 +405,9 @@ func thinkImp(c *Ctx) {
 
 	if c.InRange {
 		if c.skill(slotA) && b.HPPercent < c.impAIP(impClassA, 1) {
-			if c.impOffsetCast(c.impAIP(impClassA, 2)) {
-				return
-			}
+			c.impOffsetCast(c.impAIP(impClassA, 2))
+
+			return
 		}
 
 		if b.Roll(100) < c.impAIP(impClassC, 2) && c.WalkAway(t, 5) {
@@ -414,9 +416,9 @@ func thinkImp(c *Ctx) {
 	}
 
 	if c.skill(slotA) && b.Roll(100) < c.impAIP(impClassA, 3) {
-		if c.impOffsetCast(c.impAIP(impClassA, 2)) {
-			return
-		}
+		c.impOffsetCast(c.impAIP(impClassA, 2))
+
+		return
 	}
 
 	if c.Dist < c.impAIP(impClassC, 1) {
@@ -937,6 +939,7 @@ func thinkDarkWanderer(c *Ctx) {
 
 		if s[0] == 2 {
 			if fbnTiles(b, p.X, p.Y) < 2 || s[1] >= darkWandererRetries {
+				fbxFlags(c, 0x20000, 0) // unit flags |= 0x20000 before the death mode (0x5e91e0, w40)
 				c.die()
 				q.WandererArrived(b)
 

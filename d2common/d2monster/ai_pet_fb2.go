@@ -418,7 +418,7 @@ func thinkTotemB(c *Ctx) {
 		have = false
 	}
 
-	d := EdgeDistance(b.X-l.X, b.Y-l.Y, b.Size)
+	d := UnitDistance(b.X-l.X, b.Y-l.Y, b.Size, l.Size) // UNIT_GetDistanceToUnit, not the edge distance (w40)
 
 	if b.AIP(3) < d {
 		if r, ok := c.W.(FBNLeaderTeleporter); ok && r.FBNTeleportToLeader(b) {

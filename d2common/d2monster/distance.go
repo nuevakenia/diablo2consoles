@@ -45,3 +45,29 @@ func EdgeDistance(dx, dy, size int) int {
 
 	return Distance(dx, dy)
 }
+
+// UnitDistance is UNIT_GetDistanceToUnit 0x642b10 (w40, VERIFIED): both axes lose sizeA/2 + sizeB/2 (integer
+// halves, clamped at zero) before the usual max + min/2 metric. Totem uses it; most AIs use EdgeDistance.
+func UnitDistance(dx, dy, sizeA, sizeB int) int {
+	if dx < 0 {
+		dx = -dx
+	}
+
+	if dy < 0 {
+		dy = -dy
+	}
+
+	g := sizeA/2 + sizeB/2
+	dx -= g
+	dy -= g
+
+	if dx < 0 {
+		dx = 0
+	}
+
+	if dy < 0 {
+		dy = 0
+	}
+
+	return Distance(dx, dy)
+}

@@ -14,7 +14,7 @@ func TestWoundedAllyScan(t *testing.T) {
 			HPPercent: pct, Allied: allied}}
 	}
 
-	me := &d2monster.Brain{ID: 1, X: 100, Y: 100}
+	me := &d2monster.Brain{ID: 1, X: 100, Y: 100, HPPercent: 100}
 	d.units[1] = &unit{m: &d2mapentity.Monster{}, b: me}
 	mk(2, 110, 60, false) // in range, wounded
 	mk(3, 120, 30, false) // in range, more wounded -> wins
@@ -32,5 +32,11 @@ func TestWoundedAllyScan(t *testing.T) {
 	q.LifeBelow = 20
 	if r := d.FBXScan(me, q); r.Found {
 		t.Fatalf("nothing is below 20 percent in range: %+v", r)
+	}
+
+	// w40: the exe callback does not exclude the caster: a wounded priest finds itself
+	me.HPPercent = 3
+	if r := d.FBXScan(me, q); !r.Found || r.T.ID != 1 {
+		t.Fatalf("self heal: %+v", r)
 	}
 }

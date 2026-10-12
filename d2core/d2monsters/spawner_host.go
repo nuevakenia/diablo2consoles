@@ -132,7 +132,8 @@ func (d *Director) woundedAlly(b *d2monster.Brain, q d2monster.FBXScanQuery) d2m
 	var res d2monster.FBXScanResult
 
 	for _, u := range d.units {
-		if u.b == b || !u.m.Alive() || u.b.Allied != b.Allied {
+		// w40: the exe callback 0x5df240 does not exclude the caster, so a wounded priest can heal itself
+		if !u.m.Alive() || u.b.Allied != b.Allied {
 			continue
 		}
 
