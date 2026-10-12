@@ -9,7 +9,7 @@ func TestSingleApplicationUnchanged(t *testing.T) {
 	s := New()
 	got := s.ApplyHit(100, Hit{ColdLen: 60, FreezeLen: 30, StunLen: 10, Poison: 64, PoisonLen: 50, Burn: 100, BurnLen: 25})
 
-	want := []string{Stun, Freeze, Chill, "poison", "burn"}
+	want := []string{Stun, Chill, Freeze, "poison", "burn"}
 	if len(got) != len(want) {
 		t.Fatalf("applied %v want %v", got, want)
 	}

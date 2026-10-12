@@ -147,7 +147,7 @@ func TestApplyHit(t *testing.T) {
 	names := s.ApplyHit(100, Hit{ColdLen: 60, FreezeLen: 30, StunLen: 10, Poison: 64, PoisonLen: 50, Burn: 100, BurnLen: 25,
 		Source: "hero", SkillID: 7})
 
-	want := []string{Stun, Freeze, Chill, "poison", "burn"}
+	want := []string{Stun, Chill, Freeze, "poison", "burn"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("applied %v, want %v", names, want)
 	}

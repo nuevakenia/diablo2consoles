@@ -859,6 +859,11 @@ func (e *Engine) hurt(m *d2mapentity.Monster, src *d2mapentity.Player, d *d2comb
 	}
 	h.ColdEffect, h.HasColdEffect = coldEffect(m), true
 	h.ChillDiv, h.FreezeDiv = e.coldDivisors(m)
+	// VERIFIED gates of 0x578830 / 0x578f50: the monstats boss bit refuses a stun and turns freeze into chill; a
+	// monster with Velocity 0 refuses a stun; state 0x36 refuses a freeze. Mercenary and the unit data flag 8 are
+	// not modelled for these monsters (UNVERIFIED mapping of boss to IsSpecialBoss).
+	h.Target = &d2state.Target{Monster: true, Boss: m.Stat.IsSpecialBoss, ZeroSpeed: m.Stat.SpeedBase == 0,
+		Uninterruptable: set.Active(e.frame, "uninterruptable")}
 
 	// COMBAT_ApplyFreezeOrColdSlowState (0x578f50): a boss is chilled for the freeze length, never frozen
 	if m.Stat != nil && m.Stat.IsSpecialBoss {

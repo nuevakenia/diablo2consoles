@@ -43,6 +43,8 @@ type Set struct {
 	streams []Stream
 	frac    map[string]int // 8.8 remainder per stream kind
 	defs    Defs           // states.txt rows; nil = no exclusion or death rules
+
+	shatterOn bool // state bit 0x6b left by the last chill roll
 }
 
 // New creates an empty set.
