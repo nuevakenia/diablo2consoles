@@ -9,7 +9,7 @@ import "sort"
 //     calls allow none until the game frame reaches the stored frame, then
 //     advance it by the weapon period (WhirlDelay) and allow 1 hit, or 2 when
 //     both hands hold melee weapons (SKILL_IsDualWieldingTypeWeapons 0x5d7d90,
-//     item type 0x2e = "mele" by row order of ItemTypes: UNVERIFIED mapping).
+//     item type 0x2e = ItemTypes row 46 = "mele", VERIFIED by table, see TestExeTableRows).
 //   - SRVDO_076 0x5d8010 picks every victim with SKILL_ScanRadiusForTargets
 //     0x569a80 (radius 5, euclidean: squared distance <= 25, VERIFIED in
 //     0x569510). Its callback (0x569a40) walks the units in range and chooses
@@ -20,8 +20,8 @@ import "sort"
 //     tick's hits are dropped.
 //   - SRVST_038 0x5d7a00 moves at the class walk velocity (charstats
 //     WalkVelocity << 8, UNIT_GetBaseMoveSpeedFixed 0x56c370), not the run one;
-//     the exe refuses to start while unit state 0xc is set (UNVERIFIED which
-//     state that is in this build; not enforced).
+//     the exe refuses to start while unit state 0xc is set (state 12 = states.txt row
+//     "inferno", VERIFIED by table, see TestExeTableRows; enforced by the engine as whirlRefusedState).
 
 // WhirlFirstDelay is the frames added on the first scheduler call.
 const WhirlFirstDelay = 4

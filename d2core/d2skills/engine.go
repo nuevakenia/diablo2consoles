@@ -476,7 +476,7 @@ func (e *Engine) mayInterrupt(p *d2mapentity.Player, sk *d2skill.Skill, rec *d2r
 // is doing (PLRMODE_ServerStartMode 0x57e9b0 -> PLRMODE_CanInterruptCurrentMode 0x57ceb0, VERIFIED; the block
 // animation is started with the interrupt check on). With a used skill that does not hold (dwBits4 bit 31 clear)
 // the block animation only plays from the neutral mode: walking, running, attacking and casting heroes take the
-// block without the animation. The hold states 0x2a / 0xf are not modelled (UNVERIFIED which skills set them).
+// block without the animation. The hold states 0x2a / 0xf are not modelled (states.txt rows 42 "concentration" and 15 "concentrate" by table; which skills set them is UNVERIFIED).
 func (e *Engine) heroBlockAnim(p *d2mapentity.Player) bool {
 	u := e.hero(p)
 
