@@ -23,16 +23,17 @@ func profileWithBonus(r *d2records.MonStatRecord, diff d2monster.Difficulty, ski
 	pick := func(n, nm, h int) int { return [3]int{n, nm, h}[diff] }
 
 	p := &d2monster.Profile{
-		Class:  r.ID,
-		ID:     r.Key,
-		AI:     r.AiKey,
-		AIDel:  pick(r.AiDelayNormal, r.AiDelayNightmare, r.AiDelayHell),
-		AIDist: pick(r.AiDistanceNormal, r.AiDistanceNightmare, r.AiDistanceHell),
-		Threat: r.ThreatLevel,
-		Melee:  r.IsMelee,
-		Boss:   r.IsSpecialBoss,
-		Walk:   r.SpeedBase,
-		Run:    r.SpeedRun,
+		Class:      r.ID,
+		ID:         r.Key,
+		AI:         r.AiKey,
+		AIDel:      pick(r.AiDelayNormal, r.AiDelayNightmare, r.AiDelayHell),
+		AIDist:     pick(r.AiDistanceNormal, r.AiDistanceNightmare, r.AiDistanceHell),
+		Threat:     r.ThreatLevel,
+		Melee:      r.IsMelee,
+		Boss:       r.IsSpecialBoss,
+		NoSwitchAI: !r.IsAiSwitchable,
+		Walk:       r.SpeedBase,
+		Run:        r.SpeedRun,
 	}
 
 	p.AIP[1] = pick(r.AiParameterNormal1, r.AiParameterNightmare1, r.AiParameterHell1)

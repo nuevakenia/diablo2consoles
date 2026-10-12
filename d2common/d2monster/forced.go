@@ -286,6 +286,11 @@ func (b *Brain) ApplyForced(kind ForcedKind, now, frames int, source uint32) {
 	case ForcedConfuse:
 		// mode 3 targeting is read from b.Forced by pickTarget
 	default:
+		// w38: MONAI_GetAiTableEntry 0x5af1b0 gives the alternate row to curse states only for revivable classes
+		if b.applyCurseAIState() {
+			break
+		}
+
 		if def := StateDef(kind.AIState()); def != nil {
 			b.SetAI(def)
 		}

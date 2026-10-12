@@ -48,9 +48,7 @@ type ShamanCorpseScanner interface {
 // scan (callback MONAI_FallenShaman_CountNearbyFallenFilter, mode 1), every
 // other shaman scans the group of its leader (mode 9); the host's
 // ShamanCorpseScanner does exactly that. The corpse scan is a no-op without the
-// World's ShamanCorpseScanner / CorpseFinder. Not modelled: the exe rolls the
-// skill 2 chance whether or not skill 2 is defined (Go skips the roll when the
-// slot is unused; stock Fallen Shamans always have it).
+// World's ShamanCorpseScanner / CorpseFinder. w38: the skill 2 roll is drawn even when the slot is undefined, as in the exe.
 func thinkFallenShaman(c *Ctx) {
 	b := c.B
 	p := b.Profile
@@ -86,14 +84,20 @@ func thinkFallenShaman(c *Ctx) {
 		return
 	}
 
-	if t != nil && p.Skills[slot2].Used() && c.Dist < b.AIP(5) && b.Roll(100) < b.AIP(2) {
-		c.Cast(slot2, *t)
+	// w38: the exe rolls the Skill2 chance whether or not the slot is defined (the id test is inside
+	// MONAI_QueueSkillCast), so the roll comes first and an undefined slot queues nothing.
+	if t != nil && c.Dist < b.AIP(5) && b.Roll(100) < b.AIP(2) {
+		if p.Skills[slot2].Used() {
+			c.Cast(slot2, *t)
+		}
 
 		return
 	}
 
-	if t2, d, ok := c.W.AttackTarget(b); ok && d < b.AIP(5) && p.Skills[slot2].Used() && b.Roll(100) < b.AIP(2) {
-		c.Cast(slot2, t2)
+	if t2, d, ok := c.W.AttackTarget(b); ok && d < b.AIP(5) && b.Roll(100) < b.AIP(2) {
+		if p.Skills[slot2].Used() {
+			c.Cast(slot2, t2)
+		}
 
 		return
 	}

@@ -126,13 +126,11 @@ func thinkPantherWoman(c *Ctx) {
 		if c.WalkTo(t, meleeReach) {
 			return
 		}
-	} else if f, ok := c.W.(AllyFinder); ok {
-		if ally, d, found := f.NearestAlly(b); found && d*d > b.AIP(3)*b.AIP(3) {
-			c.SetSpeed(75)
+	} else if ally, sq, found := c.nearestSameClass(); found && b.AIP(3)*b.AIP(3) < sq {
+		c.SetSpeed(75)
 
-			if c.WalkTo(ally, meleeReach) {
-				return
-			}
+		if c.WalkTo(ally, meleeReach) {
+			return
 		}
 	}
 

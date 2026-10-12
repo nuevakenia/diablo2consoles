@@ -619,13 +619,14 @@ func thinkFrogDemonB(c *Ctx) {
 }
 
 // thinkFrogDemonPhase2B is MONAI_Think2_FrogDemon 0x5f7300 (VERIFIED flow).
-// When it runs is UNVERIFIED (the second think of the AI table row), so it is
-// not wired into the registered AI. ai is the AiGeneral state id (+0), 10/11
+// Wave 38: wired through thinkFrogDemon2 (ai_think2.go), a curse on a class
+// the alternate table refuses swaps to it. ai is the AiGeneral state id (+0), 10/11
 // restore the state and re-think in a frame.
 func thinkFrogDemonPhase2B(c *Ctx, aiState int) {
 	b := c.B
 
 	if aiState == 10 || aiState == 11 {
+		c.RestoreAI() // MONAI_SetAiState(same state): w38, back to the class think
 		c.Sleep(1)
 
 		return
@@ -640,7 +641,7 @@ func thinkFrogDemonPhase2B(c *Ctx, aiState int) {
 		return
 	}
 
-	b.Scratch = [3]int{}
+	c.RestoreAI() // SetAiState clears the scratch fields (w38)
 	c.Sleep(1)
 }
 

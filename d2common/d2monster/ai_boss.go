@@ -46,14 +46,12 @@ func thinkPantherJavelin(c *Ctx) {
 		return
 	}
 
-	// Regroup with the nearest ally of the same class when it is farther than
-	// aip3 (the notes compare squared distances).
-	if f, isF := c.W.(AllyFinder); isF {
-		if ally, ad, found := f.NearestAlly(b); found && ad > b.AIP(3) {
-			c.WalkTo(ally, meleeReach)
+	// Regroup with the nearest monster of the same class: the exe tests aip3 < SQUARED distance (aip3 is not
+	// squared here, unlike the PantherWoman; VERIFIED 0x5dfed0, w38).
+	if ally, sq, found := c.nearestSameClass(); found && b.AIP(3) < sq {
+		c.WalkTo(ally, meleeReach)
 
-			return
-		}
+		return
 	}
 
 	c.Sleep(b.AIP(5))
