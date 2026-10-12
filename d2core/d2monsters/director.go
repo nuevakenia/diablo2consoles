@@ -181,6 +181,10 @@ type Director struct {
 	players  func() []*d2mapentity.Player
 	opt      Options
 
+	// the Assassin's shadows (shadowskills.go): the name ids of the skill lists and the test seam of the animation
+	shadowNm     *shadowNames
+	shadowAttack func(*d2monster.Brain, d2monster.Mode, d2monster.Target) bool
+
 	frame int
 
 	// castSlot is the monstats slot of the Cast in progress (castSet), read

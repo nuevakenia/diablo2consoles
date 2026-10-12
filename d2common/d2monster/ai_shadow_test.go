@@ -32,7 +32,7 @@ func (f *shadowFake) ShadowSkills(*Brain) []ShadowSkill          { return f.skil
 func (f *shadowFake) ShadowScan(*Brain, *Target) ShadowScan      { return f.scan }
 func (f *shadowFake) TargetStat(Target, int) int                 { return f.resist }
 func (f *shadowFake) SelfHasState(_ *Brain, s int) bool          { return f.hasState[s] }
-func (f *shadowFake) TargetHasState(Target, int) bool            { return false }
+func (f *shadowFake) ShadowTargetHasState(Target, int) bool      { return false }
 func (f *shadowFake) SelfInCastMask(*Brain) bool                 { return f.castMask }
 func (f *shadowFake) OtherInStateGroup(*Brain, int) bool         { return f.other }
 func (f *shadowFake) SelfStateStat(*Brain, int, int) (int, bool) { return f.progStat, f.progOK }

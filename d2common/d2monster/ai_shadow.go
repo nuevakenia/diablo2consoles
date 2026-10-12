@@ -80,7 +80,7 @@ type ShadowEnv interface {
 	// etype column selects (0x24, 0x27, 0x29, 0x25, 0x2b, 0x2d).
 	TargetStat(t Target, stat int) int
 	SelfHasState(b *Brain, state int) bool
-	TargetHasState(t Target, state int) bool
+	ShadowTargetHasState(t Target, state int) bool
 	// SelfInCastMask is STATE_UnitHasStateInMaskDC(self) != 0 (mask not decoded).
 	SelfInCastMask(b *Brain) bool
 	// OtherInStateGroup is MONAI_ShadowMaster_ScanOtherEntries: the shadow has
@@ -260,7 +260,7 @@ func ShadowScore(in *ShadowScoreInput, sk ShadowSkill) (score int, target *Targe
 		return roll() + base, self
 	case 2: // curse
 		hasOwn := sk.AuraState > 0 && env.SelfHasState(b, sk.AuraState)
-		hasTgt := sk.AuraTargetState > 0 && env.TargetHasState(tgt, sk.AuraTargetState)
+		hasTgt := sk.AuraTargetState > 0 && env.ShadowTargetHasState(tgt, sk.AuraTargetState)
 
 		if hasOwn || hasTgt {
 			return 0, nil
