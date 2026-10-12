@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2party"
 )
 
 const (
@@ -469,7 +470,7 @@ func (s *Sim) pickUp(p *pstate, it *Unit) {
 	}
 
 	if it.Name == "gld" {
-		p.u.Gold += uint32(10 + s.rng.Intn(40))
+		s.pickUpGold(p, 10+s.rng.Intn(40))
 	} else {
 		p.inv = append(p.inv, invItem{it.ID, it.Name})
 	}
@@ -483,6 +484,33 @@ func (s *Sim) pickUp(p *pstate, it *Unit) {
 	}
 
 	s.sendInv(p)
+}
+
+// pickUpGold credits picked-up gold through the party rule of the exe
+// (d2party.Roster.ShareGold, 0x55a5f0 / 0x53e640): the party members of the
+// picker's level share it, each capped by their own carry limit. Gold that fits
+// nowhere is dropped (the exe spills it as piles; not modelled here).
+func (s *Sim) pickUpGold(p *pstate, amount int) {
+	purses := map[string]d2party.Purse{}
+
+	for id, q := range s.pl {
+		purses[sid(id)] = d2party.Purse{Have: int(q.u.Gold), Cap: int(q.clvl) * 10000}
+	}
+
+	for _, sh := range s.roster.ShareGold(sid(p.u.ID), amount, purses, false).Shares {
+		n, _ := strconv.ParseUint(sh.ID, 10, 32)
+
+		q, ok := s.pl[uint32(n)]
+		if !ok || sh.Add <= 0 {
+			continue
+		}
+
+		q.u.Gold += uint32(sh.Add)
+
+		if q != p { // the picker's inventory is sent by pickUp
+			s.sendInv(q)
+		}
+	}
 }
 
 // Drop puts an inventory item (by id) on the ground at the hero's feet.
