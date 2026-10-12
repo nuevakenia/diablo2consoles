@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2vendor"
 )
 
 const autoGambleGold = 1000000
@@ -96,6 +97,7 @@ func (t *TradeWindow) autoRestock(first string) {
 	t.Close()
 
 	t.now = func() time.Time { return real().Add(5 * time.Minute) }
+	t.LeaveTown(d2vendor.ActIndex(v)) // the restock check runs when the hero leaves town
 	_ = t.OpenGamble(v, 1, nil)
 	t.now = real
 

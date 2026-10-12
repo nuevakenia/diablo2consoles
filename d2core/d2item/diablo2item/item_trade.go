@@ -96,12 +96,12 @@ func (i *Item) InventoryFileName() string {
 
 // TradeItem converts the item to the input of d2trade.ItemPrice.
 //
-// Not covered (price terms are left out rather than invented): the
-// ItemStatCost per-stat price columns, the single skill price, the socketed
-// items' cost, ethereal (the factory does not roll it), the recharge cost of
-// charged items, tome and body part tables, automagic rows and gamble flags.
-// Magic affixes use PriceScale/PriceAdd (1/1024 fixed point, checked against
-// MagicPrefix.txt); unique and set rows are not priced.
+// The ItemStatCost price columns, the single skill price, the socketed items'
+// cost, the recharge cost, the tome price and the unique and set rows are
+// filled by fillPriceExtras. Not covered: body part items, automagic rows
+// (UNVERIFIED which row an item has) and items without a rolled or saved
+// stat list (their stat prices stay 0). Magic affixes use PriceScale/PriceAdd
+// (1/1024 fixed point, checked against MagicPrefix.txt).
 func (i *Item) TradeItem() *d2trade.Item {
 	rec := i.CommonRecord()
 	typ := i.factory.asset.Records.Item.Types[rec.Type] // TypeCode is only set for dropped items
@@ -134,8 +134,14 @@ func (i *Item) TradeItem() *d2trade.Item {
 
 	if typ != nil {
 		it.IsAmmo = typ.Quiver != ""
-		it.Repairable = typ.Repair && maxDur > 0 && it.Identified && !it.Ethereal
+		// TRADE_CheckItemRepairable 0x62e770 / ITEM_IsRepairableStackedThrowable
+		// 0x62e6e0: identified, not ethereal, the type repairs, and the item has
+		// durability or is a stacked throwing weapon (its quantity is restored).
+		// The charged-skill entry branch of 0x62e770 is not modelled (UNVERIFIED).
+		it.Repairable = typ.Repair && (maxDur > 0 || (rec.Throwable && rec.Stackable)) && it.Identified && !it.Ethereal
 	}
+
+	i.fillPriceExtras(it, rec.Type)
 
 	if !it.Identified {
 		return it
@@ -155,8 +161,9 @@ func (i *Item) TradeItem() *d2trade.Item {
 		}
 	}
 
-	// Unique and set rows ("cost mult" is a small integer such as 5 in the
-	// shipped tables, not 1/1024 fixed point) are UNVERIFIED and not priced.
+	// Unique and set rows use the raw "cost mult" (a small integer such as 5 in
+	// the shipped tables): the table loader at 0x634a20 stores it unscaled and
+	// the price code treats it as 1/1024 fixed point like the affix columns.
 	return it
 }
 

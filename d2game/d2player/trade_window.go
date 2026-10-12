@@ -13,6 +13,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2trade"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2inventory"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2itemdesc"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item"
@@ -102,6 +103,10 @@ type TradeWindow struct {
 	// d2vendor.Generate).
 	LevelOverride int
 
+	// stashGold, when set, is the stash gold the vendor payments fall back on
+	// (TRADE_DeductGold spends the inventory gold first, then the stash).
+	stashGold *int
+
 	difficulty int
 	mouseX     int
 	mouseY     int
@@ -116,8 +121,14 @@ type TradeWindow struct {
 	// regenerations (they change the seed); now is the clock (tests replace it).
 	built    map[string]time.Time
 	restocks map[string]uint32
-	now      func() time.Time
-	logLevel d2util.LogLevel
+	// due flags the stocks that the town-leaving check marked for a restock
+	// (the original's per vendor flag +0x27), stamp is its timestamp (+0x28)
+	// and keyVendor the vendor of each stock key.
+	due       map[string]bool
+	stamp     map[string]time.Time
+	keyVendor map[string]d2vendor.Vendor
+	now       func() time.Time
+	logLevel  d2util.LogLevel
 
 	*d2util.Logger
 }
@@ -136,6 +147,7 @@ func NewTradeWindow(asset *d2asset.AssetManager, ui *d2ui.UIManager, l d2util.Lo
 		asset: asset, ui: ui, inv: inv, hero: hero, factory: factory,
 		entries: make(map[InventoryItem]*d2vendor.Item), stocks: make(map[string]*d2vendor.Stock),
 		built: make(map[string]time.Time), restocks: make(map[string]uint32), now: time.Now,
+		due: make(map[string]bool), stamp: make(map[string]time.Time), keyVendor: make(map[string]d2vendor.Vendor),
 		onChange: onChange, onClose: onClose, logLevel: l,
 	}
 
@@ -239,10 +251,11 @@ func (t *TradeWindow) open(v d2vendor.Vendor, seed uint32, quests *d2s.QuestReco
 	key := t.stockKey(v)
 
 	stock := t.stocks[key]
-	if stock != nil && d2vendor.RestockDue(t.now().Sub(t.built[key]).Milliseconds()) {
-		t.Infof("vendor restock: vendor=%s gamble=%v after %dms", v.Name, gamble, d2vendor.RestockInterval)
+	if stock != nil && t.due[key] {
+		t.Infof("vendor restock: vendor=%s gamble=%v flagged when the hero left town", v.Name, gamble)
 
 		stock = nil
+		t.due[key] = false
 		t.restocks[key]++
 	}
 
@@ -265,6 +278,8 @@ func (t *TradeWindow) open(v d2vendor.Vendor, seed uint32, quests *d2s.QuestReco
 	if t.stocks[key] != stock {
 		t.stocks[key] = stock
 		t.built[key] = t.now()
+		t.stamp[key] = t.built[key]
+		t.keyVendor[key] = v
 	}
 
 	t.stock = stock
@@ -276,6 +291,26 @@ func (t *TradeWindow) open(v d2vendor.Vendor, seed uint32, quests *d2s.QuestReco
 	t.inv.SetPriceHook(t.inventoryPriceLines)
 	t.syncGold()
 	t.Infof("trade window opened: vendor=%s gamble=%v items=%d gold=%d", v.Name, gamble, len(stock.Items), t.hero.Gold)
+}
+
+// LeaveTown is the town-leaving restock check (0x534c20, called from the
+// town transition 0x534d40 with the act of the town being left, VERIFIED): a
+// vendor of that act whose stamp is more than d2vendor.RestockInterval old is
+// flagged and restamped; its stock is rebuilt when its window is next
+// opened. Entering a town, or staying in it, never restocks.
+func (t *TradeWindow) LeaveTown(act int) {
+	now := t.now()
+
+	for key, v := range t.keyVendor {
+		if d2vendor.ActIndex(v) != act {
+			continue
+		}
+
+		if d2vendor.RestockDue(now.Sub(t.stamp[key]).Milliseconds()) {
+			t.due[key] = true
+			t.stamp[key] = now
+		}
+	}
 }
 
 // Close hides the window.
@@ -410,6 +445,75 @@ func (t *TradeWindow) Stock() []StockLine {
 	return out
 }
 
+// vendorSells is TRADE_CheckVendorSellsItem for the open vendor: its
+// permanent stock, and the tier 4 and 5 potions on the harder difficulties.
+func (t *TradeWindow) vendorSells(code string) bool {
+	var perm []string
+
+	for _, b := range d2vendor.BasesFor(t.asset.Records, t.vendor) {
+		if b.Permanent {
+			perm = append(perm, b.Code)
+		}
+	}
+
+	return d2vendor.VendorSells(t.difficulty, code, perm)
+}
+
+// SetStashGold gives the window the stash gold that pays what the inventory
+// gold cannot (nil: inventory gold only).
+func (t *TradeWindow) SetStashGold(p *int) { t.stashGold = p }
+
+// stash is the stash gold the window can spend.
+func (t *TradeWindow) stash() int {
+	if t.stashGold == nil {
+		return 0
+	}
+
+	return *t.stashGold
+}
+
+// canPay reports whether the inventory and stash gold together cover a price.
+func (t *TradeWindow) canPay(price int) bool {
+	_, _, ok := d2trade.DeductGold(t.hero.Gold, t.stash(), price)
+
+	return price >= 0 && ok
+}
+
+// pay deducts a price: inventory gold first, then the stash (TRADE_DeductGold
+// 0x574bc0, VERIFIED).
+func (t *TradeWindow) pay(price int) error {
+	if !t.canPay(price) {
+		return ErrNotEnoughGold
+	}
+
+	inv, stash, _ := d2trade.DeductGold(t.hero.Gold, t.stash(), price)
+	t.hero.Gold = inv
+
+	if t.stashGold != nil {
+		*t.stashGold = stash
+	}
+
+	return nil
+}
+
+// earn adds sale gold up to the carry cap of the hero's level; what does not
+// fit is lost here (the original drops it as gold piles, 0x558e40).
+func (t *TradeWindow) earn(amount int) (overflow int) {
+	total, over := d2inventory.AddGold(t.hero.Gold, amount, d2inventory.InventoryGoldLimit(t.heroLevel()))
+	t.hero.Gold = total
+
+	return over
+}
+
+// heroLevel is the character level (not the stock level override).
+func (t *TradeWindow) heroLevel() int {
+	if t.hero != nil && t.hero.Stats != nil {
+		return t.hero.Stats.Level
+	}
+
+	return 1
+}
+
 // Buy purchases a vendor item: the price is paid, the item leaves the stock
 // and goes to the first free spot of the inventory (the original puts it on
 // the cursor; the engine has no cursor item yet).
@@ -421,9 +525,8 @@ func (t *TradeWindow) Buy(item *diablo2item.Item) (price int, err error) {
 
 	price = t.BuyPrice(item)
 
-	gold, err := settle(t.hero.Gold, price)
-	if err != nil {
-		return price, err
+	if !t.canPay(price) {
+		return price, ErrNotEnoughGold
 	}
 
 	if !t.inv.grid.CanAutoPlace(item, true) {
@@ -435,7 +538,10 @@ func (t *TradeWindow) Buy(item *diablo2item.Item) (price int, err error) {
 	delete(t.entries, item)
 
 	t.inv.grid.AutoPlace(item, true)
-	t.hero.Gold = gold
+
+	if err := t.pay(price); err != nil {
+		return price, err
+	}
 
 	if t.gamble {
 		t.reveal(item)
@@ -443,29 +549,48 @@ func (t *TradeWindow) Buy(item *diablo2item.Item) (price int, err error) {
 
 	t.syncGold()
 	t.changed()
-	t.Infof("bought %q for %d, gold %d", item.Label(), price, gold)
+	t.Infof("bought %q for %d, gold %d", item.Label(), price, t.hero.Gold)
 
 	return price, nil
 }
 
-// Sell sells one of the player's inventory items; it joins the vendor's
-// stock if there is room (the original has more conditions, see
-// inventory-trade.md: unverified here).
+// Sell sells one of the player's inventory items (TRADE_ServerSellItem
+// 0x577320). Quest items are refused. The item joins the vendor's stock only
+// when d2trade.Resellable allows it and the vendor has room; it is then
+// refilled (durability, thrown quantity) and the player gets the lower of the
+// price before and after the refill. The gold is capped by the hero's carry
+// limit.
 func (t *TradeWindow) Sell(item *diablo2item.Item) (price int, err error) {
+	if !d2trade.Sellable(item.SellInfo()) {
+		return 0, ErrNotSellable
+	}
+
 	price = t.SellPrice(item)
 
-	e := &d2vendor.Item{Code: item.CommonCode, SoldByPlayer: true, Payload: item}
-	e.W, e.H = item.InventoryGridSize()
+	info := item.ResaleInfo()
+	info.GambleMode = t.gamble
+	info.VendorSells = t.vendorSells(item.CommonCode)
 
 	t.inv.grid.Remove(item)
 
-	if !t.gamble && t.stock.Place(e) {
-		if err := t.grid.Set(e.X, e.Y, item); err == nil {
-			t.entries[item] = e
+	if d2trade.Resellable(info) {
+		e := &d2vendor.Item{Code: item.CommonCode, SoldByPlayer: true, Payload: item}
+		e.W, e.H = item.InventoryGridSize()
+
+		if t.stock.Place(e) {
+			if err := t.grid.Set(e.X, e.Y, item); err == nil {
+				t.entries[item] = e
+			}
+
+			item.Refill()
+			price = d2trade.ResalePaid(price, t.SellPrice(item))
 		}
 	}
 
-	t.hero.Gold += price
+	if over := t.earn(price); over > 0 {
+		t.Infof("sale gold over the carry cap: %d lost", over)
+	}
+
 	t.syncGold()
 	t.changed()
 	t.Infof("sold %q for %d, gold %d", item.Label(), price, t.hero.Gold)
@@ -515,22 +640,66 @@ func (t *TradeWindow) RepairAll() (total int, err error) {
 		total += t.RepairPrice(it)
 	}
 
-	gold, err := settle(t.hero.Gold, total)
-	if err != nil {
+	if err := t.pay(total); err != nil {
 		return total, err
 	}
 
 	for _, it := range items {
-		_, maxDur := it.Durability()
-		it.SetDurability(maxDur)
+		it.Refill()
 	}
 
-	t.hero.Gold = gold
 	t.syncGold()
 	t.changed()
-	t.Infof("repaired %d items for %d, gold %d", len(items), total, gold)
+	t.Infof("repaired %d items for %d, gold %d", len(items), total, t.hero.Gold)
 
 	return total, nil
+}
+
+// Repair repairs one item (TRADE_ServerRepairItem 0x575e80, single item
+// path). When the full price is out of reach and the item is not broken, all
+// the inventory gold buys as many durability points as it covers
+// (d2trade.PartialRepair); the returned price is what was paid.
+func (t *TradeWindow) Repair(item *diablo2item.Item) (paid int, err error) {
+	if !t.vendor.Repairs {
+		return 0, ErrNotRepairer
+	}
+
+	price := t.RepairPrice(item)
+	if price <= 0 {
+		return 0, ErrNoRepair
+	}
+
+	if t.canPay(price) {
+		if err := t.pay(price); err != nil {
+			return price, err
+		}
+
+		item.Refill()
+		t.syncGold()
+		t.changed()
+		t.Infof("repaired %q for %d, gold %d", item.Label(), price, t.hero.Gold)
+
+		return price, nil
+	}
+
+	cur, maxDur := item.Durability()
+
+	if !item.IsBroken() && maxDur > 0 {
+		if dur, spent, ok := d2trade.PartialRepair(price, cur, maxDur, t.hero.Gold); ok {
+			if err := t.pay(spent); err != nil {
+				return price, err
+			}
+
+			item.SetDurability(dur)
+			t.syncGold()
+			t.changed()
+			t.Infof("partly repaired %q to %d/%d for %d, gold %d", item.Label(), dur, maxDur, spent, t.hero.Gold)
+
+			return spent, nil
+		}
+	}
+
+	return price, ErrNotEnoughGold
 }
 
 func (t *TradeWindow) changed() {

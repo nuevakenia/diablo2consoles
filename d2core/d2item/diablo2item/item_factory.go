@@ -2,6 +2,7 @@ package diablo2item
 
 import (
 	"errors"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2trade"
 	"math/rand"
 	"regexp"
 	"strconv"
@@ -96,6 +97,9 @@ type ItemFactory struct {
 
 	descOnce   sync.Once
 	descTables *d2itemdesc.Tables
+
+	priceOnce sync.Once
+	priceTbl  *d2trade.Tables
 }
 
 // SetSeed sets the item generator seed

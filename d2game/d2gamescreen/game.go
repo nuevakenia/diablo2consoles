@@ -139,6 +139,7 @@ type Game struct {
 	gameControls         *d2player.GameControls
 	localPlayer          *d2mapentity.Player
 	lastZoneLevel        int       // Levels.txt id last announced; 0 = none yet
+	restockLevel         int       // level of the last vendor restock check (see advanceVendorRestock)
 	vendorSeed           uint32    // per game session base of every vendor stock seed (set on first use)
 	lightLogLevel        int       // level whose base light was last logged
 	statsLevel           int       // level of the last DRAWSTATS line
@@ -458,6 +459,7 @@ func (v *Game) advanceStep(elapsed, total float64, last bool) error {
 	if last {
 		v.advanceAutoScript(total)
 	}
+	v.advanceVendorRestock()
 	v.advanceQuests(elapsed)
 	v.advanceAutosave(elapsed)
 	v.advanceGroundInteraction(elapsed)
