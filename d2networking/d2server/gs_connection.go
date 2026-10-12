@@ -160,7 +160,11 @@ func (g *GameServer) handleConnectionD2GS(conn net.Conn) {
 
 // refreshInfo keeps the game info of a session in step with the host's
 // (written once, when the host's hero connects).
-func (g *GameServer) refreshInfo(side *d2gsnet.ServerSide) { side.Info = g.hostInfo }
+func (g *GameServer) refreshInfo(side *d2gsnet.ServerSide) {
+	g.RLock()
+	side.Info = g.hostInfo
+	g.RUnlock()
+}
 
 // joinErrCode maps a registration error to the exe's refusal code (0 for
 // errors that have none: bad request, no hero).

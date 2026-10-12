@@ -412,7 +412,10 @@ func (g *GameClient) handlePacket(packet d2netpacket.NetPacket) error {
 
 		os.Exit(0)
 	default:
-		g.Fatalf("Invalid packet type: %d", packet.PacketType)
+		// a bad packet from the server must not end the game
+		g.Warningf("GameClient: ignoring packet of unknown type %d", packet.PacketType)
+
+		return fmt.Errorf("unknown packet type %d", packet.PacketType)
 	}
 
 	return nil
@@ -505,6 +508,10 @@ func (g *GameClient) handleAddPlayerPacket(packet d2netpacket.NetPacket) error {
 	newPlayer.SyncSkillBar()
 	newPlayer.Death = player.Death
 	newPlayer.Hardcore = player.Hardcore
+
+	if old := g.Players[newPlayer.ID()]; old != nil && old != newPlayer {
+		g.MapEngine.RemoveEntity(old) // a hero that reconnects: no ghost of its earlier body
+	}
 
 	g.Players[newPlayer.ID()] = newPlayer
 	g.MapEngine.AddEntity(newPlayer)
@@ -629,6 +636,9 @@ func (g *GameClient) handleCastSkillPacket(packet d2netpacket.NetPacket) error {
 	player.SetDirection(direction)
 
 	skillRecord := g.asset.Records.Skill.Details[playerCast.SkillID]
+	if skillRecord == nil {
+		return fmt.Errorf("cast of unknown skill %d", playerCast.SkillID)
+	}
 
 	missileEntities, err := g.createMissileEntities(skillRecord, player, castX, castY)
 	if err != nil {

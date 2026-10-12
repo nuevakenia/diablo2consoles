@@ -271,6 +271,7 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 		{"walkprobe", "logs how many lava/water tiles of the level the hero can walk to and whether a walk order onto lava ends on it (debug)",
 			nil, v.commandWalkProbe},
 		{"players", "logs the players of the game with their positions", []string{}, v.commandPlayers},
+		{"setplayers", "forces the monster player count (the /players X of the original), 0..8", []string{"count"}, v.commandPlayers},
 		{"chat", "sends a chat line to all players (_ for a space)", []string{"text"}, v.commandChat},
 		{"mpkill", "realm games: fight the nearest monster of the realm", nil, v.commandMPKill},
 		{"mpworld", "realm games: logs the simulation as this client sees it (digest, monsters)", nil, v.commandMPWorld},
@@ -361,7 +362,7 @@ func (v *Game) OnUnload() error {
 		return err
 	}
 
-	if err := v.terminal.Unbind("spawnitemat", "spawnitem", "spawnmon", "spawnchest", "setgold", "spawnportal", "setwaypoint", "players", "chat",
+	if err := v.terminal.Unbind("spawnitemat", "spawnitem", "spawnmon", "spawnchest", "setgold", "spawnportal", "setwaypoint", "players", "setplayers", "chat",
 		"party", "hostile", "roster", "trade", "pvp", "giveitem", "givebelt", "beltlist", "setbelt", "beltinfo", "beltover", "dropinv", "autobuy", "spawnrank", "killleader", "killnear", "rewarditem", "transmute", "setexp", "cubeput", "pickground",
 		"questpending", "pickitem", "wield", "putitem", "giveitemq", "freeinv", "hoveritem", "hoverground", "openvendor", "comparelog", "stashgive",
 		"townportal", "closeportal", "portals", "useportal", "pvpcast", "pvpwalk", "sethp"); err != nil {

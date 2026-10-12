@@ -2,6 +2,7 @@ package d2gamescreen
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket"
@@ -9,7 +10,28 @@ import (
 
 // commandPlayers logs the players this client knows with their tile
 // positions (the multiplayer autotest reads the line).
-func (v *Game) commandPlayers(_ []string) error {
+func (v *Game) commandPlayers(args []string) error {
+	if len(args) == 1 { // "players X": force the monster player count (0x533190)
+		n, err := strconv.Atoi(args[0])
+		if err != nil {
+			return errors.New("usage: players [0-8]")
+		}
+
+		d := v.monsterDirector()
+		if d == nil {
+			return errors.New("players: no hero yet")
+		}
+
+		if !d.SetForcedPlayers(n) {
+			v.Infof("PLAYERS forced count %d ignored (0..8 only)", n)
+			return nil
+		}
+
+		v.Infof("PLAYERS forced count=%d effective=%d", n, d.PlayerCount())
+
+		return nil
+	}
+
 	v.Infof("%s", v.gameClient.PlayersSummary())
 
 	return nil

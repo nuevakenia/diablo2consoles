@@ -88,7 +88,7 @@ func (g *GameServer) socialRemovePlayer(id string) {
 // connByID looks a connection up. Like the rest of the server it reads the
 // connection map without the server lock (OnClientConnected runs under it).
 func (g *GameServer) connByID(id string) ClientConnection {
-	return g.connections[id]
+	return g.connByIDLocked(id)
 }
 
 // broadcastRoster sends the roster to every client. Called without soc.mu.
@@ -105,9 +105,10 @@ func (g *GameServer) sendRoster(notice, player string) {
 		return
 	}
 
-	conns := make([]ClientConnection, 0, len(g.connections))
+	list := g.connList()
+	conns := make([]ClientConnection, 0, len(list))
 
-	for _, c := range g.connections {
+	for _, c := range list {
 		conns = append(conns, c)
 	}
 
@@ -361,7 +362,7 @@ func (g *GameServer) onPartyHeal(client ClientConnection, packet d2netpacket.Net
 // syncPositionsLocked gives the roster the heroes' positions (tiles to subtiles)
 // for the experience range test. Call with soc.mu held.
 func (g *GameServer) syncPositionsLocked() {
-	for id, c := range g.connections {
+	for id, c := range g.connList() {
 		if st := c.GetPlayerState(); st != nil {
 			g.soc.roster.SetPos(id, int(st.X*5), int(st.Y*5))
 		}
@@ -379,6 +380,11 @@ func (g *GameServer) onPartyXP(client ClientConnection, packet d2netpacket.NetPa
 	}
 
 	p.Killer = client.GetUniqueID()
+
+	if p.XP <= 0 { // a kill never takes experience away; a negative claim is a forged packet
+		g.Infof("PARTYXP refused xp=%d from %q", p.XP, g.nameOf(p.Killer))
+		return nil
+	}
 
 	g.soc.mu.Lock()
 	g.syncPositionsLocked()
@@ -731,10 +737,15 @@ func (g *GameServer) onPartyGold(client ClientConnection, packet d2netpacket.Net
 
 	p.Picker = client.GetUniqueID()
 
+	if p.Amount <= 0 {
+		g.Infof("PARTYGOLD refused amount=%d from %q", p.Amount, g.nameOf(p.Picker))
+		return nil
+	}
+
 	g.soc.mu.Lock()
 	purses := map[string]d2party.Purse{}
 
-	for id, c := range g.connections {
+	for id, c := range g.connList() {
 		have, level := 0, 1
 
 		if st := c.GetPlayerState(); st != nil {

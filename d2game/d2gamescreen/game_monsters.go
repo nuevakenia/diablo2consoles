@@ -55,7 +55,7 @@ func (v *Game) monsterDirector() *d2monsters.Director {
 		// the scenario spawns monsters next to a hero who may still be in town
 		IgnoreTown: os.Getenv("OD2_AUTOMONSTER") != "" || os.Getenv("OD2_AUTOMERC") != "" || os.Getenv("OD2_AUTOAI") != "" || os.Getenv("OD2_AUTOPARTY") != "" || os.Getenv("OD2_AUTOBOSS") != "" || os.Getenv("OD2_AUTOBOSSFIGHT") != "",
 		// heroes in the game (1 when playing alone); OD2_PLAYERS can force more
-		PlayersFunc:   func() int { return len(v.gameClient.Players) },
+		PlayersFunc:   v.livePlayerCount,
 		ForcedPlayers: d2monsters.ForcedPlayersFromEnv(os.Getenv("OD2_PLAYERS")),
 		MagicFindFunc: v.heroMagicFind,
 		GoldFindFunc:  v.heroGoldFind,
@@ -88,6 +88,21 @@ func (v *Game) monsterDirector() *d2monsters.Director {
 	v.hookEndgameMonsters()
 
 	return v.monsters
+}
+
+// livePlayerCount is the exe's player count (0x5331a0 over predicate 0x552230, VERIFIED w41): only
+// heroes that are not in death mode count, so a dead hero lowers the monster HP/XP bonus of
+// monsters spawned meanwhile.
+func (v *Game) livePlayerCount() int {
+	n := 0
+
+	for _, p := range v.gameClient.Players {
+		if !p.IsDead() {
+			n++
+		}
+	}
+
+	return n
 }
 
 func (v *Game) playerList() []*d2mapentity.Player {

@@ -863,6 +863,19 @@ func (d *Director) PlayerCount() int {
 	return d2monstats.EffectivePlayers(n, d.opt.ForcedPlayers, 1)
 }
 
+// SetForcedPlayers is the "/players X" setter (0x533190, VERIFIED w41): a value above 8 is ignored
+// (the exe's unsigned compare), 0..8 is stored; 0 and 1 never lower the real count. It only affects
+// monsters spawned afterwards.
+func (d *Director) SetForcedPlayers(n int) bool {
+	if n < 0 || n > 8 {
+		return false
+	}
+
+	d.opt.ForcedPlayers = n
+
+	return true
+}
+
 // ForcedPlayersFromEnv parses the OD2_PLAYERS override (0..8; 0 or invalid: none).
 func ForcedPlayersFromEnv(v string) int {
 	n, err := strconv.Atoi(strings.TrimSpace(v))
