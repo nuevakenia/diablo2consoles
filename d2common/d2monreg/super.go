@@ -64,7 +64,7 @@ func (g *Game) SuperUnique(w World, room *Room, rec SuperRec, x, y int, pop *Pop
 		return nil
 	}
 
-	u := g.PlacePreset(w, room, rec.Class, x, y, pop)
+	u := g.PlacePreset(w, room, rec.Class, x, y, false, pop)
 	if u == nil {
 		return nil
 	}

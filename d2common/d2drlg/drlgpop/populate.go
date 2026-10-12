@@ -122,6 +122,9 @@ const (
 	// MonGroup (place_impgroup / place_miniongroup, normal difficulty only):
 	// FUN_0054bf10 spawns a group of Class.
 	MonGroup
+	// MonTentacle (place_tentacle_ns / place_tentacle_ew): the class is the one Depth links after Class
+	// (MONSTER_GetNextLinkedClassAtDepth), placed with the flags in Mode (4 north-south, 0 east-west).
+	MonTentacle
 )
 
 // Monster is the result of FUN_0054c470 for one node.
@@ -133,6 +136,8 @@ type Monster struct {
 	// Retry4 says the placement is retried with mode 4 when it fails.
 	Mode   int
 	Retry4 bool
+	// Depth is the link depth of a tentacle node.
+	Depth int
 	// Late marks classes whose unit gets flag 0x2000000 after creation.
 	Late bool
 }
@@ -154,6 +159,22 @@ func ResolveMonster(id int, c *Ctx, nm *Names) Monster {
 	}
 
 	return resolvePlace(rel-nm.SuperCount, c, nm)
+}
+
+// tentacleHead is the class the tentacle nodes start from (tentaclehead1).
+const tentacleHead = 0x105
+
+// TentacleDepth is the link depth of the tentacle nodes by level (the byte table at 0x54c9a0 with the jump table at
+// 0x54c990 of FUN_0054c470): levels 0x4c..0x4e use depth 1, 0x5c and 0x5d depth 2, every other level depth 0.
+func TentacleDepth(level int) int {
+	switch {
+	case level >= 0x4c && level <= 0x4e:
+		return 1
+	case level == 0x5c || level == 0x5d:
+		return 2
+	}
+
+	return 0
 }
 
 // Class ids the placement rules know by number.
@@ -259,6 +280,17 @@ func resolvePlace(i int, c *Ctx, nm *Names) Monster {
 		return Monster{Kind: MonClass, Class: pickIfExists(0x10b, nm)}
 	case 8: // place_tightspotboss
 		return Monster{Kind: MonClass, Class: 0x11c, Mode: 8}
+	case 10, 11: // place_tentacle_ns, place_tentacle_ew
+		m := Monster{Kind: MonTentacle, Class: tentacleHead, Depth: TentacleDepth(c.LevelID)}
+		if i == 10 {
+			m.Mode = 4
+		}
+
+		if m.Class >= nm.MonstatsCount {
+			return Monster{}
+		}
+
+		return m
 	case 17, 18, 22, 23, 29, 30, 31, 32: // fallen, fallenshaman, fetish, fetishshaman, dead*
 		return resolveSpawnClass(i, c, nm)
 	case 24, 26: // impgroup, miniongroup: normal difficulty only

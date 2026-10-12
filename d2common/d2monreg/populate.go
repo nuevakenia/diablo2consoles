@@ -307,9 +307,18 @@ func (g *Game) noGroup(class int) bool {
 // pickPos is FUN_0054ba70: up to 20 random spots of the cell, each tested
 // with a placement that does not create anything.
 func (g *Game) pickPos(w World, room *Room, c *Cell, class int, nearExit bool) (x, y int, ok bool) {
-	l, t, rr, b := c.subRect()
-	x0, y0 := l+1, t+1
-	wd, ht := rr-x0, b-y0
+	// ROOM_GetInnerBoundsSubtiles: with a cell its rectangle (tiles x 5), without one (the preset unique pack) the
+	// room's own x, y, w, h: origin + 1 and size - 1
+	var x0, y0, wd, ht int
+
+	if c != nil {
+		l, t, rr, b := c.subRect()
+		x0, y0 = l+1, t+1
+		wd, ht = rr-x0, b-y0
+	} else {
+		x0, y0 = room.X+1, room.Y+1
+		wd, ht = room.W-1, room.H-1
+	}
 
 	for try := 0; try < 20; try++ {
 		x = x0 + int(room.Seed.Roll(int32(wd)))
@@ -319,7 +328,7 @@ func (g *Game) pickPos(w World, room *Room, c *Cell, class int, nearExit bool) (
 			continue
 		}
 
-		if w.CellAt(room, x, y) != c.Flag {
+		if c != nil && w.CellAt(room, x, y) != c.Flag {
 			continue
 		}
 
