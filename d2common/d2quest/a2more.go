@@ -162,7 +162,7 @@ func newHoradricStaff() *Quest {
 
 		// Tal Rasha's orifice takes the assembled staff: the quest is done
 		if e.Object == ObjectOrifice && g.hasItem(ItemHoradricStaff) && e.Level >= LevelTalRashaFirst &&
-			e.Level <= LevelTalRashaLast {
+			e.Level <= LevelTalRashaLast && (g.RealTomb == 0 || e.Level == g.RealTomb) {
 			g.completeStaff(q)
 			g.emit(Effect{Kind: EffectPortal, Quest: q.ID, Value: LevelDurielLair, Note: "the portal to Duriel's Lair opens (delay from missile 338, unverified)"})
 		}
