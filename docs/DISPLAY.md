@@ -54,9 +54,9 @@ Size rules (`d2display.Resolve`, `d2display.Logical`):
   (`d2display.Origin`). In the game the column is centred horizontally and stands on the bottom edge
   (`AnchorBottom`: origin `((W-800)/2, H-600)`). So the bottom bar is centred at the bottom, left panels sit
   in the left half of the column and right panels in the right half, exactly as in the original relative to the
-  bar. The bar's art is 800 wide; on a wider screen the world is visible on both sides of it by default (the original
-  frame has no art for the sides, it is the look of D2 mods and Resurrected). `OD2_BAR_FILL=black` draws a black
-  strip of the bar's height on both sides; `OD2_BAR_FILL=tile` repeats the outermost 8 columns of the bar art (the
+  bar. The bar's art is 800 wide; on a wider screen the outermost columns of the bar art are repeated on both sides by default (the original
+  frame has no art for the sides; checked by eye at 1920x1080). `OD2_BAR_FILL=none` shows the world there instead (the look of D2 mods and Resurrected). `OD2_BAR_FILL=black` draws a black
+  strip of the bar's height on both sides; `OD2_BAR_FILL=tile` (the default) repeats the outermost 8 columns of the bar art (the
   left edge of the left globe holder frame on the left, the right edge of the right globe holder on the right).
   Layout: `d2display.BarFillSpans` (pure, tested), drawn by `HUD.renderBarFill`.
 * **Menus and full screen dialogs** (main menu, character select, credits, cinematics) centre the column on both axes

@@ -187,3 +187,11 @@ waypoint row0 97 120 283 29
 waypoint row3 97 228 283 29
 waypoint row4 97 265 283 29
 waypoint row8 97 409 283 29
+
+# NPC dialog box itself (width = widest text + 20, here Akara Talk/Trade; font metric tolerance), x centred on the anchor
+~3 npcmenu dialog 366 129 69 81
+# gold dialog (UI_OpenPanelByIndex 0x44f7b0): picture at (0xd7, 0x8c) standing on y + height; OK button (0xfa, bottom 0x11f),
+# cancel (0x163, bottom 0x11f); both 32x32 frames of the buy/sell button picture (frames 0x10 and 0xa, sizes read from the file)
+golddlg frame 215 140 210 158
+golddlg ok 250 255 32 32
+golddlg cancel 355 255 32 32

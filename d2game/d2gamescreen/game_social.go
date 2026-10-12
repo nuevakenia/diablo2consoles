@@ -724,8 +724,12 @@ func (v *Game) onTrade(u d2netpacket.TradeUpdatePacket) {
 // d2playerPartyHooks connects the party panel's rows to the roster.
 func d2playerPartyHooks(v *Game) d2player.PartyHooks {
 	return d2player.PartyHooks{
-		Relation: v.relationOf,
-		Hostile:  func(p *d2mapentity.Player) bool { return v.gameClient.Roster.Hostile(v.me(), p.ID()) },
+		// UI_IsGameInfoFlag4Set reads bit 0x04 of the status byte copied from the character file (the same byte
+		// that holds 0x08 died, 0x20 expansion, 0x40 ladder; writers 0x44a3b0, 0x44ad7a, 0x457cfc): hardcore.
+		// The loot toggle is therefore shown for hardcore heroes only. Its effect (no packet yet) is UNVERIFIED.
+		GameInfoFlag4: v.localHardcore,
+		Relation:      v.relationOf,
+		Hostile:       func(p *d2mapentity.Player) bool { return v.gameClient.Roster.Hostile(v.me(), p.ID()) },
 		Op: func(p *d2mapentity.Player) string {
 			r := v.gameClient.Roster
 
@@ -814,4 +818,15 @@ func (v *Game) commandDropInv(args []string) error {
 	v.Infof("DROPINV code=%s name=%q", args[0], name)
 
 	return nil
+}
+
+// localHardcore reports the game-info flag 4 of the original: the hero of this client is hardcore.
+func (v *Game) localHardcore() bool {
+	if v.gameClient == nil {
+		return false
+	}
+
+	p, ok := v.gameClient.Players[v.me()]
+
+	return ok && p != nil && p.Hardcore
 }
