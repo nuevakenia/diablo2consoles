@@ -106,6 +106,17 @@ func (v *Game) sayHeroVocal(death bool) {
 
 	if death {
 		h, kind = prefix+"_death_1", "death"
+
+		// VERIFIED wave 40: a shapeshifted hero is a monster for the sound code, and the monster
+		// branch of UNITSND_PlayUnitModeStartSound 0x4c8e90 plays the MonSounds DeathSound (record
+		// +0x3c, delay +0x40) on mode 0, so the form dies with the wolf/bear cry, not the class one.
+		if rec := v.formSoundRecord(); rec != nil {
+			if h = rec.DeathSound; h == "" {
+				return
+			}
+
+			kind = "form-death"
+		}
 	} else {
 		if !d2audio.HitGruntPlays(v.soundEngine.SpeechPlaying(), v.death.dead) {
 			return

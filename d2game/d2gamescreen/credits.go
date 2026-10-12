@@ -98,7 +98,9 @@ func (v *Credits) LoadContributors() []string {
 func (v *Credits) OnLoad(loading d2screen.LoadingState) {
 	var err error
 
-	v.creditsBackground, err = v.uiManager.NewSprite(d2resource.CreditsBackground, d2resource.PaletteSky)
+	creditsBg, creditsTxt := d2resource.CreditsPaths(expansionInstalled(v.asset))
+
+	v.creditsBackground, err = v.uiManager.NewSprite(creditsBg, d2resource.PaletteSky)
 	if err != nil {
 		v.Error(err.Error())
 	}
@@ -111,7 +113,7 @@ func (v *Credits) OnLoad(loading d2screen.LoadingState) {
 	v.exitButton.OnActivated(func() { v.onExitButtonClicked() })
 	loading.Progress(fourtyPercent)
 
-	fileData, err := v.asset.LoadFile(d2resource.CreditsText)
+	fileData, err := v.asset.LoadFile(creditsTxt)
 	if err != nil {
 		loading.Error(err)
 		return
