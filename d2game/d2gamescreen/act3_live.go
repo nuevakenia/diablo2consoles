@@ -31,6 +31,12 @@ type act3State struct {
 	flailDropped bool
 	// leverPulled is set for the session once the lever of the Lower Kurast Sewers was pulled
 	leverPulled bool
+	// killX, killY is the sub-tile where the last monster died (the Gidbinn boss drops the blade there)
+	killX, killY int
+	// gidbinn is the Gidbinn object the hero operated (the boss wakes next to it)
+	gidbinn *d2mapentity.Object
+	// bossMon is the fetish boss the object woke (only its death drops the blade)
+	bossMon *d2mapentity.Monster
 }
 
 // questItemInHand says whether the hero carries a quest item (the inventory or the quest system's count).
@@ -295,6 +301,11 @@ func (v *Game) act3Operate(ob *d2mapentity.Object) bool {
 	}
 
 	v.Infof("ACT3 %s operated (id %d): gives %q", q.Name, id, q.Item)
+
+	if id == d2act3.ObjGidbinn {
+		v.act3.gidbinn = ob
+	}
+
 	v.questObjectOperated(ob)
 
 	if id == d2act3.ObjSewerLever {
@@ -348,4 +359,35 @@ func (v *Game) operateHellgate(ob *d2mapentity.Object) {
 	v.Infof("ACT3 the hero enters the red portal")
 
 	_ = v.travelToAct(4, "portal")
+}
+
+// spawnGidbinnBoss wakes the fetish boss next to the Gidbinn object (D2MOO ACT3Q3_SpawnGidbinnBoss: class
+// MONSTER_FETISH11 as a unique). UNVERIFIED: the seven tick delay of the original timer and its unique modifiers.
+func (v *Game) spawnGidbinnBoss() {
+	ob := v.act3.gidbinn
+	if ob == nil || v.monsters == nil {
+		v.Warningf("ACT3 the Gidbinn boss cannot wake: no object or no director")
+
+		return
+	}
+
+	stat := v.monsters.FindStat("fetish11")
+	if stat == nil {
+		v.Warningf("ACT3 no monstats row fetish11")
+
+		return
+	}
+
+	x, y := ob.GetPositionF()
+
+	m, err := v.monsters.SpawnNear(stat, int(x*subtilesInTile), int(y*subtilesInTile), 3)
+	if err != nil {
+		v.Warningf("ACT3 the Gidbinn boss: %v", err)
+
+		return
+	}
+
+	v.monsters.MakeUnique(m)
+	v.act3.bossMon = m
+	v.Infof("ACT3 Gidbinn's fetish boss wakes (%s, class %d)", m.Label(), stat.ID)
 }

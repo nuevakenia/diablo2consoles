@@ -312,7 +312,28 @@ func (v *Game) onMonsterKilled(ev d2monsters.KillEvent) {
 		}
 	}
 
-	v.questDispatch(d2quest.Event{Kind: d2quest.EvMonsterKilled, Monster: d2act3.QuestKillClass(class, isSuper), Super: super, Name: ev.Label, Level: r.area})
+	if ev.Monster != nil {
+		v.act3.killX, v.act3.killY = ev.Monster.SubtilePos()
+	}
+
+	freed := 0
+
+	switch {
+	case class == d2quest.NPCPrisonDoor && v.monsters != nil && ev.Monster != nil:
+		// -1: a door that freed nobody (0 would stand for a full group of five in the scripted walk)
+		if freed = v.monsters.RescueDoorDied(ev.Monster); freed == 0 {
+			freed = -1
+		}
+	case class == d2quest.NPCGidbinnBoss && ev.Monster != v.act3.bossMon:
+		class = 0 // an ordinary fetish of the same class
+	case class == prisonerMonClass && v.monsters != nil && ev.Monster != nil:
+		// only a freed barbarian that dies counts (the exe lists the freed ones)
+		if !v.monsters.RescuePrisonerDied(ev.Monster) {
+			class = 0
+		}
+	}
+
+	v.questDispatch(d2quest.Event{Kind: d2quest.EvMonsterKilled, Monster: d2act3.QuestKillClass(class, isSuper), Super: super, Name: ev.Label, Level: r.area, Freed: freed})
 	v.questKillDrops(ev.Label, ev.Class)
 	v.act3Killed(ev)
 	v.uberKilled(ev)
@@ -411,10 +432,17 @@ func (v *Game) applyQuestEffects(effects []d2quest.Effect) {
 				v.startHellforgeShower()
 			}
 		case d2quest.EffectSpawn:
-			if e.Code != "" {
+			switch {
+			case e.Code == d2quest.GidbinnBossCode:
+				v.Infof("QUEST EFFECT spawn-boss code=%s (%s)", e.Code, e.Note)
+				v.spawnGidbinnBoss()
+			case e.Code == d2quest.GidbinnDropCode:
+				v.Infof("QUEST EFFECT spawn-drop code=%s (%s)", d2quest.ItemGidbinn, e.Note)
+				v.dropQuestItemAt(d2quest.ItemGidbinn, v.act3.killX, v.act3.killY)
+			case e.Code != "":
 				v.Infof("QUEST EFFECT spawn-item code=%s (%s)", e.Code, e.Note)
 				v.spawnQuestItem(e.Code)
-			} else {
+			default:
 				v.Infof("QUEST EFFECT spawn (%s) [not simulated]", e.Note)
 			}
 		case d2quest.EffectRespec:

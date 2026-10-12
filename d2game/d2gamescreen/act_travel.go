@@ -9,6 +9,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
 )
@@ -182,6 +183,12 @@ func (v *Game) commandCompleteQuest(args []string) error {
 
 	q.Set(slot, d2s.QuestBitDone)
 	v.Infof("QUEST act=%d quest=%d slot=%d marked done", act, quest, slot)
+
+	// the Act 5 quests open one after the other: a running quest system must see the chain move on
+	if chain := []int{d2quest.QuestSiege, d2quest.QuestRescue, d2quest.QuestPrison, d2quest.QuestBetrayal, d2quest.QuestRite}; act == 5 &&
+		quest >= 1 && quest <= len(chain) && v.questRT != nil {
+		v.questRT.g.ForceDone(chain[quest-1])
+	}
 
 	return nil
 }

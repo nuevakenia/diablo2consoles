@@ -14,6 +14,8 @@ import (
 const (
 	objCagedWussie   = 473
 	prisonDoorMonKey = "prisondoor"
+	prisonerMonKey   = "act5pow" // class 534 (0x216 in the exe handler): the caged barbarians
+	prisonerMonClass = 534
 )
 
 // placePrisonDoors puts one prison door monster on every barbarian cage of the level, once per level build, unless the
@@ -24,6 +26,7 @@ func (v *Game) placePrisonDoors() {
 	}
 
 	v.prisonDoors = v.levels.changes + 1
+	v.monsters.ResetRescue()
 
 	if r := v.quests(); r != nil {
 		if q := r.g.Quest(d2quest.QuestRescue); q != nil && r.g.Rec.Get(q.Slot, d2quest.FlagRewardGranted) {
@@ -37,6 +40,14 @@ func (v *Game) placePrisonDoors() {
 	}
 
 	placed := 0
+	pow := v.monsters.FindStat(prisonerMonKey)
+	notIntro := false
+
+	if r := v.quests(); r != nil {
+		if q := r.g.Quest(d2quest.QuestRescue); q != nil {
+			notIntro = q.NotIntro
+		}
+	}
 
 	for _, e := range v.gameClient.MapEngine.Entities() {
 		ob, ok := e.(*d2mapentity.Object)
@@ -53,6 +64,11 @@ func (v *Game) placePrisonDoors() {
 		}
 
 		placed++
+
+		// the cage's five prisoners (ACT5Q2_SpawnCagedWussies; only while the quest is on, VERIFIED D2MOO)
+		if pow != nil && notIntro {
+			v.monsters.SpawnRescueGroup(pow, sx, sy)
+		}
 	}
 
 	if placed > 0 {

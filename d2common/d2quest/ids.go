@@ -96,6 +96,8 @@ const (
 	NPCCouncilB       = 346
 	NPCCouncilC       = 347
 	NPCPrisonDoor     = 434
+	NPCGidbinnBoss    = 407 // fetish11, the boss the Gidbinn object wakes (D2MOO MONSTER_FETISH11)
+	NPCWussie         = 534 // act5pow, the caged barbarian (0x216 in the Rescue handler)
 	NPCNihlathakBoss  = 526
 	NPCAnyaFrozen     = 527 // "Drehya outside town", the frozen Anya (UNVERIFIED)
 	NPCAncientStatue1 = 537
@@ -219,3 +221,10 @@ func actOfLevel(level int) int {
 
 	return 4
 }
+
+// Codes of the EffectSpawn effects of the Gidbinn boss: the engine spawns the boss near the object, and drops the
+// blade where the boss fell.
+const (
+	GidbinnBossCode = "boss:fetish11"
+	GidbinnDropCode = "drop:g33"
+)

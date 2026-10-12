@@ -203,8 +203,9 @@ type Director struct {
 	staggerRNG *d2rand.Seed        // generator of the hit recovery gate
 	regionRNG  *d2rand.Seed        // region seed of the teleport destination search
 
-	boss BossHooks  // the boss AIs' encounter hooks (bosshooks.go)
-	rite *RiteState // Rite of Passage fight state (act5_host.go)
+	boss   BossHooks    // the boss AIs' encounter hooks (bosshooks.go)
+	rite   *RiteState   // Rite of Passage fight state (act5_host.go)
+	rescue *RescueState // Rescue on Mount Arreat state (rescue_host.go)
 
 	// ExpBonusPct, when set, returns the percent of extra experience per kill
 	// (the experience shrine).

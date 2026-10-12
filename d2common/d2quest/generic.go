@@ -114,6 +114,29 @@ var chainAfter = map[int][]int{
 	QuestGoldenBird:      {QuestKhalim, QuestBlade}, // VERIFIED shape: the Golden Bird's SeqCallback (D2MOO ACT3Q4_SeqCallback) kicks Khalim (16) and the Blade (17)
 	QuestBlackenedTemple: {QuestGuardian},
 	QuestRite:            {QuestEve},
+	// Act 5 (VERIFIED shape, D2MOO nSeqId of A5Q1..A5Q4 = 32..35 and the SeqCallback of each quest: the next
+	// quest starts at state 0 and becomes state 1 when the one before it is done; the Siege's SeqCallback runs on
+	// Larzuk's thanks (0x584d60), the others when their reward is paid)
+	QuestSiege:    {QuestRescue},
+	QuestRescue:   {QuestPrison},
+	QuestPrison:   {QuestBetrayal},
+	QuestBetrayal: {QuestRite},
+}
+
+// ForceDone marks a quest as paid out and makes the quests after it available, like a hero who finished it in an
+// earlier game (Start does the same for a stored record). The scripted walks and the debug console use it to reach a
+// quest of the Act 5 chain without playing the ones before it.
+func (g *Game) ForceDone(id int) {
+	q := g.byID[id]
+	if q == nil || g.get(q, FlagRewardGranted) {
+		return
+	}
+
+	g.set(q, FlagRewardGranted, "forced done")
+	g.Rec.Clear(q.Slot, FlagRewardPending)
+	q.NotIntro, q.Active, q.LastState = false, false, 0
+	g.global.Set(q.Slot, FlagCompletedEarly)
+	g.chainFrom(q)
 }
 
 // chainFrom makes the quests after q available.

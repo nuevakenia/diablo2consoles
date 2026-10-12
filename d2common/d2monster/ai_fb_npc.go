@@ -614,7 +614,7 @@ type FBNWussieHost interface {
 	// Refresh is RefreshLogIfStarted.
 	Refresh(b *Brain)
 	// Shout sends the help packet to the player.
-	Shout(b *Brain, p Target)
+	WussieShout(b *Brain, p Target)
 	// Rescued increments the group counter, clears the path, cancels the
 	// think event and removes the unit from the level.
 	Rescued(b *Brain)
@@ -641,7 +641,7 @@ func thinkWussieB(c *Ctx) {
 					w.Refresh(b)
 
 					if b.Roll(1000) < 100 {
-						w.Shout(b, p)
+						w.WussieShout(b, p)
 					}
 				} else {
 					w.NearGroup(b)

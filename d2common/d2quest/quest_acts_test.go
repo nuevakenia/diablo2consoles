@@ -908,6 +908,7 @@ func TestAct5QuestLine(t *testing.T) {
 
 	g2, _ := newGame(t)
 	g2.Hero.Level = 20
+	g2.ForceDone(QuestBetrayal) // the Rite opens when Betrayal of Harrogath is done
 	moveTo(g2, 1, LevelHarrogath)
 	talk(g2, NPCQualKehk)
 	moveTo(g2, LevelHarrogath, LevelArreatSummit)
@@ -983,6 +984,7 @@ func TestRescueRunesFollowTheFreedBarbarians(t *testing.T) {
 		g, _ := newGame(t)
 		q := g.Quest(QuestRescue)
 
+		g.ForceDone(QuestSiege) // Rescue opens when the Siege is done
 		moveTo(g, 1, LevelHarrogath)
 		talk(g, NPCQualKehk)
 		moveTo(g, LevelHarrogath, LevelFrigidHighlands)

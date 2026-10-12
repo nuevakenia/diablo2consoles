@@ -16,7 +16,7 @@ func TestQuestObjectsGiveTheirItems(t *testing.T) {
 		{ObjChestBrain, d2quest.ItemKhalimBrain, 91},
 		{ObjChestHeart, d2quest.ItemKhalimHeart, 93},
 		{ObjLamEsenTome, d2quest.ItemLamEsenTome, 94},
-		{ObjGidbinn, d2quest.ItemGidbinn, 0},
+		{ObjGidbinn, "", 0},
 		{ObjCompellingOrb, "", 83},
 		{ObjSewerLever, "", 92},
 	}
