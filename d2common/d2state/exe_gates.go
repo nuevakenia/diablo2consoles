@@ -12,8 +12,8 @@ type Target struct {
 	// Merc is MONSTER_GetHirelingClassIndex (0x63fed0) != 0: the monster is a mercenary. Verified.
 	Merc bool
 	// DataFlag8 is bit 8 of the monster unit data flags (+0x16, MONSTER_HasDataFlag16(unit, 8)). The meaning
-	// of the bit is UNVERIFIED (the same word has bit 2 on the kill announcement path, bit 4 on champion
-	// minions); the effect is verified.
+	// of the bit is the unique type bit (MONSTER_IsUnique 0x4aaad0, VERIFIED, d2mapentity.MonTypeUnique; bit 2 is
+	// the super unique one, bit 4 champion); the effect is verified.
 	DataFlag8 bool
 	// ZeroSpeed is monstats Velocity == 0 (stun skips immobile monsters). Verified.
 	ZeroSpeed bool

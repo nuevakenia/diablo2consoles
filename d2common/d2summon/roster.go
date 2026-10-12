@@ -72,8 +72,11 @@ func counted(petType string) bool {
 // of Life share "vine", the three totems "totem", the shadows
 // "shadowwarrior").
 //
-// Two cases (the second is UNVERIFIED in the exe, but matches the play
-// experience of golems, shadows and sentries):
+// Two cases (the second is VERIFIED, PETS_PreparePetSlotForNewPet 0x573a30: when
+// the list of a pet type holds petmax records, the head record, the oldest,
+// is removed first and its unit released; the new one is appended at the tail;
+// the first is UNVERIFIED, the exe's Raven do function 0x5c48a0 spawns one
+// raven per run and each run evicts the oldest at the limit):
 //   - a multi-summon (Count > 1, the Raven) tops the group up to Max and
 //     creates nothing when it is already full;
 //   - a single summon at the limit removes the oldest minion of the type.

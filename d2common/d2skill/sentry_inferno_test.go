@@ -10,6 +10,21 @@ func TestInfernoLife(t *testing.T) {
 	}
 }
 
+// 0x5ca5b0: a calc1 below 1 becomes (missile Param2 - 1) + level, then the same clamps.
+func TestInfernoCalc1Fallback(t *testing.T) {
+	if got := InfernoCalc1(0, 12, 4); got != 15 {
+		t.Errorf("fallback %d", got)
+	}
+
+	if got := InfernoCalc1(9, 12, 4); got != 9 {
+		t.Errorf("calc1 kept %d", got)
+	}
+
+	if InfernoLife(InfernoCalc1(-2, 1, 1)) != 1 { // 0 -> clamp to 1
+		t.Error("clamp")
+	}
+}
+
 // The real "mon inferno sentry" row: calc1 = ln34/2 + skill('Wake of Fire Sentry'.blvl); at level 6 with 4 points in
 // Wake of Fire. Only checked to be within the clamp so the flame gets a life.
 func TestInfernoSentryRowHasALife(t *testing.T) {

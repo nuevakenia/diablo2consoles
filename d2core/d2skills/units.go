@@ -273,8 +273,8 @@ func (h *heroUnit) AttackRating() int {
 }
 
 // DualWielding is SKILL_IsDualWieldingTypeWeapons (0x5d7d90): both hands hold
-// a weapon of the melee type (VERIFIED by table: the exe's item type ids are
-// ItemTypes.txt rows, 0x2e = row 46 = "mele"; TestExeTableRows pins it). Whirlwind hits twice per tick then.
+// a weapon of the melee type (VERIFIED, exe item type ids are ItemTypes row numbers: 0x2e is row 46, "mele";
+// see w36 exe_rows_test.go). Whirlwind hits twice per tick then.
 func (h *heroUnit) DualWielding() bool {
 	if h.merc != nil || h.p.Equipment == nil || h.p.Equipment.RightHand == nil || h.p.Equipment.LeftHand == nil {
 		return false
@@ -410,9 +410,26 @@ func (e *Engine) MasteryFor(unitID string, k d2skill.MasteryKind, wt string, thr
 	return d2skill.MasteryValue(mods, k, thrown, func(t string) bool { return d2skill.TypeIs(e.equivOf, wt, t) })
 }
 
-// RangedWeaponMissile is not derived from the weapon type yet (UNVERIFIED /
-// not implemented): weapons are treated as melee.
+// RangedWeaponMissile is not derived from the weapon type (the base attack missile comes from the game's own
+// attack path, not from this adapter): weapons are treated as melee. The exe's own rule
+// (UNIT_GetRangedWeaponMissileType 0x6472a0) only overrides the base attack with the magic / exploding arrow stats
+// 0x9d / 0x9e or the plain bolt; the skills read the weapon class through AttackWeaponClass instead.
 func (h *heroUnit) RangedWeaponMissile() string { return "" }
+
+// AttackWeaponClass implements d2skill.AttackWeaponClasser: the COF weapon class code of the hero's weapon
+// ("bow", "xbw", "hth"...), the class UNIT_GetAttackWeaponClass (0x623e60) reports. Mercenaries and a hero
+// without composite give "" (the skills then use the old ranged-missile name rule).
+func (h *heroUnit) AttackWeaponClass() string {
+	if h.merc != nil || h.p == nil || h.p.Equipment == nil {
+		return ""
+	}
+
+	if h.p.Equipment.RightHand == nil {
+		return "hth"
+	}
+
+	return h.p.Equipment.RightHand.GetWeaponClass()
+}
 
 // ThrownMissile is a javelin when the scenario gives infinite ammunition (the
 // weapon type is not mapped to missiles yet; UNVERIFIED), else none.

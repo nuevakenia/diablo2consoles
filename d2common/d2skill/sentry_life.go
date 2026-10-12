@@ -23,12 +23,13 @@ func (c *cast) sentryLife() (level, life int) {
 }
 
 // calcOrState is SRVDO_EvalSkillCalcOrStateValue (0x5d4c80 area, VERIFIED
-// read): for a skill with bit 4 of its flag word set whose aurastate the unit
+// read): for a skill with mask 4 of its flag word 4 set whose aurastate the unit
 // currently holds, the value is prgcalc1, 2 or 3 chosen by the base value of
 // the state's aurastat1 (at most 1 gives prgcalc1, 2 gives prgcalc2, 3 or more
-// prgcalc3); every other case is prgcalc1. The state branch is UNVERIFIED here
-// (the flag bit is not decoded and no skill read in this wave uses it), so
-// this returns prgcalc1, which is what Mind Blast and Blade Fury reach.
+// prgcalc3); every other case is prgcalc1. Mask 4 of dwBits4 is the skills.txt
+// "progressive" column (DATATBL_LoadSkillsTable 0x613450, VERIFIED), the charge-up
+// skills, which have their own path (the burst code). Mind Blast and Blade Fury are not progressive, so
+// prgcalc1, which this returns, is exact for them.
 func (c *cast) calcOrState() int {
 	return c.env.eval(c.sk.PrgCalc[1])
 }

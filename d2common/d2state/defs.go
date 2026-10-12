@@ -23,12 +23,16 @@ type Def struct {
 	Aura   bool
 	// PlrStayDeath, MonStayDeath and BossStayDeath: the state survives the
 	// death of a player / monster / boss; every other state is cleared.
-	// Meaning inferred from the shipped data (freeze keeps MonStayDeath so
-	// frozen corpses stay blue; alignment, sync_warped and corpse_noselect
-	// keep PlrStayDeath). U in the exe.
+	// VERIFIED (STATE_StaysOnDeath 0x63b5b0, flag bits 13 and 14 of
+	// DATATBL_LoadStatesTable): a monster tests MonStayDeath, everything else
+	// PlrStayDeath; the boss column is not read there (freeze keeps
+	// MonStayDeath so frozen corpses stay blue).
 	PlrStayDeath, MonStayDeath, BossStayDeath bool
 	// Shatter: a unit that dies with this state shatters (freeze).
 	Shatter bool
+	// UDead is the states.txt "udead" column, flag bit 33, the state group mask +0x150 of the exe
+	// (STATE_UnitHasStateInMask150, VERIFIED 0x617c50): a corpse that holds one is no raise / explode target.
+	UDead bool
 	// Blue is the states.txt column. Verified (0x4d65a0): the client's colour
 	// choice does not read it; only ColorPri and ColorShift decide (the
 	// column is used elsewhere, not located).
@@ -67,7 +71,7 @@ func ParseDefs(data []byte) (defs Defs, err error) {
 			Curse: d.Number("curse") > 0, RemHit: d.Number("remhit") > 0, Aura: d.Number("aura") > 0,
 			PlrStayDeath: d.Number("plrstaydeath") > 0, MonStayDeath: d.Number("monstaydeath") > 0,
 			BossStayDeath: d.Number("bossstaydeath") > 0, Shatter: d.Number("shatter") > 0,
-			Blue: d.Number("blue") > 0, ColorPri: d.Number("colorpri"), ColorShift: d.Number("colorshift"),
+			UDead: d.Number("udead") > 0, Blue: d.Number("blue") > 0, ColorPri: d.Number("colorpri"), ColorShift: d.Number("colorshift"),
 			Overlay1: d.String("overlay1"), Stat: d.String("stat"),
 		}
 		id++

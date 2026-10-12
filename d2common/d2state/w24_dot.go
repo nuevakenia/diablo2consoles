@@ -48,8 +48,7 @@ type MonsterRegen struct {
 	// when LifeFlagState is set.
 	Regen, BaseRegen int
 	// LifeFlagState is STATE_UnitHasStateInMask14C: the unit has a state of states.txt mask index 32 (0x20 in
-	// the loader, the column between shatter and udead; the header string sits at 0x6e90d8 and its name is
-	// UNVERIFIED, the order points at "life"). When set the unit's base regeneration is left out of the sum.
+	// the loader, the column between shatter and udead; the header string at 0x6e90d8 reads "life", VERIFIED). When set the unit's base regeneration is left out of the sum.
 	LifeFlagState bool
 	// PreventHeal is state 0x34.
 	PreventHeal bool

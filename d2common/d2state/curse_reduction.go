@@ -74,6 +74,12 @@ func CurseNullified(orig, reduced []StatMod) bool {
 // a monster that has no such animation (hydras, sentries, traps, tentacles, nests, maggot queens, ...).
 const WalkModeIndex = 2
 
+// TimedStateRefusedForMonster is the first test of SKILL_CreateTimedStateStatList (0x56c740, VERIFIED, disassembly
+// 0x56c7b9..0x56c7d6) for a monster target: the class is refused when its monstats npc column is set (dwBitsc
+// bit 8) or its monstats2 isAtt column is clear (flag bit 9). Every timed state of the skills goes through it
+// (curses, Inner Sight, Slow Missiles, Attract, Confuse, Enchant...).
+func TimedStateRefusedForMonster(npc, attackable bool) bool { return npc || !attackable }
+
 // CurseableMonster is the monster part of SKILL_IsCurseableUnit: the class needs a walk animation. (The exe
 // also refuses a monster with data flag16 bit 0x20 set, whose meaning is not decoded, and needs the
 // target hostile to the caster.)

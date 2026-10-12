@@ -9,7 +9,9 @@ const (
 	modeDead    = 0x11
 )
 
-// Bits4Hold is dwBits4 bit 31 of a skills row (meaning unverified): the action holds against interruption.
+// Bits4Hold is dwBits4 bit 31 of a skills row: the skills.txt "interrupt" column (DATATBL_LoadSkillsTable 0x613450,
+// VERIFIED). A skill without it (Kick, Zeal, Frenzy, Whirlwind...) is not broken by a block; one with it is broken
+// unless the Concentration aura (state 0x2a) or Concentrate (state 0xf) holds it.
 const Bits4Hold = 0x80000000
 
 // srvdo functions that repeat freely when the same skill is cast again.

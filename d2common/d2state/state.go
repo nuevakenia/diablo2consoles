@@ -298,6 +298,24 @@ func (s *Set) AddStream(frame int, kind string, perFrame, frames int, source str
 	s.streams = append(s.streams, st)
 }
 
+// StreamOpenWounds is the kind of the open wounds stream (state 0x3e, stat 0x4a negative; 0x5bda80).
+const StreamOpenWounds = "openwounds"
+
+// RefreshStream moves the end of the active stream of a kind to until and reports whether there was one. Open
+// wounds works this way (ITEM_ApplyOpenWoundsEvent 0x5bda80 through 0x56c740: a statlist of the same state, skill
+// and level only has its expiry set again; the first strength stays).
+func (s *Set) RefreshStream(frame int, kind string, until int) bool {
+	for i := range s.streams {
+		if cur := &s.streams[i]; cur.Kind == kind && cur.Until > frame {
+			cur.Until = until
+
+			return true
+		}
+	}
+
+	return false
+}
+
 // Streams returns the active streams.
 func (s *Set) Streams(frame int) []Stream {
 	var out []Stream
@@ -315,6 +333,8 @@ func (s *Set) Streams(frame int) []Stream {
 type TickResult struct {
 	// Poison and Burn are the whole hit points lost this frame.
 	Poison, Burn int
+	// Wounds is the open wounds loss of this frame (StreamOpenWounds), whole hit points like the other two.
+	Wounds int
 	// Expired lists the states that ended on this frame.
 	Expired []string
 }
@@ -349,6 +369,8 @@ func (s *Set) Tick(frame int) TickResult {
 		switch kind {
 		case "poison":
 			res.Poison += whole
+		case StreamOpenWounds:
+			res.Wounds += whole
 		default:
 			res.Burn += whole
 		}
@@ -462,6 +484,17 @@ func (s *Set) Death(kind string) {
 func (s *Set) Shatters(frame int) bool {
 	for n, in := range s.states {
 		if d, ok := s.defs[n]; ok && d.Shatter && in.Active(frame) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// HasUDead is STATE_UnitHasStateInMask150: an active state carries the states.txt udead flag.
+func (s *Set) HasUDead(frame int) bool {
+	for n, in := range s.states {
+		if d, ok := s.defs[n]; ok && d.UDead && in.Active(frame) {
 			return true
 		}
 	}

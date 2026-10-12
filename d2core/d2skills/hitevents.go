@@ -47,14 +47,14 @@ func rawPhysResist(m *d2mapentity.Monster) int {
 	return [3]int{s.ResistancePhysicalNormal, s.ResistancePhysicalNightmare, s.ResistancePhysicalHell}[diff]
 }
 
-// crushingClass classifies a monster for CrushingBlowDivisor. The monster data
-// flag +0x16 & 2 (also boss-like) is not mapped to a field and is UNVERIFIED
-// here.
+// crushingClass classifies a monster for CrushingBlowDivisor (item event func 16, 0x5bdbf0, VERIFIED): the boss
+// class is the monstats boss bit or the monster data flag +0x16 & 2, which is the super unique type bit
+// (MonTypeSuperUnique, MONSTER_IsSuperUnique 0x4aab10).
 func crushingClass(m *d2mapentity.Monster) d2combat.CrushingBlowDefender {
 	switch {
 	case specialCrushingClasses[m.MonstatID()]:
 		return d2combat.CBSpecial
-	case m.Stat.IsSpecialBoss:
+	case m.Stat.IsSpecialBoss || m.TypeFlags&d2mapentity.MonTypeSuperUnique != 0:
 		return d2combat.CBBossMonster
 	}
 
@@ -135,10 +135,14 @@ func (e *Engine) itemEvents(m *d2mapentity.Monster, p *d2mapentity.Player, melee
 
 // applyOpenWounds attaches state 0x3e (200 frames, skill 0, level 1, hp regen
 // = -value). The same state just refreshes the expiry (0x56c740). The life
-// drained per tick is NOT applied: the unit of stat 0x4a per tick is
-// UNVERIFIED in the notes.
+// drained per tick is stat 0x4a in 1/256 life points per frame (MONSTER_LifeRegenEventTick 0x5a4340, VERIFIED,
+// d2state.RunMonsterRegen), run here as a stream of the set (d2state.StreamOpenWounds).
 func (e *Engine) applyOpenWounds(m *d2mapentity.Monster, p *d2mapentity.Player, w d2combat.OpenWoundsEffect) {
 	set := e.setOf(m.ID())
+
+	if !set.RefreshStream(e.frame, d2state.StreamOpenWounds, w.Expires) {
+		set.AddStream(e.frame, d2state.StreamOpenWounds, -w.RegenStat, w.Expires-e.frame, p.ID(), 0)
+	}
 
 	if cur := set.Get(e.frame, StateOpenWounds); cur != nil {
 		next := *cur

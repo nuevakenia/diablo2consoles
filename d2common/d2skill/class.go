@@ -2,7 +2,6 @@ package d2skill
 
 import (
 	"math"
-	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2missile"
@@ -701,15 +700,19 @@ func doChargedStrikeFn(c *cast) {
 	bolts := c.calc(1)
 	ux, uy := c.u.Pos()
 
+	// SRVDO_011 0x5da4a0 + hook 0x5c7340 (VERIFIED): start at the target, destination 2*target - caster, seed =
+	// destination x + index, path type 10 (the same wobbling path as Charged Bolt, d2missile.PathType10Nodes).
+	x, y := c.tgt.UX, c.tgt.UY
+	dx, dy := 2*x-ux, 2*y-uy
+
 	for i := 0; i < bolts; i++ {
-		ang := ChargedBoltAim(ux, uy, c.tgt.UX, c.tgt.UY, i)
-		x, y := c.tgt.UX, c.tgt.UY
 		tg := c.tgt
-		tg.Unit, tg.X, tg.Y = nil, x+int(math.Round(math.Cos(ang)*10)), y+int(math.Round(math.Sin(ang)*10))
+		tg.Unit, tg.X, tg.Y = nil, dx, dy
 
 		cc := *c
 		cc.tgt = tg
-		cc.castM(c.missileName(), castOpts{hasStart: true, startX: float64(x) + 0.5, startY: float64(y) + 0.5})
+		cc.castM(c.missileName(), castOpts{hasStart: true, startX: float64(x) + 0.5, startY: float64(y) + 0.5,
+			pathType10: true, pathSeed: ChargedBoltSeed(dx, i)})
 	}
 }
 
@@ -765,11 +768,12 @@ func doLightningStrikeFn(c *cast) {
 // "real" middle missiles: the (calc1-calc3)/2 flanking ones on each side are
 // created with flag 0x10000 (meaning UNVERIFIED, not modelled) and only the
 // middle calc3 without it (calc3 0 means all). The missile B pick is the exe's
-// "attack weapon class is not 1" test; the engine has no weapon class, so the
-// old stand-in (a crossbow bolt) stays UNVERIFIED.
+// "attack weapon class is not 1" test, ported as UsesMissileB (VERIFIED; the hero reports its COF weapon class).
+// Flag 0x10000 of the created missiles is set on the flanking ones and on the middle ones it is clear; what it
+// does inside MISSILE_CreateServerMissile is not traced (UNVERIFIED).
 func doFanFn(c *cast) {
 	name := c.sk.SrvMissileA
-	if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
+	if UsesMissileB(c.u, c.sk) {
 		name = c.sk.SrvMissileB
 	}
 
@@ -804,7 +808,7 @@ func doFanFn(c *cast) {
 // reads into the percent pool of the arrow; the unit flag 0x40 is set; a crossbow picks srvmissileb.
 func doHomingFn(c *cast) {
 	name := c.missileName()
-	if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
+	if UsesMissileB(c.u, c.sk) {
 		name = c.sk.SrvMissileB
 	}
 

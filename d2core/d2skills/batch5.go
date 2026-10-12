@@ -11,10 +11,14 @@ import (
 // cast target carries.
 
 // corpseFacts describes a corpse for the raise / revive tests (d2skill.CorpseRaisable, CorpseExplodable). The
-// selectable flag is the corpseSel column of monstats2 (bit 7 of the flag word, UNVERIFIED mapping); a monster
+// selectable flag is the corpseSel column of monstats2 (bit 7 of the flag word, VERIFIED mapping, 0x658ee0); a monster
 // without a monstats2 row counts as selectable.
 func (e *Engine) corpseFacts(m *d2mapentity.Monster) *d2skill.CorpseFacts {
 	f := &d2skill.CorpseFacts{Monster: true, Dead: true, Selectable: true}
+
+	if st := e.sets[m.ID()]; st != nil {
+		f.InStateMask150 = st.HasUDead(e.frame) // the states.txt udead column (0x63b870, VERIFIED)
+	}
 
 	if m.Stat == nil {
 		f.WalkSpeed = 1

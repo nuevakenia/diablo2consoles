@@ -1,7 +1,5 @@
 package d2skill
 
-import "strings"
-
 // clockFor asks the host for the action-event clock of the caster's attack animation (nil: none).
 func (p *Pipeline) clockFor(u Unit, sk *Skill) *ActionClock {
 	if p.Clock == nil {
@@ -74,7 +72,7 @@ func strafeReach(c *cast) int {
 // strafeMissile is the arrow missile of a Strafe: srvmissilea, srvmissileb for a crossbow (VERIFIED 0x5da6c0).
 func strafeMissile(c *cast) string {
 	name := c.sk.SrvMissileA
-	if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
+	if UsesMissileB(c.u, c.sk) {
 		name = c.sk.SrvMissileB
 	}
 

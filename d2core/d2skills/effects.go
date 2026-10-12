@@ -408,11 +408,16 @@ func (e *Engine) areaState(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 
 	curse := curseDoFunc(sk.SrvDoFunc)
 
-	// UNVERIFIED gap (wave 23): Inner Sight and Slow Missiles (SRVDO_InnerSight 0x5d9d70) put their state on
-	// through SKILL_CreateTimedStateStatList (0x56c740), which refuses a monster class with monstats flag 0x100 or
-	// without a bit (value 2) of a monstats2 byte that is not the walk mode test of SKILL_IsCurseableUnit; both
-	// refusals are not modelled here.
+	// Inner Sight, Slow Missiles (SRVDO_InnerSight 0x5d9d70) and the curses put their state on through
+	// SKILL_CreateTimedStateStatList (0x56c740), which refuses a monster class with the monstats npc column set or
+	// the monstats2 isAtt column clear (VERIFIED, wave 37; d2state.TimedStateRefusedForMonster).
 	for _, m := range e.monstersNear(cx, cy, ef.Radius) {
+		if m.Stat != nil && m.StatEx != nil && d2state.TimedStateRefusedForMonster(m.Stat.IsNpc, m.StatEx.IsAttackable) {
+			e.emit("state", "STATE refused skill=%q unit=%s (npc or not attackable)", sk.Name, m.Label())
+
+			continue
+		}
+
 		if curse && !curseableMonster(m, ef.Stats) {
 			e.emit("state", "STATE curse refused skill=%q unit=%s (not curseable)", sk.Name, m.Label())
 
@@ -1504,8 +1509,8 @@ func (e *Engine) tick() {
 			continue
 		}
 
-		if res.Poison+res.Burn > 0 {
-			e.dot(mt.m, res.Poison, res.Burn)
+		if res.Poison+res.Burn+res.Wounds > 0 {
+			e.dot(mt.m, res.Poison, res.Burn+res.Wounds) // open wounds drains like burn: hpregen 0x4a, 0x5a4340
 		}
 
 		if len(res.Expired) > 0 {

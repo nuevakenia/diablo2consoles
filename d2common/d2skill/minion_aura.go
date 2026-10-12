@@ -8,8 +8,8 @@ func auraDoFunc(f int) bool { return f == 65 || f == 66 || f == 81 || f == 82 }
 // returns its name and level. SKILL_SpawnSummonedMinion (0x5c1f20 neighbour, read wave 22) adds each skill to the
 // minion and, when the skill has bit 0x20 of its flag word 4, makes it the minion's active skill, which runs
 // SKILL_ServerActivateToggleStateSkill at once: the aura state goes on and the periodic evaluation starts.
-// UNVERIFIED: which skills.txt column sets bit 0x20; the port takes "has an aura state, is not passive and runs
-// an aura do function". Fire Golem: Holy Fire at sumsk1calc.
+// Bit 0x20 of dwBits4 is the skills.txt "aura" column (VERIFIED, DATATBL_LoadSkillsTable 0x613450, bit index 5); the
+// port takes "is an aura, has an aura state and runs an aura do function". Fire Golem: Holy Fire at sumsk1calc.
 func (c *cast) minionAura() (string, int) {
 	for i := 1; i <= 5; i++ {
 		name := c.sk.SumSkill[i]
@@ -18,7 +18,7 @@ func (c *cast) minionAura() (string, int) {
 		}
 
 		ms := c.p.Skills.ByName(name)
-		if ms == nil || ms.Passive || ms.AuraState == "" || !auraDoFunc(ms.SrvDoFunc) {
+		if ms == nil || !ms.Aura || ms.AuraState == "" || !auraDoFunc(ms.SrvDoFunc) {
 			continue
 		}
 
