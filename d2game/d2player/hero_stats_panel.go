@@ -504,6 +504,12 @@ func (s *HeroStatsPanel) setDerivedValues() {
 }
 
 func (s *HeroStatsPanel) setStatValues() {
+	// the "Stat Points Remaining" number follows the hero (a level up while the panel exists showed the old count;
+	// wave 41 hunt: 5 points per level but the box read 0 beside the red + buttons)
+	if s.remainingPoints != nil {
+		s.remainingPoints.SetText(strconv.Itoa(s.heroState.StatsPoints))
+	}
+
 	s.labels.Level.SetText(strconv.Itoa(s.heroState.Level))
 	s.labels.Experience.SetText(strconv.Itoa(s.heroState.Experience))
 	s.labels.NextLevelExp.SetText(strconv.Itoa(s.heroState.NextLevelExp))

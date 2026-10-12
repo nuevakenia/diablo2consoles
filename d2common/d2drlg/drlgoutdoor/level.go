@@ -118,6 +118,7 @@ func (e *Env) Pattern(file string) (*Pattern, error) {
 		return nil, fmt.Errorf("drlgoutdoor: %s: %w", file, err)
 	}
 
+	p.Path = file
 	e.cache[file] = p
 
 	return p, nil

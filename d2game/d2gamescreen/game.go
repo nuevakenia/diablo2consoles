@@ -813,6 +813,8 @@ func (v *Game) anchorNPCMenu(menu *d2player.NPCMenu, npc d2interface.MapEntity) 
 
 // openNPCMenu shows the Talk/Trade/... menu for an NPC.
 func (v *Game) openNPCMenu(menu *d2player.NPCMenu, npc d2interface.MapEntity) []d2player.NPCMenuRow {
+	v.interruptSpeech()
+
 	classID := v.npcClassID(npc)
 	rows, known := v.npcMenuRows(classID)
 
@@ -925,6 +927,7 @@ func (v *Game) openTrade(npc d2interface.MapEntity, seed uint32) bool {
 		return false
 	}
 
+	v.interruptSpeech()
 	v.gameControls.OpenTrade(vendor, seed)
 
 	v.npcTarget, v.tradeActive = npc, true
