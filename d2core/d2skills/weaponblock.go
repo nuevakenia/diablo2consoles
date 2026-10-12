@@ -6,8 +6,10 @@ import (
 )
 
 // weaponBlockChance is the Weapon Block chance of a hero for the avoid roll (COMBAT_GetEquippedTypeBonusFromStat15C
-// 0x57bcb0) and whether the weapon class test of 0x57bd60 passes: an Assassin with a claw (item type "h2h", the
-// engine's name for exe type 0x2d, UNVERIFIED mapping) in BOTH hands (see d2skill/weaponblock.go). The chance is 0
+// 0x57bcb0) and whether the weapon class test of 0x57bd60 passes: an Assassin with an item of exe type 0x2d in BOTH
+// hands. 0x2d is row 45 of the item type table (itemtypes.bin, checked against the owner's data: code "weap", the
+// generic Weapon type, not the claw type h2h which is row 67; w37 corrected the older h2h guess). Only claws can
+// be wielded in the Assassin's off hand, so in play this still means two claws (see d2skill/weaponblock.go). The chance is 0
 // when the test fails, so the avoid chain does not roll.
 func (e *Engine) weaponBlockChance(h *heroUnit) int {
 	if h == nil || h.merc != nil || h.p == nil || h.p.Class != d2enum.HeroAssassin || h.p.Equipment == nil ||
@@ -22,7 +24,7 @@ func (e *Engine) weaponBlockChance(h *heroUnit) int {
 		return func(want string) bool { return d2skill.TypeIs(e.equivOf, have, want) }
 	}
 
-	if lt == "" || rt == "" || !is(lt)("h2h") || !is(rt)("h2h") {
+	if lt == "" || rt == "" || !is(lt)("weap") || !is(rt)("weap") {
 		return 0
 	}
 

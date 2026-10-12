@@ -150,6 +150,17 @@ func (c *cast) runPrgFunc(fn, charge int) {
 		r := prgValue(c.env, c.sk, charge)
 
 		c.effect(Effect{Kind: "area_hit", Origin: "aim", X: ax, Y: ay, Radius: r, Filter: c.sk.AuraFilter, Desc: c.desc()})
+	case 40: // SRVDO_040 0x5d3890 (w37, VERIFIED): one progressive missile created at the target position
+		if name == "" || c.lvl < 1 {
+			return
+		}
+
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, name, Target{X: ax, Y: ay},
+			castOpts{hasStart: true, startX: float64(ax) + 0.5, startY: float64(ay) + 0.5, stationary: true}); m != nil {
+			c.res.Missiles = append(c.res.Missiles, m)
+		}
+	case 41: // SRVDO_041 0x5d3910 (w37, VERIFIED): the chaos ice burst, see chaosIceBurst
+		c.chaosIceBurst(name, ax, ay, prgValue(c.env, c.sk, charge))
 	case 39: // SRVDO_039: radius*radius random tries of the progressive missile inside the circle
 		r := prgValue(c.env, c.sk, charge)
 		if name == "" || r < 1 {
@@ -185,3 +196,44 @@ func (c *cast) ringMissile(name string, ax, ay, i int, o castOpts) {
 		c.res.Missiles = append(c.res.Missiles, m)
 	}
 }
+
+// chaosIceBurst is SRVDO_041 (Royal Strike's third charge, 0x5d3910, w37). VERIFIED: the unit seed is stepped once
+// and a local generator started from its low word (DRLG_InitSeed); count (SRVDO_EvalSkillCalcOrStateValue, par5 =
+// 16 in the table) missiles are created at the target position, each with a heading (dx, dy), both
+// rand(40) - 20 (two rolls, x then y; both zero becomes (20, 0)). Each missile gets data field 0x28 = the local
+// seed's low word after the rolls and data field 0x2c = the heading as two shorts, which is what the chaos ice
+// flight function (d2missile chaosIceTurn, do function 35) turns every Param1 frames.
+// UNVERIFIED: that the heading is also the missile's initial destination offset from the start (taken so), and
+// the local seed (the unit's own seed word is not reachable here, a roll of the caster stands in for it).
+func (c *cast) chaosIceBurst(name string, ax, ay, count int) {
+	if name == "" || count < 1 || c.lvl < 1 {
+		return
+	}
+
+	s := newShockSeed(c.rollN(1 << 30))
+
+	for i := 0; i < count; i++ {
+		dx, dy := chaosHeading(&s)
+
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, name, Target{X: ax + dx, Y: ay + dy},
+			castOpts{hasStart: true, startX: float64(ax) + 0.5, startY: float64(ay) + 0.5,
+				data28: s.lo, data2C: packHeading(dx, dy)}); m != nil {
+			c.res.Missiles = append(c.res.Missiles, m)
+		}
+	}
+}
+
+// chaosHeading rolls one chaos ice heading: x then y, each modulo 40 minus 20; (0, 0) becomes (20, 0).
+func chaosHeading(s *shockSeed) (int, int) {
+	dx := s.modulo(40) - 20
+	dy := s.modulo(40) - 20
+
+	if dx == 0 && dy == 0 {
+		dx = 20
+	}
+
+	return dx, dy
+}
+
+// packHeading puts two signed shorts into one word (low half x), as the exe's field 0x2c holds them.
+func packHeading(x, y int) uint32 { return uint32(uint16(int16(x))) | uint32(uint16(int16(y)))<<16 }

@@ -73,6 +73,11 @@ func init() {
 			"aurastat1": "progressive_cold", "SrcDam": "128", "HitShift": "8", "manashift": "8", "progressive": "1",
 			"prgstack": "1", "srvprgfunc2": "38", "srvprgfunc3": "39", "prgcalc2": "par1", "prgcalc3": "par2", "Param1": "6",
 			"Param2": "3", "Param4": "50", "aurastat2": "progressive_tohit", "aurastatcalc2": "par4"},
+		row{"skill": "Royal Strike", "Id": "280", "srvstfunc": "23", "srvdofunc": "34", "srvmissilea": "royalstrikemeteorcenter",
+			"srvmissileb": "royalstrikechainlightning", "srvmissilec": "royalstrikechaosice", "aurastate": "progressive_other",
+			"auralencalc": "par3", "Param3": "375", "aurastat1": "progressive_other", "SrcDam": "128", "HitShift": "8",
+			"manashift": "8", "progressive": "1", "srvprgfunc1": "40", "srvprgfunc2": "143", "srvprgfunc3": "41",
+			"prgcalc2": "par6", "prgcalc3": "par5", "Param1": "8", "Param2": "6", "Param5": "16"},
 		row{"skill": "Dragon Talon", "Id": "314", "srvstfunc": "24", "srvdofunc": "42", "calc1": "lvl/6+1", "calc2": "dm34",
 			"Param3": "50", "Param4": "100", "HitShift": "8", "manashift": "8"},
 		row{"skill": "Corpse Explosion", "Id": "315", "srvstfunc": "17", "srvdofunc": "55", "aurarangecalc": "ln34",
@@ -121,6 +126,9 @@ func classMissiles() missileTable {
 	m["clawsofthundernova"] = std(205, "clawsofthundernova", 12, 20)
 	m["clawsofthunderbolt"] = std(206, "clawsofthunderbolt", 12, 20)
 	m["bladesoficecubes"] = std(207, "bladesoficecubes", 12, 20)
+	m["royalstrikemeteorcenter"] = std(208, "royalstrikemeteorcenter", 12, 20)
+	m["royalstrikechainlightning"] = std(209, "royalstrikechainlightning", 12, 20)
+	m["royalstrikechaosice"] = std(210, "royalstrikechaosice", 16, 40)
 	// missiles.txt (patch_d2): blizzardcenter pSrvDoFunc 10 Range 100 SubMissile1 blizzard1;
 	// blizzard1 pSrvDoFunc 3 Range 9 CollideType 3; meteorcenter pSrvHitFunc 14 Range 60 sHitPar2 1
 	m["blizzardcenter"] = &d2missile.Spec{ID: 158, Name: "blizzardcenter", SrvDoFunc: 10, Range: 100,
