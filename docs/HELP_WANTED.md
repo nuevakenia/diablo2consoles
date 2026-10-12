@@ -26,8 +26,12 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
 - Skills with approximate behaviour: 177 of 210 have engine behaviour. Open: Blood Golem, Fire Golem, Armageddon
   meteors, Conversion flag bits, Holy Bolt healing remote party members (needs a packet), Charged Strike aim and
   Fend/Zeal hit cadence (8-frame guess), Strafe/Lightning Strike extras on the client.
-- Monster AI: 134 of 148 are ported faithfully. Open: Shadow Master feed, Zealot fear gate, Regurgitator and Siege
-  Tower scan filters, FallenShaman scan, Diablo's second output, BatDemon flight boost (no monster regeneration).
+- Monster AI: 134 of 148 are ported faithfully. w24 re-read the open pieces in the exe: the Zealot fear gate, the
+  Regurgitator and Siege Tower scan filters, the Fallen Shaman scan and Diablo's player-count output are ported and
+  hosted (the unit-flag bits 1 and 9 of the Regurgitator filter are only approximated); the Bat Demon flight boost
+  works once monsters carry the regeneration stat (branch feat/w23-difficulty). The Assassin's Shadow Warrior and
+  Shadow Master now run their ported thinkers (follow, leash, plain attack); their skill scoring and the copy of the
+  hero's skills are still not hosted.
 - UI panels: 12 of 14 match the original; move-gold dialog and the NPC menu golden are open; the party panel is
   missing one toggle.
 - The summon caps (MinionSpawner 10, Hydra 9, Overseer/Impregnate, DiabPrison 4) are safety bounds, not exe values.

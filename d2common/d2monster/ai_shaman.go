@@ -42,9 +42,15 @@ type ShamanCorpseScanner interface {
 // aip3 melee%, aip4 corpse search radius, aip5 fire range. Slots: Skill1
 // Resurrect, Skill2 Shaman Fire (mode of slot 2).
 //
-// The exe skips the corpse scan under a game-state test (FUN_0059dd60, two
-// calls; UNVERIFIED what it tests); the corpse scan is a no-op without the
-// World's CorpseFinder.
+// w24 re-read: the two calls of FUN_0059dd60 (MONSTER_HasDataFlag16) are not a
+// game-state test. They test the rank bits of the shaman's monster data word
+// (+0x16): mask 8 (unique) set and mask 4 (champion) clear selects the family
+// scan (callback MONAI_FallenShaman_CountNearbyFallenFilter, mode 1), every
+// other shaman scans the group of its leader (mode 9); the host's
+// ShamanCorpseScanner does exactly that. The corpse scan is a no-op without the
+// World's ShamanCorpseScanner / CorpseFinder. Not modelled: the exe rolls the
+// skill 2 chance whether or not skill 2 is defined (Go skips the roll when the
+// slot is unused; stock Fallen Shamans always have it).
 func thinkFallenShaman(c *Ctx) {
 	b := c.B
 	p := b.Profile

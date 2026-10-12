@@ -242,7 +242,8 @@ func usesPetAI(u *unit) bool {
 		return false
 	}
 
-	return strings.EqualFold(u.b.Def.Name, "NecroPet") || strings.EqualFold(u.b.Def.Name, "Raven")
+	// w24: the Assassin's shadows run their ported thinkers (shadowhost.go).
+	return strings.EqualFold(u.b.Def.Name, "NecroPet") || strings.EqualFold(u.b.Def.Name, "Raven") || isShadowAI(u)
 }
 
 // OwnerEnemy implements d2monster.PetWorld: the nearest hostile monster to
