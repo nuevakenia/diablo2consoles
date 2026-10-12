@@ -570,6 +570,7 @@ func (d *Director) step() {
 
 			d.traceState(u)
 		} else if u.merc == nil && u.m.CorpseAge() > corpseSeconds { // merc corpses stay for a revive
+			d.emit("monster", "CORPSE expire id=%s name=%s age=%.1f", u.m.ID(), u.m.Label(), u.m.CorpseAge())
 			d.engine.RemoveEntity(u.m)
 			d.forget(u)
 		}

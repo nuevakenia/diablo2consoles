@@ -29,9 +29,13 @@ const (
 	castTestSettle       = 3.0   // seconds after the last cast before the scenario ends
 	castTestItemSettle   = 2.5   // seconds after a skill's last cast before the next skill starts
 	castTestCorpseWait   = 2.5   // seconds a corpse skill waits for a fresh corpse
-	castTestCrowdRadius  = 4     // subtiles: monsters this close to the target count as its neighbours (OD2_AUTOCAST_CROWD)
-	castTestCrowdReach   = 14    // subtiles from the hero: the crowded target is looked for this far at most
-	castTestCrowdWait    = 12.0  // seconds a cast waits for the crowd before it is made anyway
+	// castTestCorpseMaxAge: a corpse older than this (seconds) is not aimed at. The director removes corpses after
+	// 12 s, and a Revive aimed at an 11 s old one found it gone when the cast finished (w29: the rare 86f refusal
+	// unknown_monster); the scenario makes a fresh corpse instead.
+	castTestCorpseMaxAge = 7.0
+	castTestCrowdRadius  = 4    // subtiles: monsters this close to the target count as its neighbours (OD2_AUTOCAST_CROWD)
+	castTestCrowdReach   = 14   // subtiles from the hero: the crowded target is looked for this far at most
+	castTestCrowdWait    = 12.0 // seconds a cast waits for the crowd before it is made anyway
 )
 
 // castItem is one skill of the OD2_AUTOCAST list.
@@ -58,6 +62,19 @@ type castItem struct {
 	// ownHit (a trailing "!!") counts only the skill's own strike or missile
 	// hits for the retry, not area/aura pulses of earlier skills (Bash, Sacrifice).
 	ownHit bool
+	// landed (set when the skill starts, for "!!") reports how many targets the skill's own strikes, missiles
+	// and areas reached (Engine.Landed) and states how many missile states monsters got: a hit of an
+	// EARLIER skill's late missile no longer counts as this skill's hit (w29: Twister looked fine on a
+	// Molten Boulder hit). landed0/states0 are the values at the start.
+	landed           func() int
+	landed0, states0 int
+	// engage ("@N" after the entry) is how close (subtiles) the nearest monster must be before the skill is
+	// cast; 0 means castTestEngage. Short-reach rings (Battle Cry: 4 tiles) need it close.
+	engage      int
+	engageMoves int // times the hero was put next to the monster for an "@N" skill (bounded)
+	// landedKey ("~tag" after the entry) counts the engine's Landed(skill+"#"+tag) instead of the skill's own
+	// hits: a Death Sentry shoots lightning all the time, "~explode" waits for its corpse explosion.
+	landedKey string
 	// spreadCasts counts the extra casts made because the state had not spread yet
 	spreadCasts int
 }
@@ -68,6 +85,13 @@ func (it *castItem) missedHit(c d2skills.Counters) bool {
 	n := (c.Hits - it.c0.Hits) + (c.AreaHits - it.c0.AreaHits)
 	if it.ownHit {
 		n = c.Hits - it.c0.Hits
+	}
+
+	if it.ownHit && it.landed != nil {
+		n = it.landed() - it.landed0
+		if it.landedKey == "" {
+			n += c.States - it.states0
+		}
 	}
 
 	return it.mustHit && it.hitRetries < castItemMaxHitRetries && n <= 0
@@ -230,6 +254,26 @@ func (v *Game) castWithPipeline(skillID int, tileX, tileY float64) bool {
 	return true
 }
 
+// splitLandedKey cuts a trailing "~tag" off an OD2_AUTOCAST entry.
+func splitLandedKey(part string) (string, string) {
+	if i := strings.LastIndex(part, "~"); i >= 0 {
+		return strings.TrimSpace(part[:i]), "#" + strings.TrimSpace(part[i+1:])
+	}
+
+	return part, ""
+}
+
+// splitEngage cuts a trailing "@N" (the engage distance of one entry) off an OD2_AUTOCAST entry.
+func splitEngage(part string) (string, int) {
+	if i := strings.LastIndex(part, "@"); i >= 0 {
+		if n, err := strconv.Atoi(strings.TrimSpace(part[i+1:])); err == nil && n > 0 {
+			return strings.TrimSpace(part[:i]), n
+		}
+	}
+
+	return part, 0
+}
+
 // parseCastPart splits one OD2_AUTOCAST entry "<skill>[,count][!]".
 func parseCastPart(part string) (skill string, count int, mustHit bool) {
 	part, count = strings.TrimSpace(part), castTestDefaultCount
@@ -264,6 +308,8 @@ func (v *Game) parseCastTest(eng *d2skills.Engine) *castTest {
 
 	for _, part := range strings.Split(ref, ";") {
 		it := &castItem{}
+		part, it.landedKey = splitLandedKey(part)
+		part, it.engage = splitEngage(part)
 		it.skill, it.count, it.mustHit = parseCastPart(part)
 		it.ownHit = strings.HasSuffix(strings.TrimSpace(part), "!!")
 
@@ -290,6 +336,12 @@ func (v *Game) parseCastTest(eng *d2skills.Engine) *castTest {
 func (v *Game) startCastItem(eng *d2skills.Engine, t *castTest, it *castItem) {
 	it.started = true
 	it.c0 = eng.Counters
+
+	if name := v.asset.Records.Skill.Details[it.id]; name != nil {
+		skill := name.Skill + it.landedKey
+		it.landed, it.landed0, it.states0 = func() int { return eng.Landed(skill) }, eng.Landed(skill), eng.Counters.States
+	}
+
 	it.refusedSeen = eng.Counters.Wasted()
 
 	p := v.localPlayer
@@ -454,7 +506,12 @@ func (v *Game) autoCast(elapsed float64) {
 	aimX, aimY := m.SubtilePos()
 
 	// let the monsters come close: skills that act around the hero need them there
-	if hx, hy := int(v.localPlayer.Position.X()), int(v.localPlayer.Position.Y()); d2monster.Distance(hx-aimX, hy-aimY) > castTestEngage &&
+	engage := castTestEngage
+	if it.engage > 0 {
+		engage = it.engage
+	}
+
+	if hx, hy := int(v.localPlayer.Position.X()), int(v.localPlayer.Position.Y()); d2monster.Distance(hx-aimX, hy-aimY) > engage &&
 		t.engageW < castTestEngageWait && (rec == nil || rec.Range != "h2h") {
 		t.engageW += elapsed
 
@@ -462,6 +519,15 @@ func (v *Game) autoCast(elapsed float64) {
 	}
 
 	t.engageW = 0
+
+	// a short-reach skill ("@N") whose monster did not come: the scenario walks the hero next to it
+	if hx, hy := int(v.localPlayer.Position.X()), int(v.localPlayer.Position.Y()); it.engage > 0 &&
+		it.engageMoves < 4 && d2monster.Distance(hx-aimX, hy-aimY) > engage {
+		it.engageMoves++
+		v.putHeroNear(aimX, aimY)
+
+		return
+	}
 
 	if rec != nil && rec.TargetCorpse {
 		cx, cy, ok := v.corpseForCast(m, elapsed, t)
@@ -568,6 +634,10 @@ func (v *Game) corpseForCast(victim *d2mapentity.Monster, elapsed float64, t *ca
 			continue
 		}
 
+		if c.CorpseAge() > castTestCorpseMaxAge {
+			continue
+		}
+
 		cx, cy := c.SubtilePos()
 		if d := d2monster.Distance(hx-cx, hy-cy); best == nil || d < bd {
 			best, bd = c, d
@@ -576,6 +646,7 @@ func (v *Game) corpseForCast(victim *d2mapentity.Monster, elapsed float64, t *ca
 
 	if best != nil {
 		x, y := best.SubtilePos()
+		v.Infof("AUTOCAST corpse for the cast id=%s age=%.1f", best.ID(), best.CorpseAge())
 
 		return x, y, true
 	}

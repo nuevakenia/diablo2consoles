@@ -12,6 +12,9 @@ import (
 // formStates are the shape shift states (Wearwolf, Wearbear, Delirium change).
 var formStates = []string{"wolf", "bear", "delerium"}
 
+// formGroupStates are the other states of the forms' States.txt group (3): Maul and Feral Rage (monsterset is a monster state).
+var formGroupStates = []string{"maul", "feralrage"}
+
 // Shapeshifted implements d2skill.StateHolder: the hero is in a form.
 func (h *heroUnit) Shapeshifted() bool {
 	set := h.e.setOf(h.p.ID())

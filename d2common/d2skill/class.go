@@ -1171,6 +1171,8 @@ func doBlessedHammerFn(c *cast) {
 // doMineFn is SRVDO_043_ShockField (Shock Web, VERIFIED in w23, see shockfield.go): count caltrops thrown from the
 // caster to random points around the target position, not one stationary missile. The earlier port (a stationary
 // missile at the aim point zapping every 12 frames) was an invention.
+// The throws use creation kind 0x420 (VERIFIED w29, 0x5d4540): the lob flag 0x400, so each caltrop ends AT its point
+// (clamp) instead of flying its whole range of 50 frames past it (the w27 scenario saw the fields 12 tiles beyond the aim).
 func doMineFn(c *cast) {
 	count := c.calcOrState()
 	if count < 1 {
@@ -1184,7 +1186,7 @@ func doMineFn(c *cast) {
 	for _, pt := range ShockFieldPoints(ax, ay, count, c.env.eval(c.sk.AuraRangeCalc), hx, hy) {
 		tg := Target{X: pt[0], Y: pt[1]}
 
-		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, c.sk.SrvMissileA, tg, castOpts{hasDest: true,
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, c.sk.SrvMissileA, tg, castOpts{hasDest: true, clamp: true,
 			destX: float64(pt[0]) + 0.5, destY: float64(pt[1]) + 0.5}); m != nil {
 			c.res.Missiles = append(c.res.Missiles, m)
 		}

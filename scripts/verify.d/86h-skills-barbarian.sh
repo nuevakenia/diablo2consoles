@@ -5,7 +5,7 @@ scenario_turbo=1
 # skill must show its outcome in the log (damage, state, summon, missile spawned or hit) besides the finished cast.
 source scripts/verify.d/lib/skillcov.sh
 scenario_env() {
-  local list="Battle Cry,1;Howl,1;Shout,1;Taunt,1;Battle Command,1;Stun,2!!;Leap,1;Leap Attack,1!!;Double Swing,2!!;Frenzy,2!!;Concentrate,2!!;Berserk,2!!;Double Throw,1!!"
+  local list="Battle Cry,1!!@3;Howl,1;Shout,1;Taunt,1;Battle Command,1;Stun,2!!;Leap,1;Leap Attack,1!!;Double Swing,2!!;Frenzy,2!!;Concentrate,2!!;Berserk,2!!;Double Throw,1!!"
   echo "export OD2_AUTOCAST_CLASS=barbarian OD2_AUTOCAST_MANA=900 OD2_AUTOCAST_LEVEL=10 OD2_AUTOMONSTER=\"zombie1,5\" OD2_AUTOMONSTER_SECONDS=300"
   echo "export OD2_AUTOCAST=\"$list\""
 }
@@ -15,6 +15,7 @@ scenario_check() {
   skillcov_report "${skills[@]}"
   skillcov_cast "${skills[@]}"
   skillcov_effect missile "Battle Cry" 'battlecry'
+  skillcov_effect raw "Battle Cry" 'STATE apply by=.* unit=Zombie state=battlecry'
   skillcov_effect raw "Howl" 'STATE apply by=.* unit=Zombie state=terror'
   skillcov_effect missile "Howl" 'howl'
   skillcov_effect state "Shout"
