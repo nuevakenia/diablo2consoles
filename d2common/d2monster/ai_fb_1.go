@@ -430,14 +430,17 @@ func thinkSuccubusWitch(c *Ctx) {
 
 	if sk[4].Used() && b.AIP(8) > 0 {
 		if b.Roll(100) < b.AIP(5) {
-			if t2, d, ok := c.W.AttackTarget(b); ok {
-				dist = d
+			t2, d, ok := c.W.AttackTarget(b)
 
-				if b.Roll(100) < b.AIP(8) {
-					c.Cast(4, t2)
+			dist = d // 0x5dc9e0 stores 0x7fffffff in the distance when it finds nobody (w40)
+			if !ok {
+				dist = 0x7fffffff
+			}
 
-					return
-				}
+			if ok && b.Roll(100) < b.AIP(8) {
+				c.Cast(4, t2)
+
+				return
 			}
 		}
 	}
