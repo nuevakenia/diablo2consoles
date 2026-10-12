@@ -187,6 +187,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	e.pipe.TeleportFlag = opt.TeleportFlag
 	e.pipe.ApplyState = e.applyMissileState
 	e.pipe.Near = e.near
+	e.pipe.Clock = e.actionClock
 	e.pipe.After = e.after
 	e.pipe.Walkable = func(x, y int) bool {
 		return e.monsters.Grid().Flags(x, y)&(d2path.FlagWalk|d2path.FlagWall) == 0
@@ -594,18 +595,17 @@ func (e *Engine) meleeLater(p *d2mapentity.Player, sk *d2skill.Skill, m *d2skill
 	e.meleeResult(p, sk, m)
 }
 
-// burstEventFrames is the spacing of the attack animation events of a burst
-// (Fend, Zeal), in game frames. UNVERIFIED: the real spacing is the attack
-// animation's action-frame period of the hero's weapon class.
-const burstEventFrames = 8
-
 // scheduleBurst runs the remaining animation events of a multi-hit skill.
 func (e *Engine) scheduleBurst(p *d2mapentity.Player, sk *d2skill.Skill, b *d2skill.Burst) {
 	if b.Done() {
 		return
 	}
 
-	e.after(burstEventFrames, func() {
+	// the spacing of the events is the exe's animation event schedule (actionclock.go), the fallback gap only
+	// when the hero's attack has no AnimData record
+	gap, _ := b.NextDelay()
+
+	e.after(gap, func() {
 		var res d2skill.DoResult
 
 		if !e.pipe.BurstEvent(b, &res) {

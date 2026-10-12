@@ -119,6 +119,9 @@ type Pipeline struct {
 	Frame    func() int
 	Opt      Options
 	MissF    MissileFields
+	// Clock supplies the action-event clock of the caster's attack animation for a skill (actionevents.go);
+	// nil, or a nil result, leaves the burst cadence to the fallback gap.
+	Clock func(u Unit, sk *Skill) *ActionClock
 
 	// chain remembers per caster whether the last Frenzy blow hit (the exe keeps it in the skill's target-type
 	// field, SKILL_FrenzyBuildHitAndFinalize 0x5d75b0); see frenzy_w23.

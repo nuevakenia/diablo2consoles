@@ -27,6 +27,16 @@ type Burst struct {
 	target Target // victim of the next event
 	last   string // id of the unit hit by the previous event ("" none)
 	opt    strikeOpt
+
+	// Animation clock (actionevents.go): nil keeps the fallback gap. pct is the reschedule percent after each
+	// hit (Fend, Zeal, Fury: Param2; Strafe: Param6), negative for a fixed sequence (Jab). delay is the number
+	// of game frames from the last event to the next one.
+	clock *ActionClock
+	pct   int
+	delay int
+	shots int  // events run so far
+	rng   int  // Strafe: scan radius in subtiles
+	seq   bool // a fixed sequence: the victim is the stored target, never rescanned
 }
 
 // BurstKind selects what one event of a Burst does.
@@ -37,7 +47,63 @@ const (
 	// must be in melee range, else any enemy within melee range + 4 other than
 	// the last victim is taken (scan filter 0x20003, VERIFIED 0x5da910).
 	BurstMeleeChain BurstKind = iota
+	// BurstStrafe is Strafe (SRVDO_012 0x5da6c0, VERIFIED): one arrow per event at the stored target, then the
+	// next enemy within the scan radius other than the one just shot, reschedule by Param6 percent; the burst
+	// ends when no other enemy is found.
+	BurstStrafe
+	// BurstSequence is a fixed animation sequence (Jab: one strike per do row of the sequence, no reschedule).
+	BurstSequence
 )
+
+// FallbackBurstGap is the spacing in game frames of two burst events when no animation clock is available (no
+// AnimData record of the hero's attack). UNVERIFIED guess, only a fallback since wave 25.
+const FallbackBurstGap = 8
+
+// NextDelay is the number of game frames between the event just run and the next one. fromClock tells whether
+// it comes from the exe's event scheduling (true) or is the fallback gap.
+func (b *Burst) NextDelay() (frames int, fromClock bool) {
+	if b == nil || b.clock == nil || b.delay <= 0 {
+		return FallbackBurstGap, false
+	}
+
+	return b.delay, true
+}
+
+// Shots is the number of events run so far.
+func (b *Burst) Shots() int {
+	if b == nil {
+		return 0
+	}
+
+	return b.shots
+}
+
+// advance moves the animation clock past the event that just ran: the exe reschedules the animation events by
+// the skill's percent (unless the sequence is fixed) and the next do event decides the delay. A mode that ends
+// before another do event ends the burst.
+func (b *Burst) advance() {
+	if b.clock == nil || b.left <= 0 {
+		return
+	}
+
+	if b.pct >= 0 {
+		b.clock.Reschedule(b.pct)
+	}
+
+	t, ok := b.clock.NextDo()
+	if !ok {
+		b.left = 0
+
+		return
+	}
+
+	b.delay = t - b.clock.Now()
+}
+
+// attachClock arms the burst with the cast's clock; the clock is positioned on the cast's own first event.
+func (b *Burst) attachClock(c *ActionClock, pct int) {
+	b.clock, b.pct = c, pct
+}
 
 // Done reports whether no event is left.
 func (b *Burst) Done() bool { return b == nil || b.left <= 0 }
@@ -128,7 +194,21 @@ func (p *Pipeline) BurstEvent(b *Burst, res *DoResult) bool {
 		return false
 	}
 
+	if b.clock != nil {
+		b.clock.RunNextDo()
+	}
+
+	b.shots++
+
+	if b.kind == BurstStrafe {
+		return p.strafeEvent(b, res)
+	}
+
 	t, ok := b.pickMeleeVictim(p)
+	if b.seq {
+		t, ok = b.target, b.target.Unit != nil && b.target.Unit.Alive()
+	}
+
 	if !ok {
 		b.left = 0
 
@@ -146,7 +226,7 @@ func (p *Pipeline) BurstEvent(b *Burst, res *DoResult) bool {
 	b.last = t.Unit.ID()
 	b.target = t
 
-	if b.left > 0 {
+	if b.left > 0 && !b.seq {
 		// the exe rescans after the hit (excluding the victim just hit) and
 		// stores the result as the next target
 		// (none found keeps the old target, which is then struck again)
@@ -154,6 +234,8 @@ func (p *Pipeline) BurstEvent(b *Burst, res *DoResult) bool {
 			b.target = n
 		}
 	}
+
+	b.advance()
 
 	return true
 }
