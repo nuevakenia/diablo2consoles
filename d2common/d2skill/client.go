@@ -172,38 +172,97 @@ type ChainTarget struct {
 	Pos SubPoint
 }
 
-// LightningStrikePlan is CLTDO_022_LightningStrike (0x4f2340): the main target
-// needs a unit; the nearest other enemy within calc1 of it (filter 3, the exe's
-// area scan order is unread so nearest is used, UNVERIFIED) gets one kind 0x20
-// missile parented to the main target, aimed at that enemy's position, with
-// calc2 in data 0x28. Returns false when no second enemy is in range.
-func LightningStrikePlan(main ChainTarget, others []ChainTarget, calc1, calc2, slot int) (Shot, bool) {
-	best, bd := -1, 1<<30
+// ClientScanNext is CLTDO_FindTargetInAreaWithCallback (0x4c2910, callback 0x4c28d0, VERIFIED wave 24, the client twin
+// of the server scan 0x569a40): over the candidates already inside the scan area it keeps the smallest unit id ABOVE
+// the excluded id, else the smallest id of all (the excluded unit itself when it is the only candidate; the fallback
+// starts at the excluded id and takes every id up to it). It reports false for an empty list.
+func ClientScanNext(cands []ChainTarget, excluded int) (ChainTarget, bool) {
+	var above, fall ChainTarget
 
-	for i, o := range others {
-		if o.ID == main.ID {
+	haveAbove, haveFall := false, false
+	aboveID, fallID := int(^uint32(0)>>1), excluded
+
+	for _, c := range cands {
+		if c.ID > excluded {
+			if c.ID < aboveID {
+				above, aboveID, haveAbove = c, c.ID, true
+			}
+
 			continue
 		}
 
-		d := maxInt(absInt(o.Pos.X-main.Pos.X), absInt(o.Pos.Y-main.Pos.Y))
-		if d <= calc1 && d < bd {
-			best, bd = i, d
+		if c.ID <= fallID {
+			fall, fallID, haveFall = c, c.ID, true
 		}
 	}
 
-	if best < 0 {
+	switch {
+	case haveAbove:
+		return above, true
+	case haveFall:
+		return fall, true
+	}
+
+	return ChainTarget{}, false
+}
+
+// within lists the candidates inside a Chebyshev radius of a point. The exe's area shape (CLTDO_EnumerateUnitsInArea
+// 0x4c2690) is UNVERIFIED; the square matches the server scans of this port.
+func within(cands []ChainTarget, at SubPoint, radius int) []ChainTarget {
+	var out []ChainTarget
+
+	for _, c := range cands {
+		if maxInt(absInt(c.Pos.X-at.X), absInt(c.Pos.Y-at.Y)) <= radius {
+			out = append(out, c)
+		}
+	}
+
+	return out
+}
+
+// LightningStrikePlan is CLTDO_022_LightningStrike (0x4f2340): the main target needs a unit; the scan around it
+// (radius calc1, filter 3, the main unit excluded: ClientScanNext, VERIFIED wave 24 the same rule as the server
+// strike) picks the second unit, which gets one kind 0x20 missile parented to the main target, aimed at that unit's
+// position, with calc2 in data 0x28. When the main unit is alone, the scan returns the main unit itself and the bolt
+// is drawn on it, as on the server. Returns false when nothing is in range. others may include the main target.
+func LightningStrikePlan(main ChainTarget, others []ChainTarget, calc1, calc2, slot int) (Shot, bool) {
+	cands := within(others, main.Pos, calc1)
+
+	found := false
+
+	for _, c := range cands {
+		if c.ID == main.ID {
+			found = true
+		}
+	}
+
+	if !found {
+		cands = append(cands, main) // the enumeration around the unit contains the unit itself
+	}
+
+	pick, ok := ClientScanNext(cands, main.ID)
+	if !ok {
 		return Shot{}, false
 	}
 
-	return Shot{Slot: slot, Kind: KindLightningStrike, From: main.Pos, To: others[best].Pos, Data28: calc2, Parent: main.ID}, true
+	return Shot{Slot: slot, Kind: KindLightningStrike, From: main.Pos, To: pick.Pos, Data28: calc2, Parent: main.ID}, true
 }
 
-// StrafeClientPlan is CLTDO_020_Strafe (0x4f1fd0) for one animation event: one
-// kind 0x21 arrow from the archer to the current target (column a, or b for a
-// non bow weapon), then the counter drops by one; when it is still above zero the
-// next target is the nearest enemy within the aura range (filter 3) other than
-// the current one, and the exe also shortens the animation. Returns the arrow, the
-// remaining counter and the next target (ok false = no next target, burst ends).
+// StrafeSlot is the missile column CLTDO_020_Strafe picks: column b when the attack weapon class is not 1 (a bow) and
+// column b is set, else column a.
+func StrafeSlot(weaponClass int, hasColumnB bool) int {
+	if weaponClass != 1 && hasColumnB {
+		return 2
+	}
+
+	return 1
+}
+
+// StrafeClientPlan is CLTDO_020_Strafe (0x4f1fd0) for one animation event: one kind 0x21 arrow from the archer to the
+// current target, then the counter drops by one; when it is still above zero the next target is the scan result
+// around the archer (radius aurarangecalc, filter 3, the current target excluded: ClientScanNext, VERIFIED wave 24)
+// and the exe also shortens the animation. Returns the arrow, the remaining counter and the next target (ok false =
+// no next target, burst ends). With the current target alone the scan hands it back, so the burst goes on at it.
 func StrafeClientPlan(archer SubPoint, target ChainTarget, counter int, others []ChainTarget, rng, slot int) (shot Shot, left int, next ChainTarget, ok bool) {
 	shot = Shot{Slot: slot, Kind: KindAimed, From: archer, To: target.Pos}
 	left = counter - 1
@@ -212,20 +271,44 @@ func StrafeClientPlan(archer SubPoint, target ChainTarget, counter int, others [
 		return shot, left, ChainTarget{}, false
 	}
 
-	bd := 1 << 30
+	cands := within(others, archer, rng)
 
-	for _, o := range others {
-		if o.ID == target.ID {
-			continue
-		}
+	found := false
 
-		d := maxInt(absInt(o.Pos.X-archer.X), absInt(o.Pos.Y-archer.Y))
-		if d <= rng && d < bd {
-			next, bd, ok = o, d, true
+	for _, c := range cands {
+		if c.ID == target.ID {
+			found = true
 		}
 	}
 
+	if !found {
+		cands = append(cands, target)
+	}
+
+	next, ok = ClientScanNext(cands, target.ID)
+
 	return shot, left, next, ok
+}
+
+// StrafeClientBurst lists every arrow of a Strafe cast for a viewer that draws the whole burst at once (a remote caster):
+// StrafeClientPlan applied count times from the first target.
+func StrafeClientBurst(archer SubPoint, first ChainTarget, count int, others []ChainTarget, rng, slot int) []Shot {
+	var out []Shot
+
+	cur := first
+
+	for count > 0 {
+		shot, left, next, ok := StrafeClientPlan(archer, cur, count, others, rng, slot)
+		out = append(out, shot)
+
+		if !ok {
+			break
+		}
+
+		cur, count = next, left
+	}
+
+	return out
 }
 
 func absInt(v int) int {

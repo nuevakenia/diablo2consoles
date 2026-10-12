@@ -10,7 +10,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | | F | P | S | M | T |
 |---|---|---|---|---|---|
 | before (start of feat/skills-npsd) | 60 | 41 | 3 | 8 | 8 |
-| after | 101 | 11 | 0 | 0 | 8 |
+| after | 96 | 16 | 0 | 0 | 8 |
 
 
 ## Necromancer
@@ -20,20 +20,20 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 66 | Amplify Damage | 30 | F | F | state with damageresist -100 on enemies in range |
 | 67 | Teeth | 8 | F | F | missile fan (do 8) |
 | 68 | Bone Armor | 18 | F | F | absorb state; wave 22: the Director typed hook soaks only the physical part (BoneArmorAbsorb, 0x5c4300) |
-| 69 | Skeleton Mastery | - | T | T | feeds the Raise Skeleton order (hp, damage) |
-| 70 | Raise Skeleton | 31 | F | F | d2summon stats, roster limits |
+| 69 | Skeleton Mastery | - | T | T | feeds the Raise Skeleton order (hp, damage); wave 23 VERIFIED 0x5c22c0: passivestat1 maxhp is added to the unit before calc1 multiplies the maximum life, passivestat2 item_normaldamage is flat on both ends of the hit |
+| 70 | Raise Skeleton | 31 | F | F | d2summon stats, roster limits; wave 23 VERIFIED SRVDO_031 0x5c2960 / SKILL_SpawnSummonedMinion 0x5c22c0 / pet registry 0x573b50: one skeleton per corpse at the corpse position, the oldest of the pettype leaves when the limit is full, life = (template + mastery maxhp) * (100 + calc1) / 100 in 8.8 |
 | 71 | Dim Vision | 30 | S | F | before: state only; now forces monster AI state 10 (blind) |
 | 72 | Weaken | 30 | F | F | state with damageresist / damage stats |
 | 73 | Poison Dagger | 32 | F | F | melee + poison stream |
 | 74 | Corpse Explosion | 55 | P | F | VERIFIED 0x5c2c60 / 0x5c2b90: radius (r+1)/2, life roll lo..hi-1 over the corpse life, caster/corpse level scale, calc3 element split, physical part zeroed beyond (r/2)^2 squared subtiles (skills-batch-next2.md) |
-| 75 | Clay Golem | 56 | F | F | golem order, one at a time |
-| 76 | Iron Maiden | 30 | F | F | reflect via afterHit |
+| 75 | Clay Golem | 56 | F | F | golem order, one at a time; wave 23 VERIFIED event function 27 (0x5c46d0): a monster that hits the golem in melee is slowed by the golem's item_slow stat (Director.SummonSlow) |
+| 76 | Iron Maiden | 30 | F | F | wave 23 VERIFIED event function 4 (0x5c3ec0): when the CURSED unit deals melee damage it takes calc1 percent of that damage itself (ironMaidenBack); the earlier port reflected hero hits on the monster back at the hero (wrong direction). Resist handling of the returned damage UNVERIFIED; player / hireling variants (calc2, calc3) not modelled |
 | 77 | Terror | 30 | F | F | flee state |
 | 78 | Bone Wall | 60 | P | P | wall pieces as blocking monsters, exe piece layout approximated. READ (0x5c37a0, wired): the first wall stands at the target and two bonewallmaker missiles (do 13, ported in d2missile/gaps.go) fly perpendicular to the cast line summoning one wall per new subtile, calc2/2 walls each, linked to the first wall; wave 22 check: the engine consumes EventSummon (effects.go onWallSummon), so the pieces are placed by the makers |
 | 79 | Golem Mastery | - | T | T | feeds golem orders |
-| 80 | Raise Skeletal Mage | 31 | P | F | VERIFIED corpse test 0x6468b0 and summon level 0x5c2850 (batch 5); the mage is armed with the sumskill missile (necromage1) through the Director SkillFirer instead of meleeing; the caster flag source of the pet AI is U |
+| 80 | Raise Skeletal Mage | 31 | P | F | VERIFIED corpse test 0x6468b0 and summon level 0x5c2850 (batch 5); the mage is armed with the sumskill missile (necromage1) through the Director SkillFirer instead of meleeing; the caster flag source of the pet AI is U. Wave 23 VERIFIED SRVDO_149 0x5cc400 / 0x5c1fd0 / 0x5c22c0: the mage type is a random 0..3 (necromage1 poison, 2 cold, 3 fire, 4 lightning), the shot's damage is the missile record's own columns at the level sumsk1calc (Skeleton Mastery level + (lvl-2)/2 from level 4), and with sumsk1calc <= 0 the mage gets no spell; before, the shots used the Raise Skeletal Mage skill's (empty) damage |
 | 81 | Confuse | 61 | S | F | before: state only; now forces confuse (list 9, mode 3) |
-| 82 | Life Tap | 30 | F | F | heal via afterHit |
+| 82 | Life Tap | 30 | F | F | wave 23 VERIFIED event function 5 (0x5c4180, damagedinmelee and damagedbymissile): the attacker of the cursed unit gains MulDiv(damage, calc1, 100) life, clamped to 1..max (d2skill.LifeTapHeal); only hero attackers are modelled (minions and monsters hitting a cursed unit are not) |
 | 83 | Poison Explosion | 63 | P | F | VERIFIED 0x5c3dc0 / 0x5a6d70: eight stationary poisonexplosioncloud missiles on the radius-2 square ring around the corpse (d2skill.PoisonExplosionCells), the corpse is consumed |
 | 84 | Bone Spear | - | F | F | generic missile path |
 | 85 | BloodGolem | 56 | P | F | VERIFIED 0x5c4600 / 0x5c4800 (batch 9): Param5 percent of every blow the golem takes is paid from the owner life instead (owner never below one point, golem reduced by the full share), Param6 percent of the healing the owner receives goes to the golem (clamped to its missing life) and is taken from the heal; wired through d2monsters.shareGolemDamage / ShareHealWithGolem and the potion hook. Event 23 (damage the golem deals) has no handler body and is not modelled |
@@ -44,7 +44,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 90 | IronGolem | 57 | M | F | VERIFIED 0x5c1070 / 0x5c3100 (batch 5): needs a ground item target (Target.GroundItem), the golem stands at the item, the item is consumed, summon level 0x5c2850; wave 22: the item is equipped on the golem (INV_ServerEquipItem), so its single-valued properties feed the golem stat build; the weapon base damage is not used (UNVERIFIED) |
 | 91 | Lower Resist | 30 | F | F | state with resist stats |
 | 92 | Poison Nova | 22 | F | F | nova missile ring (do 22) |
-| 93 | Bone Spirit | 10 | F | F | homing missile (do 10) |
+| 93 | Bone Spirit | 10 | F | F | homing missile (do 10); wave 23 VERIFIED SRVDO_010 0x5da2f0: calc1 (0 for Bone Spirit, ln34 for Guided Arrow) is a damage percent added by the post-create callback 0x5da2c0, not a homing switch |
 | 94 | FireGolem | 56 | P | P | golem; the fire absorb / damage aura stats come from the order only. READ (batch 9): sumskill1 Holy Fire at level min(ln56,30) is added to the golem as a skill; how a monster activates an aura skill was not found, so the burning aura is not simulated. Wave 22: the exe turns the aura on at once (SKILL_SpawnSummonedMinion -> SERVER_SetPlayerActiveSkill 0x56e070 -> SKILL_ServerActivateToggleStateSkill, because the monster skill has the toggle-state bit); the port pulses Holy Fire from the golem on the aura period grid, damage rolled with the summoner numbers (UNVERIFIED) |
 | 95 | Revive | 58 | P | F | VERIFIED 0x5c35a0: life rolled between the level-scaled min and max of the corpse class at the corpse level (Director.LifeRangeAt), then the caster-level cap |
 
@@ -72,7 +72,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 113 | Concentration | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
 | 114 | Holy Freeze | 81 | F | F | enemy aura, cold damage + slow; wave 22: the aura applier 0x5cd240 clamps velocitypercent / attackrate to the monster cold effect (d2state.ClampAuraSlow, wired to enemy auras); the hook 0x5cece0 / callback 0x5ced30 are still unread |
 | 115 | Vigor | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 116 | Conversion | 79 | M | P | do 79 added (roll, state, level/life scale, charm AI); VERIFIED 0x56c0a0/0x5dc1e0: unique and super unique monsters are no valid target (skills-batch3.md); act-boss exclusion U. Batch 9 re-read SRVDO_079 0x5ce8c0 + SRVDO_ConversionRollSuccess 0x5ce820: the success test is not a hireling, a monster, alignment 0, the 0x56c0a0 candidate test (the Revive corpse test, flag bits still unnamed) and a roll below calc1 on the CASTER seed; the target must also come from a landed melee hit; the base class 0x1ec with state 0x8f is refused; the revert callback 0x5ce710 restores level and life ratio; wave 22: MONSTATS_IsRevivableType 0x5dc1e0 is ported (convertibleType: walk mode, not boss, switchai); the flag bits are named; wave 23 re-read 0x5ce8c0: success = roll below calc1 on the caster seed (matches); on success the exe also strips the target statlists with flag 8 and detaches it from its leader (UNVERIFIED, not ported) |
+| 116 | Conversion | 79 | M | P | do 79 added (roll, state, level/life scale, charm AI); VERIFIED 0x56c0a0/0x5dc1e0: unique and super unique monsters are no valid target (skills-batch3.md); act-boss exclusion U. Batch 9 re-read SRVDO_079 0x5ce8c0 + SRVDO_ConversionRollSuccess 0x5ce820: the success test is not a hireling, a monster, alignment 0, the 0x56c0a0 candidate test (the Revive corpse test, flag bits still unnamed) and a roll below calc1 on the CASTER seed; the target must also come from a landed melee hit; the base class 0x1ec with state 0x8f is refused; the revert callback 0x5ce710 restores level and life ratio; wave 22: MONSTATS_IsRevivableType 0x5dc1e0 is ported (convertibleType: walk mode, not boss, switchai); the flag bits are named; wave 23 re-read 0x5ce8c0: success = roll below calc1 on the caster seed (matches); wave 24 VERIFIED and ported: after the state the exe detaches the target from its leader (MONAI_DetachFromLeaderOrReleaseMinions 0x56c340: a follower leaves, a leader releases its followers; Brain.DetachFromLeader) and removes every statlist with flag 8, which is states.txt column aura (statlist flag 8 <- states bit 1 <- column aura, DATATBL_LoadStatesTable 0x617c50; Set.RemoveAuraStates); the revert callback 0x5ce710 strips them again inside the level-scaled branch |
 | 117 | Holy Shield | 18 | F | F | self state (do 18); wave 23 VERIFIED SRVST_036 0x5ce6f0: the start refuses without a shield in a hand (d2skill.ReasonNoShield) |
 | 118 | Holy Shock | 66 | F | F | damage aura |
 | 119 | Sanctuary | 66 | P | F | VERIFIED 0x5cd880 + filter 0x569100: aurafilter 59270 reaches hostile undead non-boss monsters only, the hit carries result flag 8 (knockback); wave 23 re-read SRVDO_066 0x5cd880: Sanctuary (mana 1) never pays: only the stat applier 0x5cd240 raises the counter that triggers the payment and Sanctuary has no target state |
@@ -89,31 +89,31 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 |---|---|---|---|---|---|
 | 36 | Fire Bolt | - | F | F | generic missile path |
 | 37 | Warmth | - | T | T |  |
-| 38 | Charged Bolt | 17 | F | F | do 17 |
+| 38 | Charged Bolt | 17 | F | F | VERIFIED wave 23 0x5c73a0 + hook 0x5c7340: calc1 bolts from the caster, each reseeded with destination x + index and flown on path type 10 (d2missile.PathType10Nodes); the old +-40 degree random fan is gone; a zero coordinate in the aim refuses the cast |
 | 39 | Ice Bolt | - | F | F | generic missile path |
-| 40 | Frozen Armor | 18 | F | F | do 18 self state with chill on melee attackers |
-| 41 | Inferno | 19 | F | F | stream (do 19) |
-| 42 | Static Field | 20 | F | F | do 20 |
-| 43 | Telekinesis | 21 | M | P | do 21 added: damage on a targeted monster; item pickup and object use are not simulated |
-| 44 | Frost Nova | 22 | F | F | do 22 |
-| 45 | Ice Blast | - | F | F | generic missile path |
-| 46 | Blaze | 23 | F | F |  |
+| 40 | Frozen Armor | 18 | F | F | VERIFIED wave 23: do 18 self state; auraevent damagedinmelee runs handler 0x5c8e20: a melee hit with a physical part of 1 or more freezes the attacker for calc1 frames (engine: frozenArmorRetaliation, through the monster freeze rules; a boss is chilled instead, d2state.BossFreezeAsChill, 0x578f50). The event id naming (id 1 = damagedinmelee) is inferred from the dispatch sites |
+| 41 | Inferno | 19 | F | F | VERIFIED wave 23 0x5c6d40 / 0x5c7050: one flame per do run (kind 0x8020), lifetime calc1 (ln12/2) frames, min 1 (d2skill.InfernoFlameLife; the old port used aurarangecalc). Wave 24 VERIFIED the channel (SRVST_011 0x5c7050, SetupChannel 0x5c6ef0, Do gate 0x5c6d40): the first run of a hold only starts state 12 (20 frames, no flame), every later run inside the window (refreshed to 6 frames) makes one flame, mana gate startmana unless state 12 is on; d2skill channel.go (Arctic Blast uses the same start function); the host adds ChannelAnimSlack (UNVERIFIED) because the hero cast animation is not shortened like the exe loop; the held button itself is the client repeat in GameControls |
+| 42 | Static Field | 20 | F | F | VERIFIED wave 23 0x5c7750 tail: a negative lightning resist is divided out first (d2skill.StaticFieldResistComp) so it never raises the damage |
+| 43 | Telekinesis | 21 | M | P | VERIFIED wave 23 0x5c79f0 + range check 0x5c70e0: ONE targeted unit (no area), start refuses a target beyond the aurarangecalc radius (25); damage rolls after a first 0..99 roll below Param2 (35) that also knocks back; items (seven item types) and objects are not simulated |
+| 44 | Frost Nova | 22 | F | F | VERIFIED wave 23: do 22, ring destinations from the exe tables (d2skill.NovaRingOffset) |
+| 45 | Ice Blast | - | F | F | VERIFIED wave 23: SrvDmgFunc 4 (0x5aadb0) turns the chill length of the hit into a FREEZE length (d2missile dmgFunc); the generic port only chilled |
+| 46 | Blaze | 23 | F | P | VERIFIED wave 23: SRVDO_023 only makes the state; the fire comes from SKILL_SpawnTrailMissileWhileMoving 0x5c7eb0 (run by the player movement tick at each reached path node, not in a town): the trail is now dropped on each new subtile instead of every 3 frames (the node spacing is U) |
 | 47 | Fire Ball | - | F | F | generic missile path |
-| 48 | Nova | 22 | F | F | do 22 |
+| 48 | Nova | 22 | F | F | VERIFIED wave 23: the 64 destinations are the exe tables 0x6e2580 / 0x6e2680 (radius 30, 5.625 degree steps, truncated; d2skill.NovaRingOffset), velocity = level velocity + calc1 |
 | 49 | Lightning | - | F | F | generic missile path |
-| 50 | Shiver Armor | 18 | F | F | do 18 self state with chill on melee attackers |
-| 51 | Fire Wall | 24 | F | F |  |
-| 52 | Enchant | 25 | F | F |  |
+| 50 | Shiver Armor | 18 | F | P | VERIFIED wave 23: do 18 self state; auraevent attackedinmelee runs handler 0x5c8f20 (skill elemental damage to the attacker) but that event is fired from COMBAT_BuildAttackerDamage 0x5794e0 only for a player or hireling attacker, so ordinary monsters never trigger it in the exe; player and mercenary attackers are not wired (U) |
+| 51 | Fire Wall | 24 | F | P | VERIFIED wave 23 0x5c7fc0: two firewallmaker missiles start on the target and fly perpendicular to the line from the caster (d2skill.FireWallMakerDestinations), srvmissileb stands on the target; refused on a zero coordinate, a blocked cell or in town. The hit cadence of the standing fire (five per second, scaled) is U |
+| 52 | Enchant | 25 | F | P | VERIFIED wave 23 0x5c8180: the state goes to the targeted unit when it is an ally, else to the caster; only the self cast is ported (ally / mercenary / summon target is not) |
 | 53 | Chain Lightning | 26 | F | F |  |
 | 54 | Teleport | 27 | P | F | levels.txt Teleport flag (0 refuse, 2 no walls) added (verified 0x5c84d0) |
-| 55 | Glacial Spike | - | F | F | generic missile path |
+| 55 | Glacial Spike | - | F | F | VERIFIED wave 23: hit 13 length lands in the FREEZE length (0x5a6930 maps by the missile EType column, frze = 12 for glacialspike), not the chill length; radius sHitPar1 else aurarangecalc (min 1), no direct damage |
 | 56 | Meteor | 28 | F | F | SRVDO_028 creates meteorcenter at the aim point (no scatter in the cast, VERIFIED wave 22: SKILL_ServerCreateMissileAtTarget only refuses an aim at distance 0x65 or more); hit 14: area damage + meteorfire burning ground with its own fire damage columns |
 | 57 | Thunder Storm | 29 | P | F | VERIFIED 0x5c8650 + 0x569a80: radius Param7 (circle), perdelay period, strikes rotate through the units in range by id (d2skill.NextAfter) |
-| 58 | Energy Shield | 23 | P | F | VERIFIED aurafunc 24 (0x5c8840): absorb pct of damage, limited by mana*16/ratio, cost absorb*ratio/16, shield ends at 0 mana; wave 22 wires the per-type walk (monster hits split into physical / fire / lightning / cold / magic); the three player-only-skipped slots stay empty (UNVERIFIED which damage fills them) |
+| 58 | Energy Shield | 23 | P | F | VERIFIED aurafunc 24 (0x5c8840): absorb pct of damage, limited by mana*16/ratio, cost absorb*ratio/16, shield ends at 0 mana; the walk order (table 0x6e4670) is physical, fire, lightning, cold, magic, then the life / mana / stamina steal fields (struct 0x38 / 0x3c / 0x40, wave 23) that count only for a non-hireling monster attacker; the leech fields are not produced by the monster hit model |
 | 59 | Blizzard | 28 | P | P | SRVDO_028 creates blizzardcenter; SrvDoFunc 10 drops blizzard1 shards (calc1 radius, calc2 period); bodies read; blizzard1 shards stamp their Size footprint (plus of 5 cells) as the missile bit 0x40 each frame, which keeps Eruption sub missiles off those cells (wave 22; the exe clearing point is UNVERIFIED) |
-| 60 | Chilling Armor | 18 | F | F | do 18 self state with chill on melee attackers |
+| 60 | Chilling Armor | 18 | F | P | VERIFIED wave 23: do 18 self state; auraevent hitbymissile (event 0, fired at every hostile missile contact, 0x5aba10) runs handler 0x5c8d00: srvmissilea (chillingarmorbolt) at the missile owner when the missile has the bits4 & 0x200 flag (read as the ReturnFire column, mapping U). Wired for monster shots at the hero (Director.HeroHitByMissile) |
 | 61 | Fire Mastery | - | T | T |  |
-| 62 | Hydra | 144 | M | P | do 144 added: 3 stationary fire shooters in the exe triangle; hydra heads run MONAI_Think_Hydra (0x5e8f10, ported in d2monster): wave 22 drives them with it (every 10 ticks, target nearer than 25, 60 percent) |
+| 62 | Hydra | 144 | M | P | VERIFIED wave 23 0x5c8ab0: three summons at (-1,-1), (0,0), (1,-1) of the target (tables 0x6e46b0 / 0x6e46bc), lifetime Param1 + (level-1) * Param2 frames, classes hydra1 / hydra2 / hydra3 (one key here, cosmetic); heads run MONAI_Think_Hydra (0x5e8f10, ported in d2monster): wave 22 drives them with it (every 10 ticks, target nearer than 25, 60 percent) |
 | 63 | Lightning Mastery | - | T | T |  |
 | 64 | Frozen Orb | - | P | F | VERIFIED do 15 (64 entry heading table, Param2 steps), hit 29 (ring only at life 0, sHitPar1 stride) and do 16 (the nova turns 45 degrees every Param2 frames for Param1 frames), d2missile/orb.go and gaps.go; create struct fields 28/32 VERIFIED (wave 22, 0x59d5b0: kind bit 2 = destination offset from the start position, x then y) |
 | 65 | Cold Mastery | - | T | T |  |

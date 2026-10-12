@@ -1,0 +1,111 @@
+package d2skill
+
+// Sustained casts (the channel mechanism, wave 24). Inferno is cast by holding the button: the client keeps
+// asking for the same skill and the server decides, from a channel kept on the caster, whether a run is the
+// wind-up or a real flame. VERIFIED in Game.exe 1.14b:
+//
+//   - Start function SRVST_011_Inferno (0x5c7050): unless the caster has state 12 the cast needs mana >= startmana
+//     (shifted 8); the skill needs a valid srvmissilea; then SRVST_InfernoSetupChannel (0x5c6ef0) runs.
+//   - SetupChannel: it stores a deadline, now + max(1, calc2), in the skill's target-type field (the slot Frenzy
+//     uses as well). With no state-12 list on the caster, it creates one that ends 20 frames later, switches
+//     state 12 on, sets the field to 0 and returns (the first run of a hold is a wind-up). With the list present
+//     it moves the end to now + 6, shifts the pending action events by one frame, and creates the flame.
+//   - Do function SRVDO_019 -> SRVDO_InfernoSpawnFlameMissile (0x5c6d40): a flame is made only while the field is
+//     not 0; afterwards the field becomes 1, state 12 goes off and the end of the action is scheduled
+//     monstats2 InfernoLen frames later (UNVERIFIED which monstats row: the code indexes the table with the
+//     hero's class number).
+//
+// The engine's hero cast animation is not shortened like the exe's loop, so Do refreshes the channel window by
+// ChannelAnimSlack frames (a host adaptation, UNVERIFIED) to keep a held button from losing the channel between
+// two animations.
+
+// Channel start function id (skills.txt srvstfunc) and the exe's windows in frames.
+const (
+	stChannel          = 11
+	ChannelStartFrames = 20 // life of the state-12 list made by the first run
+	ChannelHoldFrames  = 6  // the end it is moved to by every run while the list exists
+	// ChannelAnimSlack is the host adaptation added after a Do (see above); UNVERIFIED.
+	ChannelAnimSlack = 12
+)
+
+// channel is the per caster state of a sustained cast.
+type channel struct {
+	skill    int
+	until    int // first frame the state-12 list is gone
+	field    int // the skill's target-type field: 0 wind-up, 1 after a flame, else the deadline
+	deadline int
+	on       bool // unit state 12 is switched on
+}
+
+// IsChannelStart reports whether the skill's start function is the held-button channel.
+func IsChannelStart(sk *Skill) bool { return sk != nil && sk.SrvStFunc == stChannel }
+
+// ChannelOn reports whether the caster has the channel state (unit state 12, the "inferno" row) switched on: from
+// the start of a run until its Do.
+func (p *Pipeline) ChannelOn(u Unit) bool {
+	c := p.channels[u.ID()]
+
+	return c != nil && c.on && c.until > p.frame()
+}
+
+// ChannelActive reports whether a state-12 list of the caster is still alive (the next run is a flame).
+func (p *Pipeline) ChannelActive(u Unit) bool {
+	c := p.channels[u.ID()]
+
+	return c != nil && c.until > p.frame()
+}
+
+// channelGate is the mana test of the start function: without the state the caster needs startmana (8.8).
+func (p *Pipeline) channelGate(u Unit, sk *Skill) bool {
+	return p.ChannelActive(u) || u.Mana() >= sk.StartMana<<8
+}
+
+// channelStart is SRVST_InfernoSetupChannel. calc2 is the evaluated calc2 of the skill. It reports whether this
+// run is the first of a hold (a wind-up that makes no flame).
+func (p *Pipeline) channelStart(u Unit, sk *Skill, calc2 int) (first bool) {
+	if p.channels == nil {
+		p.channels = map[string]*channel{}
+	}
+
+	now := p.frame()
+	c := p.channels[u.ID()]
+
+	if c == nil || c.skill != sk.ID {
+		c = &channel{skill: sk.ID}
+		p.channels[u.ID()] = c
+	}
+
+	if calc2 < 1 {
+		calc2 = 1
+	}
+
+	c.deadline = now + calc2
+
+	if c.until <= now { // no live list: the first run
+		c.until, c.field, c.on = now+ChannelStartFrames, 0, true
+
+		return true
+	}
+
+	c.until, c.field, c.on = now+ChannelHoldFrames, c.deadline, true
+
+	return false
+}
+
+// channelDo is the gate of SRVDO_InfernoSpawnFlameMissile: it reports whether this Do makes a flame, then sets
+// the field to 1 and switches the state off.
+func (p *Pipeline) channelDo(u Unit) bool {
+	c := p.channels[u.ID()]
+	if c == nil {
+		return true // no start ran (a monster, a scripted cast): the plain one flame per run
+	}
+
+	spawn := c.field != 0
+	c.field, c.on = 1, false
+
+	if keep := p.frame() + ChannelHoldFrames + ChannelAnimSlack; c.until > p.frame() && c.until < keep {
+		c.until = keep
+	}
+
+	return spawn
+}

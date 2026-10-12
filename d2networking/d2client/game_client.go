@@ -680,7 +680,7 @@ func (g *GameClient) createMissileEntities(
 
 	missileEntities := make([]*d2mapentity.Missile, 0)
 
-	for _, shot := range planClientShots(skillRecord, g.clientSkillLevel(player, skillRecord), caster, target) {
+	for _, shot := range planClientShotsWith(skillRecord, g.clientSkillLevel(player, skillRecord), caster, target, g.visibleEnemies()) {
 		missileRecord := g.asset.Records.GetMissileByName(cltSlotName(skillRecord, shot.slot))
 		if missileRecord == nil {
 			continue
@@ -802,4 +802,28 @@ func (g *GameClient) handlePlayerDisconnectionPacket(packet d2netpacket.NetPacke
 // IsSinglePlayer returns a bool for whether the game is a single-player game
 func (g *GameClient) IsSinglePlayer() bool {
 	return g.connectionType == d2clientconnectiontype.Local
+}
+
+// visibleEnemies lists the living hostile monsters the client holds (wave 24), for the client skill functions that scan
+// for a second unit (Strafe, Lightning Strike). Monsters without a brain are left out.
+func (g *GameClient) visibleEnemies() clientExtras {
+	var ex clientExtras
+
+	if g.MapEngine == nil {
+		return ex
+	}
+
+	for _, e := range g.MapEngine.Entities() {
+		m, ok := e.(*d2mapentity.Monster)
+		if !ok || m == nil || !m.Alive() || m.Brain == nil || m.Brain.Allied {
+			continue
+		}
+
+		x, y := m.SubtilePos()
+		ex.Enemies = append(ex.Enemies, d2skill.ChainTarget{ID: int(m.Brain.ID), Pos: d2skill.SubPoint{X: x, Y: y}})
+	}
+
+	sort.Slice(ex.Enemies, func(i, j int) bool { return ex.Enemies[i].ID < ex.Enemies[j].ID })
+
+	return ex
 }

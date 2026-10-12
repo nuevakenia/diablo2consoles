@@ -214,6 +214,27 @@ func (b *Brain) RemoveMinion(m *Brain) {
 	m.Leader = nil
 }
 
+// DetachFromLeader is MONAI_DetachFromLeaderOrReleaseMinions (0x56c340, VERIFIED wave 24, used by
+// Conversion): a follower leaves its leader's list; a leader releases all its followers; a unit with
+// neither does nothing. It reports whether anything changed.
+func (b *Brain) DetachFromLeader() bool {
+	if b.Leader != nil {
+		b.Leader.RemoveMinion(b)
+
+		return true
+	}
+
+	if len(b.Minions) == 0 {
+		return false
+	}
+
+	for _, m := range append([]*Brain(nil), b.Minions...) {
+		b.RemoveMinion(m)
+	}
+
+	return true
+}
+
 // IsGroupLeader reports whether b leads a group. In the exe the test is
 // MONAI_GetLeaderUnit()==self; how a lone leader satisfies it is UNVERIFIED,
 // so a leader here is a unit with at least one minion.

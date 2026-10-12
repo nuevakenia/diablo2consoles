@@ -52,6 +52,11 @@ func (d *Director) ForceState(id uint32, kind d2monster.ForcedKind, frames int, 
 	}
 
 	u.mv = nil
+
+	if kind == d2monster.ForcedCharm && u.b.DetachFromLeader() { // Conversion: MONAI_DetachFromLeaderOrReleaseMinions 0x56c340
+		d.emit("leader", "MONSTER detach name=%s id=%d (conversion)", u.m.Label(), u.b.ID)
+	}
+
 	u.b.ApplyForced(kind, d.frame, frames, source)
 	d.emit("state", "MONSTER state name=%s id=%d kind=%s frames=%d until=%d source=%d unit_state=%d ai=%s->%s",
 		u.m.Label(), u.b.ID, kind, frames, u.b.ForcedUntil, source, kind.UnitStateID(), before, u.b.StateLabel())

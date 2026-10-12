@@ -121,7 +121,9 @@ func PlanSummon(rec *d2records.SkillRecord, caster *d2records.MonStatRecord) (Su
 		p.MaxAlive = rec.Petmax.Eval(d2calc.ZeroEnv{})
 	}
 
-	if c := HostSummonCap(k, caster.AiKey); p.MaxAlive <= 0 || p.MaxAlive > c {
+	if c, exe := exeSummonCap(k, rec, caster, p.MaxAlive); exe {
+		p.MaxAlive = c // an exe value (summons_exe.go): not clamped by the host bound
+	} else if c := HostSummonCap(k, caster.AiKey); p.MaxAlive <= 0 || p.MaxAlive > c {
 		p.MaxAlive = c
 	}
 
@@ -137,7 +139,8 @@ var selfLimitedSummoners = map[string]bool{"foulcrownest": true, "mosquitonest":
 	"minionspawner": true, "vilemother": true,
 	"sandmaggotqueen": true} // SandMaggotQueen: aip1 brood limit (VERIFIED port)
 
-// Host safety net (a bound and not a rule from the exe): the most live
+// Wave 24: the Hydra (table petmax 99) and EvilHole (aip1) bounds are exe values, see summons_exe.go and
+// are not clamped by the numbers below; the rest of this note stands. Host safety net: the most live
 // summons of one caster. What the exe says: no summoning handler counts live
 // units. Casting is bounded by the AI: EvilHole (0x5fa590) lays aip1 units in
 // total (10 in the 1.14b tables, one per aip2 frames, a total and not a live

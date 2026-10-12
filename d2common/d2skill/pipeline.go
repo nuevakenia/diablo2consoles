@@ -124,6 +124,9 @@ type Pipeline struct {
 	// field, SKILL_FrenzyBuildHitAndFinalize 0x5d75b0); see frenzy_w23.
 	chain map[string]bool
 
+	// channels is the sustained-cast state per caster (channel.go, Inferno).
+	channels map[string]*channel
+
 	// ApplyState is called when a missile of a skill applies a state to an
 	// enemy (Howl's fear). frames is the duration.
 	ApplyState func(owner Unit, t d2missile.Target, state string, frames int)
@@ -165,6 +168,8 @@ type StartResult struct {
 	Reason   string
 	Level    int
 	ManaPaid int // 8.8, 0 if nothing was paid yet
+	// ChannelFirst: the cast is the first run of a held-button channel (Inferno); its Do makes no flame.
+	ChannelFirst bool
 }
 
 // payAtStart: mana is paid in the start function when the skill has a start
@@ -274,7 +279,17 @@ func (p *Pipeline) Start(u Unit, skillID int, tgt Target) StartResult {
 		}
 	}
 
+	// SRVST_011_Inferno (0x5c7050): the startmana gate runs unless the channel state is on.
+	chanStart := IsChannelStart(sk) && u.IsPlayer()
+	if chanStart && !p.channelGate(u, sk) {
+		return StartResult{Reason: ReasonMana, Level: lvl}
+	}
+
 	res := StartResult{OK: true, Level: lvl}
+
+	if chanStart {
+		res.ChannelFirst = p.channelStart(u, sk, p.env(sk, lvl, u).eval(sk.Calc[2]))
+	}
 
 	if u.IsPlayer() && cost > 0 && payAtStart(sk) {
 		rest, ok := d2combat.PayMana(u.Mana(), cost)

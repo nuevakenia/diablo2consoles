@@ -114,6 +114,12 @@ func (e *Engine) convert(p *d2mapentity.Player, sk *d2skill.Skill, ef *d2skill.E
 	e.regConverted(p.ID(), m.ID())
 	e.setOf(m.ID()).Apply(e.frame, d2state.Instance{Name: ef.State, Until: e.frame + ef.Frames, Source: p.ID(),
 		SkillID: sk.ID, Level: ef.Level})
+	// SRVDO_079 0x5ce8c0 (VERIFIED wave 24): after the state and the leader detach (ForceMonster) the exe
+	// removes every statlist with flag 8 (aura states) from the target.
+	if ended := e.setOf(m.ID()).RemoveAuraStates(ef.State); len(ended) > 0 {
+		e.emit("state", "STATE convert_strip target=%s aura_states=%v", m.Label(), ended)
+	}
+
 	e.emit("state", "STATE convert skill=%q target=%s frames=%d ai=%s level=%d->%d scaled=%v hp=%d/%d", sk.Name, m.Label(),
 		ef.Frames, ai, oldLevel, lvl, scaled, v.HP, v.MaxHP)
 
@@ -123,6 +129,8 @@ func (e *Engine) convert(p *d2mapentity.Player, sk *d2skill.Skill, ef *d2skill.E
 		if scaled && m.Alive() {
 			v.HP = RevertConverted(v.HP, v.MaxHP, oldMax)
 			v.Level, v.MaxHP = oldLevel, oldMax
+			// the revert callback 0x5ce710 strips the flag-8 lists again, inside the level-scaled branch
+			e.setOf(m.ID()).RemoveAuraStates()
 		}
 
 		e.emit("state", "STATE convert_end target=%s alive=%v level=%d hp=%d/%d", m.Label(), m.Alive(), v.Level, v.HP, v.MaxHP)
