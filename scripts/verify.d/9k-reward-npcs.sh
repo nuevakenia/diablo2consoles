@@ -47,7 +47,7 @@ scenario_env() {
   talk Malah; talk Malah
   talk Nihlathak
   # Cain: the identify window (his row only shows while the hero carries an unidentified item: a negative quality gives one)
-  s+=";say:giveitemq lgl -4"
+  s+=";say:freeinv 6;say:giveitemq lgl -4"
   s+=";move:npc=Deckard Cain;until:NPC menu opened: npc=\"Deckard Cain\",60;menu:Identify;wait:2;exit"
   echo "export OD2_AUTOSCRIPT='$s'"
 }
