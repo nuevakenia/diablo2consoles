@@ -52,12 +52,22 @@ func fbnEnemy(c *Ctx, radius int) (Target, int, bool) {
 	return t, d, ok
 }
 
-// fbnSelectPet is MONAI_SelectPetActionByRange: chooses the FollowLeaderStep
-// mode and returns true when it moved the pet. p6 is the leash (7 or 8), flag
-// the "stay put when adjacent" bit. The exe's path-history and region checks
-// (previous path points, DRLG region ids) are not visible to the AI: they are
-// UNVERIFIED and omitted, so mode 2 stays the default.
-func fbnSelectPet(c *Ctx, target *Target, l OwnerInfo, flag bool, p6 int) bool {
+// fbnSelectPet is MONAI_SelectPetActionByRange 0x5e3510 (VERIFIED w39 against the disassembly): chooses the
+// FollowLeaderStep mode and returns true when it moved the pet or put it to wait. target is the pet's current foe
+// (nArg3), inRange the in-range flag the foe search wrote (nArg5), stay the "stay put" bit (nArg7: the 15 percent
+// roll of the Necromancer pets) and p6 the leash (7 or 8, widened by half the owner's pet count, capped at 36).
+//
+//   - leader within 2 and in the neutral mode, and the foe not in range: mode 5 (nudge near the leader);
+//   - a foe and not in town: farther than 80 from the leader -> mode 3 (teleport), else 0 (return false: fight);
+//   - otherwise mode 2 (idle shuffle), 0 when the leader walks, runs or town-walks (modes 2, 3, 6) or its
+//     destination differs on both axes from the point it is heading for, 1 when the pet is beyond the leash or
+//     the regions differ, 3 beyond 50; mode 4 replaces 1/2 when the owner's marker point (PlayerData +0x148/+0x14c,
+//     meaning UNVERIFIED) is closer than 28: not modelled;
+//   - mode 2 with the stay bit set returns false (the caller wanders).
+//
+// The path destination comparison and the DRLG region ids are not visible to the AI; the optional FBNLeaderPath host
+// answers them (default: leader moving = its mode, same region).
+func fbnSelectPet(c *Ctx, target *Target, l OwnerInfo, inRange, stay bool, p6 int) bool {
 	b := c.B
 	d := EdgeDistance(b.X-l.X, b.Y-l.Y, b.Size)
 
@@ -70,7 +80,7 @@ func fbnSelectPet(c *Ctx, target *Target, l OwnerInfo, flag bool, p6 int) bool {
 		maxDist = 0x24
 	}
 
-	if d < 2 && l.Mode == ModeNeutral && !flag {
+	if d < 2 && l.Mode == ModeNeutral && !inRange {
 		return fbnFollow(c, l, 5, 0, maxDist)
 	}
 
@@ -83,8 +93,19 @@ func fbnSelectPet(c *Ctx, target *Target, l OwnerInfo, flag bool, p6 int) bool {
 	}
 
 	mode := 2
-	if l.Mode == ModeWalk || l.Mode == ModeGetHit || l.Mode == 3 {
+	if leaderWalks(l.Mode) || leaderRuns(l.Mode) {
 		mode = 0
+	}
+
+	if lp, ok := c.W.(FBNLeaderPath); ok {
+		moving, sameRegion := lp.FBNLeaderPath(b)
+		if moving {
+			mode = 0
+		}
+
+		if !sameRegion {
+			mode = 1
+		}
 	}
 
 	if maxDist < d {
@@ -95,7 +116,30 @@ func fbnSelectPet(c *Ctx, target *Target, l OwnerInfo, flag bool, p6 int) bool {
 		mode = 3
 	}
 
+	if stay && mode == 2 {
+		return false
+	}
+
 	return fbnFollow(c, l, mode, 0, maxDist)
+}
+
+// leaderWalks and leaderRuns classify the leader's mode the way the exe tests it: a player in walk (2), town walk
+// (6) or run (3). The Go numbering gives the merc code's run its own value (ModeRun).
+func leaderWalks(m Mode) bool { return m == ModeWalk || m == ModeGetHit }
+
+func leaderRuns(m Mode) bool { return m == 3 || m == ModeRun }
+
+// FBNLeaderPath answers the two path questions of SelectPetActionByRange for the pet's leader: whether the
+// leader's path destination differs from the point it is heading for (it is travelling), and whether leader and pet
+// stand in the same DRLG region.
+type FBNLeaderPath interface {
+	FBNLeaderPath(b *Brain) (moving, sameRegion bool)
+}
+
+// FBNPetsAdjacent counts the other pets of the leader standing next to the pet (PETS_ForEachPetUnit with
+// MONAI_ScanCallbackCountAdjacentUnits), used by FollowLeaderStep mode 4.
+type FBNPetsAdjacent interface {
+	FBNPetsAdjacent(b *Brain) int
 }
 
 // fbnPetRoll draws the leash roll: above 14 the pet keeps a leash of 7, else 8
@@ -183,7 +227,7 @@ func fbnPetMelee(c *Ctx) {
 
 	flag, p6 := fbnPetRoll(c)
 
-	if fbnSelectPet(c, tgt, l, flag, p6) {
+	if fbnSelectPet(c, tgt, l, inRange, flag, p6) {
 		return
 	}
 
@@ -231,6 +275,10 @@ func fbnPetCaster(c *Ctx) {
 
 	var tgt *Target
 
+	// local_18 of the exe: the in-range flag GetAttackTargetAndDistance wrote for ITS target (kept when the
+	// fallback target replaces it)
+	inRange := found && c.W.InRange(b, t, d)
+
 	if found {
 		tgt = &t
 	}
@@ -245,7 +293,7 @@ func fbnPetCaster(c *Ctx) {
 
 	flag, p6 := fbnPetRoll(c)
 
-	if fbnSelectPet(c, tgt, l, flag, p6) {
+	if fbnSelectPet(c, tgt, l, inRange, flag, p6) {
 		return
 	}
 
@@ -289,7 +337,7 @@ func thinkVinesB(c *Ctx) {
 	}
 
 	if fbnInTown(c) {
-		if !fbnSelectPet(c, nil, l, false, 6) {
+		if !fbnSelectPet(c, nil, l, false, false, 6) {
 			c.Sleep(b.AIP(3))
 		}
 
@@ -304,7 +352,8 @@ func thinkVinesB(c *Ctx) {
 		tgt = &t
 	}
 
-	if fbnSelectPet(c, tgt, l, false, 6) {
+	// nArg5 of the exe is the in-range flag GetAttackTargetAndDistance wrote (local_c)
+	if fbnSelectPet(c, tgt, l, found && c.W.InRange(b, t, dist), false, 6) {
 		return
 	}
 
@@ -380,11 +429,11 @@ func thinkTotemB(c *Ctx) {
 	}
 
 	if b.AIP(4) < d {
-		if (l.Mode == ModeWalk || l.Mode == ModeRun) && fbnFollow(c, l, 0, 0, 0) {
+		if (leaderWalks(l.Mode) || l.Mode == ModeRun) && fbnFollow(c, l, 0, 0, 0) {
 			return
 		}
 
-		if l.Mode == 3 && fbnFollow(c, l, 0, 0x3c, 0) {
+		if leaderRuns(l.Mode) && fbnFollow(c, l, 0, 0x3c, 0) {
 			return
 		}
 	}
@@ -394,7 +443,7 @@ func thinkTotemB(c *Ctx) {
 		tp = &tgt
 	}
 
-	if fbnSelectPet(c, tp, l, false, 6) {
+	if fbnSelectPet(c, tp, l, false, false, 6) {
 		return
 	}
 

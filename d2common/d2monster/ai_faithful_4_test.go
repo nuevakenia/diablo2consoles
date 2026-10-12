@@ -175,7 +175,7 @@ func TestCycleOfLife(t *testing.T) {
 			frame: 100, log: "walk-target/7"},
 		{name: "other classes ignore vitals", class: 0x1a0, ownerDist: 5, cand: ally, cur: 100, max: 100,
 			frame: 100, log: "cast0", s1: 100},
-		{name: "nothing to do waits aip3", ownerDist: 5, frame: 10, wake: 22},
+		{name: "nothing to do waits 15 (mode 2 of SelectPet)", ownerDist: 5, frame: 10, wake: 25},
 	}
 
 	for _, c := range cases {
@@ -230,7 +230,11 @@ func TestCycleOfLife(t *testing.T) {
 
 	Tick(w, b)
 
-	if *b.Seed != before || b.Wake != 12 {
+	// SelectPetActionByRange mode 2 draws the 10 percent shuffle roll and waits 15 (VERIFIED w39)
+	sw := before
+	sw.Roll(100)
+
+	if *b.Seed != sw || b.Wake != 15 {
 		t.Errorf("dead target: wake=%d", b.Wake)
 	}
 

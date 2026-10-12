@@ -631,11 +631,11 @@ func thinkDruidBear(c *Ctx) {
 	}
 
 	if d > bearGapDist {
-		if (l.Mode == ModeWalk || l.Mode == ModeGetHit) && fbnFollow(c, l, 0, 0, 0) {
+		if leaderWalks(l.Mode) && fbnFollow(c, l, 0, 0, 0) {
 			return
 		}
 
-		if l.Mode == 3 && fbnFollow(c, l, 0, 100, 0) {
+		if leaderRuns(l.Mode) && fbnFollow(c, l, 0, 100, 0) {
 			return
 		}
 	}
@@ -720,7 +720,7 @@ func wolfSelect(c *Ctx, slot int) {
 	s[2] = int(l.ID)
 
 	if c.townRoom() || fbnInTown(c) {
-		if !fbnSelectPet(c, nil, l, false, 6) {
+		if !fbnSelectPet(c, nil, l, false, false, 6) {
 			c.Sleep(townWolfSleep)
 		}
 
@@ -753,13 +753,13 @@ func wolfSelect(c *Ctx, slot int) {
 		}
 
 		if d > rad {
-			if l.Mode == 3 {
+			if leaderRuns(l.Mode) {
 				fbnFollow(c, l, 0, 100, 0)
 
 				return
 			}
 
-			if l.Mode == ModeWalk || l.Mode == ModeGetHit {
+			if leaderWalks(l.Mode) {
 				fbnFollow(c, l, 0, 0, 0)
 
 				return
@@ -771,17 +771,17 @@ func wolfSelect(c *Ctx, slot int) {
 		}
 
 		if d > b.AIP(3) {
-			if (l.Mode == ModeWalk || l.Mode == ModeGetHit) && fbnFollow(c, l, 0, 0, 0) {
+			if leaderWalks(l.Mode) && fbnFollow(c, l, 0, 0, 0) {
 				return
 			}
 
-			if l.Mode == 3 && fbnFollow(c, l, 0, 100, 0) {
+			if leaderRuns(l.Mode) && fbnFollow(c, l, 0, 100, 0) {
 				return
 			}
 		}
 	}
 
-	if fbnSelectPet(c, sel, l, inRange, 6) {
+	if fbnSelectPet(c, sel, l, inRange, false, 6) {
 		return
 	}
 

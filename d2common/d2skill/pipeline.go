@@ -488,6 +488,10 @@ type SummonOrder struct {
 	// SkillDamage names this skill (VERIFIED: druid hawk, wolves, bear).
 	SkillName                            string
 	SkillDmgMin, SkillDmgMax, SkillToHit int
+	// Pecks is the number of attacks a Raven makes before it expires: SKILLS_GetSecondBasePlusPerLevelValue 0x4ecfa0
+	// (VERIFIED w39) = Param5 + (level - 1) * Param6 of the Raven skill, read by MONAI_Think_Raven 0x5ebd20 on its
+	// first think (0: not a Raven, the AI's default of 3 applies).
+	Pecks int
 	// X, Y where to place it (aim point, corpse...).
 	X, Y int
 	// Corpse to consume (id), "" if none.

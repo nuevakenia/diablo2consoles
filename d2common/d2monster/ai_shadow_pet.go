@@ -32,7 +32,7 @@ func (a shadowPetAdapter) PetAction(_ *Brain, tgt *Target, leader Target, _ bool
 		l = OwnerInfo{Target: leader}
 	}
 
-	return fbnSelectPet(a.c, tgt, l, false, 6)
+	return fbnSelectPet(a.c, tgt, l, false, false, 6)
 }
 
 // shadowPetOf returns the pet relation the shadow thinkers use: the host's own

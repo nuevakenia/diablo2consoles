@@ -982,7 +982,8 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 	}
 
 	opt := d2monsters.MinionOptions{Owner: p, Kind: o.Kind, HPPct: o.HPPct, HPFlat: o.HPFlat, Frames: o.Frames, Tag: o.PetType,
-		Level: o.Level, DrawsAggro: o.DrawsAggro, OwnerDamagePct: o.OwnerDamagePct, HealSharePct: o.HealSharePct}
+		Level: o.Level, DrawsAggro: o.DrawsAggro, OwnerDamagePct: o.OwnerDamagePct, HealSharePct: o.HealSharePct,
+		Pecks: o.Pecks}
 	if opt.Tag == "" || opt.Tag == "none" {
 		opt.Tag = stat.Key // the tag petworld.go gives such minions
 	}
