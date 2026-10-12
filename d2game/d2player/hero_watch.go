@@ -29,6 +29,7 @@ type heroWatch struct {
 	kind   heroWatchKind
 	x0, y0 float64 // moved: where it was armed; still: the last position
 	still  float64 // still: seconds without moving
+	busy   bool    // still: the hero is in a cast animation (a click then becomes a walk), which is not standing
 }
 
 func (w *heroWatch) arm(kind heroWatchKind, x, y float64) {
@@ -51,6 +52,11 @@ func (w *heroWatch) update(x, y, elapsed float64) (fired bool, dist float64) {
 			return false, 0
 		}
 
+		if w.busy { // a running cast animation is no stillness: the next click would become a walk
+			w.still = 0
+			return false, 0
+		}
+
 		w.still += elapsed
 		if w.still >= heroWatchStillSeconds {
 			w.kind = heroWatchNone
@@ -68,6 +74,7 @@ func (g *GameControls) advanceHeroWatch(elapsed float64) {
 		return
 	}
 
+	g.heroWatch.busy = g.hero.IsCasting()
 	p := g.hero.Position.World()
 	if fired, dist := g.heroWatch.update(p.X(), p.Y(), elapsed); fired {
 		if kind == heroWatchMoved {

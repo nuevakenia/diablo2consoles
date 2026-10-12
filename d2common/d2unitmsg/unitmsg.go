@@ -135,7 +135,7 @@ func (d *Dirty) Flush(send func(u *Unit, m Message)) {
 	}
 }
 
-// Hit is one entry of a defender's hit-sequence list: which attacker it came
+// Hit is one entry of a unit's hit-sequence list (the ATTACKER owns it, VERIFIED 0x57b4b0): which attacker it came
 // from, and the sequence step still to apply.
 type Hit struct {
 	AttackerType byte
@@ -143,7 +143,7 @@ type Hit struct {
 	Step         int
 }
 
-// HitList is the hit-sequence list of a defender (Unit +0xac).
+// HitList is the hit-sequence list of its owner, the attacker (Unit +0xac).
 type HitList struct{ hits []Hit }
 
 // Add appends an entry.
