@@ -465,6 +465,15 @@ func (e *Engine) target(m *d2mapentity.Monster) *monsterTarget {
 	return t
 }
 
+// UnitSize is UNIT_GetSizeX of the monster (monstats2 SizeX), see d2skill.TableDistanceSized.
+func (t *monsterTarget) UnitSize() int {
+	if t.m.StatEx == nil {
+		return 1
+	}
+
+	return t.m.StatEx.SizeX
+}
+
 func (t *monsterTarget) ID() string     { return t.m.ID() }
 func (t *monsterTarget) IsPlayer() bool { return false }
 func (t *monsterTarget) Alive() bool    { return t.m.Alive() }

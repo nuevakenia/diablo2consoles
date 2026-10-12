@@ -140,7 +140,19 @@ func (v *Game) OnPlayerAttack(m *d2mapentity.Monster) {
 // holds before he swings, so the gate in the engine (d2skill Options.MeleeGate, Director HeroStrike) never turns
 // a swing into a miss. heroMeleeReach stays the lenient radius monsters use to start their own attacks.
 func (v *Game) heroInSwingReach(hx, hy, mx, my int) bool {
-	return d2skill.AttackInReach(false, v.heroMeleeRange(), mx-hx, my-hy)
+	return d2skill.AttackInReachSized(false, v.heroMeleeRange(), mx-hx, my-hy, d2skill.HeroUnitSize, 1)
+}
+
+// heroInSwingReachOf is heroInSwingReach with the target monster's unit size (monstats2 SizeX, UNIT_GetSizeX).
+func (v *Game) heroInSwingReachOf(hx, hy int, m *d2mapentity.Monster) bool {
+	mx, my := m.SubtilePos()
+	size := 1
+
+	if m.StatEx != nil && m.StatEx.SizeX > 0 {
+		size = m.StatEx.SizeX
+	}
+
+	return d2skill.AttackInReachSized(false, v.heroMeleeRange(), mx-hx, my-hy, d2skill.HeroUnitSize, size)
 }
 
 // advanceHeroAttack keeps swinging at the attack target while it lives and
@@ -157,11 +169,10 @@ func (v *Game) advanceHeroAttack(elapsed float64) {
 	}
 
 	hx, hy := int(v.localPlayer.Position.X()), int(v.localPlayer.Position.Y())
-	mx, my := m.SubtilePos()
 
 	// the same edge distance the monsters use, so a monster that can hit the
 	// hero can also be hit back
-	if v.heroInSwingReach(hx, hy, mx, my) {
+	if v.heroInSwingReachOf(hx, hy, m) {
 		if v.localPlayer.IsCasting() {
 			return
 		}

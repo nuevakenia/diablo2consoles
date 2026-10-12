@@ -459,7 +459,11 @@ func (c *cast) outOfReach() bool {
 
 	ux, uy := c.u.Pos()
 
-	return !AttackInReach(!c.u.IsPlayer(), c.p.meleeRange(), c.tgt.UX-ux, c.tgt.UY-uy)
+	if c.u.IsPlayer() {
+		return !AttackInReachSized(false, c.p.meleeRange(), c.tgt.UX-ux, c.tgt.UY-uy, HeroUnitSize, UnitSizeOf(c.tgt.Unit))
+	}
+
+	return !AttackInReach(true, c.p.meleeRange(), c.tgt.UX-ux, c.tgt.UY-uy)
 }
 
 func (c *cast) addMelee(m *MeleeResult) {
