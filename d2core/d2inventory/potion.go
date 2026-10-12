@@ -94,53 +94,71 @@ func calcNumber(s string) int {
 	return n
 }
 
-// Regen is the over-time part of the potions the hero drank: points still to
-// be restored and the speed.
+// Regen is the over-time part of the potions the hero drank. Each pool (life,
+// mana) keeps the points still to come, the seconds still to run and the rate.
+// Drinking again while one works follows ITEM_ServerUsePotionVariantA 0x5bbf70
+// (VERIFIED): the state's end moves out by the new length, and the per-frame
+// value becomes (oldRate*remaining + newAmount) / (remaining + newLength), so the
+// points left and the new ones are spread over the summed time and none is lost.
 type Regen struct {
-	hp, mana         float64
-	hpRate, manaRate float64
+	hp, mana regenPool
 }
 
-// Add starts the over-time part of an effect. A potion drunk while an earlier
-// one is still working adds to the remaining points and raises the rate so
-// both finish together (a simplification: the original runs each potion's
-// timer separately).
+type regenPool struct {
+	left, secs, rate float64
+}
+
+func (p *regenPool) add(amount, seconds float64) {
+	if amount <= 0 {
+		return
+	}
+
+	rest := p.secs
+	if rest < 0 || p.left <= 0 {
+		rest = 0
+	}
+
+	p.left += amount
+	p.secs = rest + seconds
+	p.rate = p.left / p.secs
+}
+
+func (p *regenPool) tick(dt float64) float64 {
+	if p.left <= 0 {
+		return 0
+	}
+
+	p.secs -= dt
+
+	taken := p.rate * dt
+	if taken > p.left || p.secs <= 0 {
+		taken = p.left
+	}
+
+	p.left -= taken
+	if p.left <= 0 {
+		*p = regenPool{}
+	}
+
+	return taken
+}
+
+// Add starts the over-time part of an effect.
 func (r *Regen) Add(e PotionEffect) {
 	if e.Seconds <= 0 || (e.HP == 0 && e.Mana == 0) {
 		return
 	}
 
-	r.hp += e.HP
-	r.mana += e.Mana
-	r.hpRate += e.HP / e.Seconds
-	r.manaRate += e.Mana / e.Seconds
+	r.hp.add(e.HP, e.Seconds)
+	r.mana.add(e.Mana, e.Seconds)
 }
 
 // Active reports whether anything is left to restore.
-func (r *Regen) Active() bool { return r.hp > 0 || r.mana > 0 }
+func (r *Regen) Active() bool { return r.hp.left > 0 || r.mana.left > 0 }
 
 // Tick advances dt seconds and returns the points restored in that time.
 func (r *Regen) Tick(dt float64) (hp, mana float64) {
-	hp, r.hp = takeRegen(r.hp, r.hpRate*dt)
-	mana, r.mana = takeRegen(r.mana, r.manaRate*dt)
-
-	if r.hp <= 0 {
-		r.hpRate = 0
-	}
-
-	if r.mana <= 0 {
-		r.manaRate = 0
-	}
-
-	return hp, mana
-}
-
-func takeRegen(left, step float64) (taken, remaining float64) {
-	if step > left {
-		step = left
-	}
-
-	return step, left - step
+	return r.hp.tick(dt), r.mana.tick(dt)
 }
 
 // ApplyInstant applies the instant part of an effect to a pool and returns the
