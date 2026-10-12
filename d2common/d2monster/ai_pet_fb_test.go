@@ -71,19 +71,47 @@ func TestFBNNecroPetMelee(t *testing.T) {
 		t.Errorf("far pet: teleports=%d", f.teleports)
 	}
 
-	// no enemy: one leash roll and the 4-step shuffle (step, roll, 2 signs)
-	f, b = fbnPetNew("NecroPet", 5)
-	sh := shadow(b)
-	sh.Roll(100)
-	sh.Step()
-	sh.Roll(4)
-	sh.Step()
-	sh.Step()
+	// no enemy: one leash roll. Above 14 (leash 7) SelectPetActionByRange picks mode 2: the 10 percent shuffle roll
+	// and then ALWAYS a 15 frame wait (VERIFIED 0x5e2dc0 case 2). At 14 or below (leash 8, stay bit) mode 2
+	// returns 0 and the 4-step shuffle runs (step, roll, 2 signs).
+	sawStay, sawIdle := false, false
 
-	Tick(f, b)
+	for seed := uint32(1); seed < 60 && !(sawStay && sawIdle); seed++ {
+		f, b = fbnPetNew("NecroPet", 5)
+		b.Seed.Init(seed)
+		sh := shadow(b)
 
-	if len(f.log) != 1 || *b.Seed != *sh {
-		t.Errorf("idle pet: %v", f.log)
+		if sh.Roll(100) > 14 {
+			sawIdle = true
+
+			if sh.Roll(100) < 10 { // the shuffle step is not asserted, only the idle wait of the other branch
+				continue
+			}
+
+			Tick(f, b)
+
+			if len(f.log) != 0 || b.Wake != 15 || *b.Seed != *sh {
+				t.Errorf("seed %d idle pet: log=%v wake=%d", seed, f.log, b.Wake)
+			}
+
+			continue
+		}
+
+		sawStay = true
+		sh.Step()
+		sh.Roll(4)
+		sh.Step()
+		sh.Step()
+
+		Tick(f, b)
+
+		if len(f.log) != 1 || *b.Seed != *sh {
+			t.Errorf("seed %d stay pet: %v", seed, f.log)
+		}
+	}
+
+	if !sawStay || !sawIdle {
+		t.Errorf("seeds did not reach both branches: stay=%v idle=%v", sawStay, sawIdle)
 	}
 }
 
@@ -184,12 +212,11 @@ func TestFBNVinesAndTotem(t *testing.T) {
 	f.hasEnemy = false
 	sh := shadow(b)
 	sh.Roll(100) // aip2 forget roll
-	// Select path draws no roll when nothing is wrong (mode 2 follow): the
-	// fallback walks to the owner only beyond 8, so it sleeps 25.
+	sh.Roll(100) // mode 2 of SelectPetActionByRange: the 10 percent shuffle roll, then a 15 frame wait
 
 	Tick(f, b)
 
-	if b.Wake != 25 || *b.Seed != *sh {
+	if b.Wake != 15 || *b.Seed != *sh {
 		t.Errorf("totem: log=%v wake=%d", f.log, b.Wake)
 	}
 }

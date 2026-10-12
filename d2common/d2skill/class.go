@@ -1758,6 +1758,10 @@ func doSummonFn(c *cast) {
 		if !sk.Calc[2].Empty() {
 			o.Level = maxInt(c.calc(2), 1)
 		}
+
+		if sk.SrvDoFunc == 114 && c.lvl > 0 {
+			o.Pecks = sk.Params[5] + (c.lvl-1)*sk.Params[6]
+		}
 	case 31, 56, 57:
 		// VERIFIED (SKILL_ComputeSummonLevel 0x5c2850, called by SRVDO_031 / 056 / 057 with no fixed level)
 		o.Level = SummonLevel(c.u.Level(), c.lvl)

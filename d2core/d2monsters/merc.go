@@ -392,7 +392,7 @@ func (d *Director) Owner(b *d2monster.Brain) (d2monster.OwnerInfo, bool) {
 
 		return d2monster.OwnerInfo{
 			Target: d2monster.Target{ID: d.playerTargetID(u.ally.owner), X: x, Y: y, Size: 1, IsPlayer: true},
-			Mode:   d2monster.ModeNeutral,
+			Mode:   u.ally.ownerMode,
 		}, true
 	}
 

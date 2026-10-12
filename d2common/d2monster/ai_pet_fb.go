@@ -79,29 +79,104 @@ func fbnInTown(c *Ctx) bool {
 	return false
 }
 
-// fbnFollow is MONAI_FollowLeaderStep; the fallback walks to the owner and
-// teleports for mode 3.
+// fbnFollow is MONAI_FollowLeaderStep 0x5e2dc0 (modes read in w37, host-independent port in w39). A host that
+// implements FBNPetStepper replaces all of it. Without one: mode 0 tries the eight points 8 subtiles around the
+// leader (the exe starts at the direction of the leader's path point, which the AI cannot see: here the direction
+// from the pet to the leader, so the first candidate lies beyond the leader, UNVERIFIED) with the speed override
+// boost, else the midpoint to the leader; mode 1 follows the leader's trail (the 20-entry position history is not
+// visible: UNVERIFIED, it walks to the leader and shuffles when close); mode 2 draws the 10 percent shuffle and
+// then ALWAYS waits 15 and reports success (VERIFIED: an idle pet stands); mode 3 teleports next to the leader
+// and waits 5; mode 4 steps away from the leader only when another pet is adjacent and otherwise waits 15; mode 5
+// nudges near the leader.
 func fbnFollow(c *Ctx, l OwnerInfo, mode, boost, maxDist int) bool {
 	if s, ok := c.W.(FBNPetStepper); ok {
 		return s.FBNFollowLeader(c.B, mode, boost, maxDist)
 	}
 
-	if mode == 3 {
-		if w, ok := c.W.(interface{ Teleport(b *Brain) bool }); ok && w.Teleport(c.B) {
+	b := c.B
+	lt := l.Target
+	d := EdgeDistance(b.X-l.X, b.Y-l.Y, b.Size)
+
+	switch mode {
+	case 0:
+		c.SetSpeed(boost)
+
+		start := c.mappedDirection(l.X-b.X, l.Y-b.Y)
+		for i := 0; i < 8; i++ {
+			v := turretVec[(start+i)&7]
+			p := Point{l.X + v[0]*8, l.Y + v[1]*8}
+
+			if c.move(p, nil, 0, false) || c.move(Point{(l.X + p.X) >> 1, (l.Y + p.Y) >> 1}, nil, 0, false) {
+				return true
+			}
+		}
+
+		if fbnPetMoveToward(c, 4) {
+			return true
+		}
+
+		return c.move(Point{l.X, l.Y}, nil, 0, false)
+	case 1:
+		if d > 5 {
+			c.SetSpeed(100)
+
+			if c.move(Point{l.X, l.Y}, nil, 0, false) {
+				return true
+			}
+		}
+
+		n := d >> 2
+		if n < 4 {
+			n = 4
+		}
+
+		c.SetSpeed(0)
+
+		return fbnPetMoveToward(c, n)
+	case 2:
+		if b.Roll(100) < 10 {
+			if fbnPetMoveToward(c, int(b.Seed.Roll(3))+3) {
+				return true
+			}
+
+			c.SetSpeed(0x28)
+
+			if c.move(Point{l.X, l.Y}, nil, 0, false) {
+				return true
+			}
+		}
+
+		c.Sleep(0xf)
+
+		return true
+	case 3:
+		if w, ok := c.W.(interface{ Teleport(b *Brain) bool }); ok && w.Teleport(b) {
 			c.Sleep(5)
 
 			return true
 		}
 
 		return false
-	}
+	case 4:
+		if a, ok := c.W.(FBNPetsAdjacent); ok && a.FBNPetsAdjacent(b) > 0 {
+			if c.WalkAway(lt, maxDist) || fbnPetMoveToward(c, maxDist) {
+				return true
+			}
+		}
 
-	if mode == 5 {
-		return c.Wander(3)
-	}
+		c.Sleep(0xf)
 
-	if EdgeDistance(c.B.X-l.X, c.B.Y-l.Y, c.B.Size) > 8 {
-		return c.WalkTo(l.Target, 8)
+		return true
+	case 5:
+		c.SetSpeed(0)
+
+		if c.WalkNearTarget(&lt, maxDist) || c.WalkAway(lt, maxDist) {
+			return true
+		}
+
+		c.SetSpeed(0x28)
+
+		return c.move(Point{l.X, l.Y}, nil, 0, false)
 	}
 
 	return false

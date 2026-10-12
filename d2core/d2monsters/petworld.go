@@ -167,7 +167,8 @@ func (p directorPets) SpawnPet(owner, key string, x, y int, o *d2skill.SummonOrd
 		return 0, fmt.Errorf("unknown monster %q", key)
 	}
 
-	opt := MinionOptions{Owner: p.owners(owner), Kind: o.Kind, Frames: o.Frames, Tag: o.PetType, Stats: st, Level: o.Level}
+	opt := MinionOptions{Owner: p.owners(owner), Kind: o.Kind, Frames: o.Frames, Tag: o.PetType, Stats: st, Level: o.Level,
+		Pecks: o.Pecks}
 	if opt.Tag == "" || opt.Tag == d2summon.Unlimited {
 		opt.Tag = key
 	}
@@ -264,7 +265,8 @@ func usesPetAI(u *unit) bool {
 	}
 
 	// w24: the Assassin's shadows run their ported thinkers (shadowhost.go).
-	return strings.EqualFold(u.b.Def.Name, "NecroPet") || strings.EqualFold(u.b.Def.Name, "Raven") || isShadowAI(u)
+	return strings.EqualFold(u.b.Def.Name, "NecroPet") || strings.EqualFold(u.b.Def.Name, "Raven") || isShadowAI(u) ||
+		isDruidPetAI(u)
 }
 
 // OwnerEnemy implements d2monster.PetWorld: the nearest hostile monster to

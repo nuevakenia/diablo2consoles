@@ -188,7 +188,7 @@ func thinkCycleOfLife(c *Ctx) {
 		cand = nil
 	}
 
-	if fbnSelectPet(c, cand, l, false, cycleLeash) {
+	if fbnSelectPet(c, cand, l, melee, false, cycleLeash) {
 		return
 	}
 

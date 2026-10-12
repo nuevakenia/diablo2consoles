@@ -55,6 +55,8 @@ type MinionOptions struct {
 	// (Valkyrie: sumskill1..4). Dodge applies to melee blows, Avoid to missiles, Evade while moving, Crit doubles
 	// the physical damage of its blows (d2combat.RollAvoid / RollStrike).
 	Dodge, Avoid, Evade, Crit int
+	// Pecks is the Raven's attack count (SummonOrder.Pecks; 0: the AI default).
+	Pecks int
 	// Tag is free for the caller (the skill name).
 	Tag string
 	// Stats, when set, replace the monstats-derived life, defense, attack
@@ -76,6 +78,11 @@ type allyState struct {
 	shadow    *shadowBook // skill list of an Assassin's shadow (shadowskills.go)
 	boost     AuraBoost   // friendly aura boost (auraboost.go)
 	baseMaxHP int         // maximum life before the aura's life percent
+
+	// the owner's movement as the pet AI sees it (petfollow.go)
+	ownerMode      d2monster.Mode
+	lastOX, lastOY int
+	ownerSeen      bool
 }
 
 // SpawnMinion creates an allied unit near a subtile.
@@ -333,6 +340,7 @@ func (d *Director) petTick(u *unit) bool {
 		return false
 	}
 
+	d.stepPetOwner(u)
 	d.followIntent(u)
 	d2monster.Tick(d, u.b)
 
