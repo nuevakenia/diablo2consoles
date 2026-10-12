@@ -20,7 +20,7 @@ fail=0
 launch_game() {
   if [ -n "${OD2_VERIFY_LAUNCH:-}" ]; then ${=OD2_VERIFY_LAUNCH} $1 >/dev/null 2>&1 &
   elif launchctl asuser $(id -u) /usr/bin/true >/dev/null 2>&1; then launchctl asuser $(id -u) /bin/zsh $1 >/dev/null 2>&1 &
-  else open $1
+  else open -g $1 # -g: do not bring the app to the front
   fi
 }
 
@@ -50,6 +50,8 @@ cleanup_games() { pkill -f "$tmp/od2" 2>/dev/null; pkill -f "$tmp/[0-9a-z-]*\.co
 # longest scenario is limited to 20 min, so nothing that old can still be running.
 cleanup_run_dir() {
   cleanup_games
+  # only the `open` fallback leaves Terminal windows behind; close the idle ones (never D2MOO / claude windows)
+  [ -z "${OD2_VERIFY_LAUNCH:-}" ] && ! launchctl asuser $(id -u) /usr/bin/true >/dev/null 2>&1 && scripts/close_idle_terminals.sh >/dev/null 2>&1
   case "$tmp" in /tmp/od2-verify.??????) ;; *) return ;; esac
   [ "${fail:-1}" = 0 ] && [ -z "${OD2_VERIFY_KEEP:-}" ] && [ -z "${OD2_VERIFY_TMPFILE:-}" ] && rm -rf "$tmp"
   find /tmp/ -maxdepth 1 -name 'od2-verify.??????' -type d -mmin +360 -exec rm -rf {} + 2>/dev/null
@@ -159,6 +161,9 @@ if [ -n "${D2S_SAMPLE_BODY:-}" ]; then
         # logical screen size of every scenario (docs/DISPLAY.md): 1512x982 (the owner's MacBook) unless OD2_DISPLAY
         # is set; a scenario pinned to the legacy 800x600 layout exports OD2_DISPLAY=800x600 in its scenario_env
         echo "export OD2_DISPLAY=${OD2_DISPLAY:-1512x982}"
+        # OD2_QUIET=1 (default for verify_parallel.sh): the window opens behind the others, never takes the focus and
+        # ignores the real mouse/keyboard (scripted input is injected, so scenarios are unchanged); see docs/DISPLAY.md
+        [ -n "${OD2_QUIET:-}" ] && echo "export OD2_QUIET=$OD2_QUIET"
         echo "export OD2_AUTOGAME=\"$save\" OD2_AUTOEXIT=1"
         # muted unless OD2_VERIFY_SOUND=1 or the scenario sets scenario_unmuted=1 (real audio, uses the sound device)
         [ -n "${OD2_VERIFY_SOUND:-}" ] || [ -n "$scenario_unmuted" ] || echo "export OD2_AUTOTEST_MUTE=1"
