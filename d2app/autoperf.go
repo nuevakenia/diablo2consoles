@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 )
 
 const (
@@ -258,6 +260,8 @@ func (a *App) perfFinish() {
 		float64(m.TotalAlloc-p.gcStart.TotalAlloc)/bytesToMegabyte/p.seconds,
 		float64(m.Mallocs-p.gcStart.Mallocs)/float64(len(p.render)+1),
 		float64(m.TotalAlloc-p.gcStart.TotalAlloc)/1024/float64(len(p.render)+1))
+
+	a.Infof("PERF load %s", d2asset.ModeLoadStats())
 
 	a.Infof("PERF cpu frames=%d cpu_ms_per_frame=%.3f", len(p.render),
 		float64(processCPU()-p.cpuStart)/nsPerMs/float64(len(p.render)+1))

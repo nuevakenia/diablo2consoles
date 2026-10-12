@@ -82,6 +82,8 @@ type AssetManager struct {
 	requestedLanguage string
 	locale            d2locale.Locale
 	fontDir           string
+
+	flights keyLocks // per-file load locks, see LoadAnimationWithEffect
 }
 
 // SetLogLevel sets the log level for the asset manager,  record manager, and file loader
@@ -194,10 +196,44 @@ func (am *AssetManager) LoadAnimation(animationPath, palettePath string) (d2inte
 // LoadAnimationWithEffect loads an Animation by its resource path and its palette path with a given transparency value
 func (am *AssetManager) LoadAnimationWithEffect(animationPath, palettePath string,
 	effect d2enum.DrawEffect) (d2interface.Animation, error) {
+	return am.loadAnimation(animationPath, palettePath, effect, false)
+}
+
+// ensureAnimation puts the animation in the cache without handing it out (the background prefetch). Unlike
+// LoadAnimationWithEffect it never touches a cached animation, which the game may already be playing.
+func (am *AssetManager) ensureAnimation(animationPath, palettePath string, effect d2enum.DrawEffect) error {
+	_, err := am.loadAnimation(animationPath, palettePath, effect, true)
+
+	return err
+}
+
+func (am *AssetManager) loadAnimation(animationPath, palettePath string,
+	effect d2enum.DrawEffect, ensureOnly bool) (d2interface.Animation, error) {
 	cachePath := fmt.Sprintf("%s;%s;%d", animationPath, palettePath, effect)
 
-	if animation, found := am.animations.Retrieve(cachePath); found {
-		return animation.(d2interface.Animation).Clone(), nil
+	hit := func() (d2interface.Animation, bool) {
+		animation, found := am.animations.Retrieve(cachePath)
+		if !found {
+			return nil, false
+		}
+
+		if ensureOnly {
+			return nil, true
+		}
+
+		return animation.(d2interface.Animation).Clone(), true
+	}
+
+	if animation, found := hit(); found {
+		return animation, nil
+	}
+
+	// one loader per animation: the background prefetch (prefetch.go) and the game may ask for the
+	// same file at once, and a second Insert of the key would fail
+	defer am.flights.lock("anim:" + cachePath)()
+
+	if animation, found := hit(); found {
+		return animation, nil
 	}
 
 	am.Debugf(fmtLoadAnimation, animationPath, palettePath, effect)
@@ -225,6 +261,9 @@ func (am *AssetManager) LoadAnimationWithEffect(animationPath, palettePath strin
 	}
 
 	err = am.animations.Insert(cachePath, animation, defaultCacheEntryWeight)
+	if ensureOnly {
+		animation = nil
+	}
 
 	return animation, err
 }
@@ -286,6 +325,12 @@ func (am *AssetManager) LoadPalette(palettePath string) (d2interface.Palette, er
 
 	if types.Ext2AssetType(filepath.Ext(palettePath)) != types.AssetTypePalette {
 		return nil, fmt.Errorf("not an instance of a palette: %s", palettePath)
+	}
+
+	defer am.flights.lock("pal:" + palettePath)()
+
+	if cached, found := am.palettes.Retrieve(palettePath); found {
+		return cached.(d2interface.Palette), nil
 	}
 
 	am.Debugf(fmtLoadPalette, palettePath)
@@ -574,6 +619,12 @@ func (am *AssetManager) LoadCOF(cofPath string) (*d2cof.COF, error) {
 		return cofValue.(*d2cof.COF), nil
 	}
 
+	defer am.flights.lock("cof:" + cofPath)()
+
+	if cofValue, found := am.cofs.Retrieve(cofPath); found {
+		return cofValue.(*d2cof.COF), nil
+	}
+
 	fileData, err := am.LoadFile(cofPath)
 	if err != nil {
 		return nil, err
@@ -593,6 +644,12 @@ func (am *AssetManager) LoadCOF(cofPath string) (*d2cof.COF, error) {
 
 // LoadDCC loads and returns the given path as a DCC
 func (am *AssetManager) LoadDCC(dccPath string) (*d2dcc.DCC, error) {
+	if dccValue, found := am.dccs.Retrieve(dccPath); found {
+		return dccValue.(*d2dcc.DCC), nil
+	}
+
+	defer am.flights.lock("dcc:" + dccPath)()
+
 	if dccValue, found := am.dccs.Retrieve(dccPath); found {
 		return dccValue.(*d2dcc.DCC), nil
 	}

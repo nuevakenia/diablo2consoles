@@ -1,16 +1,19 @@
 package d2gamescreen
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapgen"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2monsters"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 )
 
 // Populating a level with the natural monsters of its Levels.txt row.
@@ -35,6 +38,8 @@ const (
 	populateSparseWalkableShare = 0.15
 	// populateRetries bounds the extra draws per room for a level that got no group.
 	populateRetries = 12
+	// removeUnreachableWorkers is the number of cores the reachability searches use.
+	removeUnreachableWorkers = 6
 )
 
 // populateLevel fills the level the hero stands in. It runs once per level
@@ -47,6 +52,8 @@ func (v *Game) populateLevel() {
 	v.populated = v.levels.changes + 1
 
 	level := v.currentLevel()
+	defer d2util.PerfTime(fmt.Sprintf("populate level=%d", level))()
+
 	if d2level.IsTown(level) || !autoPlayPopulate() || !v.isRealLevel() {
 		return
 	}
@@ -166,6 +173,10 @@ func (v *Game) spawnPlannedPopulation(level int, plan []d2mapengine.PlannedMonst
 	supers := map[*d2mapentity.Monster]bool{} // super uniques with every follower they came with (superuniques.txt class, not the level's types)
 	kinds := classifyPlan(plan)
 	units := 0
+
+	// decode the animations of the planned types off the frame thread before the first one appears
+	// (d2asset/prefetch.go); the spawn below then finds them cached
+	v.prefetchPlan(plan)
 
 	for i, pm := range plan {
 		stat := v.monsters.FindStat(pm.Key)
@@ -377,9 +388,25 @@ func (v *Game) removeUnreachableMonsters() int {
 	hero := v.heroSubtile()
 	removed := 0
 
-	for _, mon := range v.monsters.Monsters() {
+	mons := v.monsters.Monsters()
+
+	// one A* per monster is the biggest cost of a level load (about 1.6 ms each, 328 on Frigid Highlands).
+	// The searches only read the collision grid, so they run on several cores; the removals below are
+	// applied in the original order, so the result and the log are the same.
+	reach := make([]bool, len(mons))
+
+	parallelFor(len(mons), removeUnreachableWorkers, func(i int) {
+		if mons[i].SuperUnique != "" {
+			return // a quest boss is never dropped
+		}
+
+		x, y := mons[i].SubtilePos()
+		reach[i] = m.CanWalkTo(hero[0], hero[1], x, y)
+	})
+
+	for i, mon := range mons {
 		x, y := mon.SubtilePos()
-		if m.CanWalkTo(hero[0], hero[1], x, y) || mon.SuperUnique != "" { // a quest boss is never dropped
+		if reach[i] || mon.SuperUnique != "" {
 			continue
 		}
 
@@ -431,4 +458,27 @@ func minInt(a, b int) int {
 	}
 
 	return b
+}
+
+// prefetchPlan hands the monster types of a planned population to the background decoder.
+func (v *Game) prefetchPlan(plan []d2mapengine.PlannedMonster) {
+	defer d2util.PerfTime("populate-prefetch")()
+
+	seen := map[string]bool{}
+
+	var stats []*d2records.MonStatRecord
+
+	for _, pm := range plan {
+		if seen[pm.Key] {
+			continue
+		}
+
+		seen[pm.Key] = true
+
+		if st := v.monsters.FindStat(pm.Key); st != nil {
+			stats = append(stats, st)
+		}
+	}
+
+	v.monsters.Prefetch(stats, true)
 }

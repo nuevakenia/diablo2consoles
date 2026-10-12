@@ -255,6 +255,8 @@ type compositeMode struct {
 }
 
 func (c *Composite) createMode(animationMode animationMode, weaponClass string) (*compositeMode, error) {
+	defer noteModeLoad(func() string { return fmt.Sprintf("%s %s%s", c.token, animationMode, weaponClass) })()
+
 	cofPath := fmt.Sprintf("%s/%s/COF/%s%s%s.COF", c.basePath, c.token, c.token, animationMode, weaponClass)
 	if exists, err := c.FileExists(cofPath); !exists {
 		return nil, fmt.Errorf("composite not found at path '%s': %v", cofPath, err)
@@ -311,12 +313,17 @@ func (c *Composite) createMode(animationMode animationMode, weaponClass string) 
 	return mode, nil
 }
 
-func (c *Composite) loadCompositeLayer(layerKey, layerValue, animationMode, weaponClass,
-	palettePath string, drawEffect d2enum.DrawEffect) (d2interface.Animation, error) {
-	animationPaths := []string{
+// layerPaths are the files of a layer, in the order they are tried (DCC, then DC6).
+func (c *Composite) layerPaths(layerKey, layerValue, animationMode, weaponClass string) []string {
+	return []string{
 		fmt.Sprintf("%s/%s/%s/%s%s%s%s%s.dcc", c.basePath, c.token, layerKey, c.token, layerKey, layerValue, animationMode, weaponClass),
 		fmt.Sprintf("%s/%s/%s/%s%s%s%s%s.dc6", c.basePath, c.token, layerKey, c.token, layerKey, layerValue, animationMode, weaponClass),
 	}
+}
+
+func (c *Composite) loadCompositeLayer(layerKey, layerValue, animationMode, weaponClass,
+	palettePath string, drawEffect d2enum.DrawEffect) (d2interface.Animation, error) {
+	animationPaths := c.layerPaths(layerKey, layerValue, animationMode, weaponClass)
 
 	for idx := range animationPaths {
 		exists, err := c.FileExists(animationPaths[idx])

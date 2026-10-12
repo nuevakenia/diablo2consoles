@@ -128,6 +128,12 @@ func (f *MapEntityFactory) NewPlayer(id, name string, x, y, direction int, heroT
 		fmt.Printf("failed to equip, err: %v\n", err)
 	}
 
+	// decode the modes the hero uses first (walk, run, attack, hit...) off the frame thread
+	composite.PrefetchModes(equipment.RightHand.GetWeaponClass(),
+		d2enum.PlayerAnimationModeWalk, d2enum.PlayerAnimationModeRun, d2enum.PlayerAnimationModeNeutral,
+		d2enum.PlayerAnimationModeAttack1, d2enum.PlayerAnimationModeTownWalk, d2enum.PlayerAnimationModeGetHit,
+		d2enum.PlayerAnimationModeCast, d2enum.PlayerAnimationModeDeath)
+
 	return result
 }
 
