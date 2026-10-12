@@ -525,6 +525,18 @@ func newSpecQuest(s *spec) *Quest {
 				page = 2
 			}
 
+			// a negative page is "page n only while none is pushed yet" (the exe checks the stored page for 0). The
+			// record bit still follows the area (page 2 while the bit is chosen), the log page is put back after.
+			keepPage, restore := 0, false
+			if page < 0 {
+				keepPage, restore = q.LastState, true
+				if keepPage == 0 {
+					keepPage = -page
+				}
+
+				page = 2
+			}
+
 			direct := t.direct
 
 			if !g.LegacyBossBits && t.exe != nil {
@@ -536,6 +548,10 @@ func newSpecQuest(s *spec) *Quest {
 			}
 
 			apply(g, q, t.to, t.goal, direct, page, t.bit, false)
+
+			if restore && !t.goal {
+				g.cycle(q, keepPage, true)
+			}
 
 			if !g.LegacyBossBits && t.exe != nil {
 				t.exe.finish(g, q, s)
