@@ -52,9 +52,9 @@ The numbers come from [`docs/progress.json`](docs/progress.json) (what each bar 
 | Level generator equal to the real game | 427 levels, 30,129 rooms, 0 mismatches |
 | Acts played end to end by scripted heroes | 5 of 5, all 7 classes pass (35 of 35 in the class matrix) |
 | Player skills with engine behaviour | 177 of 210 |
-| Monster AI archetypes ported faithfully | 134 of 148 |
-| In-game UI panels matching the original | 12 of 14 |
-| Full verify | 39 of 39 scenarios in each of 6 jobs on the last landed tree |
+| Monster AI archetypes ported faithfully | 141 of 148 |
+| In-game UI panels matching the original | 13 of 14 |
+| Full verify | every scenario passed in each of 6 jobs on the last landed tree (land/w38, about 300 scenarios) |
 
 What is **not** done or not confirmed (the full list is [docs/KNOWN_GAPS.md](docs/KNOWN_GAPS.md) and
 [docs/HELP_WANTED.md](docs/HELP_WANTED.md)):

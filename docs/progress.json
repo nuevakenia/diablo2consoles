@@ -1,7 +1,7 @@
 {
- "updated": "2026-10-11",
- "title": "Native macOS Diablo II \u2014 progress",
- "subtitle": "driven by Claude \u00b7 counts come from code, tests and Ghidra; estimates are marked with ~ \u00b7 dashed = on branches, not yet verified",
+ "updated": "2026-10-12",
+ "title": "Native macOS Diablo II — progress",
+ "subtitle": "driven by Claude · counts come from code, tests and Ghidra; estimates are marked with ~ · dashed = on branches, not yet verified",
  "bars": [
   {
    "label": "Game.exe functions named in Ghidra",
@@ -51,7 +51,7 @@
    "label": "NPC interaction features",
    "done": 8,
    "total": 8,
-   "note": "click-walk \u00b7 greeting \u00b7 menu \u00b7 return greeting \u00b7 vendors \u00b7 gamble \u00b7 identify \u00b7 mercenary hire \u00b7 quest dialogue \u2713 (Act 1)",
+   "note": "click-walk · greeting · menu · return greeting · vendors · gamble · identify · mercenary hire · quest dialogue ✓ (Act 1)",
    "color": "#ef5da8"
   },
   {
@@ -136,10 +136,10 @@
   },
   {
    "label": "Real full verify green (scenario sections per job, real parallel log)",
-   "done": 300,
-   "total": 300,
+   "done": 291,
+   "total": 291,
    "pending": 0,
-   "note": "land/w23 run 68550 (239 scenarios) and land/w25 run 41535 (243 scenarios, 300 sections, ALL JOBS PASSED; a few first attempts retried: 97-summons, 9f-hero-voice, 9k-quest-izual) both passed fully; integration = master = b12670f3",
+   "note": "land/w38 f6fe5248, run 813: 6 jobs, ALL JOBS PASSED, 291 scenarios (a few first attempts retried); earlier land/w25 run 41535 also passed fully",
    "color": "#3ddc84"
   }
  ],
