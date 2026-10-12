@@ -202,3 +202,35 @@ func (d *Director) ShamanCorpseScan(b *d2monster.Brain, radiusSq int) (d2monster
 
 	return last, n
 }
+
+// NearestSameClass implements d2monster.SameClassFinder (MONAI_FindNearestSameClassMonsterCallback 0x5ae8d0,
+// VERIFIED w38): any other living monster with the same base class, smallest squared centre distance, the first
+// of equal distances wins. The unit walk order is the sorted unit order.
+func (d *Director) NearestSameClass(b *d2monster.Brain) (d2monster.Target, int, bool) {
+	var (
+		best  d2monster.Target
+		bestD int
+		found bool
+	)
+
+	me := d.unitOf(b)
+	if me == nil {
+		return best, 0, false
+	}
+
+	for _, u := range d.sortedUnits() {
+		if u.b == b || !u.m.Alive() || !strings.EqualFold(u.m.Stat.BaseKey, me.m.Stat.BaseKey) {
+			continue
+		}
+
+		x, y := u.m.SubtilePos()
+		dx, dy := b.X-x, b.Y-y
+
+		if sq := dx*dx + dy*dy; !found || sq < bestD {
+			bestD, found = sq, true
+			best = d2monster.Target{ID: u.b.ID, X: x, Y: y, Size: 1}
+		}
+	}
+
+	return best, bestD, found
+}
