@@ -183,10 +183,10 @@ trade tab3 320 60 79 31
 waypoint tab1 85 63 63 31
 waypoint close 353 445 32 32
 # waypoint row hit boxes from the row table at 0x721860 (left 17+80, top 60/96/../205 +60, height 29; the pitch is 36 except 37 after row 3)
-waypoint row0 97 120 283 29
-waypoint row3 97 228 283 29
-waypoint row4 97 265 283 29
-waypoint row8 97 409 283 29
+waypoint row0 98 121 279 29
+waypoint row3 98 229 279 29
+waypoint row4 98 266 279 29
+waypoint row8 98 410 279 29
 
 # NPC dialog box itself (width = widest text + 20, here Akara Talk/Trade; font metric tolerance), x centred on the anchor
 ~3 npcmenu dialog 366 129 69 81

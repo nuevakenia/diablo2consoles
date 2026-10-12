@@ -18,7 +18,7 @@ func TestQuestLayoutGolden(t *testing.T) {
 		"quest descr_button 306 450 32 32",
 		"quest descr_hover 310 451 30 33",
 		"quest name_bottom 80 308 0 0",
-		"quest descr_bottom0 80 330 270 20",
+		"quest descr_bottom0 96 330 270 20",
 	}
 
 	got := map[string]bool{}

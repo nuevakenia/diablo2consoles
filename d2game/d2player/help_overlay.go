@@ -54,16 +54,16 @@ const (
 	lineOffset    = 5
 
 	// the title of the panel
-	titleLabelOffsetX = -37
+	titleLabelOffsetX = -20 // the title is centred on x 0x17c (UI_DrawHelpScreenColumnA 0x491930, verified)
 
 	// for the bulleted list near the top of the screen
-	listRootX              = 100
+	listRootX              = 117 // 0x75: x of the left aligned rows (verified, 0x491a29)
 	listRootY              = 59
 	listBulletOffsetY      = 10
 	listBulletOffsetX      = 12
 	listItemVerticalOffset = 20
 	listBulletRootY        = listRootY - listBulletOffsetY + listItemVerticalOffset
-	listBulletX            = listRootX - listBulletOffsetX
+	listBulletX            = 100 - listBulletOffsetX
 
 	// the close button for the help panel
 	closeButtonX      = 685

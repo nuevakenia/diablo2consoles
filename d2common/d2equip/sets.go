@@ -6,6 +6,13 @@ package d2equip
 // hands: 0 set I, 1 set II (UNVERIFIED which value is which: the sample has 0
 // with the weapons in 4 and 5).
 //
+// UNVERIFIED (w37): no real save with active_arms=1 exists on the development machine (the three .d2s files there all
+// have 0), so the convention below could not be proven with data. Reading the exe suggests the opposite: the swap in
+// ITEMMODE_ValidateEquippedItems (0x55f4c0) physically exchanges the items of 4/5 and 11/12 and the writer
+// SAVE_WriteItemListJM (0x52f220) writes each item with its own location, which would put the hands at 4/5 whatever
+// the field says. Until a real file with the field set settles it the mapping stays as it was; EffectiveLoc is an involution, so a
+// read followed by a write keeps the file's own locations byte for byte in either case.
+//
 // The slots of the file are physical: when set II is active the weapon the hero
 // holds is the item in slot 11, not the one in slot 4. EffectiveLoc maps a file
 // slot to where the item currently is.

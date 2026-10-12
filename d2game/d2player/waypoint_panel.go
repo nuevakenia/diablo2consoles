@@ -19,13 +19,13 @@ import (
 const (
 	wpPanelX, wpPanelY   = 80, 60
 	wpPanelW, wpPanelH   = 320, 432
-	wpRowX, wpRowTop     = 17, 60 // top-left of row 0 inside the panel: UNVERIFIED (inferred from the icon bottom)
+	wpRowX, wpRowTop     = 18, 61 // first hit cell of row 0 inside the panel: VERIFIED (left 17 / top 60 exclusive, 0x498cf0)
 	wpRowPitch           = 36
-	wpRowH               = 29  // UNVERIFIED
-	wpRowW               = 283 // UNVERIFIED
+	wpRowH               = 29  // VERIFIED hit height 0x1e exclusive (0x498cf0)
+	wpRowW               = 279 // VERIFIED hit width 0x118 exclusive (0x498cf0)
 	wpTextBottom0        = 84
 	wpTextPitch          = 35
-	wpTextX              = 80 // UNVERIFIED: field 2 of the row record (waypoint_layout.go)
+	wpTextX              = 80 // VERIFIED: field 2 of the row record, left aligned (call at 0x499564)
 	wpHeaderBottom       = 0x30
 	wpTabX, wpTabPitch   = 5, 62 // wpTabPitch is only the fallback; the table wpTabXs is the original's
 	wpTabBottom          = 94

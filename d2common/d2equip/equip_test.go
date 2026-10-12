@@ -380,6 +380,16 @@ func TestWeaponSets(t *testing.T) {
 	}
 }
 
+func TestEffectiveLocIsAnInvolution(t *testing.T) {
+	for l := Loc(0); l < NumLocs; l++ {
+		for arms := 0; arms < 2; arms++ {
+			if got := EffectiveLoc(EffectiveLoc(l, arms), arms); got != l {
+				t.Errorf("loc %v arms %d round trip gives %v", l, arms, got)
+			}
+		}
+	}
+}
+
 // TestRealTables parses the real tables when D2_TABLES points at them.
 func TestRealTables(t *testing.T) {
 	dir := os.Getenv("D2_TABLES")

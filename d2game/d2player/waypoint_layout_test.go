@@ -9,10 +9,10 @@ func TestWaypointRowGolden(t *testing.T) {
 		textX      int
 		textBottom int
 	}{
-		{0, 120, 29, 160, 144},
-		{3, 228, 29, 160, 249},
-		{4, 265, 29, 160, 284},
-		{8, 409, 29, 160, 424},
+		{0, 121, 29, 160, 144},
+		{3, 229, 29, 160, 249},
+		{4, 266, 29, 160, 284},
+		{8, 410, 29, 160, 424},
 	}
 
 	for _, c := range tests {
@@ -21,7 +21,7 @@ func TestWaypointRowGolden(t *testing.T) {
 			t.Fatalf("row %d", c.i)
 		}
 
-		if rs[0].X != 97 || rs[0].Y != c.hitY || rs[0].H != c.h {
+		if rs[0].X != 98 || rs[0].W != 279 || rs[0].Y != c.hitY || rs[0].H != c.h {
 			t.Errorf("row %d hit %v", c.i, rs[0])
 		}
 

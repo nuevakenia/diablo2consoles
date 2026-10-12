@@ -116,8 +116,9 @@ func (d *Defs) Def(id int) (StatDef, bool) {
 // PerLevel describes a "per character level" stat: op 2, 4 or 5 in
 // ItemStatCost with op param p: the value is (stat * clvl) >> p added to the
 // first op stat (op 5: as a percent of it). Verified table columns; the
-// formula (value*clvl)>>param is the documented meaning (UNVERIFIED in the
-// binary: the handler for ops was not decompiled).
+// formula (value*clvl)>>param is VERIFIED against STATS_ComputeDerivedStatValue 0x626430
+// (ops 2 to 5 multiply the derived value of the op stat by the unit's base stat named by the op base, shifted by its
+// valshift, and shift the product right arithmetically by the op param; nothing is added when that base stat is 0 or less).
 type PerLevel struct {
 	Stat   int
 	Target int

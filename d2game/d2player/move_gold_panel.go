@@ -112,8 +112,9 @@ func (s *MoveGoldPanel) Load() {
 
 	s.actionLabel1 = s.uiManager.NewLabel(d2resource.Font16, d2resource.PaletteStatic)
 	s.actionLabel1.Alignment = d2ui.HorizontalAlignCenter
-	// text x is a register argument in the exe (UNVERIFIED): centred on the picture
-	labelX := lay.Frame.X + lay.Frame.W/2
+	// VERIFIED (UI_DialogMeasureEntryWidthSimple 0x4b4cd0): a dialog line starts at nX + (W - textW + 1)/2 + 1, i.e.
+	// it is centred on the dialog picture one pixel to the right of its middle
+	labelX := lay.Frame.X + lay.Frame.W/2 + 1
 	labelY := lay.TextBaseline0 - 16
 	s.actionLabel1.SetPosition(labelX, labelY)
 	s.panelGroup.AddWidget(s.actionLabel1)
