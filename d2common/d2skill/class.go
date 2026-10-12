@@ -457,12 +457,32 @@ func (c *cast) outOfReach() bool {
 	}
 
 	ux, uy := c.u.Pos()
+	sa, sb := HeroUnitSize, UnitSizeOf(c.tgt.Unit)
 
-	if c.u.IsPlayer() {
-		return !AttackInReachSized(false, c.p.meleeRange(), c.tgt.UX-ux, c.tgt.UY-uy, HeroUnitSize, UnitSizeOf(c.tgt.Unit))
+	if !c.u.IsPlayer() {
+		sa, sb = 1, 1 // a monster attacker keeps the unsized distance of the earlier port
 	}
 
-	return !AttackInReach(true, c.p.meleeRange(), c.tgt.UX-ux, c.tgt.UY-uy)
+	extra := 1
+	if !c.u.IsPlayer() {
+		extra = 3
+	}
+
+	d := TableDistanceSized(c.tgt.UX-ux, c.tgt.UY-uy, sa, sb)
+	if d < 1 {
+		return false
+	}
+
+	if d > c.p.meleeRange()+1+extra {
+		return true
+	}
+
+	// COMBAT_IsTargetWithinMeleeRange 0x622e40: in range, the line trace with mask 0x804 must find no blocker
+	if c.p.Grid != nil {
+		return !MeleeLineClear(c.p.Grid, MeleeTraceMask, ux, uy, sa, c.tgt.UX, c.tgt.UY, sb)
+	}
+
+	return false
 }
 
 func (c *cast) addMelee(m *MeleeResult) {

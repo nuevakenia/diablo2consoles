@@ -52,7 +52,7 @@ func TestChannelHold(t *testing.T) {
 
 	p.Opt.InfernoLenOf = nil
 
-	frame += ChannelHoldFrames + ChannelAnimSlack + 1
+	frame += ChannelHoldFrames + 1
 	if p.ChannelActive(u) {
 		t.Fatal("the window must end")
 	}

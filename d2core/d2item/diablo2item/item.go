@@ -118,6 +118,8 @@ type Item struct {
 
 	// origin is the item as a .d2s save held it (see SetOrigin).
 	origin *d2s.Item
+	// flagSet / flagClear: item flag bits changed at run time (break / restore), see item_flags.go.
+	flagSet, flagClear uint32
 }
 
 // nolint:structcheck,unused // WIP

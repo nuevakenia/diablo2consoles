@@ -25,7 +25,7 @@ func (g *GameControls) handWeapon(loc d2equip.Loc) d2equip.HandWeapon {
 		return d2equip.HandWeapon{}
 	}
 
-	h := d2equip.HandWeapon{Present: true, Weapon: true, Broken: it.IsBroken()}
+	h := d2equip.HandWeapon{Present: true, Weapon: true, Broken: it.HasBrokenFlag()}
 
 	if rec := it.CommonRecord(); rec != nil {
 		h.RangeAdder = rec.ExtraRange
