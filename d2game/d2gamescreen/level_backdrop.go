@@ -45,7 +45,8 @@ func (v *Game) updateBackdrops() {
 			Seed: d2mapgen.HeroMapSeed, Difficulty: d2drlg.Difficulty(v.gameClient.LevelDifficulty()),
 		})
 		if err != nil {
-			v.Warningf("LEVEL backdrop of level %d: %v", id, err)
+			// a level the backdrop providers cannot build (dungeons, caves) just has no neighbour drawn: not a warning
+			v.Infof("LEVEL backdrop of level %d skipped: %v", id, err)
 			continue
 		}
 
