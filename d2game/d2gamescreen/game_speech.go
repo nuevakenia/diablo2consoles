@@ -83,3 +83,17 @@ func (v *Game) onItemSound(handle, kind string) {
 	v.playSoundAtPos(handle, v.localPlayer.GetPosition(),
 		d2audio.PlayOpts{Emitter: heroEmitter, Hero: true, Kind: kind, Who: v.localPlayer.Name()})
 }
+
+// interruptSpeech cuts off the NPC voice and the subtitle that is on screen: the player clicked another NPC or
+// opened a vendor window, and the original stops the running line then (a subtitle, which is this fork's own, must
+// not stay over the trade window; wave 41 hunt: Warriv's 25 s subtitle covered Akara's and Charsi's shop).
+func (v *Game) interruptSpeech() {
+	if v.speech != nil {
+		v.speech.Stop()
+		v.speech = nil
+	}
+
+	if v.gameControls != nil && v.gameControls.Speech != nil {
+		v.gameControls.Speech.Clear()
+	}
+}

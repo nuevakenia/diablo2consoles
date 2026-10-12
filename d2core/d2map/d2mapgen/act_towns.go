@@ -6,9 +6,11 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2drlg"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2drlg/drlgoutdoor"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2rand"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 )
 
 func maxInt(a, b int) int {
@@ -275,7 +277,70 @@ func (g *MapGenerator) townHasNPC(class int) bool {
 	return false
 }
 
+// jerhynPlaceholder is the objects.txt row of the first "Jerhyn, placeholder" object of Lut Gholein (121; 122 is the
+// second). The DS1 holds no Jerhyn monster, only these two marker objects, and the original puts the NPC at one of
+// them (wave 41 hunt: Lut Gholein had no Jerhyn at all). Which marker the original uses when is UNVERIFIED: the first
+// one is taken.
+const jerhynPlaceholder, jerhynPlaceholder2 = 121, 122
+
+// placeJerhyn creates the Jerhyn NPC at his placeholder object when the town has none.
+func (g *MapGenerator) placeJerhyn() {
+	stats := g.asset.Records.Monster.Stats["jerhyn"]
+	if stats == nil || g.townHasNPC(stats.ID) {
+		return
+	}
+
+	var at d2interface.MapEntity
+
+	for _, e := range g.engine.Entities() {
+		ob, ok := e.(*d2mapentity.Object)
+		if !ok {
+			continue
+		}
+
+		if idx := ob.Record().Index; idx == jerhynPlaceholder || idx == jerhynPlaceholder2 {
+			mx, my := ob.GetPositionF()
+			g.Infof("act town: Jerhyn placeholder object %d at (%.1f,%.1f)", idx, mx, my)
+		}
+
+		switch ob.Record().Index {
+		case jerhynPlaceholder:
+			at = e
+		case jerhynPlaceholder2:
+			if at == nil {
+				at = e
+			}
+		}
+	}
+
+	if at == nil {
+		return
+	}
+
+	x, y := at.GetPositionF()
+
+	defer func() {
+		if r := recover(); r != nil {
+			g.Warningf("act town: Jerhyn: %v", r)
+		}
+	}()
+
+	// GetPositionF is in tiles, NewNPC takes sub-tiles
+	npc, err := g.engine.NewNPC(int(x*subtilesPerTile), int(y*subtilesPerTile), stats, 0)
+	if err != nil {
+		g.Warningf("act town: Jerhyn: %v", err)
+		return
+	}
+
+	g.engine.AddEntity(npc)
+	g.Infof("act town: added jerhyn at his placeholder object (%.1f,%.1f)", x, y)
+}
+
 func (g *MapGenerator) placeTownExtras(levelID, sx, sy int) {
+	if levelID == d2level.LutGholein {
+		g.placeJerhyn()
+	}
+
 	for _, ex := range townExtras[levelID] {
 		stats := g.asset.Records.Monster.Stats[ex.Key]
 		if stats == nil || g.townHasNPC(stats.ID) {

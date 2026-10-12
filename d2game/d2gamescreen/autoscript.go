@@ -8,7 +8,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/d2gamepad"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2autoscript"
 )
 
@@ -181,14 +183,36 @@ func (h autoScriptHost) Move(x, y float64) error {
 }
 
 func (h autoScriptHost) MoveToNPC(label string) error {
+	// a living entity wins over an object or item of the same name (Lut Gholein has "Jerhyn" objects as well
+	// as the NPC, and the map's iteration order is random)
+	var found d2interface.MapEntity
+
 	for _, e := range h.v.gameClient.MapEngine.Entities() {
-		if strings.EqualFold(e.Label(), label) {
-			h.v.OnPlayerInteract(e)
-			return nil
+		if !strings.EqualFold(e.Label(), label) {
+			continue
+		}
+
+		switch e.(type) {
+		case *d2mapentity.Object, *d2mapentity.Item:
+			if found == nil {
+				found = e
+			}
+		default:
+			found = e
 		}
 	}
 
-	return fmt.Errorf("no NPC %q on this map", label)
+	if found == nil {
+		return fmt.Errorf("no NPC %q on this map", label)
+	}
+
+	nx, ny := found.GetPositionF()
+	hx, hy := h.v.localPlayer.GetPositionF()
+	h.v.Infof("AUTOSCRIPT move:npc %q is a %T at (%.1f,%.1f), hero at (%.1f,%.1f)", label, found, nx, ny, hx, hy)
+
+	h.v.OnPlayerInteract(found)
+
+	return nil
 }
 
 func (h autoScriptHost) Cast(skill string, x, y float64, hasXY bool) error {

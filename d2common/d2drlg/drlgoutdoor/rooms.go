@@ -213,6 +213,17 @@ type RoomGrids struct {
 	Seed    d2rand.Seed
 	// Tags counts the random tile markers met (each costs one PickTile).
 	Tags int
+	// Subs are the sub-theme groups (waypoint, shrine, stones, wild objects) stamped into the room; their DS1
+	// objects become units of the room (DRLG_AddSubThemeGroupObjects 0x6726b0, no RNG).
+	Subs []SubStamp
+}
+
+// SubStamp is one stamped sub-theme group: the objects of the pattern file File that lie inside the group
+// rectangle, moved by (OffX, OffY) tiles (level tile coordinates: destination minus source origin).
+type SubStamp struct {
+	File       string
+	OffX, OffY int
+	Objects    []int // indexes into the pattern's Objects (file order)
 }
 
 // RoomBuildOptions customise the room build.
@@ -500,6 +511,8 @@ func (b *roomBuilder) checkSub(x, y int, g Group, d *Pattern) bool {
 }
 
 func (b *roomBuilder) stampSub(x, y int, g Group, d *Pattern, val int) {
+	b.addSubObjects(x, y, g, d, val)
+
 	for gy := 0; gy < g.H; gy++ {
 		for gx := 0; gx < g.W; gx++ {
 			sx, sy := g.X+val+gx, g.Y+gy
@@ -532,4 +545,33 @@ func (b *roomBuilder) stampSub(x, y int, g Group, d *Pattern, val int) {
 			}
 		}
 	}
+}
+
+// addSubObjects records the type 2 DS1 objects inside the group rectangle (DRLG_AddSubThemeGroupObjects 0x6726b0:
+// they become units of the room at the same offset inside the stamped rectangle). That the original keeps the
+// sub-tile remainder of the position is UNVERIFIED.
+func (b *roomBuilder) addSubObjects(x, y int, g Group, d *Pattern, val int) {
+	if d.Path == "" || len(d.Objects) == 0 {
+		return
+	}
+
+	x0, y0 := g.X+val, g.Y
+
+	var idx []int
+
+	for i, o := range d.Objects {
+		if o.Type != 2 {
+			continue
+		}
+
+		if tx, ty := o.X/5, o.Y/5; tx >= x0 && tx < x0+g.W && ty >= y0 && ty < y0+g.H {
+			idx = append(idx, i)
+		}
+	}
+
+	if len(idx) == 0 {
+		return
+	}
+
+	b.g.Subs = append(b.g.Subs, SubStamp{File: d.Path, OffX: b.r.X + x - x0, OffY: b.r.Y + y - y0, Objects: idx})
 }
