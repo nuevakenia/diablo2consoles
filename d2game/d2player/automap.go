@@ -68,6 +68,7 @@ type Automap struct {
 	level     int
 	levelFn   func() int
 	nameFn    func(id int) string
+	diffFn    func() int // the game's difficulty (0 Normal, 1 Nightmare, 2 Hell) for the difficulty line
 	lastCX    float64
 	lastCY    float64
 	haveLast  bool
@@ -116,6 +117,10 @@ func (g *GameControls) Automap() *Automap { return g.automap }
 func (a *Automap) SetLevelSource(level func() int, name func(id int) string) {
 	a.levelFn, a.nameFn = level, name
 }
+
+// SetDifficultySource tells the automap the difficulty of the game for its difficulty line
+// (nothing is drawn in Normal; see d2automap.DifficultyStringID).
+func (a *Automap) SetDifficultySource(diff func() int) { a.diffFn = diff }
 
 // On reports whether the map is shown.
 func (a *Automap) On() bool { return a.on }
@@ -168,6 +173,7 @@ func (a *Automap) command(args []string) error {
 	case "stats":
 		a.logState()
 		a.logMarkers()
+		a.Infof("AUTOMAP text lines=%q", a.textLines())
 	default:
 		return fmt.Errorf("automap: unknown mode %q (on|off|toggle|full|mini|fade|names|party|center|stats)", mode)
 	}
