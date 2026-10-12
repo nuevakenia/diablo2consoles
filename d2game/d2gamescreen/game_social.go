@@ -9,7 +9,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2statlist"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
@@ -242,8 +242,8 @@ func (v *Game) pvpSwing(target *d2mapentity.Player) error {
 	hx, hy := int(v.localPlayer.Position.X()), int(v.localPlayer.Position.Y())
 	tx, ty := int(target.Position.X()), int(target.Position.Y())
 
-	if d := d2monster.EdgeDistance(hx-tx, hy-ty, 1); d > heroMeleeReach {
-		v.Infof("PVP out of reach target=%q distance=%d reach=%d", target.Name(), d, heroMeleeReach)
+	if !v.heroInSwingReach(hx, hy, tx, ty) {
+		v.Infof("PVP out of reach target=%q distance=%d", target.Name(), d2skill.TableDistance(tx-hx, ty-hy))
 
 		return nil
 	}

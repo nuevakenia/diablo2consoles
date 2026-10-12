@@ -81,6 +81,11 @@ type Options struct {
 	// OnHeroStrike, if set, is called when a hero's swing hit a monster: the weapon
 	// may lose durability.
 	OnHeroStrike func(p *d2mapentity.Player)
+
+	// MeleeRange, if set, returns the rangeadder of the hero's weapon (UNIT_GetMeleeRange 0x622a30). With it the
+	// plain swing applies the range gate of COMBAT_RollAttackOutcome 0x57cc10 (d2skill.AttackInReach, VERIFIED w29)
+	// before the to-hit roll; the host walks the hero into reach first (w36). Nil keeps the old ungated swing.
+	MeleeRange func() int
 	// CanTeleport, if set, says which monster classes carry AiGeneral flag
 	// 0x20 (the wounded MonTeleport). No class is known to set it: nil = off.
 	CanTeleport func(class int) bool

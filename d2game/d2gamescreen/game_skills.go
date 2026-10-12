@@ -552,7 +552,7 @@ func (v *Game) autoCast(elapsed float64) {
 	mx, my := aimX, aimY
 	hx, hy := int(v.localPlayer.Position.X()), int(v.localPlayer.Position.Y())
 
-	if rec != nil && rec.Range == "h2h" && d2monster.EdgeDistance(hx-mx, hy-my, 1) > heroMeleeReach {
+	if rec != nil && rec.Range == "h2h" && !v.heroInSwingReach(hx, hy, mx, my) {
 		t.moveAcc += elapsed
 		t.walking += elapsed
 

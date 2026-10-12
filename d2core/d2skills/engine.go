@@ -196,7 +196,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	e.pipe = &d2skill.Pipeline{
 		Skills: asset.Records.SkillTable(), Missiles: asset.Records.MissileTable(), Sim: e.sim,
 		Grid: monsters.Grid(), Frame: func() int { return e.frame },
-		Opt: d2skill.Options{IgnoreTown: opt.IgnoreTown, StaticFieldMinPct: staticFieldMin(asset, monsters), EventBursts: true, MeleeRangeOf: opt.MeleeRange},
+		Opt: d2skill.Options{IgnoreTown: opt.IgnoreTown, StaticFieldMinPct: staticFieldMin(asset, monsters), EventBursts: true, MeleeRangeOf: opt.MeleeRange, MeleeGate: true},
 	}
 	e.pipe.TeleportFlag = opt.TeleportFlag
 	e.pipe.ApplyState = e.applyMissileState
