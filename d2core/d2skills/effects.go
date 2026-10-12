@@ -1505,6 +1505,7 @@ func (e *Engine) tick() {
 		e.flushDot()
 	}
 
+	e.syncForms()
 	e.aurasTick()
 	e.stormsTick()
 	e.trapsTick()
