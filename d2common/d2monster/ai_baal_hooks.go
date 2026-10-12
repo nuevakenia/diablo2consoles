@@ -107,7 +107,7 @@ func BaalHomeFlags(distAnchor int) (far, veryFar bool) {
 // BaalCloneLimit is the most clones alive at once. The weight (2 - clones)*10
 // reaches 0 at 2 (VERIFIED); the exe also refuses when the leader group
 // reports something through the callback at 0x5fba20 (w37 disassembly: it counts the list entries other than the
-// scanning unit whose field +0x10 is neither 0 nor 0xc; which list and what the field means stay UNVERIFIED), which
+// scanning unit whose field +0x10 is neither 0 nor 0xc; the callback body re-read w38: param 1 is the list entry, the scanning unit is word 0 of the block and the count word 2; the entry's field meaning stays UNVERIFIED), which
 // this cap approximates.
 const BaalCloneLimit = 2
 

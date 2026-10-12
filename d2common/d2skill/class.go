@@ -459,7 +459,9 @@ func (c *cast) outOfReach() bool {
 	ux, uy := c.u.Pos()
 
 	if c.u.IsPlayer() {
-		return !AttackInReachSized(false, c.p.meleeRange(), c.tgt.UX-ux, c.tgt.UY-uy, HeroUnitSize, UnitSizeOf(c.tgt.Unit))
+		// w38: the 0x804 line trace of 0x622e40 when the cast has a grid
+		return !MeleeReachFull(c.tgt.UX-ux, c.tgt.UY-uy, HeroUnitSize, UnitSizeOf(c.tgt.Unit), c.p.meleeRange(), 1, -1,
+			func() bool { return TraceBlocked804(c.p.Grid, ux, uy, c.tgt.UX, c.tgt.UY) })
 	}
 
 	return !AttackInReach(true, c.p.meleeRange(), c.tgt.UX-ux, c.tgt.UY-uy)

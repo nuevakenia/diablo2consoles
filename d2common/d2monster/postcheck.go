@@ -82,8 +82,8 @@ type ThreatRetargeter interface {
 }
 
 // TileFlagger is an optional Senses extension: the collision test at the
-// unit's own tile with mask 0x40 (0x64ebc0). UNVERIFIED: what the bit means (0x64ebc0 is a footprint-mask test that dispatches on the unit's footprint kind; the
-// bit meaning is not named in the exe).
+// unit's own tile with mask 0x40 (0x64ebc0). Re-read w38: 0x64ebc0 dispatches on the footprint kind (0 unit table test, 1/3/5 point test, 2/4 rectangle across rooms, other 1); the
+// Baal crab caller 0x5fb830 calls it with kind 2 and mask 0x40. UNVERIFIED: what the mask bit means (not named in the exe).
 type TileFlagger interface {
 	OwnTileFlagged(b *Brain) bool
 }

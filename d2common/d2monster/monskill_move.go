@@ -103,7 +103,7 @@ func RunAdvance(dist, reach, stride int) int {
 
 // JumpReflect is the point a jumper of class 0x4e heads for after landing
 // (VERIFIED arithmetic): 3*dest - 2*victim, i.e. the landing point pushed
-// away from the victim. Which monster class 0x4e is stays UNVERIFIED.
+// away from the victim. Class 0x4e is sandleaper1 by the monstats hcIdx column (w38 table lookup).
 func JumpReflect(dest, victim Point) Point {
 	return Point{X: 3*dest.X - 2*victim.X, Y: 3*dest.Y - 2*victim.Y}
 }

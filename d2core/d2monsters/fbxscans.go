@@ -66,7 +66,8 @@ func (d *Director) scanDefiler(b *d2monster.Brain) d2monster.FBXScanResult {
 
 // scanKnightAlly is the Oblivion Knight's callback 0x5f9fb0: the nearest other
 // living monster of base class 0x136 of the same side, within squared distance
-// 2500. The callback also tracks the nearest such unit under 40 percent life,
+// 2500 (VERIFIED w38 from the disassembled callback; it also requires unit flag bit 1 on the candidate, whose
+// meaning is not decoded and not modelled). The callback also tracks the nearest such unit under 40 percent life,
 // which the think function does not read.
 func (d *Director) scanKnightAlly(b *d2monster.Brain) d2monster.FBXScanResult {
 	best := 2500 + 1
@@ -87,7 +88,7 @@ func (d *Director) scanKnightAlly(b *d2monster.Brain) d2monster.FBXScanResult {
 	return res
 }
 
-// scanOverseer is callback 0x5e1570: friendly living monsters of base class
+// scanOverseer is callback 0x5e1570 (VERIFIED w38, filter, counters and result slots): friendly living monsters of base class
 // 0x1c5 not in state 0x8d. Count is how many pass; the first one below
 // LifeBelow percent life within squared distance AllyRadius2 is T ("ally"), the
 // first within squared distance EnemyRadius2 is T2 ("enemy", the exe also skips
@@ -143,10 +144,12 @@ func (d *Director) scanPriestAlly(b *d2monster.Brain, radius2 int) d2monster.FBX
 }
 
 // siegeTargetClass is the base class the siege weapons' scan accepts (0x5e05a0 compares MONSTER_GetBaseClassId
-// with 0x1ec; the same code falls back to -1 when the table is shorter, which no monster matches).
+// with 0x1ec; the same code falls back to class 0 when the table is shorter than 0x1ec rows, which does not occur
+// with the real tables; w38 corrected the old note that said -1).
 const siegeTargetClass = 0x1ec
 
-// scanSiege is the callback 0x5e05a0 of the Siege Tower and the Siege Beast (VERIFIED, batch 9): the FIRST unit of
+// scanSiege is the callback 0x5e05a0 of the Siege Tower and the Siege Beast (VERIFIED, batch 9, re-read w38; the
+// owner test is on the SCANNING unit, FindOwnerUnitIfFlagged(caster) must be nil, which holds for the unowned siege weapons): the FIRST unit of
 // the walk that is another monster, not dead or dying, of base class 0x1ec, on the caster's side (the state/AC
 // relation test: both alignment 0), of alignment 0, without an owner (not a hero summon), whose AI has no target
 // yet (AiGeneral +0x14 is -1) and that lies within the squared radius. The callback returns the unit, which ends

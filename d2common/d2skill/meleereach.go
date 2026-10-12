@@ -1,5 +1,7 @@
 package d2skill
 
+import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
+
 // tableDistance is UNIT_GetTableDistance (VERIFIED, read in Game.exe) for two units of size 1: the table at
 // 0x6ec730 (8x8 entries indexed dx + dy*8 in subtiles, -1 means touching) plus 1. Beyond 7 subtiles on an
 // axis the exe uses 2*max+min with no +1. Unit sizes are not modelled by TableDistance (size 1 assumed); the full
@@ -103,7 +105,8 @@ func TableDistance(dx, dy int) int {
 // WithinMeleeRange is COMBAT_IsTargetWithinMeleeRange 0x622e40 without the two special monsters (see
 // WithinMeleeRangeOfClass) and without the line trace (COLLISION_CanTraceLineBetweenUnits with the collision mask
 // 0x804: the exe refuses the blow when that trace reports a blocker; the pure functions here have no map, so the
-// trace is not modelled, UNVERIFIED which cells 0x804 stands for): in reach when the table distance is below 1,
+// trace is not modelled here, see MeleeReachFull and TraceBlocked804; mask 0x804 is walls plus objects as in the
+// other 0x804 callers): in reach when the table distance is below 1,
 // or at most meleeRange + 1 + extra. The scan radius of Fend (meleeRange + 4,
 // a Chebyshev-like subtile radius) is a different test and stays as it is.
 func WithinMeleeRange(dx, dy, meleeRange, extra int) bool {
@@ -135,8 +138,8 @@ func WithinMeleeRangeOfClass(dx, dy, meleeRange, extra, targetClass int) bool {
 // range argument (every melee skill SRVST/SRVDO, the stack argument is 0): COMBAT_IsTargetWithinMeleeRange with
 // nExtra = 1 for a player attacker and 3 for a monster attacker (the attacker's unit type is 1), so a blow lands when the
 // table distance is below 1 or at most meleeRange + 2 (players) / meleeRange + 4 (monsters). The line trace of 0x622e40
-// is not modelled (UNVERIFIED: needs the collision grid). The special classes 0x102/0x105 get range + 8 in 0x622e40
-// (VERIFIED w37, not ported: the engine has no such ids). AttackInReachSized adds the unit sizes.
+// is applied by MeleeReachFull (w38) where a collision grid exists. The special classes 0x102/0x105 get range + 8 in
+// 0x622e40 (VERIFIED w37, ported in MeleeReachFull / WithinMeleeRangeOfClass). AttackInReachSized adds the unit sizes.
 func AttackInReach(monsterAttacker bool, meleeRange, dx, dy int) bool {
 	extra := 1
 	if monsterAttacker {
@@ -144,4 +147,44 @@ func AttackInReach(monsterAttacker bool, meleeRange, dx, dy int) bool {
 	}
 
 	return WithinMeleeRange(dx, dy, meleeRange, extra)
+}
+
+// MeleeReachFull is the whole COMBAT_IsTargetWithinMeleeRange 0x622e40 (VERIFIED w38 from the decompile):
+//  1. a monster target of base class 0x102 / 0x105 is in reach when the sized table distance is below meleeRange+8
+//     (no line trace);
+//  2. otherwise in reach when the sized table distance is below 1 (no trace either);
+//  3. otherwise, when the distance is at most meleeRange+1+extra, in reach exactly when the line trace between the
+//     two units for collision mask 0x804 reports no blocker (COLLISION_CanTraceLineBetweenUnits, nonzero = blocked);
+//     farther away it is out of reach.
+//
+// blocked may be nil (no map): the trace then counts as clear, as before w38. The caller closes over the two
+// positions and returns true when the 0x804 trace is blocked.
+func MeleeReachFull(dx, dy, sa, sb, meleeRange, extra, targetClass int, blocked func() bool) bool {
+	d := TableDistanceSized(dx, dy, sa, sb)
+
+	if (targetClass == classWaterWatcherLimb || targetClass == classWaterWatcherHead) && d < meleeRange+8 {
+		return true
+	}
+
+	if d < 1 {
+		return true
+	}
+
+	if d > meleeRange+1+extra {
+		return false
+	}
+
+	return blocked == nil || !blocked()
+}
+
+// TraceBlocked804 reports whether the line between two subtile positions is blocked for collision mask 0x804
+// (the trace of 0x622e40). A nil grid never blocks.
+func TraceBlocked804(g d2path.Grid, ax, ay, bx, by int) bool {
+	if g == nil {
+		return false
+	}
+
+	clear, _ := d2path.TraceLine(g, 0x804, d2path.Point{X: ax, Y: ay}, d2path.Point{X: bx, Y: by})
+
+	return !clear
 }

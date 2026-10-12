@@ -202,8 +202,9 @@ func RollRareName(nameSeed uint16, nPrefix, nSuffix, nAppellation int) RareName 
 }
 
 // FixedNameString returns the string id the exe prints instead of a random name for these base classes (class ids of
-// monstats, the table of the switch at 0x4a9170 / 0x4a9238), and false for every other class. UNVERIFIED which monster
-// each class id is.
+// monstats, the switch in MONSTER_BuildUModEffectInfo 0x4a8fe0, VERIFIED w38 case by case), and false for every other class.
+// The classes by monstats hcIdx: 0x9c andariel; 0xd3 duriel, 0x2c4 uberduriel; 0xf2 mephisto, 0x2c0 ubermephisto; 0xf3 diablo,
+// 0x14d diabloclone, 0x2c1 uberdiablo; 0x100 izual, 0x2c2 uberizual; 0x220 baalcrab, 0x2c5 uberbaal; 0x2c3 uberandariel.
 func FixedNameString(class int) (int, bool) {
 	switch class {
 	case 0x9c:

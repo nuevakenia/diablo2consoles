@@ -8,24 +8,24 @@ package d2monster
 // FBXScanKind names one of the unit scans the exe performs with
 // MONAI_ForEachUnitByModeCallback (0x5dbe00 family) and a per-AI callback.
 // The callbacks of some scans are bare code labels that cannot be decompiled
-// read-only, so those filters are UNVERIFIED and described by their use.
+// read-only, the five callbacks were disassembled in w38 (functions created in the database) and are VERIFIED, see d2core/d2monsters/fbxscans.go.
 type FBXScanKind int
 
 // Scan kinds.
 const (
 	// FBXScanSiegeTarget is the siege weapons' enemy scan (callback 0x5e05a0,
-	// radius squared in the query; the nearest enemy wins; UNVERIFIED filter).
+	// radius squared in the query; first match of the walk; filter VERIFIED w38).
 	FBXScanSiegeTarget FBXScanKind = iota + 1
 	// FBXScanDefilerCorpse is the PutridDefiler's scan (callback 0x5eeb80,
-	// mode 0 / radius 25: a living unit it can bite; UNVERIFIED filter).
+	// mode 0 / radius 25: SRVDO_Impregnate_IsValidTarget plus edge distance <= 0x19; filter VERIFIED w38).
 	FBXScanDefilerCorpse
 	// FBXScanKnightAlly is the OblivionKnight's scan (callback 0x5f9fb0, no
 	// call site 0x5fa060 VERIFIED w37: mode 1, query block {out unit, 0, 2500, 0x7fffffff, 0x7fffffff}, i.e. a
-	// radius field of 2500; the ally it heals/buffs; callback filter UNVERIFIED).
+	// radius field of 2500; the ally it heals/buffs; callback filter VERIFIED w38).
 	FBXScanKnightAlly
 	// FBXScanOverseer is the Overseer/Nihlathak scan (callback 0x5e1570, radius
 	// 0x50 here; the Nihlathak call site 0x5ed6d0 VERIFIED w37 passes mode 1 and block {0, 625, 50, 0, 0, 0}
-	// and reads the result slot at block+0x10; callback filter UNVERIFIED).
+	// and reads the result slot at block+0x10; callback filter VERIFIED w38).
 	FBXScanOverseer
 	// FBXScanRegurgitate is MONAI_Regurgitator_TargetFilter (VERIFIED filter,
 	// read from the decompilation): the nearest monster (not the caster) that

@@ -44,7 +44,7 @@ type FB1Unit interface {
 }
 
 // FB1Scanner is the MONAI_ForEachUnitByModeCallback scan at 0x5e1570 used by
-// Overseer and Nihlathak (callback is a bare label in the database, UNVERIFIED filter; the Nihlathak call site
+// Overseer and Nihlathak (callback 0x5e1570 disassembled w38, filter VERIFIED, see scanOverseer; the Nihlathak call site
 // 0x5ed6d0 passes the block {0, 625, 50, ...} and mode 1, VERIFIED w37). The argument block holds a squared radius and a 0x32 (50)
 // threshold; the callback fills a target. It is read here as "the nearest
 // ally within radius2 whose life is at most pct percent".
