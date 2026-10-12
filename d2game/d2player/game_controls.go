@@ -1707,6 +1707,10 @@ func (g *GameControls) commandLearnSkills(term d2interface.Terminal) func(args [
 
 // OpenTrade opens the vendor window and the inventory beside it.
 func (g *GameControls) OpenTrade(v d2vendor.Vendor, seed uint32) {
+	if g.PTrade.IsOpen() { // an NPC buy is refused while a player trade is open (inventory-trade.md, w24)
+		return
+	}
+
 	g.NPCMenu.Close()
 	g.clearScreen()
 	g.inventory.Open()
@@ -1716,6 +1720,10 @@ func (g *GameControls) OpenTrade(v d2vendor.Vendor, seed uint32) {
 
 // OpenGamble opens the gamble window of a vendor and the inventory beside it.
 func (g *GameControls) OpenGamble(v d2vendor.Vendor, seed uint32) error {
+	if g.PTrade.IsOpen() {
+		return fmt.Errorf("a player trade is open")
+	}
+
 	g.NPCMenu.Close()
 	g.clearScreen()
 	g.inventory.Open()

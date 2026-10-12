@@ -112,6 +112,7 @@ type GameClient struct {
 	OnTrade     func(d2netpacket.TradeUpdatePacket)
 	OnPvPHit    func(d2netpacket.PvPHitPacket)
 	OnPartyXP   func(d2netpacket.PartyXPPacket)
+	OnPartyGold func(d2netpacket.PartyGoldPacket)
 	OnPartyHeal func(d2netpacket.PartyHealPacket)
 	OnRoster    func(notice string)
 	// OnPortals receives the server's list of open town portal pairs.
@@ -387,6 +388,8 @@ func (g *GameClient) handlePacket(packet d2netpacket.NetPacket) error {
 		return g.handlePartyXPPacket(packet)
 	case d2netpackettype.PartyHeal:
 		return g.handlePartyHealPacket(packet)
+	case d2netpackettype.PartyGold:
+		return g.handlePartyGoldPacket(packet)
 	case d2netpackettype.PortalUpdate:
 		return g.handlePortalPacket(packet)
 	case d2netpackettype.ServerClosed:

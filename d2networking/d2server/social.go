@@ -9,6 +9,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2party"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2portal"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2inventory"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2playertrade"
 	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket"
 	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket/d2netpackettype"
@@ -670,6 +671,8 @@ func (g *GameServer) socialPacket(client ClientConnection, packet d2netpacket.Ne
 		return true, g.onPvPHit(client, packet)
 	case d2netpackettype.PartyXP:
 		return true, g.onPartyXP(client, packet)
+	case d2netpackettype.PartyGold:
+		return true, g.onPartyGold(client, packet)
 	case d2netpackettype.PartyHeal:
 		return true, g.onPartyHeal(client, packet)
 	case d2netpackettype.PortalOpen:
@@ -701,4 +704,73 @@ func (g *GameServer) socialArea(id string, area int) {
 	g.soc.mu.Lock()
 	g.soc.roster.SetArea(id, area)
 	g.soc.mu.Unlock()
+}
+
+// onPartyGold shares a gold pickup among the picker's party (ITEMMODE_PickupGoldFromGround
+// 0x55a5f0 -> 0x53e640, Roster.ShareGold). d2server leaves gold to the clients, so the
+// purses are the last ones the server knows (the hero state; UNVERIFIED approximation)
+// and each client clamps its share against its true purse. The picker always gets a reply
+// (its own share and the overflow).
+func (g *GameServer) onPartyGold(client ClientConnection, packet d2netpacket.NetPacket) error {
+	p, err := d2netpacket.UnmarshalPartyGold(packet.PacketData)
+	if err != nil {
+		return err
+	}
+
+	p.Picker = client.GetUniqueID()
+
+	g.soc.mu.Lock()
+	purses := map[string]d2party.Purse{}
+
+	for id, c := range g.connections {
+		have, level := 0, 1
+
+		if st := c.GetPlayerState(); st != nil {
+			have = st.Gold
+			if st.Stats != nil {
+				level = st.Stats.Level
+			}
+		}
+
+		if m, ok := g.soc.roster.Member(id); ok && m.Level > 0 {
+			level = m.Level
+		}
+
+		purses[id] = d2party.Purse{Have: have, Cap: d2inventory.InventoryGoldLimit(level)}
+	}
+
+	split := g.soc.roster.ShareGold(p.Picker, p.Amount, purses, p.PlayerDropped)
+	names := make([]string, len(split.Shares))
+
+	for i, s := range split.Shares {
+		names[i] = fmt.Sprintf("%s=%d", g.nameOf(s.ID), s.Add)
+	}
+	g.soc.mu.Unlock()
+
+	g.Infof("PARTYGOLD pickup picker=%q amount=%d shares=%v overflow=%d", g.nameOf(p.Picker), p.Amount, names, split.Overflow)
+
+	for _, s := range split.Shares {
+		c := g.connByID(s.ID)
+		if c == nil {
+			continue
+		}
+
+		out := p
+		out.Player, out.Add = s.ID, s.Add
+
+		if s.ID == p.Picker {
+			out.Overflow = split.Overflow
+		}
+
+		pkt, err := d2netpacket.CreatePartyGoldPacket(out)
+		if err != nil {
+			return err
+		}
+
+		if err := c.SendPacketToClient(pkt); err != nil {
+			g.Errorf("PartyGold to %s: %v", s.ID, err)
+		}
+	}
+
+	return nil
 }

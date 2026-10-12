@@ -688,7 +688,7 @@ func (g *GameServer) OnPacketReceived(client ClientConnection, packet d2netpacke
 	case d2netpackettype.PlayerConnectionRequest:
 		break // prevent log message. these are handled by handleConnection
 	case d2netpackettype.PartyCommand, d2netpackettype.TradeCommand, d2netpackettype.PvPHit, d2netpackettype.PartyXP, d2netpackettype.PartyHeal,
-		d2netpackettype.PortalOpen:
+		d2netpackettype.PortalOpen, d2netpackettype.PartyGold:
 		_, err := g.socialPacket(client, packet)
 
 		return err

@@ -1,0 +1,16 @@
+800x600 party header_hover 307 84 53 11
+800x600 party close 358 449 32 32
+800x600 party invite 270 130 53 20
+800x600 party hostile 94 137 20 20
+800x600 party bit01 325 130 20 20
+800x600 party listen 346 130 20 20
+800x600 party mute 367 130 20 20
+800x600 party name_hover 116 137 104 26
+640x480 party header_hover 227 24 53 11
+640x480 party close 278 389 32 32
+640x480 party invite 190 70 53 20
+640x480 party hostile 14 77 20 20
+640x480 party bit01 245 70 20 20
+640x480 party listen 266 70 20 20
+640x480 party mute 287 70 20 20
+640x480 party name_hover 36 77 104 26

@@ -46,6 +46,7 @@ func (v *Game) hookNetwork() {
 	v.gameClient.OnPvPHit = v.onPvPHit
 	v.gameClient.OnPartyXP = v.onPartyXP
 	v.gameClient.OnPartyHeal = v.onPartyHeal
+	v.gameClient.OnPartyGold = v.onPartyGold
 	v.gameClient.OnRoster = v.onRoster
 	v.hookPortals()
 	v.hookRealm()
@@ -431,7 +432,7 @@ func (v *Game) onPartyHeal(p d2netpacket.PartyHealPacket) {
 // which checks the hostility and relays it to the defender.
 func (v *Game) sendSkillPvP(h d2skills.PvPHit) {
 	pkt, err := d2netpacket.CreatePvPHitPacket(d2netpacket.PvPHitPacket{Attacker: v.me(), Target: h.Target.ID(),
-		Damage: h.Parts.Total(), Raw: h.Raw, Skill: h.Skill, Parts: h.Parts.Slice(), Rate: h.Rate})
+		Damage: h.Parts.Total(), Raw: h.Raw, Skill: h.Skill, Parts: h.Parts.Slice(), Rate: h.Rate, Blockable: h.Blockable})
 	if err != nil {
 		v.Errorf("PVP skill packet: %v", err)
 		return
@@ -457,9 +458,9 @@ func (v *Game) onPvPHit(p d2netpacket.PvPHitPacket) {
 	}
 
 	// shield block of the defender (0x57cc10: after the to-hit roll the attacker's client passed, on the defender's own
-	// seed, before the damage). Wave 24; melee swings only: a skill hit may be an area function (Meteor, Blizzard)
-	// that never goes through the to-hit/block outcome, and the packet does not say which (UNVERIFIED, so no block).
-	if d := v.monsters; d != nil && p.Skill == "" {
+	// seed, before the damage). Melee swings roll it; of the skill hits only the direct hit of a missile with
+	// physical damage does (Blockable, 0x5ab220); area and splash hits (Meteor, Blizzard) never go through the block.
+	if d := v.monsters; d != nil && pvpHitRollsBlock(p) {
 		if blocked, note := d.HeroPvPBlock(v.localPlayer); blocked {
 			v.Infof("PVP BLOCK attacker=%q skill=%q blocked=true%s", p.Attacker, p.Skill, note)
 

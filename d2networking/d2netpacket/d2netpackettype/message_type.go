@@ -44,6 +44,7 @@ const (
 	PortalUpdate                                         // Sent by the server to everybody: the open town portal pairs
 	RealmUnit                                            // Sent by the realm connection: a monster of the authoritative simulation appeared, moved, was hit or died
 	PartyHeal                                            // Sent by a client (Holy Bolt on a party member), the server relays it to that member
+	PartyGold                                            // Sent by a client (a gold pickup), the server answers every sharing member with its part
 
 	UnknownPacketType = 666
 )
@@ -76,6 +77,7 @@ func (n NetPacketType) String() string {
 		PortalUpdate:                    "PortalUpdate",
 		RealmUnit:                       "RealmUnit",
 		PartyHeal:                       "PartyHeal",
+		PartyGold:                       "PartyGold",
 	}
 
 	return strings[n]

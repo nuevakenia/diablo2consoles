@@ -73,6 +73,15 @@ func (v *Game) OnPlayerDropItem(item d2player.InventoryItem) {
 		return
 	}
 
+	// the drop of the cursor item is blocked while a player trade is open (INV_PktDropCursorItem 0x548a30, VERIFIED
+	// in inventory-trade.md): the item stays on the cursor
+	if v.gameControls != nil && v.gameControls.PTrade.IsOpen() {
+		v.Infof("cannot drop %q: a player trade is open", it.Label())
+		v.gameControls.SetCursorItem(it)
+
+		return
+	}
+
 	px, py := v.localPlayer.GetPositionF()
 
 	cells := v.freeDropCells(int(math.Floor(px)), int(math.Floor(py)), 1, true)
@@ -237,6 +246,16 @@ func (v *Game) advanceGroundInteraction(elapsed float64) {
 // for gold, straight into the hero's purse.
 func (v *Game) pickUp(it *d2mapentity.Item) {
 	if it.IsGold() {
+		if v.partyGold(it) {
+			v.playSoundAt("item_gold", it.GetPosition(), "pickup")
+
+			if v.ground.onPickup != nil {
+				v.ground.onPickup(it)
+			}
+
+			return
+		}
+
 		before := v.localPlayer.Gold
 		pile := goldPileFuncs{
 			remove: func() { v.gameClient.MapEngine.RemoveEntity(it) },
