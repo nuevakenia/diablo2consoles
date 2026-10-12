@@ -29,6 +29,10 @@ type Spec struct {
 	AlwaysExplode bool
 	ToHit         bool // rolls to hit against defense
 	CanSlow       bool
+	// ReturnFire is the missiles.txt ReturnFire column (read as the missile record's bits4 & 0x200 by the
+	// Chilling Armor handler 0x5c8d00, column mapping UNVERIFIED): a hit by this missile fires the
+	// hitbymissile unit event, which is how Chilling Armor shoots back.
+	ReturnFire bool
 	NextHit       bool
 	NextDelay     int
 	Size          int

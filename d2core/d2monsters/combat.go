@@ -153,6 +153,10 @@ func (d *Director) monsterStrike(u *unit, mode d2monster.Mode) {
 // resolveAttack rolls to-hit and damage of an attack that reached a hero.
 func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.Mode, atk d2mapentity.MonsterAttack,
 	via string) {
+	if via != "" && d.HeroHitByMissile != nil {
+		d.HeroHitByMissile(p, u.m, shotMissile(u, mode))
+	}
+
 	defense := d2combat.Defense(0, p.Stats.Dexterity, 0)
 	blockPct, physResist, reduce := 0, 0, 0
 

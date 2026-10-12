@@ -77,7 +77,7 @@ func (m *MissileRecord) PipelineSpec() *d2missile.Spec {
 		CollideType: m.Collision.CollisionType, CollideKill: m.Collision.DestroyedUponCollision,
 		CollideFriend: m.Collision.FriendlyFire, LastCollide: m.Collision.LastCollide, Collision: m.Collision.Collision,
 		Pierce: m.AffectedByPierce, Explosion: m.ClientExplosion, AlwaysExplode: m.AlwaysExplode,
-		ToHit: m.UseAttackRating, CanSlow: m.CanBeSlowed, NextHit: m.Collision.UseCollisionTimer,
+		ToHit: m.UseAttackRating, CanSlow: m.CanBeSlowed, ReturnFire: m.TriggersHitEvents, NextHit: m.Collision.UseCollisionTimer,
 		NextDelay: m.Collision.TimerFrames, Size: m.Size,
 		SubLoop: m.Animation.HasSubLoop, SubStart: m.Animation.SubStartingFrame, SubStop: m.Animation.SubEndingFrame,
 		ExplosionMissile: m.ExplosionMissile, SubMissile: m.SubMissile, HitSubMissile: m.HitSubMissile,

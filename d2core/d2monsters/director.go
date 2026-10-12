@@ -252,6 +252,11 @@ type Director struct {
 	// was avoided, with a log note. melee is false for projectiles.
 	HeroAvoid func(p *d2mapentity.Player, attacker *d2mapentity.Monster, melee bool) (bool, string)
 
+	// HeroHitByMissile, if set, is called when a monster's missile reaches a hero, before the to-hit roll
+	// (the exe fires the hitbymissile unit event for every hostile missile contact, 0x5aba10). missile is
+	// the missile row name.
+	HeroHitByMissile func(p *d2mapentity.Player, attacker *d2mapentity.Monster, missile string)
+
 	lastBlock map[*d2mapentity.Player]int // frame of the last hero block animation
 
 	curses map[*d2mapentity.Player]map[string]timedStat // curses of Cursed monsters by stat name (umodhooks.go)
