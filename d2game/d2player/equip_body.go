@@ -117,7 +117,7 @@ func (g *Inventory) SlotCenter(loc d2equip.Loc) (x, y int, ok bool) {
 }
 
 // SwapWeaponSets exchanges the weapon set in the hands with the other one and
-// flips ActiveArms (the header field only records which set is in the hands; the items really change place, as in the exe, VERIFIED).
+// flips ActiveArms so the file locations of the items do not change.
 func (g *Inventory) SwapWeaponSets() {
 	a, b := g.WornAt(d2equip.LocRightHand), g.WornAt(d2equip.LocLeftHand)
 	c, d := g.WornAt(d2equip.LocSwapRight), g.WornAt(d2equip.LocSwapLeft)

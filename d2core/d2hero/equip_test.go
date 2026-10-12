@@ -177,20 +177,7 @@ func TestWeaponSetInStatItems(t *testing.T) {
 	f, c, h, _, _ := equipFixture(t)
 	set1, _ := totalsOf(f, c, h)
 
-	// the swap of the exe exchanges the items of 4/5 with those of 11/12 (the header field only records it)
-	for i := range c.Equipped {
-		switch c.Equipped[i].X {
-		case int(d2equip.LocRightHand):
-			c.Equipped[i].X = int(d2equip.LocSwapRight)
-		case int(d2equip.LocLeftHand):
-			c.Equipped[i].X = int(d2equip.LocSwapLeft)
-		case int(d2equip.LocSwapRight):
-			c.Equipped[i].X = int(d2equip.LocRightHand)
-		case int(d2equip.LocSwapLeft):
-			c.Equipped[i].X = int(d2equip.LocLeftHand)
-		}
-	}
-
+	// the logical hands of set II: the items in the file slots 11/12 are in the hands
 	c.ActiveArms = 1
 	set2, status := totalsOf(f, c, h)
 

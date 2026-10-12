@@ -1,24 +1,55 @@
 package d2equip
 
-// Weapon sets. A character has two weapon sets: the one in the hands lives in LocRightHand / LocLeftHand (4, 5), the
-// other in LocSwapRight / LocSwapLeft (11, 12). VERIFIED (w37, the swap in ITEMMODE_ValidateEquippedItems 0x55f4c0 and the
-// save writer SAVE_WriteItemListJM 0x52f220): a weapon swap physically exchanges the items of 4/5 with those of 11/12
-// (ITEM_SetBodyLocation) and toggles a client byte (+0x45c); the header field at 0x10 of the .d2s ("active_arms", bit 0
-// of SAVE_WriteD2sHeader 0x566c70) only records that byte, which tells the interface whether the hands hold "set II".
-// Items are written with the body location they have, so the weapons in the hands are ALWAYS at 4/5 in a file.
-// (Earlier versions mapped 4/5 to 11/12 when the field was 1; that was wrong.)
+// Weapon sets. A character has two weapon sets: set I lives in LocRightHand /
+// LocLeftHand (4, 5), set II in LocSwapRight / LocSwapLeft (11, 12), and the
+// header field at 0x10 of the .d2s ("active_arms") says which one is in the
+// hands: 0 set I, 1 set II (UNVERIFIED which value is which: the sample has 0
+// with the weapons in 4 and 5).
+//
+// UNVERIFIED (w37): no real save with active_arms=1 exists on the development machine (the three .d2s files there all
+// have 0), so the convention below could not be proven with data. Reading the exe suggests the opposite: the swap in
+// ITEMMODE_ValidateEquippedItems (0x55f4c0) physically exchanges the items of 4/5 and 11/12 and the writer
+// SAVE_WriteItemListJM (0x52f220) writes each item with its own location, which would put the hands at 4/5 whatever
+// the field says. Until a real file with the field set settles it the mapping stays as it was; EffectiveLoc is an involution, so a
+// read followed by a write keeps the file's own locations byte for byte in either case.
+//
+// The slots of the file are physical: when set II is active the weapon the hero
+// holds is the item in slot 11, not the one in slot 4. EffectiveLoc maps a file
+// slot to where the item currently is.
 
 // SetCount is the number of weapon sets.
 const SetCount = 2
 
-// EffectiveLoc maps a physical location to the one the game treats the item as being at. It is the identity: the
-// active set is always the one at 4/5 (see above); the second argument is the header field, kept for the callers.
-func EffectiveLoc(loc Loc, _ int) Loc { return loc }
+// EffectiveLoc maps a physical location to the one the game treats the item as
+// being at: with set II active, 11/12 act as 4/5 and 4/5 as 11/12.
+func EffectiveLoc(loc Loc, activeArms int) Loc {
+	if activeArms%SetCount == 0 {
+		return loc
+	}
+
+	switch loc {
+	case LocRightHand:
+		return LocSwapRight
+	case LocLeftHand:
+		return LocSwapLeft
+	case LocSwapRight:
+		return LocRightHand
+	case LocSwapLeft:
+		return LocLeftHand
+	}
+
+	return loc
+}
 
 // NextSet is the active set after a swap.
 func NextSet(activeArms int) int { return (activeArms + 1) % SetCount }
 
-// HandsOf returns the right and left hand items from a body: always the items at 4/5 (the header field does not move them).
-func HandsOf(body map[Loc]*Item, _ int) (right, left *Item) {
-	return body[LocRightHand], body[LocLeftHand]
+// HandsOf returns the right and left hand items of the active set from a
+// physical body.
+func HandsOf(body map[Loc]*Item, activeArms int) (right, left *Item) {
+	if activeArms%SetCount == 0 {
+		return body[LocRightHand], body[LocLeftHand]
+	}
+
+	return body[LocSwapRight], body[LocSwapLeft]
 }

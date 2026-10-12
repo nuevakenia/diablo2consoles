@@ -107,8 +107,8 @@ type HeroContainers struct {
 	// stat list falls back on the imported save or the base equipment.
 	Equipped    []StoredItem `json:"equipped,omitempty"`
 	EquippedSet bool         `json:"equippedSet,omitempty"`
-	// ActiveArms records which set the hands hold: 0 set I, 1 set II. It is the .d2s header field at 0x10. The
-	// weapons in the hands are always at locations 4/5 either way (VERIFIED, see d2equip/sets.go).
+	// ActiveArms is the weapon set in the hands: 0 set I (locations 4/5), 1 set
+	// II (11/12). It is the .d2s header field at 0x10.
 	ActiveArms int `json:"activeArms,omitempty"`
 }
 
