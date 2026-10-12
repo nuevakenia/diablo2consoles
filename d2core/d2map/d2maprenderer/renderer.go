@@ -73,6 +73,7 @@ type MapRenderer struct {
 	light               *lighting
 	entBuckets          map[[2]int]*entityBucket // per-frame entity index, see indexEntities
 	entFree             []*entityBucket
+	subKeys             []int8       // scratch of renderEntitiesBySubtile
 	shadeVals           []color.RGBA // scratch for renderShadedImage
 	stats               DrawStats
 	roofCover           map[[2]int]bool // roof tiles fading out because the hero is under them
@@ -331,20 +332,7 @@ func (mr *MapRenderer) renderPass2(target d2interface.Surface, startY, endY int,
 
 			tileEnt := mr.getEntitiesBelowWalls(tileX, tileY)
 
-			for subY := 0; subY < 5; subY++ {
-				for subX := 0; subX < 5; subX++ {
-					for _, mapEntity := range tileEnt {
-						pos := mapEntity.GetPosition()
-						if (int(pos.SubTileOffset().X()) != subX) || (int(pos.SubTileOffset().Y()) != subY) {
-							continue
-						}
-
-						target.PushTranslation(mr.viewport.GetTranslationScreen())
-						mr.renderLitEntity(target, mapEntity)
-						target.Pop()
-					}
-				}
-			}
+			mr.renderEntitiesBySubtile(target, tileEnt)
 
 			mr.viewport.PopTranslation()
 		}
@@ -376,8 +364,7 @@ func (mr *MapRenderer) indexEntities() {
 
 	for _, mapEntity := range mr.mapEngine.Entities() {
 		pos := mapEntity.GetPosition()
-		vec := pos.World()
-		key := [2]int{int(vec.X()), int(vec.Y())}
+		key := [2]int{int(pos.X() / subtilesPerTile), int(pos.Y() / subtilesPerTile)} // = int(pos.World()), no allocation
 
 		b := mr.entBuckets[key]
 		if b == nil {
@@ -394,6 +381,44 @@ func (mr *MapRenderer) indexEntities() {
 			b.below = append(b.below, mapEntity)
 		} else {
 			b.above = append(b.above, mapEntity)
+		}
+	}
+}
+
+// renderEntitiesBySubtile draws the entities of one tile ordered by sub tile (row by row, entities in
+// bucket order inside a sub tile). Entities whose sub tile offset is outside 0..4 are not drawn, as
+// before. The offsets are computed once per entity, without allocating (this used to cost 25 x 2
+// vector allocations per entity and tile).
+func (mr *MapRenderer) renderEntitiesBySubtile(target d2interface.Surface, ents []d2interface.MapEntity) {
+	if len(ents) == 0 {
+		return
+	}
+
+	keys := mr.subKeys[:0]
+
+	for _, e := range ents {
+		pos := e.GetPosition()
+		ox, oy := pos.SubTileXY()
+		sx, sy := int(ox), int(oy)
+
+		if sx < 0 || sx > 4 || sy < 0 || sy > 4 {
+			keys = append(keys, -1)
+		} else {
+			keys = append(keys, int8(sy*5+sx))
+		}
+	}
+
+	mr.subKeys = keys
+
+	for k := int8(0); k < 25; k++ {
+		for i, e := range ents {
+			if keys[i] != k {
+				continue
+			}
+
+			target.PushTranslation(mr.viewport.GetTranslationScreen())
+			mr.renderLitEntity(target, e)
+			target.Pop()
 		}
 	}
 }
@@ -418,20 +443,7 @@ func (mr *MapRenderer) renderPass3(target d2interface.Surface, startY, endY int,
 
 			entities := mr.getEntitiesAboveWalls(tileX, tileY)
 
-			for subY := 0; subY < 5; subY++ {
-				for subX := 0; subX < 5; subX++ {
-					for _, entity := range entities {
-						pos := entity.GetPosition()
-						if (int(pos.SubTileOffset().X()) != subX) || (int(pos.SubTileOffset().Y()) != subY) {
-							continue
-						}
-
-						target.PushTranslation(mr.viewport.GetTranslationScreen())
-						mr.renderLitEntity(target, entity)
-						target.Pop()
-					}
-				}
-			}
+			mr.renderEntitiesBySubtile(target, entities)
 
 			mr.viewport.PopTranslation()
 		}

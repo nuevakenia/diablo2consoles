@@ -79,6 +79,17 @@ func (p *Position) SubTileOffset() *Vector {
 	return c.Subtract(t)
 }
 
+// SubTileXY is SubTileOffset without the allocations (same arithmetic, same results): the offset in
+// sub tiles from the current map tile. The render passes call it for every entity of every visible tile.
+func (p *Position) SubTileXY() (x, y float64) {
+	// the explicit conversions stop the compiler fusing the multiply and the subtract (FMA on arm64),
+	// which would round differently from SubTileOffset
+	tx := float64(math.Floor(p.x/subTilesPerTile) * subTilesPerTile)
+	ty := float64(math.Floor(p.y/subTilesPerTile) * subTilesPerTile)
+
+	return p.x - tx, p.y - ty
+}
+
 // DirectionTo returns the entity direction from this vector to the given vector.
 func (v *Vector) DirectionTo(target Vector) int {
 	direction := target.Clone()
