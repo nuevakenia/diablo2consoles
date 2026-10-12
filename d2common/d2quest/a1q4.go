@@ -160,13 +160,7 @@ func newSearchForCain() *Quest {
 
 				d.rewarded = true
 
-				quality, ilvl := 1, 7 // magic ring
-				switch g.Difficulty {
-				case Nightmare:
-					quality, ilvl = 2, 30
-				case Hell:
-					quality, ilvl = 2, 60
-				}
+				ilvl, quality := CainRing(g.Difficulty) // VERIFIED 0x58ffb0 (w27)
 
 				g.emit(Effect{Kind: EffectGiveItem, Quest: q.ID, Code: ItemReward, Quality: quality, Value: ilvl,
 					Note: "ring from Akara"})

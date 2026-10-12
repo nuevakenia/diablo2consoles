@@ -55,6 +55,14 @@ func (v *Game) applyQuestReward(e d2quest.Effect) {
 		}
 	case o.Experience != 0:
 		note = v.grantQuestExperience(o.Experience)
+	case o.GoldHigh != 0:
+		amount := o.GoldLow
+		if o.GoldHigh > o.GoldLow {
+			amount += rand.Intn(o.GoldHigh - o.GoldLow + 1)
+		}
+
+		over := v.gameControls.PickUpGold(amount)
+		note = fmt.Sprintf("gold pile %d (range %d-%d, %d over the purse cap)", amount, o.GoldLow, o.GoldHigh, over)
 	case o.PendingSocket:
 		note = "Larzuk waits for an item (click him with an item on the cursor, or the Add Sockets row)"
 

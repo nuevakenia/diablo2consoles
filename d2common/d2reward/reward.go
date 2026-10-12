@@ -32,6 +32,7 @@ type Outcome struct {
 	UnlockDifficulty   bool
 	GameComplete       bool
 	Experience         int // experience to add, capped by the engine to the span of the current level (Rite of Passage)
+	GoldLow, GoldHigh  int // Baal's gold pile: the engine rolls between the two and picks it up (VERIFIED 0x58bce0)
 	Log                string
 }
 
@@ -77,6 +78,8 @@ func (s *State) Apply(e d2quest.Effect) Outcome {
 		o.Hire = who
 	case "experience":
 		o.Experience = e.Value
+	case "gold-pile":
+		o.GoldLow, o.GoldHigh = e.Value, e.Quality
 	case "unlock-difficulty":
 		s.DifficultyUnlocked = true
 		o.UnlockDifficulty = true

@@ -36,6 +36,7 @@ type exeKill struct {
 	classicBits []int  // extra bits in the classic game (Expansion false)
 	level       int    // the hero must be in this level (0: any)
 	dropCode    string // quest item dropped at the corpse (unit item-code override +0xb8)
+	gold        bool   // Baal: gold piles for the hero (EveGoldReward, VERIFIED 0x58bce0)
 }
 
 func (x *exeKill) applies(g *Game, e *Event) bool {
@@ -67,6 +68,12 @@ func (x *exeKill) finish(g *Game, q *Quest, s *spec) {
 	if x.dropCode != "" {
 		g.emit(Effect{Kind: EffectGiveItem, Quest: q.ID, Code: x.dropCode,
 			Note: "quest drop at the corpse (exe: unit code override, 0x557980)"})
+	}
+
+	if x.gold {
+		e := EveGoldReward(g.Difficulty)
+		e.Quest = q.ID
+		g.emit(e)
 	}
 
 	if s.claimFx != nil {
