@@ -60,6 +60,12 @@ func (e *Engine) knockback(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 // at the first cell that cannot be walked on.
 func (e *Engine) pushAway(u *heroUnit, m *d2mapentity.Monster, dist int, name string) {
 	hx, hy := u.Pos()
+	e.pushFrom(hx, hy, m, dist, name)
+}
+
+// pushFrom pushes a monster dist subtiles away from the point (hx, hy), stopping at the first cell that cannot be
+// walked on (the hit result bit 8: Smite, Sanctuary, the molten boulder).
+func (e *Engine) pushFrom(hx, hy int, m *d2mapentity.Monster, dist int, name string) {
 	x, y := m.SubtilePos()
 	nx, ny := knockDest(hx, hy, x, y, dist, e.pipe.Walkable)
 
@@ -142,3 +148,20 @@ func (t *monsterTarget) Heal(amount int) {
 }
 
 var _ d2missile.Healer = (*monsterTarget)(nil)
+
+// ClassBit implements d2missile.ClassBitter: the MonStats2 flag bits the molten boulder reads (0xa small, 0xb
+// large; the other bits of the exe's flag array are not mapped here).
+func (t *monsterTarget) ClassBit(bit int) bool {
+	if t.m.StatEx == nil {
+		return false
+	}
+
+	switch bit {
+	case d2missile.ClassBitSmall:
+		return t.m.StatEx.IsSmall
+	case d2missile.ClassBitLarge:
+		return t.m.StatEx.IsLarge
+	}
+
+	return false
+}

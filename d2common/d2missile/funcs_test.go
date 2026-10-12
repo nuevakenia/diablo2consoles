@@ -455,7 +455,7 @@ type boulderTarget struct {
 	bit bool
 }
 
-func (b boulderTarget) BoulderBit() bool { return b.bit }
+func (b boulderTarget) ClassBit(bit int) bool { return b.bit && bit == ClassBitLarge }
 
 // Hit functions 48 / 47 (Molten Boulder): the emerge missile ends by creating
 // the boulder toward the original aim point; the boulder only damages (2) the

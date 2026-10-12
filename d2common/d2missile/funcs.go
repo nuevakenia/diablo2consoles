@@ -295,18 +295,18 @@ func (s *Sim) wardStartHit(m *Missile) int {
 }
 
 // boulderHit is hit function 47 (0x5aa070, Molten Boulder): a unit that is not
-// a monster, or a monster without the class bit 0xb of its monstats2 record
-// (0x45f0b0, which bit that is: UNVERIFIED), is only damaged (2: the boulder
-// rolls on). Otherwise (that class of monster, or no target at the end of the
-// path or on a wall) the boulder explodes: one area damage with radius
+// a monster, or a monster without the monstats2 flag bit 0xb (the "large"
+// column, ClassBitLarge: V wave 22, see dmgfunc.go), is only damaged (2: the
+// boulder rolls on). Otherwise (a large monster, or no target at the end of
+// the path or on a wall) the boulder explodes: one area damage with radius
 // sHitPar1 (else the skill's aurarangecalc, minimum 1), then HitSubMissile1
 // (the fire path) at every sHitPar2-th entry of the Meteor offset table, and
-// the missile ends (1). BoulderBit is the optional Target interface for that
-// class bit.
+// the missile ends (1). The monster implements ClassBitter; a target that does
+// not is treated as having no class bits.
 func (s *Sim) boulderHit(m *Missile, t Target) int {
 	if t != nil {
-		bb, ok := t.(interface{ BoulderBit() bool })
-		if t.IsPlayer() || !ok || !bb.BoulderBit() {
+		cb, ok := t.(ClassBitter)
+		if t.IsPlayer() || !ok || !cb.ClassBit(ClassBitLarge) {
 			return resDamage
 		}
 	}

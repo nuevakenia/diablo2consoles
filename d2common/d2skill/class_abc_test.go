@@ -31,6 +31,7 @@ func init() {
 			"calc1": "dm12", "Param1": "5", "Param2": "60", "Param3": "30", "Param4": "5", "manashift": "8"},
 		row{"skill": "Grim Ward", "Id": "506", "charclass": "bar", "srvstfunc": "33", "srvdofunc": "75", "TargetCorpse": "1",
 			"auratargetstate": "terror", "auralencalc": "par6", "aurarangecalc": "ln12", "calc1": "ln34", "Param1": "3",
+			"srvmissilea": "grimwardmediumstart", "srvmissileb": "grimwardsmallstart", "srvmissilec": "grimwardlargestart",
 			"Param2": "1", "Param3": "1000", "Param6": "60", "manashift": "8"},
 		row{"skill": "Blade Shield", "Id": "508", "charclass": "ass", "srvstfunc": "28", "srvdofunc": "54", "aurastate": "bladeshield",
 			"auralencalc": "ln12", "aurarangecalc": "par4", "periodic": "1", "perdelay": "par3", "Param1": "500", "Param2": "125",
@@ -187,6 +188,35 @@ func TestGrimWard(t *testing.T) {
 	// lifetime, not the table Range 200)
 	if w.Radius != 6 || w.Fear != 60 || w.Period != 6 || w.Life != 1000 || w.State != "terror" || w.X != 8 || w.Y != 4 || w.CorpseID != "c2" {
 		t.Errorf("ward %+v", w)
+	}
+
+	if w.Missile != "grimwardmediumstart" {
+		t.Errorf("medium corpse got %q", w.Missile)
+	}
+
+	// the start missile follows the corpse's size class (0x5d7430: flag bit 0xb large, 0xa small)
+	for _, c := range []struct {
+		small, large bool
+		want         string
+	}{{true, false, "grimwardsmallstart"}, {false, true, "grimwardlargestart"}, {true, true, "grimwardlargestart"}} {
+		tg := corpseTarget("c3")
+		tg.CorpseSmall, tg.CorpseLarge = c.small, c.large
+
+		_, r := cf.castCorpse("Grim Ward", tg)
+		if !r.OK {
+			t.Fatal(r.Reason)
+		}
+
+		if got := effectOf(t, r, "ward").Ward.Missile; got != c.want {
+			t.Errorf("small=%v large=%v: %q, want %q", c.small, c.large, got, c.want)
+		}
+	}
+}
+
+func TestWardMissile(t *testing.T) {
+	if WardMissile(false, false, "a", "b", "c") != "a" || WardMissile(true, false, "a", "b", "c") != "b" ||
+		WardMissile(false, true, "a", "b", "c") != "c" || WardMissile(true, true, "a", "b", "c") != "c" {
+		t.Error("ward missile pick")
 	}
 }
 

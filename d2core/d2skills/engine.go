@@ -454,6 +454,7 @@ func (e *Engine) targetAt(sx, sy int) d2skill.Target {
 			cbest = d
 			tg.Corpse, tg.CX, tg.CY, tg.CorpseID, tg.CorpseHP, tg.CorpseKey = true, mx, my, m.ID(), m.Vitals.MaxHP, m.Stat.Key
 			tg.CorpseLevel = m.Vitals.Level
+			tg.CorpseSmall, tg.CorpseLarge = m.StatEx != nil && m.StatEx.IsSmall, m.StatEx != nil && m.StatEx.IsLarge
 			tg.CorpseLooted = e.isLooted(m.ID())
 			tg.CorpseInfo = e.corpseFacts(m)
 		}
@@ -1175,6 +1176,11 @@ func (e *Engine) onSim(ev d2missile.Event) {
 
 		if mt != nil {
 			e.splash(m, mt.m, &ev.Damage)
+
+			// result bit 8 of the hit (SrvDmgFunc 14, the molten boulder): the monster is pushed away from the missile
+			if ev.Damage.Result&d2missile.ResultKnockback != 0 && mt.m.Alive() {
+				e.pushFrom(int(m.X), int(m.Y), mt.m, d2skill.KnockDistance, name)
+			}
 		}
 
 		if pt, ok := ev.Target.(*playerTarget); ok && ev.Damage.SumTotal(true) > 0 {

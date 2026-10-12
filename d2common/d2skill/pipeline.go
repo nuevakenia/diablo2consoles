@@ -74,6 +74,10 @@ type Target struct {
 	// damage down when the corpse is above the caster).
 	CorpseLevel int
 
+	// CorpseSmall / CorpseLarge are the monstats2 "small" / "large" columns (flag bits 0xa / 0xb) of the corpse:
+	// Grim Ward picks its missile by them (WardMissile).
+	CorpseSmall, CorpseLarge bool
+
 	// Client start gates (clientgate.go); the zero values refuse nothing.
 	// TownRoom: the aim point lies in a town room (Bone Wall). Item: the item under the cursor (Iron Golem).
 	// Revive: the corpse under the cursor (Revive).
@@ -634,6 +638,10 @@ type castOpts struct {
 	hasStart bool
 	onHit    func(m *d2missile.Missile, t d2missile.Target)
 
+	// destX / destY (with hasDest) replace the aim point as the missile's destination (the fan of SRVDO_008).
+	destX, destY float64
+	hasDest      bool
+
 	// pathSeed (with pathType10) is the seed value of the hook 0x5c7340: the destination x plus the
 	// missile's index in the cast; the missile then walks path type 10 (d2missile.PathType10Nodes).
 	pathType10 bool
@@ -747,6 +755,10 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 	dx, dy := float64(tgt.X)+0.5, float64(tgt.Y)+0.5
 	if tgt.Unit != nil {
 		dx, dy = float64(tgt.UX)+0.5, float64(tgt.UY)+0.5
+	}
+
+	if o.hasDest {
+		dx, dy = o.destX, o.destY
 	}
 
 	// Area hit functions without a table radius (sHitPar1 < 1) take it from the
