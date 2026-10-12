@@ -529,7 +529,9 @@ func (t *Tables) loadRunewords(tb *tsv) {
 func (t *Tables) loadClasses(tb *tsv) {
 	for _, r := range tb.rows {
 		name := tb.str(r, "class")
-		if name == "" {
+		if name == "" || strings.EqualFold(name, "Expansion") {
+			// w36: the "Expansion" separator row of charstats.txt is not a class; keeping it
+			// shifted Druid and Assassin by one (blank "(Druid Only)" line, wrong class skills).
 			continue
 		}
 
