@@ -65,7 +65,7 @@ type MonStat2Record struct {
 	// Light color
 	LightR int
 	LightG int
-	lightB int
+	LightB int
 
 	// Palettes per difficulty
 	NormalPalette    int

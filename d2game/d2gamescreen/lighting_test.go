@@ -62,21 +62,45 @@ func TestBaseLight(t *testing.T) {
 	}
 }
 
-func TestBaseLightAct4UsesLevelConstant(t *testing.T) {
+func TestBaseLightAct4EasesFromCreateValue(t *testing.T) {
 	t.Setenv("OD2_AUTOTIME", "day")
 	c := newDayClock()
 
-	// Plains of Despair (0x67): 0x80 at once, not the sun cycle
-	if l := baseLight(0, 0, 0, 0, act4Index, 0x67, c); l.Intensity != 0x80 {
-		t.Errorf("plains %v", l)
+	// a game that starts in Plains of Despair (0x67, target 0x80) begins at the create value 255
+	if l := baseLight(0, 0, 0, 0, act4Index, 0x67, c); l.Intensity != 255 {
+		t.Errorf("plains start %v", l)
 	}
 
-	// moving to the City of the Damned (0x68, target 0x40) eases 1 per tick (25 ticks = 1 s)
+	// 1 s = 25 ticks, 1 per tick toward the target
+	c.Advance(1)
+
+	if l := baseLight(0, 0, 0, 0, act4Index, 0x67, c); l.Intensity != 255-25 {
+		t.Errorf("after 1 s %v", l)
+	}
+
+	// long enough to settle, then the City of the Damned (0x68, target 0x40) eases from 0x80
+	c.Advance(10)
+	baseLight(0, 0, 0, 0, act4Index, 0x67, c)
+
+	if l := baseLight(0, 0, 0, 0, act4Index, 0x67, c); l.Intensity != 0x80 {
+		t.Errorf("settled %v", l)
+	}
+
 	baseLight(0, 0, 0, 0, act4Index, 0x68, c)
 	c.Advance(1)
 
 	if l := baseLight(0, 0, 0, 0, act4Index, 0x68, c); l.Intensity != 0x80-25 {
-		t.Errorf("after 1 s %v", l)
+		t.Errorf("after move %v", l)
+	}
+}
+
+func TestAmbientFollowsSunOutsideAct4(t *testing.T) {
+	t.Setenv("OD2_AUTOTIME", "day")
+	c := newDayClock()
+	c.ambientIntensity(2, 75) // act 3 holds the sun value
+
+	if got := c.ambientIntensity(act4Index, 0x67); got != c.env.Intensity() {
+		t.Errorf("entering act 4 starts from the previous value: %d", got)
 	}
 }
 

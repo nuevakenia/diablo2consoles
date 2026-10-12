@@ -141,7 +141,7 @@ func monsterStats2Loader(r *RecordManager, d *d2txt.DataDictionary) error {
 			Light:              d.Number("Light"),
 			LightR:             d.Number("light-r"),
 			LightG:             d.Number("light-g"),
-			lightB:             d.Number("light-b"),
+			LightB:             d.Number("light-b"),
 			NormalPalette:      d.Number("Utrans"),
 			NightmarePalette:   d.Number("Utrans(N)"),
 			HellPalatte:        d.Number("Utrans(H)"),

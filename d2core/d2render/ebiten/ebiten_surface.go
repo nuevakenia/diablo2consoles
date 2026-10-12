@@ -257,9 +257,20 @@ func (s *ebitenSurface) handleStateEffect(opts *ebiten.DrawImageOptions) {
 		opts.CompositeMode = ebiten.CompositeModeMultiply
 	case d2enum.DrawEffectNormal:
 		opts.CompositeMode = ebiten.CompositeModeSourceOver
-	// Mod2XTrans uses PL2 table G whose semantics are unresolved in the notes
-	// (closest known: per-channel max); drawn as normal until verified.
+	// Mod2XTrans is PL2 table G: the pixel blends over the destination with a weight that rises
+	// with its own brightness (d2enum.Mode6Weight). The colour matrix puts the luma in the alpha
+	// row; transparent pixels are black so they stay invisible.
 	case d2enum.DrawEffectMod2XTrans:
+		opts.CompositeMode = ebiten.CompositeModeSourceOver
+
+		var m ebiten.ColorM
+
+		m.SetElement(3, 0, d2enum.Mode6Gain*d2enum.Mode6LumaR)
+		m.SetElement(3, 1, d2enum.Mode6Gain*d2enum.Mode6LumaG)
+		m.SetElement(3, 2, d2enum.Mode6Gain*d2enum.Mode6LumaB)
+		m.SetElement(3, 3, 0)
+		m.Concat(opts.ColorM) // luma of the unlit pixel first, then the light tint
+		opts.ColorM = m
 	// Mod2X is the hover highlight: the palette brightened to 170%.
 	case d2enum.DrawEffectMod2X:
 		opts.ColorM.Scale(d2enum.Mod2XBrightness, d2enum.Mod2XBrightness, d2enum.Mod2XBrightness, 1)

@@ -91,17 +91,11 @@ func baseLight(intensity, r, g, b, act, levelID int, env *dayClock) d2lightmap.C
 		return d2lightmap.Cell{Intensity: levelFixedValue, R: 0xf5, G: 0xf0, B: 0xff}
 	}
 
+	// the ambient value keeps easing even where Levels.txt overrides the light
+	i := env.ambientIntensity(act, levelID)
+
 	if r != 0 || g != 0 || b != 0 {
 		return d2lightmap.Cell{Intensity: clampByte(intensity), R: clampByte(r), G: clampByte(g), B: clampByte(b)}
-	}
-
-	i := env.Intensity()
-	if act == act4Index {
-		i = env.act4Intensity(levelID)
-	}
-
-	if act == act5Index && i > act5MaxIntensity {
-		i = act5MaxIntensity
 	}
 
 	a := env.Ambient()
@@ -149,7 +143,7 @@ func (v *Game) advanceLighting() {
 	v.mapRenderer.SetLightInput(d2maprenderer.LightInput{HeroX: pos.X(), HeroY: pos.Y(), Base: cell, Extra: v.objectLights(pos.X(), pos.Y())})
 }
 
-// objectLights collects the lights of objects (torches, fires, shrines...) within the light map window of the hero.
+// objectLights collects the lights of objects (torches, fires, shrines...), monsters and missiles within the light map window of the hero.
 func (v *Game) objectLights(hx, hy float64) []d2maprenderer.LightPoint {
 	if v.gameClient == nil || v.gameClient.MapEngine == nil {
 		return nil
@@ -160,22 +154,40 @@ func (v *Game) objectLights(hx, hy float64) []d2maprenderer.LightPoint {
 	const window = 14.0 // tiles; the light map covers 48 subtiles, objects farther out still reach into it
 
 	for _, e := range v.gameClient.MapEngine.Entities() {
-		ob, ok := e.(*d2mapentity.Object)
-		if !ok {
+		var p d2maprenderer.LightPoint
+
+		switch ent := e.(type) {
+		case *d2mapentity.Object:
+			r := ent.LightRadius()
+			if r <= 0 {
+				continue
+			}
+
+			p = d2maprenderer.LightPoint{Radius: r, R: objectLightR, G: objectLightG, B: objectLightB}
+		case *d2mapentity.Monster:
+			ls, ok := ent.LightSource()
+			if !ok {
+				continue
+			}
+
+			p = d2maprenderer.LightPoint{Radius: ls.Radius, R: ls.R, G: ls.G, B: ls.B}
+		case *d2mapentity.Missile:
+			ls, ok := ent.LightSource()
+			if !ok {
+				continue
+			}
+
+			p = d2maprenderer.LightPoint{Radius: ls.Radius, R: ls.R, G: ls.G, B: ls.B}
+		default:
 			continue
 		}
 
-		r := ob.LightRadius()
-		if r <= 0 {
+		p.X, p.Y = e.GetPositionF()
+		if p.X < hx-window || p.X > hx+window || p.Y < hy-window || p.Y > hy+window {
 			continue
 		}
 
-		x, y := ob.GetPositionF()
-		if x < hx-window || x > hx+window || y < hy-window || y > hy+window {
-			continue
-		}
-
-		out = append(out, d2maprenderer.LightPoint{X: x, Y: y, Radius: r, R: objectLightR, G: objectLightG, B: objectLightB})
+		out = append(out, p)
 	}
 
 	return out

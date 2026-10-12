@@ -45,13 +45,16 @@ type dayClock struct {
 	frozen bool // OD2_AUTOTIME holds the clock at a forced phase
 
 	// Act 4 has no sun cycle: its ambient eases 1 per tick toward a per-level constant (d2daynight.Act4Step).
-	act4Level, act4Value int
+	// ambient is the exe's env[3]: it starts at d2daynight.AmbientAtCreate (ENVIRON_CreateEnvironment) and,
+	// outside Act 4, follows the sun value, so entering Act 4 eases from whatever the previous act held.
+	act4Level, ambient int
+	act4Active         bool
 }
 
 // newDayClock starts a new game's clock at the beginning of the day (phase 2);
 // OD2_AUTOTIME=<phase>[@degree] forces and freezes another time of day.
 func newDayClock() *dayClock {
-	c := &dayClock{env: d2daynight.NewCycling()}
+	c := &dayClock{env: d2daynight.NewCycling(), ambient: d2daynight.AmbientAtCreate}
 	c.env.SetPhase(d2daynight.PhaseDay)
 	c.applyAutoTime(os.Getenv("OD2_AUTOTIME"))
 
@@ -64,7 +67,9 @@ func (c *dayClock) Advance(elapsed float64) {
 	n := int(c.acc)
 	c.acc -= float64(n)
 
-	c.act4Value = d2daynight.Act4Step(c.act4Value, c.act4Level, n)
+	if c.act4Active {
+		c.ambient = d2daynight.Act4Step(c.ambient, c.act4Level, n)
+	}
 
 	if c.frozen {
 		return
@@ -73,16 +78,24 @@ func (c *dayClock) Advance(elapsed float64) {
 	c.env.Advance(n)
 }
 
-// act4Intensity is the Act 4 ambient for a level (initialised on first use).
-func (c *dayClock) act4Intensity(level int) int {
-	if c.act4Value == 0 {
-		// UNVERIFIED: the exe's start value is unknown; start settled instead of ramping up from black.
-		c.act4Value = d2daynight.Act4Target(level)
-	}
-
+// ambientIntensity is the exe's ambient intensity for the hero's act (ENVIRON_UpdateAmbientIntensity):
+// the sun value outside Act 4 (capped in Act 5), the eased per-level constant in Act 4.
+func (c *dayClock) ambientIntensity(act, level int) int {
+	c.act4Active = act == act4Index
 	c.act4Level = level
 
-	return c.act4Value
+	if c.act4Active {
+		return c.ambient
+	}
+
+	i := c.env.Intensity()
+	if act == act5Index && i > act5MaxIntensity {
+		i = act5MaxIntensity
+	}
+
+	c.ambient = i
+
+	return i
 }
 
 // Phase implements dayPhaseSource.
