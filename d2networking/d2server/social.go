@@ -685,6 +685,8 @@ func (g *GameServer) socialPacket(client ClientConnection, packet d2netpacket.Ne
 		return true, g.onPartyGold(client, packet)
 	case d2netpackettype.PartyHeal:
 		return true, g.onPartyHeal(client, packet)
+	case d2netpackettype.QuestShare:
+		return true, g.onQuestShare(client, packet)
 	case d2netpackettype.PortalOpen:
 		return true, g.onPortalOpen(client, packet)
 	}

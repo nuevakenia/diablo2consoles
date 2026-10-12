@@ -113,9 +113,11 @@ type GameClient struct {
 	OnPvPHit    func(d2netpacket.PvPHitPacket)
 	OnPartyXP   func(d2netpacket.PartyXPPacket)
 	OnPartyGold func(d2netpacket.PartyGoldPacket)
-	OnJoinSync  func(d2netpacket.JoinSyncPacket)
-	OnPartyHeal func(d2netpacket.PartyHealPacket)
-	OnRoster    func(notice string)
+	// OnQuestShare receives this hero's share of a quest finished by another player (Rite of Passage).
+	OnQuestShare func(d2netpacket.QuestSharePacket)
+	OnJoinSync   func(d2netpacket.JoinSyncPacket)
+	OnPartyHeal  func(d2netpacket.PartyHealPacket)
+	OnRoster     func(notice string)
 	// OnPortals receives the server's list of open town portal pairs.
 	OnPortals func(pairs []d2portal.Pair, notice string)
 	// OnRealmUnit receives the monsters of a game played through the realm
@@ -391,6 +393,8 @@ func (g *GameClient) handlePacket(packet d2netpacket.NetPacket) error {
 		return g.handlePartyHealPacket(packet)
 	case d2netpackettype.PartyGold:
 		return g.handlePartyGoldPacket(packet)
+	case d2netpackettype.QuestShare:
+		return g.handleQuestSharePacket(packet)
 	case d2netpackettype.JoinSync:
 		return g.handleJoinSyncPacket(packet)
 	case d2netpackettype.PortalUpdate:

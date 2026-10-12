@@ -69,8 +69,12 @@ func TestAncientsPortalReset(t *testing.T) {
 		t.Error("one portal still open")
 	}
 
-	if reset, rearm = f.PortalsChanged(0); reset || !rearm {
-		t.Errorf("the last close re-arms an armed fight: reset=%v rearm=%v", reset, rearm)
+	if reset, rearm = f.PortalsChanged(0); reset || rearm || RiteReArmsOnClose {
+		t.Errorf("w40: closing the last portal re-arms nothing (0x58ad30): reset=%v rearm=%v", reset, rearm)
+	}
+
+	if f.Armed {
+		t.Error("the fight stays unarmed until the altar is used again")
 	}
 
 	if !f.MayStart() {
