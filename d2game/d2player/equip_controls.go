@@ -12,6 +12,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2equip"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2playertrade"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
 )
 
@@ -215,6 +216,15 @@ func (g *GameControls) TryEquipCursor(loc d2equip.Loc) EquipResult {
 	item := g.inventory.CursorItem()
 	if item == nil {
 		return EquipResult{Loc: loc, Reason: d2equip.ReasonBodyLoc, Detail: "nothing on the cursor"}
+	}
+
+	// TRADE_CanChangeEquipmentDuringTrade 0x5655b0 (VERIFIED): no equipment change while
+	// items of the hero sit in an open player trade window
+	if !d2playertrade.CanChangeEquipment(g.PTrade.IsOpen(), len(g.PTrade.Offer().Items)) {
+		res := EquipResult{Loc: loc, Reason: d2equip.Reason("player trade offer open"), Detail: "equipment cannot change while items are offered"}
+		g.refuseEquip(item, res)
+
+		return res
 	}
 
 	res := g.evaluateEquip(item, loc)

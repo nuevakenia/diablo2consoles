@@ -16,7 +16,8 @@ func (v *Game) partyGold(it *d2mapentity.Item) bool {
 		return false
 	}
 
-	pkt, err := d2netpacket.CreatePartyGoldPacket(d2netpacket.PartyGoldPacket{Picker: v.me(), Amount: it.Gold})
+	pkt, err := d2netpacket.CreatePartyGoldPacket(d2netpacket.PartyGoldPacket{Picker: v.me(), Amount: it.Gold,
+		PlayerDropped: it.DropOwner != ""})
 	if err != nil || v.gameClient.SendPacketToServer(pkt) != nil {
 		return false
 	}
