@@ -15,7 +15,7 @@ func TestValidateName(t *testing.T) {
 	}{
 		{"Maricon", nil}, {"ab", nil}, {"Ab-cd", nil}, {"Ab_cd", nil}, {"abcdefghijklmno", nil},
 		{"a", ErrNameTooShort}, {"", ErrNameTooShort}, {"abcdefghijklmnop", ErrNameTooLong},
-		{"-ab", ErrNameCharacters}, {"ab_", ErrNameCharacters}, {"a-b-c", ErrNameCharacters},
+		{"-ab", ErrNameCharacters}, {"o'ab", nil}, {"a'b'c", ErrNameCharacters}, {"'ab", ErrNameCharacters}, {"ab_", ErrNameCharacters}, {"a-b-c", ErrNameCharacters},
 		{"ab1", ErrNameCharacters}, {"a b", ErrNameCharacters},
 	}
 

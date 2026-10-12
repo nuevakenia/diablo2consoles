@@ -34,15 +34,14 @@ import (
 var (
 	ErrNameTooShort   = errors.New("d2s: character name needs at least 2 characters")
 	ErrNameTooLong    = errors.New("d2s: character name is longer than 15 characters")
-	ErrNameCharacters = errors.New("d2s: character name may only hold letters and one '-' or '_' inside")
+	ErrNameCharacters = errors.New("d2s: character name may only hold letters and one '-', '_' or apostrophe inside")
 )
 
 const (
 	// MaxCharacterName is the longest name a save can hold (16 bytes, NUL terminated).
 	MaxCharacterName = 15
 	// MinCharacterName is the shortest name the creation screen accepts
-	// (UNVERIFIED: the common rule of the game; the binary only shows the
-	// "Name doesn't have alpha characters" and "bad characters" errors).
+	// (VERIFIED: CHARSEL_ValidateNameEditBox 0x42bd50 accepts a length of 2 to 15).
 	MinCharacterName = 2
 
 	defaultUnknown29 = 0x10
@@ -95,8 +94,8 @@ func DefaultAppearance(Class) Appearance {
 }
 
 // ValidateName checks a character name: 2 to 15 characters, letters, with at
-// most one '-' or '_' that is neither first nor last (the char-select list
-// also skips names ending in '-' or starting with '_', menus-libs.md).
+// most one of '-', '_' or an apostrophe that is neither first nor last (VERIFIED, PLAYER_IsValidCharacterNameChars
+// 0x529fa0 for the characters and CHARSEL_ValidateNameEditBox 0x42bd50 for the length).
 func ValidateName(name string) error {
 	switch {
 	case len(name) < MinCharacterName:
@@ -112,7 +111,7 @@ func ValidateName(name string) error {
 
 		switch {
 		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z':
-		case c == '-' || c == '_':
+		case c == '-' || c == '_' || c == '\'':
 			separators++
 
 			if i == 0 || i == len(name)-1 {
@@ -283,9 +282,8 @@ func DiffReport(got, want []byte) (report string, unexpected int) {
 // has been played. The sections are laid out as a real 1.14b save has them
 // (VERIFIED against the NokkaSorc sample: "Woo!" 6 0x12A, "WS" 1 0x50 with
 // records starting 02 01, NPC tag 01 77); the quest, waypoint and NPC content
-// starts empty except that the first waypoint of normal difficulty (Rogue
-// Encampment) is active (UNVERIFIED: the first-save content of the real game
-// was not captured). The new-character bit is cleared, normal difficulty Act I
+// starts empty except that the first waypoint (Rogue Encampment) is active in
+// every difficulty (VERIFIED in the exe: WAYPOINT_AllocWaypointFlags 0x663600). The new-character bit is cleared, normal difficulty Act I
 // is marked active, and the item lists are empty: starting items are not
 // fabricated.
 func (c *Character) Promote() {
@@ -313,6 +311,11 @@ func (c *Character) Promote() {
 		b.WaypointsRaw[rec], b.WaypointsRaw[rec+1] = 2, 1
 	}
 
-	b.Waypoints[0] = 1 << uint(WPRogueEncampment)
+	// VERIFIED: PLAYER_AllocPlayerData 0x622170 builds the quest and waypoint records of all three difficulties, and
+	// WAYPOINT_AllocWaypointFlags 0x663600 sets the first waypoint bit (and the 0x0102 tag word) in each of them
+	for d := range b.Waypoints {
+		b.Waypoints[d] = 1 << uint(WPRogueEncampment)
+	}
+
 	c.Body = b
 }
