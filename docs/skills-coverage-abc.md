@@ -6,8 +6,8 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 
 | | before | after |
 |---|---|---|
-| fully simulated | 64 | 69 |
-| partial | 17 | 21 |
+| fully simulated | 64 | 73 |
+| partial | 17 | 17 |
 | stub | 1 | 0 |
 | missing | 8 | 0 |
 | total | 90 | 90 |
@@ -16,36 +16,36 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 
 | id | skill | st/do | clt st/do | before | after | notes |
 |---|---|---|---|---|---|---|
-| 6 | Magic Arrow | -/- | -/- | fully simulated | fully simulated |  |
-| 7 | Fire Arrow | 4/- | 11/- | fully simulated | fully simulated |  |
-| 8 | Inner Sight | -/6 | -/- | fully simulated | fully simulated |  |
+| 6 | Magic Arrow | -/- | -/- | fully simulated | fully simulated | wave 23: SrvDmgFunc 1 (0x5aaba0) moves dl12 = 1 + (l-1) percent of the physical blow to magic |
+| 7 | Fire Arrow | 4/- | 11/- | fully simulated | fully simulated | wave 23: SrvDmgFunc 1 moves dl12 = 3 + 2(l-1) percent of the blow to fire (was missing) |
+| 8 | Inner Sight | -/6 | -/- | fully simulated | fully simulated | wave 23 read: SRVDO_InnerSight + SKILL_CreateTimedStateStatList; UNVERIFIED gap: the monster gates of 0x56c740 (monstats flag 0x100, a monstats2 byte) |
 | 9 | Critical Strike | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 10 | Jab | 5/7 | 12/16 | fully simulated | fully simulated |  |
-| 11 | Cold Arrow | 4/- | 11/- | fully simulated | fully simulated |  |
-| 12 | Multiple Shot | 4/8 | 11/17 | fully simulated | fully simulated |  |
+| 11 | Cold Arrow | 4/- | 11/- | fully simulated | fully simulated | wave 23: SrvDmgFunc 1 moves dl12 = 3 + 2(l-1) percent of the blow to cold |
+| 12 | Multiple Shot | 4/8 | 11/17 | fully simulated | fully simulated | wave 23: create flag 0x800 passes calc2 (par3 = 1) as the Activate delay of every arrow; the flank flag 0x10000 (data flag 2 -> damage flag 0x80) is UNVERIFIED |
 | 13 | Dodge | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
-| 14 | Power Strike | 6/2 | -/- | fully simulated | fully simulated |  |
-| 15 | Poison Javelin | 4/- | 11/- | partial | partial | poison over time and the javelin work; the lingering poison cloud (poisonjavcloud, missile do function 3) is not simulated |
+| 14 | Power Strike | 6/2 | -/- | fully simulated | fully simulated | wave 23 read SRVST_006 (0x5d9470): calc1 is the damage percent, the lightning is rolled into the blow |
+| 15 | Poison Javelin | 4/- | 11/- | partial | fully simulated | the trail of clouds (poisonjav do function 2, poisonjavcloud do function 3) is in d2missile; wave 23: the cloud builds its own descriptor without the weapon blow (missile SrcDamage -1, 0x64ca60), so it does poison only |
 | 16 | Exploding Arrow | 4/- | 11/- | fully simulated | fully simulated |  |
-| 17 | Slow Missiles | -/6 | -/- | fully simulated | fully simulated |  |
+| 17 | Slow Missiles | -/6 | -/- | fully simulated | fully simulated | wave 23: the state's stat 0xa1 (skill_handofathena, ln12 = 33) now scales the speed of the missiles a monster fires (0x59d5d0: velocity * stat / 100, CanSlow missiles only); before, nothing read it |
 | 18 | Avoid | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 19 | Impale | 7/2 | -/- | fully simulated | fully simulated |  |
-| 20 | Lightning Bolt | 4/- | 11/- | fully simulated | fully simulated |  |
-| 21 | Ice Arrow | 4/- | 11/- | fully simulated | fully simulated |  |
-| 22 | Guided Arrow | 4/10 | 11/18 | fully simulated | fully simulated |  |
-| 23 | Penetrate | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
-| 24 | Charged Strike | 6/11 | -/19 | fully simulated | fully simulated |  |
-| 25 | Plague Javelin | 4/- | 11/- | partial | partial | javelin and poison work; the plague cloud (plaguejavcloud, do function 3) is not simulated |
-| 26 | Strafe | 8/12 | 13/20 | fully simulated | fully simulated |  |
-| 27 | Immolation Arrow | 4/- | 11/- | partial | partial | arrow and explosion work; the burning ground (immolationfire, do function 5, hit function 9) is not simulated |
+| 20 | Lightning Bolt | 4/- | 11/- | fully simulated | fully simulated | wave 23: SrvDmgFunc 12 (0x5aac30) turns the whole javelin blow (dl12 = 100) into lightning and clears the other fields |
+| 21 | Ice Arrow | 4/- | 11/- | fully simulated | fully simulated | wave 23: SrvDmgFunc 2 (0x5aacf0) turns the cold length into the freeze length (dParam1 = 100 percent) and clears the chill: the arrow freezes (it only chilled before) |
+| 22 | Guided Arrow | 4/10 | 11/18 | fully simulated | fully simulated | wave 23 (0x5da2f0): calc1 (ln34) is the arrow's damage percent through the create callback 0x5da2c0 (stat 0x19 += calc1) |
+| 23 | Penetrate | -/- | -/- | fully simulated | fully simulated | passive item_tohit_percent (stat 0x77, ln12); wave 23: COMBAT_RollToHit adds stat 0x77 on missile hits too, the missile to-hit of a player now includes it (was skill to-hit only) |
+| 24 | Charged Strike | 6/11 | -/19 | fully simulated | fully simulated | wave 23: the blow is SRVST_006: its lightning is part of the melee hit and calc1 (the bolt count) is its damage percent |
+| 25 | Plague Javelin | 4/- | 11/- | partial | fully simulated | wave 23 (hit function 2, 0x5a7810 -> 0x5a6d70): the javelin bursts into a fan of 8 slow and 15 fast clouds drifting to the ring of offsets at distance 2 around the struck unit (d2missile cloudFan), each living Range + 3 sub loops; poison only, no weapon blow |
+| 26 | Strafe | 8/12 | 13/20 | fully simulated | fully simulated | wave 23 (0x5da6c0): calc2 (ln12) is the damage percent of every arrow (callback 0x5da2c0), srvmissileb for a crossbow |
+| 27 | Immolation Arrow | 4/- | 11/- | partial | fully simulated | hit function 9 (fire disc of immolationfire cells plus the radial damage) and do function 5 are in d2missile (disassembly read, wave 20); wave 23 adds SrvDmgFunc 3 on the fire (soft hit chance dParam1 of 128) |
 | 28 | Dopplezon | -/15 | -/- | missing | fully simulated | summon (SRVDO_015 0x5dad10): life calc3 percent of the owner, lifetime calc2 frames; the decoy AI is monstats "Idle" (MONAI_Think_Idle 0x5ae8a0 only waits), so it stands still and draws aggro (VERIFIED, wave 20); the client look copy is not checked |
 | 29 | Evade | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
-| 30 | Fend | 9/13 | 14/21 | fully simulated | fully simulated |  |
+| 30 | Fend | 9/13 | 14/21 | fully simulated | fully simulated | wave 23 (SRVST_009 0x5d99b0): the hit count is min(calc1, enemies in melee range + 4), not always calc1 (Zeal keeps calc1) |
 | 31 | Freezing Arrow | 4/- | 11/- | fully simulated | fully simulated |  |
 | 32 | Valkyrie | -/16 | -/- | missing | fully simulated | summon (SRVDO_016 0x5daf10 + SKILL_SpawnSummonedMinion); sumskill1..4 Dodge/Avoid/Evade/Critical Strike are given at sumskNcalc levels and roll in the summon blows (wave 20; the monster side of the passive stats is UNVERIFIED) |
 | 33 | Pierce | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
-| 34 | Lightning Strike | 10/14 | -/22 | fully simulated | fully simulated |  |
-| 35 | Lightning Fury | 4/- | 11/- | partial | partial | missile flies; its hit function 20 (periodic effect) is not in the missile simulation |
+| 34 | Lightning Strike | 10/14 | -/22 | fully simulated | fully simulated | wave 23: the blow carries the skill's lightning and calc1 (20) as damage percent (SRVST_010 0x5d9bb0); the chain victim is the smallest unit id above the struck unit (scan callback 0x569a40), not the nearest |
+| 35 | Lightning Fury | 4/- | 11/- | partial | fully simulated | hit function 20 (0x5a8e60 + callback 0x5a8d90) is in d2missile and was checked again in wave 23; the furylightning bolts have SrcDamage -1, so they do lightning only (own descriptor) |
 
 ## Barbarian
 

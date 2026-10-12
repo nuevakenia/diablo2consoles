@@ -227,6 +227,11 @@ type CreateParams struct {
 	// HomeMode overrides the Guided Arrow mode (default: 1 when Home is set
 	// else 2, for SrvDoFunc 7 / hit func 10 missiles).
 	HomeMode int
+	// Activate (with HasActivate) replaces the Activate column as the number of frames before the missile
+	// can collide: create flag 0x800 and the word at +0x44 of the create struct (0x59d5d0, VERIFIED;
+	// Multiple Shot passes calc2).
+	Activate    int
+	HasActivate bool
 }
 
 // Positioned is implemented by targets that know where they are; homing
@@ -311,10 +316,15 @@ func (s *Sim) Create(p CreateParams) (*Missile, error) {
 
 	s.nextID++
 
+	activate := sp.Activate
+	if p.HasActivate {
+		activate = p.Activate
+	}
+
 	m := &Missile{
 		ID: s.nextID, Spec: sp, Owner: p.Owner, SkillID: p.SkillID, Level: p.Level, Damage: p.Damage,
 		X: p.X, Y: p.Y, DX: ux, DY: uy, Velocity: vel, Life: life, Total: life,
-		CollideFrom: life - sp.Activate, Pierce: p.Pierce, OnHit: p.OnHit, Tag: p.Tag,
+		CollideFrom: life - activate, Pierce: p.Pierce, OnHit: p.OnHit, Tag: p.Tag,
 		Home: p.Home, HitEvery: p.HitEvery, ScalePct: p.ScalePct, nextHit: map[string]int{},
 	}
 

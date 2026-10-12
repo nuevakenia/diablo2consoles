@@ -306,7 +306,7 @@ func (d *Director) launchShot(u *unit, mode d2monster.Mode, atk d2mapentity.Mons
 
 	shot := Shot{
 		Owner: u.b.ID, Mode: mode.String(), From: d2path.Point{X: sx, Y: sy}, To: d2path.Point{X: ax, Y: ay},
-		Missile: shotMissile(u, mode), Velocity: d.missileVelocity(shotMissile(u, mode)),
+		Missile: shotMissile(u, mode), Velocity: d.slowedVelocity(u, shotMissile(u, mode)),
 		Collide: func(x, y int) bool {
 			for _, tid := range d.targetIDs() {
 				p := d.targets[tid]
@@ -342,6 +342,29 @@ func (d *Director) launchShot(u *unit, mode d2monster.Mode, atk d2mapentity.Mons
 	}
 
 	return false
+}
+
+// slowedVelocity is missileVelocity with Slow Missiles applied: a monster under state 0x57 shoots a missile with
+// the CanSlow flag at missileSlow percent of its speed (0x59d5d0, VERIFIED: velocity * stat 0xa1 / 100).
+func (d *Director) slowedVelocity(u *unit, name string) float64 {
+	v := d.missileVelocity(name)
+
+	if u.missileSlow <= 0 || name == "" {
+		return v
+	}
+
+	rec := d.asset.Records.GetMissileByName(name)
+
+	return slowedSpeed(v, u.missileSlow, rec != nil && rec.CanBeSlowed)
+}
+
+// slowedSpeed scales a missile speed by the Slow Missiles percent when the missile can be slowed.
+func slowedSpeed(v float64, pct int, canSlow bool) float64 {
+	if pct <= 0 || !canSlow {
+		return v
+	}
+
+	return v * float64(pct) / 100
 }
 
 // missileVelocity is the flight speed in subtiles per frame: the missiles.txt

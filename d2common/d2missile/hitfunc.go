@@ -34,7 +34,7 @@ func (s *Sim) hitFunc(m *Missile, t Target) (ret int, ok bool) {
 		s.areaDamage(m)
 		return resKill, true
 	case 2:
-		s.spawnHitSub(m, 1)
+		s.cloudFan(m, t)
 		return resKill | resDamage, true
 	case 3:
 		// Fire Blast ("bomb on ground", 0x5a7a20 -> 0x5a7890, verified): with a
@@ -140,7 +140,63 @@ func (s *Sim) areaDamage(m *Missile) {
 	s.emit(Event{Kind: EventArea, Missile: m, Damage: m.Damage.Roll(m.Owner.Roller), Radius: r})
 }
 
-// spawnHitSub runs hit functions 2 (HitSubMissile1 only) and 4 (all four).
+// cloudRing is the ring of 16 offsets (x, y) around the centre that hit function 2 drifts its clouds to (the
+// tables at 0x6e39c0 and 0x6e3980 of the exe, VERIFIED bytes): the cells at Chebyshev distance 2.
+var cloudRing = [16][2]int{
+	{0, 2}, {1, 2}, {2, 2}, {2, 1}, {2, 0}, {2, -1}, {2, -2}, {1, -2},
+	{0, -2}, {-1, -2}, {-2, -2}, {-2, -1}, {-2, 0}, {-2, 1}, {-2, 2}, {-1, 2},
+}
+
+// cloudFan is hit function 2 (0x5a7810 -> MISSILE_SpawnSubMissileFanFromTable 0x5a6d70, VERIFIED): HitSubMissile1
+// is created as a fan of drifting clouds around the struck unit (the missile itself when nothing was struck):
+//   - ring 1: every sHitPar2-th (at least 1) of the 16 ring offsets, each cloud drifting to its offset at
+//     the sub missile's Param1 << 7 (8.8, before the 75 percent step);
+//   - ring 2, only when sHitPar1 is not 0: every sHitPar1-th of ring offsets 1..15, drifting at Param2 << 7;
+//   - sHitPar3 above 0 is the sub-loop count (create flag 8): the clouds live Range + (SubStop - SubStart) *
+//     sHitPar3 frames.
+//
+// The create flags are 0x17/0x1f: explicit start at the centre, destination = centre + offset, explicit fixed
+// velocity. A velocity of 0 leaves the cloud where it was made. Plague Javelin (1, 2, 3 and Param 2, 4) makes 8
+// slow and 15 fast clouds; the gas potions use the same function.
+func (s *Sim) cloudFan(m *Missile, t Target) {
+	sub := s.lookup(m.Spec.HitSubMissile[0])
+	if sub == nil {
+		return
+	}
+
+	cx, cy := m.X, m.Y
+
+	if pt, ok := t.(Positioned); ok {
+		cx, cy = pt.SubPos()
+	}
+
+	cx, cy = math.Floor(cx), math.Floor(cy)
+
+	emit := func(off [2]int, vel int) {
+		x, y := cx+0.5, cy+0.5
+
+		_, _ = s.Create(CreateParams{Spec: sub, Parent: m, Owner: m.Owner, SkillID: m.SkillID, Level: m.Level,
+			Damage: m.Damage, AreaRadius: m.AreaRadius, X: x, Y: y, DestX: x + float64(off[0]), DestY: y + float64(off[1]),
+			Velocity: vel, Stationary: vel == 0, ClampToDest: true, SubLoops: m.Spec.SHitPar[2]})
+	}
+
+	step1 := m.Spec.SHitPar[1]
+	if step1 < 1 {
+		step1 = 1
+	}
+
+	for i := 0; i < len(cloudRing); i += step1 {
+		emit(cloudRing[i], sub.Param[0]<<7)
+	}
+
+	if step2 := m.Spec.SHitPar[0]; step2 != 0 {
+		for i := 0; i+1 < len(cloudRing); i += step2 {
+			emit(cloudRing[i+1], sub.Param[1]<<7)
+		}
+	}
+}
+
+// spawnHitSub runs hit function 4 (all four HitSubMissiles at the missile).
 func (s *Sim) spawnHitSub(m *Missile, n int) {
 	for _, name := range m.Spec.HitSubMissile[:n] {
 		sub := s.lookup(name)

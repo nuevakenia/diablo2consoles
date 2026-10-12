@@ -211,7 +211,7 @@ func (c *cast) desc() *d2missile.DamageDesc {
 	}
 
 	d := c.sk.Descriptor(c.env, c.lvl, wmin, wmax, c.u.Stat(masteryStat[c.sk.EType]))
-	d.DamagePct = int32(c.u.Stat("damagepercent") + missileMastery(c.u, c.sk))
+	d.DamagePct = descriptorPct(c.u, c.sk, 0)
 
 	return &d
 }
@@ -389,7 +389,8 @@ func (c *cast) meleeOpt() strikeOpt {
 	o := strikeOpt{toHitPct: sk.ToHitBonus(c.env, c.lvl), skillElem: true}
 
 	switch {
-	case sk.SrvStFunc == stBash, sk.SrvDoFunc == doJab, sk.SrvStFunc == 7, sk.SrvStFunc == 39:
+	case sk.SrvStFunc == stBash, sk.SrvDoFunc == doJab, sk.SrvStFunc == 7, sk.SrvStFunc == 39,
+		sk.SrvStFunc == stPowerStrike, sk.SrvStFunc == stLightningStrike:
 		o.pct = c.calc(1)
 	case sk.SrvStFunc == 35: // Vengeance
 		o.elemPct = [3]int{c.calc(1), c.calc(2), c.calc(3)}
@@ -528,6 +529,25 @@ func doMultiHitFn(c *cast) {
 	}
 
 	n := c.calc(1)
+
+	// Fend only (SRVST_009 0x5d99b0, VERIFIED wave 23): the start function counts the enemies in reach (melee
+	// range + 4, filter 0x20003, the target included) and keeps min(calc1, found) hits; Zeal (SRVST_037
+	// 0x5d9ac0) keeps calc1 whatever is around. A count of 0 (the engine's aimed target is not listed) still
+	// strikes once.
+	if c.sk.SrvStFunc == stFend && c.p.Near != nil {
+		ux, uy := c.u.Pos()
+
+		found := 0
+
+		for _, f := range c.p.Near(ux, uy, FendReach(c.p.meleeRange())) {
+			if f.Target.Alive() {
+				found++
+			}
+		}
+
+		n = StrikeCount(n, found)
+	}
+
 	if n < 1 {
 		n = 1
 	}
@@ -633,8 +653,10 @@ func doChargedStrikeFn(c *cast) {
 		return
 	}
 
+	// The blow is SRVST_006 (0x5d9470, shared with Power Strike, VERIFIED wave 23): calc1 goes into the damage
+	// percent field (for Charged Strike that is the bolt count, a quirk of the table) and the skill's own
+	// lightning damage (SKILL_RollElementalSkillDamage) is part of the blow as well as of every bolt.
 	o := c.meleeOpt()
-	o.skillElem = false
 	c.addMelee(c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o))
 
 	bolts := c.calc(1)
@@ -661,28 +683,31 @@ func doLightningStrikeFn(c *cast) {
 		return
 	}
 
+	// The blow is SRVST_010 (0x5d9bb0, VERIFIED wave 23): calc1 (the radius, 20) goes into the damage percent
+	// field like Power Strike's, and the lightning of the skill (min + roll, SKILL_GetElementalMin/MaxDamage) is
+	// part of the blow.
 	o := c.meleeOpt()
-	o.skillElem = false
 	c.addMelee(c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o))
 
-	var best *Foe
+	// The scan is SKILL_ScanRadiusForTargets around the struck unit with the struck unit's id as the excluded id
+	// (0x5dab30, VERIFIED wave 23): its callback 0x569a40 keeps the smallest unit id above the struck unit's, else
+	// the smallest id of all (d2missile.ScanNext), not the nearest. The struck unit itself is a candidate and is
+	// what the scan returns when nothing else is in reach.
+	foes := c.p.foes(c.tgt.UX, c.tgt.UY, c.calc(1))
+	cands := make([]d2missile.Target, 0, len(foes))
+	byID := map[string]*Foe{}
 
-	bd := 1 << 30
-
-	for _, f := range c.p.foes(c.tgt.UX, c.tgt.UY, c.calc(1)) {
-		f := f
-		if f.Target.ID() == c.tgt.Unit.ID() || !f.Target.Alive() {
-			continue
-		}
-
-		if d := cheb(f.X-c.tgt.UX, f.Y-c.tgt.UY); d < bd {
-			bd, best = d, &f
-		}
+	for i := range foes {
+		cands = append(cands, foes[i].Target)
+		byID[foes[i].Target.ID()] = &foes[i]
 	}
 
-	if best == nil {
+	pick := d2missile.ScanNext(cands, c.tgt.Unit)
+	if pick == nil {
 		return
 	}
+
+	best := byID[pick.ID()]
 
 	cc := *c
 	cc.tgt = Target{Unit: best.Target, UX: best.X, UY: best.Y}
@@ -718,8 +743,13 @@ func doFanFn(c *cast) {
 	ax, ay := c.aim()
 	sx, sy := FanSpacing(ax-ux, ay-uy)
 
+	// create flag 0x800 with calc2 in the word at +0x44: the arrows can collide after calc2 frames instead of
+	// the missile's Activate column (0x59d5d0, VERIFIED; calc2 = par3 = 1 for Multiple Shot).
+	act := c.calc(2)
+
 	for _, d := range FanDestinations(ax, ay, n, sx, sy) {
-		c.castM(name, castOpts{hasDest: true, destX: float64(d[0]) + 0.5, destY: float64(d[1]) + 0.5})
+		c.castM(name, castOpts{hasDest: true, destX: float64(d[0]) + 0.5, destY: float64(d[1]) + 0.5,
+			activate: act, hasActivate: true})
 	}
 
 	if len(c.res.Missiles) == 0 {
@@ -729,10 +759,17 @@ func doFanFn(c *cast) {
 
 // doHomingFn is SRVDO_010_GuidedArrow (Guided Arrow, Bone Spirit): a missile
 // that steers onto the aimed unit.
+//
+// Read again in wave 23 (0x5da2f0, VERIFIED): a non-zero calc1 ("+ dmg%", Guided Arrow: ln34) goes to the
+// missile's stat 0x19 through the create callback 0x5da2c0 (stat += calc1), which MISSILE_BuildDamageDescriptor
+// reads into the percent pool of the arrow; the unit flag 0x40 is set; a crossbow picks srvmissileb.
 func doHomingFn(c *cast) {
-	// SRVDO_010 0x5da2f0 (VERIFIED wave 23): a non-zero calc1 installs the post-create callback 0x5da2c0 which adds
-	// calc1 to the missile's damage-percent stat (0x19); it does not switch homing on (Bone Spirit's calc1 is 0).
-	if c.castM(c.missileName(), castOpts{home: c.tgt.Unit, addDmgPct: c.calc(1)}) == nil {
+	name := c.missileName()
+	if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
+		name = c.sk.SrvMissileB
+	}
+
+	if c.castM(name, castOpts{home: c.tgt.Unit, pctAdd: c.calc(1)}) == nil {
 		c.fail(ReasonMissile)
 	}
 }
@@ -785,9 +822,16 @@ func doStrafeFn(c *cast) {
 			tg.Unit, tg.UX, tg.UY = f.Target, f.X, f.Y
 		}
 
+		// SRVDO_012 (0x5da6c0, VERIFIED): the arrow takes calc2 ("damage %", ln12) as its damage percent through the
+		// create callback 0x5da2c0 and srvmissileb instead of srvmissilea for a crossbow.
+		name := c.sk.SrvMissileA
+		if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
+			name = c.sk.SrvMissileB
+		}
+
 		cc := *c
 		cc.tgt = tg
-		cc.castM(c.sk.SrvMissileA, castOpts{})
+		cc.castM(name, castOpts{pctAdd: c.calc(2)})
 	}
 
 	if len(c.res.Missiles) == 0 {

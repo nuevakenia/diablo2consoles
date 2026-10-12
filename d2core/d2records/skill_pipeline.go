@@ -87,6 +87,7 @@ func (m *MissileRecord) PipelineSpec() *d2missile.Spec {
 
 	sp.SHitCalc1 = m.ServerCollisionCalc.Program
 	sp.ApplyMastery = m.ApplyMastery
+	sp.EType = strings.ToLower(m.ElementalDamage.ElementType)
 
 	// A missile without a Skill column but with damage columns carries damage
 	// of its own (burning ground: meteorfire, immolationfire, molten boulder

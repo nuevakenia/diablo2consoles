@@ -233,6 +233,15 @@ func (d *Director) SetSlow(m *d2mapentity.Monster, pct int) {
 	}
 }
 
+// SetMissileSlow records the Slow Missiles state (state 0x57) of a monster: its missiles that can be slowed fly
+// at pct percent of their speed (MISSILE_CreateServerMissile 0x59d5d0: velocity * stat 0xa1 / 100, VERIFIED);
+// 0 clears it.
+func (d *Director) SetMissileSlow(m *d2mapentity.Monster, pct int) {
+	if u := d.byEntity[m.ID()]; u != nil {
+		u.missileSlow = pct
+	}
+}
+
 // Held reports whether a monster is stunned or afraid right now.
 func (d *Director) Held(m *d2mapentity.Monster) (stunned, afraid bool) {
 	if u := d.byEntity[m.ID()]; u != nil {

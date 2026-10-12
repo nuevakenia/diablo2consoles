@@ -636,6 +636,7 @@ func TestExpiryAndWallRunHitSubMissiles(t *testing.T) {
 
 		sp := fireBolt()
 		sp.Range, sp.SrvHitFunc = 10, 2
+		sp.SHitPar[1] = 16 // ring 1 step 16: a single cloud of the fan (cloudFan)
 		sp.HitSubMissile = [4]string{"child"}
 		s := NewSim(w, tbl)
 		_, _ = s.Create(CreateParams{Spec: sp, Level: 1, DestX: 30})
