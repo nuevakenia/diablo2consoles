@@ -251,8 +251,9 @@ func (e *Env) Miss(name, field string) int {
 // or the accumulated total).
 func (e *Env) Stat(name, _ string) int { return e.Unit.Stat(name) }
 
-// Sklvl implements d2calc.Env; the argument meaning is UNVERIFIED and unused by
-// the shipped tables.
+// Sklvl implements d2calc.Env. Meaning VERIFIED (CALC_FuncSklvl 0x648010): sklvl(skill, fieldA, fieldB) is field B
+// of skill `skill`, evaluated at the level that field A of the CURRENT skill gives at the current level. No shipped
+// table uses it and the compiled field-id arguments are not mapped here, so it stays 0.
 func (e *Env) Sklvl(int, int, int) int { return 0 }
 
 // Rand implements d2calc.Env: uniform in [a, b] (inclusive, oracle verified

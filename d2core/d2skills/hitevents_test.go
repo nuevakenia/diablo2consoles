@@ -104,6 +104,30 @@ func TestOpenWoundsRefresh(t *testing.T) {
 	}
 }
 
+// 0x5a4340: stat 0x4a is 1/256 life points per frame; the open wounds stream drains value*200/256 points in total
+// and a refresh only moves its end (strength kept).
+func TestOpenWoundsDrainsLife(t *testing.T) {
+	e := newTestEngine()
+	m := &d2mapentity.Monster{}
+	p := &d2mapentity.Player{}
+
+	e.frame = 10
+	e.applyOpenWounds(m, p, d2combat.RollOpenWounds(&seqRoller{vals: []uint32{0}}, 100, 512, e.frame)) // 2 points a frame
+	e.applyOpenWounds(m, p, d2combat.RollOpenWounds(&seqRoller{vals: []uint32{0}}, 100, 9999, e.frame+100))
+
+	set := e.setOf(m.ID())
+	total := 0
+
+	for f := 11; f < 400; f++ {
+		total += set.Tick(f).Wounds
+	}
+
+	// 2 points a frame from frame 11 until the refreshed end at 10+100+200 = 310 (Until is exclusive)
+	if want := 2 * (310 - 11); total != want {
+		t.Errorf("drained %d, want %d", total, want)
+	}
+}
+
 func TestPhysZeroedVsUndeadWithSanctuary(t *testing.T) {
 	e := newTestEngine()
 	p := &d2mapentity.Player{}
@@ -157,6 +181,17 @@ func TestCrushingClass(t *testing.T) {
 
 	if crushingClass(&d2mapentity.Monster{Stat: &d2records.MonStatRecord{}}) != d2combat.CBNormalMonster {
 		t.Error("normal class")
+	}
+
+	// 0x5bdbf0: the monster data flag +0x16 & 2 (super unique) is boss class too, a plain unique is not.
+	su := &d2mapentity.Monster{Stat: &d2records.MonStatRecord{}, TypeFlags: d2mapentity.MonTypeSuperUnique}
+	if crushingClass(su) != d2combat.CBBossMonster {
+		t.Error("super unique class")
+	}
+
+	uq := &d2mapentity.Monster{Stat: &d2records.MonStatRecord{}, TypeFlags: d2mapentity.MonTypeUnique}
+	if crushingClass(uq) != d2combat.CBNormalMonster {
+		t.Error("unique class")
 	}
 }
 

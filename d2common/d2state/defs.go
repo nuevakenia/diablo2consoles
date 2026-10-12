@@ -23,9 +23,10 @@ type Def struct {
 	Aura   bool
 	// PlrStayDeath, MonStayDeath and BossStayDeath: the state survives the
 	// death of a player / monster / boss; every other state is cleared.
-	// Meaning inferred from the shipped data (freeze keeps MonStayDeath so
-	// frozen corpses stay blue; alignment, sync_warped and corpse_noselect
-	// keep PlrStayDeath). U in the exe.
+	// VERIFIED (STATE_StaysOnDeath 0x63b5b0, flag bits 13 and 14 of
+	// DATATBL_LoadStatesTable): a monster tests MonStayDeath, everything else
+	// PlrStayDeath; the boss column is not read there (freeze keeps
+	// MonStayDeath so frozen corpses stay blue).
 	PlrStayDeath, MonStayDeath, BossStayDeath bool
 	// Shatter: a unit that dies with this state shatters (freeze).
 	Shatter bool

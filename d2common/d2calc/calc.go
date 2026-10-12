@@ -27,9 +27,9 @@ type Env interface {
 	Miss(name, field string) int
 	// Stat evaluates stat('name'.mode); mode is base, mod or accr.
 	Stat(name, mode string) int
-	// Sklvl evaluates sklvl(a, b, c). Argument meaning is UNVERIFIED (the
-	// notes: field b of skill a at the level given by field c of the current
-	// skill); it is unused by the shipped tables.
+	// Sklvl evaluates sklvl(a, b, c). VERIFIED (CALC_FuncSklvl 0x648010): field c of
+	// skill a, at the level given by field b of the current skill; it is unused by
+	// the shipped tables.
 	Sklvl(a, b, c int) int
 	// Rand rolls a value for rand(a, b); it is only called when b > a.
 	Rand(a, b int) int
