@@ -2,6 +2,7 @@ package d2player
 
 import (
 	"fmt"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2automap"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2display"
 	"image"
 	"image/color"
@@ -736,15 +737,20 @@ func (h *HUD) entityAt(cx, cy int) d2interface.MapEntity {
 
 // renderAllItemLabels draws the name of every ground item (the Alt / Option "show items" key).
 func (h *HUD) renderAllItemLabels(target d2interface.Surface) {
+	shown := 0
+
 	for _, entity := range h.mapEngine.Entities() {
 		if _, ok := entity.(*d2mapentity.Item); !ok {
 			continue
 		}
 
 		sx, sy := h.mapRenderer.WorldToScreenF(entity.GetPositionF())
-		if sx < 0 || sy < 0 || sx > float64(d2display.W()) || sy > float64(d2display.H()) {
+		// INV_DrawGroundItemLabels 0x4bd100: at most 32 labels, items inside the view (x 0..W, y -8..H-16)
+		if shown >= d2automap.MaxGroundLabels || !d2automap.LabelVisible(int(sx), int(sy), d2display.W(), d2display.H(), 0) {
 			continue
 		}
+
+		shown++
 
 		_, entityHeight := entity.GetSize()
 		pos := entity.GetPosition()
