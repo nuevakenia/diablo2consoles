@@ -148,11 +148,11 @@ func (f *HeroStateFactory) statItemOfStored(s *StoredItem, loc d2equip.Loc, base
 	} else if s.Stat != nil {
 		si = *s.Stat
 		b := bases[s.Code]
-		si.Weapon, si.BaseBlock = b.Weapon, b.BaseBlock
+		si.Weapon, si.BaseBlock, si.GemKind = b.Weapon, b.BaseBlock, b.GemKind
 		si.Ethereal = si.Ethereal || s.Ethereal
 	} else {
 		b := bases[s.Code]
-		si = d2statlist.Item{Code: s.Code, Ethereal: s.Ethereal, Weapon: b.Weapon, BaseBlock: b.BaseBlock}
+		si = d2statlist.Item{Code: s.Code, Ethereal: s.Ethereal, Weapon: b.Weapon, BaseBlock: b.BaseBlock, GemKind: b.GemKind}
 		// UNVERIFIED: a generated item rolls minac..maxac, the middle stands in; the engine's
 		// affixes do not flow into the stat list yet (only imported items carry their properties)
 		si.Defense = (b.MinAC + b.MaxAC) / 2

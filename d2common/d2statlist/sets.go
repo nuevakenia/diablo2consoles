@@ -26,10 +26,10 @@ func (e *Env) gemProps(it *Item) []Prop {
 			continue
 		}
 
-		switch {
-		case it.Weapon != nil:
+		switch it.gemColumn() {
+		case 1:
 			out = append(out, g.Weapon...)
-		case it.BaseBlock > 0:
+		case 3:
 			out = append(out, g.Shield...)
 		default:
 			out = append(out, g.Helm...)
@@ -114,4 +114,22 @@ func (s SetDefs) SetBonus(setID, n int) []Prop {
 	}
 
 	return out
+}
+
+// gemColumn returns 1 weapon, 2 armor/helm, 3 shield: the item's gemapplytype
+// plus one. VERIFIED as the only input of the exe (INV_ServerApplyEquippedItemEffects
+// 55a080 passes ITEM_GetGemApplyType 629c10, the host base's byte, to the
+// property group). Without it the old guess is used (UNVERIFIED; it misses the
+// Buckler, a shield with block 0).
+func (it *Item) gemColumn() int {
+	switch {
+	case it.GemKind > 0:
+		return it.GemKind
+	case it.Weapon != nil:
+		return 1
+	case it.BaseBlock > 0:
+		return 3
+	}
+
+	return 2
 }

@@ -83,7 +83,7 @@ func (f *HeroStateFactory) equippedStatItems(state *HeroState, hero d2statlist.H
 		}
 
 		b := bases[code]
-		it := d2statlist.Item{Code: code, Slot: slot, Weapon: b.Weapon, BaseBlock: b.BaseBlock}
+		it := d2statlist.Item{Code: code, Slot: slot, Weapon: b.Weapon, BaseBlock: b.BaseBlock, GemKind: b.GemKind}
 		it.Defense = (b.MinAC + b.MaxAC) / 2 // UNVERIFIED: generated items roll minac..maxac, the middle stands in
 
 		out = append(out, it)
