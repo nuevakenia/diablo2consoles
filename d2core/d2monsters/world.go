@@ -291,6 +291,10 @@ func (d *Director) Attack(b *d2monster.Brain, mode d2monster.Mode, t d2monster.T
 	d.playPlans(u, attackPlans(d.soundRecord(u), mode, d.snd.Intn))
 	u.aimX, u.aimY = t.X, t.Y
 
+	if u.skill != nil { // which monstats skill slot the request bound (w36 boss audit)
+		d.emit("cast", "MONSTER cast name=%s id=%d slot=%d skill=%q mode=%s", u.m.Label(), b.ID, u.skill.slot, u.skill.name, mode)
+	}
+
 	if mode != d2monster.ModeAttack1 && mode != d2monster.ModeAttack2 {
 		d.emit("skill", "MONSTER skill name=%s id=%d mode=%s minions=%d", u.m.Label(), b.ID, mode, len(b.Minions))
 	}

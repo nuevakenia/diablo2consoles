@@ -194,6 +194,8 @@ type Director struct {
 
 	frame int
 
+	fx bossFX // wave 36 boss skill effects (monmissile.go, moncurse.go)
+
 	// castSlot is the monstats slot of the Cast in progress (castSet), read
 	// by Attack to bind the skill to the unit.
 	castSlot int
@@ -530,6 +532,7 @@ func (d *Director) step() {
 
 	d.indexPlayers()
 	d.launcher.Step()
+	d.stepBossFX()
 
 	if d.summoner != nil {
 		d.summoner.Step()
