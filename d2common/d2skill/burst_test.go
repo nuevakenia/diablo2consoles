@@ -1,9 +1,6 @@
 package d2skill
 
-import (
-	"math"
-	"testing"
-)
+import "testing"
 
 func burstFixture() (*classFixture, *testTarget) {
 	cf := newClassFixture(map[string]int{"Zeal": 7, "Fend": 3})
@@ -79,28 +76,9 @@ func TestBurstSingleFoeKeepsHitting(t *testing.T) {
 	}
 }
 
-func TestChargedBoltAim(t *testing.T) {
+func TestChargedBoltSeed(t *testing.T) {
 	if ChargedBoltSeed(10, 3) != 13 {
 		t.Error("seed is destX + index")
-	}
-
-	if ChargedBoltAim(0, 0, 5, 0, 0) != ChargedBoltAim(0, 0, 5, 0, 0) {
-		t.Error("aim must be repeatable")
-	}
-
-	distinct := map[float64]bool{}
-
-	for i := 0; i < 6; i++ {
-		a := ChargedBoltAim(0, 0, 5, 0, i)
-		if math.Abs(a) > math.Pi/2+1e-9 {
-			t.Errorf("bolt %d leaves the forward half plane: %f", i, a)
-		}
-
-		distinct[a] = true
-	}
-
-	if len(distinct) < 3 {
-		t.Errorf("bolts barely differ: %v", distinct)
 	}
 }
 

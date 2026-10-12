@@ -1,11 +1,5 @@
 package d2skill
 
-import (
-	"math"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2rand"
-)
-
 // Burst is the per-animation-event repetition mechanism of the exe's multi-hit
 // skills. In Game.exe a skill such as Fend or Zeal does not hit N times in one
 // call: its do function (SRVDO_013_Fend 0x5da910) runs once per attack
@@ -267,29 +261,8 @@ func (p *Pipeline) RunBurst(b *Burst, res *DoResult) {
 	}
 }
 
-// ChargedBoltSeed is the seed the per-bolt hook (0x5c7340, VERIFIED) gives the
-// i-th Charged Strike bolt's own random generator: the bolt's destination X
-// plus its index, so every bolt of a cast follows a distinct but repeatable
-// path. (The hook also sets the bolt's path type to 10 and its step counters
-// to its lifetime word, clamped to 0x4d.)
+// ChargedBoltSeed is the seed the per-bolt hook gives the i-th Charged Strike bolt's own random generator: the
+// bolt's destination X plus its index, so every bolt of a cast follows a distinct but repeatable path. VERIFIED
+// for both sides: the server hook 0x5c7340 and the client hook MISSILE_ClampDataEAndRemainingLife 0x4dfe60 (w39)
+// seed with PATH_GetDestinationX + index, set path type 10 and cap the step counters at 0x4d.
 func ChargedBoltSeed(destX, index int) uint32 { return uint32(destX + index) }
-
-// ChargedBoltAim returns the angle (radians) of the i-th Charged Strike bolt:
-// the exe aims every bolt at the target mirrored through the target
-// (destination 2*target - caster, VERIFIED in SRVDO_011) and path type 10 then
-// scatters it using the bolt's seeded generator. The scatter width (+-90
-// degrees here) is UNVERIFIED because the path-type-10 stepper is not decoded.
-func ChargedBoltAim(casterX, casterY, targetX, targetY, index int) float64 {
-	dx := float64(targetX - casterX)
-	dy := float64(targetY - casterY)
-
-	base := 0.0
-	if dx != 0 || dy != 0 {
-		base = math.Atan2(dy, dx)
-	}
-
-	seed := d2rand.New(ChargedBoltSeed(targetX*2-casterX, index))
-	jitter := float64(int(seed.Roll(181))-90) * math.Pi / 180
-
-	return base + jitter
-}

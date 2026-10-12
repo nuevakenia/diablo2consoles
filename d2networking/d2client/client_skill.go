@@ -17,6 +17,9 @@ type clientShot struct {
 	slot int
 	from d2skill.SubPoint
 	to   d2skill.SubPoint
+	// pathType10 / pathSeed carry the hook of MISSILE_ClampDataEAndRemainingLife (0x4dfe60): Charged Strike bolts.
+	pathType10 bool
+	pathSeed   uint32
 }
 
 // cltSkillEnv evaluates skills.txt calc columns on the client: the skill level
@@ -135,7 +138,7 @@ func planClientShotsWith(rec *d2records.SkillRecord, level int, caster, target d
 	add := func(ss ...d2skill.Shot) {
 		for _, s := range ss {
 			if cltSlotName(rec, s.Slot) != "" {
-				shots = append(shots, clientShot{slot: s.Slot, from: s.From, to: s.To})
+				shots = append(shots, clientShot{slot: s.Slot, from: s.From, to: s.To, pathType10: s.PathType10, pathSeed: s.PathSeed})
 			}
 		}
 	}
