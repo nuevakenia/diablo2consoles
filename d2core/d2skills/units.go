@@ -410,9 +410,26 @@ func (e *Engine) MasteryFor(unitID string, k d2skill.MasteryKind, wt string, thr
 	return d2skill.MasteryValue(mods, k, thrown, func(t string) bool { return d2skill.TypeIs(e.equivOf, wt, t) })
 }
 
-// RangedWeaponMissile is not derived from the weapon type yet (UNVERIFIED /
-// not implemented): weapons are treated as melee.
+// RangedWeaponMissile is not derived from the weapon type (the base attack missile comes from the game's own
+// attack path, not from this adapter): weapons are treated as melee. The exe's own rule
+// (UNIT_GetRangedWeaponMissileType 0x6472a0) only overrides the base attack with the magic / exploding arrow stats
+// 0x9d / 0x9e or the plain bolt; the skills read the weapon class through AttackWeaponClass instead.
 func (h *heroUnit) RangedWeaponMissile() string { return "" }
+
+// AttackWeaponClass implements d2skill.AttackWeaponClasser: the COF weapon class code of the hero's weapon
+// ("bow", "xbw", "hth"...), the class UNIT_GetAttackWeaponClass (0x623e60) reports. Mercenaries and a hero
+// without composite give "" (the skills then use the old ranged-missile name rule).
+func (h *heroUnit) AttackWeaponClass() string {
+	if h.merc != nil || h.p == nil || h.p.Equipment == nil {
+		return ""
+	}
+
+	if h.p.Equipment.RightHand == nil {
+		return "hth"
+	}
+
+	return h.p.Equipment.RightHand.GetWeaponClass()
+}
 
 // ThrownMissile is a javelin when the scenario gives infinite ammunition (the
 // weapon type is not mapped to missiles yet; UNVERIFIED), else none.

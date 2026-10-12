@@ -2,7 +2,6 @@ package d2skill
 
 import (
 	"math"
-	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2missile"
@@ -765,11 +764,12 @@ func doLightningStrikeFn(c *cast) {
 // "real" middle missiles: the (calc1-calc3)/2 flanking ones on each side are
 // created with flag 0x10000 (meaning UNVERIFIED, not modelled) and only the
 // middle calc3 without it (calc3 0 means all). The missile B pick is the exe's
-// "attack weapon class is not 1" test; the engine has no weapon class, so the
-// old stand-in (a crossbow bolt) stays UNVERIFIED.
+// "attack weapon class is not 1" test, ported as UsesMissileB (VERIFIED; the hero reports its COF weapon class).
+// Flag 0x10000 of the created missiles is set on the flanking ones and on the middle ones it is clear; what it
+// does inside MISSILE_CreateServerMissile is not traced (UNVERIFIED).
 func doFanFn(c *cast) {
 	name := c.sk.SrvMissileA
-	if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
+	if UsesMissileB(c.u, c.sk) {
 		name = c.sk.SrvMissileB
 	}
 
@@ -804,7 +804,7 @@ func doFanFn(c *cast) {
 // reads into the percent pool of the arrow; the unit flag 0x40 is set; a crossbow picks srvmissileb.
 func doHomingFn(c *cast) {
 	name := c.missileName()
-	if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
+	if UsesMissileB(c.u, c.sk) {
 		name = c.sk.SrvMissileB
 	}
 
