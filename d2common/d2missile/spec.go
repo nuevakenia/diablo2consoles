@@ -33,9 +33,9 @@ type Spec struct {
 	// Chilling Armor handler 0x5c8d00, column mapping UNVERIFIED): a hit by this missile fires the
 	// hitbymissile unit event, which is how Chilling Armor shoots back.
 	ReturnFire bool
-	NextHit       bool
-	NextDelay     int
-	Size          int
+	NextHit    bool
+	NextDelay  int
+	Size       int
 
 	SubLoop            bool
 	SubStart, SubStop  int
