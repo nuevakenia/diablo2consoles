@@ -44,6 +44,8 @@ type Summoner struct {
 	diff      d2summon.Difficulty
 	rng       *d2rand.Seed
 	rosters   map[string]*d2summon.Roster
+	// group is the PetType.txt group lookup handed to every roster.
+	group func(petType string) int
 }
 
 // NewSummoner creates a Summoner. templates may be nil: minions are then
@@ -56,7 +58,7 @@ func NewSummoner(w PetSpawner, t *d2summon.Templates, diff d2summon.Difficulty, 
 func (s *Summoner) Roster(owner string) *d2summon.Roster {
 	r := s.rosters[owner]
 	if r == nil {
-		r = &d2summon.Roster{}
+		r = &d2summon.Roster{Group: s.group}
 		s.rosters[owner] = r
 	}
 
@@ -214,6 +216,13 @@ func (d *Director) Summoner() *Summoner {
 	}}
 
 	d.summoner = NewSummoner(pets, tpl, d2summon.Difficulty(d.opt.Difficulty), d.opt.Seed)
+	d.summoner.group = func(petType string) int {
+		if rec := d.asset.Records.PetTypes[petType]; rec != nil {
+			return rec.GroupID
+		}
+
+		return 0
+	}
 
 	return d.summoner
 }

@@ -107,6 +107,9 @@ type Skill struct {
 	PerDelay     *d2calc.Program
 	// Range is the skills.txt range column (h2h, rng, none...).
 	Range string
+	// Restrict and FormStates are skills.txt restrict and State1..State3 (restrict.go).
+	Restrict   int
+	FormStates [3]string
 }
 
 // Registry is a skill lookup table.

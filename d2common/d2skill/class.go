@@ -1610,7 +1610,12 @@ func doSummonFn(c *cast) {
 
 	switch {
 	case sk.SrvDoFunc == 114:
-		o.Count = o.Max
+		// VERIFIED (wave 23): SRVDO_114 0x5c48a0 spawns ONE raven per cast
+		// (SKILL_ServerSpawnSummonedMonster once; the do function is run once
+		// per cast by SKILL_ServerRunSkillFunc 0x56d6a0). The pet limit
+		// (petmax) is enforced when it registers: at the limit the oldest
+		// pet of the type is released (PETS_PreparePetSlotForNewPet 0x573a30).
+		o.Count = 1
 	case sk.SrvDoFunc == 44 || sk.SrvDoFunc == 45 || sk.PetType == "assassintrap":
 		o.Kind = "trap"
 		o.Frames = 25 * 60
