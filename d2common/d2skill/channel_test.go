@@ -38,6 +38,20 @@ func TestChannelHold(t *testing.T) {
 		t.Fatal("the second run makes a flame")
 	}
 
+	// no monstats2 row: the action ends one frame after the Do (0x5c6cb0); a row's InfernoLen byte replaces it
+	if got := p.ChannelActionEnd(u); got != frame+1 {
+		t.Errorf("action end %d, want %d", got, frame+1)
+	}
+
+	p.Opt.InfernoLenOf = func(Unit) (int, bool) { return 14, true }
+	p.channelDo(u)
+
+	if got := p.ChannelActionEnd(u); got != frame+14 {
+		t.Errorf("action end with InfernoLen 14 = %d, want %d", got, frame+14)
+	}
+
+	p.Opt.InfernoLenOf = nil
+
 	frame += ChannelHoldFrames + ChannelAnimSlack + 1
 	if p.ChannelActive(u) {
 		t.Fatal("the window must end")
@@ -57,5 +71,28 @@ func TestChannelStartManaGate(t *testing.T) {
 
 	if st := p.Start(u, id, Target{X: 1, Y: 1}); st.OK || st.Reason != ReasonMana {
 		t.Fatalf("%+v", st)
+	}
+}
+
+// The hero's class number (0..6) indexes monstats rows 0..6 in SRVDO_InfernoScheduleAnimEnd (0x5c6cb0); the owner's
+// monstats2 holds InfernoLen 1 for all of them (monsters/patch_d2/monstats2.txt under $D2_TABLES).
+func TestInfernoLenHeroRows(t *testing.T) {
+	hdr := tableRow(t, "monsters/patch_d2/monstats2.txt", -1)
+	col := -1
+
+	for i, h := range hdr {
+		if h == "InfernoLen" {
+			col = i
+		}
+	}
+
+	if col < 0 {
+		t.Fatal("no InfernoLen column")
+	}
+
+	for class := 0; class < 7; class++ {
+		if got := tableRow(t, "monsters/patch_d2/monstats2.txt", class)[col]; got != "1" {
+			t.Errorf("class %d InfernoLen %q, want 1", class, got)
+		}
 	}
 }

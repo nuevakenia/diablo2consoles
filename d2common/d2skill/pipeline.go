@@ -115,6 +115,9 @@ type Options struct {
 	MeleeRange int
 	// MeleeRangeOf, when set, is read at every use instead of MeleeRange: the hero's wielded weapon changes.
 	MeleeRangeOf func() int
+	// InfernoLenOf returns the monstats2 InfernoLen byte of the caster's class row (SRVDO_InfernoScheduleAnimEnd
+	// 0x5c6cb0, VERIFIED w39) and whether the row exists. Optional: nil means no row, 1 frame.
+	InfernoLenOf func(u Unit) (frames int, ok bool)
 	// MeleeGate turns on the reach test of COMBAT_RollAttackOutcome 0x57cc10 for the generic melee skills
 	// (VERIFIED w29, see AttackInReach). Off by default: the host starts a swing from a lenient distance
 	// (heroMeleeReach), so the exact test would turn most of its swings into misses.

@@ -52,7 +52,7 @@ func TestChargedStrikePlan(t *testing.T) {
 	}
 
 	for i, s := range got {
-		if s.From != (SubPoint{6, 5}) || s.To != (SubPoint{10, 7}) || s.Loop != i || s.Kind != KindAimed {
+		if s.From != (SubPoint{6, 5}) || s.To != (SubPoint{10, 7}) || s.Loop != i || s.Kind != KindAimed || !s.PathType10 || s.PathSeed != uint32(10+i) {
 			t.Errorf("bolt %d = %+v", i, s)
 		}
 	}

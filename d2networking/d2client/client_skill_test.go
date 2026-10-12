@@ -44,8 +44,9 @@ func TestPlanClientShots(t *testing.T) {
 			t.Fatalf("%d shots, want 4 (not 3x the columns)", len(shots))
 		}
 
-		for _, s := range shots {
-			if s.from != target || s.to != (d2skill.SubPoint{X: 20, Y: 0}) {
+		for i, s := range shots {
+			// hook 0x4dfe60 (VERIFIED w39): path type 10, generator seed = destination x + index
+			if s.from != target || s.to != (d2skill.SubPoint{X: 20, Y: 0}) || !s.pathType10 || s.pathSeed != uint32(20+i) {
 				t.Errorf("shot %+v", s)
 			}
 		}

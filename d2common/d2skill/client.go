@@ -44,6 +44,10 @@ type Shot struct {
 	Data28 int
 	Data2C int
 	Parent int // unit id the missile is parented to, 0 for the caster
+	// PathType10 and PathSeed: the missile hook sets path type 10 and seeds its generator (Charged Strike,
+	// 0x4dfe60: seed = destination x + loop index). Visual wobble is not drawn by the legacy client missile.
+	PathType10 bool
+	PathSeed   uint32
 }
 
 // SynergyMissileSlot is CLTDO_GetSkillSynergyBonusLevel (0x4ef560): for a skill
@@ -137,14 +141,16 @@ func MultiShotSlot(weaponClass int, hasColumnB bool) int {
 
 // ChargedStrikePlan is CLTDO_019_ChargedStrike (0x4f1e70): calc1 bolts, all
 // created AT the target unit and aimed at the point mirrored through it
-// (2*target - caster). The loop index rotates the bolts in the per-missile hook
-// (0x5c7340, not decoded). Needs a target unit; the caller checks that.
+// (2*target - caster). The per-missile hook MISSILE_ClampDataEAndRemainingLife (0x4dfe60, VERIFIED w39) seeds
+// bolt i with destination x + i and sets path type 10 (the server hook 0x5c7340 does the same). Needs a target
+// unit; the caller checks that.
 func ChargedStrikePlan(caster, target SubPoint, bolts, slot int) []Shot {
 	out := make([]Shot, 0, bolts)
 	mirror := SubPoint{target.X*2 - caster.X, target.Y*2 - caster.Y}
 
 	for i := 0; i < bolts; i++ {
-		out = append(out, Shot{Slot: slot, Kind: KindAimed, From: target, To: mirror, Loop: i})
+		out = append(out, Shot{Slot: slot, Kind: KindAimed, From: target, To: mirror, Loop: i,
+			PathType10: true, PathSeed: ChargedBoltSeed(mirror.X, i)})
 	}
 
 	return out

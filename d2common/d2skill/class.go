@@ -689,7 +689,7 @@ func doSacrificeFn(c *cast) {
 // doChargedStrikeFn is SRVDO_011_ChargedStrike (0x5da4a0, VERIFIED): a Power-Strike style melee hit, then
 // calc1 charged bolts are created AT THE TARGET whether or not the hit landed (the exe never tests the
 // outcome). Their direction is the point mirrored through the target (2*target - self); the per-bolt
-// per-bolt hook (0x5c7340) reseeds each bolt with destX+index (ChargedBoltAim); scatter width UNVERIFIED.
+// per-bolt hook (0x5c7340) reseeds each bolt with destX+index (ChargedBoltSeed) and walks path type 10.
 func doChargedStrikeFn(c *cast) {
 	if !c.needTarget() {
 		return

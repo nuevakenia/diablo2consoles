@@ -36,6 +36,8 @@ type channel struct {
 	field    int // the skill's target-type field: 0 wind-up, 1 after a flame, else the deadline
 	deadline int
 	on       bool // unit state 12 is switched on
+	// actionEnd is the game frame the exe schedules the end of the action for after a Do (now + InfernoLen).
+	actionEnd int
 }
 
 // IsChannelStart reports whether the skill's start function is the held-button channel.
@@ -103,10 +105,33 @@ func (p *Pipeline) channelDo(u Unit) bool {
 
 	spawn := c.field != 0
 	c.field, c.on = 1, false
+	c.actionEnd = p.frame() + p.infernoLen(u)
 
 	if keep := p.frame() + ChannelHoldFrames + ChannelAnimSlack; c.until > p.frame() && c.until < keep {
 		c.until = keep
 	}
 
 	return spawn
+}
+
+// infernoLen is SRVDO_InfernoScheduleAnimEnd's delay (0x5c6cb0, VERIFIED w39): the unit's class number indexes
+// monstats, the row's monstats2 link gives the InfernoLen byte; 1 frame when no row is found. (For the seven hero
+// classes the owner's tables hold 1.) The port still stretches the channel window by ChannelAnimSlack.
+func (p *Pipeline) infernoLen(u Unit) int {
+	if p.Opt.InfernoLenOf != nil {
+		if n, ok := p.Opt.InfernoLenOf(u); ok && n >= 0 {
+			return n
+		}
+	}
+
+	return 1
+}
+
+// ChannelActionEnd is the game frame at which the exe ends the action of the last Inferno Do of u (0 before any).
+func (p *Pipeline) ChannelActionEnd(u Unit) int {
+	if c := p.channels[u.ID()]; c != nil {
+		return c.actionEnd
+	}
+
+	return 0
 }
