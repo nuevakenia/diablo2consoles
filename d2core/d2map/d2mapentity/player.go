@@ -7,6 +7,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2herostats"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
@@ -65,10 +66,23 @@ type Player struct {
 }
 
 // run speed should be walkspeed * 1.5, since in the original game it is 6 yards walk and 9 yards run.
+// The exe speeds (d2path.PlayerSubtilesPerSecond: 9.375 walk, 14.0625 run, plus
+// faster run/walk) replace the former hand-tuned 9 and 13.
 const (
-	baseWalkSpeed = 9.0
-	baseRunSpeed  = 13.0
+	baseWalkSpeed = 9.375
+	baseRunSpeed  = 14.0625
 )
+
+// moveSpeed is the ground speed in subtiles per second for the current
+// faster run/walk total (the hero's item stat 96).
+func (p *Player) moveSpeed(running bool) float64 {
+	frw := 0
+	if p.Stats != nil && p.Stats.Totals != nil {
+		frw = p.Stats.Totals.FasterRun
+	}
+
+	return d2path.PlayerSubtilesPerSecond(d2path.PlayerBase(int(p.Class)), running, frw, 0)
+}
 
 // ID returns the Player uuid
 func (p *Player) ID() string {
@@ -101,11 +115,7 @@ func (p *Player) IsRunning() bool {
 func (p *Player) SetIsRunning(isRunning bool) {
 	p.isRunning = isRunning
 
-	if isRunning {
-		p.SetSpeed(baseRunSpeed)
-	} else {
-		p.SetSpeed(baseWalkSpeed)
-	}
+	p.SetSpeed(p.moveSpeed(isRunning))
 }
 
 // IsInTown returns true if the player is currently in town.
@@ -175,7 +185,7 @@ func (p *Player) Advance(tickTime float64) {
 		p.Stats.Stamina -= perSecond * tickTime
 
 		if p.Stats.Stamina <= 0 {
-			p.SetSpeed(baseWalkSpeed)
+			p.SetSpeed(p.moveSpeed(false))
 			p.Stats.Stamina = 0
 		}
 	} else if p.Stats.Stamina < float64(p.Stats.MaxStamina) {
@@ -201,7 +211,7 @@ func (p *Player) Advance(tickTime float64) {
 		}
 
 		if p.IsRunning() && p.Stats.Stamina >= 1 {
-			p.SetSpeed(baseRunSpeed)
+			p.SetSpeed(p.moveSpeed(true))
 		}
 	}
 }

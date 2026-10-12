@@ -185,3 +185,27 @@ func TestMonstatsVelocities(t *testing.T) {
 		t.Errorf("only %d rows", n)
 	}
 }
+
+func TestPlayerSpeedExe(t *testing.T) {
+	b := PlayerBase(ClassSorceress)
+	if RunRatioBonus(b) != 50 {
+		t.Fatalf("ratio %d", RunRatioBonus(b))
+	}
+
+	if got := PlayerSubtilesPerSecond(b, false, 0, 0); got != 9.375 {
+		t.Errorf("walk %v", got)
+	}
+
+	if got := PlayerSubtilesPerSecond(b, true, 0, 0); got != 14.0625 {
+		t.Errorf("run %v", got)
+	}
+
+	// frw 30 diminishes to 150*30/180 = 25
+	if p := PlayerSpeedPercent(b, true, 30, 0); p != 175 {
+		t.Errorf("run+frw pct %d", p)
+	}
+
+	if p := PlayerSpeedPercent(b, false, 0, -90); p != MinSpeedPercent {
+		t.Errorf("floor %d", p)
+	}
+}
