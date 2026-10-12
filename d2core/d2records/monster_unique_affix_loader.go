@@ -52,12 +52,13 @@ const (
 )
 
 func uniqueMonsterPrefixLoader(r *RecordManager, d *d2txt.DataDictionary) error {
-	records, err := uniqueMonsterAffixCommonLoader(d)
+	records, order, err := uniqueMonsterAffixCommonLoader(d)
 	if err != nil {
 		return err
 	}
 
 	r.Monster.Name.Prefix = records
+	r.Monster.Name.PrefixOrder = order
 
 	r.Debugf("Loaded %d UniqueMonsterPrefix records", len(records))
 
@@ -65,20 +66,23 @@ func uniqueMonsterPrefixLoader(r *RecordManager, d *d2txt.DataDictionary) error 
 }
 
 func uniqueMonsterSuffixLoader(r *RecordManager, d *d2txt.DataDictionary) error {
-	records, err := uniqueMonsterAffixCommonLoader(d)
+	records, order, err := uniqueMonsterAffixCommonLoader(d)
 	if err != nil {
 		return err
 	}
 
 	r.Monster.Name.Suffix = records
+	r.Monster.Name.SuffixOrder = order
 
 	r.Debugf("Loaded %d UniqueMonsterSuffix records", len(records))
 
 	return nil
 }
 
-func uniqueMonsterAffixCommonLoader(d *d2txt.DataDictionary) (UniqueMonsterAffixes, error) {
+func uniqueMonsterAffixCommonLoader(d *d2txt.DataDictionary) (UniqueMonsterAffixes, []string, error) {
 	records := make(UniqueMonsterAffixes)
+
+	var order []string
 
 	for d.Next() {
 		record := &UniqueMonsterAffixRecord{
@@ -92,7 +96,8 @@ func uniqueMonsterAffixCommonLoader(d *d2txt.DataDictionary) (UniqueMonsterAffix
 		}
 
 		records[record.StringTableKey] = record
+		order = append(order, record.StringTableKey)
 	}
 
-	return records, d.Err
+	return records, order, d.Err
 }

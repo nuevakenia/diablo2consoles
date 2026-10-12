@@ -419,6 +419,9 @@ type BaalSituation struct {
 	Nearby     int  // FUN_00571760's out value (UNVERIFIED), 2 or more disables nothing
 	Flag1      bool // FUN_005fb280 (UNVERIFIED predicate)
 	Dist       int  // edge distance to the target
+	// Target is the unit the decision is about (the tick's target or the scan's best), set before the host hook
+	// runs so the host can answer the per-target inputs (life percent, state 0xb, the last town portal).
+	Target *Target
 }
 
 // BaalWeights returns the 16-entry weight table for the situation: the table
@@ -649,6 +652,8 @@ func baalDecide(c *Ctx, score, count int) int {
 	if a := b.FindCommand(CmdAnchor); a != nil {
 		s.Far, s.VeryFar = BaalHomeFlags(EdgeDistance(c.Target.X-a.X, c.Target.Y-a.Y, c.Target.Size))
 	}
+
+	s.Target = c.Target
 
 	if h, ok := c.W.(BaalSituationHook); ok {
 		h.BaalSituation(b, &s)

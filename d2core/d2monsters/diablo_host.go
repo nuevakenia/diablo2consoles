@@ -14,11 +14,10 @@ import (
 // the weights' player count (the exe tests the callback on the first unit of
 // a bucket only; hero buckets hold one hero each, so the quirk is moot here).
 //
-// The scored stats are the ones the engine tracks: fire, cold and lightning
-// resistance, life percent and the left/right skill (attack rank and total
-// level). The physical/magic resist group (0x24/0x25) and the damage group
-// (0x16, 0x31-0x3a) and state 0xb are NOT provided and stay 0 (UNVERIFIED
-// that this changes the choice noticeably: both only add to the score).
+// The scored stats: fire, cold and lightning resistance, life percent, the
+// left/right skill (attack rank and total level) and, since wave 22, the
+// physical/magic resist group (0x24/0x25), the damage group (0x16, 0x31-0x3a)
+// and state 0xb (fillHeroDiaStats in endgame_hosts.go).
 func (d *Director) DiabloCandidates(b *d2monster.Brain) []d2monster.DiaCandidate {
 	var out []d2monster.DiaCandidate
 
@@ -39,6 +38,7 @@ func (d *Director) DiabloCandidates(b *d2monster.Brain) []d2monster.DiaCandidate
 		st.S27, st.S2B, st.S29 = d.Resists(t)
 		st.LeftRank, st.LeftLevel, st.LeftID = heroSkillScore(p.LeftSkill)
 		st.RightRank, st.RightLevel, st.RightID = heroSkillScore(p.RightSkill)
+		d.fillHeroDiaStats(p, &st) // resist group, damage group and state 0xb (wave 22)
 
 		out = append(out, d2monster.DiaCandidate{Target: t, Stats: st})
 	}

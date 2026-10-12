@@ -145,6 +145,7 @@ func (v *Game) questSpeak(npc questNPC, s d2quest.Speech) {
 	}
 
 	v.applyQuestEffects(r.g.Hear(npc.class, s.Msg))
+	v.riteMessageHeard(s.Msg)
 
 	r.dirty = true
 
