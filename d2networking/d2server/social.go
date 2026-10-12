@@ -307,8 +307,8 @@ func (g *GameServer) onPvPHit(client ClientConnection, packet d2netpacket.NetPac
 		return err
 	}
 
-	// N16 is opt-in (OD2_HITQUEUE=1): 9f-pvp-skills-ear passed once with it on (after a load flake) but the final rerun gave no result
-	if p.Kill || (os.Getenv("OD2_HITQUEUE") == "" && !g.soc.hitQueueOn) { // a death report is not part of the hit sequence
+	// N16 hit list: on by default, OD2_HITQUEUE=0 turns it off
+	if p.Kill || (os.Getenv("OD2_HITQUEUE") == "0" && !g.soc.hitQueueOn) { // a death report is not part of the hit sequence
 		return target.SendPacketToClient(pkt)
 	}
 

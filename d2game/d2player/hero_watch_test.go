@@ -46,6 +46,32 @@ func TestHeroWatchStill(t *testing.T) {
 	}
 }
 
+// A hero that stands but is still in a cast animation is not still: a click then would become a walk.
+func TestHeroWatchStillWaitsForCast(t *testing.T) {
+	var w heroWatch
+	w.arm(heroWatchStill, 0, 0)
+
+	w.busy = true
+	for i := 0; i < 100; i++ {
+		if fired, _ := w.update(0, 0, 0.04); fired {
+			t.Fatalf("fired during the cast animation at step %d", i)
+		}
+	}
+
+	w.busy = false
+	steps := 0
+
+	for ; steps < 100; steps++ {
+		if fired, _ := w.update(0, 0, 0.04); fired {
+			break
+		}
+	}
+
+	if steps < 11 || steps > 14 {
+		t.Fatalf("fired after %d standing updates, want about 12", steps)
+	}
+}
+
 func TestHeroWatchIdle(t *testing.T) {
 	var w heroWatch
 	if fired, _ := w.update(1, 1, 1); fired {

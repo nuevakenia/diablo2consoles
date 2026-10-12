@@ -47,7 +47,7 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
   three real-input scenarios need a retry on first attempt (a click that lands mid-cast becomes a walk).
 - `test/real-input-3` (on the fork, not landed): scripted input through the input manager plus new UI/keyboard/click
   scenarios; it made the party/PvP scenario fail (`panel "party" did not open`), so it was left out. Start there.
-- Hit-queue purge (N16, `OD2_HITQUEUE=1`) is default off because `9f-pvp-skills-ear` fails with it on.
+- Hit-queue purge (N16) is on by default (`OD2_HITQUEUE=0` turns it off); `9f-pvp-skills-ear` passes with it (6 of 6). The purge on a unit mode change is not ported (see d2-re-notes/w24-hitqueue.md).
 - The in-repo Bink tables credit FFmpeg (LGPL-2.1-or-later); pin a release tag if provenance matters.
 
 ## Wave 20 notes (2026-10-11)

@@ -47,9 +47,9 @@ scenario_check() {
   actions=$(echo "$body" | grep "INPUT world-click" | sed 's/.*action=\([a-z-]*\) left_skill=\([0-9]*\)/\1:\2/' | tr -d '\r' | tr '\n' ' ')
   want="move:36 stand-still:36 cast-right:36 "
   [ "$actions" = "$want" ] || { echo "FAIL: world click actions '$actions' want '$want'"; fail=1; }
-  casts=$(echo "$body" | grep "CAST start" | sed 's/.*skill="\([^"]*\)".*/\1/' | tr -d '\r' | tr '\n' ',')
+  casts=$(echo "$body" | grep "CAST start skill=" | sed 's/.*skill="\([^"]*\)".*/\1/' | tr -d '\r' | tr '\n' ',')
   want="Fire Bolt,Fire Ball,"
-  casts="${casts##*Jab,}"; casts="${casts##*Might,}"
+  # the mercenary casts Jab and Might at random times; its lines say merc= and are not counted
   [ "$casts" = "$want" ] || { echo "FAIL: skills cast '$casts' want '$want'"; fail=1; }
   # positions: 1 start, 2 door, 3 waypoint, 4 chest, 5 gold, 6 ground walk, 7 Shift, 8 right
   pos=("${(@f)$(grep -o 'HERO pos=([-0-9.]*,[-0-9.]*)' $log.txt | sed 's/HERO pos=//')}")

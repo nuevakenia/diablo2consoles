@@ -9,16 +9,26 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket"
 )
 
-// The deferred per-unit hit list of Game.exe (UNIT\SUnitDmg.cpp, purge at
-// 0x57a900, N16): a hit that connects on a unit is not delivered at once, it is
-// appended to the defender's list (in order), the room flush delivers the lists
-// later, and when the attacker is freed every entry that came from it is
-// purged (matched on unit type and id, the order of the rest kept).
+// The deferred hit-sequence list of Game.exe (UNIT\SUnitDmg.cpp, N16). VERIFIED
+// this wave (Ghidra, D2_1_14b): the list hangs on the ATTACKER (unit +0xac,
+// "pHitSequenceList"), not on the defender. A melee swing appends an entry
+// keyed (attacker type, attacker id, defender type, defender id) with a copy
+// of the damage struct; the action-frame event resolves it (0x57b4b0
+// SRVDO_ResolveQueuedHitSequence, found by that four-part key in the attacker's
+// list) if the defender is still in range, else drops it. The purge 0x57a900
+// compares each entry with the list owner's own type and id and unlinks the
+// matches, and is called from only three places: every server unit mode change
+// (SERVER_SetUnitModeWithEvents 0x5515c0, so an interrupted swing never lands),
+// PLAYER_FreeServerPlayerUnit 0x532430 and MONAI_FreeServerMonsterData 0x5714d0
+// (the unit is freed).
 //
-// Here the defenders are the players, the entries are the PvP hits relayed by
-// onPvPHit, the flush runs every hitFlushEvery (a frame of the 25 fps server)
-// and a player who leaves the game takes the hits he has not yet delivered
-// with him. UNVERIFIED: the exact flush point of the exe.
+// Here the owners are the attacking players, the entries are the PvP hits
+// relayed by onPvPHit (already resolved by the attacker's client), the flush
+// runs every hitFlushEvery (a frame of the 25 fps server) and a player who
+// leaves the game takes the hits he has not yet delivered with him (the free
+// path). UNVERIFIED: the exact flush point of the exe. NOT ported: the purge on
+// a mode change (the relay carries no attacker mode and the hits are already
+// resolved, so dropping them on a mode change would lose real damage).
 
 // hitFlushEvery is one server frame.
 const hitFlushEvery = 40 * time.Millisecond
@@ -31,10 +41,10 @@ type queuedHit struct {
 	pkt d2netpacket.NetPacket
 }
 
-// hitQueue holds the pending hits per defender.
+// hitQueue holds the pending hits per attacker (the owner of the list in the exe).
 type hitQueue struct {
 	mu    sync.Mutex
-	lists map[string]*d2unitmsg.HitList // by defender id
+	lists map[string]*d2unitmsg.HitList // by attacker id
 	pkts  map[int]queuedHit             // by Hit.Step
 	seq   int
 	ids   map[string]uint32 // numeric unit id of a player id
@@ -59,10 +69,10 @@ func (q *hitQueue) Add(attacker, defender string, pkt d2netpacket.NetPacket) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	l := q.lists[defender]
+	l := q.lists[attacker]
 	if l == nil {
 		l = &d2unitmsg.HitList{}
-		q.lists[defender] = l
+		q.lists[attacker] = l
 	}
 
 	q.seq++
@@ -75,38 +85,41 @@ func (q *hitQueue) Pending(defender string) int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if l := q.lists[defender]; l != nil {
-		return l.Len()
+	n := 0
+
+	for _, h := range q.pkts {
+		if h.to == defender {
+			n++
+		}
 	}
 
-	return 0
+	return n
 }
 
-// PurgeAttacker drops every pending hit that came from the attacker, in every
-// defender's list, and returns how many.
+// PurgeAttacker is 0x57a900 for a unit that is being freed: the entries of the
+// unit's own list whose attacker is that unit (all of them: a list only holds
+// its owner's swings) are unlinked. It returns how many.
 func (q *hitQueue) PurgeAttacker(attacker string) int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	id, ok := q.ids[attacker]
-	if !ok {
+	l := q.lists[attacker]
+
+	if !ok || l == nil {
 		return 0
 	}
 
-	n := 0
-
-	for def, l := range q.lists {
-		for _, h := range l.Entries() {
-			if h.AttackerType == playerUnitType && h.AttackerID == id {
-				delete(q.pkts, h.Step)
-			}
+	for _, h := range l.Entries() {
+		if h.AttackerType == playerUnitType && h.AttackerID == id {
+			delete(q.pkts, h.Step)
 		}
+	}
 
-		n += l.PurgeAttacker(playerUnitType, id)
+	n := l.PurgeAttacker(playerUnitType, id)
 
-		if l.Len() == 0 {
-			delete(q.lists, def)
-		}
+	if l.Len() == 0 {
+		delete(q.lists, attacker)
 	}
 
 	return n
