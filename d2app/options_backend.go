@@ -30,6 +30,13 @@ func (o optionsBackend) Change(key string, index int) error {
 
 	o.a.applyAccessibility(key)
 
+	if key == d2config.OptFullscreen {
+		// the FULL SCREEN row: switch now, keep the FullScreen field in step with the option
+		full := o.a.config.WantFullscreen()
+		o.a.config.SetFullscreenChoice(full)
+		o.a.renderer.SetFullScreen(full)
+	}
+
 	if key == d2config.OptNpcSpeech {
 		o.a.applySpeechOption()
 	}

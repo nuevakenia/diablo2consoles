@@ -88,6 +88,7 @@ type CharacterSelect struct {
 	characterNameLabel     [8]*d2ui.Label
 	characterStatsLabel    [8]*d2ui.Label
 	characterExpLabel      [8]*d2ui.Label
+	characterExp2Label     [8]*d2ui.Label // second kind line ("Hardcore" over "Expansion Character")
 	characterImage         [8]*d2mapentity.Player
 	gameStates             []*d2hero.HeroState
 	selectedCharacter      int
@@ -207,6 +208,10 @@ func (v *CharacterSelect) OnLoad(loading d2screen.LoadingState) {
 		v.characterExpLabel[i] = v.uiManager.NewLabel(d2resource.Font16, d2resource.PaletteStatic)
 		v.characterExpLabel[i].SetPosition(offsetX, offsetY)
 		v.characterExpLabel[i].Color[0] = d2util.Color(lightGreen)
+
+		v.characterExp2Label[i] = v.uiManager.NewLabel(d2resource.Font16, d2resource.PaletteStatic)
+		v.characterExp2Label[i].SetPosition(offsetX, offsetY+labelHeight)
+		v.characterExp2Label[i].Color[0] = d2util.Color(lightGreen)
 	}
 
 	v.refreshGameStates()
@@ -323,6 +328,7 @@ func (v *CharacterSelect) updateCharacterBoxes() {
 			v.characterNameLabel[i].SetText("")
 			v.characterStatsLabel[i].SetText("")
 			v.characterExpLabel[i].SetText("")
+			v.characterExp2Label[i].SetText("")
 			v.characterImage[i] = nil
 
 			continue
@@ -333,7 +339,9 @@ func (v *CharacterSelect) updateCharacterBoxes() {
 
 		v.characterNameLabel[i].SetText(line1)
 		v.characterStatsLabel[i].SetText(line2)
-		v.characterExpLabel[i].SetText(line3)
+		kind1, kind2 := splitKindLines(line3)
+		v.characterExpLabel[i].SetText(kind1)
+		v.characterExp2Label[i].SetText(kind2)
 
 		heroType := v.gameStates[idx].HeroType
 		equipment := v.DefaultHeroItems[heroType]
@@ -383,24 +391,47 @@ func characterListText(asset *d2asset.AssetManager, state *d2hero.HeroState) (na
 
 	infoText := asset.TranslateString("level") + " " + strconv.Itoa(level) + " " + asset.TranslateString(state.HeroType.String())
 
-	var kindText string
+	// "Hardcore Expansion Character" is wider than a list cell and ran into the next column, so a hardcore
+	// character's kind is two lines: "Hardcore" (with "Dead " first) over "Expansion Character".
+	var kindLines []string
 
-	if dead {
-		kindText = "Dead "
-	}
-
-	if hardcore {
-		kindText += asset.TranslateString("strChatHardcore") + " "
+	switch {
+	case hardcore && dead:
+		kindLines = []string{"Dead " + asset.TranslateString("strChatHardcore")}
+	case hardcore:
+		kindLines = []string{asset.TranslateString("strChatHardcore")}
+	case dead:
+		kindLines = []string{"Dead"}
 	}
 
 	// classic characters have no kind line
 	if expansion {
-		kindText += asset.TranslateString("#803")
+		kindLines = append(kindLines, asset.TranslateString("#803"))
 	}
 
 	return d2ui.ColorTokenize(state.HeroName, nameColor),
 		d2ui.ColorTokenize(infoText, d2ui.ColorTokenWhite),
-		d2ui.ColorTokenize(strings.TrimSpace(kindText), d2ui.ColorTokenGreen)
+		joinKindLines(kindLines)
+}
+
+// joinKindLines colours each kind line green and joins them with a line break (see splitKindLines).
+func joinKindLines(lines []string) string {
+	out := make([]string, 0, len(lines))
+
+	for _, l := range lines {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, d2ui.ColorTokenize(l, d2ui.ColorTokenGreen))
+		}
+	}
+
+	return strings.Join(out, "\n")
+}
+
+// splitKindLines splits the joined kind text into the two label lines.
+func splitKindLines(kind string) (first, second string) {
+	first, second, _ = strings.Cut(kind, "\n")
+
+	return first, second
 }
 
 func (v *CharacterSelect) onNewCharButtonClicked() {
@@ -431,6 +462,7 @@ func (v *CharacterSelect) Render(screen d2interface.Surface) {
 		v.characterNameLabel[i].Render(screen)
 		v.characterStatsLabel[i].Render(screen)
 		v.characterExpLabel[i].Render(screen)
+		v.characterExp2Label[i].Render(screen)
 
 		x, y := v.characterNameLabel[i].GetPosition()
 		charImgX := x - selectionBoxImageOffsetX

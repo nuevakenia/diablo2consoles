@@ -34,6 +34,10 @@ const (
 	OptUIScale     = "uiscale"     // window size multiplier, 1X..3X
 	OptColorblind  = "colorblind"  // colour-blind friendly item colours
 	OptSubtitleLog = "subtitlelog" // NPC speech subtitles are also written to the log
+
+	// OptFullscreen is the FULL SCREEN row of the video page. The game starts full screen by default; choosing OFF is
+	// remembered (index 1) so the next start opens a window.
+	OptFullscreen = "fullscreen"
 )
 
 // OptionDef describes one row of the options menu.
@@ -69,6 +73,7 @@ func OptionDefs() []OptionDef {
 		OptionDef{OptUIScale, []string{"1X", "2X", "3X"}, 0},
 		OptionDef{OptColorblind, []string{"OFF", "ON"}, 0},
 		OptionDef{OptSubtitleLog, []string{"OFF", "ON"}, 0},
+		OptionDef{OptFullscreen, onOff, 0},
 	)
 
 	// one remap row per gamepad button: the value is the action name
@@ -190,6 +195,22 @@ func (c *Configuration) SetOption(key string, index int) error {
 // PadMapping is the gamepad button mapping chosen in the controls pages.
 func (c *Configuration) PadMapping() d2gamepad.Mapping {
 	return d2gamepad.MappingFromChoices(c.OptionValue)
+}
+
+// WantFullscreen reports whether the game should start full screen: the default, until the video page (or Cmd+Enter,
+// Cmd+F, the console) chose a window.
+func (c *Configuration) WantFullscreen() bool { return c.OptionIndex(OptFullscreen) == 0 }
+
+// SetFullscreenChoice remembers the choice in both the FullScreen field and the option (it does not save the file).
+func (c *Configuration) SetFullscreenChoice(full bool) {
+	c.FullScreen = full
+
+	i := 1
+	if full {
+		i = 0
+	}
+
+	_ = c.SetOption(OptFullscreen, i)
 }
 
 // UIScale is the chosen window size multiplier (1..3).

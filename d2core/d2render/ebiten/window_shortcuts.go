@@ -32,7 +32,7 @@ func (r *Renderer) handleWindowShortcuts() error {
 	for _, k := range []struct {
 		ebiten ebiten.Key
 		key    d2enum.Key
-	}{{ebiten.KeyEnter, d2enum.KeyEnter}, {ebiten.KeyQ, d2enum.KeyQ}, {ebiten.KeyW, d2enum.KeyW}} {
+	}{{ebiten.KeyEnter, d2enum.KeyEnter}, {ebiten.KeyF, d2enum.KeyF}, {ebiten.KeyQ, d2enum.KeyQ}, {ebiten.KeyW, d2enum.KeyW}} {
 		if !inpututil.IsKeyJustPressed(k.ebiten) {
 			continue
 		}

@@ -16,6 +16,9 @@ func TestResolveWindowShortcut(t *testing.T) {
 	}{
 		{"cmd+enter", "darwin", true, false, d2enum.KeyEnter, WindowToggleFullscreen},
 		{"option+enter", "darwin", false, true, d2enum.KeyEnter, WindowToggleFullscreen},
+		{"cmd+f", "darwin", true, false, d2enum.KeyF, WindowToggleFullscreen},
+		{"f alone", "darwin", false, false, d2enum.KeyF, WindowNone},
+		{"cmd+f elsewhere", "linux", true, false, d2enum.KeyF, WindowNone},
 		{"plain enter (chat)", "darwin", false, false, d2enum.KeyEnter, WindowNone},
 		{"cmd+q", "darwin", true, false, d2enum.KeyQ, WindowQuit},
 		{"cmd+w", "darwin", true, false, d2enum.KeyW, WindowQuit},

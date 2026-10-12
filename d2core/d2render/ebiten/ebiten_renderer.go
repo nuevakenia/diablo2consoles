@@ -11,7 +11,6 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
@@ -53,12 +52,6 @@ func (r *Renderer) Update() error {
 
 	if r.updateCallback == nil {
 		return errors.New("no update callback defined for ebiten renderer")
-	}
-
-	// Cmd+Enter (macOS) or Alt+Enter toggles fullscreen, like the original game
-	if inpututil.IsKeyJustPressed(ebiten.KeyEnter) &&
-		(commandHeld() || ebiten.IsKeyPressed(ebiten.KeyAlt)) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
 	if d2util.TurboEnabled() {
@@ -152,7 +145,7 @@ func CreateRenderer(cfg *d2config.Configuration) (*Renderer, error) {
 		config := cfg
 
 		ebiten.SetCursorMode(ebiten.CursorModeHidden)
-		ebiten.SetFullscreen(config.FullScreen || alwaysFullscreen())
+		ebiten.SetFullscreen(startFullscreen(config, alwaysFullscreen()))
 		ebiten.SetRunnableOnUnfocused(config.RunInBackground)
 		ebiten.SetVsyncEnabled(config.VsyncEnabled)
 		ebiten.SetMaxTPS(config.TicksPerSecond)
@@ -286,6 +279,16 @@ func (r *Renderer) SetWindowScale(scale int) {
 	}
 
 	ebiten.SetWindowSize(s.W*scale, s.H*scale)
+}
+
+// startFullscreen decides the start state: scripted runs keep config.FullScreen (off by default); a normal start is
+// full screen unless the player chose a window (the FULL SCREEN video option, Cmd+Enter, Cmd+F or the console).
+func startFullscreen(cfg *d2config.Configuration, always bool) bool {
+	if always {
+		return cfg.WantFullscreen()
+	}
+
+	return cfg.FullScreen
 }
 
 // alwaysFullscreen is the owner's choice: the game starts full screen every time, whatever config.json says. Test and

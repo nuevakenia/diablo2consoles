@@ -55,7 +55,7 @@ func runBundleSupervisor() (handled bool, code int) {
 	logPath := filepath.Join(logDir, "OpenDiablo2.log")
 
 	_ = os.MkdirAll(logDir, 0o750)
-	_ = os.Rename(logPath, filepath.Join(logDir, "OpenDiablo2.previous.log"))
+	rotateLogs(logDir)
 
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o640) //nolint:gosec // user log
 	if err != nil {

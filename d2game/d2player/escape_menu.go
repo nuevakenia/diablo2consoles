@@ -65,6 +65,7 @@ const (
 	optUIScale
 	optColorblind
 	optSubtitleLog
+	optVideoFullscreen
 )
 
 const (
@@ -237,6 +238,10 @@ func (m *EscapeMenu) newVideoOptionsLayout() *layout {
 		m.addEnumLabel(l, optVideoPerspective, "PERSPECTIVE")
 		m.addEnumLabel(l, optVideoGamma, "GAMMA")
 		m.addEnumLabel(l, optVideoContrast, "CONTRAST")
+
+		if !m.exeLayout { // the original's page has no such row; its plan has a fixed row count
+			m.addEnumLabel(l, optVideoFullscreen, "FULL SCREEN")
+		}
 		m.addPreviousMenuLabel(l)
 	})
 }
