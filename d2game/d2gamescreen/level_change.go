@@ -650,6 +650,11 @@ func (v *Game) openWaypointPanel(level int) {
 func (v *Game) questSlotDone() func(slot int) bool {
 	q := v.heroQuests()
 
+	// "travelfree" (the console / scenario cheat that ignores the act rules) opens every tab as well
+	if v.travel.free {
+		return func(int) bool { return true }
+	}
+
 	return func(slot int) bool { return q != nil && q.Get(slot, d2s.QuestBitDone) }
 }
 
