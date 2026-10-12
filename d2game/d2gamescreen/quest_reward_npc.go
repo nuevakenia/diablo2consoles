@@ -6,6 +6,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2npc"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2reward"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item"
@@ -153,7 +154,8 @@ func (v *Game) respecAvailable() bool {
 		return false
 	}
 
-	return r.g.Rec.AkaraRespecAvailable()
+	// UI_BuildNpcMenu's gate for string 0x2ba0: quest slot 0x29 bit 0 (done) hides the row, bit 1 shows it
+	return d2npc.RespecShown(d2npc.Ctx{Quest: r.g.Rec.Get})
 }
 
 // akaraRespec resets the attributes to the class base and refunds every spent

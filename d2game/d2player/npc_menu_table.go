@@ -33,13 +33,17 @@ const (
 	// "Reset Stat/Skill Points" (string 0x2ba0, gated by quest slot 41).
 	NPCActionReward
 	NPCActionRespec
+	// NPCActionIntro and NPCActionGossip are the rows of the Talk submenu (0x4b20f0): the NPC's introduction
+	// line and the gossip line chosen for it (d2common/d2npc).
+	NPCActionIntro
+	NPCActionGossip
 )
 
 // String names the action for logs.
 func (a NPCMenuAction) String() string {
 	names := [...]string{
 		"Talk", "Trade", "TradeRepair", "Gamble", "Hire", "Identify", "TravelWest", "SailWest", "TravelEast", "SailEast", "Cancel",
-		"Topic", "HireOffer", "ReviveMerc", "Reward", "Respec",
+		"Topic", "HireOffer", "ReviveMerc", "Reward", "Respec", "Introduction", "Gossip",
 	}
 
 	if int(a) < 0 || int(a) >= len(names) {
@@ -147,7 +151,7 @@ var npcMenuTable = map[int][]NPCMenuRow{
 	512: {rowTalk, rowTrade, rowGamble}, // Drehya/Anya
 
 	// Hire
-	150: {rowTalk, rowHire},           // Kashya (the notes list Talk only; the hire row is needed for the Act 1 rogues)
+	150: {rowTalk},                    // Kashya: Talk only in the static table (0x725d60); the exe adds Hire from hero level 8 (d2npc.Options)
 	198: {rowTalk, rowHire},           // Greiz
 	252: {rowTalk, rowHire, rowTrade}, // Asheara
 	515: {rowTalk, rowHire},           // Qual-Kehk (quest-gated in HIRE_ProcessHireOffer)
@@ -196,6 +200,17 @@ func NPCMenuFor(classID int) (rows []NPCMenuRow, ok bool) {
 	}
 
 	return rows, true
+}
+
+// NPCRowFor returns the menu row of a string.tbl id of the exe's menu table (0xd35 talk, 0xd44 trade...).
+func NPCRowFor(stringID int) (NPCMenuRow, bool) {
+	for _, r := range []NPCMenuRow{rowTalk, rowTrade, rowTradeRepair, rowGamble, rowHire, rowIdentify, rowGoWest, rowSailWest, RowRespec} {
+		if r.StringID == stringID {
+			return r, true
+		}
+	}
+
+	return NPCMenuRow{}, false
 }
 
 // NPCClassName returns a known name for a class id, or "".

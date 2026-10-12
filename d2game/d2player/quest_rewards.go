@@ -104,12 +104,22 @@ func (g *GameControls) SaveItems() { g.saveHero() }
 // and item level into the inventory (a console aid for the autotests) and
 // returns its name.
 func (g *GameControls) GiveItemQuality(code string, quality, ilvl int) (string, error) {
+	// a negative quality gives the item unidentified (Cain's identify row only shows with such an item)
+	unidentified := quality < 0
+	if unidentified {
+		quality = -quality
+	}
+
 	item, err := g.inventory.item.ItemFromCode(code, d2drop.Quality(quality), ilvl, 4242)
 	if err != nil {
 		return "", err
 	}
 
-	item.Identify()
+	if unidentified {
+		item.Unidentify()
+	} else {
+		item.Identify()
+	}
 
 	if !g.inventory.grid.AutoPlace(item, true) {
 		return "", fmt.Errorf("no room in the inventory for %s", code)

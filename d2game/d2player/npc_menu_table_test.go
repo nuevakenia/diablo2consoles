@@ -15,7 +15,7 @@ func TestNPCMenuFor(t *testing.T) {
 		{405, []NPCMenuAction{NPCActionTrade, NPCActionGamble}},                // Jamella
 		{244, []NPCMenuAction{NPCActionTalk, NPCActionIdentify}},               // Cain
 		{175, []NPCMenuAction{NPCActionTalk, NPCActionTravelWest}},             // Warriv2
-		{150, []NPCMenuAction{NPCActionTalk, NPCActionHire}},                   // Kashya
+		{150, []NPCMenuAction{NPCActionTalk}},                                  // Kashya: Hire comes with hero level 8 (d2npc.Options)
 		{367, []NPCMenuAction{NPCActionTalk}},                                  // Tyrael2: Talk only in Game.exe 0x725d60
 	}
 

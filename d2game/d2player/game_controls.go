@@ -1709,11 +1709,11 @@ func (g *GameControls) OpenGamble(v d2vendor.Vendor, seed uint32) error {
 }
 
 // OpenIdentify opens Cain's identify window and the inventory beside it.
-func (g *GameControls) OpenIdentify() {
+func (g *GameControls) OpenIdentify(quest *d2s.QuestRecord) {
 	g.NPCMenu.Close()
 	g.clearScreen()
 	g.inventory.Open()
-	g.Identify.Open(nil) // quest bit (4,0)/(4,1) not reachable here: the fee is always charged (UNVERIFIED path)
+	g.Identify.Open(quest) // quest bits (4,0) / (4,1) make the fee 0 (UI_BuildNpcMenu 0x4b1050)
 	g.updateLayout()
 }
 
