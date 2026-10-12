@@ -79,6 +79,9 @@ func (a *autoQuest) stagePrison() {
 		a.move(h, d2quest.LevelFrozenRiver)
 		a.object(h, d2quest.ObjectFrozenAnya)
 		a.state(h, id, "Anya thawed")
+		// the potion is handed out once per game, also after it was used on Anya (VERIFIED 0x587460, counter in the node)
+		again := h.Q().Hear(d2quest.NPCMalah, 20127)
+		a.expect(h, "Malah gives the potion only once per game", !a.hasEffect(h, again, d2quest.EffectGiveItem, d2quest.ItemDefrostPotion))
 		a.expect(h, "reward pending + primary goal, state 5", a.bit(h, id, d2quest.FlagRewardPending) &&
 			a.bit(h, id, d2quest.FlagPrimaryGoal) && a.quest(h, id).State == 5)
 		a.move(h, d2quest.LevelHarrogath)

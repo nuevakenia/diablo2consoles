@@ -264,7 +264,7 @@ func (a *autoQuest) advance(h autoHost, elapsed float64) {
 
 	if !a.started {
 		a.started = true
-		h.Infof("AUTOQUEST start spec=%q stages=%v real_kills=%v", a.spec, a.stages, a.real)
+		h.Infof("AUTOQUEST start spec=%q stages=%v real_kills=%v difficulty=%d", a.spec, a.stages, a.real, h.Q().Difficulty)
 	}
 
 	if st.fn(h, a) {
