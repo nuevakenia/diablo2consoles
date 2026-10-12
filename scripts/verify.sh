@@ -189,12 +189,12 @@ if [ -n "${D2S_SAMPLE_BODY:-}" ]; then
       [ $fail -eq $fail_before ] && break
       # keep the failed first attempt's log: the retry overwrites $log, and a flake that passes on retry
       # would otherwise leave no evidence of why it failed (batch 16 had four such flakes and no logs)
-      if [ $attempt -eq 1 ]; then
+      if true; then # every failed attempt keeps its log (the second attempt's was lost: w22 86-class-skills)
         # (outside $tmp: a run that passed removes its scratch folder)
         flake_dir="${OD2_VERIFY_FLAKE_DIR:-/tmp/od2-flake-logs}"; mkdir -p $flake_dir
-        flake_log=$flake_dir/${n}.$$.attempt1.txt
+        flake_log=$flake_dir/${n}.$$.attempt${attempt}.txt
         cp -f $log.txt $flake_log 2>/dev/null
-        echo "(first-attempt log kept in $flake_log; its last failure lines:)"
+        echo "(attempt $attempt log kept in $flake_log; its last failure lines:)"
         grep -E "AUTOSCRIPT .*FAIL|DEATH|CAST start .*ok=false|CAST do .*ok=false|AUTOCAST .*refused|\[(ERROR|WARNING)\]|panic|LEVEL CHANGE" $log.txt | tail -12 | cut -c1-220
       fi
       [ $attempt -eq 1 ] && echo "RETRY: $scenario_name failed once; running it again (scenarios are timing sensitive on a loaded machine)"
