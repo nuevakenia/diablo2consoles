@@ -34,7 +34,10 @@ scenario_check() {
   grep -q "QUEST A5Q2 slot=36 bits .* (all fifteen barbarians freed)" $log.txt || { echo "FAIL: the freed-barbarian count was not recorded"; fail=1; }
   grep -q 'QUESTPANEL act=5 quest=2 status=0 title="Rescue on Mount Arreat"' $log.txt || { echo "FAIL: panel before the quest"; fail=1; }
   grep -q "QUESTPANEL act=5 quest=2 status=1 .*Find the Soldiers in the Frigid Highlands" $log.txt || { echo "FAIL: panel page 1 text"; fail=1; }
-  grep -q "QUESTPANEL act=5 quest=2 status=2 .*Rescue 15 more Soldiers" $log.txt || { echo "FAIL: panel page 2 text (the count)"; fail=1; }
+  # w37 (exe 0x5860f0, VERIFIED): entering level 111/112 moves the record but the log keeps page 1 while no page is pushed, so
+  # the panel opened in the Frigid Highlands still reads page 1; the "Rescue %d more Soldiers" count page is covered by
+  # d2player TestFillCount / d2quest w37_acts45_test
+  [ "$(grep -c 'QUESTPANEL act=5 quest=2 status=1 .*Find the Soldiers in the Frigid Highlands' $log.txt)" -ge 2 ] || { echo "FAIL: panel page 1 text not kept in the Frigid Highlands"; fail=1; }
   grep -q "QUESTPANEL act=5 quest=2 status=3 .*Return to Qual-Kehk" $log.txt || { echo "FAIL: panel page 3 text"; fail=1; }
   grep -q "QUESTPANEL .*text=\".*%d" $log.txt && { echo "FAIL: a quest log page shows a raw %d"; fail=1; }
   qw_laterquests

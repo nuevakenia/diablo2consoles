@@ -739,6 +739,11 @@ func (g *GameControls) AutoEquipCursor() bool {
 func (g *GameControls) StripAll() int {
 	n := 0
 
+	// an item a previous call left on the cursor (the grid was full) goes into the grid first, else nothing can come off
+	if g.inventory.CursorItem() != nil {
+		g.AutoPlaceCursor()
+	}
+
 	for _, loc := range autoEquipLocs {
 		if g.inventory.WornAt(loc) == nil || g.inventory.CursorItem() != nil {
 			continue

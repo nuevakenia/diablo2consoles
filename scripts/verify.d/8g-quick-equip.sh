@@ -9,7 +9,7 @@ scenario_env() {
     echo "export OD2_AUTOGAME=\"$qe/s94/Hero.d2s\" OD2_D2S_WRITEBACK=\"$qe/wb94\" OD2_AUTOSPEED=3"
   fi
   echo 'export OD2_REALMAPS=1 OD2_AUTOLEVEL=2 OD2_PICKUP=quick'
-  local s='expect:level=2;say:clearinv;say:stripall;say:clearinv'
+  local s='expect:level=2;say:clearinv;say:stripall;say:clearinv;say:stripall;say:clearinv;say:stripall;say:clearinv'
   s="$s;say:spawnground cap 8 8;until:AUTOGROUND spawn source=command name=,30;click:left@item:Cap;until:QUICKEQUIP name=,120"
   s="$s;say:spawnground cap 9 9;until:AUTOGROUND spawn source=command name=,30;click:left@item:Cap;until:QUICKPICKUP name=,120;exit"
   echo "export OD2_AUTOSCRIPT='$s'"
