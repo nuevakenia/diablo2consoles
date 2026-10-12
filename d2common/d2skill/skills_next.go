@@ -330,8 +330,8 @@ func ChargeFrames(dist float64, baseVel, param1, velocityPct int) int {
 // only then he strikes it with calc1 percent damage and the skill's elemental part (when calc4 is above zero), and
 // the overlay stat 0x93 is shown on the target. The rush therefore takes ChargeFrames game frames: the "move"
 // effect carries them and the blow and the overlay are delayed by the same amount. It ends next to the target (not
-// halfway). A target holding state 0x36 is not charged from afar (SRVST_031; UNVERIFIED which state it is, not
-// modelled).
+// halfway). A target holding state 0x36 is not charged from afar (SRVST_031; state 0x36 is states.txt row "uninterruptable" by table; the refusal itself
+// is not modelled and not compared in the exe this wave).
 func doChargeFn(c *cast) {
 	hx, hy := c.u.Pos()
 	t, tx, ty := c.tgt.Unit, c.tgt.UX, c.tgt.UY

@@ -43,5 +43,5 @@ func auraTargetMods(m *d2mapentity.Monster, stats []d2skill.StatMod) []d2state.S
 }
 
 // whirlRefusedState is the engine name of state 12 of states.txt (the "inferno" row), the state that makes the
-// Whirlwind start function return 0 (d2skill.WhirlwindRefusedState; UNVERIFIED that no other table order is meant).
+// Whirlwind start function return 0 (d2skill.WhirlwindRefusedState; the state ids are states.txt rows, pinned by d2skill.TestExeTableRows).
 const whirlRefusedState = "inferno"
