@@ -3,7 +3,6 @@ package d2autoscript
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -205,17 +204,7 @@ const WaitLogTimeout = 240.0
 // deadline (kill:near=30,150 runs up to 150 s); with the tougher natural monsters of the packs the
 // fights of the playthroughs use their whole time, and a runner that gave up waiting at 120 s started
 // the next walk while the hero still fought (Chaos Sanctuary: seal 394 never operated).
-// OD2_AUTOSCRIPT_BUSY=<seconds> raises it for the full-game chain, where a level 14 hero needs 1300 s to kill Duriel
-// (wave 43: at 400 s the runner started the Tyrael steps in the middle of the fight).
-var BusyTimeout = busyTimeoutFromEnv(400.0)
-
-func busyTimeoutFromEnv(def float64) float64 {
-	if v, err := strconv.ParseFloat(os.Getenv("OD2_AUTOSCRIPT_BUSY"), 64); err == nil && v >= def {
-		return v
-	}
-
-	return def
-}
+const BusyTimeout = 400.0
 
 // Host performs the side effects of steps. Methods must not block.
 type Host interface {

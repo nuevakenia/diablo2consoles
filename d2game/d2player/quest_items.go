@@ -98,38 +98,6 @@ func (g *GameControls) ClearInventoryGrid() int {
 	return n
 }
 
-// DumpJunk removes the inventory items that are not worth keeping: everything except the codes in keep and the
-// scrolls, tomes and keys (a player sells or drops what the monsters left behind when the pack is full;
-// wave 43, the full-game chain). It returns how many items went.
-func (g *GameControls) DumpJunk(keep []string) int {
-	n := 0
-
-	for _, it := range append([]InventoryItem{}, g.inventory.grid.Items()...) {
-		code := strings.ToLower(strings.TrimSpace(it.GetItemCode()))
-		kept := false
-
-		for _, k := range keep {
-			if code == k {
-				kept = true
-			}
-		}
-
-		for _, pfx := range []string{"tbk", "ibk"} {
-			if strings.HasPrefix(code, pfx) {
-				kept = true
-			}
-		}
-
-		if !kept {
-			g.inventory.grid.Remove(it)
-
-			n++
-		}
-	}
-
-	return n
-}
-
 // MoveInventoryItemToCube takes the first inventory item with this base code and puts it into the Horadric Cube
 // (what dragging it onto the open cube does); it reports whether it was moved.
 func (g *GameControls) MoveInventoryItemToCube(code string) bool {

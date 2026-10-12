@@ -273,11 +273,6 @@ func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.
 		}
 
 		d.Counters.AttackHits++
-
-		if HeroCannotDie && dmg >= p.Stats.Health { // OD2_AUTOSCRIPT_HEAL=2, a script aid: the hero keeps 1 life point
-			dmg = p.Stats.Health - 1
-		}
-
 		p.Stats.Health -= dmg
 
 		d.cursedHit(u, p) // hook type 3 of the modifiers: Cursed (umodhooks.go)
@@ -416,10 +411,6 @@ func (d *Director) missileVelocity(name string) float64 {
 
 	return DefaultShotVelocity
 }
-
-// HeroCannotDie is a test aid of the full-game playthroughs (OD2_AUTOSCRIPT_HEAL=2): monster hits never take the
-// hero's last life point. It stands in for the potions, armour and mercenary a player would use.
-var HeroCannotDie bool
 
 // HeroStrike resolves a hero melee swing against a monster at the swing's hit
 // frame. The to-hit uses the hero's attack rating (d2combat.PlayerAttackRating

@@ -59,63 +59,6 @@ func (v *Game) anyaEnter(level int) {
 	v.anyaMelted(ob)
 }
 
-// anyaTown puts Anya (Drehya, class 512) into Harrogath once she is thawed. Before wave 43 the town never had her, so
-// nobody could take her reward or hear her open the portal to Nihlathak's Temple, and the Betrayal of Harrogath (and with it
-// the Rite of Passage) could not be reached in a played game. Her real spot is UNVERIFIED: she stands next to Malah.
-func (v *Game) anyaTown(level int) {
-	if level != d2quest.LevelHarrogath || v.gameClient == nil || v.gameClient.MapEngine == nil {
-		return
-	}
-
-	r := v.quests()
-	if r == nil {
-		return
-	}
-
-	q := r.g.Quest(d2quest.QuestPrison)
-	if q == nil || !(r.g.Rec.Get(q.Slot, d2quest.FlagRewardPending) || r.g.Rec.Get(q.Slot, d2quest.FlagRewardGranted) ||
-		r.g.Rec.Get(q.Slot, d2quest.FlagPrimaryGoal)) {
-		return
-	}
-
-	stats := v.asset.Records.Monster.Stats["drehya"]
-	if stats == nil {
-		return
-	}
-
-	var mx, my float64
-
-	for _, e := range v.gameClient.MapEngine.Entities() {
-		if npc, ok := e.(interface{ MonstatID() int }); ok {
-			switch npc.MonstatID() {
-			case stats.ID:
-				return // she is there already
-			case 513: // Malah
-				mx, my = e.(interface{ GetPositionF() (float64, float64) }).GetPositionF()
-			}
-		}
-	}
-
-	if mx == 0 && my == 0 {
-		return
-	}
-
-	sx, sy, ok := v.gameClient.MapEngine.NearestWalkable(int(mx*subtilesInTile)+10, int(my*subtilesInTile)+5, 20)
-	if !ok {
-		return
-	}
-
-	npc, err := v.gameClient.MapEngine.NewNPC(sx, sy, stats, 0)
-	if err != nil {
-		v.Warningf("ANYA town: %v", err)
-
-		return
-	}
-
-	v.gameClient.MapEngine.AddEntity(npc)
-	v.Infof("ANYA placed in Harrogath next to Malah at subtile (%d,%d)", sx, sy)
-}
-
 // anyaMelted opens the block when the potion was already used (reward pending or paid).
 func (v *Game) anyaMelted(ob *d2mapentity.Object) {
 	r := v.quests()

@@ -49,26 +49,6 @@ func (s *HeroState) UnlockedDifficulties() [3]bool {
 	return d2difficulty.Unlocked(s.questRecords(), s.StoredProgression(), s.Expansion)
 }
 
-// actReachedIn is the act a hero stands in on a difficulty: Act 1, or the one after the last act whose boss quest the
-// quest record of that difficulty has done in order (Act 5 needs the expansion).
-func actReachedIn(q *d2s.QuestRecord, expansion bool) int {
-	act := 1
-
-	for a := 1; a < 5; a++ {
-		if !d2difficulty.ActBossDefeated(q, a) {
-			break
-		}
-
-		act = a + 1
-	}
-
-	if !expansion && act > 4 {
-		act = 4
-	}
-
-	return act
-}
-
 // ChooseDifficulty makes a difficulty the one the hero plays in. It refuses a
 // difficulty that is not unlocked unless force is set (test scenarios). The
 // choice is saved in the hero file and in the .d2s header (active byte) on the
@@ -80,14 +60,6 @@ func (s *HeroState) ChooseDifficulty(l d2difficulty.Level, force bool) error {
 
 	if !force && !s.UnlockedDifficulties()[l] {
 		return fmt.Errorf("%s is not unlocked for %s", l, s.HeroName)
-	}
-
-	// A hero who finished Normal in Act 5 and starts Nightmare begins in the Rogue Encampment: every difficulty has its own
-	// progress, and the act the .d2s says is the act of the difficulty the hero was saved in (wave 43: the Nightmare of a
-	// hero saved in Harrogath started in Harrogath, with no Warriv to take him east).
-	if prev := s.Difficulty; prev != d2enum.DifficultyType(l) {
-		rec := s.questRecords()
-		s.Act = actReachedIn(&rec[l], s.Expansion)
 	}
 
 	s.Difficulty = d2enum.DifficultyType(l)

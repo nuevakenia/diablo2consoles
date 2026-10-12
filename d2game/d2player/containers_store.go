@@ -119,7 +119,6 @@ func (g *GameControls) loadContainers() {
 	g.itemOrigin = make(map[InventoryItem]*d2s.Item)
 
 	g.loadEquipment()
-	g.installRecalc()
 
 	if c.BeltCode != "" && g.inventory.WornAt(d2equip.LocBelt) == nil {
 		if belt, err := factory.NewItem(c.BeltCode); err == nil {

@@ -54,13 +54,10 @@ type killState struct {
 
 	// the skills of the fight (fightskill.go)
 	plan        *fightPlan
-	dropped     map[int]bool         // attack skills the engine refused again and again in this fight
-	castAfter   float64              // kill clock before which no attack is tried again
-	castFails   int                  // refusals in a row that count against the skill
-	lastCast    float64              // kill clock of the last accepted cast of the left skill
-	holdTarget  *d2mapentity.Monster // the target the hero stands and casts at, its life when that began and the kill clock then
-	holdHP      int
-	holdSince   float64
+	dropped     map[int]bool   // attack skills the engine refused again and again in this fight
+	castAfter   float64        // kill clock before which no attack is tried again
+	castFails   int            // refusals in a row that count against the skill
+	lastCast    float64        // kill clock of the last accepted cast of the left skill
 	lastMana    float64        // game clock of the last mana potion
 	manaPotions int            // mana potions drunk
 	casts       map[string]int // accepted casts by skill name, for the summary
@@ -539,24 +536,11 @@ func (v *Game) holdGround(k *killState, dist float64) bool {
 		return false
 	}
 
-	// A target the spells do not hurt (the fireballs end on a wall between them, wave 43: 961 casts in the Durance of Hate)
-	// is not held against for ever: after holdPatience seconds without a point of damage the hero walks closer.
-	if hp, ok := v.monsters.HPOf(k.target); ok {
-		if k.holdTarget != k.target || hp != k.holdHP {
-			k.holdTarget, k.holdHP, k.holdSince = k.target, hp, k.elapsed
-		} else if k.elapsed-k.holdSince > holdPatience {
-			return false
-		}
-	}
-
 	v.attackTarget = nil
 	v.localPlayer.StopMoving()
 
 	return true
 }
-
-// holdPatience is how long (kill clock seconds) a hero with a ranged skill stands while the target loses no life.
-const holdPatience = 6.0
 
 // castSupport casts the support skill that is due (the right button, the summons and buffs of the
 // hotkeys). It reports whether a cast started, which takes the tick: the attack comes next tick.

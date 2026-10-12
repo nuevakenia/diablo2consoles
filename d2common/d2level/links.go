@@ -554,13 +554,10 @@ func OutdoorExitByPreset(level int, path string) (int, bool) {
 
 	p := strings.ToLower(path)
 
-	// The side of the level the caves stand on depends on the map seed (West for the sample hero; North for a seed of
-	// wave 43's full-game chain: NorthEntrance_Snow at the top, NorthExit_Snow at the bottom, both "leads to level 0" before,
-	// so the hero could not leave the Frozen Tundra): the Entrance cave is the way back, the Exit cave the way on, on any side.
 	switch {
-	case strings.Contains(p, "entrance_snow"):
+	case strings.Contains(p, "westentrance"):
 		return 115, true
-	case strings.Contains(p, "exit_snow"):
+	case strings.Contains(p, "westexit"):
 		return 118, true
 	}
 
