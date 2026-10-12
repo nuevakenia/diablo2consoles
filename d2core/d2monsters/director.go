@@ -25,7 +25,7 @@ const (
 
 	frameSeconds   = 1.0 / 25.0 // the game runs at 25 Hz
 	maxCatchUp     = 0.25       // seconds of simulation per rendered frame, at most
-	corpseSeconds  = 12.0       // corpses are removed after this long (engine choice, UNVERIFIED: the original's timing is not in the notes)
+	corpseSeconds  = 12.0       // corpses are removed after this long: ENGINE CHOICE, the exe has NO corpse timer (VERIFIED w29: dead monsters are freed only when their room goes idle, GAME_UpdateIdleRooms 0x52acb0 -> SERVER_UpdateUnitPerFrame 0x541100 -> SERVER_UpdateDeadUnitCleanup 0x540f00, and a dead one is kept for a later restore on only a 1 in 3 roll)
 	blockedRetry   = 8          // refused steps in a row before a blocked monster re-thinks
 	adoptInterval  = 0.5        // seconds between scans for DS1 monster placements
 	replanDistance = 5          // the target moved this far since planning: re-plan (VERIFIED, notes)

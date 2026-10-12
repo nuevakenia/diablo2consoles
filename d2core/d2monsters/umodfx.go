@@ -195,6 +195,9 @@ func (u *fxUnit) Velocity() int {
 	return u.m.Stat.SpeedBase
 }
 
+// HalfDamage: MONSTER_GetBaseClassId (the monstats record's base class word, 0x45f070) == 0x76 (0x59f340). Row 118
+// (hcIdx 0x76) of the stock monstats is willowisp1, the BaseId of the whole will-o-wisp family (willowisp1..8 all
+// name it), so matching the BaseId key is the same test (VERIFIED w29).
 func (u *fxUnit) HalfDamage() bool {
 	return u.m.Stat != nil && strings.EqualFold(u.m.Stat.BaseKey, "willowisp1")
 }

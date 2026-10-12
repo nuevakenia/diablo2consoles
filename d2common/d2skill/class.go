@@ -449,6 +449,19 @@ func (c *cast) needTarget() bool {
 	return true
 }
 
+// outOfReach is the range gate of the attack outcome (AttackInReach) when Options.MeleeGate is on: the blow finds
+// no hit when the target is farther than the table distance allows (no to-hit roll is made then, 0x57cc10 returns 0
+// before it).
+func (c *cast) outOfReach() bool {
+	if !c.p.Opt.MeleeGate || c.tgt.Unit == nil {
+		return false
+	}
+
+	ux, uy := c.u.Pos()
+
+	return !AttackInReach(!c.u.IsPlayer(), c.p.meleeRange(), c.tgt.UX-ux, c.tgt.UY-uy)
+}
+
 func (c *cast) addMelee(m *MeleeResult) {
 	if c.res.Melee == nil {
 		c.res.Melee = m
@@ -459,6 +472,12 @@ func (c *cast) addMelee(m *MeleeResult) {
 
 func doMeleeFn(c *cast) {
 	if !c.needTarget() {
+		return
+	}
+
+	if c.outOfReach() {
+		c.addMelee(&MeleeResult{Target: c.tgt.Unit})
+
 		return
 	}
 

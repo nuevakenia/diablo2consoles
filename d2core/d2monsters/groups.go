@@ -287,6 +287,13 @@ func levelMonsterNames(det *d2records.LevelDetailRecord, diff d2monster.Difficul
 		det.MonsterID9Normal, det.MonsterID10Normal}
 }
 
+// levelUMonNames lists the umon1..umon10 columns of a levels.txt row.
+func levelUMonNames(det *d2records.LevelDetailRecord) []string {
+	return []string{det.MonsterUniqueID1, det.MonsterUniqueID2, det.MonsterUniqueID3, det.MonsterUniqueID4,
+		det.MonsterUniqueID5, det.MonsterUniqueID6, det.MonsterUniqueID7, det.MonsterUniqueID8,
+		det.MonsterUniqueID9, det.MonsterUniqueID10}
+}
+
 // PopulateRoom fills a room of a levels.txt area with natural groups: the
 // level's monster types are drawn once (at most 13, without replacement), the
 // number of groups follows the area's density, and each group picks a type by
@@ -370,12 +377,22 @@ func (d *Director) PopulateRoom(room Room, levelID int) ([]*PackResult, error) {
 		// MONREGION_SpawnRoomMonsters 0x54cad0 / RollGroupMemberVariant 0x5bbba0 (VERIFIED w28): a group
 		// can be a unique spawn, which rolls champion with the monumod row 0 constant (20) percent
 		// (MONSTER_RollUniqueModifiers 0x59e330). The class comes from the level's types here (the exe takes
-		// the levels.txt UMon list in Normal: UNVERIFIED stand-in) and the room ramp is not hosted.
+		// the levels.txt UMon list in Normal, ported w29) and the room ramp is not hosted.
 		uMin, uMax := d.levelUniqueRange(det)
 		roll := func(n int) int { return int(d.packRNG.Roll(int32(n))) }
 
 		if !ci.Boss && d2monster.UniqueVariantRoll(roll, d.uniqueCount[levelID], uMin, uMax, 0, 0) {
 			d.noteUnique(levelID)
+
+			// MONREGION_PickRandomSpawnVariant 0x5bba00 (VERIFIED w29): in Normal the class of a unique comes from
+			// the level's umon1..umon10 list; an empty list keeps the ordinary class (stand-in, UNVERIFIED).
+			if d.opt.Difficulty == d2monster.Normal {
+				if name, ok := d2monster.PickUMonClass(roll, levelUMonNames(det)); ok {
+					if us := d.minionStat(name); us != nil {
+						stat = us
+					}
+				}
+			}
 
 			plan := d2monster.PlanUnique(d.packRNG, d.classInfo(stat))
 			if roll(100) < d.championChance() {
