@@ -126,3 +126,24 @@ func TestMeleeReachIsRangeAdderPlus4(t *testing.T) {
 		t.Errorf("fend strikes = %d, want 2", len(r.Melees))
 	}
 }
+
+// The hero's weapon rangeadder is read at every use (Options.MeleeRangeOf), so a weapon swap changes the reach.
+func TestMeleeRangeOfFollowsWeapon(t *testing.T) {
+	cf, _ := burstFixture()
+	r := 0
+	cf.p.Opt.MeleeRangeOf = func() int { return r }
+
+	if cf.p.swingReach() != 4 {
+		t.Fatalf("bare reach %d", cf.p.swingReach())
+	}
+
+	r = 5 // a polearm
+	if cf.p.swingReach() != 9 || FendReach(cf.p.meleeRange()) != 9 {
+		t.Fatalf("polearm reach %d", cf.p.swingReach())
+	}
+
+	r = -3
+	if cf.p.meleeRange() != 0 {
+		t.Fatal("negative range must read as 0")
+	}
+}

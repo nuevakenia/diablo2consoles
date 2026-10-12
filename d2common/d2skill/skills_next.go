@@ -299,7 +299,7 @@ func doSmiteFn(c *cast) {
 }
 
 // RunVelocityHolder is implemented by a Unit that knows its class run velocity (charstats RunVelocity; the exe
-// reads the byte at record +0x41, which column that is stays UNVERIFIED, the run velocity column is the best fit).
+// reads the byte at record +0x41 = the RunVelocity column, VERIFIED w28 in DATATBL_LoadCharStatsTable 0x612590).
 type RunVelocityHolder interface {
 	RunVelocity() int
 }

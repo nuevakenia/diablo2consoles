@@ -146,6 +146,7 @@ func (v *Game) skillEngine() *d2skills.Engine {
 		},
 		Act:        v.currentAct,
 		Difficulty: int(v.gameClient.Difficulty),
+		MeleeRange: v.heroMeleeRange,
 		WearWeapon: func(chance, amount int) {
 			if v.gameControls != nil {
 				v.gameControls.WearWeapon(chance, amount)

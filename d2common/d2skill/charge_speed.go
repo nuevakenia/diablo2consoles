@@ -7,8 +7,9 @@ import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
 //
 //	base * (Param1 + max(stat 0x43, 50)) / 100
 //
-// where base is the class velocity byte of charstats at record +0x41 (shifted left by 8; the run velocity column,
-// 9 in the shipped rows, UNVERIFIED which column sits at +0x41), Param1 the skill's "percent increase in velocity"
+// where base is the class velocity byte of charstats at record +0x41 (shifted left by 8; the RunVelocity column:
+// VERIFIED w28, DATATBL_LoadCharStatsTable 0x612590 maps RunVelocity to +0x41 and WalkVelocity to +0x40; monsters use the
+// word at monstats +0x34 instead), Param1 the skill's "percent increase in velocity"
 // (150) and stat 0x43 the unit's velocity percentage, floored at 50. The rush then repeats until the target is in
 // melee range (SRVDO_067) with a path step counter of 20 for monsters.
 

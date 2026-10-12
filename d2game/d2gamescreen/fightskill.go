@@ -292,3 +292,12 @@ func (v *Game) drinkMana(k *killState) {
 		}
 	}
 }
+
+// heroMeleeRange is the skill engine's view of UNIT_GetMeleeRange for the hero (the wielded weapon's rangeadder).
+func (v *Game) heroMeleeRange() int {
+	if v.gameControls == nil {
+		return 0
+	}
+
+	return v.gameControls.WeaponRangeAdder()
+}

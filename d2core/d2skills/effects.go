@@ -294,6 +294,11 @@ func (e *Engine) selfState(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 	}
 
 	set.Apply(e.frame, inst)
+
+	if ef.ModeBound && u.merc == nil {
+		e.bindToMode(p, ef.State)
+	}
+
 	e.emit("state", "STATE apply skill=%q unit=%s state=%s frames=%d stacks=%d stats=%s chill_attackers=%d", sk.Name, who,
 		ef.State, ef.Frames, inst.Count, describeMods(ef.Stats), ef.Chill)
 

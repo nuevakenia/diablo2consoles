@@ -369,6 +369,7 @@ type GameControls struct {
 	regenHP, regenMana    float64           // fractions of points not yet applied
 	ammoCap               int               // stack size a replenishing thrown weapon regains up to (ammo_replenish.go)
 	ammoAcc               float64           // seconds towards its next piece
+	repair                repairState       // broken worn items and stat 252 timers (repair_restore.go)
 	vitals                d2herostats.Regen // natural life/mana regeneration (natural_regen.go)
 	bottomMenuRect        *d2geom.Rectangle
 	leftMenuRect          *d2geom.Rectangle
@@ -1235,6 +1236,7 @@ func (g *GameControls) Advance(elapsed float64) error {
 	g.advancePotions(elapsed)
 	g.advanceNaturalRegen(elapsed)
 	g.advanceAmmo(elapsed)
+	g.advanceRepair(elapsed)
 	g.automap.Advance(elapsed)
 	g.questLog.Advance(elapsed)
 	g.mercPanel.Advance(elapsed)
