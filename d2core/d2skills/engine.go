@@ -55,6 +55,9 @@ type Options struct {
 	// WearWeapon rolls the held weapon's durability loss after an Impale hit: chance percent, amount points
 	// (ITEM_ReduceDurabilityOrConsumeOnSkillUse). Nil: no wear.
 	WearWeapon func(chance, amount int)
+	// MeleeRange returns the rangeadder of the weapon the hero wields (UNIT_GetMeleeRange 0x622a30, 0 for bare
+	// hands and most weapons; polearms and spears 5-6). Nil: 0.
+	MeleeRange func() int
 }
 
 // Counters tally what happened, for scenario summaries.
@@ -116,6 +119,7 @@ type Engine struct {
 	visuals     map[uint32]*d2mapentity.Missile
 	fx          map[*d2mapentity.Missile]int // explosion entities and the frame they vanish at
 	sets        map[string]*d2state.Set      // unit id -> states and DoT streams
+	modeBound   []*modeBoundState            // states that end on the hero's next mode change (modebound.go)
 	defs        d2state.Defs                 // states.txt rules shared by the sets
 	timers      []timer
 
@@ -186,7 +190,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	e.pipe = &d2skill.Pipeline{
 		Skills: asset.Records.SkillTable(), Missiles: asset.Records.MissileTable(), Sim: e.sim,
 		Grid: monsters.Grid(), Frame: func() int { return e.frame },
-		Opt: d2skill.Options{IgnoreTown: opt.IgnoreTown, StaticFieldMinPct: staticFieldMin(asset, monsters), EventBursts: true},
+		Opt: d2skill.Options{IgnoreTown: opt.IgnoreTown, StaticFieldMinPct: staticFieldMin(asset, monsters), EventBursts: true, MeleeRangeOf: opt.MeleeRange},
 	}
 	e.pipe.TeleportFlag = opt.TeleportFlag
 	e.pipe.ApplyState = e.applyMissileState
@@ -1206,6 +1210,7 @@ func (e *Engine) Advance(elapsed float64) {
 		e.sim.Step()
 		e.runTimers()
 		e.tick()
+		e.tickModeBound()
 	}
 
 	e.syncVisuals()

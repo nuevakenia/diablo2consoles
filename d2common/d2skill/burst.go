@@ -126,6 +126,14 @@ func (b *Burst) Last() string { return b.last }
 // radius in subtiles tested on squared distance (SKILL_ForEachUnitInRadius 0x569510). Options.MeleeRange holds it
 // (0 when unset).
 func (p *Pipeline) meleeRange() int {
+	if p.Opt.MeleeRangeOf != nil {
+		if r := p.Opt.MeleeRangeOf(); r > 0 {
+			return r
+		}
+
+		return 0
+	}
+
 	if p.Opt.MeleeRange > 0 {
 		return p.Opt.MeleeRange
 	}

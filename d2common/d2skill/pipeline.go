@@ -108,6 +108,8 @@ type Options struct {
 	EventBursts bool
 	// MeleeRange is UNIT_GetMeleeRange (the wielded weapon's rangeadder, 0 when unset; VERIFIED 0x622a30).
 	MeleeRange int
+	// MeleeRangeOf, when set, is read at every use instead of MeleeRange: the hero's wielded weapon changes.
+	MeleeRangeOf func() int
 }
 
 // Pipeline runs skills for casters.
@@ -421,6 +423,9 @@ type Effect struct {
 	// the group (itself included) nothing new is applied (Wearwolf, Werebear,
 	// VERIFIED 0x5c4e80 + 0x56a480).
 	Toggle bool
+	// ModeBound makes a self_state last until the unit's mode changes (stat list flag 4 with no expiry:
+	// UNIT_SetUnitMode calls UNIT_RemoveModeBoundStatLists, VERIFIED; Concentrate, Frames 0).
+	ModeBound bool
 }
 
 // Strike is one delayed hit of a "strikes" effect.

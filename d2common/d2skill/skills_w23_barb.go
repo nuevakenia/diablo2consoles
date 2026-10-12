@@ -55,9 +55,9 @@ func ElemConvClass(etype string) byte {
 
 // ---- Bash, Stun, Concentrate, Berserk: the aurastate ----
 
-// concentrateFrames is how long the Concentrate state is kept. UNVERIFIED: SRVST_Bash allocates the state list with
-// type 4 and expiry 0 (no timer) and the owner of its removal was not found, so the state is kept for one second.
-const concentrateFrames = 25
+// The Concentrate state has no timer in the exe: SRVST_Bash 0x5d6910 allocates its stat list with flag 4 and expiry 0, and
+// UNIT_SetUnitMode (on a real mode change) runs UNIT_RemoveModeBoundStatLists, which switches off the state of every
+// child list with flag 4 and destroys it (VERIFIED w28). So the state lasts until the hero's mode changes (ModeBound).
 
 // berserkMinFrames is the floor of the Berserk duration (0x5d82a0: an expiry not after the current frame becomes
 // frame + 10).
@@ -66,8 +66,8 @@ const berserkMinFrames = 10
 // doMeleeStateFn is the do function 2 (Kick, Power Strike, Bash, Stun, Concentrate, Berserk) followed by the part
 // of SRVST_Bash / SRVST_039 the old port left out (VERIFIED, 0x5d6910 and 0x5d82a0): once the blow is resolved, hit
 // or miss, a skill with a valid aurastate puts it on the CASTER with the aurastat columns. Berserk lasts calc2
-// frames (at least 10) and replaces the state each time; Concentrate has no timer in the exe (see
-// concentrateFrames). Bash and Stun have no aurastate, so nothing changes for them.
+// frames (at least 10) and replaces the state each time; Concentrate has no timer in the exe (ends
+// on the next mode change, see above). Bash and Stun have no aurastate, so nothing changes for them.
 func doMeleeStateFn(c *cast) {
 	doMeleeFn(c)
 
@@ -84,7 +84,7 @@ func doMeleeStateFn(c *cast) {
 
 		c.effect(Effect{Kind: "self_state", State: c.sk.AuraState, Frames: frames, Stats: statsOf(c.env, c.sk)})
 	case c.sk.SrvStFunc == stBash:
-		c.effect(Effect{Kind: "self_state", State: c.sk.AuraState, Frames: concentrateFrames, Stats: statsOf(c.env, c.sk)})
+		c.effect(Effect{Kind: "self_state", State: c.sk.AuraState, ModeBound: true, Stats: statsOf(c.env, c.sk)})
 	}
 }
 
