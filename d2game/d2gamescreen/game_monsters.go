@@ -9,6 +9,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapgen"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2monsters"
@@ -60,6 +61,7 @@ func (v *Game) monsterDirector() *d2monsters.Director {
 		GoldFindFunc:  v.heroGoldFind,
 		OnSound:       v.onMonsterSound,
 		ZealotAfraid:  v.zealotAfraid,
+		MeleeRange:    v.heroMeleeRange,
 		OnShake:       func(s d2monster.Shake) { v.mapRenderer.StartShake(s) },
 		// worn items lose durability when the hero is hit or hits (d2equip)
 		OnHeroHit: func(p *d2mapentity.Player) {
@@ -137,6 +139,14 @@ func (v *Game) OnPlayerAttack(m *d2mapentity.Monster) {
 	v.npcTarget = nil
 }
 
+// heroInSwingReach is the range gate of COMBAT_RollAttackOutcome 0x57cc10 for the hero (VERIFIED w29, ported
+// w36): the blow lands when the table distance is below 1 or at most rangeadder + 2. The hero walks until this
+// holds before he swings, so the gate in the engine (d2skill Options.MeleeGate, Director HeroStrike) never turns
+// a swing into a miss. heroMeleeReach stays the lenient radius monsters use to start their own attacks.
+func (v *Game) heroInSwingReach(hx, hy, mx, my int) bool {
+	return d2skill.AttackInReach(false, v.heroMeleeRange(), mx-hx, my-hy)
+}
+
 // advanceHeroAttack keeps swinging at the attack target while it lives and
 // chases it when it is out of reach.
 func (v *Game) advanceHeroAttack(elapsed float64) {
@@ -155,7 +165,7 @@ func (v *Game) advanceHeroAttack(elapsed float64) {
 
 	// the same edge distance the monsters use, so a monster that can hit the
 	// hero can also be hit back
-	if d2monster.EdgeDistance(hx-mx, hy-my, 1) <= heroMeleeReach {
+	if v.heroInSwingReach(hx, hy, mx, my) {
 		if v.localPlayer.IsCasting() {
 			return
 		}

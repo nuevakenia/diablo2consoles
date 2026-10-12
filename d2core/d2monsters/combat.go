@@ -14,6 +14,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2rand"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2statlist"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop"
@@ -414,6 +415,16 @@ func (d *Director) HeroStrike(p *d2mapentity.Player, m *d2mapentity.Monster) boo
 	}
 
 	d.Counters.HeroSwings++
+
+	// range gate of COMBAT_RollAttackOutcome 0x57cc10 (VERIFIED w29): before the to-hit roll and any seed step
+	if d.opt.MeleeRange != nil {
+		mx, my := m.SubtilePos()
+		if !d2skill.AttackInReach(false, d.opt.MeleeRange(), mx-int(p.Position.X()), my-int(p.Position.Y())) {
+			d.emit("herohit", "HERO swing target=%s hit=false outofreach=true", m.Label())
+
+			return false
+		}
+	}
 
 	st := d.asset.Records.Character.Stats[p.Class]
 	ar := d2combat.PlayerAttackRating(0, p.Stats.Dexterity, st.ToHitFactor)

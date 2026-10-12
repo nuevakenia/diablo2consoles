@@ -24,7 +24,9 @@ import (
 // three cpick weights (short, per difficulty), +0x14 the three upick weights,
 // +0x1c the constant (row 0 holds the champion chance).
 //
-// UNVERIFIED: the type test of exclude1/exclude2 (0x59dc50) reads a bitmask
+// PARTLY VERIFIED w36: the type test of exclude1/exclude2 (MONSTER_TestMonTypeInTypeBitmask 0x59dc50) is a bit lookup,
+// row = excluded type, bit = the class's monstats wMonType, in a table at monster-data +0xc44 (row stride +0xc48 dwords).
+// UNVERIFIED: how that table is filled; it reads a bitmask
 // table built from montype.txt; it is modelled as "the class' MonType is the
 // excluded type or lists it (transitively) in equiv1..3".
 

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2monsters"
@@ -364,7 +363,7 @@ func (v *Game) advanceKill(elapsed float64) {
 	// closer nor stands in reach and swings
 	hsx, hsy := v.localPlayer.Position.X(), v.localPlayer.Position.Y()
 	msx, msy := k.target.SubtilePos()
-	inReach := d2monster.EdgeDistance(int(hsx)-msx, int(hsy)-msy, 1) <= heroMeleeReach
+	inReach := v.heroInSwingReach(int(hsx), int(hsy), msx, msy)
 	// a caster that stands and casts at the target is not stuck
 	casting := k.elapsed-k.lastCast < killStuckSeconds/2
 
@@ -469,7 +468,7 @@ func (v *Game) targetInReach(m *d2mapentity.Monster) bool {
 	hsx, hsy := v.localPlayer.Position.X(), v.localPlayer.Position.Y()
 	msx, msy := m.SubtilePos()
 
-	return d2monster.EdgeDistance(int(hsx)-msx, int(hsy)-msy, 1) <= heroMeleeReach
+	return v.heroInSwingReach(int(hsx), int(hsy), msx, msy)
 }
 
 // castLeftSkill casts the hero's left skill at the fight's target. A refused cast is tried again after a
