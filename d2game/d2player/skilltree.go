@@ -388,6 +388,11 @@ func (s *skillTree) setHeroTypeResourcePath() error {
 
 	for i := 0; i < numTabs; i++ {
 		s.tab[i].closeButtonPosX = entry.closeButtonPos[i]
+
+		// the exe table (0x723eac) is the source of truth; the hero table above is kept as a cross check
+		if ci := SkillTreeClassIndex(s.heroClass); ci >= 0 {
+			s.tab[i].closeButtonPosX = Mode800.SkillTreeCloseX(ci, i)
+		}
 	}
 
 	return nil

@@ -542,7 +542,10 @@ func (m *EscapeMenu) placePentagramsExe(id int) {
 		w, h = Mode800.W, Mode800.H
 	}
 
-	plan := escapeMenuModeFor(w, h).GameMenuPlan(n, n, pentSize)
+	page, rows := gameMenuPageFor(m.currentLayout, n)
+	plan := page.Plan(escapeMenuModeFor(w, h), rows, pentSize)
+
+	id += page.FirstActionRow
 	if id < 0 || id >= len(plan) {
 		return
 	}

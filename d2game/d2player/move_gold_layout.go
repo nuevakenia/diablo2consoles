@@ -33,7 +33,7 @@ const (
 // Constants of the dialog (verified in the call arguments of 0x44f7b0).
 const (
 	goldDlgX, goldDlgY    = 0xd7, 0x8c // nX, nY of the dialog (picture top = nY, bottom = nY + frame height)
-	goldDlgSpinnerX       = 0xdf       // spinner control (up/down arrows) anchor; size UNVERIFIED
+	goldDlgSpinnerX       = 0xdf       // spinner control (up/down arrows) anchor; size = frame 0 of ui menu spinner (read at run time, 0x4b8c20)
 	goldDlgSpinnerY       = 0xdb
 	goldDlgEditX          = 0x102 // edit box anchor; width 100, 10 digits
 	goldDlgEditY          = 0xe4
@@ -44,7 +44,9 @@ const (
 	goldDlgCancelX        = 0x163 // button type 1 (frame 0x0a, 0x0b pressed)
 	goldDlgTextWidth      = 200   // text wrapped to this width (D2WIN_WrapTextToWidth)
 	goldDlgTextRowAdvance = 0x18  // each wrapped line is a dialog entry (type 4), row advance 0x18
-	goldDlgButtonSize     = 32    // UNVERIFIED: size of the OK / cancel pictures (assumed like the party close button)
+	goldDlgButtonSize     = 32    // default size of the OK / cancel pictures when the file is not at hand
+	goldDlgOkFrame        = 0x10  // frame of the buy/sell button picture (table 0x726594, type 0), +1 pressed
+	goldDlgCancelFrame    = 0x0a  // frame for type 1, +1 pressed
 )
 
 // GoldDlgLayout is the result: top left rectangles (the original anchors pictures by the bottom left).
@@ -59,16 +61,41 @@ type GoldDlgLayout struct {
 
 // GoldDialog returns the layout of the dialog for a picture of frameW x frameH (the size of frame 0 of
 // "dialogbackground", read from the game file at run time). The edit box height and the spinner size are not
-// known from the exe (UNVERIFIED): 20 high edit box and 16x30 spinner are placeholders for the hit areas.
+// known from the exe 20 high edit box and 16x30 spinner are placeholders for the hit areas.
 func GoldDialog(kind GoldDlgKind, frameW, frameH int) GoldDlgLayout {
-	btnTop := goldDlgOkY - goldDlgButtonSize
+	return GoldDialogSized(kind, frameW, frameH, GoldDlgSizes{})
+}
+
+// GoldDlgSizes carries the picture sizes the exe reads at run time: UI_ButtonImpl_Construct 0x4b77b0 takes the
+// width and height of the frame (goldDlgOkFrame / goldDlgCancelFrame of the buy/sell button picture) as the
+// button size, CTRL_SpinnerImplConstruct 0x4b8c20 those of frame 0 of ui\menu\spinner. They are file data, not
+// constants of the exe; a zero size falls back to the 32x32 / 16x30 defaults.
+type GoldDlgSizes struct {
+	OkW, OkH, CancelW, CancelH, SpinnerW, SpinnerH int
+}
+
+// GoldDialogSized is GoldDialog with the real sizes of the button and spinner frames. The buttons stand on their bottom
+// edge y = goldDlgOkY (0x11f), so the top is that minus the frame height. The edit box height stays a placeholder
+// (the edit box class takes it from the font; UNVERIFIED).
+func GoldDialogSized(kind GoldDlgKind, frameW, frameH int, sz GoldDlgSizes) GoldDlgLayout {
+	pick := func(v, def int) int {
+		if v > 0 {
+			return v
+		}
+
+		return def
+	}
+
+	okW, okH := pick(sz.OkW, goldDlgButtonSize), pick(sz.OkH, goldDlgButtonSize)
+	cW, cH := pick(sz.CancelW, goldDlgButtonSize), pick(sz.CancelH, goldDlgButtonSize)
+	spW, spH := pick(sz.SpinnerW, 16), pick(sz.SpinnerH, 30)
 
 	l := GoldDlgLayout{
 		Frame:         UIRect{"golddlg", "frame", goldDlgX, goldDlgY, frameW, frameH},
-		Spinner:       UIRect{"golddlg", "spinner", goldDlgSpinnerX, goldDlgSpinnerY, 16, 30},
+		Spinner:       UIRect{"golddlg", "spinner", goldDlgSpinnerX, goldDlgSpinnerY, spW, spH},
 		Edit:          UIRect{"golddlg", "edit", goldDlgEditX, goldDlgEditY, goldDlgEditW, 20},
-		Ok:            UIRect{"golddlg", "ok", goldDlgOkX, btnTop, goldDlgButtonSize, goldDlgButtonSize},
-		Cancel:        UIRect{"golddlg", "cancel", goldDlgCancelX, btnTop, goldDlgButtonSize, goldDlgButtonSize},
+		Ok:            UIRect{"golddlg", "ok", goldDlgOkX, goldDlgOkY - okH, okW, okH},
+		Cancel:        UIRect{"golddlg", "cancel", goldDlgCancelX, goldDlgOkY - cH, cW, cH},
 		TextBaseline0: goldDlgY + goldDlgTextRowAdvance,
 		TextWidth:     goldDlgTextWidth, EditDigits: goldDlgEditDigits, RowStep: goldDlgTextRowAdvance,
 		StatLimit: 14,
