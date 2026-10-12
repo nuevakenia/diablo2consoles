@@ -1,6 +1,7 @@
 package d2player
 
 import (
+	"fmt"
 	"image/color"
 	"sort"
 
@@ -327,19 +328,36 @@ func (a *Automap) drawText(target d2interface.Surface, w int) {
 		a.label.Color[0] = automapColorTextGld
 	}
 
+	width := func(s string) int { x, _ := a.label.GetTextMetrics(s); return x }
+	_, lh := a.label.GetTextMetrics("A")
+
+	// AUTOMAP_DrawAutomap 0x4564a0: level name, then the version line, right aligned and 16 apart.
+	// The game name / password lines are not drawn (no join info here); the difficulty line follows the version line.
+	for _, l := range d2automap.TextStack(a.textLines(), w, width) {
+		a.label.SetText(l.Text)
+		a.label.SetPosition(l.X, l.Y-lh) // the engine's y is the text baseline (UNVERIFIED)
+		a.label.Render(target)
+	}
+}
+
+// textLines are the lines drawn over the automap, in the engine's order: the level name, the version line and, in
+// Nightmare and Hell, the difficulty line (AUTOMAP_DrawAutomap 0x4564a0 / 0x4558b0; the string-table texts
+// "automapdif" = "Difficulty: %s" and the names behind ids 0x1423 / 0x1422 were read from the real string table).
+// UNVERIFIED: that the panel flag byte of the exe equals the game's difficulty index.
+func (a *Automap) textLines() []string {
 	name := ""
 	if a.nameFn != nil {
 		name = a.nameFn(a.currentLevel())
 	}
 
-	width := func(s string) int { x, _ := a.label.GetTextMetrics(s); return x }
-	_, lh := a.label.GetTextMetrics("A")
+	lines := []string{name, d2automap.VersionText}
 
-	// AUTOMAP_DrawAutomap 0x4564a0: level name, then the version line, right aligned and 16 apart.
-	// The game name / password / difficulty lines are not drawn (strings not read, UNVERIFIED).
-	for _, l := range d2automap.TextStack([]string{name, d2automap.VersionText}, w, width) {
-		a.label.SetText(l.Text)
-		a.label.SetPosition(l.X, l.Y-lh) // the engine's y is the text baseline (UNVERIFIED)
-		a.label.Render(target)
+	if a.diffFn != nil {
+		if id := d2automap.DifficultyStringID(a.diffFn()); id != 0 {
+			lines = append(lines, d2automap.DifficultyLine(a.asset.TranslateString("automapdif"),
+				a.asset.TranslateString(fmt.Sprintf("#%d", id))))
+		}
 	}
+
+	return lines
 }

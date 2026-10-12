@@ -1,5 +1,7 @@
 package d2automap
 
+import "strings"
+
 // The text lines that Game.exe 1.14b draws over the automap (AUTOMAP_DrawAutomap 0x4564a0).
 //
 // VERIFIED from the code: after the cells and the unit markers the running y is set to
@@ -64,4 +66,14 @@ func DifficultyStringID(flag int) int {
 	}
 
 	return 0
+}
+
+// DifficultyLine formats the difficulty line from the string-table template ("Difficulty: %s", key automapdif)
+// and the difficulty name.
+func DifficultyLine(template, name string) string {
+	if strings.Contains(template, "%s") {
+		return strings.Replace(template, "%s", name, 1)
+	}
+
+	return template + name
 }
