@@ -284,6 +284,17 @@ func TestPlanTransition(t *testing.T) {
 	if _, err := PlanTransition(1, 200, 0, 0, 0); !errors.Is(err, ErrBadLevel) {
 		t.Errorf("level 200: %v", err)
 	}
+
+	// the Pandemonium areas 133..136 are real Levels.txt rows a portal can lead to (found by the 9s-walk-act5-end scenario)
+	for _, to := range []int{132, 133, 134, 135, 136} {
+		if p, err := PlanTransition(109, to, StartPortal, 1, 2); err != nil || p.ToAct != 5 || p.ActChange {
+			t.Errorf("level %d: %+v, %v", to, p, err)
+		}
+	}
+
+	if _, err := PlanTransition(109, 137, 0, 0, 0); !errors.Is(err, ErrBadLevel) {
+		t.Errorf("level 137: %v", err)
+	}
 }
 
 func TestActWorlds(t *testing.T) {
