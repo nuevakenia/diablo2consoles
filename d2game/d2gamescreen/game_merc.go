@@ -207,7 +207,7 @@ func (v *Game) mercView(p *d2mapentity.Player) (d2player.MercView, bool) {
 		Name: v.mercDisplayName(info.Rec, int(info.Save.NameID)), Level: info.Level,
 		Exp: int(info.Save.Experience), NextExp: info.Stats.NextXP,
 		Str: info.Stats.Str, Dex: info.Stats.Dex, DmgMin: info.Stats.DmgMin, DmgMax: info.Stats.DmgMax,
-		Defense: info.Stats.Defense, Resist: info.Gear.Resist, HP: info.HP, MaxHP: info.MaxHP, Dead: info.Save.Dead,
+		Defense: info.Stats.Defense, Resist: info.Gear.Resist, HP: info.HP, MaxHP: info.MaxHP, Dead: info.Save.Dead, Class: info.Rec.Class,
 	}, true
 }
 
@@ -340,14 +340,29 @@ func (v *Game) offerLine(o d2hireling.Offer) string {
 	return fmt.Sprintf("%s  Lv %d  %s  %dg", v.mercDisplayName(o.Rec, o.NameID), o.Stats.Level, o.Rec.SubType, o.Cost)
 }
 
-// menuLine is the text of one row of the hire list: name, level, kind, life, defense and price.
+// tr translates a string.tbl key (the key itself when it has no text).
+func (v *Game) tr(key string) string {
+	if s := v.asset.TranslateString(key); s != "" {
+		return s
+	}
+
+	return key
+}
+
+// menuLine is the text of one row of the hire list in the form of the exe's dialog (UI_OpenMercHireDialog 0x4b24c0):
+// "<name> - Lvl: N  Life: N  Def: N  Cost: N", then the HireDesc label of the row.
 func (v *Game) menuLine(r d2hireling.MenuRow) string {
 	name := r.NameKey
 	if s := v.asset.TranslateString(r.NameKey); s != "" && s != r.NameKey {
 		name = s
 	}
 
-	return fmt.Sprintf("%s  Lv %d  %s  HP %d  Def %d  %dg", name, r.Level, r.SubType, r.HP, r.Defense, r.Price)
+	line := d2player.HireDialogLine(v.tr, name, r.Level, r.HP, r.Defense, r.Price)
+	if d := d2player.HireDialogDesc(v.tr, r.HireDesc); d != "" {
+		line += "  (" + d + ")"
+	}
+
+	return line
 }
 
 func skillNames(sk []d2hireling.SkillAt) string {
@@ -377,15 +392,35 @@ func (v *Game) openHire(npc d2interface.MapEntity) {
 		return
 	}
 
-	o := v.offerTable(seller)
-	if o == nil || v.localPlayer == nil {
+	title, rows, lines, ok := v.hireDialog(seller)
+	if !ok {
 		v.Infof("NPC menu: Hire at %q has no offers (class %d)", npc.Label(), seller)
 		return
 	}
 
+	v.gameControls.NPCMenu.Open(title, rows, 0, 0, func(row d2player.NPCMenuRow) {
+		v.onHireChoice(seller, row)
+	})
+	v.anchorNPCMenu(v.gameControls.NPCMenu, npc)
+
+	v.Infof("MERC hire dialog title=%q rows=%d", title, len(lines))
+	v.Infof("MERC offers seller=%d npc=%q difficulty=%d owner_level=%d count=%d", seller, npc.Label(), v.mercDifficulty(),
+		v.localPlayer.Stats.Level, len(lines))
+
+	for _, l := range lines {
+		v.Infof("MERC offer %s", l)
+	}
+}
+
+// hireDialog builds what the hire list of a seller shows: its title, its rows (the offers, then the revive row of a dead
+// merc) and a log line per offer.
+func (v *Game) hireDialog(seller int) (title string, rows []d2player.NPCMenuRow, lines []string, ok bool) {
+	o := v.offerTable(seller)
+	if o == nil || v.localPlayer == nil {
+		return "", nil, nil, false
+	}
+
 	tab := v.hirelingTable()
-	rows := []d2player.NPCMenuRow{}
-	lines := []string{}
 
 	for _, r := range tab.HireMenu(o.table, v.localPlayer.Stats.Level, nil) {
 		line := v.menuLine(r)
@@ -396,22 +431,24 @@ func (v *Game) openHire(npc d2interface.MapEntity) {
 
 	if info, ok := v.deadMerc(); ok {
 		rows = append(rows, d2player.NPCMenuRow{
-			Fallback: fmt.Sprintf("Revive %s  %dg", v.mercDisplayName(info.Rec, int(info.Save.NameID)), info.ReviveCost),
+			Fallback: v.reviveLine(info),
 			Action:   d2player.NPCActionReviveMerc,
 		})
 	}
 
-	v.gameControls.NPCMenu.Open(npc.Label(), rows, 0, 0, func(row d2player.NPCMenuRow) {
-		v.onHireChoice(seller, row)
-	})
-	v.anchorNPCMenu(v.gameControls.NPCMenu, npc)
-
-	v.Infof("MERC offers seller=%d npc=%q difficulty=%d owner_level=%d count=%d", seller, npc.Label(), v.mercDifficulty(),
-		v.localPlayer.Stats.Level, len(lines))
-
-	for _, l := range lines {
-		v.Infof("MERC offer %s", l)
+	// the exe titles the dialog with the hero's gold and says so when nothing is left to hire (stash gold, stat 0xf, is not
+	// added: the game does not carry it yet)
+	title = d2player.HireDialogTitle(v.tr, v.localPlayer.Gold)
+	if len(lines) == 0 {
+		title = d2player.HireDialogEmpty(v.tr)
 	}
+
+	return title, rows, lines, true
+}
+
+// reviveLine is the revive row of the hire list: string hireresurrect2 "Resurrect %s: %d" with the merc's name and the price.
+func (v *Game) reviveLine(info d2monsters.MercInfo) string {
+	return d2player.ReviveLine(v.tr("hireresurrect2"), v.mercDisplayName(info.Rec, int(info.Save.NameID)), info.ReviveCost)
 }
 
 // openRevive shows only the revive row (Tyrael).
@@ -424,7 +461,7 @@ func (v *Game) openRevive(npc d2interface.MapEntity) {
 	}
 
 	rows := []d2player.NPCMenuRow{{
-		Fallback: fmt.Sprintf("Revive %s  %dg", v.mercDisplayName(info.Rec, int(info.Save.NameID)), info.ReviveCost),
+		Fallback: v.reviveLine(info),
 		Action:   d2player.NPCActionReviveMerc,
 	}}
 
@@ -790,11 +827,48 @@ func (v *Game) mercTestSetup(t *mercTest) {
 		d.GrantMercExp(p, uint32(n))
 	}
 
+	if os.Getenv("OD2_AUTOMERC_UI") != "" {
+		v.mercTestUI()
+	}
+
 	if !v.mercTestSpawn(t) {
 		return
 	}
 
 	v.next(t)
+}
+
+// mercTestUI is OD2_AUTOMERC_UI=1: the hire lists of the four hirelings' vendors, the portrait and the potion dropped on it.
+func (v *Game) mercTestUI() {
+	p, d := v.localPlayer, v.monsters
+
+	for _, seller := range []int{d2hireling.SellerKashya, d2hireling.SellerGreiz, d2hireling.SellerAsheara, d2hireling.SellerQualKehk} {
+		title, rows, _, ok := v.hireDialog(seller)
+		first := ""
+
+		if len(rows) > 0 {
+			first = rows[0].Fallback
+		}
+
+		v.Infof("AUTOMERC ui: hire seller=%d ok=%v title=%q rows=%d first=%q", seller, ok, title, len(rows), first)
+	}
+
+	info, ok := d.Merc(p)
+	if !ok {
+		v.Infof("AUTOMERC ui: no living merc")
+
+		return
+	}
+
+	d.SetMercHP(p, info.MaxHP*3/10)
+	hurt, _ := d.Merc(p)
+	fill, _, drawn := d2player.MercPortraitBar(hurt.HP, hurt.MaxHP)
+	v.Infof("AUTOMERC ui: merc hurt hp=%d/%d portrait_bar=%d/46 drawn=%v", hurt.HP, hurt.MaxHP, fill, drawn)
+
+	v.gameControls.AutoMercUI(func(format string, a ...interface{}) { v.Infof("AUTOMERC ui: "+format, a...) })
+
+	healed, _ := d.Merc(p)
+	v.Infof("AUTOMERC ui: potion hp %d -> %d healed=%v", hurt.HP, healed.HP, healed.HP > hurt.HP)
 }
 
 // mercTestSpawn puts the scenario's hostile monsters in a ring around the hero.

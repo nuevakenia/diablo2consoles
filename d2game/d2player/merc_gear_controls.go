@@ -1,7 +1,9 @@
 package d2player
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2display"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2equip"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2statlist"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2inventory"
@@ -249,4 +251,81 @@ func orNone(s string) string {
 // MercStatItems is the hero's merc gear as stat list items for the director.
 func (g *GameControls) MercStatItems() []d2statlist.Item {
 	return g.heroState.MercStatItems(g.hero.Merc)
+}
+
+// renderMercPortrait draws the hireling portrait of the HUD (UI_DrawHirelingPortraitStrip). It shares the top left
+// corner with the left panels, so it is hidden while one is open (the exe hides it for its open-panel checks:
+// which panels exactly is UNVERIFIED).
+func (g *GameControls) renderMercPortrait(target d2interface.Surface) {
+	v, ok := g.portraitShown()
+	if !ok {
+		return
+	}
+
+	// the exe draws it in screen coordinates (the strip starts at the left edge of the screen), not in the interface column
+	ox, oy := d2display.ColumnOrigin()
+
+	target.PushTranslation(-ox, -oy)
+	g.mercPortrait.Render(target, v)
+
+	if sx, sy := g.lastMouseX+ox, g.lastMouseY+oy; MercPortraitHit(sx, sy) {
+		g.mercPortrait.RenderTooltip(target, g.mercPortraitTooltip(), sx, sy)
+	}
+
+	target.Pop()
+}
+
+// portraitPoint is a point of the portrait picture in interface-column coordinates (what the mouse handlers receive).
+func portraitPoint() (x, y int) {
+	ox, oy := d2display.ColumnOrigin()
+
+	return mercPortraitX + 5 - ox, mercPortraitBarTop + 10 - oy
+}
+
+func (g *GameControls) mercPortraitTooltip() []string {
+	return MercPortraitTooltip(g.asset.TranslateString("hireiconinfo2"), g.asset.TranslateString("hireiconinfo1"), "O")
+}
+
+// portraitShown reports whether the portrait is on screen (a merc exists and no left panel covers it).
+func (g *GameControls) portraitShown() (MercView, bool) {
+	if g.mercPortrait == nil || g.mercHost.View == nil || g.isLeftPanelOpen() {
+		return MercView{}, false
+	}
+
+	v, ok := g.mercHost.View()
+
+	return v, ok && MercPortraitIcon(v.Class) != ""
+}
+
+// mercPortraitClick handles a click on the portrait: the left button drops the cursor item on the merc (a potion
+// heals it, gear is equipped: GiveCursorToMerc), the right button opens the merc's inventory ("Right-click to Open
+// Inventory", "Drop Potion on Portrait to Heal": strings hireiconinfo2 / hireiconinfo1).
+func (g *GameControls) mercPortraitClick(left bool, mx, my int) bool {
+	ox, oy := d2display.ColumnOrigin()
+
+	if !MercPortraitHit(mx+ox, my+oy) {
+		return false
+	}
+
+	if _, ok := g.portraitShown(); !ok {
+		return false
+	}
+
+	if !left {
+		g.ToggleMercPanel()
+
+		return true
+	}
+
+	if g.inventory.CursorItem() == nil {
+		return false
+	}
+
+	if v := g.GiveCursorToMerc(); !v.OK {
+		g.Infof("MERC portrait: refused reason=%v %s", v.Reason, v.Detail)
+	} else {
+		g.Infof("MERC portrait: item given consumed=%v", v.Consumed)
+	}
+
+	return true
 }

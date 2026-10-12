@@ -222,6 +222,7 @@ func NewGameControls(
 		skilltree:      skilltree,
 		heroStatsPanel: heroStatsPanel,
 		mercPanel:      NewMercPanel(asset, ui, l),
+		mercPortrait:   NewMercPortrait(asset, ui),
 		questLog:       questLog,
 		HelpOverlay:    helpOverlay,
 		NPCMenu:        NewNPCMenu(asset, ui),
@@ -343,6 +344,7 @@ type GameControls struct {
 	skilltree         *skillTree
 	heroStatsPanel    *HeroStatsPanel
 	mercPanel         *MercPanel
+	mercPortrait      *MercPortrait
 	PartyPanel        *PartyPanel
 	questLog          *QuestLog
 	HelpOverlay       *HelpOverlay
@@ -868,6 +870,13 @@ func (g *GameControls) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 	px = truncateFloat64(px)
 	py = truncateFloat64(py)
 
+	if (event.Button() == d2enum.MouseButtonLeft || event.Button() == d2enum.MouseButtonRight) &&
+		g.mercPortraitClick(event.Button() == d2enum.MouseButtonLeft, mx, my) {
+		g.lastLeftBtnActionTime = d2util.Now()
+
+		return true
+	}
+
 	if event.Button() == d2enum.MouseButtonLeft && g.mercPanelClick(mx, my) {
 		g.lastLeftBtnActionTime = d2util.Now()
 
@@ -1367,6 +1376,8 @@ func (g *GameControls) Render(target d2interface.Surface) error {
 	if err := g.renderPanels(target); err != nil {
 		return err
 	}
+
+	g.renderMercPortrait(target)
 
 	g.Trade.Render(target)
 	g.PTrade.Render(target)

@@ -6,7 +6,9 @@ scenario_env() {
   # a desert mercenary (Prayer aura), an eastern sorcerer (Frozen Armor, Glacial Spike, Ice Blast) and a barbarian (Bash, Stun) and casts each
   # of their skills once; then OD2_AUTOMERC_LEVELS takes the hero by waypoint to the real DRLG map of Jail Level 1 (OD2_REALMAPS) with the
   # merc hurt, kills it there, goes back to the encampment by portal (the dead merc stays behind) and revives it
-  echo "export OD2_AUTOMERC=skeleton1,4 OD2_AUTOMERC_KILL=1 OD2_AUTOMERC_TYPES=0,6,16,24 OD2_AUTOMERC_MERCLEVEL=85 OD2_AUTOMERC_LEVELS=1 OD2_REALMAPS=1 OD2_D2S_WRITEBACK=\"$wb\""
+  # W37_SHOT=<file.png> (optional, by hand) saves a frame of the interface while the portrait shows the hurt merc
+  if [ -n "${W37_SHOT:-}" ]; then echo "export OD2_AUTOSHOT=$W37_SHOT OD2_AUTOSHOT_DELAY=${W37_SHOT_DELAY:-14}"; fi
+  echo "export OD2_AUTOMERC_UI=1 OD2_AUTOMERC=skeleton1,4 OD2_AUTOMERC_KILL=1 OD2_AUTOMERC_TYPES=0,6,16,24 OD2_AUTOMERC_MERCLEVEL=85 OD2_AUTOMERC_LEVELS=1 OD2_REALMAPS=1 OD2_D2S_WRITEBACK=\"$wb\""
 }
 scenario_check() {
   grep -E "AUTOMERC (summary|types|levels)|MERC (spawn|hire|death|revive|leaves|arrive|stays)|D2S EXPORT reparse" $log.txt | cut -c1-300
@@ -14,6 +16,16 @@ scenario_check() {
     "D2S EXPORT reparse: .*merc=type"; do
     grep -qE "$pat" $log.txt || { echo "FAIL: no '$pat' in the merc log"; fail=1; }
   done
+
+  # w37 merc interface: the hire lists are in the form of the exe's dialog, the portrait takes a potion and heals the merc,
+  # gear dropped on it is worn, a too heavy item is refused, the right button opens the merc screen
+  for pat in "AUTOMERC ui: hire seller=150 ok=true title=\"Your Gold: [0-9]+ +Hire which Mercenary\\?\" rows=[0-9]+ first=\".* - Lvl: +[0-9]+  Life: +[0-9]+  Def: +[0-9]+  Cost: +[0-9]+" \
+    "AUTOMERC ui: hire seller=198 ok=true" "AUTOMERC ui: hire seller=252 ok=true" "AUTOMERC ui: hire seller=515 ok=true" \
+    "MERC ui portrait shown tooltip=" "MERC ui potion drop handled=true cursor_empty=true" "MERC potion name=.*(instant=[1-9]|over_time=[1-9])" \
+    "MERC ui right click merc_screen_open=true" "MERC give decision=ok item=hp5 consumed=true" "MERC ui gear gear=cap@1" "MERC ui shield item=tow on_cursor=true"; do
+    grep -qE "$pat" $log.txt || { echo "FAIL: no '$pat' in the merc log"; fail=1; }
+  done
+  grep -E "AUTOMERC ui:" $log.txt | cut -c1-260
 
   # skills.txt effects through the d2skills engine instead of own damage + a timed flag
   for pat in "AUTOMERC types: probe Inner Sight=ok Fire Arrow=ok" "AUTOMERC types: probe Jab=ok Prayer=ok" \
