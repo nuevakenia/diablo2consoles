@@ -107,6 +107,13 @@ type Hit struct {
 	// record +0x18 and +0x14) a monster's cold and freeze lengths are
 	// integer-divided by; 0 = none. Only used with HasColdEffect.
 	ChillDiv, FreezeDiv int
+	// Target, when set, turns on the exe's target gates (exe_gates.go): boss / immobile / mercenary stun rules,
+	// the freeze routing to chill, and non-monsters taking the plain -50 chill with no divisor. Roll100 draws
+	// the seed%100 rolls (stun skip on DataFlag8 monsters, the shatter visual); nil = roll 99 (no skip, no flash).
+	// NoFlash is monstats2 flag bit 0x13 of the class.
+	Target  *Target
+	Roll100 func() int
+	NoFlash bool
 }
 
 // ApplyHit turns the lengths of a hit into states and streams on the set and
@@ -121,48 +128,53 @@ type Hit struct {
 func (s *Set) ApplyHit(frame int, h Hit) []string {
 	var out []string
 
-	if h.HasColdEffect {
-		if h.ColdEffect == 0 {
-			h.CannotChill, h.CannotFreeze = true, true
+	roll := func() int {
+		if h.Roll100 == nil {
+			return 99
 		}
 
-		if h.ColdEffect > 0 {
-			h.CannotFreeze = true
-		}
-
-		if h.ColdEffect < 0 {
-			if h.ChillDiv > 0 && h.ColdLen > 0 {
-				h.ColdLen /= h.ChillDiv
-				if h.ColdLen < 1 {
-					h.ColdLen = 1
-				}
-			}
-
-			if h.FreezeDiv > 0 {
-				h.FreezeLen /= h.FreezeDiv
-			}
-		}
+		return h.Roll100()
 	}
 
+	// the exe order is stun, chill, freeze, poison, burn (0x57a650)
 	if h.StunLen > 0 && !h.CannotStun {
-		s.Apply(frame, Instance{Name: Stun, Until: frame + StunLength(h.StunLen), Source: h.Source, SkillID: h.SkillID})
-		out = append(out, Stun)
-	}
+		n, ok := StunLength(h.StunLen), true
+		if h.Target != nil {
+			r := 99
+			if h.Target.Monster && h.Target.DataFlag8 {
+				r = roll()
+			}
 
-	if h.FreezeLen > 0 && !h.CannotFreeze {
-		s.extend(frame, Instance{Name: Freeze, Until: frame + h.FreezeLen, Source: h.Source, SkillID: h.SkillID})
-		out = append(out, Freeze)
-	}
-
-	if h.ColdLen > 0 && !h.CannotChill {
-		slow := ChillSpeedPct
-		if h.HasColdEffect {
-			slow = h.ColdEffect
+			n, ok = StunFor(h.StunLen, *h.Target, r)
 		}
 
-		s.extend(frame, Instance{Name: Chill, Until: frame + h.ColdLen, Source: h.Source, SkillID: h.SkillID,
-			Mods: []StatMod{{"velocitypercent", slow}, {"attackrate", slow}, {"other_animrate", slow}}})
+		if ok {
+			s.Apply(frame, Instance{Name: Stun, Until: frame + n, Source: h.Source, SkillID: h.SkillID})
+			out = append(out, Stun)
+		}
+	}
+
+	if h.ColdLen > 0 && s.applyChill(frame, h, h.ColdLen, roll) {
 		out = append(out, Chill)
+	}
+
+	if h.FreezeLen > 0 {
+		route := RouteFreeze
+		if h.Target != nil {
+			route = RouteFreezeFor(*h.Target)
+		}
+
+		switch route {
+		case RouteChill:
+			// the freeze length goes through the chill applier (its divisor, its min of 1)
+			if s.applyChill(frame, h, h.FreezeLen, roll) {
+				out = append(out, Chill)
+			}
+		case RouteFreeze:
+			if s.applyFreeze(frame, h) {
+				out = append(out, Freeze)
+			}
+		}
 	}
 
 	if h.Poison > 0 && h.PoisonLen > 0 {
@@ -177,6 +189,81 @@ func (s *Set) ApplyHit(frame int, h Hit) []string {
 
 	return out
 }
+
+// coldEffectOf returns the cold effect the appliers use: the monster's value when known, else -50 (players and
+// unknown targets). A target flagged as a non-monster never uses the monster value or the divisors.
+func (h Hit) coldEffectOf() (eff int, monsterValue bool) {
+	if (h.Target == nil || h.Target.Monster) && h.HasColdEffect {
+		return h.ColdEffect, true
+	}
+
+	return ChillSpeedPct, false
+}
+
+// applyChill is COMBAT_ApplyColdSlowState (0x578ca0): ColdEffect 0 does nothing; a negative one on a monster
+// divides the length by the difficulty cold divisor; the length is at least 1; an active chill only gets a later
+// end and keeps its first slow.
+func (s *Set) applyChill(frame int, h Hit, length int, roll func() int) bool {
+	if h.CannotChill {
+		return false
+	}
+
+	slow, monster := h.coldEffectOf()
+	if monster && slow == 0 {
+		return false
+	}
+
+	if monster && slow < 0 && h.ChillDiv > 0 {
+		length /= h.ChillDiv
+	}
+
+	if length < 2 {
+		length = 1
+	}
+
+	s.extend(frame, Instance{Name: Chill, Until: frame + length, Source: h.Source, SkillID: h.SkillID,
+		Mods: []StatMod{{"velocitypercent", slow}, {"attackrate", slow}, {"other_animrate", slow}}})
+
+	if h.Target != nil && h.Target.Monster && h.Roll100 != nil {
+		s.shatterOn = ShatterVisual(roll(), true, h.NoFlash)
+	}
+
+	return true
+}
+
+// applyFreeze is the tail of 0x578f50: it needs a negative ColdEffect (default -50), divides the length by the
+// freeze divisor for monsters and only ever extends an active freeze.
+func (s *Set) applyFreeze(frame int, h Hit) bool {
+	if h.CannotFreeze {
+		return false
+	}
+
+	eff, monster := h.coldEffectOf()
+	if monster && eff >= 0 {
+		return false
+	}
+
+	n := h.FreezeLen
+	if monster && h.FreezeDiv > 0 {
+		n /= h.FreezeDiv
+	}
+
+	if n <= 0 {
+		return false // expires on the frame it is made (the exe makes the list and ends it at once)
+	}
+
+	if n <= 0 {
+		return false // expires on the frame it is made (the exe makes the list and ends it at once)
+	}
+
+	s.extend(frame, Instance{Name: Freeze, Until: frame + n, Source: h.Source, SkillID: h.SkillID})
+
+	return true
+}
+
+// ShatterVisual reports the state 0x6b bit the last chill call left (verified 0x578ca0; the bit is a visual
+// only, cleared by the next chill roll that fails).
+func (s *Set) ShatterVisual() bool { return s.shatterOn }
 
 // extend applies a state that, when already active, only gets a later end
 // (chill, freeze).
