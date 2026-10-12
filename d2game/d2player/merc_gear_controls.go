@@ -133,7 +133,8 @@ func (g *GameControls) GiveCursorToMerc() MercGiveVerdict {
 
 	if res.Consumed {
 		if it, isPotion := item.(*diablo2item.Item); isPotion && g.mercHost.Drink != nil {
-			g.mercHost.Drink(d2inventory.PotionEffectOf(it.CommonRecord()))
+			// a non-player drinker: life x2, mana x1 (PLAYER_ScaleValueByClassGroupA/B 0x62a730 / 0x62a780)
+			g.mercHost.Drink(d2inventory.ScaledPotion(d2inventory.PotionEffectOf(it.CommonRecord()), 0, false, 0, 0, nil))
 		}
 
 		g.inventory.SetCursorItem(nil)

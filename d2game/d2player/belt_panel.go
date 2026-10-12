@@ -194,9 +194,8 @@ func (b *BeltPanel) AutoBelt(item InventoryItem) (cell int, ok bool) {
 		return 0, false
 	}
 
-	// The first-empty-cell fallback is on: in the original it depends on a flag of the potion's
-	// base record (+0x131); whether the misc.txt "belt" column is that flag (or +0x130) is
-	// UNVERIFIED, so the engine keeps its previous behaviour for every autobelt item.
+	// The fallback flag of INV_FindBeltSlotForItem 0x63d700 is the autobelt column itself (VERIFIED), which is
+	// required above, so the fallback is on.
 	cell, ok = d2inventory.FindBeltSlotOpt(b.kinds(), b.Boxes(), b.kindOf(item), true)
 	if !ok {
 		return 0, false

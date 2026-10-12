@@ -10,9 +10,9 @@ package d2player
 //	automap     0x71ece0  7 entries, same numbers
 //
 // The entries of the sound / video / automap pages are the title row, the option rows and the previous menu row.
-// Which of the two sound (video) headers applies is chosen by code not examined (UNVERIFIED; the 7 / 6 entry
-// variants are presumably the pages without the options a machine cannot offer). The Go pages are the 8 / 8 / 7
-// variants. The page header values are the same arguments UI_DrawGameMenu 0x47a1d0 reads (count, pitch, strip dy,
+// The 8 / 8 / 7 pages are the Lord of Destruction ones: UI_BuildGameMenu initialises video 0x71a258 and automap
+// 0x71ece0 only when MAIN_CheckExpansionMpq is true, and the 7-entry sound 0x715294 and 6-entry video 0x71a26c
+// pages (no automap page) otherwise (VERIFIED, w25-input). The Go pages are the 8 / 8 / 7 variants. The page header values are the same arguments UI_DrawGameMenu 0x47a1d0 reads (count, pitch, strip dy,
 // pentagram dy); the fifth int (36) is the title text offset (meaning UNVERIFIED).
 
 // GameMenuPage describes one page of the menu.

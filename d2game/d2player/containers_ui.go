@@ -197,8 +197,10 @@ func (g *GameControls) AutoBeltUse(col int) []string {
 // through the regen that advancePotions ticks. A potion without an effect in
 // the tables is used up without one.
 func (g *GameControls) drink(it *diablo2item.Item) {
-	e := d2inventory.PotionEffectOf(it.CommonRecord())
 	st := g.hero.Stats
+	// class factor and vitality / energy doubling of the exe (d2inventory/potion_exe.go)
+	e := d2inventory.ScaledPotion(d2inventory.PotionEffectOf(it.CommonRecord()), d2inventory.ExeClass(g.hero.Class),
+		true, st.Vitality, st.Energy, potionRoll)
 
 	before := st.Health
 	beforeMana := st.Mana

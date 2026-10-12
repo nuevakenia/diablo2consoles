@@ -18,7 +18,7 @@ func TestVkToKey(t *testing.T) {
 		{'A', d2enum.KeyA, true}, {'Z', d2enum.KeyZ, true}, {'0', d2enum.Key0, true}, {'4', d2enum.Key4, true},
 		{0x70, d2enum.KeyF1, true}, {0x7b, d2enum.KeyF12, true}, {0x60, d2enum.KeyKP0, true},
 		{0x67, d2enum.KeyKP7, true}, {0x09, d2enum.KeyTab, true}, {0xc0, d2enum.KeyTilde, true},
-		{0x103, d2enum.KeyMouseWheelUp, true}, {d2key.Unbound, 0, false}, {0x100, 0, false},
+		{0x103, d2enum.KeyMouseWheelUp, true}, {d2key.Unbound, 0, false}, {0x100, d2enum.KeyMouse3, true}, {0x105, 0, false},
 	}
 
 	for _, tc := range tests {
