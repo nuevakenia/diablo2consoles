@@ -49,7 +49,12 @@ The full list is in Configure Controls.
 * NPC list (Talk / Trade / Gamble / ...): Up / Down or Tab / Shift+Tab move the highlighted row (wraps around), Enter or
   Space chooses it, Esc picks Cancel.
 * Game menu and its pages: Up / Down, Enter, Esc.
-* Trade windows, inventory and the other panels still need the pointer to move items; use a gamepad or the mouse.
+* Moving items without the mouse (inventory, stash, cube, vendor window): with one of them open, an arrow key shows a
+  yellow cell cursor; arrows move it, Enter or Space is a left click on that cell (pick the item up, drop or swap the
+  held one, buy from a vendor), Ctrl + Enter auto-places, PageUp / PageDown (or Home / End) hop to the previous / next
+  open panel. Enter is the chat key again once all panels are closed.
+* Mouse wheel: previous / next skill (the default binding); it steps the right skill, Shift + wheel the left one.
+  Skills are visited in skill id order (which button the original changes is not verified).
 
 ## Gamepad
 

@@ -393,6 +393,7 @@ type GameControls struct {
 	// ground click (a walk or a skill use). Only such a hold repeats; a click that began on an NPC,
 	// object or item interacts once.
 	heldLeftWalk           bool
+	kbd                    kbdState // keyboard cell cursor over the item grids (kbd_grid.go)
 	lastRightBtnActionTime float64
 	FreeCam                bool
 	isSinglePlayer         bool
@@ -509,6 +510,10 @@ func (g *GameControls) OnKeyDown(event d2interface.KeyEvent) bool {
 		return true
 	}
 
+	if g.gridKeyNav(event) {
+		return true
+	}
+
 	gameEvent := g.keyMap.getGameEvent(event.Key())
 
 	switch gameEvent {
@@ -545,6 +550,10 @@ func (g *GameControls) OnKeyDown(event d2interface.KeyEvent) bool {
 		g.useNextPotion()
 	case d2enum.UseTownPortal:
 		g.useTownPortalKey()
+	case d2enum.SelectNextSkill:
+		g.onWheelSkill(1, event.KeyMod())
+	case d2enum.SelectPreviousSkill:
+		g.onWheelSkill(-1, event.KeyMod())
 	case d2enum.UseBeltSlot1, d2enum.UseBeltSlot2, d2enum.UseBeltSlot3, d2enum.UseBeltSlot4:
 		g.UseBeltColumn(int(gameEvent - d2enum.UseBeltSlot1))
 	case d2enum.UseSkill1, d2enum.UseSkill2, d2enum.UseSkill3, d2enum.UseSkill4,
@@ -1392,6 +1401,7 @@ func (g *GameControls) Render(target d2interface.Surface) error {
 		return err
 	}
 
+	g.renderKbdCursor(target)
 	g.inventory.RenderCursorItem(target, g.lastMouseX, g.lastMouseY)
 
 	return nil
@@ -1511,6 +1521,12 @@ func (g *GameControls) bindTerminalCommands(term d2interface.Terminal) error {
 
 	if err := term.Bind("bindkey", "bind a key to a game event and save it, e.g. bindkey ToggleInventoryPanel X",
 		[]string{"event", "key"}, g.commandBindKey(term)); err != nil {
+		return err
+	}
+
+	// test-only: puts the keyboard cell cursor on the first item of its grid (scenarios cannot know where items lie)
+	if err := term.Bind("kbdfind", "move the keyboard grid cursor to the first item of its grid, for scenarios", nil,
+		func([]string) error { g.kbdFind(); return nil }); err != nil {
 		return err
 	}
 

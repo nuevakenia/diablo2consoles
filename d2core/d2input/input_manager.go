@@ -52,6 +52,7 @@ func (im *inputManager) Advance(elapsed, _ float64) error {
 		im.updatePressedKey(key, eventBase)
 	}
 
+	im.updateWheel(eventBase)
 	im.updateInputChars(eventBase)
 
 	for button := d2enum.MouseButtonMin; button <= d2enum.MouseButtonMax; button++ {

@@ -103,6 +103,15 @@ func (p *Pipeline) channelDo(u Unit) bool {
 
 	spawn := c.field != 0
 	c.field, c.on = 1, false
+
+	// HOST ADAPTATION (UNVERIFIED, w42): in the exe the held button keeps asking while the animation runs, so every
+	// request lands inside the 6 frame window of the one before. The port asks again only when the action has
+	// ended (InfernoLen frames after this Do), which came 8 frames after the previous Start and made every second
+	// run a wind-up (found by scenario w42-inferno-hold). The Do therefore keeps the list alive for the window.
+	if now := p.frame(); c.until < now+ChannelHoldFrames {
+		c.until = now + ChannelHoldFrames
+	}
+
 	c.actionEnd = p.frame() + p.infernoLen(u)
 
 	return spawn

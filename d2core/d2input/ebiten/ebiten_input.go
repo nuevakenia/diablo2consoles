@@ -159,7 +159,12 @@ func (is InputService) IsKeyPressed(key d2enum.Key) bool {
 		return commandHeld()
 	}
 
-	return inpututil.KeyPressDuration(keyToEbiten[key]) > 0
+	ek, ok := keyToEbiten[key]
+	if !ok {
+		return false // no ebiten key (mouse 3-5, wheel, tilde): never alias key 0
+	}
+
+	return inpututil.KeyPressDuration(ek) > 0
 }
 
 // IsKeyJustPressed checks if the provided key is just transitioned from up to down.
@@ -172,7 +177,12 @@ func (is InputService) IsKeyJustPressed(key d2enum.Key) bool {
 		return false // no ebiten key: only the held state is known
 	}
 
-	return inpututil.IsKeyJustPressed(keyToEbiten[key])
+	ek, ok := keyToEbiten[key]
+	if !ok {
+		return false // no ebiten key (mouse 3-5, wheel, tilde): never alias key 0
+	}
+
+	return inpututil.IsKeyJustPressed(ek)
 }
 
 // IsKeyJustReleased checks if the provided key is just transitioned from down to up.
@@ -185,7 +195,12 @@ func (is InputService) IsKeyJustReleased(key d2enum.Key) bool {
 		return false
 	}
 
-	return inpututil.IsKeyJustReleased(keyToEbiten[key])
+	ek, ok := keyToEbiten[key]
+	if !ok {
+		return false // no ebiten key (mouse 3-5, wheel, tilde): never alias key 0
+	}
+
+	return inpututil.IsKeyJustReleased(ek)
 }
 
 // ignoreRealMouseButtons: a scripted run (OD2_AUTOSCRIPT) takes its clicks from the script only. A physical click on
@@ -236,5 +251,20 @@ func (is InputService) KeyPressDuration(key d2enum.Key) int {
 		return 0
 	}
 
-	return inpututil.KeyPressDuration(keyToEbiten[key])
+	ek, ok := keyToEbiten[key]
+	if !ok {
+		return 0 // no ebiten key (mouse 3-5, wheel, tilde): never alias key 0
+	}
+
+	return inpututil.KeyPressDuration(ek)
+}
+
+// MouseWheel returns the wheel movement of the last tick (positive y = wheel up / away from the user). A scripted
+// run ignores the real wheel like the real buttons (OD2_REAL_INPUT=1 lets it through).
+func (is InputService) MouseWheel() (dx, dy float64) {
+	if ignoreRealMouseButtons || d2util.QuietEnabled() {
+		return 0, 0
+	}
+
+	return ebiten.Wheel()
 }
