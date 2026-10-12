@@ -95,6 +95,9 @@ type TradeWindow struct {
 	tabSprite  *d2ui.Sprite // buyselltabs.dc6: frames 0..3 selected, 4..7 other
 	tabLabels  [vendorTabs]*d2ui.Label
 
+	// tab is the selected vendor tab (storepage row, DAT_007b4c8c).
+	tab int
+
 	isOpen  bool
 	vendor  d2vendor.Vendor
 	stock   *d2vendor.Stock
@@ -289,6 +292,12 @@ func (t *TradeWindow) open(v d2vendor.Vendor, seed uint32, quests *d2s.QuestReco
 	}
 
 	t.stock = stock
+	t.tab = 0
+
+	if !gamble {
+		t.tab = t.firstTab(initialVendorTab(v.ClassID))
+	}
+
 	t.rebuildGrid()
 	t.title.SetText(v.Name)
 	t.repairBtn.SetVisible(v.Repairs)
@@ -386,7 +395,7 @@ func (t *TradeWindow) rebuildGrid() {
 
 	for _, e := range t.stock.Items {
 		item, ok := e.Payload.(*diablo2item.Item)
-		if !ok {
+		if !ok || e.Page != t.visiblePage() {
 			continue
 		}
 
@@ -542,6 +551,7 @@ func (t *TradeWindow) Buy(item *diablo2item.Item) (price int, err error) {
 	t.stock.Remove(e)
 	t.grid.Remove(item)
 	delete(t.entries, item)
+	t.fixTab()
 
 	t.inv.grid.AutoPlace(item, true)
 
@@ -582,10 +592,13 @@ func (t *TradeWindow) Sell(item *diablo2item.Item) (price int, err error) {
 	if d2trade.Resellable(info) {
 		e := &d2vendor.Item{Code: item.CommonCode, SoldByPlayer: true, Payload: item}
 		e.W, e.H = item.InventoryGridSize()
+		e.Page = d2vendor.StorePageOf(t.asset.Records, item.CommonCode)
 
 		if t.stock.Place(e) {
-			if err := t.grid.Set(e.X, e.Y, item); err == nil {
-				t.entries[item] = e
+			if e.Page == t.visiblePage() {
+				if err := t.grid.Set(e.X, e.Y, item); err == nil {
+					t.entries[item] = e
+				}
 			}
 
 			item.Refill()
@@ -785,6 +798,12 @@ func (t *TradeWindow) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 	mx, my := event.X(), event.Y()
 
 	if event.Button() == d2enum.MouseButtonLeft {
+		if i := t.tabAt(mx, my); i >= 0 {
+			t.selectTab(i)
+
+			return true
+		}
+
 		if item, ok := t.grid.ItemAtScreen(mx, my).(*diablo2item.Item); ok {
 			if _, err := t.Buy(item); err != nil {
 				t.Infof("buy %q: %v", item.Label(), err)
@@ -833,7 +852,7 @@ func (t *TradeWindow) Render(target d2interface.Surface) {
 // of buyselltabs.dc6 standing on y 91 (H + oy - 0x1c1) at x = 80 + 0x50*i, frame i for the selected tab and i+4 for
 // the others, captioned with the strings 0xfc4..0xfc7 (Armor, Weapons, Magic, Misc: the static table repeats 0xfc5 for
 // the third entry, which is UNVERIFIED and read as Magic); the caption stands at y 80 (UNVERIFIED anchor: bottom of
-// the text). The tabs are drawn with the first selected; the engine's stock is not split into pages (UNVERIFIED).
+// the text). The stock is split into pages by the item type's StorePage (d2vendor.Item.Page); a tab without items is not drawn.
 const (
 	vendorTabs       = 4
 	vendorTabsSprite = "/data/global/ui/panel/buyselltabs.dc6"
@@ -862,14 +881,109 @@ func (t *TradeWindow) tabBox(i int) (x, top, w, h int) {
 	return vendorTabX + vendorTabPitch*i, vendorTabBottom - h, w, h
 }
 
+// pageCount is the number of stock items on a tab.
+func (t *TradeWindow) pageCount(page int) int {
+	n := 0
+
+	if t.stock == nil {
+		return 0
+	}
+
+	for _, e := range t.stock.Items {
+		if e.Page == page {
+			n++
+		}
+	}
+
+	return n
+}
+
+// visiblePage is the page the grid shows: the gamble stock has a single page.
+func (t *TradeWindow) visiblePage() int {
+	if t.gamble {
+		return 0
+	}
+
+	return t.tab
+}
+
+// initialVendorTab is the tab a vendor window opens on (UI_OpenNpcTradePanelInit 0x48dd70, VERIFIED switch on the
+// NPC class): Charsi (0x9a) and Larzuk (0x1ff) open on Weapons, the classes listed as Misc open there (empty tabs
+// fall through to the next, see firstTab), any other class starts on the first tab.
+func initialVendorTab(class int) int {
+	switch class {
+	case 0x9a, 0x1ff:
+		return 1
+	case 0x94, 0xb1, 0xb2, 0xca, 0xfc, 0xfd, 0x101, 0x195, 0x201, 0xff:
+		return 3
+	}
+
+	return 0
+}
+
+// firstTab is the tab to show when tab want is asked for: itself when it holds items, else the next one that does,
+// wrapping after the last (UI_BuildNpcTabItemCounts 0x483b60, VERIFIED loop of at most four steps).
+func (t *TradeWindow) firstTab(want int) int {
+	for i := 0; i < vendorTabs; i++ {
+		p := (want + i) % vendorTabs
+		if t.pageCount(p) > 0 {
+			return p
+		}
+	}
+
+	return 0
+}
+
+// fixTab leaves a tab that has just run empty (the grid is rebuilt by the caller when it changed).
+func (t *TradeWindow) fixTab() {
+	if !t.gamble && t.pageCount(t.tab) == 0 {
+		t.tab = t.firstTab(t.tab + 1)
+		t.rebuildGrid()
+	}
+}
+
+// selectTab shows tab i if it holds items and is not shown yet (click handler 0x48e340 region, VERIFIED: an empty
+// tab is neither drawn nor clickable).
+func (t *TradeWindow) selectTab(i int) bool {
+	if t.gamble || i < 0 || i >= vendorTabs || i == t.tab || t.pageCount(i) == 0 {
+		return false
+	}
+
+	t.tab = i
+	t.rebuildGrid()
+	t.tooltip.SetVisible(false)
+
+	return true
+}
+
+// tabAt returns the tab under a screen point, or -1.
+func (t *TradeWindow) tabAt(mx, my int) int {
+	if t.gamble || t.tabSprite == nil {
+		return -1
+	}
+
+	for i := 0; i < vendorTabs; i++ {
+		x, top, w, h := t.tabBox(i)
+		if t.pageCount(i) > 0 && mx >= x && mx < x+w && my >= top && my < top+h {
+			return i
+		}
+	}
+
+	return -1
+}
+
 func (t *TradeWindow) renderTabs(target d2interface.Surface) {
 	if t.tabSprite == nil || t.gamble {
 		return
 	}
 
 	for i := 0; i < vendorTabs; i++ {
+		if t.pageCount(i) == 0 {
+			continue // empty tabs are not drawn (flag +0x16 of the tab record)
+		}
+
 		frame := i + vendorTabs
-		if i == 0 {
+		if i == t.tab {
 			frame = i
 		}
 
@@ -881,6 +995,12 @@ func (t *TradeWindow) renderTabs(target d2interface.Surface) {
 		}
 
 		l := t.tabLabels[i]
+		if i == t.tab {
+			l.Color[0] = color.RGBA{R: 255, G: 215, B: 0, A: 255} // font colour 4 (gold) for the selected tab
+		} else {
+			l.Color[0] = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+		}
+
 		tw, th := l.GetTextMetrics(l.GetText())
 		l.SetPosition(x+(w-tw)/2, vendorTabTextY-th)
 		l.Render(target)

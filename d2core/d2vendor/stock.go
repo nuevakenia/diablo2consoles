@@ -64,6 +64,8 @@ type Base struct {
 	ReqLevel int // required level (record +0xfd)
 	W, H     int // inventory size in cells
 	Vendor   Params
+	// Page is the vendor tab of the item type, -1 when the type has none (the original then discards the item).
+	Page int
 
 	// Permanent is PermStoreItem: the item is always for sale, never rolled.
 	Permanent bool
@@ -104,7 +106,10 @@ type Item struct {
 	SoldByPlayer bool
 
 	W, H int
-	X, Y int // top-left cell in the vendor grid
+	X, Y int // top-left cell in the vendor grid (of the item's page)
+	// Page is the vendor window tab holding the item (storepage.txt row, ITEM_GetStorePage 0x62e990 from the item
+	// type's StorePage column: 0 Armor, 1 Weapons, 2 Magic, 3 Misc). Every page has its own grid.
+	Page int
 
 	// Payload lets the UI attach the realised item object.
 	Payload interface{}
@@ -135,24 +140,40 @@ type Options struct {
 // Stock is a vendor inventory.
 type Stock struct {
 	Items []*Item
-	grid  *d2inventory.OccupancyGrid
+	grids map[int]*d2inventory.OccupancyGrid
+}
+
+func (s *Stock) gridOf(page int) *d2inventory.OccupancyGrid {
+	g := s.grids[page]
+	if g == nil {
+		g = d2inventory.NewOccupancyGrid(GridCols, GridRows)
+		s.grids[page] = g
+	}
+
+	return g
 }
 
 // NewStock creates an empty stock grid.
 func NewStock() *Stock {
-	return &Stock{grid: d2inventory.NewOccupancyGrid(GridCols, GridRows)}
+	return &Stock{grids: map[int]*d2inventory.OccupancyGrid{}}
 }
 
 // Place puts an item on the first free spot (the vendor owner uses first fit
 // column-major, VERIFIED) and reports whether there was room.
 func (s *Stock) Place(it *Item) bool {
-	x, y, ok := s.grid.FindFreeSlot(it.W, it.H, false)
+	if it.Page < 0 {
+		return false
+	}
+
+	g := s.gridOf(it.Page)
+
+	x, y, ok := g.FindFreeSlot(it.W, it.H, false)
 	if !ok {
 		return false
 	}
 
 	it.X, it.Y = x, y
-	s.grid.Fill(x, y, it.W, it.H, true)
+	g.Fill(x, y, it.W, it.H, true)
 	s.Items = append(s.Items, it)
 
 	return true
@@ -163,7 +184,7 @@ func (s *Stock) Place(it *Item) bool {
 func (s *Stock) Remove(it *Item) {
 	for i, o := range s.Items {
 		if o == it {
-			s.grid.Fill(it.X, it.Y, it.W, it.H, false)
+			s.gridOf(it.Page).Fill(it.X, it.Y, it.W, it.H, false)
 			s.Items = append(s.Items[:i], s.Items[i+1:]...)
 
 			return
@@ -173,8 +194,13 @@ func (s *Stock) Remove(it *Item) {
 
 // ItemAt returns the item covering a grid cell, or nil.
 func (s *Stock) ItemAt(x, y int) *Item {
+	return s.ItemAtPage(0, x, y)
+}
+
+// ItemAtPage is ItemAt on one tab.
+func (s *Stock) ItemAtPage(page, x, y int) *Item {
 	for _, it := range s.Items {
-		if x >= it.X && x < it.X+it.W && y >= it.Y && y < it.Y+it.H {
+		if it.Page == page && x >= it.X && x < it.X+it.W && y >= it.Y && y < it.Y+it.H {
 			return it
 		}
 	}
@@ -366,11 +392,11 @@ func Generate(rng d2drop.RNG, bases []Base, opt Options) *Stock {
 	failures := 0
 
 	create := func(b *Base, q d2drop.Quality, perm bool) bool {
-		it := &Item{Code: b.Code, Quality: q, ILvl: ilvl, W: b.W, H: b.H, Permanent: perm}
+		it := &Item{Code: b.Code, Quality: q, ILvl: ilvl, W: b.W, H: b.H, Permanent: perm, Page: b.Page}
 
 		if code := upgradeCode(rng, b, opt, ilvl); code != b.Code && opt.Resolve != nil {
 			if nb, ok := opt.Resolve(code); ok {
-				it.Code, it.W, it.H = code, nb.W, nb.H
+				it.Code, it.W, it.H, it.Page = code, nb.W, nb.H, nb.Page
 				b = &nb
 			}
 		}
