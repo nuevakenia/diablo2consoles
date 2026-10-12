@@ -159,8 +159,9 @@ func Compute(t *Template, diff Difficulty, m Mods, r *d2rand.Seed) Stats {
 	}
 
 	// item_normaldamage (stat 0x6f, Skeleton Mastery's passivestat2) is a flat amount added to both ends of the
-	// physical roll (COMBAT_BuildAttackerDamage, skills-combat.md). The order against damagepercent is UNVERIFIED
-	// (the percent is applied by a later step of the combat code that was not read): flat first.
+	// physical roll (COMBAT_BuildAttackerDamage, skills-combat.md). The order against damagepercent is VERIFIED
+	// (COMBAT_RollPhysicalDamage 0x579120, wave 27): stat 0x6f is added to both ends first, then the percent is
+	// applied to each end; flat first.
 	flat := s.Other["item_normaldamage"]
 	s.DmgMin += flat
 	s.DmgMax += flat

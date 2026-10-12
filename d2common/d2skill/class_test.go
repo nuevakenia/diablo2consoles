@@ -250,7 +250,7 @@ func TestCurses(t *testing.T) {
 func TestDoubleSwingAndMultiHit(t *testing.T) {
 	cf := newClassFixture(map[string]int{"Double Swing": 5, "Bash": 4, "Zeal": 7, "Fend": 3})
 	z := cf.addFoe("z", 3, 0)
-	z2 := cf.addFoe("z2", 5, 1)
+	z2 := cf.addFoe("z2", 4, 0)
 	cf.addFoe("far", 40, 0)
 	cf.u.roller = &seq{vals: make([]uint32, 200)}
 	cf.u.ar = 100000 // never miss

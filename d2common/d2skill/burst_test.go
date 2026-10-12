@@ -8,7 +8,7 @@ import (
 func burstFixture() (*classFixture, *testTarget) {
 	cf := newClassFixture(map[string]int{"Zeal": 7, "Fend": 3})
 	z := cf.addFoe("z", 3, 0)
-	cf.addFoe("z2", 7, 0)   // outside melee range 4, inside 4+4
+	cf.addFoe("z2", 4, 0)   // inside melee range 0 + 4 (UNIT_GetMeleeRange is 0 for most weapons)
 	cf.addFoe("far", 20, 0) // never reached
 	cf.u.roller = &seq{vals: make([]uint32, 400)}
 	cf.u.ar = 100000
@@ -101,5 +101,28 @@ func TestChargedBoltAim(t *testing.T) {
 
 	if len(distinct) < 3 {
 		t.Errorf("bolts barely differ: %v", distinct)
+	}
+}
+
+// UNIT_GetMeleeRange (0x622a30) is the weapon's rangeadder, 0 for most weapons; the scans use that + 4.
+func TestMeleeReachIsRangeAdderPlus4(t *testing.T) {
+	cf, _ := burstFixture()
+	cf.addFoe("edge", 5, 0)
+
+	if cf.p.meleeRange() != 0 || cf.p.swingReach() != 4 {
+		t.Fatalf("meleeRange=%d swingReach=%d", cf.p.meleeRange(), cf.p.swingReach())
+	}
+
+	cf.p.Opt.MeleeRange = 2 // polearm-like rangeadder
+
+	if cf.p.swingReach() != 6 || FendReach(cf.p.meleeRange()) != 6 {
+		t.Fatalf("swingReach=%d", cf.p.swingReach())
+	}
+
+	cf.p.Opt.MeleeRange = 0
+	_, r := cf.castOn("Fend", cf.foes[0])
+	// z (3) and z2 (4) are in reach 4, edge (5) and far (20) are not: min(calc1, 2) strikes
+	if len(r.Melees) != 2 {
+		t.Errorf("fend strikes = %d, want 2", len(r.Melees))
 	}
 }
