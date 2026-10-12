@@ -67,6 +67,7 @@ func (v *Game) advanceSound(elapsed float64) {
 	v.soundEnv.SetDayPhase(v.currentDayPhase().Phase())
 	v.soundEngine.SetPanelOpen(v.gameControls != nil && v.gameControls.IsEscapeMenuOpen())
 	v.advanceHeroFootsteps(elapsed)
+	v.advanceAreaVoice()
 }
 
 // soundPos converts a map position to sound units.
@@ -180,6 +181,8 @@ func heroFootstepHandle(weight string, material int) string {
 
 // playHeroSwing plays the weapon swing of the hero's melee attack.
 func (v *Game) playHeroSwing() {
+	v.heroSoundTick = v.soundEngine.Ticks()
+
 	if v.playFormSwing() { // the Werewolf / Werebear attack sounds replace the weapon swing
 		return
 	}

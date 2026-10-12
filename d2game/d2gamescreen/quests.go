@@ -289,12 +289,13 @@ func (v *Game) onMonsterKilled(ev d2monsters.KillEvent) {
 
 		r.g.SyncDenMonsters(alive)
 
-		if alive == 0 {
-			v.playStinger(denStinger, "den of evil cleared")
-		}
+		// the cleared Den's sting comes with the hero line 0x23 the quest effects send
 	}
 
-	if h, ok := questStingers[ev.Label]; ok && ev.ByHero {
+	if id, ok := questKillVoices[ev.Label]; ok && ev.ByHero {
+		v.Infof("QUEST kill voice %q id=%#x", ev.Label, id)
+		v.sayHero(id)
+	} else if h, ok := questStingers[ev.Label]; ok && ev.ByHero {
 		v.playStinger(h, "killed "+ev.Label)
 	}
 
@@ -460,7 +461,9 @@ func (v *Game) applyQuestEffects(effects []d2quest.Effect) {
 			r.respec = true
 			v.Infof("QUEST EFFECT respec-available (Akara, slot 41)")
 		case d2quest.EffectSound:
-			v.Infof("QUEST EFFECT sound id=%d quest=%d (%s) [not played: the attach-sound table is not decoded]", e.Value, e.Quest, e.Note)
+			// the value is the hero voice id of UNITSND_PlayUnitSoundById (0x13 impossible .. 0x53 defeat_baal)
+			v.Infof("QUEST EFFECT sound id=%d quest=%d (%s)", e.Value, e.Quest, e.Note)
+			v.sayHero(e.Value)
 		case d2quest.EffectPortal:
 			v.questPortal(e)
 		case d2quest.EffectUnlockAct:

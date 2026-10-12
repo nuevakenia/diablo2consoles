@@ -354,6 +354,7 @@ func (v *Game) afterLevelBuilt(from, to int, via string) {
 	v.riteEnter(to)
 	v.anyaEnter(to)
 	v.enterSoundEnv(to)
+	v.areaVoiceEnter(to)
 	v.chaosEnter(to)
 	v.restoreCorpse()
 	v.restoreLevel(to)
@@ -606,7 +607,7 @@ func (v *Game) operateDoor(ob *d2mapentity.Object) {
 	blocked := v.gameClient.MapEngine.DoorBlocks(fx, fy)
 
 	if changed {
-		v.playObjectSound(d2audio.DoorSound(ob.Record().Index, open), ob, "door")
+		v.playDoorSound(ob, open)
 	}
 
 	v.Infof("OBJECT door %q id=%d open=%v changed=%v blocks=%v footprint=(%d,%d %dx%d) pos=(%.1f,%.1f)",
@@ -640,7 +641,7 @@ func (v *Game) operateWaypoint(ob *d2mapentity.Object) {
 	}
 
 	if changed {
-		v.playObjectSound(d2audio.HandleWaypointOpen, ob, "waypoint")
+		v.playObjectSound(d2audio.ObjectModeSound(ob.Record().Index, 1), ob, "waypoint")
 
 		bit, _ := d2level.WaypointBit(level)
 		v.Infof("WAYPOINT activated level=%d (%s) bit=%d difficulty=%d", level, v.levelName(level), bit, v.gameClient.Difficulty)

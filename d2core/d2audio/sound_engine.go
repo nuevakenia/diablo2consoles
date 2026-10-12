@@ -144,7 +144,7 @@ func rowsFromRecords(details d2records.SoundDetails) []d2sfx.Row {
 			DeferInst: e.DeferInst, StopInst: e.StopInst, Duration: e.Duration,
 			Compound: e.Compound, Falloff: e.Falloff, Priority: e.Priority,
 			AsyncOnly: e.AsyncOnly, Stream: e.Stream, Stereo: e.Stereo, Tracking: e.Tracking,
-			Solo: e.Solo, MusicVol: e.MusicVol,
+			Solo: e.Solo, MusicVol: e.MusicVol, Block1: e.Block1, Block2: e.Block2, Block3: e.Block3,
 		})
 	}
 
