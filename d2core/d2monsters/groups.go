@@ -416,9 +416,13 @@ func (d *Director) leaderDied(u *unit) {
 // recordRank stores what makes the leader of a pack special on its unit: the
 // super unique key and hcIdx with the modifiers of its row (Mod1..3), or the
 // modifiers rolled for a champion / unique (type bit 0x1 = modifiers rolled).
-// The counts per rank and difficulty are UNVERIFIED: champion 2, unique
-// 1 + difficulty + 1 (Mod1..3 of a super unique are used as they are).
+// The unique count is VERIFIED w27 (rolledModCount); the champion count of 2 stays
+// UNVERIFIED (Mod1..3 of a super unique are used as they are).
 func (d *Director) recordRank(m *d2mapentity.Monster, plan d2monster.Pack) {
+	if m.Brain != nil {
+		m.Brain.Unique = m.TypeFlags&d2mapentity.MonTypeUnique != 0 // data flag mask 8 (0x59dd60)
+	}
+
 	switch {
 	case plan.SuperUnique != "":
 		m.SuperUnique = plan.SuperUnique
@@ -439,10 +443,8 @@ func (d *Director) recordRank(m *d2mapentity.Monster, plan d2monster.Pack) {
 
 		m.TypeFlags |= d2mapentity.MonTypeModsRolled
 	case m.TypeFlags&(d2mapentity.MonTypeChampion|d2mapentity.MonTypeUnique) != 0:
-		n, champion := 2+int(d.opt.Difficulty), m.TypeFlags&d2mapentity.MonTypeChampion != 0
-		if champion {
-			n = 2
-		}
+		champion := m.TypeFlags&d2mapentity.MonTypeChampion != 0
+		n := rolledModCount(int(d.opt.Difficulty), champion)
 
 		m.Modifiers = d2monster.PickUniqueMods(d.packRNG, d.modCandidates(champion), n)
 		m.TypeFlags |= d2mapentity.MonTypeModsRolled
@@ -474,4 +476,16 @@ func (d *Director) modCandidates(champion bool) []d2monster.ModCandidate {
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID }) // map order must not change the roll
 
 	return out
+}
+
+// rolledModCount is the number of non-champion modifier rows a unique draws:
+// MONSTER_RollUniqueModifiers 0x59e330 (VERIFIED w27) draws Roll(1) + 1 + the
+// game difficulty byte (+0x6d: 0 normal, 1 nightmare, 2 hell) rows, so 1, 2 or 3
+// (the Roll(1) step is always 0). A champion keeps the UNVERIFIED count of 2.
+func rolledModCount(difficulty int, champion bool) int {
+	if champion {
+		return 2
+	}
+
+	return 1 + difficulty
 }

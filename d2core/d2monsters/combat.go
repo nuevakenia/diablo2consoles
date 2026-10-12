@@ -845,7 +845,9 @@ func (d *Director) creditOwnerMerc(src *d2mapentity.Player, victim *unit, baseXP
 	}
 
 	// EXP_CapMercExperienceGain 0x57c400 (VERIFIED): one kill never gives more
-	// than 1/64 of the level span. Order against the share is UNVERIFIED.
+	// than 1/64 of the level span. Order VERIFIED w27: EXP_CalcKillExperience
+	// 0x57c490 applies the cap last (after level scale 0x57c300, ExpRatio 0x57c3a0
+	// and the item bonus), before MERC_AwardExperience 0x57c860 credits it.
 	share = d2hireling.KillGainCap(share, mu.merc.level, mu.merc.rec.ExpPerLvl)
 
 	d.creditMerc(mu.merc, mu, d2herostats.MercKillShare(share, d.killer == mu))

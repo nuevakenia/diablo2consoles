@@ -278,7 +278,8 @@ func (d *Director) strikeUnit(u, tu *unit, atk d2mapentity.MonsterAttack, mode d
 	}
 
 	// dodge / avoid / evade of a summon's passive skills (Valkyrie), rolled after the to-hit and before the damage
-	// like the hero's (VERIFIED order for players, COMBAT_RollDodgeAvoidEvade 0x57bd60; for monsters UNVERIFIED)
+	// like the hero's (VERIFIED w27 for monsters too: COMBAT_RollDodgeAvoidEvade 0x57bd60 has a monster branch, evade
+	// (stat 0x154) only in modes walk 2 / run 0xf and then nothing else is rolled, otherwise block, then dodge (0x152) or avoid (0x153))
 	if hit && tu.ally != nil {
 		moving := tu.m.Mode() == d2monster.ModeWalk || tu.m.Mode() == d2monster.ModeRun
 		if summonAvoids(tu.b.Seed, tu.ally.opt, moving, attackIsRanged(u.m.Stat, mode)) {

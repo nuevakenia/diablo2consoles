@@ -195,9 +195,11 @@ func acquire(c *Ctx) bool {
 	return false
 }
 
-// postTargetWake is MONAI_PostTargetChecks' first stage 0x5aed10 (VERIFIED):
-// for a Summoner (class 250), or a unit the host marks "unaware" (the exe
-// tests a game flag, FUN_0059dd60 with 8, whose meaning is UNVERIFIED), the
+// postTargetWake is MONAI_PostTargetChecks' first stage 0x5aed10
+// (MONAI_CheckSummonerWakeUp, VERIFIED w27): for a Summoner (class 250), a unit
+// whose type flags carry the unique mask 8 (MONSTER_HasDataFlag16 0x59dd60 on
+// unit data +0x16, Brain.Unique) or a class with the monstats boss flag
+// (MONSTER_IsBossMonster 0x63fa40, flag dword bit 6, Profile.Boss), the
 // first time a player is the target within tick distance < 20 (VERIFIED in
 // the 0x5aed10 disassembly: it reads +0x14 of the tick params, which 0x5aefc0
 // also uses as the distance; an earlier pass wrongly called it a counter) and
@@ -209,7 +211,7 @@ func postTargetWake(c *Ctx) bool {
 		return false
 	}
 
-	if b.Class != summonerClass && !(b.Def != nil && b.Def.Name == "Summoner") {
+	if !wakesOnFirstSight(b) {
 		return false
 	}
 
@@ -221,6 +223,12 @@ func postTargetWake(c *Ctx) bool {
 	c.Sleep(wakeUpFrames)
 
 	return true
+}
+
+// wakesOnFirstSight is the class/flag gate of 0x5aed10: Summoner, unique flag or boss class.
+func wakesOnFirstSight(b *Brain) bool {
+	return b.Class == summonerClass || (b.Def != nil && b.Def.Name == "Summoner") ||
+		b.Unique || (b.Profile != nil && b.Profile.Boss)
 }
 
 // findStandard is the target search of 0x5dd6b0 without its idle side effects

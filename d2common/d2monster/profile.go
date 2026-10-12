@@ -48,6 +48,8 @@ type Profile struct {
 	// Melee is monstats flag bit 1 (isMelee, class flag test 0x452b20 bit 1).
 	// UNVERIFIED mapping of the bit's name; the bit index is VERIFIED.
 	Melee bool
+	// Boss is the monstats boss column (flag dword bit 6, MONSTER_IsBossMonster 0x63fa40, VERIFIED w27).
+	Boss bool
 	// NoWalk is true when the class lacks the WL mode (monstats2 mode byte
 	// +0xf0 bit 2, test 0x467af0). The zero value (can walk) is the usual case.
 	NoWalk bool
