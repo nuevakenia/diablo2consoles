@@ -10,7 +10,7 @@ func TestRolledModCount(t *testing.T) {
 		}
 	}
 
-	if got := rolledModCount(2, true); got != 2 {
+	if got := rolledModCount(2, true); got != 1 {
 		t.Fatalf("champion: got %d", got)
 	}
 }

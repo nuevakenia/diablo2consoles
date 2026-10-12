@@ -290,8 +290,8 @@ func levelMonsterNames(det *d2records.LevelDetailRecord, diff d2monster.Difficul
 // PopulateRoom fills a room of a levels.txt area with natural groups: the
 // level's monster types are drawn once (at most 13, without replacement), the
 // number of groups follows the area's density, and each group picks a type by
-// rarity and a free centre cell inside the room. Champion and unique packs
-// (umon, MonUMin/Max) are not generated (the notes do not cover them).
+// rarity and a free centre cell inside the room. Unique and champion packs
+// roll as in the exe (w28); super uniques and the room ramp toward MonUMin are not generated.
 func (d *Director) PopulateRoom(room Room, levelID int) ([]*PackResult, error) {
 	det := d.asset.Records.GetLevelDetails(levelID)
 	if det == nil {
@@ -322,13 +322,15 @@ func (d *Director) PopulateRoom(room Room, levelID int) ([]*PackResult, error) {
 	}
 
 	density := [3]int{det.MonsterDensityNormal, det.MonsterDensityNightmare, det.MonsterDensityHell}[d.opt.Difficulty]
-	tiles := room.W * room.H / (subtilesPerTile * subtilesPerTile)
-	if room.WalkTiles > 0 && room.WalkTiles < tiles {
-		tiles = room.WalkTiles
+	// MONREGION_SpawnRoomMonsters 0x54cad0 (VERIFIED w28): one group roll per 3x3 subtile cell of the room,
+	// each succeeding with chance (MonDen+1)/100000. Cells the hero cannot walk are dropped in proportion
+	// (engine choice; the exe tries a random point and fails when it is blocked).
+	cells := d2monster.RoomCells(room.W, room.H)
+	if tiles := room.W * room.H / (subtilesPerTile * subtilesPerTile); room.WalkTiles > 0 && room.WalkTiles < tiles && tiles > 0 {
+		cells = cells * room.WalkTiles / tiles
 	}
 
-	groups := d2monster.GroupsForRoomFrac(tiles, density,
-		d2monster.AvgGroupSize(types), func(n int) int { return int(d.packRNG.Roll(int32(n))) })
+	groups := d2monster.GroupsForCells(cells, density, func(n int) int { return int(d.packRNG.Roll(int32(n))) })
 
 	var out []*PackResult
 
@@ -360,7 +362,32 @@ func (d *Director) PopulateRoom(room Room, levelID int) ([]*PackResult, error) {
 			continue
 		}
 
-		if res, err := d.SpawnGroup(stat, free); err == nil {
+		var (
+			res *PackResult
+			err error
+		)
+
+		// MONREGION_SpawnRoomMonsters 0x54cad0 / RollGroupMemberVariant 0x5bbba0 (VERIFIED w28): a group
+		// can be a unique spawn, which rolls champion with the monumod row 0 constant (20) percent
+		// (MONSTER_RollUniqueModifiers 0x59e330). The class comes from the level's types here (the exe takes
+		// the levels.txt UMon list in Normal: UNVERIFIED stand-in) and the room ramp is not hosted.
+		uMin, uMax := d.levelUniqueRange(det)
+		roll := func(n int) int { return int(d.packRNG.Roll(int32(n))) }
+
+		if !ci.Boss && d2monster.UniqueVariantRoll(roll, d.uniqueCount[levelID], uMin, uMax, 0, 0) {
+			d.noteUnique(levelID)
+
+			plan := d2monster.PlanUnique(d.packRNG, d.classInfo(stat))
+			if roll(100) < d.championChance() {
+				plan = d2monster.PlanChampion(d.packRNG, d.classInfo(stat))
+			}
+
+			res, err = d.SpawnPack(plan, free)
+		} else {
+			res, err = d.SpawnGroup(stat, free)
+		}
+
+		if err == nil {
 			out = append(out, res)
 		}
 	}
@@ -417,8 +444,8 @@ func (d *Director) leaderDied(u *unit) {
 // recordRank stores what makes the leader of a pack special on its unit: the
 // super unique key and hcIdx with the modifiers of its row (Mod1..3), or the
 // modifiers rolled for a champion / unique (type bit 0x1 = modifiers rolled).
-// The unique count is VERIFIED w27 (rolledModCount); the champion count of 2 stays
-// UNVERIFIED (Mod1..3 of a super unique are used as they are).
+// The unique count is VERIFIED w27 and the champion count of 1 w28 (rolledModCount);
+// the 20% chance that a unique turns champion in the exe is not rolled here (Mod1..3 of a super unique are used as they are).
 func (d *Director) recordRank(m *d2mapentity.Monster, plan d2monster.Pack) {
 	if m.Brain != nil {
 		m.Brain.Unique = m.TypeFlags&d2mapentity.MonTypeUnique != 0 // data flag mask 8 (0x59dd60)
@@ -460,7 +487,7 @@ func (d *Director) modCandidates(champion bool) []d2monster.ModCandidate {
 	var out []d2monster.ModCandidate
 
 	for _, r := range d.asset.Records.Monster.Unique.Mods {
-		if !r.Enabled || r.ID <= 2 || (r.ExpansionOnly && !d.opt.Expansion) || (r.Champion && !champion) {
+		if !r.Enabled || r.ID <= 2 || (r.ExpansionOnly && !d.opt.Expansion) || (r.Champion != champion) { // champion: boss rows only (0x59e330 -> MONSTER_PickRandomBossUMod); unique: non-boss rows only
 			continue
 		}
 
@@ -482,11 +509,39 @@ func (d *Director) modCandidates(champion bool) []d2monster.ModCandidate {
 // rolledModCount is the number of non-champion modifier rows a unique draws:
 // MONSTER_RollUniqueModifiers 0x59e330 (VERIFIED w27) draws Roll(1) + 1 + the
 // game difficulty byte (+0x6d: 0 normal, 1 nightmare, 2 hell) rows, so 1, 2 or 3
-// (the Roll(1) step is always 0). A champion keeps the UNVERIFIED count of 2.
+// (the Roll(1) step is always 0). A champion (VERIFIED w28) takes the other branch of
+// 0x59e330: exactly one row, from MONSTER_PickRandomBossUMod (champion column rows).
 func rolledModCount(difficulty int, champion bool) int {
 	if champion {
-		return 2
+		return 1
 	}
 
 	return 1 + difficulty
+}
+
+// levelUniqueRange is MonUMin / MonUMax of the level for the game difficulty.
+func (d *Director) levelUniqueRange(det *d2records.LevelDetailRecord) (uMin, uMax int) {
+	mins := [3]int{det.MonsterUniqueMinNormal, det.MonsterUniqueMinNightmare, det.MonsterUniqueMinHell}
+	maxs := [3]int{det.MonsterUniqueMaxNormal, det.MonsterUniqueMaxNightmare, det.MonsterUniqueMaxHell}
+
+	return mins[d.opt.Difficulty], maxs[d.opt.Difficulty]
+}
+
+// noteUnique counts a unique of a level (the +0x2c8 byte of the exe's level record).
+func (d *Director) noteUnique(levelID int) {
+	if d.uniqueCount == nil {
+		d.uniqueCount = map[int]int{}
+	}
+
+	d.uniqueCount[levelID]++
+}
+
+// championChance is the chance in percent that a rolled unique is a champion: the constant of monumod row 0
+// (0x59e330, 20 in the stock table); 0 without the table.
+func (d *Director) championChance() int {
+	if c := d.asset.Records.Monster.Unique.Constants; len(c) > 0 {
+		return c[0]
+	}
+
+	return 0
 }

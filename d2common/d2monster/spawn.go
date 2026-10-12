@@ -264,9 +264,45 @@ func rarityOf(c ClassInfo) int {
 	return c.Rarity
 }
 
+// MaxMonsterDensity is the cap MONREGION_SpawnRoomMonsters 0x54cad0 puts on the level's MonDen
+// (VERIFIED w28, the region word at +0x2b8 is clamped to 10000 before the cell loop).
+const MaxMonsterDensity = 10000
+
+// RoomCells is the number of spawn cells of a room rectangle given in subtiles
+// (VERIFIED w28, 0x54cad0): (width / 3) * (height / 3), integer divisions.
+func RoomCells(subW, subH int) int {
+	if subW <= 0 || subH <= 0 {
+		return 0
+	}
+
+	return (subW / 3) * (subH / 3)
+}
+
+// GroupsForCells is the cell loop of MONREGION_SpawnRoomMonsters 0x54cad0 (VERIFIED w28):
+// every cell draws Roll(100000) from the room seed and spawns one group when the draw is at or
+// below the level density (MonDen of the game difficulty, capped to 10000). roll(n) returns 0..n-1.
+func GroupsForCells(cells, density int, roll func(n int) int) int {
+	if density > MaxMonsterDensity {
+		density = MaxMonsterDensity
+	}
+
+	if density < 0 {
+		return 0
+	}
+
+	g := 0
+	for i := 0; i < cells; i++ {
+		if roll(100000) <= density {
+			g++
+		}
+	}
+
+	return g
+}
+
 // GroupsForRoom estimates how many natural groups a room of the given size
-// (in tiles) holds. The exe's population pass is not in the notes
-// (UNVERIFIED): the monster count is tiles*density/100000 (density = levels
+// (in tiles) holds. SUPERSEDED (w28) by GroupsForCells, the port of the exe's
+// per-cell loop; kept for its tests. The old guess: the monster count is tiles*density/100000 (density = levels
 // MonDen, 0 for towns) with avgGroup monsters per group, rounded to nearest,
 // at least 0.
 func GroupsForRoom(tiles, density, avgGroup int) int {
