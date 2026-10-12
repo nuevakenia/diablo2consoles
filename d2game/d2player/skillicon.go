@@ -79,7 +79,10 @@ func (si *skillIcon) renderSprite(target d2interface.Surface) {
 		return
 	}
 
-	if si.skill.SkillPoints == 0 {
+	// 0x4a86b0: an icon with no points but an item bonus is drawn lit (state 3), not greyed
+	itemLit := si.effective != nil && SkillItemOnly(si.skill.SkillPoints, si.effective(si.skill))
+
+	if si.skill.SkillPoints == 0 && !itemLit {
 		target.PushSaturation(skillIconGreySat)
 		defer target.Pop()
 
