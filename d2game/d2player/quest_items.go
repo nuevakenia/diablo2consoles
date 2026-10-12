@@ -99,7 +99,7 @@ func (g *GameControls) ClearInventoryGrid() int {
 }
 
 // DumpJunk removes the inventory items that are not worth keeping: everything except the codes in keep and the
-// potions, scrolls, tomes and keys (a player sells or drops what the monsters left behind when the pack is full;
+// scrolls, tomes and keys (a player sells or drops what the monsters left behind when the pack is full;
 // wave 43, the full-game chain). It returns how many items went.
 func (g *GameControls) DumpJunk(keep []string) int {
 	n := 0
@@ -114,7 +114,7 @@ func (g *GameControls) DumpJunk(keep []string) int {
 			}
 		}
 
-		for _, pfx := range []string{"hp", "mp", "rv", "tsc", "isc", "tbk", "ibk", "key", "vps", "yps", "wms", "gps", "ops", "xyz"} {
+		for _, pfx := range []string{"tbk", "ibk"} {
 			if strings.HasPrefix(code, pfx) {
 				kept = true
 			}

@@ -357,6 +357,11 @@ func (v *Game) onMonsterKilled(ev d2monsters.KillEvent) {
 
 // questObjectOperated is a quest object (cairn stone, Malus chest...) used by the hero.
 func (v *Game) questObjectOperated(ob *d2mapentity.Object) {
+	// the altar and the gate of the Arreat Summit (a click or a walk to them ends here since wave 43)
+	if v.riteOperate(ob) {
+		return
+	}
+
 	if id := ob.Record().Index; isSealObject(id) {
 		v.chaosOperate(ob)
 

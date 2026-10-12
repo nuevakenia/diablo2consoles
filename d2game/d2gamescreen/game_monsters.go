@@ -135,6 +135,7 @@ func (v *Game) advanceMonsters(elapsed float64) {
 	v.advanceMonsterTest(elapsed)
 	v.advanceAITest(elapsed)
 	v.advanceBossTest(elapsed)
+	v.advanceBaalLive(elapsed)
 	v.advanceBossFight(elapsed)
 	v.advanceUberTest(elapsed)
 }

@@ -30,6 +30,12 @@ func (v *Game) commandDumpJunk(_ []string) error {
 
 	v.Infof("DUMPJUNK removed %d item(s)", v.gameControls.DumpJunk(keep))
 
+	// a loot walk that ends on the time limit leaves the item it was carrying on the cursor, and an NPC click with an item
+	// on the cursor is a reward drop: put it away
+	if v.gameControls.PutCursorItemAway() {
+		v.Infof("CURSOR item put away")
+	}
+
 	return nil
 }
 

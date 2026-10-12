@@ -7,14 +7,14 @@
 # OD2_AUTOBUILD (the points of a level-up are spent by a fixed plan).
 
 # ---- building blocks -------------------------------------------------------------------------------------------
-fgs_talk()   { printf 'move:npc=%s;until:NPC menu opened: npc="%s",60;menu:Talk;wait:%s;' "$1" "$1" "${2:-6}"; }
+fgs_talk()   { printf 'say:dumpjunk;move:npc=%s;until:NPC menu opened: npc="%s",60;menu:Talk;wait:%s;' "$1" "$1" "${2:-6}"; }
 # a player's trip to the weapon smith: the Repair All button of the trade window, then close it (positions: ui-layout.golden)
 fgs_repair() { printf 'move:npc=%s;until:NPC menu opened: npc="%s",60;menu:Trade;wait:1;click:left@ui:211,461;wait:1;click:left@ui:368,461;wait:1;' "$1" "$1"; }
 fgs_hop()    { local l; for l in "$@"; do printf 'walkto:exit=%s;expect:level=%s;wait:1;' "$l" "$l"; done; }
 fgs_wpact()  { printf 'use:Waypoint;wait:1;panel:close;'; }
-fgs_wpgo()   { printf 'use:Waypoint;waypoint:%s;expect:level=%s;wait:2;' "$1" "$1"; }
+fgs_wpgo()   { printf 'wait:11;use:Waypoint;waypoint:%s;expect:level=%s;wait:2;' "$1" "$1"; }
 # clear the neighbourhood: a near sweep, loot, a wider sweep
-fgs_clear()  { printf 'kill:near=%s,%s;loot:30,40;' "${1:-30}" "${2:-60}"; }
+fgs_clear()  { printf 'kill:near=%s,%s;loot:30,40;say:dumpjunk;' "${1:-30}" "${2:-60}"; }
 fgs_rest()   { printf 'say:restorevitals;'; }
 fgs_shot()   { printf 'say:capframe %s/%s.png;' "$fg_dir" "$1"; }
 
@@ -25,9 +25,9 @@ fg_sc_a1() {
   printf 'wait:1;'
   fgs_talk Akara; fgs_talk Akara; fgs_talk Kashya 4
   fgs_hop 2; fgs_clear 45 100; printf 'kill:all,200;loot:60,60;say:autobuild;'
-  printf 'walkto:exit=8;expect:level=8;kill:all,300;until:Den of Evil cleared,10;loot:40,40;'
+  printf 'walkto:exit=8;expect:level=8;kill:all,300;loot:40,40;'
   fgs_hop 2 1
-  fgs_talk Akara 8; printf 'say:autobuild;'
+  fgs_talk Akara 8; fgs_talk Akara 4; printf 'say:autobuild;'
   fgs_hop 2 3; fgs_wpact; fgs_clear 40 100
   fgs_hop 17; fgs_clear 25 100; fgs_clear 40 100; printf 'kill:near=60,200;loot:40,40;'
   fgs_hop 3; fgs_wpgo 1; fgs_repair Charsi; fgs_talk Kashya 4

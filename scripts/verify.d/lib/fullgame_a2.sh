@@ -5,7 +5,7 @@ fgs_travel() { printf 'move:npc=%s;until:NPC menu opened: npc="%s",60;menu:%s;wa
 # Lut Gholein: the trip east, the talk with the town, Radament's Lair (and the scroll chest next to it).
 fg_sc_a2a() {
   printf 'wait:2;'
-  fgs_travel Warriv "go east" 40
+  fgs_talk Warriv 8; fgs_travel Warriv "go east" 40
   fgs_repair Fara; fgs_talk Jerhyn 4; fgs_talk Atma; fgs_talk Fara 4; fgs_talk Drognan 4
   # Radament: the manhole of the town, three sewer levels, the Book of Skill, Atma
   fgs_hop 47 48; fgs_wpact; fgs_clear 40 80; fgs_hop 49; printf 'kill:name=Radament,400;kill:near=40,100;say:lootquest 200 90;say:useitem ass;'
@@ -32,7 +32,7 @@ fg_sc_a2d() {
   printf 'wait:2;'
   fgs_repair Fara; printf 'say:cubetake;'
   fgs_hop 50 51 52 53 54; printf 'walkto:object=Portal;wait:3;expect:level=74;wait:3;'
-  printf 'kill:name=Summoner,1500;kill:near=30,100;loot:30,40;say:dumpjunk;walkto:object=357;wait:3;'
+  printf 'say:padsto 7 94;kill:name=Summoner,1500;say:dumpjunk;walkto:object=357;wait:3;loot:10,20;'
   printf 'walkto:object=Portal;wait:3;expect:level=46;wait:3;'
   fgs_hop "$1"; printf 'kill:near=40,100;walkto:object=152;wait:5;'
   printf 'walkto:object=Portal;wait:3;expect:level=73;wait:3;kill:name=Duriel,3000;'
@@ -40,7 +40,7 @@ fg_sc_a2d() {
   fgs_talk Tyrael 6
   printf 'walkto:object=Portal;wait:3;expect:level=40;wait:3;'
   fgs_talk Jerhyn 6
-  fgs_travel Meshif "sail east" 75
+  fgs_talk Meshif 8; fgs_travel Meshif "sail east" 75
   printf 'exit'
 }
 

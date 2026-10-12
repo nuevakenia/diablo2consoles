@@ -21,13 +21,13 @@ func IsQuestObject(id int) bool {
 
 // isLaterQuestObject lists the quest objects of Acts 2-4 the quest system reacts to: the tainted sun altar,
 // Tal Rasha's orifice, the three Horadric Staff chests, the Arcane Sanctuary journal, Lam Esen's tome, the
-// Compelling Orb and the Hellforge. (Before this list only the Act 1 objects were walked to as quest objects,
+// Compelling Orb, the Hellforge, and (wave 43) the Ancients' altar and gate, which a click never reached. (Before this list only the Act 1 objects were walked to as quest objects,
 // so operating the others in the world never reached the quest system.)
 func isLaterQuestObject(id int) bool {
 	switch id {
 	case ObjectTaintedSunAltar, ObjectOrifice, ObjectCubeChest, ObjectScrollChest, ObjectStaffChest,
 		ObjectHorazonJournal, ObjectLamEsenTome, ObjectCompellingOrb, ObjectHellforge, ObjectGidbinnAltar, ObjectGidbinn,
-		ObjectFrozenAnya:
+		ObjectFrozenAnya, AncientsAltar, AncientsDoor:
 		return true
 	}
 

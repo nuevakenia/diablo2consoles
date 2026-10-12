@@ -188,6 +188,7 @@ type Game struct {
 	summonCheckAcc       float64 // seconds since the last SUMMONCHECK line (game_monsters.go)
 	aiTest               *aiAutoTest
 	bossTest             *bossAutoTest
+	baal                 *baalLive // the live Baal encounter (baal_live.go)
 	bossFight            *bossFightTest
 	uber                 *uberRuntime
 	forge                *forgeShower // N22: the running Hellforge reward shower
@@ -326,6 +327,8 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 			[]string{"code"}, v.commandPickGround},
 		{"cubeput", "moves inventory items (by base code) into the Horadric Cube; then use transmute (debug)",
 			[]string{"code1", "code2", "code3", "code4"}, v.commandCubePut},
+		{"padsto", "moves the hero over the teleport pads of the Arcane Sanctuary to the platform of a tile (scripts)",
+			[]string{"tileX", "tileY"}, v.commandPadsTo},
 		{"cubetake", "moves every item of the Horadric Cube into the inventory (scripts)", nil, v.commandCubeTake},
 		{"dumpjunk", "drops the inventory items that are not quest items, potions, scrolls or keys (scripts)", nil, v.commandDumpJunk},
 		{"autobuild", "spends the unspent stat and skill points by the OD2_AUTOBUILD plan (scripts)", nil, v.commandAutoBuild},
@@ -853,6 +856,10 @@ func (v *Game) onNPCMenuChoice(npc d2interface.MapEntity, row d2player.NPCMenuRo
 
 		if v.questTalk(npc) {
 			v.Infof("NPC menu: Talk with %q (quest speech)", npc.Label())
+			// Tyrael's quest speech after Diablo (msg 20000) used to eat the Talk: the trip to Harrogath only
+			// happened on a second talk, when the speech was over (wave 43). The rule check refuses it while
+			// Diablo lives, so every Fortress talk may try.
+			v.travelOnTalk(npc)
 			v.endConversationUnlessMenuOpen()
 
 			return

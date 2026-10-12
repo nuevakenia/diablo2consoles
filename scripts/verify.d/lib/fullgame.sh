@@ -56,7 +56,7 @@ fg_newchar() { # <class> <name>
   fg_launch $fg_dir/$fg_name.command; fg_wait 120
   ./scripts/gameslot.sh release $slot
   sed 's/\x1b\[[0-9;]*m//g' $fg_log > $fg_log.txt; cat $fg_log.txt >> $fg_all
-  fg_d2s=$(ls $wb/*.d2s(N) | head -1)
+  fg_d2s=$(print -l $wb/*.d2s(N) | head -1)
   [ -s "$fg_d2s" ] || { echo "FAIL: no new hero .d2s"; return 1; }
 }
 
@@ -74,7 +74,7 @@ fg_seg() { # <name> <script> [export words...]
     # repairs often enough that the axe does not break, and the runner waits for the long boss fights
     echo "export OD2_AUTOSCRIPT_HEAL=${FG_HEAL:-2} OD2_DURABILITY_CHANCE=${FG_DURABILITY:-1} OD2_AUTOSCRIPT_BUSY=${FG_BUSY:-4000}"
     echo "export OD2_AUTOBUILD='${FG_BUILD:-vit=3,str=2,dex=3|Bash:1,Axe Mastery:20,Iron Skin:20,Bash:20}'"
-    local kv; for kv in "$@"; do echo "export ${kv%%=*}='${kv#*=}'"; done
+    local kv; for kv in "$@" ${=FG_EXTRA:-}; do echo "export ${kv%%=*}='${kv#*=}'"; done # FG_EXTRA: words like OD2_AUTODIFFICULTY=1
     echo "export OD2_AUTOSCRIPT='$script'"
     echo "$tmp/od2 2>&1 | tee $fg_log"
   } > $fg_dir/$fg_name.command
@@ -84,7 +84,7 @@ fg_seg() { # <name> <script> [export words...]
   ./scripts/gameslot.sh release $slot
   echo "FG SEGMENT $fg_name wall=$((SECONDS - t0))s"
   sed 's/\x1b\[[0-9;]*m//g' $fg_log > $fg_log.txt; echo "=== SEGMENT $fg_name" >> $fg_all; cat $fg_log.txt >> $fg_all
-  local out; out=$(ls $wb/*.d2s(N) | head -1)
+  local out; out=$(print -l $wb/*.d2s(N) | head -1)
   [ -s "$out" ] && fg_d2s=$out
   grep -q "AUTOSCRIPT RESULT PASS" $fg_log.txt
 }

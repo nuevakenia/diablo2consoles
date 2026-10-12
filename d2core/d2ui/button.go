@@ -1088,7 +1088,14 @@ func (v *Button) Render(target d2interface.Surface) {
 		if v.toggled {
 			target.Render(v.toggledSurface)
 		} else if v.buttonLayout.HasImage { // it allows to use SetEnabled(false) for non-image budons
-			target.Render(v.disabledSurface)
+			// A button type without a disabled frame has no disabledSurface: the difficulty screen of a hero who
+			// finished Normal (Hell still locked) crashed here (wave 43); the normal picture, tinted by the colour
+			// pushed above, stands in.
+			if v.disabledSurface != nil {
+				target.Render(v.disabledSurface)
+			} else if v.normalSurface != nil {
+				target.Render(v.normalSurface)
+			}
 		}
 	case v.toggled && v.pressed:
 		target.Render(v.pressedToggledSurface)
