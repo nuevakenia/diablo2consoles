@@ -8,6 +8,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2portal"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2audio"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
@@ -155,6 +156,8 @@ func (v *Game) spawnPortals() {
 		m.AddEntity(ob)
 		v.portal.ents[ob] = p
 
+		v.playObjectSound(d2audio.HandleTownPortalOpen, ob, "portal-open")
+
 		v.Infof("PORTAL object level=%d (%s) owner=%q dest=%d (%s) town=%v at=(%d,%d)", level, v.levelName(level), p.OwnerName,
 			p.Dest.Level, v.levelName(p.Dest.Level), p.InTown, sx, sy)
 	}
@@ -182,6 +185,8 @@ func (v *Game) openTownPortal() error {
 
 	v.Infof("PORTAL cast level=%d (%s) at=(%.1f,%.1f) town=%d (%s)", level, v.levelName(level), px+portalCastOffset, py,
 		pair.Town.Level, v.levelName(pair.Town.Level))
+
+	v.playHeroSound(d2audio.HandleTownPortalCast, "portal-cast")
 
 	return v.gameClient.SendPacketToServer(pkt)
 }
@@ -262,6 +267,8 @@ func (v *Game) operateTownPortal(ob *d2mapentity.Object) bool {
 	}
 
 	if v.startLevelChange(p.Dest.Level, d2level.StartPortal, "portal") {
+		v.playHeroSound(d2audio.HandleTownPortalEnter, "portal-enter")
+
 		dest := p.Dest
 		v.levels.trans.portalDest, v.levels.trans.portalPair = &dest, p.PairID
 		v.Infof("PORTAL used owner=%q from=%d dest=%d (%s) town=%v mine=%v", p.OwnerName, v.currentLevel(), p.Dest.Level,

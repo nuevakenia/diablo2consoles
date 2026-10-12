@@ -180,6 +180,10 @@ func heroFootstepHandle(weight string, material int) string {
 
 // playHeroSwing plays the weapon swing of the hero's melee attack.
 func (v *Game) playHeroSwing() {
+	if v.playFormSwing() { // the Werewolf / Werebear attack sounds replace the weapon swing
+		return
+	}
+
 	class := strings.ToLower(v.localPlayer.WeaponClass())
 
 	handle, ok := weaponSwings[class]

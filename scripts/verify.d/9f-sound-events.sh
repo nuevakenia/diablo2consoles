@@ -9,6 +9,8 @@ scenario_check() {
   grep -qE "SOUNDLOG .* kind=pickup .*handle=cursor_point_drop" $log.txt && { echo "FAIL: old pickup sound still played"; fail=1; }
   # zombie1: monstats2 HitClass 12 -> Sounds.txt row 0x145 (impact_claw_1.. family, body layer)
   grep -qE "SOUNDLOG .* kind=impact .*handle=impact_claw_[0-9]+ id=32[5-8] " $log.txt || { echo "FAIL: no HitClass impact layer (impact_claw group)"; fail=1; }
+  # the area track starts at its stored position (0 on the first visit; w36 resume bookkeeping)
+  grep -qE "AMBIENT music playing=[a-z_0-9]+\([0-9]+\) .* from=0" $log.txt || { echo "FAIL: no area music start with a resume position"; fail=1; }
   grep -qE "SOUNDLOG .* kind=death " $log.txt || { echo "FAIL: no monster death sound"; fail=1; }
 }
 scenario_unmuted=0

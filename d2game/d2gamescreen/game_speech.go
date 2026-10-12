@@ -1,6 +1,8 @@
 package d2gamescreen
 
 import (
+	"os"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2audio"
 )
 
@@ -18,6 +20,18 @@ func (v *Game) speechAudio() bool {
 // overlaps: the line still playing is stopped first (its Fade Out applies).
 // With NPC SPEECH on TEXT ONLY nothing is played.
 func (v *Game) playSpeech(index int) *d2audio.Sound {
+	return v.playSpeechKind(index, "npc-speech")
+}
+
+// speechPlays says whether voice lines are started. They are not under
+// OD2_AUTOTEST_MUTE, except when OD2_SOUNDLOG records the sounds: the engine
+// then runs them on its silent players so the log can assert them.
+func speechPlays() bool {
+	return os.Getenv("OD2_AUTOTEST_MUTE") == "" || os.Getenv("OD2_SOUNDLOG") != ""
+}
+
+// playSpeechKind is playSpeech with the SOUNDLOG kind (npc-speech, npc-greeting).
+func (v *Game) playSpeechKind(index int, kind string) *d2audio.Sound {
 	if !v.speechAudio() {
 		return nil
 	}
@@ -27,7 +41,7 @@ func (v *Game) playSpeech(index int) *d2audio.Sound {
 		v.speech = nil
 	}
 
-	v.speech = v.soundEngine.PlaySoundID(index)
+	v.speech = v.soundEngine.PlaySoundKind(index, kind)
 
 	return v.speech
 }

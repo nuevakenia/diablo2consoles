@@ -6,6 +6,11 @@ scenario_check() {
   grep -qE "HEROVOICE id=0x15 handle=[a-z]+_needmana_1" $log.txt || { echo "FAIL: no needmana voice on a refused cast"; fail=1; }
   grep -qE "SOUNDLOG .* kind=hero-voice .*handle=[a-z]+_needmana_1" $log.txt || { echo "FAIL: needmana never reached the sound bank"; fail=1; }
   grep -qE "HEROVOICE hit handle=[a-z]+_hit_1" $log.txt || { echo "FAIL: no hit grunt when the hero was struck"; fail=1; }
+  # the hit grunt reaches the sound bank as the class row of the hero (record slot 0), once per hit
+  grep -qE "SOUNDLOG .* kind=hero-voice .*handle=[a-z]+_hit_[1-5] .*decision=(played|stolen|queued|inaudible)" $log.txt || { echo "FAIL: hit grunt never reached the sound bank"; fail=1; }
+  # repeats of a refusal voice are cut by the gap / the "unit sound already playing" test (w36)
+  grep -qE "HEROVOICE id=0x15 suppressed" $log.txt || { echo "FAIL: repeated needmana was never suppressed"; fail=1; }
+  # a voice line never starts while the previous hero voice is still sounding (refusals are the gated ones)
   # the 74-tick repeat gap: needmana (id 0x15) lines at most 30s*25/74 + 1
   local n=$(grep -cE "HEROVOICE id=0x15 handle=" $log.txt)
   [ "$n" -le 11 ] || { echo "FAIL: needmana repeated $n times (gap not applied)"; fail=1; }

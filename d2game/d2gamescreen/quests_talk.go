@@ -2,7 +2,6 @@ package d2gamescreen
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
@@ -134,7 +133,7 @@ func (v *Game) questSpeak(npc questNPC, s d2quest.Speech) {
 	r.spoken = append(r.spoken, s.Msg)
 	v.logSubtitle(npc.label, s.Msg, text)
 
-	if hasSound && os.Getenv("OD2_AUTOTEST_MUTE") == "" {
+	if hasSound && speechPlays() {
 		if v.playSpeech(snd.Index) == nil && v.speechAudio() {
 			v.Warningf("could not play message %d (sound %d)", s.Msg, snd.Index)
 		}

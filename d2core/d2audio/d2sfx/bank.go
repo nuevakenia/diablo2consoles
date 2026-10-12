@@ -89,7 +89,11 @@ type Request struct {
 	FixedVariant bool    // do not pick a Group Size variant (verified flag bit 0)
 	NoFade       bool    // skip Fade In (verified flag bit 1)
 	Volume       int     // 0 = none; else 1..255 scales the level (MonSounds.txt Wea1Vol; unverified in the original)
+	StartTicks   int     // > 0: start this many game ticks into the sound (music resume), when the player can seek
 }
+
+// Seeker is implemented by players that can start inside the sound.
+type Seeker interface{ PlayFrom(ticks int) }
 
 // Report describes a decision, for logs and tests.
 type Report struct {
@@ -642,7 +646,13 @@ func (b *Bank) start(q *Instance, now int64) {
 
 	q.report.Voice, q.report.Decision, q.report.Dist2 = slot, d, q.dist2
 	q.lastVol, q.lastPan = -1, 2
-	p.Play()
+
+	if sk, ok := p.(Seeker); ok && q.req.StartTicks > 0 {
+		sk.PlayFrom(q.req.StartTicks)
+	} else {
+		p.Play()
+	}
+
 	b.applyMix(q)
 	b.emit(q.report)
 }

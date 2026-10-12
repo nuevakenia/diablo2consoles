@@ -42,6 +42,11 @@ func (s *Sound) Stop() {
 	s.bank.Stop(s.inst)
 }
 
+// Alive says whether the sound is playing or still waiting for its start delay.
+func (s *Sound) Alive() bool {
+	return s != nil && s.inst != nil && s.inst.Alive()
+}
+
 // Report returns the engine's latest decision about this sound.
 func (s *Sound) Report() d2sfx.Report {
 	return s.inst.Report()
@@ -328,6 +333,11 @@ func (s *SoundEngine) Reset() {
 // nil when the engine decided not to play it (index 0, no file, no voice...).
 func (s *SoundEngine) PlaySoundID(id int) *Sound {
 	return s.play(d2sfx.Request{Index: id})
+}
+
+// PlaySoundKind is PlaySoundID with a label for the SOUNDLOG line (kind=).
+func (s *SoundEngine) PlaySoundKind(id int, kind string) *Sound {
+	return s.play(d2sfx.Request{Index: id}, PlayOpts{Kind: kind})
 }
 
 // PlaySoundAt plays a positional sound; x and y are in the same units as

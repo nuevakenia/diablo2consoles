@@ -73,6 +73,7 @@ func (g *GameControls) handleContainerRightClick(mx, my int) bool {
 	}
 
 	if it, ok := item.(*diablo2item.Item); ok && from == g.inventory.grid && IsIdentifyScroll(it) {
+		itemUseSound(it, "item-use")
 		g.Identify.Arm(it)
 		return true
 	}
@@ -83,6 +84,8 @@ func (g *GameControls) handleContainerRightClick(mx, my int) bool {
 	}
 
 	if it, ok := item.(*diablo2item.Item); ok && from == g.inventory.grid && IsTownPortalItem(it) {
+		itemUseSound(it, "item-use")
+
 		if g.OnTownPortal != nil {
 			g.OnTownPortal(it)
 		}

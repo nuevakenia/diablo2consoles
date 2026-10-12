@@ -5,6 +5,7 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
@@ -128,6 +129,23 @@ func (v *SoundEffect) Play() {
 
 	if err != nil {
 		panic(err)
+	}
+
+	v.player.Play()
+}
+
+// PlayFrom plays the sound effect starting ticks game ticks (25 per second)
+// into the sound; used to resume the area music where it was left.
+func (v *SoundEffect) PlayFrom(ticks int) {
+	atomic.AddInt64(&totalPlays, 1)
+
+	if err := v.player.Rewind(); err != nil {
+		panic(err)
+	}
+
+	if ticks > 0 {
+		// a failed seek (past the end) leaves the sound at its start
+		_ = v.player.Seek(time.Duration(ticks) * time.Second / 25) //nolint:gomnd // 25 ticks per second
 	}
 
 	v.player.Play()

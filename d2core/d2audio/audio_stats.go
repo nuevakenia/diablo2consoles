@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2audio/d2sfx"
 )
 
 // Sound categories of the in-game audio audit (OD2_VERIFY_SOUND scenarios).
@@ -106,6 +108,20 @@ type statPlayer struct {
 func (p *statPlayer) Play() {
 	p.e.audit.Started[p.cat]++
 	p.e.live[p] = struct{}{}
+	p.inner.Play()
+}
+
+// PlayFrom starts the wrapped player ticks game ticks into the sound (music
+// resume); a player that cannot seek starts at the beginning.
+func (p *statPlayer) PlayFrom(ticks int) {
+	p.e.audit.Started[p.cat]++
+	p.e.live[p] = struct{}{}
+
+	if sk, ok := p.inner.(d2sfx.Seeker); ok {
+		sk.PlayFrom(ticks)
+		return
+	}
+
 	p.inner.Play()
 }
 
