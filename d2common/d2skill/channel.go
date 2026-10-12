@@ -25,8 +25,6 @@ const (
 	stChannel          = 11
 	ChannelStartFrames = 20 // life of the state-12 list made by the first run
 	ChannelHoldFrames  = 6  // the end it is moved to by every run while the list exists
-	// ChannelAnimSlack is the host adaptation added after a Do (see above); UNVERIFIED.
-	ChannelAnimSlack = 12
 )
 
 // channel is the per caster state of a sustained cast.
@@ -107,16 +105,12 @@ func (p *Pipeline) channelDo(u Unit) bool {
 	c.field, c.on = 1, false
 	c.actionEnd = p.frame() + p.infernoLen(u)
 
-	if keep := p.frame() + ChannelHoldFrames + ChannelAnimSlack; c.until > p.frame() && c.until < keep {
-		c.until = keep
-	}
-
 	return spawn
 }
 
 // infernoLen is SRVDO_InfernoScheduleAnimEnd's delay (0x5c6cb0, VERIFIED w39): the unit's class number indexes
 // monstats, the row's monstats2 link gives the InfernoLen byte; 1 frame when no row is found. (For the seven hero
-// classes the owner's tables hold 1.) The port still stretches the channel window by ChannelAnimSlack.
+// classes the owner's tables hold 1.)
 func (p *Pipeline) infernoLen(u Unit) int {
 	if p.Opt.InfernoLenOf != nil {
 		if n, ok := p.Opt.InfernoLenOf(u); ok && n >= 0 {

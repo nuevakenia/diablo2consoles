@@ -80,6 +80,7 @@ func (i *Item) IsIndestructible() bool {
 // SetDurability sets the current durability.
 func (i *Item) SetDurability(n int) {
 	i.attributes.currentDurability = n
+	i.noteDurability(n)
 }
 
 // InventoryFileName returns the DC6 name of the item's inventory picture

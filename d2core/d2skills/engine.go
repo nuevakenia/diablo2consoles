@@ -207,6 +207,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	e.pipe.ApplyState = e.applyMissileState
 	e.pipe.Near = e.near
 	e.pipe.Clock = e.actionClock
+	e.pipe.Opt.InfernoLenOf = e.infernoLenOf
 	e.pipe.After = e.after
 	e.pipe.Walkable = func(x, y int) bool {
 		return e.monsters.Grid().Flags(x, y)&(d2path.FlagWalk|d2path.FlagWall) == 0
@@ -617,6 +618,15 @@ func (e *Engine) runDo(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, tg
 
 	if d2skill.IsChannelStart(sk) && u.IsPlayer() {
 		e.setOf(p.ID()).Remove(whirlRefusedState)
+
+		// SRVDO_InfernoScheduleAnimEnd (0x5c6cb0): the action ends InfernoLen frames after the Do, so the held
+		// button can start the next run at once (this replaces the 12 frame ChannelAnimSlack stand-in).
+		n := e.pipe.ChannelActionEnd(u) - e.frame
+		if n < 1 {
+			n = 1
+		}
+
+		e.after(n, func() { p.EndAction() })
 	}
 
 	e.emit("cast", "CAST do skill=%q level=%d ok=%v reason=%s missiles=%d melee=%v effects=%d mana_paid=%.2f cooldown=%d mana=%s",

@@ -697,6 +697,12 @@ func (g *GameClient) createMissileEntities(
 			return nil, err
 		}
 
+		if shot.pathType10 && missileEntity != nil {
+			missileEntity.SetWobblePath(shotWobbleNodes(shot, missileRecord.Range), func() {
+				g.MapEngine.RemoveEntity(missileEntity)
+			})
+		}
+
 		missileEntities = append(missileEntities, missileEntity)
 	}
 

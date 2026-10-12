@@ -115,6 +115,22 @@ func charstatsClass(h d2enum.Hero) int {
 	return d2path.ClassAmazon // an unknown hero walks like any other class (the base velocity is 6 and 9 for all)
 }
 
+// ClassNumber is the exe's class number of the hero (Amazon 0, Sorceress 1, Necromancer 2, Paladin 3, Barbarian 4,
+// Druid 5, Assassin 6).
+func (p *Player) ClassNumber() int { return charstatsClass(p.Class) }
+
+// EndAction ends a running cast or swing at once (the exe's scheduled end of the action, e.g. Inferno's
+// SRVDO_InfernoScheduleAnimEnd 0x5c6cb0); the hero falls back to the neutral mode. It reports whether one ran.
+func (p *Player) EndAction() bool {
+	if !p.isCasting {
+		return false
+	}
+
+	p.isCasting, p.isAttacking, p.onFinishedCasting = false, false, nil
+
+	return true
+}
+
 // ID returns the Player uuid
 func (p *Player) ID() string {
 	return p.mapEntity.uuid

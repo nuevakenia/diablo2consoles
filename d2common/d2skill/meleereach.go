@@ -102,8 +102,8 @@ func TableDistance(dx, dy int) int {
 
 // WithinMeleeRange is COMBAT_IsTargetWithinMeleeRange 0x622e40 without the two special monsters (see
 // WithinMeleeRangeOfClass) and without the line trace (COLLISION_CanTraceLineBetweenUnits with the collision mask
-// 0x804: the exe refuses the blow when that trace reports a blocker; the pure functions here have no map, so the
-// trace is not modelled, UNVERIFIED which cells 0x804 stands for): in reach when the table distance is below 1,
+// 0x804 = closed door + wall: the exe refuses the blow when that trace reports a blocker; the pure functions here
+// have no map, so the trace lives in MeleeLineClear, VERIFIED w40): in reach when the table distance is below 1,
 // or at most meleeRange + 1 + extra. The scan radius of Fend (meleeRange + 4,
 // a Chebyshev-like subtile radius) is a different test and stays as it is.
 func WithinMeleeRange(dx, dy, meleeRange, extra int) bool {
@@ -135,7 +135,7 @@ func WithinMeleeRangeOfClass(dx, dy, meleeRange, extra, targetClass int) bool {
 // range argument (every melee skill SRVST/SRVDO, the stack argument is 0): COMBAT_IsTargetWithinMeleeRange with
 // nExtra = 1 for a player attacker and 3 for a monster attacker (the attacker's unit type is 1), so a blow lands when the
 // table distance is below 1 or at most meleeRange + 2 (players) / meleeRange + 4 (monsters). The line trace of 0x622e40
-// is not modelled (UNVERIFIED: needs the collision grid). The special classes 0x102/0x105 get range + 8 in 0x622e40
+// is MeleeLineClear (meleetrace.go, w40), applied by cast.outOfReach where the pipeline has a grid; these pure helpers skip it. The special classes 0x102/0x105 get range + 8 in 0x622e40
 // (VERIFIED w37, not ported: the engine has no such ids). AttackInReachSized adds the unit sizes.
 func AttackInReach(monsterAttacker bool, meleeRange, dx, dy int) bool {
 	extra := 1
