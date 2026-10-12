@@ -46,6 +46,10 @@ type Summoner struct {
 	rosters   map[string]*d2summon.Roster
 	// group is the PetType.txt group lookup handed to every roster.
 	group func(petType string) int
+	// SkillNow, when set, gives the owner's CURRENT physical damage (whole points) and to-hit bonus of a skill by
+	// name (false: unknown or unlearned). A minion whose template has a SkillDamage gets its attack numbers
+	// recomputed from it before every blow (d2summon.Stats.Live). The caller sets it before each Cast.
+	SkillNow func(skill string) (min, max, ar int, ok bool)
 }
 
 // NewSummoner creates a Summoner. templates may be nil: minions are then
@@ -98,6 +102,23 @@ func (s *Summoner) Cast(owner, key string, o *d2skill.SummonOrder, passive []d2s
 
 			c := d2summon.Compute(t, s.diff, mods, s.rng)
 			st = &c
+
+			if now := s.SkillNow; now != nil && t.DamageSkill != "" {
+				diff := s.diff
+				st.Live = func() (int, int, int) {
+					// a skill the owner no longer has adds nothing (UNVERIFIED: level 0 of the skill damage calc)
+					m2 := mods
+					m2.SkillName, m2.SkillMin, m2.SkillMax, m2.SkillAR = t.DamageSkill, 0, 0, 0
+
+					if mn, mx, ar, ok := now(t.DamageSkill); ok {
+						m2.SkillMin, m2.SkillMax, m2.SkillAR = mn, mx, ar
+					}
+
+					l := d2summon.Compute(t, diff, m2, nil)
+
+					return l.DmgMin, l.DmgMax, l.AR
+				}
+			}
 		}
 	}
 

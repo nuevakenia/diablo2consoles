@@ -490,6 +490,13 @@ func (d *Director) allyStrike(u *unit, _ d2monster.Mode) {
 		return
 	}
 
+	// MONSTER_SetupLevelScaledStats 0x5a2960 runs before every blow (VERIFIED): a SkillDamage pet follows the
+	// owner's skill level of this moment
+	if live := a.opt.Stats; live != nil && live.Live != nil {
+		mn, mx, ar := live.Live()
+		u.m.Vitals.A1.Min, u.m.Vitals.A1.Max, u.m.Vitals.A1.ToHit = mn, mx, ar
+	}
+
 	atk := u.m.Vitals.A1
 	if atk.Max < 1 {
 		atk = d2mapentity.MonsterAttack{ToHit: atk.ToHit, Min: 1, Max: 3}
