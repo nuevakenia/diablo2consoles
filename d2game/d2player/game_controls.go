@@ -288,6 +288,7 @@ func NewGameControls(
 	hoverLabel.SetBackgroundColor(d2util.Color(blackAlpha50percent))
 
 	gc.heroStatsPanel.SetOnCloseCb(gc.onCloseHeroStatsPanel)
+	gc.heroStatsPanel.SetHandSkills(gc.handSkillInfo)
 	gc.mercPanel.SetOnCloseCb(gc.updateLayout)
 	gc.stash.SetOnClose(gc.updateLayout) // closing the stash or cube moves the mini panel strip back
 	gc.cube.SetOnClose(gc.updateLayout)
@@ -1179,6 +1180,32 @@ func (g *GameControls) logPanel(name string) {
 		g.Infof("PANEL inventory: gold=%d items=%d worn=[%s] equipment=[%s]", g.inventory.Gold(),
 			len(g.inventory.grid.items), g.inventory.EquippedSummary(), g.equipmentSummary())
 	}
+}
+
+// handSkillInfo describes the left and right skills for the character sheet boxes.
+func (g *GameControls) handSkillInfo() [2]HandSkillInfo {
+	var out [2]HandSkillInfo
+
+	for i, sk := range []*d2hero.HeroSkill{g.hero.LeftSkill, g.hero.RightSkill} {
+		if sk == nil || sk.SkillRecord == nil {
+			continue
+		}
+
+		if sk.SkillDescriptionRecord != nil {
+			out[i].Name = g.asset.TranslateString(sk.SkillDescriptionRecord.NameKey)
+		}
+
+		if out[i].Name == "" {
+			out[i].Name = sk.Skill
+		}
+
+		switch sk.Anim {
+		case d2enum.PlayerAnimationModeAttack1, d2enum.PlayerAnimationModeAttack2, d2enum.PlayerAnimationModeThrow:
+			out[i].Weapon = true
+		}
+	}
+
+	return out
 }
 
 func skillLabel(s *d2hero.HeroSkill) string {
