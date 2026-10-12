@@ -9,6 +9,7 @@ Start with the guides:
 * [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the packages and how data flows
 * [docs/TESTING.md](docs/TESTING.md): unit, real-data, oracle and in-game tests; the verify gate
 * [docs/REVERSE_ENGINEERING.md](docs/REVERSE_ENGINEERING.md): where the facts come from, the Ghidra workflow, naming, the notes index, the legal stance, the rules
+* [docs/ADDING_A_SCENARIO.md](docs/ADDING_A_SCENARIO.md) and [docs/GHIDRA_WORKFLOW.md](docs/GHIDRA_WORKFLOW.md): the two short how-to guides
 * [docs/STATUS_MATRIX.md](docs/STATUS_MATRIX.md): per feature, what is implemented, verified against the original, or approximate, with the test or scenario that is the evidence
 
 ## Never commit game files
