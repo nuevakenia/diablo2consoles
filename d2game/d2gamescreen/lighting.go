@@ -140,7 +140,33 @@ func (v *Game) advanceLighting() {
 		v.Infof("LIGHT level=%d base intensity=%d rgb=%d,%d,%d", id, cell.Intensity, cell.R, cell.G, cell.B)
 	}
 
-	v.mapRenderer.SetLightInput(d2maprenderer.LightInput{HeroX: pos.X(), HeroY: pos.Y(), Base: cell, Extra: v.objectLights(pos.X(), pos.Y())})
+	radius, hr, hg, hb := v.heroLight()
+
+	v.mapRenderer.SetLightInput(d2maprenderer.LightInput{HeroX: pos.X(), HeroY: pos.Y(), Base: cell,
+		RadiusSubtiles: radius, HeroColor: [3]uint8{hr, hg, hb}, Extra: v.objectLights(pos.X(), pos.Y())})
+}
+
+// heroLight is the hero's light radius and colour from the equipment stats item_lightradius (89) and
+// item_lightcolor (90): radius 13 + stat, applied at once (UNIT_SetLightRadiusFromSkill 0x45c100); a
+// total <= 0 leaves the previous radius, reported here as 0 (= the renderer default 13 / keep).
+// The colour 0 means white and is returned as zeros (the renderer maps zeros to white).
+func (v *Game) heroLight() (radius int, r, g, b uint8) {
+	if v.localPlayer == nil || v.localPlayer.Stats == nil || v.localPlayer.Stats.Totals == nil || v.localPlayer.Stats.Totals.Stats == nil {
+		return 0, 0, 0, 0
+	}
+
+	st := v.localPlayer.Stats.Totals.Stats
+
+	rad, ok := d2lightmap.UnitRadiusFromStat(d2lightmap.HeroBaseRadius, int(st.Get(d2lightmap.StatLightRadius)))
+	if !ok {
+		rad = 0
+	}
+
+	if packed := int32(st.Get(d2lightmap.StatLightColor)); packed != 0 {
+		r, g, b = d2lightmap.DecodeLightColor(packed)
+	}
+
+	return rad, r, g, b
 }
 
 // objectLights collects the lights of objects (torches, fires, shrines...), monsters and missiles within the light map window of the hero.
