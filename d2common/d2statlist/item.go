@@ -31,6 +31,8 @@ type WeaponBase struct {
 	DexBonus       int // dexbonus column
 	Ranged         bool
 	Throwing       bool
+	OneOrTwo       bool // 1or2handed column: a Barbarian may use it one or two handed
+	MisMin, MisMax int  // minmisdam / maxmisdam: the thrown range of a throwing weapon
 }
 
 // SocketedItem is an item socketed into another: a gem, rune or jewel.
