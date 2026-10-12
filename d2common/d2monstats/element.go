@@ -104,7 +104,8 @@ func (e Element) Fires(roll func(n int) int) bool {
 
 // PoisonTotal is the damage of a poison slot spread over its length: the exe stores the damage rate as
 // ten times the scaled value (in 1/256 per frame) and the length as twice the column, so the total is
-// rate*length/256. The unit of the rate is UNVERIFIED against the running game.
+// rate*length/256. The unit of the rate is VERIFIED w27: COMBAT_ApplyPoisonState 0x578990 stores it
+// negated as stat 0x4a (life regen, 1/256 life per frame) for the length in frames.
 func (e Element) PoisonTotal() (min, max int) {
 	frames := e.Length * 2
 

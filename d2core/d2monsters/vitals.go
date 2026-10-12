@@ -30,6 +30,7 @@ func profileWithBonus(r *d2records.MonStatRecord, diff d2monster.Difficulty, ski
 		AIDist: pick(r.AiDistanceNormal, r.AiDistanceNightmare, r.AiDistanceHell),
 		Threat: r.ThreatLevel,
 		Melee:  r.IsMelee,
+		Boss:   r.IsSpecialBoss,
 		Walk:   r.SpeedBase,
 		Run:    r.SpeedRun,
 	}

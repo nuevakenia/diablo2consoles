@@ -55,6 +55,11 @@ type Brain struct {
 	// (VERIFIED 0x5aed10).
 	WakeShouted bool
 
+	// Unique is the unique bit (mask 8) of the unit data type flags at +0x16
+	// (MONSTER_HasDataFlag16, VERIFIED w27); the host sets it for unique
+	// leaders. It makes the unit take the one-shot wake-up of 0x5aed10.
+	Unique bool
+
 	// CanTeleport is AiGeneral flag 0x20 (+8 ushort, test 0x5dbf60), the gate
 	// of the wounded MonTeleport (0x5aedc0, VERIFIED). Which code sets it is
 	// UNVERIFIED, so it stays false (feature off) unless the host sets it.

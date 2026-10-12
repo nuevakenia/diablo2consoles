@@ -45,7 +45,7 @@ func (d *Director) FindReviveCorpse(b *d2monster.Brain, _, _ int, near d2monster
 	return best, found
 }
 
-// corpseSelectable is the monstats2 corpseSel column (flag bit 7, mapping UNVERIFIED); a monster without a row
+// corpseSelectable is the monstats2 corpseSel column (flag bit 7, mapping VERIFIED w27: monstats2 loader 0x658ee0, test MONSTATS2_TestFlagBit 0x45f0b0 in SKILL_CanReviveOrExplodeCorpse 0x646a10); a monster without a row
 // counts as selectable, as in the skill engine's corpse facts.
 func (d *Director) corpseSelectable(u *unit) bool {
 	if u.m.Stat == nil || d.asset == nil || d.asset.Records == nil || d.asset.Records.Monster.Stats2 == nil {
