@@ -53,7 +53,9 @@ type Profile struct {
 	// NoWalk is true when the class lacks the WL mode (monstats2 mode byte
 	// +0xf0 bit 2, test 0x467af0). The zero value (can walk) is the usual case.
 	NoWalk bool
-	Walk   int // Velocity
+	// NoSwitchAI is true when the monstats switchai column (flag dword bit 16) is clear (w38, see StateAIAllowed).
+	NoSwitchAI bool
+	Walk       int // Velocity
 	// ChaseReach is the stop distance the CorruptLancer passes to "run to target
 	// within" (monstats2 byte +0xe = MeleeRng, VERIFIED w23); 0 when unknown.
 	ChaseReach int
