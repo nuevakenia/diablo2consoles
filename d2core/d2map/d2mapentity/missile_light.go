@@ -16,7 +16,10 @@ const maxLightCatchUp = 5
 // 0x4c9c10 through the ramping setter). The roll comes from a seed private to the missile, derived
 // from its id (the exe's unit seed is not modelled; UNVERIFIED how it is initialised).
 func (m *Missile) advanceLight(elapsed float64) {
-	if m.record == nil || m.record.Light.Diameter <= 0 {
+	// MISSILE_DispatchClientDoFuncAndUpdateLight 0x4cf9c0 (w37) only calls the flicker update when
+	// Missiles.txt Flicker is not 0; the flag word (+0x44, UnitAny.dwFlags) bits 0x300 stop it, and
+	// what sets them is not traced (UNVERIFIED, treated as 0).
+	if m.record == nil || m.record.Light.Diameter <= 0 || m.record.Light.Flicker == 0 {
 		return
 	}
 

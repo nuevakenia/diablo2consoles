@@ -778,7 +778,9 @@ func (h *HUD) renderAllItemLabels(target d2interface.Surface) {
 		reqs[i] = p.req
 	}
 
-	for i, box := range d2automap.LayoutLabels(reqs, 0, d2display.W(), d2display.H()) {
+	for _, pl := range d2automap.PlaceLabels(reqs, 0, d2display.W(), d2display.H()) {
+		i, box := pl.Index, pl.Box
+
 		h.nameLabel.SetText(items[i].text)
 		h.nameLabel.SetPosition((box.L+box.R)/2, box.B-items[i].req.TextH)
 		h.nameLabel.Render(target)

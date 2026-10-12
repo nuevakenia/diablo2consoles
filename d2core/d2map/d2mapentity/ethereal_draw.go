@@ -9,8 +9,8 @@ import (
 // w22-render): a worn ethereal (item flag 0x400000) right-hand or left-hand weapon draws at mode 1
 // (50 percent, d2enum.DrawEffectPctTransparency50) and an ethereal item in the shield slot at mode 2
 // (d2enum.DrawEffectPctTransparency75). Mode numbers follow the d2enum.DrawEffect order, as for the
-// missile modes. NOT ported: Items.txt transparent=1 items (their transtbl) and the unit stat 0xb5
-// that forces mode 1.
+// missile modes. The Items.txt transparent rule and the
+// unit stat 0xb5 rule are in transparency_draw.go (the Items.txt rule is not wired to items yet).
 
 // EtherealLayerEffect returns the draw effect override of an equipment layer.
 func EtherealLayerEffect(layer d2enum.CompositeType, ethereal bool) (d2enum.DrawEffect, bool) {

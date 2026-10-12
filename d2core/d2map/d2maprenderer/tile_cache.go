@@ -85,6 +85,12 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 			tileData = append(tileData, &tileOptions[tile.RandomIndex])
 		} else {
 			tile.Animated = true
+
+			if mr.animFrames == nil {
+				mr.animFrames = map[uint16]int{}
+			}
+
+			mr.animFrames[uint16(tile.Style)<<8|uint16(tile.Sequence)] = len(tileOptions)
 			for i := range tileOptions {
 				tileData = append(tileData, &tileOptions[i])
 			}

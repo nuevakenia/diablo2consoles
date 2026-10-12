@@ -2,27 +2,69 @@ package d2lightmap
 
 import "testing"
 
-func TestRayOcclusion(t *testing.T) {
-	wall := func(x, y int) bool { return x == 5 }
+func TestTraceGrid(t *testing.T) {
+	// source in the middle of subtile (0,0): X = 4 (the +4 of SetPosition), wall column at +4
+	g := &occGrids{}
+	for row := 0; row < occGridSize; row++ {
+		g.occ[row*occGridSize+gridCentre+4] = occlusionFull
+	}
+
+	g.trace(4, 4, 8*8)
+
+	at := func(kx, ky int) int { return g.res[(gridCentre+ky)*occGridSize+gridCentre+kx] }
 
 	tests := []struct {
-		name           string
-		x0, y0, x1, y1 int
-		want           int
+		name   string
+		kx, ky int
+		want   int
 	}{
-		{"clear", 0, 0, 4, 0, 0},
-		{"wall cell itself is lit", 0, 0, 5, 0, 0},
-		{"behind the wall", 0, 0, 7, 0, occlusionFull},
-		{"diagonal behind", 0, 0, 8, 4, occlusionFull},
-		{"other side, going left", 9, 0, 3, 0, occlusionFull},
-		{"neighbour", 4, 0, 5, 0, 0},
-		{"same cell", 3, 3, 3, 3, 0},
+		{"in front", 3, 0, 0},
+		{"wall cell itself", 4, 0, 0},
+		{"behind, straight", 6, 0, occlusionFull},
+		{"behind, straight left side", -5, 0, 0},
+		{"behind, diagonal", 6, 6, occlusionFull},
 	}
 
 	for _, tc := range tests {
-		if got := rayOcclusion(tc.x0, tc.y0, tc.x1, tc.y1, wall); got != tc.want {
+		if got := at(tc.kx, tc.ky); got != tc.want {
 			t.Errorf("%s: got %d want %d", tc.name, got, tc.want)
 		}
+	}
+}
+
+func TestTraceCellModes(t *testing.T) {
+	// a neighbour at (row 32, col 33) blocked; target (row 32, col 34), source to the left (dy == 0): mode 1
+	g := &occGrids{}
+	g.occ[32*occGridSize+33] = occlusionFull
+	g.traceCell(32, 34, 0, 0, 8*2, 0)
+
+	if g.res[32*occGridSize+34] != occlusionFull {
+		t.Errorf("source toward -x: neighbour col 33 is blocked, got %d", g.res[32*occGridSize+34])
+	}
+
+	g = &occGrids{}
+	g.occ[32*occGridSize+35] = occlusionFull // neighbour toward the source (source at x=+)
+	g.traceCell(32, 34, 100, 0, 8*2, 0)
+
+	if g.res[32*occGridSize+34] != occlusionFull {
+		t.Errorf("mode 1 toward +x: got %d", g.res[32*occGridSize+34])
+	}
+
+	// mode 2 blend: major axis x, ratio 128: halfway between blocked (16) and open (0) = 8
+	g = &occGrids{}
+	g.occ[32*occGridSize+35] = occlusionFull
+	g.traceCell(32, 34, 100, 50, 0, 0)
+
+	if got := g.res[32*occGridSize+34]; got != 8 {
+		t.Errorf("mode 2 blend: got %d want 8", got)
+	}
+
+	// the target at the source position is not computed
+	g = &occGrids{}
+	g.traceCell(32, 32, 4, 4, 4, 4)
+
+	if g.res[32*occGridSize+32] != 0 {
+		t.Error("zero distance must leave the cell alone")
 	}
 }
 

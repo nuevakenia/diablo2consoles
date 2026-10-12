@@ -37,6 +37,8 @@ type Source struct {
 	R, G, B        uint8
 	// Occluded makes the source use the line-of-sight painter (see occluded.go) when the map has a Blocked func.
 	Occluded bool
+	// Object marks a kind 2 (object) light: its occupancy has no light map window (0x470d80).
+	Object bool
 }
 
 // NewSource creates a light of the given radius (in subtiles), fully grown.

@@ -182,6 +182,7 @@ func (mr *MapRenderer) advanceLighting(elapsed float64) {
 		src := d2lightmap.NewSource(p.Radius, staticLightIntensity, p.R, p.G, p.B)
 		src.SetPosition(p.X*subtilesPerTile, p.Y*subtilesPerTile)
 		src.Occluded = p.Kind == d2lightmap.KindObject || (p.Kind == d2lightmap.KindUnit && l.input.UnitLOS)
+		src.Object = p.Kind == d2lightmap.KindObject
 		l.sources = append(l.sources, src)
 	}
 

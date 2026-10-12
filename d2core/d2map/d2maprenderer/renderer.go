@@ -70,6 +70,9 @@ type MapRenderer struct {
 	entityDebugVisLevel int             // Entity Debug visibility index (0=none, 1=vectors)
 	lastFrameTime       float64         // The last time the map was rendered
 	currentFrame        int             // Current render frame (for animations)
+	animTicks           int             // client world ticks (25 Hz) for animated floors, see tile_anim.go
+	animAcc             float64
+	animFrames          map[uint16]int // frame count of animated floor sequences by style<<8|sequence
 	light               *lighting
 	entBuckets          map[[2]int]*entityBucket // per-frame entity index, see indexEntities
 	entFree             []*entityBucket
@@ -495,7 +498,8 @@ func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, 
 	if !tile.Animated {
 		img = mr.getImageCacheRecord(tile.Style, tile.Sequence, 0, tile.RandomIndex)
 	} else {
-		img = mr.getImageCacheRecord(tile.Style, tile.Sequence, 0, byte(mr.currentFrame))
+		img = mr.getImageCacheRecord(tile.Style, tile.Sequence, 0,
+			byte(tileAnimFrame(mr.animTicks, 0, mr.animFrames[uint16(tile.Style)<<8|uint16(tile.Sequence)])))
 	}
 
 	if img == nil {
@@ -898,6 +902,12 @@ func (mr *MapRenderer) Advance(elapsed float64) {
 	mr.currentFrame += framesAdvanced
 	if mr.currentFrame >= frameOverflow {
 		mr.currentFrame = 0
+	}
+
+	mr.animAcc += elapsed
+	if n := int(mr.animAcc / tileAnimTickSeconds); n > 0 {
+		mr.animAcc -= float64(n) * tileAnimTickSeconds
+		mr.animTicks += n
 	}
 
 	mr.Camera.Advance(elapsed)

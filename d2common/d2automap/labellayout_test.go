@@ -84,3 +84,35 @@ func TestLayoutLabelsGolden(t *testing.T) {
 		t.Errorf("got %+v want %+v", got[0], want)
 	}
 }
+
+func TestOverlapStepsFromExe(t *testing.T) {
+	// the second label on the same point sits 3 pixels above the first (bottom = first top - 3)
+	reqs := []LabelRequest{
+		{ItemX: 600, ItemY: 400, TextW: 100, TextH: 16},
+		{ItemX: 600, ItemY: 400, TextW: 100, TextH: 16},
+	}
+
+	got := LayoutLabels(reqs, 0, 1512, 982)
+	if got[1].B != got[0].T-3 {
+		t.Errorf("above step: %+v %+v", got[0], got[1])
+	}
+
+	// a tall stack runs out of the 7 vertical tries and continues to the right of a label
+	var tall []LabelRequest
+	for i := 0; i < 12; i++ {
+		tall = append(tall, LabelRequest{ItemX: 600, ItemY: 400, TextW: 100, TextH: 16})
+	}
+
+	placed := PlaceLabels(tall, 0, 1512, 982)
+	for i := range placed {
+		for j := i + 1; j < len(placed); j++ {
+			if placed[i].Box.overlaps(placed[j].Box) {
+				t.Errorf("overlap %v %v", placed[i], placed[j])
+			}
+		}
+	}
+
+	if len(placed) == 0 || placed[0].Index != 0 {
+		t.Fatal("first label must be placed")
+	}
+}
