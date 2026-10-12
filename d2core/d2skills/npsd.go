@@ -158,7 +158,10 @@ func (t *monsterTarget) CanConvert() bool {
 		return false
 	}
 
-	return !t.e.setOf(t.m.ID()).Active(t.e.frame, "conversion")
+	// VERIFIED (w37, 0x5dc1e0): a unit holding state 0x36 (uninterruptable) is no candidate either
+	set := t.e.setOf(t.m.ID())
+
+	return !set.Active(t.e.frame, "conversion") && !set.Active(t.e.frame, d2skill.StateUninterruptable)
 }
 
 // reviveLife is the life of a revived monster (SRVDO_058 0x5c35a0, VERIFIED):

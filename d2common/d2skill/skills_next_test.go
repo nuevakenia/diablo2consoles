@@ -335,6 +335,39 @@ func TestChargeEndsNextToTheTarget(t *testing.T) {
 	}
 }
 
+type uninterruptableFoe struct{ *testTarget }
+
+func (uninterruptableFoe) HasStateNamed(s string) bool { return s == StateUninterruptable }
+
+// w37, SRVST_031 0x5cdbb0: a far target in state 0x36 is dropped and the nearest unit within 3 is charged; a
+// target already in melee range is kept.
+func TestChargeSkipsUninterruptableTarget(t *testing.T) {
+	id := nextFixture(map[string]int{"Charge": 5}).id("Charge")
+
+	cf := nextFixture(map[string]int{"Charge": 5})
+	boss := cf.addFoe("boss", 10, 4)
+	cf.addFoe("close", 2, 0)
+	cf.u.roller = &seq{vals: make([]uint32, 20)}
+	tg := Target{X: 10, Y: 4, Unit: uninterruptableFoe{boss}, UX: 10, UY: 4}
+	cf.p.Start(cf.u, id, tg)
+	r := cf.p.Do(cf.u, id, tg)
+
+	if !r.OK || r.Melee == nil || r.Melee.Target.ID() != "close" {
+		t.Errorf("far uninterruptable target: %+v", r.Melee)
+	}
+
+	cf2 := nextFixture(map[string]int{"Charge": 5})
+	near := cf2.addFoe("near", 1, 0)
+	cf2.addFoe("other", 2, 0)
+	cf2.u.roller = &seq{vals: make([]uint32, 20)}
+	tg = Target{X: 1, Y: 0, Unit: uninterruptableFoe{near}, UX: 1, UY: 0}
+	cf2.p.Start(cf2.u, id, tg)
+
+	if r = cf2.p.Do(cf2.u, id, tg); !r.OK || r.Melee == nil || r.Melee.Target.ID() != "near" {
+		t.Errorf("near uninterruptable target must stay: %+v", r.Melee)
+	}
+}
+
 func TestDragonTalonKnockback(t *testing.T) {
 	cases := []struct {
 		class KnockClass
