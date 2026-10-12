@@ -67,7 +67,7 @@ type Event struct {
 	// VERIFIED 0x5b9550: INV_GetSelectedWeapon, item code "qf2 ").
 	Wielded string
 	// Freed is the number of barbarians a destroyed prison door freed (Rescue on Mount Arreat); 0 means a full
-	// group of five.
+	// group of five, negative none.
 	Freed int
 }
 

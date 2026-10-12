@@ -332,6 +332,29 @@ func (v *Game) uberSteps() []uberStep {
 
 	steps := []uberStep{}
 
+	// The portals open only in Harrogath on Hell (VERIFIED shape, D2MOO): the script first tries elsewhere, where
+	// the cube must open nothing, then stands the hero in Harrogath on Hell.
+	steps = append(steps, uberStep{"uber: the cube portals fail outside Harrogath and below Hell",
+		func(v *Game, t *uberAutoTest, _ float64) bool {
+			u := v.uberRT()
+
+			for _, at := range [][2]int{{40, 2}, {d2uber.LevelHarrogath, 1}} {
+				at := at
+				u.at = func() (int, int) { return at[0], at[1] }
+				before := u.ev.PortalsOpened
+
+				t.expect(v, "keys fit in the cube", put(d2uber.CodeKeyTerror, d2uber.CodeKeyHate, d2uber.CodeKeyDestr) == nil)
+
+				_, err := v.transmuteCube()
+				t.expect(v, fmt.Sprintf("no area portal in level %d on difficulty %d", at[0], at[1]), err == nil && u.ev.PortalsOpened == before)
+
+			}
+
+			u.at = func() (int, int) { return d2uber.LevelHarrogath, 2 }
+
+			return true
+		}})
+
 	for _, lvl := range []int{d2uber.LevelMatronsDen, d2uber.LevelForgottenSands, d2uber.LevelFurnaceOfPain} {
 		lvl := lvl
 		area, _ := d2uber.AreaOf(lvl)
@@ -377,7 +400,9 @@ func (v *Game) uberSteps() []uberStep {
 				v.uberKill(k)
 			}
 
-			if v.uber.ev.State() != "done" || !v.uber.rewarded {
+			// (the three arrive together now, so the run no longer lasts for the arrival delays: it waits for the
+			// Hellforge shower of the cube step, which the verify scenario checks, to be over)
+			if v.uber.ev.State() != "done" || !v.uber.rewarded || v.forge != nil {
 				return false
 			}
 

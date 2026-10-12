@@ -38,6 +38,7 @@ func (a *autoQuest) stageRescue() {
 	const id = d2quest.QuestRescue
 
 	a.once("rescue: Qual-Kehk and the cages", func(h autoHost, a *autoQuest) {
+		a.require(h, d2quest.QuestSiege)
 		a.move(h, d2quest.LevelHarrogath)
 		a.offer(h, id, d2quest.NPCQualKehk, 20096)
 		a.move(h, d2quest.LevelFrigidHighlands)
@@ -64,6 +65,7 @@ func (a *autoQuest) stagePrison() {
 	const id = d2quest.QuestPrison
 
 	a.once("prison: Malah, the frozen Anya and the potion", func(h autoHost, a *autoQuest) {
+		a.requireChain(h, d2quest.QuestRescue)
 		a.move(h, d2quest.LevelHarrogath)
 		a.says(h, "Malah offers the quest", d2quest.NPCMalah, 20116)
 		a.expect(h, "STARTED bit, state 2", a.bit(h, id, d2quest.FlagStarted) && a.quest(h, id).State == 2)
@@ -96,6 +98,7 @@ func (a *autoQuest) stageBetrayal() {
 	const id = d2quest.QuestBetrayal
 
 	a.once("betrayal: Anya, the portal and Nihlathak", func(h autoHost, a *autoQuest) {
+		a.requireChain(h, d2quest.QuestPrison)
 		a.move(h, d2quest.LevelHarrogath)
 		a.offer(h, id, d2quest.NPCDrehya, 20137)
 		a.move(h, d2quest.LevelNihlathakTemple)
@@ -127,6 +130,7 @@ func (a *autoQuest) stageRite() {
 	const id = d2quest.QuestRite
 
 	a.once("rite: Qual-Kehk and the Ancients", func(h autoHost, a *autoQuest) {
+		a.requireChain(h, d2quest.QuestBetrayal)
 		a.move(h, d2quest.LevelHarrogath)
 		a.offer(h, id, d2quest.NPCQualKehk, 20153)
 		a.move(h, d2quest.LevelArreatSummit)
@@ -143,4 +147,22 @@ func (a *autoQuest) stageRite() {
 			a.bit(h, id, d2quest.FlagPrimaryGoal) && !a.bit(h, id, d2quest.FlagRewardPending))
 		a.expect(h, "Eve of Destruction opened", a.quest(h, d2quest.QuestEve).State >= 1)
 	})
+}
+
+// require marks a quest earlier in the Act 5 chain (Siege, Rescue, Prison, Betrayal, Rite) as done when the script
+// plays a later one alone; the chain then opens the quest, as it does for a hero who finished the first ones.
+func (a *autoQuest) require(h autoHost, id int) {
+	h.Q().ForceDone(id)
+	h.Infof("AUTOQUEST requires %s done", h.Q().Quest(id).Label)
+}
+
+// requireChain marks the quests of the Act 5 chain up to and including id as done.
+func (a *autoQuest) requireChain(h autoHost, id int) {
+	for _, q := range []int{d2quest.QuestSiege, d2quest.QuestRescue, d2quest.QuestPrison, d2quest.QuestBetrayal} {
+		a.require(h, q)
+
+		if q == id {
+			return
+		}
+	}
 }

@@ -285,6 +285,7 @@ const (
 
 type bladeData struct {
 	dropped  bool // Gidbinn left the boss (ACT3Q3 bGidbinnDropped)
+	boss     bool // the fetish boss was woken (ACT3Q3 bBossHasSpawned)
 	hratli   bool
 	rewarded bool
 }
@@ -429,10 +430,11 @@ func newBlade() *Quest {
 		flags(g, q)
 	}
 
-	// The Gidbinn object: the original wakes a fetish boss whose death drops the blade (UNVERIFIED in the exe);
-	// the engine gives the blade at the altar, which the dropped flag mirrors.
+	// The Gidbinn object (OperateFn 31): operating it wakes the fetish boss (class 407, D2MOO ACT3Q3_SpawnGidbinnBoss,
+	// a timer of seven ticks when a hero stands near); the boss's death drops the blade at the boss (D2MOO
+	// ACT3Q3_Callback08_MonsterKilled sets dwDropItemCode "g33 "). The altar (251) is scenery (OperateFn 0).
 	q.on[EvObjectOperated] = func(g *Game, q *Quest, e *Event) {
-		if e.Object != ObjectGidbinn && e.Object != ObjectGidbinnAltar {
+		if e.Object != ObjectGidbinn {
 			return
 		}
 
@@ -444,13 +446,25 @@ func newBlade() *Quest {
 			g.setState(q, 1)
 		}
 
-		if g.hasItem(ItemGidbinn) {
+		if g.hasItem(ItemGidbinn) || d.dropped || d.boss {
 			return
 		}
 
+		d.boss = true
+
+		g.emit(Effect{Kind: EffectSpawn, Quest: q.ID, Code: GidbinnBossCode, Note: "the fetish boss wakes (D2MOO)"})
+		flags(g, q)
+	}
+
+	q.on[EvMonsterKilled] = func(g *Game, q *Quest, e *Event) {
+		if e.Monster != NPCGidbinnBoss || !d.boss || d.dropped || !q.NotIntro {
+			return
+		}
+
+		d.boss = false
 		d.dropped = true
 
-		g.emit(Effect{Kind: EffectSpawn, Quest: q.ID, Code: ItemGidbinn, Note: "Gidbinn on the altar"})
+		g.emit(Effect{Kind: EffectSpawn, Quest: q.ID, Code: GidbinnDropCode, Note: "the boss drops Gidbinn where it fell"})
 		flags(g, q)
 	}
 

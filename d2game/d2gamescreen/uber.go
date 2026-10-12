@@ -26,6 +26,9 @@ type uberRuntime struct {
 	spawned []*d2mapentity.Monster
 	// rewarded is set when the final reward (Standard of Heroes) was dropped.
 	rewarded bool
+	// at, when set, replaces the hero's real place for the cube portal rule (the scripted OD2_AUTOUBER run stands
+	// the hero in Harrogath on Hell without travelling there)
+	at func() (level, difficulty int)
 }
 
 // uberRT returns the event runtime, creating it on first use.
@@ -37,6 +40,13 @@ func (v *Game) uberRT() *uberRuntime {
 	u := &uberRuntime{}
 	u.mgr = d2boss.New(func(s string) { v.Infof("%s", s) })
 	u.ev = d2uber.New(u.mgr)
+	u.ev.Where = func() (int, int) {
+		if u.at != nil {
+			return u.at()
+		}
+
+		return v.currentLevel(), v.questDifficulty()
+	}
 
 	if os.Getenv("OD2_AUTOUBER") == "" {
 		u.ev.Pick = rand.Intn // nolint:gosec // a game choice, not security

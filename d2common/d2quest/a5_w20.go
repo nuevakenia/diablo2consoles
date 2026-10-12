@@ -52,7 +52,7 @@ func RiteLevelGate(difficulty int) int { return 20 * (difficulty + 1) }
 // ---- A5Q2 Rescue on Mount Arreat ----
 
 type rescueData struct {
-	doors, freed int
+	doors, freed, killed int
 }
 
 // Rune codes of the Rescue reward: Tal, Ral, Ort.
@@ -69,12 +69,12 @@ func newRescue() *Quest {
 
 	return newSpecQuest(&spec{
 		id: QuestRescue, slot: 36, act: 4, logIndex: 2, name: "Rescue on Mount Arreat", label: "A5Q2",
-		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
+		start: 0, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
 		steps: []step{{from: 1, npc: NPCQualKehk, msg: 20096, to: 2}},
 		trigs: []trig{
 			{ev: EvAreaChanged, level: LevelFrigidHighlands, max: 3, to: 3},
 			{ev: EvMonsterKilled, monster: NPCPrisonDoor, count: 3, goal: true,
-				cond: func(g *Game, q *Quest) bool { return d.doors < 3 || d.freed >= 12 },
+				cond: func(g *Game, q *Quest) bool { return d.doors < 3 || (d.freed >= 12 && d.killed < 5) },
 				fx: func(g *Game, q *Quest) []Effect {
 					switch {
 					case d.freed >= 15:
@@ -91,9 +91,17 @@ func newRescue() *Quest {
 		setup: func(q *Quest, _ *spec) {
 			inner := q.on[EvMonsterKilled]
 			q.on[EvMonsterKilled] = func(g *Game, q *Quest, e *Event) {
+				// a freed barbarian that died (VERIFIED 0x585f30: five dead ones fail the quest)
+				if e.Monster == NPCWussie && q.NotIntro && !g.grantedOrPending(q) {
+					d.killed++
+				}
+
 				if e.Monster == NPCPrisonDoor && q.NotIntro && !g.grantedOrPending(q) {
 					n := e.Freed
-					if n <= 0 {
+					switch {
+					case n < 0: // the door freed nobody
+						n = 0
+					case n == 0: // the scripted walks do not say: a full group
 						n = 5
 					}
 
@@ -183,7 +191,7 @@ const (
 func newPrison() *Quest {
 	d := &prisonData{}
 	q := &Quest{ID: QuestPrison, Slot: 37, Act: 4, Name: "Prison of Ice", Label: "A5Q3", LogIndex: 3,
-		Active: true, NotIntro: true, State: 1, InitNo: 5, SeqID: QuestBetrayal, tables: speechTables("A5Q3")}
+		Active: true, NotIntro: true, State: 0, InitNo: 5, SeqID: QuestBetrayal, tables: speechTables("A5Q3")}
 
 	q.seq = chainSeq(true, 5)
 
@@ -429,7 +437,7 @@ func (g *Game) anyaLine(q *Quest, complete func(*Game, *Quest, string)) {
 func newBetrayal() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestBetrayal, slot: 38, act: 4, logIndex: 4, name: "Betrayal of Harrogath", label: "A5Q4",
-		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
+		start: 0, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
 		steps: []step{{from: 1, npc: NPCDrehya, msg: 20137, to: 2, fx: func(g *Game, q *Quest) []Effect {
 			return []Effect{{Kind: EffectPortal, Quest: q.ID, Value: LevelNihlathakTemple, Note: "Anya opens the portal to Nihlathak's Temple"}}
 		}}},
@@ -453,7 +461,7 @@ func newBetrayal() *Quest {
 func newRite() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestRite, slot: 39, act: 4, logIndex: 5, name: "Rite of Passage", label: "A5Q5",
-		start: 1, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 5, done: 3,
+		start: 0, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 5, done: 3,
 		steps: []step{{from: 1, npc: NPCQualKehk, msg: 20153, to: 2}},
 		trigs: []trig{
 			{ev: EvAreaChanged, level: LevelArreatSummit, max: 3, to: 3},

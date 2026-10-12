@@ -7,6 +7,14 @@
 // entered and the monsters killed, and receives the same Actions as for the
 // story bosses (spawn a monster, open a portal, drop an item).
 //
+// Wave 22 re-audit (D2MOO, which tracks the exe: ACT1Q4_CreateUberRunPortal 0x594270 and
+// ACT1Q4_CreateUberFinalePortal 0x594280, SUNIT_SpawnPresetUnitsInRoom 0x5559A0; notes w22-quest-world.md):
+//   - VERIFIED shape: both cube portals open only in Harrogath on Hell (difficulty 2), as a permanent town portal;
+//     the keys' portal goes to a random uber area that was not opened yet in this game (start 0, 1 or 2 of the
+//     three, then the next unopened one, wrapping), a fourth one fails; the finale portal opens once per game;
+//   - VERIFIED shape: Uber Mephisto, Uber Baal and Uber Diablo all spawn together at the Cain gibbet position of
+//     Pandemonium Finale (no arrival delays); Lilith and Uber Izual stand at the sparkly chest of their area.
+//
 // Evidence (tables of the 1.14b patch_d2 data, read from the owner's install):
 //   - VERIFIED: monstats rows ubermephisto, uberdiablo, uberizual, uberandariel
 //     (display name Lilith), uberduriel, uberbaal exist with exe classes 704,
@@ -60,12 +68,8 @@ const (
 	CodeStandardOfHeroes = "std" // UNVERIFIED: not in the tables of the owner's install
 )
 
-// Delays in game frames (25 per second), UNVERIFIED.
-const (
-	diabloDelay = 75
-	baalDelay   = 150
-	portalDelay = 50
-)
+// portalDelay is the delay in game frames (25 per second) between the last Tristram kill and the way out, UNVERIFIED.
+const portalDelay = 50
 
 // Area is one uber area.
 type Area struct {
@@ -138,7 +142,15 @@ type Event struct {
 	// choice.
 	Pick func(n int) int
 
+	// Where, when set, says where the hero stands when the cube opens a portal: the level id and the difficulty
+	// (0 normal, 1 nightmare, 2 hell). The portals open only in Harrogath on Hell (VERIFIED shape, D2MOO); nil
+	// leaves them unrestricted (unit tests of the event alone).
+	Where func() (level, difficulty int)
+
 	entered map[int]bool
+	// opened is bUberPortalRuns of the exe: the area portals already made in this game, finaleOpened the finale's.
+	opened       [3]bool
+	finaleOpened bool
 	// organs the hero has collected from kills (by code), for the log.
 	organs map[string]bool
 	// Tristram
@@ -175,35 +187,78 @@ func (e *Event) State() string {
 	return "idle"
 }
 
+// runOrder is the order the exe tries the three areas in for its random start 0, 1 or 2 (ACT1Q4_CreateUberRunPortal).
+//
+//nolint:gochecknoglobals // static lookup data
+var runOrder = [3][3]int{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}
+
+// allowed says whether the cube may open a portal where the hero stands (Harrogath, Hell).
+func (e *Event) allowed() (bool, string) {
+	if e.Where == nil {
+		return true, ""
+	}
+
+	level, diff := e.Where()
+	if level != LevelHarrogath || diff != 2 {
+		return false, fmt.Sprintf("the hero stands in level %d on difficulty %d: the portal opens only in Harrogath on Hell", level, diff)
+	}
+
+	return true, ""
+}
+
+func (e *Event) refuse(m *d2boss.Manager, why string) []d2boss.Action {
+	return m.Do(func() { m.Logf("uber trigger: the cube portal fails: %s", why) })
+}
+
 // OpenKeyPortal is the cube transmuting the three keys: a portal to an uber
-// area appears.
+// area appears (ACT1Q4_CreateUberRunPortal).
 func (e *Event) OpenKeyPortal(m *d2boss.Manager) []d2boss.Action {
+	if ok, why := e.allowed(); !ok {
+		return e.refuse(m, why)
+	}
+
+	if e.opened[0] && e.opened[1] && e.opened[2] {
+		return e.refuse(m, "all three area portals were opened in this game")
+	}
+
 	return m.Do(func() {
-		n := len(Areas)
+		start := 0
+		if e.Pick != nil {
+			start = e.Pick(len(Areas)) % len(Areas)
+		}
 
-		i := 0
+		i := runOrder[start][2]
 
-		switch {
-		case e.Pick != nil:
-			i = e.Pick(n) % n
-		default:
-			for i < n-1 && e.entered[Areas[i].Level] {
-				i++
+		for _, c := range runOrder[start] {
+			if !e.opened[c] {
+				i = c
+
+				break
 			}
 		}
 
+		e.opened[i] = true
 		a := Areas[i]
 		e.PortalsOpened++
 		m.Logf("uber trigger: Terror, Hate and Destruction keys transmuted -> portal to %s (level %d)", a.Name, a.Level)
 		m.Emit("uber", d2boss.Action{Kind: d2boss.ActPortal, Name: "Pandemonium portal to " + a.Name, Class: d2boss.ObjHellgate,
-			Level: a.Level, Note: "area chosen by the engine, UNVERIFIED"})
+			Level: a.Level, Note: "random unopened area (VERIFIED shape, D2MOO)"})
 	})
 }
 
-// OpenFinalePortal is the cube transmuting the three organs: the red portal to
-// Tristram opens.
+// OpenFinalePortal is the cube transmuting the three organs: the portal to
+// Tristram opens, once per game (ACT1Q4_CreateUberFinalePortal).
 func (e *Event) OpenFinalePortal(m *d2boss.Manager) []d2boss.Action {
+	if ok, why := e.allowed(); !ok {
+		return e.refuse(m, why)
+	}
+
+	if e.finaleOpened {
+		return e.refuse(m, "the Tristram portal was opened in this game")
+	}
+
 	return m.Do(func() {
+		e.finaleOpened = true
 		e.PortalsOpened++
 		m.Logf("uber trigger: Diablo's Horn, Baal's Eye and Mephisto's Brain transmuted -> red portal to Tristram")
 		m.Emit("uber", d2boss.Action{Kind: d2boss.ActPortal, Name: "red portal to Tristram", Class: d2boss.ObjHellgate,
@@ -240,22 +295,14 @@ func (e *Event) OnEnter(m *d2boss.Manager, level int) {
 
 	if level == LevelTristram && !e.tristram {
 		e.tristram = true
-		m.Logf("uber trigger: Tristram entered -> Uber Mephisto, Uber Diablo and Uber Baal arrive")
-		m.Emit("uber", spawn(UberMephisto, level, "first of the three"))
+		m.Logf("uber trigger: Tristram entered -> Uber Mephisto, Uber Diablo and Uber Baal arrive together")
 
-		e.bossesAlive[ClassUberMephisto] = true
-		e.arrived++
+		for _, b := range []Boss{UberMephisto, UberBaal, UberDiablo} {
+			m.Emit("uber", spawn(b, level, "all three at the Cain gibbet position (VERIFIED shape, D2MOO)"))
 
-		m.After(diabloDelay, func() {
-			e.bossesAlive[ClassUberDiablo] = true
+			e.bossesAlive[b.Class] = true
 			e.arrived++
-			m.Emit("uber", spawn(UberDiablo, level, "delay UNVERIFIED"))
-		})
-		m.After(baalDelay, func() {
-			e.bossesAlive[ClassUberBaal] = true
-			e.arrived++
-			m.Emit("uber", spawn(UberBaal, level, "delay UNVERIFIED"))
-		})
+		}
 	}
 }
 
