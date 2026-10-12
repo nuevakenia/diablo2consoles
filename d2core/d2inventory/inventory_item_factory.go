@@ -87,8 +87,7 @@ func (f *InventoryItemFactory) loadHeroObjects() error {
 			Shield:    shield,
 		},
 		d2enum.HeroSorceress: {
-			RightHand: rhsst,
-			LeftHand:  rhsst,
+			RightHand: rhsst, // the short staff is two-handed: nothing in the left hand
 		},
 		d2enum.HeroAmazon: {
 			RightHand: rhjav,

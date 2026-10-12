@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2inventory"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop"
 )
 
@@ -198,6 +199,10 @@ func (f *HeroStateFactory) wearStartingEquipment(state *HeroState, hero d2enum.H
 	if rec == nil {
 		return
 	}
+
+	// the class kit replaces the placeholder gear of CreateHeroState (DefaultHeroItems); it used to be added on top,
+	// which left a second short staff in a Sorceress' left hand that the first .d2s export reported as unwritable
+	state.Equipment = d2inventory.CharacterEquipment{}
 
 	for _, it := range starterBodyItems(rec.StartItem[:], rec.StartItemLocation[:]) {
 		switch {
