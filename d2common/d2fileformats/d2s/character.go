@@ -36,6 +36,12 @@ type Character struct {
 	MercItems []Item
 	// Golem is the item an iron golem was made from, for Necromancers.
 	Golem *Item
+	// NoGolemSection records that the parsed expansion save ended without the
+	// 'kf' golem section (the exe tolerates this; saves written by older
+	// builds of this port for non-Necromancers look like that), so Write
+	// reproduces the file. A character built from scratch leaves it false and
+	// gets 'kf' like the exe writes.
+	NoGolemSection bool
 	// Trailing is any data after the last section the parser understands,
 	// kept so that Write reproduces the file.
 	Trailing []byte
@@ -101,10 +107,10 @@ func parse(data []byte, tables *ItemTables) (*Character, error) {
 		return nil, fmt.Errorf("mercenary: %w", err)
 	}
 
-	if header.Class == Necromancer {
-		if pos, err = c.readGolem(data, pos, tables); err != nil {
-			return nil, fmt.Errorf("golem: %w", err)
-		}
+	// The exe (0x568b60) reads the 'kf' golem section for every class of an
+	// expansion save, not only Necromancers; other classes carry 'kf' + 0.
+	if pos, err = c.readGolem(data, pos, tables); err != nil {
+		return nil, fmt.Errorf("golem: %w", err)
 	}
 
 	c.keepTrailing(data, pos)
@@ -178,6 +184,13 @@ func (c *Character) keepTrailing(data []byte, pos int) {
 }
 
 func (c *Character) readGolem(data []byte, pos int, tables *ItemTables) (int, error) {
+	// exe 0x568b60: with fewer than two bytes left the section is simply absent.
+	if pos+2 > len(data) {
+		c.NoGolemSection = true
+
+		return pos, nil
+	}
+
 	if pos+3 > len(data) || !bytes.Equal(data[pos:pos+2], golemTag) {
 		return pos, fmt.Errorf("%w: golem tag at 0x%X", ErrBadSection, pos)
 	}

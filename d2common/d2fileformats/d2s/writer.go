@@ -130,8 +130,8 @@ func (c *Character) appendBody(out []byte, tables *ItemTables) ([]byte, error) {
 		return nil, fmt.Errorf("%w: mercenary items need an expansion save with a mercenary", ErrWouldDrop)
 	}
 
-	if c.Golem != nil && (!c.Header.IsExpansion() || c.Header.Class != Necromancer) {
-		return nil, fmt.Errorf("%w: golem needs an expansion Necromancer", ErrWouldDrop)
+	if c.Golem != nil && !c.Header.IsExpansion() {
+		return nil, fmt.Errorf("%w: golem needs an expansion save", ErrWouldDrop)
 	}
 
 	out = c.Body.appendSections(out, tables)
@@ -155,7 +155,8 @@ func (c *Character) appendBody(out []byte, tables *ItemTables) ([]byte, error) {
 			}
 		}
 
-		if c.Header.Class == Necromancer {
+		// exe 0x567710 writes 'kf' for every class of an expansion save.
+		if !c.NoGolemSection || c.Golem != nil {
 			if out, err = c.appendGolem(out, tables); err != nil {
 				return nil, fmt.Errorf("golem: %w", err)
 			}
