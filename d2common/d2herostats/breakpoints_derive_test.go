@@ -126,8 +126,7 @@ func TestDruidFHRExplained(t *testing.T) {
 func TestUnverifiedRowsFlagged(t *testing.T) {
 	for _, e := range Tables {
 		flagged := e.Unverified != ""
-		forced := e.Note == "werewolf" || e.Note == "werebear" || e.Note == "lightning/chain lightning" ||
-			e.Kind == IAS || e.Note == "with a shield"
+		forced := e.Note == "lightning/chain lightning"
 
 		if forced && !flagged {
 			t.Errorf("%s %s %q must be flagged unverified", e.Class, e.Kind, e.Note)

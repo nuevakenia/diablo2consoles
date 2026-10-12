@@ -61,6 +61,9 @@ type Item struct {
 	Defense int
 	// BaseBlock is the block chance of the base shield (armor.txt "block").
 	BaseBlock int
+	// BaseSpeed is the base's "speed" column (BaseInfo.Speed): the movement penalty of an armor piece (stat 0x43
+	// is -BaseSpeed) or the weapon speed modifier of a weapon (stat 0x44 is -BaseSpeed).
+	BaseSpeed int
 	Weapon    *WeaponBase
 	// GemKind is the base's gemapplytype plus one (BaseInfo.GemKind); 0 falls
 	// back to the weapon / block guess, which is wrong for the Buckler.

@@ -14,6 +14,10 @@ type BaseInfo struct {
 	BaseBlock int         // armor.txt "block" (shields)
 	MinAC     int
 	MaxAC     int
+	// Speed is the "speed" column of armor.txt / weapons.txt. ITEMGEN_InitItemBaseStats
+	// (0x555b10, VERIFIED) turns it into stat 0x43 = -speed on armor pieces and stat 0x44 = -speed (the
+	// weapon speed modifier) on weapons.
+	Speed int
 	// GemKind is the base's gemapplytype column plus one (0 = unknown): which
 	// Gems.txt column group applies to gems in it (ITEM_GetGemApplyType 629c10).
 	GemKind int
@@ -42,6 +46,7 @@ func ParseBases(armor, weapons []byte) (Bases, error) {
 			GemKind:   tsvInt(r, col, "gemapplytype") + 1,
 			MinAC:     tsvInt(r, col, "minac"),
 			MaxAC:     tsvInt(r, col, "maxac"),
+			Speed:     tsvInt(r, col, "speed"),
 		}
 	}
 
@@ -71,7 +76,7 @@ func ParseBases(armor, weapons []byte) (Bases, error) {
 			w.Ranged = true
 		}
 
-		b[code] = BaseInfo{Weapon: w, GemKind: tsvInt(r, col, "gemapplytype") + 1}
+		b[code] = BaseInfo{Weapon: w, GemKind: tsvInt(r, col, "gemapplytype") + 1, Speed: tsvInt(r, col, "speed")}
 	}
 
 	return b, nil

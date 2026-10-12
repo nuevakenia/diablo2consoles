@@ -123,8 +123,24 @@ type Totals struct {
 	ManaSteal             int
 
 	FasterAttack, FasterCast, FasterHit, FasterBlock, FasterRun int
-	MagicFind, GoldFind                                         int
-	AllSkills                                                   int
+	// ArmorSpeed is the sum of the armor.txt "speed" column over the worn armor pieces (body armor 5 or 10, large
+	// shields 5 or 10, the rest 0). The exe puts -speed on each piece as stat 0x43 (ITEMGEN_InitItemBaseStats
+	// 0x555b10, VERIFIED) and adds the stat to the walk/run percent, so the movement percent is
+	// 100 - ArmorSpeed (+50 running) + the diminished faster run/walk.
+	ArmorSpeed int
+	// BodyArmorSpeed is the speed column of the body armor (slot torso, 0 when none): PLAYER_CalcStaminaDrainPerStep
+	// (0x57d220, VERIFIED) multiplies the run drain by BodyArmorSpeed/10 + 1, so a heavy body armor (speed 10)
+	// doubles the stamina drain. StaminaDrainPct is stat 0x9a (item_staminadrainpct), read by the same function.
+	BodyArmorSpeed  int
+	StaminaDrainPct int
+	// StaminaRecoveryPct is stat 0x1c (staminarecoverybonus): PLAYER_ServerRegenStaminaTick (0x57e4f0, VERIFIED)
+	// adds that percent to the regeneration step, and at 1000 or more lets a running unit regenerate.
+	StaminaRecoveryPct int
+	// WeaponSpeed is the weapon speed modifier (weapons.txt "speed") of the weapon in the right hand: stat 0x44 of
+	// the attack rate is 100 - WeaponSpeed + skill speed, before the diminished IAS is added (VERIFIED, 0x624150).
+	WeaponSpeed         int
+	MagicFind, GoldFind int
+	AllSkills           int
 
 	// Natural regeneration inputs (see d2herostats/regen.go): ManaRecoveryPct
 	// is stat 27 (regenerate mana %, items and the mana shrine), ManaRecoveryRaw
@@ -364,6 +380,25 @@ func Compute(h Hero, items []Item, env *Env) Totals {
 	t.FasterHit = int(list.Get(StatFasterHit))
 	t.FasterBlock = int(list.Get(StatFasterBlock))
 	t.FasterRun = int(list.Get(StatFasterMove))
+	t.StaminaDrainPct = int(list.Get(StatStaminaDrain))
+	t.StaminaRecoveryPct = int(list.Get(StatStamRecovery))
+
+	for i := range active {
+		if active[i].Charm {
+			continue
+		}
+
+		switch {
+		case active[i].Weapon == nil:
+			t.ArmorSpeed += active[i].BaseSpeed
+
+			if active[i].Slot == SlotTorso {
+				t.BodyArmorSpeed = active[i].BaseSpeed
+			}
+		case active[i].Slot == SlotRightHand:
+			t.WeaponSpeed = active[i].BaseSpeed
+		}
+	}
 	t.MagicFind = int(list.Get(StatMagicFind))
 	t.GoldFind = int(list.Get(StatGoldFind))
 	t.ManaRecoveryPct = int(list.Get(StatManaRecovery))

@@ -86,12 +86,15 @@ func (e *Engine) actionClock(u d2skill.Unit, sk *d2skill.Skill) *d2skill.ActionC
 		start = d2skill.AttackStartFrame(exeClassIndex(h.p.Class), wc)
 	}
 
-	ias := 0
+	ias, stat44 := 0, d2animspeed.AttackBasePct
 	if t := h.totals(); t != nil && t.Stats != nil {
 		ias = int(t.Stats.Get(itemIASStat))
+		// stat 0x44 starts at 100 and the weapon adds -WSM (weapons.txt speed, ITEMGEN_InitItemBaseStats
+		// 0x555b10 VERIFIED). UNVERIFIED here: the skill speed term (Zeal, Fury, Dragon Talon...) is not added.
+		stat44 -= t.WeaponSpeed
 	}
 
-	rate := d2animspeed.AttackRate(rec.Speed(), d2animspeed.AttackBasePct, ias, 0, false)
+	rate := d2animspeed.AttackRate(rec.Speed(), stat44, ias, 0, false)
 
 	return d2skill.NewActionClock(flags, start, rate, frames)
 }

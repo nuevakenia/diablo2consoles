@@ -3,11 +3,14 @@ package d2herostats
 // Stamina drain and recovery, from the exe (observations only):
 // 0x0057d220 (drain per running step) and 0x0057e4f0 (recovery per tick).
 // Stamina (stat 10/11) is held in 1/256 units, so the functions below work in
-// those raw units. The per-tick rate of both routines is UNVERIFIED: the engine
-// assumes the original's 25 Hz frame (a level 1 Barbarian then runs dry in
-// ~23 s, which matches the old empirical note in d2mapentity).
+// those raw units. Both routines run once per game frame (VERIFIED wave 31: the
+// drain is called from the per-frame movement tick PLRMODE_ServerTickMovement
+// 0x57ec40 while the mode is run; the recovery is called by the regeneration
+// event 0x57e800 that reschedules itself one game frame later), 25 per second. A
+// level 1 Barbarian runs dry in ~23.6 s, which matches the old empirical note in
+// d2mapentity.
 
-// FramesPerSecond is the assumed tick rate of the two routines (UNVERIFIED).
+// FramesPerSecond is the game frame rate the two routines run at.
 const FramesPerSecond = 25
 
 // Unit modes the recovery distinguishes (player modes of the exe).
@@ -24,12 +27,13 @@ const (
 // (VERIFIED 0x0057d220, read from the disassembly):
 //
 //	d = charstats RunDrain * 2
-//	if body armor is worn: d *= weight/10 + 1   (the armor's weight column)
+//	if body armor is worn: d *= speed/10 + 1   (the armor's speed column: 5 or 10, so heavy armor doubles it)
 //	d -= d * stat0x9a / 100                     (stamina drain percent)
 //	d = max(d, 1)
 //
-// In town the routine returns before any of this (no drain). bodyWeight < 0
-// means no armor is worn. Truncation is toward zero.
+// In town the routine returns before any of this (no drain). bodyWeight is the
+// speed column of the body armor (it was long mislabelled weight; armor.txt has no weight
+// column), < 0 means no armor is worn (the same as speed 0). Truncation is toward zero.
 func StaminaDrainPerStep(runDrain, bodyWeight, drainPct int, inTown bool) int {
 	if inTown {
 		return 0

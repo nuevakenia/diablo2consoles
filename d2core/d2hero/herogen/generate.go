@@ -346,7 +346,7 @@ func statItems(items []d2s.Item, bases d2statlist.Bases) []d2statlist.Item {
 		}
 
 		if b, ok := bases[code]; ok {
-			si.Weapon, si.BaseBlock = b.Weapon, b.BaseBlock
+			si.Weapon, si.BaseBlock, si.BaseSpeed = b.Weapon, b.BaseBlock, b.Speed
 		}
 
 		out = append(out, si)
