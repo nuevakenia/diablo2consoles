@@ -42,8 +42,10 @@ func (p *Pipeline) bladeFuryRefresh(u Unit) {
 func (p *Pipeline) bladeFuryDo(u Unit, sk *Skill, lvl int, tgt Target) DoResult {
 	f := p.frame()
 	res := DoResult{OK: true, Level: lvl}
+	fresh := false
 
 	if !p.bladeFuryActive(u) {
+		fresh = true
 		if sm := sk.StartMana; sm > 0 && u.IsPlayer() && u.Mana() < sm*256 {
 			return DoResult{Reason: ReasonMana, Level: lvl}
 		}
@@ -68,7 +70,7 @@ func (p *Pipeline) bladeFuryDo(u Unit, sk *Skill, lvl int, tgt Target) DoResult 
 
 	// the start function lets slot <= frame through, the do function throws only when slot < frame; a slot still
 	// ahead only pushes the events back
-	if slot >= f {
+	if slot >= f && !fresh { // a state made by this very use has slot 0, which is behind any later frame
 		return res
 	}
 
