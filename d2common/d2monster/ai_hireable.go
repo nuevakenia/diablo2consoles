@@ -69,6 +69,44 @@ func init() {
 // (desert guard, barbarians; VERIFIED).
 func mercFixedThreshold(class int) bool { return class == 338 || class == 560 || class == 561 }
 
+// MercLeaderOps are the optional host hooks of the faithful Hireable think (w40). A host that lacks them gets
+// the fallbacks named in each comment.
+type MercLeaderOps interface {
+	// ClearState is STATE_ToggleUnitState(unit, id, 0).
+	ClearState(b *Brain, id int)
+	// FootprintBlocked is COLLISION_TestFootprintMask(room, x, y, size, 0x40) != 0 (fallback: false).
+	FootprintBlocked(b *Brain) bool
+	// InTownRoom is ROOM_IsTownRoom of the merc's room (fallback: false).
+	InTownRoom(b *Brain) bool
+	// SameRegion compares DRLG_GetRegionIdAtPointInRoom of the leader and the merc (fallback: same level).
+	SameRegion(b *Brain, o OwnerInfo) bool
+	// LeaderFollow is MONAI_TeleportToLeader 0x5e2810 for kind 0 (step toward the leader's destination, trying 8
+	// directions in the same region) or kind 1 (leader path breadcrumbs, then PetMoveTowardTarget); run and speed
+	// are its nArg5/nArg6. It returns false when the host could not start a move.
+	LeaderFollow(b *Brain, o OwnerInfo, kind int, run bool, speed int) bool
+}
+
+// mercRogueClass gets alternate state 5 (GoodNpcRanged, not ported) when it has no player leader; all others state 6.
+const mercRogueClass = 271 // 0x10f
+
+// mercGuardClass: 0x152 and 0x230..0x231 take the 6 (not 12) footprint wander threshold (VERIFIED 0x5e446b).
+func mercGuardClass(class int) bool { return class == 338 || class == 560 || class == 561 }
+
+// mercEnterState is MONAI_SetAiState(n) + wait 10 for the no-leader case. State 5 has no Go think
+// (UNVERIFIED stand-in: wait).
+func mercEnterState(c *Ctx, n int) {
+	if def := StateDef(n); def != nil {
+		if c.B.baseDef == nil {
+			c.B.baseDef = c.B.Def
+		}
+
+		c.B.SetAI(def)
+	}
+
+	c.Sleep(10)
+}
+
+// thinkHireable is MONAI_Think_Hireable 0x5e4240, rewritten from the exe in w40 (order of tests as in the exe).
 func thinkHireable(c *Ctx) {
 	w, ok := c.W.(MercWorld)
 	if !ok {
@@ -78,10 +116,27 @@ func thinkHireable(c *Ctx) {
 	}
 
 	b := c.B
+	ops, _ := c.W.(MercLeaderOps)
 
 	owner, ok := w.Owner(b)
-	if !ok {
-		c.Sleep(10) // the original switches to a forced-state AI; no owner means idle here
+	if !ok || !owner.IsPlayer {
+		// no leader, or the leader is not a player: alternate state 5 (class 271) or 6
+		if b.Class == mercRogueClass {
+			mercEnterState(c, StateGoodRange)
+		} else {
+			mercEnterState(c, StateTownGuard)
+		}
+
+		return
+	}
+
+	if ops != nil && w.HasState(b, StateTaunt) {
+		ops.ClearState(b, 0xc)
+	}
+
+	// mode 2 (walk) and 0xf (run): return, the animation end wakes the AI
+	if b.Mode == ModeWalk || b.Mode == ModeRun {
+		c.busy()
 
 		return
 	}
@@ -94,53 +149,117 @@ func thinkHireable(c *Ctx) {
 
 	d := EdgeDistance(b.X-owner.X, b.Y-owner.Y, b.Size)
 
-	switch {
-	case d > mercTeleportDist:
-		if w.Teleport(b) {
-			c.Sleep(5)
+	follow := func(kind int, run bool, speed int) {
+		if ops != nil {
+			if !ops.LeaderFollow(b, owner, kind, run, speed) {
+				c.busy()
+			}
 
 			return
 		}
-	case d > outer:
-		c.SetSpeed(0x3c)
 
-		if c.RunTo(owner.Target, inner) {
-			return
+		if speed != 0 {
+			c.SetSpeed(speed)
 		}
-	case d > far:
-		switch owner.Mode {
-		case ModeWalk:
-			if c.WalkTo(owner.Target, inner) {
-				return
-			}
-		case ModeRun:
-			if c.RunTo(owner.Target, inner) {
-				return
-			}
+
+		if run {
+			c.RunTo(owner.Target, inner)
+		} else {
+			c.WalkTo(owner.Target, inner)
 		}
 	}
 
-	if b.Mode == ModeNeutral {
-		if t, dist, ok := w.AttackTarget(b); ok && dist <= mercSeekRadius {
+	switch {
+	case d > mercTeleportDist:
+		w.Teleport(b) // kind 3; on success the exe waits 5 frames
+
+		c.Sleep(5)
+
+		return
+	case d > outer:
+		follow(1, true, 0x3c)
+
+		return
+	case d > far:
+		// owner modes 2/6 (host: ModeWalk) and 3 (ModeRun)
+		switch owner.Mode {
+		case ModeWalk:
+			follow(0, false, 0)
+
+			return
+		case ModeRun:
+			follow(0, true, 0x3c)
+
+			return
+		}
+	}
+
+	if b.Mode != ModeNeutral {
+		c.Sleep(5) // EVENT_CancelByTypeAndData(2, 0) then wait 5
+
+		return
+	}
+
+	blocked := ops != nil && ops.FootprintBlocked(b)
+
+	if blocked {
+		thr := 6
+		if !mercGuardClass(b.Class) {
+			thr = 12
+		}
+
+		if b.Roll(128) < thr { // RAND_RollSeedPow2Mask(0x80)
+			c.Wander(5)
+
+			return
+		}
+	}
+
+	if !(ops != nil && ops.InTownRoom(b)) {
+		if t, dist, ok := w.AttackTarget(b); ok && dist < 0x19 {
 			mercDecideAttack(c, w, t, dist)
 
 			return
 		}
+	}
 
-		switch {
-		case b.LevelID != owner.LevelID:
-			if c.RunTo(owner.Target, inner) {
-				return
-			}
-		case d < 2:
-			if c.WalkNearRandom(owner.Target, inner-1) {
-				return
-			}
-		case b.Roll(100) < 5:
-			if c.WalkNearRandom(owner.Target, far) {
-				return
-			}
+	if blocked {
+		c.Wander(5)
+
+		return
+	}
+
+	same := b.LevelID == owner.LevelID
+	if ops != nil {
+		same = ops.SameRegion(b, owner)
+	}
+
+	if !same {
+		follow(0, true, 0x3c)
+
+		return
+	}
+
+	if d < 2 {
+		// step around the leader, else away, else walk to the leader's destination
+		if c.WalkNearRandom(owner.Target, inner-1) {
+			return
 		}
+
+		if c.WalkAway(owner.Target, inner-1) {
+			return
+		}
+
+		c.SetSpeed(0x28)
+		c.WalkTo(owner.Target, 0)
+
+		return
+	}
+
+	if b.Roll(100) < 5 {
+		c.WalkNearRandom(owner.Target, far)
+
+		return
 	}
 
 	c.Sleep(5)
