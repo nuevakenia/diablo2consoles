@@ -78,7 +78,7 @@ func BetrayalEligible(prisonDoneOrPending, missedBit bool) bool {
 
 // Rite of Passage, the Ancients and the summit gate.
 //
-// VERIFIED (0x58b1e0, the altar object): the altar that opens the way to the Worldstone Keep works only for a hero
+// VERIFIED (0x58b1e0, OperateFn 66 = the DOOR object 547; the altar 546 is 0x58b0f0, w39): the door that opens the way to the Worldstone Keep works only for a hero
 // whose Rite record has bit 0 or bit 1 (done / reward pending), and not while the fight of this game is still going
 // (the node's done byte clear and the node active, or a fight flag at +0x48 set while the done byte is clear). A hero
 // without the bits gets the object reset and nothing happens.

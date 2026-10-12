@@ -21,10 +21,11 @@ import (
 
 // riteLive is the Rite state of the game screen.
 type riteLive struct {
-	fight    d2quest.AncientsFight
-	ancients []*d2mapentity.Monster // the Ancients woken in the current level
-	gateOpen bool
-	slotUsed [d2quest.AncientCount]bool // the statue of the slot was spoken to (VERIFIED 0x589f10: it goes to mode 4)
+	fight     d2quest.AncientsFight
+	ancients  []*d2mapentity.Monster // the Ancients woken in the current level
+	gateOpen  bool
+	altarUsed bool                       // the altar (546) is in mode 1 (VERIFIED 0x58b0f0)
+	slotUsed  [d2quest.AncientCount]bool // the statue of the slot was spoken to (VERIFIED 0x589f10: it goes to mode 4)
 }
 
 const (
@@ -52,6 +53,7 @@ func (v *Game) riteEnter(level int) {
 	}
 
 	v.rite.gateOpen = false
+	v.rite.altarUsed = false
 
 	if v.monsters != nil {
 		v.monsters.RiteReset()
@@ -62,6 +64,13 @@ func (v *Game) riteEnter(level int) {
 		x, y := v.heroTilePos()
 		if v.newObjectAt(d2quest.AncientsAltar, int(x*subtilesInTile)+riteAltarOffset, int(y*subtilesInTile)) != nil {
 			v.Infof("RITE the level has no altar: one is placed next to the hero (fallback: the exe has no code that creates it, UNVERIFIED place)")
+		}
+	}
+
+	if len(v.objectsOf(d2quest.AncientsDoor)) == 0 {
+		x, y := v.heroTilePos()
+		if v.newObjectAt(d2quest.AncientsDoor, int(x*subtilesInTile)+riteAltarOffset, int(y*subtilesInTile)+riteAltarOffset) != nil {
+			v.Infof("RITE the level has no gate door: one is placed next to the hero (harness fallback, UNVERIFIED place)")
 		}
 	}
 
@@ -253,31 +262,64 @@ func (v *Game) riteRewardParty() {
 	}
 }
 
-// riteOperate is the altar. It reports whether the object was one.
+// riteOperate handles the two summit objects (w39 correction, VERIFIED against the operate table at 0x730350: the
+// table entry of OperateFn n is at 0x730350 + 4*(n-62), so fn 65 = 0x58b0f0 is the altar (546) and fn 66 = 0x58b1e0
+// is the door (547); fn 67 = 0x588a60 is Frozen Anya, which cross-checks the base). It reports whether the object
+// was one of them.
 func (v *Game) riteOperate(ob *d2mapentity.Object) bool {
-	if ob.Record().Index != d2quest.AncientsAltar {
+	switch ob.Record().Index {
+	case d2quest.AncientsAltar:
+		v.riteOperateAltar(ob)
+	case d2quest.AncientsDoor:
+		v.riteOperateDoor(ob)
+	default:
 		return false
 	}
 
+	return true
+}
+
+// riteOperateAltar is 0x58b0f0: an altar that was not used yet (mode 0) resets the Ancients when a town portal
+// is open, speaks message 20002 (the Ancients' introduction, which starts the statue sequence) and goes to mode 1.
+// The exe also moves the quest node to state 2 (message 0x59f) and queues the callback 0x589c70; the node bytes
+// are UNVERIFIED and not modelled (the introduction path of the harness does the start).
+func (v *Game) riteOperateAltar(ob *d2mapentity.Object) {
+	if v.rite.altarUsed {
+		v.Infof("RITE the altar was used already")
+
+		return
+	}
+
+	v.rite.altarUsed = true
+
+	if _, err := ob.Open(); err != nil {
+		v.Warningf("RITE altar: %v", err)
+	}
+
+	v.Infof("RITE the altar is operated: the Ancients' introduction")
+	v.riteStart()
+}
+
+// riteOperateDoor is 0x58b1e0 (the gate to the Worldstone Keep): works only for a hero whose Rite record has bit 0
+// or bit 1 and not while the fight of this game is still going; otherwise nothing happens.
+func (v *Game) riteOperateDoor(ob *d2mapentity.Object) {
 	r := v.quests()
 	open := r != nil && r.g.RiteAltarOpen() // both the done and the reward-pending bit
 
 	if !v.rite.fight.AltarWorks(open, false) {
-		v.Infof("RITE the altar does nothing (rite open=%v, fight running=%v)", open, v.rite.fight.Running())
+		v.Infof("RITE the door does nothing (rite open=%v, fight running=%v)", open, v.rite.fight.Running())
 
-		return true
+		return
 	}
 
 	if opened, err := ob.Open(); err != nil {
-		v.Warningf("RITE altar: %v", err)
+		v.Warningf("RITE door: %v", err)
 	} else if !opened {
-		v.Infof("RITE the altar is already open")
+		v.Infof("RITE the door is already open")
 	}
 
 	v.riteOpenGate()
-	v.Infof("RITE the altar opens the way to the Worldstone Keep")
-
-	return true
+	v.Infof("RITE the door opens the way to the Worldstone Keep")
 }
 
 // riteOpenGate opens the door objects to the Worldstone Keep (the level gate itself follows the quest bits).
@@ -293,6 +335,17 @@ func (v *Game) riteOpenGate() {
 
 func (v *Game) commandRiteStart(_ []string) error {
 	v.riteStart()
+
+	return nil
+}
+
+func (v *Game) commandRiteDoor(_ []string) error {
+	d := v.objectsOf(d2quest.AncientsDoor)
+	if len(d) == 0 {
+		return errors.New("no gate door in this level")
+	}
+
+	v.riteOperate(d[0])
 
 	return nil
 }

@@ -8,8 +8,8 @@ package d2quest
 const (
 	AncientCount  = 3
 	LevelSummit   = LevelArreatSummit // the level of the fight (120, 0x78 in the exe)
-	AncientsAltar = 546               // objects.txt row "ancientsaltar", OperateFn 65 = entry 0x730360 of the operate table = 0x58b1e0 (VERIFIED w37: fn 62..64 of the statue rows resolve to the Rite stubs next to it)
-	AncientsDoor  = 547               // objects.txt row of the door to the Worldstone Keep (UNVERIFIED: its OperateFn 66 resolves to 0x588a60, the Prison of Ice handler, which does not fit)
+	AncientsAltar = 546               // objects.txt "ancientsaltar", OperateFn 65 = 0x58b0f0 (VERIFIED w39: table entry = 0x730350 + 4*(fn-62); fn 62..64 are the statue stubs 0x58afc0/e0/b000, fn 67 = Frozen Anya 0x588a60 cross-checks)
+	AncientsDoor  = 547               // objects.txt "ancientsdoor" (gate to the Worldstone Keep), OperateFn 66 = 0x58b1e0 (VERIFIED w39)
 )
 
 // Statue objects.txt rows (VERIFIED 0x589f10: dwTxtFileNo 0x1da, 0x1db, 0x1dc of the activated statue).

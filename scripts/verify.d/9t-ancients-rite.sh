@@ -1,6 +1,6 @@
 scenario_timeout=900
 scenario_turbo=1  # scripted autoplay, no wall-clock assertions (numbers: ~/git/d2-re-notes/turbo-mode.md)
-scenario_name="Rite of Passage (Arreat Summit altar refuses, the statues wake the three Ancients, a town portal resets them, the third death pays the quest and the altar opens the Worldstone Keep gate)"
+scenario_name="Rite of Passage (Arreat Summit gate door refuses, the altar starts the introduction, the statues wake the three Ancients, a town portal resets them, the third death pays the quest and the door opens the Worldstone Keep gate)"
 ri=$tmp/rite
 # Played by OD2_AUTOSCRIPT. The hero (level 94 sample) travels to Harrogath with the quest chain forced, steps into the
 # Arreat Summit through a spawned portal, and drives the fight with the scenario commands ritestart / ritekill /
@@ -14,15 +14,15 @@ scenario_env() {
     s+=";say:completequest 5 1;say:completequest 5 2;say:completequest 5 3;say:completequest 5 4;wait:6"
     s+=";say:spawnportal 120;use:Portal;expect:level=120;wait:3;say:restorevitals"
     # the altar refuses while the Rite is neither done nor pending
-    s+=";say:ritealtar;expect:log=RITE the altar does nothing"
+    s+=";say:ritedoor;expect:log=RITE the door does nothing"
     # the statues' introduction wakes the three Ancients
-    s+=";say:ritestart;wait:1;expect:log=RITE Ancient 3 wakes;expect:log=RITE the fight starts"
+    s+=";say:ritealtar;wait:1;expect:log=RITE the altar is operated;expect:log=RITE Ancient 3 wakes;expect:log=RITE the fight starts"
     # a town portal in the summit resets them; closing it arms the fight again
     s+=";say:townportal free;wait:2;expect:log=RITE a town portal opened in the summit"
     s+=";say:closeportal;wait:2;expect:log=RITE the last portal closed"
     # killing all three: the third death ends the fight and pays the quest
     s+=";say:restorevitals;say:ritekill;wait:2;expect:log=RITE the third Ancient died"
-    s+=";say:ritealtar;expect:log=RITE the altar opens the way to the Worldstone Keep;say:ritestatus;wait:1;exit"
+    s+=";say:ritedoor;expect:log=RITE the door opens the way to the Worldstone Keep;say:ritestatus;wait:1;exit"
     echo "export OD2_AUTOGAME=\"$ri/s94/Hero.d2s\" OD2_D2S_WRITEBACK=\"$ri/wb94\" OD2_AUTOSPEED=4 OD2_AUTOMONSTER_DIFF=0"
     echo "export OD2_AUTOSCRIPT='$s'"
   else
@@ -36,9 +36,9 @@ scenario_check() {
   grep -q "AUTOSCRIPT RESULT PASS" $log.txt || { echo "FAIL: the Rite of Passage script did not pass"; fail=1; }
   grep -E "AUTOSCRIPT step [0-9]+ FAIL" $log.txt | cut -c1-200
   grep -qE "LEVEL CHANGE .*to=120" $log.txt || { echo "FAIL: the hero did not reach the Arreat Summit"; fail=1; }
-  for l in "RITE the altar does nothing" "RITE Ancient 1 wakes" "RITE Ancient 2 wakes" "RITE Ancient 3 wakes" "RITE the fight starts" \
+  for l in "RITE the door does nothing" "RITE the altar is operated" "RITE Ancient 1 wakes" "RITE Ancient 2 wakes" "RITE Ancient 3 wakes" "RITE the fight starts" \
            "RITE a town portal opened in the summit" "RITE the last portal closed" "RITE the third Ancient died" \
-           "RITE the altar opens the way"; do
+           "RITE the door opens the way"; do
     grep -q "$l" $log.txt || { echo "FAIL: no log line '$l'"; fail=1; }
   done
   # the Ancients are the classes 540..542 and the quest system saw all three deaths
