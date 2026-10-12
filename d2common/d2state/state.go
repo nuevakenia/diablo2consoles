@@ -84,6 +84,11 @@ func (s *Set) Apply(frame int, in Instance) *Instance {
 func (s *Set) ApplyTimed(frame int, in Instance) (applied bool, prev *Instance) {
 	var old string
 
+	// VERIFIED (0x56c740): a unit with state 0x39 (attract) refuses every curse, after the resist handling
+	if s.attractRefuses(frame, in.Name) {
+		return false, s.Get(frame, in.Name)
+	}
+
 	if d, ok := s.defs[in.Name]; ok && d.Curse && !isShrine(in.Name) {
 		for n, x := range s.states {
 			if dx, ok := s.defs[n]; ok && dx.Curse && !isShrine(n) && x.Active(frame) {
