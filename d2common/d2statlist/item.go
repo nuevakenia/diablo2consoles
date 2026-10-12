@@ -61,7 +61,11 @@ type Item struct {
 	Props []Prop
 	// SetID identifies the set (0 none). SetLists[i] is the bonus list of
 	// tier i, active when at least i+2 pieces of the set are equipped.
-	SetID         int
+	SetID int
+	// SetPiece identifies which piece of the set this is (1 + its SetItems
+	// row, 0 unknown). The game counts distinct pieces: two copies of the
+	// same set item (two rings) are one piece (INV_CountEquippedSetMates).
+	SetPiece      int
 	SetLists      [][]Prop
 	Runeword      bool
 	RunewordProps []Prop

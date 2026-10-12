@@ -288,6 +288,7 @@ func (i *Item) fromRolled(c *d2drop.Creator) {
 			si := c.Uniques.SetItems[r.Unique]
 			i.SetItemCode = si.Name
 			i.setRow = si.Set + 1
+			i.setPiece = r.Unique + 1
 
 			if si.Set >= 0 && si.Set < len(c.Uniques.Sets) {
 				i.SetCode = c.Uniques.Sets[si.Set].Name

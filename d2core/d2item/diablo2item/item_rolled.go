@@ -238,7 +238,7 @@ const SetBonusTiers = setListLast - setListFirst + 1
 // row of Sets.txt). The set bonuses are active only while enough pieces of
 // the set are worn (d2statlist.Compute counts them).
 func (i *Item) StatItem() d2statlist.Item {
-	it := d2statlist.Item{Code: strings.TrimSpace(i.CommonCode), Ethereal: i.IsEthereal(), SetID: i.setRow}
+	it := d2statlist.Item{Code: strings.TrimSpace(i.CommonCode), Ethereal: i.IsEthereal(), SetID: i.setRow, SetPiece: i.setPiece}
 
 	if i.attributes != nil {
 		it.Defense = i.attributes.defense

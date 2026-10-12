@@ -56,6 +56,8 @@ func (v *Game) monsterDirector() *d2monsters.Director {
 		// heroes in the game (1 when playing alone); OD2_PLAYERS can force more
 		PlayersFunc:   func() int { return len(v.gameClient.Players) },
 		ForcedPlayers: d2monsters.ForcedPlayersFromEnv(os.Getenv("OD2_PLAYERS")),
+		MagicFindFunc: v.heroMagicFind,
+		GoldFindFunc:  v.heroGoldFind,
 		OnSound:       v.onMonsterSound,
 		ZealotAfraid:  v.zealotAfraid,
 		OnShake:       func(s d2monster.Shake) { v.mapRenderer.StartShake(s) },

@@ -37,6 +37,10 @@ type Request struct {
 	// ForcedID is 1 + the UniqueItems or SetItems row to create (0: pick one).
 	ForcedID int
 	Flags    RequestFlags
+	// ItemFlags are the item flags carried by the request (request +0x44):
+	// 0x400000 forces ethereal and 0x800 forces sockets (both checked in
+	// 554d90 / 554c60, VERIFIED; the rolls are still taken).
+	ItemFlags uint32
 	// GameSeed is the server's generator; the item takes two steps of it, one
 	// for its unit generator (base stats) and one for its item generator
 	// (affixes, properties, sockets), exactly as ITEMGEN does.

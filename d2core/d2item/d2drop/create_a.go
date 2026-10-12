@@ -1109,7 +1109,7 @@ func (c *Creator) rollEthereal(st *itemState) {
 	}
 
 	eth := st.itemRoll(100) < 5
-	if !eth && st.req.Flags&FlagForceEthereal == 0 {
+	if !eth && st.req.Flags&FlagForceEthereal == 0 && st.req.ItemFlags&flagEthereal == 0 {
 		return
 	}
 
@@ -1200,7 +1200,7 @@ func (c *Creator) rollSockets(st *itemState) {
 		roll = 0
 	}
 
-	if roll >= 33 {
+	if roll >= 33 && st.req.ItemFlags&flagSocketed == 0 {
 		return
 	}
 

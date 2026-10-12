@@ -855,7 +855,11 @@ func (d *Director) dropLootFrom(u *unit, tc string) {
 		return
 	}
 
+	// ITEMGEN_GetDropBaseLevel (556260): the monster's level stat, 1 below 2.
 	level := u.m.Vitals.Level
+	if level < 2 {
+		level = 1
+	}
 
 	// the treasure class moves along its level group with the monster level
 	// only in the expansion above Normal (VERIFIED, 0x558d80)
@@ -866,8 +870,18 @@ func (d *Director) dropLootFrom(u *unit, tc string) {
 
 	upgrade := d2drop.MonsterUpgradeLevel(d.opt.Expansion, int(d.opt.Difficulty), true, flags, level)
 
+	mf, gf := 0, 0
+	if d.opt.MagicFindFunc != nil {
+		mf = d.opt.MagicFindFunc()
+	}
+
+	if d.opt.GoldFindFunc != nil {
+		gf = d.opt.GoldFindFunc()
+	}
+
 	loot, err := d.engine.DropLoot(tc, diablo2item.DropOptions{
-		Seed: u.b.Seed.Step(), ILvl: level, UpgradeLevel: upgrade, Players: 1,
+		Seed: u.b.Seed.Step(), ILvl: level, UpgradeLevel: upgrade, Players: d.PlayerCount(),
+		MagicFind: mf, GoldFind: gf,
 		RollExtras: true, Difficulty: int(d.opt.Difficulty), Classic: !d.opt.Expansion,
 	}, 0)
 	if err != nil {

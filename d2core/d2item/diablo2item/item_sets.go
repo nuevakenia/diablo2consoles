@@ -41,6 +41,18 @@ func (f *ItemFactory) SetTable() (d2statlist.SetDefs, error) {
 		}
 
 		def := d2statlist.SetDef{Pieces: b.Pieces, Full: props(b.Full)}
+
+		for _, si := range c.Uniques.Sets[set].Items {
+			def.Members = append(def.Members, si)
+
+			af := 0
+			if si >= 0 && si < len(c.Uniques.SetItems) {
+				af = c.Uniques.SetItems[si].AddFunc
+			}
+
+			def.AddFuncs = append(def.AddFuncs, af)
+		}
+
 		for _, p := range b.Partial {
 			def.Partial = append(def.Partial, props(p))
 		}

@@ -89,7 +89,8 @@ func TestComputeSetTiers(t *testing.T) {
 		Full:    []Prop{{ID: StatStrength, Value: 10000}},
 	}}
 	slots := []int{SlotHead, SlotTorso, SlotRightHand, SlotLeftHand, SlotGloves}
-	want := []int64{0, 0, 1, 11, 111, 11111}
+	// the tier of the last piece (5) is never used; the full bonus replaces it
+	want := []int64{0, 0, 1, 11, 111, 10111}
 
 	for n := 0; n <= 5; n++ {
 		var items []Item
