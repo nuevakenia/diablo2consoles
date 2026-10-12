@@ -112,5 +112,5 @@ func DefaultUI() UI {
 		return &ScriptedUI{Pick: p}
 	}
 
-	return OsaUI{}
+	return nativeUI()
 }

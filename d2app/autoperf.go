@@ -218,17 +218,6 @@ func (a *App) perfRenderDone(t0 time.Time) {
 	}
 }
 
-// processCPU is the user+system CPU time the process has used so far; unlike wall-clock frame
-// times it is not inflated when other programs compete for the machine.
-func processCPU() time.Duration {
-	var ru syscall.Rusage
-	if syscall.Getrusage(syscall.RUSAGE_SELF, &ru) != nil {
-		return 0
-	}
-
-	return time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
-}
-
 func perfStats(v []float64) (avg, p95, p99, mx float64) {
 	if len(v) == 0 {
 		return
