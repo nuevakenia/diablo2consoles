@@ -61,6 +61,22 @@ func (v *Game) travelToAct(to int, via string) error {
 		return fmt.Errorf("a level change is already running")
 	}
 
+	// the act movie (if the exe sends one) plays first, over the standing game; the trip starts when it is over
+	if m, ok := v.actMovie(from, to, via); ok && v.playGameMovies(m.Movie, m.Then) {
+		v.movie.after = func() {
+			if err := v.beginActTravel(from, to, via, rule); err != nil {
+				v.Errorf("TRAVEL after the movie: %v", err)
+			}
+		}
+
+		return nil
+	}
+
+	return v.beginActTravel(from, to, via, rule)
+}
+
+// beginActTravel starts the level change to the town of the destination act and marks the trip.
+func (v *Game) beginActTravel(from, to int, via string, rule d2level.ActRule) error {
 	dest := d2level.ActStartLevel(to)
 	forward := to > from
 
@@ -81,8 +97,6 @@ func (v *Game) travelToAct(to int, via string) error {
 	if forward && (via == "npc" || via == "talk") {
 		v.activateTravelWaypoint(dest)
 	}
-
-	v.logActMovie(from, to, via)
 
 	return nil
 }

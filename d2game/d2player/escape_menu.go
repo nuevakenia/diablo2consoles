@@ -65,6 +65,7 @@ const (
 	optUIScale
 	optColorblind
 	optSubtitleLog
+	optCinematics
 )
 
 const (

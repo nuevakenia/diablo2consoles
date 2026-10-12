@@ -14,14 +14,17 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2screen"
 )
 
-// PlayVideosEnabled reports whether OD2_PLAY_VIDEOS=1: cinematics are played from the user's Bink files.
-// It is off by default. The soundtrack (Bink audio) is streamed to the sound device and is the clock of the picture;
-// without a sound device or under OD2_AUTOTEST_MUTE the clock still runs from the (silent) device, and without audio
-// support in the provider the video follows the wall clock.
-func PlayVideosEnabled() bool { return os.Getenv("OD2_PLAY_VIDEOS") == "1" }
+// skipGrace is how long a new video ignores skip input: the click or key that started it is still being released.
+const skipGrace = 0.25
 
-// VideoPlayer is a game screen that plays one Bink cinematic letterboxed on a black screen. Esc, Space, Enter or
-// any mouse click skips it; when it ends (or fails to load) onDone is called once to go to the next screen.
+// VideoPlayer plays one Bink cinematic letterboxed on a black screen. It is a game screen of its own (the intro, the
+// Cinematics menu) or an overlay that a running Game drives (act-change movies, see game_movie.go). Esc, Space, Enter
+// or any mouse click skips it; when it ends (or fails to load) onDone is called once.
+//
+// The soundtrack (Bink audio) is streamed to the sound device at the sound effect volume and is the clock of the
+// picture; without a sound device the video follows the wall clock. Decoding runs on its own goroutine
+// (d2video.Runner), the game loop only uploads the newest frame. UNVERIFIED: the original draws no subtitles on
+// the movies and none were found in the exe, so none are drawn.
 type VideoPlayer struct {
 	asset    *d2asset.AssetManager
 	renderer d2interface.Renderer
@@ -31,11 +34,14 @@ type VideoPlayer struct {
 	onDone   func()
 
 	cin     *d2video.Cinematic
+	runner  *d2video.Runner
 	player  *d2video.Player
 	stream  d2interface.PCMStream
 	surface d2interface.Surface
 	done    bool
 	bound   bool
+	overlay bool    // input at high priority: the movie sits over a running game
+	age     float64 // seconds on screen
 
 	// OD2_VIDEO_SECONDS=<n> ends the video after n seconds of playback (an automated test); with OD2_AUTOEXIT the
 	// game then quits instead of going on to the next screen.
@@ -58,7 +64,10 @@ func CreateVideoPlayer(asset *d2asset.AssetManager, renderer d2interface.Rendere
 }
 
 // OnLoad opens the video. A video that cannot be opened ends the screen at the first Advance.
-func (v *VideoPlayer) OnLoad(_ d2screen.LoadingState) {
+func (v *VideoPlayer) OnLoad(_ d2screen.LoadingState) { v.Open() }
+
+// Open loads the Bink file, starts the sound and the decoder, and binds the skip keys.
+func (v *VideoPlayer) Open() {
 	data, err := v.asset.LoadFile(v.path)
 	if err != nil {
 		v.Errorf("cannot load %s: %v", v.path, err)
@@ -107,13 +116,21 @@ func (v *VideoPlayer) OnLoad(_ d2screen.LoadingState) {
 		v.limit = s
 	}
 
-	if err := v.input.BindHandler(v); err == nil {
+	v.runner = d2video.NewRunner(v.cin)
+
+	prio := d2enum.PriorityDefault
+	if v.overlay {
+		prio = d2enum.PriorityHigh
+	}
+
+	if err := v.input.BindHandlerWithPriority(v, prio); err == nil {
 		v.bound = true
 	}
 }
 
-// OnUnload releases the input handler.
+// OnUnload stops the decoder and releases the input handler.
 func (v *VideoPlayer) OnUnload() error {
+	v.stopRunner()
 	v.closeStream()
 
 	if v.bound {
@@ -123,6 +140,12 @@ func (v *VideoPlayer) OnUnload() error {
 	}
 
 	return nil
+}
+
+func (v *VideoPlayer) stopRunner() {
+	if v.runner != nil {
+		v.runner.Stop()
+	}
 }
 
 func (v *VideoPlayer) closeStream() {
@@ -138,16 +161,19 @@ func (v *VideoPlayer) logStats() {
 		return
 	}
 
+	clock := v.runner.Clock()
+	slow := v.runner.SlowestStep().Milliseconds()
+
 	st := v.stream
 	if st == nil {
-		v.Infof("VIDEO end audio=none frames=%d clock=%.2fs", v.player.Decoder().FrameIndex(), v.cin.Clock())
+		v.Infof("VIDEO end audio=none frames=%d clock=%.2fs decode_step_max=%dms", v.player.Decoder().FrameIndex(), clock, slow)
 
 		return
 	}
 
-	v.Infof("VIDEO end audio_decoded=%d written=%d played=%d underruns=%d bad_packets=%d max_update_gap=%.0fms frames=%d clock=%.2fs",
+	v.Infof("VIDEO end audio_decoded=%d written=%d played=%d underruns=%d bad_packets=%d max_update_gap=%.0fms frames=%d clock=%.2fs decode_step_max=%dms",
 		v.cin.DecodedFrames, st.Written(), st.Played(), st.Underruns(), v.cin.BadPackets, v.maxDt*1000,
-		v.player.Decoder().FrameIndex(), v.cin.Clock())
+		v.player.Decoder().FrameIndex(), clock, slow)
 }
 
 func (v *VideoPlayer) finish() {
@@ -156,6 +182,7 @@ func (v *VideoPlayer) finish() {
 	}
 
 	v.done = true
+	v.stopRunner()
 	v.logStats()
 	v.closeStream()
 
@@ -168,7 +195,13 @@ func (v *VideoPlayer) finish() {
 	}
 }
 
-// Advance decodes the frames that are due.
+// Active reports that the video is loaded and still playing.
+func (v *VideoPlayer) Active() bool { return v.player != nil && !v.done }
+
+// Skip ends the video at once (what Esc, Space, Enter and a click do).
+func (v *VideoPlayer) Skip() { v.finish() }
+
+// Advance uploads the newest decoded frame and ends the video when the decoder is done.
 func (v *VideoPlayer) Advance(elapsed float64) error {
 	if v.player == nil {
 		v.finish()
@@ -180,23 +213,22 @@ func (v *VideoPlayer) Advance(elapsed float64) error {
 	}
 
 	v.wall += elapsed
+	v.age += elapsed
+
 	if elapsed > v.maxDt {
 		v.maxDt = elapsed
 	}
 
-	changed, err := v.cin.Advance(elapsed)
-	if err != nil {
+	v.runner.TakeFrame(func(px []byte) { v.surface.ReplacePixels(px) })
+
+	if err := v.runner.Err(); err != nil {
 		v.Errorf("playback stopped: %v", err)
 		v.finish()
 
 		return nil
 	}
 
-	if changed {
-		v.surface.ReplacePixels(v.player.Frame())
-	}
-
-	if v.cin.Done() || (v.limit > 0 && v.cin.Clock() >= v.limit) {
+	if v.runner.Done() || (v.limit > 0 && v.runner.Clock() >= v.limit) {
 		v.finish()
 	}
 
@@ -207,13 +239,13 @@ func (v *VideoPlayer) Advance(elapsed float64) error {
 func (v *VideoPlayer) Render(target d2interface.Surface) {
 	target.Clear(color.Black)
 
-	if v.player == nil || v.player.Frame() == nil {
+	if v.player == nil || v.surface == nil || v.done {
 		return
 	}
 
 	vw, vh := v.player.Size()
-	sw, sh := target.GetSize()
-	x, y, w, h := d2display.VideoRect(d2display.Size{W: sw, H: sh}, vw, vh)
+	// the logical screen (the window divided by the UI scale), not the size of the render target
+	x, y, w, h := d2display.VideoRect(d2display.Get(), vw, vh)
 
 	if w <= 0 || h <= 0 {
 		return
@@ -234,16 +266,37 @@ func (v *VideoPlayer) Render(target d2interface.Surface) {
 func (v *VideoPlayer) OnKeyUp(event d2interface.KeyEvent) bool {
 	switch event.Key() {
 	case d2enum.KeyEscape, d2enum.KeySpace, d2enum.KeyEnter:
-		v.finish()
+		if v.age >= skipGrace || v.limit > 0 {
+			v.finish()
+		}
+
 		return true
 	}
 
-	return false
+	return v.overlay
 }
+
+// OnKeyDown keeps the keys away from the game under an overlay movie.
+func (v *VideoPlayer) OnKeyDown(_ d2interface.KeyEvent) bool { return v.overlay }
+
+// OnKeyRepeat keeps held keys away from the game under an overlay movie.
+func (v *VideoPlayer) OnKeyRepeat(_ d2interface.KeyEvent) bool { return v.overlay }
+
+// OnMouseButtonDown keeps clicks away from the game under an overlay movie.
+func (v *VideoPlayer) OnMouseButtonDown(_ d2interface.MouseEvent) bool { return v.overlay }
+
+// OnMouseButtonRepeat keeps held buttons away from the game under an overlay movie.
+func (v *VideoPlayer) OnMouseButtonRepeat(_ d2interface.MouseEvent) bool { return v.overlay }
 
 // OnMouseButtonUp skips the video on a click.
 func (v *VideoPlayer) OnMouseButtonUp(_ d2interface.MouseEvent) bool {
-	v.finish()
+	if v.age >= skipGrace {
+		v.finish()
+	}
 
 	return true
 }
+
+// DisplayAnchor makes the video screen use the whole window (a cinematic is not the 800x600 interface): the logical
+// screen is the window size, so the picture is letterboxed or pillarboxed against the window.
+func (v *VideoPlayer) DisplayAnchor() d2display.Anchor { return d2display.AnchorBottom }

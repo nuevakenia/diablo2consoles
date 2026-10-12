@@ -26,6 +26,7 @@ type UIManager struct {
 	CursorY          int
 	pressedWidget    ClickableWidget
 	clickSfx         d2interface.SoundEffect
+	hidden           bool // a cinematic covers the screen: the widgets are not drawn
 
 	*d2util.Logger
 }
@@ -152,8 +153,15 @@ func (ui *UIManager) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 	return false
 }
 
+// SetHidden stops (true) or resumes (false) drawing every widget; a full-screen cinematic uses it.
+func (ui *UIManager) SetHidden(hidden bool) { ui.hidden = hidden }
+
 // Render renders all of the UI elements
 func (ui *UIManager) Render(target d2interface.Surface) {
+	if ui.hidden {
+		return
+	}
+
 	for _, widget := range ui.widgets {
 		if widget.GetVisible() {
 			widget.Render(target)

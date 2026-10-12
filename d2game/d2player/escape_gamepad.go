@@ -12,6 +12,7 @@ func init() {
 	optionKeys[optUIScale] = d2config.OptUIScale
 	optionKeys[optColorblind] = d2config.OptColorblind
 	optionKeys[optSubtitleLog] = d2config.OptSubtitleLog
+	optionKeys[optCinematics] = d2config.OptCinematics
 
 	for _, b := range d2gamepad.Buttons() {
 		optionKeys[optPadBase+optionID(b)] = d2gamepad.OptionKey(b)
@@ -24,6 +25,7 @@ func (m *EscapeMenu) newAccessibilityLayout() *layout {
 		m.addEnumLabel(l, optUIScale, "WINDOW SCALE")
 		m.addEnumLabel(l, optColorblind, "COLOR BLIND ITEMS")
 		m.addEnumLabel(l, optSubtitleLog, "SPEECH SUBTITLE LOG")
+		m.addEnumLabel(l, optCinematics, "CINEMATICS")
 		m.addPreviousMenuLabel(l)
 	})
 }

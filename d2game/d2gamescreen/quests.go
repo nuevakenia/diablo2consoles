@@ -276,6 +276,10 @@ func (v *Game) onMonsterKilled(ev d2monsters.KillEvent) {
 		return
 	}
 
+	if ev.Class == d2quest.NPCBaalCrab && r.area == d2quest.LevelWorldstoneChamber && v.heroExpansion() {
+		v.playBaalMovie()
+	}
+
 	// the Den of Evil is cleared when no monster is left in the level
 	if r.area == d2quest.LevelDenOfEvil && v.monsters != nil {
 		alive := 0
