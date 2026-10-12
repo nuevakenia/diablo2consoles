@@ -81,7 +81,31 @@ func (p *Player) moveSpeed(running bool) float64 {
 		frw = p.Stats.Totals.FasterRun
 	}
 
-	return d2path.PlayerSubtilesPerSecond(d2path.PlayerBase(int(p.Class)), running, frw, 0)
+	return d2path.PlayerSubtilesPerSecond(d2path.PlayerBase(charstatsClass(p.Class)), running, frw, 0)
+}
+
+// charstatsClass converts the engine's hero enum (None, Barbarian, Necromancer, Paladin, Assassin, Sorceress, Amazon,
+// Druid: 0 to 7) into the charstats.txt class order that d2path uses (Amazon 0 to Assassin 6). Passing the hero enum
+// straight through gave the Druid (7) no base velocity at all, so pressing run froze it in place.
+func charstatsClass(h d2enum.Hero) int {
+	switch h {
+	case d2enum.HeroAmazon:
+		return d2path.ClassAmazon
+	case d2enum.HeroSorceress:
+		return d2path.ClassSorceress
+	case d2enum.HeroNecromancer:
+		return d2path.ClassNecromancer
+	case d2enum.HeroPaladin:
+		return d2path.ClassPaladin
+	case d2enum.HeroBarbarian:
+		return d2path.ClassBarbarian
+	case d2enum.HeroDruid:
+		return d2path.ClassDruid
+	case d2enum.HeroAssassin:
+		return d2path.ClassAssassin
+	}
+
+	return d2path.ClassAmazon // an unknown hero walks like any other class (the base velocity is 6 and 9 for all)
 }
 
 // ID returns the Player uuid
