@@ -155,6 +155,14 @@ func (d *Director) Minions() []*d2mapentity.Monster {
 	return out
 }
 
+// IsFriendly reports whether m is one of the hero's own units (a summon, a golem, a mercenary or a converted monster):
+// it is not a target for a click attack or an area skill of the hero.
+func (d *Director) IsFriendly(m *d2mapentity.Monster) bool {
+	u := d.byEntity[m.ID()]
+
+	return u != nil && (u.friendly() || u.b.Allied)
+}
+
 // MinionKind returns the kind and tag of a minion ("" if m is not one).
 func (d *Director) MinionKind(m *d2mapentity.Monster) (kind, tag string) {
 	if u := d.byEntity[m.ID()]; u != nil && u.ally != nil {

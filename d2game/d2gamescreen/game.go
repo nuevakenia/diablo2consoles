@@ -590,6 +590,7 @@ func (v *Game) bindGameControls() error {
 		v.gameControls.Automap().SetLevelSource(v.currentLevel, v.levelName)
 		v.gameControls.SetEquipSound(v.playHeroUISound)
 		v.gameControls.SetHeroVoice(v.sayHero)
+		v.gameControls.SetFriendlyCheck(func(m *d2mapentity.Monster) bool { return v.monsters != nil && v.monsters.IsFriendly(m) })
 		v.gameControls.SetQuestItemUse(v.useQuestItem)
 		v.gameControls.SetHealShare(func(heal int) int {
 			if d := v.monsters; d != nil && v.localPlayer != nil {

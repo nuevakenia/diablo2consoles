@@ -325,6 +325,7 @@ type GameControls struct {
 	asset             *d2asset.AssetManager
 	renderer          d2interface.Renderer // https://github.com/OpenDiablo2/OpenDiablo2/issues/798
 	inputListener     inputCallbackListener
+	isFriendly        func(m *d2mapentity.Monster) bool // the hero's own units are not attacked by a click
 	hero              *d2mapentity.Player
 	heroState         *d2hero.HeroStateFactory
 	mapRenderer       *d2maprenderer.MapRenderer
@@ -761,7 +762,7 @@ func (g *GameControls) hoveredMonster() *d2mapentity.Monster {
 		return nil
 	}
 
-	if m, ok := g.hud.hoveredEntity.(*d2mapentity.Monster); ok && m.Alive() {
+	if m, ok := g.hud.hoveredEntity.(*d2mapentity.Monster); ok && m.Alive() && (g.isFriendly == nil || !g.isFriendly(m)) {
 		return m
 	}
 
