@@ -152,11 +152,10 @@ func (e *Engine) leech(p *d2mapentity.Player, d *d2combat.Damage, dealt int) {
 // CanConvert implements d2skill.Convertible: a monster that is not already
 // converted (alignment 0 in the exe, VERIFIED) and not a unique or super
 // unique monster (VERIFIED, SKILL_IsValidMonsterSkillTarget 0x56c0a0 ends in
-// 0x5dc1e0 which refuses the +0x16 mask 0xa). U: act bosses and other special
-// bosses are refused as well (the monstats type test of 0x5dc1e0 was not
-// mapped).
+// 0x5dc1e0 which refuses the +0x16 mask 0xa). Wave 22: the monstats type test
+// of 0x5dc1e0 (MONSTATS_IsRevivableType) is convertibleType.
 func (t *monsterTarget) CanConvert() bool {
-	if t.m.Stat == nil || t.m.Stat.IsSpecialBoss || !canConvertMonster(t.m.TypeFlags) {
+	if t.m.Stat == nil || t.m.Stat.IsSpecialBoss || !canConvertMonster(t.m.TypeFlags) || !convertibleType(t.m.Stat, t.m.StatEx) {
 		return false
 	}
 

@@ -668,18 +668,17 @@ func doLightningStrikeFn(c *cast) {
 // ---- ranged / missile families ----
 
 // doFanFn is SRVDO_008_MultipleShot (Multiple Shot, Teeth, Shock Wave): calc1
-// missiles in a fan around the aim direction (8 degrees apart, U).
+// missiles, each aimed at its own point of a row through the aim point and
+// perpendicular to the line of fire (FanSpacing / FanDestinations, V wave 22:
+// the helpers 0x56b0e0 and 0x56b120 were read).
 //
-// Read from the binary (0x5d9fe0, read-only spot check): the count is calc1
-// (verified); calc2 goes to the created missile's damage word and calc3 is the
-// number of "real" middle missiles: the (calc1-calc3)/2 flanking ones on each side
-// are created with flag 0x10000 (probably no ammo / no damage-scaling) and only
-// the middle calc3 without it. The destinations are not an angular fan but
-// points spaced along a line through the aim point (the step is the
-// unit->aim vector after two helpers, 0x56b0e0 and 0x56b120, that were not
-// read), so the 8 degree spacing, the missile B pick (bolt when the weapon is
-// not a bow, via 0x623e60) and the equal treatment of all missiles here are
-// approximations.
+// Read from the binary (0x5d9fe0): the count is calc1; calc2 goes to the
+// created missile's word at +0x44 (role UNVERIFIED) and calc3 is the number of
+// "real" middle missiles: the (calc1-calc3)/2 flanking ones on each side are
+// created with flag 0x10000 (meaning UNVERIFIED, not modelled) and only the
+// middle calc3 without it (calc3 0 means all). The missile B pick is the exe's
+// "attack weapon class is not 1" test; the engine has no weapon class, so the
+// old stand-in (a crossbow bolt) stays UNVERIFIED.
 func doFanFn(c *cast) {
 	name := c.sk.SrvMissileA
 	if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
@@ -691,8 +690,12 @@ func doFanFn(c *cast) {
 		n = 1
 	}
 
-	for _, a := range fanAngles(n, 8) {
-		c.castM(name, castOpts{angle: a})
+	ux, uy := c.u.Pos()
+	ax, ay := c.aim()
+	sx, sy := FanSpacing(ax-ux, ay-uy)
+
+	for _, d := range FanDestinations(ax, ay, n, sx, sy) {
+		c.castM(name, castOpts{hasDest: true, destX: float64(d[0]) + 0.5, destY: float64(d[1]) + 0.5})
 	}
 
 	if len(c.res.Missiles) == 0 {

@@ -122,8 +122,8 @@ func (e *Engine) ward(p *d2mapentity.Player, sk *d2skill.Skill, ef *d2skill.Effe
 	}
 
 	end := e.frame + w.Life
-	e.emit("state", "WARD start skill=%q at=(%d,%d) radius=%d period=%d life=%d state=%s fear=%d", sk.Name, w.X, w.Y, w.Radius,
-		w.Period, w.Life, w.State, w.Fear)
+	e.emit("state", "WARD start skill=%q at=(%d,%d) radius=%d period=%d life=%d state=%s fear=%d missile=%s", sk.Name, w.X, w.Y,
+		w.Radius, w.Period, w.Life, w.State, w.Fear, w.Missile)
 
 	e.watches = append(e.watches, &watch{every: w.Period, next: e.frame, fn: func() bool {
 		if e.frame >= end {
@@ -149,10 +149,11 @@ func (e *Engine) ward(p *d2mapentity.Player, sk *d2skill.Skill, ef *d2skill.Effe
 	}})
 }
 
-// whirl runs a Whirlwind: the hero moves one subtile per frame toward the
-// destination (U: the exe walks the computed path at the base walk speed) and
-// every Delay frames hits the nearest enemy within Radius other than the one
-// hit before, until the destination, the longest run or a wall ends it.
+// whirl runs a Whirlwind: the hero walks the path to the destination at the
+// base walk speed of its class (0.375 subtile per frame, d2skill.WhirlTickDistance,
+// V wave 22) and the hit scheduler picks the victims within Radius in id order,
+// until the destination, the longest run or a wall ends it. The skill does not
+// start while the caster has the "inferno" state (state 12, SRVST_038).
 func (e *Engine) whirl(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect) {
 	o := ef.Whirl
 	if e.abc.whirling == nil {
@@ -160,6 +161,12 @@ func (e *Engine) whirl(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef
 	}
 
 	if e.abc.whirling[p.ID()] {
+		return
+	}
+
+	if e.HasState(p.ID(), whirlRefusedState) {
+		e.emit("state", "WHIRL refused skill=%q why=state_%d", sk.Name, d2skill.WhirlwindRefusedState)
+
 		return
 	}
 
@@ -174,6 +181,7 @@ func (e *Engine) whirl(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef
 	}
 
 	steps, hits, last := 0, 0, ""
+	budget, moved := 0.0, false
 	sched := &d2skill.WhirlSched{}
 
 	finish := func(why string) bool {
@@ -200,14 +208,35 @@ func (e *Engine) whirl(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef
 			return finish("max_run")
 		}
 
-		nx, ny := x+sign(o.X-x), y+sign(o.Y-y)
-		if e.pipe.Walkable != nil && !e.pipe.Walkable(nx, ny) {
-			return finish("wall")
+		// the path velocity is the base walk speed (d2skill.WhirlTickDistance, V wave 22): cells are entered as the
+		// travelled distance allows
+		budget += d2skill.WhirlTickDistance
+
+		for {
+			x, y = u.Pos()
+			sx, sy := sign(o.X-x), sign(o.Y-y)
+
+			if (sx == 0 && sy == 0) || steps >= o.MaxSteps || budget < d2skill.WhirlStepCost(sx, sy) {
+				break
+			}
+
+			if e.pipe.Walkable != nil && !e.pipe.Walkable(x+sx, y+sy) {
+				if moved {
+					break
+				}
+
+				return finish("wall")
+			}
+
+			e.setHeroPos(p, x+sx, y+sy)
+
+			budget -= d2skill.WhirlStepCost(sx, sy)
+			steps++
+			moved = true
 		}
 
-		e.setHeroPos(p, nx, ny)
-
-		steps++
+		nx, ny := u.Pos()
+		moved = false
 
 		// SKILL_WhirlwindComputeNextStepDelay: the scheduler says how many hits this frame
 		for n := sched.Step(e.frame, o.Delay, o.Dual); n > 0; n-- {

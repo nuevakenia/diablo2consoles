@@ -307,6 +307,24 @@ type WardOrder struct {
 	// frames of the auratargetstate (auralencalc, Param6).
 	Radius, Period, Life, Fear int
 	State                      string
+	// Missile is the start missile the exe creates for the corpse's size class (WardMissile, V wave 22); the ward
+	// itself behaves the same for the three sizes, only the graphics differ.
+	Missile string
+}
+
+// WardMissile is the missile pick of SRVDO_075_GrimWard (0x5d7430, V wave 22): the corpse's monstats2 flag byte
+// 0xb ("large", mask 8 of the second flag byte) selects srvmissilec, else 0xa ("small", mask 4) srvmissileb,
+// else srvmissilea. An empty result (the picked column names no missile) makes the exe return 0 before it
+// touches the corpse.
+func WardMissile(small, large bool, a, b, c string) string {
+	switch {
+	case large:
+		return c
+	case small:
+		return b
+	}
+
+	return a
 }
 
 // Grim Ward numbers of missiles.txt (grimwardsmall..large: pSrvDoFunc 14 with
@@ -337,7 +355,13 @@ func doGrimWardFn(c *cast) {
 		state = "terror"
 	}
 
-	w := &WardOrder{CorpseID: c.tgt.CorpseID, X: c.tgt.CX, Y: c.tgt.CY, Radius: c.env.eval(c.sk.AuraRangeCalc),
+	missile := WardMissile(c.tgt.CorpseSmall, c.tgt.CorpseLarge, c.sk.SrvMissileA, c.sk.SrvMissileB, c.sk.SrvMissileC)
+	if missile == "" {
+		c.fail(ReasonMissile)
+		return
+	}
+
+	w := &WardOrder{Missile: missile, CorpseID: c.tgt.CorpseID, X: c.tgt.CX, Y: c.tgt.CY, Radius: c.env.eval(c.sk.AuraRangeCalc),
 		Period: wardPeriod, Life: maxInt(c.calc(1), wardMinLife), Fear: c.env.eval(c.sk.AuraLenCalc), State: state}
 
 	c.effect(Effect{Kind: "ward", Ward: w})

@@ -1,6 +1,7 @@
 package d2skill
 
 import (
+	"math"
 	"testing"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2missile"
@@ -267,10 +268,11 @@ func TestMultipleShotFan(t *testing.T) {
 		t.Fatalf("ok=%v missiles=%d %s", r.OK, len(r.Missiles), r.Reason)
 	}
 
-	// symmetric fan: first and last directions mirror around the x axis
-	a, b := r.Missiles[0], r.Missiles[len(r.Missiles)-1]
-	if a.DY*b.DY >= 0 || abs(a.DY+b.DY) > 1e-9 {
-		t.Errorf("fan not symmetric: %v %v", a.DY, b.DY)
+	// SRVDO_008 geometry (V wave 22): a row through the aim point perpendicular to the line of fire, spacing 1;
+	// with six arrows the row is y = +3 .. -2 (the exe halves n * s towards zero, so an even count is not symmetric)
+	first, last := r.Missiles[0], r.Missiles[len(r.Missiles)-1]
+	if first.DY <= 0 || last.DY >= 0 || abs(first.DY-3/math.Hypot(30, 3)) > 1e-9 || abs(last.DY+2/math.Hypot(30, 2)) > 1e-9 {
+		t.Errorf("fan rows: %v %v", first.DY, last.DY)
 	}
 }
 

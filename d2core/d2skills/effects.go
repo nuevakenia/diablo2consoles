@@ -723,7 +723,7 @@ func (e *Engine) pulseAura(a *auraRun) {
 			}
 
 			if ef.TargetState != "" {
-				e.applyMonsterState(m, d2state.Instance{Name: ef.TargetState, Until: until, Mods: statMods(ef.TargetStats),
+				e.applyMonsterState(m, d2state.Instance{Name: ef.TargetState, Until: until, Mods: auraTargetMods(m, ef.TargetStats),
 					Source: a.p.ID(), SkillID: ef.SkillID, Level: ef.Level})
 			}
 
@@ -744,7 +744,8 @@ func (e *Engine) pulseAura(a *auraRun) {
 
 		for _, rv := range e.rivalsNear(hx, hy, ef.Radius) {
 			if ef.TargetState != "" {
-				e.setOf(rv.ID()).Apply(e.frame, d2state.Instance{Name: ef.TargetState, Until: until, Mods: statMods(ef.TargetStats),
+				e.setOf(rv.ID()).Apply(e.frame, d2state.Instance{Name: ef.TargetState, Until: until,
+					Mods:   d2state.ClampAuraSlow(statMods(ef.TargetStats), d2combat.DefaultColdEffect),
 					Source: a.p.ID(), SkillID: ef.SkillID, Level: ef.Level})
 			}
 
