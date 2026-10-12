@@ -1019,21 +1019,31 @@ func doBlessedHammerFn(c *cast) {
 	m.Spiral = true
 }
 
-// doMineFn is SRVDO_043_ShockField (Shock Web, U): a stationary trap missile at
-// the aim point that zaps whatever walks into it every 12 frames.
+// doMineFn is SRVDO_043_ShockField (Shock Web, VERIFIED in w23, see shockfield.go): count caltrops thrown from the
+// caster to random points around the target position, not one stationary missile. The earlier port (a stationary
+// missile at the aim point zapping every 12 frames) was an invention.
 func doMineFn(c *cast) {
-	ax, ay := c.aim()
-	tg := Target{X: ax, Y: ay}
-
-	m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, c.sk.SrvMissileA, tg, castOpts{
-		hasStart: true, startX: float64(ax) + 0.5, startY: float64(ay) + 0.5, stationary: true, hitEvery: 12,
-	})
-	if m == nil {
+	count := c.calcOrState()
+	if count < 1 {
 		c.fail(ReasonMissile)
 		return
 	}
 
-	c.res.Missiles = append(c.res.Missiles, m)
+	ax, ay := c.aim()
+	hx, hy := c.u.Pos()
+
+	for _, pt := range ShockFieldPoints(ax, ay, count, c.env.eval(c.sk.AuraRangeCalc), hx, hy) {
+		tg := Target{X: pt[0], Y: pt[1]}
+
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, c.sk.SrvMissileA, tg, castOpts{hasDest: true,
+			destX: float64(pt[0]) + 0.5, destY: float64(pt[1]) + 0.5}); m != nil {
+			c.res.Missiles = append(c.res.Missiles, m)
+		}
+	}
+
+	if len(c.res.Missiles) == 0 {
+		c.fail(ReasonMissile)
+	}
 }
 
 // ---- area effects ----

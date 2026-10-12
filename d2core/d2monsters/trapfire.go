@@ -64,6 +64,8 @@ type TrapSpec struct {
 	ReviveRadius     int
 	// FanSkillID is the monster skill of a Charged Bolt Sentry (do function 17): each shot throws its calc1 bolts.
 	FanSkillID int
+	// InfernoSkillID is the monster skill of an Inferno Sentry (do function 95).
+	InfernoSkillID int
 }
 
 // SkillFirer is implemented by the skill engine. It returns whether a missile

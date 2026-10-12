@@ -63,6 +63,8 @@ type trapRun struct {
 	cycler string
 	// fan is the monster skill (do function 17, Charged Bolt Sentry) whose bolt count each shot throws, at fanLevel.
 	fan, fanLevel int
+	// inferno is the monster skill (do function 95, Inferno Sentry) whose calc1 gives the flame's life.
+	inferno int
 }
 
 // ---- helpers ----
@@ -1096,9 +1098,14 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 
 	death := e.deathSentrySpec(sk, o, m, &missile)
 
-	fan := 0
-	if ts := e.pipe.Skills.ByName(o.TrapSkill); ts != nil && ts.SrvDoFunc == 17 && death == nil {
-		fan = ts.ID // Charged Bolt Sentry: do function 17 throws calc1 bolts per shot (CastTrapBolts)
+	fan, inferno := 0, 0
+	if ts := e.pipe.Skills.ByName(o.TrapSkill); ts != nil && death == nil {
+		switch ts.SrvDoFunc {
+		case 17:
+			fan = ts.ID // Charged Bolt Sentry: do function 17 throws calc1 bolts per shot (CastTrapBolts)
+		case 95:
+			inferno = ts.ID // Inferno Sentry: do function 95, the flame's life is calc1 (CastTrapInferno)
+		}
 	}
 
 	if missile == "" {
@@ -1111,7 +1118,7 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 		t.cycler = sk.SumSkill[2]
 	}
 
-	t.fan, t.fanLevel = fan, maxInt(o.TrapLevel, 1)
+	t.fan, t.inferno, t.fanLevel = fan, inferno, maxInt(o.TrapLevel, 1)
 
 	e.traps = append(e.traps, t)
 
@@ -1124,7 +1131,7 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 		// MONAI_Think_AssassinSentry drives the cadence, range and shot budget (sentry_ai_test.go)
 		e.monsters.SetSkillFirer(e)
 		spec := d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile, Level: o.TrapLevel, Life: o.TrapLife,
-			FanSkillID: fan}
+			FanSkillID: fan, InfernoSkillID: inferno}
 		if death != nil {
 			spec = *death
 			spec.Level, spec.Life = o.TrapLevel, o.TrapLife
@@ -1203,6 +1210,7 @@ func (e *Engine) explodeCorpse(s d2monsters.TrapShot) bool {
 type trapCaster interface {
 	CastTrap(u d2skill.Unit, skillID int, missile string, fromX, fromY int, tgt d2skill.Target) *d2missile.Missile
 	CastTrapBolts(u d2skill.Unit, placingID, monsterSkillID, monsterLevel, fromX, fromY int, tgt d2skill.Target) []*d2missile.Missile
+	CastTrapInferno(u d2skill.Unit, placingID, monsterSkillID, monsterLevel, fromX, fromY int, tgt d2skill.Target) *d2missile.Missile
 }
 
 // trapCaster returns the pipeline, or the fake a test injected.
@@ -1220,6 +1228,10 @@ func (e *Engine) trapCaster() trapCaster {
 func (e *Engine) fireTrapAt(c trapCaster, t *trapRun, tx, ty int, best *d2mapentity.Monster) bool {
 	bx, by := best.SubtilePos()
 	tg := d2skill.Target{X: bx, Y: by, Unit: e.target(best), UX: bx, UY: by}
+
+	if t.inferno != 0 {
+		return c.CastTrapInferno(t.u, t.skillID, t.inferno, t.fanLevel, tx, ty, tg) != nil
+	}
 
 	if t.fan != 0 {
 		return len(c.CastTrapBolts(t.u, t.skillID, t.fan, t.fanLevel, tx, ty, tg)) > 0
@@ -1240,7 +1252,7 @@ func (e *Engine) FireTrap(s d2monsters.TrapShot) bool {
 	}
 
 	t := &trapRun{m: s.Trap, u: e.hero(s.Owner), skillID: s.Spec.SkillID, missile: s.Spec.Missile, skillName: s.Spec.SkillName,
-		fan: s.Spec.FanSkillID, fanLevel: s.Spec.Level}
+		fan: s.Spec.FanSkillID, inferno: s.Spec.InfernoSkillID, fanLevel: s.Spec.Level}
 	if !e.fireTrapAt(e.trapCaster(), t, s.FromX, s.FromY, s.Target) {
 		return false
 	}

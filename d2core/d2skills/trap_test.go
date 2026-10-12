@@ -44,6 +44,16 @@ func (f *fakeCaster) CastTrapBolts(u d2skill.Unit, id, ms, ml, fx, fy int, tg d2
 	return []*d2missile.Missile{{}}
 }
 
+func (f *fakeCaster) CastTrapInferno(u d2skill.Unit, id, ms, ml, fx, fy int, tg d2skill.Target) *d2missile.Missile {
+	f.calls = append(f.calls, castCall{u, id, "inferno", fx, fy, tg})
+
+	if !f.fire {
+		return nil
+	}
+
+	return &d2missile.Missile{}
+}
+
 func trapTestEngine(f *fakeCaster) *Engine {
 	return &Engine{Logger: d2util.NewLogger(), fakeCaster: f, targets: map[string]*monsterTarget{},
 		heroes: map[string]*heroUnit{}}
