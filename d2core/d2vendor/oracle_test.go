@@ -184,7 +184,7 @@ func TestStockInvariantsOracle(t *testing.T) {
 				regular := map[string]int{}
 				magic := map[string]int{}
 				perm := map[string]bool{}
-				occupied := map[[2]int]string{}
+				occupied := map[[3]int]string{}
 
 				for _, it := range s.Items {
 					b, ok := byCode[it.Code]
@@ -198,11 +198,11 @@ func TestStockInvariantsOracle(t *testing.T) {
 
 					for x := it.X; x < it.X+it.W; x++ {
 						for y := it.Y; y < it.Y+it.H; y++ {
-							if o, taken := occupied[[2]int{x, y}]; taken {
+							if o, taken := occupied[[3]int{it.Page, x, y}]; taken {
 								t.Fatalf("%s: %s overlaps %s at %d,%d", v.Name, it.Code, o, x, y)
 							}
 
-							occupied[[2]int{x, y}] = it.Code
+							occupied[[3]int{it.Page, x, y}] = it.Code
 						}
 					}
 
