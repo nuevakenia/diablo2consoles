@@ -116,6 +116,8 @@ type Engine struct {
 	lastPhys, lastLife int32
 
 	heroes      map[string]*heroUnit
+	formMode    map[string]string    // the animation mode last logged for a hero in a form
+	lastFormOff string               // offsound of the form the hero was last drawn in (form.go)
 	mercCasters map[string]*heroUnit // hireling casters by id (merc.go)
 	targets     map[string]*monsterTarget
 	visuals     map[uint32]*d2mapentity.Missile
