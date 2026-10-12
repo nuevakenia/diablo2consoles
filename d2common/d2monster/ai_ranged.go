@@ -48,8 +48,8 @@ func thinkSkeletonBow(c *Ctx) {
 // 818 bytes). aip1 approach roll limit, aip2 shoot%, aip3 stall time, aip4
 // run (flee-close) %, aip5 always-run distance, aip6 skill2 %, aip7 skill3 %,
 // aip8 walk-toward distance. Order of the bounded rolls inside the skill
-// choice is the order printed in the notes; whether the roll is skipped for an
-// empty skill slot is UNVERIFIED (it is skipped here).
+// choice is the order printed in the notes; the roll is skipped for an
+// empty skill slot (VERIFIED w37 in 0x5f4b10: the slot id test comes before the roll).
 func thinkCorruptArcher(c *Ctx) {
 	b := c.B
 	pt := *c.Target

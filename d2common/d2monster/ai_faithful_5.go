@@ -24,7 +24,8 @@ package d2monster
 // true when it returns nonzero. The helper MONAI_IsNotImmune 0x5dbfd0 (a
 // misleading Ghidra name) is "mask 4 result == 0"; UberIzual asks with mask 6.
 // Polarity (nonzero = the line is blocked) is inferred from the uses
-// (UNVERIFIED). Absent means never blocked.
+// (VERIFIED w37: 0x622c80 returns the trace helper's result unchanged, so nonzero means the line is blocked at
+// the mask; the callers test "== 0" for clear). Absent means never blocked.
 type LineChecker interface {
 	LineBlocked(b *Brain, t Target, mask int) bool
 }
@@ -72,7 +73,9 @@ type WaypointCellFinder interface {
 
 // DiaStats is what MONAI_Diablo_ScoreTargetResists 0x5e7420 reads about a
 // candidate. The stat ids are the exe's (STATS_GetUnitStat); their names are
-// the usual stat table ones and UNVERIFIED for the damage group.
+// itemstatcost names (VERIFIED w37 against the table): 0x24 damageresist, 0x25 magicresist, 0x27 fireresist,
+// 0x29 lightresist, 0x2b coldresist, 0x16 maxdamage, 0x31/0x33/0x35/0x37 fire/light/magic/cold max damage,
+// 0x3a poison max damage (read >> 8).
 type DiaStats struct {
 	S24, S25, S27, S29, S2B int // 0x24/0x25 resists, 0x27 fire, 0x29 lightning, 0x2b cold
 	S16                     int // 0x16 max damage
@@ -118,7 +121,9 @@ type DiabloPortalSource interface {
 
 // PlayerScaler is the second output of MONSTER_CalcPlayerCountScaling 0x571760
 // (read by Diablo's decision as "local_8 < 2"; the meaning, probably the player
-// count, is UNVERIFIED). Absent: 1.
+// count: VERIFIED w37, 0x571760 zeroes five outputs; with game info present and its +0x4c byte 0 it sets out[0],
+// out[1] and out[4] from the effective player count helpers, else out[4] = 1; out[2], out[3] are the difficulty
+// skill bonus and the clamped difficulty). Absent: 1.
 type PlayerScaler interface {
 	PlayerScaling(b *Brain) int
 }
@@ -239,8 +244,9 @@ type DiaSituation struct {
 
 // groundSkillUser is the exe's test on the target's left and right skills
 // (VERIFIED immediates 0x3b, 0x38, 0x33 with total level > 3, 0x1b with total
-// level > 7). Which skills those are (Blizzard, Meteor, Fire Wall,
-// Immolation Arrow) is from the usual id table, UNVERIFIED.
+// level > 7). The ids are Blizzard 59, Meteor 56, Fire Wall 51, Immolation Arrow 27 (VERIFIED w37 against
+// skills.txt; the exe predicate is MONAI_Baal_CheckSkillAvailable 0x5fb280: right skill first, then the left
+// skill by record).
 func groundSkillUser(id, level int) bool {
 	switch id {
 	case 0x3b, 0x38:
@@ -401,6 +407,16 @@ func DiabloActionWeights(s DiaSituation) [diaWeights]int {
 // melee: target within melee reach; lineClear: no blocked line; leashBonus: the
 // monster is farther than 0x55 from the anchor while the target is nearer.
 func DiabloScore(s DiaStats, melee, lineClear, leashBonus bool) int {
+	return diabloScore(s, melee, lineClear, leashBonus, false)
+}
+
+// CrabScore is MONAI_BaalCrab_ScoreTargetResists 0x5fac60 (VERIFIED w37): the same sum as DiabloScore with the
+// leash 0x4b, except that the cold resist is always counted (Diablo's scorer adds it only in melee reach).
+func CrabScore(s DiaStats, melee, lineClear, leashBonus bool) int {
+	return diabloScore(s, melee, lineClear, leashBonus, true)
+}
+
+func diabloScore(s DiaStats, melee, lineClear, leashBonus, coldAlways bool) int {
 	if s.IsMonster && s.Threat < 2 {
 		return 0
 	}
@@ -417,6 +433,10 @@ func DiabloScore(s DiaStats, melee, lineClear, leashBonus bool) int {
 		cold, reach = s.S2B, 100
 	case lineClear:
 		reach = 0x4b
+	}
+
+	if coldAlways {
+		cold = s.S2B
 	}
 
 	rank := s.RightRank*s.RightLevel + s.LeftRank*s.LeftLevel
@@ -489,7 +509,11 @@ func (c *Ctx) pickAway(anchor *Command, away int) (best *Target, score, count in
 				leash = EdgeDistance(cd.Target.X-anchor.X, cd.Target.Y-anchor.Y, cd.Target.Size) < away
 			}
 
-			s = DiabloScore(cd.Stats, c.diabloMelee(cd.Target), !c.lineBlocked(cd.Target, 4), leash)
+			if away == crabAway {
+				s = CrabScore(cd.Stats, c.diabloMelee(cd.Target), !c.lineBlocked(cd.Target, 4), leash)
+			} else {
+				s = DiabloScore(cd.Stats, c.diabloMelee(cd.Target), !c.lineBlocked(cd.Target, 4), leash)
+			}
 		}
 
 		if s > score {

@@ -82,7 +82,8 @@ type UnitFinder interface {
 
 // ChaseProbe is MONAI_PickChaseOffsetByEdgeDistance 0x5db3a0: line probes to
 // the target; the exe's returned flag is not recoverable from the (void)
-// decompilation, so true ("reachable") is the fallback. UNVERIFIED.
+// decompilation, so true ("reachable") is the fallback. Disassembly w37 (VERIFIED): three line probes with mask
+// 0x805; the result is 0 only for a nil unit or when all three are blocked, otherwise 1.
 type ChaseProbe interface {
 	ChaseOK(b *Brain, t Target) bool
 }
@@ -273,7 +274,7 @@ func thinkCatapultSpotter(c *Ctx) {
 	probe := s[2] == 0 || b.Roll(100) < spotterRoll
 	if probe {
 		if p, ok := c.W.(DeadPlayerProbe); ok && p.DeadPlayerNear(b) {
-			c.setMode(ModeDying) // UNVERIFIED: the exe queues mode 0 on the target slot
+			c.setMode(ModeDying) // mode 0 is the death mode (0x57cc10 treats dwMode 0 as dead); queued on the target slot is UNVERIFIED
 			return
 		}
 	}

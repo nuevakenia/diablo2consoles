@@ -114,7 +114,8 @@ func thinkAndariel(c *Ctx) {
 
 // thinkSmith is MONAI_Think_Smith 0x5e2770 (VERIFIED): A1 in range; out of
 // range the speed override is (100-clamp(hp%,0,100))>>1 (he hurries as he
-// loses hit points; the override itself is UNVERIFIED) and he walks to melee.
+// loses hit points; the override is MONAI_SetMoveSpeedOverride 0x5dcf80: a percent in -126..126 stored with a queued move command,
+// VERIFIED w37) and he walks to melee.
 func thinkSmith(c *Ctx) {
 	b, t := c.B, *c.Target
 
