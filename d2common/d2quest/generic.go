@@ -128,11 +128,14 @@ var chainAfter = map[int][]int{
 // quest of the Act 5 chain without playing the ones before it.
 func (g *Game) ForceDone(id int) {
 	q := g.byID[id]
-	if q == nil || g.get(q, FlagRewardGranted) {
+	if q == nil {
 		return
 	}
 
-	g.set(q, FlagRewardGranted, "forced done")
+	if !g.get(q, FlagRewardGranted) {
+		g.set(q, FlagRewardGranted, "forced done")
+	}
+
 	g.Rec.Clear(q.Slot, FlagRewardPending)
 	q.NotIntro, q.Active, q.LastState = false, false, 0
 	g.global.Set(q.Slot, FlagCompletedEarly)
