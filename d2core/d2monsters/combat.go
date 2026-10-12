@@ -419,7 +419,7 @@ func (d *Director) HeroStrike(p *d2mapentity.Player, m *d2mapentity.Monster) boo
 	// range gate of COMBAT_RollAttackOutcome 0x57cc10 (VERIFIED w29): before the to-hit roll and any seed step
 	if d.opt.MeleeRange != nil {
 		mx, my := m.SubtilePos()
-		if !d2skill.AttackInReach(false, d.opt.MeleeRange(), mx-int(p.Position.X()), my-int(p.Position.Y())) {
+		if !d2skill.AttackInReachSized(false, d.opt.MeleeRange(), mx-int(p.Position.X()), my-int(p.Position.Y()), d2skill.HeroUnitSize, monsterUnitSize(m)) {
 			d.emit("herohit", "HERO swing target=%s hit=false outofreach=true", m.Label())
 
 			return false
@@ -1136,4 +1136,13 @@ func DamageToManaGain(mana, maxMana, total int32, pct int) int32 {
 	}
 
 	return n
+}
+
+// monsterUnitSize is UNIT_GetSizeX of a monster (monstats2 SizeX, 1 when the row is missing).
+func monsterUnitSize(m *d2mapentity.Monster) int {
+	if m.StatEx == nil || m.StatEx.SizeX < 1 {
+		return 1
+	}
+
+	return m.StatEx.SizeX
 }
