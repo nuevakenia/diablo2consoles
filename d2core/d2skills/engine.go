@@ -147,6 +147,8 @@ type Engine struct {
 
 	monSeed *d2rand.Seed // rolls for monsters that own missiles (Rabies' plague carriers)
 
+	unitRolls map[string]*d2rand.Seed // per-target seeds of the hit state rolls (w24_rolls.go)
+
 	travel map[uint32]func() // missile id -> stop of its travel sound
 
 	reg     *d2summon.Targets // target registry (targetreg.go)
@@ -860,10 +862,12 @@ func (e *Engine) hurt(m *d2mapentity.Monster, src *d2mapentity.Player, d *d2comb
 	h.ColdEffect, h.HasColdEffect = coldEffect(m), true
 	h.ChillDiv, h.FreezeDiv = e.coldDivisors(m)
 	// VERIFIED gates of 0x578830 / 0x578f50: the monstats boss bit refuses a stun and turns freeze into chill; a
-	// monster with Velocity 0 refuses a stun; state 0x36 refuses a freeze. Mercenary and the unit data flag 8 are
-	// not modelled for these monsters (UNVERIFIED mapping of boss to IsSpecialBoss).
+	// monster with Velocity 0 refuses a stun; state 0x36 refuses a freeze. DataFlag8 is the unique type bit
+	// (wave 24); a mercenary is never a pipeline target here. The seed%100 rolls (stun skip, shatter visual)
+	// come from the target's own generator (VERIFIED target seed). UNVERIFIED mapping of boss to IsSpecialBoss.
 	h.Target = &d2state.Target{Monster: true, Boss: m.Stat.IsSpecialBoss, ZeroSpeed: m.Stat.SpeedBase == 0,
-		Uninterruptable: set.Active(e.frame, "uninterruptable")}
+		DataFlag8: monsterDataFlag8(m), Uninterruptable: set.Active(e.frame, "uninterruptable")}
+	h.Roll100 = e.unitRoll100(m.ID())
 
 	// COMBAT_ApplyFreezeOrColdSlowState (0x578f50): a boss is chilled for the freeze length, never frozen
 	if m.Stat != nil && m.Stat.IsSpecialBoss {
