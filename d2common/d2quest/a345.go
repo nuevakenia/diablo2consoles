@@ -259,7 +259,7 @@ func newEve() *Quest {
 		trigs: []trig{
 			{ev: EvAreaChanged, level: LevelWorldstone1, max: 1, to: 2},
 			{ev: EvAreaChanged, level: LevelThrone, max: 2, to: 2},
-			{ev: EvMonsterKilled, monster: NPCBaalCrab, names: []string{"baal"}, min: -1, goal: true, exe: &exeKill{level: LevelWorldstoneChamber}},
+			{ev: EvMonsterKilled, monster: NPCBaalCrab, names: []string{"baal"}, min: -1, goal: true, exe: &exeKill{level: LevelWorldstoneChamber, gold: true}},
 		},
 		claimFx: fxs(reward("unlock-difficulty", 0, "Baal is dead: the next difficulty opens"),
 			reward("game-complete", 0, "end of the game")),

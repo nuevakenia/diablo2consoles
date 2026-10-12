@@ -22,8 +22,8 @@ package d2quest
 // (0x733404 Nightmare above clvl 45, 0x73343c Hell above clvl 65, 0x733474 otherwise; per class, rare, ilvl = hero
 // level) match anyaRewards; Malah hands the potion out once per game (0x587460); the Betrayal kill (lambda 0x589300)
 // sets RP + goal only for heroes near the corpse whose Prison of Ice is rewarded or pending, others get bit 14.
-// UNVERIFIED: the "game type == 3" test that gives the higher Anya tier at any level (D2MOO nGameType, meaning
-// unknown), the availability triggers.
+// w27: the "game type == 3" Anya test is explained in w27_quests2.go (AnyaTier); the Cain rescue, the Ancients and the
+// Baal gold are there too. UNVERIFIED: the availability triggers.
 
 // ObjectFrozenAnya is the frozen Anya block (objects.txt row 558, OperateFn 67): operating it with Malah's
 // potion thaws her.
@@ -162,20 +162,7 @@ var anyaRewards = [7][3][]string{
 // AnyaRewardCodes lists the items Anya may give a hero of a class on a difficulty (D2MOO ACT5Q3_Callback11): the
 // exceptional tier from Nightmare with a hero above level 45, the elite tier in Hell above level 65.
 func AnyaRewardCodes(class, difficulty, heroLevel int) []string {
-	if class < 0 || class >= len(anyaRewards) {
-		return nil
-	}
-
-	tier := 0
-
-	switch {
-	case difficulty == Nightmare && heroLevel > 45:
-		tier = 1
-	case difficulty == Hell && heroLevel > 65:
-		tier = 2
-	}
-
-	return anyaRewards[class][tier]
+	return AnyaRewardCodesFor(class, difficulty, heroLevel, GameTypeHost)
 }
 
 type prisonData struct {
@@ -442,7 +429,7 @@ func (g *Game) anyaLine(q *Quest, complete func(*Game, *Quest, string)) {
 // ACT5Q4_SetRewardGranted). D2MOO: Nihlathak's death only counts when Prison of Ice is done or reward pending;
 // Anya opens the portal to his temple after her first line.
 func newBetrayal() *Quest {
-	return newSpecQuest(&spec{
+	q := newSpecQuest(&spec{
 		id: QuestBetrayal, slot: 38, act: 4, logIndex: 4, name: "Betrayal of Harrogath", label: "A5Q4",
 		start: 0, goal: 4, tbl: map[int]int{1: 0, 2: 1, 3: 2}, rp: 3, done: 4,
 		steps: []step{{from: 1, npc: NPCDrehya, msg: 20137, to: 2, fx: func(g *Game, q *Quest) []Effect {
@@ -453,11 +440,32 @@ func newBetrayal() *Quest {
 			{ev: EvMonsterKilled, monster: NPCNihlathakBoss, goal: true, cond: func(g *Game, q *Quest) bool {
 				p := g.byID[QuestPrison]
 
-				return p == nil || g.get(p, FlagRewardGranted) || g.get(p, FlagRewardPending)
+				return BetrayalEligible(p == nil || g.get(p, FlagRewardGranted) || g.get(p, FlagRewardPending),
+					g.get(q, betrayalMissedBit))
 			}},
 		},
 		hold: true, holdBit: FlagEnterArea, holdKeep: true,
 	})
+	q.on[EvMonsterKilled] = betrayalMissed(q.on[EvMonsterKilled])
+
+	return q
+}
+
+// betrayalMissed wraps the kill handler: after the grant rules ran, a hero that has neither the done bit, reward
+// pending nor the goal bit gets bit 14 (VERIFIED lambda 0x589530).
+func betrayalMissed(next func(*Game, *Quest, *Event)) func(*Game, *Quest, *Event) {
+	return func(g *Game, q *Quest, e *Event) {
+		if next != nil {
+			next(g, q, e)
+		}
+
+		if e.Monster != NPCNihlathakBoss || g.get(q, FlagRewardGranted) || g.get(q, FlagRewardPending) ||
+			g.get(q, FlagPrimaryGoal) {
+			return
+		}
+
+		g.set(q, betrayalMissedBit, "missed Nihlathak's kill: bit 14 (VERIFIED 0x589530)")
+	}
 }
 
 // ---- A5Q5 Rite of Passage ----
