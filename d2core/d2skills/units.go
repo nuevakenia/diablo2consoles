@@ -608,6 +608,30 @@ func (w *world) Targets(x, y int) []d2missile.Target {
 	return out
 }
 
+// TargetsWithin implements d2missile.NearWorld: the units whose own cell is within r cells of (x, y), for the
+// footprint test of Size 2 and 3 missiles.
+func (w *world) TargetsWithin(x, y, r int) []d2missile.Target {
+	var out []d2missile.Target
+
+	for _, m := range w.e.monsters.Monsters() {
+		if !m.Alive() {
+			continue
+		}
+
+		if mx, my := m.SubtilePos(); chebyshev(mx-x, my-y) <= r {
+			out = append(out, w.e.target(m))
+		}
+	}
+
+	for _, m := range w.e.monsters.Allies() {
+		if mx, my := m.SubtilePos(); chebyshev(mx-x, my-y) <= r {
+			out = append(out, w.e.target(m))
+		}
+	}
+
+	return out
+}
+
 // AdjustAROperands implements d2skill.AROperandAdjuster for the hero's skill
 // strikes: 0x57b8b0 against a monster target (d2monsters.HeroAROperands).
 func (h *heroUnit) AdjustAROperands(t d2missile.Target, ar, def int) (int, int) {

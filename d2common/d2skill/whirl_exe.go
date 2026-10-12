@@ -9,7 +9,7 @@ import "sort"
 //     calls allow none until the game frame reaches the stored frame, then
 //     advance it by the weapon period (WhirlDelay) and allow 1 hit, or 2 when
 //     both hands hold melee weapons (SKILL_IsDualWieldingTypeWeapons 0x5d7d90,
-//     item type 0x2e = "mele" by row order of ItemTypes: UNVERIFIED mapping).
+//     item type 0x2e = "mele", VERIFIED in w37: row 46 of the item type table of the owner data).
 //   - SRVDO_076 0x5d8010 picks every victim with SKILL_ScanRadiusForTargets
 //     0x569a80 (radius 5, euclidean: squared distance <= 25, VERIFIED in
 //     0x569510). Its callback (0x569a40) walks the units in range and chooses
