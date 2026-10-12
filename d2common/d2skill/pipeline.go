@@ -655,6 +655,8 @@ type castOpts struct {
 
 	// ownLevel, when > 0, builds the damage from the missile record's own columns at this level (monster skills).
 	ownLevel int
+	// addDmgPct is added to the missile's damage percent (SRVDO_010's calc1 callback).
+	addDmgPct int
 
 	stationary bool
 	hitEvery   int
@@ -738,6 +740,7 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 	desc := sk.Descriptor(env, lvl, wmin, wmax, u.Stat(masteryStat[sk.EType]))
 	desc.DamagePct = int32(u.Stat("damagepercent") + missileMastery(u, sk))
 	desc.Crit = missileCrit(u, sk, ms)
+	desc.DamagePct += int32(o.addDmgPct)
 
 	// A monster skill whose missile has no Skill column (the Skeletal Mage's necromage1..4) takes the damage from
 	// the missile record's own columns at the missile level, which is the level of the monster's skill

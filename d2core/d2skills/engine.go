@@ -187,6 +187,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	monsters.HeroDefense = e.heroDefense
 	monsters.HeroDefenseParts = e.heroDefenseParts
 	monsters.HeroAvoid = e.heroAvoid
+	monsters.SummonSlow = e.applySlowTarget
 	e.installMercHooks()
 	e.monsters.SetSkillFirer(e)
 
@@ -991,6 +992,7 @@ func (e *Engine) AreaChanged(md *d2monsters.Director) {
 		md.HeroDefense = e.heroDefense
 		md.HeroDefenseParts = e.heroDefenseParts
 		md.HeroAvoid = e.heroAvoid
+		md.SummonSlow = e.applySlowTarget
 		e.installMercHooks()
 	}
 }

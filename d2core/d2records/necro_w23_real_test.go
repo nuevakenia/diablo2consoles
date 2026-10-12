@@ -59,6 +59,20 @@ func TestRealMageOwnDamage(t *testing.T) {
 	}
 }
 
+// SRVDO_010 (0x5da2f0): calc1 of the homing skills is a damage percent added to the missile, not a switch; Guided
+// Arrow has ln34, Bone Spirit has 0.
+func TestRealHomingCalc1IsDamagePercent(t *testing.T) {
+	bs := realCast(t, "Bone Spirit", 20)
+	if len(bs.res.Missiles) != 1 || bs.res.Missiles[0].Damage.DamagePct != 0 {
+		t.Errorf("Bone Spirit %+v", bs.res.Missiles)
+	}
+
+	ga := realCast(t, "Guided Arrow", 20)
+	if len(ga.res.Missiles) != 1 || ga.res.Missiles[0].Damage.DamagePct <= 0 {
+		t.Errorf("Guided Arrow damage percent %+v", ga.res.Missiles)
+	}
+}
+
 type auditMissile struct {
 	pMin, pMax, pLen int32
 	cold, fire, ltng int32
