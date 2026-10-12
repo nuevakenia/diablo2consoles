@@ -149,6 +149,8 @@ func (v *Game) heroDies() {
 	st.dead, st.deadFor = true, 0
 	st.hardcore = p.Hardcore
 
+	v.sayHeroVocal(true)
+
 	if v.attackTarget != nil {
 		v.attackTarget = nil
 	}

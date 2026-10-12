@@ -148,6 +148,8 @@ type Game struct {
 	ticksSinceLevelCheck float64
 	escapeMenu           *d2player.EscapeMenu
 	soundEngine          *d2audio.SoundEngine
+	heroVoiceGate        d2audio.VoiceGate // hero voice suppression (game_hero_voice.go)
+	heroHitTick          int64
 	soundEnv             d2audio.SoundEnvironment
 	guiManager           *d2gui.GuiManager
 	keyMap               *d2player.KeyMap

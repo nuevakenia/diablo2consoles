@@ -99,6 +99,10 @@ type Engine struct {
 	frame int
 	acc   float64
 
+	// OnRefusal, if set, is called with the d2skill.Reason* of every refused CastAt of the pipeline (the
+	// game uses it for the hero's "not enough mana" / "not in town" voice lines).
+	OnRefusal func(reason string)
+
 	lastRefusal string // d2skill.Reason* of the last refused CastAt, "" after an accepted one
 
 	lastDealt int // whole life points the last hurt() removed (leech)
@@ -388,6 +392,10 @@ func (e *Engine) CastAt(p *d2mapentity.Player, skillID, sx, sy int) bool {
 	if !st.OK {
 		e.Counters.Refused++
 		e.lastRefusal = st.Reason
+
+		if e.OnRefusal != nil {
+			e.OnRefusal(st.Reason)
+		}
 
 		return false
 	}
