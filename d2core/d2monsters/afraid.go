@@ -36,6 +36,18 @@ func (d *Director) FBXAfraidOf(_ *d2monster.Brain, t d2monster.Target) bool {
 
 // PlayerScaling implements d2monster.PlayerScaler, the fifth word of the block MONSTER_CalcPlayerCountScaling
 // (0x571760) fills (VERIFIED batch 9: the effective player count of the game, the larger of the live count and the
-// forced one; the exe stores 1 instead when the monster's AI record has byte +0x4c set, a flag not decoded). Diablo's
-// decision reads it as "fewer than two players" (0x5e7710).
-func (d *Director) PlayerScaling(_ *d2monster.Brain) int { return d.PlayerCount() }
+// forced one). The exe stores 1 instead when the monster's monstats byte +0x4c is non-zero; w24 read the column
+// table of the loader (MONTBL_LoadMonstatsTable, the "Align" entry has offset 0x4c): that byte is Align, so a unit
+// whose class is not hostile (Align != 0) always reports 1. Diablo's decision reads it as "fewer than two players"
+// (0x5e7710).
+func (d *Director) PlayerScaling(b *d2monster.Brain) int {
+	if b == nil {
+		return d.PlayerCount()
+	}
+
+	if u := d.unitOf(b); u != nil && u.m != nil && u.m.Stat != nil && u.m.Stat.Alignment != 0 {
+		return 1
+	}
+
+	return d.PlayerCount()
+}

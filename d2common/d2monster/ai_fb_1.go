@@ -609,7 +609,7 @@ func nihOffset(c *Ctx, slot int) {
 func thinkShadowWarrior(c *Ctx) {
 	b := c.B
 
-	pet, ok := c.W.(FB1Pet)
+	pet, ok := shadowPetOf(c)
 	if !ok {
 		c.Sleep(100)
 
@@ -718,7 +718,7 @@ func thinkShadowMaster(c *Ctx) {
 		return
 	}
 
-	pet, hasPet := c.W.(FB1Pet)
+	pet, hasPet := shadowPetOf(c)
 
 	var leader *Target
 
