@@ -54,6 +54,9 @@ func TestAuditReferencesResolve(t *testing.T) {
 func TestAuditPlayerSkillsProduceAnEffect(t *testing.T) {
 	rows, _ := buildAudit(t)
 	needsWeapon := map[int]bool{140: true}
+	// Blade Fury (266): the first use only creates state 0xc and throws nothing (SRVST_026, w23); the throws follow
+	// on the next uses (bladefury.go, class_abc_test.go)
+	firstUseOnly := map[int]bool{266: true}
 
 	for _, a := range playerRows(rows) {
 		if a.Passive {
@@ -65,6 +68,7 @@ func TestAuditPlayerSkillsProduceAnEffect(t *testing.T) {
 			case c.Panic != "":
 				t.Errorf("skill %d %s L%d panics: %s", a.ID, a.Name, lvl, c.Panic)
 			case needsWeapon[a.ID]:
+			case firstUseOnly[a.ID] && c.StartOK && c.DoOK:
 			case !c.StartOK || !c.DoOK:
 				t.Errorf("skill %d %s L%d refused: %q", a.ID, a.Name, lvl, c.Reason)
 			case !c.produced():
