@@ -40,6 +40,10 @@ type MapGenerator struct {
 
 	rng *d2rand.Seed // layout rolls of the fake overworld (see intn)
 
+	// backdrop marks a generator that only builds terrain for the neighbouring-level backdrop of the renderer: no
+	// population, no monsters (see BuildBackdrop)
+	backdrop bool
+
 	*d2util.Logger
 }
 

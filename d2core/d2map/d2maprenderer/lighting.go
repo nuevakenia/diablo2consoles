@@ -305,7 +305,7 @@ func (mr *MapRenderer) renderShadedImage(target d2interface.Surface, img d2inter
 
 	vals := mr.shadeVals[:0]
 	uniform := true
-	baseX, baseY := float64(tileX*subtilesPerTile), float64(tileY*subtilesPerTile)
+	baseX, baseY := float64((tileX+mr.offX)*subtilesPerTile), float64((tileY+mr.offY)*subtilesPerTile)
 
 	for _, p := range mr.shadeGrid(kind, w, h, cols, rows) {
 		c := withAlpha(mr.light.tintAt(baseX+p.u, baseY+p.v), alpha)

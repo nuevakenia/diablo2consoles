@@ -417,6 +417,7 @@ func (v *Game) Render(screen d2interface.Surface) {
 		v.gameClient.RegenMap = false
 		v.mapRenderer.RegenerateTileCache()
 		v.gameClient.MapEngine.IsLoading = false
+		v.updateBackdrops()
 	}
 
 	// the world fills the whole screen: leave the interface column the app translated into

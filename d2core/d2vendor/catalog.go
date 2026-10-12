@@ -136,6 +136,7 @@ func BasesFor(rec *d2records.RecordManager, v Vendor) []Base {
 
 		bases = append(bases, Base{
 			Code:       code,
+			Page:       StorePageOf(rec, code),
 			ReqLevel:   icr.RequiredLevel,
 			W:          icr.InventoryWidth,
 			H:          icr.InventoryHeight,
@@ -154,6 +155,33 @@ func BasesFor(rec *d2records.RecordManager, v Vendor) []Base {
 	return bases
 }
 
+// StorePages are the rows of storepage.txt in order (the tabs of the vendor window); the item types name theirs in
+// the StorePage column. A type without one (-1) is never stocked (ITEM_GetStorePage returns 0xff, VERIFIED).
+//
+//nolint:gochecknoglobals // table
+var storePageCodes = []string{"armo", "weap", "mag", "misc"}
+
+// StorePageOf is the vendor tab of a base item code, -1 when its type has none.
+func StorePageOf(rec *d2records.RecordManager, code string) int {
+	icr := rec.Item.All[code]
+	if icr == nil {
+		return -1
+	}
+
+	tr := rec.Item.Types[icr.Type]
+	if tr == nil {
+		return -1
+	}
+
+	for i, c := range storePageCodes {
+		if strings.EqualFold(c, tr.StorePage) {
+			return i
+		}
+	}
+
+	return -1
+}
+
 // Resolver returns the Options.Resolve function for a record set: the size
 // and upgrade codes of any base item, without vendor columns.
 func Resolver(rec *d2records.RecordManager) func(code string) (Base, bool) {
@@ -164,7 +192,7 @@ func Resolver(rec *d2records.RecordManager) func(code string) (Base, bool) {
 		}
 
 		return Base{
-			Code: code, ReqLevel: icr.RequiredLevel, W: icr.InventoryWidth, H: icr.InventoryHeight,
+			Code: code, Page: StorePageOf(rec, code), ReqLevel: icr.RequiredLevel, W: icr.InventoryWidth, H: icr.InventoryHeight,
 			MaxStack: icr.MaxStack, Version: icr.Version,
 		}, true
 	}

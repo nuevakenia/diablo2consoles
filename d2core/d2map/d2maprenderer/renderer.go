@@ -80,8 +80,10 @@ type MapRenderer struct {
 	shadeVals           []color.RGBA                  // scratch for renderShadedImage
 	shadeGrids          map[shadeGridKey][]shadePoint // subtile offsets of the vertices of a grid, per image size
 	stats               DrawStats
-	roofCover           map[[2]int]bool // roof tiles fading out because the hero is under them
-	shake               screenShake     // view shake of a Siege Beast stomp, see shake.go
+	roofCover           map[[2]int]bool  // roof tiles fading out because the hero is under them
+	shake               screenShake      // view shake of a Siege Beast stomp, see shake.go
+	backdrops           []*backdropLayer // neighbouring levels drawn beyond the map edge, see backdrop.go
+	offX, offY          int              // a backdrop renderer: tile offset to the main map (light and fade keys)
 
 	*d2util.Logger
 }
@@ -212,6 +214,7 @@ func (mr *MapRenderer) Render(target d2interface.Surface) {
 	// only the tiles that can be seen (the range is a rectangle around the isometric diamond of the screen)
 	rows := VisibleTileRows(mr.viewport, sz.W, sz.H, startX, startY, endX, endY)
 
+	mr.renderBackdrops(target)
 	mr.renderPass1(target, startY, endY, rows)
 	mr.renderPass2(target, startY, endY, rows)
 
@@ -555,7 +558,8 @@ func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2
 
 	alpha := 1.0
 	if upper {
-		alpha = mr.light.fadeFor(wallKey{tileX, tileY, idx}, mr.heroBehind(tile.Type, tileX, tileY))
+		alpha = mr.light.fadeFor(wallKey{tileX + mr.offX, tileY + mr.offY, idx},
+			mr.heroBehind(tile.Type, tileX+mr.offX, tileY+mr.offY))
 		if alpha < 1 {
 			mr.stats.WallsFading++
 		}
@@ -583,7 +587,8 @@ func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2
 	defer target.Pop()
 
 	if mr.light.active() {
-		alpha := mr.light.roofAlpha(wallKey{tileX, tileY, idx}, mr.roofCover[[2]int{tileX, tileY}])
+		alpha := mr.light.roofAlpha(wallKey{tileX + mr.offX, tileY + mr.offY, idx},
+			mr.roofCover[[2]int{tileX + mr.offX, tileY + mr.offY}])
 		if alpha < 1 {
 			mr.stats.RoofsFading++
 		}

@@ -288,6 +288,7 @@ func NewGameControls(
 	hoverLabel.SetBackgroundColor(d2util.Color(blackAlpha50percent))
 
 	gc.heroStatsPanel.SetOnCloseCb(gc.onCloseHeroStatsPanel)
+	gc.heroStatsPanel.SetHandSkills(gc.handSkillInfo)
 	gc.mercPanel.SetOnCloseCb(gc.updateLayout)
 	gc.stash.SetOnClose(gc.updateLayout) // closing the stash or cube moves the mini panel strip back
 	gc.cube.SetOnClose(gc.updateLayout)
@@ -633,7 +634,7 @@ func (g *GameControls) OnMouseButtonRepeat(event d2interface.MouseEvent) bool {
 		return true
 	}
 
-	if isLeft && inRect && !g.hero.IsCasting() {
+	if isLeft && inRect && !g.ignoredWhileCasting(button, event.KeyMod()) {
 		g.lastLeftBtnActionTime = now
 
 		g.worldClick(button, event.KeyMod(), px, py)
@@ -653,7 +654,7 @@ func (g *GameControls) OnMouseButtonRepeat(event d2interface.MouseEvent) bool {
 		return true
 	}
 
-	if isRight && shouldDoRight && inRect && !g.hero.IsCasting() {
+	if isRight && shouldDoRight && inRect && !g.ignoredWhileCasting(button, event.KeyMod()) {
 		g.lastRightBtnActionTime = now
 
 		g.worldClick(button, event.KeyMod(), px, py)
@@ -675,8 +676,8 @@ func (g *GameControls) effectiveButton(event d2interface.MouseEvent) d2enum.Mous
 	return EffectiveButton(event.Button(), event.KeyMod(), runtime.GOOS)
 }
 
-// worldClick performs a click on the game world (see ResolveWorldClick for the rules).
-func (g *GameControls) worldClick(button d2enum.MouseButton, mod d2enum.KeyMod, px, py float64) {
+// worldClickInput describes a click on the world for ResolveWorldClick.
+func (g *GameControls) worldClickInput(button d2enum.MouseButton, mod d2enum.KeyMod) WorldClickInput {
 	in := WorldClickInput{Button: button, Mod: mod, OverMonster: g.hoveredMonster() != nil}
 	if g.hero.LeftSkill != nil {
 		in.LeftSkillID = g.hero.LeftSkill.ID
@@ -685,6 +686,33 @@ func (g *GameControls) worldClick(button d2enum.MouseButton, mod d2enum.KeyMod, 
 
 	in.InTown = g.hero.IsInTown()
 
+	return in
+}
+
+// ignoredWhileCasting says whether a click is dropped because the hero is busy with a cast or swing. The exe
+// ignores such orders, it does not queue them: the walk, run and interact packets reach PLRMODE_ServerStartMode
+// 0x57e9b0, which asks PLRMODE_CanInterruptCurrentMode 0x57ceb0, and a walk mode is never in the list of modes that
+// may break a running cast (VERIFIED: attack, cast, throw and the skill modes 7, 8, 10, 0xb, 0xd, 0x12, only near the
+// action frame). A skill click is passed on: the skill engine applies that rule itself (d2skills mayInterrupt) and
+// refuses it when the cast cannot be broken (still not queued).
+func (g *GameControls) ignoredWhileCasting(button d2enum.MouseButton, mod d2enum.KeyMod) bool {
+	if !g.hero.IsCasting() {
+		return false
+	}
+
+	act := ResolveWorldClick(g.worldClickInput(button, mod))
+	if !IgnoredWhileCasting(act) {
+		return false
+	}
+
+	g.Infof("INPUT click ignored while casting: button=%d action=%s (the exe drops it, it does not queue it)", button, act)
+
+	return true
+}
+
+// worldClick performs a click on the game world (see ResolveWorldClick for the rules).
+func (g *GameControls) worldClick(button d2enum.MouseButton, mod d2enum.KeyMod, px, py float64) {
+	in := g.worldClickInput(button, mod)
 	act := ResolveWorldClick(in)
 
 	hsx, hsy := g.mapRenderer.WorldToScreen(g.hero.GetPositionF())
@@ -929,17 +957,24 @@ func (g *GameControls) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 		return true
 	}
 
-	if button == d2enum.MouseButtonLeft && !g.isInActiveMenusRect(mx, my) && !g.hero.IsCasting() {
+	if button == d2enum.MouseButtonLeft && !g.isInActiveMenusRect(mx, my) && !g.ignoredWhileCasting(button, event.KeyMod()) {
 		g.lastLeftBtnActionTime = d2util.Now()
 		g.heldLeftWalk = false
 
+		// talking to an NPC or using an object walks there: ignored while a cast runs, like any walk order
 		if npc := g.hoveredNPC(); npc != nil && !standStill {
-			g.inputListener.OnPlayerInteract(npc)
+			if !g.hero.IsCasting() {
+				g.inputListener.OnPlayerInteract(npc)
+			}
+
 			return true
 		}
 
 		if thing := g.hoveredWorldThing(); thing != nil && !standStill {
-			g.inputListener.OnPlayerInteract(thing)
+			if !g.hero.IsCasting() {
+				g.inputListener.OnPlayerInteract(thing)
+			}
+
 			return true
 		}
 
@@ -950,7 +985,7 @@ func (g *GameControls) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 		return true
 	}
 
-	if button == d2enum.MouseButtonRight && !g.isInActiveMenusRect(mx, my) && !g.hero.IsCasting() {
+	if button == d2enum.MouseButtonRight && !g.isInActiveMenusRect(mx, my) && !g.ignoredWhileCasting(button, event.KeyMod()) {
 		g.lastRightBtnActionTime = d2util.Now()
 
 		g.worldClick(button, event.KeyMod(), px, py)
@@ -1179,6 +1214,32 @@ func (g *GameControls) logPanel(name string) {
 		g.Infof("PANEL inventory: gold=%d items=%d worn=[%s] equipment=[%s]", g.inventory.Gold(),
 			len(g.inventory.grid.items), g.inventory.EquippedSummary(), g.equipmentSummary())
 	}
+}
+
+// handSkillInfo describes the left and right skills for the character sheet boxes.
+func (g *GameControls) handSkillInfo() [2]HandSkillInfo {
+	var out [2]HandSkillInfo
+
+	for i, sk := range []*d2hero.HeroSkill{g.hero.LeftSkill, g.hero.RightSkill} {
+		if sk == nil || sk.SkillRecord == nil {
+			continue
+		}
+
+		if sk.SkillDescriptionRecord != nil {
+			out[i].Name = g.asset.TranslateString(sk.SkillDescriptionRecord.NameKey)
+		}
+
+		if out[i].Name == "" {
+			out[i].Name = sk.Skill
+		}
+
+		switch sk.Anim {
+		case d2enum.PlayerAnimationModeAttack1, d2enum.PlayerAnimationModeAttack2, d2enum.PlayerAnimationModeThrow:
+			out[i].Weapon = true
+		}
+	}
+
+	return out
 }
 
 func skillLabel(s *d2hero.HeroSkill) string {

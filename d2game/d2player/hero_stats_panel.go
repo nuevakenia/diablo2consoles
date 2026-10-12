@@ -101,10 +101,8 @@ type StatsPanelLabels struct {
 	Stamina      *d2ui.Label
 
 	// derived from the equipment (d2statlist totals)
-	Defense      *d2ui.Label
-	AttackRating *d2ui.Label
-	Damage       *d2ui.Label
-	Resist       [4]*d2ui.Label // fire, cold, lightning, poison
+	Defense *d2ui.Label
+	Resist  [4]*d2ui.Label // fire, cold, lightning, poison
 }
 
 // Positions of the derived value labels. UNVERIFIED against the original
@@ -113,13 +111,45 @@ type StatsPanelLabels struct {
 // strength and dexterity values.
 const (
 	labelDefenseValueX, labelDefenseValueY = 370, 258 // the box right of the caption: x 273..307 of the panel (0x723b70)
-	labelDamageValueX, labelDamageValueY   = 140, 177
-	labelARValueX, labelARValueY           = 140, 237
 	labelResValueX                         = 370
 )
 
 // resistValueY are the y positions of the fire, cold, lightning and poison values.
 var resistValueY = [4]int{400, 424, 448, 472}
+
+// The four boxes right of Strength and Dexterity show the description of the hand skills
+// (SKILLDESC_DrawSkillDescription 0x4ea490 called for rows 0 and 6 of the table at 0x72bff8 by 0x4ea940, VERIFIED): the
+// left hand skill in the upper box of each pair, the right hand skill in the lower one. A damage box carries the skill
+// name (row 0, bottom y 93) over the caption "Damage" (string 0xfdd, bottom y 101) and the value in its right part
+// (x 263..307, y 98); an attack rating box the caption (string 0xfdf, x 162..270) and the value (x 270..310, y 160).
+// The row triples are {x1, y, x2}, six rows per hand (the right hand's start at row 6, 24 px lower). The damage and
+// attack rating of a skill come from a per skill function of skilldesc.txt (descdam / descatt); this port prints the
+// weapon's damage and the character's attack rating for skills that attack with the weapon and leaves other skills
+// with the name only (UNVERIFIED: spell damage lines). Pixels of the anchors inside the lines are UNVERIFIED (the
+// exe's draw calls pass them in registers): captions centred in x1..x2, text bottoms at the table y.
+const (
+	handBoxNameX1, handBoxNameX2     = 162, 258
+	handDamageValueX1, handDamageX2  = 263, 307
+	handARCaptionX1, handARCaptionX2 = 162, 270
+	handARValueX1, handARValueX2     = 270, 310
+
+	handNameY, handCaptionY, handDamageValueY = 93, 101, 98
+	handARY                                   = 160
+	handRowShift                              = 24 // the right hand's rows are 24 px lower (y 117/125/122, AR 184)
+	panelColumnX                              = 80 // table x to panel x (the art's left edge)
+	panelTextY                                = 53 // table y to the label y of the Go panel
+)
+
+// HandSkillInfo describes a hand skill for the character sheet.
+type HandSkillInfo struct {
+	Name   string // translated skill name (empty: no skill)
+	Weapon bool   // the skill attacks with the weapon: damage and attack rating are listed
+}
+
+// handLabels are the labels of one hand's pair of boxes.
+type handLabels struct {
+	name, damageCaption, damage, arCaption, arCaption2, ar *d2ui.Label
+}
 
 // NewHeroStatsPanel creates a new hero status panel
 func NewHeroStatsPanel(asset *d2asset.AssetManager,
@@ -158,6 +188,8 @@ type HeroStatsPanel struct {
 	heroName        string
 	heroClass       d2enum.Hero
 	labels          *StatsPanelLabels
+	hands           [2]handLabels
+	handSkills      func() [2]HandSkillInfo
 	onCloseCb       func()
 	panelGroup      *d2ui.WidgetGroup
 	newStatPoints   *d2ui.WidgetGroup
@@ -476,8 +508,25 @@ func (s *HeroStatsPanel) initStatValueLabels() {
 	}
 
 	s.labels.Defense = s.createStatValueLabel(0, labelDefenseValueX, labelDefenseValueY)
-	s.labels.Damage = small(labelDamageValueX, labelDamageValueY)
-	s.labels.AttackRating = small(labelARValueX, labelARValueY)
+
+	for h := range s.hands {
+		dy := h * handRowShift
+		mid := func(x1, x2 int) int { return (x1+x2)/2 + panelColumnX }
+		mk := func(x, y int) *d2ui.Label {
+			return s.createTextLabel(PanelText{X: x, Y: y + dy + panelTextY, Font: d2resource.Font6, AlignCenter: true})
+		}
+
+		nameX, arX := mid(handBoxNameX1, handBoxNameX2), mid(handARCaptionX1, handARCaptionX2)
+
+		s.hands[h] = handLabels{
+			name:          mk(nameX, handNameY),
+			damageCaption: mk(nameX, handCaptionY),
+			damage:        mk(mid(handDamageValueX1, handDamageX2), handDamageValueY),
+			arCaption:     mk(arX, handARY-3),
+			arCaption2:    mk(arX, handARY+5),
+			ar:            mk(mid(handARValueX1, handARValueX2), handARY),
+		}
+	}
 
 	for i := range s.labels.Resist {
 		s.labels.Resist[i] = small(labelResValueX, resistValueY[i])
@@ -495,11 +544,54 @@ func (s *HeroStatsPanel) setDerivedValues() {
 	}
 
 	s.labels.Defense.SetText(strconv.Itoa(t.Defense))
-	s.labels.AttackRating.SetText("AR " + strconv.Itoa(t.AttackRating))
-	s.labels.Damage.SetText("Dmg " + strconv.Itoa(t.DamageMin) + "-" + strconv.Itoa(t.DamageMax))
+	s.setHandBoxes(t.DamageMin, t.DamageMax, t.AttackRating)
 
 	for i, l := range s.labels.Resist {
 		l.SetText(strconv.Itoa(t.ResistShown[i]))
+	}
+}
+
+// SetHandSkills gives the panel the hero's left and right skills.
+func (s *HeroStatsPanel) SetHandSkills(f func() [2]HandSkillInfo) { s.handSkills = f }
+
+// setHandBoxes fills the four boxes right of Strength and Dexterity.
+func (s *HeroStatsPanel) setHandBoxes(dmin, dmax, ar int) {
+	var skills [2]HandSkillInfo
+	if s.handSkills != nil {
+		skills = s.handSkills()
+	}
+
+	capDamage := s.asset.TranslateString("strchrskm")
+	// string 0xfe1 ("strchrrat") is the caption when the skill has no to-hit element, 0xfdf ("%s\nAttack Rating") otherwise
+	capAR := strings.ReplaceAll(s.asset.TranslateString("strchrrat"), "%s", "Attack") // the %s argument is UNVERIFIED
+
+	for h, l := range s.hands {
+		if l.name == nil {
+			continue
+		}
+
+		sk := skills[h]
+		l.name.SetText(sk.Name)
+
+		damage, rating, dcap, acap := "", "", "", ""
+
+		if sk.Name != "" && sk.Weapon {
+			damage = strconv.Itoa(dmin) + "-" + strconv.Itoa(dmax)
+			rating = strconv.Itoa(ar)
+			dcap, acap = capDamage, capAR
+		}
+
+		l.damageCaption.SetText(dcap)
+		l.damage.SetText(damage)
+		// a two line caption: the lines stand 8 px apart around the box middle (anchor UNVERIFIED)
+		first, second := acap, ""
+		if i := strings.Index(acap, "\n"); i >= 0 {
+			first, second = acap[:i], acap[i+1:]
+		}
+
+		l.arCaption.SetText(first)
+		l.arCaption2.SetText(second)
+		l.ar.SetText(rating)
 	}
 }
 
@@ -539,11 +631,27 @@ func (s *HeroStatsPanel) Summary() string {
 	st := s.heroState
 
 	return fmt.Sprintf("level=%d name=%q class=%s str=%d dex=%d vit=%d ene=%d hp=%d/%d mana=%d/%d stamina=%d/%d "+
-		"exp=%d next=%d statpoints=%d skillpoints=%d shownExp=%s shownNext=%s",
+		"exp=%d next=%d statpoints=%d skillpoints=%d shownExp=%s shownNext=%s hands=%s",
 		st.Level, s.heroName, s.heroClass, st.Strength, st.Dexterity, st.Vitality, st.Energy,
 		st.Health, st.MaxHealth, st.Mana, st.MaxMana, int(st.Stamina), st.MaxStamina,
 		st.Experience, st.NextLevelExp, st.StatsPoints, st.SkillPoints,
-		s.labels.Experience.GetText(), s.labels.NextLevelExp.GetText())
+		s.labels.Experience.GetText(), s.labels.NextLevelExp.GetText(), s.handSummary())
+}
+
+// handSummary lists the texts of the hand skill boxes ("name|damage caption|damage|AR caption|AR" per hand).
+func (s *HeroStatsPanel) handSummary() string {
+	var out []string
+
+	for _, l := range s.hands {
+		if l.name == nil {
+			continue
+		}
+
+		out = append(out, fmt.Sprintf("%q|%q|%q|%q|%q", l.name.GetText(), l.damageCaption.GetText(), l.damage.GetText(),
+			l.arCaption.GetText(), l.ar.GetText()))
+	}
+
+	return strings.Join(out, ",")
 }
 
 func (s *HeroStatsPanel) createStatValueLabel(stat, x, y int) *d2ui.Label {
