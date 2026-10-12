@@ -887,42 +887,69 @@ func doStreamFn(c *cast) {
 	}
 }
 
-// doFireWallFn is SRVDO_024_FireWall: a line of stationary fire missiles across
-// the aim direction. The length (8 + level subtiles) and the five hits per
-// second are U. The skill's damage is listed per second (Fire Wall L1 shows
-// 15-20 and has HitShift 4): each of the five hits does 1<<HitShift/5 of
-// the descriptor, so a target standing in the fire loses the listed amount
-// per second (U: the missile damage function 3 that does this in the game was
-// not read).
+// FireWallMakerDestinations are the two destinations SRVDO_024_FireWall (0x5c7fc0, VERIFIED wave 23) gives its
+// two srvmissilea makers: both start on the target (tx, ty), and fly along the perpendicular to the line from the
+// target to the caster (hx, hy), one each way: (tx - (hy - ty), (hx - tx) + ty) and (tx + (hy - ty), ty - (hx - tx)).
+// A destination that equals the start (caster on the target) is moved by one subtile in both axes, the exe's fix for
+// a missile with no direction (MISSILE_CreateServerMissile 0x59d5d0).
+func FireWallMakerDestinations(tx, ty, hx, hy int) [2][2]int {
+	out := [2][2]int{{tx - (hy - ty), (hx - tx) + ty}, {tx + (hy - ty), ty - (hx - tx)}}
+
+	for i := range out {
+		if out[i][0] == tx && out[i][1] == ty {
+			out[i][0]++
+			out[i][1]++
+		}
+	}
+
+	return out
+}
+
+// doFireWallFn is SRVDO_024_FireWall (0x5c7fc0, VERIFIED wave 23). The cast needs a valid srvmissilea
+// (firewallmaker), a walkable target cell for that missile (SKILL_IsSkillTargetCellWalkable 0x56c210), a target
+// that is not on 0 and not in a town room. Then two firewallmaker missiles start on the target and fly
+// perpendicular to the line from the caster, one each way (FireWallMakerDestinations); each drops a firewall
+// (its SubMissile1) at every cell it passes (SrvDoFunc 6, 0x5ac1b0) for Range + LevRange * level frames. A third
+// missile, srvmissileb (firewall), stands on the target itself. The old port laid a fixed line of stationary
+// missiles. UNVERIFIED: the hit cadence of the standing fire, kept at five hits per second scaled to the listed
+// damage per second (the makers hand it to their fire).
 func doFireWallFn(c *cast) {
-	name := c.sk.SrvMissileB
-	if name == "" {
-		name = c.sk.SrvMissileA
+	nameA, nameB := c.sk.SrvMissileA, c.sk.SrvMissileB
+	if nameA == "" {
+		c.fail(ReasonMissile)
+		return
 	}
 
 	ax, ay := c.aim()
-	hx, hy := c.u.Pos()
-	dx, dy := float64(ax-hx), float64(ay-hy)
-
-	d := math.Hypot(dx, dy)
-	if d == 0 {
-		dx, dy, d = 1, 0, 1
+	if ax == 0 || ay == 0 || (c.p.Walkable != nil && !c.p.Walkable(ax, ay)) {
+		c.fail(ReasonMissile)
+		return
 	}
 
-	px, py := -dy/d, dx/d // perpendicular
-	half := (8 + c.lvl) / 2
+	if c.u.InTown() && !c.p.Opt.IgnoreTown {
+		c.fail(ReasonTown)
+		return
+	}
 
-	for i := -half / 2; i <= half/2; i++ {
-		cx, cy := float64(ax)+0.5+px*float64(i)*2, float64(ay)+0.5+py*float64(i)*2
-		tg := Target{X: int(cx), Y: int(cy)}
+	hx, hy := c.u.Pos()
+	sx, sy := float64(ax)+0.5, float64(ay)+0.5
+	hit := castOpts{hitEvery: 5, scalePct: 100 * (1 << uint(c.sk.HitShift)) / 5}
 
-		if c.p.Walkable != nil && !c.p.Walkable(tg.X, tg.Y) {
-			continue
+	for _, d := range FireWallMakerDestinations(ax, ay, hx, hy) {
+		o := hit
+		o.hasStart, o.startX, o.startY = true, sx, sy
+		o.hasDest, o.destX, o.destY = true, float64(d[0])+0.5, float64(d[1])+0.5
+
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, nameA, Target{X: ax, Y: ay}, o); m != nil {
+			c.res.Missiles = append(c.res.Missiles, m)
 		}
+	}
 
-		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, name, tg, castOpts{
-			hasStart: true, startX: cx, startY: cy, stationary: true, hitEvery: 5, scalePct: 100 * (1 << uint(c.sk.HitShift)) / 5,
-		}); m != nil {
+	if nameB != "" {
+		o := hit
+		o.hasStart, o.startX, o.startY, o.stationary = true, sx, sy, true
+
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, nameB, Target{X: ax, Y: ay}, o); m != nil {
 			c.res.Missiles = append(c.res.Missiles, m)
 		}
 	}

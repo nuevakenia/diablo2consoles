@@ -94,6 +94,8 @@ func classMissiles() missileTable {
 	m["chainlightning"] = std(201, "chainlightning", 30, 25)
 	m["chainlightning"].SrvHitFunc = 12
 	m["guidedarrow"] = std(202, "guidedarrow", 24, 128)
+	m["firewallmaker"] = &d2missile.Spec{ID: 202, Name: "firewallmaker", SrvDoFunc: 6, Vel: 12, MaxVel: 12, Range: 7, LevRange: 2,
+		CollideType: 8, SubMissile: [3]string{"firewall"}}
 	m["firewall"] = &d2missile.Spec{ID: 203, Name: "firewall", SrvDoFunc: 5, Range: 90, CollideType: 3}
 	m["fistsoffirefirewall"] = std(204, "fistsoffirefirewall", 12, 20)
 	// missiles.txt (patch_d2): blizzardcenter pSrvDoFunc 10 Range 100 SubMissile1 blizzard1;
@@ -369,25 +371,47 @@ func TestFireWall(t *testing.T) {
 	cf := newClassFixture(map[string]int{"Fire Wall": 10})
 	cf.u.x, cf.u.y = 0, 0
 
-	_, r := cf.cast("Fire Wall", 20, 0)
-	if !r.OK || len(r.Missiles) < 5 {
-		t.Fatalf("fire wall pieces: %d (%s)", len(r.Missiles), r.Reason)
+	// SRVDO_024 (0x5c7fc0): two makers fly perpendicular to the line caster -> target, one each way, and the
+	// firewall (srvmissileb) stands on the target
+	_, r := cf.cast("Fire Wall", 20, 4)
+	if !r.OK || len(r.Missiles) != 3 {
+		t.Fatalf("fire wall missiles: %d (%s)", len(r.Missiles), r.Reason)
 	}
 
-	for _, m := range r.Missiles {
-		if m.Velocity != 0 || m.HitEvery != 5 {
-			t.Fatalf("wall piece not stationary/periodic: %+v", m)
-		}
+	a, b, c := r.Missiles[0], r.Missiles[1], r.Missiles[2]
+
+	if a.Velocity == 0 || b.Velocity == 0 || c.Velocity != 0 {
+		t.Fatalf("makers must fly, the fire stand: %v %v %v", a.Velocity, b.Velocity, c.Velocity)
 	}
 
-	// pieces are spread along y (perpendicular to the cast direction)
-	ys := map[int]bool{}
-	for _, m := range r.Missiles {
-		ys[int(m.Y)] = true
+	if a.DX*20+a.DY*4 > 1e-6 || a.DX*20+a.DY*4 < -1e-6 || b.DX*20+b.DY*4 > 1e-6 || b.DX*20+b.DY*4 < -1e-6 {
+		t.Errorf("makers not perpendicular to the line of fire: (%v,%v) (%v,%v)", a.DX, a.DY, b.DX, b.DY)
 	}
 
-	if len(ys) < len(r.Missiles)/2 {
-		t.Errorf("wall pieces not spread: %v", ys)
+	if a.DX*b.DX+a.DY*b.DY > -0.99 {
+		t.Errorf("makers must fly opposite ways: (%v,%v) (%v,%v)", a.DX, a.DY, b.DX, b.DY)
+	}
+
+	if c.HitEvery != 5 || int(c.X) != 20 || int(c.Y) != 4 {
+		t.Errorf("fire on the target: %+v", c)
+	}
+
+	// a target on y 0 is refused by the exe (zero coordinate)
+	if _, r = cf.cast("Fire Wall", 20, 0); r.OK {
+		t.Errorf("target with a zero coordinate must be refused: %+v", r)
+	}
+}
+
+func TestFireWallMakerDestinations(t *testing.T) {
+	got := FireWallMakerDestinations(20, 4, 0, 0)
+	if got[0] != [2]int{24, -16} || got[1] != [2]int{16, 24} {
+		t.Fatalf("%v", got)
+	}
+
+	// caster on the target: both destinations equal the start and move by (1, 1)
+	got = FireWallMakerDestinations(7, 9, 7, 9)
+	if got[0] != [2]int{8, 10} || got[1] != [2]int{8, 10} {
+		t.Fatalf("on target: %v", got)
 	}
 }
 
