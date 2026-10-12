@@ -133,9 +133,10 @@ func (p *Pipeline) meleeRange() int {
 	return 0
 }
 
-// targetReach is the distance within which the stored target of a burst still counts as in melee range of the
-// caster. UNVERIFIED: the exe's own test (COMBAT_IsTargetWithinMeleeRange 0x622e40) was not compared; the old
-// value 4 + rangeadder is kept.
+// targetReach is the radius within which the Near hook is asked for the stored target of a burst; the in-reach
+// test itself is withinMeleeRange (COMBAT_IsTargetWithinMeleeRange 0x622e40, called by SRVDO_013_Fend 0x5da990 with
+// extra 0: table distance <= meleeRange + 1; the line trace the exe adds is not modelled). VERIFIED w28; before
+// it the port used a Chebyshev distance of 4 + rangeadder.
 func (p *Pipeline) targetReach() int { return 4 + p.meleeRange() }
 
 // newMeleeBurst arms an event burst of n hits at the cast's target.
@@ -165,7 +166,7 @@ func (b *Burst) pickMeleeVictim(p *Pipeline) (Target, bool) {
 			}
 		}
 
-		if known && (p.Near == nil || cheb(x-ux, y-uy) <= reach) {
+		if known && (p.Near == nil || withinMeleeRange(x-ux, y-uy, p.meleeRange(), 0)) {
 			t.UX, t.UY = x, y
 
 			return t, true
