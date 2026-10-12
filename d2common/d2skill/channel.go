@@ -12,8 +12,9 @@ package d2skill
 //     it moves the end to now + 6, shifts the pending action events by one frame, and creates the flame.
 //   - Do function SRVDO_019 -> SRVDO_InfernoSpawnFlameMissile (0x5c6d40): a flame is made only while the field is
 //     not 0; afterwards the field becomes 1, state 12 goes off and the end of the action is scheduled
-//     monstats2 InfernoLen frames later (UNVERIFIED which monstats row: the code indexes the table with the
-//     hero's class number).
+//     monstats2 InfernoLen frames later (VERIFIED, SRVDO_InfernoScheduleAnimEnd 0x5c6cb0: the unit's class number
+//     indexes monstats, that row's monstats2 link gives the byte; 1 frame when there is no row). The port does
+//     not use the byte: the host adaptation below stands in for it.
 //
 // The engine's hero cast animation is not shortened like the exe's loop, so Do refreshes the channel window by
 // ChannelAnimSlack frames (a host adaptation, UNVERIFIED) to keep a held button from losing the channel between

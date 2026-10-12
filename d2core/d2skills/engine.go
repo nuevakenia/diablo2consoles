@@ -329,7 +329,7 @@ func (e *Engine) stateDefs() d2state.Defs {
 		e.defs[name] = d2state.Def{
 			ID: r.ID, Name: name, Group: r.Group, Curse: r.Curse, RemHit: r.RemHit, Aura: r.Aura,
 			PlrStayDeath: r.PlrStayDeath, MonStayDeath: r.MonStayDeath, BossStayDeath: r.BossStayDeath,
-			Shatter: r.Shatter, Blue: r.Blue, ColorPri: r.ColorPri, ColorShift: r.ColorShift,
+			Shatter: r.Shatter, UDead: r.UDead, Blue: r.Blue, ColorPri: r.ColorPri, ColorShift: r.ColorShift,
 			Overlay1: r.Overlay1, Stat: r.Stat,
 		}
 	}
@@ -458,16 +458,22 @@ func rec0(e *Engine, skillID int) *d2records.SkillRecord {
 
 // mayInterrupt applies PLRMODE_CanInterruptCurrentMode (0x57ceb0) when a cast arrives during a running
 // cast or swing: only the modes 7, 8, 10, 0xb, 0xd, 0x12 may break it, and only near the action frame.
-// The states 0x36 / 0x2a / 0xf and the dwBits4 hold bit are not modelled (unverified meaning).
+// The hold bit is the skills.txt interrupt column (dwBits4 bit 31) and the states 0x2a / 0xf are read by holdInputs
+// (VERIFIED), as is state 0x36 (uninterruptable, refuses at once).
 func (e *Engine) mayInterrupt(p *d2mapentity.Player, sk *d2skill.Skill, rec *d2records.SkillRecord) bool {
 	if !p.IsCasting() || rec == nil {
 		return true
 	}
 
-	ok, _ := d2skill.CanInterrupt(d2skill.InterruptInput{
+	// The exe reads dwBits4 of the skill in use (UNIT_GetUsedSkill), not of the one arriving.
+	u := e.hero(p)
+	in := d2skill.InterruptInput{
 		CurrentMode: int(p.GetAnimationMode()), NewMode: int(rec.Anim), Flag: true, HasUsedSkill: true,
-		SkillBits4: sk.Bits4, ActionDue: p.ActionDueSoon(),
-	})
+		SkillBits4: u.usedBits4, ActionDue: p.ActionDueSoon(),
+	}
+	e.holdInputs(p, u, &in)
+
+	ok, _ := d2skill.CanInterrupt(in)
 
 	return ok
 }
@@ -476,14 +482,18 @@ func (e *Engine) mayInterrupt(p *d2mapentity.Player, sk *d2skill.Skill, rec *d2r
 // is doing (PLRMODE_ServerStartMode 0x57e9b0 -> PLRMODE_CanInterruptCurrentMode 0x57ceb0, VERIFIED; the block
 // animation is started with the interrupt check on). With a used skill that does not hold (dwBits4 bit 31 clear)
 // the block animation only plays from the neutral mode: walking, running, attacking and casting heroes take the
-// block without the animation. The hold states 0x2a / 0xf are not modelled (UNVERIFIED which skills set them).
+// block without the animation. The hold states 0x2a / 0xf (Concentration aura, Concentrate / Berserk) are read by
+// holdInputs (VERIFIED, hold_states.go).
 func (e *Engine) heroBlockAnim(p *d2mapentity.Player) bool {
 	u := e.hero(p)
 
-	ok, _ := d2skill.CanInterrupt(d2skill.InterruptInput{
+	in := d2skill.InterruptInput{
 		CurrentMode: int(p.GetAnimationMode()), NewMode: int(d2enum.PlayerAnimationModeBlock), Flag: true,
 		HasUsedSkill: u.usedSkill, SkillBits4: u.usedBits4, ActionDue: p.ActionDueSoon(),
-	})
+	}
+	e.holdInputs(p, u, &in)
+
+	ok, _ := d2skill.CanInterrupt(in)
 
 	return ok
 }

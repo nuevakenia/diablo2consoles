@@ -7,7 +7,7 @@ func init() {
 		row{"skill": "Test Fire Golem", "Id": "520", "charclass": "nec", "srvdofunc": "56", "summon": "firegolem",
 			"pettype": "firegolem", "petmax": "1", "summode": "NU", "calc1": "0", "manashift": "8",
 			"sumskill1": "Test Holy Fire", "sumsk1calc": "min(lvl,30)"},
-		row{"skill": "Test Holy Fire", "Id": "521", "srvdofunc": "66", "aurastate": "holyfire", "aurafilter": "3",
+		row{"skill": "Test Holy Fire", "Id": "521", "srvdofunc": "66", "aura": "1", "aurastate": "holyfire", "aurafilter": "3",
 			"aurarangecalc": "par1", "Param1": "6", "etype": "fire", "EMin": "5", "EMax": "9", "perdelay": "25", "manashift": "8"},
 	)
 }

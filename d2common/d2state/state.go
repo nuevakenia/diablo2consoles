@@ -469,6 +469,17 @@ func (s *Set) Shatters(frame int) bool {
 	return false
 }
 
+// HasUDead is STATE_UnitHasStateInMask150: an active state carries the states.txt udead flag.
+func (s *Set) HasUDead(frame int) bool {
+	for n, in := range s.states {
+		if d, ok := s.defs[n]; ok && d.UDead && in.Active(frame) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ColorShift returns the PL2 hue variation the unit is drawn with: among the
 // active states with colorpri > 0 and id > 0, the highest colorpri, ties to
 // the lowest id (verified, client FUN_004d65a0). The "blue" column plays no

@@ -14,9 +14,9 @@ const ResistCap = 85
 
 // Mods are the level-scaled numbers a summoning skill adds to the template.
 // Aura holds the evaluated aurastat1..6 (these apply to the minion), Passive
-// the evaluated passivestat1..5 of the skill (UNVERIFIED which of the two
-// groups the exe attaches to the pet: both lists of the real skills.txt only
-// use stats that make sense on a minion, so both are applied alike).
+// the evaluated passivestat1..5 of the skill. VERIFIED (SKILL_SpawnSummonedMinion 0x5c22c0): the exe adds both
+// groups to the pet, the passive ones as plain stats of the unit and the aura ones as base values of a second
+// stat list attached to it, so they add up alike.
 type Mods struct {
 	// HPPct is the life bonus in percent (calc1 of golems, Raise Skeleton and
 	// the vines; d2skill.SummonOrder.HPPct).
@@ -70,11 +70,11 @@ type Stats struct {
 
 // Compute builds the stats of a minion of template t on difficulty diff with
 // the skill modifiers m. r rolls the life between minHP and maxHP; with a nil
-// r the maximum is taken. The order of the steps is UNVERIFIED (the exe was
-// not traced for it):
+// r the maximum is taken. The order of the steps (life and damage VERIFIED, the armor class percent step is
+// UNVERIFIED):
 //
-//	life   = roll(minHP..maxHP) * (100 + HPPct) / 100 + maxhp/256
-//	damage = A1 min/max * (100 + damagepercent) / 100
+//	life   = (roll(minHP..maxHP) + maxhp/256) * (100 + HPPct) / 100   (0x5c22c0: the flat bonus is inside the percent)
+//	damage = (A1 min/max + item_normaldamage) * (100 + damagepercent + strength) / 100
 //	AC     = AC + armorclass, then * (100 + item_armor_percent) / 100
 //	AR     = A1TH + tohit
 //

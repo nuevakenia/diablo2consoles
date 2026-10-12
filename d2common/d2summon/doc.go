@@ -10,7 +10,8 @@
 // Evidence levels follow the repository convention. VERIFIED: the skills.txt
 // columns and their meaning (summon, pettype, petmax, aurastat*, passivestat*,
 // calc1; skills-combat.md) and the pet AI constants (monster-ai-2.md 6.2).
-// UNVERIFIED (marked in the code): how the exe turns the numbers into a unit
-// (rounding, the order of the percent steps) and the eviction rule when a
-// non-golem summon is cast at the limit.
+// UNVERIFIED (marked in the code): the rounding of the armor class percent
+// step and the Raven top-up rule. VERIFIED since wave 37: the life and
+// damage order (SKILL_SpawnSummonedMinion 0x5c22c0) and the eviction of the
+// oldest minion of a pet type at the limit (0x573a30).
 package d2summon

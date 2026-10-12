@@ -273,8 +273,8 @@ func (h *heroUnit) AttackRating() int {
 }
 
 // DualWielding is SKILL_IsDualWieldingTypeWeapons (0x5d7d90): both hands hold
-// a weapon of the melee type (UNVERIFIED: the exe's item type 0x2e is taken
-// as ItemTypes "mele"). Whirlwind hits twice per tick then.
+// a weapon of the melee type (VERIFIED, exe item type ids are ItemTypes row numbers: 0x2e is row 46, "mele";
+// see w36 exe_rows_test.go). Whirlwind hits twice per tick then.
 func (h *heroUnit) DualWielding() bool {
 	if h.merc != nil || h.p.Equipment == nil || h.p.Equipment.RightHand == nil || h.p.Equipment.LeftHand == nil {
 		return false

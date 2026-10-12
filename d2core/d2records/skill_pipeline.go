@@ -161,6 +161,12 @@ func (s *SkillRecord) PipelineSkill() *d2skill.Skill {
 		TargetCorpse: s.TargetCorpse, Periodic: s.Periodic, PerDelay: s.Perdelay, Range: s.Range,
 	}
 
+	// dwBits4 bit 31 is the skills.txt "interrupt" column (DATATBL_LoadSkillsTable 0x613450, flag index 0x1f of the
+	// dword, VERIFIED); PLRMODE_CanInterruptCurrentMode (0x57ceb0) reads it as the hold bit.
+	if s.Interrupt {
+		sk.Bits4 |= d2skill.Bits4Hold
+	}
+
 	sk.Restrict, sk.FormStates = s.Restrict, [3]string{s.State1, s.State2, s.State3}
 	sk.PrgDam = s.Prgdam
 	sk.PrgStack, sk.SrvPrgFunc = s.Prgstack, [4]int{0, s.Srvprgfunc1, s.Srvprgfunc2, s.Srvprgfunc3}

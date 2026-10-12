@@ -2,7 +2,7 @@ package d2skill
 
 // AuraPeriod is the pulse period of an aura skill. VERIFIED (SKILL_CalcNextPeriodicTickFrame 0x56aa90, used by
 // SRVDO_065 / 066 / 081 / 082 and SKILL_StartAuraStateTimerEvent 0x5bd0f0): the skill record calc at +0x128 is
-// evaluated (the perdelay column; the offset-to-column mapping is UNVERIFIED but it is the only period calc) and a
+// evaluated (the perdelay column; VERIFIED in DATATBL_LoadSkillsTable 0x613450: perdelay compiles to record +0x128) and a
 // result below 6 becomes 5. A skill without the column keeps the old fixed 25.
 func AuraPeriod(env *Env, sk *Skill) int {
 	if sk.PerDelay == nil {

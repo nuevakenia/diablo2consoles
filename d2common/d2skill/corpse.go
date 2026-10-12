@@ -11,12 +11,12 @@ type CorpseFacts struct {
 	// first mode, which Raise Skeleton accepts too when asked to.
 	Dead, Dying bool
 	// InStateMask150 is STATE_UnitHasStateInMask150: a unit that is flagged
-	// by the state group mask 0x150 (the exe tests the mask; which states it
-	// holds was not read, so the engine reports its "already used" corpses
-	// here, UNVERIFIED).
+	// by the state group mask 0x150. VERIFIED (DATATBL_LoadStatesTable
+	// 0x617c50): that mask is flag bit 33 of states.txt, the "udead" column.
+	// The engine reports its "already used" corpses here.
 	InStateMask150 bool
-	// Selectable is bit 7 of the monstats2 flag word. In the project's table
-	// order that is the corpseSel column (UNVERIFIED mapping of the bit).
+	// Selectable is bit 7 of the monstats2 flag word, which is the corpseSel
+	// column (VERIFIED in DATATBL_LoadMonStats2Table 0x658ee0, MONSTATS2_TestFlagBit 0x45f0b0).
 	Selectable bool
 	// WalkSpeed is the Velocity column of monstats.
 	WalkSpeed int

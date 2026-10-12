@@ -24,7 +24,8 @@ func (h *heroUnit) ConcentrationDamagePct() int {
 var _ d2skill.ConcentrationHolder = (*heroUnit)(nil)
 
 // RunVelocity implements d2skill.RunVelocityHolder: the class run velocity of charstats.txt, the base of the
-// Charge rush (SRVST_031 0x5cdbb0; which charstats byte the exe reads is UNVERIFIED).
+// Charge rush (SRVST_031 0x5cdbb0; the byte is charstats +0x41, the RunVelocity column, shifted 8 bits: VERIFIED from
+// the loader 0x612590 and the disassembly).
 func (h *heroUnit) RunVelocity() int {
 	if h.merc != nil || h.p == nil || h.e.asset == nil {
 		return 0
