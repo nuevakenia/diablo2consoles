@@ -241,8 +241,11 @@ func (e *Engine) selfState(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 		}
 
 		for i := range inst.Mods {
-			if inst.Mods[i].Stat == ef.State {
+			switch inst.Mods[i].Stat {
+			case ef.State:
 				inst.Mods[i].Value = inst.Count
+			case "progressive_tohit": // the charge-up adds its aurastatcalc2 once per charge (0x5d19e0)
+				inst.Mods[i].Value *= inst.Count
 			}
 		}
 	}

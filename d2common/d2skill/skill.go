@@ -72,6 +72,10 @@ type Skill struct {
 	Calc   [5]*d2calc.Program
 	// PrgCalc are prgcalc1..3 (1-based), read by SRVDO_EvalSkillCalcOrStateValue 0x5d4c80-ish (see calcOrState).
 	PrgCalc [4]*d2calc.Program
+	// PrgStack is skills.txt prgstack (dwBits4 & 0x80) and SrvPrgFunc srvprgfunc1..3 (1-based): the functions a
+	// finisher runs for the charge level held (chargerelease.go).
+	PrgStack   bool
+	SrvPrgFunc [4]int
 
 	DamageSpec
 

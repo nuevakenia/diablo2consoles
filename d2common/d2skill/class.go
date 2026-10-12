@@ -1456,8 +1456,15 @@ func doChargeUpFn(c *cast) {
 			frames = 375
 		}
 
-		c.effect(Effect{Kind: "self_state", State: c.sk.AuraState, Frames: frames, Stack: 3,
-			Stats: []StatMod{{Stat: c.sk.AuraState, Value: 1}}})
+		stats := []StatMod{{Stat: c.sk.AuraState, Value: 1}}
+
+		// VERIFIED (SRVDO_TigerStrike_ApplyChargeStatList 0x5d19e0): each new charge (up to 3) adds aurastatcalc2 to
+		// aurastat2 (progressive_tohit); the engine multiplies a stacking state's progressive_tohit by the count.
+		if st := c.sk.AuraStat[2]; st != "" {
+			stats = append(stats, StatMod{Stat: st, Value: c.env.eval(c.sk.AuraStatCalc[2])})
+		}
+
+		c.effect(Effect{Kind: "self_state", State: c.sk.AuraState, Frames: frames, Stack: 3, Stats: stats})
 	}
 }
 
@@ -1509,42 +1516,6 @@ func doDragonFn(c *cast) {
 	}
 
 	c.releaseCharges()
-}
-
-// releaseCharges fires the missile of every builder whose charge the caster
-// holds, and clears the charges.
-func (c *cast) releaseCharges() {
-	for _, st := range chargeStats {
-		n := c.u.Stat(st)
-		if n < 1 {
-			continue
-		}
-
-		b := c.p.builderOf(st)
-		if b == nil {
-			continue
-		}
-
-		lvl := c.u.SkillLevel(b.ID)
-		if lvl < 1 {
-			continue
-		}
-
-		name := b.SrvMissileC
-		if name == "" {
-			name = b.SrvMissileB
-		}
-
-		env := c.p.env(b, lvl, c.u)
-
-		for i := 0; i < n && name != ""; i++ {
-			if m := c.p.castMissile(c.u, b, lvl, env, name, c.tgt, castOpts{angle: float64(i-1) * 0.3}); m != nil {
-				c.res.Missiles = append(c.res.Missiles, m)
-			}
-		}
-
-		c.effect(Effect{Kind: "clear_state", State: st})
-	}
 }
 
 // builderOf finds the charge-up skill whose aurastate is the given progressive state.

@@ -133,6 +133,9 @@ type Pipeline struct {
 	TeleportFlag func() int
 	// After runs fn after that many frames (staggered bursts such as Inferno).
 	After func(frames int, fn func())
+
+	// bfState is Blade Fury's state 0xc per unit id: the frame it expires (bladefury.go).
+	bfState map[string]int
 }
 
 // Foe is an enemy unit near a point.
@@ -202,6 +205,10 @@ func (p *Pipeline) Start(u Unit, skillID int, tgt Target) StartResult {
 
 	if !sk.InTown && u.InTown() && !p.Opt.IgnoreTown {
 		return StartResult{Reason: ReasonTown, Level: lvl}
+	}
+
+	if isBladeFury(sk) && p.bladeFuryActive(u) {
+		p.bladeFuryRefresh(u) // SRVST_026 refreshes the state before looking at the slot
 	}
 
 	if until := u.Cooldown(skillID); until > p.frame() {
@@ -483,6 +490,10 @@ func (p *Pipeline) Do(u Unit, skillID int, tgt Target) DoResult {
 	lvl := u.SkillLevel(skillID)
 	if lvl < 1 {
 		return DoResult{Reason: ReasonNoSkill}
+	}
+
+	if isBladeFury(sk) {
+		return p.bladeFuryDo(u, sk, lvl, tgt)
 	}
 
 	cost := costOf(u, sk, lvl)

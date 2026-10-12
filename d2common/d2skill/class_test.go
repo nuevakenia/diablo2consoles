@@ -52,7 +52,21 @@ func init() {
 			"LineOfSight": "4", "delay": "35", "EType": "fire", "EMin": "1", "EMax": "2", "HitShift": "8", "manashift": "8"},
 		row{"skill": "Fists of Fire", "Id": "313", "srvstfunc": "23", "srvdofunc": "35", "srvmissilec": "fistsoffirefirewall",
 			"aurastate": "progressive_fire", "auralencalc": "par3", "calc1": "lvl*3", "Param3": "375", "EType": "fire",
-			"EMin": "4", "EMax": "6", "aurastat1": "progressive_fire", "SrcDam": "128", "HitShift": "8", "manashift": "8"},
+			"EMin": "4", "EMax": "6", "aurastat1": "progressive_fire", "SrcDam": "128", "HitShift": "8", "manashift": "8",
+			// patch_d2 progressive columns (w23)
+			"progressive": "1", "prgstack": "1", "srvprgfunc1": "143", "srvprgfunc2": "38", "srvprgfunc3": "39",
+			"prgcalc2": "par1", "prgcalc3": "par2", "Param1": "4", "Param2": "4", "Param4": "50",
+			"aurastat2": "progressive_tohit", "aurastatcalc2": "par4"},
+		row{"skill": "Claws of Thunder", "Id": "560", "srvstfunc": "23", "srvdofunc": "35", "srvmissileb": "clawsofthundernova",
+			"srvmissilec": "clawsofthunderbolt", "aurastate": "progressive_lightning", "auralencalc": "par3", "Param3": "375",
+			"EType": "ltng", "EMin": "1", "EMax": "80", "aurastat1": "progressive_lightning", "SrcDam": "128", "HitShift": "8",
+			"manashift": "8", "progressive": "1", "prgstack": "1", "srvprgfunc2": "36", "srvprgfunc3": "37", "prgcalc3": "par1",
+			"Param1": "4", "Param4": "50", "aurastat2": "progressive_tohit", "aurastatcalc2": "par4"},
+		row{"skill": "Blades of Ice", "Id": "561", "srvstfunc": "23", "srvdofunc": "35", "srvmissilec": "bladesoficecubes",
+			"aurastate": "progressive_cold", "auralencalc": "par3", "Param3": "375", "EType": "cold", "EMin": "15", "EMax": "35",
+			"aurastat1": "progressive_cold", "SrcDam": "128", "HitShift": "8", "manashift": "8", "progressive": "1",
+			"prgstack": "1", "srvprgfunc2": "38", "srvprgfunc3": "39", "prgcalc2": "par1", "prgcalc3": "par2", "Param1": "6",
+			"Param2": "3", "Param4": "50", "aurastat2": "progressive_tohit", "aurastatcalc2": "par4"},
 		row{"skill": "Dragon Talon", "Id": "314", "srvstfunc": "24", "srvdofunc": "42", "calc1": "lvl/6+1", "calc2": "dm34",
 			"Param3": "50", "Param4": "100", "HitShift": "8", "manashift": "8"},
 		row{"skill": "Corpse Explosion", "Id": "315", "srvstfunc": "17", "srvdofunc": "55", "aurarangecalc": "ln34",
@@ -96,6 +110,9 @@ func classMissiles() missileTable {
 	m["guidedarrow"] = std(202, "guidedarrow", 24, 128)
 	m["firewall"] = &d2missile.Spec{ID: 203, Name: "firewall", SrvDoFunc: 5, Range: 90, CollideType: 3}
 	m["fistsoffirefirewall"] = std(204, "fistsoffirefirewall", 12, 20)
+	m["clawsofthundernova"] = std(205, "clawsofthundernova", 12, 20)
+	m["clawsofthunderbolt"] = std(206, "clawsofthunderbolt", 12, 20)
+	m["bladesoficecubes"] = std(207, "bladesoficecubes", 12, 20)
 	// missiles.txt (patch_d2): blizzardcenter pSrvDoFunc 10 Range 100 SubMissile1 blizzard1;
 	// blizzard1 pSrvDoFunc 3 Range 9 CollideType 3; meteorcenter pSrvHitFunc 14 Range 60 sHitPar2 1
 	m["blizzardcenter"] = &d2missile.Spec{ID: 158, Name: "blizzardcenter", SrvDoFunc: 10, Range: 100,
@@ -408,8 +425,14 @@ func TestChargesAndFinisher(t *testing.T) {
 		t.Errorf("fists of fire must add fire damage: %+v", r.Melee)
 	}
 
-	// the caster now holds 2 charges: Dragon Talon kicks lvl/6+1 = 3 times
-	// and releases 2 firewall missiles, clearing the charges
+	// the charge-up adds progressive_tohit per charge (aurastat2 / aurastatcalc2 = par4 = 50)
+	if v, ok := statOf(e.Stats, "progressive_tohit"); !ok || v != 50 {
+		t.Errorf("charge tohit %v", e.Stats)
+	}
+
+	// the caster now holds 2 charges: Dragon Talon kicks lvl/6+1 = 3 times; the release of Fists of Fire at count 2
+	// is srvprgfunc1 (143: no srvmissilea, nothing) then srvprgfunc2 (38: the skill's damage around the aim point),
+	// and the charge is cleared (w23, 0x5d3ae0)
 	cf.u.stats["progressive_fire"] = 2
 	cf.u.levels["Fists of Fire"] = 4
 
@@ -418,13 +441,68 @@ func TestChargesAndFinisher(t *testing.T) {
 		t.Errorf("talon kicks = %d", len(r.Melees))
 	}
 
-	if len(r.Missiles) != 2 {
-		t.Errorf("released missiles = %d, want 2", len(r.Missiles))
+	if len(r.Missiles) != 0 {
+		t.Errorf("released missiles = %d, want 0 at count 2", len(r.Missiles))
+	}
+
+	hits := 0
+
+	for _, ef := range r.Effects {
+		if ef.Kind == "area_hit" && ef.Desc != nil {
+			hits++
+
+			if ef.Radius != 4 { // prgcalc2 = par1 = 4
+				t.Errorf("release radius %d, want 4", ef.Radius)
+			}
+		}
+	}
+
+	if hits != 1 {
+		t.Errorf("area_hit effects = %d, want 1", hits)
 	}
 
 	if e := effectOf(t, r, "clear_state"); e.State != "progressive_fire" {
 		t.Errorf("clear %+v", e)
 	}
+
+	// three charges add srvprgfunc3 (39): radius*radius tries inside the circle of prgcalc3 = par2 = 4, of the third
+	// progressive missile (srvmissilec)
+	cf.u.stats["progressive_fire"] = 3
+	cf.u.roller = &seq{vals: fours(400)}
+
+	_, r = cf.castOn("Dragon Talon", z)
+	if len(r.Missiles) == 0 || len(r.Missiles) > 16 {
+		t.Errorf("count 3 missiles = %d, want 1..16", len(r.Missiles))
+	}
+}
+
+// Claws of Thunder: nothing at count 1 (srvprgfunc1 is empty), the nova ring at count 2, and at count 3 the nova
+// then the bolt ring of 64/prgcalc3 (par1 = 4) = 16 missiles.
+func TestChargeReleaseClaws(t *testing.T) {
+	for _, tc := range []struct {
+		count, want int
+	}{{1, 0}, {2, 64}, {3, 64 + 16}} {
+		cf := newClassFixture(map[string]int{"Claws of Thunder": 4, "Dragon Talon": 12})
+		z := cf.addFoe("z", 2, 0)
+		cf.u.roller = &seq{vals: make([]uint32, 100)}
+		cf.u.ar = 100000
+		cf.u.stats["progressive_lightning"] = tc.count
+
+		_, r := cf.castOn("Dragon Talon", z)
+		if len(r.Missiles) != tc.want {
+			t.Errorf("count %d: %d missiles, want %d", tc.count, len(r.Missiles), tc.want)
+		}
+	}
+}
+
+// fours is a roll script of n fours (a centred try of the radius-4 circle in SRVDO_039).
+func fours(n int) []uint32 {
+	v := make([]uint32, n)
+	for i := range v {
+		v[i] = 4
+	}
+
+	return v
 }
 
 func TestCorpseExplosion(t *testing.T) {

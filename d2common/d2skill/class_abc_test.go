@@ -22,7 +22,7 @@ func init() {
 		row{"skill": "Evade", "Id": "509", "passive": "1", "passivestat1": "passive_evade", "passivecalc1": "dm12",
 			"Param1": "10", "Param2": "65", "manashift": "8"},
 		row{"skill": "Blade Fury", "Id": "502", "charclass": "ass", "srvstfunc": "26", "srvdofunc": "48",
-			"srvmissilea": "bladefragment1", "Param3": "3", "Param4": "5", "usemanaondo": "1", "HitShift": "8", "manashift": "8"},
+			"srvmissilea": "bladefragment1", "Param3": "3", "Param4": "5", "usemanaondo": "1", "HitShift": "8", "manashift": "8", "mana": "8", "startmana": "6"},
 		row{"skill": "Dragon Flight", "Id": "503", "charclass": "ass", "srvstfunc": "12", "srvdofunc": "52", "Kick": "1",
 			"Param7": "27", "aurarangecalc": "par7", "ToHit": "60", "LevToHit": "25", "HitShift": "8", "manashift": "8"},
 		row{"skill": "Find Potion", "Id": "504", "charclass": "bar", "srvstfunc": "33", "srvdofunc": "69", "TargetCorpse": "1",
@@ -274,22 +274,60 @@ func TestDopplezonAndValkyrie(t *testing.T) {
 func TestBladeFuryStream(t *testing.T) {
 	cf := abcFixture(map[string]int{"Blade Fury": 6})
 	cf.w.frame = 100
+	mana0 := cf.u.mana
 
-	_, r := cf.cast("Blade Fury", 30, 0)
-	if !r.OK || len(r.Missiles) != 1 || r.Missiles[0].Spec.Name != "bladefragment1" {
-		t.Fatalf("first cast: ok=%v %q missiles=%d", r.OK, r.Reason, len(r.Missiles))
+	// SRVST_026 first use: creates state 0xc and returns without a throw and without paying (w23)
+	st, r := cf.cast("Blade Fury", 30, 0)
+	if !st.OK || !r.OK || len(r.Missiles) != 0 || r.ManaPaid != 0 || cf.u.mana != mana0 {
+		t.Fatalf("first cast: ok=%v %q missiles=%d paid=%d", r.OK, r.Reason, len(r.Missiles), r.ManaPaid)
 	}
 
-	// the next blade is blocked for prgcalc1 (par4 = 5) - 1 frames
-	cf.w.frame = 103
+	if !cf.p.bladeFuryActive(cf.u) || cf.p.bfState[cf.u.ID()] != 121 {
+		t.Fatalf("state 0xc after the first use: %v", cf.p.bfState)
+	}
+
+	// the next use throws (slot 0 is behind the frame) and pays; the state is refreshed to frame+7
+	cf.w.frame = 101
+
+	st, r = cf.cast("Blade Fury", 30, 0)
+	if !st.OK || !r.OK || len(r.Missiles) != 1 || r.Missiles[0].Spec.Name != "bladefragment1" || r.ManaPaid <= 0 {
+		t.Fatalf("second cast: %+v ok=%v %q missiles=%d paid=%d", st, r.OK, r.Reason, len(r.Missiles), r.ManaPaid)
+	}
+
+	if cf.p.bfState[cf.u.ID()] != 108 {
+		t.Errorf("state expiry %d, want 108", cf.p.bfState[cf.u.ID()])
+	}
+
+	// the next blade is blocked for prgcalc1 (par4 = 5) - 1 frames: the repeat is refused and still refreshes the state
+	paid := mana0 - cf.u.mana
+	cf.w.frame = 104
+
 	if st, _ := cf.cast("Blade Fury", 30, 0); st.OK || st.Reason != ReasonCooldown {
 		t.Errorf("a blade 3 frames later: %+v", st)
 	}
 
-	cf.w.frame = 104
+	if cf.p.bfState[cf.u.ID()] != 111 || mana0-cf.u.mana != paid {
+		t.Errorf("refused repeat: expiry %d, mana spent %d (was %d)", cf.p.bfState[cf.u.ID()], mana0-cf.u.mana, paid)
+	}
 
-	if st, r := cf.cast("Blade Fury", 30, 0); !st.OK || !r.OK || len(r.Missiles) != 1 {
-		t.Errorf("a blade 4 frames later: %+v ok=%v", st, r.OK)
+	// slot == frame passes the start function but the do function needs slot < frame: no blade, no mana
+	cf.w.frame = 105
+
+	if st, r := cf.cast("Blade Fury", 30, 0); !st.OK || !r.OK || len(r.Missiles) != 0 || mana0-cf.u.mana != paid {
+		t.Errorf("slot == frame: %+v ok=%v missiles=%d", st, r.OK, len(r.Missiles))
+	}
+
+	cf.w.frame = 106
+
+	if st, r := cf.cast("Blade Fury", 30, 0); !st.OK || !r.OK || len(r.Missiles) != 1 || mana0-cf.u.mana != 2*paid {
+		t.Errorf("a blade 5 frames later: %+v ok=%v", st, r.OK)
+	}
+
+	// after more than 7 idle frames the state is gone: the next use is a first use again (no throw)
+	cf.w.frame = 120
+
+	if _, r := cf.cast("Blade Fury", 30, 0); !r.OK || len(r.Missiles) != 0 {
+		t.Errorf("restart after the state expired: missiles=%d", len(r.Missiles))
 	}
 }
 
