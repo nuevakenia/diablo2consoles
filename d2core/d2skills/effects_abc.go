@@ -1,6 +1,7 @@
 package d2skills
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2state"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
@@ -305,10 +306,19 @@ func (e *Engine) shield(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 		n := 0
 
 		for _, m := range e.monstersNear(hx, hy, ef.Radius) {
+			mt := e.target(m)
+
+			// VERIFIED (0x5d6750): with result flags bit 0 clear each unit is rolled against first
+			if ef.RollToHit {
+				if hit, _, _ := d2combat.RollToHit(u.Roller(), d2combat.ToHitInput{AttackRating: u.AttackRating(), Defense: mt.Defense(false),
+					AttackerLevel: u.Level(), DefenderLevel: mt.Level(), AttackRatingPct: ef.Pct + u.Stat("item_tohit_percent")}); !hit {
+					continue
+				}
+			}
+
 			dmg := e.rollDesc(u, ef.Desc)
 			n++
 
-			e.target(m)
 			e.hurt(m, p, &dmg, sk.Name)
 		}
 

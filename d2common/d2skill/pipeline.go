@@ -141,6 +141,9 @@ type Pipeline struct {
 	TeleportFlag func() int
 	// After runs fn after that many frames (staggered bursts such as Inferno).
 	After func(frames int, fn func())
+
+	// bfState is Blade Fury's state 0xc per unit id: the frame it expires (bladefury.go).
+	bfState map[string]int
 }
 
 // Foe is an enemy unit near a point.
@@ -214,6 +217,10 @@ func (p *Pipeline) Start(u Unit, skillID int, tgt Target) StartResult {
 
 	if !RestrictOK(u, sk) {
 		return StartResult{Reason: ReasonRestricted, Level: lvl}
+	}
+
+	if isBladeFury(sk) && p.bladeFuryActive(u) {
+		p.bladeFuryRefresh(u) // SRVST_026 refreshes the state before looking at the slot
 	}
 
 	if until := u.Cooldown(skillID); until > p.frame() {
@@ -367,6 +374,10 @@ type Effect struct {
 	Loot  *LootOrder
 	Ward  *WardOrder
 	Whirl *WhirlOrder
+
+	// RollToHit makes a periodic area effect roll to hit each unit before damaging it, with Pct as the skill's to-hit
+	// bonus percent (Blade Shield: SRVDO_142 rolls only when the skill's result flags have bit 0 clear).
+	RollToHit bool
 
 	// Cost is the mana an aura pulse pays when it did its work, 8.8 fixed
 	// point (Redemption: SKILL_GetAuraParamAtLevel, VERIFIED 0x645ed0).
@@ -530,6 +541,10 @@ func (p *Pipeline) Do(u Unit, skillID int, tgt Target) DoResult {
 		return DoResult{Reason: ReasonNoSkill}
 	}
 
+	if isBladeFury(sk) {
+		return p.bladeFuryDo(u, sk, lvl, tgt)
+	}
+
 	cost := costOf(u, sk, lvl)
 	payHere := u.IsPlayer() && cost > 0 && !payAtStart(sk)
 
@@ -619,6 +634,12 @@ func (p *Pipeline) SummonPassives(u Unit, skillID int) []StatMod {
 	lvl := u.SkillLevel(skillID)
 	if lvl < 1 {
 		return nil
+	}
+
+	if sk.SrvDoFunc == 49 { // Shadow Warrior / Master: shadow.go
+		_, pas := shadowBonuses(p.env(sk, lvl, u), sk, lvl)
+
+		return pas
 	}
 
 	return p.passiveStats(u, sk, lvl)

@@ -162,6 +162,8 @@ func (s *SkillRecord) PipelineSkill() *d2skill.Skill {
 	}
 
 	sk.Restrict, sk.FormStates = s.Restrict, [3]string{s.State1, s.State2, s.State3}
+	sk.PrgDam = s.Prgdam
+	sk.PrgStack, sk.SrvPrgFunc = s.Prgstack, [4]int{0, s.Srvprgfunc1, s.Srvprgfunc2, s.Srvprgfunc3}
 	sk.HitShift, sk.SrcDam = s.HitShift, s.SrcDam
 	sk.MinDam, sk.MaxDam = s.MinDam, s.MaxDam
 	sk.MinLevDam = [5]int{s.MinLevDam1, s.MinLevDam2, s.MinLevDam3, s.MinLevDam4, s.MinLevDam5}

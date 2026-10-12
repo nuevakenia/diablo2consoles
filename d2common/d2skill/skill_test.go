@@ -54,7 +54,10 @@ func skillFromRow(r row) *Skill {
 
 	for i := 1; i <= 3; i++ {
 		s.PrgCalc[i] = r.calc("prgcalc" + strconv.Itoa(i))
+		s.SrvPrgFunc[i] = r.num("srvprgfunc" + strconv.Itoa(i))
 	}
+
+	s.PrgStack, s.Progressive, s.PrgDam = r.num("prgstack") > 0, r.num("progressive") > 0, r.num("prgdam")
 
 	for i := 1; i <= 6; i++ {
 		s.AuraStat[i] = r["aurastat"+strconv.Itoa(i)]
@@ -650,6 +653,29 @@ func TestChargedBoltFanOut(t *testing.T) {
 		if m.Damage.Lightning.Min != 1024 || m.Damage.Lightning.Max != 1536 {
 			t.Fatalf("per-bolt damage %+v", m.Damage.Lightning)
 		}
+	}
+
+	// w23: every bolt walks path type 10 (hook 0x5c7340), none is fanned by a random angle
+	for i, m := range do.Missiles {
+		if !m.OnWalkPath() {
+			t.Errorf("bolt %d is not on a walk path", i)
+		}
+	}
+
+	f2 := newFixture(map[string]int{"Charged Bolt": 2})
+	f2.u.base = f2.u.levels
+	_, do = f2.cast("Charged Bolt", 20, 3)
+
+	if len(do.Missiles) != 4 {
+		t.Fatalf("level 2 -> 4 bolts, got %d", len(do.Missiles))
+	}
+
+	// a target at x 0 or y 0 creates no bolt (0x5c73a0 skips them)
+	f3 := newFixture(map[string]int{"Charged Bolt": 2})
+	f3.u.base = f3.u.levels
+
+	if _, do = f3.cast("Charged Bolt", 0, 5); do.OK {
+		t.Errorf("a zero target x must create nothing: %d missiles", len(do.Missiles))
 	}
 }
 

@@ -53,7 +53,9 @@ type SkillCalc interface {
 // ReviveHost serves DeathSentry: SKILL_FindReviveCorpseNearUnit and the
 // skill's linear radius (SKILLS_CalcLinearValueByLevel).
 type ReviveHost interface {
-	FindReviveCorpse(b *Brain, slot, level int) (Target, bool)
+	// FindReviveCorpse searches around the attack target `near` (VERIFIED 0x5e99f0: the search position is
+	// the target's, radius 10, filter SKILL_ReviveCorpseSearchFilter).
+	FindReviveCorpse(b *Brain, slot, level int, near Target) (Target, bool)
 	ReviveRadius(b *Brain, slot, level int) int
 }
 
@@ -533,7 +535,7 @@ func thinkDeathSentry(c *Ctx) {
 	radius := 0
 
 	if r, ok := c.W.(ReviveHost); ok {
-		corpse, found = r.FindReviveCorpse(b, slotA, lv)
+		corpse, found = r.FindReviveCorpse(b, slotA, lv, t)
 		radius = r.ReviveRadius(b, slotA, lv)
 	}
 

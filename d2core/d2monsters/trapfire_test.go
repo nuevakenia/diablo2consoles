@@ -31,14 +31,14 @@ func TestCastRoutesToSkillFirer(t *testing.T) {
 	sentry.ally.trap = &spec
 
 	// no firer injected: not handled, the monstats cast runs as before
-	if handled, _ := d.fireTrap(sentry, d2monster.Target{ID: 2}); handled {
+	if handled, _ := d.fireTrap(sentry, 0, d2monster.Target{ID: 2}); handled {
 		t.Fatal("handled without a firer")
 	}
 
 	f := &fakeFirer{ok: true}
 	d.SetSkillFirer(f)
 
-	if handled, ok := d.fireTrap(sentry, d2monster.Target{ID: 2}); !handled || !ok {
+	if handled, ok := d.fireTrap(sentry, 0, d2monster.Target{ID: 2}); !handled || !ok {
 		t.Fatalf("handled=%v ok=%v", handled, ok)
 	}
 
@@ -52,18 +52,18 @@ func TestCastRoutesToSkillFirer(t *testing.T) {
 	}
 
 	// a vanished target is handled (no melee fallback) but does not fire
-	if handled, ok := d.fireTrap(sentry, d2monster.Target{ID: 99}); !handled || ok || len(f.shots) != 1 {
+	if handled, ok := d.fireTrap(sentry, 0, d2monster.Target{ID: 99}); !handled || ok || len(f.shots) != 1 {
 		t.Errorf("unknown target: handled=%v ok=%v shots=%d", handled, ok, len(f.shots))
 	}
 
 	// unarmed units and hostile monsters are never routed
 	sentry.ally.trap = nil
 
-	if handled, _ := d.fireTrap(sentry, d2monster.Target{ID: 2}); handled {
+	if handled, _ := d.fireTrap(sentry, 0, d2monster.Target{ID: 2}); handled {
 		t.Error("unarmed sentry routed")
 	}
 
-	if handled, _ := d.fireTrap(foe, d2monster.Target{ID: 1}); handled {
+	if handled, _ := d.fireTrap(foe, 0, d2monster.Target{ID: 1}); handled {
 		t.Error("hostile monster routed")
 	}
 
@@ -74,7 +74,7 @@ func TestCastRoutesToSkillFirer(t *testing.T) {
 	d.SetSkillFirer(nil)
 	sentry.ally.trap = &spec
 
-	if handled, _ := d.fireTrap(sentry, d2monster.Target{ID: 2}); handled {
+	if handled, _ := d.fireTrap(sentry, 0, d2monster.Target{ID: 2}); handled {
 		t.Error("handled after the firer was removed")
 	}
 }

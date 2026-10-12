@@ -307,7 +307,7 @@ func (d *Director) Cast(b *d2monster.Brain, slot int, t d2monster.Target) bool {
 		mode = d2monster.ModeAttack1
 	}
 
-	if handled, ok := d.fireTrap(d.unitOf(b), t); handled {
+	if handled, ok := d.fireTrap(d.unitOf(b), slot, t); handled {
 		return ok
 	}
 

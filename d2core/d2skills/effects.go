@@ -62,6 +62,10 @@ type trapRun struct {
 	// cycler is the cycler skill (CorpseCycler, VineCycler) of a Cycle of Life or Vines vine: such a vine cycles
 	// corpses for its owner and never shoots (druid_w20.go).
 	cycler string
+	// fan is the monster skill (do function 17, Charged Bolt Sentry) whose bolt count each shot throws, at fanLevel.
+	fan, fanLevel int
+	// inferno is the monster skill (do function 95, Inferno Sentry) whose calc1 gives the flame's life.
+	inferno int
 }
 
 // ---- helpers ----
@@ -262,8 +266,11 @@ func (e *Engine) selfState(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 		}
 
 		for i := range inst.Mods {
-			if inst.Mods[i].Stat == ef.State {
+			switch inst.Mods[i].Stat {
+			case ef.State:
 				inst.Mods[i].Value = inst.Count
+			case "progressive_tohit": // the charge-up adds its aurastatcalc2 once per charge (0x5d19e0)
+				inst.Mods[i].Value *= inst.Count
 			}
 		}
 
@@ -1175,6 +1182,18 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 		}
 	}
 
+	death := e.deathSentrySpec(sk, o, m, &missile)
+
+	fan, inferno := 0, 0
+	if ts := e.pipe.Skills.ByName(o.TrapSkill); ts != nil && death == nil {
+		switch ts.SrvDoFunc {
+		case 17:
+			fan = ts.ID // Charged Bolt Sentry: do function 17 throws calc1 bolts per shot (CastTrapBolts)
+		case 95:
+			inferno = ts.ID // Inferno Sentry: do function 95, the flame's life is calc1 (CastTrapInferno)
+		}
+	}
+
 	if missile == "" {
 		e.emit("summon", "TRAP skill=%q has no missile", sk.Name)
 		return
@@ -1184,6 +1203,8 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 	if sk.SrvDoFunc == 115 && sk.SumSkill[2] != "" {
 		t.cycler = sk.SumSkill[2]
 	}
+
+	t.fan, t.inferno, t.fanLevel = fan, inferno, maxInt(o.TrapLevel, 1)
 
 	e.traps = append(e.traps, t)
 
@@ -1195,16 +1216,87 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 	} else if o.TrapLife > 0 && t.cycler == "" {
 		// MONAI_Think_AssassinSentry drives the cadence, range and shot budget (sentry_ai_test.go)
 		e.monsters.SetSkillFirer(e)
-		e.monsters.ArmTrap(m, d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile,
-			Level: o.TrapLevel, Life: o.TrapLife})
+		spec := d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile, Level: o.TrapLevel, Life: o.TrapLife,
+			FanSkillID: fan, InfernoSkillID: inferno}
+		if death != nil {
+			spec = *death
+			spec.Level, spec.Life = o.TrapLevel, o.TrapLife
+			spec.ReviveRadius = e.pipe.LinearValue(spec.ExplodeSkillID, o.TrapLevel)
+		}
+
+		e.monsters.ArmTrap(m, spec)
 	}
 
 	e.emit("summon", "TRAP armed skill=%q missile=%s period=%d range=%d", sk.Name, missile, trapPeriod, trapRange)
 }
 
+// deathSentrySpec recognises the Death Sentry (its sumskill1 is a corpse explosion, do function 55) and returns
+// the spec skeleton: Skill1 explodes a corpse (that skill), Skill2 shoots the lightning missile of the monster's
+// Skill2 (monstats, falling back to sumskill2), which replaces *missile. nil for every other sentry.
+func (e *Engine) deathSentrySpec(sk *d2skill.Skill, o *d2skill.SummonOrder, m *d2mapentity.Monster, missile *string) *d2monsters.TrapSpec {
+	ts := e.pipe.Skills.ByName(o.TrapSkill)
+	if ts == nil || ts.SrvDoFunc != 55 {
+		return nil
+	}
+
+	var s2 *d2skill.Skill
+	if m != nil && m.Stat != nil && m.Stat.SkillId2 != "" {
+		s2 = e.pipe.Skills.ByName(m.Stat.SkillId2)
+	}
+
+	if s2 == nil && sk.SumSkill[2] != "" {
+		s2 = e.pipe.Skills.ByName(sk.SumSkill[2])
+	}
+
+	*missile = ""
+
+	if s2 != nil {
+		*missile = s2.SrvMissile
+		if *missile == "" {
+			*missile = s2.SrvMissileA
+		}
+	}
+
+	return &d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: *missile, Missile2: *missile, Death: true,
+		ExplodeSkillID: ts.ID, ExplodeSkillName: ts.Name}
+}
+
+// explodeCorpse is a Death Sentry's Skill1 (SRVDO_055 on the corpse, level = the sentry's skill level): the corpse
+// at the target is consumed and the units around it take the fire damage (d2skill.doCorpseExplosionFn).
+func (e *Engine) explodeCorpse(s d2monsters.TrapShot) bool {
+	ts := e.pipe.Skills.ByID(s.Spec.ExplodeSkillID)
+	if ts == nil || s.Corpse == nil {
+		return false
+	}
+
+	mx, my := s.Corpse.SubtilePos()
+	tg := d2skill.Target{X: mx, Y: my, Corpse: true, CX: mx, CY: my, CorpseID: s.Corpse.ID(), CorpseHP: s.Corpse.Vitals.MaxHP,
+		CorpseLevel: s.Corpse.Vitals.Level, CorpseInfo: e.corpseFacts(s.Corpse)}
+	if s.Corpse.Stat != nil {
+		tg.CorpseKey = s.Corpse.Stat.Key
+	}
+
+	u := e.hero(s.Owner)
+	res := e.pipe.CastSentrySkill(u, ts.ID, maxInt(s.Spec.Level, 1), tg)
+
+	if !res.OK {
+		return false
+	}
+
+	for i := range res.Effects {
+		e.effect(s.Owner, u, ts, &res.Effects[i])
+	}
+
+	e.emit("summon", "TRAP explode skill=%q monster_skill=%q level=%d effects=%d", s.Spec.SkillName, ts.Name, maxInt(s.Spec.Level, 1), len(res.Effects))
+
+	return true
+}
+
 // trapCaster is the part of d2skill.Pipeline a trap shot needs (a fake in tests).
 type trapCaster interface {
 	CastTrap(u d2skill.Unit, skillID int, missile string, fromX, fromY int, tgt d2skill.Target) *d2missile.Missile
+	CastTrapBolts(u d2skill.Unit, placingID, monsterSkillID, monsterLevel, fromX, fromY int, tgt d2skill.Target) []*d2missile.Missile
+	CastTrapInferno(u d2skill.Unit, placingID, monsterSkillID, monsterLevel, fromX, fromY int, tgt d2skill.Target) *d2missile.Missile
 }
 
 // trapCaster returns the pipeline, or the fake a test injected.
@@ -1229,18 +1321,31 @@ func (e *Engine) fireTrapAt(c trapCaster, t *trapRun, tx, ty int, best *d2mapent
 		return oc.CastTrapOwn(t.u, t.skillID, t.missile, t.ownLevel, tx, ty, tg) != nil
 	}
 
+	if t.inferno != 0 {
+		return c.CastTrapInferno(t.u, t.skillID, t.inferno, t.fanLevel, tx, ty, tg) != nil
+	}
+
+	if t.fan != 0 {
+		return len(c.CastTrapBolts(t.u, t.skillID, t.fan, t.fanLevel, tx, ty, tg)) > 0
+	}
+
 	return c.CastTrap(t.u, t.skillID, t.missile, tx, ty, tg) != nil
 }
 
 // FireTrap implements d2monsters.SkillFirer (UNVERIFIED path, see
 // d2monsters/trapfire.go: nothing arms traps with it yet).
 func (e *Engine) FireTrap(s d2monsters.TrapShot) bool {
+	if s.Corpse != nil && s.Owner != nil {
+		return e.explodeCorpse(s)
+	}
+
 	if s.Owner == nil || s.Target == nil {
 		return false
 	}
 
 	t := &trapRun{m: s.Trap, u: e.hero(s.Owner), skillID: s.Spec.SkillID, missile: s.Spec.Missile, skillName: s.Spec.SkillName,
-		ownLevel: s.Spec.OwnLevel}
+		ownLevel: s.Spec.OwnLevel,
+		fan:      s.Spec.FanSkillID, inferno: s.Spec.InfernoSkillID, fanLevel: s.Spec.Level}
 	if !e.fireTrapAt(e.trapCaster(), t, s.FromX, s.FromY, s.Target) {
 		return false
 	}
@@ -1456,7 +1561,11 @@ func (e *Engine) heroAvoid(p *d2mapentity.Player, _ *d2mapentity.Monster, melee 
 		Moving:      !vel.IsZero(),
 		EvadeChance: u.Stat("passive_evade"), DodgeChance: u.Stat("passive_dodge"), AvoidChance: u.Stat("passive_avoid"),
 		IsMissile: !melee,
+		// Weapon Block (w23, 0x57bcb0 / 0x57bd60): the chance is only non-zero with a claw in both hands
+		AnimBlockChance: e.weaponBlockChance(u), AnimIsBlock: true,
 	}); out {
+	case d2combat.AvoidMonBlock:
+		return true, fmt.Sprintf(" avoided=%d weapon_block=true", out)
 	case d2combat.AvoidAvoided, d2combat.AvoidDodged, d2combat.AvoidEvaded:
 		return true, fmt.Sprintf(" avoided=%d", out)
 	}

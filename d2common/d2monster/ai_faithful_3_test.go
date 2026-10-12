@@ -61,7 +61,7 @@ func (w *f3World) ImpLinkedUnit(*Brain, uint32) (Target, bool) {
 func (w *f3World) RandomOffsetCast(*Brain, int, int) bool { w.offsetCast++; return true }
 func (w *f3World) SkillLevel(*Brain, int) int             { return w.level }
 func (w *f3World) SkillCalc4(*Brain, int, int) int        { return w.calc4 }
-func (w *f3World) FindReviveCorpse(*Brain, int, int) (Target, bool) {
+func (w *f3World) FindReviveCorpse(*Brain, int, int, Target) (Target, bool) {
 	if w.corpse == nil {
 		return Target{}, false
 	}

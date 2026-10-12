@@ -221,12 +221,22 @@ func doDragonClawFn(c *cast) {
 		return
 	}
 
+	held := c.heldCharges() // chargedamage.go: the charges are in the blows up to the first that hit
+
 	for i := 0; i < 2; i++ {
 		o := c.meleeOpt()
-		o.pct = c.calc(1)
+		o.pct = c.calc(1) + c.chargePct(held)
 		o.toHitPct += c.u.Stat(progressiveToHit)
 		o.skillElem = false
-		c.addMelee(c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o))
+
+		m := c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o)
+		c.applyChargeDamage(m, held)
+
+		if m.Hit {
+			held = nil
+		}
+
+		c.addMelee(m)
 	}
 
 	c.releaseCharges()
@@ -314,7 +324,13 @@ func doDragonFlightExeFn(c *cast) {
 	o := c.meleeOpt()
 	o.autoHit = false
 	o.toHitPct += c.u.Stat(progressiveToHit)
-	c.addMelee(c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o))
+
+	held := c.heldCharges()
+	o.pct += c.chargePct(held)
+
+	m := c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o)
+	c.applyChargeDamage(m, held)
+	c.addMelee(m)
 	c.releaseCharges()
 }
 

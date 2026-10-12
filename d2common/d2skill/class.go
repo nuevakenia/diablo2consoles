@@ -1120,21 +1120,31 @@ func doBlessedHammerFn(c *cast) {
 	m.Spiral = true
 }
 
-// doMineFn is SRVDO_043_ShockField (Shock Web, U): a stationary trap missile at
-// the aim point that zaps whatever walks into it every 12 frames.
+// doMineFn is SRVDO_043_ShockField (Shock Web, VERIFIED in w23, see shockfield.go): count caltrops thrown from the
+// caster to random points around the target position, not one stationary missile. The earlier port (a stationary
+// missile at the aim point zapping every 12 frames) was an invention.
 func doMineFn(c *cast) {
-	ax, ay := c.aim()
-	tg := Target{X: ax, Y: ay}
-
-	m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, c.sk.SrvMissileA, tg, castOpts{
-		hasStart: true, startX: float64(ax) + 0.5, startY: float64(ay) + 0.5, stationary: true, hitEvery: 12,
-	})
-	if m == nil {
+	count := c.calcOrState()
+	if count < 1 {
 		c.fail(ReasonMissile)
 		return
 	}
 
-	c.res.Missiles = append(c.res.Missiles, m)
+	ax, ay := c.aim()
+	hx, hy := c.u.Pos()
+
+	for _, pt := range ShockFieldPoints(ax, ay, count, c.env.eval(c.sk.AuraRangeCalc), hx, hy) {
+		tg := Target{X: pt[0], Y: pt[1]}
+
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, c.sk.SrvMissileA, tg, castOpts{hasDest: true,
+			destX: float64(pt[0]) + 0.5, destY: float64(pt[1]) + 0.5}); m != nil {
+			c.res.Missiles = append(c.res.Missiles, m)
+		}
+	}
+
+	if len(c.res.Missiles) == 0 {
+		c.fail(ReasonMissile)
+	}
 }
 
 // ---- area effects ----
@@ -1566,8 +1576,15 @@ func doChargeUpFn(c *cast) {
 			frames = 375
 		}
 
-		c.effect(Effect{Kind: "self_state", State: c.sk.AuraState, Frames: frames, Stack: 3,
-			Stats: []StatMod{{Stat: c.sk.AuraState, Value: 1}}})
+		stats := []StatMod{{Stat: c.sk.AuraState, Value: 1}}
+
+		// VERIFIED (SRVDO_TigerStrike_ApplyChargeStatList 0x5d19e0): each new charge (up to 3) adds aurastatcalc2 to
+		// aurastat2 (progressive_tohit); the engine multiplies a stacking state's progressive_tohit by the count.
+		if st := c.sk.AuraStat[2]; st != "" {
+			stats = append(stats, StatMod{Stat: st, Value: c.env.eval(c.sk.AuraStatCalc[2])})
+		}
+
+		c.effect(Effect{Kind: "self_state", State: c.sk.AuraState, Frames: frames, Stack: 3, Stats: stats})
 	}
 }
 
@@ -1591,6 +1608,9 @@ func doDragonFn(c *cast) {
 		hits = 2
 	}
 
+	// w23: the charges are in the damage of every blow up to and including the first that hit (chargedamage.go)
+	held := c.heldCharges()
+
 	for i := 0; i < hits; i++ {
 		o := c.meleeOpt()
 		o.pct = c.env.eval(c.sk.Calc[1])
@@ -1601,9 +1621,16 @@ func doDragonFn(c *cast) {
 
 		o.skillElem = false
 		lastHit = false
+		o.pct += c.chargePct(held)
 
 		m := c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o)
 		lastHit = m.Hit
+		c.applyChargeDamage(m, held)
+
+		if m.Hit {
+			held = nil
+		}
+
 		c.addMelee(m)
 	}
 
@@ -1621,46 +1648,10 @@ func doDragonFn(c *cast) {
 	c.releaseCharges()
 }
 
-// releaseCharges fires the missile of every builder whose charge the caster
-// holds, and clears the charges.
-func (c *cast) releaseCharges() {
-	for _, st := range chargeStats {
-		n := c.u.Stat(st)
-		if n < 1 {
-			continue
-		}
-
-		b := c.p.builderOf(st)
-		if b == nil {
-			continue
-		}
-
-		lvl := c.u.SkillLevel(b.ID)
-		if lvl < 1 {
-			continue
-		}
-
-		name := b.SrvMissileC
-		if name == "" {
-			name = b.SrvMissileB
-		}
-
-		env := c.p.env(b, lvl, c.u)
-
-		for i := 0; i < n && name != ""; i++ {
-			if m := c.p.castMissile(c.u, b, lvl, env, name, c.tgt, castOpts{angle: float64(i-1) * 0.3}); m != nil {
-				c.res.Missiles = append(c.res.Missiles, m)
-			}
-		}
-
-		c.effect(Effect{Kind: "clear_state", State: st})
-	}
-}
-
 // builderOf finds the charge-up skill whose aurastate is the given progressive state.
 func (p *Pipeline) builderOf(state string) *Skill {
 	for _, id := range p.Skills.IDs() {
-		if sk := p.Skills.ByID(id); sk.AuraState == state && sk.SrvDoFunc == 35 {
+		if sk := p.Skills.ByID(id); sk.AuraState == state && (sk.SrvDoFunc == 34 || sk.SrvDoFunc == 35) {
 			return sk
 		}
 	}
@@ -1708,6 +1699,12 @@ func doSummonFn(c *cast) {
 		// VERIFIED (SRVDO_044 0x5d49c0): the same, then the caster's own level
 		// (stat 0xc) is written over it.
 		o.Level = c.u.Level()
+	}
+
+	if sk.SrvDoFunc == 49 {
+		// VERIFIED (shadow.go): bonuses only above level 1, every slot at aurastatcalc2, life (lvl-1)*Param1 percent
+		o.Stats, _ = shadowBonuses(c.env, sk, c.lvl)
+		o.HPPct = shadowHPPct(sk, c.lvl)
 	}
 
 	if sk.SrvDoFunc == 56 {

@@ -41,8 +41,17 @@ func doBladeShieldFn(c *cast) {
 	e := &c.res.Effects[len(c.res.Effects)-1]
 	e.Level, e.SkillID, e.SkillName = c.lvl, c.sk.ID, c.sk.Name
 
-	c.effect(Effect{Kind: "shield", State: c.sk.AuraState, Frames: frames, Radius: c.env.eval(c.sk.AuraRangeCalc),
-		Interval: maxInt(c.env.eval(c.sk.PerDelay), 1), Desc: c.desc()})
+	// VERIFIED (SRVDO_142 0x5d6750): radius = calc-or-state value, else aurarangecalc; the damage struct carries the
+	// skill's hit class / hit flags / SrcDam; a unit is only hurt after a to-hit roll when the skill's result flags
+	// have bit 0 clear (Blade Shield: 32), using SKILL_GetToHitBonus as the bonus.
+	radius := c.calcOrState()
+	if radius == 0 {
+		radius = c.env.eval(c.sk.AuraRangeCalc)
+	}
+
+	c.effect(Effect{Kind: "shield", State: c.sk.AuraState, Frames: frames, Radius: radius,
+		Interval: maxInt(c.env.eval(c.sk.PerDelay), 1), Desc: c.desc(), RollToHit: c.sk.ResultFlags&1 == 0,
+		Pct: c.sk.ToHitBonus(c.env, c.lvl)})
 }
 
 // ---- summons: Dopplezon and Valkyrie ----
