@@ -615,15 +615,19 @@ func (v *Game) operateDoor(ob *d2mapentity.Object) {
 		ob.Label(), ob.Record().Index, ob.IsOpened(), changed, blocked, fx, fy, fw, fh, x, y)
 }
 
-// waypointLevelOf returns the level a waypoint object belongs to: objects.txt
-// row 119 is the town waypoint of act 1; other waypoints belong to the level
-// the hero is in.
+// waypointLevelOf returns the level a waypoint object belongs to: the level the hero is in (the original
+// reads the level of the object's room). objects.txt row 119 is the waypoint object of ALL of Act 1 (the
+// outdoor waypoint patterns of Cold Plains, Stony Field, Dark Wood and Black Marsh place it too; wave 41
+// hunt: it used to be taken for the town waypoint, so the field waypoints activated nothing); it only
+// stands for the Rogue Encampment when the level has no waypoint bit.
 func (v *Game) waypointLevelOf(ob *d2mapentity.Object) int {
-	if ob.Record().Index == 119 {
+	level := v.currentLevel()
+
+	if _, ok := d2level.WaypointBit(level); !ok && ob.Record().Index == 119 {
 		return d2level.RogueEncampment
 	}
 
-	return v.currentLevel()
+	return level
 }
 
 // operateWaypoint activates the waypoint (setting and saving its bit) and opens

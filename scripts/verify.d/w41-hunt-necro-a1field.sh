@@ -35,7 +35,7 @@ scenario_env() {
   hop 17; play 17; hop 3
   hop 4; play 4
   s+=";use:Waypoint;wait:2;say:capframe $tmp/wp-open2.png;waypoint:3;expect:level=3;wait:3;say:capframe $tmp/wp-arrive.png"
-  echo "export OD2_AUTOGAME=\"$h2/new/Hunter.d2s\" OD2_D2S_WRITEBACK=\"$h2/wb\" OD2_AUTOSPEED=3 OD2_POPULATE_DENSITY=25"
+  echo "export OD2_AUTOGAME=\"$h2/new/Hunter.d2s\" OD2_D2S_WRITEBACK=\"$h2/wb\" OD2_AUTOSPEED=3 OD2_POPULATE_DENSITY=25 OD2_AUTOSCRIPT_HEAL=1"
   echo "export OD2_AUTOSCRIPT='$s;exit'"
 }
 scenario_check() {
