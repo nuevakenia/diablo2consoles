@@ -17,6 +17,7 @@ func TestItemSounds(t *testing.T) {
 		{"no drop sound: use sound ignored", ItemSoundRow{Use: 6}, nil, 0, 0, 12},
 		{"unique overrides", ItemSoundRow{Drop: 5, Use: 6, DropFrame: 9}, &ItemSoundRow{Drop: 7, Use: 8}, 7, 8, 9},
 		{"unique use may be 0", ItemSoundRow{Drop: 5, Use: 6}, &ItemSoundRow{Drop: 7, DropFrame: 3}, 7, 0, 3},
+		{"unique alone, default frame", ItemSoundRow{}, &ItemSoundRow{Drop: 7, Use: 8}, 7, 8, 12},
 		{"unique without drop keeps base", ItemSoundRow{Drop: 5, Use: 6}, &ItemSoundRow{Use: 8}, 5, 6, 12},
 	} {
 		d, u, f := ItemSounds(tc.base, tc.special)

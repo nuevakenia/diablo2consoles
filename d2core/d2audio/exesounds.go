@@ -56,7 +56,8 @@ type GroundDrop struct {
 
 // GroundDropPlan is what ITEM_PlayGroundDropSound plays: the flippy sound at
 // once (no unit) and the item's drop sound after frame frames (a non-zero
-// third argument of the request; reading it as a frame delay is UNVERIFIED).
+// third argument of the request, VERIFIED w39: SOUND_PlayRequest 0x4b6350 stores counter+arg as the start;
+// the counter DAT_007b4a44 (read by 0x47d690) has an UNVERIFIED unit, taken as game frames).
 func GroundDropPlan(drop, frame int) []GroundDrop {
 	out := []GroundDrop{{ID: SndItemFlippy}}
 

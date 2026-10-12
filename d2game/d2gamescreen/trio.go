@@ -9,7 +9,8 @@ import (
 // Mephisto, Uber Diablo and Uber Baal (classes 0x2c0, 0x2c1, 0x2c5) have all
 // died in the game, a charm (cm2) with its charges at the maximum drops, then
 // the dying monster's standard treasure class is rolled once per entry of the
-// game's counter (Game +0x8c; taken here as the number of players, UNVERIFIED).
+// game's counter (Game +0x8c = the client count: SERVER_AddClientToGame 0x537470 refuses
+// it at 8 and adds 1 per client, VERIFIED w39; the roster length stands in for it).
 
 // trioReward feeds one kill to the tracker and, when it completes the trio,
 // calls charm for the charm and extra for the number of standard drops.

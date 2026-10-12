@@ -8,7 +8,9 @@ import (
 
 // playGroundDrop plays the sounds of an item landing (ITEM_PlayGroundDropSound
 // 0x4be190): item_flippy at once, then the item's drop sound after its
-// dropsfxframe frames (12 by default; frame delay reading UNVERIFIED).
+// dropsfxframe frames (12 by default, VERIFIED w39: ITEM_GetDropSoundAndType 0x4bdfb0 starts at 12 and a non-zero
+// dropsfxframe of the base, unique or set row replaces it; the unit of the sound system counter the delay is added to,
+// DAT_007b4a44, is UNVERIFIED).
 func (v *Game) playGroundDrop(it *diablo2item.Item, ent *d2mapentity.Item) {
 	var base d2audio.ItemSoundRow
 
