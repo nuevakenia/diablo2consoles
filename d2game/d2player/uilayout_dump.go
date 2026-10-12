@@ -67,6 +67,10 @@ func (g *GameControls) UILayout(panel string) []UIRect {
 			widgetRect("hud", "experience_bar", h.widgetExperience),
 			widgetRect("hud", "minipanel_toggle", h.miniPanel.menuButton),
 		)
+		// the sprite position is only set by Render; take it from the widget so the dump does not depend on a frame
+		h.healthGlobe.globe.setPosition(h.healthGlobe.GetPosition())
+		h.manaGlobe.globe.setPosition(h.manaGlobe.GetPosition())
+
 		gx, gy := h.healthGlobe.globe.sprite.GetPosition()
 		rs = append(rs, UIRect{"hud", "life_fill", gx, gy - globeHeight, globeWidth, globeHeight})
 		gx, gy = h.manaGlobe.globe.sprite.GetPosition()
