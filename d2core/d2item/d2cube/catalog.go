@@ -252,7 +252,7 @@ func (c *Catalog) MaxSockets(code string, ilvl int) int {
 			cap = ti.maxSock25
 		}
 
-		if cap > 0 && cap < limit {
+		if cap < limit { // VERIFIED 62bd70: min(base, type cap); a zero cap means none (rings, amulets)
 			limit = cap
 		}
 	}

@@ -14,6 +14,9 @@ type BaseInfo struct {
 	BaseBlock int         // armor.txt "block" (shields)
 	MinAC     int
 	MaxAC     int
+	// GemKind is the base's gemapplytype column plus one (0 = unknown): which
+	// Gems.txt column group applies to gems in it (ITEM_GetGemApplyType 629c10).
+	GemKind int
 }
 
 // Bases maps item codes to their base data.
@@ -36,6 +39,7 @@ func ParseBases(armor, weapons []byte) (Bases, error) {
 
 		b[code] = BaseInfo{
 			BaseBlock: tsvInt(r, col, "block"),
+			GemKind:   tsvInt(r, col, "gemapplytype") + 1,
 			MinAC:     tsvInt(r, col, "minac"),
 			MaxAC:     tsvInt(r, col, "maxac"),
 		}
@@ -67,7 +71,7 @@ func ParseBases(armor, weapons []byte) (Bases, error) {
 			w.Ranged = true
 		}
 
-		b[code] = BaseInfo{Weapon: w}
+		b[code] = BaseInfo{Weapon: w, GemKind: tsvInt(r, col, "gemapplytype") + 1}
 	}
 
 	return b, nil

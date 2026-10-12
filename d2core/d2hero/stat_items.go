@@ -75,7 +75,7 @@ func statItem(it *d2s.Item, bases d2statlist.Bases, charm bool, resolve SetResol
 	}
 
 	if b, ok := bases[code]; ok {
-		si.Weapon, si.BaseBlock = b.Weapon, b.BaseBlock
+		si.Weapon, si.BaseBlock, si.GemKind = b.Weapon, b.BaseBlock, b.GemKind
 	}
 
 	for _, l := range it.SetProperties {

@@ -59,6 +59,9 @@ type Item struct {
 	// BaseBlock is the block chance of the base shield (armor.txt "block").
 	BaseBlock int
 	Weapon    *WeaponBase
+	// GemKind is the base's gemapplytype plus one (BaseInfo.GemKind); 0 falls
+	// back to the weapon / block guess, which is wrong for the Buckler.
+	GemKind int
 
 	Props []Prop
 	// SetID identifies the set (0 none). SetLists[i] is the bonus list of

@@ -61,6 +61,17 @@ func (i *Item) socketKind() string {
 		return "helm"
 	}
 
+	if rec.GemSockets > 0 { // VERIFIED 629c10: the base's gemapplytype column decides
+		switch rec.GemApplyType {
+		case 0:
+			return "weapon"
+		case 1:
+			return "helm"
+		case 2:
+			return "shield"
+		}
+	}
+
 	switch {
 	case rec.Source == d2enum.InventoryItemTypeWeapon:
 		return "weapon"
