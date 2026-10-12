@@ -123,10 +123,25 @@ type envSink interface {
 	handle(index int) string
 }
 
+// resumeSink is implemented by sinks whose music can start inside the track.
+type resumeSink interface {
+	loopFrom(index, ticks int) (stop func())
+}
+
 type engineSink struct{ e *SoundEngine }
 
 func (s engineSink) loop(index int) func() {
 	snd := s.e.PlaySoundID(index)
+	if snd == nil {
+		return func() {}
+	}
+
+	return snd.Stop
+}
+
+// loopFrom starts a looping sound ticks game ticks into the track.
+func (s engineSink) loopFrom(index, ticks int) func() {
+	snd := s.e.play(d2sfx.Request{Index: index, StartTicks: ticks}, PlayOpts{Kind: "music"})
 	if snd == nil {
 		return func() {}
 	}
@@ -181,6 +196,9 @@ type SoundEnvironment struct {
 	levelChangeAt float64 // tick of the last SetEnv
 	songCur       int     // song held by the level music slot (the exe's DAT_007c0a60)
 	songPlaying   int     // song actually started (0 when stopped)
+	songStartedAt float64 // tick the playing song started
+	songStartPos  int     // track position (ticks) it started at
+	resume        MusicResume
 	cur           Selection
 
 	eventInterval float64 // game ticks between events
@@ -299,15 +317,28 @@ func (s *SoundEnvironment) updateMusic() {
 	if s.stopMusic != nil {
 		s.stopMusic()
 		s.stopMusic = nil
+
+		// the track position is kept for the next visit (cue points, see MusicResume)
+		s.resume.Store(s.songPlaying, s.songStartPos+int(s.ticks-s.songStartedAt), 0)
 	}
 
 	s.songPlaying = want
+	from := 0
+
 	if want != 0 {
-		s.stopMusic = s.sink.loop(want)
+		from = s.resume.Position(want)
+		s.songStartedAt, s.songStartPos = s.ticks, from
+
+		if rs, ok := s.sink.(resumeSink); ok && from > 0 {
+			s.stopMusic = rs.loopFrom(want, from)
+		} else {
+			s.stopMusic = s.sink.loop(want)
+			s.songStartPos = 0
+		}
 	}
 
-	s.logf("AMBIENT music playing=%s(%d) wanted=%s(%d) enabled=%v", s.sink.handle(want), want,
-		s.sink.handle(s.cur.Song), s.cur.Song, on)
+	s.logf("AMBIENT music playing=%s(%d) wanted=%s(%d) enabled=%v from=%d", s.sink.handle(want), want,
+		s.sink.handle(s.cur.Song), s.cur.Song, on, from)
 }
 
 func (s *SoundEnvironment) restart(stop func(), index int) func() {

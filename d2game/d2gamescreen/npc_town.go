@@ -321,7 +321,7 @@ func (v *Game) sayNPCLine(npc d2interface.MapEntity, class, index int, what stri
 		snd.Index, d2npc.MessageKey(msg), shorten(text, 60))
 	v.logSubtitle(npc.Label(), msg, text)
 
-	if hasSound && os.Getenv("OD2_AUTOTEST_MUTE") == "" {
+	if hasSound && speechPlays() {
 		v.playSpeech(snd.Index)
 	}
 

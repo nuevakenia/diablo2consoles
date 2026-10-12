@@ -53,7 +53,8 @@ func (v *Game) soundIndexLookups() (func(string) (int, bool), func(int) string) 
 
 // sayHero plays hero voice id (d2audio.Voice*) with the exe's suppression
 // rules (UNITSND_PlayUnitSoundById 0x4c8470). Whether a voice is still playing
-// is approximated by the speech sound of the NPC dialogue (UNVERIFIED).
+// is the hero's last voice sound (hit, death or line) still sounding: the "unit sound already playing" test of the
+// exe (what counts as a unit sound there is UNVERIFIED beyond the voices).
 func (v *Game) sayHero(id int) {
 	prefix := v.heroClassPrefix()
 	if prefix == "" || v.localPlayer == nil {
@@ -61,7 +62,7 @@ func (v *Game) sayHero(id int) {
 	}
 
 	dead := v.death.dead
-	if !v.heroVoiceGate.Allow(id, v.soundEngine.Ticks(), false, dead) {
+	if !v.heroVoiceGate.Allow(id, v.soundEngine.Ticks(), v.unitSounds.Playing(heroEmitter), dead) {
 		v.Infof("HEROVOICE id=%#x suppressed", id)
 		return
 	}
@@ -74,9 +75,9 @@ func (v *Game) sayHero(id int) {
 	}
 
 	v.Infof("HEROVOICE id=%#x handle=%s", id, h)
-	v.playSoundAtPos(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
+	v.unitSounds.Note(heroEmitter, v.playSoundAtPosSound(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
 		Emitter: heroEmitter, Hero: true, Kind: "hero-voice", Who: v.localPlayer.Name(), Delay: d2audio.VoiceDelay(id),
-	})
+	}))
 }
 
 // sayHeroVocal plays the hit (slot 0) or death (slot 1) vocal of the class record.
@@ -87,18 +88,35 @@ func (v *Game) sayHeroVocal(death bool) {
 	}
 
 	h, kind := prefix+"_hit_1", "hit"
+
 	if death {
 		h, kind = prefix+"_death_1", "death"
-	} else if now := v.soundEngine.Ticks(); now-v.heroHitTick < heroHitMinTicks && v.heroHitTick != 0 {
-		return
 	} else {
+		if v.death.dead {
+			return // a dead hero does not grunt
+		}
+
+		if rec := v.formSoundRecord(); rec != nil {
+			// the form's own hit sound (UNVERIFIED, see d2audio.FormMonSoundsID); a form row without one is silent
+			if h = rec.HitSound; h == "" {
+				return
+			}
+
+			kind = "form-hit"
+		}
+
+		now := v.soundEngine.Ticks()
+		if now-v.heroHitTick < heroHitMinTicks && v.heroHitTick != 0 {
+			return
+		}
+
 		v.heroHitTick = now
 	}
 
 	v.Infof("HEROVOICE %s handle=%s", kind, h)
-	v.playSoundAtPos(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
+	v.unitSounds.Note(heroEmitter, v.playSoundAtPosSound(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
 		Emitter: heroEmitter, Hero: true, Kind: "hero-voice", Who: v.localPlayer.Name(),
-	})
+	}))
 }
 
 // onSkillRefused maps a refused cast to the hero's complaint (needmana, not in town).

@@ -15,6 +15,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2audio"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
@@ -604,6 +605,10 @@ func (v *Game) operateDoor(ob *d2mapentity.Object) {
 	fx, fy, fw, fh := ob.Footprint()
 	blocked := v.gameClient.MapEngine.DoorBlocks(fx, fy)
 
+	if changed {
+		v.playObjectSound(d2audio.DoorSound(ob.Record().Index, open), ob, "door")
+	}
+
 	v.Infof("OBJECT door %q id=%d open=%v changed=%v blocks=%v footprint=(%d,%d %dx%d) pos=(%.1f,%.1f)",
 		ob.Label(), ob.Record().Index, ob.IsOpened(), changed, blocked, fx, fy, fw, fh, x, y)
 }
@@ -635,6 +640,8 @@ func (v *Game) operateWaypoint(ob *d2mapentity.Object) {
 	}
 
 	if changed {
+		v.playObjectSound(d2audio.HandleWaypointOpen, ob, "waypoint")
+
 		bit, _ := d2level.WaypointBit(level)
 		v.Infof("WAYPOINT activated level=%d (%s) bit=%d difficulty=%d", level, v.levelName(level), bit, v.gameClient.Difficulty)
 	}

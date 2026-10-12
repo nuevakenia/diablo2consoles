@@ -31,3 +31,18 @@ func itemSound(it InventoryItem, kind string) {
 		}
 	}
 }
+
+// itemUseSound plays the use sound of an item the hero uses by right click
+// (ITEM_GetDropSfxFrame 0x4be0d0 picks it, INV_HandleGridItemUse 0x483890
+// plays it): scrolls, tomes and keys. Potions play theirs in drink.
+func itemUseSound(it InventoryItem, kind string) {
+	if itemSoundHook == nil || it == nil {
+		return
+	}
+
+	if s, ok := it.(interface{ UseSoundHandle() string }); ok {
+		if h := s.UseSoundHandle(); h != "" {
+			itemSoundHook(h, kind)
+		}
+	}
+}

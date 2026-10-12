@@ -117,3 +117,23 @@ func (i *Item) DropSoundHandle() string {
 
 	return i.CommonRecord().DropSound
 }
+
+// UseSoundHandle returns the Sounds.txt handle played when the item is used
+// (right click on a scroll or tome, a potion). VERIFIED rule of
+// ITEM_GetDropSfxFrame 0x4be0d0 (w29): the base row's usesound counts only when
+// its dropsound is set, and a unique or set row whose own dropsound is set
+// replaces it, even with an empty usesound.
+func (i *Item) UseSoundHandle() string {
+	use := ""
+	if rec := i.CommonRecord(); rec != nil && rec.DropSound != "" {
+		use = rec.UseSound
+	}
+
+	if u := i.UniqueRecord(); u != nil && u.DropSound != "" {
+		use = u.UseSound
+	} else if s := i.SetItemRecord(); s != nil && s.DropSound != "" {
+		use = s.UseSound
+	}
+
+	return use
+}

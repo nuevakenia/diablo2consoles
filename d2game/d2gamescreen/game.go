@@ -150,6 +150,7 @@ type Game struct {
 	soundEngine          *d2audio.SoundEngine
 	heroVoiceGate        d2audio.VoiceGate // hero voice suppression (game_hero_voice.go)
 	heroHitTick          int64
+	unitSounds           d2audio.UnitSounds // last sound per unit, for the "unit sound already playing" test
 	soundEnv             d2audio.SoundEnvironment
 	guiManager           *d2gui.GuiManager
 	keyMap               *d2player.KeyMap
@@ -962,14 +963,9 @@ func (v *Game) playNPCGreeting(name string) string {
 		return ""
 	}
 
-	sfx, err := v.audioProvider.LoadSound(path, false, false)
-	if err != nil {
-		v.Warningf("could not load NPC greeting %s: %v", path, err)
-		return ""
-	}
-
-	if os.Getenv("OD2_AUTOTEST_MUTE") == "" {
-		sfx.Play()
+	// the greeting is NPC speech: it goes through the voice bank like the quest lines (and ends the line before it)
+	if speechPlays() {
+		v.playSpeechKind(record.Index, "npc-greeting")
 	}
 
 	v.Infof("NPC greeting: %s (%s)", handle, path)
