@@ -49,6 +49,17 @@ func NoticePlacement(screen d2display.Size, textW int) (x, y, boxW int) {
 	return (screen.W - boxW) / 2, noticeTop, boxW
 }
 
+// SpeechPlacement is the top left corner and the size of the subtitle box for n text lines, in column space
+// (the 800x600 interface column, which AnchorBottom centres on the screen and stands on its bottom edge). The
+// box is centred on the column and ends speechBottom pixels from the column top, i.e. 130 above the HUD bar, so on a
+// wider or taller screen it stays centred over the bar and clear of it. Not from the exe (the original has no
+// subtitles): UNVERIFIED design values.
+func SpeechPlacement(n int) (x, y, w, h int) {
+	h = (n+1)*speechLineHeight + 2*speechPadding
+
+	return (d2display.BaseW - speechWidth) / 2, speechBottom - h, speechWidth, h
+}
+
 // NewSpeechBubble creates an empty bubble.
 func NewSpeechBubble(ui *d2ui.UIManager) *SpeechBubble {
 	return &SpeechBubble{ui: ui}
@@ -128,8 +139,7 @@ func (s *SpeechBubble) Render(target d2interface.Surface) {
 		return
 	}
 
-	height := (len(s.lines)+1)*speechLineHeight + 2*speechPadding
-	left, top := (800-speechWidth)/2, speechBottom-height
+	left, top, _, height := SpeechPlacement(len(s.lines))
 
 	target.PushTranslation(left, top)
 	target.DrawRect(speechWidth, height, speechBackground)

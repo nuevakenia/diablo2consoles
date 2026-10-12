@@ -1045,6 +1045,11 @@ func (g *GameControls) AutoPanel(name string) error {
 		g.clearScreen()
 		g.NPCMenu.Close()
 		g.Trade.Close()
+
+		if g.inventory.moveGoldPanel.IsOpen() {
+			g.inventory.moveGoldPanel.Close()
+		}
+
 		g.updateLayout()
 
 		return nil
@@ -1061,6 +1066,10 @@ func (g *GameControls) AutoPanel(name string) error {
 		// Akara's menu (Talk, Trade) for the layout run, anchored where an NPC at (400, 300) puts it
 		rows, _ := NPCMenuFor(148)
 		g.NPCMenu.Open("Akara", rows, 400, 300-0x96, nil)
+
+		return nil
+	case "golddlg":
+		g.inventory.moveGoldPanel.Open()
 
 		return nil
 	case "inventory":

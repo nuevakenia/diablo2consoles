@@ -53,6 +53,7 @@ type MoveGoldPanel struct {
 	actionLabel1 *d2ui.Label
 	actionLabel2 *d2ui.Label
 	value        *d2ui.TextBox
+	ok, cancel   *d2ui.Button
 
 	originX int
 	originY int
@@ -80,12 +81,22 @@ func (s *MoveGoldPanel) Load() {
 	s.panelGroup.AddWidget(s.panel)
 
 	closeButton := s.uiManager.NewButton(d2ui.ButtonTypeSquareClose, "")
+	okButton := s.uiManager.NewButton(d2ui.ButtonTypeSquareOk, "")
+
+	// the exe sizes both buttons from their picture frames (UI_ButtonImpl_Construct 0x4b77b0) and stands them on
+	// their bottom edge, so the top depends on the real frame height
+	var sz GoldDlgSizes
+
+	sz.OkW, sz.OkH = okButton.GetSize()
+	sz.CancelW, sz.CancelH = closeButton.GetSize()
+	lay = GoldDialogSized(GoldDlgDrop, fw, fh, sz)
+
+	s.ok, s.cancel = okButton, closeButton
 	closeButton.SetVisible(false)
 	closeButton.SetPosition(lay.Cancel.X, lay.Cancel.Y)
 	closeButton.OnActivated(func() { s.Close() })
 	s.panelGroup.AddWidget(closeButton)
 
-	okButton := s.uiManager.NewButton(d2ui.ButtonTypeSquareOk, "")
 	okButton.SetVisible(false)
 	okButton.SetPosition(lay.Ok.X, lay.Ok.Y)
 	okButton.OnActivated(func() { s.action() })

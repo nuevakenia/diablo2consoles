@@ -28,8 +28,8 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
   Fend/Zeal hit cadence (8-frame guess), Strafe/Lightning Strike extras on the client.
 - Monster AI: 134 of 148 are ported faithfully. Open: Shadow Master feed, Zealot fear gate, Regurgitator and Siege
   Tower scan filters, FallenShaman scan, Diablo's second output, BatDemon flight boost (no monster regeneration).
-- UI panels: 12 of 14 match the original; move-gold dialog and the NPC menu golden are open; the party panel is
-  missing one toggle.
+- UI panels: move-gold dialog and NPC menu now have golden numbers (9f-ui-layout, 800x600); the party panel loot toggle
+  shows for hardcore heroes (game-info flag 4); its effect (a packet) and a party golden (needs two players) are open.
 - The summon caps (MinionSpawner 10, Hydra 9, Overseer/Impregnate, DiabPrison 4) are safety bounds, not exe values.
 - Lava levels 107/108 make about 8x fewer monster groups than the density rolls predict; probably the estimate, not
   verified against the original.
@@ -42,7 +42,7 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
 - Windows build: a zig cross-compile worked once (needs the Unix-only `autoperf.go` split); not committed.
 - Cinematics: Bink video and audio decode exist (`d2common/d2data/d2video`, off by default `OD2_PLAY_VIDEOS=1`);
   audio sync was only checked by clock, not by ear; the Cinematics menu path is untested.
-- Widescreen leftovers: bottom HUD bar side fill (`OD2_BAR_FILL`), NPC subtitle placement.
+- Widescreen: the bar side fill is now `tile` by default (`OD2_BAR_FILL=none` to turn off); the subtitle box is centred on the column (golden numbers); ultrawide not looked at by eye.
 - Scenario hardening: `scripts/verify.d/wip/8g-click-dungeon.sh` (Jail Level 1 click matrix) does not pass yet;
   three real-input scenarios need a retry on first attempt (a click that lands mid-cast becomes a walk).
 - `test/real-input-3` (on the fork, not landed): scripted input through the input manager plus new UI/keyboard/click

@@ -227,11 +227,17 @@ func (h *HUD) loadCustomWidgets() {
 		return
 	}
 
-	if mode, ok := d2display.ParseBarFill(os.Getenv("OD2_BAR_FILL")); !ok {
-		h.Warningf("OD2_BAR_FILL=%q: want none, black or tile", os.Getenv("OD2_BAR_FILL"))
+	// default: tile (the bar art continued beside the 800 wide bar on a wide screen); OD2_BAR_FILL=none turns it off
+	fillEnv := os.Getenv("OD2_BAR_FILL")
+	if fillEnv == "" {
+		fillEnv = "tile"
+	}
+
+	if mode, ok := d2display.ParseBarFill(fillEnv); !ok {
+		h.Warningf("OD2_BAR_FILL=%q: want none, black or tile", fillEnv)
 	} else if mode != d2display.BarFillNone {
 		h.barFill = mode
-		h.Infof("BAR_FILL mode=%s tile_w=%d", os.Getenv("OD2_BAR_FILL"), barFillTileW)
+		h.Infof("BAR_FILL mode=%s tile_w=%d", fillEnv, barFillTileW)
 		h.panelGroup.AddWidget(h.uiManager.NewCustomWidget(h.renderBarFill, screenWidth, height))
 	}
 

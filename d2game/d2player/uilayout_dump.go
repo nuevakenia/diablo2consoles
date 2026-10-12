@@ -36,7 +36,7 @@ func artRect(panel, name string, s *d2ui.Sprite, frameIdx, x, top int) UIRect {
 }
 
 // UILayoutPanels lists the panels UILayout knows.
-var UILayoutPanels = []string{"hud", "minipanel", "belt", "character", "inventory", "skills", "quest", "stash", "cube", "npcmenu", "trade", "waypoint", "party"} //nolint:gochecknoglobals // list
+var UILayoutPanels = []string{"hud", "minipanel", "belt", "character", "inventory", "skills", "quest", "stash", "cube", "npcmenu", "trade", "waypoint", "golddlg", "party"} //nolint:gochecknoglobals // list
 
 // UILayout returns the rectangles of what the interface really places for a panel, taken from the widgets and
 // the constants they are placed with (not from uilayout.go's expected values), for the OD2_AUTOUILAYOUT log and its
@@ -115,6 +115,8 @@ func (g *GameControls) UILayout(panel string) []UIRect {
 		rs = append(rs, g.Trade.layoutRects()...)
 	case "npcmenu":
 		rs = append(rs, g.NPCMenu.layoutRects()...)
+	case "golddlg":
+		rs = append(rs, g.inventory.moveGoldPanel.layoutRects()...)
 	case "party":
 		rs = append(rs, UIRect{"party", "art_origin", partyPanelOffsetX, partyPanelOffsetY, 0, 0},
 			UIRect{"party", "close", partyPanelCloseButtonX, partyPanelCloseButtonY, 32, 32})
