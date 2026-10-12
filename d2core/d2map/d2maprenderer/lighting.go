@@ -253,16 +253,28 @@ const (
 	shadeWall                   // a wall image: only the columns matter, sampled along the tile's south edges
 )
 
-// renderShadedImage draws img with per-vertex light colours sampled at tile (tileX, tileY).
-// Uniformly lit images take the plain path. The vertex colours live in a scratch slice of the
-// renderer, so a draw allocates nothing.
-func (mr *MapRenderer) renderShadedImage(target d2interface.Surface, img d2interface.Surface,
-	cols, rows int, alpha float64, kind shadeKind, tileX, tileY int) {
-	w, h := img.GetSize()
+type shadeGridKey struct {
+	kind             shadeKind
+	w, h, cols, rows int
+}
 
-	vals := mr.shadeVals[:0]
-	uniform := true
-	baseX, baseY := float64(tileX*subtilesPerTile), float64(tileY*subtilesPerTile)
+// shadePoint is the subtile offset inside the tile of one grid vertex.
+type shadePoint struct{ u, v float64 }
+
+// shadeGrid returns the subtile offsets of the (cols+1) x (rows+1) vertices of an image of w x h
+// pixels, row by row. They depend only on the image size and the grid, so they are computed once
+// (the floor and wall images of a level have a handful of distinct sizes). Read only.
+func (mr *MapRenderer) shadeGrid(kind shadeKind, w, h, cols, rows int) []shadePoint {
+	key := shadeGridKey{kind, w, h, cols, rows}
+	if g, ok := mr.shadeGrids[key]; ok {
+		return g
+	}
+
+	if mr.shadeGrids == nil {
+		mr.shadeGrids = make(map[shadeGridKey][]shadePoint)
+	}
+
+	g := make([]shadePoint, 0, (rows+1)*(cols+1))
 
 	for j := 0; j <= rows; j++ {
 		for i := 0; i <= cols; i++ {
@@ -275,13 +287,33 @@ func (mr *MapRenderer) renderShadedImage(target d2interface.Surface, img d2inter
 				u, v = wallBaseSubtile(x)
 			}
 
-			c := withAlpha(mr.light.tintAt(baseX+u, baseY+v), alpha)
-			if len(vals) > 0 && c != vals[0] {
-				uniform = false
-			}
-
-			vals = append(vals, c)
+			g = append(g, shadePoint{u, v})
 		}
+	}
+
+	mr.shadeGrids[key] = g
+
+	return g
+}
+
+// renderShadedImage draws img with per-vertex light colours sampled at tile (tileX, tileY).
+// Uniformly lit images take the plain path. The vertex colours live in a scratch slice of the
+// renderer, so a draw allocates nothing.
+func (mr *MapRenderer) renderShadedImage(target d2interface.Surface, img d2interface.Surface,
+	cols, rows int, alpha float64, kind shadeKind, tileX, tileY int) {
+	w, h := img.GetSize()
+
+	vals := mr.shadeVals[:0]
+	uniform := true
+	baseX, baseY := float64(tileX*subtilesPerTile), float64(tileY*subtilesPerTile)
+
+	for _, p := range mr.shadeGrid(kind, w, h, cols, rows) {
+		c := withAlpha(mr.light.tintAt(baseX+p.u, baseY+p.v), alpha)
+		if len(vals) > 0 && c != vals[0] {
+			uniform = false
+		}
+
+		vals = append(vals, c)
 	}
 
 	mr.shadeVals = vals
