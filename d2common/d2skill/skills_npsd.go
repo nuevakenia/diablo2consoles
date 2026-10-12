@@ -174,6 +174,16 @@ func doIronGolemFn(c *cast) {
 // 35) adds result bits 9 (hit + knockback). Items of seven types are picked up and objects operated (not
 // simulated). The range test is the start function (SRVST 0x5c70e0, TelekinesisRangeOK).
 func doTelekinesisFn(c *cast) {
+	// an item on the ground (SRVDO_Telekinesis item branch, w37): the six item types of TKItem.Pick go into the
+	// inventory at once, any other item only starts a visual action (no pickup)
+	if c.tgt.TKItem != nil && c.u.IsPlayer() {
+		if it := c.tgt.TKItem; it.Pick {
+			c.effect(Effect{Kind: "pickup_item", ItemID: it.ID, X: it.X, Y: it.Y})
+		}
+
+		return
+	}
+
 	if !c.u.IsPlayer() || !c.needTarget() {
 		return
 	}
@@ -191,6 +201,19 @@ func doTelekinesisFn(c *cast) {
 		c.knock(c.tgt.Unit)
 	}
 }
+
+// TKItem is a ground item offered to Telekinesis. Pick says whether its item type is one of the six the exe takes
+// into the inventory from afar (VERIFIED w37, SRVDO_Telekinesis 0x5c79f0, ITEM_IsOfType ids 0x16 scro, 4 gold, 0x26
+// tpot, 0x38 misl, 9 poti, 0x29 key: rows of the item type table).
+type TKItem struct {
+	ID   string
+	X, Y int
+	Pick bool
+}
+
+// TelekinesisPickTypes are the item type codes the exe's pickup branch accepts (a type counts through its equiv
+// chain, ITEM_IsOfType).
+var TelekinesisPickTypes = []string{"scro", "gold", "tpot", "misl", "poti", "key "}
 
 // TelekinesisRangeOK is SRVST_TelekinesisRangeCheck (0x5c70e0, VERIFIED): the squared distance between the
 // caster and the target must not exceed the squared radius (aurarangecalc = Param1, 25 subtiles).

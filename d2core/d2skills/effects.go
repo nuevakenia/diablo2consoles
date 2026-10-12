@@ -202,6 +202,12 @@ func (e *Engine) effect(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 		e.hitUnit(p, u, sk, ef)
 	case "unit_state":
 		e.unitState(p, sk, ef)
+	case "pickup_item":
+		e.emit("skill", "TELEKINESIS pickup item=%s", ef.ItemID)
+
+		if e.OnTelekinesisPickup != nil {
+			e.OnTelekinesisPickup(p, ef.ItemID)
+		}
 	case "knockback":
 		e.knockback(p, u, sk, ef)
 	case "overlay":
