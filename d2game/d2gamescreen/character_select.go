@@ -7,6 +7,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2difficulty"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2display"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
@@ -615,6 +616,14 @@ func (v *CharacterSelect) onOkButtonClicked() {
 	}
 
 	hero := v.gameStates[v.selectedCharacter]
+
+	// the load gate of the original (SAVE_CheckCharFlagsAgainstGameMode 0x567a40) on the flags the hero carries and the
+	// session it would start; with a difficulty choice pending the chosen difficulty is gated on that screen
+	if code := heroGate(hero); code != d2difficulty.GateOK {
+		v.Warningf("GATE refused hero=%q code=%#x join=%d: %v", hero.HeroName, int(code), code.JoinResult(), code)
+
+		return
+	}
 
 	// a hero that has unlocked Nightmare or Hell chooses the difficulty first
 	if NeedsDifficultyChoice(hero) {

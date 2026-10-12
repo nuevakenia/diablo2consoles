@@ -182,6 +182,13 @@ func (v *DifficultySelect) Choose(l d2difficulty.Level) {
 		return
 	}
 
+	// the load gate of the original, for the difficulty the game would be created in
+	if code := v.hero.CheckLocal(l); code != d2difficulty.GateOK {
+		v.Warningf("GATE refused hero=%q difficulty=%v code=%#x join=%d: %v", v.hero.HeroName, l, int(code), code.JoinResult(), code)
+
+		return
+	}
+
 	if err := v.hero.ChooseDifficulty(l, false); err != nil {
 		v.Warningf("DIFFICULTY %v", err)
 

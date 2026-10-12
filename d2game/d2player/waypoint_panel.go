@@ -68,6 +68,11 @@ type WaypointPanel struct {
 	hover    int
 	onChoose func(level int)
 	tabs     *d2ui.Sprite // expwaygatetabs.dc6: frame 2*act = selected, 2*act+1 = other
+	// tabCount, tabOK and onTab are the tab logic of the original (UI_DrawWaygatePanel 0x499190): a tab other than the
+	// open one is drawn, and can be clicked, once its quest flag is set. Without SetTabs the old approximation stays.
+	tabCount int
+	tabOK    func(tab int) bool
+	onTab    func(tab int)
 	closeBtn *d2ui.Sprite // buysellbtn.dc6: frame 10 = close, 11 = pressed
 }
 
@@ -108,6 +113,28 @@ func (p *WaypointPanel) Open(act, current int, rows []WaypointRow, onChoose func
 
 		p.labels = append(p.labels, l)
 	}
+}
+
+// SetTabs gives the panel the tab rules: how many tabs are drawn (5 in the expansion, 4 in classic), which are unlocked,
+// and what a click on an unlocked tab does (the tab number 0..4).
+func (p *WaypointPanel) SetTabs(count int, unlocked func(tab int) bool, onTab func(tab int)) {
+	p.tabCount, p.tabOK, p.onTab = count, unlocked, onTab
+}
+
+// tabAt returns the tab under the point, or -1.
+func (p *WaypointPanel) tabAt(mx, my int) int {
+	if p.tabOK == nil {
+		return -1
+	}
+
+	for i := 0; i < p.tabCount && i < len(wpTabXs); i++ {
+		x, top, w, h := p.tabBox(i)
+		if mx >= x && mx < x+w && my >= top && my < top+h && (i == p.act-1 || p.tabOK(i)) {
+			return i
+		}
+	}
+
+	return -1
 }
 
 // loadArt loads the act tab and close button pictures once.
@@ -248,6 +275,12 @@ func (p *WaypointPanel) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 			return true
 		}
 
+		if tab := p.tabAt(event.X(), event.Y()); tab >= 0 && tab != p.act-1 && p.onTab != nil {
+			p.onTab(tab)
+
+			return true
+		}
+
 		if i := p.rowAt(event.X(), event.Y()); i >= 0 && i < len(p.rows) && p.rows[i].Enabled() {
 			_ = p.Choose(p.rows[i].Level)
 		}
@@ -289,7 +322,25 @@ func (p *WaypointPanel) Render(target d2interface.Surface) {
 // (flags 7, 0xf, 0x17, 0x1a for acts 2..5); the engine does not carry those flags here, so the tabs of the acts up to
 // the panel's own are drawn (UNVERIFIED approximation); the panel's act is the selected one (frame 2*i, else 2*i+1).
 func (p *WaypointPanel) renderArt(target d2interface.Surface) {
-	if p.tabs != nil {
+	if p.tabs != nil && p.tabOK != nil {
+		for i := 0; i < p.tabCount && i < len(wpTabXs); i++ {
+			frame := 2*i + 1
+
+			switch {
+			case i == p.act-1:
+				frame = 2 * i
+			case !p.tabOK(i):
+				continue
+			}
+
+			x, top, _, h := p.tabBox(i)
+
+			if p.tabs.SetCurrentFrame(frame) == nil {
+				p.tabs.SetPosition(x, top+h)
+				p.tabs.Render(target)
+			}
+		}
+	} else if p.tabs != nil {
 		for i := 0; i < p.act && i < len(wpTabXs); i++ {
 			frame := 2*i + 1
 			if i == p.act-1 {

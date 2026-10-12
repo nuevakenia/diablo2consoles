@@ -7,11 +7,12 @@ scenario_name="town portals (two processes over TCP: a portal pair opens in the 
 #   2 the joiner is not in the host's party: its use of the portal is refused
 #   3 party formed; the joiner uses the host's portal and arrives beside the field end
 #   4 the host walks back to town through its portal (5 s cooldown refuses an immediate second jump) and returns
-#     to the Cold Plains through the town end: the pair outlived both level changes
-#   5 the host casts again: the first pair is replaced (one pair per owner); the joiner casts its own, then leaves,
+#     to the Cold Plains through the town end: that trip closes the pair (wave 24, VERIFIED in SERVER_UsePortalObject:
+#     the trip through the end whose partner is the caster's remembered portal destroys both ends)
+#   5 the host casts again: the closed pair is not replaced, a new one opens; the joiner casts its own, then leaves,
 #     which closes its pair
 # UNVERIFIED rules (d2common/d2portal): one pair per owner, replacement on recast, closing when the owner leaves,
-# the town end next to the waypoint. VERIFIED (session-core.md): 5 s cooldown, owner/party rule, arrival with start
+# the town end next to the waypoint. VERIFIED in wave 24: the caster's trip back through the town end closes the pair. VERIFIED (session-core.md): 5 s cooldown, owner/party rule, arrival with start
 # type 3 beside the other portal, both ends belong to the same pair.
 mp_second_name=NokkaTwin
 mp_join_log=$tmp/9g-join.log
@@ -104,15 +105,16 @@ scenario_check() {
     echo "FAIL: cannot compare the arrival with the portal (object '$ob' hero '$hero')"; fail=1
   fi
 
-  # 4 the owner's cooldown, and the pair outlives level changes (both ends used, the objects rebuilt)
+  # 4 the owner's cooldown; the field end takes the host to town, the trip back through the town end closes the pair
   grep -q "PORTAL refused: portal: less than 5 s since the last level change" $log.txt || { echo "FAIL: no 5 s cooldown after a portal jump"; fail=1; }
   grep -qE "PORTAL used owner=\"$hn\" from=3 dest=1 .* mine=true" $log.txt || { echo "FAIL: host did not go to town through its portal"; fail=1; }
   grep -qE "PORTAL used owner=\"$hn\" from=1 dest=3 .* mine=true" $log.txt || { echo "FAIL: host did not return through the town end"; fail=1; }
-  [ "$(grep -cE "PORTAL object level=(1|3) .* owner=\"$hn\"" $log.txt)" -ge 4 ] || { echo "FAIL: the portal objects were not rebuilt after the level changes"; fail=1; }
+  [ "$(grep -cE "PORTAL object level=(1|3) .* owner=\"$hn\"" $log.txt)" -ge 2 ] || { echo "FAIL: the portal objects were not rebuilt after the level change"; fail=1; }
+  grep -q "PORTAL closed owner=\"$hn\"" $log.txt || { echo "FAIL: the trip back through the town end did not close the host's pair"; fail=1; }
   grep -q "LEVEL portal state" $log.txt || { echo "FAIL: no portal arrival state"; fail=1; }
 
-  # 5 recasting replaces the pair; the joiner sees the new one; leaving closes the joiner's pair
-  grep -qE "PORTAL opened owner=\"$hn\" id=[0-9]+ field=3 town=1 replaced=true" $log.txt || { echo "FAIL: recast did not replace the old pair"; fail=1; }
+  # 5 the closed pair is gone, so the recast opens a new one; the joiner sees it; leaving closes the joiner's pair
+  [ "$(grep -cE "PORTAL opened owner=\"$hn\" id=[0-9]+ field=3 town=1" $log.txt)" -ge 2 ] || { echo "FAIL: recast did not open a new pair"; fail=1; }
   grep -qE "PORTAL opened owner=\"$jn\" " $log.txt || { echo "FAIL: the joiner's own portal was not stored"; fail=1; }
   grep -q "PORTAL closed owner=\"$jn\" (left the game)" $log.txt || { echo "FAIL: the joiner's pair stayed open after it left"; fail=1; }
   [ "$(grep -c "PORTAL pair id=" $log.txt)" -ge 1 ] && grep "PORTAL list level" $log.txt | tail -1 | grep -q "pairs=1" || { echo "FAIL: host does not end with exactly its own pair"; fail=1; }
