@@ -63,6 +63,9 @@ type Target struct {
 	Unit d2missile.Target
 	// UX, UY are its subtile position.
 	UX, UY int
+	// Ally is the nearest allied unit (pet, mercenary, converted monster) around the aim point, or nil; Enchant
+	// (SRVDO_025 0x5c8180) gives its state to such a unit instead of the caster (w37).
+	Ally d2missile.Target
 	// Corpse is set when a corpse lies near the aim point (corpse skills:
 	// Raise Skeleton, Corpse Explosion, Revive...). CX, CY is its subtile,
 	// CorpseID an engine handle, CorpseHP its maximum life and CorpseKey its

@@ -1251,6 +1251,12 @@ func doArmorFn(c *cast) {
 	e := &c.res.Effects[len(c.res.Effects)-1]
 	e.Level, e.SkillID, e.SkillName = c.lvl, c.sk.ID, c.sk.Name
 
+	// VERIFIED (w37, SRVDO_025_Enchant 0x5c8180): the state goes to the targeted unit when the exe's alliance test
+	// holds for it (a pet, mercenary or converted monster), else to the caster. Only Enchant has that rule.
+	if c.sk.SrvDoFunc == 25 && c.tgt.Ally != nil && c.tgt.Ally.Alive() && c.tgt.Ally.ID() != c.u.ID() {
+		e.Kind, e.Target = "unit_state", c.tgt.Ally
+	}
+
 	switch c.sk.AuraState { // calc1 is the chill time of the cold armors
 	case "frozenarmor", "shiverarmor", "chillingarmor":
 		e.Chill = c.calc(1)

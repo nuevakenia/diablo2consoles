@@ -544,6 +544,25 @@ func (e *Engine) targetAt(sx, sy int) d2skill.Target {
 		}
 	}
 
+	// the nearest ally (Enchant's target, w37)
+	abest := pickRadius + 1
+
+	for _, m := range e.monsters.Allies() {
+		if !m.Alive() {
+			continue
+		}
+
+		mx, my := m.SubtilePos()
+		if d := chebyshev(mx-sx, my-sy); d < abest {
+			abest = d
+			tg.Ally = e.target(m)
+		}
+	}
+
+	if abest > best { // an enemy lies nearer to the click: that is the unit under the cursor (UNVERIFIED pick)
+		tg.Ally = nil
+	}
+
 	return tg
 }
 
