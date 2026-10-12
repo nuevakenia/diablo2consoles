@@ -56,6 +56,13 @@ scenario_env() {
   hscript+=";waitlog:PVP EAR dropped;wait:1;loot:8,15;wait:2;say:chat eartaken;wait:4;exit"
 
   local jscript="wait:1;waitlog:SOCIAL roster n=2;say:spawnportal 3;use:Portal;waitlog:LEVEL built: level 3"
+  # The victim steps east (0.8 tile; the walk ends on x=20) before the host's casts. Blizzard's shards (Size 2, hit by
+  # the exe footprint test since w37: only the cell and its 4 neighbours) fall on cells picked by SEED(centre x +
+  # elapsed): the shard columns are centre x + {-5,-1,3} for x = 15 (the portal arrival cell), so a hero standing
+  # there is never under a shard (the old 3x3 lookup caught it by luck), while for x = 12, 16, 20, 24 they are
+  # centre x + {-4,0,4} and the column of the hero gets shards on the rows next to it. The scenario owns this
+  # position, it is not an engine rule (d2missile hitCandidates / d2skills TargetsWithin are).
+  jscript+=";wait:2;say:pvpwalk 0.8 0;wait:2"
   # the victim may die before the host's last Fire Ball (Meteor's burning ground keeps hurting): it stays in the
   # game until the host has picked the ear up, so the host's casts and the loot still find it
   jscript+=";waitlog:PVP HIT attacker;waitlog:PVP KILLED;waitlog:eartaken;wait:1;exit"
