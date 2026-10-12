@@ -8,9 +8,46 @@ package d2quest
 const (
 	AncientCount  = 3
 	LevelSummit   = LevelArreatSummit // the level of the fight (120, 0x78 in the exe)
-	AncientsAltar = 546               // objects.txt row of the Altar of the Heavens (UNVERIFIED as the 0x58b1e0 object id)
-	AncientsDoor  = 547               // objects.txt row of the door to the Worldstone Keep (UNVERIFIED as the gate object)
+	AncientsAltar = 546               // objects.txt row "ancientsaltar", OperateFn 65 = entry 0x730360 of the operate table = 0x58b1e0 (VERIFIED w37: fn 62..64 of the statue rows resolve to the Rite stubs next to it)
+	AncientsDoor  = 547               // objects.txt row of the door to the Worldstone Keep (UNVERIFIED: its OperateFn 66 resolves to 0x588a60, the Prison of Ice handler, which does not fit)
 )
+
+// Statue objects.txt rows (VERIFIED 0x589f10: dwTxtFileNo 0x1da, 0x1db, 0x1dc of the activated statue).
+const (
+	StatueObject3 = 474 // "Ancient Statue 3"
+	StatueObject1 = 475 // "Ancient Statue 1"
+	StatueObject2 = 476 // "Ancient Statue 2"
+)
+
+// AncientSlotForStatueObject says which of the three Ancient slots a statue object wakes (VERIFIED 0x589f10: row
+// 474 -> slot 1, 475 -> slot 0, 476 -> slot 2; the slot's class is 540+slot, 0x589e50 removes saved unit 0x21c+slot).
+func AncientSlotForStatueObject(row int) (slot int, ok bool) {
+	switch row {
+	case StatueObject1:
+		return 0, true
+	case StatueObject3:
+		return 1, true
+	case StatueObject2:
+		return 2, true
+	}
+
+	return 0, false
+}
+
+// AncientSlotForStatueMonster is the same order for the statue NPC classes of the harness (Statue 1, 2, 3 stand for
+// the objects 475, 476, 474).
+func AncientSlotForStatueMonster(class int) (slot int, ok bool) {
+	switch class {
+	case NPCAncientStatue1:
+		return AncientSlotForStatueObject(StatueObject1)
+	case NPCAncientStatue2:
+		return AncientSlotForStatueObject(StatueObject2)
+	case NPCAncientStatue3:
+		return AncientSlotForStatueObject(StatueObject3)
+	}
+
+	return 0, false
+}
 
 // IsAncientClass says whether a monster class is one of the three Ancients (540, 541, 542).
 func IsAncientClass(class int) bool { return class >= NPCAncient1 && class <= NPCAncient3 }

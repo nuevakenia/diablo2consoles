@@ -14,7 +14,8 @@ import (
 // done is refused. The warp-tile handler SERVER_EnterWarpTile (0x553140) does NOT read the column; it has its
 // own destination list (73, 100, 118, 128, 132), of which only the 120 -> 128 check (Rite of Passage node
 // 0x58ae70) concerns a flagged level that a plain warp reaches. The engine applies the table like this:
-//   - Portal (town portal and portal objects): the table, VERIFIED.
+//   - Portal: VERIFIED w37 (0x582700): only another hero's town portal object is tested, bit 0 only (CheckPortalGate); the
+//     game screen no longer routes portals through CheckLevelGate (the entry below stays for the tests and tools).
 //   - Waypoint: the table, UNVERIFIED (the exe was not seen to read it there; a hero cannot have the waypoint
 //     of a flagged level without having walked in, so the rule only guards forged states).
 //   - Warp: only the Worldstone Keep levels 128..132 (the exe's warp list names 128 from 120 and 132; both
@@ -95,4 +96,27 @@ func GatedLevels(expansion bool) [][2]int {
 	}
 
 	return out
+}
+
+// CheckPortalGate is the quest rule of SERVER_UsePortalObject (0x582700, VERIFIED w37). It applies to town portal
+// objects (objects.txt row 0x3b) only, and only when the portal is not the hero's own (the clicked portal is not the
+// hero's last portal and its linked end is not either): then the Levels.txt QuestFlag (classic) / QuestFlagEx
+// (expansion) of the destination level is read from the using hero's quest record of the game difficulty, bit 0 only
+// (the reward-pending bit does not open it), and a missing record refuses. Other portal objects (the red portals)
+// are not tested by this function.
+func CheckPortalGate(from, to int, expansion, ownPortal bool, q *d2s.QuestRecord) error {
+	if ownPortal {
+		return nil
+	}
+
+	if q == nil {
+		return &LevelGateError{From: from, To: to, Slot: LevelQuestFlag(to, expansion), Via: GatePortal}
+	}
+
+	slot := LevelQuestFlag(to, expansion)
+	if slot <= 0 || q.Get(slot, d2s.QuestBitDone) {
+		return nil
+	}
+
+	return &LevelGateError{From: from, To: to, Slot: slot, Via: GatePortal}
 }

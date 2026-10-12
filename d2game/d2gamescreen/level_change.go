@@ -240,7 +240,8 @@ func (v *Game) startLevelChange(level int, start d2level.StartType, via string) 
 }
 
 // levelGate applies the Levels.txt QuestFlag / QuestFlagEx rule (d2level.CheckLevelGate) to a warp, waypoint or
-// portal change; other ways (act travel, loading a save, outdoor edges) are not gated here. A game without a
+// change; the portal rule is its own (d2level.CheckPortalGate, applied to other heroes' town portals in
+// operateTownPortal: VERIFIED 0x582700); other ways (act travel, loading a save, outdoor edges) are not gated here. A game without a
 // quest record (no hero progress) or with the travelfree debug switch on is not gated.
 func (v *Game) levelGate(from, to int, via string) error {
 	q := v.heroQuests()
@@ -249,7 +250,7 @@ func (v *Game) levelGate(from, to int, via string) error {
 	}
 
 	switch d2level.GateVia(via) {
-	case d2level.GateWarp, d2level.GateWaypoint, d2level.GatePortal:
+	case d2level.GateWarp, d2level.GateWaypoint:
 		return d2level.CheckLevelGate(from, to, d2level.GateVia(via), v.heroExpansion(), q)
 	}
 
@@ -766,7 +767,7 @@ func (v *Game) operatePortal(ob *d2mapentity.Object) {
 		Dest:   ob.PortalDest,
 		Owner:  ob.PortalOwner,
 		Player: v.gameClient.PlayerID,
-		// the quest flag of the destination is not wired in yet (UNVERIFIED rule input)
+		// VERIFIED 0x582700: the quest flag is tested for town portal objects only (operateTownPortal), not for these
 	}
 	if err := d2level.ValidatePortal(req); err != nil {
 		v.Infof("PORTAL refused: %v", err)
