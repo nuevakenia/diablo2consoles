@@ -116,6 +116,10 @@ type Pipeline struct {
 	Opt      Options
 	MissF    MissileFields
 
+	// chain remembers per caster whether the last Frenzy blow hit (the exe keeps it in the skill's target-type
+	// field, SKILL_FrenzyBuildHitAndFinalize 0x5d75b0); see frenzy_w23.
+	chain map[string]bool
+
 	// ApplyState is called when a missile of a skill applies a state to an
 	// enemy (Howl's fear). frames is the duration.
 	ApplyState func(owner Unit, t d2missile.Target, state string, frames int)
@@ -285,6 +289,10 @@ type Effect struct {
 	// Stack > 0 makes the state a counter that grows by one per cast up to
 	// Stack (assassin charges, Frenzy, Maul).
 	Stack int
+	// CountStats, with Stack, gives the stats of the state for each stack count (index = count, 1..Stack): the exe
+	// evaluates the aura stats with the count in place of the skill level (Frenzy, wave 23). The engine takes the
+	// entry of the new count instead of Stats.
+	CountStats map[int][]StatMod
 	// Desc is the damage an area_hit / strikes / storm effect deals to every
 	// enemy it reaches; SkillName names the skill in logs.
 	Desc      *d2missile.DamageDesc
@@ -451,6 +459,8 @@ type MeleeResult struct {
 	Roll   int
 	Damage d2combat.Damage // rolled, before resists, 8.8
 	Total  int32           // sum of the damage components, 8.8
+	// Delay is the frames before the blow lands (a Leap Attack hits after the landing); 0 is at once.
+	Delay int
 }
 
 // DoResult is the outcome of the do phase.

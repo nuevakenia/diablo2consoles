@@ -57,27 +57,27 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 129 | Mace Mastery | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 130 | Howl | -/22 | -/25 | fully simulated | fully simulated |  |
 | 131 | Find Potion | 33/69 | 26/38 | missing | fully simulated | SRVDO_069 0x5d6c40 + the act/difficulty potion table 0x73e988 (golden test) |
-| 132 | Leap | 40/77 | 29/43 | partial | fully simulated | VERIFIED SRVDO_077 0x5d8e60: a landing player throws back everything hostile within calc1 (result flags 9, no damage; the radius unit and centre are U); the jump itself is still an instant move (no arc, clamped to 18 subtiles) |
-| 133 | Double Swing | -/70 | 27/39 | fully simulated | fully simulated |  |
+| 132 | Leap | 40/77 | 29/43 | partial | fully simulated | Wave 23 VERIFIED SRVST_040 0x5d8830 / 0x5d84d0: range = aurarangecalc (dm12) by octagonal distance, 1 subtile per frame, knockback at the landing |
+| 133 | Double Swing | -/70 | 27/39 | fully simulated | fully simulated | Wave 23 VERIFIED 0x5d6ee0: two events, second blow on the next unit id in reach (attackrate calc3 not modelled) |
 | 134 | Pole Arm Mastery | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 135 | Throwing Mastery | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 136 | Spear Mastery | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 137 | Taunt | -/71 | -/- | partial | partial | curse-style state with a synthetic stat; AI reaction is U |
 | 138 | Shout | -/68 | -/25 | fully simulated | fully simulated |  |
 | 139 | Stun | 32/2 | -/- | fully simulated | fully simulated |  |
-| 140 | Double Throw | -/74 | 11/42 | fully simulated | fully simulated |  |
+| 140 | Double Throw | -/74 | 11/42 | fully simulated | fully simulated | Wave 23 VERIFIED 0x5d7340: two missiles on one line (no fan) |
 | 141 | Increased Stamina | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 142 | Find Item | 34/72 | 28/40 | missing | fully simulated | SRVDO_FindItem 0x5d7210: bucket roll over Param1..4 picks monstats TreasureClass1..4 and drops it at the corpse |
-| 143 | Leap Attack | 41/78 | 30/44 | partial | fully simulated | VERIFIED SRVDO_078 0x5d9320 / 0x5d9170 / 0x5d8f90: ONE victim (the target in melee range, else the nearest in a scan), to-hit roll, calc1 percent, knockback bit, bash overlay, the victim's stun removed (skills-batch3.md) |
-| 144 | Concentrate | 32/2 | -/- | fully simulated | fully simulated |  |
+| 143 | Leap Attack | 41/78 | 30/44 | partial | fully simulated | Wave 23 VERIFIED SRVST_041 0x5d9040 / 0x647040: lands 2 subtiles beyond the target, no range cap, no jump when in melee reach, victim = smallest unit id in reach, blow after the jump (w23-skills-barb.md) |
+| 144 | Concentrate | 32/2 | -/- | fully simulated | fully simulated | Wave 23 VERIFIED 0x5d6910: aurastate after the blow (lifetime UNVERIFIED), calc4 percent to magic |
 | 145 | Iron Skin | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 146 | Battle Cry | -/68 | -/25 | fully simulated | fully simulated |  |
-| 147 | Frenzy | -/9 | -/39 | fully simulated | fully simulated |  |
+| 147 | Frenzy | -/9 | -/39 | fully simulated | fully simulated | Wave 23 VERIFIED 0x5d78b0: two blows per swing (second by round robin), state only after a hit, stack up to the skill level with the count as level, calc4 percent to magic |
 | 148 | Increased Speed | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 149 | Battle Orders | -/68 | -/25 | fully simulated | fully simulated |  |
 | 150 | Grim Ward | 33/75 | 26/41 | missing | partial | corpse consumed, terror state on enemies within aurarangecalc every 6 frames for 200 frames (SRVDO_075 0x5d7430, missile table values); the small/medium/large variant by corpse size is not modelled |
 | 151 | Whirlwind | 38/76 | 31/45 | missing | partial | hero walks to the point one subtile per frame hitting the nearest other enemy every weapon-delay frames (SRVST_038/SRVDO_076, 0x5d7a00/0x5d8010); walk speed and the scan radius unit are U |
-| 152 | Berserk | 39/2 | -/- | fully simulated | fully simulated |  |
+| 152 | Berserk | 39/2 | -/- | fully simulated | fully simulated | Wave 23 VERIFIED 0x5d82a0: state (zero defense) for calc2 frames, calc4 percent converted to magic |
 | 153 | Natural Resistance | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 154 | War Cry | -/68 | -/25 | fully simulated | fully simulated |  |
 | 155 | Battle Command | -/68 | -/25 | fully simulated | fully simulated |  |

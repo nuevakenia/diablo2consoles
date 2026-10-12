@@ -575,7 +575,8 @@ func TestSacrificeAndFrenzy(t *testing.T) {
 	_, r = cf.castOn("Frenzy", z)
 	e := effectOf(t, r, "self_state")
 
-	if e.State != "frenzy" || e.Frames != 150 || e.Stack != 3 {
+	// the state comes before the second blow of the swing (the first one hit) and stacks up to the skill level
+	if e.State != "frenzy" || e.Frames != 150 || e.Stack != 2 || len(e.CountStats) != 2 {
 		t.Errorf("frenzy %+v", e)
 	}
 }

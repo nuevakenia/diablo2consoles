@@ -209,16 +209,14 @@ func TestLeapAttackSingleVictim(t *testing.T) {
 		t.Errorf("stun removal %+v", e)
 	}
 
-	// the skill's target is out of reach after the landing: the nearest unit is struck instead
+	// no target unit: the scan around the landing takes the SMALLEST unit id in reach, not the nearest
+	// (0x5d8f90 passes -1 as the last victim to the round robin callback)
 	cf2 := b3Fixture(map[string]int{"Leap Attack": 5})
-	cf2.addFoe("close", 12, 0)
-	far := cf2.addFoe("far", 60, 0)
-	tg = Target{X: 12, Y: 0, Unit: far, UX: 60, UY: 0}
-	id = cf2.id("Leap Attack")
-	cf2.p.Start(cf2.u, id, tg)
-	r = cf2.p.Do(cf2.u, id, tg)
+	cf2.addFoe("b", 13, 0)
+	cf2.addFoe("a", 15, 0)
+	_, r = cf2.cast("Leap Attack", 12, 0)
 
-	if len(r.Melees) != 1 || r.Melee.Target.ID() != "close" {
+	if len(r.Melees) != 1 || r.Melee.Target.ID() != "a" {
 		t.Errorf("scan victim: %+v", r.Melees)
 	}
 
