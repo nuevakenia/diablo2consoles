@@ -379,7 +379,12 @@ func (g *GameServer) onPartyXP(client ClientConnection, packet d2netpacket.NetPa
 
 	var shares []d2party.XPShare
 	if p.MonsterLevel > 0 {
-		shares = g.soc.roster.ShareKillXP(p.Killer, p.XP, p.MonsterLevel, partyMaxLevel)
+		var mon *d2party.KillPos
+		if p.HasMonsterPos {
+			mon = &d2party.KillPos{X: p.MonsterX, Y: p.MonsterY}
+		}
+
+		shares = g.soc.roster.ShareKillXPAt(p.Killer, p.XP, p.MonsterLevel, partyMaxLevel, mon)
 	} else {
 		shares = g.soc.roster.ShareXP(p.Killer, p.XP)
 	}

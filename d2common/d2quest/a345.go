@@ -157,7 +157,7 @@ func (g *Game) ResistBonus() int {
 }
 
 // A3Q6 The Guardian (Ormus): through the Durance of Hate and Mephisto's death.
-// UNVERIFIED: levels 100-102 and class 242 (Mephisto).
+// Levels 100-102 and class 242 (Mephisto) checked w28 against Levels.txt / MonStats.txt row numbers (table check, not read in the exe).
 func newGuardian() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestGuardian, slot: 22, act: 2, logIndex: 6, name: "The Guardian", label: "A3Q6",
@@ -175,7 +175,7 @@ func newGuardian() *Quest {
 
 // A4Q1 The Fallen Angel (Tyrael): Izual in the Plains of Despair, +2 skill
 // points. VERIFIED w25: the 2 points (0x5b15c0) and the kill (0x5b1c50: RP + goal for the killer, whoever sits in
-// Izual's room or the next ones). UNVERIFIED: Izual's class (256 or the ghost 406).
+// Izual's room or the next ones). Both Izual rows (256, ghost 406) are accepted; MonStats.txt confirms both ids (w28, table check).
 func newFallenAngel() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestFallenAngel, slot: 25, act: 3, logIndex: 1, name: "The Fallen Angel", label: "A4Q1",
@@ -191,7 +191,7 @@ func newFallenAngel() *Quest {
 }
 
 // A4Q2 Terror's End (Tyrael): Diablo in the Chaos Sanctuary. The expansion
-// uses the SUCCESSEXP lines (tables 4 and 5). VERIFIED w25: Diablo is class 243 (0x5b2f10); UNVERIFIED: level 108.
+// uses the SUCCESSEXP lines (tables 4 and 5). VERIFIED w25: Diablo is class 243 (0x5b2f10); Level 108 is Chaos Sanctum in Levels.txt (w28, table check).
 func newTerrorsEnd() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestTerrorsEnd, slot: 26, act: 3, logIndex: 2, name: "Terror's End", label: "A4Q2",
@@ -231,7 +231,7 @@ func newMalachai() *Quest {
 // ---- Act 5 ----
 
 // A5Q1 Siege on Harrogath (Larzuk): Shenk the Overseer in the Bloody
-// Foothills; Larzuk sockets an item. UNVERIFIED: level 110 and the super name.
+// Foothills; Larzuk sockets an item. Level 110 is Bloody Foothills in Levels.txt (w28, table check); the super name is UNVERIFIED.
 func newSiege() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestSiege, slot: 35, act: 4, logIndex: 1, name: "Siege on Harrogath", label: "A5Q1",
@@ -250,8 +250,7 @@ func newSiege() *Quest {
 }
 
 // A5Q6 Eve of Destruction (everyone): the Worldstone Keep, the Throne and
-// Baal. Available once Rite of Passage is done. UNVERIFIED: levels 128/131
-// and Baal's class (543).
+// Baal. Available once Rite of Passage is done. Levels 128/131 are the Worldstone Keep 1 and the Throne in Levels.txt (w28 table check); Baal's class is 544 (baalcrab, MonStats.txt; 543 is the throne Baal).
 func newEve() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestEve, slot: 40, act: 4, logIndex: 6, name: "Eve of Destruction", label: "A5Q6",

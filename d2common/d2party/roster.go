@@ -372,7 +372,24 @@ func (r *Roster) DeclareHostile(from, to string) (Declared, error) {
 		d.LeftParty = r.Leave(from)
 	}
 
+	// VERIFIED w28 (PLAYER_DeclareHostilityToPartyOrPlayer 0x5a37f0, PLAYER_SetHostileFlagBothAndNotify
+	// 0x5a3790, PLAYER_SetHostileFlag 0x5a3ae0): a declaration sets the flag in BOTH directions, and
+	// against a target in a party every member of that party (level above 8) is made mutually hostile
+	// with the declarer. A withdrawal (PLAYER_ClearHostileFlag 0x5a3a90) clears only the declarer's own
+	// flag, so the other side stays hostile until it withdraws too.
 	f.hostile[to] = true
+	t := r.players[to]
+	t.hostile[from] = true
+
+	if t.party != 0 {
+		for _, o := range r.players {
+			if o.party == t.party && o != f && o.Level > d2enum.PlayersHostileLevel-1 {
+				f.hostile[o.ID] = true
+				o.hostile[from] = true
+			}
+		}
+	}
+
 	delete(r.invites, from) // no invitations with hostile players
 	delete(r.invites, to)
 
@@ -437,8 +454,9 @@ func (r *Roster) Relation(from, to string) d2enum.PlayersRelationships {
 }
 
 // CanAttack reports whether attacker may hurt defender: the attacker has
-// declared hostility to the defender (UNVERIFIED direction) and they are not in
-// one party (no friendly fire).
+// declared hostility to the defender (VERIFIED w28: UNIT_AreUnitsHostile 0x552270
+// tests the attacker's own flag toward the defender, and a declaration sets both
+// directions) and they are not in one party (no friendly fire).
 func (r *Roster) CanAttack(attacker, defender string) bool {
 	return attacker != defender && !r.SameParty(attacker, defender) && r.Hostile(attacker, defender)
 }
@@ -496,6 +514,18 @@ func (r *Roster) ShareXP(killer string, xp int) []XPShare {
 
 // killGroup is the killer plus the party members in the killer's area.
 func (r *Roster) killGroup(k *entry) []*entry {
+	return r.killGroupAt(k, nil)
+}
+
+// KillPos is the whole-subtile position of the dead monster.
+type KillPos struct{ X, Y int }
+
+// killGroupAt is killGroup with the recipient reference taken from ref (the dead
+// monster, VERIFIED: 0x57c990 passes the monster unit as the callback context
+// of 0x57c6b0). With ref set the killer goes through the same range test as
+// every other member (the callback runs over all members in the level,
+// including the credited player); without it the killer is the reference.
+func (r *Roster) killGroupAt(k *entry, ref *KillPos) []*entry {
 	if k.party == 0 {
 		return []*entry{k}
 	}
@@ -503,7 +533,11 @@ func (r *Roster) killGroup(k *entry) []*entry {
 	var group []*entry
 
 	for _, o := range r.players {
-		if o.party == k.party && o.Area == k.Area && (o == k || r.inXPRange(k, o)) {
+		if o.party != k.party || o.Area != k.Area {
+			continue
+		}
+
+		if ref == nil && (o == k || r.inXPRange(k, o)) || ref != nil && inRangeOf(*ref, o) {
 			group = append(group, o)
 		}
 	}
@@ -526,8 +560,10 @@ func (r *Roster) SetPos(id string, x, y int) {
 // 0x10000) reports true, which the roster models as "body"; a member whose x
 // is 0 is skipped; the squared distance to the reference unit must not exceed
 // 0x1900; both coordinates are the whole part of the path's precise position
-// (PATH_GetXPos), i.e. subtiles, 5 per tile. UNVERIFIED: which unit is the
-// reference (the dead monster is the likelier, the killer is used here).
+// (PATH_GetXPos), i.e. subtiles, 5 per tile. The reference unit is the dead
+// monster (VERIFIED w28: EXP_ServerAwardKillExperience 0x57c990 passes the
+// monster at the call 0x57ca78); ShareKillXPAt uses it. This killer-relative
+// form is the fallback while the monster position is unknown.
 func (r *Roster) inXPRange(k, o *entry) bool {
 	if o.body {
 		return false
@@ -556,12 +592,40 @@ func (r *Roster) inXPRange(k, o *entry) bool {
 // "alive" and "squared distance <= 6400" recipient tests, and the unit of that
 // distance; the area stands in for them.
 func (r *Roster) ShareKillXP(killer string, xp, monsterLevel, maxLevel int) []XPShare {
+	return r.ShareKillXPAt(killer, xp, monsterLevel, maxLevel, nil)
+}
+
+// inRangeOf is the callback 0x57c5a0 for a member o against the dead monster at
+// ref: a body is skipped, a member without a known position counts (the area stands in), x == 0 is skipped, and the squared distance must not exceed RecipientRadiusSq.
+func inRangeOf(ref KillPos, o *entry) bool {
+	if o.body {
+		return false
+	}
+
+	if !o.posKnown {
+		return true
+	}
+
+	dx, dy := o.x-ref.X, o.y-ref.Y
+
+	return o.x != 0 && dx*dx+dy*dy <= RecipientRadiusSq
+}
+
+// ShareKillXPAt is ShareKillXP with the recipients measured from the dead
+// monster at mon (VERIFIED reference, see inXPRange); nil falls back to the
+// killer's position. A party whose members all fail the test gets nothing
+// (0x57c6b0 returns when the recipient count is 0).
+func (r *Roster) ShareKillXPAt(killer string, xp, monsterLevel, maxLevel int, mon *KillPos) []XPShare {
 	k, ok := r.players[killer]
 	if !ok {
 		return nil
 	}
 
-	group := r.killGroup(k)
+	group := r.killGroupAt(k, mon)
+
+	if len(group) == 0 {
+		return nil
+	}
 	sort.Slice(group, func(i, j int) bool { return group[i].ID < group[j].ID })
 
 	if len(group) > MaxRecipients { // keep the killer, then the lowest ids

@@ -80,8 +80,12 @@ func (r *Roster) RelationOf(owner, other string) (Relation, bool) {
 }
 
 // RefreshPartyBits recomputes the "other is in a party" bit of every node
-// (PLAYERLIST_RefreshPartyRelationFlags 0x559410; body not read in detail,
-// UNVERIFIED that it is a plain recompute).
+// (PLAYERLIST_RefreshPartyRelationFlags 0x559410). Read in w28: the exe is NOT a
+// plain recompute, it only revisits nodes whose bit field holds the value 2
+// (the state PARTY_FormPartyBetweenPlayers 0x5a3490 tests on the pair's node
+// before forming a party), recomputes it as "party id != 0xffff" and re-sends
+// 0x8B for it. The Go model has only the two-valued bit, so this keeps the
+// recompute of all nodes (UNVERIFIED equivalence: no scenario depends on stale bits).
 func (r *Roster) RefreshPartyBits() {
 	for _, o := range r.players {
 		for id, n := range o.rel {
