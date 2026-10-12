@@ -452,8 +452,10 @@ var (
 // world adapts the engine to d2missile.World.
 type world struct{ e *Engine }
 
-func (w *world) Flags(x, y int) uint16 { return w.e.monsters.Grid().Flags(x, y) }
-func (w *world) Frame() int            { return w.e.frame }
+func (w *world) Flags(x, y int) uint16 {
+	return w.e.monsters.Grid().Flags(x, y) | w.e.stamps.flags(x, y)
+}
+func (w *world) Frame() int { return w.e.frame }
 
 // IsEnemy: heroes' missiles hurt monsters (all of the director's monsters are
 // hostile); monsters do not fire these missiles.

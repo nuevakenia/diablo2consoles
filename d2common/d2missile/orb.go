@@ -6,8 +6,10 @@ package d2missile
 //   - SrvDoFunc 15 (0x5acba0): every Param1 (min 1) frames of elapsed life the
 //     orb creates SubMissile1 at its position with a heading read from the
 //     64 entry table orbSin / orbCos at the index kept in its data field 0x28
-//     (create kind 2, taken as an offset from the orb: UNVERIFIED role of the
-//     create struct's two fields), then advances the index by Param2 modulo 64.
+//     (create kind 2: MISSILE_CreateServerMissile 0x59d5b0 reads kind bit 2 as "destination = the start
+//     position plus the create struct's fields +0x1c (x) and +0x20 (y)", and SrvDoFunc 15 fills them with
+//     the cosine / sine table entries, so the offset-from-the-orb reading is VERIFIED wave 22), then
+//     advances the index by Param2 modulo 64.
 //   - hit function 29 (0x5a9640): while the orb has life left it returns 2 (a
 //     hit: damage, the orb flies on; the orb carries none itself); when its
 //     life is 0 it creates HitSubMissile1 for every sHitPar1-th table entry

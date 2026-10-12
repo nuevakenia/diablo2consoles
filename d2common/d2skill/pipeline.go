@@ -373,6 +373,11 @@ type SummonOrder struct {
 	// SKILL_AddSkillToUnit; Valkyrie's Dodge, Avoid, Evade and Critical Strike). That the passive stats of a monster
 	// skill take effect exactly like a player's is UNVERIFIED (AddSkillToUnit was not read).
 	Passives []StatMod
+	// AuraSkill / AuraLevel: the aura skill a summoned golem is given (sumskill1..5 with an aura state and an aura
+	// do function) and its level (sumskNcalc); the exe turns it on at once (SKILL_SpawnSummonedMinion ->
+	// SERVER_SetPlayerActiveSkill -> SKILL_ServerActivateToggleStateSkill). Fire Golem: Holy Fire.
+	AuraSkill string
+	AuraLevel int
 	// TrapSkill is the monster skill a trap or totem uses (sumskill1).
 	TrapSkill string
 	// TrapLevel is the level of the trap's monster skill (sumsk1calc) and TrapLife the shots the sentry may fire

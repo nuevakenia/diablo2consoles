@@ -223,12 +223,16 @@ func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.
 		// VERIFIED (0x579c90): flat reduction first, then the physical resist
 		// percent; no floor per component, the Total is only subtracted when > 0.
 		dmg = heroPhysicalDamage(dmg, reduce, physResist)
-		dmg += d.elementalHit(u, p, atk)
-		dmg += d.uModHit(u, p)
+		parts := HitParts{Phys: dmg}
+		dmg += d.elementalHitInto(u, p, atk, &parts)
+		dmg += d.uModHitInto(u, p, &parts)
 
 		// skill defenses run after the to-hit and shield block steps and the
 		// armor reductions: Energy Shield, Bone Armor, Thorns
-		if d.HeroDefense != nil {
+		if d.HeroDefenseParts != nil {
+			note += d.HeroDefenseParts(p, u.m, via == "", &parts)
+			dmg = parts.Total()
+		} else if d.HeroDefense != nil {
 			var dnote string
 
 			dmg, dnote = d.HeroDefense(p, u.m, via == "", dmg)

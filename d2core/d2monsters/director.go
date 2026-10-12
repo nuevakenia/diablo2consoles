@@ -233,6 +233,11 @@ type Director struct {
 	// Thorns...). melee is false for projectiles.
 	HeroDefense func(p *d2mapentity.Player, attacker *d2mapentity.Monster, melee bool, dmg int) (int, string)
 
+	// HeroDefenseParts, when set, replaces HeroDefense for monster hits: it gets the hit split by damage
+	// type and edits it in place (the exe's absorb callbacks walk the damage struct type by type), and
+	// returns a log note. Reflected damage (thorns) is the hook's own business.
+	HeroDefenseParts func(p *d2mapentity.Player, attacker *d2mapentity.Monster, melee bool, parts *HitParts) string
+
 	// HeroAvoid, if set, rolls the hero's dodge / avoid / evade for a landed
 	// hit BEFORE the damage roll (the exe's order). It reports whether the hit
 	// was avoided, with a log note. melee is false for projectiles.

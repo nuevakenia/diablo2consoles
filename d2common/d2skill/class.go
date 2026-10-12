@@ -1339,6 +1339,11 @@ func doRainFn(c *cast) {
 		return
 	}
 
+	if hx, hy := c.u.Pos(); !CreateAtTargetInRange(hx, hy, ax, ay) { // SKILL_ServerCreateMissileAtTarget, distance < 0x65
+		c.fail(ReasonMissile)
+		return
+	}
+
 	if c.castM(c.missileName(), castOpts{hasStart: true, startX: float64(ax) + 0.5, startY: float64(ay) + 0.5,
 		stationary: true}) == nil {
 		c.fail(ReasonMissile)
@@ -1590,6 +1595,10 @@ func doSummonFn(c *cast) {
 		// VERIFIED (SRVDO_044 0x5d49c0): the same, then the caster's own level
 		// (stat 0xc) is written over it.
 		o.Level = c.u.Level()
+	}
+
+	if sk.SrvDoFunc == 56 {
+		o.AuraSkill, o.AuraLevel = c.minionAura()
 	}
 
 	if sk.SrvDoFunc == 56 && sk.Name == "BloodGolem" {

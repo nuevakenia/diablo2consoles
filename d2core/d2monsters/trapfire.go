@@ -46,6 +46,9 @@ type TrapSpec struct {
 	// Level is the level of the sentry's monster skill and Life the shots it may take (calc4 at that level);
 	// see d2skill.SummonOrder.TrapLevel. Life 0 = unknown: the AI is then not used (TrapAIDriven false).
 	Level, Life int
+	// Hydra marks a Hydra head: its cadence is MONAI_Think_Hydra (0x5e8f10): every 10 ticks, a target nearer
+	// than 25 and a 60 percent roll fire the skill (no shot budget).
+	Hydra bool
 }
 
 // SkillFirer is implemented by the skill engine. It returns whether a missile
@@ -105,7 +108,15 @@ func (d *Director) trapTick(u *unit) bool {
 // unarmed sentry or one of another AI keeps the old driver.
 func (d *Director) TrapAIDriven(m *d2mapentity.Monster) bool {
 	u := d.byEntity[m.ID()]
-	if d.firer == nil || u == nil || u.ally == nil || u.ally.trap == nil || u.ally.trap.Life <= 0 {
+	if d.firer == nil || u == nil || u.ally == nil || u.ally.trap == nil {
+		return false
+	}
+
+	if u.ally.trap.Hydra {
+		return u.b.Def != nil && u.b.Def.Implemented && u.b.Profile != nil && u.b.Profile.AI == "Hydra"
+	}
+
+	if u.ally.trap.Life <= 0 {
 		return false
 	}
 

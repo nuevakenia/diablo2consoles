@@ -269,13 +269,18 @@ func (u *fxUnit) finish() {
 // uModHit adds what the monster's modifiers put on every hit (Fire / Lightning / Cold / Poison Enchanted) and takes
 // the mana of Mana Burn. The elements are reduced by the hero's resistance like the attack's own element. The rolls
 // are taken on the unit's seed only when a modifier carries the effect.
-func (d *Director) uModHit(u *unit, p *d2mapentity.Player) int {
+func (d *Director) uModHit(u *unit, p *d2mapentity.Player) int { return d.uModHitInto(u, p, nil) }
+
+// uModHitInto is uModHit that also books each element roll in parts (when not nil).
+func (d *Director) uModHitInto(u *unit, p *d2mapentity.Player, parts *HitParts) int {
 	b := &u.m.UMod
 	total := 0
 
 	for _, e := range b.Elems {
 		r := e.Min + int(u.b.Seed.Roll(int32(e.Max-e.Min+1)))
-		total += applyElemResist(r, e.Type, p.Stats.Totals)
+		r = applyElemResist(r, e.Type, p.Stats.Totals)
+		parts.add(e.Type, r)
+		total += r
 	}
 
 	if b.DrainMax > 0 {

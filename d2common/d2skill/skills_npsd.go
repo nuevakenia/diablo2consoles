@@ -105,7 +105,12 @@ func doHydraFn(c *cast) {
 
 	ax, ay := c.aim()
 
-	c.effect(Effect{Kind: "summon", Summon: &SummonOrder{
+	level := 0
+	if c.sk.SumSkCalc[1] != nil {
+		level = c.env.eval(c.sk.SumSkCalc[1]) // sumsk1calc: the level of the head's skill
+	}
+
+	c.effect(Effect{Kind: "summon", Summon: &SummonOrder{TrapLevel: level,
 		Key: c.sk.Summon, PetType: c.sk.PetType, Mode: c.sk.SumMode, Count: 3, Max: maxInt(c.env.eval(c.sk.PetMax), 3),
 		Kind: "trap", Frames: c.sk.Params[1], TrapSkill: c.sk.SumSkill[1], Stats: statsOf(c.env, c.sk),
 		X: ax, Y: ay, Desc: c.desc(), Cells: [][2]int{{-1, -1}, {0, 0}, {1, -1}},

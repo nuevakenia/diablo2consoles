@@ -262,6 +262,11 @@ func shotMissile(u *unit, mode d2monster.Mode) string {
 // stat). Returns the damage to add; a roll is consumed only when there is an
 // element.
 func (d *Director) elementalHit(u *unit, p *d2mapentity.Player, atk d2mapentity.MonsterAttack) int {
+	return d.elementalHitInto(u, p, atk, nil)
+}
+
+// elementalHitInto is elementalHit that also adds the roll to the matching field of parts (when not nil).
+func (d *Director) elementalHitInto(u *unit, p *d2mapentity.Player, atk d2mapentity.MonsterAttack, parts *HitParts) int {
 	if atk.ElemType == "" || atk.ElemMax <= 0 {
 		return 0
 	}
@@ -273,7 +278,10 @@ func (d *Director) elementalHit(u *unit, p *d2mapentity.Player, atk d2mapentity.
 
 	e := atk.ElemMin + int(u.b.Seed.Roll(int32(atk.ElemMax-atk.ElemMin+1)))
 
-	return applyElemResist(e, atk.ElemType, p.Stats.Totals)
+	e = applyElemResist(e, atk.ElemType, p.Stats.Totals)
+	parts.add(atk.ElemType, e)
+
+	return e
 }
 
 // applyElemResist reduces an elemental roll by the hero's shown resistance of
@@ -298,3 +306,34 @@ func applyElemResist(e int, elem string, t *d2statlist.Totals) int {
 
 	return e * (100 - pct) / 100
 }
+
+// HitParts is the damage of one monster hit on a hero split by damage type, as the exe's damage struct
+// keeps it (physical, fire, lightning, cold, magic, poison); the typed HeroDefenseParts hook (Energy
+// Shield, Bone Armor) reads and edits it. Poison is never absorbed by those two.
+type HitParts struct {
+	Phys, Fire, Light, Cold, Magic, Pois int
+}
+
+// add books v under the element name a monster attack or unique modifier uses (fire, cold, ltng, pois,
+// mag). nil safe; unknown names count as magic (UNVERIFIED, only reachable with a table typo).
+func (h *HitParts) add(elem string, v int) {
+	if h == nil {
+		return
+	}
+
+	switch elem {
+	case "fire":
+		h.Fire += v
+	case "cold":
+		h.Cold += v
+	case "ltng":
+		h.Light += v
+	case "pois":
+		h.Pois += v
+	default:
+		h.Magic += v
+	}
+}
+
+// Total is the sum of all parts.
+func (h HitParts) Total() int { return h.Phys + h.Fire + h.Light + h.Cold + h.Magic + h.Pois }

@@ -84,6 +84,8 @@ type timer struct {
 type Engine struct {
 	*d2util.Logger
 
+	stamps *cellStamps // missile cell bits (cellstamp.go)
+
 	asset     *d2asset.AssetManager
 	mapEngine *d2mapengine.MapEngine
 	monsters  *d2monsters.Director
@@ -161,7 +163,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 		visuals: map[uint32]*d2mapentity.Missile{}, fx: map[*d2mapentity.Missile]int{},
 		sets: map[string]*d2state.Set{}, auras: map[string]*auraRun{}, pets: map[string][]*d2mapentity.Monster{}, dots: map[string]dotTotal{},
 		walls: map[string]*wallRun{}, monSeed: d2rand.New(opt.Seed ^ 0x6d6f6e73),
-		travel: map[uint32]func(){},
+		travel: map[uint32]func(){}, stamps: newCellStamps(),
 	}
 
 	e.Logger.SetLevel(l)
@@ -183,6 +185,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 		return e.monsters.Grid().Flags(x, y)&(d2path.FlagWalk|d2path.FlagWall) == 0
 	}
 	monsters.HeroDefense = e.heroDefense
+	monsters.HeroDefenseParts = e.heroDefenseParts
 	monsters.HeroAvoid = e.heroAvoid
 	e.installMercHooks()
 	e.monsters.SetSkillFirer(e)
@@ -985,6 +988,7 @@ func (e *Engine) AreaChanged(md *d2monsters.Director) {
 		e.monsters = md
 		e.pipe.Grid = md.Grid()
 		md.HeroDefense = e.heroDefense
+		md.HeroDefenseParts = e.heroDefenseParts
 		md.HeroAvoid = e.heroAvoid
 		e.installMercHooks()
 	}
@@ -1099,6 +1103,7 @@ func (e *Engine) Advance(elapsed float64) {
 	for e.acc >= frameSeconds {
 		e.acc -= frameSeconds
 		e.frame++
+		e.stamps.roll()
 		e.sim.Step()
 		e.runTimers()
 		e.tick()

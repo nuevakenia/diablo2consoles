@@ -884,6 +884,11 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 		}
 	}
 
+	if o.ItemID != "" {
+		// Iron Golem (0x5c3100): the item is equipped on the golem, so its properties become the golem's
+		o.Stats = append(append([]d2skill.StatMod{}, o.Stats...), e.groundItemMods(o.ItemID)...)
+	}
+
 	if o.ItemID != "" && !e.takeGroundItem(o.ItemID) {
 		e.emit("summon", "SUMMON skill=%q key=%s refused=item_gone", sk.Name, key)
 
@@ -972,6 +977,10 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 
 	e.emit("summon", "SUMMON skill=%q key=%s kind=%s created=%d alive=%d max=%d hp_pct=%d damage_pct=%d at=(%d,%d)", sk.Name,
 		stat.Key, o.Kind, made, len(e.alivePets(p.ID(), opt.Tag)), o.Max, o.HPPct, opt.DamagePct, x, y)
+
+	if o.AuraSkill != "" && first != nil {
+		e.startMinionAura(p, u, o, first)
+	}
 
 	if o.Makers != nil && first != nil {
 		e.launchWallMakers(u, sk, o, first)
@@ -1091,7 +1100,12 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 
 	e.traps = append(e.traps, t)
 
-	if o.TrapLife > 0 && t.cycler == "" {
+	if sk.SrvDoFunc == 144 {
+		// the Hydra heads run MONAI_Think_Hydra instead of the fixed trap timer
+		e.monsters.SetSkillFirer(e)
+		e.monsters.ArmTrap(m, d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile, Level: maxInt(o.TrapLevel, 1),
+			Hydra: true})
+	} else if o.TrapLife > 0 && t.cycler == "" {
 		// MONAI_Think_AssassinSentry drives the cadence, range and shot budget (sentry_ai_test.go)
 		e.monsters.SetSkillFirer(e)
 		e.monsters.ArmTrap(m, d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile,
