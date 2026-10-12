@@ -36,8 +36,8 @@ func mergeIntoStack(onGrid, held InventoryItem) (rest InventoryItem, merged bool
 	}
 
 	b, ok := held.(StackableItem)
-	if !ok || !a.IsStackable() || !b.IsStackable() || a.GetItemCode() != b.GetItemCode() {
-		return nil, false
+	if !ok || !a.IsStackable() || !b.IsStackable() || !d2inventory.CanStack(stackProbe(a), stackProbe(b)) {
+		return nil, false // INV_CheckItemsStackable 0x62c9a0: quality, ethereal, sockets and damage must match too
 	}
 
 	stack, surplus := d2inventory.MergeStacks(a.Quantity(), b.Quantity(), a.StackLimit())
