@@ -1,5 +1,11 @@
 package d2player
 
+import (
+	"strings"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2locale"
+)
+
 // Pure layout of the quest log of the original (UI_DrawQuestLogPanel 0x49fc00; slot table 0x7231a8, text tables
 // 0x723510..0x723520 read from the exe file). Panel relative values; add the panel offset (80, 60 at 800x600).
 // Pictures stand on their bottom edge.
@@ -54,4 +60,10 @@ func (m Mode) QuestLayoutRects() []UIRect {
 	)
 
 	return rs
+}
+
+// QuestDescriptionText wraps the quest description at questDescrWrapWidth pixels (the exe wraps at 270 px, read
+// at 0x49fc00) using the given pixel measure; lines are joined with newlines (pitch questDescrPitch).
+func QuestDescriptionText(text string, measure func(string) int) string {
+	return strings.Join(d2locale.Default().WrapText(text, questDescrWrapWidth, measure), "\n")
 }

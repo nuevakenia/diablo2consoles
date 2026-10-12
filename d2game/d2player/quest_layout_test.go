@@ -1,6 +1,9 @@
 package d2player
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestQuestLayoutGolden(t *testing.T) {
 	want := []string{
@@ -27,5 +30,18 @@ func TestQuestLayoutGolden(t *testing.T) {
 		if !got[w] {
 			t.Errorf("missing %q", w)
 		}
+	}
+}
+
+func TestQuestDescriptionTextPixelWrap(t *testing.T) {
+	measure := func(s string) int { return 10 * len(s) } // 27 glyphs fit in 270 px
+	got := QuestDescriptionText("aaaaaaaaa bbbbbbbbb ccccccccc ddddddddd", measure)
+	want := "aaaaaaaaa bbbbbbbbb\nccccccccc ddddddddd"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+
+	if got := QuestDescriptionText(strings.Repeat("x", 27), measure); strings.Contains(got, "\n") {
+		t.Fatalf("27 glyphs = 270 px must fit: %q", got)
 	}
 }

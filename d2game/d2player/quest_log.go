@@ -2,7 +2,6 @@ package d2player
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
@@ -177,7 +176,13 @@ const (
 	socketHighlightedFrame = 1
 )
 
-const questDescriptionLenght = 30
+// wrapQuestDescription wraps at the exe width of 270 px measured with the description font.
+func (s *QuestLog) wrapQuestDescription(text string) string {
+	return QuestDescriptionText(text, func(t string) int {
+		w, _ := s.questDescr.GetTextMetrics(t)
+		return w
+	})
+}
 
 type questLogTab struct {
 	sprite          *d2ui.Sprite
@@ -439,11 +444,7 @@ func (s *QuestLog) setQuestLabel() {
 	switch status {
 	case d2enum.QuestStatusCompleted, d2enum.QuestStatusCompleting:
 		s.questDescr.SetText(
-			strings.Join(
-				d2util.SplitIntoLinesWithMaxWidth(
-					s.asset.TranslateString("qstsprevious"),
-					questDescriptionLenght),
-				"\n"),
+			s.wrapQuestDescription(s.asset.TranslateString("qstsprevious")),
 		)
 	case d2enum.QuestStatusNotStarted:
 		s.questDescr.SetText("")
@@ -455,11 +456,7 @@ func (s *QuestLog) setQuestLabel() {
 		if str == descr {
 			s.questDescr.SetText("")
 		} else {
-			s.questDescr.SetText(strings.Join(
-				d2util.SplitIntoLinesWithMaxWidth(
-					descr, questDescriptionLenght),
-				"\n"),
-			)
+			s.questDescr.SetText(s.wrapQuestDescription(descr))
 		}
 	}
 }
