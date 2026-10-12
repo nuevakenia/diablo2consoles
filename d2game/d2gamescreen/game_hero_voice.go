@@ -86,7 +86,7 @@ func (v *Game) sayHero(id int) {
 		delay = plan.LineDelay
 	}
 
-	v.Infof("HEROVOICE id=%#x handle=%s", id, h)
+	v.Infof("HEROVOICE id=%#x handle=%s tick=%d", id, h, v.soundEngine.Ticks())
 	v.heroSoundTick = v.soundEngine.Ticks()
 	v.playSoundAtPos(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
 		Emitter: heroEmitter, Hero: true, Kind: "hero-voice", Who: v.localPlayer.Name(), Delay: delay,

@@ -53,7 +53,8 @@ func (v *Game) monsterDirector() *d2monsters.Director {
 		LogStats:   os.Getenv("OD2_AUTODIFFICULTY") != "",
 		Expansion:  true, // the game data is Lord of Destruction (MonLvl*Ex columns)
 		// the scenario spawns monsters next to a hero who may still be in town
-		IgnoreTown: os.Getenv("OD2_AUTOMONSTER") != "" || os.Getenv("OD2_AUTOMERC") != "" || os.Getenv("OD2_AUTOAI") != "" || os.Getenv("OD2_AUTOPARTY") != "" || os.Getenv("OD2_AUTOBOSS") != "" || os.Getenv("OD2_AUTOBOSSFIGHT") != "",
+		IgnoreTown:    os.Getenv("OD2_AUTOMONSTER") != "" || os.Getenv("OD2_AUTOMERC") != "" || os.Getenv("OD2_AUTOAI") != "" || os.Getenv("OD2_AUTOPARTY") != "" || os.Getenv("OD2_AUTOBOSS") != "" || os.Getenv("OD2_AUTOBOSSFIGHT") != "",
+		TestAlwaysHit: os.Getenv("OD2_AUTOMONSTER_ALWAYSHIT") != "",
 		// heroes in the game (1 when playing alone); OD2_PLAYERS can force more
 		PlayersFunc:   v.livePlayerCount,
 		ForcedPlayers: d2monsters.ForcedPlayersFromEnv(os.Getenv("OD2_PLAYERS")),

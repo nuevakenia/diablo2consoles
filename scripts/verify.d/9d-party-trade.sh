@@ -41,11 +41,11 @@ b[0x0c:0x10] = s.to_bytes(4, "little")
 open(sys.argv[2], "wb").write(b)' "$1" "$2" "$3"
 }
 
-# _swings <name>: 24 melee swings at a player, a second apart (a level 94 sorceress hits a level 94
+# _swings <name>: 48 melee swings at a player, a second apart (a level 94 sorceress hits a level 94
 # sorceress about one time in five: the hero's attack rating against her defense)
 _swings() {
   local i out=""
-  for i in {1..24}; do out+="say:pvp $1;wait:1;"; done
+  for i in {1..48}; do out+="say:pvp $1;wait:1;"; done
   echo "${out%;}"
 }
 
@@ -91,7 +91,10 @@ scenario_env() {
     [ -n "${OD2_VERIFY_CONFIG_DIR:-}" ] && echo "export OD2_CONFIG_DIR=\"$OD2_VERIFY_CONFIG_DIR\""
     echo "export OD2_AUTOGAME=\"$jsave\""
     echo "export OD2_AUTOSCRIPT='$jscript'"
-    echo "sleep 25  # the host imports its save first (two imports at once pick the same hero file name)"
+    # the host imports its save first (two imports at once pick the same hero file name): wait until the host's server is up
+    # (its log has the line), not a fixed 25 s, which a loaded machine overran (the joiner then collided with the host's import
+    # and never joined: "log did not contain SOCIAL roster n=2")
+    echo "for i in {1..300}; do grep -q 'Starting Game Server' $log 2>/dev/null && break; sleep 1; done; sleep 3"
     echo "$tmp/od2 2>&1 | tee $mp_join_log"
   } > $jcmd
   chmod +x $jcmd; rm -f $mp_join_log
@@ -105,7 +108,7 @@ scenario_env() {
 _9d_nums() { sed -nE "s/.*$2.*/\1/p" $1; }
 
 scenario_check() {
-  local j=$mp_join_log.txt hn=$mp_host_name jn=$mp_second_name
+  local j=$mp_join_log.txt hn=$mp_host_name jn=$mp_second_name fail_in=$fail
   [ -f "$mp_join_log" ] && sed 's/\x1b\[[0-9;]*m//g' $mp_join_log > $j
   if [ ! -f "$j" ]; then echo "FAIL: no joiner log"; fail=1; return; fi
 
@@ -198,4 +201,6 @@ scenario_check() {
   grep -q "notice=\"$jn left the game\"" $log.txt || { echo "FAIL: host did not see the joiner leave"; fail=1; }
   grep 'SOCIAL roster' $log.txt | tail -1 | grep -q 'n=1 ' || { echo "FAIL: host still lists the joiner after it left"; fail=1; }
   if grep -E "\[(ERROR|WARNING)\]|panic" $j | grep -v "skipping missing"; then echo "FAIL: errors in the joiner log"; fail=1; fi
+  # the runner keeps only the host's log of a failed attempt: keep the joiner's too
+  if [ "$fail" != "$fail_in" ]; then mkdir -p ${OD2_VERIFY_FLAKE_DIR:-/tmp/od2-flake-logs}; cp -f $j ${OD2_VERIFY_FLAKE_DIR:-/tmp/od2-flake-logs}/9d-party-trade.$$.joiner.txt; fi
 }

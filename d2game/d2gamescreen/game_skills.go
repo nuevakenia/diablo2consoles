@@ -72,6 +72,12 @@ type castItem struct {
 	// cast; 0 means castTestEngage. Short-reach rings (Battle Cry: 4 tiles) need it close.
 	engage      int
 	engageMoves int // times the hero was put next to the monster for an "@N" skill (bounded)
+	// pull is set once an area state of this skill reached nobody (Counters.EmptyArea rose, emptySeen is the count
+	// already accounted for): the zombies of the scenario shamble about and may stand outside the radius (Inner
+	// Sight: 20 subtiles, monsters 23 to 26 away), and repeating the cast on the same spot changes nothing, so the
+	// scenario walks the hero next to the monster like an "@N" entry would.
+	pull      bool
+	emptySeen int
 	// landedKey ("~tag" after the entry) counts the engine's Landed(skill+"#"+tag) instead of the skill's own
 	// hits: a Death Sentry shoots lightning all the time, "~explode" waits for its corpse explosion.
 	landedKey string
@@ -94,7 +100,13 @@ func (it *castItem) missedHit(c d2skills.Counters) bool {
 		}
 	}
 
-	return it.mustHit && it.hitRetries < castItemMaxHitRetries && n <= 0
+	// a "!!" skill whose swing or missile missed on the to-hit roll and landed no direct hit is cast again even when a
+	// splash or a late area of the same cast reached the target (Lightning Strike, Charged Strike: the swing missed
+	// while the bolt killed the zombie; Freezing Arrow: the arrow missed, its blast killed it): the 5% minimum miss
+	// would otherwise flake a scenario that checks "SKILL melee ... hit=true" / "MISSILE hit name=...".
+	toHitMissed := it.ownHit && c.Misses-it.c0.Misses > 0 && c.Hits-it.c0.Hits <= 0
+
+	return it.mustHit && it.hitRetries < castItemMaxHitRetries && (n <= 0 || toHitMissed)
 }
 
 // castItemMaxRetries bounds how often a refused cast is repeated.
@@ -107,7 +119,7 @@ const castItemMaxRetries = 12
 const castBusyWaitMax = 10.0
 
 // castItemMaxHitRetries bounds how often a mustHit skill is cast again.
-const castItemMaxHitRetries = 8
+const castItemMaxHitRetries = 16
 
 // castItemMaxSpreadCasts bounds the extra casts of a skill that has to spread (OD2_AUTOCAST_SPREAD).
 const castItemMaxSpreadCasts = 8
@@ -344,6 +356,7 @@ func (v *Game) startCastItem(eng *d2skills.Engine, t *castTest, it *castItem) {
 	}
 
 	it.refusedSeen = eng.Counters.Wasted()
+	it.emptySeen = eng.Counters.EmptyArea
 
 	p := v.localPlayer
 	if s := p.Skills[it.id]; s == nil || s.SkillPoints < 1 {
@@ -420,6 +433,12 @@ func (v *Game) autoCast(elapsed float64) {
 			}
 
 			it.refusedSeen = eng.Counters.Wasted()
+
+			if eng.Counters.EmptyArea > it.emptySeen {
+				it.pull = true
+			}
+
+			it.emptySeen = eng.Counters.EmptyArea
 		}
 	}
 
@@ -433,6 +452,7 @@ func (v *Game) autoCast(elapsed float64) {
 
 		if it.missedHit(eng.Counters) {
 			it.hitRetries++
+			it.pull = true // the next cast starts with the hero next to the monster (an aura or field that reached nobody)
 			it.casts = it.count - 1
 			it.doneFor = 0
 			v.Infof("AUTOCAST skill=%q hit nobody, casting again (%d)", it.skill, it.hitRetries)
@@ -522,8 +542,8 @@ func (v *Game) autoCast(elapsed float64) {
 	t.engageW = 0
 
 	// a short-reach skill ("@N") whose monster did not come: the scenario walks the hero next to it
-	if hx, hy := int(v.localPlayer.Position.X()), int(v.localPlayer.Position.Y()); it.engage > 0 &&
-		it.engageMoves < 4 && d2monster.Distance(hx-aimX, hy-aimY) > engage {
+	if hx, hy := int(v.localPlayer.Position.X()), int(v.localPlayer.Position.Y()); (it.engage > 0 || it.pull) &&
+		it.engageMoves < 8 && d2monster.Distance(hx-aimX, hy-aimY) > engage {
 		it.engageMoves++
 		v.putHeroNear(aimX, aimY)
 

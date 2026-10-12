@@ -1149,7 +1149,7 @@ func (g *GameControls) AutoPanel(name string) error {
 	if name == "character" {
 		// the values the panel shows, for the autotests (scripts/verify.d/89-hero-stats.sh)
 		g.heroStatsPanel.setDerivedValues()
-		g.Infof("PANEL character: %s", d2hero.StatsSummary(g.hero.Stats))
+		g.Infof("PANEL character: %s sim=%.2f", d2hero.StatsSummary(g.hero.Stats), d2util.SimSeconds())
 	}
 
 	g.logPanel(name)

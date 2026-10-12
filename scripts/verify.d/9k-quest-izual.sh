@@ -1,12 +1,12 @@
 scenario_name="Quest walkthrough, Act 4: The Fallen Angel in the real world (Tyrael, Outer Steppes, Plains of Despair, Izual, Tyrael's reward, quest log, .d2s)"
 # The sample hero (quests reset, Normal monsters) arrives in the Pandemonium Fortress, talks to Tyrael (his lines come
 # newest quest first: Terror's End, The Fallen Angel, the Act 4 welcome), walks through the Outer Steppes into the Plains of
-# Despair, kills everything there including Izual (placed by the DS1) and returns to Tyrael for the 2 skill points.
+# Despair, kills Izual (placed by the DS1; kill:name, because kill:all over the whole level cleared only 110 to 150 of 237 monsters in 250 game seconds on a loaded machine and left Izual alive) and returns to Tyrael for the 2 skill points.
 # Needs D2_TABLES + D2S_SAMPLE_BODY.
 source scripts/quest_walk_lib.zsh
 scenario_warnings_ok=1
 scenario_env() {
-  local s="$(qw_begin 4)$(qw_panel 4 1)$(qw_talk Tyrael)$(qw_talk Tyrael)$(qw_talk Tyrael)$(qw_panel 4 1)$(qw_go 104 105)kill:all,250;$(qw_panel 4 1)"
+  local s="$(qw_begin 4)$(qw_panel 4 1)$(qw_talk Tyrael)$(qw_talk Tyrael)$(qw_talk Tyrael)$(qw_panel 4 1)$(qw_go 104 105)kill:name=Izual,300;$(qw_panel 4 1)"
   s+="$(qw_go 104 103)$(qw_talk Tyrael)$(qw_talk Tyrael)$(qw_panel 4 1)exit"
   qw_env izual "$s"
 }

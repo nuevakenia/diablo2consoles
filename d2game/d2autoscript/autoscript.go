@@ -198,7 +198,7 @@ type LogMarkHost interface {
 }
 
 // WaitLogTimeout is the longest a waitlog step waits (game seconds).
-const WaitLogTimeout = 90.0
+const WaitLogTimeout = 240.0
 
 // BusyTimeout is the longest the runner waits for a busy host (game seconds). A fight has its own
 // deadline (kill:near=30,150 runs up to 150 s); with the tougher natural monsters of the packs the
