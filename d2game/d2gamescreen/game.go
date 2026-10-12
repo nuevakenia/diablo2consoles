@@ -157,6 +157,7 @@ type Game struct {
 	dayClock             *dayClock
 	greetingRecent       map[string]string
 	returnGreet          returnGreetings
+	npcTownRT            *npcTownState // the client NPC memory: greeting gate, gossip lines (npc_town.go)
 	autosaveElapsed      float64
 	autoTestElapsed      float64
 	autoTestDone         bool
@@ -686,6 +687,8 @@ func (v *Game) npcClassID(entity d2interface.MapEntity) int {
 // the NPC they clicked, keeps it attached to the NPC and closes it again
 // when the player walks away.
 func (v *Game) advanceNPCInteraction(_ float64) {
+	v.watchNPCRoom()
+
 	if v.npcTarget == nil || v.localPlayer == nil || v.gameControls == nil {
 		return
 	}
@@ -739,8 +742,9 @@ func (v *Game) advanceNPCInteraction(_ float64) {
 		return
 	}
 
+	v.healOnTalk(v.npcTarget)
 	v.openNPCMenu(menu, v.npcTarget)
-	v.playNPCGreeting(v.npcTarget.Label())
+	v.greetOnOpen(v.npcTarget)
 }
 
 // endConversationUnlessMenuOpen forgets the NPC the hero walked up to once its
@@ -772,7 +776,7 @@ func (v *Game) anchorNPCMenu(menu *d2player.NPCMenu, npc d2interface.MapEntity) 
 // openNPCMenu shows the Talk/Trade/... menu for an NPC.
 func (v *Game) openNPCMenu(menu *d2player.NPCMenu, npc d2interface.MapEntity) []d2player.NPCMenuRow {
 	classID := v.npcClassID(npc)
-	rows, known := d2player.NPCMenuFor(classID)
+	rows, known := v.npcMenuRows(classID)
 
 	rows = v.withTravelRows(classID, rows)
 	rows = v.withRewardRows(classID, rows)
@@ -811,9 +815,17 @@ func (v *Game) onNPCMenuChoice(npc d2interface.MapEntity, row d2player.NPCMenuRo
 			return
 		}
 
-		path := v.playNPCGreeting(npc.Label())
-		v.Infof("NPC menu: Talk with %q (voice %q)", npc.Label(), path)
+		// no quest speech: the exe's Talk row opens the introduction / gossip submenu (0x4b20f0); the greeting
+		// already played when the menu opened
+		opened := v.talkSubmenu(npc)
+		v.Infof("NPC menu: Talk with %q (submenu %v)", npc.Label(), opened)
 		v.travelOnTalk(npc)
+		v.endConversationUnlessMenuOpen()
+	case d2player.NPCActionIntro:
+		v.npcIntro(npc)
+		v.endConversationUnlessMenuOpen()
+	case d2player.NPCActionGossip:
+		v.npcGossip(npc)
 		v.endConversationUnlessMenuOpen()
 	case d2player.NPCActionTopic:
 		v.questTopic(npc, row.StringID)
@@ -858,7 +870,7 @@ func (v *Game) openGamble(npc d2interface.MapEntity, seed uint32) bool {
 
 // openIdentify opens Deckard Cain's identify window.
 func (v *Game) openIdentify(npc d2interface.MapEntity) {
-	v.gameControls.OpenIdentify()
+	v.gameControls.OpenIdentify(v.npcQuestRecord())
 
 	v.npcTarget, v.tradeActive = npc, true
 }
@@ -1140,7 +1152,7 @@ func (v *Game) autoTestIdentify(spec string, byLabel map[string]d2interface.MapE
 		// Cain only stands in the camp after his rescue; the window does not
 		// need him, so the test opens it directly
 		v.Infof("AUTOIDENTIFY npc=Cain in_town=false (opening the window directly)")
-		v.gameControls.OpenIdentify()
+		v.gameControls.OpenIdentify(v.npcQuestRecord())
 	} else {
 		v.openIdentify(cain)
 	}

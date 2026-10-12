@@ -16,7 +16,7 @@ func TestRewardNPCMenus(t *testing.T) {
 		{"Malah", 513, []NPCMenuAction{NPCActionTalk, NPCActionTrade}},
 		{"Charsi", 154, []NPCMenuAction{NPCActionTalk, NPCActionTradeRepair}},
 		{"Akara", 148, []NPCMenuAction{NPCActionTalk, NPCActionTrade}},
-		{"Kashya", 150, []NPCMenuAction{NPCActionTalk, NPCActionHire}},
+		{"Kashya", 150, []NPCMenuAction{NPCActionTalk}}, // Hire is added from hero level 8 (d2npc.Options)
 		{"Qual-Kehk", 515, []NPCMenuAction{NPCActionTalk, NPCActionHire}},
 		{"Asheara", 252, []NPCMenuAction{NPCActionTalk, NPCActionHire, NPCActionTrade}},
 		{"Hratli", 253, []NPCMenuAction{NPCActionTalk, NPCActionTradeRepair}},
