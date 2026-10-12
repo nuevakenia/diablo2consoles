@@ -247,16 +247,24 @@ func (g *GameControls) ContainerPositions(name string) (lines []string, size str
 	case "stash":
 		cols, rows := g.stash.Size()
 
-		return g.stash.Describe(), fmt.Sprintf("%dx%d", cols, rows), nil
+		return g.stash.Describe(), fmt.Sprintf("%dx%d %s", cols, rows, gridRectInfo(g.stash.Grid())), nil
 	case "cube":
 		cols, rows := g.cube.Size()
 
-		return g.cube.Describe(), fmt.Sprintf("%dx%d", cols, rows), nil
+		return g.cube.Describe(), fmt.Sprintf("%dx%d %s", cols, rows, gridRectInfo(g.cube.Grid())), nil
 	case "belt":
 		return g.belt.Describe(), fmt.Sprintf("%dx%d boxes=%d", d2inventory.BeltColumns, g.belt.Rows(), g.belt.Boxes()), nil
 	}
 
 	return nil, "", fmt.Errorf("unknown container %q", name)
+}
+
+// gridRectInfo is "grid=left,top,right,bottom outside=N" (N items leaving the grid rectangle, always 0 when the layout
+// matches the panel picture).
+func gridRectInfo(gr *ItemGrid) string {
+	l, t, r, b := gr.Bounds()
+
+	return fmt.Sprintf("grid=%d,%d,%d,%d outside=%d", l, t, r, b, gr.ItemsOutside())
 }
 
 // SpecRoundTripMismatches rebuilds every container item from its spec and

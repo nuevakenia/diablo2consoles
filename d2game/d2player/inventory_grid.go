@@ -343,6 +343,32 @@ func (g *ItemGrid) Bounds() (left, top, right, bottom int) {
 	return g.originX, g.originY, g.originX + g.width*g.slotSize, g.originY + g.height*g.slotSize
 }
 
+// ItemsOutside counts the items whose cells or whose drawn picture (slot corner + sprite size, as renderInventoryItems
+// draws it) leave the grid rectangle; a layout that matches its picture has none (autotest and unit tests).
+func (g *ItemGrid) ItemsOutside() int {
+	left, top, right, bottom := g.Bounds()
+	bad := 0
+
+	for _, it := range g.items {
+		x, y := g.SlotToScreen(it.InventoryGridSlot())
+		w, h := it.InventoryGridSize()
+		r, b := x+w*g.slotSize, y+h*g.slotSize
+
+		if sp := g.sprites[it.GetItemCode()]; sp != nil {
+			sw, sh := sp.GetCurrentFrameSize()
+			if x+sw > r+1 || y+sh > b+1 { // the picture may not be larger than its cells
+				r, b = x+sw, y+sh
+			}
+		}
+
+		if x < left || y < top || r > right || b > bottom {
+			bad++
+		}
+	}
+
+	return bad
+}
+
 // ItemAtScreen returns the item under a screen position, or nil.
 func (g *ItemGrid) ItemAtScreen(mx, my int) InventoryItem {
 	left, top, right, bottom := g.Bounds()
