@@ -903,12 +903,13 @@ func (a *App) ToCinematics() {
 // importD2SSave imports a Diablo II .d2s character as a new OpenDiablo2 save
 // and returns the path of the saved file. The original is only read.
 func (a *App) importD2SSave(path string) (string, error) {
-	data, err := os.ReadFile(filepath.Clean(path))
+	factory, err := d2hero.NewHeroStateFactory(a.asset)
 	if err != nil {
 		return "", err
 	}
 
-	factory, err := d2hero.NewHeroStateFactory(a.asset)
+	// validated; a damaged save is offered a backup instead of failing blindly
+	data, err := factory.ReadD2SFile(filepath.Clean(path))
 	if err != nil {
 		return "", err
 	}
@@ -919,6 +920,7 @@ func (a *App) importD2SSave(path string) (string, error) {
 	}
 
 	state.Imported.Source = path
+	state.NoteD2SOnDisk(path, data)
 
 	if err = factory.SaveImported(state); err != nil {
 		return "", err
