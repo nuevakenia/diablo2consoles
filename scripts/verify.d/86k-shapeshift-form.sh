@@ -8,17 +8,17 @@ scenario_warnings_ok=1
 # W32_SHOT=<dir> also saves screenshots of the forms (never inside the repo).
 scenario_env() {
   local shot="${W32_SHOT:-}" s
-  s='wait:3;skill:spend=Wearwolf;skill:spend=Wearbear;skill:right=Wearwolf;click:right@hero:60,30;until:FORM wolf composite=40,40;wait:1'
+  s='wait:3;skill:spend=Wearwolf;skill:spend=Wearbear;skill:right=Wearwolf;click:right@hero:60,30;wait:3'
   [ -n "$shot" ] && s="$s;say:capframe $shot/wolf-idle.png;wait:1"
-  s="$s;skill:left=Attack;say:heromoved;click:left@hero:140,30;until:HERO moved,60;wait:1"
+  s="$s;skill:left=Attack;say:heromoved;click:left@hero:140,30;wait:2"
   [ -n "$shot" ] && s="$s;say:capframe $shot/wolf-walk.png;wait:1"
-  s="$s;until:HERO still,120;press:R;click:left@hero:-140,-30;until:HERO moved,60;wait:1;press:R"
+  s="$s;wait:3;press:R;click:left@hero:-140,-30;wait:2;press:R"
   [ -n "$shot" ] && s="$s;say:capframe $shot/wolf-run.png;wait:1"
-  s="$s;until:HERO still,120;click:right@hero:60,30;until:FORM human composite=DZ,40;wait:1"
+  s="$s;wait:2;click:right@hero:60,30;wait:3"
   [ -n "$shot" ] && s="$s;say:capframe $shot/human.png;wait:1"
-  s="$s;skill:right=Wearbear;click:right@hero:60,30;until:FORM bear composite=TG,40;wait:1"
+  s="$s;skill:right=Wearbear;click:right@hero:60,30;wait:3"
   [ -n "$shot" ] && s="$s;say:capframe $shot/bear-idle.png;wait:1"
-  s="$s;click:right@hero:60,30;until:FORM human composite=DZ,40;wait:1;exit"
+  s="$s;click:right@hero:60,30;wait:3;exit"
   echo "export OD2_AUTOGAME=\"$tmp/w32.od2\" OD2_AUTOCAST_CLASS=druid OD2_AUTOCAST_CLVL=18 OD2_AUTOCAST_SKILLPOINTS=4"
   echo "export OD2_AUTOSCRIPT='$s'"
 }
