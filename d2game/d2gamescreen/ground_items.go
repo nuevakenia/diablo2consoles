@@ -345,7 +345,7 @@ func (v *Game) openChest(ob *d2mapentity.Object) {
 	// the chest stands in (VERIFIED, see diablo2item.ChestLoot)
 	co := diablo2item.ChestDropOptions{
 		DropOptions: diablo2item.DropOptions{Seed: 0, Players: 1, MagicFind: v.heroMagicFind(), GoldFind: v.heroGoldFind()},
-		LevelID:     v.currentLevel(), Difficulty: v.difficulty(), Expansion: true,
+		LevelID:     v.currentLevel(), Difficulty: v.difficulty(), Expansion: v.heroExpansion(),
 	}
 
 	all := &diablo2item.Loot{}
@@ -506,6 +506,7 @@ func areaMonsterLevel(l *d2records.LevelDetailRecord, difficulty int, expansion 
 func (v *Game) itemFactory() *diablo2item.ItemFactory {
 	f := v.gameClient.MapEngine.ItemFactory()
 	f.Difficulty = v.difficulty()
+	f.Classic = !v.heroExpansion()
 
 	return f
 }

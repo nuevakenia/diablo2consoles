@@ -60,10 +60,11 @@ func (t *TradeWindow) generateGamble(v d2vendor.Vendor, seed uint32) *d2vendor.S
 
 	params := d2vendor.GambleParamsFor(t.asset.Records, t.difficulty)
 	t.factory.Difficulty = t.difficulty
+	t.factory.Classic = t.classic
 	// The expansion check of the original (record version < 100 skips
 	// classic-only rows, upgrades need the expansion) is not modelled: this
 	// engine always runs with the Lord of Destruction tables.
-	picks := d2vendor.GenerateGamble(d2rand.New(seed), pool, ring, amulet, params, t.playerLevel(), true)
+	picks := d2vendor.GenerateGamble(d2rand.New(seed), pool, ring, amulet, params, t.playerLevel(), !t.classic)
 
 	for idx, g := range picks {
 		item, err := t.factory.ItemFromCode(g.Code, g.Quality, g.ILvl, seed+uint32(idx)+1)

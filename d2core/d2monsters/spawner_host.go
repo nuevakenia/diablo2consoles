@@ -219,7 +219,12 @@ func (d *Director) scaledSpawnClass(u *unit, id int) *d2records.MonStatRecord {
 		}
 	}
 
-	got := d2monster.ScaleSpawnClass(monScale{d}, st.ID, mons, det.MonsterLevelNormalEx)
+	areaLvl := det.MonsterLevelNormalEx
+	if !d.opt.Expansion {
+		areaLvl = det.MonsterLevelNormal // classic game: the non Ex column (UNVERIFIED that the exe scales at all)
+	}
+
+	got := d2monster.ScaleSpawnClass(monScale{d}, st.ID, mons, areaLvl)
 	if r := d.statByID[got]; r != nil {
 		return r
 	}

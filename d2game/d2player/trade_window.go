@@ -111,8 +111,10 @@ type TradeWindow struct {
 	stashGold *int
 
 	difficulty int
-	mouseX     int
-	mouseY     int
+	// classic is a game without the expansion: no Version >= 100 stock, no gamble upgrades (w43)
+	classic bool
+	mouseX  int
+	mouseY  int
 
 	onChange func()
 	onClose  func()
@@ -276,7 +278,7 @@ func (t *TradeWindow) open(v d2vendor.Vendor, seed uint32, quests *d2s.QuestReco
 		// Tier is the vendor's act (VERIFIED item level cap index, normal
 		// difficulty only; Options ignores it when Difficulty != 0).
 		stock = d2vendor.GenerateSeeded(seed, bases, d2vendor.Options{
-			PlayerLevel: t.playerLevel(), Tier: d2vendor.ActIndex(v), Difficulty: t.difficulty, Resolve: d2vendor.Resolver(t.asset.Records),
+			PlayerLevel: t.playerLevel(), Tier: d2vendor.ActIndex(v), Difficulty: t.difficulty, Resolve: d2vendor.Resolver(t.asset.Records), Classic: t.classic,
 		})
 		t.realise(stock, seed)
 	}
@@ -352,6 +354,7 @@ func (t *TradeWindow) playerLevel() int {
 func (t *TradeWindow) realise(stock *d2vendor.Stock, seed uint32) {
 	entries := append([]*d2vendor.Item{}, stock.Items...)
 	t.factory.Difficulty = t.difficulty
+	t.factory.Classic = t.classic
 
 	for idx, e := range entries {
 		item, err := t.factory.ItemFromCodeForVendor(e.Code, e.Quality, e.ILvl, seed+uint32(idx)+1, t.difficulty)
@@ -886,3 +889,6 @@ func (t *TradeWindow) renderTabs(target d2interface.Surface) {
 		l.Render(target)
 	}
 }
+
+// SetClassic tells the shop that the game is a classic (non expansion) one.
+func (t *TradeWindow) SetClassic(classic bool) { t.classic = classic }

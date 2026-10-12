@@ -51,7 +51,11 @@ func (v *Game) monsterDirector() *d2monsters.Director {
 		Seed:       uint32(v.gameClient.MapEngine.Seed()),
 		Difficulty: d2monster.Difficulty(v.difficulty()),
 		LogStats:   os.Getenv("OD2_AUTODIFFICULTY") != "",
-		Expansion:  true, // the game data is Lord of Destruction (MonLvl*Ex columns)
+		// the game's mode: an expansion hero uses the MonLvl*Ex columns and the LoD monlvl set; a classic hero the plain
+		// ones (w43; which monlvl column set the exe takes per mode is UNVERIFIED, MONTBL_GetLevelScaledStats 0x6551e0
+		// reads the loaded table and does not branch on the mode)
+		Expansion: v.heroExpansion(),
+		Classic:   !v.heroExpansion(),
 		// the scenario spawns monsters next to a hero who may still be in town
 		IgnoreTown:    os.Getenv("OD2_AUTOMONSTER") != "" || os.Getenv("OD2_AUTOMERC") != "" || os.Getenv("OD2_AUTOAI") != "" || os.Getenv("OD2_AUTOPARTY") != "" || os.Getenv("OD2_AUTOBOSS") != "" || os.Getenv("OD2_AUTOBOSSFIGHT") != "",
 		TestAlwaysHit: os.Getenv("OD2_AUTOMONSTER_ALWAYSHIT") != "",

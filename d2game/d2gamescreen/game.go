@@ -608,6 +608,10 @@ func (v *Game) bindGameControls() error {
 		}
 
 		v.gameControls.Load()
+		v.gameControls.SetCubeRules(v.heroExpansion(), false)
+		v.gameControls.Trade.SetClassic(!v.heroExpansion())
+		v.Infof("GAME MODE %s (fromSave=%v expansion=%v)", map[bool]string{true: "expansion", false: "classic"}[v.heroExpansion()],
+			v.gameClient.FromSave, v.gameClient.Expansion)
 		v.gameControls.SetCubePortalHandler(v.cubePortal)
 		v.gameControls.BindGamepad()
 		v.gameControls.Automap().SetLevelSource(v.currentLevel, v.levelName)

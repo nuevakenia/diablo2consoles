@@ -216,7 +216,7 @@ func (v *Game) operateRack(ob *d2mapentity.Object) {
 	weapons := rec.OperateFn == 20
 
 	// the item level follows from the monster level of the area (the same lookup the chests use)
-	_, opts, err := v.itemFactory().ChestSetup(diablo2item.ChestDropOptions{LevelID: v.currentLevel(), Difficulty: v.difficulty(), Expansion: true})
+	_, opts, err := v.itemFactory().ChestSetup(diablo2item.ChestDropOptions{LevelID: v.currentLevel(), Difficulty: v.difficulty(), Expansion: v.heroExpansion()})
 	if err != nil {
 		v.Warningf("OBJECT rack %d: %v", rec.Index, err)
 		return

@@ -224,6 +224,12 @@ func (v *Game) startLevelChange(level int, start d2level.StartType, via string) 
 		return false
 	}
 
+	// a classic game has Acts I-IV only: no way (warp, waypoint, portal, console) leads to Act V (w43)
+	if !v.heroExpansion() && d2level.ActOfLevel(level) >= 5 {
+		v.Infof("LEVEL change to %d (%s) refused: Act V needs an expansion game (classic hero)", level, v.levelName(level))
+		return false
+	}
+
 	if !v.gameClient.CanLoadLevel(level) {
 		v.Infof("LEVEL change to %d (%s) refused: the engine cannot load that level yet", level, v.levelName(level))
 		return false

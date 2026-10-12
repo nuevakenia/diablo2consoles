@@ -529,7 +529,7 @@ func (g *GameServer) OnClientConnected(client ClientConnection) {
 		g.hostInfoOK = true
 		g.hostInfo.Difficulty = uint8(clientPlayerState.Difficulty)
 		g.hostInfo.Hardcore = clientPlayerState.Hardcore
-		g.hostInfo.Expansion = true
+		g.hostInfo.Expansion = clientPlayerState.Expansion || len(clientPlayerState.D2SBase) == 0 // heroes without a .d2s are expansion (legacy)
 	}
 	g.Unlock()
 

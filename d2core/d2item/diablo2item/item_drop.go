@@ -260,6 +260,7 @@ func (f *ItemFactory) DropAll(tcName string, opts DropOptions) (*DropResult, err
 func (f *ItemFactory) rollEntries(tcName string, opts DropOptions) ([]LootEntry, error) {
 	t := f.dropTables()
 	rng := d2rand.New(opts.Seed)
+	opts.Classic = opts.Classic || f.Classic // the factory knows the game's mode
 
 	drops, err := t.dropper.Roll(&d2drop.Context{
 		RNG: rng, ILvl: opts.ILvl, UpgradeLevel: opts.UpgradeLevel, Players: opts.Players,
