@@ -233,14 +233,14 @@ func TestSetTiersAndGems(t *testing.T) {
 	env := &Env{
 		Gems: GemTable{"gsr": {Weapon: []Prop{{ID: StatToHit, Value: 100}}, Helm: []Prop{{ID: StatDexterity, Value: 7}},
 			Shield: []Prop{{ID: StatFireResist, Value: 20}}}},
-		Sets: SetDefs{7: {Pieces: 2, Partial: [][]Prop{{{ID: StatVitality, Value: 5}}}, Full: []Prop{{ID: StatEnergy, Value: 9}}}},
+		Sets: SetDefs{7: {Pieces: 3, Partial: [][]Prop{{{ID: StatVitality, Value: 5}}}, Full: []Prop{{ID: StatEnergy, Value: 9}}}},
 	}
 
 	helm := Item{Slot: SlotHead, SetID: 7, Sockets: []SocketedItem{{Code: "gsr"}}}
 	shield := Item{Slot: SlotLeftHand, BaseBlock: 20, SetID: 7, Sockets: []SocketedItem{{Code: "gsr"}}}
 	got := Compute(h, []Item{helm, shield}, env)
 
-	if got.Dex != 47 || got.Resist[ResFire] != 20 || got.Vit != 55 || got.Ene != 69 {
+	if got.Dex != 47 || got.Resist[ResFire] != 20 || got.Vit != 55 || got.Ene != 60 {
 		t.Errorf("gems/sets: dex=%d fire=%d vit=%d ene=%d", got.Dex, got.Resist[ResFire], got.Vit, got.Ene)
 	}
 

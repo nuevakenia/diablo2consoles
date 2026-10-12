@@ -48,15 +48,48 @@ type SetTable interface {
 
 // SetDef is one set from Sets.txt with its properties already expanded.
 type SetDef struct {
-	Pieces  int
-	Partial [][]Prop // Partial[i] applies from i+2 worn pieces (PCode2a/2b ...)
-	Full    []Prop   // applies when all pieces are worn (FCode1-8)
+	Pieces int
+	// Members are the SetItems rows of the set in table order (the position
+	// is the piece index of the game) and AddFuncs their "add func" column.
+	// Both optional: without them every worn set item counts as its own piece.
+	Members  []int
+	AddFuncs []int
+	Partial  [][]Prop // Partial[i] applies from i+2 worn pieces (PCode2a/2b ...)
+	Full     []Prop   // applies when all pieces are worn (FCode1-8)
 }
 
 // SetDefs implements SetTable over expanded definitions keyed by set id.
 type SetDefs map[int]SetDef
 
+// pieceInfo returns the position in the set and the add func of the set item
+// with the given SetItems row.
+func (s SetDefs) pieceInfo(setID, row int) (idx, addFunc int, ok bool) {
+	d, found := s[setID]
+	if !found {
+		return 0, 0, false
+	}
+
+	for i, m := range d.Members {
+		if m == row {
+			if i < len(d.AddFuncs) {
+				addFunc = d.AddFuncs[i]
+			}
+
+			return i, addFunc, true
+		}
+	}
+
+	return 0, 0, false
+}
+
 // SetBonus implements SetTable.
+//
+// VERIFIED (ITEM_ApplySetBonusProperties 6626a0): with n worn distinct pieces
+// the partial tiers 2 .. min(n, pieces-1) apply (the tier of the last piece
+// never does: the full bonus takes over), and the full bonus applies from
+// n >= pieces. (The piece count is Sets.txt's item count: UNVERIFIED that the
+// exe's field at +0xc is that, but it matches the shipped data, where the
+// last tier of 3 and 4 piece sets is filled and unused in game.)
 func (s SetDefs) SetBonus(setID, n int) []Prop {
 	d, ok := s[setID]
 	if !ok {
@@ -65,8 +98,13 @@ func (s SetDefs) SetBonus(setID, n int) []Prop {
 
 	var out []Prop
 
+	top := n
+	if d.Pieces > 0 && top > d.Pieces-1 {
+		top = d.Pieces - 1
+	}
+
 	for i, props := range d.Partial {
-		if n >= i+2 {
+		if top >= i+2 {
 			out = append(out, props...)
 		}
 	}

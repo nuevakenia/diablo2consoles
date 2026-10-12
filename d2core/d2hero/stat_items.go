@@ -66,6 +66,7 @@ func statItem(it *d2s.Item, bases d2statlist.Bases, charm bool, resolve SetResol
 		si.SetID = 0
 		if it.Quality == d2s.QualitySet {
 			si.SetID = resolve(int(it.SetID))
+			si.SetPiece = int(it.SetID) + 1
 		}
 	}
 

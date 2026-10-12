@@ -194,13 +194,7 @@ func Compute(h Hero, items []Item, env *Env) Totals {
 	}
 
 	active := activeItems(items)
-	setCount := map[int]int{}
-
-	for _, it := range active {
-		if it.SetID != 0 {
-			setCount[it.SetID]++
-		}
-	}
+	setCount, setPieces := countSetPieces(active, env.Sets)
 
 	// the stat lists form the exe's tree: the hero's list with one list per
 	// worn item, per set bonus tier and per gem group attached under it (tree.go)
@@ -225,7 +219,7 @@ func Compute(h Hero, items []Item, env *Env) Totals {
 		attach(0, it.ownProps())
 
 		for tier, props := range it.SetLists {
-			if setCount[it.SetID] >= tier+2 {
+			if setListActive(it, tier, setCount[it.SetID], setPieces[it.SetID], env.Sets) {
 				attach(0, props) // active tier: summed like an item list (a 0x2000 list in the exe is kept apart and adds nothing on attach)
 			}
 		}
@@ -475,4 +469,66 @@ func weaponDamage(active []Item, list *List, str, dex int) (min, max int) {
 	}
 
 	return min, max
+}
+
+// pieceTable is optionally implemented by a SetTable that knows the members
+// of its sets (SetDefs does).
+type pieceTable interface {
+	pieceInfo(setID, row int) (idx, addFunc int, ok bool)
+}
+
+// countSetPieces is INV_CountEquippedSetMates (62a4e0): per set, the number of
+// DISTINCT worn pieces (the game ORs 1<<index of each piece). Pieces whose
+// index is unknown count once per item. The mask is also returned (bit =
+// position in the set) for the sets whose members are known.
+func countSetPieces(active []Item, tab SetTable) (count map[int]int, mask map[int]uint32) {
+	count = map[int]int{}
+	mask = map[int]uint32{}
+	seen := map[[2]int]bool{}
+	pt, _ := tab.(pieceTable)
+
+	for i := range active {
+		it := &active[i]
+		if it.SetID == 0 {
+			continue
+		}
+
+		if it.SetPiece > 0 {
+			key := [2]int{it.SetID, it.SetPiece}
+			if seen[key] {
+				continue
+			}
+
+			seen[key] = true
+
+			if pt != nil {
+				if idx, _, ok := pt.pieceInfo(it.SetID, it.SetPiece-1); ok && idx < 32 {
+					mask[it.SetID] |= 1 << uint(idx)
+				}
+			}
+		}
+
+		count[it.SetID]++
+	}
+
+	return count, mask
+}
+
+// setListActive says whether tier list `tier` of a set item is attached.
+// VERIFIED (INV_ApplySetItemStateList 6663c0): add func 2 attaches the first
+// (distinct pieces - 1) lists; add func 1 attaches list k when the k-th OTHER
+// piece of the set is worn (the item's own position is skipped).
+func setListActive(it *Item, tier, count int, mask uint32, tab SetTable) bool {
+	if pt, ok := tab.(pieceTable); ok && it.SetPiece > 0 {
+		if own, addFunc, found := pt.pieceInfo(it.SetID, it.SetPiece-1); found && addFunc == 1 {
+			m := tier
+			if m >= own {
+				m++
+			}
+
+			return m < 32 && mask&(1<<uint(m)) != 0
+		}
+	}
+
+	return count >= tier+2
 }

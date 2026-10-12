@@ -92,6 +92,7 @@ type Item struct {
 	socketed []*Item
 	ear      *EarInfo
 	setRow   int // 1 + the Sets.txt row of a set item
+	setPiece int // 1 + the SetItems.txt row of a set item
 
 	properties      map[PropertyPool][]*Property
 	statContext     d2item.StatContext
