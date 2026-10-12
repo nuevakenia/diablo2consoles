@@ -19,7 +19,7 @@ func TestHeroUnitReadsEquipment(t *testing.T) {
 
 	e := newTestEngine()
 	st := &d2hero.HeroStatsState{}
-	st.Totals = &d2statlist.Totals{Stats: list, AttackRating: 777, DamageMin: 12, DamageMax: 31}
+	st.Totals = &d2statlist.Totals{Stats: list, AttackRatingFlat: 777, Weapon: d2statlist.WeaponParts{Armed: true, Min: 12, Max: 31}}
 	p := &d2mapentity.Player{Stats: st}
 	h := &heroUnit{e: e, p: p}
 
