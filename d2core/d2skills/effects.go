@@ -1089,6 +1089,8 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 		}
 	}
 
+	death := e.deathSentrySpec(sk, o, m, &missile)
+
 	if missile == "" {
 		e.emit("summon", "TRAP skill=%q has no missile", sk.Name)
 		return
@@ -1109,11 +1111,79 @@ func (e *Engine) registerTrap(u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect
 	} else if o.TrapLife > 0 && t.cycler == "" {
 		// MONAI_Think_AssassinSentry drives the cadence, range and shot budget (sentry_ai_test.go)
 		e.monsters.SetSkillFirer(e)
-		e.monsters.ArmTrap(m, d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile,
-			Level: o.TrapLevel, Life: o.TrapLife})
+		spec := d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: missile, Level: o.TrapLevel, Life: o.TrapLife}
+		if death != nil {
+			spec = *death
+			spec.Level, spec.Life = o.TrapLevel, o.TrapLife
+			spec.ReviveRadius = e.pipe.LinearValue(spec.ExplodeSkillID, o.TrapLevel)
+		}
+
+		e.monsters.ArmTrap(m, spec)
 	}
 
 	e.emit("summon", "TRAP armed skill=%q missile=%s period=%d range=%d", sk.Name, missile, trapPeriod, trapRange)
+}
+
+// deathSentrySpec recognises the Death Sentry (its sumskill1 is a corpse explosion, do function 55) and returns
+// the spec skeleton: Skill1 explodes a corpse (that skill), Skill2 shoots the lightning missile of the monster's
+// Skill2 (monstats, falling back to sumskill2), which replaces *missile. nil for every other sentry.
+func (e *Engine) deathSentrySpec(sk *d2skill.Skill, o *d2skill.SummonOrder, m *d2mapentity.Monster, missile *string) *d2monsters.TrapSpec {
+	ts := e.pipe.Skills.ByName(o.TrapSkill)
+	if ts == nil || ts.SrvDoFunc != 55 {
+		return nil
+	}
+
+	var s2 *d2skill.Skill
+	if m != nil && m.Stat != nil && m.Stat.SkillId2 != "" {
+		s2 = e.pipe.Skills.ByName(m.Stat.SkillId2)
+	}
+
+	if s2 == nil && sk.SumSkill[2] != "" {
+		s2 = e.pipe.Skills.ByName(sk.SumSkill[2])
+	}
+
+	*missile = ""
+
+	if s2 != nil {
+		*missile = s2.SrvMissile
+		if *missile == "" {
+			*missile = s2.SrvMissileA
+		}
+	}
+
+	return &d2monsters.TrapSpec{SkillID: sk.ID, SkillName: sk.Name, Missile: *missile, Missile2: *missile, Death: true,
+		ExplodeSkillID: ts.ID, ExplodeSkillName: ts.Name}
+}
+
+// explodeCorpse is a Death Sentry's Skill1 (SRVDO_055 on the corpse, level = the sentry's skill level): the corpse
+// at the target is consumed and the units around it take the fire damage (d2skill.doCorpseExplosionFn).
+func (e *Engine) explodeCorpse(s d2monsters.TrapShot) bool {
+	ts := e.pipe.Skills.ByID(s.Spec.ExplodeSkillID)
+	if ts == nil || s.Corpse == nil {
+		return false
+	}
+
+	mx, my := s.Corpse.SubtilePos()
+	tg := d2skill.Target{X: mx, Y: my, Corpse: true, CX: mx, CY: my, CorpseID: s.Corpse.ID(), CorpseHP: s.Corpse.Vitals.MaxHP,
+		CorpseLevel: s.Corpse.Vitals.Level, CorpseInfo: e.corpseFacts(s.Corpse)}
+	if s.Corpse.Stat != nil {
+		tg.CorpseKey = s.Corpse.Stat.Key
+	}
+
+	u := e.hero(s.Owner)
+	res := e.pipe.CastSentrySkill(u, ts.ID, maxInt(s.Spec.Level, 1), tg)
+
+	if !res.OK {
+		return false
+	}
+
+	for i := range res.Effects {
+		e.effect(s.Owner, u, ts, &res.Effects[i])
+	}
+
+	e.emit("summon", "TRAP explode skill=%q monster_skill=%q level=%d effects=%d", s.Spec.SkillName, ts.Name, maxInt(s.Spec.Level, 1), len(res.Effects))
+
+	return true
 }
 
 // trapCaster is the part of d2skill.Pipeline a trap shot needs (a fake in tests).
@@ -1143,6 +1213,10 @@ func (e *Engine) fireTrapAt(c trapCaster, t *trapRun, tx, ty int, best *d2mapent
 // FireTrap implements d2monsters.SkillFirer (UNVERIFIED path, see
 // d2monsters/trapfire.go: nothing arms traps with it yet).
 func (e *Engine) FireTrap(s d2monsters.TrapShot) bool {
+	if s.Corpse != nil && s.Owner != nil {
+		return e.explodeCorpse(s)
+	}
+
 	if s.Owner == nil || s.Target == nil {
 		return false
 	}

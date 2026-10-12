@@ -36,6 +36,11 @@ type TrapShot struct {
 	FromX, FromY int
 	// Target is the monster aimed at.
 	Target *d2mapentity.Monster
+	// Corpse is set for a Death Sentry's first skill (mon death sentry, do function 55): the corpse to explode.
+	// Target is then the enemy the sentry was looking at (the corpse search centre).
+	Corpse *d2mapentity.Monster
+	// Slot is the monstats skill slot the AI cast (0 = Skill1, 1 = Skill2).
+	Slot int
 }
 
 // TrapSpec names the skill a trap fires; the skill engine resolves it.
@@ -49,6 +54,14 @@ type TrapSpec struct {
 	// Hydra marks a Hydra head: its cadence is MONAI_Think_Hydra (0x5e8f10): every 10 ticks, a target nearer
 	// than 25 and a 60 percent roll fire the skill (no shot budget).
 	Hydra bool
+	// Death marks a Death Sentry (MONAI_Think_DeathSentry 0x5e99f0): Skill1 explodes a corpse near the target
+	// (ExplodeSkillID, at Level), Skill2 fires Missile2 at the target with the placing skill's damage.
+	// ReviveRadius is SKILLS_CalcLinearValueByLevel(Skill1, Level) = (Level-1)*Param4+Param3, the AI's corpse range.
+	Death            bool
+	ExplodeSkillID   int
+	ExplodeSkillName string
+	Missile2         string
+	ReviveRadius     int
 }
 
 // SkillFirer is implemented by the skill engine. It returns whether a missile
@@ -76,9 +89,22 @@ func (d *Director) ArmTrap(m *d2mapentity.Monster, spec TrapSpec) bool {
 // fireTrap routes a Cast of an armed unit to the SkillFirer. handled is false
 // when the unit is not armed (or no firer is set): the caller does its normal
 // monstats cast.
-func (d *Director) fireTrap(u *unit, t d2monster.Target) (handled, ok bool) {
+func (d *Director) fireTrap(u *unit, slot int, t d2monster.Target) (handled, ok bool) {
 	if d.firer == nil || u == nil || u.ally == nil || u.ally.trap == nil {
 		return false, false
+	}
+
+	x, y := u.m.SubtilePos()
+
+	if t.ID >= corpseTargetBase {
+		// Death Sentry Skill1 on the corpse found by FindReviveCorpse
+		cu := d.units[t.ID-corpseTargetBase]
+		if !u.ally.trap.Death || cu == nil || cu.m.Alive() {
+			return true, false
+		}
+
+		return true, d.firer.FireTrap(TrapShot{Trap: u.m, Owner: u.ally.owner, Spec: *u.ally.trap, FromX: x, FromY: y,
+			Corpse: cu.m, Slot: slot})
 	}
 
 	tu := d.units[t.ID]
@@ -86,9 +112,7 @@ func (d *Director) fireTrap(u *unit, t d2monster.Target) (handled, ok bool) {
 		return true, false
 	}
 
-	x, y := u.m.SubtilePos()
-
-	return true, d.firer.FireTrap(TrapShot{Trap: u.m, Owner: u.ally.owner, Spec: *u.ally.trap, FromX: x, FromY: y, Target: tu.m})
+	return true, d.firer.FireTrap(TrapShot{Trap: u.m, Owner: u.ally.owner, Spec: *u.ally.trap, FromX: x, FromY: y, Target: tu.m, Slot: slot})
 }
 
 // trapTick runs the ported AI of an armed trap; false means it is not armed.
@@ -118,6 +142,10 @@ func (d *Director) TrapAIDriven(m *d2mapentity.Monster) bool {
 
 	if u.ally.trap.Life <= 0 {
 		return false
+	}
+
+	if u.ally.trap.Death {
+		return u.b.Def != nil && u.b.Def.Implemented && u.b.Profile != nil && u.b.Profile.AI == "DeathSentry"
 	}
 
 	return u.b.Def != nil && u.b.Def.Implemented && u.b.Profile != nil && u.b.Profile.AI == "AssassinSentry"
