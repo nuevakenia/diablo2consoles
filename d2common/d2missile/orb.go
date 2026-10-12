@@ -42,25 +42,34 @@ func orbSin(i int) int {
 // sine table a quarter turn on.
 func orbCos(i int) int { return orbSin(i + 16) }
 
-func (s *Sim) orbEmit(m *Missile) {
+// orbEmit is SrvDoFunc 15 before its standard move. Wave 24 VERIFIED (0x5acba0): a missile without SubMissile1 or
+// without its owner returns 2 at once (it ends), every frame, before the period test. false means it vanished.
+func (s *Sim) orbEmit(m *Missile) bool {
+	if m.Spec.SubMissile[0] == "" || m.ownerGone() {
+		s.vanish(m)
+		return false
+	}
+
 	period := m.Spec.Param[0]
 	if period < 1 {
 		period = 1
 	}
 
 	if m.Elapsed()%period != 0 {
-		return
+		return true
 	}
 
 	sub := s.lookup(m.Spec.SubMissile[0])
 	if sub == nil {
-		return
+		return true
 	}
 
 	idx := int(m.Data28 & 63)
 	m.Data28 = uint32((idx + m.Spec.Param[1]) & 63)
 
 	s.orbShoot(m, sub, orbCos(idx), orbSin(idx), false)
+
+	return true
 }
 
 // orbHit is hit function 29, see the comment at the top of the file.

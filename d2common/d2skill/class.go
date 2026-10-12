@@ -999,8 +999,7 @@ func FireWallMakerDestinations(tx, ty, hx, hy int) [2][2]int {
 // perpendicular to the line from the caster, one each way (FireWallMakerDestinations); each drops a firewall
 // (its SubMissile1) at every cell it passes (SrvDoFunc 6, 0x5ac1b0) for Range + LevRange * level frames. A third
 // missile, srvmissileb (firewall), stands on the target itself. The old port laid a fixed line of stationary
-// missiles. UNVERIFIED: the hit cadence of the standing fire, kept at five hits per second scaled to the listed
-// damage per second (the makers hand it to their fire).
+// missiles. Wave 24 VERIFIED the hit cadence of the standing fire: one hit per frame per unit in the cell, no scale.
 func doFireWallFn(c *cast) {
 	nameA, nameB := c.sk.SrvMissileA, c.sk.SrvMissileB
 	if nameA == "" {
@@ -1021,7 +1020,10 @@ func doFireWallFn(c *cast) {
 
 	hx, hy := c.u.Pos()
 	sx, sy := float64(ax)+0.5, float64(ay)+0.5
-	hit := castOpts{hitEvery: 5, scalePct: 100 * (1 << uint(c.sk.HitShift)) / 5}
+	// The standing fire hits every frame (w24, VERIFIED 0x5abd00 / 0x5aba10: firewall has neither LastCollide nor
+	// NextHit, so nothing dedupes a target standing in it), each hit with the rolled damage << HitShift; the
+	// missile column DamageRate (41, about 1024 / 25) scales the target's flat damage reduction per hit (0x579ef0).
+	hit := castOpts{}
 
 	for _, d := range FireWallMakerDestinations(ax, ay, hx, hy) {
 		o := hit

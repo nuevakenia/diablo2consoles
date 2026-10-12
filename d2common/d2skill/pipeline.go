@@ -223,7 +223,7 @@ func (p *Pipeline) Start(u Unit, skillID int, tgt Target) StartResult {
 		p.bladeFuryRefresh(u) // SRVST_026 refreshes the state before looking at the slot
 	}
 
-	if until := u.Cooldown(skillID); until > p.frame() {
+	if until := u.Cooldown(skillID); until > p.frame() || p.delayBlocked(u, sk, lvl) {
 		return StartResult{Reason: ReasonCooldown, Level: lvl}
 	}
 
@@ -582,11 +582,28 @@ func (p *Pipeline) Do(u Unit, skillID int, tgt Target) DoResult {
 	}
 
 	if d := env.eval(sk.Delay); d > 0 && u.IsPlayer() {
-		u.SetCooldown(skillID, p.frame()+d)
+		u.SetCooldown(DelayStateKey, p.frame()+d)
 		res.Cooldown = d
 	}
 
 	return res
+}
+
+// DelayStateKey is the Unit.Cooldown key of the skill delay state. Wave 24 VERIFIED (0x56d6a0 SKILL_ServerRunSkillFunc,
+// 0x56cde0 SKILL_ApplyDelayCooldown, 0x648cd0 SKILL_CheckCooldownDelayElapsed): a player who finishes a skill whose
+// delay calc is above 0 gets ONE timed state 0x79 (121) for that many frames, and while it is on every skill whose
+// own delay calc is above 0 is refused (a skill with no delay is not). The delay is shared between Blizzard, Meteor,
+// Frozen Orb, Hydra, Fire Wall and every other delayed skill, not kept per skill. The key is the negated state id so
+// it never collides with a skill id.
+const DelayStateKey = -121
+
+// delayBlocked says whether the shared delay state refuses sk (0x648cd0).
+func (p *Pipeline) delayBlocked(u Unit, sk *Skill, lvl int) bool {
+	if sk.Delay == nil || !u.IsPlayer() || u.Cooldown(DelayStateKey) <= p.frame() {
+		return false
+	}
+
+	return p.env(sk, lvl, u).eval(sk.Delay) > 0
 }
 
 // runDo dispatches the srvdofunc through the table in class.go.

@@ -128,7 +128,7 @@ func TestAreaRadiusFallsBackToCalcRadius(t *testing.T) {
 		}
 	}
 
-	// neither source gives a radius: no area event at all (0x569510 needs radius > 0)
+	// neither source gives a radius: the exe clamps the radius to 1 (0x5a7500 / 0x5a8680, VERIFIED wave 24)
 	s2 := NewSim(newWorld(), nil)
 	ev2 := collect(s2)
 	_, _ = s2.Create(CreateParams{Spec: sp, Level: 1, DestX: 30})
@@ -138,8 +138,14 @@ func TestAreaRadiusFallsBackToCalcRadius(t *testing.T) {
 		s2.Step()
 	}
 
-	if count(*ev2, EventArea) != 0 {
-		t.Error("area event without a radius")
+	if count(*ev2, EventArea) == 0 {
+		t.Error("no area event without a radius (the exe uses radius 1)")
+	}
+
+	for _, e := range *ev2 {
+		if e.Kind == EventArea && e.Radius != 1 {
+			t.Errorf("clamped radius %d", e.Radius)
+		}
 	}
 }
 
