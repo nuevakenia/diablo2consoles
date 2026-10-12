@@ -190,6 +190,13 @@ func (e *Engine) effect(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 	case "knockback":
 		e.knockback(p, u, sk, ef)
 	case "overlay":
+		if ef.Delay > 0 { // Charge: the overlay lands when the rush ends
+			cp := *ef
+			e.after(ef.Delay, func() { e.overlayOn(&cp) })
+
+			break
+		}
+
 		e.overlayOn(ef)
 	case "shield":
 		e.shield(p, u, sk, ef)
@@ -204,7 +211,7 @@ func (e *Engine) effect(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 	case "unit_clear_state":
 		e.unitClearState(ef)
 	case "self_damage":
-		loss := p.Stats.MaxHealth * ef.SelfDamagePct / 100
+		loss := ef.SelfDamageFixed >> 8 // Sacrifice: calc2 percent of the blow, VERIFIED 0x5cccb0
 		p.Stats.Health = maxInt(p.Stats.Health-loss, 1)
 		e.emit("damage", "DAMAGE skill=%q self hero=%s dmg=%d hero_hp=%d/%d", sk.Name, p.Name(), loss, p.Stats.Health,
 			p.Stats.MaxHealth)
@@ -668,26 +675,27 @@ func (e *Engine) pulseAura(a *auraRun) {
 	hx, hy := u.Pos()
 	until := a.next + 3
 
-	// VERIFIED (SRVDO_065 0x5cd4b0): a player's friendly aura applies its stats only while the mana covers the
-	// upkeep, (lvlmana*(lvl-1)+mana)<<manashift in 24.8, and pays it after a pulse that applied; a pulse
-	// without the mana drops the state (the marker state 0x55 goes off).
+	// VERIFIED (SRVDO_065 0x5cd4b0, SRVDO_066 0x5cd880, wave 23). The upkeep is (lvlmana*(lvl-1)+mana)<<manashift in
+	// 24.8. A player's aura stats are gathered only while the mana covers it (mana >= upkeep); the passive stats
+	// need the mana STRICTLY above it. Nothing is paid up front: after the pulse the upkeep is paid once, and only
+	// when the pulse really changed something (a stat took effect, Prayer only when somebody's life went up);
+	// otherwise the marker state 0x55 goes off and nothing is paid. The damage auras of do 66 never pay: only the
+	// stat applier 0x5cd240 raises the counter, and they carry no target-state stats (Sanctuary mana 1 is free).
 	upkeep := 0
-	if ef.Mode == "friendly" && u.merc == nil {
+	if (ef.Mode == "friendly" || ef.Mode == "damage") && u.merc == nil {
 		upkeep = ef.Cost
 	}
 
-	paid := true
+	mana8 := a.p.Stats.Mana * 256
+	covered := d2skill.AuraStatsCovered(mana8, upkeep)
+	// a hireling is assumed to hold no mana (UNVERIFIED), so it never gets the passive stats
+	passiveOK := u.merc == nil && d2skill.AuraPassiveCovered(mana8, upkeep)
+	paid := covered
+	changed := false // some stat took effect this pulse (the exe's counter)
 
-	if upkeep > 0 {
-		var mana int
-
-		mana, a.frac, paid = auraUpkeepPay(a.p.Stats.Mana, a.frac, upkeep)
-		a.p.Stats.Mana = mana
-
-		if !paid {
-			e.setOf(a.p.ID()).Remove(ef.State)
-			e.emit("state", "STATE aura upkeep short skill=%q mana=%d need=%d/256", ef.SkillName, mana, upkeep)
-		}
+	if ef.Mode == "friendly" && !covered {
+		e.setOf(a.p.ID()).Remove(ef.State)
+		e.emit("state", "STATE aura upkeep short skill=%q mana=%d need=%d/256", ef.SkillName, a.p.Stats.Mana, upkeep)
 	}
 
 	if ef.Mode == "friendly" && a.u == nil && ef.Filter&d2skill.FilterAllied != 0 && ef.State != "" {
@@ -697,19 +705,51 @@ func (e *Engine) pulseAura(a *auraRun) {
 	if paid && (len(ef.Stats) > 0 || ef.State != "" && ef.Mode == "friendly") {
 		// a merc's aura helps its owner and itself (party range is not modelled)
 		for _, id := range []string{a.p.ID(), u.ID()} {
-			e.setOf(id).Apply(e.frame, d2state.Instance{Name: ef.State, Until: until, Mods: statMods(ef.Stats), Source: u.ID(),
+			mods := statMods(ef.Stats)
+			if passiveOK && id == a.p.ID() {
+				mods = append(mods, statMods(ef.PassiveStats)...)
+			}
+
+			e.setOf(id).Apply(e.frame, d2state.Instance{Name: ef.State, Until: until, Mods: mods, Source: u.ID(),
 				SkillID: ef.SkillID, Level: ef.Level})
 		}
 
 		for _, m := range ef.Stats {
-			if m.Stat == "hitpoints" && m.Value > 0 {
+			if m.Value == 0 {
+				continue
+			}
+
+			if m.Stat != "hitpoints" {
+				changed = true // a timed stat counts every pulse (0x5cd240 bumps the counter)
+
+				continue
+			}
+
+			if m.Value > 0 {
+				before := a.p.Stats.Health
 				a.p.Stats.Health = minInt(a.p.Stats.Health+maxInt(m.Value>>8, 1), a.p.Stats.MaxHealth)
+				changed = changed || a.p.Stats.Health != before
 
 				if a.u != nil {
 					e.monsters.HealMerc(a.p, a.u.merc.c.Token, maxInt(m.Value>>8, 1))
 				}
 			}
 		}
+	}
+
+	if ef.Mode == "friendly" && upkeep > 0 && paid {
+		if changed {
+			var mana int
+
+			mana, a.frac, _ = auraUpkeepPay(a.p.Stats.Mana, a.frac, upkeep)
+			a.p.Stats.Mana = mana
+		}
+	}
+
+	// SRVDO_066: the stats of the target state are zeroed while the caster's mana is below the upkeep
+	targetStats := ef.TargetStats
+	if !covered {
+		targetStats = nil
 	}
 
 	switch ef.Mode {
@@ -723,7 +763,7 @@ func (e *Engine) pulseAura(a *auraRun) {
 			}
 
 			if ef.TargetState != "" {
-				e.applyMonsterState(m, d2state.Instance{Name: ef.TargetState, Until: until, Mods: auraTargetMods(m, ef.TargetStats),
+				e.applyMonsterState(m, d2state.Instance{Name: ef.TargetState, Until: until, Mods: auraTargetMods(m, targetStats),
 					Source: a.p.ID(), SkillID: ef.SkillID, Level: ef.Level})
 			}
 
@@ -745,7 +785,7 @@ func (e *Engine) pulseAura(a *auraRun) {
 		for _, rv := range e.rivalsNear(hx, hy, ef.Radius) {
 			if ef.TargetState != "" {
 				e.setOf(rv.ID()).Apply(e.frame, d2state.Instance{Name: ef.TargetState, Until: until,
-					Mods:   d2state.ClampAuraSlow(statMods(ef.TargetStats), d2combat.DefaultColdEffect),
+					Mods:   d2state.ClampAuraSlow(statMods(targetStats), d2combat.DefaultColdEffect),
 					Source: a.p.ID(), SkillID: ef.SkillID, Level: ef.Level})
 			}
 
@@ -805,7 +845,10 @@ func (e *Engine) move(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef 
 		return
 	}
 
-	const steps = 8
+	steps := 8
+	if ef.Frames > 0 { // Charge: one step per game frame of the rush (d2skill.ChargeFrames)
+		steps = ef.Frames
+	}
 
 	for i := 1; i <= steps; i++ {
 		i := i

@@ -1,6 +1,8 @@
 package d2skill
 
 import (
+	"math"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2missile"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2state"
@@ -278,19 +280,58 @@ func doSmiteFn(c *cast) {
 		}
 	}
 
-	ph := rollRange(c.u.Roller(), lo8, hi8)
-	ph += int32(mulDiv(int(ph), c.calc(1)+c.u.Stat("damagepercent"), 100))
+	// VERIFIED (0x5ccdd0): COMBAT_RollPhysicalDamage (0x579120, d2combat.RollPhysical) is called with the shield as
+	// the weapon, its range (plus Holy Shield's), calc1 as the added percent and no SrcDam scaling. Not carried by
+	// this Unit (UNVERIFIED here): unit stats 0x6f, 0x11 / 0x12 (enhanced damage of all worn items), the shield's
+	// strength / dexterity bonus and the weapon mastery.
+	ph := d2combat.RollPhysical(c.u.Roller(), d2combat.WeaponRollIn{
+		Get: func(stat int) int32 {
+			if stat == 0x19 {
+				return int32(c.u.Stat("damagepercent"))
+			}
+
+			return 0
+		},
+		Weapon: true, Min: lo8, Max: hi8, PctAdd: int32(c.calc(1)), Scale: 0x80,
+	})
 	dmg := d2combat.Damage{Result: d2combat.ResultHit, HitClass: int32(c.sk.HitClass), Physical: ph, StunLen: int32(c.calc(2))}
 	c.addMelee(&MeleeResult{Target: c.tgt.Unit, Hit: true, Chance: 100, Damage: dmg, Total: dmg.SumTotal(false)})
 }
 
-// doChargeFn is SRVDO_067_Charge (0x5cde00, VERIFIED flow): the paladin rushes
-// at the target unit of the skill, or, with none, the nearest unit within 3
-// subtiles of himself; once in melee range he strikes it with calc1 percent
-// damage and the skill's elemental part, and the overlay stat 0x93 is shown
-// on the target. The rush ends next to the target (not halfway: the
-// animation loop of the exe repeats until the target is within melee range),
-// which is what the "move" effect now says.
+// RunVelocityHolder is implemented by a Unit that knows its class run velocity (charstats RunVelocity; the exe
+// reads the byte at record +0x41, which column that is stays UNVERIFIED, the run velocity column is the best fit).
+type RunVelocityHolder interface {
+	RunVelocity() int
+}
+
+// chargeBaseVelocity is the base velocity of a rush when the unit does not report one (the shipped run velocity).
+const chargeBaseVelocity = 9
+
+// ChargeFrames is how many game frames a rush over dist subtiles takes at the Charge velocity of SRVST_031
+// (0x5cdbb0, VERIFIED wave 23): base * (Param1 + max(stat 0x43, 50)) / 100 with the base shifted to 8.8, walked at
+// d2path.SubtilesPerTick per frame. At least one frame.
+func ChargeFrames(dist float64, baseVel, param1, velocityPct int) int {
+	step := ChargeSubtilesPerTick(ChargeVelocity(baseVel, param1, velocityPct))
+	if step <= 0 || dist <= 0 {
+		return 1
+	}
+
+	n := int(math.Ceil(dist / step))
+	if n < 1 {
+		n = 1
+	}
+
+	return n
+}
+
+// doChargeFn is SRVDO_067_Charge (0x5cde00) with SRVST_031 (0x5cdbb0), VERIFIED: the paladin rushes at the
+// target unit of the skill, or, with none, the nearest unit within 3 subtiles of himself, at the velocity
+// ChargeVelocity gives (state 0x12 on while he runs); the rush repeats until the target is in melee range, and
+// only then he strikes it with calc1 percent damage and the skill's elemental part (when calc4 is above zero), and
+// the overlay stat 0x93 is shown on the target. The rush therefore takes ChargeFrames game frames: the "move"
+// effect carries them and the blow and the overlay are delayed by the same amount. It ends next to the target (not
+// halfway). A target holding state 0x36 is not charged from afar (SRVST_031; UNVERIFIED which state it is, not
+// modelled).
 func doChargeFn(c *cast) {
 	hx, hy := c.u.Pos()
 	t, tx, ty := c.tgt.Unit, c.tgt.UX, c.tgt.UY
@@ -310,16 +351,26 @@ func doChargeFn(c *cast) {
 		}
 	}
 
-	c.effect(Effect{Kind: "move", Mode: "charge", X: tx - sgn(tx-hx), Y: ty - sgn(ty-hy)})
+	ex, ey := tx-sgn(tx-hx), ty-sgn(ty-hy)
+
+	base := chargeBaseVelocity
+	if rv, ok := c.u.(RunVelocityHolder); ok && rv.RunVelocity() > 0 {
+		base = rv.RunVelocity()
+	}
+
+	frames := ChargeFrames(math.Hypot(float64(ex-hx), float64(ey-hy)), base, c.sk.Params[1], c.u.Stat("velocitypercent"))
+
+	c.effect(Effect{Kind: "move", Mode: "charge", X: ex, Y: ey, Frames: frames})
 
 	o := c.meleeOpt()
 	o.pct = c.calc(1)
 	m := c.p.strike(c.u, c.sk, c.lvl, t, c.env, o)
+	m.Delay = frames
 	c.addMelee(m)
 
 	// VERIFIED: the strike is followed by overlay 147 on the target (only when
 	// the rush ended in melee range, i.e. the blow was made).
-	c.effect(Effect{Kind: "overlay", Overlay: OverlayBash, Target: t, X: tx, Y: ty})
+	c.effect(Effect{Kind: "overlay", Overlay: OverlayBash, Target: t, X: tx, Y: ty, Delay: frames})
 }
 
 func sgn(v int) int {

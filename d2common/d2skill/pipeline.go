@@ -27,26 +27,27 @@ const (
 
 // srvst/srvdo function ids used by the implemented skills (skills.txt columns).
 const (
-	stAttack   = 1
-	stKick     = 2
-	stRanged   = 4 // SRVST_RangedAmmoCheck
-	stStrafe   = 8 // SRVST_008_Strafe (ammo check as well)
-	stJab      = 5
-	stImpale   = 7  // SRVST_007_Impale
-	stBash     = 32 // Bash, Stun, Concentrate...
-	stThrow    = 65
-	doAttack   = 1
-	doMelee    = 2 // Kick, Power Strike, Bash, Stun
-	doThrow    = 3
-	doLHThrow  = 5
-	doInner    = 6
-	doJab      = 7
-	doCharged  = 17
-	doFrozenAr = 18
-	doStatic   = 20
-	doNova     = 22 // Frost Nova, Nova, Poison Nova, Howl
-	novaCount  = 64
-	novaRadius = 10.0
+	stAttack     = 1
+	stKick       = 2
+	stRanged     = 4 // SRVST_RangedAmmoCheck
+	stStrafe     = 8 // SRVST_008_Strafe (ammo check as well)
+	stJab        = 5
+	stImpale     = 7  // SRVST_007_Impale
+	stBash       = 32 // Bash, Stun, Concentrate...
+	stHolyShield = 36 // SRVST_036 0x5ce6f0: needs a shield
+	stThrow      = 65
+	doAttack     = 1
+	doMelee      = 2 // Kick, Power Strike, Bash, Stun
+	doThrow      = 3
+	doLHThrow    = 5
+	doInner      = 6
+	doJab        = 7
+	doCharged    = 17
+	doFrozenAr   = 18
+	doStatic     = 20
+	doNova       = 22 // Frost Nova, Nova, Poison Nova, Howl
+	novaCount    = 64
+	novaRadius   = 10.0
 )
 
 // los masks for skills.txt LineOfSight (verified).
@@ -233,6 +234,16 @@ func (p *Pipeline) Start(u Unit, skillID int, tgt Target) StartResult {
 		return StartResult{Reason: ReasonAmmo, Level: lvl}
 	}
 
+	// SRVST_036_HolyShield (0x5ce6f0, VERIFIED wave 23): the skill starts only with a shield in a hand
+	// (INV_FindHandItemOfType33).
+	if sk.SrvStFunc == stHolyShield {
+		if sd, ok := u.(ShieldDamager); ok {
+			if _, _, has := sd.ShieldDamage(); !has {
+				return StartResult{Reason: ReasonNoShield, Level: lvl}
+			}
+		}
+	}
+
 	res := StartResult{OK: true, Level: lvl}
 
 	if u.IsPlayer() && cost > 0 && payAtStart(sk) {
@@ -262,6 +273,9 @@ type Effect struct {
 	State  string
 	Frames int
 	Stats  []StatMod
+	// PassiveStats ride on the caster's own aura state only, and only while the unit's mana is STRICTLY above the
+	// upkeep (SRVDO_065 0x5cd4b0, VERIFIED wave 23; the stat gathering itself needs only mana >= upkeep).
+	PassiveStats []StatMod
 	// Area effects.
 	Radius int
 	Filter int
@@ -306,6 +320,8 @@ type Effect struct {
 	CorpseHP int
 	// SelfDamagePct: percent of own maximum life the caster loses (Sacrifice).
 	SelfDamagePct int
+	// SelfDamageFixed is the 8.8 damage the caster takes (Sacrifice: calc2 percent of the blow, 0x5cccb0).
+	SelfDamageFixed int
 	// WearAmount is the durability points the "weapon_wear" effect (Impale) takes; Pct is its chance.
 	WearAmount int
 	// Heal is a one-off life gain in whole points.
@@ -451,6 +467,8 @@ type MeleeResult struct {
 	Roll   int
 	Damage d2combat.Damage // rolled, before resists, 8.8
 	Total  int32           // sum of the damage components, 8.8
+	// Delay is the number of game frames the engine waits before it applies the blow (Charge: the rush takes time).
+	Delay int
 }
 
 // DoResult is the outcome of the do phase.
