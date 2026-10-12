@@ -72,25 +72,31 @@ const (
 	StatFasterBlock  = 102
 	StatFasterCast   = 105
 	StatDamageToMana = 114
-	StatToHitPct     = 119
-	StatAllSkills    = 127
-	StatClassSkills  = 83
-	StatSingleSkill  = 107
-	StatNonClass     = 97
-	StatElemSkill    = 126
-	StatSkillTab     = 188
-	StatDeadlyStrike = 141
-	StatCrushing     = 136
-	StatOpenWounds   = 135
-	StatSlowTarget   = 150 // item_slow: "slows target by N%"
-	StatCritical     = 337 // passive_critical_strike
-	StatDodge        = 338
-	StatAvoid        = 339
-	StatEvade        = 340
-	StatPierceCold   = 305
-	StatPierceFire   = 306
-	StatPierceLight  = 307
-	StatPiercePoison = 308
+	// StatAttackerTakes and StatAttackerTakesLight: item thorns (78, 128).
+	StatAttackerTakes      = 78
+	StatAttackerTakesLight = 128
+	// StatAbsorbFirePct is 142; the pairs (percent, flat) run fire 142/143,
+	// lightning 144/145, magic 146/147, cold 148/149.
+	StatAbsorbFirePct = 142
+	StatToHitPct      = 119
+	StatAllSkills     = 127
+	StatClassSkills   = 83
+	StatSingleSkill   = 107
+	StatNonClass      = 97
+	StatElemSkill     = 126
+	StatSkillTab      = 188
+	StatDeadlyStrike  = 141
+	StatCrushing      = 136
+	StatOpenWounds    = 135
+	StatSlowTarget    = 150 // item_slow: "slows target by N%"
+	StatCritical      = 337 // passive_critical_strike
+	StatDodge         = 338
+	StatAvoid         = 339
+	StatEvade         = 340
+	StatPierceCold    = 305
+	StatPierceFire    = 306
+	StatPierceLight   = 307
+	StatPiercePoison  = 308
 )
 
 // Prop is one stat contribution: a stat id, its parameter (skill id, class

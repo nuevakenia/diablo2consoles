@@ -140,7 +140,27 @@ func (h *heroUnit) Stat(name string) int {
 		v = h.p.Stats.Vitality
 	}
 
-	return v + h.e.setOf(h.p.ID()).Stat(h.e.frame, name) + h.passive(name)
+	return v + h.e.setOf(h.p.ID()).Stat(h.e.frame, name) + h.passive(name) + h.itemStat(name)
+}
+
+// itemStatIDs are the stats of a strike that the hero's equipment contributes
+// (BuildAttackerDamage 0x5794e0 reads the unit's full stat list, items
+// included): elemental and poison damage, leech, deadly and critical strike.
+// Other names are not item sourced here (their item part is in Totals).
+var itemStatIDs = map[string]int{
+	"firemindam": 48, "firemaxdam": 49, "lightmindam": 50, "lightmaxdam": 51, "magicmindam": 52, "magicmaxdam": 53,
+	"coldmindam": 54, "coldmaxdam": 55, "coldlength": 56, "poisonmindam": 57, "poisonmaxdam": 58, "poisonlength": 59,
+	"lifedrainmindam": 60, "manadrainmindam": 62, "item_deadlystrike": 141, "passive_critical_strike": 337,
+}
+
+// itemStat is what the worn items add to a name of itemStatIDs.
+func (h *heroUnit) itemStat(name string) int {
+	id, ok := itemStatIDs[name]
+	if !ok || h.merc != nil || h.p.Stats == nil || h.p.Stats.Totals == nil || h.p.Stats.Totals.Stats == nil {
+		return 0
+	}
+
+	return int(h.p.Stats.Totals.Stats.Get(id))
 }
 
 // passive sums the passivestat columns of the hero's passive skills (Dodge,
@@ -209,6 +229,10 @@ func (h *heroUnit) AttackRating() int {
 		return h.merc.c.AR
 	}
 
+	if t := h.p.Stats.Totals; t != nil && t.AttackRating > 0 {
+		return t.AttackRating // equipment, dexterity and AR percent (d2statlist)
+	}
+
 	st := h.e.asset.Records.Character.Stats[h.p.Class]
 	if st == nil {
 		return d2combat.PlayerAttackRating(0, h.p.Stats.Dexterity, 0)
@@ -239,6 +263,10 @@ func (h *heroUnit) WeaponDamage() (min, max int) {
 
 	if h.merc != nil {
 		return maxInt(h.merc.c.DmgMin, 1), maxInt(h.merc.c.DmgMax, 2)
+	}
+
+	if t := h.p.Stats.Totals; t != nil && t.DamageMax > 0 {
+		return t.DamageMin, t.DamageMax // weapon, enhanced damage, added damage, strength bonus
 	}
 
 	if h.p.Equipment != nil && h.p.Equipment.RightHand != nil {

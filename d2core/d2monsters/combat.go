@@ -243,6 +243,26 @@ func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.
 			note += dnote
 		}
 
+		// the Total decides: components below zero offset the others, a negative Total is not subtracted
+		if !d2combat.ApplicableTotal(int32(dmg)) {
+			dmg = 0
+		}
+
+		// life the absorb stats gave back (0x579c20), then the item events of a melee or missile hit
+		// on the defender (0x57a650 dispatches them before the life is subtracted)
+		if parts.Heal > 0 {
+			p.Stats.Health = minInt(p.Stats.Health+parts.Heal, p.Stats.MaxHealth)
+		}
+
+		d.heroDamageToMana(p, dmg)
+
+		if via == "" && d.HeroThorns != nil && p.Stats.Totals != nil {
+			t := p.Stats.Totals
+			if t.AttackerTakes > 0 || t.AttackerTakesLight > 0 {
+				d.HeroThorns(p, u.m, int32(t.AttackerTakes)<<d2combat.FixedShift, int32(t.AttackerTakesLight)<<d2combat.FixedShift)
+			}
+		}
+
 		d.Counters.AttackHits++
 		p.Stats.Health -= dmg
 
@@ -428,6 +448,23 @@ func (d *Director) HeroStrike(p *d2mapentity.Player, m *d2mapentity.Monster) boo
 	dmg := min + int(d.heroRoller().Roll(int32(max-min+1)))
 	crit := false
 
+	// the engine resolves the hit like a skill strike: strike chances, elemental damage, resists, leech and
+	// the item events (crushing blow, open wounds, slow target)
+	if d.HeroHurt != nil {
+		d.Counters.HeroHits++
+		d.emit("herohit", "HERO swing target=%s hit=true chance=%d roll=%d dmg=%d ar=%d", m.Label(), chance, roll, dmg, ar)
+
+		if d.HeroHurt(p, m, dmg) {
+			if d.opt.OnHeroStrike != nil {
+				d.opt.OnHeroStrike(p)
+			}
+
+			return true
+		}
+
+		d.Counters.HeroHits--
+	}
+
 	// deadly strike and critical strike both double physical damage (verified)
 	if t := p.Stats.Totals; t != nil {
 		if crit = d2combat.RollStrike(d.heroRoller(), d2combat.StrikeInput{
@@ -459,12 +496,24 @@ func (d *Director) HeroStrike(p *d2mapentity.Player, m *d2mapentity.Monster) boo
 // their fractions. One generator step is spent when life and mana both leech.
 func (d *Director) heroLeech(p *d2mapentity.Player, m *d2mapentity.Monster, dmg int) {
 	t := p.Stats.Totals
-	if t == nil || (t.LifeSteal == 0 && t.ManaSteal == 0) || m.Stat == nil {
+	if t == nil || (t.LifeSteal == 0 && t.ManaSteal == 0) {
 		return
 	}
 
-	if dmg > m.Vitals.HP {
-		dmg = m.Vitals.HP
+	d.HeroLeech(p, m, int32(dmg)<<d2combat.FixedShift, int32(m.Vitals.HP)<<d2combat.FixedShift, t.LifeSteal, t.ManaSteal)
+}
+
+// HeroLeech is the leech transfer of a hero's hit on a monster: total is the
+// physical damage that got through, 8.8; lifeBefore the monster's life before
+// the hit, 8.8 (the physical part is capped at it, 0x57a650); lifeLeech and
+// manaLeech are the percent stats of the struct.
+func (d *Director) HeroLeech(p *d2mapentity.Player, m *d2mapentity.Monster, total, lifeBefore int32, lifeLeech, manaLeech int) {
+	if m.Stat == nil || (lifeLeech == 0 && manaLeech == 0) {
+		return
+	}
+
+	if total > lifeBefore {
+		total = lifeBefore
 	}
 
 	drain := m.Stat.LeechSensitivityNormal
@@ -496,7 +545,7 @@ func (d *Director) heroLeech(p *d2mapentity.Player, m *d2mapentity.Monster, dmg 
 
 	fr := d.leechFrac[p.ID()]
 	o := d2combat.ApplyLeech(d.heroRoller(), d2combat.LeechIn{
-		Total: int32(dmg) << d2combat.FixedShift, LifeLeech: int32(t.LifeSteal), ManaLeech: int32(t.ManaSteal),
+		Total: total, LifeLeech: int32(lifeLeech), ManaLeech: int32(manaLeech),
 		HasAttacker: true, AttackerKind: 0,
 		Life: int32(p.Stats.Health)<<d2combat.FixedShift | fr[0], MaxLife: int32(p.Stats.MaxHealth) << d2combat.FixedShift,
 		Mana: int32(p.Stats.Mana)<<d2combat.FixedShift | fr[1], MaxMana: int32(p.Stats.MaxMana) << d2combat.FixedShift,
@@ -1031,4 +1080,45 @@ func (d *Director) UnitID(m *d2mapentity.Monster) uint32 {
 	}
 
 	return 0
+}
+
+// heroDamageToMana is item event func 13 (stat 114, 0x5bd7c0, VERIFIED): when the
+// hero is hit for a Total above zero and her mana is below the maximum, she gains
+// MulDiv(Total, pct, 100) mana (8.8, truncating), clamped to the maximum. The
+// damage itself is not reduced. The hidden mana fraction is kept with the leech's.
+func (d *Director) heroDamageToMana(p *d2mapentity.Player, dmg int) {
+	t := p.Stats.Totals
+	if t == nil || t.DamageToMana <= 0 || dmg <= 0 || p.Stats.Mana >= p.Stats.MaxMana {
+		return
+	}
+
+	if d.leechFrac == nil {
+		d.leechFrac = map[string][2]int32{}
+	}
+
+	fr := d.leechFrac[p.ID()]
+	mana := int32(p.Stats.Mana)<<d2combat.FixedShift | fr[1]
+	mana = DamageToManaGain(mana, int32(p.Stats.MaxMana)<<d2combat.FixedShift, int32(dmg)<<d2combat.FixedShift, t.DamageToMana)
+	d.leechFrac[p.ID()] = [2]int32{fr[0], mana & 0xff}
+	p.Stats.Mana = int(mana >> d2combat.FixedShift)
+}
+
+// DamageToManaGain is the arithmetic of 0x5bd7c0 on 8.8 values: mana plus
+// MulDiv(total, pct, 100), floored at 0 and capped at maxMana; mana already at
+// the maximum is returned unchanged.
+func DamageToManaGain(mana, maxMana, total int32, pct int) int32 {
+	if mana >= maxMana {
+		return mana
+	}
+
+	n := mana + d2combat.MulDiv(total, int32(pct), 100)
+	if n < 0 {
+		n = 0
+	}
+
+	if n >= maxMana {
+		n = maxMana
+	}
+
+	return n
 }

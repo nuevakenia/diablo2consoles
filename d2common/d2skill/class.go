@@ -364,6 +364,18 @@ func (p *Pipeline) strike(u Unit, sk *Skill, lvl int, t d2missile.Target, env *E
 		}
 	}
 
+	// poison damage of the weapon: the stat is the per-frame 8.8 value, rolled raw (BuildAttackerDamage)
+	if hi := u.Stat("poisonmaxdam"); hi > 0 && !sk.Kick {
+		dmg.Poison += rollRange(r, int32(u.Stat("poisonmindam")), int32(hi))
+		dmg.PoisonLen += int32(u.Stat("poisonlength"))
+	}
+
+	// life and mana leech of the attacker's stats ride on the struct (BuildAttackerDamage, players)
+	if !sk.Kick {
+		dmg.LifeLeech += int32(u.Stat("lifedrainmindam"))
+		dmg.ManaLeech += int32(u.Stat("manadrainmindam"))
+	}
+
 	if o.elemPct != [3]int{} {
 		p.vengeanceElem(u, sk, lvl, env, o, &dmg)
 	}
