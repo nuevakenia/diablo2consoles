@@ -57,7 +57,10 @@ scenario_env() {
     echo "$common OD2_JOIN=127.0.0.1:$OD2_PORT OD2_JOIN_RETRY=120"
     echo "export OD2_AUTOGAME=\"$jsave\""
     echo "export OD2_AUTOSCRIPT='$jscript'"
-    echo "sleep 25  # the host imports its save first (two imports at once pick the same hero file name)"
+    # the host imports its save first (two imports at once pick the same hero file name): wait until the host's server is up
+    # (its log has the line), not a fixed 25 s, which a loaded machine overran (the joiner then collided with the host's import
+    # and never joined: "log did not contain SOCIAL roster n=2")
+    echo "for i in {1..300}; do grep -q 'Starting Game Server' $log 2>/dev/null && break; sleep 1; done; sleep 3"
     echo "$tmp/od2 2>&1 | tee $mp_join_log"
   } > $jcmd
   chmod +x $jcmd; rm -f $mp_join_log
