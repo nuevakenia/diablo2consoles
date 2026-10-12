@@ -141,3 +141,16 @@ func TestScaleKillXP(t *testing.T) {
 		}
 	}
 }
+
+// TestCreditKillAtPassesMonsterPos: the party hook gets the dead monster's
+// subtile position (0x57c990 range reference).
+func TestCreditKillAtPassesMonsterPos(t *testing.T) {
+	d := &Director{}
+	gx, gy := -1, -1
+	d.PartyXPAt = func(_ *d2mapentity.Player, _, _ int, _ string, x, y int) bool { gx, gy = x, y; return true }
+	h := &d2mapentity.Player{Stats: &d2hero.HeroStatsState{Level: 30}}
+
+	if got := d.creditKillAt(h, 2560, 20, "x", &[2]int{123, 45}); got != 2560 || gx != 123 || gy != 45 || h.Stats.Experience != 0 {
+		t.Errorf("got %d pos %d,%d exp %d", got, gx, gy, h.Stats.Experience)
+	}
+}

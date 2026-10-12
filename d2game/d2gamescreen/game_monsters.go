@@ -81,6 +81,7 @@ func (v *Game) monsterDirector() *d2monsters.Director {
 	v.monsters = d2monsters.NewDirector(v.asset, v.gameClient.MapEngine, v.playerList, v.logLevel, opt)
 	v.monsters.ExpBonusPct = v.experienceBonusPct
 	v.monsters.PartyXP = v.partyXP
+	v.monsters.PartyXPAt = v.partyXPAt
 	v.monsters.OnMirrorHit = v.onMirrorHit
 	v.hookEndgameMonsters()
 
