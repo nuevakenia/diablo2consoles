@@ -943,8 +943,20 @@ func (e *Engine) summon(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 	}
 
 	stat := e.monsters.FindStat(key)
+
+	// Revive (SRVDO_058) has no summon column: the minion is the corpse's own monster type, which the corpse
+	// loop below picks. The lookup by the empty key used to refuse every Revive (w27, found by 86f).
+	if o.UseCorpseType && o.CorpseID != "" {
+		for _, c := range e.monsters.Corpses() {
+			if c.ID() == o.CorpseID && c.Stat != nil {
+				stat = c.Stat
+			}
+		}
+	}
+
 	if stat == nil {
-		e.emit("summon", "SUMMON skill=%q key=%s refused=unknown_monster", sk.Name, key)
+		e.emit("summon", "SUMMON skill=%q key=%s refused=unknown_monster corpse_id=%q corpses=%d", sk.Name, key, o.CorpseID,
+			len(e.monsters.Corpses()))
 		return
 	}
 

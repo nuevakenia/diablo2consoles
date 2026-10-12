@@ -308,6 +308,12 @@ func (v *Game) startCastItem(eng *d2skills.Engine, t *castTest, it *castItem) {
 	}
 
 	if os.Getenv("OD2_AUTOCAST_MANA") != "" || len(t.items) > 1 {
+		// a level-up from the scenario's kills recomputes MaxMana from the class (a fresh Druid dropped to 54 and a
+		// 35-mana skill could be cast once only): keep the pool the scenario asked for
+		if n, err := strconv.Atoi(os.Getenv("OD2_AUTOCAST_MANA")); err == nil && n > p.Stats.MaxMana {
+			p.Stats.MaxMana = n
+		}
+
 		p.Stats.Mana = p.Stats.MaxMana
 	}
 
@@ -463,6 +469,17 @@ func (v *Game) autoCast(elapsed float64) {
 		}
 
 		aimX, aimY = cx, cy
+	}
+
+	// Iron Golem (SRVST_020 0x5c1070) consumes a ground item. The TargetItem column is set for other skills too
+	// (Revive), so the scenario goes by the skill's name.
+	if rec != nil && rec.Skill == castTestIronGolem {
+		ix, iy, ok := v.itemForCast()
+		if !ok {
+			return
+		}
+
+		aimX, aimY = ix, iy
 	}
 
 	mx, my := aimX, aimY
