@@ -26,8 +26,10 @@ type Composite struct {
 	palettePath string
 	direction   int
 	equipment   [d2enum.CompositeTypeMax]string
-	mode        *compositeMode
-	size        *size
+	// layerEffects overrides the draw effect of a layer (the equipment rule of the exe, 0x4d8090).
+	layerEffects map[d2enum.CompositeType]d2enum.DrawEffect
+	mode         *compositeMode
+	size         *size
 }
 
 type size struct {
@@ -126,6 +128,9 @@ func (c *Composite) SetMode(animationMode animationMode, weaponClass string) err
 
 	return nil
 }
+
+// SetLayerEffects sets the draw effect overrides of layers; it takes effect with the next Equip or mode change.
+func (c *Composite) SetLayerEffects(e map[d2enum.CompositeType]d2enum.DrawEffect) { c.layerEffects = e }
 
 // Equip changes the current layer configuration
 func (c *Composite) Equip(equipment *[d2enum.CompositeTypeMax]string) error {
@@ -293,6 +298,10 @@ func (c *Composite) createMode(animationMode animationMode, weaponClass string) 
 
 		if cofLayer.Transparent {
 			drawEffect = cofLayer.DrawEffect
+		}
+
+		if eff, ok := c.layerEffects[cofLayer.Type]; ok {
+			drawEffect = eff
 		}
 
 		layer, err := c.loadCompositeLayer(cofLayer.Type.String(), layerValue, animationMode.String(),

@@ -127,9 +127,24 @@ func (p *Player) applyHumanEquipment() {
 		fmt.Printf("player %s: weapon class change: %v\n", p.name, err)
 	}
 
+	p.composite.SetLayerEffects(p.layerEffects())
+
 	if err := p.composite.Equip(equipmentLayers(p.Equipment)); err != nil {
 		fmt.Printf("player %s: equip: %v\n", p.name, err)
 	}
 
 	p.composite.SetDirection(p.composite.GetDirection())
+}
+
+// layerEffects is the draw effect override map of the worn equipment plus the unit stat 0xb5 rule
+// (StatTransparency; applied when the equipment is redrawn, UNVERIFIED that the stat reaches Totals).
+func (p *Player) layerEffects() map[d2enum.CompositeType]d2enum.DrawEffect {
+	out := equipmentEffects(p.Equipment)
+
+	if p.Stats != nil && p.Stats.Totals != nil && p.Stats.Totals.Stats != nil &&
+		StatTransparency(true, int(p.Stats.Totals.Stats.Get(statTransparencyID)), false) {
+		out = allLayersTransparent(out)
+	}
+
+	return out
 }

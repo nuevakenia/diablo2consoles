@@ -68,7 +68,7 @@ type Automap struct {
 	level     int
 	levelFn   func() int
 	nameFn    func(id int) string
-	diffFn    func() int // the game's difficulty (0 Normal, 1 Nightmare, 2 Hell) for the difficulty line
+	diffFn    func() int // difficulty 0..2 for the automap difficulty line
 	lastCX    float64
 	lastCY    float64
 	haveLast  bool
@@ -118,9 +118,8 @@ func (a *Automap) SetLevelSource(level func() int, name func(id int) string) {
 	a.levelFn, a.nameFn = level, name
 }
 
-// SetDifficultySource tells the automap the difficulty of the game for its difficulty line
-// (nothing is drawn in Normal; see d2automap.DifficultyStringID).
-func (a *Automap) SetDifficultySource(diff func() int) { a.diffFn = diff }
+// SetDifficultySource tells the automap the difficulty (0 normal, 1 nightmare, 2 hell) for the text line.
+func (a *Automap) SetDifficultySource(f func() int) { a.diffFn = f }
 
 // On reports whether the map is shown.
 func (a *Automap) On() bool { return a.on }

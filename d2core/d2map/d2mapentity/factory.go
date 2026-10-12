@@ -124,6 +124,8 @@ func (f *MapEntityFactory) NewPlayer(id, name string, x, y, direction int, heroT
 
 	composite.SetDirection(direction)
 
+	composite.SetLayerEffects(equipmentEffects(equipment))
+
 	if err := composite.Equip(layerEquipment); err != nil {
 		fmt.Printf("failed to equip, err: %v\n", err)
 	}

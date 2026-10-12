@@ -13,6 +13,8 @@ type InventoryItemArmor struct {
 	ItemName       string `json:"itemName"`
 	ItemCode       string `json:"itemCode"`
 	ArmorClass     string `json:"armorClass"`
+	// Ethereal is the item flag 0x400000 of the worn item (the draw mode rule reads it).
+	Ethereal bool `json:"ethereal,omitempty"`
 }
 
 // GetArmorClass returns the class of the armor

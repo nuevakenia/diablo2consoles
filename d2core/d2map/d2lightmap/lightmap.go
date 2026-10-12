@@ -35,6 +35,10 @@ type Source struct {
 	Radius, Target int
 	Intensity      uint8
 	R, G, B        uint8
+	// Occluded makes the source use the line-of-sight painter (see occluded.go) when the map has a Blocked func.
+	Occluded bool
+	// Object marks a kind 2 (object) light: its occupancy has no light map window (0x470d80).
+	Object bool
 }
 
 // NewSource creates a light of the given radius (in subtiles), fully grown.
@@ -80,8 +84,10 @@ func (s *Source) Step() {
 type Map struct {
 	// OriginX and OriginY are the subtile coordinates of cell (0,0).
 	OriginX, OriginY int
-	cells            [Size * Size]Cell
-	recip            [256]int
+	// Blocked tells the occluded painter which absolute subtiles block light; nil = every source is radial.
+	Blocked Blocker
+	cells   [Size * Size]Cell
+	recip   [256]int
 }
 
 // New returns a map filled with black.
@@ -123,6 +129,11 @@ func (m *Map) Rebuild(heroSubX, heroSubY int, base Cell, sources []*Source) {
 	}
 
 	for _, s := range sources {
+		if s.Occluded && m.Blocked != nil {
+			m.PaintOccluded(s, m.Blocked)
+			continue
+		}
+
 		m.paintRadial(s)
 	}
 }

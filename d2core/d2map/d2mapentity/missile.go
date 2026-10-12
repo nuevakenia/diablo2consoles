@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2lightmap"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 )
 
@@ -12,6 +13,9 @@ import (
 type Missile struct {
 	*AnimatedEntity
 	record *d2records.MissileRecord
+
+	flicker  d2lightmap.FlickerLight // Missiles.txt Light/Flicker state, see missile_light.go
+	lightAcc float64
 }
 
 // ID returns the missile uuid
@@ -73,4 +77,5 @@ func (m *Missile) Advance(tickTime float64) {
 	// https://github.com/OpenDiablo2/OpenDiablo2/issues/819
 	m.Step(tickTime)
 	m.AnimatedEntity.Advance(tickTime)
+	m.advanceLight(tickTime)
 }

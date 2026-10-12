@@ -58,6 +58,16 @@ func (i *Item) Label() string {
 	return i.Item.Label()
 }
 
+// GroundLabel is the name shown for the Alt ground label: coloured by the label rule of
+// INV_DrawGroundItemLabels (gold piles keep their gold label).
+func (i *Item) GroundLabel() string {
+	if i.IsGold() || i.Item == nil {
+		return i.Label()
+	}
+
+	return i.Item.GroundLabelText()
+}
+
 // GetSize returns the current frame size
 func (i *Item) GetSize() (width, height int) {
 	w, h := i.animation.GetCurrentFrameSize()

@@ -66,6 +66,7 @@ type AssetManager struct {
 	*d2loader.Loader
 
 	tables           []d2tbl.TextDictionary
+	idTables         []idTable // id-keyed views of the same tables, see string_ids.go
 	dt1s             d2interface.Cache
 	ds1s             d2interface.Cache
 	cofs             d2interface.Cache
@@ -365,6 +366,7 @@ func (am *AssetManager) LoadStringTable(tablePath string) (d2tbl.TextDictionary,
 	am.Debugf(fmtLoadStringTable, tablePath)
 
 	am.tables = append(am.tables, table)
+	am.addIDTable(tablePath, data)
 
 	return table, err
 }

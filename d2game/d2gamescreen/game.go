@@ -590,7 +590,7 @@ func (v *Game) bindGameControls() error {
 		v.gameControls.SetCubePortalHandler(v.cubePortal)
 		v.gameControls.BindGamepad()
 		v.gameControls.Automap().SetLevelSource(v.currentLevel, v.levelName)
-		v.gameControls.Automap().SetDifficultySource(v.difficulty)
+		v.gameControls.Automap().SetDifficultySource(func() int { return int(v.gameClient.LevelDifficulty()) })
 		v.gameControls.SetEquipSound(v.playHeroUISound)
 		v.gameControls.SetHeroVoice(v.sayHero)
 		v.gameControls.SetFriendlyCheck(func(m *d2mapentity.Monster) bool { return v.monsters != nil && v.monsters.IsFriendly(m) })
