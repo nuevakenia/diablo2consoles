@@ -42,7 +42,7 @@ func attackIsRanged(st *d2records.MonStatRecord, mode d2monster.Mode) bool {
 }
 
 // attackReach is the edge distance at which an attack of that kind is used:
-// melee reach 7 (VERIFIED value) or the engine's ranged distance (UNVERIFIED).
+// melee reach 7 (VERIFIED value) or the engine's ranged distance (engine choice).
 func attackReach(ranged bool) int {
 	if ranged {
 		return rangedInRange

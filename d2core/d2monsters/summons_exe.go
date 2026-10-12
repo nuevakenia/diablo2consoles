@@ -15,7 +15,7 @@ import (
 //     near nine anyway.
 //   - DiabPrison (SRVDO_104 0x5cb900 -> 0x5b1100): pettype "none", no petmax, no count: each cast makes four
 //     units from the template at 0x73a668 (class boneprison1 + index) around the target. The exe has no live
-//     cap; four is the size of one cast and stays a HOST bound (UNVERIFIED as a limit).
+//     cap; four is the size of one cast and stays a HOST bound (engine choice, the exe has none).
 //   - Overseer Whip (131, 0x5d0580) and Impregnate (133, 0x5d0850) create no unit (a different effect), so
 //     they have no cap.
 //   - Nest users with their own think function bound themselves by aip values (selfLimitedSummoners). EvilHole
