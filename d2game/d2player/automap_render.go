@@ -324,7 +324,6 @@ func (a *Automap) drawText(target d2interface.Surface, w int) {
 			return
 		}
 
-		a.label.Alignment = d2ui.HorizontalAlignRight
 		a.label.Color[0] = automapColorTextGld
 	}
 
@@ -333,11 +332,14 @@ func (a *Automap) drawText(target d2interface.Surface, w int) {
 		name = a.nameFn(a.currentLevel())
 	}
 
-	if name == "" {
-		return
-	}
+	width := func(s string) int { x, _ := a.label.GetTextMetrics(s); return x }
+	_, lh := a.label.GetTextMetrics("A")
 
-	a.label.SetText(name)
-	a.label.SetPosition(w-16, 40)
-	a.label.Render(target)
+	// AUTOMAP_DrawAutomap 0x4564a0: level name, then the version line, right aligned and 16 apart.
+	// The game name / password / difficulty lines are not drawn (strings not read, UNVERIFIED).
+	for _, l := range d2automap.TextStack([]string{name, d2automap.VersionText}, w, width) {
+		a.label.SetText(l.Text)
+		a.label.SetPosition(l.X, l.Y-lh) // the engine's y is the text baseline (UNVERIFIED)
+		a.label.Render(target)
+	}
 }
