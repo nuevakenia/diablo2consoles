@@ -581,6 +581,7 @@ func (v *Game) bindGameControls() error {
 		v.gameControls.BindGamepad()
 		v.gameControls.Automap().SetLevelSource(v.currentLevel, v.levelName)
 		v.gameControls.SetEquipSound(v.playHeroUISound)
+		v.gameControls.SetHeroVoice(v.sayHero)
 		v.gameControls.SetQuestItemUse(v.useQuestItem)
 		v.gameControls.SetHealShare(func(heal int) int {
 			if d := v.monsters; d != nil && v.localPlayer != nil {

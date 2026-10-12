@@ -113,7 +113,10 @@ type TradeWindow struct {
 
 	onChange func()
 	onClose  func()
-	stocks   map[string]*d2vendor.Stock
+	// OnImpossible plays the hero's "impossible" line (voice 0x13): ctrl-clicking an item the vendor does not buy
+	// (INV_HandleGridClick 0x48c3c0, TRADE_CheckItemSellable false).
+	OnImpossible func()
+	stocks       map[string]*d2vendor.Stock
 
 	// gamble is true while the window shows the vendor's gamble stock.
 	gamble bool
@@ -789,6 +792,10 @@ func (t *TradeWindow) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 			if item, ok := t.inv.grid.ItemAtScreen(mx, my).(*diablo2item.Item); ok {
 				if _, err := t.Sell(item); err != nil {
 					t.Infof("sell %q: %v", item.Label(), err)
+
+					if errors.Is(err, ErrNotSellable) && t.OnImpossible != nil {
+						t.OnImpossible()
+					}
 				}
 
 				return true

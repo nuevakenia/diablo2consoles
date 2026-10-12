@@ -26,6 +26,10 @@ func (g *GameControls) handleContainerClick(mx, my int, ctrl bool) bool {
 		return true
 	}
 
+	if g.tryInventoryHeldSpecial(mx, my) {
+		return true
+	}
+
 	if g.inventory.HandleClick(mx, my, ctrl) {
 		switch g.inventory.lastClick {
 		case ClickPlace, ClickSwap, ClickAuto, ClickMerge:

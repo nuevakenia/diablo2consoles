@@ -19,22 +19,13 @@ import (
 // recalculation of the hero's totals after each change and the durability loss
 // in combat. All of it logs "EQUIP" / "DURABILITY" lines for the autotests.
 
-// Sounds for refusals and breaks (Sounds.txt handles). Which sound the game plays
-// for which refusal is UNVERIFIED: the voice lines exist per class, the binary was
-// not searched for their use.
+// Sounds for breaks (Sounds.txt handles). The refusal lines are hero voices by id: see hero_voice.go and
+// d2equip.VoiceForReason (VERIFIED in INV_HandleBodySlotClick 0x48cbb0).
 const (
-	soundBroken     = "ESOUND_CURSOR_DURABILITY_BREAK"
-	soundCantUseFmt = "ESOUND_%s_CANTUSEYET"
-	soundCantCarry  = "ESOUND_%s_CANTCARRY_1"
-	envDurChance    = "OD2_DURABILITY_CHANCE" // test override of the loss chance in percent
-	lowDurPct       = 20                      // the HUD warning icons show at or below this share (UI_DrawLowDurabilityWarningIcons 0x494470)
+	soundBroken  = "ESOUND_CURSOR_DURABILITY_BREAK"
+	envDurChance = "OD2_DURABILITY_CHANCE" // test override of the loss chance in percent
+	lowDurPct    = 20                      // the HUD warning icons show at or below this share (UI_DrawLowDurabilityWarningIcons 0x494470)
 )
-
-var voiceNames = map[string]string{
-	d2equip.ClassAmazon: "AMAZON", d2equip.ClassSorceress: "SORCERESS", d2equip.ClassNecromancer: "NECROMANCER",
-	d2equip.ClassPaladin: "PALADIN", d2equip.ClassBarbarian: "BARBARIAN", d2equip.ClassDruid: "DRUID",
-	d2equip.ClassAssassin: "ASSASSIN",
-}
 
 // EquipResult is the verdict on putting an item at a body location.
 type EquipResult struct {
@@ -211,21 +202,9 @@ func (g *GameControls) evaluateEquip(item InventoryItem, loc d2equip.Loc) EquipR
 	return res
 }
 
-func isRequirementReason(r d2equip.Reason) bool {
-	switch r {
-	case d2equip.ReasonStrength, d2equip.ReasonDexterity, d2equip.ReasonLevel, d2equip.ReasonClass, d2equip.ReasonUnidentified:
-		return true
-	}
-
-	return false
-}
-
 func (g *GameControls) refuseEquip(item InventoryItem, res EquipResult) {
 	g.Infof("EQUIP decision=refused item=%s slot=%s reason=%q detail=%q", item.GetItemCode(), res.Loc, res.Reason, res.Detail)
-
-	if name, ok := voiceNames[g.equipClass()]; ok && isRequirementReason(res.Reason) {
-		g.playEquipSound(fmt.Sprintf(soundCantUseFmt, name))
-	}
+	g.sayHeroVoice(d2equip.VoiceForReason(res.Reason))
 }
 
 // TryEquipCursor puts the cursor item at loc following the rules. The item it
@@ -272,7 +251,13 @@ func (g *GameControls) TryEquipCursor(loc d2equip.Loc) EquipResult {
 	loc = res.Loc
 	old := g.inventory.WornAt(loc)
 
+	// INV_ClassifyHandSwapAction (0x63ee20, VERIFIED): into an empty hand slot, the other hand's item that cannot be
+	// held together with the new one (action 2) ends up on the CURSOR, not in the inventory (packet 0x1b,
+	// 0x561b70). Only when the slot is occupied (action 7) does the displaced item go to the inventory, and then
+	// only if it fits there, else the click is refused with the "impossible" line.
 	var moved []InventoryItem
+
+	var toCursor InventoryItem
 
 	for _, d := range res.Displaced {
 		it := g.inventory.WornAt(d)
@@ -280,13 +265,16 @@ func (g *GameControls) TryEquipCursor(loc d2equip.Loc) EquipResult {
 			continue
 		}
 
+		if old == nil && len(res.Displaced) == 1 {
+			toCursor = it
+
+			continue
+		}
+
 		if !g.inventory.grid.CanAutoPlace(it, true) {
 			res.OK, res.Reason, res.Detail = false, d2equip.ReasonNoRoom, "no room in the inventory for "+it.GetItemCode()
 			g.Infof("EQUIP decision=refused item=%s slot=%s reason=%q detail=%q", item.GetItemCode(), loc, res.Reason, res.Detail)
-
-			if name, ok := voiceNames[g.equipClass()]; ok {
-				g.playEquipSound(fmt.Sprintf(soundCantCarry, name))
-			}
+			g.sayHeroVoice(d2equip.VoiceForReason(res.Reason))
 
 			return res
 		}
@@ -300,6 +288,10 @@ func (g *GameControls) TryEquipCursor(loc d2equip.Loc) EquipResult {
 		if i < len(moved) {
 			g.inventory.grid.AutoPlaceForPickup(moved[i])
 		}
+	}
+
+	if toCursor != nil {
+		old = toCursor
 	}
 
 	g.inventory.SetWorn(loc, item)
@@ -387,6 +379,14 @@ func (g *GameControls) EquipClick(mx, my int) bool {
 	}
 
 	if g.inventory.CursorItem() == nil {
+		// action 4 of INV_ClassifyHandSwapAction (0x63ee20, VERIFIED): an empty hand slot next to a two-handed
+		// weapon picks that weapon up
+		if g.inventory.WornAt(loc) == nil && loc.IsHand() {
+			if other := g.inventory.WornAt(loc.Other()); other != nil && g.isTwoHanded(other, loc.Other()) {
+				loc = loc.Other()
+			}
+		}
+
 		g.TryUnequipToCursor(loc)
 	} else {
 		g.TryEquipCursor(loc)
@@ -668,4 +668,22 @@ func (g *GameControls) EquipSummary() string {
 	}
 
 	return fmt.Sprintf("active_arms=%d worn=[%s]", g.inventory.activeArms, strings.Join(parts, " "))
+}
+
+// isTwoHanded reports whether the worn item is a weapon with the two-handed flag (ITEM_IsTwoHanded, 0x628b90: the
+// base flag only, without the Barbarian exception that the hand pair check applies).
+func (g *GameControls) isTwoHanded(it InventoryItem, loc d2equip.Loc) bool {
+	_, bases, ok := g.heroState.EquipRules()
+	if !ok {
+		return false
+	}
+
+	s, isItem := g.storedOf(it, loc)
+	if !isItem {
+		return false
+	}
+
+	e := d2hero.EquipItemOf(&s, bases)
+
+	return e.Weapon && e.TwoHanded
 }

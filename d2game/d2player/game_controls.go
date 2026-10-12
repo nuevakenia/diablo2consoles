@@ -258,6 +258,7 @@ func NewGameControls(
 	}
 
 	gc.Trade = trade
+	trade.OnImpossible = func() { gc.sayHeroVoice(0x13) }
 	gc.PTrade = newPlayerTradeWindow(asset, ui, l, gc)
 	gc.Identify = NewIdentifyWindow(asset, ui, l, inventory, hero, gc.saveHero, gc.onCloseTrade)
 
@@ -358,6 +359,7 @@ type GameControls struct {
 	belt                  *BeltPanel
 	itemOrigin            map[InventoryItem]*d2s.Item
 	equipSound            func(handle string)
+	heroVoice             func(id int)
 	equipTouched          bool
 	equipNoSave           bool // the equip autotest saves once at the end
 	mercHost              MercGearHost
