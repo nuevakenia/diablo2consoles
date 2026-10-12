@@ -450,6 +450,7 @@ func (v *Game) Advance(elapsed float64) error {
 // nolint:gocyclo // not need to change
 func (v *Game) advanceStep(elapsed, total float64, last bool) error {
 	d2util.PerfMark("game-playable")
+	d2util.AddSimSeconds(elapsed)
 
 	v.gameClient.Drain()
 

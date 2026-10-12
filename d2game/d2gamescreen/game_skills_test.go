@@ -119,6 +119,18 @@ func TestOwnHitIgnoresAreaPulses(t *testing.T) {
 		t.Error("a strike hit is a hit")
 	}
 
+	// the swing missed but the bolt (or the blast of a missed arrow) reached the target: the direct hit is still missing
+	start2 := d2skills.Counters{Hits: 1}
+	it2 := &castItem{mustHit: true, ownHit: true, c0: start2, landed: func() int { return 1 }, landed0: 0}
+
+	if !it2.missedHit(d2skills.Counters{Hits: 1, Misses: 1, Melee: 1}) {
+		t.Error("a to-hit miss with no direct hit is cast again even when something else of the cast landed")
+	}
+
+	if it2.missedHit(d2skills.Counters{Hits: 2, Misses: 1, Melee: 2}) {
+		t.Error("a miss followed by a hit of the same cast is a hit")
+	}
+
 	if s, n, must := parseCastPart("Bash,1!!"); s != "Bash" || n != 1 || !must {
 		t.Errorf("parse: %q %d %v", s, n, must)
 	}

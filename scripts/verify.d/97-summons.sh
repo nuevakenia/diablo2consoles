@@ -38,12 +38,16 @@ scenario_check() {
 
   for fam in minionspawner1:minion1:25:0 councilmember1:hydra1:30:1; do
     ref=${${(s.:.)fam}[1]}; class=${${(s.:.)fam}[2]}; bound=${${(s.:.)fam}[3]}; fight=${${(s.:.)fam}[4]}
-    cp -f "$save" "$tmp/97s-$ref.d2s"; rm -f "$tmp/97s-$ref.d2s.bak"
+    # a pristine copy: the main game wrote its end state (a hero at 158 life) back into $save, and the priest then
+    # killed that hero before its first Hydra
+    cp -f "${OD2_VERIFY_SAVE:-$D2S_SAMPLE_BODY}" "$tmp/97s-$ref.d2s"; rm -f "$tmp/97s-$ref.d2s.bak"
     sub_cmd=$tmp/97s-$ref.command log=$tmp/97s-$ref.log; rm -f $log
     {
       echo '#!/bin/zsh'
       echo "export OD2_PORT=$OD2_PORT"
       echo "export OD2_AUTOGAME=\"$tmp/97s-$ref.d2s\" OD2_AUTOEXIT=1 OD2_AUTOTEST_MUTE=1 OD2_AUTOSPEED=8"
+      # the private config folder of the runner (the sub game imported its hero into the user's own save folder before)
+      [ -n "${OD2_VERIFY_CONFIG_DIR:-}" ] && echo "export OD2_CONFIG_DIR=\"$OD2_VERIFY_CONFIG_DIR\""
       echo "export OD2_AUTOMONSTER=$ref OD2_AUTOMONSTER_SECONDS=20 OD2_AUTOMONSTER_SUMMONS=1"
       [ "$fight" = 0 ] && echo "export OD2_AUTOMONSTER_PASSIVE=1"
       echo "$tmp/od2 2>&1 | tee $log"
@@ -54,6 +58,7 @@ scenario_check() {
     wait_run
     ./scripts/gameslot.sh release $slot
     sed 's/\x1b\[[0-9;]*m//g' $log > $log.txt
+    local fail_sub=$fail
     summon_asserts $ref $log.txt $class $bound
     grep -E "\[(ERROR|WARNING)\]|panic" $log.txt | grep -v "skipping missing" | head -3 | grep -q . && { echo "FAIL: errors in the $ref log"; fail=1; }
     if [ $class = hydra1 ]; then
@@ -63,6 +68,8 @@ scenario_check() {
         grep -qE "MONSTER (death|dismiss) name=.* id=${id}([^0-9]|\$)" $log.txt || { echo "FAIL: hydra $id never died"; fail=1; }
       done
     fi
+    # keep the sub game's log when it failed (the runner only keeps the main game's log of a failed attempt)
+    [ "$fail" != "$fail_sub" ] && { mkdir -p ${OD2_VERIFY_FLAKE_DIR:-/tmp/od2-flake-logs}; cp -f $log.txt ${OD2_VERIFY_FLAKE_DIR:-/tmp/od2-flake-logs}/97s-$ref.$$.txt; }
   done
   log=$main_log
 }

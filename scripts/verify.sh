@@ -70,11 +70,17 @@ for v in D2S_SAMPLE_BODY D2S_SAMPLE_BODY_JSON D2_TABLES; do
 done
 scenarios_run=0
 
+if [ -z "${SKIP_HYGIENE:-}" ]; then # (scripts/flake_loop.sh skips it: it takes minutes on a loaded machine and the loop repeats a run)
 step "repo hygiene (no game files / decompiled code)"
 scripts/check_repo_hygiene.sh || { echo "REPO HYGIENE FAILED"; exit 1; }
+fi
 
 step "build"
+if [ -n "${OD2_VERIFY_BIN:-}" ]; then # a prebuilt binary (scripts/flake_loop.sh builds once for a whole loop)
+  cp -f "$OD2_VERIFY_BIN" $tmp/od2 || { echo "BUILD FAILED (cannot copy $OD2_VERIFY_BIN)"; exit 1; }
+else
 go build -o $tmp/od2 . 2>&1 | grep -v "ld: warning" ; [ ${pipestatus[1]} -eq 0 ] || { echo "BUILD FAILED"; exit 1; }
+fi
 
 if [ -z "${SKIP_UNIT:-}" ]; then
 step "unit tests"

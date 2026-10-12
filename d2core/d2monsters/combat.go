@@ -188,6 +188,10 @@ func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.
 	hit, chance, roll := true, 0, 0
 	if !heroAutoHit(p) {
 		hit, chance, roll = d2combat.RollToHit(u.b.Seed, in)
+
+		if d.opt.TestAlwaysHit { // (the roll is still taken: the seed sequence stays the same)
+			hit, chance = true, 100
+		}
 	}
 
 	dmg := 0

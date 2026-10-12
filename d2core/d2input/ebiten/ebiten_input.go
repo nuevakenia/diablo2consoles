@@ -2,6 +2,8 @@
 package ebiten
 
 import (
+	"os"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
@@ -165,19 +167,37 @@ func (is InputService) IsKeyJustReleased(key d2enum.Key) bool {
 	return inpututil.IsKeyJustReleased(keyToEbiten[key])
 }
 
+// ignoreRealMouseButtons: a scripted run (OD2_AUTOSCRIPT) takes its clicks from the script only. A physical click on
+// the window of a verification game (the owner's mouse, another tool clicking on a window that lies under the pointer)
+// walked the hero of 8g-portal-roundtrip to the edge of the Blood Moor before the script's first step. OD2_REAL_INPUT=1
+// lets the real buttons through again (a scripted run that is driven by hand).
+var ignoreRealMouseButtons = os.Getenv("OD2_AUTOSCRIPT") != "" && os.Getenv("OD2_REAL_INPUT") == ""
+
 // IsMouseButtonPressed checks if the provided mouse button is down.
 // Like IsKeyPressed it reads the once-per-tick sample of inpututil instead of asking the window thread.
 func (is InputService) IsMouseButtonPressed(button d2enum.MouseButton) bool {
+	if ignoreRealMouseButtons {
+		return false
+	}
+
 	return inpututil.MouseButtonPressDuration(mouseButtonToEbiten[button]) > 0
 }
 
 // IsMouseButtonJustPressed checks if the provided mouse button is just transitioned from up to down.
 func (is InputService) IsMouseButtonJustPressed(button d2enum.MouseButton) bool {
+	if ignoreRealMouseButtons {
+		return false
+	}
+
 	return inpututil.IsMouseButtonJustPressed(mouseButtonToEbiten[button])
 }
 
 // IsMouseButtonJustReleased checks if the provided mouse button is just transitioned from down to up.
 func (is InputService) IsMouseButtonJustReleased(button d2enum.MouseButton) bool {
+	if ignoreRealMouseButtons {
+		return false
+	}
+
 	return inpututil.IsMouseButtonJustReleased(mouseButtonToEbiten[button])
 }
 

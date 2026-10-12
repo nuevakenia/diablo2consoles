@@ -64,6 +64,10 @@ type Options struct {
 	// IgnoreTown lets monsters target heroes standing in town (for tests; the
 	// original never aggroes onto players in town).
 	IgnoreTown bool
+	// TestAlwaysHit makes every monster attack that reaches a hero connect (test scenarios only: a level 94 hero
+	// against a level 5 zombie sits on the 5% minimum to-hit however low her defense is, so a scenario that needs a
+	// hit within seconds would be a coin toss). Shield blocks and avoidance still apply.
+	TestAlwaysHit bool
 	// MagicFindFunc and GoldFindFunc, if set, give the killer's item_magicbonus
 	// and gold find totals for the drops (ITEMGEN_GetMagicFindStat: the killer's
 	// own stat plus its leader's). Without them drops roll with 0.

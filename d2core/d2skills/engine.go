@@ -767,6 +767,7 @@ func (e *Engine) staticField(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Ski
 		}
 	}
 
+	e.Counters.AreaHits += n // (a scenario that casts Static Field with "!" repeats it until it reached somebody)
 	e.emit("state", "STATE area skill=%q radius=%d affected=%d", sk.Name, ef.Radius, n)
 }
 

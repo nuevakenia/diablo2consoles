@@ -22,7 +22,17 @@ scenario_check() {
   case "$m0$m1$m2" in ''|*[!0-9]*) echo "FAIL: could not read the mana of three character panels"; fail=1 ;; *)
     [ "$m0" -gt 464 ] && [ "$m0" -le 477 ] || { echo "FAIL: mana did not rise from the saved 464 ($m0)"; fail=1; }
     [ "$m1" -le 40 ] || { echo "FAIL: mana was not emptied by setmana 0 ($m1)"; fail=1; }
-    [ "$m2" -ge 15 ] && [ "$m2" -le 45 ] && [ "$m2" -gt "$m1" ] || { echo "FAIL: mana did not regenerate by about 3.9 per game second ($m2 after about 6 s)"; fail=1; } ;;
+    # the rate is measured against the simulated clock (sim= on the panel line), not the script waits: a wait ends at a
+    # frame boundary and a slow frame of a loaded machine at x8 overshoots it by seconds
+    local t1 t2 rate
+    t1=$(grep "PANEL character: level.* def=" $log.txt | sed -n 2p | sed -nE 's/.* sim=([0-9.]+).*/\1/p')
+    t2=$(grep "PANEL character: level.* def=" $log.txt | sed -n 3p | sed -nE 's/.* sim=([0-9.]+).*/\1/p')
+    rate=$(awk -v a="$m1" -v b="$m2" -v t1="${t1:-0}" -v t2="${t2:-0}" 'BEGIN{ if (t2-t1 >= 2) printf "%.2f", (b-a)/(t2-t1); else print "none" }')
+    echo "mana regeneration rate: $rate per game second (sim $t1 -> $t2)"
+    if [ "$rate" = none ]; then echo "FAIL: no simulated-clock stamps on the character panels"; fail=1
+    else
+      awk -v r="$rate" 'BEGIN{ exit !(r >= 3.0 && r <= 5.0) }' || { echo "FAIL: mana did not regenerate by about 3.9 per game second ($rate: $m1 -> $m2 between sim $t1 and $t2)"; fail=1; }
+    fi ;;
   esac
   grep -q "AUTOSCRIPT RESULT PASS" $log.txt || { echo "FAIL: scripted scenario did not pass"; fail=1; }
 }
