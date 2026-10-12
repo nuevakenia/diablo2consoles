@@ -75,6 +75,7 @@ type mercUnit struct {
 	buffs  map[string]int // skill name -> frame the buff ends
 
 	lastOwnerX, lastOwnerY int
+	trail                  []d2path.Point // the owner's last distinct subtiles (merc_leader.go)
 	ownerMode              d2monster.Mode
 	skill                  string // the skill being cast, for logs
 	regen                  mercRegen
@@ -357,7 +358,7 @@ func (d *Director) teleportNextToOwner(u *unit) bool {
 
 	ox, oy := playerSubtile(owner)
 
-	p, ok := d2path.NearestFree(d.grid, d2path.MaskMonster, d2path.Point{X: ox + 2, Y: oy}, 10)
+	p, ok := d2path.NearestFree(d.staticGrid(), d2path.MaskMonster, d2path.Point{X: ox + 2, Y: oy}, 10)
 	if !ok {
 		return false
 	}
@@ -571,6 +572,7 @@ func (d *Director) stepMerc(u *unit) {
 	}
 
 	mu.lastOwnerX, mu.lastOwnerY = x, y
+	mu.pushTrail(x, y)
 
 	if u.m.Alive() {
 		mu.stepRegen(&u.m.Vitals)

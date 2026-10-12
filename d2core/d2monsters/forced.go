@@ -228,8 +228,8 @@ func (d *Director) HasMode(b *d2monster.Brain, m d2monster.Mode) bool {
 	return true
 }
 
-// ClearState implements d2monster.StateClearer (unit states are not modelled).
-func (d *Director) ClearState(*d2monster.Brain, int) {}
+// ClearState implements d2monster.StateClearer and MercLeaderOps: STATE_ToggleUnitState(unit, id, 0).
+func (d *Director) ClearState(b *d2monster.Brain, id int) { d.SetUnitState(b, id, false) }
 
 // ---- monster against monster ----
 

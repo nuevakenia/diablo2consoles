@@ -11,11 +11,17 @@ scenario_env() {
   echo "export OD2_AUTOMERC_UI=1 OD2_AUTOMERC=skeleton1,4 OD2_AUTOMERC_KILL=1 OD2_AUTOMERC_TYPES=0,6,16,24 OD2_AUTOMERC_MERCLEVEL=85 OD2_AUTOMERC_LEVELS=1 OD2_REALMAPS=1 OD2_D2S_WRITEBACK=\"$wb\""
 }
 scenario_check() {
-  grep -E "AUTOMERC (summary|types|levels)|MERC (spawn|hire|death|revive|leaves|arrive|stays)|D2S EXPORT reparse" $log.txt | cut -c1-300
-  for pat in "MERC spawn " "MERC attack .*hit=true" "MERC death " "MERC revive " "AUTOMERC follow dist=" "AUTOMERC summary" \
+  grep -E "AUTOMERC (summary|types|levels)|MERC (spawn|hire|death|revive|leaves|arrive|stays)|MERC leader follow|D2S EXPORT reparse" $log.txt | cut -c1-300
+  for pat in "MERC spawn " "MERC attack .*hit=true" "MERC death " "MERC revive " "AUTOMERC follow dist=" "MERC leader follow kind=[01] " "AUTOMERC summary" \
     "D2S EXPORT reparse: .*merc=type"; do
     grep -qE "$pat" $log.txt || { echo "FAIL: no '$pat' in the merc log"; fail=1; }
   done
+
+  # w42: the exe-ported Hireable AI follows through the Director's host hooks (MercLeaderOps): the hero walks 60 subtiles
+  # away, the merc runs after it (kind 1 ring) and is back within the inner ring before the phase ends
+  local fdist
+  fdist=$(grep "AUTOMERC follow dist=" $log.txt | tail -1 | sed -E 's/.*follow dist=([0-9]+) .*/\1/')
+  if [ -z "$fdist" ] || [ "$fdist" -gt 30 ]; then echo "FAIL: the merc did not catch up with the hero (last follow dist=$fdist)"; fail=1; fi
 
   # w37 merc interface: the hire lists are in the form of the exe's dialog, the portrait takes a potion and heals the merc,
   # gear dropped on it is worn, a too heavy item is refused, the right button opens the merc screen

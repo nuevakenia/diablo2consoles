@@ -217,6 +217,7 @@ type Director struct {
 	blessings  map[*d2mapentity.Player]map[int]timedStat // timed hero stats (wispbless.go)
 	grid       mapGrid                                   // static map flags (line of sight)
 	fp         *footprints
+	regions    *regionMap // walkable components (merc_leader.go)
 	fpPlayer   map[uint32]bool
 	launcher   Launcher
 	hero       *d2rand.Seed

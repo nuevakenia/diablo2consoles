@@ -86,6 +86,10 @@ type MercLeaderOps interface {
 	LeaderFollow(b *Brain, o OwnerInfo, kind int, run bool, speed int) bool
 }
 
+// mercClearedState is the unit state the exe tests (0x63af30) and clears (0x63aef0) first: 0xc, VERIFIED w42 from
+// the disassembly (w40 called it taunt and the Go port tested 27; states.txt 12 is inferno).
+const mercClearedState = 0xc
+
 // mercRogueClass gets alternate state 5 (GoodNpcRanged, not ported) when it has no player leader; all others state 6.
 const mercRogueClass = 271 // 0x10f
 
@@ -130,8 +134,8 @@ func thinkHireable(c *Ctx) {
 		return
 	}
 
-	if ops != nil && w.HasState(b, StateTaunt) {
-		ops.ClearState(b, 0xc)
+	if ops != nil && w.HasState(b, mercClearedState) {
+		ops.ClearState(b, mercClearedState)
 	}
 
 	// mode 2 (walk) and 0xf (run): return, the animation end wakes the AI

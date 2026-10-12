@@ -96,7 +96,7 @@ func TestW40HireableEarlyOutsAndNoOwner(t *testing.T) {
 // A taunt state is cleared; town rooms skip the attack; another region follows with kind 0 running.
 func TestW40HireableIdleBranches(t *testing.T) {
 	o, b := newOpsMerc(8)
-	o.states[StateTaunt] = true
+	o.states[0xc] = true
 	Tick(o, b)
 
 	if len(o.cleared) != 1 || o.cleared[0] != 0xc {
