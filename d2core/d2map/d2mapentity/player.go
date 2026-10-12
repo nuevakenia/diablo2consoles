@@ -76,12 +76,15 @@ const (
 // moveSpeed is the ground speed in subtiles per second for the current
 // faster run/walk total (the hero's item stat 96).
 func (p *Player) moveSpeed(running bool) float64 {
-	frw := 0
+	frw, armor := 0, 0
 	if p.Stats != nil && p.Stats.Totals != nil {
 		frw = p.Stats.Totals.FasterRun
+		// stat 0x43 of each worn armor piece is -speed (armor.txt, VERIFIED 0x555b10): heavy armor and
+		// large shields slow walking and running
+		armor = -p.Stats.Totals.ArmorSpeed
 	}
 
-	return d2path.PlayerSubtilesPerSecond(d2path.PlayerBase(int(p.Class)), running, frw, 0)
+	return d2path.PlayerSubtilesPerSecond(d2path.PlayerBase(int(p.Class)), running, frw, armor)
 }
 
 // ID returns the Player uuid
@@ -178,10 +181,16 @@ func (p *Player) Advance(tickTime float64) {
 
 	// Drain and recover stamina with the exe's rules (0x0057d220 / 0x0057e4f0,
 	// see d2herostats/stamina.go): raw 1/256 units, 25 ticks per second
-	// (the tick rate is UNVERIFIED). Armor weight and the drain percent stat
-	// are not tracked here, so the drain is the bare charstats RunDrain.
+	// (both routines run once per game frame, 25 per second). The body armor speed column and the drain
+	// percent stat (0x9a) come from the stat totals, the recovery percent (0x1c) too.
+	armorSpeed, drainPct, recoverPct := 0, 0, 0
+	if p.Stats != nil && p.Stats.Totals != nil {
+		armorSpeed, drainPct = p.Stats.Totals.BodyArmorSpeed, p.Stats.Totals.StaminaDrainPct
+		recoverPct = p.Stats.Totals.StaminaRecoveryPct
+	}
+
 	if p.IsRunning() && !p.atTarget() && !p.IsInTown() {
-		perSecond := float64(d2herostats.StaminaDrainPerStep(charstats.StaminaRunDrain, -1, 0, false)*d2herostats.FramesPerSecond) / stamina256
+		perSecond := float64(d2herostats.StaminaDrainPerStep(charstats.StaminaRunDrain, armorSpeed, drainPct, false)*d2herostats.FramesPerSecond) / stamina256
 		p.Stats.Stamina -= perSecond * tickTime
 
 		if p.Stats.Stamina <= 0 {
@@ -203,7 +212,7 @@ func (p *Player) Advance(tickTime float64) {
 		}
 
 		maxRaw, curRaw := p.Stats.MaxStamina*stamina256, int(p.Stats.Stamina*stamina256)
-		perSecond := float64(d2herostats.StaminaRegenPerTick(maxRaw, curRaw, mode, 0)*d2herostats.FramesPerSecond) / stamina256
+		perSecond := float64(d2herostats.StaminaRegenPerTick(maxRaw, curRaw, mode, recoverPct)*d2herostats.FramesPerSecond) / stamina256
 		p.Stats.Stamina += perSecond * tickTime
 
 		if p.Stats.Stamina > float64(p.Stats.MaxStamina) {

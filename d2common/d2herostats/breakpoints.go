@@ -149,10 +149,22 @@ type spec struct {
 
 const (
 	unverLightning = "frame count 19 is the community number (equals records SOA11HT/DZA11HS, not SOSC); which record the exe plays for lightning is unverified"
-	unverForm      = "token-to-form mapping (40=werewolf, TG=werebear) is inferred"
-	unverBear      = unverForm + "; the community werebear row 0,5,10,16,26,39,56,86,152,377 (7 frames at 256) matches no record"
-	unverShield    = "the old community row (8 frames, identical to the Sorceress FHR row) matches no Paladin record; the data gives 3 frames"
-	unverIAS       = "stat 0x44 composition (100 - WSM + skill) is unverified; table is for WSM 0 and no skill bonus"
+
+	// Settled in wave 31 (VERIFIED in the exe, notes in w31-mech2.md), so the rows carry no flag any more:
+	//   - Druid forms: states.txt gives state 139 (wolf) gfxtype 1 gfxclass 430 and state 140 (bear) gfxclass 431;
+	//     monstats rows 430 / 431 are Wolf (token 40) and Bear (token TG). UNIT_GetShapeshiftAdjustedMode
+	//     (0x624830 region) turns the player into a monster of that class for the animation rules, so hit and
+	//     block recovery run the monster mode formulas on the 40 / TG records. The werebear row
+	//     0,5,10,16,24,37,54,86,152,360 follows from TGGHHTH (5 frames at speed 184); it is NOT the Necromancer
+	//     row (7 frames at 256), which was an old recollection.
+	//   - Paladin block: COMPOSIT_ResolveWeaponClassCode (0x650480) never looks at the shield, the record comes
+	//     from the weapon class; PABL1HS and PABLHTH both have 3 frames at 256, so "with a shield" is the 3 frame
+	//     row. The old 8 frame (Sorceress) row matches no record.
+	//   - Attack: stat 0x44 starts at 100 (0x56e5d0), a weapon adds -speed (0x555b10), a skill adds its own term.
+	unverForm   = ""
+	unverBear   = ""
+	unverShield = ""
+	unverIAS    = ""
 )
 
 // specs lists the animations of the seven classes plus the 1.14 per-form

@@ -72,6 +72,8 @@ const (
 	StatFasterBlock  = 102
 	StatFasterCast   = 105
 	StatDamageToMana = 114
+	// StatStaminaDrain is item_staminadrainpct (154 = 0x9a), the percent the run drain is reduced by.
+	StatStaminaDrain = 154
 	// StatAttackerTakes and StatAttackerTakesLight: item thorns (78, 128).
 	StatAttackerTakes      = 78
 	StatAttackerTakesLight = 128
