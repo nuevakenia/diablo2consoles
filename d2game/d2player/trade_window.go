@@ -305,7 +305,8 @@ func (t *TradeWindow) open(v d2vendor.Vendor, seed uint32, quests *d2s.QuestReco
 	t.isOpen = true
 	t.inv.SetPriceHook(t.inventoryPriceLines)
 	t.syncGold()
-	t.Infof("trade window opened: vendor=%s gamble=%v items=%d gold=%d", v.Name, gamble, len(stock.Items), t.hero.Gold)
+	t.Infof("trade window opened: vendor=%s gamble=%v items=%d gold=%d tab=%d pages=%d/%d/%d/%d", v.Name, gamble,
+		len(stock.Items), t.hero.Gold, t.tab, t.pageCount(0), t.pageCount(1), t.pageCount(2), t.pageCount(3))
 }
 
 // LeaveTown is the town-leaving restock check (0x534c20, called from the
@@ -952,6 +953,7 @@ func (t *TradeWindow) selectTab(i int) bool {
 	t.tab = i
 	t.rebuildGrid()
 	t.tooltip.SetVisible(false)
+	t.Infof("vendor tab: vendor=%s tab=%d items=%d", t.vendor.Name, i, t.pageCount(i))
 
 	return true
 }
