@@ -126,7 +126,7 @@ func (h *Header) marshal() ([]byte, error) {
 }
 
 func (c *Character) appendBody(out []byte, tables *ItemTables) ([]byte, error) {
-	if len(c.MercItems) > 0 && (!c.Header.IsExpansion() || c.Header.Mercenary.ID == 0) {
+	if len(c.MercItems) > 0 && (!c.Header.IsExpansion() || !c.Header.Mercenary.Exists()) {
 		return nil, fmt.Errorf("%w: mercenary items need an expansion save with a mercenary", ErrWouldDrop)
 	}
 
@@ -149,7 +149,7 @@ func (c *Character) appendBody(out []byte, tables *ItemTables) ([]byte, error) {
 	if c.Header.IsExpansion() {
 		out = append(out, mercTag...)
 
-		if c.Header.Mercenary.ID != 0 {
+		if c.Header.Mercenary.Exists() {
 			if out, err = appendItemList(out, c.MercItems, tables); err != nil {
 				return nil, fmt.Errorf("mercenary: %w", err)
 			}
@@ -209,7 +209,16 @@ func (b *Body) SetStat(id int, value uint64) {
 		}
 	}
 
-	b.Stats = append(b.Stats, Stat{ID: id, Value: value})
+	// the game lists the stats in ascending id order: put a new one where it
+	// belongs and leave the order of the stats already present alone
+	at := len(b.Stats)
+	for at > 0 && b.Stats[at-1].ID > id {
+		at--
+	}
+
+	b.Stats = append(b.Stats, Stat{})
+	copy(b.Stats[at+1:], b.Stats[at:])
+	b.Stats[at] = Stat{ID: id, Value: value}
 	b.Attributes.set(id, value)
 }
 
@@ -269,7 +278,16 @@ func (b *Body) marshalStats(tables *ItemTables) []byte {
 			w.write(uint64(s.Param), paramBits)
 		}
 
-		w.write(s.Value, bits)
+		// SAVE_WriteStatsSection (Game.exe) saturates a value to the
+		// CSvBits range of an unsigned stat instead of letting it wrap; a
+		// signed stat (ItemStatCost flag 0x2000) is clamped to the signed
+		// range, which a uint64 value cannot express here, so it is left alone.
+		v := s.Value
+		if st, found := tables.Stat(s.ID); (!found || !st.Signed) && bits > 0 && bits < 64 && v >= 1<<uint(bits) {
+			v = 1<<uint(bits) - 1
+		}
+
+		w.write(v, bits)
 	}
 
 	w.write(statEndID, statIDBits)
