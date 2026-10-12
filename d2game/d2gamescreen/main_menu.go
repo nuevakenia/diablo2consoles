@@ -18,6 +18,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2screen"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
+	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
 	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2client/d2clientconnectiontype"
 	"github.com/OpenDiablo2/OpenDiablo2/d2script"
 )
@@ -106,6 +107,7 @@ func CreateMainMenu(
 	mainMenu := &MainMenu{
 		asset:          asset,
 		screenMode:     ScreenModeUnknown,
+		focus:          -1,
 		leftButtonHeld: true,
 		renderer:       renderer,
 		inputManager:   inputManager,
@@ -131,6 +133,7 @@ func CreateMainMenu(
 // MainMenu represents the main menu
 type MainMenu struct {
 	tcpIPBackground     *d2ui.Sprite
+	focus               int // keyboard focus in focusButtons(), -1 = none
 	trademarkBackground *d2ui.Sprite
 	background          *d2ui.Sprite
 	diabloLogoLeft      *d2ui.Sprite
@@ -583,6 +586,10 @@ func (v *MainMenu) onEscapePressed(event d2interface.KeyEvent, mode mainMenuScre
 func (v *MainMenu) OnKeyUp(event d2interface.KeyEvent) bool {
 	preventKeyEventPropagation := false
 
+	if v.screenMode != ScreenModeTrademark && v.screenMode != ScreenModeServerIP && v.onMenuNavKey(event) {
+		return true
+	}
+
 	switch v.screenMode {
 	case ScreenModeTrademark: // On retail version of D2, some specific key events (Escape, Space and Enter) puts you onto the main menu.
 		switch event.Key() {
@@ -614,6 +621,8 @@ func (v *MainMenu) OnKeyUp(event d2interface.KeyEvent) bool {
 
 // SetScreenMode sets the screen mode (which sub-menu the screen is on)
 func (v *MainMenu) SetScreenMode(screenMode mainMenuScreenMode) {
+	v.clearFocus()
+	v.focus = -1
 	v.screenMode = screenMode
 	isMainMenu := screenMode == ScreenModeMainMenu
 	isMultiplayer := screenMode == ScreenModeMultiplayer
@@ -690,4 +699,66 @@ func (v *MainMenu) getLocalIP() string {
 	v.Warning("no IPv4 Address could be found")
 
 	return v.asset.TranslateString(d2enum.IPNotFoundLabel)
+}
+
+// focusButtons lists the buttons of the current page in keyboard order.
+func (v *MainMenu) focusButtons() []*d2ui.Button {
+	switch v.screenMode {
+	case ScreenModeMainMenu:
+		return []*d2ui.Button{v.singlePlayerButton, v.multiplayerButton, v.githubButton, v.mapTestButton,
+			v.creditsButton, v.cinematicsButton, v.exitDiabloButton}
+	case ScreenModeMultiplayer:
+		return []*d2ui.Button{v.openBattleNetButton, v.networkTCPIPButton, v.networkCancelButton}
+	case ScreenModeTCPIP:
+		return []*d2ui.Button{v.btnTCPIPHostGame, v.btnTCPIPJoinGame, v.btnTCPIPCancel}
+	}
+
+	return nil
+}
+
+func (v *MainMenu) clearFocus() {
+	btns := v.focusButtons()
+	if v.focus >= 0 && v.focus < len(btns) && btns[v.focus] != nil {
+		btns[v.focus].SetPressed(false)
+	}
+}
+
+// onMenuNavKey is the keyboard control of the button pages: Up/Down (Tab and
+// Shift+Tab too) move the focus, Enter or Space presses the focused button.
+func (v *MainMenu) onMenuNavKey(event d2interface.KeyEvent) bool {
+	btns := v.focusButtons()
+	if len(btns) == 0 {
+		return false
+	}
+
+	delta := 0
+
+	switch event.Key() {
+	case d2enum.KeyUp:
+		delta = -1
+	case d2enum.KeyDown:
+		delta = 1
+	case d2enum.KeyTab:
+		delta = 1
+		if event.KeyMod()&d2enum.KeyModShift != 0 {
+			delta = -1
+		}
+	case d2enum.KeyEnter, d2enum.KeySpace:
+		if v.focus >= 0 && v.focus < len(btns) {
+			b := btns[v.focus]
+			v.clearFocus()
+			v.focus = -1
+			b.Activate()
+		}
+
+		return true
+	default:
+		return false
+	}
+
+	v.clearFocus()
+	v.focus = d2player.NextNPCMenuRow(v.focus, len(btns), delta)
+	btns[v.focus].SetPressed(true)
+
+	return true
 }
