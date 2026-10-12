@@ -111,7 +111,6 @@ var (
 	ErrWaypointOutOfRange   = errors.New("waypoint: player is too far from the waypoint")
 	ErrWaypointInvalidLevel = errors.New("waypoint: target level has no waypoint")
 	ErrWaypointNotActive    = errors.New("waypoint: waypoint is not activated for this difficulty")
-	ErrWaypointNotInAct     = errors.New("waypoint: target level is in another act")
 )
 
 // WaypointRange is the distance (tiles) within which the waypoint object can
@@ -157,10 +156,9 @@ func ValidateWaypoint(r WaypointRequest) error {
 		return ErrWaypointInvalidLevel
 	}
 
-	// The notes say travel is limited to the current act ("same-act check").
-	if ActOfLevel(r.Target) != r.PlayerAct {
-		return ErrWaypointNotInAct
-	}
+	// VERIFIED (wave 24, 0x547450): the exe does NOT compare the act of the target level. The acts it compares are the
+	// hero's and the waypoint object's; a waypoint takes the hero to any activated waypoint of any act (the menu has a tab
+	// per act, see WaypointMenu). Earlier code limited the trip to the current act.
 
 	if !r.Waypoints.Has(int(r.Diff), d2s.Waypoint(bit)) {
 		return ErrWaypointNotActive

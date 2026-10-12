@@ -3,6 +3,7 @@ package d2app
 import (
 	"os"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2difficulty"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 )
 
@@ -23,7 +24,21 @@ func (a *App) playRefusal(filePath string) string {
 		return ""
 	}
 
-	return hero.PlayRefusal()
+	if reason := hero.PlayRefusal(); reason != "" {
+		return reason
+	}
+
+	// the load gate of the original (0x567a40) for the session the hero is about to start; the forced difficulty test aid
+	// (OD2_AUTODIFFICULTY_FORCE) skips it on purpose
+	if os.Getenv("OD2_AUTODIFFICULTY_FORCE") != "" {
+		return ""
+	}
+
+	if code := hero.CheckLocal(d2difficulty.Clamp(int(hero.Difficulty))); code != d2difficulty.GateOK {
+		return "GATE " + hero.HeroName + ": " + code.String()
+	}
+
+	return ""
 }
 
 // markAutoDead is the OD2_AUTOMARKDEAD=1 test aid: it turns the OD2_AUTOGAME hero

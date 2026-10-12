@@ -150,7 +150,8 @@ func TestValidateWaypoint(t *testing.T) {
 		{"too far", func(r *WaypointRequest) { r.Distance = 2.5 }, ErrWaypointOutOfRange},
 		{"custom range", func(r *WaypointRequest) { r.Distance = 2.5; r.Range = 3 }, nil},
 		{"no waypoint at level", func(r *WaypointRequest) { r.Target = 2 }, ErrWaypointInvalidLevel},
-		{"other act target", func(r *WaypointRequest) { r.Target = 40 }, ErrWaypointNotInAct},
+		{"other act target, not activated", func(r *WaypointRequest) { r.Target = 40 }, ErrWaypointNotActive},
+		{"other act target, activated", func(r *WaypointRequest) { r.Target = 40; r.Waypoints.Set(0, d2s.WPLutGholein, true) }, nil},
 		{"not activated", func(r *WaypointRequest) { r.Target = 4 }, ErrWaypointNotActive},
 		{"wrong difficulty", func(r *WaypointRequest) { r.Diff = 1 }, ErrWaypointNotActive},
 	}

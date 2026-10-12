@@ -259,9 +259,49 @@ func (v *Game) operateTownPortal(ob *d2mapentity.Object) bool {
 		v.levels.trans.portalDest, v.levels.trans.portalPair = &dest, p.PairID
 		v.Infof("PORTAL used owner=%q from=%d dest=%d (%s) town=%v mine=%v", p.OwnerName, v.currentLevel(), p.Dest.Level,
 			v.levelName(p.Dest.Level), p.InTown, p.Owner == v.me())
+
+		if v.portalEndsPair(p) {
+			v.closeOwnPair()
+		}
 	}
 
 	return true
+}
+
+// portalEndsPair is the rule of SERVER_UsePortalObject 0x582700 applied to the pair registry: the caster remembers the
+// FIELD end of the pair (PLAYER_SetLastPortalUnitId), and a trip through the portal whose partner is the remembered one
+// destroys both ends. So the caster's trip back through the town end closes the pair (a scroll buys one round trip);
+// guests and trips through the field end leave it. The ids here are synthetic: 2*pair for the field end, 2*pair+1 for
+// the town end.
+func (v *Game) portalEndsPair(p d2portal.Portal) bool {
+	field, town := uint32(2*p.PairID), uint32(2*p.PairID+1)
+	used, linked := field, town
+
+	if p.InTown {
+		used, linked = town, field
+	}
+
+	last := uint32(0)
+	if own := v.ownPair(); own != nil {
+		last = uint32(2 * own.ID)
+	}
+
+	res := d2portal.DecideUse(d2portal.UseInput{
+		Class: d2portal.ClassTownPortal, PortalID: used, LinkedID: linked, HasLinked: true, LastPortalID: last,
+		Owner: 1, User: 1, SinceLastUseMs: -1,
+	})
+
+	return res.DestroyPair
+}
+
+// closeOwnPair sends the close of the hero's pair to the server.
+func (v *Game) closeOwnPair() {
+	if err := v.commandClosePortal(nil); err != nil {
+		v.Warningf("PORTAL close after the trip back: %v", err)
+		return
+	}
+
+	v.Infof("PORTAL pair closed after the trip back through the town end")
 }
 
 // nextToPortalEnd picks the arrival next to the far end of the portal that was

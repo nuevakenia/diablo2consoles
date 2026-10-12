@@ -76,6 +76,12 @@ func (v *Game) travelToAct(to int, via string) error {
 	// QUESTS_OnHellPortalActChange sets slot 23; earlier code excluded it)
 	v.levels.trans.actFinished = forward && (via == "npc" || via == "talk" || via == "portal")
 
+	// the three travel rows of the NPCs (Warriv, Meshif, Tyrael) open the waypoint of the town they end in when the menu
+	// action runs (VERIFIED, TRADE_ServerHandleNpcMenuAction 0x577b70); the Mephisto portal does not
+	if forward && (via == "npc" || via == "talk") {
+		v.activateTravelWaypoint(dest)
+	}
+
 	v.logActMovie(from, to, via)
 
 	return nil
@@ -256,4 +262,18 @@ func (h autoScriptHost) Travel(act int) error {
 	}
 
 	return h.v.travelToAct(act, via)
+}
+
+// activateTravelWaypoint activates the waypoint of the town an NPC trip ends in (d2level.NpcWaypoints).
+func (v *Game) activateTravelWaypoint(town int) {
+	for _, n := range d2level.NpcWaypoints {
+		if n.Level != town {
+			continue
+		}
+
+		changed, err := v.gameClient.SetWaypoint(town, true)
+		v.Infof("WAYPOINT travel activated level=%d (%s) changed=%v err=%v", town, v.levelName(town), changed, err)
+
+		return
+	}
 }

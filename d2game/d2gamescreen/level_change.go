@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2level"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
@@ -642,7 +643,23 @@ func (v *Game) operateWaypoint(ob *d2mapentity.Object) {
 }
 
 func (v *Game) openWaypointPanel(level int) {
-	act := d2level.ActOfLevel(level)
+	v.openWaypointTab(level, d2level.SelectWaypointTab(d2level.ActOfLevel(level)-1, v.questSlotDone()))
+}
+
+// questSlotDone reads bit 0 of a quest slot of the hero (QUESTREC_GetFlag(record, slot, 0) of the exe's menus).
+func (v *Game) questSlotDone() func(slot int) bool {
+	q := v.heroQuests()
+
+	return func(slot int) bool { return q != nil && q.Get(slot, d2s.QuestBitDone) }
+}
+
+// openWaypointTab shows the waypoint panel on a tab (0..4). The tab that opens first is the one
+// UI_SelectWaypointTabForAct picks (VERIFIED 0x498f30: never beyond the acts the hero finished); the tabs of the other
+// finished acts can be clicked (UI_DrawWaygatePanel 0x499190), and a trip may go to any activated waypoint of any act.
+func (v *Game) openWaypointTab(level, tab int) {
+	act := tab + 1
+	done := v.questSlotDone()
+	expansion := v.heroExpansion()
 	entries := d2level.WaypointList(v.gameClient.Progress.Waypoints, d2level.Difficulty(v.gameClient.Difficulty), act, v.gameClient.CanLoadLevel)
 
 	rows := make([]d2player.WaypointRow, 0, len(entries))
@@ -674,6 +691,9 @@ func (v *Game) openWaypointPanel(level int) {
 	}
 
 	v.gameControls.NPCMenu.Close()
+	v.gameControls.Waypoints.SetTabs(d2level.TabCount(expansion),
+		func(t int) bool { return d2level.TabUnlocked(t, expansion, done) },
+		func(t int) { v.openWaypointTab(level, t) })
 	v.gameControls.Waypoints.Open(act, level, rows, v.onWaypointChosen)
 
 	v.Infof("WAYPOINT PANEL act=%d level=%d rows=%d active=%d enabled=%d entries=[%s]",
