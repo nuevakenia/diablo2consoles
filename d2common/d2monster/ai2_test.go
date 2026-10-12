@@ -261,7 +261,7 @@ func TestScarabTogglesCircleAndWalk(t *testing.T) {
 
 	runOne(t, w, b)
 
-	if !strings.HasPrefix(w.last(), "walk-to") || b.Scratch[0] != 1 {
+	if w.last() != "walk-target/1" || b.Scratch[0] != 1 {
 		t.Fatalf("first out-of-range tick should circle: %v", w.log)
 	}
 

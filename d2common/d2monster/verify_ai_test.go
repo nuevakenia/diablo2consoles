@@ -117,33 +117,28 @@ func TestVerifyWander(t *testing.T) {
 	}
 }
 
-// TestVerifyCircleDirection pins the 5/6 split of 0x5de5e0 on the low byte of
-// the LCG (threshold 0x80), not on bit 0.
-func TestVerifyCircleDirection(t *testing.T) {
-	seen := map[bool]bool{}
+// TestVerifyCircleIsApproach pins 0x5de5e0 as re-read in wave 23: one LCG
+// step is consumed and discarded, and the move is a walk toward the target
+// unit with path limit 1 (no sideways step). Replaces the old direction test.
+func TestVerifyCircleIsApproach(t *testing.T) {
+	for _, n := range []int{0, 3, 4, 6} {
+		for seed := uint32(1); seed <= 50; seed++ {
+			b := brainAt(profile("Idle"))
+			b.Seed.Init(seed)
+			ref := d2rand.New(seed)
+			ref.Step()
 
-	for seed := uint32(1); seed <= 400; seed++ {
-		b := brainAt(profile("Idle"))
-		b.Seed.Init(seed)
-		lo := d2rand.New(seed).Step() & 0xff
+			w := newFake(10, true)
+			(&Ctx{B: b, W: w}).Circle(Target{ID: 1, X: 110, Y: 100}, n)
 
-		w := newFake(10, true)
-		(&Ctx{B: b, W: w}).Circle(Target{X: 110, Y: 100}, 4)
+			if w.last() != "walk-target/1" {
+				t.Fatalf("n %d seed %d: %s", n, seed, w.last())
+			}
 
-		want := "walk-to(100,104)"
-		if lo >= 0x80 {
-			want = "walk-to(100,96)"
+			if b.Seed.Lo != ref.Lo || b.Seed.Hi != ref.Hi {
+				t.Fatalf("n %d seed %d: exactly one LCG step expected", n, seed)
+			}
 		}
-
-		if w.last() != want {
-			t.Fatalf("seed %d lo %#x: %s want %s", seed, lo, w.last(), want)
-		}
-
-		seen[lo >= 0x80] = true
-	}
-
-	if !seen[true] || !seen[false] {
-		t.Fatal("both directions must occur")
 	}
 }
 

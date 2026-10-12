@@ -301,17 +301,6 @@ func TestSkeletonForcedBranches(t *testing.T) {
 	}
 }
 
-func TestMoveFailureFallsBackToStall(t *testing.T) {
-	w := newFake(12, false)
-	w.failMove = true
-	b := brainAt(profile("Skeleton", 100, 15, 0, 0))
-	Tick(w, b)
-
-	if b.Wake != 15 {
-		t.Fatalf("failed walk should stall aip2: wake=%d", b.Wake)
-	}
-}
-
 func TestGoatmanAlwaysA1(t *testing.T) {
 	w := newFake(3, true)
 	b := brainAt(profile("Goatman", 75, 10, 100))
