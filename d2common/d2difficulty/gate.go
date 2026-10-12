@@ -28,8 +28,10 @@ type GateGame struct {
 	Difficulty Level // game+0x6d (0 Normal, 1 Nightmare, 2 Hell)
 	// Realm is true when the realm interface exists (DAT_0087bd94, i.e. Battle.net); the ladder test only runs then.
 	Realm bool
-	// LadderExpired is CompareFileTime(char ladder time at +400, realm clock) > 0. UNVERIFIED which time each side
-	// is (the char record field is not decoded); only the comparison shape is read from the exe.
+	// LadderExpired is CompareFileTime(char ladder time at +400, realm clock) > 0, VERIFIED w28 at 0x567a40: the
+	// first operand is the character record's FILETIME at +400, the second the realm clock filled by the realm
+	// interface call at vtable +0x54, so the flag is "the character's time is LATER than the realm's now". The name
+	// is kept; what the +400 stamp means in the char record is still not decoded.
 	LadderExpired bool
 }
 

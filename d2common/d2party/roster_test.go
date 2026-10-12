@@ -113,9 +113,9 @@ func TestHostility(t *testing.T) {
 		}
 	}
 
-	// directional: a declared, b did not
-	if !r.CanAttack("a", "b") || r.CanAttack("b", "a") {
-		t.Fatal("attack permission follows the declaring side")
+	// a declaration sets both directions (0x5a37f0), so both may attack
+	if !r.CanAttack("a", "b") || !r.CanAttack("b", "a") {
+		t.Fatal("a declaration makes both sides hostile")
 	}
 
 	if r.Relation("a", "b") != d2enum.PlayerRelationEnemy || r.Relation("b", "a") != d2enum.PlayerRelationEnemy {
@@ -135,6 +135,11 @@ func TestHostility(t *testing.T) {
 
 	if r.CanAttack("a", "b") {
 		t.Fatal("peace must stop attacks")
+	}
+
+	// the withdrawal clears only the declarer's flag (0x5a3a90)
+	if !r.CanAttack("b", "a") {
+		t.Fatal("the other side stays hostile until it withdraws")
 	}
 }
 

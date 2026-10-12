@@ -34,6 +34,9 @@ func TestHostileCooldown(t *testing.T) {
 	}
 
 	// the cooldown belongs to the declarer
+	// (a's declaration already made b hostile to a; b withdraws its own flag first)
+	_ = r.SetHostile("b", "a", false)
+
 	if d, err := r.DeclareHostile("b", "a"); err != nil || !d.Changed {
 		t.Fatalf("%+v %v", d, err)
 	}

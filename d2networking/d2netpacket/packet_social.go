@@ -112,9 +112,14 @@ type PartyXPPacket struct {
 	XP      int    `json:"xp"`
 	// MonsterLevel lets the server scale each share by the member level; 0 (an
 	// old client) keeps the plain level-proportional split.
-	MonsterLevel int    `json:"monsterLevel,omitempty"`
-	Player       string `json:"player,omitempty"`
-	Amount       int    `json:"amount,omitempty"`
+	MonsterLevel int `json:"monsterLevel,omitempty"`
+	// MonsterX/MonsterY (subtiles) and HasMonsterPos: where the monster died; the
+	// recipients are measured from it (VERIFIED reference of 0x57c5a0).
+	MonsterX      int    `json:"monsterX,omitempty"`
+	MonsterY      int    `json:"monsterY,omitempty"`
+	HasMonsterPos bool   `json:"hasMonsterPos,omitempty"`
+	Player        string `json:"player,omitempty"`
+	Amount        int    `json:"amount,omitempty"`
 }
 
 // PortalOpenPacket is a client telling the server it opened its town portal

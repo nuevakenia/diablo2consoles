@@ -39,7 +39,10 @@ const (
 	deathTestSeconds = 60.0
 	deathTestSettle  = 1.0
 
-	deathMessage = "You have died" // UNVERIFIED wording (no tbl string was looked up)
+	// The exe shows no text: it draws the pictures UI\<lang>\youdiedinst (softcore) and
+	// UI\<lang>\youdiedhardcore (strings at 0x6d746c / 0x6d7484, found w28). The text is a stand-in
+	// until those pictures are drawn (UNVERIFIED placement).
+	deathMessage = "You have died"
 )
 
 // deathState is the Game's runtime state of the death system.

@@ -12,8 +12,8 @@ package d2party
 //     difference (d2herostats.KillXP).
 //
 // Which members are recipients: alive members within squared distance 6400
-// (RecipientRadiusSq) of the killer, at most 8. The unit of the position
-// (tile or subtile) and the exact reference unit are UNVERIFIED.
+// (RecipientRadiusSq, whole subtiles) of the dead monster (VERIFIED w28:
+// 0x57c990 passes the monster as the reference), at most 8.
 func SplitKillXP(xp int, levels []int) []int {
 	n := len(levels)
 	out := make([]int, n)
