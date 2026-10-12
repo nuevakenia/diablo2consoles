@@ -11,15 +11,15 @@ import (
 // animation rate are recalculated. Caps: a player 50; a monster with type flags champion or unique (0xc) 50, a
 // special boss 50, a hireling 50; a super unique (flag 2) 75; every other monster 90.
 //
-// UNVERIFIED: the state id and the duration come from the caller's context in the exe and were not recovered;
-// the state is named "itemslow" and lasts slowTargetFrames here. The movement speed is slowed by the same
-// percent (the velocity recalculation reads the same stats; U).
+// VERIFIED (wave 27, disassembly of 0x5bdf30 and the 0x56c740 record it fills): the timed state list is state id
+// 24 ("slowed"), duration 750 frames (30 seconds), skill 0, level 1; it sets stat 0x43 (velocity percent) and
+// stats 0x44 / 0x45 to -amount.
 
 const (
 	// StateItemSlow is the state the slow of a weapon puts on the target.
-	StateItemSlow = "itemslow"
+	StateItemSlow = "slowed"
 
-	slowTargetFrames = 100 // UNVERIFIED duration, 4 seconds at 25 frames per second
+	slowTargetFrames = 750 // VERIFIED 0x5bdf30: duration field 0x2ee
 
 	slowCapPlayer      = 50
 	slowCapBossOrElite = 50

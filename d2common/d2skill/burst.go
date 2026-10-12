@@ -120,15 +120,23 @@ func (b *Burst) Left() int {
 // Last is the id of the previous event's victim.
 func (b *Burst) Last() string { return b.last }
 
-// meleeRange is the reach of Fend / Zeal in subtiles (Options.MeleeRange, 4
-// when unset; the exe calls a helper whose value is not decoded: UNVERIFIED).
+// meleeRange is UNIT_GetMeleeRange (0x622a30, VERIFIED): for a player the rangeadder column of the wielded weapon
+// (0 for most weapons and for bare hands), for a monster the monstats2 melee range. It is NOT the reach itself:
+// the Fend / Zeal scan and the second blow of Frenzy / Double Swing use meleeRange + 4 (0x56c2d0, 0x4c46a0), a
+// radius in subtiles tested on squared distance (SKILL_ForEachUnitInRadius 0x569510). Options.MeleeRange holds it
+// (0 when unset).
 func (p *Pipeline) meleeRange() int {
 	if p.Opt.MeleeRange > 0 {
 		return p.Opt.MeleeRange
 	}
 
-	return 4
+	return 0
 }
+
+// targetReach is the distance within which the stored target of a burst still counts as in melee range of the
+// caster. UNVERIFIED: the exe's own test (COMBAT_IsTargetWithinMeleeRange 0x622e40) was not compared; the old
+// value 4 + rangeadder is kept.
+func (p *Pipeline) targetReach() int { return 4 + p.meleeRange() }
 
 // newMeleeBurst arms an event burst of n hits at the cast's target.
 func (p *Pipeline) newMeleeBurst(c *cast, n int) *Burst {
@@ -141,7 +149,7 @@ func (p *Pipeline) newMeleeBurst(c *cast, n int) *Burst {
 // the stored target is used as is.
 func (b *Burst) pickMeleeVictim(p *Pipeline) (Target, bool) {
 	ux, uy := b.u.Pos()
-	reach := p.meleeRange()
+	reach := p.targetReach()
 
 	if t := b.target; t.Unit != nil && t.Unit.Alive() {
 		x, y := t.UX, t.UY

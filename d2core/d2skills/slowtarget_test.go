@@ -32,3 +32,10 @@ func TestSlowTargetAmount(t *testing.T) {
 		}
 	}
 }
+
+// 0x5bdf30 fills the timed state record with state 24 ("slowed") and 750 frames.
+func TestSlowTargetStateAndDuration(t *testing.T) {
+	if StateItemSlow != "slowed" || slowTargetFrames != 750 {
+		t.Errorf("state %q frames %d, want slowed / 750", StateItemSlow, slowTargetFrames)
+	}
+}

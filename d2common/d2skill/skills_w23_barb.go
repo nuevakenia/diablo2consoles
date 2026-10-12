@@ -91,7 +91,7 @@ func doMeleeStateFn(c *cast) {
 // ---- Frenzy and Double Swing: two blows per swing ----
 
 // swingReach is "melee range plus 4" of the second blow's scan (UNIT_GetMeleeRangePlus4 0x56c2d0), in subtiles.
-// UNVERIFIED value, shared with the Fend burst (Options.MeleeRange, 4 when unset).
+// VERIFIED value: UNIT_GetMeleeRange (0 for most weapons) + 4, shared with the Fend search (Options.MeleeRange).
 func (p *Pipeline) swingReach() int { return p.meleeRange() + 4 }
 
 // secondVictim is the target of the odd animation event of Frenzy and Double Swing (VERIFIED 0x5d78b0 /

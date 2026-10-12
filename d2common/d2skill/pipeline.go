@@ -106,7 +106,7 @@ type Options struct {
 	// hand the rest to the engine as DoResult.Burst (one BurstEvent per attack
 	// animation event). Off: the whole burst runs inside Do.
 	EventBursts bool
-	// MeleeRange is the melee reach in subtiles for bursts (0 = 4, UNVERIFIED).
+	// MeleeRange is UNIT_GetMeleeRange (the wielded weapon's rangeadder, 0 when unset; VERIFIED 0x622a30).
 	MeleeRange int
 }
 
