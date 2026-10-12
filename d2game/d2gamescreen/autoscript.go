@@ -11,6 +11,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/d2gamepad"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2monsters"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2autoscript"
 )
 
@@ -146,7 +147,10 @@ func (v *Game) advanceAutoScript(elapsed float64) {
 // still dies from a hit stronger than his whole life, and a hero that is already dead stays dead).
 func (v *Game) autoScriptHeal() {
 	p := v.localPlayer
-	if os.Getenv("OD2_AUTOSCRIPT_HEAL") != "1" || p == nil || p.Stats == nil || p.Stats.Health <= 0 {
+	mode := os.Getenv("OD2_AUTOSCRIPT_HEAL")
+	d2monsters.HeroCannotDie = mode == "2"
+
+	if (mode != "1" && mode != "2") || p == nil || p.Stats == nil || p.Stats.Health <= 0 {
 		return
 	}
 

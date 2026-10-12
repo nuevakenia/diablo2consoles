@@ -49,6 +49,26 @@ func (g *GameControls) CubeClear() int {
 	return len(items)
 }
 
+// CubeTakeAll moves every item of the Horadric Cube into the inventory (what dragging them out with the open cube
+// does) and returns how many went; items that do not fit stay in the cube.
+func (g *GameControls) CubeTakeAll() int {
+	n := 0
+
+	for _, it := range append([]InventoryItem{}, g.cube.grid.Items()...) {
+		g.cube.grid.Remove(it)
+
+		if !g.inventory.grid.AutoPlace(it, true) {
+			g.CubePut(it)
+
+			continue
+		}
+
+		n++
+	}
+
+	return n
+}
+
 // CubePut places an item in the Horadric Cube at the first free spot; it
 // reports whether it fitted.
 func (g *GameControls) CubePut(it InventoryItem) bool {

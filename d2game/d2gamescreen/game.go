@@ -326,6 +326,9 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 			[]string{"code"}, v.commandPickGround},
 		{"cubeput", "moves inventory items (by base code) into the Horadric Cube; then use transmute (debug)",
 			[]string{"code1", "code2", "code3", "code4"}, v.commandCubePut},
+		{"cubetake", "moves every item of the Horadric Cube into the inventory (scripts)", nil, v.commandCubeTake},
+		{"dumpjunk", "drops the inventory items that are not quest items, potions, scrolls or keys (scripts)", nil, v.commandDumpJunk},
+		{"autobuild", "spends the unspent stat and skill points by the OD2_AUTOBUILD plan (scripts)", nil, v.commandAutoBuild},
 		{"setexp", "raises the hero's experience to at least <amount>; the level follows (debug)", []string{"amount"}, v.commandSetExp},
 	}
 

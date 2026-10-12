@@ -563,3 +563,11 @@ func (s *HeroStatsPanel) createTextLabel(element PanelText) *d2ui.Label {
 
 	return label
 }
+
+// SetStatsPointsChanged refreshes the panel after the attribute points were spent without its + buttons
+// (OD2_AUTOBUILD, a script aid).
+func (s *HeroStatsPanel) SetStatsPointsChanged() {
+	s.remainingPoints.SetText(strconv.Itoa(s.heroState.StatsPoints))
+	s.setStatValues()
+	s.setLayout()
+}

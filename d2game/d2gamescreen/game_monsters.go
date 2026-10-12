@@ -202,9 +202,16 @@ func (v *Game) advanceHeroAttack(elapsed float64) {
 		v.localPlayer.StopMoving()
 		v.localPlayer.SetDirection(v.localPlayer.Position.DirectionTo(m.Position.Vector))
 
-		hero, target := v.localPlayer, m
+		hero, target, dir := v.localPlayer, m, v.monsters
 		v.playHeroSwing()
-		hero.StartAttack(func() { v.monsters.HeroStrike(hero, target) })
+		// The hit frame comes some updates after the swing starts. A level change in between (an exit tile walked
+		// onto in mid-swing) drops the director (v.monsters = nil) and used to crash the game here (wave 43, Cold
+		// Plains arrival): the swing is then lost, like the monsters of the level the hero left.
+		hero.StartAttack(func() {
+			if dir != nil && dir == v.monsters {
+				dir.HeroStrike(hero, target)
+			}
+		})
 
 		return
 	}
