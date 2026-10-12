@@ -17,7 +17,7 @@ https://github.com/AbyssEngine/
 [![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/OpenDiablo2?label=reddit&style=social)](https://www.reddit.com/r/OpenDiablo2/)
 
 
-![Logo](d2logo.png)
+![Logo](../d2logo.png)
 
 [![Patreon](https://img.shields.io/badge/dynamic/json?color=%23e85b46&label=Support%20us%20on%20Patreon&query=data.attributes.patron_count&suffix=%20patrons&url=https://www.patreon.com/api/campaigns/4762180)](https://www.patreon.com/bePatron?u=37261055)
 
@@ -29,7 +29,7 @@ The engine is written in Go and is cross platform.
 > The project does not ship with the assets or content required to play Diablo 2.
 You must have a legally purchased copy of [Diablo 2](https://us.shop.battle.net/en-us/product/diablo-ii) and its expansion [Lord of Destruction](https://us.shop.battle.net/en-us/product/diablo-ii-lord-of-destruction) installed on your computer in order to run that game on this engine.
 
-If you like to contribute to OpenDiablo2, please be so kind to read our [Contribution Policy](./docs/CONTRIBUTING.md) first.
+If you like to contribute to OpenDiablo2, please be so kind to read our [Contribution Policy](CONTRIBUTING.md) first.
 
 ----
 
@@ -39,38 +39,38 @@ _Stay awhile and listen_ ...
 
 ### ⚡ Project Info
 
-* 👉 **[Current Status](./docs/status.md)** 👈 - what you should focus on
-* [Roadmap](./docs/roadmap.md) - Planning ahead
+* 👉 **[Current Status](status.md)** 👈 - what you should focus on
+* [Roadmap](roadmap.md) - Planning ahead
 * Design - High-level overview of the OpenDiablo2 org and its projects
-* [FAQ](./docs/faq.md) - Common questions from new people to the project
+* [FAQ](faq.md) - Common questions from new people to the project
 
 ### ⭐ For Users
 
-* [Purchase](./docs/purchase.md) - Buy the official game from Blizzard
-* [MPQ](./docs/mpq.md) - Locate the MPQ files
-* [Install](./docs/install.md) - Install OpenDiablo2 to your system (Linux/Windows/MacOS)
-* [Run it](./docs/play.md) - How to play the game
+* [Purchase](purchase.md) - Buy the official game from Blizzard
+* [MPQ](mpq.md) - Locate the MPQ files
+* [Install](install.md) - Install OpenDiablo2 to your system (Linux/Windows/MacOS)
+* [Run it](play.md) - How to play the game
 
 ### 🔥 For Developers
 
-* [Building](./docs/building.md) - Instructions for building the project
-* [Development](./docs/development.md) - Instructions for developers who want to contribute
-* [Profiling](./docs/profiling.md) - Debug performance issues
-* [Debugging](./docs/debug.md) - Common errors and pitfalls
+* [Building](building.md) - Instructions for building the project
+* [Development](development.md) - Instructions for developers who want to contribute
+* [Profiling](profiling.md) - Debug performance issues
+* [Debugging](debug.md) - Common errors and pitfalls
 
 ## Screenshots
 
-![Main Menu](docs/MainMenuSS.png)
+![Main Menu](MainMenuSS.png)
 
-![Select Hero](docs/SelectHeroSS.png)
+![Select Hero](SelectHeroSS.png)
 
-![Select Hero](docs/areas.gif)
+![Select Hero](areas.gif)
 
-![Gameplay](docs/Gameplay.png)
+![Gameplay](Gameplay.png)
 
-![Inventory Window](docs/Inventory.png)
+![Inventory Window](Inventory.png)
 
-![Game Panels](docs/game_panels.png)
+![Game Panels](game_panels.png)
 
 ## Additional Credits
 

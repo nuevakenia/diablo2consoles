@@ -1,17 +1,18 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
-
+about: Suggest a Mac feature or a missing piece of the original game
+title: ''
+labels: enhancement
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**What is missing or what would you like**
+(One sentence. If it exists in the original Diablo II, say where you saw it.)
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+**Why it matters to you**
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+**Original behaviour, if known**
+In your own words. Please do not paste Blizzard code, decompiler output or game files.
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+**Alternatives you considered**
+
+**Check first**: [docs/KNOWN_GAPS.md](../../docs/KNOWN_GAPS.md) and [docs/HELP_WANTED.md](../../docs/HELP_WANTED.md) may already list it.
