@@ -166,3 +166,23 @@ func LifeRegenStat(maxHP int) int {
 
 	return v
 }
+
+// KillGainCap is EXP_CapMercExperienceGain 0x57c400 (V): the experience a
+// merc is credited for ONE kill is at most (T(L+1) - T(L)) >> 6, where T is
+// ExpThreshold with the ExpPerLvl of the row valid at the merc's level L. The
+// cap is applied to the kill experience before the merc's x2 (MERC_AwardExperience
+// adds 2*gain). A smaller gain passes unchanged. UNVERIFIED: whether the 86/256
+// share of a kill the merc did not make is taken before or after the cap
+// (the cap sits in EXP_CalcKillExperience 0x57c490; the share is applied by the
+// caller of the port's credit path).
+func KillGainCap(gain, level, expPerLvl int) int {
+	span := ExpThreshold(level+1, expPerLvl) - ExpThreshold(level, expPerLvl)
+	// the exe shifts the 32-bit difference as unsigned
+	limit := int(uint32(span) >> 6)
+
+	if gain > limit {
+		return limit
+	}
+
+	return gain
+}

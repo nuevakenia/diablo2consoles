@@ -292,3 +292,14 @@ func TestLifeRegenStat(t *testing.T) {
 		t.Error("LifeRegenStat")
 	}
 }
+
+func TestKillGainCap(t *testing.T) {
+	// T(L)=(L+1)L*L*e: L=10,e=1 -> T(11)-T(10)=1452-1100=352; >>6 = 5
+	if g := KillGainCap(1000, 10, 1); g != 5 {
+		t.Fatalf("cap = %d, want 5", g)
+	}
+
+	if g := KillGainCap(3, 10, 1); g != 3 {
+		t.Fatalf("small gain changed: %d", g)
+	}
+}

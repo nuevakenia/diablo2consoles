@@ -20,7 +20,11 @@ func TestCreditOwnerMercLevelsTheMercNotTheVictim(t *testing.T) {
 		t.Fatalf("setup: merc level %d", mercUnit.m.Vitals.Level)
 	}
 
-	d.creditOwnerMerc(owner, victim, 40000)
+	// a kill is capped to 1/64 of the level span (EXP_CapMercExperienceGain), so
+	// it takes several kills to level up
+	for i := 0; i < 5000 && mercUnit.merc.level <= 3; i++ {
+		d.creditOwnerMerc(owner, victim, 40000)
+	}
 
 	if mercUnit.merc.level <= 3 {
 		t.Fatalf("setup: the XP should have levelled the merc up, level %d", mercUnit.merc.level)
