@@ -614,7 +614,9 @@ func (t *TradeWindow) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 			return true
 		}
 
-		if t.inv.IsOpen() {
+		// INV_HandleGridClick 0x48c3c0: with an empty cursor, ctrl held and a vendor open the
+		// click on an inventory item sells it; without ctrl it picks the item up.
+		if t.inv.IsOpen() && event.KeyMod() == d2enum.KeyModControl && t.inv.CursorItem() == nil {
 			if item, ok := t.inv.grid.ItemAtScreen(mx, my).(*diablo2item.Item); ok {
 				if _, err := t.Sell(item); err != nil {
 					t.Infof("sell %q: %v", item.Label(), err)

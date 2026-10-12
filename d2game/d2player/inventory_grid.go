@@ -91,6 +91,10 @@ type ItemGrid struct {
 	originY        int
 	sprites        map[string]*d2ui.Sprite
 	slotSize       int
+	// tint gives the cell tint of an item (nil: no tints); hovered is the item under the mouse.
+	tint     func(InventoryItem) TintMode
+	slotTint func(InventoryItem) (TintMode, bool)
+	hovered  InventoryItem
 
 	*d2util.Logger
 }
@@ -281,6 +285,8 @@ func (g *ItemGrid) renderInventoryItems(target d2interface.Surface) {
 		itemSprite := g.sprites[item.GetItemCode()]
 		slotX, slotY := g.SlotToScreen(item.InventoryGridSlot())
 		_, h := itemSprite.GetCurrentFrameSize()
+		g.drawCellTint(target, item)
+
 		slotY += h
 
 		g.renderItem(item, target, slotX, slotY)
@@ -300,6 +306,7 @@ func (g *ItemGrid) renderEquippedItems(target d2interface.Surface) {
 		// nolint:gomnd // 1/2 ov height
 		y := eq.y - ((eq.height - itemHeight) / 2)
 
+		g.drawSlotTint(target, eq)
 		g.renderItem(eq.item, target, x, y)
 	}
 }
