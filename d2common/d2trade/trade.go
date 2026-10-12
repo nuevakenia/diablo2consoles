@@ -98,6 +98,17 @@ type Item struct {
 	// the caller.
 	StatPrice, SkillPrice, SocketPrice [3]int
 
+	// When Tables is set the add-ons are computed from the item's data (see
+	// statprice.go) and added to the fixed amounts above: Stats are the item's
+	// stat list bonus entries, SingleSkills the entries of stat 0x6b (used
+	// only when StaffMods: the item type has a staff-mods class),
+	// SocketedCosts the base costs of the items in its sockets.
+	Tables        *Tables
+	Stats         []StatEntry
+	SingleSkills  []StatEntry
+	StaffMods     bool
+	SocketedCosts []int
+
 	// ClassSpecificType is the ItemTypes byte at +0x21 tested as "< 7" by
 	// FUN_0062c1c0: true when the item's own ItemTypes row has a class
 	// (Amazon Bow, Orb, Hand to Hand, ...); the sell value is then divided by 4.
@@ -275,14 +286,15 @@ func ItemPrice(it *Item, p Params) int {
 	a, b, c, d := basePrices(it, qty)
 
 	if !magicOrBetter(it.Quality) {
-		a, b, c = w(a+it.SkillPrice[0]), w(b+it.SkillPrice[1]), w(c+it.SkillPrice[2])
+		a, b, c = it.addSkill(a, b, c, d)
 	}
 
 	if it.Identified {
 		a, b, c = identifiedPrices(it, a, b, c, d)
 	}
 
-	a, b, c = w(a+it.SocketPrice[0]), w(b+it.SocketPrice[1]), w(c+it.SocketPrice[2])
+	sock := SocketedDelta(it.SocketedCosts)
+	a, b, c = w(a+it.SocketPrice[0]+sock), w(b+it.SocketPrice[1]+sock), w(c+it.SocketPrice[2]+sock)
 
 	if it.Ethereal {
 		b = w(b) / 4
@@ -444,16 +456,28 @@ func identifiedPrices(it *Item, a, b, c, d int) (int, int, int) {
 	}
 
 	if stat {
-		a, b, c = w(a+it.StatPrice[0]), w(b+it.StatPrice[1]), w(c+it.StatPrice[2])
+		da, db, dc := StatPropertyDelta(it.Tables, it.Stats, a, b, c, d)
+		a, b, c = w(a+it.StatPrice[0]+da), w(b+it.StatPrice[1]+db), w(c+it.StatPrice[2]+dc)
 	}
 
 	a, b, c = w(a+w(ta)/d), w(b+w(tb)/d), w(c+w(tc)/d)
 
 	if magicOrBetter(it.Quality) {
-		a, b, c = w(a+it.SkillPrice[0]), w(b+it.SkillPrice[1]), w(c+it.SkillPrice[2])
+		a, b, c = it.addSkill(a, b, c, d)
 	}
 
 	return a, b, c
+}
+
+// addSkill adds the single skill price (TRADE_AddSingleSkillPrice).
+func (it *Item) addSkill(a, b, c, d int) (int, int, int) {
+	da, db, dc := 0, 0, 0
+
+	if it.Tables != nil && it.StaffMods {
+		da, db, dc = SingleSkillDelta(it.Tables, it.SingleSkills, a, b, c, d)
+	}
+
+	return w(a + it.SkillPrice[0] + da), w(b + it.SkillPrice[1] + db), w(c + it.SkillPrice[2] + dc)
 }
 
 // repairBase scales the repair accumulator by the missing durability.
