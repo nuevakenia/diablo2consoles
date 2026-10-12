@@ -241,11 +241,11 @@ func TestDoubleSwingAndMultiHit(t *testing.T) {
 		t.Errorf("zeal strikes = %d, want 5", len(r.Melees))
 	}
 
-	// Fend: calc1 (12) events; each retargets within melee range + 4 other than
-	// the last victim, so z and z2 alternate and the far one is never hit
+	// Fend: min(calc1 = 12, enemies in reach = 2) events (SRVST_009, wave 23); each retargets within melee
+	// range + 4 other than the last victim, so z and z2 are hit once each and the far one never
 	_, r = cf.castOn("Fend", z)
-	if len(r.Melees) != 12 {
-		t.Fatalf("fend strikes = %d, want 12", len(r.Melees))
+	if len(r.Melees) != 2 {
+		t.Fatalf("fend strikes = %d, want 2", len(r.Melees))
 	}
 
 	got := map[string]bool{}

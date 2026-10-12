@@ -312,6 +312,10 @@ func (e *Engine) syncMonster(m *d2mapentity.Monster) {
 
 	e.monsters.SetSlow(m, set.SpeedPct(e.frame))
 
+	// Slow Missiles (state 0x57, aurastat skill_handofathena = stat 0xa1): the monster's own missiles fly at that
+	// percent of their speed (0x59d5d0, VERIFIED)
+	e.monsters.SetMissileSlow(m, set.Stat(e.frame, "skill_handofathena"))
+
 	for _, name := range []string{d2state.Stun, d2state.Freeze} {
 		if in := set.Get(e.frame, name); in != nil && in.Until > e.frame {
 			e.monsters.Stun(m, in.Until-e.frame)
@@ -340,6 +344,10 @@ func (e *Engine) areaState(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 
 	curse := curseDoFunc(sk.SrvDoFunc)
 
+	// UNVERIFIED gap (wave 23): Inner Sight and Slow Missiles (SRVDO_InnerSight 0x5d9d70) put their state on
+	// through SKILL_CreateTimedStateStatList (0x56c740), which refuses a monster class with monstats flag 0x100 or
+	// without a bit (value 2) of a monstats2 byte that is not the walk mode test of SKILL_IsCurseableUnit; both
+	// refusals are not modelled here.
 	for _, m := range e.monstersNear(cx, cy, ef.Radius) {
 		if curse && !curseableMonster(m, ef.Stats) {
 			e.emit("state", "STATE curse refused skill=%q unit=%s (not curseable)", sk.Name, m.Label())

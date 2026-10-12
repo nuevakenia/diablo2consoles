@@ -3,6 +3,7 @@ package d2skill
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2missile"
@@ -27,26 +28,29 @@ const (
 
 // srvst/srvdo function ids used by the implemented skills (skills.txt columns).
 const (
-	stAttack   = 1
-	stKick     = 2
-	stRanged   = 4 // SRVST_RangedAmmoCheck
-	stStrafe   = 8 // SRVST_008_Strafe (ammo check as well)
-	stJab      = 5
-	stImpale   = 7  // SRVST_007_Impale
-	stBash     = 32 // Bash, Stun, Concentrate...
-	stThrow    = 65
-	doAttack   = 1
-	doMelee    = 2 // Kick, Power Strike, Bash, Stun
-	doThrow    = 3
-	doLHThrow  = 5
-	doInner    = 6
-	doJab      = 7
-	doCharged  = 17
-	doFrozenAr = 18
-	doStatic   = 20
-	doNova     = 22 // Frost Nova, Nova, Poison Nova, Howl
-	novaCount  = 64
-	novaRadius = 10.0
+	stAttack          = 1
+	stKick            = 2
+	stRanged          = 4 // SRVST_RangedAmmoCheck
+	stStrafe          = 8 // SRVST_008_Strafe (ammo check as well)
+	stJab             = 5
+	stImpale          = 7  // SRVST_007_Impale
+	stFend            = 9  // SRVST_009_Fend
+	stPowerStrike     = 6  // SRVST_006_PowerStrike (Power Strike, Charged Strike)
+	stLightningStrike = 10 // SRVST_010_LightningStrike
+	stBash            = 32 // Bash, Stun, Concentrate...
+	stThrow           = 65
+	doAttack          = 1
+	doMelee           = 2 // Kick, Power Strike, Bash, Stun
+	doThrow           = 3
+	doLHThrow         = 5
+	doInner           = 6
+	doJab             = 7
+	doCharged         = 17
+	doFrozenAr        = 18
+	doStatic          = 20
+	doNova            = 22 // Frost Nova, Nova, Poison Nova, Howl
+	novaCount         = 64
+	novaRadius        = 10.0
 )
 
 // los masks for skills.txt LineOfSight (verified).
@@ -669,6 +673,13 @@ type castOpts struct {
 	// owner replaces the caster as the missile's owner (Rabies' plague belongs
 	// to the infected monster).
 	owner *d2missile.Owner
+	// pctAdd is the damage percent the create-struct callback at +0x54 (0x5da2c0, VERIFIED) adds to the
+	// missile's stat 0x19: Guided Arrow's calc1 and Strafe's calc2.
+	pctAdd int
+	// activate (with hasActivate) is create flag 0x800: the frames before the missile can collide (Multiple
+	// Shot passes calc2).
+	activate    int
+	hasActivate bool
 }
 
 func (p *Pipeline) owner(u Unit) d2missile.Owner {
@@ -715,6 +726,30 @@ var masteryStat = map[string]string{
 	"cold": "passive_cold_mastery", "pois": "passive_pois_mastery",
 }
 
+// descriptorPct is the percent pool of MISSILE_BuildDamageDescriptor (0x64ca60, VERIFIED) for a missile whose
+// skill has a weapon part: the owner's stat 0x19, the weapon mastery, the percent the missile itself carries
+// (extra: stat 0x19 of the missile, set by the create callback) and the larger of the owner's stats 0x11 and 0x12
+// (item_maxdamage_percent, item_mindamage_percent), never below -90. Without a weapon part only the missile's own
+// percent counts, but only physical damage reads the pool, so the owner's stat is kept for those too.
+func descriptorPct(u Unit, sk *Skill, extra int) int32 {
+	pct := u.Stat("damagepercent") + missileMastery(u, sk) + extra
+
+	if sk != nil && sk.SrcDam > 0 {
+		hi, lo := u.Stat("item_maxdamage_percent"), u.Stat("item_mindamage_percent")
+		if lo > hi {
+			hi = lo
+		}
+
+		pct += hi
+	}
+
+	if pct < -90 {
+		pct = -90
+	}
+
+	return int32(pct)
+}
+
 // castMissile is SKILL_ServerCastMissile: it creates one missile of the named
 // record with the skill's damage descriptor, aimed at the target.
 func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string, tgt Target, o castOpts) *d2missile.Missile {
@@ -733,8 +768,15 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 	}
 
 	desc := sk.Descriptor(env, lvl, wmin, wmax, u.Stat(masteryStat[sk.EType]))
-	desc.DamagePct = int32(u.Stat("damagepercent") + missileMastery(u, sk))
+	desc.DamagePct = descriptorPct(u, sk, o.pctAdd)
 	desc.Crit = missileCrit(u, sk, ms)
+
+	// COMBAT_RollToHit (0x57b9c0, VERIFIED) adds the player's stat 0x77 (item_tohit_percent: Penetrate, Blessed
+	// Aim, gear) to the skill's to-hit percent for melee and missile hits alike; only the weapon mastery term
+	// is left out for missiles.
+	if u.IsPlayer() {
+		desc.ToHit += u.Stat("item_tohit_percent")
+	}
 
 	// Hit function 13 (Glacial Spike, 0x5a8360, read): the elemental length of
 	// its damage struct is sHitPar2 when > 0, else auralencalc (record +0x60),
@@ -909,6 +951,7 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 		PierceChance: u.Stat("skill_pierce") + u.Stat("item_pierce"), OnHit: o.onHit,
 		PathType10: o.pathType10, PathSeed: o.pathSeed, RestorePct: o.restorePct,
 		Stationary: o.stationary, HitEvery: o.hitEvery, ScalePct: o.scalePct, Home: o.home, Range: o.rangeLife,
+		Activate: o.activate, HasActivate: o.hasActivate,
 	})
 	if err != nil {
 		return nil
@@ -1126,6 +1169,24 @@ func (p *Pipeline) ownDamages(u Unit, sk *Skill, lvl int, env *Env, root *d2miss
 
 			seen[sub.Name] = true
 			queue = append(queue, sub)
+
+			// A sub missile of the cast skill whose SrcDamage is -1 (poisonjavcloud, plaguejavcloud,
+			// furylightning) builds its own descriptor without the weapon part (0x64ca60: SrcDamage 0xff forces
+			// the skill's SrcDam to 0, VERIFIED): the skill's own damage columns only, no owner percent pool.
+			if sub.SrcDam < 0 && sub.SkillName != "" && strings.EqualFold(sub.SkillName, sk.Name) {
+				tmp := *sk
+				tmp.DamageSpec.SrcDam = 0
+
+				d := tmp.Descriptor(env, lvl, wmin, wmax, u.Stat(masteryStat[sk.EType]))
+
+				if out == nil {
+					out = map[string]d2missile.DamageDesc{}
+				}
+
+				out[sub.Name] = d
+
+				continue
+			}
 
 			own, ok := sub.Own.(*DamageSpec)
 			if !ok || own == nil {

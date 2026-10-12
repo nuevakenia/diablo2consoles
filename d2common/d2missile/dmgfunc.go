@@ -1,6 +1,9 @@
 package d2missile
 
-import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
+import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2calc"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
+)
 
 // Server damage functions (pSrvDmgFunc, table 0x739b88, ids 1..14), run on the damage struct a missile hit
 // built (MISSILE_ProcessHitOrExpire 0x5aba10). Only the ones read so far are modelled. Table entries (V, read from
@@ -21,6 +24,110 @@ import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 // Function 14, 0x5ab120 (V, wave 22; the molten boulder; the exe's own name for it is
 // MISSILE_RollDamageBonusVsTargetKind, but it never touches damage): a knockback roll. It sets result bit 8 of the
 // damage struct when a roll of 100 on the MISSILE's seed is below the chance BoulderKnockChance gives.
+
+// Functions 1, 2, 3 and 12 (V, wave 23; read from the disassembly, the functions are not defined in the project):
+//
+// Function 1, 0x5aaba0 (Magic, Fire and Cold Arrow): the missile's DmgCalc1 (dl12 = dParam1 + (level - 1) *
+// dParam2, the missile's own skill level) is a percent, clamped to 100; a percent of zero or less ends the
+// function. That percent of the rolled physical damage (never more than all of it) moves from the physical
+// field to the field of the missile's EType (0x5a6c70: none physical, fire, lightning, magic, cold, poison,
+// life leech, mana leech, stamina leech, stun, burn; frze SETS the cold field).
+//
+// Function 12, 0x5aac30 (Lightning Bolt, the javelin): the same percent of the physical damage, plus what the
+// missile's EType would roll on its own (0x5a6690: the lightning field the descriptor rolled), but every damage
+// field and the three ignore-flags (0x100, 0x200, 0x400) are cleared first (0x5a6bd0); the sum then goes to the
+// field of the EType. With the table's dParam1 100 the whole weapon blow becomes lightning.
+//
+// Function 2, 0x5aacf0 (Ice Arrow, the chaos ice): the freeze length of the hit is the missile's cold length
+// times dParam1 percent (a negative dParam1 counts as 0), and the chill length is cleared.
+//
+// Function 3, 0x5aad50 (Fire Wall, Blaze, the burning grounds): one roll of the MISSILE's own seed, (value &
+// 0x7f) below dParam1 sets result bit 0x4000 (a soft hit: the target is not staggered).
+
+// ResultSoftHit is result bit 0x4000 of a hit: the target is not staggered (function 3, a blocked hit).
+const ResultSoftHit uint32 = 0x4000
+
+// missEnv evaluates the misscalc fields a damage function needs (dl12, dd12, dpa1, dpa2, lvl) for a missile.
+type missEnv struct {
+	d2calc.ZeroEnv
+	sp  *Spec
+	lvl int
+}
+
+// Field implements d2calc.Env.
+func (e missEnv) Field(code string) int {
+	a, b := e.sp.DParam[0], e.sp.DParam[1]
+
+	switch code {
+	case "dl12":
+		return d2calc.LN(a, b, e.lvl)
+	case "dd12":
+		return d2calc.DM78(a, b, e.lvl)
+	case "dpa1":
+		return a
+	case "dpa2":
+		return b
+	case "lvl":
+		return e.lvl
+	}
+
+	return 0
+}
+
+// convertPercent is the percent DmgCalc1 gives for a missile (0x64c9b0 with the missile's own skill and level),
+// clamped to 100; 0 when the missile has no calc.
+func convertPercent(m *Missile) int {
+	if m.Spec.DmgCalc1.Empty() {
+		return 0
+	}
+
+	pct := m.Spec.DmgCalc1.Eval(missEnv{sp: m.Spec, lvl: m.Level})
+	if pct > 100 {
+		pct = 100
+	}
+
+	return pct
+}
+
+// addByEType is MISSILE_AddToHitDataFieldByType (0x5a6c70).
+func addByEType(d *d2combat.Damage, etype string, v int32) {
+	switch etype {
+	case "", "none", "phys":
+		d.Physical += v
+	case "fire":
+		d.Fire += v
+	case "ltng":
+		d.Lightning += v
+	case "mag":
+		d.Magic += v
+	case "cold":
+		d.Cold += v
+	case "pois":
+		d.Poison += v
+	case "life":
+		d.LifeLeech += v
+	case "mana":
+		d.ManaLeech += v
+	case "stam":
+		d.StaminaLeech += v
+	case "stun":
+		d.StunLen += v
+	case "burn":
+		d.Burn += v
+	case "frze":
+		d.Cold = v
+	}
+}
+
+// convertedPhysical is the part of the physical damage functions 1 and 12 move: percent of it, at most all of it.
+func convertedPhysical(phys int32, pct int) int32 {
+	e := int32(int64(phys) * int64(pct) / 100)
+	if e > phys {
+		e = phys
+	}
+
+	return e
+}
 
 // dmgFuncHitClassStun is the hit class word function 7 stores.
 const dmgFuncHitClassStun = 0x60
@@ -107,6 +214,41 @@ func stunFor(m *Missile) int {
 // dmgFunc runs the missile's pSrvDmgFunc on the rolled damage.
 func (s *Sim) dmgFunc(m *Missile, t Target, d *d2combat.Damage) {
 	switch m.Spec.SrvDmgFunc {
+	case 1:
+		pct := convertPercent(m)
+		if pct <= 0 {
+			return
+		}
+
+		e := convertedPhysical(d.Physical, pct)
+		d.Physical -= e
+		addByEType(d, m.Spec.EType, e)
+	case 12:
+		pct := convertPercent(m)
+		if pct <= 0 {
+			return
+		}
+
+		e := convertedPhysical(d.Physical, pct)
+		if m.Spec.EType == "ltng" {
+			e += d.Lightning
+		}
+
+		flags := d.Flags &^ (d2combat.DamageFlagIgnoreUndead | d2combat.DamageFlagIgnoreDemon | d2combat.DamageFlagIgnoreBeast)
+		*d = d2combat.Damage{Flags: flags, Result: d.Result, HitClass: d.HitClass, ForcedClass: d.ForcedClass}
+		addByEType(d, m.Spec.EType, e)
+	case 2:
+		pct := m.Spec.DParam[0]
+		if pct < 0 {
+			pct = 0
+		}
+
+		d.FreezeLen = int32(int64(d.ColdLen) * int64(pct) / 100)
+		d.ColdLen = 0
+	case 3:
+		if int(m.seed.Step()&0x7f) < m.Spec.DParam[0] {
+			d.Result |= ResultSoftHit
+		}
 	case 7:
 		d.StunLen = int32(stunFor(m))
 		d.HitClass = dmgFuncHitClassStun

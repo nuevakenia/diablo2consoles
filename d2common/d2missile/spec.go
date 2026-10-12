@@ -53,7 +53,10 @@ type Spec struct {
 	Param        [5]int // Param1..5
 	SHitPar      [3]int // sHitPar1..3
 	DParam       [2]int // dParam1..2
-	HitClass     int
+	// EType is the missiles.txt EType column in lower case (record byte +0xe4): the damage functions 1 and
+	// 12 add what they convert to that element (0x5a6c70).
+	EType    string
+	HitClass int
 	// SrcDam is the missiles.txt SrcDamage column (byte +0x12d of the record):
 	// -1 (0xff) turns the skill's SrcDam off for this missile, which also
 	// turns off its critical strike roll (0x64cbde, verified).

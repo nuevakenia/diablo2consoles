@@ -20,8 +20,9 @@ func TestBurstEventPerAnimationEvent(t *testing.T) {
 	cf, z := burstFixture()
 	cf.p.Opt.EventBursts = true
 
-	_, r := cf.castOn("Fend", z)
-	if len(r.Melees) != 1 || r.Burst == nil || r.Burst.Left() != 11 {
+	// Zeal keeps calc1 hits whatever is around (Fend keeps min(calc1, enemies in reach), TestFendCountsEnemies)
+	_, r := cf.castOn("Zeal", z)
+	if len(r.Melees) != 1 || r.Burst == nil || r.Burst.Left() != 4 {
 		t.Fatalf("first event: melees=%d burst=%v", len(r.Melees), r.Burst)
 	}
 
@@ -43,7 +44,7 @@ func TestBurstEventPerAnimationEvent(t *testing.T) {
 		}
 	}
 
-	if r.Burst.Left() != 8 || r.Burst.Last() != "z2" {
+	if r.Burst.Left() != 1 || r.Burst.Last() != "z2" {
 		t.Errorf("left=%d last=%s", r.Burst.Left(), r.Burst.Last())
 	}
 }

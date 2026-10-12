@@ -142,6 +142,19 @@ func Scan(g d2path.Grid, owner d2path.Point, x, y float64, radius int, cs []Cand
 // bolt then). Guided Arrow passes no hit unit (id -1), which gives the plain
 // lowest id (see lowestSerial). Targets without a Serial count as id 0.
 func ChainNext(cs []Target, hit Target) Target {
+	pick := ScanNext(cs, hit)
+	if pick == nil || (hit != nil && sameUnit(pick, hit)) {
+		return nil
+	}
+
+	return pick
+}
+
+// ScanNext is the raw result of SKILL_ScanRadiusForTargets (callback 0x569a40) for the excluded unit hit: the
+// smallest id above it, else the smallest id of all, which can be the unit hit itself when it is the only
+// candidate. Lightning Strike (SRVDO_014, 0x5dab30) uses it as is and does not mind; Chain Lightning's hit
+// function does (ChainNext).
+func ScanNext(cs []Target, hit Target) Target {
 	hitID := uint32(0xffffffff)
 	if hit != nil {
 		hitID = uint32(targetSerial(hit))
@@ -171,16 +184,11 @@ func ChainNext(cs []Target, hit Target) Target {
 		}
 	}
 
-	pick := best1
-	if pick == nil {
-		pick = best2
+	if best1 != nil {
+		return best1
 	}
 
-	if pick == nil || (hit != nil && sameUnit(pick, hit)) {
-		return nil
-	}
-
-	return pick
+	return best2
 }
 
 func sameUnit(a, b Target) bool {

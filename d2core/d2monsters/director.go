@@ -144,6 +144,7 @@ type unit struct {
 	stunUntil           int
 	fleeUntil           int
 	slowPct             int
+	missileSlow         int // state 0x57 (Slow Missiles): the percent of their speed its missiles keep, 0 = none
 	lastFlee, lastThink int
 	lastLabel           string       // the AI state last traced (forced.go)
 	raising             bool         // a corpse a shaman is raising (corpses.go)
