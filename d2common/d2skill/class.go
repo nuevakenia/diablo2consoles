@@ -38,7 +38,7 @@ func init() {
 		doThrow:    doThrowFn,
 		doLHThrow:  doThrowFn,
 		doInner:    doInnerFn,
-		doJab:      doMeleeFn,
+		doJab:      doJabFn,
 		doCharged:  func(c *cast) { c.p.doChargedBolt(c.u, c.sk, c.lvl, c.tgt, c.env, c.res) },
 		doFrozenAr: doArmorFn,
 		doStatic: func(c *cast) {
@@ -569,6 +569,12 @@ func doMultiHitFn(c *cast) {
 	b := c.p.newMeleeBurst(c, n)
 	b.opt.pct = c.calc(2)
 
+	// the animation clock of the hero's attack: every event reschedules the animation by Param2 percent of the
+	// elapsed time (SRVDO_013 0x5da910 passes SKILLS_GetPerLevelIncrementOfBaseValue = dwParam2 to 0x551b90)
+	if clk := c.p.clockFor(c.u, c.sk); clk != nil {
+		b.attachClock(clk, c.sk.Params[2])
+	}
+
 	if !c.p.BurstEvent(b, c.res) && c.res.Melee == nil {
 		// nobody in reach: the aimed target is struck anyway (the engine only
 		// starts the skill with a target)
@@ -807,16 +813,13 @@ func StrafeBurst(calc1, calc3, found int) int {
 	return m
 }
 
-// doStrafeFn is SRVDO_012_Strafe: one arrow per animation event at a (new) enemy within aurarangecalc of
-// the archer, the burst length from StrafeBurst. The exe spreads the arrows over attack events and picks
-// the next enemy as any other than the previous one; here the burst is fired in one call, alternating over
-// the enemies found, and with a single enemy only one arrow flies (the rescan excluding it ends the burst).
+// doStrafeFn is SRVDO_012_Strafe (0x5da6c0, VERIFIED): one arrow per attack animation event at the stored
+// target, then the next enemy within aurarangecalc other than the one just shot; the burst length comes from
+// StrafeBurst (SRVST_008) and every event reschedules the animation by Param6 percent (see Burst, actionevents.go).
+// A lone enemy ends the burst after one arrow (the rescan excluding it finds nobody). With Options.EventBursts
+// only the first arrow flies here and DoResult.Burst carries the rest.
 func doStrafeFn(c *cast) {
-	rng := c.env.eval(c.sk.AuraRangeCalc)
-	if rng <= 0 {
-		rng = 14
-	}
-
+	rng := strafeReach(c)
 	ux, uy := c.u.Pos()
 	foes := c.p.foes(ux, uy, rng)
 	n := StrafeBurst(c.calc(1), c.calc(3), len(foes))
@@ -825,52 +828,33 @@ func doStrafeFn(c *cast) {
 		n = 1
 	}
 
-	// SRVDO_012 (0x5da6c0, VERIFIED wave 24): the first target is the stored unit (the aimed one, else the scan
-	// result with the excluded id 0xffffffff); after each arrow the scan around the archer, the current target
-	// excluded, picks the next one (callback 0x569a40, d2missile.ScanNext: the smallest id above, else the
-	// smallest of all, the current unit itself when it is alone) and the burst goes on at the same unit when
-	// the scan finds nothing. So a lone enemy takes the whole burst (the old port stopped after one arrow).
-	cands := make([]d2missile.Target, 0, len(foes))
-	pos := map[d2missile.Target]Foe{}
-
-	for _, f := range foes {
-		cands = append(cands, f.Target)
-		pos[f.Target] = f
+	tg := c.tgt
+	if tg.Unit == nil && len(foes) > 0 {
+		tg.Unit, tg.UX, tg.UY = foes[0].Target, foes[0].X, foes[0].Y
 	}
 
-	cur := c.tgt.Unit
-	if cur == nil {
-		cur = d2missile.ScanNext(cands, nil)
+	b := &Burst{kind: BurstStrafe, u: c.u, sk: c.sk, lvl: c.lvl, env: c.env, left: n, target: tg, rng: rng}
+	if clk := c.p.clockFor(c.u, c.sk); clk != nil {
+		b.attachClock(clk, c.sk.Params[6])
 	}
 
-	for i := 0; i < n; i++ {
-		tg := c.tgt
-		if cur != nil {
-			tg.Unit = cur
-			if f, ok := pos[cur]; ok {
-				tg.UX, tg.UY = f.X, f.Y
-			}
-		}
-
-		// SRVDO_012 (0x5da6c0, VERIFIED): the arrow takes calc2 ("damage %", ln12) as its damage percent through the
-		// create callback 0x5da2c0 and srvmissileb instead of srvmissilea for a crossbow.
-		name := c.sk.SrvMissileA
-		if strings.Contains(c.u.RangedWeaponMissile(), "bolt") && c.sk.SrvMissileB != "" {
-			name = c.sk.SrvMissileB
-		}
-
-		cc := *c
-		cc.tgt = tg
-		cc.castM(name, castOpts{pctAdd: c.calc(2)})
-
-		if next := d2missile.ScanNext(cands, cur); next != nil && cur != nil {
-			cur = next
-		}
-	}
+	c.p.BurstEvent(b, c.res)
 
 	if len(c.res.Missiles) == 0 {
 		c.fail(ReasonMissile)
+
+		return
 	}
+
+	if c.p.Opt.EventBursts {
+		if !b.Done() {
+			c.res.Burst = b
+		}
+
+		return
+	}
+
+	c.p.RunBurst(b, c.res)
 }
 
 // doChainFn is SRVDO_026_ChainLightning (0x5c8320, VERIFIED): the cast stores
