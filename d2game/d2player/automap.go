@@ -76,6 +76,7 @@ type Automap struct {
 
 	sprites   map[d2automap.Size]*d2ui.Sprite
 	spriteAt  map[d2automap.Size]int // act the palette was loaded for
+	warmedAct int                    // act whose sprite Advance has already pre-loaded (0 = none; acts are 1-5)
 	label     *d2ui.Label
 	nameLabel *d2ui.Label
 	offscr    d2interface.Surface
@@ -302,6 +303,13 @@ func (a *Automap) Advance(elapsed float64) {
 
 	if a.table == nil || a.eng == nil || a.hero == nil {
 		return
+	}
+
+	// Load the MaxiMap sprite while the level loads instead of on the frame Tab is pressed (measured:
+	// a 240 ms render hitch at 2560x1080). Once per act; the draw path still loads lazily if needed.
+	if act := a.eng.LevelType().Act; a.warmedAct != act {
+		a.warmedAct = act
+		a.sprite(a.size)
 	}
 
 	lvl := a.currentLevel()

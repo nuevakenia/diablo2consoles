@@ -76,8 +76,9 @@ type MapRenderer struct {
 	light               *lighting
 	entBuckets          map[[2]int]*entityBucket // per-frame entity index, see indexEntities
 	entFree             []*entityBucket
-	subKeys             []int8       // scratch of renderEntitiesBySubtile
-	shadeVals           []color.RGBA // scratch for renderShadedImage
+	subKeys             []int8                        // scratch of renderEntitiesBySubtile
+	shadeVals           []color.RGBA                  // scratch for renderShadedImage
+	shadeGrids          map[shadeGridKey][]shadePoint // subtile offsets of the vertices of a grid, per image size
 	stats               DrawStats
 	roofCover           map[[2]int]bool // roof tiles fading out because the hero is under them
 	shake               screenShake     // view shake of a Siege Beast stomp, see shake.go

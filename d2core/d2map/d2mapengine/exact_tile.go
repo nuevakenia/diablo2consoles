@@ -141,6 +141,12 @@ func (m *MapEngine) extendRank() {
 		t := &m.dt1TileData[i]
 		k := [3]int32{t.Style, t.Sequence, t.Type}
 		m.dt1Rank = append(m.dt1Rank, m.dt1KeyCount[k])
+
+		if m.dt1Index == nil {
+			m.dt1Index = map[[3]int32][]int32{}
+		}
+
+		m.dt1Index[k] = append(m.dt1Index[k], int32(i))
 		m.dt1KeyCount[k]++
 	}
 }

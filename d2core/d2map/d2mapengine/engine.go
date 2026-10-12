@@ -36,6 +36,7 @@ type MapEngine struct {
 	startSubTileY int                       // Starting Y position
 	dt1Files      []string                  // List of DS1 strings
 	dt1Starts     []int                     // index into dt1TileData of the first tile of each dt1Files entry
+	dt1Index      map[[3]int32][]int32      // (style, sequence, type) -> indices into dt1TileData, ascending (see extendRank)
 	dt1Rank       []int                     // for every dt1TileData entry: its position among the tiles of its (style, sequence, type)
 	dt1KeyCount   map[[3]int32]int          // tiles seen per (style, sequence, type) while filling dt1Rank
 	objBlock      *ObjectCollision          // run-time collision of doors
@@ -116,6 +117,7 @@ func (m *MapEngine) ResetMap(levelType d2enum.RegionIdType, width, height int) {
 	m.dt1Files = make([]string, 0)
 	m.dt1Starts = make([]int, 0)
 	m.dt1Rank = nil
+	m.dt1Index = nil
 	m.dt1KeyCount = map[[3]int32]int{}
 	m.startOverride = nil
 	m.world = World{}
@@ -397,13 +399,20 @@ func (m *MapEngine) RemoveEntity(entity d2interface.MapEntity) {
 func (m *MapEngine) GetTiles(style, sequence int, tileType d2enum.TileType) []d2dt1.Tile {
 	tiles := make([]d2dt1.Tile, 0)
 
-	for idx := range m.dt1TileData {
-		if m.dt1TileData[idx].Style != int32(style) || m.dt1TileData[idx].Sequence != int32(sequence) ||
-			m.dt1TileData[idx].Type != int32(tileType) {
-			continue
+	if len(m.dt1Rank) == len(m.dt1TileData) && m.dt1Index != nil {
+		// indexed lookup: same tiles in the same (file, tile) order as the scan below
+		for _, idx := range m.dt1Index[[3]int32{int32(style), int32(sequence), int32(tileType)}] {
+			tiles = append(tiles, m.dt1TileData[idx])
 		}
+	} else {
+		for idx := range m.dt1TileData {
+			if m.dt1TileData[idx].Style != int32(style) || m.dt1TileData[idx].Sequence != int32(sequence) ||
+				m.dt1TileData[idx].Type != int32(tileType) {
+				continue
+			}
 
-		tiles = append(tiles, m.dt1TileData[idx])
+			tiles = append(tiles, m.dt1TileData[idx])
+		}
 	}
 
 	// special tiles (type 10: start position, warp and other markers) are logical markers that
