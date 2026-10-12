@@ -82,6 +82,9 @@ type TradeWindow struct {
 	hero    *d2mapentity.Player
 	factory *diablo2item.ItemFactory
 
+	// compareHook adds the lines that compare a vendor item with the worn one (before the price line).
+	compareHook func(InventoryItem) []string
+
 	panelGroup *d2ui.WidgetGroup
 	grid       *ItemGrid
 	tooltip    *d2ui.Tooltip
@@ -756,6 +759,10 @@ func (t *TradeWindow) OnMouseMove(event d2interface.MouseMoveEvent) bool {
 	it := t.grid.ItemAtScreen(t.mouseX, t.mouseY)
 	if item, ok := it.(*diablo2item.Item); ok {
 		lines := item.GetItemDescription()
+		if t.compareHook != nil {
+			lines = append(append([]string{}, lines...), t.compareHook(item)...)
+		}
+
 		lines = append(lines, t.costLine("cost", "Cost: ", t.BuyPrice(item)))
 
 		t.tooltip.SetTextLines(lines)

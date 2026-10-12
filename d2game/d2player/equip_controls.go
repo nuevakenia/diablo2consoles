@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -560,7 +559,7 @@ func (g *GameControls) itemTooltipLines(it InventoryItem) []string {
 		}
 	}
 
-	lines = append(lines, g.compareWithWorn(item)...)
+	lines = append(lines, g.compareLines(item)...)
 
 	if note := g.requirementNote(item); note != "" {
 		lines = append(lines, d2ui.ColorTokenize(note, d2ui.ColorTokenRed))
@@ -747,88 +746,4 @@ func (g *GameControls) StripAll() int {
 	}
 
 	return n
-}
-
-var (
-	defenseRe = regexp.MustCompile(`Defense:\s*(\d+)`)
-	damageRe  = regexp.MustCompile(`Damage:\s*(\d+) to (\d+)`)
-)
-
-// itemNumbers reads the defense and the average damage off the description lines of an item (0 when it has none).
-func itemNumbers(it InventoryItem) (defense int, damage float64) {
-	for _, l := range it.GetItemDescription() {
-		l = stripColorTokens(l)
-
-		if m := defenseRe.FindStringSubmatch(l); m != nil && defense == 0 {
-			defense, _ = strconv.Atoi(m[1])
-		}
-
-		if m := damageRe.FindStringSubmatch(l); m != nil && damage == 0 {
-			lo, _ := strconv.Atoi(m[1])
-			hi, _ := strconv.Atoi(m[2])
-			damage = float64(lo+hi) / 2
-		}
-	}
-
-	return defense, damage
-}
-
-// compareLine formats a better or worse line of an item against the worn one ("" when equal): blue when higher, red
-// when lower, as percent of the worn value.
-func compareLine(name string, newV, oldV float64) string {
-	if newV == oldV {
-		return ""
-	}
-
-	var text string
-
-	if oldV > 0 {
-		text = fmt.Sprintf("%s %+.0f%%", name, (newV-oldV)*100/oldV)
-	} else {
-		text = fmt.Sprintf("%s %+.0f", name, newV-oldV)
-	}
-
-	if newV > oldV {
-		return d2ui.ColorTokenize(text, d2ui.ColorTokenBlue)
-	}
-
-	return d2ui.ColorTokenize(text, d2ui.ColorTokenRed)
-}
-
-// compareWithWorn lists how the item compares with what the hero wears in the slot it would go to: blue lines when it
-// is better, red when it is worse (the owner's request). Nothing for an item that is worn, or when the slot is empty.
-func (g *GameControls) compareWithWorn(item *diablo2item.Item) []string {
-	for loc := d2equip.Loc(1); loc < d2equip.NumLocs; loc++ {
-		if g.inventory.WornAt(loc) == item {
-			return nil
-		}
-	}
-
-	for _, loc := range autoEquipLocs {
-		worn := g.inventory.WornAt(loc)
-		if worn == nil || g.evaluateEquip(item, loc).Reason == d2equip.ReasonBodyLoc {
-			continue
-		}
-
-		newDef, newDmg := itemNumbers(item)
-		oldDef, oldDmg := itemNumbers(worn)
-
-		var out []string
-
-		if newDef > 0 && oldDef > 0 { // only armour against armour
-			if l := compareLine("Defense:", float64(newDef), float64(oldDef)); l != "" {
-				out = append(out, l)
-			}
-		}
-
-		if newDmg > 0 && oldDmg > 0 { // only weapons against weapons
-			if l := compareLine("Damage:", newDmg, oldDmg); l != "" {
-				out = append(out, l)
-			}
-		}
-
-		return out
-	}
-
-	return nil
 }

@@ -43,3 +43,23 @@ func TestColorBlindPaletteSeparatesItemKinds(t *testing.T) {
 		t.Fatal("turning the option off must restore the original colours")
 	}
 }
+
+func TestCompareColours(t *testing.T) {
+	defer SetColorBlind(false)
+
+	SetColorBlind(false)
+
+	if CompareBetter() != ColorTokenBlue || CompareWorse() != ColorTokenRed || CompareEqual() != ColorTokenWhite || CompareWords() {
+		t.Fatal("the normal comparison colours are blue, red and white")
+	}
+
+	SetColorBlind(true)
+
+	if CompareWorse() != ColorTokenOrange || !CompareWords() {
+		t.Fatal("the colour-blind option uses vermillion for worse and spells the words")
+	}
+
+	if getColor(CompareBetter()) == getColor(CompareWorse()) || getColor(CompareWorse()) == getColor(CompareEqual()) {
+		t.Fatal("better, worse and equal must stay apart")
+	}
+}

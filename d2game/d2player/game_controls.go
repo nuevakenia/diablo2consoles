@@ -268,6 +268,9 @@ func NewGameControls(
 	gc.stash = NewContainerPanel(asset, ui, l, inventory, stashKind, gc.saveHero)
 	gc.cube = NewContainerPanel(asset, ui, l, inventory, cubeKind, gc.saveHero)
 	gc.cube.SetOnTransmute(gc.onTransmuteButton)
+	gc.stash.itemHook, gc.cube.itemHook = gc.itemTooltipLines, gc.itemTooltipLines
+	gc.Trade.compareHook = gc.compareLines
+	gc.cmpTooltip = ui.NewTooltip(d2resource.FontFormal11, d2resource.PaletteStatic, d2ui.TooltipXCenter, d2ui.TooltipYBottom)
 	gc.belt = NewBeltPanel(asset, ui, l, inventory, gc.beltBoxes, gc.saveHero)
 	gc.wireTints()
 
@@ -332,6 +335,8 @@ type GameControls struct {
 	escapeMenu        *EscapeMenu
 	ui                *d2ui.UIManager
 	inventory         *Inventory
+	cmpCache          *compareCache // the comparison lines of the last hovered item (item_compare.go)
+	cmpTooltip        *d2ui.Tooltip // the held item and the ground item under the pointer (item_compare.go)
 	hud               *HUD
 	questItemUse      func(code string) bool // Book of Skill, Potion of Life, Scroll of Resistance
 	healShare         func(heal int) int     // Blood Golem share of potion healing (SetHealShare)
@@ -1350,6 +1355,8 @@ func (g *GameControls) Render(target d2interface.Surface) error {
 	if err := g.hud.Render(target); err != nil {
 		return err
 	}
+
+	g.updateCompareTooltip()
 
 	if err := g.renderPanels(target); err != nil {
 		return err

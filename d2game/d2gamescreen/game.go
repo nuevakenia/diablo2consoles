@@ -320,6 +320,8 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 		{"setexp", "raises the hero's experience to at least <amount>; the level follows (debug)", []string{"amount"}, v.commandSetExp},
 	}
 
+	commands = append(commands, v.compareCommands()...)
+
 	for _, cmd := range commands {
 		if err := v.terminal.Bind(cmd.name, cmd.desc, cmd.args, cmd.fn); err != nil {
 			v.Errorf(err.Error())
@@ -351,7 +353,7 @@ func (v *Game) OnUnload() error {
 
 	if err := v.terminal.Unbind("spawnitemat", "spawnitem", "spawnmon", "spawnchest", "setgold", "spawnportal", "setwaypoint", "players", "chat",
 		"party", "hostile", "roster", "trade", "pvp", "giveitem", "givebelt", "beltlist", "dropinv", "autobuy", "spawnrank", "killleader", "killnear", "rewarditem", "transmute", "setexp", "cubeput", "pickground",
-		"questpending", "pickitem", "wield", "putitem", "giveitemq", "freeinv",
+		"questpending", "pickitem", "wield", "putitem", "giveitemq", "freeinv", "hoveritem", "hoverground", "openvendor", "comparelog", "stashgive",
 		"townportal", "closeportal", "portals", "useportal", "pvpcast", "pvpwalk", "sethp"); err != nil {
 		return err
 	}
