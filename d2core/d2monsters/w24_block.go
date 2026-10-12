@@ -26,7 +26,7 @@ var blockNoAnimClasses = map[int]bool{0xf3: true, 0x14d: true, 0x2c1: true}
 // command, which the Go brain approximates with the same drop as hit recovery).
 func (d *Director) MonsterBlock(m *d2mapentity.Monster, missile bool) bool {
 	u := d.byEntity[m.ID()]
-	if u == nil || u.mirror || !m.Alive() || m.Vitals.Block < 1 {
+	if u == nil || u.mirror || !m.Alive() {
 		return false
 	}
 
@@ -34,8 +34,11 @@ func (d *Director) MonsterBlock(m *d2mapentity.Monster, missile bool) bool {
 		return false
 	}
 
-	if !d2combat.RollShieldBlock(u.b.Seed, m.Vitals.Block, false) {
-		return false
+	// COMBAT_RollShieldBlock 0x57bfa0: no block chance (or a failed block roll) falls through to
+	// COMBAT_RollDodgeAvoidEvade 0x57bd60 (VERIFIED w29): a monster in walk (2) / run (0xf) rolls only evade (stat
+	// 0x154), otherwise dodge (0x152, melee) or avoid (0x153, missile); the stats exist on summons (Valkyrie passives).
+	if m.Vitals.Block < 1 || !d2combat.RollShieldBlock(u.b.Seed, m.Vitals.Block, false) {
+		return d.monsterAvoids(u, missile)
 	}
 
 	d.Counters.MonsterBlocks++
@@ -55,6 +58,22 @@ func (d *Director) MonsterBlock(m *d2mapentity.Monster, missile bool) bool {
 	} else {
 		u.b.WakeNow(d.frame)
 	}
+
+	return true
+}
+
+// monsterAvoids is the dodge / avoid / evade step of a hit on monster u (summons with passive skills only).
+func (d *Director) monsterAvoids(u *unit, missile bool) bool {
+	if u.ally == nil {
+		return false
+	}
+
+	moving := u.m.Mode() == d2monster.ModeWalk || u.m.Mode() == d2monster.ModeRun
+	if !summonAvoids(u.b.Seed, u.ally.opt, moving, missile) {
+		return false
+	}
+
+	d.emit("avoid", "MONSTER avoid name=%s id=%d missile=%v", u.m.Label(), u.b.ID, missile)
 
 	return true
 }

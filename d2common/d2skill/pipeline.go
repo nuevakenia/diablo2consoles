@@ -110,6 +110,10 @@ type Options struct {
 	MeleeRange int
 	// MeleeRangeOf, when set, is read at every use instead of MeleeRange: the hero's wielded weapon changes.
 	MeleeRangeOf func() int
+	// MeleeGate turns on the reach test of COMBAT_RollAttackOutcome 0x57cc10 for the generic melee skills
+	// (VERIFIED w29, see AttackInReach). Off by default: the host starts a swing from a lenient distance
+	// (heroMeleeReach), so the exact test would turn most of its swings into misses.
+	MeleeGate bool
 }
 
 // Pipeline runs skills for casters.

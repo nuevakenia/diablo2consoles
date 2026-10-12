@@ -44,3 +44,17 @@ func WithinMeleeRange(dx, dy, meleeRange, extra int) bool {
 
 	return d < 1 || d <= meleeRange+1+extra
 }
+
+// AttackInReach is the range gate of COMBAT_RollAttackOutcome 0x57cc10 (VERIFIED w29) for callers that pass no extra
+// range argument (every melee skill SRVST/SRVDO, the stack argument is 0): COMBAT_IsTargetWithinMeleeRange with
+// nExtra = 1 for a player attacker and 3 for a monster attacker (the attacker's unit type is 1), so a blow lands when the
+// table distance is below 1 or at most meleeRange + 2 (players) / meleeRange + 4 (monsters). The line trace of 0x622e40
+// is not modelled (UNVERIFIED).
+func AttackInReach(monsterAttacker bool, meleeRange, dx, dy int) bool {
+	extra := 1
+	if monsterAttacker {
+		extra = 3
+	}
+
+	return WithinMeleeRange(dx, dy, meleeRange, extra)
+}

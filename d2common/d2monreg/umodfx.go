@@ -44,8 +44,8 @@ type FxUnit interface {
 	// Velocity is the monstats word at +0x32 (the walk velocity), 0 or negative: none.
 	Velocity() int
 	// HalfDamage is true for the class the damage bonus is halved for: VERIFIED w28 (0x59f340) the test is
-	// MONSTER_GetBaseClassId (0x45f070, the monstats record word at +2) == 0x76; the host maps that to a row
-	// name, which of the stock rows that is stays UNVERIFIED.
+	// MONSTER_GetBaseClassId (0x45f070, the monstats record word at +2) == 0x76; stock monstats row 0x76 (118)
+	// is willowisp1, the BaseId of the will-o-wisp family; the host tests that BaseId (VERIFIED w29).
 	HalfDamage() bool
 	// GrantSkill adds a skill; active sets it as the monster's active skill.
 	GrantSkill(skill, level int, active bool)

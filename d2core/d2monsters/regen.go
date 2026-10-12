@@ -2,6 +2,7 @@ package d2monsters
 
 import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monstats"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2state"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 )
 
@@ -29,11 +30,17 @@ func (d *Director) initRegen(u *unit, r *d2records.MonStatRecord) {
 }
 
 // regenStep is MONSTER_LifeRegenEventTick (0x005a4340) for a living monster: every frame the life stat (1/256
-// points) grows by stat 0x4a, up to the maximum. UNVERIFIED and not modelled: state 0x34 (blocks positive
-// regeneration), the mask 0x14c states that drop the base value (poison, burn, open wounds are not stats here).
+// points) grows by stat 0x4a, up to the maximum. State 0x34 (preventheal, row 52 of states.txt) stops positive
+// or zero net regeneration (VERIFIED w29, 0x5a4340: the tick does nothing and is not rescheduled while the state
+// lasts); it reads the AI-set state map (SetUnitState). Not modelled: the mask 0x14c states that drop the base value
+// (poison, burn, open wounds are not stats here, UNVERIFIED).
 func (d *Director) regenStep(u *unit) {
 	r := u.stats[statHPRegen]
 	if r <= 0 || !u.m.Alive() {
+		return
+	}
+
+	if u.states[d2state.StatePreventHeal] {
 		return
 	}
 
