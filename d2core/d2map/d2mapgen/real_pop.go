@@ -212,6 +212,10 @@ func (p *popLevel) addUnits(pop *d2monreg.Population, superKey string) {
 // newPopLevel prepares the population of a level; nil (after a warning) when
 // the tables are unavailable, in which case the caller keeps the old placement.
 func (g *MapGenerator) newPopLevel(levelID int, seed uint32, diff d2drlg.Difficulty) *popLevel {
+	if g.backdrop {
+		return nil
+	}
+
 	env, err := g.popEnv()
 	if err != nil {
 		g.Warningf("real population: tables unavailable, DS1 monsters use the approximation: %v", err)

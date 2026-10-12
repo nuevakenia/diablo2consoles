@@ -393,6 +393,10 @@ type monsterStats struct{ direct, place, super, groups, skipped int }
 //   - other markers (nests, npc packs, champions, nothing) are skipped.
 func (g *MapGenerator) placeMonsters(stamp *d2mapstamp.Stamp, levelID int, diff d2drlg.Difficulty,
 	ox, oy, w, h int, rng *d2rand.Seed, st *monsterStats) {
+	if g.backdrop {
+		return
+	}
+
 	rec := g.asset.Records
 	presets := rec.Monster.Presets[int32(stamp.Act())]
 	levelMons := levelMonsters(rec.Level.Details[levelID], diff)
