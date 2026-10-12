@@ -85,7 +85,7 @@ func (v *Cinematics) OnLoad(_ d2screen.LoadingState) {
 
 	v.background.SetPosition(backgroundX, backgroundY)
 
-	v.cinematicsBackground, err = v.uiManager.NewSprite(d2resource.CinematicsBackground, d2resource.PaletteSky)
+	v.cinematicsBackground, err = v.uiManager.NewSprite(d2resource.CinematicsBackgroundFor(expansionInstalled(v.asset)), d2resource.PaletteSky)
 
 	if err != nil {
 		v.Error(err.Error())
@@ -128,13 +128,19 @@ func (v *Cinematics) createButtons() {
 	v.endCreditClassBtn.SetPosition(endCreditClassBtnX, endCreditClassBtnY)
 	v.endCreditClassBtn.OnActivated(func() { v.onEndCreditClassBtnClicked() })
 
-	v.a5Btn = v.uiManager.NewButton(d2ui.ButtonTypeWide, v.asset.TranslateString("act5X"))
-	v.a5Btn.SetPosition(a5BtnX, a5BtnY)
-	v.a5Btn.OnActivated(func() { v.onA5BtnClicked() })
+	showA5, showLast := cinematicRows(expansionInstalled(v.asset))
 
-	v.endCreditExpBtn = v.uiManager.NewButton(d2ui.ButtonTypeWide, v.asset.TranslateString("strlastcinematic"))
-	v.endCreditExpBtn.SetPosition(endCreditExpBtnX, endCreditExpBtnY)
-	v.endCreditExpBtn.OnActivated(func() { v.onEndCreditExpBtnClicked() })
+	if showA5 {
+		v.a5Btn = v.uiManager.NewButton(d2ui.ButtonTypeWide, v.asset.TranslateString("act5X"))
+		v.a5Btn.SetPosition(a5BtnX, a5BtnY)
+		v.a5Btn.OnActivated(func() { v.onA5BtnClicked() })
+	}
+
+	if showLast {
+		v.endCreditExpBtn = v.uiManager.NewButton(d2ui.ButtonTypeWide, v.asset.TranslateString("strlastcinematic"))
+		v.endCreditExpBtn.SetPosition(endCreditExpBtnX, endCreditExpBtnY)
+		v.endCreditExpBtn.OnActivated(func() { v.onEndCreditExpBtnClicked() })
+	}
 }
 
 func (v *Cinematics) onCinematicsExitBtnClicked() {
