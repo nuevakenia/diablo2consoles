@@ -13,6 +13,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2config"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2gui"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2screen"
+	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2gamescreen"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
 )
 
@@ -49,6 +50,7 @@ func (a *App) initialize() error {
 	d2player.SetOptionsBackend(optionsBackend{a})
 	a.loadGamepadProfiles()
 	a.applyAccessibility("")
+	d2gamescreen.SetCinematicsOption(a.config.Cinematics)
 
 	if err := a.loadStrings(); err != nil {
 		return err

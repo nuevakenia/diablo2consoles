@@ -66,6 +66,7 @@ const (
 	optColorblind
 	optSubtitleLog
 	optVideoFullscreen
+	optCinematics
 )
 
 const (

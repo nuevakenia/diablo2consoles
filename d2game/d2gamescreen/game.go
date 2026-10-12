@@ -145,6 +145,7 @@ type Game struct {
 	statsLevel           int       // level of the last DRAWSTATS line
 	statsAt              time.Time // time of the last DRAWSTATS line
 	travel               travelState
+	movie                movieState // a cinematic over the game (game_movie.go)
 	ticksSinceLevelCheck float64
 	escapeMenu           *d2player.EscapeMenu
 	soundEngine          *d2audio.SoundEngine
@@ -252,6 +253,7 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 			[]string{"level", "0|1"}, v.commandSetWaypoint},
 		{"completequest", "marks quest <act> <quest> done for the hero (debug)",
 			[]string{"act", "quest"}, v.commandCompleteQuest},
+		{"skipmovie", "skips the cinematic that is playing over the game (debug)", nil, v.commandSkipMovie},
 		{"restorevitals", "fills the hero's life and mana (debug)", nil, v.commandRestoreVitals},
 
 		{"useitem", "uses the inventory item with this base code like a right click (debug)", []string{"code"}, v.commandUseItem},
@@ -339,6 +341,8 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 
 // OnUnload releases the resources of Gameplay screen
 func (v *Game) OnUnload() error {
+	v.stopMovie()
+
 	v.gameControls.UnbindGamepad()
 
 	if err := v.gameControls.UnbindTerminalCommands(v.terminal); err != nil {
@@ -404,6 +408,8 @@ func fillScreen(screen d2interface.Surface, c color.Color) {
 
 // Render renders the Gameplay screen
 func (v *Game) Render(screen d2interface.Surface) {
+	defer v.renderMovie(screen)
+
 	if v.gameClient.RegenMap {
 		v.gameClient.RegenMap = false
 		v.mapRenderer.RegenerateTileCache()
@@ -434,6 +440,12 @@ func (v *Game) Render(screen d2interface.Surface) {
 // Advance runs the update logic on the Gameplay screen
 // nolint:gocyclo // not need to change
 func (v *Game) Advance(elapsed float64) error {
+	if v.advanceMovie(elapsed) {
+		v.advanceAutoScript(elapsed) // the scripted tests go on (waits, captures) while a cinematic is on screen
+
+		return nil // a cinematic is on screen: the game stands still
+	}
+
 	// OD2_AUTOSPEED: a fast scripted run takes several update steps per frame. Every step is at most one
 	// 25 Hz tick long (the simulations clamp a call to 0.25 s and the hero's walking and collision were
 	// made for short steps), so no simulation time is lost however fast the clock runs. The harness

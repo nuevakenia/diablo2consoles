@@ -38,6 +38,10 @@ const (
 	// OptFullscreen is the FULL SCREEN row of the video page. The game starts full screen by default; choosing OFF is
 	// remembered (index 1) so the next start opens a window.
 	OptFullscreen = "fullscreen"
+	// Cinematics: movies play on their own (intro, act changes, Baal) when ON; the Cinematics menu always plays.
+	OptCinematics = "cinematics"
+	// OptIntroSeen is not shown in a menu: the opening movie plays on the first launch only (0 = not yet).
+	OptIntroSeen = "introseen"
 )
 
 // OptionDef describes one row of the options menu.
@@ -74,6 +78,8 @@ func OptionDefs() []OptionDef {
 		OptionDef{OptColorblind, []string{"OFF", "ON"}, 0},
 		OptionDef{OptSubtitleLog, []string{"OFF", "ON"}, 0},
 		OptionDef{OptFullscreen, onOff, 0},
+		OptionDef{OptCinematics, onOff, 0},
+		OptionDef{OptIntroSeen, []string{"NO", "YES"}, 0},
 	)
 
 	// one remap row per gamepad button: the value is the action name
@@ -221,3 +227,9 @@ func (c *Configuration) ColorBlind() bool { return c.OptionIndex(OptColorblind) 
 
 // SubtitleLog reports the NPC speech subtitle log option.
 func (c *Configuration) SubtitleLog() bool { return c.OptionIndex(OptSubtitleLog) == 1 }
+
+// Cinematics reports whether the movies play on their own (default ON).
+func (c *Configuration) Cinematics() bool { return c.OptionIndex(OptCinematics) == 0 }
+
+// IntroSeen reports that the opening movie was already shown on an earlier launch.
+func (c *Configuration) IntroSeen() bool { return c.OptionIndex(OptIntroSeen) == 1 }

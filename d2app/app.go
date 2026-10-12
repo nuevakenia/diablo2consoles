@@ -390,9 +390,19 @@ func (a *App) Run() (err error) {
 	} else if os.Getenv("OD2_AUTOSCREEN") == "charselect" {
 		// OD2_AUTOSCREEN=charselect opens the character select screen directly (for OD2_AUTOSHOT)
 		a.ToCharacterSelect(d2clientconnectiontype.Local, "")
-	} else if d2gamescreen.PlayVideosEnabled() {
-		// OD2_PLAY_VIDEOS=1: play the intro cinematic first (Esc or a click skips it)
-		a.ToVideo(d2resource.Act1Intro, func() { a.ToMainMenu() })
+	} else if os.Getenv("OD2_AUTOSCREEN") == "cinematics" {
+		// OD2_AUTOSCREEN=cinematics opens the Cinematics menu directly (for OD2_AUTOSHOT)
+		a.ToCinematics()
+	} else if d2gamescreen.PlayVideosEnabled() && (os.Getenv("OD2_PLAY_VIDEOS") == "1" || !a.config.IntroSeen()) {
+		// the intro cinematic plays on the first launch (and always with OD2_PLAY_VIDEOS=1); Esc or a click skips it
+		a.ToVideo(d2resource.Act1Intro, func() {
+			if !a.config.IntroSeen() {
+				_ = a.config.SetOption(d2config.OptIntroSeen, 1)
+				_ = a.config.Save()
+			}
+
+			a.ToMainMenu()
+		})
 	} else {
 		a.ToMainMenu()
 	}
