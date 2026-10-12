@@ -201,6 +201,57 @@ func (m *NPCMenu) Choose(idx int) {
 	}
 }
 
+// NextNPCMenuRow is the row keyboard focus moves to from cur (-1 = none) by
+// delta (+1 down, -1 up) among n rows; it wraps around.
+func NextNPCMenuRow(cur, n, delta int) int {
+	if n <= 0 {
+		return -1
+	}
+
+	if cur < 0 || cur >= n {
+		if delta < 0 {
+			return n - 1
+		}
+
+		return 0
+	}
+
+	return ((cur+delta)%n + n) % n
+}
+
+// OnKeyDown is the keyboard control of the open menu: Up/Down (and Tab,
+// Shift+Tab) move the highlighted row, Enter or Space chooses it. Returns true
+// when the key was used. Escape is handled by GameControls (it picks Cancel).
+func (m *NPCMenu) OnKeyDown(event d2interface.KeyEvent) bool {
+	if !m.open {
+		return false
+	}
+
+	switch event.Key() {
+	case d2enum.KeyUp:
+		m.hover = NextNPCMenuRow(m.hover, len(m.rows), -1)
+	case d2enum.KeyDown:
+		m.hover = NextNPCMenuRow(m.hover, len(m.rows), 1)
+	case d2enum.KeyTab:
+		d := 1
+		if event.KeyMod()&d2enum.KeyModShift != 0 {
+			d = -1
+		}
+
+		m.hover = NextNPCMenuRow(m.hover, len(m.rows), d)
+	case d2enum.KeyEnter, d2enum.KeySpace:
+		if m.hover < 0 {
+			return true
+		}
+
+		m.Choose(m.hover)
+	default:
+		return false
+	}
+
+	return true
+}
+
 // OnMouseMove updates the highlighted row.
 func (m *NPCMenu) OnMouseMove(event d2interface.MouseMoveEvent) bool {
 	if !m.open {

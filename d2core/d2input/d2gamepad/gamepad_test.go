@@ -446,3 +446,60 @@ func TestSyntheticSteps(t *testing.T) {
 		t.Fatal("disconnect")
 	}
 }
+
+func TestMenuModeDpadArrowsAndEnter(t *testing.T) {
+	ctl := NewController(DefaultConfig())
+	open := true
+	ctl.SetMenuMode(func() bool { return open })
+	ctl.Update(0.016, []PadInfo{pad()}, 0, 0)
+
+	// A before any D-pad use is still a click
+	ctl.Update(0.016, []PadInfo{pad(ButtonA)}, 0, 0)
+
+	if !ctl.MouseDown(d2enum.MouseButtonLeft) || ctl.KeyDown(d2enum.KeyEnter) {
+		t.Fatal("A without D-pad steering must click")
+	}
+
+	ctl.Update(0.016, []PadInfo{pad()}, 0, 0)
+
+	cases := []struct {
+		b Button
+		k d2enum.Key
+	}{{ButtonDUp, d2enum.KeyUp}, {ButtonDDown, d2enum.KeyDown}, {ButtonDLeft, d2enum.KeyLeft}, {ButtonDRight, d2enum.KeyRight}}
+	for _, c := range cases {
+		ctl.Update(0.016, []PadInfo{pad(c.b)}, 0, 0)
+
+		if !ctl.KeyJustPressed(c.k) || ctl.KeyDown(d2enum.Key1) || ctl.KeyDown(d2enum.Key4) {
+			t.Fatalf("%v: arrow %v missing or potion key pressed", c.b, c.k)
+		}
+
+		ctl.Update(0.016, []PadInfo{pad()}, 0, 0)
+	}
+
+	ctl.Update(0.016, []PadInfo{pad(ButtonA)}, 0, 0)
+
+	if !ctl.KeyJustPressed(d2enum.KeyEnter) {
+		t.Fatal("A after D-pad steering must press Enter")
+	}
+
+	if ctl.MouseDown(d2enum.MouseButtonLeft) {
+		t.Fatal("A must not also click")
+	}
+
+	// a stick movement hands A back to the cursor
+	ctl.Update(0.016, []PadInfo{padStick(0, 0, 1, 0)}, 0, 0)
+	ctl.Update(0.016, []PadInfo{pad(ButtonA)}, 0, 0)
+
+	if ctl.KeyDown(d2enum.KeyEnter) {
+		t.Fatal("A pressed Enter after the cursor stick moved")
+	}
+
+	// outside a menu the D-pad drinks potions again
+	open = false
+	ctl.Update(0.016, []PadInfo{pad()}, 0, 0)
+	ctl.Update(0.016, []PadInfo{pad(ButtonDUp)}, 0, 0)
+
+	if !ctl.KeyDown(d2enum.Key1) || ctl.KeyDown(d2enum.KeyUp) {
+		t.Fatal("D-pad is potion 1 outside menus")
+	}
+}

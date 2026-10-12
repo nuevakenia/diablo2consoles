@@ -475,6 +475,10 @@ func (g *GameControls) OnKeyDown(event d2interface.KeyEvent) bool {
 		return true
 	}
 
+	if g.NPCMenu.IsOpen() && g.NPCMenu.OnKeyDown(event) {
+		return true
+	}
+
 	if event.Key() == d2enum.KeyEscape && g.PTrade.IsOpen() {
 		g.PTrade.Cancel()
 		return true

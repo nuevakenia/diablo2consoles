@@ -34,6 +34,7 @@ func (g *GameControls) BindGamepad() {
 		return 0, false
 	})
 	pad.SetUIMode(g.gamepadUIMode)
+	pad.SetMenuMode(g.gamepadMenuMode)
 	pad.SetActionHandler(g.onGamepadAction)
 }
 
@@ -42,6 +43,7 @@ func (g *GameControls) UnbindGamepad() {
 	pad := d2gamepad.Default()
 	pad.SetKeyResolver(nil)
 	pad.SetUIMode(nil)
+	pad.SetMenuMode(nil)
 	pad.SetActionHandler(nil)
 }
 
@@ -49,6 +51,11 @@ func (g *GameControls) UnbindGamepad() {
 func (g *GameControls) gamepadUIMode() bool {
 	return g.hasOpenPanels() || g.escapeMenu.IsOpen() || g.HelpOverlay.IsOpen() ||
 		g.NPCMenu.IsOpen() || g.Waypoints.IsOpen() || g.PTrade.IsOpen()
+}
+
+// gamepadMenuMode reports a list menu is open: the D-pad then steers it like the arrow keys.
+func (g *GameControls) gamepadMenuMode() bool {
+	return g.escapeMenu.IsOpen() || g.NPCMenu.IsOpen()
 }
 
 func (g *GameControls) onGamepadAction(a d2gamepad.Action) {

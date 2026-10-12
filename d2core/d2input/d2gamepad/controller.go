@@ -40,11 +40,13 @@ type KeyResolver func(e d2enum.GameEvent) (d2enum.Key, bool)
 type Controller struct {
 	mu sync.Mutex
 
-	cfg     Config
-	mapping Mapping
-	resolve KeyResolver
-	handler func(Action)
-	uiMode  func() bool
+	cfg      Config
+	mapping  Mapping
+	resolve  KeyResolver
+	handler  func(Action)
+	uiMode   func() bool
+	menuMode func() bool
+	menuNav  bool // the D-pad steered a menu since the cursor stick last moved: A presses Enter
 
 	// frame state
 	pads           map[int]string // connected controllers
@@ -114,6 +116,15 @@ func (c *Controller) SetActionHandler(h func(Action)) {
 func (c *Controller) SetUIMode(probe func() bool) {
 	c.mu.Lock()
 	c.uiMode = probe
+	c.mu.Unlock()
+}
+
+// SetMenuMode registers a probe telling whether a list menu (game menu, NPC menu,
+// waypoints) is open. Then the D-pad presses the arrow keys, and A presses Enter
+// while the D-pad is steering (A clicks at the cursor again once a stick moves it).
+func (c *Controller) SetMenuMode(probe func() bool) {
+	c.mu.Lock()
+	c.menuMode = probe
 	c.mu.Unlock()
 }
 
@@ -241,6 +252,11 @@ func (c *Controller) Update(dt float64, pads []PadInfo, mouseX, mouseY int) {
 		c.logf("GAMEPAD walk=%v target=(%d,%d)", moveLeft, int(c.cx), int(c.cy))
 	}
 
+	menuMode := c.menuMode != nil && c.menuMode()
+	if !menuMode || lm > 0 || rm > 0 {
+		c.menuNav = false
+	}
+
 	// buttons -> actions
 	c.prev, c.keys = c.keys, map[d2enum.Key]bool{}
 	c.prevMouse = c.mouse
@@ -254,6 +270,33 @@ func (c *Controller) Update(dt float64, pads []PadInfo, mouseX, mouseY int) {
 
 		act := c.mapping[i]
 		justPressed := down && !c.prevPress[i]
+
+		if menuMode {
+			if k, ok := menuArrow(Button(i)); ok {
+				if down {
+					c.keys[k] = true
+					c.menuNav = true
+				}
+
+				if justPressed {
+					c.logf("GAMEPAD button=%s menu key=%v", Button(i), k)
+				}
+
+				c.prevPress[i] = down
+
+				continue
+			}
+
+			if c.menuNav && act == ActionClick {
+				if down {
+					c.keys[d2enum.KeyEnter] = true
+				}
+
+				c.prevPress[i] = down
+
+				continue
+			}
+		}
 
 		if justPressed && act != ActionNone {
 			c.logf("GAMEPAD button=%s action=%s", Button(i), act)
@@ -458,4 +501,20 @@ func (c *Controller) Walking() bool {
 
 func clampF(v, lo, hi float64) float64 {
 	return math.Max(lo, math.Min(hi, v))
+}
+
+// menuArrow is the arrow key a D-pad button presses in a list menu.
+func menuArrow(b Button) (d2enum.Key, bool) {
+	switch b {
+	case ButtonDUp:
+		return d2enum.KeyUp, true
+	case ButtonDDown:
+		return d2enum.KeyDown, true
+	case ButtonDLeft:
+		return d2enum.KeyLeft, true
+	case ButtonDRight:
+		return d2enum.KeyRight, true
+	}
+
+	return 0, false
 }
