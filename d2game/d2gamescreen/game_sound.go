@@ -105,8 +105,36 @@ func farther(dx, dy float64) bool {
 
 // onMonsterSound plays a monster sound from the director at the monster.
 func (v *Game) onMonsterSound(ev d2monsters.SoundEvent) {
-	v.playSoundAtPos(ev.Handle, d2vector.NewPosition(ev.X, ev.Y),
-		d2audio.PlayOpts{Emitter: ev.Emitter, Delay: ev.DelayTicks, Volume: ev.Volume, Kind: ev.Kind, Who: ev.Who})
+	handle := ev.Handle
+	if handle == "" && ev.ID != 0 {
+		handle = v.soundHandle(ev.ID)
+	}
+
+	pos := d2vector.NewPosition(ev.X, ev.Y)
+	opts := d2audio.PlayOpts{Emitter: ev.Emitter, Delay: ev.DelayTicks, Volume: ev.Volume, Kind: ev.Kind, Who: ev.Who}
+
+	// The Init vocal is often a loop (fire golem, hydra, swarm...): the exe removes the unit's
+	// sounds when it dies (UNITSND_RemoveModeSoundsForUnit 0x4c7d90), so keep it to stop it then.
+	if ev.Kind == "init" {
+		if snd := v.playSoundAtPosSound(handle, pos, opts); snd != nil {
+			if v.initSounds == nil {
+				v.initSounds = map[int]*d2audio.Sound{}
+			}
+
+			v.initSounds[ev.Emitter] = snd
+		}
+
+		return
+	}
+
+	if ev.Kind == "death" {
+		if snd := v.initSounds[ev.Emitter]; snd != nil {
+			snd.Stop()
+			delete(v.initSounds, ev.Emitter)
+		}
+	}
+
+	v.playSoundAtPos(handle, pos, opts)
 }
 
 // advanceHeroFootsteps plays the hero's footsteps while the walk or run

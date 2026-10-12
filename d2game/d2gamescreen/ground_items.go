@@ -265,7 +265,7 @@ func (v *Game) pickUp(it *d2mapentity.Item) {
 
 	v.gameClient.MapEngine.RemoveEntity(it)
 	v.gameControls.SetCursorItem(it.Item)
-	v.playSoundAt("cursor_point_drop", it.GetPosition(), "pickup")
+	v.playSoundAt("item_pickup", it.GetPosition(), "pickup") // row 0xeb: item enters the cursor (ITEM_InitClientItem 0x4be1f0)
 	v.Infof("AUTOGROUND pickup name=%q quality=%s -> cursor", plainLabel(it.Label()), it.Item.QualityName())
 	v.questItemPickedUp(it.Item.GetItemCode())
 
@@ -526,7 +526,7 @@ func (v *Game) spawnGroundItem(it *diablo2item.Item, c d2ground.Cell) (*d2mapent
 	}
 
 	v.gameClient.MapEngine.AddEntity(ent)
-	v.playSoundAt(ent.DropSound, ent.GetPosition(), "drop")
+	v.playGroundDrop(it, ent)
 
 	return ent, nil
 }

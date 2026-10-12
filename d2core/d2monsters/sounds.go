@@ -4,6 +4,7 @@ import (
 	"math/rand"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2audio"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 )
 
@@ -16,6 +17,8 @@ type SoundEvent struct {
 	Kind string
 	// Handle is a Sounds.txt handle (group variants are picked by the sound bank).
 	Handle string
+	// ID is the Sounds.txt index when Handle is empty (impact layers).
+	ID int
 	// X, Y is the monster position in map subtiles.
 	X, Y float64
 	// Emitter is the brain id, for Defer/Stop Inst.
@@ -32,6 +35,7 @@ type SoundEvent struct {
 type soundPlan struct {
 	kind, handle string
 	delay, vol   int
+	id           int // Sounds.txt index when there is no handle (impact layers)
 }
 
 // attackPlans returns the sounds of an attack or skill animation.
@@ -50,7 +54,7 @@ func attackPlans(r *d2records.MonsterSoundRecord, mode d2monster.Mode, rnd func(
 
 	add := func(kind, handle string, delay, vol int) {
 		if handle != "" {
-			out = append(out, soundPlan{kind, handle, delay, vol})
+			out = append(out, soundPlan{kind: kind, handle: handle, delay: delay, vol: vol})
 		}
 	}
 
@@ -85,7 +89,7 @@ func hitPlans(r *d2records.MonsterSoundRecord) []soundPlan {
 		return nil
 	}
 
-	return []soundPlan{{"hit", r.HitSound, r.HitDelay, 0}}
+	return []soundPlan{{"hit", r.HitSound, r.HitDelay, 0, 0}}
 }
 
 func deathPlans(r *d2records.MonsterSoundRecord) []soundPlan {
@@ -93,7 +97,7 @@ func deathPlans(r *d2records.MonsterSoundRecord) []soundPlan {
 		return nil
 	}
 
-	return []soundPlan{{"death", r.DeathSound, r.DeaDelay, 0}}
+	return []soundPlan{{"death", r.DeathSound, r.DeaDelay, 0, 0}}
 }
 
 func tauntPlans(r *d2records.MonsterSoundRecord) []soundPlan {
@@ -101,7 +105,7 @@ func tauntPlans(r *d2records.MonsterSoundRecord) []soundPlan {
 		return nil
 	}
 
-	return []soundPlan{{"taunt", r.Taunt, 0, 0}}
+	return []soundPlan{{"taunt", r.Taunt, 0, 0, 0}}
 }
 
 // neutralPlans is the idle vocal; NeuTime says how often (see nextNeutral).
@@ -110,7 +114,7 @@ func neutralPlans(r *d2records.MonsterSoundRecord) []soundPlan {
 		return nil
 	}
 
-	return []soundPlan{{"neutral", r.Neutral, 0, 0}}
+	return []soundPlan{{"neutral", r.Neutral, 0, 0, 0}}
 }
 
 // nextNeutral is the wait in frames before the next idle vocal: NeuTime frames
@@ -136,7 +140,7 @@ func footstepPlans(r *d2records.MonsterSoundRecord, rnd func(int) int) []soundPl
 
 	for _, h := range []string{r.Footstep, r.FootstepLayer} {
 		if h != "" {
-			out = append(out, soundPlan{"footstep", h, 0, 0})
+			out = append(out, soundPlan{"footstep", h, 0, 0, 0})
 		}
 	}
 
@@ -177,7 +181,7 @@ func (d *Director) playPlans(u *unit, plans []soundPlan) {
 	pos := u.m.GetPosition()
 
 	for _, p := range plans {
-		d.opt.OnSound(SoundEvent{Kind: p.kind, Handle: p.handle, X: pos.X(), Y: pos.Y(),
+		d.opt.OnSound(SoundEvent{Kind: p.kind, Handle: p.handle, ID: p.id, X: pos.X(), Y: pos.Y(),
 			Emitter: int(u.b.ID), DelayTicks: p.delay, Volume: p.vol, Who: u.m.Label()})
 	}
 }
@@ -225,4 +229,37 @@ func (d *Director) ambientSounds(u *unit) {
 func newSoundRand(seed uint32) *rand.Rand {
 	// nolint:gosec // sound variation only, never feeds gameplay
 	return rand.New(rand.NewSource(int64(seed) + 0x5d2))
+}
+
+// initPlans is the Init vocal a monster makes when it first appears
+// (UNITSND_PlayMonsterSpawnSound 0x4c8e00, called by MONSTER_CreateClientMonster
+// 0x461f18: MonSounds row +0x70, once per monster, only while alive). The exe
+// runs it when the client creates the unit, which is when it comes into view;
+// the port plays it at spawn and lets the falloff radius decide (UNVERIFIED).
+func initPlans(r *d2records.MonsterSoundRecord) []soundPlan {
+	if r == nil || !d2audio.MonsterInitSound(r.Init != "", false, false) {
+		return nil
+	}
+
+	return []soundPlan{{kind: "init", handle: r.Init}}
+}
+
+// impactPlans are the two impact layers of a unit starting its death or get-hit
+// mode (UNITSND_LookupSoundForUnitMode 0x4c7080), chosen by monstats2 HitClass.
+func impactPlans(st *d2records.MonStat2Record) []soundPlan {
+	if st == nil || st.HitClass == 0 {
+		return nil
+	}
+
+	body, layer := d2audio.ImpactSounds(st.HitClass, 1, 0)
+
+	var out []soundPlan
+
+	for _, id := range []int{body, layer} {
+		if id != 0 {
+			out = append(out, soundPlan{kind: "impact", id: id})
+		}
+	}
+
+	return out
 }

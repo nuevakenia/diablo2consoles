@@ -29,6 +29,11 @@ func (g *GameControls) bar() *d2hero.SkillBar { return g.hero.SyncSkillBar() }
 
 // playClick plays the button click.
 func (g *GameControls) playClick() {
+	if playUISound("cursor_button_click", "ui-click") {
+		g.Infof("SKILLBAR click-sound %s", d2resource.SFXButtonClick)
+		return
+	}
+
 	if g.clickSfx != nil {
 		g.clickSfx.Play()
 	}

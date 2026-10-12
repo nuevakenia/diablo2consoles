@@ -440,6 +440,7 @@ func (d *Director) spawn(stat *d2records.MonStatRecord, subX, subY int, ally *al
 	d.byEntity[m.ID()] = u
 	d.engine.AddEntity(m)
 	d.noteSpawnForRite(stat.ID)
+	d.playPlans(u, initPlans(d.soundRecord(u)))
 
 	if ally != nil {
 		return m, nil

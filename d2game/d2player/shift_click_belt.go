@@ -10,7 +10,7 @@ func IsShiftBeltClick(mod d2enum.KeyMod, cursorEmpty, beltable bool) bool {
 }
 
 // shiftClickToBelt moves the clicked inventory item to the belt (shift + left click). The exe plays sound
-// 0xeb for it (not reproduced). The belt slot search is PlaceBeltable (belt_exe.go; its first-empty-cell
+// 0xeb (item_pickup) for it (itemPickupSound). The belt slot search is PlaceBeltable (belt_exe.go; its first-empty-cell
 // fallback needs the autobelt column, VERIFIED). It reports whether the click was consumed.
 func (g *GameControls) shiftClickToBelt(mod d2enum.KeyMod, mx, my int) bool {
 	if !g.inventory.IsOpen() || !g.inventory.grid.Contains(mx, my) {
@@ -27,6 +27,7 @@ func (g *GameControls) shiftClickToBelt(mod d2enum.KeyMod, mx, my int) bool {
 	}
 
 	g.inventory.grid.Remove(item)
+	itemPickupSound()
 	g.saveHero()
 	g.Infof("shift-click: %s moved to the belt", item.GetItemCode())
 

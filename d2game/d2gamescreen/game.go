@@ -199,6 +199,8 @@ type Game struct {
 	attackTarget         *d2mapentity.Monster
 	attackRepathAcc      float64
 	soundTraceSet        bool
+	initSounds           map[int]*d2audio.Sound // looping monster Init vocals by emitter
+	soundHandles         map[int]string         // Sounds.txt index -> handle (built on first use)
 	heroStepAcc          float64
 	speech               *d2audio.Sound // the NPC voice line playing, if any
 	ambientTest          *ambientTest
@@ -559,6 +561,7 @@ func (v *Game) advanceStep(elapsed, total float64, last bool) error {
 
 func (v *Game) bindGameControls() error {
 	d2player.SetItemSoundHook(v.onItemSound)
+	d2player.SetUISoundHook(v.onItemSound)
 
 	for _, player := range v.gameClient.Players {
 		if player.ID() != v.gameClient.PlayerID {
