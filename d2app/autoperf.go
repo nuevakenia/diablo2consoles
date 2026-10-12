@@ -263,11 +263,12 @@ func (a *App) perfFinish() {
 	runtime.ReadMemStats(&m)
 
 	a.Infof("PERF runtime goroutines=%d heap_alloc_mb=%.1f heap_sys_mb=%.1f gc_cycles=%d gc_pause_total_ms=%.2f "+
-		"alloc_mb_per_s=%.1f mallocs_per_frame=%.0f",
+		"alloc_mb_per_s=%.1f mallocs_per_frame=%.0f alloc_kb_per_frame=%.0f",
 		runtime.NumGoroutine(), float64(m.HeapAlloc)/bytesToMegabyte, float64(m.HeapSys)/bytesToMegabyte,
 		m.NumGC-p.gcStart.NumGC, float64(m.PauseTotalNs-p.gcStart.PauseTotalNs)/nsPerMs,
 		float64(m.TotalAlloc-p.gcStart.TotalAlloc)/bytesToMegabyte/p.seconds,
-		float64(m.Mallocs-p.gcStart.Mallocs)/float64(len(p.render)+1))
+		float64(m.Mallocs-p.gcStart.Mallocs)/float64(len(p.render)+1),
+		float64(m.TotalAlloc-p.gcStart.TotalAlloc)/1024/float64(len(p.render)+1))
 
 	a.Infof("PERF cpu frames=%d cpu_ms_per_frame=%.3f", len(p.render),
 		float64(processCPU()-p.cpuStart)/nsPerMs/float64(len(p.render)+1))

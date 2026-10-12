@@ -157,11 +157,7 @@ func (s *ebitenSurface) RenderSprite(sprite *d2ui.Sprite) {
 func (s *ebitenSurface) Render(sfc d2interface.Surface) {
 	opts := s.scratchDrawImageOptions()
 
-	if s.stateCurrent.brightness != 1 || s.stateCurrent.saturation != 1 {
-		s.applyHSV(opts)
-	}
-
-	s.handleStateEffect(opts)
+	s.prepareColorM(opts, s.stateCurrent.brightness != 1 || s.stateCurrent.saturation != 1)
 
 	s.image.DrawImage(sfc.(*ebitenSurface).image, opts)
 }
@@ -170,13 +166,92 @@ func (s *ebitenSurface) Render(sfc d2interface.Surface) {
 func (s *ebitenSurface) RenderSection(sfc d2interface.Surface, bound image.Rectangle) {
 	opts := s.scratchDrawImageOptions()
 
-	if s.stateCurrent.brightness != 0 {
+	s.prepareColorM(opts, s.stateCurrent.brightness != 0)
+
+	s.image.DrawImage(sfc.(*ebitenSurface).image.SubImage(bound).(*ebiten.Image), opts)
+}
+
+// matrixKey identifies the colour matrix that applyHSV (when hsv) and handleStateEffect build from a
+// surface state: it is a pure function of the draw colour, saturation, brightness and effect.
+type matrixKey struct {
+	r, g, b, a  uint32
+	hasColor    bool
+	hsv         bool
+	sat, bright float64
+	effect      d2enum.DrawEffect
+}
+
+const matrixCacheMax = 4096
+
+//nolint:gochecknoglobals // render-thread cache, guarded by hsvMu
+var matrixCache = map[matrixKey]ebiten.ColorM{}
+
+// effectEditsMatrix reports whether handleStateEffect changes the colour matrix for the effect.
+func effectEditsMatrix(e d2enum.DrawEffect) bool {
+	switch e {
+	case d2enum.DrawEffectPctTransparency25, d2enum.DrawEffectPctTransparency50, d2enum.DrawEffectPctTransparency75,
+		d2enum.DrawEffectMod2XTrans, d2enum.DrawEffectMod2X:
+		return true
+	}
+
+	return false
+}
+
+// prepareColorM does applyHSV (when hsv) and handleStateEffect on freshly created opts. The matrix part is
+// memoised: a lit scene draws thousands of shadows and tinted sprites per frame from a few dozen distinct
+// (colour, brightness, effect) states, and rebuilding the matrices allocated about ten objects per draw.
+// The cached matrices are immutable values shared between draws, as ebiten intends.
+func (s *ebitenSurface) prepareColorM(opts *ebiten.DrawImageOptions, hsv bool) {
+	st := &s.stateCurrent
+	if !hsv && !effectEditsMatrix(st.effect) {
+		s.handleStateEffect(opts) // nothing to rebuild: only the composite mode
+		return
+	}
+
+	k := matrixKey{hsv: hsv, effect: st.effect, sat: st.saturation, bright: st.brightness}
+
+	if st.color != nil {
+		k.r, k.g, k.b, k.a = st.color.RGBA()
+		k.hasColor = true
+	}
+
+	hsvMu.Lock()
+	m, ok := matrixCache[k]
+	hsvMu.Unlock()
+
+	if ok {
+		s.handleStateComposite(opts)
+		opts.ColorM = m
+
+		return
+	}
+
+	if hsv {
 		s.applyHSV(opts)
 	}
 
 	s.handleStateEffect(opts)
 
-	s.image.DrawImage(sfc.(*ebitenSurface).image.SubImage(bound).(*ebiten.Image), opts)
+	hsvMu.Lock()
+	if len(matrixCache) >= matrixCacheMax {
+		matrixCache = map[matrixKey]ebiten.ColorM{}
+	}
+
+	matrixCache[k] = opts.ColorM
+	hsvMu.Unlock()
+}
+
+// handleStateComposite sets the composite mode of the current effect (the part of handleStateEffect that
+// does not touch the colour matrix).
+func (s *ebitenSurface) handleStateComposite(opts *ebiten.DrawImageOptions) {
+	switch s.stateCurrent.effect {
+	case d2enum.DrawEffectModulate:
+		opts.CompositeMode = ebiten.CompositeModeLighter
+	case d2enum.DrawEffectBurn:
+		opts.CompositeMode = ebiten.CompositeModeMultiply
+	case d2enum.DrawEffectNormal, d2enum.DrawEffectMod2XTrans, d2enum.DrawEffectNone:
+		opts.CompositeMode = ebiten.CompositeModeSourceOver
+	}
 }
 
 // hsvCache holds the colour matrices of ColorM.ChangeHSV(0, saturation, brightness) applied to the
