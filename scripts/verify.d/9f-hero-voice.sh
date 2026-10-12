@@ -24,7 +24,7 @@ hit_grunt_game() {
   {
     echo '#!/bin/zsh'
     echo "export OD2_PORT=$OD2_PORT"
-    echo "export OD2_AUTOGAME=\"$hg.d2s\" OD2_AUTOEXIT=1 OD2_AUTOTEST_MUTE=1 OD2_AUTOSPEED=8"
+    echo "export OD2_AUTOGAME=\"$hg.d2s\" OD2_AUTOEXIT=1 OD2_AUTOTEST_MUTE=1 OD2_AUTOSPEED=8 OD2_SOUNDLOG=1"
     [ -n "${OD2_VERIFY_CONFIG_DIR:-}" ] && echo "export OD2_CONFIG_DIR=\"$OD2_VERIFY_CONFIG_DIR\""
     echo "export OD2_AUTOMONSTER=skeleton1,2 OD2_AUTOMONSTER_SECONDS=12 OD2_AUTOMONSTER_DIFF=0 OD2_AUTOMONSTER_ALWAYSHIT=1 OD2_AUTOMONSTER_PASSIVE=1"
     echo "$tmp/od2 2>&1 | tee $hg.log"

@@ -33,9 +33,9 @@ scenario_check() {
   skillcov_effect dmg "Lightning Fury"
   skillcov_effect hit "Lightning Fury" 'lightningfury'
   skillcov_effect dmg "Multiple Shot"
-  skillcov_effect missile "Multiple Shot" 'multipleshotarrow'
+  skillcov_effect missile "Multiple Shot" 'multipleshot(arrow|bolt)'
   skillcov_effect dmg "Strafe"
-  skillcov_effect hit "Strafe" 'strafearrow'
+  skillcov_effect hit "Strafe" 'strafe(arrow|bolt)'
   skillcov_effect melee "Jab"
   skillcov_effect dmg "Jab"
   skillcov_effect melee "Power Strike"
