@@ -60,6 +60,12 @@ type Stats struct {
 	Absorb map[string]int
 	// Other collects the stats that have no dedicated field, by name.
 	Other map[string]int
+	// Live, when set, recomputes the attack numbers from the owner's skill as it stands now. The exe calls
+	// MONSTER_SetupLevelScaledStats 0x5a2960 before every monster attack (MONAI_ExecuteAiCommand 0x5a5630); it
+	// rewrites stats 0x15, 0x16 and 0x13 and adds the SkillDamage skill's damage and to-hit at the owner's CURRENT skill
+	// level (MONSTER_FillSkillDamageInfoIfHasLeader 0x56bdf0, VERIFIED, wave 31). Only the wolves, bear and raven have
+	// a SkillDamage; everything else (life, defense, the level scaled numbers of the spawn level) stays fixed.
+	Live func() (dmgMin, dmgMax, ar int)
 }
 
 // Compute builds the stats of a minion of template t on difficulty diff with
@@ -178,6 +184,15 @@ func Compute(t *Template, diff Difficulty, m Mods, r *d2rand.Seed) Stats {
 	flat := s.Other["item_normaldamage"]
 	s.DmgMin += flat
 	s.DmgMax += flat
+
+	// COMBAT_RollPhysicalDamage 0x579120 (VERIFIED, wave 31): a unit without a weapon (every summon here) adds its whole
+	// strength stat (stat 0, 1 percent per point, no divisor) to the same percent accumulator as damagepercent
+	// (stat 0x19). Only the Valkyrie has strength (aurastat1 = lvl * Param2 = 25 per level), which is where the
+	// community's "+25 percent damage per level" comes from. The accumulator is floored at -90 before it scales each end.
+	dmgPct += s.Str
+	if dmgPct < -90 {
+		dmgPct = -90
+	}
 
 	s.DmgMin = s.DmgMin * (100 + dmgPct) / 100
 	s.DmgMax = s.DmgMax * (100 + dmgPct) / 100

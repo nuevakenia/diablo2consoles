@@ -1747,6 +1747,12 @@ func doSummonFn(c *cast) {
 	case 31, 56, 57:
 		// VERIFIED (SKILL_ComputeSummonLevel 0x5c2850, called by SRVDO_031 / 056 / 057 with no fixed level)
 		o.Level = SummonLevel(c.u.Level(), c.lvl)
+	case 15, 16:
+		// VERIFIED (SRVDO_015 0x5dad10, SRVDO_016 0x5daf10, wave 31): Dopplezon and Valkyrie call SKILL_ComputeSummonLevel
+		// with no fixed level, so the monster level is the SummonLevel of the owner and the skill (calc2 only reaches
+		// SpawnSummonedMinion as the item level for the template equipment; it is never the unit's level and the
+		// wiki's 99 cap is not a monster level cap: only the monlvl.txt row used for AC and AR is capped, LevelBonus).
+		o.Level = SummonLevel(c.u.Level(), c.lvl)
 	case 45:
 		// VERIFIED (SKILL_SummonSentryUnit 0x5d4790, via SRVDO_045 0x5d4b20): the
 		// sentry's level comes from SKILL_ComputeSummonLevel with no fixed level.
