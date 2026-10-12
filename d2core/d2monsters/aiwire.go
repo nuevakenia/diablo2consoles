@@ -13,7 +13,7 @@ import (
 //   - wounded MonTeleport: gated by Brain.CanTeleport (AiGeneral flag 0x20),
 //     which no class sets; Options.CanTeleport is the host switch (nil = off).
 //   - level-threat re-target: gated by Options.LevelThreat (levels.txt byte
-//     +0x2f, column UNVERIFIED); nil = threat 0 = off.
+//     +0x2f = MonSpcWalk, VERIFIED w37 from the levels loader 0x61c210: the column after MonWndr at +0x2e); nil = threat 0 = off.
 //   - idle wander: needs Brain.Aggressive (set by nothing yet) or own-tile
 //     flag 0x40, which the static map never carries (missile bit); inert.
 //   - SandRaider overlay: forwarded to Options.OnOverlay, a visual hook.

@@ -90,7 +90,7 @@ type Options struct {
 	// 0x20 (the wounded MonTeleport). No class is known to set it: nil = off.
 	CanTeleport func(class int) bool
 	// LevelThreat, if set, returns the levels.txt byte +0x2f of a level (the
-	// level-threat re-target; column UNVERIFIED). nil = 0 = off.
+	// level-threat re-target; the column is MonSpcWalk, VERIFIED w37 in the loader 0x61c210). nil = 0 = off.
 	LevelThreat func(levelID int) int
 	// IsTownLevel, if set, keeps teleports out of town levels.
 	IsTownLevel func(levelID int) bool

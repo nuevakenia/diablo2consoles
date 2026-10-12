@@ -71,7 +71,8 @@ func (d *Director) MaxMana(t d2monster.Target) int {
 
 // HasStatListFlag implements d2monster.FB1Unit (STATS_FindStatListByFlags). The
 // engine keeps no flagged stat lists on units, so no list is ever found; the
-// Succubus gate on flag 0x20 therefore never blocks (UNVERIFIED meaning).
+// Succubus gate on flag 0x20 therefore never blocks. VERIFIED w37 (0x625920): the lookup returns the first list on the
+// unit's chain whose flag dword (+0x10) shares a bit with the mask; what sets bit 0x20 stays UNVERIFIED.
 func (d *Director) HasStatListFlag(d2monster.Target, uint32) bool { return false }
 
 // SlotAuraState implements d2monster.AuraStateSource: the states.txt id of the
