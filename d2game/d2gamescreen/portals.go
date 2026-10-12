@@ -146,6 +146,12 @@ func (v *Game) spawnPortals() {
 		}
 
 		ob.PortalDest, ob.PortalOwner = p.Dest.Level, p.Owner
+
+		// the portal object is drawn in its opening / opened modes (it is invisible in the neutral one)
+		if _, err := ob.Open(); err != nil {
+			v.Warningf("PORTAL open animation: %v", err)
+		}
+
 		m.AddEntity(ob)
 		v.portal.ents[ob] = p
 

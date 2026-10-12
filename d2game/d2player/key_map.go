@@ -271,6 +271,7 @@ func (km *KeyMap) ResetToDefault() {
 		d2enum.UseBeltSlot3:  {-1, -1}, // OD2: Q drinks the potions in order
 		d2enum.UseBeltSlot4:  {-1, -1}, // OD2: Q drinks the potions in order
 		d2enum.UseNextPotion: {d2enum.KeyQ, -1},
+		d2enum.UseTownPortal: {d2enum.KeyX, -1},
 		d2enum.SwapWeapons:   {d2enum.KeyW, -1},
 
 		d2enum.ToggleChatBox:       {d2enum.KeyEnter, -1},
