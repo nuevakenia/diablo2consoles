@@ -158,6 +158,7 @@ var rows = []row{
 	{"skill": "Frozen Orb", "Id": "956"}, {"skill": "Shiver Armor", "Id": "957"}, {"skill": "Chilling Armor", "Id": "958"},
 	{"skill": "Exploding Arrow", "Id": "959"}, {"skill": "Concentrate", "Id": "960"},
 	{"skill": "Test Delay", "Id": "900", "srvmissile": "firebolt", "manashift": "8", "delay": "35"},
+	{"skill": "Test Delay B", "Id": "903", "srvmissile": "firebolt", "manashift": "8", "delay": "20"},
 	{"skill": "Test Late", "Id": "901", "srvstfunc": "9", "srvmissile": "firebolt", "manashift": "8", "mana": "10",
 		"usemanaondo": "1"},
 	{"skill": "Test Start", "Id": "902", "srvstfunc": "9", "srvmissile": "firebolt", "manashift": "8", "mana": "10"},

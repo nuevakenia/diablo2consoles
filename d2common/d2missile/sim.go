@@ -558,8 +558,8 @@ func (s *Sim) stepOne(m *Missile) {
 		s.tornadoPulse(m)
 	}
 
-	if sp.SrvDoFunc == 15 {
-		s.orbEmit(m)
+	if sp.SrvDoFunc == 15 && !s.orbEmit(m) {
+		return
 	}
 
 	// displacement per frame in subtiles: step(8.8) * 16 / 65536 (verified scale)

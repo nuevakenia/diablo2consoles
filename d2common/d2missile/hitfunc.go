@@ -134,7 +134,7 @@ func (s *Sim) areaDamage(m *Missile) {
 	}
 
 	if r < 1 {
-		return
+		r = 1 // w24 VERIFIED (0x5a7500, 0x5a8680): the radius is clamped to at least 1, never skipped
 	}
 
 	s.emit(Event{Kind: EventArea, Missile: m, Damage: m.Damage.Roll(m.Owner.Roller), Radius: r})

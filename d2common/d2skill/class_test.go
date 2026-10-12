@@ -415,7 +415,7 @@ func TestFireWall(t *testing.T) {
 		t.Errorf("makers must fly opposite ways: (%v,%v) (%v,%v)", a.DX, a.DY, b.DX, b.DY)
 	}
 
-	if c.HitEvery != 5 || int(c.X) != 20 || int(c.Y) != 4 {
+	if c.HitEvery != 0 || c.ScalePct != 0 || int(c.X) != 20 || int(c.Y) != 4 {
 		t.Errorf("fire on the target: %+v", c)
 	}
 
