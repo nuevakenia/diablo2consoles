@@ -157,18 +157,24 @@ func (f *HeroStateFactory) importD2SDir(dir string, byName map[string]*HeroState
 
 		path := filepath.Clean(filepath.Join(dir, name))
 
-		data, err := ioutil.ReadFile(path)
+		data, err := f.ReadD2SFile(path)
 		if err != nil {
+			fmt.Printf("could not import %s: %v\n", name, err)
+			f.markUnreadable(byName, path, err)
+
 			continue
 		}
 
 		state, err := f.ImportD2S(data)
 		if err != nil {
 			fmt.Printf("could not import %s: %v\n", name, err)
+			f.markUnreadable(byName, path, err)
+
 			continue
 		}
 
 		state.Imported.Source = path
+		state.NoteD2SOnDisk(path, data)
 
 		prev := byName[strings.ToLower(state.HeroName)]
 		if prev != nil && !isImportOf(prev, state) {
@@ -196,6 +202,17 @@ func (f *HeroStateFactory) importD2SDir(dir string, byName map[string]*HeroState
 	}
 
 	return imported
+}
+
+// markUnreadable keeps an earlier import of a .d2s that cannot be read now from
+// being written back over the file: its copy of the character may be older
+// than the file.
+func (f *HeroStateFactory) markUnreadable(byName map[string]*HeroState, path string, err error) {
+	for _, h := range byName {
+		if h.Imported != nil && h.Imported.Source == path {
+			h.LoadProblem = "its .d2s could not be read: " + err.Error()
+		}
+	}
 }
 
 // isImportOf reports whether an existing hero is an earlier import of the same

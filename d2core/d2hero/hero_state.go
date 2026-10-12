@@ -54,6 +54,15 @@ type HeroState struct {
 	// never died.
 	Death *DeathState `json:"death,omitempty"`
 
+	// LoadProblem is set when the hero was not read completely from its .d2s (item
+	// tables missing, items unreadable, file unreadable at refresh); such a hero
+	// is never written back (SaveD2S returns ErrIncompleteLoad). Not stored.
+	LoadProblem string `json:"-"`
+	// d2sDiskPath and d2sDiskSum identify the .d2s content this process last
+	// read or wrote, for the last-writer check (CommitD2S).
+	d2sDiskPath string
+	d2sDiskSum  string
+
 	// statEquipped caches the equipped items as the stat list sees them.
 	statEquipped []d2statlist.Item
 	// Merc is the hired mercenary (the d2s header fields); nil when the hero

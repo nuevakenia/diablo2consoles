@@ -81,6 +81,7 @@ func (f *HeroStateFactory) CreateNewHero(name string, hero d2enum.Hero, expansio
 		res.Warnings = append(res.Warnings, err.Error())
 	} else {
 		state.D2SBase = data
+		state.NoteD2SOnDisk(res.Path, data)
 		res.Summary = SummarizeD2S(data, nil)
 
 		// the file is the character from now on: saves go back to it

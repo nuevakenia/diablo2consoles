@@ -169,6 +169,11 @@ func (f *HeroStateFactory) SaveD2S(state *HeroState) (*D2SExport, error) {
 		return nil, ErrNoOriginal
 	}
 
+	// a hero that did not load completely would be written with parts missing
+	if state.LoadProblem != "" {
+		return &D2SExport{Path: D2SPath(state)}, fmt.Errorf("%w: %s", ErrIncompleteLoad, state.LoadProblem)
+	}
+
 	if f.d2sTables == nil {
 		tables, err := f.loadD2SItemTables()
 		if err != nil {
@@ -192,17 +197,13 @@ func (f *HeroStateFactory) SaveD2S(state *HeroState) (*D2SExport, error) {
 		return res, err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(res.Path), mkdirPermission); err != nil {
+	// the one writer: validated, locked, last-writer checked, backed up, atomic
+	sum, err := CommitD2S(res.Path, data, state.knownSum(res.Path))
+	if err != nil {
 		return res, err
 	}
 
-	if err := backupOriginal(res.Path); err != nil {
-		return res, fmt.Errorf("backup of %s: %w", res.Path, err)
-	}
-
-	if err := writeFileAtomic(res.Path, data); err != nil {
-		return res, err
-	}
+	state.d2sDiskPath, state.d2sDiskSum = res.Path, sum
 
 	res.Summary = SummarizeD2S(data, f.d2sTables)
 	res.NewItems = NewItemsInD2S(state, data, f.d2sTables)

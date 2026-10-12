@@ -775,6 +775,9 @@ func (g *GameServer) onChangeLevel(client ClientConnection, packet d2netpacket.N
 		}
 
 		g.saveD2S(state)
+	} else if g.heroStateFactory != nil {
+		// every level change is a save point (same writer as the others: SaveD2S)
+		g.saveD2S(state)
 	}
 
 	return nil

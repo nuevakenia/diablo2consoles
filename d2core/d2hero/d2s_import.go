@@ -88,7 +88,10 @@ func (f *HeroStateFactory) ImportD2S(data []byte) (*HeroState, error) {
 	applyD2SAttributes(state, &body.Attributes, f)
 	state.Progress = &HeroProgress{Quests: quests(body), Waypoints: body.Waypoints, NPC: *body.NPCFlags()}
 
-	f.importD2SItems(state, data)
+	if problem := f.importD2SItems(state, data); problem != "" {
+		state.LoadProblem = problem
+		fmt.Printf("d2s: %s loaded INCOMPLETELY (%s): it will not be written back\n", state.HeroName, problem)
+	}
 
 	if path := os.Getenv(StashEnvVar); path != "" && state.Containers != nil {
 		added, skipped, err := f.ImportStashFile(state, path)
@@ -222,18 +225,19 @@ func (f *HeroStateFactory) applyD2SSkills(state *HeroState, hero d2enum.Hero, po
 }
 
 // importD2SItems adds the equipped items. Failures only cost the equipment:
-// the character is still imported.
-func (f *HeroStateFactory) importD2SItems(state *HeroState, data []byte) {
+// the character is still imported, but the returned problem marks it as
+// loaded incompletely so it is never written back (state.LoadProblem).
+func (f *HeroStateFactory) importD2SItems(state *HeroState, data []byte) (problem string) {
 	tables, err := f.loadD2SItemTables()
 	if err != nil {
 		fmt.Printf("d2s: item tables unavailable, skipping equipment: %v\n", err)
-		return
+		return "item tables unavailable: " + err.Error()
 	}
 
 	character, err := d2s.Parse(data, tables)
 	if err != nil {
 		fmt.Printf("d2s: could not read items of %s, skipping equipment: %v\n", state.HeroName, err)
-		return
+		return "items unreadable: " + err.Error()
 	}
 
 	// the starter gear of the class is only for new characters; a saved hero wears what it saved
@@ -262,6 +266,8 @@ func (f *HeroStateFactory) importD2SItems(state *HeroState, data []byte) {
 			}
 		}
 	}
+
+	return ""
 }
 
 // applyD2SContainers puts the inventory (page 1), cube (4), stash (5) and belt
