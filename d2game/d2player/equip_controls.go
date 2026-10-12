@@ -687,3 +687,61 @@ func (g *GameControls) isTwoHanded(it InventoryItem, loc d2equip.Loc) bool {
 
 	return e.Weapon && e.TwoHanded
 }
+
+// autoEquipLocs is the order AutoEquipCursor tries the body locations in.
+var autoEquipLocs = []d2equip.Loc{
+	d2equip.LocHead, d2equip.LocNeck, d2equip.LocTorso, d2equip.LocGloves, d2equip.LocFeet, d2equip.LocBelt,
+	d2equip.LocLeftRing, d2equip.LocRightRing, d2equip.LocRightHand, d2equip.LocLeftHand,
+}
+
+// AutoEquipCursor puts the cursor item on the body when the slot it belongs to is empty and the rules (class,
+// strength, dexterity, level, two-handed pairs) allow it: the owner's quick pickup choice. It reports whether the
+// item was worn; otherwise the cursor is untouched.
+func (g *GameControls) AutoEquipCursor() bool {
+	item := g.inventory.CursorItem()
+	if item == nil {
+		return false
+	}
+
+	for _, loc := range autoEquipLocs {
+		if g.inventory.WornAt(loc) != nil {
+			continue
+		}
+
+		if res := g.evaluateEquip(item, loc); !res.OK || len(res.Displaced) > 0 {
+			continue
+		}
+
+		if res := g.TryEquipCursor(loc); res.OK && g.inventory.CursorItem() == nil {
+			g.Infof("QUICKEQUIP item=%s slot=%s", item.GetItemCode(), loc)
+
+			return true
+		}
+	}
+
+	return false
+}
+
+// StripAll takes every worn item off into the inventory (debug, for the scenarios of the quick equip) and returns how
+// many items it moved. An item that does not fit stays on the cursor and stops the loop.
+func (g *GameControls) StripAll() int {
+	n := 0
+
+	for _, loc := range autoEquipLocs {
+		if g.inventory.WornAt(loc) == nil || g.inventory.CursorItem() != nil {
+			continue
+		}
+
+		if !g.TryUnequipToCursor(loc) {
+			continue
+		}
+
+		if _, _, ok := g.AutoPlaceCursor(); !ok {
+			break
+		}
+
+		n++
+	}
+
+	return n
+}

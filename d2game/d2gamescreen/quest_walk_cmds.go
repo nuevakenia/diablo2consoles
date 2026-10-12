@@ -83,3 +83,14 @@ func (v *Game) commandLootQuest(args []string) error {
 
 	return nil
 }
+
+// commandStripAll is "stripall": the hero takes off everything it wears (debug).
+func (v *Game) commandStripAll(_ []string) error {
+	if v.gameControls == nil {
+		return errors.New("not in a game")
+	}
+
+	v.Infof("STRIPALL took off %d item(s)", v.gameControls.StripAll())
+
+	return nil
+}
