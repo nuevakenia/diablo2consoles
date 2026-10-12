@@ -53,7 +53,29 @@ type bossFightRound struct {
 	lowest   int
 	casts    map[string]int
 	fx       map[string]int
+	quest    []uint16
 	drops    int
+}
+
+// bossFightLevel is the levels.txt id the quest system should believe the fight happens in.
+var bossFightLevel = map[string]int{
+	"bloodraven": 17, "andariel": 37, "radament": 49, "duriel": 73, "summoner": 74, "councilmember1": 83, "mephisto": 102,
+	"izual": 105, "diablo": 108, "ancientbarb1": 120, "ancientbarb2": 120, "ancientbarb3": 120, "nihlathakboss": 124,
+	"baalcrab": 132,
+}
+
+// questSlots snapshots the quest record (96 slots of 16 bits); nil without a quest system.
+func (v *Game) questSlots() []uint16 {
+	if v.quests() == nil || v.questRT == nil || v.questRT.g == nil || v.questRT.g.Rec == nil {
+		return nil
+	}
+
+	out := make([]uint16, 96)
+	for i := range out {
+		out[i] = v.questRT.g.Rec.Slot(i)
+	}
+
+	return out
 }
 
 func bossFightKeys() []string {
@@ -158,8 +180,20 @@ func (v *Game) advanceBossFight(elapsed float64) {
 					r.fx[verb]++
 				}
 			case "attack":
-				if strings.Contains(line, " missile hit=true") && strings.Contains(line, fmt.Sprintf(" id=%d ", r.boss.Brain.ID)) {
+				if !strings.Contains(line, fmt.Sprintf(" id=%d ", r.boss.Brain.ID)) {
+					return
+				}
+
+				if strings.Contains(line, " missile hit=true") {
 					r.fx["missilehit"]++
+				}
+
+				// the blows of the boss by animation mode (A1, A2, S1.., SQ), landed or not
+				if i := strings.Index(line, " mode="); i >= 0 {
+					rest := line[i+len(" mode="):]
+					if j := strings.IndexAny(rest, " "); j > 0 {
+						r.fx["blow:"+rest[:j]]++
+					}
 				}
 			case "drop":
 				if strings.Contains(line, "tc=") && strings.Contains(line, "items=") && !strings.Contains(line, "items=0") {
@@ -217,6 +251,19 @@ func (v *Game) startBossRound(t *bossFightTest) {
 
 	t.round = r
 
+	if lvl, ok := bossFightLevel[key]; ok {
+		v.questArea(lvl)
+	}
+
+	v.resetQuests()
+	r.quest = v.questSlots()
+
+	// the Ancients wait for the statues' introduction (RiteOfPassage); the hero "hears" it here
+	if strings.HasPrefix(key, "ancientbarb") {
+		v.monsters.RiteReset()
+		v.monsters.RiteIntroHeard(true)
+	}
+
 	b := m.Brain
 	v.Infof("BOSSFIGHT begin boss=%s name=%q class=%d ai=%s implemented=%v hp=%d", key, m.Label(), stat.ID, b.Profile.AI,
 		b.Def != nil && b.Def.Implemented, r.maxHP)
@@ -270,6 +317,21 @@ func (v *Game) finishBossRound(t *bossFightTest, timeout bool) {
 	r := t.round
 	killed := !r.boss.Alive()
 
+	changed := ""
+
+	if now := v.questSlots(); now != nil && r.quest != nil {
+		for i := range now {
+			if now[i] != r.quest[i] {
+				changed += fmt.Sprintf("%d:%04x>%04x,", i, r.quest[i], now[i])
+			}
+		}
+	}
+
+	if changed == "" {
+		changed = "-"
+	}
+
+	v.Infof("BOSSFIGHT quest boss=%s slots=%s", r.key, changed)
 	v.Infof("BOSSFIGHT summary boss=%s diff=%s casts=%s new=%s killed=%v drops=%d lowest=%d/%d fx=%s seconds=%.0f", r.key,
 		os.Getenv("OD2_AUTOMONSTER_DIFF"), pairs(r.casts), pairs(r.newClass), killed, r.drops, r.lowest, r.maxHP,
 		pairs(r.fx), t.elapsed-r.start)
@@ -309,4 +371,22 @@ func (v *Game) endBossFight(t *bossFightTest) {
 
 	t.idx = len(t.keys) + 1
 	v.autoTestExit()
+}
+
+// resetQuests starts every quest from scratch (the sample hero has most of them done) and makes them active, so the
+// kill of a boss shows which quest bits it sets.
+func (v *Game) resetQuests() {
+	if v.quests() == nil || v.questRT == nil || v.questRT.g == nil || v.questRT.g.Rec == nil {
+		return
+	}
+
+	for i := 0; i < 96; i++ {
+		v.questRT.g.Rec.SetSlot(i, 0)
+	}
+
+	for id := 0; id < 48; id++ {
+		if q := v.questRT.g.Quest(id); q != nil {
+			q.NotIntro, q.Active = true, true
+		}
+	}
 }

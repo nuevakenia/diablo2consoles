@@ -195,8 +195,17 @@ func (d *Director) monMissile(u *unit, mode d2monster.Mode, name string, lvl int
 		Damage: d.missileDesc(u, name, lvl, mode), ChildDamage: d.childDescs(u, spec, lvl, mode, 0),
 	}
 
+	// state 0x57 (Slow Missiles) on the caster slows missiles that can be slowed (0x59d5d0, VERIFIED)
+	if spec.CanSlow && u.missileSlow > 0 {
+		p.Slowed, p.SlowPct = true, u.missileSlow
+	}
+
 	if tune != nil {
 		tune(&p)
+	}
+
+	if p.Velocity != 0 && spec.CanSlow && u.missileSlow > 0 {
+		p.Velocity = p.Velocity * u.missileSlow / 100
 	}
 
 	m, err := s.Create(p)
@@ -225,7 +234,9 @@ func (d *Director) landBossSkill(u *unit, mode d2monster.Mode) bool {
 	switch rec.Srvdofunc {
 	case 30, 112:
 		return d.landCurse(u, rec, lvl)
-	case 17, 88, 99, 102, 152:
+	case 140:
+		return d.landTentacles(u)
+	case 17, 22, 88, 95, 99, 102, 139, 152:
 	default:
 		return false
 	}
@@ -249,7 +260,17 @@ func (d *Director) landBossSkill(u *unit, mode d2monster.Mode) bool {
 	n := 0
 
 	switch rec.Srvdofunc {
-	case 152: // DiabLight
+	case 22: // NovaMissileRing
+		n = d.novaRing(u, mode, name, lvl, calc(1))
+	case 139: // Baal Cold Missiles
+		if d.monMissile(u, mode, name, lvl, tx, ty, func(p *d2missile.CreateParams) {
+			// the maker keeps the quarter turn of the line of fire in its data fields (0x5d0fa0, VERIFIED)
+			sx, sy := u.m.SubtilePos()
+			p.Data28, p.Data2C = d2missile.WakeVector(sx, sy, ax, ay)
+		}) != nil {
+			n++
+		}
+	case 152, 95: // DiabLight, FetishInferno (Baal Inferno)
 		life := calc(1)
 		if life < 1 {
 			life = 0
@@ -357,8 +378,8 @@ func (d *Director) poisonNova(u *unit, mode d2monster.Mode, name string, lvl, ca
 		return 0
 	}
 
-	if calc1 < 1 {
-		calc1 = lvl
+	if calc1 < 0 {
+		calc1 = 0
 	}
 
 	if calc2 < 1 {
@@ -371,8 +392,8 @@ func (d *Director) poisonNova(u *unit, mode d2monster.Mode, name string, lvl, ca
 
 	fire := func(pts [][2]int, param int) {
 		for _, o := range pts {
-			if d.monMissile(u, mode, name, calc1, float64(sx)+0.5+float64(o[0]), float64(sy)+0.5+float64(o[1]),
-				func(p *d2missile.CreateParams) { p.Velocity = param << 6 }) != nil {
+			if d.monMissile(u, mode, name, lvl, float64(sx)+0.5+float64(o[0]), float64(sy)+0.5+float64(o[1]),
+				func(p *d2missile.CreateParams) { p.Velocity, p.SubLoops = param<<6, calc1 }) != nil {
 				n++
 			}
 		}
@@ -565,4 +586,98 @@ func (d *Director) childDescs(u *unit, spec *d2missile.Spec, lvl int, mode d2mon
 	}
 
 	return out
+}
+
+// baalTentacleKeys are the five tentacle classes (monstats baaltentacle1..5).
+var baalTentacleKeys = []string{"baaltentacle1", "baaltentacle2", "baaltentacle3", "baaltentacle4", "baaltentacle5"}
+
+// landTentacles is SRVDO_140_BaalTentacle 0x5d12b0. VERIFIED: the number of tentacles is the difficulty plus a roll
+// of 3 plus 2 (rolls of the caster's seed), each is laid at the skill target (the caster when it has none) offset by
+// two rolls of 18 minus 9 in x and y, flagged 0x4020000 and linked to the caster as its owner (the tentacle's think
+// function kills it when the owner is gone, host OwnerGone). UNVERIFIED: the class of each tentacle (the exe walks the
+// next-in-class chain of the spawn table at a depth of its own; here a roll of five picks baaltentacle1..5).
+func (d *Director) landTentacles(u *unit) bool {
+	n := int(d.opt.Difficulty) + int(u.b.Seed.Roll(3)) + 2
+	ax, ay := d.skillAim(u)
+
+	if ax == 0 && ay == 0 {
+		ax, ay = u.m.SubtilePos()
+	}
+
+	made := 0
+
+	for i := 0; i < n; i++ {
+		x := ax + int(u.b.Seed.Roll(18)) - 9
+		y := ay + int(u.b.Seed.Roll(18)) - 9
+
+		stat := d.FindStat(baalTentacleKeys[int(u.b.Seed.Roll(int32len(baalTentacleKeys)))])
+		if stat == nil {
+			continue
+		}
+
+		p, ok := d2path.NearestFree(d.fp, d2path.MaskMonster, d2path.Point{X: x, Y: y}, 4)
+		if !ok {
+			continue
+		}
+
+		m, err := d.spawn(stat, p.X, p.Y, nil)
+		if err != nil {
+			continue
+		}
+
+		d.byEntity[m.ID()].summoner = u.b.ID
+		d.Counters.Summoned++
+		made++
+	}
+
+	d.emit("bossfx", "MONSTER tentacles name=%s id=%d skill=%q count=%d of=%d aim=(%d,%d)", u.m.Label(), u.b.ID, u.skill.name, made, n, ax, ay)
+
+	return true
+}
+
+func int32len(s []string) int32 { return int32(len(s)) }
+
+// The exe's two 64 entry tables at 0x6e2580 (x) and 0x6e2680 (y), VERIFIED: the destination offsets of the 64 missiles of
+// SKILL_ServerCreateNovaRing 0x56b170, a ring of radius 30 in steps of 5.625 degrees.
+var (
+	novaRingX64 = [64]int{30, 29, 29, 28, 27, 26, 24, 23, 21, 19, 16, 14, 11, 8, 5, 2, 0, -2, -5, -8, -11, -14, -16, -19, -21, -23, -24, -26, -27, -28, -29, -29,
+		-30, -29, -29, -28, -27, -26, -24, -23, -21, -19, -16, -14, -11, -8, -5, -2, 0, 2, 5, 8, 11, 14, 16, 19, 21, 23, 24, 26, 27, 28, 29, 29}
+	novaRingY64 = [64]int{0, 2, 5, 8, 11, 14, 16, 19, 21, 23, 24, 26, 27, 28, 29, 29, 30, 29, 29, 28, 27, 26, 24, 23, 21, 19, 16, 14, 11, 8, 5, 2,
+		0, -2, -5, -8, -11, -14, -16, -19, -21, -23, -24, -26, -27, -28, -29, -29, -30, -29, -29, -28, -27, -26, -24, -23, -21, -19, -16, -14, -11, -8, -5, -2}
+)
+
+func novaRingPoints() (pts [][2]int) {
+	for i := range novaRingX64 {
+		pts = append(pts, [2]int{novaRingX64[i], novaRingY64[i]})
+	}
+
+	return pts
+}
+
+// novaRing is SRVDO_022 NovaMissileRing 0x5c7c50 -> SKILL_ServerCreateNovaRing 0x56b170 (VERIFIED): 64 missiles of the
+// skill's srvmissilea from the caster, destinations on a ring of radius 30, speed the missile's level velocity plus
+// calc1. The missiles die at their first hit (CollideKill) and NextHit lets one hero take a single hit per nova.
+func (d *Director) novaRing(u *unit, mode d2monster.Mode, name string, lvl, calc1 int) int {
+	s := d.monSim()
+	if s == nil {
+		return 0
+	}
+
+	sp := s.Table.ByName(name)
+	if sp == nil {
+		return 0
+	}
+
+	vel := d2combat.MissileVelocity(uint8(sp.Vel), uint8(sp.VelLev), lvl, false, 0) + calc1<<8
+	sx, sy := u.m.SubtilePos()
+	n := 0
+
+	for _, o := range novaRingPoints() {
+		if d.monMissile(u, mode, name, lvl, float64(sx)+0.5+float64(o[0]), float64(sy)+0.5+float64(o[1]),
+			func(p *d2missile.CreateParams) { p.Velocity = vel }) != nil {
+			n++
+		}
+	}
+
+	return n
 }
