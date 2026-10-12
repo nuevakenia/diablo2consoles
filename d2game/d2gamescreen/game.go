@@ -286,6 +286,7 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 		{"portals", "logs the open town portal pairs", []string{}, v.commandPortals},
 		{"useportal", "uses the nearest town portal object without walking to it (scenarios)", []string{}, v.commandUsePortal},
 		{"killnear", "kills the nearest monster as the hero (party experience tests)", []string{}, v.commandKillNear},
+		{"killgidbinn", "kills the fetish boss the Gidbinn object woke, as the hero (scenarios)", []string{}, v.commandKillGidbinn},
 		{"rewarditem", "spends a pending Larzuk (socket), Anya (personalize) or Charsi (imbue) quest reward on an item",
 			[]string{"socket|personalize|imbue"}, v.commandRewardItem},
 		{"questpending", "puts quest <act> <quest> into the state of a finished quest whose reward waits (debug)",

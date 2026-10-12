@@ -1,6 +1,7 @@
 package d2gamescreen
 
 import (
+	"errors"
 	"math"
 	"sort"
 	"strconv"
@@ -390,4 +391,18 @@ func (v *Game) spawnGidbinnBoss() {
 	v.monsters.MakeUnique(m)
 	v.act3.bossMon = m
 	v.Infof("ACT3 Gidbinn's fetish boss wakes (%s, class %d)", m.Label(), stat.ID)
+}
+
+// commandKillGidbinn is "killgidbinn": the hero kills the fetish boss the Gidbinn object woke (the scripted walks
+// cannot tell it from the other fetishes of the jungle by name).
+func (v *Game) commandKillGidbinn(_ []string) error {
+	m := v.act3.bossMon
+	if m == nil || v.monsters == nil || !m.Alive() {
+		return errors.New("no living Gidbinn boss")
+	}
+
+	v.Infof("KILLGIDBINN %s", m.Label())
+	v.monsters.Damage(m, 1<<20, v.localPlayer)
+
+	return nil
 }

@@ -358,8 +358,9 @@ func (v *Game) questObjectOperated(ob *d2mapentity.Object) {
 	// the chests, the altar and the tome give their item once: they open (animation) and a second click
 	// does nothing, like the original's object state
 	switch id {
-	case d2quest.ObjectCubeChest, d2quest.ObjectScrollChest, d2quest.ObjectStaffChest, d2quest.ObjectTaintedSunAltar,
-		d2quest.ObjectLamEsenTome, d2quest.ObjectGidbinnAltar, d2quest.ObjectGidbinn:
+	// (Lam Esen's tome and the Gidbinn objects are opened by act3Operate before it calls this: a second Open here
+	// would report "already open" and the quest system would never hear of the operation)
+	case d2quest.ObjectCubeChest, d2quest.ObjectScrollChest, d2quest.ObjectStaffChest, d2quest.ObjectTaintedSunAltar:
 		opened, err := ob.Open()
 		if err != nil {
 			v.Warningf("opening quest object %q: %v", ob.Label(), err)

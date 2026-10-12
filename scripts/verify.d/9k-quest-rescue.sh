@@ -1,6 +1,5 @@
 scenario_name="Quest walkthrough, Act 5: the first steps of Rescue on Mount Arreat in the real world (Qual-Kehk, Bloody Foothills, Frigid Highlands, quest log, .d2s)"
-# The sample hero (quests reset) takes the quest from Qual-Kehk (his lines come newest quest first: Rite of Passage, then
-# Rescue), travels to the Frigid Highlands by waypoint (the quest moves on, the three barbarian cages are
+# The sample hero (quests reset) takes the quest from Qual-Kehk (the Rite of Passage line is not heard: that quest opens after Betrayal of Harrogath), travels to the Frigid Highlands by waypoint (the quest moves on, the three barbarian cages are
 # there), kills the prison doors on the cages (monster class 434, placed on the cage objects when the level is built:
 # no DS1 monster marker can place them), walks back by the waypoint and takes Qual-Kehk's reward (runes by the number
 # of freed barbarians, not a hire). Needs D2_TABLES + D2S_SAMPLE_BODY.
@@ -8,16 +7,15 @@ source scripts/quest_walk_lib.zsh
 scenario_warnings_ok=1
 scenario_env() {
   # (the Act 5 quests open one after the other, exe sequence filters: the Siege on Harrogath is done first)
-  local s="$(qw_begin 5)say:completequest 5 1;$(qw_panel 5 2)$(qw_talk Qual-Kehk)$(qw_talk Qual-Kehk)$(qw_panel 5 2)say:setwaypoint 111 1;wait:11;$(qw_wp 111)$(qw_panel 5 2)kill:name=prison door,300;$(qw_panel 5 2)$(qw_wp 109)$(qw_talk Qual-Kehk)$(qw_panel 5 2)exit"
+  local s="$(qw_begin 5)say:completequest 5 1;$(qw_panel 5 2)$(qw_talk Qual-Kehk)$(qw_panel 5 2)say:setwaypoint 111 1;wait:11;$(qw_wp 111)$(qw_panel 5 2)kill:name=prison door,300;$(qw_panel 5 2)$(qw_wp 109)$(qw_talk Qual-Kehk)$(qw_panel 5 2)exit"
   qw_env rescue "$s"
 }
 scenario_check() {
   grep -E "AUTOSCRIPT RESULT|PRISONDOOR|MONSTER death name=Prison|QUEST EFFECT give-item|QUEST A5Q2|QUEST SPEECH npc=\"Qual-Kehk\"|QUESTPANEL act=5 quest=2|LEVEL objects: .*Cage|RESCUE" $log.txt | cut -c1-220
   qw_sample rescue || { echo "SKIP: no revived sample hero in this run"; return; }
   grep -q "AUTOSCRIPT RESULT PASS" $log.txt || { echo "FAIL: the Rescue on Mount Arreat walkthrough did not pass"; fail=1; }
-  for m in 20153 20096; do
-    grep -qE "QUEST SPEECH npc=\"Qual-Kehk\" class=515 msg=$m mode=[0-9] .* sound=[0-9]+ handle=ESOUND_QUALKEHK" $log.txt || { echo "FAIL: Qual-Kehk did not speak message $m"; fail=1; }
-  done
+  grep -qE "QUEST SPEECH npc=\"Qual-Kehk\" class=515 msg=20096 mode=[0-9] .* sound=[0-9]+ handle=ESOUND_QUALKEHK" $log.txt || { echo "FAIL: Qual-Kehk did not speak message 20096"; fail=1; }
+  grep -q "QUEST SPEECH npc=\"Qual-Kehk\" class=515 msg=20153 " $log.txt && { echo "FAIL: Qual-Kehk offered the Rite of Passage before Betrayal of Harrogath was done"; fail=1; }
   grep -E "QUEST SPEECH npc=\"Qual-Kehk\" class=515 msg=(20153|20096) " $log.txt | grep -q 'text=""' && { echo "FAIL: a Qual-Kehk line has no text"; fail=1; }
   for t in "1->2" "2->3" "3->4" "4->5"; do
     grep -q "QUEST A5Q2 state $t" $log.txt || { echo "FAIL: no state change $t of A5Q2"; fail=1; }

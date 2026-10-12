@@ -52,6 +52,6 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
 
 ## Wave 20 notes (2026-10-11)
 
-- Quest rules from the exe are landed (Act 1-5); freed barbarians (Rescue) and the frozen Anya object are not modelled in the world.
+- Quest rules from the exe are landed (Act 1-5); the Rescue prisoners, the frozen Anya block, the Gidbinn boss and the Act 5 quest order are in the world (wave 22); the town Anya and the iced Drehya monster are not.
 - The class matrix (docs/class-matrix.md) passes 35/35; the walk give-up clock was fixed (it used to reset every cycle).
 - Exe monster modifiers are now applied: super-unique/champion life bonuses made the Den of Evil lethal to a level-1 hero without Fire Bolt.

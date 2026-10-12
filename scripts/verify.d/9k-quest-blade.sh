@@ -14,7 +14,7 @@ scenario_env() {
   # first visit of the jungle (the quest becomes available), back by portal, Hratli's line, and in again
   s+="wait:11;$(qw_wp 78)wait:2;say:spawnportal 75;use:Portal;expect:level=75;wait:3;$(qw_talk Hratli)$(qw_panel 3 3)$(qw_wp 78)"
   # (operating the Gidbinn object wakes the fetish boss; its death drops the blade where it fell, D2MOO ACT3Q3)
-  s+="kill:all,100;$(qw_chest 252 4)kill:all,100;say:lootquest 15 30;wait:2;say:lootquest 15 30;$(qw_panel 3 3)$(qw_go 88)$(qw_go 78)wait:2;say:spawnportal 75;use:Portal;expect:level=75;wait:3;"
+  s+="kill:all,100;$(qw_chest 252 4)say:killgidbinn;wait:2;say:lootquest 15 30;wait:2;say:lootquest 15 30;$(qw_panel 3 3)$(qw_go 88)$(qw_go 78)wait:2;say:spawnportal 75;use:Portal;expect:level=75;wait:3;"
   # (the way back to Kurast is the act travel: the Flayer Dungeon hole leaves the hero at a spot of the generated jungle
   # from which no walk reaches the waypoint on every build; verify runs failed at 'use:Waypoint' with 30+ tiles to go)
   s+="$(qw_talk Ormus 10)$(qw_panel 3 3)$(qw_talk Asheara 10)$(qw_panel 3 3)$(qw_talk Ormus 10)$(qw_panel 3 3)exit"

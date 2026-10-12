@@ -400,7 +400,9 @@ func (v *Game) uberSteps() []uberStep {
 				v.uberKill(k)
 			}
 
-			if v.uber.ev.State() != "done" || !v.uber.rewarded {
+			// (the three arrive together now, so the run no longer lasts for the arrival delays: it waits for the
+			// Hellforge shower of the cube step, which the verify scenario checks, to be over)
+			if v.uber.ev.State() != "done" || !v.uber.rewarded || v.forge != nil {
 				return false
 			}
 
