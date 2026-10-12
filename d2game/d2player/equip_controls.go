@@ -27,7 +27,7 @@ const (
 	soundCantUseFmt = "ESOUND_%s_CANTUSEYET"
 	soundCantCarry  = "ESOUND_%s_CANTCARRY_1"
 	envDurChance    = "OD2_DURABILITY_CHANCE" // test override of the loss chance in percent
-	lowDurPct       = 20                      // UNVERIFIED: tooltip turns red at or below this share of the maximum
+	lowDurPct       = 20                      // the HUD warning icons show at or below this share (UI_DrawLowDurabilityWarningIcons 0x494470)
 )
 
 var voiceNames = map[string]string{
@@ -547,12 +547,10 @@ func (g *GameControls) itemTooltipLines(it InventoryItem) []string {
 
 		text := fmt.Sprintf("%s %d of %d", label, cur, maxDur)
 
-		color := d2ui.ColorTokenWhite
-		if cur*100 <= maxDur*lowDurPct {
-			color = d2ui.ColorTokenRed
-		}
-
-		lines = append(lines, d2ui.ColorTokenize(text, color))
+		// INV_BuildDurabilityLine 0x480eb0 never colours the line red (white; the maximum is
+		// blue when the item has the max-durability-percent stat 0x4b); the low durability
+		// warning is a HUD icon, see LowDurabilityWarning.
+		lines = append(lines, d2ui.ColorTokenize(text, d2ui.ColorTokenWhite))
 	}
 
 	for loc, st := range g.equipStatus {

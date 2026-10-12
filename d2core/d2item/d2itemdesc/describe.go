@@ -225,10 +225,10 @@ func (d *desc) qualityColor() Color {
 		return Green
 	case d2s.QualityUnique:
 		return Gold
-	case d2s.QualityLow:
-		return Gray
 	}
 
+	// INV_BuildItemNameTooltipLines/INV_BuildPanelAndItemTooltips: low quality and superior
+	// items are white unless ethereal or socketed (grey, colour 5).
 	if d.isRune() {
 		return Orange
 	}
@@ -544,18 +544,9 @@ func (d *desc) baseLines() []Line {
 		cs, cd, cl = d.ctx.Strength, d.ctx.Dexterity, d.ctx.CharLevel
 	}
 
-	if str > 1 {
-		lines = append(lines, d.requirement("ItemStats1e", str, cs, hero))
-	}
-
-	if dex > 1 {
-		lines = append(lines, d.requirement("ItemStats1f", dex, cd, hero))
-	}
-
-	if lv := d.levelReq(); lv > 1 {
-		lines = append(lines, d.requirement("ItemStats1p", lv, cl, hero))
-	}
-
+	// INV_BuildPanelAndItemTooltips 0x48a090 puts the lines in this order (the tooltip text
+	// is built bottom up: class, dexterity, strength, level, read from the order of the
+	// concatenation, the name last).
 	if cl := t.classOfType(b.Type, 0); cl != "" {
 		if idx, ok := classCodes[cl]; ok {
 			if c := t.class(idx); c != nil {
@@ -567,6 +558,18 @@ func (d *desc) baseLines() []Line {
 				lines = append(lines, Line{t.tr(c.ClassOnly), col})
 			}
 		}
+	}
+
+	if dex > 1 {
+		lines = append(lines, d.requirement("ItemStats1f", dex, cd, hero))
+	}
+
+	if str > 1 {
+		lines = append(lines, d.requirement("ItemStats1e", str, cs, hero))
+	}
+
+	if lv := d.levelReq(); lv > 1 {
+		lines = append(lines, d.requirement("ItemStats1p", lv, cl, hero))
 	}
 
 	return lines
@@ -613,12 +616,9 @@ func (d *desc) durabilityLine() (Line, bool) {
 		return Line{}, false
 	}
 
-	c := White
-	if it.Durability == 0 {
-		c = Red
-	}
-
-	return Line{fmt.Sprintf("%s %d %s %d", d.t.tr("ItemStats1d"), it.Durability, d.t.tr("ItemStats1j"), it.MaxDurability), c}, true
+	// INV_BuildDurabilityLine 0x480eb0: no red here (a broken item shows it in its name colour);
+	// the maximum is blue when the item has the stat 0x4b (not split out here, UNVERIFIED).
+	return Line{fmt.Sprintf("%s %d %s %d", d.t.tr("ItemStats1d"), it.Durability, d.t.tr("ItemStats1j"), it.MaxDurability), White}, true
 }
 
 // propertyLines are the magical properties, blue.

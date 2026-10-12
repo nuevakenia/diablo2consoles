@@ -105,6 +105,9 @@ type Inventory struct {
 	// priceHook adds lines (sell value, repair cost) to item tooltips while
 	// a trade window is open.
 	priceHook func(InventoryItem) []string
+	// slotFits tells whether the held item may go to a body location and the hero meets
+	// its requirements (w23 slot highlight); nil draws no highlight.
+	slotFits func(item InventoryItem, loc d2equip.Loc) bool
 
 	*d2util.Logger
 }
@@ -293,6 +296,7 @@ func (g *Inventory) Render(target d2interface.Surface) {
 	g.renderFrame(target)
 
 	g.grid.Render(target)
+	g.renderSlotHighlight(target)
 	g.showItemDescriptionTooltip()
 }
 
@@ -330,6 +334,7 @@ func (g *Inventory) renderFrame(target d2interface.Surface) {
 }
 
 func (g *Inventory) showItemDescriptionTooltip() {
+	g.grid.hovered = nil
 	hoveringNow := g.checkEquippedSlotsHover()
 
 	if hoveringNow {
@@ -363,6 +368,7 @@ func (g *Inventory) checkGridSlotsHover() bool {
 				g.hoverX, g.hoverY = mx, my
 			}
 
+			g.grid.hovered = item
 			g.showGridItemDescriptionTooltip(item)
 
 			break
@@ -384,6 +390,7 @@ func (g *Inventory) checkEquippedSlotsHover() bool {
 				g.hoverX, g.hoverY = mx, my
 			}
 
+			g.grid.hovered = slot.item
 			g.showEquippedItemDescriptionTooltip(slot)
 
 			break

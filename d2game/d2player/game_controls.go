@@ -268,6 +268,7 @@ func NewGameControls(
 	gc.cube = NewContainerPanel(asset, ui, l, inventory, cubeKind, gc.saveHero)
 	gc.cube.SetOnTransmute(gc.onTransmuteButton)
 	gc.belt = NewBeltPanel(asset, ui, l, inventory, gc.beltBoxes, gc.saveHero)
+	gc.wireTints()
 
 	if !isSinglePlayer {
 		PartyPanel := NewPartyPanel(asset, ui, hero.Name(), l, hero, hero.Stats, players)
