@@ -63,6 +63,13 @@ func (a *App) freshHeroSave(class string) (string, error) {
 		stats.SkillPoints = n
 	}
 
+	// OD2_AUTOCAST_MANA=<n> gives the fresh hero a full pool of n mana: stats.Level is raised after the stats were built
+	// at level 1, so without it the hero starts with the level-1 mana (22 of 54 at level 18) and scripts that cast
+	// several 15-mana forms are refused for mana (w39, 86k Wearbear step).
+	if n, err := strconv.Atoi(os.Getenv("OD2_AUTOCAST_MANA")); err == nil && n > 0 {
+		stats.Mana, stats.MaxMana = n, n
+	}
+
 	state, err := factory.CreateHeroState("Auto"+hero.String(), hero, stats)
 	if err != nil {
 		return "", err

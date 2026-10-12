@@ -19,7 +19,7 @@ scenario_env() {
   s="$s;skill:right=Wearbear;click:right@hero:60,30;wait:3"
   [ -n "$shot" ] && s="$s;say:capframe $shot/bear-idle.png;wait:1"
   s="$s;click:right@hero:60,30;wait:3;exit"
-  echo "export OD2_SOUNDLOG=1 OD2_AUTOGAME=\"$tmp/w32.od2\" OD2_AUTOCAST_CLASS=druid OD2_AUTOCAST_CLVL=18 OD2_AUTOCAST_SKILLPOINTS=4"
+  echo "export OD2_SOUNDLOG=1 OD2_AUTOCAST_MANA=200 OD2_AUTOGAME=\"$tmp/w32.od2\" OD2_AUTOCAST_CLASS=druid OD2_AUTOCAST_CLVL=18 OD2_AUTOCAST_SKILLPOINTS=4"
   echo "export OD2_AUTOSCRIPT='$s'"
 }
 scenario_check() {
@@ -31,6 +31,9 @@ scenario_check() {
   grep -q "FORM mode=WL composite=40" $log.txt || { echo "FAIL: the wolf never played its walk animation"; fail=1; }
   grep -q "FORM mode=RN composite=40" $log.txt || { echo "FAIL: the wolf never played its run animation"; fail=1; }
   grep -q "HERO moved" $log.txt || { echo "FAIL: the hero did not move in the form"; fail=1; }
+  # w39: the cast that turns a form off is free (nocostinstate, VERIFIED 0x569ee0); the casts that enter a form cost 15
+  grep -qE 'CAST do skill="Wearwolf" .*mana_paid=0.00' $log.txt || { echo "FAIL: leaving the wolf form was not free"; fail=1; }
+  grep -qE 'CAST do skill="Wearbear" .*ok=true .*mana_paid=15.00' $log.txt || { echo "FAIL: the Wearbear cast did not pay its 15 mana"; fail=1; }
   # w37: the form change plays the states.txt on/off sound (druid_morph, VERIFIED STATE_ClientAddState 0x4d68c0 / CLIENT_RemovePlayerState 0x4d69d0)
   [ "$(grep -cE "SOUNDLOG .* kind=state .*handle=druid_morph " $log.txt)" -ge 2 ] || { echo "FAIL: the form change did not play druid_morph (on and off)"; fail=1; }
 }
