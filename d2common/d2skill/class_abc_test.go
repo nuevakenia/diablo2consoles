@@ -276,58 +276,49 @@ func TestBladeFuryStream(t *testing.T) {
 	cf.w.frame = 100
 	mana0 := cf.u.mana
 
-	// SRVST_026 first use: creates state 0xc and returns without a throw and without paying (w23)
+	// SRVST_026 first use creates state 0xc (expiry frame+21, here refreshed to frame+7 by the second action event
+	// of the animation that the port runs at once, U), then the blade is thrown and paid for (w23)
 	st, r := cf.cast("Blade Fury", 30, 0)
-	if !st.OK || !r.OK || len(r.Missiles) != 0 || r.ManaPaid != 0 || cf.u.mana != mana0 {
+	if !st.OK || !r.OK || len(r.Missiles) != 1 || r.Missiles[0].Spec.Name != "bladefragment1" || r.ManaPaid <= 0 ||
+		cf.u.mana != mana0-r.ManaPaid {
 		t.Fatalf("first cast: ok=%v %q missiles=%d paid=%d", r.OK, r.Reason, len(r.Missiles), r.ManaPaid)
 	}
 
-	if !cf.p.bladeFuryActive(cf.u) || cf.p.bfState[cf.u.ID()] != 121 {
+	paid := r.ManaPaid
+
+	if !cf.p.bladeFuryActive(cf.u) || cf.p.bfState[cf.u.ID()] != 107 {
 		t.Fatalf("state 0xc after the first use: %v", cf.p.bfState)
 	}
 
-	// the next use throws (slot 0 is behind the frame) and pays; the state is refreshed to frame+7
-	cf.w.frame = 101
-
-	st, r = cf.cast("Blade Fury", 30, 0)
-	if !st.OK || !r.OK || len(r.Missiles) != 1 || r.Missiles[0].Spec.Name != "bladefragment1" || r.ManaPaid <= 0 {
-		t.Fatalf("second cast: %+v ok=%v %q missiles=%d paid=%d", st, r.OK, r.Reason, len(r.Missiles), r.ManaPaid)
-	}
-
-	if cf.p.bfState[cf.u.ID()] != 108 {
-		t.Errorf("state expiry %d, want 108", cf.p.bfState[cf.u.ID()])
-	}
-
 	// the next blade is blocked for prgcalc1 (par4 = 5) - 1 frames: the repeat is refused and still refreshes the state
-	paid := mana0 - cf.u.mana
-	cf.w.frame = 104
+	cf.w.frame = 103
 
 	if st, _ := cf.cast("Blade Fury", 30, 0); st.OK || st.Reason != ReasonCooldown {
 		t.Errorf("a blade 3 frames later: %+v", st)
 	}
 
-	if cf.p.bfState[cf.u.ID()] != 111 || mana0-cf.u.mana != paid {
+	if cf.p.bfState[cf.u.ID()] != 110 || mana0-cf.u.mana != paid {
 		t.Errorf("refused repeat: expiry %d, mana spent %d (was %d)", cf.p.bfState[cf.u.ID()], mana0-cf.u.mana, paid)
 	}
 
 	// slot == frame passes the start function but the do function needs slot < frame: no blade, no mana
-	cf.w.frame = 105
+	cf.w.frame = 104
 
 	if st, r := cf.cast("Blade Fury", 30, 0); !st.OK || !r.OK || len(r.Missiles) != 0 || mana0-cf.u.mana != paid {
 		t.Errorf("slot == frame: %+v ok=%v missiles=%d", st, r.OK, len(r.Missiles))
 	}
 
-	cf.w.frame = 106
+	cf.w.frame = 105
 
 	if st, r := cf.cast("Blade Fury", 30, 0); !st.OK || !r.OK || len(r.Missiles) != 1 || mana0-cf.u.mana != 2*paid {
 		t.Errorf("a blade 5 frames later: %+v ok=%v", st, r.OK)
 	}
 
-	// after more than 7 idle frames the state is gone: the next use is a first use again (no throw)
-	cf.w.frame = 120
+	// after more than 7 idle frames the state is gone: the next use is a first use again (state recreated)
+	cf.w.frame = 130
 
-	if _, r := cf.cast("Blade Fury", 30, 0); !r.OK || len(r.Missiles) != 0 {
-		t.Errorf("restart after the state expired: missiles=%d", len(r.Missiles))
+	if _, r := cf.cast("Blade Fury", 30, 0); !r.OK || len(r.Missiles) != 1 || cf.p.bfState[cf.u.ID()] != 137 {
+		t.Errorf("restart after the state expired: missiles=%d state %v", len(r.Missiles), cf.p.bfState)
 	}
 }
 

@@ -5,7 +5,11 @@ import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 // Blade Fury upkeep (w23). SRVST_026 0x5d53c0 + SRVDO_048 0x5d5260, VERIFIED in this wave:
 //
 //   - The first use with no state 0xc needs startmana*256 <= mana, creates state 0xc expiring at frame+21, resets
-//     the skill's target-type slot to 0 and returns WITHOUT a throw and without paying.
+//     the skill's target-type slot to 0 and returns WITHOUT a throw and without paying. That is the first action
+//     event of the cast animation; the animation (sequence "SQ") has later action events that run the same start
+//     function with the state present. The engine makes one Do per cast, so the port runs the second event at once
+//     after the first (U: the number and spacing of the action events of the sequence were not read). A single tap
+//     therefore throws one blade and pays for it; a held button repeats casts and follows the gating below.
 //   - Every later use (state present) moves the expiry to frame+7. If the slot is <= frame the do function runs:
 //     it needs prgcalc1-1 > 0, clears unit flag 0x40, needs a target position, and throws one progressive
 //     missile only when slot < frame (strictly); the slot then becomes frame+prgcalc1-1. The start function pays
@@ -50,8 +54,6 @@ func (p *Pipeline) bladeFuryDo(u Unit, sk *Skill, lvl int, tgt Target) DoResult 
 
 		p.bfState[u.ID()] = f + bladeFuryFirstFrames
 		u.SetCooldown(sk.ID, 0)
-
-		return res
 	}
 
 	p.bladeFuryRefresh(u)
