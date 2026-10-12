@@ -385,6 +385,11 @@ func (g *Inventory) checkEquippedSlotsHover() bool {
 		mx, my := g.lastMouseX, g.lastMouseY
 
 		hovering = hovering || ((mx > slot.x) && (mx < slot.x+slot.width) && (my < slot.y) && (my > slot.y-slot.height))
+		if hovering && slot.item == nil {
+			// an empty equipment slot has no tooltip (the mouse over it used to crash the game)
+			break
+		}
+
 		if hovering {
 			if !g.hovering {
 				g.hoverX, g.hoverY = mx, my
