@@ -30,7 +30,7 @@ func skillFromRow(r row) *Skill {
 		Lob: r.num("lob") > 0, Passive: r.num("passive") > 0, Kick: r.num("Kick") > 0, NoAmmo: r.num("noammo") > 0,
 		SrvStFunc: r.num("srvstfunc"), SrvDoFunc: r.num("srvdofunc"),
 		SrvMissile: r["srvmissile"], SrvMissileA: r["srvmissilea"], LineOfSight: r.num("LineOfSight"),
-		MinMana: r.num("minmana"), ManaShift: r.num("manashift"), Mana: r.num("mana"), LvlMana: r.num("lvlmana"),
+		StartMana: r.num("startmana"), MinMana: r.num("minmana"), ManaShift: r.num("manashift"), Mana: r.num("mana"), LvlMana: r.num("lvlmana"),
 		Delay: r.calc("delay"), ToHit: r.num("ToHit"), LevToHit: r.num("LevToHit"), ToHitCalc: r.calc("ToHitCalc"),
 		HitClass: r.num("HitClass"), AuraFilter: r.num("aurafilter"), AuraState: r["aurastate"],
 		AuraTargetState: r["auratargetstate"], AuraLenCalc: r.calc("auralencalc"), AuraRangeCalc: r.calc("aurarangecalc"),

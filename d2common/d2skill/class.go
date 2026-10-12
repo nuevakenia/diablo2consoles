@@ -811,15 +811,31 @@ func doStrafeFn(c *cast) {
 		n = 1
 	}
 
-	if len(foes) == 1 && n > 1 {
-		n = 1
+	// SRVDO_012 (0x5da6c0, VERIFIED wave 24): the first target is the stored unit (the aimed one, else the scan
+	// result with the excluded id 0xffffffff); after each arrow the scan around the archer, the current target
+	// excluded, picks the next one (callback 0x569a40, d2missile.ScanNext: the smallest id above, else the
+	// smallest of all, the current unit itself when it is alone) and the burst goes on at the same unit when
+	// the scan finds nothing. So a lone enemy takes the whole burst (the old port stopped after one arrow).
+	cands := make([]d2missile.Target, 0, len(foes))
+	pos := map[d2missile.Target]Foe{}
+
+	for _, f := range foes {
+		cands = append(cands, f.Target)
+		pos[f.Target] = f
+	}
+
+	cur := c.tgt.Unit
+	if cur == nil {
+		cur = d2missile.ScanNext(cands, nil)
 	}
 
 	for i := 0; i < n; i++ {
 		tg := c.tgt
-		if len(foes) > 0 {
-			f := foes[i%len(foes)]
-			tg.Unit, tg.UX, tg.UY = f.Target, f.X, f.Y
+		if cur != nil {
+			tg.Unit = cur
+			if f, ok := pos[cur]; ok {
+				tg.UX, tg.UY = f.X, f.Y
+			}
 		}
 
 		// SRVDO_012 (0x5da6c0, VERIFIED): the arrow takes calc2 ("damage %", ln12) as its damage percent through the
@@ -832,6 +848,10 @@ func doStrafeFn(c *cast) {
 		cc := *c
 		cc.tgt = tg
 		cc.castM(name, castOpts{pctAdd: c.calc(2)})
+
+		if next := d2missile.ScanNext(cands, cur); next != nil && cur != nil {
+			cur = next
+		}
 	}
 
 	if len(c.res.Missiles) == 0 {
@@ -942,6 +962,15 @@ func doStreamFn(c *cast) {
 	}
 
 	rng := InfernoFlameLife(c.calc(1))
+
+	// the held-button channel (channel.go): one flame per run after the wind-up
+	if IsChannelStart(c.sk) && c.u.IsPlayer() {
+		if c.p.channelDo(c.u) && c.castM(name, castOpts{rangeLife: rng}) == nil {
+			c.fail(ReasonMissile)
+		}
+
+		return
+	}
 
 	for i := 0; i < 6; i++ {
 		if i == 0 || c.p.After == nil {

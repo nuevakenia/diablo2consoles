@@ -71,16 +71,41 @@ func TestGuidedArrowPlan(t *testing.T) {
 }
 
 func TestLightningStrikePlan(t *testing.T) {
-	main := ChainTarget{1, SubPoint{10, 10}}
-	others := []ChainTarget{main, {2, SubPoint{30, 10}}, {3, SubPoint{14, 10}}, {4, SubPoint{12, 12}}}
+	main := ChainTarget{5, SubPoint{10, 10}}
+	others := []ChainTarget{main, {2, SubPoint{30, 10}}, {7, SubPoint{14, 10}}, {6, SubPoint{12, 12}}, {1, SubPoint{9, 10}}}
 
+	// 0x4c28d0: the smallest id ABOVE the struck unit (6), not the nearest
 	s, ok := LightningStrikePlan(main, others, 5, 4, 1)
-	if !ok || s.To != (SubPoint{12, 12}) || s.Data28 != 4 || s.Parent != 1 || s.Kind != 0x20 {
+	if !ok || s.To != (SubPoint{12, 12}) || s.Data28 != 4 || s.Parent != 5 || s.Kind != 0x20 {
 		t.Errorf("%v %+v", ok, s)
 	}
 
-	if _, ok := LightningStrikePlan(main, others[:2], 5, 4, 1); ok {
-		t.Error("nothing within range")
+	// nothing above: the smallest id of all (1)
+	s, ok = LightningStrikePlan(main, []ChainTarget{main, {1, SubPoint{9, 10}}, {3, SubPoint{8, 10}}}, 5, 4, 1)
+	if !ok || s.To != (SubPoint{9, 10}) {
+		t.Errorf("fallback %v %+v", ok, s)
+	}
+
+	// alone (or the others out of range): the bolt is drawn on the struck unit itself
+	s, ok = LightningStrikePlan(main, others[:2], 5, 4, 1)
+	if !ok || s.To != main.Pos {
+		t.Errorf("alone %v %+v", ok, s)
+	}
+}
+
+func TestClientScanNext(t *testing.T) {
+	if _, ok := ClientScanNext(nil, 3); ok {
+		t.Error("empty")
+	}
+
+	got, _ := ClientScanNext([]ChainTarget{{9, SubPoint{}}, {4, SubPoint{}}, {2, SubPoint{}}}, 3)
+	if got.ID != 4 {
+		t.Errorf("above: %d", got.ID)
+	}
+
+	got, _ = ClientScanNext([]ChainTarget{{2, SubPoint{}}, {1, SubPoint{}}, {3, SubPoint{}}}, 3)
+	if got.ID != 1 {
+		t.Errorf("fallback: %d", got.ID)
 	}
 }
 
@@ -89,7 +114,7 @@ func TestStrafeClientPlan(t *testing.T) {
 	others := []ChainTarget{cur, {2, SubPoint{9, 0}}, {3, SubPoint{3, 0}}, {4, SubPoint{40, 0}}}
 
 	s, left, next, ok := StrafeClientPlan(SubPoint{0, 0}, cur, 3, others, 10, 1)
-	if s.To != cur.Pos || left != 2 || !ok || next.ID != 3 {
+	if s.To != cur.Pos || left != 2 || !ok || next.ID != 2 { // the smallest id above 1 in range
 		t.Errorf("%+v %d %+v %v", s, left, next, ok)
 	}
 
@@ -97,8 +122,17 @@ func TestStrafeClientPlan(t *testing.T) {
 		t.Error("last arrow ends the burst")
 	}
 
-	if _, _, _, ok = StrafeClientPlan(SubPoint{}, cur, 3, []ChainTarget{cur}, 10, 1); ok {
-		t.Error("a lone enemy has no next target")
+	// a lone enemy: the scan hands it back, so the burst goes on at it (VERIFIED wave 24)
+	if _, _, next, ok = StrafeClientPlan(SubPoint{}, cur, 3, []ChainTarget{cur}, 10, 1); !ok || next.ID != cur.ID {
+		t.Error("a lone enemy keeps the burst")
+	}
+
+	if shots := StrafeClientBurst(SubPoint{}, cur, 4, []ChainTarget{cur}, 10, 1); len(shots) != 4 {
+		t.Errorf("%d arrows at a lone enemy, want 4", len(shots))
+	}
+
+	if StrafeSlot(1, true) != 1 || StrafeSlot(3, true) != 2 || StrafeSlot(3, false) != 1 {
+		t.Error("weapon class picks the column")
 	}
 }
 

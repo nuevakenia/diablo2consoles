@@ -175,6 +175,37 @@ func (s *Set) Active(frame int, name string) bool { return s.Get(frame, name) !=
 // Remove ends a state at once.
 func (s *Set) Remove(name string) { delete(s.states, name) }
 
+// RemoveAuraStates ends every state whose states.txt row has the aura column set, except the named
+// ones (keep). This is the loop Conversion runs on its target (SRVDO_079 0x5ce8c0: STATS_FindStatListByFlags
+// with flag 8, remove, free, until none is left) and its revert callback (0x5ce710) runs again. VERIFIED
+// wave 24: statlist flag 8 is set by SKILL_CreateTimedStateStatList 0x56c740 when bit 1 of the states.txt
+// row's flag word is set, and DATATBL_LoadStatesTable 0x617c50 loads bit 1 of that word from the column
+// "aura". It returns the names that ended, sorted.
+func (s *Set) RemoveAuraStates(keep ...string) []string {
+	var out []string
+
+next:
+	for n := range s.states {
+		if d, ok := s.defs[n]; !ok || !d.Aura {
+			continue
+		}
+
+		for _, k := range keep {
+			if k == n {
+				continue next
+			}
+		}
+
+		delete(s.states, n)
+
+		out = append(out, n)
+	}
+
+	sort.Strings(out)
+
+	return out
+}
+
 // Names lists the active states, sorted.
 func (s *Set) Names(frame int) []string {
 	var out []string

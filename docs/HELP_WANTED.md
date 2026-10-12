@@ -23,14 +23,17 @@ Recent fixes you can verify by hand: menus scale to the window at any size; a ch
 
 ## Engine fidelity (needs a Ghidra reader)
 
-- Skills with approximate behaviour: 177 of 210 have engine behaviour. Open: Blood Golem, Fire Golem, Armageddon
-  meteors, Conversion flag bits, Holy Bolt healing remote party members (needs a packet), Charged Strike aim and
-  Fend/Zeal hit cadence (8-frame guess), Strafe/Lightning Strike extras on the client.
+- Skills with approximate behaviour: Charged Strike aim and Fend/Zeal hit cadence (8-frame guess) are open. Wave 24 closed
+  Conversion (leader detach and aura-state strip), the Inferno / Arctic Blast held-button channel, the Strafe lone-enemy
+  burst and the client Strafe / Lightning Strike extras. Blood Golem, Fire Golem absorb, Armageddon and the Holy Bolt party
+  packet were already in; the only leftovers there are the Holy Fire pulse timing of the Fire Golem and the host
+  `ChannelAnimSlack` of the Inferno channel (both marked UNVERIFIED in the code).
 - Monster AI: 134 of 148 are ported faithfully. Open: Shadow Master feed, Zealot fear gate, Regurgitator and Siege
   Tower scan filters, FallenShaman scan, Diablo's second output, BatDemon flight boost (no monster regeneration).
 - UI panels: 12 of 14 match the original; move-gold dialog and the NPC menu golden are open; the party panel is
   missing one toggle.
-- The summon caps (MinionSpawner 10, Hydra 9, Overseer/Impregnate, DiabPrison 4) are safety bounds, not exe values.
+- The summon caps: the Hydra bound is the exe pet limit (skills.txt petmax, 99) and EvilHole is bounded by its aip1; DiabPrison
+  (4 per cast) and the Nest / MinionSpawner stand-in bound of 10 stay host choices because the exe has no live count for them.
 - Lava levels 107/108 make about 8x fewer monster groups than the density rolls predict; probably the estimate, not
   verified against the original.
 - Ubers (UberDiablo, UberMephisto) stand still as in the exe in this build; restore the two `register` lines in

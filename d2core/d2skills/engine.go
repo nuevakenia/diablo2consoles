@@ -384,6 +384,12 @@ func (e *Engine) CastAt(p *d2mapentity.Player, skillID, sx, sy int) bool {
 
 	e.lastRefusal = ""
 
+	if d2skill.IsChannelStart(sk) && u.IsPlayer() { // unit state 12 is on from the start of a run to its Do
+		e.setOf(p.ID()).Apply(e.frame, d2state.Instance{Name: whirlRefusedState, Until: e.frame + d2skill.ChannelStartFrames,
+			Source: p.ID(), SkillID: skillID})
+		e.emit("cast", "CHANNEL skill=%q first=%v", sk.Name, st.ChannelFirst)
+	}
+
 	e.Counters.ManaSpent += st.ManaPaid
 	p.SetDirection(p.Position.DirectionTo(*d2vector.NewVector(float64(sx), float64(sy))))
 
@@ -523,6 +529,10 @@ func (e *Engine) runDo(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, tg
 	}
 
 	res := e.pipe.Do(u, sk.ID, tg)
+
+	if d2skill.IsChannelStart(sk) && u.IsPlayer() {
+		e.setOf(p.ID()).Remove(whirlRefusedState)
+	}
 
 	e.emit("cast", "CAST do skill=%q level=%d ok=%v reason=%s missiles=%d melee=%v effects=%d mana_paid=%.2f cooldown=%d mana=%s",
 		sk.Name, res.Level, res.OK, reasonOf(res.Reason), len(res.Missiles), res.Melee != nil, len(res.Effects),

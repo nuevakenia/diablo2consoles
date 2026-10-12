@@ -41,7 +41,7 @@ func TestPlanSummonTable(t *testing.T) {
 			"", nil, false, 0, 0, ""},
 		{"Hydra: three, Param1 lifetime, petmax 99",
 			&d2records.SkillRecord{Srvdofunc: 144, Summon: "hydra1", Pettype: "hydra", Petmax: d2calc.Compile("99", d2calc.KindSkill), Param1: 250},
-			gen, true, "hydra1", [][2]int{{-1, -1}, {0, 0}, {1, -1}}, false, hydraSummonCap, 250, ""},
+			gen, true, "hydra1", [][2]int{{-1, -1}, {0, 0}, {1, -1}}, false, 99, 250, ""}, // the exe pet limit (petmax), wave 24,
 		// VERIFIED (0x5b1100, template 0x73a668): four units around the target
 		{"DiabPrison none pettype", &d2records.SkillRecord{Srvdofunc: 104, Summon: "boneprison1", Pettype: "none"}, gen, true,
 			"boneprison1", [][2]int{{1, 1}, {1, -1}, {-1, -1}, {-1, 1}}, false, prisonSummonCap, 0, ""},
@@ -204,7 +204,7 @@ func TestRealMonsterSummonSlots(t *testing.T) {
 
 			// the host cap: every summoning slot is bounded, and a self-limited AI's own live
 			// limit (any difficulty) never reaches the safety net
-			if p.MaxAlive <= 0 || p.MaxAlive > selfLimitedSummonCap {
+			if p.MaxAlive <= 0 || p.MaxAlive > selfLimitedSummonCap && p.Kind != SummonHydra { // a hydra row keeps its exe petmax (99)
 				t.Errorf("%s/%s: unbounded or oversized cap %d", st.Key, name, p.MaxAlive)
 			}
 

@@ -190,6 +190,13 @@ func castOnce(reg *d2skill.Registry, mt *MissileTable, id, lvl int) (out castOut
 		// Iron Golem needs a usable ground weapon or armor item (SRVST_020, batch 5)
 		GroundItem: &d2skill.GroundItem{ID: "item1", X: 55, Y: 50, Valid: true}}
 
+	// a held-button channel (Inferno, Arctic Blast; d2skill channel.go) makes its flame from the second run on
+	if d2skill.IsChannelStart(reg.ByID(id)) {
+		if first := p.Start(u, id, tg); first.OK {
+			p.Do(u, id, tg)
+		}
+	}
+
 	st := p.Start(u, id, tg)
 	out.StartOK, out.Reason = st.OK, st.Reason
 
