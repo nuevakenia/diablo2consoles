@@ -405,6 +405,8 @@ func (d *Director) Spawn(stat *d2records.MonStatRecord, subX, subY int) (*d2mape
 }
 
 func (d *Director) spawn(stat *d2records.MonStatRecord, subX, subY int, ally *allyState) (*d2mapentity.Monster, error) {
+	d.Prefetch([]*d2records.MonStatRecord{stat}, false) // first sighting of a type: decode its modes off the frame thread
+
 	prof := profileFromRecord(stat, d.opt.Difficulty)
 	applyChaseReach(prof, stat, d.asset.Records.Monster.Stats2)
 	d.nextID++

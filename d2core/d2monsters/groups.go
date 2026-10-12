@@ -312,6 +312,7 @@ func (d *Director) PopulateRoom(room Room, levelID int) ([]*PackResult, error) {
 		}
 
 		types = d2monster.PickLevelTypes(d.packRNG, list, det.NumMonsterTypes, det.MonsterPreferRanged)
+		d.prefetchTypes(types)
 
 		if d.levelTypes == nil {
 			d.levelTypes = map[int][]d2monster.ClassInfo{}
