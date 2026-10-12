@@ -6,8 +6,8 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 
 | | before | after |
 |---|---|---|
-| fully simulated | 64 | 73 |
-| partial | 17 | 17 |
+| fully simulated | 64 | 83 |
+| partial | 17 | 7 |
 | stub | 1 | 0 |
 | missing | 8 | 0 |
 | total | 90 | 90 |
