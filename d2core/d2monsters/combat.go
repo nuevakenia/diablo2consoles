@@ -416,6 +416,14 @@ func (d *Director) HeroStrike(p *d2mapentity.Player, m *d2mapentity.Monster) boo
 		return false
 	}
 
+	// shield block of the monster after the to-hit roll (COMBAT_RollShieldBlock 0x57bfa0, VERIFIED: the roll
+	// takes a step of the DEFENDER's seed; the chance is stat 0x14 gated by COMBAT_GetBlockChance 0x6228d0)
+	if d2combat.RollShieldBlock(u.b.Seed, m.Vitals.Block, false) {
+		d.emit("herohit", "HERO swing target=%s hit=false blocked=true chance=%d roll=%d", m.Label(), chance, roll)
+
+		return false
+	}
+
 	min, max := d.heroDamage(p)
 	dmg := min + int(d.heroRoller().Roll(int32(max-min+1)))
 	crit := false

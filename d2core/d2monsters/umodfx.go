@@ -119,6 +119,10 @@ func (u *fxUnit) Stat(id int) int {
 		return v.Experience
 	case 0x1f:
 		return v.Defense
+	case statHPRegen:
+		if un := u.d.byEntity[u.m.ID()]; un != nil {
+			return un.stats[statHPRegen]
+		}
 	}
 
 	if i, ok := fxResistStats[id]; ok {
@@ -144,6 +148,14 @@ func (u *fxUnit) SetStat(id, val int) {
 		v.Experience = maxInt(val, 0)
 	case 0x1f:
 		v.Defense = val
+	case statHPRegen:
+		if un := u.d.byEntity[u.m.ID()]; un != nil {
+			if un.stats == nil {
+				un.stats = map[int]int{}
+			}
+
+			un.stats[statHPRegen] = val
+		}
 	default:
 		if i, ok := fxResistStats[id]; ok {
 			u.extra[id] = val - u.base[i]
