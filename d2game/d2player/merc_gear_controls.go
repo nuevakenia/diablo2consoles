@@ -1,6 +1,7 @@
 package d2player
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2display"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2equip"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2statlist"
@@ -261,11 +262,24 @@ func (g *GameControls) renderMercPortrait(target d2interface.Surface) {
 		return
 	}
 
+	// the exe draws it in screen coordinates (the strip starts at the left edge of the screen), not in the interface column
+	ox, oy := d2display.ColumnOrigin()
+
+	target.PushTranslation(-ox, -oy)
 	g.mercPortrait.Render(target, v)
 
-	if MercPortraitHit(g.lastMouseX, g.lastMouseY) {
-		g.mercPortrait.RenderTooltip(target, g.mercPortraitTooltip(), g.lastMouseX, g.lastMouseY)
+	if sx, sy := g.lastMouseX+ox, g.lastMouseY+oy; MercPortraitHit(sx, sy) {
+		g.mercPortrait.RenderTooltip(target, g.mercPortraitTooltip(), sx, sy)
 	}
+
+	target.Pop()
+}
+
+// portraitPoint is a point of the portrait picture in interface-column coordinates (what the mouse handlers receive).
+func portraitPoint() (x, y int) {
+	ox, oy := d2display.ColumnOrigin()
+
+	return mercPortraitX + 5 - ox, mercPortraitBarTop + 10 - oy
 }
 
 func (g *GameControls) mercPortraitTooltip() []string {
@@ -287,7 +301,9 @@ func (g *GameControls) portraitShown() (MercView, bool) {
 // heals it, gear is equipped: GiveCursorToMerc), the right button opens the merc's inventory ("Right-click to Open
 // Inventory", "Drop Potion on Portrait to Heal": strings hireiconinfo2 / hireiconinfo1).
 func (g *GameControls) mercPortraitClick(left bool, mx, my int) bool {
-	if !MercPortraitHit(mx, my) {
+	ox, oy := d2display.ColumnOrigin()
+
+	if !MercPortraitHit(mx+ox, my+oy) {
 		return false
 	}
 

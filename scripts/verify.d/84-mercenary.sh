@@ -8,7 +8,7 @@ scenario_env() {
   # merc hurt, kills it there, goes back to the encampment by portal (the dead merc stays behind) and revives it
   # W37_SHOT=<file.png> (optional, by hand) saves a frame of the interface while the portrait shows the hurt merc
   if [ -n "${W37_SHOT:-}" ]; then echo "export OD2_AUTOSHOT=$W37_SHOT OD2_AUTOSHOT_DELAY=${W37_SHOT_DELAY:-14}"; fi
-  echo "export OD2_AUTOMERC_UI=1OD2_AUTOMERC=skeleton1,4 OD2_AUTOMERC_KILL=1 OD2_AUTOMERC_TYPES=0,6,16,24 OD2_AUTOMERC_MERCLEVEL=85 OD2_AUTOMERC_LEVELS=1 OD2_REALMAPS=1 OD2_D2S_WRITEBACK=\"$wb\""
+  echo "export OD2_AUTOMERC_UI=1 OD2_AUTOMERC=skeleton1,4 OD2_AUTOMERC_KILL=1 OD2_AUTOMERC_TYPES=0,6,16,24 OD2_AUTOMERC_MERCLEVEL=85 OD2_AUTOMERC_LEVELS=1 OD2_REALMAPS=1 OD2_D2S_WRITEBACK=\"$wb\""
 }
 scenario_check() {
   grep -E "AUTOMERC (summary|types|levels)|MERC (spawn|hire|death|revive|leaves|arrive|stays)|D2S EXPORT reparse" $log.txt | cut -c1-300

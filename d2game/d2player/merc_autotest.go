@@ -10,6 +10,8 @@ func (g *GameControls) AutoMercUI(log func(format string, a ...interface{})) {
 		return
 	}
 
+	px, py := portraitPoint()
+
 	log("MERC ui portrait shown tooltip=%q", g.mercPortraitTooltip())
 
 	// items made in the game cannot be written to the save yet (exportMercItems): the probe leaves the gear as it was
@@ -23,19 +25,19 @@ func (g *GameControls) AutoMercUI(log func(format string, a ...interface{})) {
 	// a potion dropped on the portrait is used up and heals the merc (the caller logs the life before and after)
 	if p := g.newItem("hp5"); p != nil {
 		g.inventory.SetCursorItem(p)
-		hit := g.mercPortraitClick(true, mercPortraitX+5, mercPortraitBarTop+10)
+		hit := g.mercPortraitClick(true, px, py)
 		log("MERC ui potion drop handled=%v cursor_empty=%v", hit, g.inventory.CursorItem() == nil)
 	}
 
 	// right click opens the merc's screen, a second one closes it
-	g.mercPortraitClick(false, mercPortraitX+5, mercPortraitBarTop+10)
+	g.mercPortraitClick(false, px, py)
 	log("MERC ui right click merc_screen_open=%v", g.mercPanel.IsOpen())
 
 	// gear dropped on the portrait is worn (a cap), taken off by the screen's slot and put back
 	if cap := g.newItem("cap"); cap != nil {
 		g.inventory.SetCursorItem(cap)
 		g.mercPanel.Close()
-		g.mercPortraitClick(true, mercPortraitX+5, mercPortraitBarTop+10)
+		g.mercPortraitClick(true, px, py)
 		log("MERC ui gear gear=%s cursor_empty=%v", g.hero.Merc.MercItemsSummary(), g.inventory.CursorItem() == nil)
 	}
 
@@ -48,7 +50,7 @@ func (g *GameControls) AutoMercUI(log func(format string, a ...interface{})) {
 		}
 
 		g.inventory.SetCursorItem(heavy)
-		g.mercPortraitClick(true, mercPortraitX+5, mercPortraitBarTop+10)
+		g.mercPortraitClick(true, px, py)
 		log("MERC ui shield item=%s on_cursor=%v", code, g.inventory.CursorItem() != nil)
 		g.inventory.SetCursorItem(nil)
 	}

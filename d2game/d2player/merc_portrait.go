@@ -101,7 +101,7 @@ func (p *MercPortrait) icon(name string) *d2ui.Sprite {
 		return s
 	}
 
-	s, err := p.ui.NewSprite(mercPortraitDir+name+".DC6", d2resource.PaletteStatic)
+	s, err := p.ui.NewSprite(mercPortraitDir+name+".DC6", d2resource.PaletteSky)
 	if err != nil {
 		s = nil
 	}
