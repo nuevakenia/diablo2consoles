@@ -53,7 +53,7 @@ type Profile struct {
 	NoWalk bool
 	Walk   int // Velocity
 	// ChaseReach is the stop distance the CorruptLancer passes to "run to target
-	// within" (monstats2 byte +0xe, UNVERIFIED meaning); 0 when unknown.
+	// within" (monstats2 byte +0xe = MeleeRng, VERIFIED w23); 0 when unknown.
 	ChaseReach int
 	Run        int // Run velocity
 	// Level and combat numbers are read by the engine, not by the AI.

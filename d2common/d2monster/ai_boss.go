@@ -21,11 +21,18 @@ func thinkPantherJavelin(c *Ctx) {
 		d = c.Dist
 	}
 
-	if d < 8 && b.Chance(b.AIP(4)) && c.WalkAway(pt, 16) {
+	// The exe ends the tick after each of the next two requests whether or not
+	// the request was accepted (w23 decompile of 0x5dfed0: the return values of
+	// WalkAwayFromTarget and WalkNearTargetRandom are not tested).
+	if d < 8 && b.Chance(b.AIP(4)) {
+		c.WalkAway(pt, 16)
+
 		return
 	}
 
-	if d > b.AIP(6)-6 && b.Chance(b.AIP(1)) && c.WalkNearTarget(&pt, 4) {
+	if d > b.AIP(6)-6 && b.Chance(b.AIP(1)) {
+		c.WalkNearTarget(&pt, 4)
+
 		return
 	}
 
@@ -42,7 +49,9 @@ func thinkPantherJavelin(c *Ctx) {
 	// Regroup with the nearest ally of the same class when it is farther than
 	// aip3 (the notes compare squared distances).
 	if f, isF := c.W.(AllyFinder); isF {
-		if ally, ad, found := f.NearestAlly(b); found && ad > b.AIP(3) && c.WalkTo(ally, meleeReach) {
+		if ally, ad, found := f.NearestAlly(b); found && ad > b.AIP(3) {
+			c.WalkTo(ally, meleeReach)
+
 			return
 		}
 	}

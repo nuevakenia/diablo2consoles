@@ -129,7 +129,7 @@ func TestFaithfulAActions(t *testing.T) {
 			}},
 		{name: "clawviper-ex A1 on cooldown stalls", ai: "ClawViperEx", aip: []int{0, 0, 0, 100, 6, 0, 10, 8}, dist: 6, wake: 7,
 			pre: func(b *Brain, w *faWorld) { w.frame = 1; b.Scratch[1] = 50 }},
-		{name: "corrupt lancer charges", ai: "CorruptLancer", aip: []int{0, 0, 0, 0, 10}, dist: 12, log: "run-target/0",
+		{name: "corrupt lancer charges", ai: "CorruptLancer", aip: []int{0, 0, 0, 0, 10}, dist: 12, log: "run-target/1",
 			check: func(t *testing.T, b *Brain, _ *faWorld) {
 				if b.Scratch[0] != 1 {
 					t.Errorf("charging = %d", b.Scratch[0])

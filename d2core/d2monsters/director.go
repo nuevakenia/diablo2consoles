@@ -374,6 +374,7 @@ func (d *Director) Spawn(stat *d2records.MonStatRecord, subX, subY int) (*d2mape
 
 func (d *Director) spawn(stat *d2records.MonStatRecord, subX, subY int, ally *allyState) (*d2mapentity.Monster, error) {
 	prof := profileFromRecord(stat, d.opt.Difficulty)
+	applyChaseReach(prof, stat, d.asset.Records.Monster.Stats2)
 	d.nextID++
 
 	b := d2monster.NewBrain(d.nextID, stat.ID, d.opt.Difficulty, prof, d.opt.Seed)
