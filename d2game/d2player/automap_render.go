@@ -1,11 +1,11 @@
 package d2player
 
 import (
-	"fmt"
 	"image/color"
 	"sort"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2automap"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
@@ -355,9 +355,13 @@ func (a *Automap) textLines() []string {
 	if a.diffFn != nil {
 		if id := d2automap.DifficultyStringID(a.diffFn()); id != 0 {
 			lines = append(lines, d2automap.DifficultyLine(a.asset.TranslateString("automapdif"),
-				a.asset.TranslateString(fmt.Sprintf("#%d", id))))
+				a.asset.TranslateString(difficultyLabels[id])))
 		}
 	}
 
 	return lines
 }
+
+// difficultyLabels maps the string ids of the difficulty line (0x1423 Nightmare, 0x1422 Hell) to the label numbers
+// of the same names in the string table (the same strings the difficulty screen shows).
+var difficultyLabels = map[int]int{0x1423: d2enum.NightmareLabel, 0x1422: d2enum.HellLabel}
