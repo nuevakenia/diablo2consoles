@@ -2,6 +2,7 @@ package d2gamescreen
 
 import (
 	"errors"
+	"sort"
 	"strconv"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
@@ -118,7 +119,7 @@ func (v *Game) riteStart() {
 		f.Wake()
 		v.rite.slotUsed[st.slot] = true
 		v.rite.ancients = append(v.rite.ancients, m)
-		v.Infof("RITE Ancient slot %d wakes at its statue (%s, class %d)", st.slot, m.Label(), stat.ID)
+		v.Infof("RITE Ancient %d wakes at its statue (%s, class %d)", f.Spawned, m.Label(), stat.ID)
 	}
 
 	v.monsters.RiteSetPortals(f.Portals)
@@ -159,6 +160,8 @@ func (v *Game) riteStatues() []riteStatue {
 			out = append(out, riteStatue{int(hx * subtilesInTile), int(hy * subtilesInTile), slot})
 		}
 	}
+
+	sort.SliceStable(out, func(i, j int) bool { return out[i].slot < out[j].slot })
 
 	return out
 }
