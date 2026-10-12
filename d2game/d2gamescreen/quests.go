@@ -142,6 +142,7 @@ func (v *Game) quests() *questRuntime {
 		diff, r.g.Hero.Class, r.g.Hero.Level)
 	v.Infof("HERO state at start: level=%d exp=%d skillpoints=%d statpoints=%d gold=%d", p.Stats.Level, p.Stats.Experience,
 		p.Stats.SkillPoints, p.Stats.StatsPoints, p.Gold)
+	v.gameControls.AutoBuild() // OD2_AUTOBUILD: points a save carried over
 
 	for _, l := range r.g.Log() {
 		v.Infof("QUEST LOG act=%d quest=%d status=%d page=%d", l.Act, l.Index, l.Status, l.Page)
@@ -356,6 +357,11 @@ func (v *Game) onMonsterKilled(ev d2monsters.KillEvent) {
 
 // questObjectOperated is a quest object (cairn stone, Malus chest...) used by the hero.
 func (v *Game) questObjectOperated(ob *d2mapentity.Object) {
+	// the altar and the gate of the Arreat Summit (a click or a walk to them ends here since wave 43)
+	if v.riteOperate(ob) {
+		return
+	}
+
 	if id := ob.Record().Index; isSealObject(id) {
 		v.chaosOperate(ob)
 
@@ -386,6 +392,12 @@ func (v *Game) questObjectOperated(ob *d2mapentity.Object) {
 
 	v.Infof("QUEST object operated id=%d name=%q", id, ob.Label())
 	v.syncQuestItems()
+
+	// Horazon's Journal opens the portal to the Canyon of the Magi (the Canyon has no road from the Arcane
+	// Sanctuary: wave 43 found the Seven Tombs unreachable on foot, the scenarios had used spawnportal)
+	if id == d2quest.ObjectHorazonJournal && v.currentLevel() == d2quest.LevelArcane {
+		v.questPortal(d2quest.Effect{Kind: d2quest.EffectPortal, Value: d2quest.LevelCanyon, Note: "Horazon's Journal opens the portal to the Canyon of the Magi"})
+	}
 
 	if id == d2quest.ObjectOrifice && d2mapgen.RealMapsEnabled() {
 		// the maze generator puts the orifice only into the tomb the game seed draws (d2drlg.RealTomb)

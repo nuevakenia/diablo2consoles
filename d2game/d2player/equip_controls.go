@@ -114,6 +114,18 @@ func (g *GameControls) loadEquipment() {
 	g.Infof("equipment loaded: worn=%d active_arms=%d", loaded, c.ActiveArms)
 }
 
+// installRecalc gives the live copy of the hero stats a Recalc that works. The closure the factory stores in
+// HeroStatsState.Recalc is not serialised, so the copy the client plays with had none until the first equipment
+// change: level-ups, the attribute + buttons and OD2_AUTOBUILD left the maximum life and mana where they were until the
+// game was saved and loaded again (wave 43, found with a fresh Sorceress: Vitality 10 -> 25, life stayed 40).
+func (g *GameControls) installRecalc() {
+	if g.hero == nil || g.hero.Stats == nil || g.heroState == nil {
+		return
+	}
+
+	g.hero.Stats.Recalc = func() { g.recalcWorn() }
+}
+
 // wornEquipItems returns the worn items as equip rule items by logical location.
 func (g *GameControls) wornEquipItems(skip d2equip.Loc, bases d2equip.Bases) map[d2equip.Loc]*d2equip.Item {
 	out := map[d2equip.Loc]*d2equip.Item{}
@@ -366,6 +378,7 @@ func (g *GameControls) recalcWorn() string {
 	g.hero.Containers = c
 
 	status := g.heroState.RecalcWorn(g.hero.Stats, g.hero.Class, c)
+	g.installRecalc() // RecalcWorn stored a closure over a throw-away state
 	g.equipStatus = map[d2equip.Loc]d2hero.EquipStatus{}
 
 	for _, s := range status {

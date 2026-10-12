@@ -1,6 +1,55 @@
 package d2gamescreen
 
-import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2herostats"
+import (
+	"errors"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2herostats"
+)
+
+// commandCubeTake is "cubetake": everything in the Horadric Cube goes back into the inventory (the Horadric Staff has to be
+// carried to Tal Rasha's orifice, not left in the cube).
+func (v *Game) commandCubeTake(_ []string) error {
+	if v.gameControls == nil {
+		return errors.New("not in a game")
+	}
+
+	v.Infof("CUBE took %d item(s) out of the cube", v.gameControls.CubeTakeAll())
+	v.syncQuestItems()
+
+	return nil
+}
+
+// commandDumpJunk is "dumpjunk": drops the loot that is not a quest item, potion, scroll or key (the pack is full).
+func (v *Game) commandDumpJunk(_ []string) error {
+	if v.gameControls == nil {
+		return errors.New("not in a game")
+	}
+
+	keep := append([]string{}, questItemCodes...)
+	keep = append(keep, "box", "msf", "vip", "leg", "hdm", "hfh", "hst")
+
+	v.Infof("DUMPJUNK removed %d item(s)", v.gameControls.DumpJunk(keep))
+
+	// a loot walk that ends on the time limit leaves the item it was carrying on the cursor, and an NPC click with an item
+	// on the cursor is a reward drop: put it away
+	if v.gameControls.PutCursorItemAway() {
+		v.Infof("CURSOR item put away")
+	}
+
+	return nil
+}
+
+// commandAutoBuild is "autobuild": spends the unspent points by the OD2_AUTOBUILD plan (a quest reward skill point
+// does not come with a level-up).
+func (v *Game) commandAutoBuild(_ []string) error {
+	if v.gameControls == nil {
+		return errors.New("not in a game")
+	}
+
+	v.gameControls.AutoBuild()
+
+	return nil
+}
 
 // The hero's level follows his experience: the monster kills only add
 // experience points (d2monsters), the level-up itself (the new level, one skill
@@ -38,6 +87,7 @@ func (v *Game) advanceHeroLevel() {
 	}
 
 	v.gameControls.GrantLevels(gained)
+	v.gameControls.AutoBuild() // OD2_AUTOBUILD: a script's plan for the new points (no effect when unset)
 
 	if st.Recalc != nil {
 		st.Recalc() // life and mana maxima follow the level
