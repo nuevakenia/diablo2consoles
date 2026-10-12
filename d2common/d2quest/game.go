@@ -196,6 +196,9 @@ type Game struct {
 	LegacyBossBits bool
 	// Level is the id of the level the hero is in.
 	Level int
+	// RealTomb is the level id (66..72) of Tal Rasha's real tomb for the game seed (d2drlg.RealTomb); the orifice
+	// only takes the staff there. 0 = unknown, any tomb counts.
+	RealTomb int
 	// Items counts the quest items the hero carries by item code.
 	Items map[string]int
 	// Trace, if set, receives every state change as a line.

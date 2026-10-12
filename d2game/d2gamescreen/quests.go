@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2act3"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2drlg"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2hireling"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
@@ -379,6 +380,12 @@ func (v *Game) questObjectOperated(ob *d2mapentity.Object) {
 
 	v.Infof("QUEST object operated id=%d name=%q", id, ob.Label())
 	v.syncQuestItems()
+
+	if id == d2quest.ObjectOrifice && d2mapgen.RealMapsEnabled() {
+		// the maze generator puts the orifice only into the tomb the game seed draws (d2drlg.RealTomb)
+		v.questRT.g.RealTomb = d2drlg.RealTomb(d2mapgen.HeroMapSeed)
+	}
+
 	v.questDispatch(d2quest.Event{Kind: d2quest.EvObjectOperated, Object: id, Level: v.quests().area, Wielded: v.wieldedCode()})
 }
 
