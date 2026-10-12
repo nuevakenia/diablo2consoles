@@ -63,7 +63,7 @@ func (r Record) Eligible(heroClass int, q QuestFlag) bool {
 	return (q != nil && q(r.Quest, 0)) == r.Want
 }
 
-// gossipTries is the number of rolls before the picker gives up (iVar6 counts 10 down).
+// gossipTries is the number of rolls before the picker gives up (a countdown from 10).
 const gossipTries = 10
 
 // gossipFallback is the index chosen when no roll fits (*(entry+0xd) = 2).

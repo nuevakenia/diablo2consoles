@@ -294,7 +294,7 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 			[]string{"act", "quest"}, v.commandQuestPending},
 		{"pickitem", "takes the first inventory item with this base code (or any) onto the cursor",
 			[]string{"code|any"}, v.commandPickItem},
-		{"giveitemq", "puts a new item of a quality (1 low .. 4 magic, 6 rare) into the inventory",
+		{"giveitemq", "puts a new item of a quality (1 low .. 4 magic, 6 rare; negative = unidentified) into the inventory",
 			[]string{"code", "quality"}, v.commandGiveItemQ},
 		{"freeinv", "removes up to n items from the inventory to make room (debug)", []string{"n"}, v.commandFreeInv},
 		{"wield", "puts the first inventory or cube item with this base code into the weapon hand (scripts)",
