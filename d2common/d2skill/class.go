@@ -1604,6 +1604,12 @@ func doSummonFn(c *cast) {
 		o.AuraSkill, o.AuraLevel = c.minionAura()
 	}
 
+	// The Skeletal Mage's monster skill (sumskill1) gets the level sumsk1calc (SKILL_SpawnSummonedMinion 0x5c22c0,
+	// VERIFIED); the shots take their damage from the missile record at that level.
+	if sk.SrvDoFunc == 31 && sk.SumSkill[1] != "" && sk.SumSkCalc[1] != nil {
+		o.TrapLevel = c.env.eval(sk.SumSkCalc[1]) // <= 0: the exe adds no skill, the mage then only melees
+	}
+
 	if sk.SrvDoFunc == 56 && sk.Name == "BloodGolem" {
 		o.OwnerDamagePct, o.HealSharePct = sk.Params[5], sk.Params[6]
 	}
