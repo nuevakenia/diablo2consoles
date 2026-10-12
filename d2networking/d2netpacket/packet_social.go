@@ -95,6 +95,8 @@ type PvPHitPacket struct {
 	// Rate is the DamageRate of the missile that hit (0x579ef0): the defender scales its flat damage reductions by
 	// Rate / 1024 when it is above 0. Wave 31.
 	Rate int `json:"rate,omitempty"`
+	// Blockable: a missile's direct hit with physical damage; only such a skill hit rolls the defender's shield block.
+	Blockable bool `json:"blockable,omitempty"`
 	// Kill reverses the direction: the defender's client tells the killer
 	// (Target) that the sender (Attacker, the victim) died of its hit. Level
 	// and Class describe the victim; Hardcore says whether it was a hardcore
@@ -123,6 +125,20 @@ type PartyXPPacket struct {
 	HasMonsterPos bool   `json:"hasMonsterPos,omitempty"`
 	Player        string `json:"player,omitempty"`
 	Amount        int    `json:"amount,omitempty"`
+}
+
+// PartyGoldPacket carries a gold pickup. The picker's client sends it with
+// Amount set (the whole pile); the server shares it (d2party.Roster.ShareGold,
+// 0x53e640) and sends each member (Player) its Add. The picker's reply also has
+// Overflow, the part that fits nowhere, which the picker spills on the ground.
+type PartyGoldPacket struct {
+	Picker string `json:"picker"`
+	Amount int    `json:"amount"`
+	// PlayerDropped: the pile was dropped by a hero, it goes to the picker alone.
+	PlayerDropped bool   `json:"playerDropped,omitempty"`
+	Player        string `json:"player,omitempty"`
+	Add           int    `json:"add,omitempty"`
+	Overflow      int    `json:"overflow,omitempty"`
 }
 
 // PortalOpenPacket is a client telling the server it opened its town portal
@@ -263,6 +279,18 @@ func UnmarshalPvPHit(b []byte) (p PvPHitPacket, err error) {
 
 // UnmarshalPartyXP decodes a PartyXP packet's data.
 func UnmarshalPartyXP(b []byte) (p PartyXPPacket, err error) {
+	err = json.Unmarshal(b, &p)
+
+	return
+}
+
+// CreatePartyGoldPacket builds a PartyGold packet.
+func CreatePartyGoldPacket(p PartyGoldPacket) (NetPacket, error) {
+	return social(d2netpackettype.PartyGold, p)
+}
+
+// UnmarshalPartyGold decodes a PartyGold packet's data.
+func UnmarshalPartyGold(b []byte) (p PartyGoldPacket, err error) {
 	err = json.Unmarshal(b, &p)
 
 	return

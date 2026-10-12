@@ -177,3 +177,16 @@ func (g *GameClient) RosterLines() []string {
 func (g *GameClient) RosterPanelSummary() string {
 	return "ROSTER PANEL " + strings.Join(g.RosterLines(), " | ")
 }
+
+func (g *GameClient) handlePartyGoldPacket(packet d2netpacket.NetPacket) error {
+	p, err := d2netpacket.UnmarshalPartyGold(packet.PacketData)
+	if err != nil {
+		return err
+	}
+
+	if g.OnPartyGold != nil {
+		g.OnPartyGold(p)
+	}
+
+	return nil
+}

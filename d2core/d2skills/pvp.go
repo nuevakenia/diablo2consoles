@@ -29,6 +29,11 @@ type PvPHit struct {
 	// Rate is the DamageRate of the missile that hit (0 for a hit without a missile): the defender scales its
 	// flat damage reductions by Rate / 1024 (0x579ef0, wave 31).
 	Rate int
+	// Blockable: the hit is the direct hit of a missile that carries physical damage, the only PvP skill hit that
+	// goes through the shield block roll (MISSILE_BuildHitFlagsAndRollBlock 0x5ab220 rolls it only for physical
+	// damage, w28 VERIFIED for the missile sim). Area and splash damage (Meteor, Blizzard, explosions) never roll
+	// a block. The defender rolls it on its own generator.
+	Blockable bool
 }
 
 // playerTarget adapts a rival hero to d2missile.Target.
@@ -117,6 +122,16 @@ func (e *Engine) hurtPlayer(dst, src *d2mapentity.Player, d *d2combat.Damage, wh
 
 // hurtPlayerRate is hurtPlayer for a hit of a missile with the given DamageRate.
 func (e *Engine) hurtPlayerRate(dst, src *d2mapentity.Player, d *d2combat.Damage, what string, rate int) {
+	e.hurtPlayerFull(dst, src, d, what, rate, false)
+}
+
+// hurtPlayerMissile is hurtPlayerRate for the direct hit of a missile: the defender may block it when it holds
+// physical damage.
+func (e *Engine) hurtPlayerMissile(dst, src *d2mapentity.Player, d *d2combat.Damage, what string, rate int) {
+	e.hurtPlayerFull(dst, src, d, what, rate, d.Physical > 0)
+}
+
+func (e *Engine) hurtPlayerFull(dst, src *d2mapentity.Player, d *d2combat.Damage, what string, rate int, blockable bool) {
 	if src == nil || dst == nil {
 		return
 	}
@@ -153,7 +168,7 @@ func (e *Engine) hurtPlayerRate(dst, src *d2mapentity.Player, d *d2combat.Damage
 	}
 
 	if e.OnPvPHit != nil {
-		e.OnPvPHit(PvPHit{Source: src, Target: dst, Skill: what, Raw: raw.Total(), Parts: scaled, Rate: rate})
+		e.OnPvPHit(PvPHit{Source: src, Target: dst, Skill: what, Raw: raw.Total(), Parts: scaled, Rate: rate, Blockable: blockable})
 	}
 }
 
