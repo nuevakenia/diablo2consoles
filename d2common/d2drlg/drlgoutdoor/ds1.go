@@ -24,6 +24,8 @@ type Pattern struct {
 	Act     int
 	Version int
 	Objects []Object
+	// Path is the file name the pattern was loaded under (Env.Pattern).
+	Path string
 }
 
 // Object is one DS1 object record: Type 1 monster, 2 object.

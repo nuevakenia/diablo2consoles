@@ -294,6 +294,27 @@ func (m *MapEngine) PlaceStampClippedWhere(stamp *d2mapstamp.Stamp, tileOffsetX,
 	}
 }
 
+// AddStampObjects makes the entities of the DS1 objects of a stamp that keep accepts (monsters are not made) and
+// puts them on the map, moved by tileOffsetX/Y tiles; objects that land outside the map are dropped. The outdoor
+// generator uses it for the objects of sub-theme groups (waypoint, shrines, stones), whose DS1 is not a room preset.
+func (m *MapEngine) AddStampObjects(stamp *d2mapstamp.Stamp, tileOffsetX, tileOffsetY int, keep func(idx int) bool) int {
+	n := 0
+
+	for _, e := range stamp.EntitiesWhere(tileOffsetX, tileOffsetY, keep, false) {
+		pos := e.GetPosition()
+		tx, ty := int(pos.X())/subtilesPerTile, int(pos.Y())/subtilesPerTile
+
+		if pos.X() < 0 || pos.Y() < 0 || tx >= m.size.Width || ty >= m.size.Height {
+			continue
+		}
+
+		m.entities[e.ID()] = e
+		n++
+	}
+
+	return n
+}
+
 // SetTile puts one tile that a level generator built itself (not copied from a
 // DS1 stamp) on the map and resolves its graphics and sub-tile flags. Tiles
 // outside the map are ignored.

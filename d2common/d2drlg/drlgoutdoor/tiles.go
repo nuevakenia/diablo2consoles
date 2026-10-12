@@ -53,6 +53,8 @@ type RoomTiles struct {
 	Walls, Floors, Shadows []*TileRecord
 	// Logic is the room's logic region list (logic.go), newest node first.
 	Logic []LogicRegion
+	// Subs are the sub-theme groups stamped into a plain room (their DS1 objects are units of the room).
+	Subs []SubStamp
 	// Seed is the room seed after the whole build (later builds of
 	// neighbouring rooms can still advance it).
 	Seed d2rand.Seed
@@ -784,6 +786,7 @@ func (l *Level) buildTiles(plainOnly bool) (res []*RoomTiles, err error) {
 				}
 
 				rt.Seed = g.Seed
+				rt.Subs = g.Subs
 				tb.rs = &rt.Seed
 				tb.buildCells(g)
 			} else {

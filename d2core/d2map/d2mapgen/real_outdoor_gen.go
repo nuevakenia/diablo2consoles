@@ -403,6 +403,8 @@ func (g *MapGenerator) applyExactTiles(tiles []*drlgoutdoor.RoomTiles, rect drlg
 
 	plain, presets := 0, 0
 
+	g.placeSubObjects(tiles, rect, region)
+
 	for _, rt := range tiles {
 		if rt == nil {
 			continue
@@ -727,3 +729,34 @@ func (g *MapGenerator) markWarpTiles(stamp *d2mapstamp.Stamp, path string, ox, o
 
 // startMarkerStyle is the style of the player start special tile (not an exit).
 const startMarkerStyle = 30
+
+// placeSubObjects creates the DS1 objects of the sub-theme groups stamped into the plain rooms: the waypoint
+// (with the objects that flank it), the shrines, the stones and the wild objects of the outdoor levels
+// (DRLG_AddSubThemeGroupObjects 0x6726b0). Before wave 41 these were dropped: no outdoor level had a waypoint.
+func (g *MapGenerator) placeSubObjects(tiles []*drlgoutdoor.RoomTiles, rect drlgoutdoor.Rect, region d2enum.RegionIdType) {
+	made := 0
+
+	for _, rt := range tiles {
+		if rt == nil {
+			continue
+		}
+
+		for _, sub := range rt.Subs {
+			stamp := g.engine.LoadStampPath(region, 0, sub.File)
+			if stamp == nil {
+				continue
+			}
+
+			keep := map[int]bool{}
+			for _, i := range sub.Objects {
+				keep[i] = true
+			}
+
+			made += g.engine.AddStampObjects(stamp, sub.OffX-rect.X, sub.OffY-rect.Y, func(idx int) bool { return keep[idx] })
+		}
+	}
+
+	if made > 0 {
+		g.Infof("real outdoor: %d sub-theme objects (waypoint, shrines, stones, wild objects)", made)
+	}
+}
