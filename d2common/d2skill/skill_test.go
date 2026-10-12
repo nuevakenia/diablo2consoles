@@ -57,7 +57,7 @@ func skillFromRow(r row) *Skill {
 		s.SrvPrgFunc[i] = r.num("srvprgfunc" + strconv.Itoa(i))
 	}
 
-	s.PrgStack, s.Progressive = r.num("prgstack") > 0, r.num("progressive") > 0
+	s.PrgStack, s.Progressive, s.PrgDam = r.num("prgstack") > 0, r.num("progressive") > 0, r.num("prgdam")
 
 	for i := 1; i <= 6; i++ {
 		s.AuraStat[i] = r["aurastat"+strconv.Itoa(i)]

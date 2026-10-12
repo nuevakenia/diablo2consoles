@@ -160,6 +160,7 @@ func (s *SkillRecord) PipelineSkill() *d2skill.Skill {
 		TargetCorpse: s.TargetCorpse, Periodic: s.Periodic, PerDelay: s.Perdelay, Range: s.Range,
 	}
 
+	sk.PrgDam = s.Prgdam
 	sk.PrgStack, sk.SrvPrgFunc = s.Prgstack, [4]int{0, s.Srvprgfunc1, s.Srvprgfunc2, s.Srvprgfunc3}
 	sk.HitShift, sk.SrcDam = s.HitShift, s.SrcDam
 	sk.MinDam, sk.MaxDam = s.MinDam, s.MaxDam

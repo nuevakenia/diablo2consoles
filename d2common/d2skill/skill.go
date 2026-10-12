@@ -74,7 +74,9 @@ type Skill struct {
 	PrgCalc [4]*d2calc.Program
 	// PrgStack is skills.txt prgstack (dwBits4 & 0x80) and SrvPrgFunc srvprgfunc1..3 (1-based): the functions a
 	// finisher runs for the charge level held (chargerelease.go).
-	PrgStack   bool
+	PrgStack bool
+	// PrgDam is skills.txt prgdam: how a charge state of this builder changes a finisher's damage (chargedamage.go).
+	PrgDam     int
 	SrvPrgFunc [4]int
 
 	DamageSpec

@@ -378,6 +378,18 @@ func TestBladeShield(t *testing.T) {
 	if st.State != "bladeshield" || st.Frames != 750 || sh.Frames != 750 || sh.Radius != 6 || sh.Interval != 25 || sh.Desc == nil {
 		t.Errorf("state %+v shield %+v", st, sh)
 	}
+
+	// w23 (0x5d6750): result flags bit 0 clear means every unit is rolled against before it is hurt
+	if !sh.RollToHit {
+		t.Error("blade shield ticks must roll to hit when result flags bit 0 is clear")
+	}
+
+	cf.reg.ByName("Blade Shield").ResultFlags = 1
+	cf.u.cooldowns = map[int]int{}
+
+	if _, r = cf.cast("Blade Shield", 5, 5); effectOf(t, r, "shield").RollToHit {
+		t.Error("result flags bit 0 set must not roll")
+	}
 }
 
 func TestWhirlwindOrderAndDelay(t *testing.T) {

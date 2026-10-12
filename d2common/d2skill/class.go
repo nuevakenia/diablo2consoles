@@ -1498,6 +1498,9 @@ func doDragonFn(c *cast) {
 		hits = 2
 	}
 
+	// w23: the charges are in the damage of every blow up to and including the first that hit (chargedamage.go)
+	held := c.heldCharges()
+
 	for i := 0; i < hits; i++ {
 		o := c.meleeOpt()
 		o.pct = c.env.eval(c.sk.Calc[1])
@@ -1508,9 +1511,16 @@ func doDragonFn(c *cast) {
 
 		o.skillElem = false
 		lastHit = false
+		o.pct += c.chargePct(held)
 
 		m := c.p.strike(c.u, c.sk, c.lvl, c.tgt.Unit, c.env, o)
 		lastHit = m.Hit
+		c.applyChargeDamage(m, held)
+
+		if m.Hit {
+			held = nil
+		}
+
 		c.addMelee(m)
 	}
 
@@ -1531,7 +1541,7 @@ func doDragonFn(c *cast) {
 // builderOf finds the charge-up skill whose aurastate is the given progressive state.
 func (p *Pipeline) builderOf(state string) *Skill {
 	for _, id := range p.Skills.IDs() {
-		if sk := p.Skills.ByID(id); sk.AuraState == state && sk.SrvDoFunc == 35 {
+		if sk := p.Skills.ByID(id); sk.AuraState == state && (sk.SrvDoFunc == 34 || sk.SrvDoFunc == 35) {
 			return sk
 		}
 	}

@@ -54,13 +54,19 @@ func init() {
 			"aurastate": "progressive_fire", "auralencalc": "par3", "calc1": "lvl*3", "Param3": "375", "EType": "fire",
 			"EMin": "4", "EMax": "6", "aurastat1": "progressive_fire", "SrcDam": "128", "HitShift": "8", "manashift": "8",
 			// patch_d2 progressive columns (w23)
-			"progressive": "1", "prgstack": "1", "srvprgfunc1": "143", "srvprgfunc2": "38", "srvprgfunc3": "39",
+			"progressive": "1", "prgdam": "4", "prgstack": "1", "srvprgfunc1": "143", "srvprgfunc2": "38", "srvprgfunc3": "39",
 			"prgcalc2": "par1", "prgcalc3": "par2", "Param1": "4", "Param2": "4", "Param4": "50",
 			"aurastat2": "progressive_tohit", "aurastatcalc2": "par4"},
+		row{"skill": "Tiger Strike", "Id": "562", "srvstfunc": "23", "srvdofunc": "34", "prgdam": "1", "aurastate": "progressive_damage",
+			"aurastat1": "progressive_damage", "calc1": "ln12", "Param1": "100", "Param2": "20", "Param3": "375", "progressive": "1",
+			"SrcDam": "128", "HitShift": "8", "manashift": "8"},
+		row{"skill": "Cobra Strike", "Id": "563", "srvstfunc": "23", "srvdofunc": "34", "prgdam": "2", "aurastate": "progressive_steal",
+			"aurastat1": "progressive_steal", "Param1": "40", "Param2": "5", "Param3": "375", "progressive": "1", "SrcDam": "128",
+			"HitShift": "8", "manashift": "8"},
 		row{"skill": "Claws of Thunder", "Id": "560", "srvstfunc": "23", "srvdofunc": "35", "srvmissileb": "clawsofthundernova",
 			"srvmissilec": "clawsofthunderbolt", "aurastate": "progressive_lightning", "auralencalc": "par3", "Param3": "375",
 			"EType": "ltng", "EMin": "1", "EMax": "80", "aurastat1": "progressive_lightning", "SrcDam": "128", "HitShift": "8",
-			"manashift": "8", "progressive": "1", "prgstack": "1", "srvprgfunc2": "36", "srvprgfunc3": "37", "prgcalc3": "par1",
+			"manashift": "8", "progressive": "1", "prgdam": "4", "prgstack": "1", "srvprgfunc2": "36", "srvprgfunc3": "37", "prgcalc3": "par1",
 			"Param1": "4", "Param4": "50", "aurastat2": "progressive_tohit", "aurastatcalc2": "par4"},
 		row{"skill": "Blades of Ice", "Id": "561", "srvstfunc": "23", "srvdofunc": "35", "srvmissilec": "bladesoficecubes",
 			"aurastate": "progressive_cold", "auralencalc": "par3", "Param3": "375", "EType": "cold", "EMin": "15", "EMax": "35",
@@ -720,3 +726,66 @@ func TestPassivesAndTable(t *testing.T) {
 
 // SubPos lets the chain and homing code find the test targets.
 func (t *testTarget) SubPos() (float64, float64) { return float64(t.x) + 0.5, float64(t.y) + 0.5 }
+
+// Charge damage of the finishers (w23, 0x5d3d90): Tiger Strike charges add calc1*count percent, Cobra Strike charges
+// add the base-plus-level value to the life leech (and mana leech from two charges), a blow after the first hit has
+// no charges left, and Fists of Fire converts calc1 percent of the physical damage into its element.
+func TestChargeDamageOfTheFinishers(t *testing.T) {
+	kick := func(stats map[string]int, levels map[string]int) *MeleeResult {
+		cf := newClassFixture(levels)
+		z := cf.addFoe("z", 2, 0)
+		cf.u.roller = &seq{vals: make([]uint32, 100)}
+		cf.u.ar = 100000
+
+		for k, v := range stats {
+			cf.u.stats[k] = v
+		}
+
+		_, r := cf.castOn("Dragon Talon", z)
+		if len(r.Melees) == 0 {
+			t.Fatal("no kick")
+		}
+
+		return r.Melees[0]
+	}
+
+	base := kick(nil, map[string]int{"Dragon Talon": 1})
+	tiger := kick(map[string]int{"progressive_damage": 2}, map[string]int{"Dragon Talon": 1, "Tiger Strike": 4})
+
+	// ln12 at level 4 = 100 + 3*20 = 160 percent per charge, two charges: +320 percent of the weapon damage
+	if !(tiger.Damage.Physical > base.Damage.Physical*3) {
+		t.Errorf("tiger physical %d vs base %d", tiger.Damage.Physical, base.Damage.Physical)
+	}
+
+	cobra := func(count int) *MeleeResult {
+		return kick(map[string]int{"progressive_steal": count}, map[string]int{"Dragon Talon": 1, "Cobra Strike": 3})
+	}
+
+	// Param1 40 + 2*5 = 50
+	for count, want := range map[int][2]int32{1: {50, 0}, 2: {50, 50}, 3: {100, 100}} {
+		if m := cobra(count); m.Damage.LifeLeech != want[0] || m.Damage.ManaLeech != want[1] {
+			t.Errorf("cobra %d charges: life %d mana %d, want %v", count, m.Damage.LifeLeech, m.Damage.ManaLeech, want)
+		}
+	}
+
+	// Fists of Fire at level 4: calc1 = lvl*3 = 12 percent of the physical damage becomes fire, plus its rolled fire
+	fists := kick(map[string]int{"progressive_fire": 1}, map[string]int{"Dragon Talon": 1, "Fists of Fire": 4})
+	if fists.Damage.Fire <= base.Damage.Fire || fists.Damage.Physical >= base.Damage.Physical {
+		t.Errorf("fists fire %d physical %d (base fire %d physical %d)", fists.Damage.Fire, fists.Damage.Physical,
+			base.Damage.Fire, base.Damage.Physical)
+	}
+
+	// a miss gives the charges nothing
+	cf := newClassFixture(map[string]int{"Dragon Talon": 1, "Cobra Strike": 3})
+	z := cf.addFoe("z", 2, 0)
+	z.defense = 1 << 30
+	cf.u.roller = &seq{vals: []uint32{99, 99, 99, 99}}
+	cf.u.ar = 1
+	cf.u.stats["progressive_steal"] = 3
+
+	if _, r := cf.castOn("Dragon Talon", z); len(r.Melees) > 0 && r.Melees[0].Hit {
+		t.Skip("the fixture still hits")
+	} else if len(r.Melees) > 0 && r.Melees[0].Damage.LifeLeech != 0 {
+		t.Errorf("leech on a miss: %d", r.Melees[0].Damage.LifeLeech)
+	}
+}

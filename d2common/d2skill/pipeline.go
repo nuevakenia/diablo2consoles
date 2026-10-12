@@ -332,6 +332,10 @@ type Effect struct {
 	Ward  *WardOrder
 	Whirl *WhirlOrder
 
+	// RollToHit makes a periodic area effect roll to hit each unit before damaging it, with Pct as the skill's to-hit
+	// bonus percent (Blade Shield: SRVDO_142 rolls only when the skill's result flags have bit 0 clear).
+	RollToHit bool
+
 	// Cost is the mana an aura pulse pays when it did its work, 8.8 fixed
 	// point (Redemption: SKILL_GetAuraParamAtLevel, VERIFIED 0x645ed0).
 	Cost int
