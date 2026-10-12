@@ -245,6 +245,8 @@ type Director struct {
 	// levelTypes holds the monster types drawn for a level (VERIFIED: drawn once per game and level,
 	// MONREGION_PickLevelMonsterTypes), so every room of the level shares them.
 	levelTypes map[int][]d2monster.ClassInfo
+	// uniqueCount is the number of uniques rolled per level (MONREGION_CountMonsterOnce, region +0x2c8).
+	uniqueCount map[int]int
 	// forceLevel, when set, replaces the resolved monster level of a spawn.
 	forceLevel int
 

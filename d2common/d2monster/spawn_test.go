@@ -252,3 +252,27 @@ func TestLeaderSuccessor(t *testing.T) {
 		t.Error("nobody alive")
 	}
 }
+
+// MONREGION_SpawnRoomMonsters 0x54cad0: cells are (w/3)*(h/3) subtiles, a draw at or below MonDen spawns a group,
+// MonDen is capped at 10000.
+func TestW28RoomCells(t *testing.T) {
+	if RoomCells(400, 400) != 133*133 || RoomCells(2, 9) != 0 || RoomCells(-1, 9) != 0 {
+		t.Fatal("cells")
+	}
+
+	if got := GroupsForCells(10, 520, func(int) int { return 520 }); got != 10 {
+		t.Errorf("inclusive bound: %d", got)
+	}
+
+	if got := GroupsForCells(10, 520, func(int) int { return 521 }); got != 0 {
+		t.Errorf("above: %d", got)
+	}
+
+	if got := GroupsForCells(5, 90000, func(int) int { return 10000 }); got != 5 {
+		t.Errorf("cap: %d", got)
+	}
+
+	if got := GroupsForCells(5, 90000, func(int) int { return 10001 }); got != 0 {
+		t.Errorf("cap above: %d", got)
+	}
+}
