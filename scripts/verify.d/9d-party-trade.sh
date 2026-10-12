@@ -61,6 +61,7 @@ scenario_env() {
   hscript+=";panel:party;wait:2;say:roster;say:capframe $tmp/9d-host-party.png;automap:stats;panel:close"
   hscript+=";say:pvp $jn;wait:1"
   hscript+=";say:spawnmon zombie1;wait:1;say:killnear;waitlog:PARTYXP award"
+  hscript+=";say:spawnground gold 555 6;until:AUTOGROUND spawn source=command,30;click:left@item:555;until:PARTYGOLD award,60"
   hscript+=";say:trade request $jn;waitlog:TRADE open with"
   hscript+=";say:trade add cm2;waitlog:yours=[Hellfire Torch];say:trade gold 1000;waitlog:gold=400 you_accepted;wait:1;say:capframe $tmp/9d-host-trade.png;wait:2;say:trade accept -"
   hscript+=";waitlog:TRADE done;wait:2;say:roster"
@@ -74,6 +75,7 @@ scenario_env() {
   local jscript="wait:1;waitlog:SOCIAL roster n=2;waitlog:$hn invites you to a party;say:party accept -;waitlog:$jn joined the party"
   jscript+=";panel:party;wait:2;say:roster;say:capframe $tmp/9d-joiner-party.png;automap:stats;panel:close"
   jscript+=";say:pvp $hn;waitlog:PARTYXP award"
+  jscript+=";waitlog:PARTYGOLD award"
   jscript+=";waitlog:TRADE request from;say:trade yes -;waitlog:TRADE open with"
   jscript+=";say:trade add tbk;waitlog:yours=[Tome of Town Portal];say:trade gold 400;waitlog:gold=1000 you_accepted;wait:1;say:capframe $tmp/9d-joiner-trade.png;wait:2;say:trade accept -"
   jscript+=";waitlog:TRADE done;wait:2;say:roster"
@@ -107,7 +109,7 @@ scenario_check() {
   [ -f "$mp_join_log" ] && sed 's/\x1b\[[0-9;]*m//g' $mp_join_log > $j
   if [ ! -f "$j" ]; then echo "FAIL: no joiner log"; fail=1; return; fi
 
-  local pat="PARTY (invite|join|leave|hostile|peace|refused)|SOCIAL roster|ROSTER PANEL|AUTOMAP marker other|PARTYXP|PVP |TRADE |AUTOSCRIPT RESULT"
+  local pat="PARTY (invite|join|leave|hostile|peace|refused)|SOCIAL roster|ROSTER PANEL|AUTOMAP marker other|PARTYXP|PARTYGOLD|PVP |TRADE |AUTOSCRIPT RESULT"
   grep -E "$pat" $log.txt | sed 's/^/host   /' | cut -c1-260
   grep -E "$pat" $j | sed 's/^/joiner /' | cut -c1-260
 
@@ -133,6 +135,14 @@ scenario_check() {
   jxp=$(_9d_nums $j 'PARTYXP award amount=([0-9]+) of=' | head -1)
   { [ -n "$xp" ] && [ "$xp" -gt 0 ] && [ -n "$hxp" ] && [ -n "$jxp" ] && [ "$hxp" -gt 0 ] && [ "$jxp" -gt 0 ] && [ $((hxp + jxp)) -le "$xp" ]; } || { echo "FAIL: party experience: kill=$xp host=$hxp joiner=$jxp"; fail=1; }
   grep -q "PARTYXP kill monster=.*shares=\[$hn=$hxp $jn=$jxp\]\|PARTYXP kill monster=.*shares=\[$jn=$jxp $hn=$hxp\]" $log.txt || { echo "FAIL: server share log differs"; fail=1; }
+
+  # 3b hosted gold sharing (0x53e640 via the server): 555 picked up by the host, split between the two party members
+  # in the same level (277 + 278, the picker keeps the remainder), no overflow at level 94
+  local hg jg
+  hg=$(_9d_nums $log.txt 'PARTYGOLD award add=([0-9]+) of=555 ' | head -1)
+  jg=$(_9d_nums $j 'PARTYGOLD award add=([0-9]+) of=555 ' | head -1)
+  { [ "$hg" = 278 ] && [ "$jg" = 277 ]; } || { echo "FAIL: party gold share host=$hg joiner=$jg, want 278 277"; fail=1; }
+  grep -q 'PARTYGOLD pickup picker=.* amount=555 ' $log.txt || { echo "FAIL: server did not log the gold share"; fail=1; }
 
   # 4 trade: item and gold both ways, with the gold totals before and after
   local hline jline hb ha jb ja

@@ -100,6 +100,10 @@ scenario_check() {
     grep -q "PVP HIT attacker=\"$hn\" .*skill=\"$sk" $j || { echo "FAIL: the joiner never took a $sk hit"; fail=1; }
   done
 
+  # w36: only a missile's direct hit with physical damage rolls the shield block (0x5ab220); Fire Ball (no physical
+  # part), Meteor and Blizzard (area) are never blocked, whatever shield the victim wears
+  grep -qE 'PVP BLOCK attacker=.*skill="(Fire Ball|Meteor|Blizzard)' $j && { echo "FAIL: a Fire Ball / Meteor / Blizzard hit rolled a shield block"; fail=1; }
+
   local bad
   bad=$(sed -nE 's/.*PVP SKILL target="[^"]*" skill="[^"]*" raw=([0-9]+) scaled=([0-9]+) pct=([0-9]+).*/\3/p' $log.txt | awk '$1 != 17 {n++} END {print n + 0}')
   [ "$bad" -eq 0 ] || { echo "FAIL: $bad skill hits are not scaled to 17 percent"; fail=1; }
