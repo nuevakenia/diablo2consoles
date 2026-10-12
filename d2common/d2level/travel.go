@@ -149,8 +149,9 @@ type Plan struct {
 	LoadAct *LoadAct
 }
 
-// ErrBadLevel is returned for level ids outside 1..132 (Levels.txt rows that
-// exist in the game).
+// ErrBadLevel is returned for level ids outside 1..136 (Levels.txt rows that
+// exist in the game; 133..136 are the Pandemonium areas, which the portal factory of the exe lets a
+// permanent portal in Harrogath open, VERIFIED in verify-level-graph.md section 3).
 var ErrBadLevel = errors.New("invalid level id")
 
 // PlanTransition mirrors SERVER_ChangePlayerLevel: within an act the unit is
@@ -158,7 +159,7 @@ var ErrBadLevel = errors.New("invalid level id")
 // on demand from the same seed and the client gets a LoadAct for it. The aux
 // seed is the second per-game seed (pGame+0x80).
 func PlanTransition(from, to int, start StartType, seed, aux uint32) (Plan, error) {
-	if to < 1 || to > 132 {
+	if to < 1 || to > 136 {
 		return Plan{}, fmt.Errorf("%w: %d", ErrBadLevel, to)
 	}
 
