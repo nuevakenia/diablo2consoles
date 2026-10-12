@@ -1765,6 +1765,17 @@ func doSummonFn(c *cast) {
 
 	if sk.SrvDoFunc == 56 {
 		o.AuraSkill, o.AuraLevel = c.minionAura()
+
+		// Fire Golem: its Holy Fire is a SRVDO_066 aura held by a monster, which puts the five passivestat pairs
+		// (firemindam / firemaxdam = enms / exms * par5 / 256) on the golem's own state unconditionally (0x5cd880,
+		// VERIFIED, see auraPassiveStats), so every blow of the golem carries them on top of the skill's own fire
+		// damage. The wiki "Fire damage" column of the golem is exactly skill fire + this + the A1 hit (w31).
+		// UNVERIFIED: synergies (Resist Fire / Salvation) read the golem's skills, which it does not have.
+		if o.AuraSkill != "" {
+			if as := c.p.Skills.ByName(o.AuraSkill); as != nil {
+				o.Stats = append(o.Stats, MonsterAuraStats(c.p.Skills, as, o.AuraLevel, o.Level)...)
+			}
+		}
 	}
 
 	// The Skeletal Mage's monster skill (sumskill1) gets the level sumsk1calc (SKILL_SpawnSummonedMinion 0x5c22c0,

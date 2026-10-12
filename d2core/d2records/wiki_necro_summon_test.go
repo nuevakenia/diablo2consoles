@@ -198,12 +198,53 @@ func TestWikiNecroSummons(t *testing.T) {
 		t.Errorf("blood golem + mastery 20: life %d", s.MaxHP)
 	}
 
-	// Fire Golem: the fire damage added to every hit is the skill's firemindam/firemaxdam (wiki 44-90 187-242 411-476 are
-	// about twice the 1.14b values 10-27 93-119 197-233: wiki differs, UNVERIFIED which patch)
-	for _, c := range []struct{ lvl, lo, hi int }{{1, 10, 27}, {10, 93, 119}, {20, 197, 233}} {
+	// Fire Golem (w31): the fire damage added to every hit is the skill's own fire (10-27, 93-119, 197-233) plus the
+	// Holy Fire passive of the golem's aura (firemindam = enms * par5 / 256 at Holy Fire level min(8 + L - 1, 30):
+	// 27-39, 84-96, 204-216; SRVDO_066 on a monster). The wiki column 44-90 / 187-242 / 411-476 is that sum plus the
+	// golem's A1 hit 10-27 (below level 10 the wiki floors the Holy Fire figure first, so it is 3 higher).
+	for _, c := range []struct{ lvl, lo, hi, wikiLo, wikiHi int }{{1, 37, 66, 44, 90}, {10, 177, 215, 187, 242}, {20, 401, 449, 411, 476}} {
 		_, s := necroSummon(t, tp, "FireGolem", map[string]int{"FireGolem": c.lvl}, 30)
 		if s.FireMin != c.lo || s.FireMax != c.hi || s.MaxHP != 313 {
 			t.Errorf("fire golem L%d: fire %d-%d life %d", c.lvl, s.FireMin, s.FireMax, s.MaxHP)
+		}
+
+		if c.lvl >= 10 && (s.FireMin+s.DmgMin != c.wikiLo || s.FireMax+s.DmgMax != c.wikiHi) {
+			t.Errorf("fire golem L%d: fire + hit %d-%d, wiki %d-%d", c.lvl, s.FireMin+s.DmgMin, s.FireMax+s.DmgMax, c.wikiLo, c.wikiHi)
+		}
+	}
+
+	// The wiki tables include the synergy of the prerequisite skills at one point: Fire Golem life +5 percent
+	// (Blood Golem 1 * par8 5): 313 -> 328 (Iron Golem 306 -> 321 has the same calc1 but needs an item target); Bone Wall +10 percent (Bone Armor 1): 20 / 63 / 111;
+	// Bone Prison +16 percent (Bone Armor 1 + Bone Wall 1): 22 / 64 / 112. Attack rating +20 (Clay Golem 1 * par8 20):
+	// Fire 120 -> 140, Iron 80 -> 100 by the same passivecalc2.
+	for _, c := range []struct {
+		skill string
+		lvl   int
+		own   map[string]int
+		life  int
+	}{
+		{"FireGolem", 1, map[string]int{"BloodGolem": 1}, 328},
+		{"Bone Wall", 1, map[string]int{"Bone Armor": 1}, 20}, {"Bone Wall", 10, map[string]int{"Bone Armor": 1}, 63},
+		{"Bone Wall", 20, map[string]int{"Bone Armor": 1}, 111},
+		{"Bone Prison", 1, map[string]int{"Bone Armor": 1, "Bone Wall": 1}, 22}, {"Bone Prison", 10, map[string]int{"Bone Armor": 1, "Bone Wall": 1}, 64},
+		{"Bone Prison", 20, map[string]int{"Bone Armor": 1, "Bone Wall": 1}, 112},
+	} {
+		lv := map[string]int{c.skill: c.lvl}
+		for k, v := range c.own {
+			lv[k] = v
+		}
+
+		if _, s := necroSummon(t, tp, c.skill, lv, 30); s.MaxHP != c.life {
+			t.Errorf("%s L%d with prerequisites: life %d, wiki %d", c.skill, c.lvl, s.MaxHP, c.life)
+		}
+	}
+
+	for _, sk := range []string{"FireGolem"} {
+		_, with := necroSummon(t, tp, sk, map[string]int{sk: 1, "Clay Golem": 1}, 30)
+		_, without := necroSummon(t, tp, sk, map[string]int{sk: 1}, 30)
+
+		if with.AR-without.AR != 20 {
+			t.Errorf("%s: Clay Golem 1 adds %d attack rating, wiki +20", sk, with.AR-without.AR)
 		}
 	}
 
