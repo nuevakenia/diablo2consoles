@@ -46,6 +46,7 @@ const (
 	PartyHeal                                            // Sent by a client (Holy Bolt on a party member), the server relays it to that member
 	PartyGold                                            // Sent by a client (a gold pickup), the server answers every sharing member with its part
 	JoinSync                                             // Sent by the server to a hero that entered: the quest/act sync of 0x544140 and 0x536ef0
+	QuestShare                                           // Sent by a client (the third Ancient died), the server answers every other hero with its Rite outcome
 
 	UnknownPacketType = 666
 )
@@ -80,6 +81,7 @@ func (n NetPacketType) String() string {
 		PartyHeal:                       "PartyHeal",
 		PartyGold:                       "PartyGold",
 		JoinSync:                        "JoinSync",
+		QuestShare:                      "QuestShare",
 	}
 
 	return strings[n]

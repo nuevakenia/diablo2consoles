@@ -190,3 +190,16 @@ func (g *GameClient) handlePartyGoldPacket(packet d2netpacket.NetPacket) error {
 
 	return nil
 }
+
+func (g *GameClient) handleQuestSharePacket(packet d2netpacket.NetPacket) error {
+	p, err := d2netpacket.UnmarshalQuestShare(packet.PacketData)
+	if err != nil {
+		return err
+	}
+
+	if g.OnQuestShare != nil {
+		g.OnQuestShare(p)
+	}
+
+	return nil
+}

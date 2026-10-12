@@ -16,10 +16,11 @@ scenario_env() {
     # the altar refuses while the Rite is neither done nor pending
     s+=";say:ritedoor;expect:log=RITE the door does nothing"
     # the statues' introduction wakes the three Ancients
-    s+=";say:ritealtar;wait:1;expect:log=RITE the altar is operated;expect:log=RITE Ancient 3 wakes;expect:log=RITE the fight starts"
-    # a town portal in the summit resets them; closing it arms the fight again
+    s+=";say:ritealtar;wait:3;expect:log=RITE the altar is operated;expect:log=RITE the statues wake: the Ancients appear in 20 frames;expect:log=RITE Ancient 3 wakes;expect:log=RITE the fight starts"
+    # a town portal in the summit resets them; closing it wakes nothing (w40, 0x58ad30): the altar is used again
     s+=";say:townportal free;wait:2;expect:log=RITE a town portal opened in the summit"
-    s+=";say:closeportal;wait:2;expect:log=RITE the last portal closed"
+    s+=";say:closeportal;wait:2;expect:log=RITE the last portal closed: the Ancients stay asleep"
+    s+=";say:ritealtar;wait:3;expect:log=RITE the altar is operated"
     # killing all three: the third death ends the fight and pays the quest
     s+=";say:restorevitals;say:ritekill;wait:2;expect:log=RITE the third Ancient died"
     s+=";say:ritedoor;expect:log=RITE the door opens the way to the Worldstone Keep;say:ritestatus;wait:1;exit"
@@ -37,7 +38,7 @@ scenario_check() {
   grep -E "AUTOSCRIPT step [0-9]+ FAIL" $log.txt | cut -c1-200
   grep -qE "LEVEL CHANGE .*to=120" $log.txt || { echo "FAIL: the hero did not reach the Arreat Summit"; fail=1; }
   for l in "RITE the door does nothing" "RITE the altar is operated" "RITE Ancient 1 wakes" "RITE Ancient 2 wakes" "RITE Ancient 3 wakes" "RITE the fight starts" \
-           "RITE a town portal opened in the summit" "RITE the last portal closed" "RITE the third Ancient died" \
+           "RITE a town portal opened in the summit" "RITE the last portal closed: the Ancients stay asleep" "RITE the statues wake: the Ancients appear in 20 frames" "RITE the third Ancient died" \
            "RITE the door opens the way"; do
     grep -q "$l" $log.txt || { echo "FAIL: no log line '$l'"; fail=1; }
   done
@@ -48,7 +49,9 @@ scenario_check() {
   # w37: the third death pays at once (VERIFIED 0x58a7b0): the record ends with bit 0 (done) set and bit 1 (pending) clear
   last=$(grep -E "QUEST A5Q5 slot=39 bits" $log.txt | tail -1 | sed -E 's/.*->(0x[0-9a-f]+).*/\1/')
   [ -n "$last" ] && [ $(( last & 1 )) -eq 1 ] && [ $(( last & 2 )) -eq 0 ] || { echo "FAIL: Rite record $last is not done without a pending reward"; fail=1; }
-  # the fight armed again after the reset: six Ancients woke in all (three, reset, three)
-  [ "$(grep -c 'RITE Ancient [123] wakes' $log.txt)" -ge 6 ] || { echo "FAIL: the Ancients did not wake again after the portal closed"; fail=1; }
+  # the altar woke them again after the reset: six Ancients woke in all (three, reset, altar again, three)
+  [ "$(grep -c 'RITE Ancient [123] wakes' $log.txt)" -ge 6 ] || { echo "FAIL: the Ancients did not wake again after the altar was used again"; fail=1; }
+  [ "$(grep -c 'RITE the altar is operated' $log.txt)" -ge 2 ] || { echo "FAIL: the altar was not usable again after the reset"; fail=1; }
+  grep -E "RITE the level has no (altar|gate door)" $log.txt | cut -c1-160 | head -2
   if grep -E "\[ERROR\]|panic" $log.txt | grep -v "skipping missing"; then echo "FAIL: errors in the Rite log"; fail=1; fi
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2monsters"
+	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket"
 )
 
 // Rite of Passage in the running game (wave 29): the Arreat Summit altar, the three statues that wake the Ancients,
@@ -16,8 +17,9 @@ import (
 //
 // VERIFIED (0x589f10, 0x589e50): each statue wakes the Ancient of its own slot at its own coordinates, the statue
 // then cannot be used again until the reset. UNVERIFIED: the altar is a level object, the harness places one when the
-// map has none; the Ancients returning after a portal closes (the exe clears the armed flags 0x10/0x11 and the
-// re-arm test is not decoded).
+// map has none (the exe has no placement code: the altar and the door are objects of the level's preset map).
+// w40 (VERIFIED 0x58ad30 with 0x58ace0 and 0x58a0c0): the Ancients do NOT return when the portal closes; the reset
+// puts the statues and the altar back to mode 0 and the hero operates the altar again.
 
 // riteLive is the Rite state of the game screen.
 type riteLive struct {
@@ -26,6 +28,8 @@ type riteLive struct {
 	gateOpen  bool
 	altarUsed bool                       // the altar (546) is in mode 1 (VERIFIED 0x58b0f0)
 	slotUsed  [d2quest.AncientCount]bool // the statue of the slot was spoken to (VERIFIED 0x589f10: it goes to mode 4)
+	wakeIn    float64                    // seconds until the statues spawn their Ancients after the introduction; 0 = none pending
+	logSub    int                        // the quest node's sub-state byte (+0xb): 3 once the altar refreshed the logs (0x58b0f0)
 }
 
 const (
@@ -54,6 +58,7 @@ func (v *Game) riteEnter(level int) {
 
 	v.rite.gateOpen = false
 	v.rite.altarUsed = false
+	v.rite.wakeIn = 0
 
 	if v.monsters != nil {
 		v.monsters.RiteReset()
@@ -186,6 +191,7 @@ func (v *Game) riteSyncPortals() {
 	}
 
 	f := &v.rite.fight
+	was := f.Portals
 	reset, rearm := f.PortalsChanged(n)
 
 	if v.monsters == nil || v.currentLevel() != d2quest.LevelSummit {
@@ -202,12 +208,15 @@ func (v *Game) riteSyncPortals() {
 
 		v.rite.ancients = nil
 		v.rite.slotUsed = [d2quest.AncientCount]bool{}
+		v.rite.wakeIn = 0
+		v.riteAltarBack()
 
 		v.monsters.RiteReset()
 		v.Infof("RITE a town portal opened in the summit: the Ancients are reset")
 	case rearm:
-		v.Infof("RITE the last portal closed: the fight is armed again")
-		v.riteStart()
+		v.Infof("RITE the last portal closed (unexpected re-arm request ignored)")
+	case was > 0 && n == 0 && !f.Done && !f.Armed:
+		v.Infof("RITE the last portal closed: the Ancients stay asleep until the altar is operated again (VERIFIED 0x58ad30)")
 	}
 }
 
@@ -240,25 +249,43 @@ func (v *Game) riteKilled(ev d2monsters.KillEvent) {
 	v.riteRewardParty()
 }
 
-// riteRewardParty names the heroes the death pays (VERIFIED 0x58a7b0: the killer and the heroes in level 120, and
-// the party members in Act 5, at or above the level gate and without the done bit). The local hero's reward is the
-// quest system's own (a5_w20.go); other players are only reported, their records live in their own games.
+// riteRewardParty shares the end of the fight with the other heroes of the game (VERIFIED 0x58a7b0 with the callbacks
+// 0x58a600, 0x58a5a0 and 0x58a4f0, see d2quest.RiteDeathOutcomes): the local hero's own reward is the quest system's
+// (a5_w20.go); the server decides the others from the roster (QuestShare packet) and each client applies its share in
+// onQuestShare. Alone in the game there is nobody to tell.
 func (v *Game) riteRewardParty() {
 	r := v.quests()
-	if r == nil || v.gameClient == nil || v.gameClient.Roster == nil {
+	if r == nil || v.gameClient == nil || v.gameClient.IsSinglePlayer() {
 		return
 	}
 
-	diff := r.g.Difficulty
+	pkt, err := d2netpacket.CreateQuestSharePacket(d2netpacket.QuestSharePacket{Quest: d2quest.QuestRite, Difficulty: r.g.Difficulty})
+	if err != nil || v.gameClient.SendPacketToServer(pkt) != nil {
+		v.Warningf("RITE the end of the fight could not be shared with the party")
 
-	for _, m := range v.gameClient.Roster.PartyMembers(v.me()) {
-		if m.ID == v.me() {
-			continue
-		}
+		return
+	}
 
-		if d2quest.RiteRewardRecipient(m.Level, diff, m.Area == d2quest.LevelSummit, false) {
-			v.Infof("RITE party member %q (level %d) is paid by the Ancients", m.Name, m.Level)
-		}
+	v.Infof("RITE the end of the fight is shared with the game (QuestShare sent)")
+}
+
+// onQuestShare applies this hero's share of the Rite of Passage that another player finished.
+func (v *Game) onQuestShare(p d2netpacket.QuestSharePacket) {
+	if p.Quest != d2quest.QuestRite || p.Player != v.me() {
+		return
+	}
+
+	r := v.quests()
+	if r == nil {
+		return
+	}
+
+	changed := r.g.RiteShared(d2quest.RiteOutcome(p.Outcome))
+	v.Infof("RITE shared outcome=%d changed=%v", p.Outcome, changed)
+
+	if changed {
+		r.dirty = true
+		v.applyQuestEffects(r.g.TakeEffects())
 	}
 }
 
@@ -279,10 +306,11 @@ func (v *Game) riteOperate(ob *d2mapentity.Object) bool {
 	return true
 }
 
-// riteOperateAltar is 0x58b0f0: an altar that was not used yet (mode 0) resets the Ancients when a town portal
-// is open, speaks message 20002 (the Ancients' introduction, which starts the statue sequence) and goes to mode 1.
-// The exe also moves the quest node to state 2 (message 0x59f) and queues the callback 0x589c70; the node bytes
-// are UNVERIFIED and not modelled (the introduction path of the harness does the start).
+// riteOperateAltar is 0x58b0f0: an altar that was not used yet (mode 0) goes through d2quest.RiteAltarStep (w40,
+// VERIFIED from the disassembly): reset the Ancients when a town portal is open, speak message 20002 (the Ancients'
+// introduction, which wakes the statues), lift the quest node from a state below 2 to 2 and refresh every hero's log
+// once (callback 0x589c70); the altar then goes to mode 1. The statues spawn their Ancients 20 frames after the
+// introduction (0x589d90 schedules the event for frame + 0x14), see advanceRite.
 func (v *Game) riteOperateAltar(ob *d2mapentity.Object) {
 	if v.rite.altarUsed {
 		v.Infof("RITE the altar was used already")
@@ -296,7 +324,80 @@ func (v *Game) riteOperateAltar(ob *d2mapentity.Object) {
 		v.Warningf("RITE altar: %v", err)
 	}
 
-	v.Infof("RITE the altar is operated: the Ancients' introduction")
+	node := d2quest.RiteNode{Sub: v.rite.logSub}
+
+	if r := v.quests(); r != nil {
+		if q := r.g.Quest(d2quest.QuestRite); q != nil {
+			node.Active, node.State = q.State >= 1, q.State
+		}
+	}
+
+	step := d2quest.RiteAltarStep(node, v.rite.fight.Portals)
+	v.Infof("RITE the altar is operated: the Ancients' introduction (speak=%v reset=%v state %d->%d log=%v)", step.Speak,
+		step.ResetAncients, node.State, step.NewState, step.RefreshLog)
+
+	if step.NewState != node.State {
+		if r := v.quests(); r != nil && r.g.RiteAltarLift() {
+			r.dirty = true
+		}
+	}
+
+	if step.RefreshLog {
+		v.rite.logSub = 3
+		v.riteRefreshLogs()
+	}
+
+	if !step.Speak {
+		return
+	}
+
+	// 0x589d90: the statues are woken at once, their Ancients appear RiteStatueWakeFrames later
+	v.rite.wakeIn = float64(d2quest.RiteStatueWakeFrames) / d2quest.RiteFramesPerSecond
+	v.Infof("RITE the statues wake: the Ancients appear in %d frames", d2quest.RiteStatueWakeFrames)
+}
+
+// riteRefreshLogs is the per-hero callback 0x589c70: a hero whose record has the done and goal bits gets its quest log
+// refreshed (no bit changes).
+func (v *Game) riteRefreshLogs() {
+	r := v.quests()
+	if r == nil {
+		return
+	}
+
+	q := r.g.Quest(d2quest.QuestRite)
+	if q == nil {
+		return
+	}
+
+	if d2quest.RiteLogRefreshes(func(bit int) bool { return r.g.Rec.Get(q.Slot, bit) }) {
+		r.dirty = true
+		v.Infof("RITE the quest log of the hero is refreshed (0x589c70)")
+	}
+}
+
+// riteAltarBack puts the altar and the statues back to mode 0 after a reset (VERIFIED 0x589e50: the altar unit gets
+// mode 0, the statue modes and the altar flag +0x4c are cleared), so the introduction can be started again.
+func (v *Game) riteAltarBack() {
+	v.rite.altarUsed = false
+
+	for _, ob := range v.objectsOf(d2quest.AncientsAltar) {
+		if _, err := ob.Close(); err != nil {
+			v.Warningf("RITE altar reset: %v", err)
+		}
+	}
+}
+
+// advanceRite counts the statue wake-up delay down and then spawns the Ancients.
+func (v *Game) advanceRite(elapsed float64) {
+	if v.rite.wakeIn <= 0 {
+		return
+	}
+
+	if v.rite.wakeIn -= elapsed; v.rite.wakeIn > 0 {
+		return
+	}
+
+	v.rite.wakeIn = 0
 	v.riteStart()
 }
 

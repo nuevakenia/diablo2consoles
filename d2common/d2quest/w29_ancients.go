@@ -60,7 +60,6 @@ type AncientsFight struct {
 	Armed   bool // the statues were woken (the fight is on, the Ancients attack)
 	Done    bool // the third Ancient died
 
-	rearmOnClose bool
 }
 
 // MayStart says whether a statue may wake its Ancient now.
@@ -73,8 +72,10 @@ func (f *AncientsFight) Wake() {
 }
 
 // PortalsChanged sets the number of town portals open in level 120. VERIFIED 0x58ace0: a portal while the fight is
-// not done clears the armed flag and resets the Ancients (reset is true); closing the last one re-arms a fight that
-// was armed (rearm is true; the caller wakes the Ancients again).
+// not done clears the armed flag and resets the Ancients (reset is true). w40 CORRECTION (VERIFIED 0x58ad30 with
+// 0x58ace0 and 0x58a0c0): closing the last portal re-arms nothing, because the opening cleared the armed byte the
+// close tests; rearm stays in the signature for the callers and is always false (RiteReArmsOnClose). The reset
+// puts the altar back in mode 0, so the hero operates it again to wake the Ancients.
 func (f *AncientsFight) PortalsChanged(open int) (reset, rearm bool) {
 	if f.Done {
 		f.Portals = open
@@ -85,17 +86,10 @@ func (f *AncientsFight) PortalsChanged(open int) (reset, rearm bool) {
 	was := f.Portals
 	f.Portals = open
 
-	switch {
-	case was == 0 && open > 0:
-		wasArmed := f.Armed
+	if was == 0 && open > 0 {
 		f.Armed, f.Spawned, f.Deaths = false, 0, 0
-		f.rearmOnClose = wasArmed
 
 		return true, false
-	case was > 0 && open == 0 && f.rearmOnClose:
-		f.rearmOnClose = false
-
-		return false, true
 	}
 
 	return false, false

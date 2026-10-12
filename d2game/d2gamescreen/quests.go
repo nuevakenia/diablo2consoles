@@ -233,6 +233,7 @@ func (v *Game) advanceQuests(elapsed float64) {
 
 	v.advanceBarks(elapsed)
 	v.advanceUber(elapsed)
+	v.advanceRite(elapsed)
 	v.advanceHellforge(elapsed)
 	v.advanceChaos(elapsed)
 	v.advanceAct3(elapsed)
