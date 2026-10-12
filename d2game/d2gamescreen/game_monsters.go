@@ -121,6 +121,10 @@ func (v *Game) advanceMonsters(elapsed float64) {
 
 // OnPlayerAttack makes the hero walk up to a monster and fight it.
 func (v *Game) OnPlayerAttack(m *d2mapentity.Monster) {
+	if m != nil && v.monsters != nil && v.monsters.IsFriendly(m) { // the hero's own unit (shift-click, scripts, realm): never attacked
+		return
+	}
+
 	v.attackTarget = m
 	v.attackRepathAcc = heroRepathSeconds // path immediately
 
@@ -141,7 +145,7 @@ func (v *Game) advanceHeroAttack(elapsed float64) {
 		return
 	}
 
-	if !m.Alive() || v.localPlayer.Stats.Health <= 0 {
+	if !m.Alive() || v.localPlayer.Stats.Health <= 0 || (v.monsters != nil && v.monsters.IsFriendly(m)) { // e.g. converted meanwhile
 		v.attackTarget = nil
 		return
 	}

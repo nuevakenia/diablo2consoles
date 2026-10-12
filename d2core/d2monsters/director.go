@@ -101,6 +101,8 @@ type Options struct {
 type Counters struct {
 	Spawned, Aggro, Attacks, AttackHits, HeroSwings, HeroHits, Deaths, Drops, HeroDeaths int
 
+	// FriendlyRefused counts hero attacks on the hero's own units that the friendly fire guard refused (friendly_guard.go).
+	FriendlyRefused int
 	// mercenaries
 	MercSpawns, MercAttacks, MercHits, MercSkills, MercDeaths, MercRevives, MercTeleports, MercLevelUps int
 	// Shots is projectiles launched, ShotHits those that reached a hero.
