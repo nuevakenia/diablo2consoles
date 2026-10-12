@@ -167,6 +167,8 @@ type HeroStatsPanel struct {
 	originY int
 	isOpen  bool
 
+	clickMod d2enum.KeyMod // modifiers held at the last mouse press (shift/ctrl multi-spend)
+
 	*d2util.Logger
 }
 
@@ -266,8 +268,15 @@ func (s *HeroStatsPanel) loadNewStatPoints() {
 		button = s.uiManager.NewButton(d2ui.ButtonTypeAddSkill, d2resource.PaletteSky)
 		button.SetPosition(i.x, i.y+panelShiftY)
 		button.OnActivated(func() {
-			currentValue.cb()
-			s.heroState.StatsPoints--
+			n := StatSpendCount(s.clickMod, s.heroState.StatsPoints)
+			if n == 0 {
+				return
+			}
+
+			for k := 0; k < n; k++ {
+				currentValue.cb()
+				s.heroState.StatsPoints--
+			}
 
 			if s.heroState.Recalc != nil {
 				s.heroState.Recalc() // life, mana, defense, attack rating follow the new attribute
@@ -284,6 +293,9 @@ func (s *HeroStatsPanel) loadNewStatPoints() {
 func (s *HeroStatsPanel) setLayout() {
 	s.newStatPoints.SetVisible(s.heroState.StatsPoints > 0 && s.IsOpen())
 }
+
+// SetClickMod records the modifier keys held at the latest mouse press.
+func (s *HeroStatsPanel) SetClickMod(m d2enum.KeyMod) { s.clickMod = m }
 
 // IsOpen returns true if the hero status panel is open
 func (s *HeroStatsPanel) IsOpen() bool {

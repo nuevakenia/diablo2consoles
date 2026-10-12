@@ -809,6 +809,8 @@ func (g *GameControls) InventoryItemCount() int { return len(g.inventory.grid.it
 func (g *GameControls) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 	mx, my := event.X(), event.Y()
 
+	g.heroStatsPanel.SetClickMod(event.KeyMod())
+
 	if event.Button() == d2enum.MouseButtonLeft {
 		g.heldLeftWalk = false
 	}
