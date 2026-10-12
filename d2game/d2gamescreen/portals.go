@@ -45,6 +45,7 @@ func (v *Game) hookPortals() {
 // onPortals takes the server's list and redraws the ends in this level.
 func (v *Game) onPortals(pairs []d2portal.Pair, notice string) {
 	v.portal.pairs = pairs
+	v.riteSyncPortals()
 
 	if notice != "" {
 		v.Infof("PORTAL notice: %s", notice)

@@ -1,0 +1,299 @@
+package d2gamescreen
+
+import (
+	"errors"
+	"strconv"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2monsters"
+)
+
+// Rite of Passage in the running game (wave 29): the Arreat Summit altar, the three statues that wake the Ancients,
+// the town-portal reset and the reward of the third Ancient's death. The rules are d2quest.AncientsFight (exe
+// facts in d2quest/w27_quests2.go); this file feeds it with the engine's events.
+//
+// UNVERIFIED: where the altar, the statues and the Ancients stand (the Ancients appear next to the statue monsters
+// when the level has them, else next to the hero), and the Ancients returning after a portal closes.
+
+// riteLive is the Rite state of the game screen.
+type riteLive struct {
+	fight    d2quest.AncientsFight
+	ancients []*d2mapentity.Monster // the Ancients woken in the current level
+	gateOpen bool
+}
+
+const (
+	riteStatueFirst  = d2quest.NPCAncientStatue1
+	riteStatueLast   = d2quest.NPCAncientStatue3
+	riteSpawnRing    = 4
+	riteAltarOffset  = 15
+	riteFightDamage  = 1 << 20
+	riteStatusFormat = "RITE status portals=%d spawned=%d deaths=%d armed=%v done=%v gate=%v"
+)
+
+// riteEnter runs when the hero arrives in a level.
+func (v *Game) riteEnter(level int) {
+	f := &v.rite.fight
+	v.rite.ancients = nil
+
+	if level != d2quest.LevelSummit {
+		return
+	}
+
+	// the map is new: the Ancients of an earlier visit are gone and the statues must be spoken to again (UNVERIFIED)
+	if !f.Done {
+		f.Armed, f.Spawned, f.Deaths = false, 0, 0
+	}
+
+	v.rite.gateOpen = false
+
+	if v.monsters != nil {
+		v.monsters.RiteReset()
+		v.monsters.RiteSetPortals(f.Portals)
+	}
+
+	if len(v.objectsOf(d2quest.AncientsAltar)) == 0 {
+		x, y := v.heroTilePos()
+		if v.newObjectAt(d2quest.AncientsAltar, int(x*subtilesInTile)+riteAltarOffset, int(y*subtilesInTile)) != nil {
+			v.Infof("RITE the level has no altar: one is placed next to the hero (UNVERIFIED place)")
+		}
+	}
+
+	v.Infof("RITE Arreat Summit: altar=%d door=%d done=%v portals=%d", len(v.objectsOf(d2quest.AncientsAltar)),
+		len(v.objectsOf(d2quest.AncientsDoor)), f.Done, f.Portals)
+}
+
+// riteStart is the statues' introduction: each statue wakes its Ancient while no town portal is open and fewer than
+// three are out (AncientsMayStart), and the fight starts.
+func (v *Game) riteStart() {
+	f := &v.rite.fight
+
+	if v.monsters == nil {
+		return
+	}
+
+	if v.currentLevel() != d2quest.LevelSummit {
+		v.monsters.RiteIntroHeard(true) // outside the summit the harness keeps its old behaviour
+
+		return
+	}
+
+	if !f.MayStart() {
+		v.Infof("RITE the statues stay asleep (portals=%d spawned=%d done=%v)", f.Portals, f.Spawned, f.Done)
+
+		return
+	}
+
+	sx, sy := v.riteSpot()
+
+	for i := 0; i < d2quest.AncientCount && f.MayStart(); i++ {
+		stat := v.monsters.FindStat(strconv.Itoa(d2quest.NPCAncient1 + i))
+		if stat == nil {
+			v.Warningf("RITE no monstats row for class %d", d2quest.NPCAncient1+i)
+
+			continue
+		}
+
+		m, err := v.monsters.SpawnNear(stat, sx, sy, riteSpawnRing)
+		if err != nil {
+			v.Warningf("RITE Ancient %d: %v", i, err)
+
+			continue
+		}
+
+		f.Wake()
+		v.rite.ancients = append(v.rite.ancients, m)
+		v.Infof("RITE Ancient %d wakes (%s, class %d)", i+1, m.Label(), stat.ID)
+	}
+
+	v.monsters.RiteSetPortals(f.Portals)
+	started := v.monsters.RiteIntroHeard(true)
+	v.Infof("RITE the fight starts: ancients=%d started=%v", len(v.rite.ancients), started)
+}
+
+// riteSpot is where the Ancients appear: the first statue monster of the level, else the hero.
+func (v *Game) riteSpot() (x, y int) {
+	if v.monsters != nil {
+		for _, m := range v.monsters.Monsters() {
+			if id := m.MonstatID(); id >= riteStatueFirst && id <= riteStatueLast {
+				return m.SubtilePos()
+			}
+		}
+	}
+
+	hx, hy := v.heroTilePos()
+
+	return int(hx * subtilesInTile), int(hy * subtilesInTile)
+}
+
+// riteSyncPortals follows the town portals open in level 120 (VERIFIED 0x58ace0 rules in AncientsFight).
+func (v *Game) riteSyncPortals() {
+	n := 0
+
+	for i := range v.portal.pairs {
+		if v.portal.pairs[i].Field.Level == d2quest.LevelSummit {
+			n++
+		}
+	}
+
+	f := &v.rite.fight
+	reset, rearm := f.PortalsChanged(n)
+
+	if v.monsters == nil || v.currentLevel() != d2quest.LevelSummit {
+		return
+	}
+
+	v.monsters.RiteSetPortals(n)
+
+	switch {
+	case reset:
+		for _, m := range v.rite.ancients {
+			v.monsters.DismissMonster(m)
+		}
+
+		v.rite.ancients = nil
+
+		v.monsters.RiteReset()
+		v.Infof("RITE a town portal opened in the summit: the Ancients are reset")
+	case rearm:
+		v.Infof("RITE the last portal closed: the fight is armed again")
+		v.riteStart()
+	}
+}
+
+// riteKilled is the death hook: the third Ancient ends the fight.
+func (v *Game) riteKilled(ev d2monsters.KillEvent) {
+	if !d2quest.IsAncientClass(ev.Class) || ev.Monster == nil {
+		return
+	}
+
+	known := false
+
+	for _, m := range v.rite.ancients {
+		if m == ev.Monster {
+			known = true
+		}
+	}
+
+	if !known {
+		return
+	}
+
+	f := &v.rite.fight
+	if !f.AncientDied() {
+		v.Infof("RITE Ancient died: %d of %d", f.Deaths, d2quest.AncientCount)
+
+		return
+	}
+
+	v.Infof("RITE the third Ancient died: the fight is done")
+	v.riteRewardParty()
+}
+
+// riteRewardParty names the heroes the death pays (VERIFIED 0x58a7b0: the killer and the heroes in level 120, and
+// the party members in Act 5, at or above the level gate and without the done bit). The local hero's reward is the
+// quest system's own (a5_w20.go); other players are only reported, their records live in their own games.
+func (v *Game) riteRewardParty() {
+	r := v.quests()
+	if r == nil || v.gameClient == nil || v.gameClient.Roster == nil {
+		return
+	}
+
+	diff := r.g.Difficulty
+
+	for _, m := range v.gameClient.Roster.PartyMembers(v.me()) {
+		if m.ID == v.me() {
+			continue
+		}
+
+		if d2quest.RiteRewardRecipient(m.Level, diff, m.Area == d2quest.LevelSummit, false) {
+			v.Infof("RITE party member %q (level %d) is paid by the Ancients", m.Name, m.Level)
+		}
+	}
+}
+
+// riteOperate is the altar. It reports whether the object was one.
+func (v *Game) riteOperate(ob *d2mapentity.Object) bool {
+	if ob.Record().Index != d2quest.AncientsAltar {
+		return false
+	}
+
+	r := v.quests()
+	open := r != nil && r.g.RiteAltarOpen() // both the done and the reward-pending bit
+
+	if !v.rite.fight.AltarWorks(open, false) {
+		v.Infof("RITE the altar does nothing (rite open=%v, fight running=%v)", open, v.rite.fight.Running())
+
+		return true
+	}
+
+	if opened, err := ob.Open(); err != nil {
+		v.Warningf("RITE altar: %v", err)
+	} else if !opened {
+		v.Infof("RITE the altar is already open")
+	}
+
+	v.riteOpenGate()
+	v.Infof("RITE the altar opens the way to the Worldstone Keep")
+
+	return true
+}
+
+// riteOpenGate opens the door objects to the Worldstone Keep (the level gate itself follows the quest bits).
+func (v *Game) riteOpenGate() {
+	v.rite.gateOpen = true
+
+	for _, d := range v.objectsOf(d2quest.AncientsDoor) {
+		if _, err := d.Open(); err != nil {
+			v.Warningf("RITE gate: %v", err)
+		}
+	}
+}
+
+func (v *Game) commandRiteStart(_ []string) error {
+	v.riteStart()
+
+	return nil
+}
+
+func (v *Game) commandRiteAltar(_ []string) error {
+	alt := v.objectsOf(d2quest.AncientsAltar)
+	if len(alt) == 0 {
+		return errors.New("no Ancients' altar in this level")
+	}
+
+	v.riteOperate(alt[0])
+
+	return nil
+}
+
+// commandRiteKill kills the Ancients that stand, as the hero.
+func (v *Game) commandRiteKill(_ []string) error {
+	if v.monsters == nil {
+		return errors.New("no monsters")
+	}
+
+	n := 0
+
+	for _, m := range append([]*d2mapentity.Monster(nil), v.rite.ancients...) {
+		if m.Alive() {
+			v.monsters.Damage(m, riteFightDamage, v.localPlayer)
+
+			n++
+		}
+	}
+
+	if n == 0 {
+		return errors.New("no living Ancient")
+	}
+
+	return nil
+}
+
+func (v *Game) commandRiteStatus(_ []string) error {
+	f := v.rite.fight
+	v.Infof(riteStatusFormat, f.Portals, f.Spawned, f.Deaths, f.Armed, f.Done, v.rite.gateOpen)
+
+	return nil
+}

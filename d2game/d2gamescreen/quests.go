@@ -341,6 +341,7 @@ func (v *Game) onMonsterKilled(ev d2monsters.KillEvent) {
 		v.saveBeforeExit()
 	}
 	v.act3Killed(ev)
+	v.riteKilled(ev)
 	v.uberKilled(ev)
 	v.trioKilled(ev)
 	v.chaosKilled(ev)

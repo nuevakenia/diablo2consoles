@@ -57,6 +57,6 @@ func (v *Game) heroHasState(p *d2mapentity.Player, state int) bool {
 // are not modelled in the harness: the introduction itself is the trigger.
 func (v *Game) riteMessageHeard(msg int) {
 	if msg == riteIntroMessage && v.monsters != nil {
-		v.monsters.RiteIntroHeard(true)
+		v.riteStart()
 	}
 }

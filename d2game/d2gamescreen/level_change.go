@@ -350,6 +350,7 @@ func (v *Game) afterLevelBuilt(from, to int, via string) {
 	v.questArea(to) // the quest system follows the hero between areas
 	v.uberEnter(to)
 	v.act3Enter(to)
+	v.riteEnter(to)
 	v.anyaEnter(to)
 	v.enterSoundEnv(to)
 	v.chaosEnter(to)
@@ -573,7 +574,7 @@ func (v *Game) advanceObjectUse(elapsed float64) {
 }
 
 func (v *Game) operateObject(ob *d2mapentity.Object) {
-	if v.act3Operate(ob) {
+	if v.act3Operate(ob) || v.riteOperate(ob) {
 		return
 	}
 

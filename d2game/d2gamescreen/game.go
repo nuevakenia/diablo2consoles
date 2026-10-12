@@ -191,6 +191,7 @@ type Game struct {
 	trio                 d2uber.Trio  // N24: which of the three endgame bosses died in this game
 	chaos                *chaosRuntime
 	act3                 act3State
+	rite                 riteLive
 	uberTest             *uberAutoTest
 	merc                 mercGame
 	skills               *d2skills.Engine
@@ -290,6 +291,10 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 		{"portals", "logs the open town portal pairs", []string{}, v.commandPortals},
 		{"useportal", "uses the nearest town portal object without walking to it (scenarios)", []string{}, v.commandUsePortal},
 		{"killnear", "kills the nearest monster as the hero (party experience tests)", []string{}, v.commandKillNear},
+		{"ritestart", "wakes the Ancients as the statues' introduction does (scenarios)", nil, v.commandRiteStart},
+		{"ritealtar", "uses the Ancients' altar without walking to it (scenarios)", nil, v.commandRiteAltar},
+		{"ritekill", "kills the woken Ancients as the hero (scenarios)", nil, v.commandRiteKill},
+		{"ritestatus", "logs the Rite of Passage fight state", nil, v.commandRiteStatus},
 		{"killgidbinn", "kills the fetish boss the Gidbinn object woke, as the hero (scenarios)", []string{}, v.commandKillGidbinn},
 		{"rewarditem", "spends a pending Larzuk (socket), Anya (personalize) or Charsi (imbue) quest reward on an item",
 			[]string{"socket|personalize|imbue"}, v.commandRewardItem},
