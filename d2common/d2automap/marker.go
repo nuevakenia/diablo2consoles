@@ -28,6 +28,9 @@ const (
 	ColorNPC
 	ColorPortal
 	ColorBlack // palette index 0: the stash cross
+	// ColorCorpse is magenta (255,0,255), DAT_0079d23a: the corpse of a dead player that still holds the
+	// items (mode 0x11 and the inventory's owner is the unit itself), AUTOMAP_GetUnitMarkerColor 0x4552e0.
+	ColorCorpse
 )
 
 // Object ids (objects.txt Id) with a special marker. VERIFIED (class compares in 0x455f70/0x455470).
@@ -44,14 +47,17 @@ var portalHiddenLevels = map[int]bool{0x7d: true, 0x7e: true, 0x7f: true, 0x6f: 
 
 // Unit is what the marker logic needs to know about a unit.
 type Unit struct {
-	Kind        UnitKind
-	Self        bool // the client's own player
-	Party       bool // a player in the hero's party
-	Dead        bool // dead or dying
-	FriendlyNPC bool // a monster with the "automap" monstats flag (town folk)
-	Minion      bool // the hero's own mercenary or summon
-	ObjectID    int  // objects.txt Id for objects
-	Level       int  // level id the unit stands in
+	Kind  UnitKind
+	Self  bool // the client's own player
+	Party bool // a player in the hero's party
+	Dead  bool // dead or dying
+	// CorpseHoldsItems marks a dead player (mode 0x11) whose inventory belongs to the corpse; only
+	// such a corpse gets a marker (magenta), every other dead player none.
+	CorpseHoldsItems bool
+	FriendlyNPC      bool // a monster with the "automap" monstats flag (town folk)
+	Minion           bool // the hero's own mercenary or summon
+	ObjectID         int  // objects.txt Id for objects
+	Level            int  // level id the unit stands in
 }
 
 // Options are the automap options that change markers.
@@ -81,8 +87,14 @@ type Marker struct {
 func Classify(u Unit, o Options) Marker {
 	switch u.Kind {
 	case UnitPlayer:
-		if u.Dead && !u.Self {
-			return Marker{}
+		if u.Dead {
+			if u.CorpseHoldsItems {
+				return Marker{Cross: true, Color: ColorCorpse}
+			}
+
+			if !u.Self {
+				return Marker{}
+			}
 		}
 
 		c := ColorOther

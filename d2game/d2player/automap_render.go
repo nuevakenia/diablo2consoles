@@ -16,12 +16,13 @@ import (
 // that this gives (computed offline, which palette the engine searches is
 // UNVERIFIED but the colours only differ slightly between acts).
 var (
-	automapColorSelf    = color.RGBA{36, 96, 216, 255}  // (0,0,255): the hero's cross
-	automapColorOther   = color.RGBA{252, 44, 0, 255}   // (255,0,0): other players, not in the party
-	automapColorParty   = color.RGBA{24, 252, 0, 255}   // (0,255,0): party members
-	automapColorMinion  = color.RGBA{68, 112, 116, 255} // (0x44,0x70,0x74): own mercenary and minions
-	automapColorNPC     = color.RGBA{72, 160, 52, 255}  // (0x48,0xa0,0x34): friendly town folk
-	automapColorPortal  = color.RGBA{244, 192, 76, 255} // (0xf4,0xf4,0): portals
+	automapColorSelf    = color.RGBA{36, 96, 216, 255}   // (0,0,255): the hero's cross
+	automapColorOther   = color.RGBA{252, 44, 0, 255}    // (255,0,0): other players, not in the party
+	automapColorParty   = color.RGBA{24, 252, 0, 255}    // (0,255,0): party members
+	automapColorMinion  = color.RGBA{68, 112, 116, 255}  // (0x44,0x70,0x74): own mercenary and minions
+	automapColorNPC     = color.RGBA{244, 244, 244, 255} // (0xf4,0xf4,0xf4) DAT_0079d23e: town folk (monsters with the monstats flag); UNVERIFIED nearest palette entry
+	automapColorCorpse  = color.RGBA{252, 0, 252, 255}   // (255,0,255) DAT_0079d23a: a corpse that holds items; UNVERIFIED nearest palette entry
+	automapColorPortal  = color.RGBA{244, 192, 76, 255}  // (0xf4,0xf4,0): portals
 	automapColorTextGld = color.RGBA{199, 179, 119, 255}
 )
 
@@ -205,6 +206,8 @@ func (a *Automap) markerColor(c d2automap.ColorID) color.Color {
 		return automapColorMinion
 	case d2automap.ColorNPC:
 		return automapColorNPC
+	case d2automap.ColorCorpse:
+		return automapColorCorpse
 	case d2automap.ColorPortal:
 		return automapColorPortal
 	case d2automap.ColorBlack:

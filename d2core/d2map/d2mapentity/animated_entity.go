@@ -25,10 +25,6 @@ const (
 	subtileOffsetY = -5
 )
 
-const (
-	highlightBrightness = 2
-)
-
 func translateSubtile(fx, fy float64) (x, y int) {
 	return int(fx * subtileWidth), int(fy*subtileHeight) - subtileOffsetY
 }

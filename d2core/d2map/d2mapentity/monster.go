@@ -193,6 +193,14 @@ func (m *Monster) Render(target d2interface.Surface) {
 
 	defer target.Pop()
 
+	if m.highlight {
+		// hovered: draw mode 7 (palette at 170%)
+		target.PushBrightness(highlightBrightness)
+		defer target.Pop()
+
+		m.highlight = false
+	}
+
 	_ = m.composite.Render(target)
 }
 

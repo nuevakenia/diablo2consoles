@@ -15,6 +15,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2lightmap"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 )
 
@@ -650,7 +651,15 @@ func (mr *MapRenderer) renderLitEntity(target d2interface.Surface, e d2interface
 	}
 
 	x, y := e.GetPositionF()
-	target.PushColor(mr.light.tintAt(x*subtilesPerTile, y*subtilesPerTile))
+
+	cell := mr.light.lm.Sample(x*subtilesPerTile, y*subtilesPerTile)
+
+	// the hovered unit's light byte is doubled (min 0x40, max 0xff), 0x46dab0 / 0x46c9a0
+	if h, ok := e.(interface{ Highlighted() bool }); ok && h.Highlighted() {
+		cell.Intensity = d2lightmap.HoverIntensity(cell.Intensity)
+	}
+
+	target.PushColor(mr.light.tint(cell))
 	e.Render(target)
 	target.Pop()
 }

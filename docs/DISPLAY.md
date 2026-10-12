@@ -122,3 +122,5 @@ screen centre.
   ~16 ms wall (GPU present of the large target). Without the cull the drawn tiles were the whole rectangle (not timed).
 * The map-engine test screen (`map_engine_testing.go`) is a developer tool; it now draws the world over the whole screen
   and picks in screen coordinates, its text overlay stays in the column.
+
+* Wave 22 renderer: Act 4 ambient starts at 255 (the exe create value) and eases; hovered units get the doubled light byte and the 170%% highlight (monsters too); monsters and missiles cast light (MonStats2 Light/light-r/g/b, Missiles.txt Light/Red/Green/Blue, radius capped at 18 subtiles); draw mode 6 (PL2 table G) is an alpha-by-brightness blend; automap town folk are white and item-holding corpses magenta. Flash/darkening envelopes, shake call sites and Palshift.dat loader exist as tested pure code but are not wired to their triggers. Details and the UNVERIFIED list: d2-re-notes/w22-render.md.
