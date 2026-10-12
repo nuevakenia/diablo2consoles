@@ -655,6 +655,16 @@ func (w *world) TargetsWithin(x, y, r int) []d2missile.Target {
 		}
 	}
 
+	// Rival heroes and party heroes are targets too, exactly as in Targets: without them a Size 2/3 missile
+	// (Blizzard shards, w37 footprint test) never hit a hostile hero (9f-pvp-skills-ear, bisected to 47c9a80c).
+	for _, p := range w.e.rivalsNear(x, y, r) {
+		out = append(out, w.e.rivalTarget(p))
+	}
+
+	for _, p := range w.e.partyNear(x, y, r) {
+		out = append(out, w.e.rivalTarget(p))
+	}
+
 	return out
 }
 
