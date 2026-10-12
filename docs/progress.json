@@ -42,9 +42,9 @@
     },
     {
       "label": "Real .d2s save: read and write verified",
-      "done": 9,
+      "done": 10,
       "total": 10,
-      "note": "9 sections read; whole file written back byte-for-byte (golem section unverified)",
+      "note": "all 10 sections read and written back byte-for-byte; golem section ('kf', every expansion class) checked against the exe writer and reader",
       "color": "#f2a81d"
     },
     {
