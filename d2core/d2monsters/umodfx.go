@@ -282,7 +282,11 @@ func (d *Director) uModHitInto(u *unit, p *d2mapentity.Player, parts *HitParts) 
 
 	for _, e := range b.Elems {
 		r := e.Min + int(u.b.Seed.Roll(int32(e.Max-e.Min+1)))
-		r = applyElemResist(r, e.Type, p.Stats.Totals)
+		r, heal := applyElemReduce(r, e.Type, p.Stats.Totals)
+		if parts != nil {
+			parts.Heal += heal
+		}
+
 		parts.add(e.Type, r)
 		total += r
 	}

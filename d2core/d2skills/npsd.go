@@ -129,24 +129,15 @@ func (e *Engine) convert(p *d2mapentity.Player, sk *d2skill.Skill, ef *d2skill.E
 	})
 }
 
-// leech gives the hero life and mana back, a percent of the damage a hit dealt
-// (Hunger: the damage struct's life steal / mana steal fields).
-func (e *Engine) leech(p *d2mapentity.Player, d *d2combat.Damage, dealt int) {
-	if p == nil || dealt <= 0 {
+// leech gives the hero life and mana back through the exe's transfer (0x57a3b0, d2combat.ApplyLeech via
+// Director.HeroLeech): the physical part that got through the resists, capped at the monster's life before the
+// hit, scaled by the monster's Drain column and the difficulty divisors.
+func (e *Engine) leech(p *d2mapentity.Player, m *d2mapentity.Monster, d *d2combat.Damage) {
+	if p == nil || m == nil || (d.LifeLeech <= 0 && d.ManaLeech <= 0) {
 		return
 	}
 
-	if d.LifeLeech > 0 {
-		heal := dealt * int(d.LifeLeech) / 100
-		p.Stats.Health = minInt(p.Stats.Health+heal, p.Stats.MaxHealth)
-		e.emit("damage", "HEAL leech hero=%s heal=%d hero_hp=%d/%d", p.Name(), heal, p.Stats.Health, p.Stats.MaxHealth)
-	}
-
-	if d.ManaLeech > 0 {
-		gain := dealt * int(d.ManaLeech) / 100
-		p.Stats.Mana = minInt(p.Stats.Mana+gain, p.Stats.MaxMana)
-		e.emit("damage", "HEAL mana_leech hero=%s mana=%d mana=%d/%d", p.Name(), gain, p.Stats.Mana, p.Stats.MaxMana)
-	}
+	e.monsters.HeroLeech(p, m, e.lastPhys, e.lastLife, int(d.LifeLeech), int(d.ManaLeech))
 }
 
 // CanConvert implements d2skill.Convertible: a monster that is not already

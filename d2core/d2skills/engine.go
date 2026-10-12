@@ -100,6 +100,9 @@ type Engine struct {
 	lastRefusal string // d2skill.Reason* of the last refused CastAt, "" after an accepted one
 
 	lastDealt int // whole life points the last hurt() removed (leech)
+	// lastPhys and lastLife are the post-resist physical component and the monster's life before the hit,
+	// both 8.8: the leech transfer is paid from them (0x57a650 caps the physical part at the defender's life)
+	lastPhys, lastLife int32
 
 	heroes      map[string]*heroUnit
 	mercCasters map[string]*heroUnit // hireling casters by id (merc.go)
@@ -187,6 +190,8 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	monsters.HeroDefense = e.heroDefense
 	monsters.HeroDefenseParts = e.heroDefenseParts
 	monsters.HeroAvoid = e.heroAvoid
+	monsters.HeroThorns = e.heroThorns
+	monsters.HeroHurt = e.heroPlainHit
 	e.installMercHooks()
 	e.monsters.SetSkillFirer(e)
 
@@ -637,7 +642,7 @@ func (e *Engine) meleeResult(p *d2mapentity.Player, sk *d2skill.Skill, r *d2skil
 	if mt != nil {
 		e.Counters.Hits++
 		e.hurt(mt.m, p, &r.Damage, sk.Name)
-		e.leech(p, &r.Damage, e.lastDealt)
+		e.leech(p, mt.m, &r.Damage)
 		e.itemEvents(mt.m, p, true) // crushing blow, open wounds: after the base damage
 	}
 
@@ -808,6 +813,14 @@ func (e *Engine) hurt(m *d2mapentity.Monster, src *d2mapentity.Player, d *d2comb
 			// Total is (applied below).
 			out, _ := d2combat.ReduceComponent(int(p.v), 0, e.resistFrom(m, src, p.kind), false, false, 0, 0)
 			total += out
+		}
+	}
+
+	e.lastPhys, e.lastLife = 0, int32(m.Vitals.HP)<<d2combat.FixedShift
+	if d.Physical > 0 {
+		ph, _ := d2combat.ReduceComponent(int(d.Physical), 0, e.resistFrom(m, src, "phys"), false, false, 0, 0)
+		if ph > 0 {
+			e.lastPhys = int32(ph)
 		}
 	}
 
@@ -991,6 +1004,8 @@ func (e *Engine) AreaChanged(md *d2monsters.Director) {
 		md.HeroDefense = e.heroDefense
 		md.HeroDefenseParts = e.heroDefenseParts
 		md.HeroAvoid = e.heroAvoid
+		md.HeroThorns = e.heroThorns
+		md.HeroHurt = e.heroPlainHit
 		e.installMercHooks()
 	}
 }

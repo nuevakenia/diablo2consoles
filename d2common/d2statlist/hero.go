@@ -100,8 +100,19 @@ type Totals struct {
 	CrushingBlow   int
 	OpenWounds     int
 	SlowTarget     int // item_slow (150): slows the target of a hit by N percent
-	LifeSteal      int
-	ManaSteal      int
+
+	// DamageToMana is item_damagetomana (114): percent of the damage a hit did
+	// to the wearer that is paid back as mana (event func 13, 0x5bd7c0).
+	DamageToMana int
+	// AttackerTakes and AttackerTakesLight are item_attackertakesdamage (78)
+	// and item_attackertakeslightdamage (128): flat physical / lightning
+	// damage dealt back to a melee attacker (event funcs 6 and 10).
+	AttackerTakes, AttackerTakesLight int
+	// AbsorbPct and AbsorbFlat are the item absorb stats (142..149) per
+	// element in the order fire, lightning, magic, cold.
+	AbsorbPct, AbsorbFlat [4]int
+	LifeSteal             int
+	ManaSteal             int
 
 	FasterAttack, FasterCast, FasterHit, FasterBlock, FasterRun int
 	MagicFind, GoldFind                                         int
@@ -329,6 +340,14 @@ func Compute(h Hero, items []Item, env *Env) Totals {
 	t.CrushingBlow = int(list.Get(StatCrushing))
 	t.OpenWounds = int(list.Get(StatOpenWounds))
 	t.SlowTarget = int(list.Get(StatSlowTarget))
+	t.DamageToMana = int(list.Get(StatDamageToMana))
+	t.AttackerTakes = int(list.Get(StatAttackerTakes))
+	t.AttackerTakesLight = int(list.Get(StatAttackerTakesLight))
+
+	for i := 0; i < 4; i++ {
+		t.AbsorbPct[i] = int(list.Get(StatAbsorbFirePct + 2*i))
+		t.AbsorbFlat[i] = int(list.Get(StatAbsorbFirePct + 2*i + 1))
+	}
 	t.LifeSteal = int(list.Get(StatLifeSteal))
 	t.ManaSteal = int(list.Get(StatManaSteal))
 	t.FasterAttack = int(list.Get(StatFasterAttack))

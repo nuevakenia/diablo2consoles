@@ -252,6 +252,16 @@ type Director struct {
 	// was avoided, with a log note. melee is false for projectiles.
 	HeroAvoid func(p *d2mapentity.Player, attacker *d2mapentity.Monster, melee bool) (bool, string)
 
+	// HeroThorns, if set, deals the item thorns of a hero (stats 78 and 128, event funcs 6 and 10 of
+	// 0x5bd250 / 0x5bd310: flat physical and lightning damage in 8.8) back to the monster that hit her in
+	// melee. The engine runs it through the monster's resists.
+	HeroThorns func(p *d2mapentity.Player, attacker *d2mapentity.Monster, phys, light int32)
+
+	// HeroHurt, if set, takes over the damage of a hero's plain melee swing that hit: it gets the rolled
+	// weapon damage (whole points, before strike chances) and returns true when it dealt the hit itself
+	// (resists, elemental damage, leech, crushing blow, open wounds, slow target).
+	HeroHurt func(p *d2mapentity.Player, m *d2mapentity.Monster, phys int) bool
+
 	lastBlock map[*d2mapentity.Player]int // frame of the last hero block animation
 
 	curses map[*d2mapentity.Player]map[string]timedStat // curses of Cursed monsters by stat name (umodhooks.go)

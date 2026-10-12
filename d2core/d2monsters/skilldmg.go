@@ -1,6 +1,7 @@
 package d2monsters
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2combat"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
@@ -278,33 +279,59 @@ func (d *Director) elementalHitInto(u *unit, p *d2mapentity.Player, atk d2mapent
 
 	e := atk.ElemMin + int(u.b.Seed.Roll(int32(atk.ElemMax-atk.ElemMin+1)))
 
-	e = applyElemResist(e, atk.ElemType, p.Stats.Totals)
+	e, heal := applyElemReduce(e, atk.ElemType, p.Stats.Totals)
+	if parts != nil {
+		parts.Heal += heal
+	}
+
 	parts.add(atk.ElemType, e)
 
 	return e
 }
 
-// applyElemResist reduces an elemental roll by the hero's shown resistance of
-// that element (negative resistance adds damage); nil totals mean 0.
+// applyElemResist reduces an elemental roll of whole points the way the exe does
+// for one damage type (0x579c90, VERIFIED): in 8.8, the flat magic reduction
+// (stat 35, none for poison) first, then the shown resistance percent (negative
+// resistance adds damage), then the absorb stats of fire, lightning, cold and
+// magic. The result can be negative when the flat reduction exceeds the roll
+// (the exe keeps it: the Total decides, see HitParts.Total); nil totals mean
+// no reduction. The absorbed amount (whole points, healed to the hero) is
+// returned second.
 func applyElemResist(e int, elem string, t *d2statlist.Totals) int {
-	pct := 0
+	out, _ := applyElemReduce(e, elem, t)
 
-	if t != nil {
-		switch elem {
-		case "fire":
-			pct = t.ResistShown[d2statlist.ResFire]
-		case "cold":
-			pct = t.ResistShown[d2statlist.ResCold]
-		case "ltng":
-			pct = t.ResistShown[d2statlist.ResLight]
-		case "pois":
-			pct = t.ResistShown[d2statlist.ResPoison]
-		case "mag":
-			pct = t.MagicResist
-		}
+	return out
+}
+
+func applyElemReduce(e int, elem string, t *d2statlist.Totals) (out, heal int) {
+	if t == nil || e <= 0 {
+		return e, 0
 	}
 
-	return e * (100 - pct) / 100
+	pct, slot := 0, -1
+
+	switch elem {
+	case "fire":
+		pct, slot = t.ResistShown[d2statlist.ResFire], 0
+	case "ltng":
+		pct, slot = t.ResistShown[d2statlist.ResLight], 1
+	case "cold":
+		pct, slot = t.ResistShown[d2statlist.ResCold], 3
+	case "pois":
+		pct = t.ResistShown[d2statlist.ResPoison]
+	default: // magic
+		pct, slot = t.MagicResist, 2
+	}
+
+	flat, ap, af := 0, 0, 0
+	if slot >= 0 {
+		flat = d2combat.ScaleFlatReduction(t.MagicReduction, 0)
+		ap, af = t.AbsorbPct[slot], t.AbsorbFlat[slot]
+	}
+
+	r, h := d2combat.ReduceComponent(e<<d2combat.FixedShift, flat, pct, false, slot >= 0, ap, af)
+
+	return r >> d2combat.FixedShift, h >> d2combat.FixedShift
 }
 
 // HitParts is the damage of one monster hit on a hero split by damage type, as the exe's damage struct
@@ -312,6 +339,8 @@ func applyElemResist(e int, elem string, t *d2statlist.Totals) int {
 // Shield, Bone Armor) reads and edits it. Poison is never absorbed by those two.
 type HitParts struct {
 	Phys, Fire, Light, Cold, Magic, Pois int
+	// Heal is the life the hero's absorb stats gave back (whole points).
+	Heal int
 }
 
 // add books v under the element name a monster attack or unique modifier uses (fire, cold, ltng, pois,
