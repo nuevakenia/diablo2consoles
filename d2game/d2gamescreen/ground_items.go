@@ -274,8 +274,13 @@ func (v *Game) pickUp(it *d2mapentity.Item) {
 	// into the inventory when it fits, and stays on the cursor when it does not. Scripted runs (autoscript, autopickup)
 	// and OD2_PICKUP=cursor keep the original behaviour.
 	if quickPickup() {
-		if x, y, ok := v.gameControls.AutoPlaceCursor(); ok {
-			v.Infof("QUICKPICKUP name=%q slot=(%d,%d)", plainLabel(it.Label()), x, y)
+		// an empty body slot of the item: wear it at once, else the inventory
+		if v.gameControls.AutoEquipCursor() {
+			v.Infof("QUICKEQUIP name=%q", plainLabel(it.Label()))
+		} else {
+			if x, y, ok := v.gameControls.AutoPlaceCursor(); ok {
+				v.Infof("QUICKPICKUP name=%q slot=(%d,%d)", plainLabel(it.Label()), x, y)
+			}
 		}
 	}
 

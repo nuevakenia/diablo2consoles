@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -559,6 +560,8 @@ func (g *GameControls) itemTooltipLines(it InventoryItem) []string {
 		}
 	}
 
+	lines = append(lines, g.compareWithWorn(item)...)
+
 	if note := g.requirementNote(item); note != "" {
 		lines = append(lines, d2ui.ColorTokenize(note, d2ui.ColorTokenRed))
 	}
@@ -686,4 +689,146 @@ func (g *GameControls) isTwoHanded(it InventoryItem, loc d2equip.Loc) bool {
 	e := d2hero.EquipItemOf(&s, bases)
 
 	return e.Weapon && e.TwoHanded
+}
+
+// autoEquipLocs is the order AutoEquipCursor tries the body locations in.
+var autoEquipLocs = []d2equip.Loc{
+	d2equip.LocHead, d2equip.LocNeck, d2equip.LocTorso, d2equip.LocGloves, d2equip.LocFeet, d2equip.LocBelt,
+	d2equip.LocLeftRing, d2equip.LocRightRing, d2equip.LocRightHand, d2equip.LocLeftHand,
+}
+
+// AutoEquipCursor puts the cursor item on the body when the slot it belongs to is empty and the rules (class,
+// strength, dexterity, level, two-handed pairs) allow it: the owner's quick pickup choice. It reports whether the
+// item was worn; otherwise the cursor is untouched.
+func (g *GameControls) AutoEquipCursor() bool {
+	item := g.inventory.CursorItem()
+	if item == nil {
+		return false
+	}
+
+	for _, loc := range autoEquipLocs {
+		if g.inventory.WornAt(loc) != nil {
+			continue
+		}
+
+		if res := g.evaluateEquip(item, loc); !res.OK || len(res.Displaced) > 0 {
+			continue
+		}
+
+		if res := g.TryEquipCursor(loc); res.OK && g.inventory.CursorItem() == nil {
+			g.Infof("QUICKEQUIP item=%s slot=%s", item.GetItemCode(), loc)
+
+			return true
+		}
+	}
+
+	return false
+}
+
+// StripAll takes every worn item off into the inventory (debug, for the scenarios of the quick equip) and returns how
+// many items it moved. An item that does not fit stays on the cursor and stops the loop.
+func (g *GameControls) StripAll() int {
+	n := 0
+
+	for _, loc := range autoEquipLocs {
+		if g.inventory.WornAt(loc) == nil || g.inventory.CursorItem() != nil {
+			continue
+		}
+
+		if !g.TryUnequipToCursor(loc) {
+			continue
+		}
+
+		if _, _, ok := g.AutoPlaceCursor(); !ok {
+			break
+		}
+
+		n++
+	}
+
+	return n
+}
+
+var (
+	defenseRe = regexp.MustCompile(`Defense:\s*(\d+)`)
+	damageRe  = regexp.MustCompile(`Damage:\s*(\d+) to (\d+)`)
+)
+
+// itemNumbers reads the defense and the average damage off the description lines of an item (0 when it has none).
+func itemNumbers(it InventoryItem) (defense int, damage float64) {
+	for _, l := range it.GetItemDescription() {
+		l = stripColorTokens(l)
+
+		if m := defenseRe.FindStringSubmatch(l); m != nil && defense == 0 {
+			defense, _ = strconv.Atoi(m[1])
+		}
+
+		if m := damageRe.FindStringSubmatch(l); m != nil && damage == 0 {
+			lo, _ := strconv.Atoi(m[1])
+			hi, _ := strconv.Atoi(m[2])
+			damage = float64(lo+hi) / 2
+		}
+	}
+
+	return defense, damage
+}
+
+// compareLine formats a better or worse line of an item against the worn one ("" when equal): blue when higher, red
+// when lower, as percent of the worn value.
+func compareLine(name string, newV, oldV float64) string {
+	if newV == oldV {
+		return ""
+	}
+
+	var text string
+
+	if oldV > 0 {
+		text = fmt.Sprintf("%s %+.0f%%", name, (newV-oldV)*100/oldV)
+	} else {
+		text = fmt.Sprintf("%s %+.0f", name, newV-oldV)
+	}
+
+	if newV > oldV {
+		return d2ui.ColorTokenize(text, d2ui.ColorTokenBlue)
+	}
+
+	return d2ui.ColorTokenize(text, d2ui.ColorTokenRed)
+}
+
+// compareWithWorn lists how the item compares with what the hero wears in the slot it would go to: blue lines when it
+// is better, red when it is worse (the owner's request). Nothing for an item that is worn, or when the slot is empty.
+func (g *GameControls) compareWithWorn(item *diablo2item.Item) []string {
+	for loc := d2equip.Loc(1); loc < d2equip.NumLocs; loc++ {
+		if g.inventory.WornAt(loc) == item {
+			return nil
+		}
+	}
+
+	for _, loc := range autoEquipLocs {
+		worn := g.inventory.WornAt(loc)
+		if worn == nil || g.evaluateEquip(item, loc).Reason == d2equip.ReasonBodyLoc {
+			continue
+		}
+
+		newDef, newDmg := itemNumbers(item)
+		oldDef, oldDmg := itemNumbers(worn)
+
+		var out []string
+
+		if newDef > 0 && oldDef > 0 { // only armour against armour
+			if l := compareLine("Defense:", float64(newDef), float64(oldDef)); l != "" {
+				out = append(out, l)
+			}
+		}
+
+		if newDmg > 0 && oldDmg > 0 { // only weapons against weapons
+			if l := compareLine("Damage:", newDmg, oldDmg); l != "" {
+				out = append(out, l)
+			}
+		}
+
+		return out
+	}
+
+	return nil
 }

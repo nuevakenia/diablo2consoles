@@ -20,6 +20,10 @@ type Player struct {
 	name          string
 	animationMode string
 	composite     *d2asset.Composite
+	// formToken / formHuman: while the hero is shapeshifted composite is the monster's and formHuman the hero's own
+	// (player_form.go); both are empty in human shape and never saved.
+	formToken string
+	formHuman *d2asset.Composite
 	Equipment     *d2inventory.CharacterEquipment
 	Stats         *d2hero.HeroStatsState
 	Skills        map[int]*d2hero.HeroSkill
@@ -302,12 +306,12 @@ func (p *Player) GetAnimationMode() d2enum.PlayerAnimationMode {
 
 // SetAnimationMode sets the Composite's animation mode weapon class and direction.
 func (p *Player) SetAnimationMode(animationMode d2enum.PlayerAnimationMode) error {
-	return p.composite.SetMode(animationMode, p.composite.GetWeaponClass())
+	return p.composite.SetMode(p.modeFor(animationMode), p.composite.GetWeaponClass())
 }
 
 // rotate sets direction and changes animation
 func (p *Player) rotate(direction int) {
-	newAnimationMode := p.GetAnimationMode()
+	newAnimationMode := p.modeFor(p.GetAnimationMode())
 
 	if newAnimationMode.String() != p.composite.GetAnimationMode() {
 		if err := p.composite.SetMode(newAnimationMode, p.composite.GetWeaponClass()); err != nil {
@@ -486,19 +490,11 @@ func equipmentLayers(equipment *d2inventory.CharacterEquipment) *[d2enum.Composi
 // ApplyEquipment redraws the hero after its Equipment changed (a death takes
 // the equipment, recovering the corpse gives it back).
 func (p *Player) ApplyEquipment() {
-	if p.Equipment == nil {
+	if p.Equipment == nil || p.InForm() { // in a form the gear is not drawn; ClearForm redraws it
 		return
 	}
 
-	if err := p.composite.SetMode(p.GetAnimationMode(), p.Equipment.RightHand.GetWeaponClass()); err != nil {
-		fmt.Printf("player %s: weapon class change: %v\n", p.name, err)
-	}
-
-	if err := p.composite.Equip(equipmentLayers(p.Equipment)); err != nil {
-		fmt.Printf("player %s: equip: %v\n", p.name, err)
-	}
-
-	p.composite.SetDirection(p.composite.GetDirection())
+	p.applyHumanEquipment()
 }
 
 // LieDead puts the hero straight into the dead pose (a corpse that was there

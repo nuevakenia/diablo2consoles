@@ -58,6 +58,11 @@ func (a *App) freshHeroSave(class string) (string, error) {
 
 	stats.Level = level
 
+	// OD2_AUTOCAST_SKILLPOINTS=<n> hands the fresh hero n unspent skill points (scripts that skill:spend)
+	if n, err := strconv.Atoi(os.Getenv("OD2_AUTOCAST_SKILLPOINTS")); err == nil && n > 0 {
+		stats.SkillPoints = n
+	}
+
 	state, err := factory.CreateHeroState("Auto"+hero.String(), hero, stats)
 	if err != nil {
 		return "", err

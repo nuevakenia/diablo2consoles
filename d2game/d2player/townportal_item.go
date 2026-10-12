@@ -76,3 +76,18 @@ func (g *GameControls) ConsumeTownPortal(src *diablo2item.Item) (left int, err e
 
 	return left, nil
 }
+
+// useTownPortalKey is the town portal hot key: it reads a scroll (else a tome) of the inventory without clicking.
+func (g *GameControls) useTownPortalKey() {
+	src := g.TownPortalSource()
+	if src == nil {
+		g.Infof("TOWNPORTAL key: %v", ErrNoTownPortalItem)
+		g.sayHeroVoice(0x13) // "impossible"
+
+		return
+	}
+
+	if g.OnTownPortal != nil {
+		g.OnTownPortal(src)
+	}
+}

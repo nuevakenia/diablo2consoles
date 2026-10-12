@@ -83,4 +83,7 @@ const (
 
 	// UseNextPotion drinks the front potion of the first filled belt column (OD2 key, default Q)
 	UseNextPotion
+
+	// UseTownPortal opens a town portal with a scroll, else a tome, from the inventory (OD2 key, default X)
+	UseTownPortal
 )
