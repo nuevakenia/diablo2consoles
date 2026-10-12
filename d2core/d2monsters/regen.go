@@ -33,7 +33,9 @@ func (d *Director) initRegen(u *unit, r *d2records.MonStatRecord) {
 // points) grows by stat 0x4a, up to the maximum. State 0x34 (preventheal, row 52 of states.txt) stops positive
 // or zero net regeneration (VERIFIED w29, 0x5a4340: the tick does nothing and is not rescheduled while the state
 // lasts); it reads the AI-set state map (SetUnitState). Not modelled: the mask 0x14c states that drop the base value
-// (poison, burn, open wounds are not stats here, UNVERIFIED).
+// (poison, burn, open wounds are not stats here). VERIFIED w37 0x5a4340: the mask test (0x63b850 -> 0x63b240) is a state bitset
+// overlap with a mask the caller passes in a register; which states the mask holds is not decoded (UNVERIFIED), and the
+// base stat 0x4a is subtracted from the net rate while one of them is on.
 func (d *Director) regenStep(u *unit) {
 	r := u.stats[statHPRegen]
 	if r <= 0 || !u.m.Alive() {

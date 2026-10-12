@@ -164,7 +164,7 @@ func (d *Director) ShadowTargetHasState(t d2monster.Target, state int) bool {
 	return d.mercHooks.State(nil, 0, o.m, name).Active
 }
 
-// SelfInCastMask implements d2monster.ShadowEnv. UNVERIFIED: STATE_UnitHasStateInMaskDC's mask is not decoded.
+// SelfInCastMask implements d2monster.ShadowEnv. The exe tests the unit's state bitset against a caller-supplied mask (0x63b240 overlap loop, VERIFIED w37); which states the mask holds is not decoded (UNVERIFIED).
 func (d *Director) SelfInCastMask(_ *d2monster.Brain) bool { return false }
 
 // OtherInStateGroup implements d2monster.ShadowEnv (STATE_HasOtherActiveStateInSameGroup).
@@ -195,14 +195,26 @@ func (d *Director) SelfStateStat(b *d2monster.Brain, state, stat int) (int, bool
 }
 
 // TargetMonsterThreat implements d2monster.ShadowEnv: the byte at monstats +0xa0 + difficulty of a monster target.
-// UNVERIFIED reading: those three bytes are the Level, Level(N) and Level(H) columns, so this is the monster level.
-func (d *Director) TargetMonsterThreat(t d2monster.Target, _ d2monster.Difficulty) (bool, int) {
+// VERIFIED w37 (record layout in monster-ai.md: Drain +0xa0 with one byte per difficulty, Level is +0xaa): those bytes
+// are the Drain (leech sensitivity) column, not the monster level; the caller compares it with 0x18.
+func (d *Director) TargetMonsterThreat(t d2monster.Target, diff d2monster.Difficulty) (bool, int) {
 	o := d.units[t.ID]
 	if o == nil || o.m == nil {
 		return false, 0
 	}
 
-	return true, o.m.Vitals.Level
+	if o.m.Stat == nil {
+		return true, 0
+	}
+
+	switch diff {
+	case d2monster.Nightmare:
+		return true, o.m.Stat.LeechSensitivityNightmare
+	case d2monster.Hell:
+		return true, o.m.Stat.LeechSensitivityHell
+	}
+
+	return true, o.m.Stat.LeechSensitivityNormal
 }
 
 // SelectActiveSkill implements d2monster.ShadowEnv (SKILL_SelectActiveSkillForUnit): the shadow's left skill.

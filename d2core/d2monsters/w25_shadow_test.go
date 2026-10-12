@@ -407,8 +407,7 @@ func TestShadowEnvQueries(t *testing.T) {
 
 	// the resist stat of a hostile monster
 	h := petUnit(2, 105, 100, "Melee", "")
-	h.m.Stat = &d2records.MonStatRecord{Key: "x"}
-	h.m.Vitals.Level = 30
+	h.m.Stat = &d2records.MonStatRecord{Key: "x", LeechSensitivityNormal: 30}
 	r.d.units[2] = h
 
 	if is, lvl := r.d.TargetMonsterThreat(d2monster.Target{ID: 2}, d2monster.Normal); !is || lvl != 30 {
