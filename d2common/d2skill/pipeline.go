@@ -472,6 +472,11 @@ type SummonOrder struct {
 	Stats []StatMod
 	// HP is an extra life bonus (percent for golems/walls, flat for walls).
 	HPPct, HPFlat int
+	// SkillName is the summoning skill; SkillDmgMin/Max (whole points) and SkillToHit are its physical damage and
+	// to-hit bonus at the cast level, the numbers MONSTER_FillSkillDamageInfo 0x56bdb0 gives a minion whose monstats
+	// SkillDamage names this skill (VERIFIED: druid hawk, wolves, bear).
+	SkillName                            string
+	SkillDmgMin, SkillDmgMax, SkillToHit int
 	// X, Y where to place it (aim point, corpse...).
 	X, Y int
 	// Corpse to consume (id), "" if none.

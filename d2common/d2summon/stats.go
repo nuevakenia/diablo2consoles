@@ -29,12 +29,17 @@ type Mods struct {
 	LevelAC, LevelAR int
 	// SummonResist is the owner's passive_summon_resist: resistances for the minion (d2skill.SummonResistMods).
 	SummonResist int
+	// SkillName, SkillMin, SkillMax and SkillAR are the summoning skill's physical damage (whole points) and
+	// to-hit bonus at its level; Compute adds them when the template's SkillDamage names that skill.
+	SkillName                   string
+	SkillMin, SkillMax, SkillAR int
 }
 
 // FromOrder takes the modifiers of a d2skill summon order plus the skill's
 // evaluated passive stats.
 func FromOrder(o *d2skill.SummonOrder, passive []d2skill.StatMod) Mods {
-	return Mods{HPPct: o.HPPct, Aura: o.Stats, Passive: passive, SummonResist: o.SummonResist}
+	return Mods{HPPct: o.HPPct, Aura: o.Stats, Passive: passive, SummonResist: o.SummonResist,
+		SkillName: o.SkillName, SkillMin: o.SkillDmgMin, SkillMax: o.SkillDmgMax, SkillAR: o.SkillToHit}
 }
 
 // Stats are the combat numbers of one minion.
@@ -84,6 +89,14 @@ func Compute(t *Template, diff Difficulty, m Mods, r *d2rand.Seed) Stats {
 	s.Defense = b.AC + m.LevelAC
 	s.AR = b.A1TH + m.LevelAR
 	s.DmgMin, s.DmgMax = b.A1Min, b.A1Max
+
+	// MONSTER_SetupLevelScaledStats 0x5a2960 adds the SkillDamage skill's min, max and to-hit to the level scaled
+	// A1 numbers (stats 0x15, 0x16, 0x13) before any damagepercent (VERIFIED).
+	if t.DamageSkill != "" && strings.EqualFold(t.DamageSkill, m.SkillName) {
+		s.DmgMin += m.SkillMin
+		s.DmgMax += m.SkillMax
+		s.AR += m.SkillAR
+	}
 
 	var dmgPct, armorPct, flatHP int
 

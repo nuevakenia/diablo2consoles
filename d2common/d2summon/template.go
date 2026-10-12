@@ -53,6 +53,9 @@ type Template struct {
 	Run    int
 	Diff   [3]Base
 	Skill1 string // monstats Skill1 (the skill traps and casters use)
+	// DamageSkill is monstats SkillDamage (+0xa8): the owner's skill whose damage and to-hit the minion gets
+	// (MONSTER_FillSkillDamageInfo 0x56bdb0, VERIFIED); only druid hawk, wolves and bear have one.
+	DamageSkill string
 }
 
 // Templates indexes monstats rows by id (case insensitive) and class.
@@ -127,7 +130,7 @@ func LoadTemplates(monstats []byte) (*Templates, error) {
 
 		tp := &Template{
 			Class: d.Number("hcIdx"), ID: id, AI: d.String("AI"),
-			Walk: d.Number("Velocity"), Run: d.Number("Run"), Skill1: d.String("Skill1"),
+			Walk: d.Number("Velocity"), Run: d.Number("Run"), Skill1: d.String("Skill1"), DamageSkill: d.String("SkillDamage"),
 		}
 
 		for i, s := range diffSuffix {

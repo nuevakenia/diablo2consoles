@@ -1730,6 +1730,12 @@ func doSummonFn(c *cast) {
 		o.Max = 1
 	}
 
+	wmin, wmax := c.u.WeaponDamage()
+	o.SkillName = sk.Name
+	o.SkillDmgMin = int(sk.PhysMin(c.env, c.lvl, wmin, true)) >> 8
+	o.SkillDmgMax = int(sk.PhysMax(c.env, c.lvl, wmax, true)) >> 8
+	o.SkillToHit = sk.ToHitBonus(c.env, c.lvl)
+
 	// VERIFIED (SRVDO_114 / 115 / 119): the monster's level is skills.txt calc2
 	// (at least 1) through SKILL_ComputeSummonLevel; a blank calc2 keeps the
 	// owner's level here.
