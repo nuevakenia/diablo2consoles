@@ -71,9 +71,10 @@ func Merge(lists ...[]Stat) []Stat {
 }
 
 type statLine struct {
-	prio int
-	id   int
-	text string
+	prio  int
+	id    int
+	text  string
+	param int
 }
 
 // StatLines turns merged stats into description lines, ordered by
@@ -113,15 +114,28 @@ func (t *Tables) StatLines(stats []Stat, ctx *Context) []string {
 			continue
 		}
 
-		lines = append(lines, statLine{def.Priority, s.ID, text})
+		lines = append(lines, statLine{prio: def.Priority, id: s.ID, text: text, param: s.Param})
 	}
+
+	rank := t.displayRank()
 
 	sort.SliceStable(lines, func(i, j int) bool {
 		if lines[i].prio != lines[j].prio {
 			return lines[i].prio > lines[j].prio
 		}
 
-		return lines[i].id < lines[j].id
+		// same priority: the exe's qsort order (exe_order.go), then the
+		// parameters from high to low
+		ri, rj := rank[lines[i].id], rank[lines[j].id]
+		if ri != rj {
+			return ri < rj
+		}
+
+		if lines[i].id != lines[j].id {
+			return lines[i].id < lines[j].id
+		}
+
+		return lines[i].param > lines[j].param
 	})
 
 	out := make([]string, 0, len(lines))
@@ -193,7 +207,7 @@ func (t *Tables) groupLines(byID map[int]Stat, used map[int]bool) []statLine {
 		}
 
 		text := t.format(d.GrpFunc, d.GrpVal, d.GrpStrPos, d.GrpStrNeg, d.GrpStr, val, 0, d)
-		out = append(out, statLine{prio, d.ID, text})
+		out = append(out, statLine{prio: prio, id: d.ID, text: text})
 	}
 
 	return out
@@ -207,18 +221,18 @@ func (t *Tables) pairLines(byID map[int]Stat, used map[int]bool) []statLine {
 			used[statEnhDmgMax], used[statEnhDmgMin] = true, true
 
 			p := maxInt(t.Stats[statEnhDmgMax].Priority, t.Stats[statEnhDmgMin].Priority)
-			out = append(out, statLine{p, statEnhDmgMax, fmt.Sprintf("%s%d%% %s", sign(mx.Value), mx.Value, t.enhancedDamageText())})
+			out = append(out, statLine{prio: p, id: statEnhDmgMax, text: fmt.Sprintf("%s%d%% %s", sign(mx.Value), mx.Value, t.enhancedDamageText())})
 		} else {
 			used[statEnhDmgMax] = true
-			out = append(out, statLine{t.Stats[statEnhDmgMax].Priority, statEnhDmgMax,
-				fmt.Sprintf("%s%d%% %s", sign(mx.Value), mx.Value, t.tr(t.Stats[statEnhDmgMax].StrPos))})
+			out = append(out, statLine{prio: t.Stats[statEnhDmgMax].Priority, id: statEnhDmgMax,
+				text: fmt.Sprintf("%s%d%% %s", sign(mx.Value), mx.Value, t.tr(t.Stats[statEnhDmgMax].StrPos))})
 		}
 	}
 
 	if mn, ok := byID[statEnhDmgMin]; ok && !used[statEnhDmgMin] {
 		used[statEnhDmgMin] = true
-		out = append(out, statLine{t.Stats[statEnhDmgMin].Priority, statEnhDmgMin,
-			fmt.Sprintf("%s%d%% %s", sign(mn.Value), mn.Value, t.tr(t.Stats[statEnhDmgMin].StrPos))})
+		out = append(out, statLine{prio: t.Stats[statEnhDmgMin].Priority, id: statEnhDmgMin,
+			text: fmt.Sprintf("%s%d%% %s", sign(mn.Value), mn.Value, t.tr(t.Stats[statEnhDmgMin].StrPos))})
 	}
 
 	ids := make([]int, 0, len(damagePairs))
@@ -272,7 +286,7 @@ func (t *Tables) pairLines(byID map[int]Stat, used map[int]bool) []statLine {
 			}
 		}
 
-		out = append(out, statLine{prio, id, text})
+		out = append(out, statLine{prio: prio, id: id, text: text})
 	}
 
 	return out

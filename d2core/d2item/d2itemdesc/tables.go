@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Source returns the bytes of a game table by file name, for example
@@ -168,6 +169,10 @@ type Tables struct {
 
 	// EtherealText is the line printed for ethereal items; the original
 	// string is not in the string tables (unverified), so it can be replaced.
+	// rank is the exe tooltip order of described stats (exe_order.go)
+	rankOnce sync.Once
+	rank     map[int]int
+
 	EtherealText string
 }
 
