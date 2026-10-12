@@ -21,6 +21,11 @@ type heroUnit struct {
 	manaFrac  int // the 8.8 fraction of mana the integer Stats.Mana cannot hold
 	cooldowns map[int]int
 
+	// usedSkill / usedBits4: the skill the hero last started (the exe's "used skill", UNIT_GetUsedSkill) and its
+	// skills.txt dwBits4 word, read by the block animation gate (heroBlockAnim).
+	usedSkill bool
+	usedBits4 uint32
+
 	passives     map[string]int
 	passiveFrame int
 	inPassive    bool
@@ -554,3 +559,11 @@ var (
 	_ d2path.Grid      = (*world)(nil)
 	_ d2missile.Finder = (*world)(nil)
 )
+
+// RollBlock implements d2missile.Blocker: the monster's shield block of a hit that passed the to-hit roll, rolled on
+// the monster's own seed by the director (COMBAT_RollShieldBlock 0x57bfa0, wave 24).
+func (t *monsterTarget) RollBlock(missile bool) bool {
+	return t.e.monsters.MonsterBlock(t.m, missile)
+}
+
+var _ d2missile.Blocker = (*monsterTarget)(nil)

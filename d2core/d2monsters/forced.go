@@ -267,6 +267,11 @@ func (d *Director) strikeUnit(u, tu *unit, atk d2mapentity.MonsterAttack, mode d
 	dmg := 0
 	avoided := false
 
+	// shield block of a monster defender, rolled on its own seed right after the to-hit roll (0x57cc10)
+	if hit && tu.merc == nil && d.MonsterBlock(tu.m, attackIsRanged(u.m.Stat, mode)) {
+		hit, avoided = false, true
+	}
+
 	// dodge / avoid / evade of a summon's passive skills (Valkyrie), rolled after the to-hit and before the damage
 	// like the hero's (VERIFIED order for players, COMBAT_RollDodgeAvoidEvade 0x57bd60; for monsters UNVERIFIED)
 	if hit && tu.ally != nil {

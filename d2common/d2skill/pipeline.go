@@ -503,8 +503,10 @@ type MeleeResult struct {
 	Hit    bool
 	Chance int
 	Roll   int
-	Damage d2combat.Damage // rolled, before resists, 8.8
-	Total  int32           // sum of the damage components, 8.8
+	// Blocked: the to-hit roll succeeded but the target's shield block took the blow (Hit is then false).
+	Blocked bool
+	Damage  d2combat.Damage // rolled, before resists, 8.8
+	Total   int32           // sum of the damage components, 8.8
 	// Delay is the frames before the blow lands (a Leap Attack hits after the landing); 0 is at once.
 	Delay int
 }

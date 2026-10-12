@@ -418,7 +418,7 @@ func (d *Director) HeroStrike(p *d2mapentity.Player, m *d2mapentity.Monster) boo
 
 	// shield block of the monster after the to-hit roll (COMBAT_RollShieldBlock 0x57bfa0, VERIFIED: the roll
 	// takes a step of the DEFENDER's seed; the chance is stat 0x14 gated by COMBAT_GetBlockChance 0x6228d0)
-	if d2combat.RollShieldBlock(u.b.Seed, m.Vitals.Block, false) {
+	if d.MonsterBlock(m, false) {
 		d.emit("herohit", "HERO swing target=%s hit=false blocked=true chance=%d roll=%d", m.Label(), chance, roll)
 
 		return false
@@ -1009,7 +1009,13 @@ func (d *Director) noteBlockAnim(p *d2mapentity.Player) string {
 	play := !seen || d2combat.BlockRecoveryReady(d.frame-last, fbr)
 
 	if play {
-		d.lastBlock[p] = d.frame
+		d.lastBlock[p] = d.frame // the stamp (stat 0x5f) is set whether or not the mode change is accepted (0x57ae50)
+
+		// the mode change itself is gated by what the hero is doing (PLRMODE_CanInterruptCurrentMode, wave 24)
+		if d.HeroBlockAnim != nil && !d.HeroBlockAnim(p) {
+			return " block_anim=false gated=true"
+		}
+
 		d.Counters.BlockAnims++
 	}
 
