@@ -3,6 +3,7 @@ package ebiten
 import (
 	"errors"
 	"image"
+	"os"
 	"time"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2display"
@@ -151,7 +152,7 @@ func CreateRenderer(cfg *d2config.Configuration) (*Renderer, error) {
 		config := cfg
 
 		ebiten.SetCursorMode(ebiten.CursorModeHidden)
-		ebiten.SetFullscreen(config.FullScreen)
+		ebiten.SetFullscreen(config.FullScreen || alwaysFullscreen())
 		ebiten.SetRunnableOnUnfocused(config.RunInBackground)
 		ebiten.SetVsyncEnabled(config.VsyncEnabled)
 		ebiten.SetMaxTPS(config.TicksPerSecond)
@@ -285,4 +286,17 @@ func (r *Renderer) SetWindowScale(scale int) {
 	}
 
 	ebiten.SetWindowSize(s.W*scale, s.H*scale)
+}
+
+// alwaysFullscreen is the owner's choice: the game starts full screen every time, whatever config.json says. Test and
+// scripted runs (any OD2_AUTO* variable, OD2_TURBO, OD2_DISPLAY) and OD2_WINDOWED=1 keep the window.
+func alwaysFullscreen() bool {
+	for _, name := range []string{"OD2_WINDOWED", "OD2_DISPLAY", "OD2_TURBO", "OD2_AUTOSCRIPT", "OD2_AUTOGAME", "OD2_AUTOFLOW",
+		"OD2_AUTOLEVEL", "OD2_AUTOCAST", "OD2_AUTOMONSTER", "OD2_REALMAPS"} {
+		if os.Getenv(name) != "" {
+			return false
+		}
+	}
+
+	return true
 }

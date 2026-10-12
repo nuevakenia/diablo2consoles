@@ -10,6 +10,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
 )
 
@@ -36,6 +37,9 @@ type containerKind struct {
 	page    int    // d2hero.Page*
 	art     string // the quadrant picture (4 frames: top-left, top-right, bottom-left, bottom-right)
 	records []string
+	// expArt is the picture that goes with the FIRST record (the expansion stash: TradeStash.dc6 carries the 6x8
+	// grid recess; bank.dc6 has the classic 6x4 one at the bottom). Empty = the same art for every record.
+	expArt string
 	// fallback layout when no record is found: columns, rows and the pixel rect of the grid
 	cols, rows, left, top int
 	acceptsCube           bool
@@ -47,7 +51,9 @@ var (
 		art: "/data/global/ui/PANEL/bank.DC6",
 		// the expansion stash (Big Bank, 6x8) is used when the game data has it; the classic one is 6x4
 		records: []string{"Big Bank Page2", "Bank Page2"},
-		cols:    6, rows: 8, left: 154, top: 142,
+		expArt:  "/data/global/ui/PANEL/TradeStash.DC6",
+		// fallback = the classic 6x4 stash and its picture (Bank Page2, UNVERIFIED without the data)
+		cols: 6, rows: 4, left: 154, top: 333,
 		acceptsCube: true,
 	}
 	cubeKind = containerKind{
@@ -71,6 +77,7 @@ type ContainerPanel struct {
 	tooltip    *d2ui.Tooltip
 	grid       *ItemGrid
 	originX    int
+	artPath    string
 
 	isOpen         bool
 	mouseX, mouseY int
@@ -91,25 +98,68 @@ type ContainerPanel struct {
 	*d2util.Logger
 }
 
+// containerLayout is where a panel's picture and item grid are, in the 800x600 interface column (the same space as the
+// Inventory.txt "...2" rows); the picture is drawn at (PanelLeft, panelArtTop).
+type containerLayout struct {
+	Art                                    string
+	Cols, Rows, Left, Top, Cell, PanelLeft int
+}
+
+// resolveContainerLayout picks the first usable record of the kind with the picture that goes with it, so the grid
+// always sits on the recess of the picture (classic bank.dc6 = 6x4 at the bottom; TradeStash.dc6 = 6x8 on top).
+func resolveContainerLayout(kind containerKind, record func(name string) (containerLayout, bool),
+	exists func(string) bool) containerLayout {
+	lay := containerLayout{Art: kind.art, Cols: kind.cols, Rows: kind.rows, Left: kind.left, Top: kind.top,
+		Cell: vendorCell, PanelLeft: 80}
+
+	for i, name := range kind.records {
+		art := kind.art
+
+		if i == 0 && kind.expArt != "" {
+			if !exists(kind.expArt) {
+				continue // the expansion record needs the expansion picture
+			}
+
+			art = kind.expArt
+		}
+
+		if rec, ok := record(name); ok {
+			rec.Art = art
+
+			return rec
+		}
+	}
+
+	return lay
+}
+
+// inventoryRecordLayout reads the grid rectangle and the panel left edge of an Inventory.txt row.
+func inventoryRecordLayout(inv d2records.Inventory) func(string) (containerLayout, bool) {
+	return func(name string) (containerLayout, bool) {
+		rec := inv[name]
+		if rec == nil || rec.Grid == nil || rec.Grid.Columns <= 0 {
+			return containerLayout{}, false
+		}
+
+		return containerLayout{Cols: rec.Grid.Columns, Rows: rec.Grid.Rows, Left: rec.Grid.Box.Left,
+			Top: rec.Grid.Box.Top, Cell: rec.Grid.CellWidth, PanelLeft: rec.Panel.Left}, true
+	}
+}
+
 // NewContainerPanel creates a closed panel of a kind ("stash" or "cube").
 func NewContainerPanel(asset *d2asset.AssetManager, ui *d2ui.UIManager, l d2util.LogLevel, cursor *Inventory,
 	kind containerKind, onChange func()) *ContainerPanel {
 	p := &ContainerPanel{asset: asset, ui: ui, kind: kind, cursor: cursor, onChange: onChange}
 
-	cols, rows, left, top, cell, panelLeft := kind.cols, kind.rows, kind.left, kind.top, vendorCell, 80
+	lay := resolveContainerLayout(kind, inventoryRecordLayout(asset.Records.Layout.Inventory), func(f string) bool {
+		ok, _ := asset.FileExists(f)
 
-	for _, name := range kind.records {
-		if rec := asset.Records.Layout.Inventory[name]; rec != nil && rec.Grid != nil && rec.Grid.Columns > 0 {
-			cols, rows = rec.Grid.Columns, rec.Grid.Rows
-			left, top, cell = rec.Grid.Box.Left, rec.Grid.Box.Top, rec.Grid.CellWidth
-			panelLeft = rec.Panel.Left
+		return ok
+	})
 
-			break
-		}
-	}
-
-	p.originX = panelLeft
-	p.grid = newPlainItemGrid(asset, ui, l, cols, rows, left, top, cell)
+	p.originX = lay.PanelLeft
+	p.artPath = lay.Art
+	p.grid = newPlainItemGrid(asset, ui, l, lay.Cols, lay.Rows, lay.Left, lay.Top, lay.Cell)
 
 	p.Logger = d2util.NewLogger()
 	p.Logger.SetLevel(l)
@@ -125,7 +175,7 @@ func (p *ContainerPanel) Load() {
 
 	var err error
 
-	if p.art, err = p.ui.NewSprite(p.kind.art, d2resource.PaletteSky); err != nil {
+	if p.art, err = p.ui.NewSprite(p.artPath, d2resource.PaletteSky); err != nil {
 		p.Errorf("%s panel art: %v", p.kind.name, err)
 	}
 
