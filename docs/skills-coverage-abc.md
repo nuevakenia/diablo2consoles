@@ -6,8 +6,8 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 
 | | before | after |
 |---|---|---|
-| fully simulated | 64 | 73 |
-| partial | 17 | 17 |
+| fully simulated | 64 | 89 |
+| partial | 17 | 1 |
 | stub | 1 | 0 |
 | missing | 8 | 0 |
 | total | 90 | 90 |
@@ -62,7 +62,7 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 134 | Pole Arm Mastery | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 135 | Throwing Mastery | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 136 | Spear Mastery | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
-| 137 | Taunt | -/71 | -/- | partial | partial | curse-style state with a synthetic stat; AI reaction is U |
+| 137 | Taunt | -/71 | -/- | partial | fully simulated | w37: SRVDO_071 0x5d6fe0 and the forced state 12 think (MONAI_State12_Think 0x5e7240) are both ported (d2monster/forced.go thinkState12); curse on one unit, the target or the nearest valid one within 20 |
 | 138 | Shout | -/68 | -/25 | fully simulated | fully simulated |  |
 | 139 | Stun | 32/2 | -/- | fully simulated | fully simulated |  |
 | 140 | Double Throw | -/74 | 11/42 | fully simulated | fully simulated | Wave 23 VERIFIED 0x5d7340: two missiles on one line (no fan) |
@@ -75,8 +75,8 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 147 | Frenzy | -/9 | -/39 | fully simulated | fully simulated | Wave 23 VERIFIED 0x5d78b0: two blows per swing (second by round robin), state only after a hit, stack up to the skill level with the count as level, calc4 percent to magic |
 | 148 | Increased Speed | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 149 | Battle Orders | -/68 | -/25 | fully simulated | fully simulated |  |
-| 150 | Grim Ward | 33/75 | 26/41 | missing | partial | corpse consumed, terror state on enemies within aurarangecalc every 6 frames for 200 frames (SRVDO_075 0x5d7430, missile table values); the small/medium/large variant by corpse size is not modelled |
-| 151 | Whirlwind | 38/76 | 31/45 | missing | partial | hero walks to the point one subtile per frame hitting the nearest other enemy every weapon-delay frames (SRVST_038/SRVDO_076, 0x5d7a00/0x5d8010); walk speed and the scan radius unit are U |
+| 150 | Grim Ward | 33/75 | 26/41 | missing | fully simulated | w22: the missile is picked by the corpse size flags (WardMissile, 0x5d7430); the ward is a terror field every 6 frames for 200 frames |
+| 151 | Whirlwind | 38/76 | 31/45 | missing | partial | w21/w22/w37 VERIFIED: walk velocity (charstats WalkVelocity << 8, no movement percentage), refused in state 0xc, scan radius 5 (squared 25) with victims rotating by unit id, hit scheduler 0x5d7de0 with 2 hits when both hands hold item type 0x2e (= mele, table row 46, verified w37); left: later velocity rescale by PATH_UpdateUnitVelocityAndAnimRate (UNVERIFIED) |
 | 152 | Berserk | 39/2 | -/- | fully simulated | fully simulated | Wave 23 VERIFIED 0x5d82a0: state (zero defense) for calc2 frames, calc4 percent converted to magic |
 | 153 | Natural Resistance | -/- | -/- | fully simulated | fully simulated | passive stats (PassiveTotals / mastery / defense hooks) |
 | 154 | War Cry | -/68 | -/25 | fully simulated | fully simulated |  |
@@ -98,10 +98,10 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 260 | Dragon Claw | 25/46 | -/- | partial | fully simulated | VERIFIED SRVDO_046 0x5d4cf0 / 0x5d4ba0: one blow per action frame (two per cast here), to-hit bonus plus stat 0x145, calc1 damage bonus, charges released |
 | 261 | Charged Bolt Sentry | -/45 | -/- | fully simulated | fully simulated |  |
 | 262 | Wake of Fire Sentry | -/45 | -/- | partial | fully simulated | VERIFIED SRVDO_125 0x5cf700 + missile do function 31 0x5addd0 (w20): the maker drops two flames per new cell along +-(quarter turn of the line of fire); sentry fires on the generic trap cadence (U) |
-| 263 | Weapon Block | -/- | -/- | partial | partial | passive stat is keyed to the weapon type, so it is left out of PassiveTotals; the block rule lives in d2combat/avoid.go |
+| 263 | Weapon Block | -/- | -/- | partial | fully simulated | w37 VERIFIED: the weapon class test of 0x57bd60 (COMPOSIT_ResolveWeaponClassCode 0x650480) needs item type 0x2d in both hands, which is table row 45 = code weap (the generic weapon type, not the claw type), so only a dual-wielding Assassin rolls; the passive stat is keyed by item type, hence left out of PassiveTotals (d2skills/weaponblock.go, d2skill/weaponblock.go) |
 | 264 | Cloak of Shadows | -/47 | 7/- | partial | fully simulated | VERIFIED SRVDO_047 0x5d4fe0 / 0x5d4ec0 (batch next): aura on caster, target state + AI state 10 for monsters |
 | 265 | Cobra Strike | 23/34 | -/- | fully simulated | fully simulated |  |
-| 266 | Blade Fury | 26/48 | 8/6 | missing | partial | one bladefragment1 per do, repeat gate prgcalc1-1 frames (SRVDO_048 0x5d5260); the fragment flight/bounce rules of the missile are the generic ones |
+| 266 | Blade Fury | 26/48 | 8/6 | missing | fully simulated | w23 VERIFIED SRVST_026/SRVDO_048: state 0xc upkeep and the throw gate in the skill's target slot (d2skill/bladefury.go); one bladefragment1 per do, the flight is the generic missile path |
 | 267 | Fade | -/18 | -/- | fully simulated | fully simulated |  |
 | 268 | Shadow Warrior | -/49 | -/- | fully simulated | fully simulated |  |
 | 269 | Claws of Thunder | 23/35 | -/- | fully simulated | fully simulated |  |
@@ -112,10 +112,10 @@ Status words: **fully simulated** (a ported function plus the missiles/states it
 | 274 | Blades of Ice | 23/35 | -/- | fully simulated | fully simulated |  |
 | 275 | Dragon Flight | 12/52 | 5/- | missing | fully simulated | VERIFIED SRVDO_052 0x5d6290: needs a target unit; the branch is the animation frame (first: teleport when levels.txt Teleport != 0, 2 refuses a blocked line; second: the kick with the skill bonus + stat 0x145 and the charge release); the port lands next to the target (the exe goes to its position) |
 | 276 | Death Sentry | -/45 | -/- | fully simulated | fully simulated |  |
-| 277 | Blade Shield | 28/54 | -/- | stub | partial | SRVDO_054 0x5d6880 + SRVDO_142 0x5d6750 area tick every perdelay, skipped in town (w20); hit-roll rule U |
+| 277 | Blade Shield | 28/54 | -/- | stub | fully simulated | SRVDO_054 0x5d6880 + SRVDO_142 0x5d6750 area tick every perdelay, skipped in town; the to-hit roll happens when resultflags bit 0 is clear (VERIFIED w23, Effect.RollToHit) |
 | 278 | Venom | -/18 | -/- | fully simulated | fully simulated |  |
 | 279 | Shadow Master | -/49 | -/- | fully simulated | fully simulated |  |
-| 280 | Royal Strike | 23/34 | -/- | partial | partial | charge strike works; the chaos ice missile (do function 35) is not simulated |
+| 280 | Royal Strike | 23/34 | -/- | partial | fully simulated | w37 VERIFIED: the charge release runs srvprgfunc1/2/3 = 40 (SRVDO_040 0x5d3890: one progressive missile at the target), 143 (arc B, chain lightning step from prgcalc2) and 41 (SRVDO_041 0x5d3910: chaos ice, par5 = 16 missiles with a random heading in -20..19 packed into data field 0x2c, local seed in 0x28); the flight is missile do function 35. UNVERIFIED: the unit seed word stands in as a roll of the caster, and that the heading is also the first destination offset |
 
 ## What was added
 
