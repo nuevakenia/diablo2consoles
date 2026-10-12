@@ -84,6 +84,8 @@ type ContainerPanel struct {
 
 	// cursor is the inventory that owns the cursor item.
 	cursor *Inventory
+	// itemHook adds lines to the tooltip of an item (durability, the comparison with the worn item).
+	itemHook func(InventoryItem) []string
 	// onChange runs after the content changed (the game saves the hero).
 	onChange func()
 	onClose  func()
@@ -358,7 +360,12 @@ func (p *ContainerPanel) OnMouseMove(mx, my int) {
 	}
 
 	if it := p.grid.ItemAtScreen(mx, my); it != nil {
-		p.tooltip.SetTextLines(it.GetItemDescription())
+		lines := it.GetItemDescription()
+		if p.itemHook != nil {
+			lines = append(append([]string{}, lines...), p.itemHook(it)...)
+		}
+
+		p.tooltip.SetTextLines(lines)
 		p.tooltip.SetPosition(mx, my-vendorCell/2)
 		p.tooltip.SetVisible(true)
 

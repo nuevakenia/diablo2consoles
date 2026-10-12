@@ -3,39 +3,63 @@ package d2player
 import (
 	"strings"
 	"testing"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2equip"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
 )
 
-func TestCompareLine(t *testing.T) {
-	if l := compareLine("Defense:", 11, 10); !strings.Contains(l, "Defense: +10%") {
-		t.Errorf("better line %q", l)
+func TestCompareRowLinesColours(t *testing.T) {
+	defer d2ui.SetColorBlind(false)
+
+	rows := []d2hero.CompareRow{
+		{Name: "Defense", Text: "+12 (+8%)", Verdict: d2hero.Better},
+		{Name: "Damage", Text: "-3.5 (-9%)", Verdict: d2hero.Worse},
+		{Name: "Attack Speed", Text: "same", Verdict: d2hero.Same},
 	}
 
-	if l := compareLine("Damage:", 8, 10); !strings.Contains(l, "Damage: -20%") {
-		t.Errorf("worse line %q", l)
+	tests := []struct {
+		name  string
+		blind bool
+		want  []string
+	}{
+		{"normal: blue better, red worse, white same", false, []string{
+			"[blue]Defense: +12 (+8%)", "[red]Damage: -3.5 (-9%)", "[white]Attack Speed: same"}},
+		{"colour blind: vermillion for worse, words as well", true, []string{
+			"[blue]Defense: +12 (+8%) (better)", "[orange]Damage: -3.5 (-9%) (worse)", "[white]Attack Speed: same"}},
 	}
 
-	if l := compareLine("Damage:", 5, 5); l != "" {
-		t.Errorf("equal values give %q", l)
-	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			d2ui.SetColorBlind(tc.blind)
 
-	if l := compareLine("Defense:", 7, 0); !strings.Contains(l, "Defense: +7") {
-		t.Errorf("no worn value: %q", l)
-	}
-
-	if better, worse := compareLine("X", 2, 1), compareLine("X", 1, 2); better == worse {
-		t.Error("better and worse use the same colour")
+			got := compareRowLines(rows)
+			if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
+				t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(tc.want, "\n"))
+			}
+		})
 	}
 }
 
-type fakeDescItem struct{ InventoryItem }
+func TestPlaceableReasons(t *testing.T) {
+	tests := []struct {
+		r    d2equip.Reason
+		want bool
+	}{
+		{d2equip.ReasonOK, true},
+		{d2equip.ReasonStrength, true}, // compared by what it would give
+		{d2equip.ReasonDexterity, true},
+		{d2equip.ReasonLevel, true},
+		{d2equip.ReasonBodyLoc, false},
+		{d2equip.ReasonClass, false},
+		{d2equip.ReasonDualWield, false},
+		{d2equip.ReasonNoAmmoWeapon, false},
+		{d2equip.ReasonUnidentified, false},
+	}
 
-func (fakeDescItem) GetItemDescription() []string {
-	return []string{"Cap", "Defense: 12", "One-Hand Damage: 3 to 7", "Durability: 12 of 12"}
-}
-
-func TestItemNumbers(t *testing.T) {
-	def, dmg := itemNumbers(fakeDescItem{})
-	if def != 12 || dmg != 5 {
-		t.Errorf("defense %d damage %v", def, dmg)
+	for _, tc := range tests {
+		if got := placeable(tc.r); got != tc.want {
+			t.Errorf("placeable(%q) = %v, want %v", tc.r, got, tc.want)
+		}
 	}
 }
