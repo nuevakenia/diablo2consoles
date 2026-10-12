@@ -86,6 +86,10 @@ func ExportD2SWithOptions(state *HeroState, original []byte, tables *d2s.ItemTab
 		}
 	}
 
+	if opts.Affixes != nil && state.Containers != nil {
+		exportNewWorn(c, state.Containers, tables, opts.Affixes, warn)
+	}
+
 	if c.Body != nil && state.Stats != nil {
 		exportAttributes(c, state, warn)
 		exportSkills(c.Body, state, opts.SkillIDs)

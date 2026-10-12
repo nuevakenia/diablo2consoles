@@ -320,6 +320,11 @@ func exportEquipment(c *d2s.Character, state *HeroState, warn func(string, ...in
 	for i := range cont.Equipped {
 		s := &cont.Equipped[i]
 		if s.D2S == nil {
+			if id, ok := wornInFile(c, s.X, s.Code); ok {
+				seen[id] = true
+				continue // written by an earlier save (exportNewWorn)
+			}
+
 			warn("worn item %q (slot %d) is not from the save, not written", s.Code, s.X)
 			continue
 		}

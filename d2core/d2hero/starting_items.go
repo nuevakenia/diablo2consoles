@@ -31,26 +31,59 @@ func (f *HeroStateFactory) StartingContainers(hero d2enum.Hero) *HeroContainers 
 		return nil
 	}
 
-	out := &HeroContainers{Items: []StoredItem{}}
-	belt, invX := 0, 0
-
-	for i, code := range rec.StartItem {
-		code = strings.TrimSpace(code)
-		if code == "" || code == "0" || bodySlotLocation(rec.StartItemLocation[i]) {
-			continue
-		}
-
+	return startingKit(rec.StartItem[:], rec.StartItemLocation[:], rec.StartItemCount[:], func(code string) (int, bool) {
 		item := f.asset.Records.Item.All[code]
 		if item == nil {
+			return 0, false
+		}
+
+		return item.InventoryWidth, true
+	})
+}
+
+// startingKit lays out the item1..item10 columns of a CharStats row: the items
+// whose location is a body slot are worn (Equipped, in the order of the rows),
+// potions go to the belt, everything else to the inventory from the top left.
+// widthOf gives the inventory width of a base item and false for a code the
+// tables do not have (such a row is skipped). The worn items are listed in
+// Equipped with EquippedSet, so the body of a new hero is exactly the kit and
+// nothing else (no placeholder gear); all items are identified, normal quality.
+func startingKit(codes, locs []string, counts []int, widthOf func(code string) (int, bool)) *HeroContainers {
+	out := &HeroContainers{Items: []StoredItem{}, Equipped: []StoredItem{}, EquippedSet: true}
+	belt, invX := 0, 0
+
+	for i, code := range codes {
+		code = strings.TrimSpace(code)
+		if code == "" || code == "0" {
 			continue
 		}
 
-		count := rec.StartItemCount[i]
-		if count < 1 {
-			count = 1
+		w, known := widthOf(code)
+		if !known {
+			continue
 		}
 
-		w := item.InventoryWidth
+		loc := ""
+		if i < len(locs) {
+			loc = locs[i]
+		}
+
+		if bodySlotLocation(loc) {
+			if slot := starterSlot(loc); slot > 0 {
+				out.Equipped = append(out.Equipped, StoredItem{
+					Code: code, Page: PageEquipped, X: slot, ILvl: 1, Quality: int(d2drop.QualityNormal),
+					Seed: int64(1000*i + 1), Identified: true, Origin: true,
+				})
+			}
+
+			continue
+		}
+
+		count := 1
+		if i < len(counts) && counts[i] > 1 {
+			count = counts[i]
+		}
+
 		if w < 1 {
 			w = 1
 		}
@@ -123,7 +156,7 @@ func (f *HeroStateFactory) giveStartingItemsToFreshHero(state *HeroState, hero d
 		return
 	}
 
-	if c := f.StartingContainers(hero); c != nil && len(c.Items) > 0 {
+	if c := f.StartingContainers(hero); c != nil && len(c.Items)+len(c.Equipped) > 0 {
 		state.Containers = c
 	}
 
