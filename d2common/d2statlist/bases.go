@@ -57,6 +57,8 @@ func ParseBases(armor, weapons []byte) (Bases, error) {
 			TwoMin: tsvInt(r, col, "2handmindam"), TwoMax: tsvInt(r, col, "2handmaxdam"),
 			TwoHanded: tsvInt(r, col, "2handed") != 0,
 			StrBonus:  tsvInt(r, col, "strbonus"), DexBonus: tsvInt(r, col, "dexbonus"),
+			OneOrTwo: tsvInt(r, col, "1or2handed") != 0,
+			MisMin:   tsvInt(r, col, "minmisdam"), MisMax: tsvInt(r, col, "maxmisdam"),
 		}
 
 		if w.Max == 0 && w.Min == 0 {

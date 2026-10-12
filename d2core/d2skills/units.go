@@ -8,6 +8,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2missile"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2statlist"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2monsters"
@@ -135,7 +136,35 @@ func (h *heroUnit) Stat(name string) int {
 		v = h.p.Stats.Vitality
 	}
 
-	return v + h.e.setOf(h.p.ID()).Stat(h.e.frame, name) + h.passive(name)
+	return v + h.e.setOf(h.p.ID()).Stat(h.e.frame, name) + h.passive(name) + h.gearStat(name)
+}
+
+// gearStat is what the hero's items add to the stats the damage and to-hit pools read (damage percent, stat 0x19;
+// attack rating percent, stat 0x77), which a skill engine unit would otherwise only see from skills. The items'
+// share only: the totals' own list also holds the skills' stats, which setOf and passive already supply.
+func (h *heroUnit) gearStat(name string) int {
+	t := h.totals()
+	if t == nil {
+		return 0
+	}
+
+	switch name {
+	case "damagepercent":
+		return t.GearDamagePct
+	case "item_tohit_percent":
+		return t.GearToHitPct
+	}
+
+	return 0
+}
+
+// totals is the hero's equipment totals (nil for a merc or a hero without them).
+func (h *heroUnit) totals() *d2statlist.Totals {
+	if h.merc != nil || h.p == nil || h.p.Stats == nil {
+		return nil
+	}
+
+	return h.p.Stats.Totals
 }
 
 // passive sums the passivestat columns of the hero's passive skills (Dodge,
@@ -204,6 +233,12 @@ func (h *heroUnit) AttackRating() int {
 		return h.merc.c.AR
 	}
 
+	// The attack rating with the gear's flat part and dexterity, like HeroStrike; the percent (stat 0x77) is added
+	// by COMBAT_RollToHit (0x57b9c0) itself and reaches the roll through Stat("item_tohit_percent").
+	if t := h.totals(); t != nil && t.AttackRatingFlat != 0 {
+		return t.AttackRatingFlat
+	}
+
 	st := h.e.asset.Records.Character.Stats[h.p.Class]
 	if st == nil {
 		return d2combat.PlayerAttackRating(0, h.p.Stats.Dexterity, 0)
@@ -236,6 +271,12 @@ func (h *heroUnit) WeaponDamage() (min, max int) {
 		return maxInt(h.merc.c.DmgMin, 1), maxInt(h.merc.c.DmgMax, 2)
 	}
 
+	// The unit damage stats 0x15/0x16 (wave 24, VERIFIED 0x64ca60): base or two handed range, the weapon's
+	// enhanced damage (ethereal included) and the added damage, before the percent pool.
+	if t := h.totals(); t != nil && t.Weapon.Max > 0 {
+		return t.Weapon.Min, t.Weapon.Max
+	}
+
 	if h.p.Equipment != nil && h.p.Equipment.RightHand != nil {
 		if rec := h.e.asset.Records.Item.Weapons[h.p.Equipment.RightHand.GetItemCode()]; rec != nil && rec.MaxDamage > 0 {
 			min, max = rec.MinDamage, rec.MaxDamage
@@ -243,6 +284,34 @@ func (h *heroUnit) WeaponDamage() (min, max int) {
 	}
 
 	return min, max
+}
+
+// MissileWeaponDamage is the range a missile skill's descriptor takes (0x64ca60): the thrown stats 0x9f/0xa0 when
+// the weapon is a throwing weapon (ITEM_IsThrowableType), else the 0x15/0x16 range of WeaponDamage.
+func (h *heroUnit) MissileWeaponDamage() (min, max int) {
+	if t := h.totals(); t != nil && t.Weapon.Throwing && t.Weapon.ThrowMax > 0 {
+		return t.Weapon.ThrowMin, t.Weapon.ThrowMax
+	}
+
+	return h.WeaponDamage()
+}
+
+// WeaponBonusPct is the weapon's strength and dexterity bonus (d2skill.WeaponStats).
+func (h *heroUnit) WeaponBonusPct() int {
+	if t := h.totals(); t != nil {
+		return t.Weapon.BonusPct
+	}
+
+	return 0
+}
+
+// BareHandPct is the strength percent of a bare handed blow (d2skill.WeaponStats).
+func (h *heroUnit) BareHandPct() int {
+	if t := h.totals(); t != nil && !t.Weapon.Armed {
+		return t.Str
+	}
+
+	return 0
 }
 
 // Mastery is the weapon mastery lookup (SKILL_Func_646bc0 0x646bc0) for the

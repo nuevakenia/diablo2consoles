@@ -201,14 +201,7 @@ func statsOf(env *Env, sk *Skill) []StatMod {
 
 // desc is the skill's damage descriptor with the caster's weapon.
 func (c *cast) desc() *d2missile.DamageDesc {
-	wmin, wmax := c.u.WeaponDamage()
-	if wmin < 1 {
-		wmin = 1
-	}
-
-	if wmax < wmin+1 {
-		wmax = wmin + 1
-	}
+	wmin, wmax := missileWeapon(c.u)
 
 	d := c.sk.Descriptor(c.env, c.lvl, wmin, wmax, c.u.Stat(masteryStat[c.sk.EType]))
 	d.DamagePct = descriptorPct(c.u, c.sk, 0)
@@ -317,7 +310,7 @@ func (p *Pipeline) strike(u Unit, sk *Skill, lvl int, t d2missile.Target, env *E
 		}
 
 		ph := rollRange(r, lo, hi)
-		ph += int32(mulDiv(int(ph), o.pct+u.Stat("damagepercent")+masteryOf(u, MasteryDamage, sk), 100))
+		ph += int32(mulDiv(int(ph), o.pct+u.Stat("damagepercent")+meleeBonusPct(u)+masteryOf(u, MasteryDamage, sk), 100))
 		ph = d2combat.ScaleBySrcDam(ph, uint8(sk.SrcDam))
 		ph += o.flat
 

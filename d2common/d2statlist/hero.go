@@ -80,11 +80,19 @@ type Totals struct {
 
 	Defense      int
 	AttackRating int
-	DamageMin    int // physical damage of the main hand (or bare hands)
-	DamageMax    int
-	BlockPct     int // block chance with shield and dexterity, capped at 75
-	Resist       [4]int
-	MaxResist    [4]int // the cap (75 plus max resist bonuses, at most 95)
+	// AttackRatingFlat is AttackRating before the percent (stat 0x77): COMBAT_RollToHit (0x57b9c0) adds that
+	// percent itself, so the skill engine takes this and the percent apart.
+	AttackRatingFlat int
+	DamageMin        int // physical damage of the main hand (or bare hands)
+	DamageMax        int
+	// Weapon is the percent free weapon numbers for the skill descriptor (see WeaponParts).
+	Weapon WeaponParts
+	// GearDamagePct and GearToHitPct are stats 25 and 119 from the items only (the skill engine's own states
+	// supply the skills' share).
+	GearDamagePct, GearToHitPct int
+	BlockPct                    int // block chance with shield and dexterity, capped at 75
+	Resist                      [4]int
+	MaxResist                   [4]int // the cap (75 plus max resist bonuses, at most 95)
 	// ResistShown is Resist after the difficulty penalty and the cap, which
 	// is what the character panel prints.
 	ResistShown [4]int
@@ -242,6 +250,10 @@ func Compute(h Hero, items []Item, env *Env) Totals {
 
 	list := root.List()
 
+	// the item only part of two percent stats: the skill engine adds the skills' own part itself
+	gear := NewList()
+	gear.Merge(list)
+
 	// skill sourced stats (passives, aura, buffs) join the item stats
 	list.Merge(env.Skill)
 
@@ -279,9 +291,12 @@ func Compute(h Hero, items []Item, env *Env) Totals {
 
 	toHit := int(list.Get(StatToHit))
 	t.AttackRating = d2combat.PlayerAttackRating(toHit, t.Dex, h.Class.ToHitFactor)
+	t.AttackRatingFlat = t.AttackRating
 	t.AttackRating += t.AttackRating * int(list.Get(StatToHitPct)) / 100
 
-	t.DamageMin, t.DamageMax = weaponDamage(active, list, t.Str, t.Dex)
+	t.DamageMin, t.DamageMax = weaponDamageClass(active, list, h.Class.ID, t.Str, t.Dex)
+	t.Weapon = weaponParts(active, list, h.Class.ID, t.Str, t.Dex)
+	t.GearDamagePct, t.GearToHitPct = int(gear.Get(StatDamagePct)), int(gear.Get(StatToHitPct))
 
 	shield := shieldOf(active)
 	t.BlockPct = d2combat.PlayerBlockChance(d2combat.PlayerBlockInput{
@@ -417,44 +432,43 @@ func shieldBlock(s *Item) int {
 // the roll helper's operands were hidden in the decompile); the floor
 // min>=1, max>=2 is verified (COMBAT_RollPhysicalDamage).
 func weaponDamage(active []Item, list *List, str, dex int) (min, max int) {
-	var w *Item
+	return weaponDamageClass(active, list, -1, str, dex)
+}
 
-	for i := range active {
-		if active[i].Slot == SlotRightHand && active[i].Weapon != nil {
-			w = &active[i]
-		}
-	}
+// WeaponParts are the weapon numbers the skill engine needs apart from the finished range of Totals.DamageMin /
+// DamageMax: the unit damage stats 0x15/0x16 (0x9f/0xa0 for a throwing weapon) BEFORE the percent pool of
+// MISSILE_BuildDamageDescriptor (0x64ca60, VERIFIED wave 24) and that pool's weapon part. The descriptor scales
+// these stats by the skill's SrcDam and adds stat 0x19, the weapon mastery and the weapon's strength / dexterity
+// bonus to ONE percent, so the range of DamageMin / DamageMax (which already holds that percent) would count it twice.
+type WeaponParts struct {
+	Armed bool // a weapon sits in the right hand
+	// Min and Max are base damage (two handed range when it is used two handed) raised by the weapon's own
+	// enhanced damage (stats 17/18 of its properties), ethereal included, plus the added damage stats 21/22.
+	Min, Max int
+	// ThrowMin and ThrowMax are the same for the thrown range (weapons.txt minmisdam / maxmisdam, stats 0x9f/0xa0);
+	// Throwing is set for a weapon that has one. UNVERIFIED: the added damage 21/22 and the enhanced damage are
+	// applied to the thrown range like to the melee range.
+	ThrowMin, ThrowMax int
+	Throwing           bool
+	// BonusPct is the weapon's strength and dexterity bonus in percent (ITEM_GetStrBonus / ITEM_GetDexBonus
+	// times the attribute, divided by 100, 0x64ca60).
+	BonusPct int
+}
 
-	baseMin, baseMax, strB, dexB := 1, 2, 0, 0
-	edMin, edMax := int64(0), int64(0)
+func weaponDamageClass(active []Item, list *List, class, str, dex int) (min, max int) {
+	wp := weaponParts(active, list, class, str, dex)
+	bonus := int64(wp.BonusPct) + list.Get(StatDamagePct)
 
-	if w != nil {
-		wb := w.Weapon
-		baseMin, baseMax = wb.Min, wb.Max
-
-		if wb.TwoHanded && wb.TwoMax > 0 {
-			baseMin, baseMax = wb.TwoMin, wb.TwoMax
-		}
-
-		if w.Ethereal {
-			baseMin, baseMax = EtherealDamage(baseMin), EtherealDamage(baseMax)
-		}
-
-		strB, dexB = wb.StrBonus, wb.DexBonus
-		props := w.ownProps()
-		edMin, edMax = sumID(props, StatMinDmgPct), sumID(props, StatMaxDmgPct)
-	}
-
-	bonus := int64(str*strB/100+dex*dexB/100) + list.Get(StatDamagePct)
-	if w == nil {
+	if !wp.Armed {
 		bonus += int64(str) // bare hands: strength counts as percent (VERIFIED 0x579120)
 	}
 
 	if bonus < -90 { // VERIFIED 0x579120: the percent is floored at -90
 		bonus = -90
 	}
-	min = int((int64(baseMin)*(100+edMin)/100 + list.Get(StatMinDamage)) * (100 + bonus) / 100)
-	max = int((int64(baseMax)*(100+edMax)/100 + list.Get(StatMaxDamage)) * (100 + bonus) / 100)
+
+	min = int(int64(wp.Min) * (100 + bonus) / 100)
+	max = int(int64(wp.Max) * (100 + bonus) / 100)
 
 	if min < 1 {
 		min = 1
@@ -469,6 +483,68 @@ func weaponDamage(active []Item, list *List, str, dex int) (min, max int) {
 	}
 
 	return min, max
+}
+
+// weaponParts is the percent free part of weaponDamage. class is the hero class id (4 = Barbarian) or -1.
+// INV_ClassifyHandWeaponMode (0x63e3e0, VERIFIED wave 24) picks the two handed range (stats 0x17/0x18): a two
+// handed weapon always, a weapon of the 1or2handed column only for a Barbarian (INV_PlayerCanUseOneOrTwoHanded
+// 0x62a350) with the other hand empty; with both hands filled such a weapon is used one handed.
+func weaponParts(active []Item, list *List, class, str, dex int) WeaponParts {
+	var w *Item
+
+	hasLeft := false
+
+	for i := range active {
+		if active[i].Slot == SlotRightHand && active[i].Weapon != nil {
+			w = &active[i]
+		}
+
+		if active[i].Slot == SlotLeftHand {
+			hasLeft = true
+		}
+	}
+
+	baseMin, baseMax := 1, 2
+	edMin, edMax := int64(0), int64(0)
+
+	var wp WeaponParts
+
+	if w != nil {
+		wb := w.Weapon
+		wp.Armed = true
+		baseMin, baseMax = wb.Min, wb.Max
+
+		two := wb.TwoHanded
+		if class == 4 && wb.OneOrTwo {
+			two = !hasLeft
+		}
+
+		if two && wb.TwoMax > 0 {
+			baseMin, baseMax = wb.TwoMin, wb.TwoMax
+		}
+
+		thrMin, thrMax := wb.MisMin, wb.MisMax
+
+		if w.Ethereal {
+			baseMin, baseMax = EtherealDamage(baseMin), EtherealDamage(baseMax)
+			thrMin, thrMax = EtherealDamage(thrMin), EtherealDamage(thrMax)
+		}
+
+		wp.BonusPct = str*wb.StrBonus/100 + dex*wb.DexBonus/100
+		props := w.ownProps()
+		edMin, edMax = sumID(props, StatMinDmgPct), sumID(props, StatMaxDmgPct)
+
+		if wb.MisMax > 0 {
+			wp.Throwing = true
+			wp.ThrowMin = int(int64(thrMin)*(100+edMin)/100 + list.Get(StatMinDamage))
+			wp.ThrowMax = int(int64(thrMax)*(100+edMax)/100 + list.Get(StatMaxDamage))
+		}
+	}
+
+	wp.Min = int(int64(baseMin)*(100+edMin)/100 + list.Get(StatMinDamage))
+	wp.Max = int(int64(baseMax)*(100+edMax)/100 + list.Get(StatMaxDamage))
+
+	return wp
 }
 
 // pieceTable is optionally implemented by a SetTable that knows the members

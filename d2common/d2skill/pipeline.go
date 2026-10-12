@@ -808,6 +808,8 @@ func descriptorPct(u Unit, sk *Skill, extra int) int32 {
 		}
 
 		pct += hi
+
+		pct += weaponBonusPct(u) // ITEM_GetStrBonus / GetDexBonus of the weapon, 0x64ca60
 	}
 
 	if pct < -90 {
@@ -825,14 +827,7 @@ func (p *Pipeline) castMissile(u Unit, sk *Skill, lvl int, env *Env, name string
 		return nil
 	}
 
-	wmin, wmax := u.WeaponDamage()
-	if wmin < 1 {
-		wmin = 1
-	}
-
-	if wmax < wmin+1 {
-		wmax = wmin + 1
-	}
+	wmin, wmax := missileWeapon(u)
 
 	desc := sk.Descriptor(env, lvl, wmin, wmax, u.Stat(masteryStat[sk.EType]))
 	desc.DamagePct = descriptorPct(u, sk, o.pctAdd)
@@ -1266,14 +1261,7 @@ func (p *Pipeline) ownDamages(u Unit, sk *Skill, lvl int, env *Env, root *d2miss
 	seen := map[string]bool{root.Name: true}
 	queue := []*d2missile.Spec{root}
 
-	wmin, wmax := u.WeaponDamage()
-	if wmin < 1 {
-		wmin = 1
-	}
-
-	if wmax < wmin+1 {
-		wmax = wmin + 1
-	}
+	wmin, wmax := missileWeapon(u)
 
 	for len(queue) > 0 {
 		cur := queue[0]
