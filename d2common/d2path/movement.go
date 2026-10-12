@@ -184,3 +184,40 @@ func Advance(x, y, vel, dirX, dirY int) (nx, ny int) {
 func TeleportTo(g Grid, mask uint16, dest Point, radius int) (Point, bool) {
 	return NearestFree(g, mask, dest, radius)
 }
+
+// RunRatioBonus is the stat 0x43 bonus the exe attaches while a player is in
+// run mode (STATS_AttachRunWalkRatioStatFromCharStats 0x621090, called from the
+// mode-set routine 0x6245a0 for player modes 3 and 0x13): RunVelocity*100 /
+// WalkVelocity - 100, in C integer division (6/9 gives 50). The base stat 0x43
+// of a player is 100 (PLAYER_InitBaseStatsFromClass). VERIFIED.
+// The velocity itself reads only charstats +0x40 for BOTH modes (0x621550;
+// +0x41 is read only by charge and leap code), so a run is the walk velocity
+// at 150 percent, and faster run/walk scales walking too.
+func RunRatioBonus(b BaseVelocity) int {
+	if b.Walk == 0 {
+		return 0
+	}
+
+	return b.Run*100/b.Walk - 100
+}
+
+// PlayerSpeedPercent is the movement percentage of a player: base 100, plus the
+// run ratio bonus when running, plus the other 0x43 modifiers (cold slow etc,
+// negative), plus the diminished faster run/walk stat; floor 25 (VERIFIED).
+func PlayerSpeedPercent(b BaseVelocity, running bool, frw, otherStat43 int) int {
+	stat43 := 100 + otherStat43
+	if running {
+		stat43 += RunRatioBonus(b)
+	}
+
+	return SpeedPercent(stat43, frw)
+}
+
+// PlayerSubtilesPerSecond is the on-ground speed of a player in subtiles per
+// second under the exe rules: 9.375 walking and 14.0625 running with no
+// modifiers.
+func PlayerSubtilesPerSecond(b BaseVelocity, running bool, frw, otherStat43 int) float64 {
+	vel := (b.Walk << 8) * PlayerSpeedPercent(b, running, frw, otherStat43) / 100
+
+	return SubtilesPerSecond(vel)
+}
