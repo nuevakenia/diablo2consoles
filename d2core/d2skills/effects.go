@@ -156,6 +156,16 @@ func (e *Engine) firstHero() *d2mapentity.Player {
 // ---- dispatch ----
 
 func (e *Engine) effect(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef *d2skill.Effect) {
+	// effects that land later (a Leap Attack's knockback, overlay and stun release come at the landing)
+	if ef.Delay > 0 && delayedKinds[ef.Kind] {
+		d := *ef
+		d.Delay = 0
+
+		e.after(ef.Delay, func() { e.effect(p, u, sk, &d) })
+
+		return
+	}
+
 	if u.merc != nil && !mercEffect[ef.Kind] { // jumps, summons, self damage: not for a hireling
 		e.emit("state", "STATE skipped skill=%q kind=%s (not modelled for a mercenary)", sk.Name, ef.Kind)
 
@@ -218,6 +228,9 @@ func (e *Engine) effect(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, e
 	}
 }
 
+// delayedKinds are the effect kinds the dispatcher postpones by Effect.Delay (area_hit does it itself).
+var delayedKinds = map[string]bool{"knock_area": true, "knockback": true, "overlay": true, "unit_clear_state": true}
+
 // ---- states ----
 
 // selfState puts a timed (or indefinite) state on the hero. Stack > 0 makes it
@@ -244,6 +257,10 @@ func (e *Engine) selfState(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 			if inst.Mods[i].Stat == ef.State {
 				inst.Mods[i].Value = inst.Count
 			}
+		}
+
+		if by, ok := ef.CountStats[inst.Count]; ok { // stats evaluated with the count as the level (Frenzy)
+			inst.Mods = statMods(by)
 		}
 	}
 
@@ -805,7 +822,10 @@ func (e *Engine) move(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, ef 
 		return
 	}
 
-	const steps = 8
+	steps := 8
+	if ef.Frames > 0 { // the jump takes as long as the path at the leap velocity (d2skill.LeapFrames)
+		steps = ef.Frames
+	}
 
 	for i := 1; i <= steps; i++ {
 		i := i

@@ -538,11 +538,11 @@ func (e *Engine) runDo(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, tg
 	}
 
 	for _, m := range res.Melees {
-		e.meleeResult(p, sk, m)
+		e.meleeLater(p, sk, m)
 	}
 
 	if len(res.Melees) == 0 && res.Melee != nil {
-		e.meleeResult(p, sk, res.Melee)
+		e.meleeLater(p, sk, res.Melee)
 	}
 
 	for i := range res.Effects {
@@ -552,6 +552,17 @@ func (e *Engine) runDo(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill, tg
 	e.scheduleBurst(p, sk, res.Burst)
 
 	return true
+}
+
+// meleeLater applies a blow now, or after its Delay (Leap Attack lands first).
+func (e *Engine) meleeLater(p *d2mapentity.Player, sk *d2skill.Skill, m *d2skill.MeleeResult) {
+	if m.Delay > 0 {
+		e.after(m.Delay, func() { e.meleeResult(p, sk, m) })
+
+		return
+	}
+
+	e.meleeResult(p, sk, m)
 }
 
 // burstEventFrames is the spacing of the attack animation events of a burst

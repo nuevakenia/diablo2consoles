@@ -244,7 +244,10 @@ type strikeOpt struct {
 	autoHit   bool  // no to-hit roll
 	skillElem bool  // add the skill's own elemental damage (EType)
 	flat      int32 // 8.8 physical added after the percent
-	toMagic   bool  // convert physical damage to magic (Berserk)
+	// convClass / convPct move that percent of the physical damage into an element (damage struct +0x65 / +0x68,
+	// skill EType and calc4; Berserk, Concentrate, Frenzy: magic).
+	convClass byte
+	convPct   int
 	// elemPct adds fire, cold and lightning damage equal to that percent of
 	// the physical damage (Vengeance, U: added rather than converted).
 	elemPct [3]int
@@ -362,9 +365,8 @@ func (p *Pipeline) strike(u Unit, sk *Skill, lvl int, t d2missile.Target, env *E
 		dmg.StunLen += int32(st)
 	}
 
-	if o.toMagic {
-		dmg.Magic += dmg.Physical
-		dmg.Physical = 0
+	if o.convClass > 0 && o.convPct > 0 {
+		d2combat.ConvertPhysical(&dmg, r, o.convClass, int32(o.convPct))
 	}
 
 	if !sk.Kick {
@@ -395,8 +397,14 @@ func (c *cast) meleeOpt() strikeOpt {
 		o.skillElem = false
 	}
 
-	if sk.SrvStFunc == 39 { // Berserk: damage converted to magic
-		o.toMagic = true
+	// Bash, Stun, Concentrate, Berserk, Frenzy and Double Swing (SRVST_Bash 0x5d6910, SRVST_039 0x5d82a0,
+	// 0x5d75b0, VERIFIED): with an EType and calc4 > 0 that percent of the physical damage becomes that element.
+	if sk.SrvStFunc == stBash || sk.SrvStFunc == 39 || sk.SrvDoFunc == 9 || sk.SrvDoFunc == 70 {
+		if cls := ElemConvClass(sk.EType); cls > 0 {
+			if pct := c.calc(4); pct > 0 {
+				o.convClass, o.convPct = cls, pct
+			}
+		}
 	}
 
 	return o
