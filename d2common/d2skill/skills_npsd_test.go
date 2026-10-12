@@ -24,7 +24,7 @@ func init() {
 			"calc1": "par3 * (lvl-1)", "calc2": "ulvl * 3 / 4 + lvl", "Param3": "25", "EType": "pois", "EMin": "12",
 			"EMax": "16", "ELen": "100", "manashift": "8", "mana": "8"},
 		row{"skill": "Telekinesis", "Id": "404", "charclass": "sor", "srvstfunc": "12", "srvdofunc": "21",
-			"aurarangecalc": "par1", "Param1": "25", "EType": "", "manashift": "8", "mana": "7"},
+			"aurarangecalc": "par1", "Param1": "25", "Param2": "35", "EType": "", "manashift": "8", "mana": "7"},
 		row{"skill": "Raven2", "Id": "405", "srvdofunc": "114", "summon": "druidhawk", "pettype": "raven",
 			"petmax": "min(lvl,par2)", "Param1": "-2", "Param2": "5", "summode": "S1", "calc2": "ulvl + par1 + lvl",
 			"manashift": "8"},
@@ -190,16 +190,46 @@ func TestTelekinesisDamagesTarget(t *testing.T) {
 	cf := newClassFixture(map[string]int{"Telekinesis": 3})
 	foe := cf.addFoe("m1", 9, 9)
 
-	_, r := cf.castOn("Telekinesis", foe)
-	e := effectOf(t, r, "area_hit")
+	// the roll (0) is below Param2 35: the hit carries the knockback
+	cf.u.roller = &seq{vals: []uint32{0}}
 
-	if e.X != 9 || e.Y != 9 || e.Desc == nil {
+	_, r := cf.castOn("Telekinesis", foe)
+	e := effectOf(t, r, "hit_unit")
+
+	if e.Target != foe || e.Desc == nil {
 		t.Errorf("telekinesis %+v", e)
 	}
 
-	// no target: refused
-	if _, r = cf.cast("Telekinesis", 9, 9); r.OK && len(r.Effects) > 0 {
-		t.Errorf("telekinesis without a target: %+v", r)
+	if effectOf(t, r, "knockback").Target != foe {
+		t.Errorf("a roll under Param2 must knock the target back")
+	}
+
+	// a roll of 80 does not
+	cf.u.roller = &seq{vals: []uint32{80}}
+
+	_, r = cf.castOn("Telekinesis", foe)
+	for _, ef := range r.Effects {
+		if ef.Kind == "knockback" {
+			t.Errorf("roll 80 knocked back")
+		}
+	}
+
+	// no target: refused at the start (SRVST range check)
+	if st, _ := cf.cast("Telekinesis", 9, 9); st.OK {
+		t.Errorf("telekinesis without a target unit: %+v", st)
+	}
+
+	// beyond the Param1 radius: refused
+	far := cf.addFoe("m2", 40, 0)
+	if st, _ := cf.castOn("Telekinesis", far); st.OK {
+		t.Errorf("telekinesis out of range: %+v", st)
+	}
+}
+
+func TestTelekinesisRangeOK(t *testing.T) {
+	if !TelekinesisRangeOK(0, 0, 25, 0, 25) || TelekinesisRangeOK(0, 0, 26, 0, 25) || !TelekinesisRangeOK(0, 0, 17, 17, 25) ||
+		TelekinesisRangeOK(0, 0, 18, 18, 25) {
+		t.Fatal("squared distance against the squared radius")
 	}
 }
 

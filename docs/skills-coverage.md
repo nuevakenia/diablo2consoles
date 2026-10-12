@@ -74,7 +74,7 @@ Columns: st/do = srvstfunc/srvdofunc; mana = mana cost at L1 / L20 (whole points
 | 48 | Nova | 0/22 | handler | 15.0 / 34.0 | 0 / 0 | elem 131.0-188.0 | - | nova (24->24, 13) | - | - | 0 | 12/20 Static Field | 64m/64m |  |
 | 49 | Lightning | 0/0 | generic | 8.0 / 17.5 | 0 / 0 | elem 1.0-272.0 | - | lightningbolt (30->30, 25) | - | - | 3 | 12/20 Charged Bolt | 1m/1m |  |
 | 50 | Shiver Armor | 0/18 | handler | 11.0 / 11.0 | 0 / 0 | elem 60.0-71.5 | 500 | - | 8700 | - | 2 | 12/20 Ice Blast+Frozen Armor | 1e/1e |  |
-| 51 | Fire Wall | 0/24 | handler | 22.0 / 41.0 | 35 / 35 | elem 17.1-17.4 | - | firewallmaker (12->12, 7) | - | - | 2 | 18/20 Blaze | 5m/15m |  |
+| 51 | Fire Wall | 0/24 | handler | 22.0 / 41.0 | 35 / 35 | elem 17.1-17.4 | - | firewallmaker (12->12, 7) | - | - | 2 | 18/20 Blaze | 3m/3m |  |
 | 52 | Enchant | 0/25 | handler | 25.0 / 44.0 | 0 / 0 | elem 68.5-89.5 | - | - | 15000 | - | 1 | 18/20 Warmth+Fire Ball | 1e/1e |  |
 | 53 | Chain Lightning | 0/26 | handler | 9.0 / 28.0 | 0 / 0 | elem 1.0-281.0 | - | chainlightning (30->30, 25) | - | - | 3 | 18/20 Lightning | 1m/1m |  |
 | 54 | Teleport | 0/27 | handler | 24.0 / 5.0 | 0 / 0 | - | - | - | - | - | 0 | 18/20 Telekinesis | 1e/1e |  |

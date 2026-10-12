@@ -9,7 +9,7 @@ import (
 
 // Glacial Spike (hit function 13, 0x5a8360, read in Ghidra): the area hit uses
 // sHitPar1 else aurarangecalc as its radius, and sHitPar2 else auralencalc as
-// the elemental (chill) length of the damage it carries.
+// the freeze length of the damage it carries (missile EType frze).
 func TestGlacialSpikeHit13(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
@@ -38,7 +38,7 @@ func TestGlacialSpikeHit13(t *testing.T) {
 		f.sim.OnEvent = func(e d2missile.Event) {
 			if e.Kind == d2missile.EventArea {
 				radii = append(radii, e.Radius)
-				lens = append(lens, int(e.Damage.ColdLen))
+				lens = append(lens, int(e.Damage.FreezeLen))
 			}
 		}
 

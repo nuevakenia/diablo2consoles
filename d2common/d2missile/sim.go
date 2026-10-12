@@ -689,7 +689,8 @@ func (s *Sim) trailSub(m *Missile) bool {
 	x, y := math.Floor(m.X)+0.5, math.Floor(m.Y)+0.5
 
 	_, _ = s.Create(CreateParams{Spec: sub, Parent: m, Owner: m.Owner, SkillID: m.SkillID, Level: m.Level,
-		Damage: m.Damage, X: x, Y: y, DestX: x, DestY: y, Stationary: sp.SrvDoFunc == 2})
+		Damage: m.Damage, X: x, Y: y, DestX: x, DestY: y, Stationary: sp.SrvDoFunc == 2,
+		HitEvery: m.HitEvery, ScalePct: m.ScalePct})
 
 	return true
 }

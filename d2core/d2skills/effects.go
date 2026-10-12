@@ -295,19 +295,36 @@ func (e *Engine) selfState(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Skill
 	}
 }
 
-// trail drops a missile at the hero's feet every Interval frames while the
-// state lasts (Blaze).
+// trail drops a missile at the hero's feet while the state lasts (Blaze).
+// SKILL_SpawnTrailMissileWhileMoving (0x5c7eb0, VERIFIED wave 23) runs from the
+// player's movement tick (PLRMODE_ServerTickMovement 0x57ec40) and creates the
+// skill's srvmissilea at the player's position each time the path reports a
+// reached node (PATH_TestFlag08), never in a town room, only while the player
+// has the blaze state. A standing player leaves nothing; the old port dropped
+// one every Interval frames. Here a new subtile stands for a reached node
+// (UNVERIFIED: the exact node spacing of the player's path).
 func (e *Engine) trail(p *d2mapentity.Player, sk *d2skill.Skill, ef *d2skill.Effect) {
 	u := e.hero(p)
 	end := e.frame + ef.Frames
 	name := ef.Missile
+	lx, ly := u.Pos()
 
-	e.watches = append(e.watches, &watch{every: ef.Interval, next: e.frame, fn: func() bool {
-		if e.frame >= end {
+	e.watches = append(e.watches, &watch{every: 1, next: e.frame, fn: func() bool {
+		if e.frame >= end || !e.setOf(p.ID()).Active(e.frame, ef.State) {
 			return false
 		}
 
 		x, y := u.Pos()
+		if !d2skill.BlazeTrailStep(lx, ly, x, y) {
+			return true
+		}
+
+		lx, ly = x, y
+
+		if u.InTown() {
+			return true
+		}
+
 		e.pipe.CastTrap(u, sk.ID, name, x, y, d2skill.Target{X: x, Y: y})
 
 		return true

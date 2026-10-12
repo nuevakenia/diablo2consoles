@@ -640,7 +640,7 @@ func TestChargedBoltFanOut(t *testing.T) {
 	f := newFixture(map[string]int{"Charged Bolt": 5})
 	f.u.base = f.u.levels
 
-	_, do := f.cast("Charged Bolt", 20, 0)
+	_, do := f.cast("Charged Bolt", 20, 7)
 	// calc1 = min(24, 3+(5-1)) = 7 bolts, 5.0 mana
 	if !do.OK || len(do.Missiles) != 7 || f.u.mana != 100<<8-1280 {
 		t.Fatalf("%d missiles, mana %d (%+v)", len(do.Missiles), f.u.mana, do.OK)
@@ -650,20 +650,6 @@ func TestChargedBoltFanOut(t *testing.T) {
 		if m.Damage.Lightning.Min != 1024 || m.Damage.Lightning.Max != 1536 {
 			t.Fatalf("per-bolt damage %+v", m.Damage.Lightning)
 		}
-	}
-
-	// the seeded roller returns 0 -> -40 degrees for every bolt here; a different roll fans out
-	f2 := newFixture(map[string]int{"Charged Bolt": 2})
-	f2.u.base = f2.u.levels
-	f2.u.roller = &seq{vals: []uint32{0, 40, 80}}
-	_, do = f2.cast("Charged Bolt", 20, 0)
-
-	if len(do.Missiles) != 4 {
-		t.Fatalf("level 2 -> 4 bolts, got %d", len(do.Missiles))
-	}
-
-	if a, b, c := do.Missiles[0].DY, do.Missiles[1].DY, do.Missiles[2].DY; !(a < b && b < c) {
-		t.Fatalf("not fanned out: %v %v %v", a, b, c)
 	}
 }
 

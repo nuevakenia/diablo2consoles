@@ -188,6 +188,7 @@ func New(asset *d2asset.AssetManager, mapEngine *d2mapengine.MapEngine, monsters
 	monsters.HeroDefenseParts = e.heroDefenseParts
 	monsters.HeroAvoid = e.heroAvoid
 	monsters.SummonSlow = e.applySlowTarget
+	monsters.HeroHitByMissile = e.heroHitByMissile
 	e.installMercHooks()
 	e.monsters.SetSkillFirer(e)
 
@@ -684,7 +685,10 @@ func (e *Engine) staticField(p *d2mapentity.Player, u *heroUnit, sk *d2skill.Ski
 		dmg := d2skill.StaticFieldDamage(v.HP, v.MaxHP, ef.Pct, ef.MinDamage, floorPct)
 
 		res := e.resistFrom(m, p, "ltng")
-		dmg, _ = d2combat.ReduceComponent(dmg, 0, res, false, false, 0, 0)
+		// exe tail of 0x5c7750: a negative resist is compensated first (d2skill.StaticFieldResistComp)
+		dmg8 := d2skill.StaticFieldResistComp(dmg<<8, res)
+		dmg8, _ = d2combat.ReduceComponent(dmg8, 0, res, false, false, 0, 0)
+		dmg = dmg8 >> 8
 		n++
 
 		e.emit("damage", "SKILL static_field target=%s pct=%d floor=%d%% resist=%d dmg=%d hp=%d/%d", m.Label(), ef.Pct,
@@ -856,6 +860,11 @@ func (e *Engine) hurt(m *d2mapentity.Monster, src *d2mapentity.Player, d *d2comb
 	h.ColdEffect, h.HasColdEffect = coldEffect(m), true
 	h.ChillDiv, h.FreezeDiv = e.coldDivisors(m)
 
+	// COMBAT_ApplyFreezeOrColdSlowState (0x578f50): a boss is chilled for the freeze length, never frozen
+	if m.Stat != nil && m.Stat.IsSpecialBoss {
+		h = d2state.BossFreezeAsChill(h)
+	}
+
 	// a hit ends the states flagged remhit (states.txt)
 	set.Hit(e.frame)
 
@@ -1015,6 +1024,7 @@ func (e *Engine) AreaChanged(md *d2monsters.Director) {
 		md.HeroDefenseParts = e.heroDefenseParts
 		md.HeroAvoid = e.heroAvoid
 		md.SummonSlow = e.applySlowTarget
+		md.HeroHitByMissile = e.heroHitByMissile
 		e.installMercHooks()
 	}
 }

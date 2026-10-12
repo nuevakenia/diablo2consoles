@@ -917,27 +917,31 @@ func (p *Pipeline) castFrom(u Unit, sk *Skill, lvl int, env *Env, name string, t
 	return p.castMissile(u, sk, lvl, env, name, tg, castOpts{hasStart: true, startX: sx, startY: sy, onHit: hook})
 }
 
-// doStreamFn is SRVDO_019_Inferno (Inferno, Arctic Blast): a burst of flame
-// missiles along the aim line. In the game the skill is channelled (start
-// function 11 re-runs it while the button is held); one cast here is a burst of
-// six flames three frames apart whose range is aurarangecalc yards (U).
+// InfernoFlameLife is the lifetime in frames SRVDO_InfernoSpawnFlameMissile (0x5c6d40, VERIFIED wave 23) gives
+// each flame: calc1 of the skill (ln12/2 for Inferno), at least 1; the create kind 0x8020 takes the life from the
+// params instead of the missile's Range column. The old port used aurarangecalc (ln12/4-2) converted to frames.
+func InfernoFlameLife(calc1 int) int {
+	if calc1 < 1 {
+		return 1
+	}
+
+	return calc1
+}
+
+// doStreamFn is SRVDO_019_Inferno (Inferno, Arctic Blast): in the exe every run of the do function
+// creates ONE flame missile at the caster toward the target position (0x5c6d40, VERIFIED) and the channel
+// start function (SRVST_011 0x5c7050, mana gate: startmana unless state 12 is on) repeats the do while the
+// button is held. The engine has no channel, so one cast is still a burst of six flames three frames apart (U);
+// each flame lives InfernoFlameLife frames.
 func doStreamFn(c *cast) {
 	name := c.missileName()
-	ms := c.p.Missiles.ByName(name)
 
-	if ms == nil {
+	if c.p.Missiles.ByName(name) == nil {
 		c.fail(ReasonMissile)
 		return
 	}
 
-	rng := 0
-
-	if y := c.env.eval(c.sk.AuraRangeCalc); y > 0 {
-		step := float64(d2combat.MissileStep(d2combat.MissileVelocity(uint8(ms.Vel), uint8(ms.VelLev), c.lvl, false, 0))) / 4096
-		if step > 0 {
-			rng = int(math.Ceil(float64(y) / step))
-		}
-	}
+	rng := InfernoFlameLife(c.calc(1))
 
 	for i := 0; i < 6; i++ {
 		if i == 0 || c.p.After == nil {
@@ -957,42 +961,69 @@ func doStreamFn(c *cast) {
 	}
 }
 
-// doFireWallFn is SRVDO_024_FireWall: a line of stationary fire missiles across
-// the aim direction. The length (8 + level subtiles) and the five hits per
-// second are U. The skill's damage is listed per second (Fire Wall L1 shows
-// 15-20 and has HitShift 4): each of the five hits does 1<<HitShift/5 of
-// the descriptor, so a target standing in the fire loses the listed amount
-// per second (U: the missile damage function 3 that does this in the game was
-// not read).
+// FireWallMakerDestinations are the two destinations SRVDO_024_FireWall (0x5c7fc0, VERIFIED wave 23) gives its
+// two srvmissilea makers: both start on the target (tx, ty), and fly along the perpendicular to the line from the
+// target to the caster (hx, hy), one each way: (tx - (hy - ty), (hx - tx) + ty) and (tx + (hy - ty), ty - (hx - tx)).
+// A destination that equals the start (caster on the target) is moved by one subtile in both axes, the exe's fix for
+// a missile with no direction (MISSILE_CreateServerMissile 0x59d5d0).
+func FireWallMakerDestinations(tx, ty, hx, hy int) [2][2]int {
+	out := [2][2]int{{tx - (hy - ty), (hx - tx) + ty}, {tx + (hy - ty), ty - (hx - tx)}}
+
+	for i := range out {
+		if out[i][0] == tx && out[i][1] == ty {
+			out[i][0]++
+			out[i][1]++
+		}
+	}
+
+	return out
+}
+
+// doFireWallFn is SRVDO_024_FireWall (0x5c7fc0, VERIFIED wave 23). The cast needs a valid srvmissilea
+// (firewallmaker), a walkable target cell for that missile (SKILL_IsSkillTargetCellWalkable 0x56c210), a target
+// that is not on 0 and not in a town room. Then two firewallmaker missiles start on the target and fly
+// perpendicular to the line from the caster, one each way (FireWallMakerDestinations); each drops a firewall
+// (its SubMissile1) at every cell it passes (SrvDoFunc 6, 0x5ac1b0) for Range + LevRange * level frames. A third
+// missile, srvmissileb (firewall), stands on the target itself. The old port laid a fixed line of stationary
+// missiles. UNVERIFIED: the hit cadence of the standing fire, kept at five hits per second scaled to the listed
+// damage per second (the makers hand it to their fire).
 func doFireWallFn(c *cast) {
-	name := c.sk.SrvMissileB
-	if name == "" {
-		name = c.sk.SrvMissileA
+	nameA, nameB := c.sk.SrvMissileA, c.sk.SrvMissileB
+	if nameA == "" {
+		c.fail(ReasonMissile)
+		return
 	}
 
 	ax, ay := c.aim()
-	hx, hy := c.u.Pos()
-	dx, dy := float64(ax-hx), float64(ay-hy)
-
-	d := math.Hypot(dx, dy)
-	if d == 0 {
-		dx, dy, d = 1, 0, 1
+	if ax == 0 || ay == 0 || (c.p.Walkable != nil && !c.p.Walkable(ax, ay)) {
+		c.fail(ReasonMissile)
+		return
 	}
 
-	px, py := -dy/d, dx/d // perpendicular
-	half := (8 + c.lvl) / 2
+	if c.u.InTown() && !c.p.Opt.IgnoreTown {
+		c.fail(ReasonTown)
+		return
+	}
 
-	for i := -half / 2; i <= half/2; i++ {
-		cx, cy := float64(ax)+0.5+px*float64(i)*2, float64(ay)+0.5+py*float64(i)*2
-		tg := Target{X: int(cx), Y: int(cy)}
+	hx, hy := c.u.Pos()
+	sx, sy := float64(ax)+0.5, float64(ay)+0.5
+	hit := castOpts{hitEvery: 5, scalePct: 100 * (1 << uint(c.sk.HitShift)) / 5}
 
-		if c.p.Walkable != nil && !c.p.Walkable(tg.X, tg.Y) {
-			continue
+	for _, d := range FireWallMakerDestinations(ax, ay, hx, hy) {
+		o := hit
+		o.hasStart, o.startX, o.startY = true, sx, sy
+		o.hasDest, o.destX, o.destY = true, float64(d[0])+0.5, float64(d[1])+0.5
+
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, nameA, Target{X: ax, Y: ay}, o); m != nil {
+			c.res.Missiles = append(c.res.Missiles, m)
 		}
+	}
 
-		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, name, tg, castOpts{
-			hasStart: true, startX: cx, startY: cy, stationary: true, hitEvery: 5, scalePct: 100 * (1 << uint(c.sk.HitShift)) / 5,
-		}); m != nil {
+	if nameB != "" {
+		o := hit
+		o.hasStart, o.startX, o.startY, o.stationary = true, sx, sy, true
+
+		if m := c.p.castMissile(c.u, c.sk, c.lvl, c.env, nameB, Target{X: ax, Y: ay}, o); m != nil {
 			c.res.Missiles = append(c.res.Missiles, m)
 		}
 	}
@@ -1176,7 +1207,8 @@ func doInnerFn(c *cast) {
 
 // doBlazeFn is SRVDO_023 (Blaze, Energy Shield). Blaze: a timed state (dm12
 // frames) during which the caster leaves fire behind (the engine drops the
-// srvmissilea every 3 frames). Energy Shield: a timed state whose synthetic
+// srvmissilea on each new subtile the caster walks onto, see Engine.trail and
+// BlazeTrailStep; Interval only marks the trail). Energy Shield: a timed state whose synthetic
 // stats tell the engine to absorb calc1 percent of the damage taken with
 // mana, at calc2 mana per... U: the ratio is calc2/? and is passed as is.
 func doBlazeFn(c *cast) {

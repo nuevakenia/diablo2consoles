@@ -112,7 +112,7 @@ func doHydraFn(c *cast) {
 
 	c.effect(Effect{Kind: "summon", Summon: &SummonOrder{TrapLevel: level,
 		Key: c.sk.Summon, PetType: c.sk.PetType, Mode: c.sk.SumMode, Count: 3, Max: maxInt(c.env.eval(c.sk.PetMax), 3),
-		Kind: "trap", Frames: c.sk.Params[1], TrapSkill: c.sk.SumSkill[1], Stats: statsOf(c.env, c.sk),
+		Kind: "trap", Frames: d2calcLN(c.sk.Params[1], c.sk.Params[2], c.lvl), TrapSkill: c.sk.SumSkill[1], Stats: statsOf(c.env, c.sk),
 		X: ax, Y: ay, Desc: c.desc(), Cells: [][2]int{{-1, -1}, {0, 0}, {1, -1}},
 	}})
 }
@@ -167,21 +167,35 @@ func doIronGolemFn(c *cast) {
 	}
 }
 
-// doTelekinesisFn is SRVDO_Telekinesis (0x5c79f0). VERIFIED: the caster must be
-// a player and have a target. A hostile monster outside town takes the skill's
-// physical and elemental damage (stats flagged by the skill's hit flags; a
-// roll under the skill's per-level increment adds hit flag 9: knockback / stun
-// class), a ground item of the usable types is picked up, an object is
-// operated. Only the damage on monsters is simulated here (U).
+// doTelekinesisFn is SRVDO_Telekinesis (0x5c79f0, VERIFIED, re-read wave 23). The caster must be a player; the
+// skill acts on the ONE unit it targets (no area): a hostile unit outside a town room takes the skill's physical
+// and elemental damage (struct flags from ResultFlags / HitFlags / HitClass), and a first roll 0..99 on the
+// caster's seed below Param2 (SKILLS_GetPerLevelIncrementOfBaseValue 0x4ecf10 simply returns the Param2 column,
+// 35) adds result bits 9 (hit + knockback). Items of seven types are picked up and objects operated (not
+// simulated). The range test is the start function (SRVST 0x5c70e0, TelekinesisRangeOK).
 func doTelekinesisFn(c *cast) {
 	if !c.u.IsPlayer() || !c.needTarget() {
 		return
 	}
 
+	// the damage needs both rooms to be outside a town; items and objects are not simulated
 	if c.u.InTown() && !c.p.Opt.IgnoreTown {
-		c.fail(ReasonTown)
 		return
 	}
 
-	c.effect(Effect{Kind: "area_hit", Origin: "aim", X: c.tgt.UX, Y: c.tgt.UY, Radius: 1, Desc: c.desc()})
+	knock := c.rollN(100) < c.sk.Params[2]
+
+	c.effect(Effect{Kind: "hit_unit", Target: c.tgt.Unit, Desc: c.desc()})
+
+	if knock {
+		c.knock(c.tgt.Unit)
+	}
+}
+
+// TelekinesisRangeOK is SRVST_TelekinesisRangeCheck (0x5c70e0, VERIFIED): the squared distance between the
+// caster and the target must not exceed the squared radius (aurarangecalc = Param1, 25 subtiles).
+func TelekinesisRangeOK(casterX, casterY, targetX, targetY, radius int) bool {
+	dx, dy := casterX-targetX, casterY-targetY
+
+	return dx*dx+dy*dy <= radius*radius
 }

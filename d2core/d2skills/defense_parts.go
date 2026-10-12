@@ -57,6 +57,8 @@ func (e *Engine) heroDefenseParts(p *d2mapentity.Player, attacker *d2mapentity.M
 		}
 	}
 
+	note += e.frozenArmorRetaliation(p, attacker, melee, hp.Phys)
+
 	dmg := hp.Total()
 
 	if pct := set.ThornsPct(e.frame); pct > 0 && melee && dmg > 0 {

@@ -249,6 +249,13 @@ func (s *Sim) dmgFunc(m *Missile, t Target, d *d2combat.Damage) {
 		if int(m.seed.Step()&0x7f) < m.Spec.DParam[0] {
 			d.Result |= ResultSoftHit
 		}
+	case 4:
+		// 0x5aadb0 (V, wave 23; Ice Blast): the chill length of the hit becomes its freeze length and the
+		// chill length is cleared
+		d.FreezeLen, d.ColdLen = d.ColdLen, 0
+	case 10:
+		// 0x5aadd0 (V, wave 23; Blades of Ice cubes): the freeze length is a copy of the chill length
+		d.FreezeLen = d.ColdLen
 	case 7:
 		d.StunLen = int32(stunFor(m))
 		d.HitClass = dmgFuncHitClassStun
