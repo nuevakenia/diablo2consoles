@@ -1191,6 +1191,9 @@ func (g *GameControls) Load() {
 	g.stash.Load()
 	g.cube.Load()
 	g.belt.Load()
+	// The interface widgets (the bar picture with the four potion boxes) are drawn after the screen, so the potions
+	// must be a widget of the same group to be on top of the boxes (drawn in the screen pass they were hidden under them).
+	g.hud.panelGroup.AddWidget(g.ui.NewCustomWidget(g.belt.Render, screenWidth, screenHeight))
 	g.skilltree.load()
 	g.heroStatsPanel.Load()
 	g.mercPanel.Load()
@@ -1355,7 +1358,6 @@ func (g *GameControls) Render(target d2interface.Surface) error {
 	g.Identify.Render(target)
 	g.stash.Render(target)
 	g.cube.Render(target)
-	g.belt.Render(target)
 	g.NPCMenu.Render(target)
 	g.Speech.Render(target)
 	g.Waypoints.Render(target)

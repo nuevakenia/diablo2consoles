@@ -206,6 +206,14 @@ func (g *GameControls) drink(it *diablo2item.Item) {
 	e := d2inventory.ScaledPotion(d2inventory.PotionEffectOf(it.CommonRecord()), d2inventory.ExeClass(g.hero.Class),
 		true, st.Vitality, st.Energy, potionRoll)
 
+	// the potion's own use sound (misc.txt usesound), "item_potion" when the row names none
+	handle := it.CommonRecord().UseSound
+	if handle == "" {
+		handle = "item_potion"
+	}
+
+	g.playEquipSound(handle)
+
 	before := st.Health
 	beforeMana := st.Mana
 
