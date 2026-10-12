@@ -38,8 +38,10 @@ func EnergyShieldAbsorb(dmg, pct, ratio, mana int) (absorbed, cost int) {
 // the damage-struct fields the shield absorbs and whether the entry is skipped
 // when the attacker is a player or a hireling: physical, fire, lightning,
 // cold and magic always; the three last offsets (0x38, 0x3c, 0x40) only for
-// other attackers (U: which damage types those are; the Go struct's names for
-// them are life/mana/stamina leech, which cannot be right for an absorb table).
+// other attackers. Wave 23 resolved the U: with the damage struct layout of
+// skills-2.md section 5 (dwords 14, 15, 16 at 0x38, 0x3c, 0x40) they are the life,
+// mana and stamina steal fields of a monster's hit, so the shield also soaks
+// those for non-hireling monster attackers.
 var EnergyShieldTypes = []struct {
 	Offset      int
 	NotVsPlayer bool

@@ -1137,7 +1137,8 @@ func doInnerFn(c *cast) {
 
 // doBlazeFn is SRVDO_023 (Blaze, Energy Shield). Blaze: a timed state (dm12
 // frames) during which the caster leaves fire behind (the engine drops the
-// srvmissilea every 3 frames). Energy Shield: a timed state whose synthetic
+// srvmissilea on each new subtile the caster walks onto, see Engine.trail and
+// BlazeTrailStep; Interval only marks the trail). Energy Shield: a timed state whose synthetic
 // stats tell the engine to absorb calc1 percent of the damage taken with
 // mana, at calc2 mana per... U: the ratio is calc2/? and is passed as is.
 func doBlazeFn(c *cast) {
