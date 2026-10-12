@@ -268,7 +268,7 @@ func TestDiabloActions(t *testing.T) {
 		{"run", diaRun, []int{4}, Normal, "cast4", -1},
 		{"firewall", diaFirewall, []int{5}, Normal, "cast5", -1},
 		{"prison", diaPrison, []int{6}, Normal, "cast6", -1},
-		{"circle strafes", diaCircle, nil, Normal, "walk-to(", -1},
+		{"circle walks at the target", diaCircle, nil, Normal, "walk-target/1", -1},
 		{"wander", diaWander, nil, Normal, "walk-to(", -1},
 		{"wait normal", diaWait, nil, Normal, "", 12},
 		{"wait nightmare", diaWait, nil, Nightmare, "", 8},

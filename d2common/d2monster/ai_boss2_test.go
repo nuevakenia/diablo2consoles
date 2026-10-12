@@ -307,7 +307,7 @@ func TestMephistoMeleePhase(t *testing.T) {
 	w = newFake2(3, true)
 	Tick(w, b)
 
-	if len(w.log) != 1 || !strings.HasPrefix(w.log[0], "walk-to(") {
+	if len(w.log) != 1 || w.log[0] != "walk-target/1" {
 		t.Fatalf("strafe: %v", w.log)
 	}
 }
@@ -688,7 +688,7 @@ func TestVultureGroundTail(t *testing.T) {
 	b.Scratch[0] = -1
 	Tick(w, b)
 
-	if !strings.HasPrefix(w.last(), "walk-to(") || b.Scratch[0] != 0 {
+	if w.last() != "walk-target/1" || b.Scratch[0] != 0 {
 		t.Fatalf("circle: %v laps=%d", w.log, b.Scratch[0])
 	}
 

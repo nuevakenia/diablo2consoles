@@ -68,7 +68,44 @@ func (c *Ctx) SetSpeed(v int) { c.W.SetSpeed(c.B, v) }
 // WalkTo is MONAI_WalkToTarget(target, reach): reach 7 is the usual melee
 // value, 0 is tile exact. Returns false when the request failed (no sleep is
 // scheduled so the caller can fall back, as the original does).
-func (c *Ctx) WalkTo(t Target, reach int) bool { return c.move(Point{t.X, t.Y}, &t, reach, false) }
+func (c *Ctx) WalkTo(t Target, reach int) bool {
+	if c.move(Point{t.X, t.Y}, &t, reach, false) {
+		return true
+	}
+
+	return c.walkToFailed(reach)
+}
+
+// walkToFailed is the failure tail of MONAI_QueueMoveCommand 0x5dd980 for the
+// "walk to melee" call (VERIFIED wave 23): MONAI_WalkToTarget(target, 7) hands
+// its 7 over as the FLAGS byte (1 = AI flag, 2 = fallback, 4 = cancel event 2),
+// not as a reach. When the request is refused, flag 2 takes one LCG step: below
+// 70 percent the unit wanders 4 subtiles, otherwise it sleeps 10 frames, and
+// the call reports SUCCESS either way, so the caller's own fallback (its sleep,
+// its attack) never runs. Other reach values are not the flags value and keep
+// the plain failure result.
+func (c *Ctx) walkToFailed(reach int) bool {
+	if reach != meleeReach {
+		return false
+	}
+
+	if c.B.Roll(100) < walkFailWanderPct {
+		c.Wander(walkFailWanderDist)
+	} else {
+		c.Sleep(walkFailSleep)
+	}
+
+	c.acted = true
+
+	return true
+}
+
+// Constants of the flag 2 fallback of 0x5dd980 (VERIFIED immediates 0x46, 4, 10).
+const (
+	walkFailWanderPct  = 70
+	walkFailWanderDist = 4
+	walkFailSleep      = 10
+)
 
 // RunTo is MONAI_RunToTarget (mode RN).
 func (c *Ctx) RunTo(t Target, reach int) bool { return c.move(Point{t.X, t.Y}, &t, reach, true) }
@@ -158,12 +195,20 @@ func (c *Ctx) away(t Target, n int, run bool) bool {
 // mode, no target).
 func (c *Ctx) Wander(n int) bool {
 	b := c.B
+	dx, dy := c.wanderOffset(n)
+
+	return c.move(Point{b.X + dx, b.Y + dy}, nil, 0, false)
+}
+
+// wanderOffset draws the four LCG steps shared by 0x5dcff0 and 0x5de330.
+func (c *Ctx) wanderOffset(n int) (dx, dy int) {
+	b := c.B
 	s1 := b.Seed.Step()
 	r := int(b.Seed.Roll(int32(n)))
 	sx := b.Seed.Step()
 	sy := b.Seed.Step()
 
-	dx, dy := r, n
+	dx, dy = r, n
 	if s1&1 != 0 {
 		dx, dy = n, r
 	}
@@ -176,59 +221,47 @@ func (c *Ctx) Wander(n int) bool {
 		dy = -dy
 	}
 
-	return c.move(Point{b.X + dx, b.Y + dy}, nil, 0, false)
+	return dx, dy
 }
 
-// WalkNearTarget is MONAI_WalkNearTargetRandom(target, n): the Wander offset
-// scheme applied around the target instead of the monster (VERIFIED
-// description; the offsets still follow Wander's old UNVERIFIED reading, not
-// the verified 0x5dcff0 scheme). Without a
-// target it falls back to Wander(2).
+// WalkNearTarget is MONAI_WalkNearTargetRandom(target, n) 0x5de330 (VERIFIED
+// from the disassembly in wave 23): the Wander offset scheme (see Wander)
+// applied around the target's position. Step 1's low bit set: dx = n and
+// dy = roll(n); clear: dx = roll(n) and dy = n; the roll is the second LCG
+// step, the third step's low bit negates dx and the fourth's negates dy. The
+// path distance limit is 1 and the walk (mode 2) has no target unit. Without
+// a target it falls back to Wander(2). An earlier port used roll(n+1) and a
+// different bit assignment.
 func (c *Ctx) WalkNearTarget(t *Target, n int) bool {
 	if t == nil {
 		return c.Wander(2)
 	}
 
-	b := c.B
-	s1 := b.Seed.Step()
-	other := b.Roll(n + 1)
-
-	major, minor := n, other
-	if s1&2 != 0 {
-		major = -major
-	}
-
-	if b.Seed.Lo&1 != 0 {
-		minor = -minor
-	}
-
-	dx, dy := major, minor
-	if s1&1 == 0 {
-		dx, dy = minor, major
-	}
+	dx, dy := c.wanderOffset(n)
 
 	return c.move(Point{t.X + dx, t.Y + dy}, nil, 0, false)
 }
 
-// Circle is MONAI_CircleOrStrafeTarget 0x5de5e0. VERIFIED: it consumes one
-// LCG step, whose low byte (not bit 0) picks the move-speed override value, 5
-// when below 0x80 and 6 otherwise (the two strafe directions), then queues a
-// walk (mode 2) toward the target unit with no coordinates and extra flag 4
-// when its third argument is set. UNVERIFIED: what the override values do to
-// the walk; this port strafes n subtiles perpendicular to the target, the
-// side following the exe's 5/6 split (below 0x80: counter-clockwise).
+// Circle is MONAI_CircleOrStrafeTarget 0x5de5e0. VERIFIED (re-read in wave 23,
+// decompile plus disassembly): it consumes one LCG step and DISCARDS it (the
+// low byte only picks the value 5 or 6 that goes in a register the speed
+// override ignores), calls MONAI_SetMoveSpeedOverride(0, third argument) and
+// queues a walk (mode 2) toward the TARGET UNIT with path distance limit 1 and
+// extra flag 4 (cancel event 2 on failure) when its last argument is set. There
+// is no sideways step in the exe: the "circle" is a plain approach. The n of
+// the Go signature is the exe's third argument (0, 3, 4 or 6 at the callers),
+// stored in the move record's second field, whose use is UNVERIFIED, so it is
+// not modelled. An earlier port strafed n subtiles perpendicular to the target.
 func (c *Ctx) Circle(t Target, n int) bool {
-	b := c.B
-	s := b.Seed.Step()
-	dx, dy := t.X-b.X, t.Y-b.Y
-	px, py := -sign(dy), sign(dx)
+	_ = n
 
-	if s&0xff >= 0x80 {
-		px, py = -px, -py
-	}
+	c.B.Seed.Step()
 
-	return c.move(Point{b.X + px*n, b.Y + py*n}, nil, 0, false)
+	return c.move(Point{t.X, t.Y}, &t, circleReach, false)
 }
+
+// circleReach is the path distance limit passed by 0x5de5e0 (VERIFIED, push 1).
+const circleReach = 1
 
 func sign(v int) int {
 	switch {
