@@ -44,7 +44,8 @@ scenario_check() {
     grep -qE "LEVEL CHANGE $route" $log.txt || { echo "FAIL: missing level change $route"; fail=1; }
   done
   # the cave and temple exits lead somewhere; the two exits of the Frozen Tundra go different ways
-  grep -qE "exit tile style=[0-9]+ at .* leads to level 0" $log.txt && { echo "FAIL: an exit tile of Act 5 leads nowhere"; fail=1; }
+  # (Act 1 cottage tiles of the neighbouring Blood Moor, drawn since the backdrop change, are decor, not exits)
+  grep -E "exit tile style=[0-9]+ at .* leads to level 0" $log.txt | grep -v "Act1/Outdoors/Cott" | grep -q . && { echo "FAIL: an exit tile of Act 5 leads nowhere"; fail=1; }
   grep -qE "exit tile style=[0-9]+ at .*WestEntrance_Snow.ds1 leads to level 115" $log.txt || { echo "FAIL: the Frozen Tundra west cave does not lead to the Glacial Trail"; fail=1; }
   grep -qE "exit tile style=[0-9]+ at .*WestExit_Snow.ds1 leads to level 118" $log.txt || { echo "FAIL: the Frozen Tundra east cave does not lead to the Ancients' Way"; fail=1; }
   # the hero arrives next to the way back through the stairs of the cave levels (not at the fallback entry)

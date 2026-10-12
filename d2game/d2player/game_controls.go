@@ -634,7 +634,9 @@ func (g *GameControls) OnMouseButtonRepeat(event d2interface.MouseEvent) bool {
 		return true
 	}
 
-	if isLeft && inRect && !g.ignoredWhileCasting(button, event.KeyMod()) {
+	// a held button repeating is not a fresh click: while a cast runs it waits (a held Inferno must not restart
+	// its run on every repeat); only a new button press reaches the skill engine's interrupt rule
+	if isLeft && inRect && !g.hero.IsCasting() {
 		g.lastLeftBtnActionTime = now
 
 		g.worldClick(button, event.KeyMod(), px, py)
@@ -654,7 +656,7 @@ func (g *GameControls) OnMouseButtonRepeat(event d2interface.MouseEvent) bool {
 		return true
 	}
 
-	if isRight && shouldDoRight && inRect && !g.ignoredWhileCasting(button, event.KeyMod()) {
+	if isRight && shouldDoRight && inRect && !g.hero.IsCasting() {
 		g.lastRightBtnActionTime = now
 
 		g.worldClick(button, event.KeyMod(), px, py)

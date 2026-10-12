@@ -53,7 +53,8 @@ scenario_check() {
     grep -qE "LEVEL CHANGE $route" $log.txt || { echo "FAIL: missing level change $route"; fail=1; }
   done
   # the exit presets lead somewhere (the lava warp and the Arreat Plateau cave led to level 0)
-  grep -qE "exit tile style=[0-9]+ at .* leads to level 0" $log.txt && { echo "FAIL: an exit tile of Act 4/5 leads nowhere"; fail=1; }
+  # (Act 1 cottage tiles of the neighbouring Blood Moor, drawn since the backdrop change, are decor, not exits)
+  grep -E "exit tile style=[0-9]+ at .* leads to level 0" $log.txt | grep -v "Act1/Outdoors/Cott" | grep -q . && { echo "FAIL: an exit tile of Act 4/5 leads nowhere"; fail=1; }
   grep -qE "exit tile style=[0-9]+ at .*WarpLava1.ds1 leads to level 107" $log.txt || { echo "FAIL: the City of the Damned lava warp does not lead to the River of Flame"; fail=1; }
   grep -qE "exit tile style=[0-9]+ at .*Entry1.ds1 leads to level 107" $log.txt || { echo "FAIL: the Chaos Sanctuary entry does not lead back to the River of Flame"; fail=1; }
   grep -qE "exit tile style=[0-9]+ at .*WestEntrance_Dirt.ds1 leads to level 113" $log.txt || { echo "FAIL: the Arreat Plateau cave does not lead to the Crystalline Passage"; fail=1; }
