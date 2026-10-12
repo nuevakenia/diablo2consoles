@@ -186,6 +186,7 @@ type Game struct {
 	summonCheckAcc       float64 // seconds since the last SUMMONCHECK line (game_monsters.go)
 	aiTest               *aiAutoTest
 	bossTest             *bossAutoTest
+	bossFight            *bossFightTest
 	uber                 *uberRuntime
 	forge                *forgeShower // N22: the running Hellforge reward shower
 	trio                 d2uber.Trio  // N24: which of the three endgame bosses died in this game

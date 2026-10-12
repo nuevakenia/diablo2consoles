@@ -99,6 +99,10 @@ func (d *Director) monsterStrike(u *unit, mode d2monster.Mode) {
 		return
 	}
 
+	if d.landBossSkill(u, mode) {
+		return
+	}
+
 	d.closeIn(u)
 	d.stompShake(u)
 
@@ -186,7 +190,7 @@ func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.
 	// VERIFIED (0x57cc10): a player defender in mode 3 (running) is auto-hit,
 	// the to-hit is not rolled and no seed step is consumed.
 	hit, chance, roll := true, 0, 0
-	if !heroAutoHit(p) {
+	if !heroAutoHit(p) && !d.fx.forceHit {
 		hit, chance, roll = d2combat.RollToHit(u.b.Seed, in)
 	}
 
