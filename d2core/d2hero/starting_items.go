@@ -169,9 +169,9 @@ func (f *HeroStateFactory) wearStartingEquipment(state *HeroState, hero d2enum.H
 	for _, it := range starterBodyItems(rec.StartItem[:], rec.StartItemLocation[:]) {
 		switch {
 		case f.asset.Records.Item.Armors[it.Code] != nil:
-			f.equipArmor(&state.Equipment, uint8(it.Slot), it.Code)
+			f.equipArmor(&state.Equipment, uint8(it.Slot), it.Code, false)
 		case f.asset.Records.Item.Weapons[it.Code] != nil:
-			f.equipWeapon(&state.Equipment, uint8(it.Slot), it.Code)
+			f.equipWeapon(&state.Equipment, uint8(it.Slot), it.Code, false)
 		}
 	}
 }

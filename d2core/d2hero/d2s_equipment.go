@@ -76,18 +76,20 @@ func (f *HeroStateFactory) applyD2SEquipment(state *HeroState, items []d2s.Item,
 
 		switch tables.ItemKindOf(code) {
 		case d2s.KindArmor:
-			f.equipArmor(&state.Equipment, item.Equipped, code)
+			f.equipArmor(&state.Equipment, item.Equipped, code, item.Ethereal)
 		case d2s.KindWeapon:
-			f.equipWeapon(&state.Equipment, item.Equipped, code)
+			f.equipWeapon(&state.Equipment, item.Equipped, code, item.Ethereal)
 		}
 	}
 }
 
-func (f *HeroStateFactory) equipArmor(eq *d2inventory.CharacterEquipment, slot uint8, code string) {
+func (f *HeroStateFactory) equipArmor(eq *d2inventory.CharacterEquipment, slot uint8, code string, ethereal bool) {
 	armor, err := f.GetArmorItemByCode(code)
 	if err != nil {
 		return
 	}
+
+	armor.Ethereal = ethereal
 
 	switch slot {
 	case d2sSlotHead:
@@ -103,11 +105,13 @@ func (f *HeroStateFactory) equipArmor(eq *d2inventory.CharacterEquipment, slot u
 	}
 }
 
-func (f *HeroStateFactory) equipWeapon(eq *d2inventory.CharacterEquipment, slot uint8, code string) {
+func (f *HeroStateFactory) equipWeapon(eq *d2inventory.CharacterEquipment, slot uint8, code string, ethereal bool) {
 	weapon, err := f.GetWeaponItemByCode(code)
 	if err != nil {
 		return
 	}
+
+	weapon.Ethereal = ethereal
 
 	switch slot {
 	case d2sSlotRightArm:

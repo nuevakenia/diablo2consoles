@@ -41,6 +41,12 @@ type LightInput struct {
 	HeroColor [3]uint8
 	// Extra are the static lights near the hero (objects such as torches and fires).
 	Extra []LightPoint
+	// Blocked tells which absolute subtiles block light (collision mask 0x22); nil = every light is radial.
+	Blocked d2lightmap.Blocker
+	// UnitLOS turns the line-of-sight painter on for the hero and monster lights (light quality 2 in the exe,
+	// UNVERIFIED which quality OD2 should default to, so it is off unless asked for). Object lights (kind 2)
+	// always use the occluded painter when Blocked is set.
+	UnitLOS bool
 }
 
 // LightPoint is a static light: a position in tile units, a radius in subtiles and a colour.
@@ -48,6 +54,8 @@ type LightPoint struct {
 	X, Y    float64
 	Radius  int
 	R, G, B uint8
+	// Kind is the d2lightmap source kind (KindUnit for monsters, KindMissile, KindObject); the zero value is KindUnit.
+	Kind int
 }
 
 // staticLightIntensity is the peak intensity of object lights (U: the object light intensity is not in the notes).
@@ -162,6 +170,8 @@ func (mr *MapRenderer) advanceLighting(elapsed float64) {
 	subX, subY := l.input.HeroX*subtilesPerTile, l.input.HeroY*subtilesPerTile
 	l.built = true
 	l.hero.SetPosition(subX, subY)
+	l.hero.Occluded = l.input.UnitLOS
+	l.lm.Blocked = l.input.Blocked
 	l.sources = append(l.sources[:0], l.hero)
 
 	for _, p := range l.input.Extra {
@@ -171,6 +181,7 @@ func (mr *MapRenderer) advanceLighting(elapsed float64) {
 
 		src := d2lightmap.NewSource(p.Radius, staticLightIntensity, p.R, p.G, p.B)
 		src.SetPosition(p.X*subtilesPerTile, p.Y*subtilesPerTile)
+		src.Occluded = p.Kind == d2lightmap.KindObject || (p.Kind == d2lightmap.KindUnit && l.input.UnitLOS)
 		l.sources = append(l.sources, src)
 	}
 

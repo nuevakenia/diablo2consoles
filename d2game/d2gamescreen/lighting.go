@@ -143,7 +143,8 @@ func (v *Game) advanceLighting() {
 	radius, hr, hg, hb := v.heroLight()
 
 	v.mapRenderer.SetLightInput(d2maprenderer.LightInput{HeroX: pos.X(), HeroY: pos.Y(), Base: cell,
-		RadiusSubtiles: radius, HeroColor: [3]uint8{hr, hg, hb}, Extra: v.objectLights(pos.X(), pos.Y())})
+		RadiusSubtiles: radius, HeroColor: [3]uint8{hr, hg, hb}, Extra: v.objectLights(pos.X(), pos.Y()),
+		Blocked: v.lightBlocker(), UnitLOS: lightUnitLOS()})
 }
 
 // heroLight is the hero's light radius and colour from the equipment stats item_lightradius (89) and
@@ -189,21 +190,21 @@ func (v *Game) objectLights(hx, hy float64) []d2maprenderer.LightPoint {
 				continue
 			}
 
-			p = d2maprenderer.LightPoint{Radius: r, R: objectLightR, G: objectLightG, B: objectLightB}
+			p = d2maprenderer.LightPoint{Radius: r, R: objectLightR, G: objectLightG, B: objectLightB, Kind: d2lightmap.KindObject}
 		case *d2mapentity.Monster:
 			ls, ok := ent.LightSource()
 			if !ok {
 				continue
 			}
 
-			p = d2maprenderer.LightPoint{Radius: ls.Radius, R: ls.R, G: ls.G, B: ls.B}
+			p = d2maprenderer.LightPoint{Radius: ls.Radius, R: ls.R, G: ls.G, B: ls.B, Kind: d2lightmap.KindUnit}
 		case *d2mapentity.Missile:
 			ls, ok := ent.LightSource()
 			if !ok {
 				continue
 			}
 
-			p = d2maprenderer.LightPoint{Radius: ls.Radius, R: ls.R, G: ls.G, B: ls.B}
+			p = d2maprenderer.LightPoint{Radius: ls.Radius, R: ls.R, G: ls.G, B: ls.B, Kind: d2lightmap.KindMissile}
 		default:
 			continue
 		}

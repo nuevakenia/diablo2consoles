@@ -127,6 +127,8 @@ func (p *Player) applyHumanEquipment() {
 		fmt.Printf("player %s: weapon class change: %v\n", p.name, err)
 	}
 
+	p.composite.SetLayerEffects(equipmentEffects(p.Equipment))
+
 	if err := p.composite.Equip(equipmentLayers(p.Equipment)); err != nil {
 		fmt.Printf("player %s: equip: %v\n", p.name, err)
 	}

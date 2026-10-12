@@ -736,29 +736,51 @@ func (h *HUD) entityAt(cx, cy int) d2interface.MapEntity {
 	return nil
 }
 
-// renderAllItemLabels draws the name of every ground item (the Alt / Option "show items" key).
+// renderAllItemLabels draws the name of every ground item (the Alt / Option "show items" key): the colour
+// of the label rule, the screen clamp and the overlap avoidance of INV_DrawGroundItemLabels 0x4bd100 /
+// INV_ClampGroundLabelToScreen 0x4bcf20 (see d2automap.LayoutLabels).
 func (h *HUD) renderAllItemLabels(target d2interface.Surface) {
-	shown := 0
+	type pending struct {
+		text string
+		req  d2automap.LabelRequest
+	}
+
+	var items []pending
 
 	for _, entity := range h.mapEngine.Entities() {
-		if _, ok := entity.(*d2mapentity.Item); !ok {
+		it, ok := entity.(*d2mapentity.Item)
+		if !ok {
 			continue
 		}
 
 		sx, sy := h.mapRenderer.WorldToScreenF(entity.GetPositionF())
 		// INV_DrawGroundItemLabels 0x4bd100: at most 32 labels, items inside the view (x 0..W, y -8..H-16)
-		if shown >= d2automap.MaxGroundLabels || !d2automap.LabelVisible(int(sx), int(sy), d2display.W(), d2display.H(), 0) {
+		if len(items) >= d2automap.MaxGroundLabels || !d2automap.LabelVisible(int(sx), int(sy), d2display.W(), d2display.H(), 0) {
 			continue
 		}
-
-		shown++
 
 		_, entityHeight := entity.GetSize()
 		pos := entity.GetPosition()
 		off := pos.RenderOffset()
 
-		h.nameLabel.SetText(entity.Label())
-		h.nameLabel.SetPosition(int(sx)-int(off.X()), int(sy)-int(off.Y())-entityHeight-hoverLabelOuterPad)
+		h.nameLabel.SetText(it.GroundLabel())
+		tw, th := h.nameLabel.GetSize()
+
+		// the label used to start at this y; the exe's box has its bottom on the item point
+		top := int(sy) - int(off.Y()) - entityHeight - hoverLabelOuterPad
+		items = append(items, pending{it.GroundLabel(), d2automap.LabelRequest{
+			ItemX: int(sx) - int(off.X()), ItemY: top + th, TextW: tw, TextH: th,
+		}})
+	}
+
+	reqs := make([]d2automap.LabelRequest, len(items))
+	for i, p := range items {
+		reqs[i] = p.req
+	}
+
+	for i, box := range d2automap.LayoutLabels(reqs, 0, d2display.W(), d2display.H()) {
+		h.nameLabel.SetText(items[i].text)
+		h.nameLabel.SetPosition((box.L+box.R)/2, box.B-items[i].req.TextH)
 		h.nameLabel.Render(target)
 	}
 }

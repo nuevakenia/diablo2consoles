@@ -68,6 +68,7 @@ type Automap struct {
 	level     int
 	levelFn   func() int
 	nameFn    func(id int) string
+	diffFn    func() int // difficulty 0..2 for the automap difficulty line
 	lastCX    float64
 	lastCY    float64
 	haveLast  bool
@@ -116,6 +117,9 @@ func (g *GameControls) Automap() *Automap { return g.automap }
 func (a *Automap) SetLevelSource(level func() int, name func(id int) string) {
 	a.levelFn, a.nameFn = level, name
 }
+
+// SetDifficultySource tells the automap the difficulty (0 normal, 1 nightmare, 2 hell) for the text line.
+func (a *Automap) SetDifficultySource(f func() int) { a.diffFn = f }
 
 // On reports whether the map is shown.
 func (a *Automap) On() bool { return a.on }

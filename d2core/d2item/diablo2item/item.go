@@ -159,8 +159,8 @@ type minMaxEnhanceable struct {
 	enhance int // nolint:structcheck,unused // WIP
 }
 
-// Label returns the item name
-func (i *Item) Label() string {
+// plainLabel is the item name without colour (personalised for Anya's reward).
+func (i *Item) plainLabel() string {
 	str := i.name
 
 	if !i.attributes.identitified {
@@ -170,6 +170,13 @@ func (i *Item) Label() string {
 	if p := i.attributes.personalization; p != "" { // Anya's reward
 		str = d2reward.PersonalName(p, str)
 	}
+
+	return str
+}
+
+// Label returns the item name
+func (i *Item) Label() string {
+	str := i.plainLabel()
 
 	if i.rolled != nil {
 		return d2ui.ColorTokenize(str, i.rolledColor())

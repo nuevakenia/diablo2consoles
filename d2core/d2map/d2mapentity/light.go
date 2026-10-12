@@ -40,22 +40,6 @@ func (m *Monster) LightSource() (LightSource, bool) {
 	return LightSource{radius, colorByte(m.StatEx.LightR), colorByte(m.StatEx.LightG), colorByte(m.StatEx.LightB)}, true
 }
 
-// LightSource is the light of a missile: Missiles.txt Light (radius, read as subtiles; the OD2
-// record names it Diameter, UNVERIFIED which it is) and Red, Green, Blue (MISSILE_CreateClientMissile
-// 0x4c9f80).
-func (m *Missile) LightSource() (LightSource, bool) {
-	if m.record == nil {
-		return LightSource{}, false
-	}
-
-	radius, ok := d2lightmap.ClampSourceRadius(m.record.Light.Diameter)
-	if !ok {
-		return LightSource{}, false
-	}
-
-	return LightSource{radius, m.record.Light.Red, m.record.Light.Green, m.record.Light.Blue}, true
-}
-
 func colorByte(v int) uint8 {
 	switch {
 	case v < 0:

@@ -335,9 +335,16 @@ func (a *Automap) drawText(target d2interface.Surface, w int) {
 	width := func(s string) int { x, _ := a.label.GetTextMetrics(s); return x }
 	_, lh := a.label.GetTextMetrics("A")
 
-	// AUTOMAP_DrawAutomap 0x4564a0: level name, then the version line, right aligned and 16 apart.
-	// The game name / password / difficulty lines are not drawn (strings not read, UNVERIFIED).
-	for _, l := range d2automap.TextStack([]string{name, d2automap.VersionText}, w, width) {
+	// AUTOMAP_DrawAutomap 0x4564a0: game name, password (join info only, none in single player), level name,
+	// version, difficulty (strings by id from the player's own string table), right aligned and 16 apart.
+	in := d2automap.TextInput{LevelName: name}
+	if a.diffFn != nil {
+		in.Difficulty = a.diffFn()
+	}
+
+	str := func(id int) string { s, _ := a.asset.StringByID(id); return s }
+
+	for _, l := range d2automap.TextStack(d2automap.BuildLines(in, str), w, width) {
 		a.label.SetText(l.Text)
 		a.label.SetPosition(l.X, l.Y-lh) // the engine's y is the text baseline (UNVERIFIED)
 		a.label.Render(target)
