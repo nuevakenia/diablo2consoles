@@ -643,7 +643,7 @@ func TestChargedBoltFanOut(t *testing.T) {
 	f := newFixture(map[string]int{"Charged Bolt": 5})
 	f.u.base = f.u.levels
 
-	_, do := f.cast("Charged Bolt", 20, 0)
+	_, do := f.cast("Charged Bolt", 20, 3)
 	// calc1 = min(24, 3+(5-1)) = 7 bolts, 5.0 mana
 	if !do.OK || len(do.Missiles) != 7 || f.u.mana != 100<<8-1280 {
 		t.Fatalf("%d missiles, mana %d (%+v)", len(do.Missiles), f.u.mana, do.OK)
@@ -655,18 +655,27 @@ func TestChargedBoltFanOut(t *testing.T) {
 		}
 	}
 
-	// the seeded roller returns 0 -> -40 degrees for every bolt here; a different roll fans out
+	// w23: every bolt walks path type 10 (hook 0x5c7340), none is fanned by a random angle
+	for i, m := range do.Missiles {
+		if !m.OnWalkPath() {
+			t.Errorf("bolt %d is not on a walk path", i)
+		}
+	}
+
 	f2 := newFixture(map[string]int{"Charged Bolt": 2})
 	f2.u.base = f2.u.levels
-	f2.u.roller = &seq{vals: []uint32{0, 40, 80}}
-	_, do = f2.cast("Charged Bolt", 20, 0)
+	_, do = f2.cast("Charged Bolt", 20, 3)
 
 	if len(do.Missiles) != 4 {
 		t.Fatalf("level 2 -> 4 bolts, got %d", len(do.Missiles))
 	}
 
-	if a, b, c := do.Missiles[0].DY, do.Missiles[1].DY, do.Missiles[2].DY; !(a < b && b < c) {
-		t.Fatalf("not fanned out: %v %v %v", a, b, c)
+	// a target at x 0 or y 0 creates no bolt (0x5c73a0 skips them)
+	f3 := newFixture(map[string]int{"Charged Bolt": 2})
+	f3.u.base = f3.u.levels
+
+	if _, do = f3.cast("Charged Bolt", 0, 5); do.OK {
+		t.Errorf("a zero target x must create nothing: %d missiles", len(do.Missiles))
 	}
 }
 

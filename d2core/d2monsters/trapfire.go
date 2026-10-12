@@ -62,6 +62,8 @@ type TrapSpec struct {
 	ExplodeSkillName string
 	Missile2         string
 	ReviveRadius     int
+	// FanSkillID is the monster skill of a Charged Bolt Sentry (do function 17): each shot throws its calc1 bolts.
+	FanSkillID int
 }
 
 // SkillFirer is implemented by the skill engine. It returns whether a missile

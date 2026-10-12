@@ -34,6 +34,16 @@ func (f *fakeCaster) CastTrap(u d2skill.Unit, id int, missile string, fx, fy int
 	return &d2missile.Missile{}
 }
 
+func (f *fakeCaster) CastTrapBolts(u d2skill.Unit, id, ms, ml, fx, fy int, tg d2skill.Target) []*d2missile.Missile {
+	f.calls = append(f.calls, castCall{u, id, "bolts", fx, fy, tg})
+
+	if !f.fire {
+		return nil
+	}
+
+	return []*d2missile.Missile{{}}
+}
+
 func trapTestEngine(f *fakeCaster) *Engine {
 	return &Engine{Logger: d2util.NewLogger(), fakeCaster: f, targets: map[string]*monsterTarget{},
 		heroes: map[string]*heroUnit{}}
@@ -110,5 +120,20 @@ func TestFireTrapGuards(t *testing.T) {
 
 	if e.FireTrap(d2monsters.TrapShot{Trap: monAt(0, 0), Owner: &d2mapentity.Player{}, Target: monAt(1, 1)}) {
 		t.Error("a pipeline miss must report false")
+	}
+}
+
+// A Charged Bolt Sentry shot goes through CastTrapBolts (the monster skill's bolt count), not through the single
+// missile CastTrap.
+func TestTrapFireFanSkill(t *testing.T) {
+	f := &fakeCaster{fire: true}
+	e := trapTestEngine(f)
+	owner := &d2mapentity.Player{}
+	foe := monAt(14, 9)
+
+	ok := e.FireTrap(d2monsters.TrapShot{Trap: monAt(10, 10), Owner: owner, Target: foe, FromX: 10, FromY: 10,
+		Spec: d2monsters.TrapSpec{SkillID: 261, SkillName: "Charged Bolt Sentry", Missile: "sentrychargedbolt", Level: 4, FanSkillID: 400}})
+	if !ok || len(f.calls) != 1 || f.calls[0].missile != "bolts" || f.calls[0].skillID != 261 {
+		t.Fatalf("ok=%v calls=%+v", ok, f.calls)
 	}
 }

@@ -961,27 +961,29 @@ func (p *Pipeline) effectHook(u Unit) func(d2missile.Event) {
 	}
 }
 
-// doChargedBolt is SRVDO_ChargedBolt (0x5c73a0; spot check against the binary:
-// the count calc1, the creation flags 0x21 and the per-bolt post-create
-// callback 0x5c7340 are confirmed, the missile is the progressive missile of
-// the skill rather than always srvmissilea): calc1 bolts of srvmissilea,
-// each in its own random direction. The game randomises direction and speed
-// in a post-create callback (0x5c7340) that was not read; here every bolt
-// is rotated by a uniform random angle within +-40 degrees (UNVERIFIED).
+// doChargedBolt is SRVDO_ChargedBolt (0x5c73a0, VERIFIED in w23): the caster's unit flag 0x40 is set, then calc1
+// bolts of the skill's progressive missile (srvmissilea) are created at the caster, every one aimed at the
+// skill's target position (a bolt whose target x or y is 0 is skipped) and every one through the per-missile hook
+// 0x5c7340: path type 10 seeded with the destination x plus the bolt's index, lifetime clamped to 77
+// (d2missile.PathType10Nodes). The earlier port fanned the bolts +-40 degrees at random (UNVERIFIED, wrong).
 func (p *Pipeline) doChargedBolt(u Unit, sk *Skill, lvl int, tgt Target, env *Env, res *DoResult) {
 	name := sk.SrvMissileA
 	if name == "" {
 		name = sk.SrvMissile
 	}
 
+	ax, ay := tgt.X, tgt.Y
+	if tgt.Unit != nil {
+		ax, ay = tgt.UX, tgt.UY
+	}
+
 	n := env.eval(sk.Calc[1])
 	for i := 0; i < n; i++ {
-		deg := 0
-		if r := u.Roller(); r != nil {
-			deg = int(r.Roll(81)) - 40
+		if ax == 0 || ay == 0 {
+			continue
 		}
 
-		if m := p.castMissile(u, sk, lvl, env, name, tgt, castOpts{angle: float64(deg) * math.Pi / 180}); m != nil {
+		if m := p.castMissile(u, sk, lvl, env, name, tgt, castOpts{pathType10: true, pathSeed: ChargedBoltSeed(ax, i)}); m != nil {
 			res.Missiles = append(res.Missiles, m)
 		}
 	}
