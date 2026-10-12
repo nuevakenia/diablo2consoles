@@ -42,10 +42,20 @@ type Renderer struct {
 	lastRenderError error
 	fullscreenHook  func(bool)
 	turboFrame      int
+	quietFrames     int
 }
 
 // Update calls the game's logical update function (the `Advance` method)
 func (r *Renderer) Update() error {
+	// OD2_QUIET: send the window behind the others, a few times while it opens (see quiet_darwin.go)
+	if d2util.QuietEnabled() {
+		if r.quietFrames < 30 || r.quietFrames%250 == 0 {
+			quietWindow()
+		}
+
+		r.quietFrames++
+	}
+
 	if err := r.handleWindowShortcuts(); err != nil {
 		return err
 	}
@@ -146,7 +156,7 @@ func CreateRenderer(cfg *d2config.Configuration) (*Renderer, error) {
 
 		ebiten.SetCursorMode(ebiten.CursorModeHidden)
 		ebiten.SetFullscreen(startFullscreen(config, alwaysFullscreen()))
-		ebiten.SetRunnableOnUnfocused(config.RunInBackground)
+		ebiten.SetRunnableOnUnfocused(config.RunInBackground || d2util.QuietEnabled()) // a quiet window is never focused
 		ebiten.SetVsyncEnabled(config.VsyncEnabled)
 		ebiten.SetMaxTPS(config.TicksPerSecond)
 

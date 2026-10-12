@@ -4,6 +4,8 @@
 #   scripts/verify_parallel.sh [jobs]      default 6; env as for verify.sh; logs in /tmp/verify-par-<pid>-<n>.log
 # Exit 0 only if every job printed ALL CHECKS PASSED.
 jobs=${1:-6}
+# quiet windows (behind the others, no focus, real input ignored) unless OD2_QUIET=0: the owner plays on this Mac
+export OD2_QUIET=${OD2_QUIET:-1}
 cd "${0:A:h}/.." || exit 1
 # slow-first order by wall seconds measured alone (turbo scenarios with their turbo time): the turbo ones (9e-act2, 9g-act3,
 # 9h-act45, 9i-*, 9j-quest-staff) dropped to 10-45 s and moved down; numbers in ~/git/d2-re-notes/turbo-mode.md

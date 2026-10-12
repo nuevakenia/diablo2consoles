@@ -6,6 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 )
 
 var (
@@ -125,11 +126,19 @@ type InputService struct{}
 
 // CursorPosition returns a position of a mouse cursor relative to the game screen (window).
 func (is InputService) CursorPosition() (x, y int) {
+	if d2util.QuietEnabled() {
+		return 0, 0 // OD2_QUIET: the real mouse is ignored; scripts inject their own
+	}
+
 	return ebiten.CursorPosition()
 }
 
 // InputChars return "printable" runes read from the keyboard at the time update is called.
 func (is InputService) InputChars() []rune {
+	if d2util.QuietEnabled() {
+		return nil
+	}
+
 	return ebiten.InputChars()
 }
 
@@ -140,6 +149,10 @@ func (is InputService) InputChars() []rune {
 // same ebiten.IsKeyPressed once per tick, just before Update, so a press duration > 0 is the same
 // answer for the whole tick without the round trip.
 func (is InputService) IsKeyPressed(key d2enum.Key) bool {
+	if d2util.QuietEnabled() {
+		return false
+	}
+
 	if key == d2enum.KeyMeta {
 		return commandHeld()
 	}
@@ -149,6 +162,10 @@ func (is InputService) IsKeyPressed(key d2enum.Key) bool {
 
 // IsKeyJustPressed checks if the provided key is just transitioned from up to down.
 func (is InputService) IsKeyJustPressed(key d2enum.Key) bool {
+	if d2util.QuietEnabled() {
+		return false
+	}
+
 	if key == d2enum.KeyMeta {
 		return false // no ebiten key: only the held state is known
 	}
@@ -158,6 +175,10 @@ func (is InputService) IsKeyJustPressed(key d2enum.Key) bool {
 
 // IsKeyJustReleased checks if the provided key is just transitioned from down to up.
 func (is InputService) IsKeyJustReleased(key d2enum.Key) bool {
+	if d2util.QuietEnabled() {
+		return false
+	}
+
 	if key == d2enum.KeyMeta {
 		return false
 	}
@@ -168,21 +189,37 @@ func (is InputService) IsKeyJustReleased(key d2enum.Key) bool {
 // IsMouseButtonPressed checks if the provided mouse button is down.
 // Like IsKeyPressed it reads the once-per-tick sample of inpututil instead of asking the window thread.
 func (is InputService) IsMouseButtonPressed(button d2enum.MouseButton) bool {
+	if d2util.QuietEnabled() {
+		return false
+	}
+
 	return inpututil.MouseButtonPressDuration(mouseButtonToEbiten[button]) > 0
 }
 
 // IsMouseButtonJustPressed checks if the provided mouse button is just transitioned from up to down.
 func (is InputService) IsMouseButtonJustPressed(button d2enum.MouseButton) bool {
+	if d2util.QuietEnabled() {
+		return false
+	}
+
 	return inpututil.IsMouseButtonJustPressed(mouseButtonToEbiten[button])
 }
 
 // IsMouseButtonJustReleased checks if the provided mouse button is just transitioned from down to up.
 func (is InputService) IsMouseButtonJustReleased(button d2enum.MouseButton) bool {
+	if d2util.QuietEnabled() {
+		return false
+	}
+
 	return inpututil.IsMouseButtonJustReleased(mouseButtonToEbiten[button])
 }
 
 // KeyPressDuration returns how long the key is pressed in frames.
 func (is InputService) KeyPressDuration(key d2enum.Key) int {
+	if d2util.QuietEnabled() {
+		return 0
+	}
+
 	if key == d2enum.KeyMeta {
 		if commandHeld() {
 			return 1
