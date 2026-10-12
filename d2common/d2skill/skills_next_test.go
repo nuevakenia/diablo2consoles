@@ -286,10 +286,11 @@ func TestSmiteShieldDamage(t *testing.T) {
 		t.Fatalf("smite %+v", r)
 	}
 
-	// damage = roll(10<<8..20<<8) raised by calc1 = ln34 percent; the stun is calc2
-	base := int32(10<<8 + 3<<8)
+	// damage = RollPhysical (0x579120): calc1 = ln34 percent raised on BOTH ends of the shield range, then one roll
+	// between them (the test roller adds 3<<8 to the low end); the stun is calc2
 	pct := int32(cf.env("Smite", 10).eval(cf.reg.ByName("Smite").Calc[1]))
-	want := base + base*pct/100
+	lo := int32(10<<8) + int32(10<<8)*pct/100
+	want := lo + 3<<8
 
 	if r.Melee.Damage.Physical != want || r.Melee.Damage.StunLen <= 0 {
 		t.Errorf("physical %d stun %d, want %d and a stun", r.Melee.Damage.Physical, r.Melee.Damage.StunLen, want)

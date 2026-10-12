@@ -621,6 +621,17 @@ func (e *Engine) overlayAt(name string, x, y int) {
 
 // ---- results ----
 
+// meleeResultAfter applies a blow now, or when its rush ends (MeleeResult.Delay, Charge).
+func (e *Engine) meleeResultAfter(p *d2mapentity.Player, sk *d2skill.Skill, r *d2skill.MeleeResult) {
+	if r.Delay > 0 {
+		e.after(r.Delay, func() { e.meleeResult(p, sk, r) })
+
+		return
+	}
+
+	e.meleeResult(p, sk, r)
+}
+
 func (e *Engine) meleeResult(p *d2mapentity.Player, sk *d2skill.Skill, r *d2skill.MeleeResult) {
 	e.Counters.Melee++
 

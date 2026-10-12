@@ -249,7 +249,8 @@ type strikeOpt struct {
 	convClass byte
 	convPct   int
 	// elemPct adds fire, cold and lightning damage equal to that percent of
-	// the physical damage (Vengeance, U: added rather than converted).
+	// the bare weapon damage roll (Vengeance, SRVST_035 0x5ce340, VERIFIED wave 23:
+	// added, not converted; see vengeanceElem).
 	elemPct [3]int
 }
 
@@ -355,9 +356,7 @@ func (p *Pipeline) strike(u Unit, sk *Skill, lvl int, t d2missile.Target, env *E
 	}
 
 	if o.elemPct != [3]int{} {
-		dmg.Fire += int32(mulDiv(int(dmg.Physical), o.elemPct[0], 100))
-		dmg.Cold += int32(mulDiv(int(dmg.Physical), o.elemPct[1], 100))
-		dmg.Lightning += int32(mulDiv(int(dmg.Physical), o.elemPct[2], 100))
+		p.vengeanceElem(u, sk, lvl, env, o, &dmg)
 	}
 
 	// stun on hit from states (Maul: stunlength, frames)
@@ -591,8 +590,18 @@ func doStrikeBuffFn(c *cast) {
 	c.effect(Effect{Kind: "self_state", State: c.sk.AuraState, Frames: frames, Stats: statsOf(c.env, c.sk), Stack: stack})
 }
 
-// doSacrificeFn is SRVDO_064_Sacrifice (U): a strike with calc1 percent damage
-// that costs the caster calc2 percent of its maximum life.
+// LifeHolder is implemented by a Target that can say how much life it has (whole points). Sacrifice caps the
+// damage its self cost is taken from by the target's current life.
+type LifeHolder interface {
+	LifePoints() int
+}
+
+// doSacrificeFn is SRVDO_064_Sacrifice (0x5cccb0) with the blow of SRVST_029 (0x5ccb50), VERIFIED wave 23: the blow
+// is a plain melee hit with calc1 percent damage (the percent goes into the weapon roll, SrcDam 0, and the skill's
+// element only when calc4 is above zero). The do function then finds the queued hit and charges the caster calc2
+// percent of the physical damage that hit rolled (before the target's resists), capped by the life the target had
+// (stat 6); a miss rolled no damage, so it costs nothing. The charge is a damage struct flagged 0x1000 applied to
+// the caster. It is NOT a share of the caster's maximum life (the older stand-in).
 func doSacrificeFn(c *cast) {
 	if !c.needTarget() {
 		return
@@ -604,7 +613,14 @@ func doSacrificeFn(c *cast) {
 	c.addMelee(m)
 
 	if m.Hit {
-		c.effect(Effect{Kind: "self_damage", SelfDamagePct: c.calc(2)})
+		dealt := int(m.Damage.Physical)
+		if lh, ok := c.tgt.Unit.(LifeHolder); ok {
+			if life := lh.LifePoints() << 8; life < dealt {
+				dealt = life
+			}
+		}
+
+		c.effect(Effect{Kind: "self_damage", SelfDamagePct: c.calc(2), SelfDamageFixed: mulDiv(dealt, c.calc(2), 100)})
 	}
 }
 
@@ -1314,9 +1330,17 @@ func doAuraFn(c *cast) {
 	}
 
 	// the passive stats that ride on the caster's aura state (SRVDO_065 / 066 / 081, VERIFIED)
-	e.Stats = append(e.Stats, auraPassiveStats(c.env, sk)...)
+	if sk.SrvDoFunc == 65 {
+		e.PassiveStats = auraPassiveStats(c.env, sk)
+	} else {
+		e.Stats = append(e.Stats, auraPassiveStats(c.env, sk)...)
+	}
 
 	if sk.SrvDoFunc == 65 { // friendly aura: the upkeep is the aura parameter (VERIFIED 0x5cd4b0 + 0x645ed0)
+		e.Cost = int(sk.calcMana(c.lvl, false))
+	}
+
+	if sk.SrvDoFunc == 66 { // SRVDO_066 0x5cd880 (VERIFIED wave 23): the same upkeep gates its passive stats (mana >= upkeep); it never pays
 		e.Cost = int(sk.calcMana(c.lvl, false))
 	}
 

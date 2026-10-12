@@ -10,7 +10,7 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | | F | P | S | M | T |
 |---|---|---|---|---|---|
 | before (start of feat/skills-npsd) | 60 | 41 | 3 | 8 | 8 |
-| after | 99 | 13 | 0 | 0 | 8 |
+| after | 101 | 11 | 0 | 0 | 8 |
 
 
 ## Necromancer
@@ -52,33 +52,33 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 
 | id | skill | do | before | after | note |
 |---|---|---|---|---|---|
-| 96 | Sacrifice | 64 | F | F | self damage + strike |
-| 97 | Smite | 150 | P | F | VERIFIED 0x5ccdd0: shield damage plus the Holy Shield skill's damage range at its level (StateSkiller), calc1 percent, always hits, calc2 stun; knockback bit 8 of ResultFlags rides on the hit |
+| 96 | Sacrifice | 64 | F | F | self damage + strike; wave 23 VERIFIED SRVST_029 0x5ccb50 + SRVDO_064 0x5cccb0: the blow is a plain melee roll with calc1 percent; the cost is calc2 percent (par3 = 8) of the physical damage that blow rolled (before resists), capped by the life the target had, NOT a share of the maximum life of the caster (fixed) |
+| 97 | Smite | 150 | P | F | VERIFIED 0x5ccdd0: shield damage plus the Holy Shield skill's damage range at its level (StateSkiller), calc1 percent, always hits, calc2 stun; knockback bit 8 of ResultFlags rides on the hit; wave 23: the damage goes through the verified RollPhysical (0x579120): calc1 raises both ends of the shield range, then one roll; not carried (UNVERIFIED here): stat 0x6f, enhanced damage of worn items, weapon mastery |
 | 98 | Might | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 99 | Prayer | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
+| 99 | Prayer | 65 | F | F | friendly aura (do 65): stats re-applied every pulse; wave 23 VERIFIED SRVDO_065 0x5cd4b0: the upkeep ((lvlmana*(lvl-1)+mana)<<manashift) is paid once after the pulse, and only when a stat really changed (Prayer: only when somebody gained life); stats need mana >= upkeep (before: paid every pulse before the heal) |
 | 100 | Resist Fire | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 101 | Holy Bolt | - | P | F | VERIFIED 0x5a7a40: allies (pets, mercenary, converted units) are targets of the bolt and healed calc1..calc2 (Healer); undead/demon class filter on enemies |
+| 101 | Holy Bolt | - | P | F | VERIFIED 0x5a7a40: allies (pets, mercenary, converted units) are targets of the bolt and healed calc1..calc2 (Healer); undead/demon class filter on enemies; wave 23 re-read 0x5a7a40: the exe heals only the caster own pets (leader = caster, skill flag TargetPet) and same-party players (TargetAlly); the port heals every non-enemy (a pet of another player would differ); the heal rolls on the MISSILE seed |
 | 102 | Holy Fire | 66 | F | F | damage aura (do 66) |
 | 103 | Thorns | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
 | 104 | Defiance | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
 | 105 | Resist Cold | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 106 | Zeal | 13 | F | F | multi hit |
-| 107 | Charge | 67 | P | P | rush + strike, movement approximated |
+| 106 | Zeal | 13 | F | F | multi hit; wave 23 re-read SRVDO_013 0x5da910: calc1 hits (max targets), calc2 damage percent only on a landed blow, SrcDam defaults to 0x80; matches the port |
+| 107 | Charge | 67 | P | F | rush + strike, movement approximated; wave 22 read SRVST_031 0x5cdbb0: the rush velocity is base * (Param1 + max(stat 0x43, 50)) / 100 (d2skill.ChargeVelocity, not yet wired: the engine still moves in one step and strikes at once), the target must lack state 0x36; wave 23 VERIFIED SRVST_031 0x5cdbb0 + SRVDO_067 0x5cde00: the rush takes d2skill.ChargeFrames frames at base * (Param1 + max(stat 0x43, 50)) / 100 (base = the charstats byte at +0x41, the run velocity column is assumed), the blow and the overlay land when it ends (MeleeResult.Delay, Effect.Delay), the move effect carries the frames; the target holding state 0x36 is not charged (which state: UNVERIFIED, not modelled) |
 | 108 | Blessed Aim | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
 | 109 | Cleansing | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
 | 110 | Resist Lightning | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 111 | Vengeance | 2 | F | F | elemental melee |
-| 112 | Blessed Hammer | 73 | P | F | VERIFIED 0x5ce5a0: path type 0xe spiral (PATH_ApplyAngleStepVelocity 0x67d050, d2missile.SpiralNodes) and the Concentration damage scale (0x647550) |
+| 111 | Vengeance | 2 | F | F | elemental melee; wave 23 VERIFIED SRVST_035 0x5ce340: fire / cold / lightning are calc1..calc3 (each raised by its mastery stat 0x149 / 0x14b / 0x14a) percent of ONE bare weapon roll (stats 0x15 / 0x16, 0x5ce260), added to the full physical blow, plus the ELen as cold length (before: percent of the physical damage) |
+| 112 | Blessed Hammer | 73 | P | F | VERIFIED 0x5ce5a0: path type 0xe spiral (PATH_ApplyAngleStepVelocity 0x67d050, d2missile.SpiralNodes) and the Concentration damage scale (0x647550); wave 23 re-read 0x5ce5a0 / 0x647550: scale = Param1 * damagepercent of the Concentration state / 8 (toward zero), stats 0x34 / 0x35 become base * (100 + scale) / 100; matches |
 | 113 | Concentration | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 114 | Holy Freeze | 81 | F | F | enemy aura, cold damage + slow |
+| 114 | Holy Freeze | 81 | F | F | enemy aura, cold damage + slow; wave 22: the aura applier 0x5cd240 clamps velocitypercent / attackrate to the monster cold effect (d2state.ClampAuraSlow, wired to enemy auras); the hook 0x5cece0 / callback 0x5ced30 are still unread |
 | 115 | Vigor | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 116 | Conversion | 79 | M | P | do 79 added (roll, state, level/life scale, charm AI); VERIFIED 0x56c0a0/0x5dc1e0: unique and super unique monsters are no valid target (skills-batch3.md); act-boss exclusion U. Batch 9 re-read SRVDO_079 0x5ce8c0 + SRVDO_ConversionRollSuccess 0x5ce820: the success test is not a hireling, a monster, alignment 0, the 0x56c0a0 candidate test (the Revive corpse test, flag bits still unnamed) and a roll below calc1 on the CASTER seed; the target must also come from a landed melee hit; the base class 0x1ec with state 0x8f is refused; the revert callback 0x5ce710 restores level and life ratio |
-| 117 | Holy Shield | 18 | F | F | self state (do 18) |
+| 116 | Conversion | 79 | M | P | do 79 added (roll, state, level/life scale, charm AI); VERIFIED 0x56c0a0/0x5dc1e0: unique and super unique monsters are no valid target (skills-batch3.md); act-boss exclusion U. Batch 9 re-read SRVDO_079 0x5ce8c0 + SRVDO_ConversionRollSuccess 0x5ce820: the success test is not a hireling, a monster, alignment 0, the 0x56c0a0 candidate test (the Revive corpse test, flag bits still unnamed) and a roll below calc1 on the CASTER seed; the target must also come from a landed melee hit; the base class 0x1ec with state 0x8f is refused; the revert callback 0x5ce710 restores level and life ratio; wave 22: MONSTATS_IsRevivableType 0x5dc1e0 is ported (convertibleType: walk mode, not boss, switchai); the flag bits are named; wave 23 re-read 0x5ce8c0: success = roll below calc1 on the caster seed (matches); on success the exe also strips the target statlists with flag 8 and detaches it from its leader (UNVERIFIED, not ported) |
+| 117 | Holy Shield | 18 | F | F | self state (do 18); wave 23 VERIFIED SRVST_036 0x5ce6f0: the start refuses without a shield in a hand (d2skill.ReasonNoShield) |
 | 118 | Holy Shock | 66 | F | F | damage aura |
-| 119 | Sanctuary | 66 | P | F | VERIFIED 0x5cd880 + filter 0x569100: aurafilter 59270 reaches hostile undead non-boss monsters only, the hit carries result flag 8 (knockback) |
+| 119 | Sanctuary | 66 | P | F | VERIFIED 0x5cd880 + filter 0x569100: aurafilter 59270 reaches hostile undead non-boss monsters only, the hit carries result flag 8 (knockback); wave 23 re-read SRVDO_066 0x5cd880: Sanctuary (mana 1) never pays: only the stat applier 0x5cd240 raises the counter that triggers the payment and Sanctuary has no target state |
 | 120 | Meditation | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
-| 121 | Fist of the Heavens | 80 | P | P | VERIFIED do 80 + hit 22 (0x5cebd0 / 0x5ab7f0): the delay missile marks the target, strikes it with the lightning at its end and sends calc4 holy bolts to the enemies around; the srvoverlay is left to the engine |
-| 122 | Fanaticism | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
+| 121 | Fist of the Heavens | 80 | P | P | VERIFIED do 80 + hit 22 (0x5cebd0 / 0x5ab7f0): the delay missile marks the target, strikes it with the lightning at its end and sends calc4 holy bolts to the enemies around; the srvoverlay is left to the engine; wave 22 re-read 0x5cebd0: needs a target unit, the missile sits on it with its type and id in the data fields, the srvoverlay goes on the target (cosmetic); nothing else is open here |
+| 122 | Fanaticism | 65 | F | F | friendly aura (do 65): stats re-applied every pulse; wave 23 VERIFIED SRVDO_065: the passive damagepercent rides on the caster state only (not on allied minions) and needs the mana STRICTLY above the upkeep (a hero without mana loses it) |
 | 123 | Conviction | 66 | F | F | enemy resist aura |
 | 124 | Redemption | 82 | P | F | VERIFIED 0x5cf410 / 0x5cf2e0: Euclidean radius, per corpse roll, heal and consume; a pulse that redeemed pays (lvlmana*(lvl-1)+mana)<<manashift (0 in the shipped row) |
 | 125 | Salvation | 65 | F | F | friendly aura (do 65): stats re-applied every pulse |
@@ -130,12 +130,12 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 226 | Oak Sage | 119 | P | F | VERIFIED (batch 5) aurafilter 0x10103 through filter 0x569100: the totem aura reaches the hero, the mercenary and the summoned minions inside aurarangecalc (minions through d2monsters.AuraBoost: damage, attack rating and life percent; thorns on minions not applied) |
 | 227 | Summon Spirit Wolf | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied; resist / armor / damage stats from the order |
 | 228 | Wearbear | 116 | P | F | VERIFIED like Wearwolf (0x5c4e80): toggle and free recast in the form |
-| 229 | Molten Boulder | - | P | P | emerge (hit 48) -> boulder (do 6 trail, hit 47) -> moltenboulderfirepath fire; bodies read, hit 47 monster-class bit UNVERIFIED |
+| 229 | Molten Boulder | - | P | P | emerge (hit 48) -> boulder (do 6 trail, hit 47) -> moltenboulderfirepath fire; bodies read, hit 47 monster-class bit UNVERIFIED; wave 22: hit 47 class bit 0xb is the monstats2 large column, SrvDmgFunc 14 0x5ab120 is a knockback roll on the missile seed (dParam1 mode, dParam2 chance: small x2, large immune; d2missile.BoulderKnockChance) and is wired to the hit push; the footprint of Size 2 (d2missile.FootprintOverlap) is the rest |
 | 230 | Arctic Blast | 19 | F | F | stream (do 19) |
 | 231 | Cycle of Life | 115 | M | F | VERIFIED wave 20: the cycleoflife monster only has CorpseCycler (no Vine Attack, monstats). SRVST_063 0x5d1090 + recycler delay SrvDoFunc 29 0x5ad910: each corpse (state 0x76) feeds one cycle, 45 frames later the owner gets calc1 (dm12 over 3..12) percent of its maximum life; engine host after the AI gate of thinkCycleOfLife (gap aip1 50, idle aip3 25). UNVERIFIED: the vine does not walk to its corpse, every corpse within aurarangecalc 10 counts |
 | 232 | Feral Rage | 120 | P | F | VERIFIED 0x5c57c0: count = min(calc2, count+1), aura stats evaluated with the count as level, applies on a miss too, keeps the wolf form (no group clear) |
 | 233 | Maul | 120 | P | F | VERIFIED 0x5c57c0: same stacking rule as Feral Rage (damagepercent = count * par3, stunlength at the count) |
-| 234 | Eruption | 28 | P | P | SRVDO_028 creates erruption center; SrvDoFunc 25 scatter (calc1/calc2) read; the crack and fire sub missiles are not read |
+| 234 | Eruption | 28 | P | P | SRVDO_028 creates erruption center; SrvDoFunc 25 scatter (calc1/calc2) read; the crack and fire sub missiles are not read; wave 22: the crack has no server sub missiles (SrvDmgFunc 8 only adds a hit overlay; smoke is client side); what is left is the Size 3 hit footprint (d2missile.FootprintOverlap, not wired) |
 | 235 | Cyclone Armor | 18 | F | F | do 18 |
 | 236 | Heart of Wolverine | 119 | P | F | VERIFIED (batch 5) aurafilter 0x10103 through filter 0x569100: the totem aura reaches the hero, the mercenary and the summoned minions inside aurarangecalc (minions through d2monsters.AuraBoost: damage, attack rating and life percent; thorns on minions not applied) |
 | 237 | Summon Fenris | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied |
@@ -144,8 +144,8 @@ The statuses come from reading the handlers and the scenario logs (`scripts/veri
 | 240 | Twister | 118 | P | F | VERIFIED 0x5c52c0 / 0x5c5000: calc1 twisters, ALL through the shared per-missile hook (no straight first one, no fan); wave 20: path type 10 wired (PathType10Nodes, 0x67d160), the twister pulses are SrvDoFunc 27 |
 | 241 | Vines | 115 | M | F | VERIFIED wave 20: like Cycle of Life but the VineCycler restores mana (SrvDoFunc 33 0x5ada80, dm12 over 1..8 percent of maximum mana); the vinecreature monster has VineCycler only |
 | 242 | Hunger | 122 | M | F | do 122 added: melee roll, calc1 damage percent, life and mana steal (verified 0x5c5f40) |
-| 243 | Shock Wave | 8 | P | P | missile fan (do 8, calc1 = 5 shockwave missiles; the fan geometry is still the 8 degree stand-in of Multiple Shot). Wave 20: the stun is the exe rule, SrvDmgFunc 7 0x5aaef0: Param1 + (level-1) * Param2 frames (40 + 15 per level) and hit class 0x60 on every hit of the shockwave missile (d2missile.StunLength) |
-| 244 | Volcano | 123 | P | P | SRVDO_123 creates volcano with a random data byte; SrvDoFunc 28 lobs debris, hit 51 spawns the fire; bodies read |
+| 243 | Shock Wave | 8 | P | F | missile fan (do 8, calc1 = 5 shockwave missiles; the fan geometry is still the 8 degree stand-in of Multiple Shot). Wave 20: the stun is the exe rule, SrvDmgFunc 7 0x5aaef0: Param1 + (level-1) * Param2 frames (40 + 15 per level) and hit class 0x60 on every hit of the shockwave missile (d2missile.StunLength); wave 22: the fan is the exe geometry (FanSpacing / FanDestinations, 0x56b0e0 and 0x56b120 read): five destinations in a row through the aim point perpendicular to the line of fire; the shockwave missile pair is one missile; nothing else is open |
+| 244 | Volcano | 123 | P | P | SRVDO_123 creates volcano with a random data byte; SrvDoFunc 28 lobs debris, hit 51 spawns the fire; bodies read; wave 22 re-read SRVDO_123 0x5c60c0, SrvDoFunc 28 0x5ad6f0 and hit 51 0x5aa3b0 against the port: they match; what is left is the Size 2 / 3 hit footprints of the fire |
 | 245 | Tornado | 118 | P | F | same do function as Twister (calc1 = 1); the tornado missile (SrvDoFunc 27) is modelled and wave 20 wired its path type 10 (0x67d160) |
 | 246 | Spirit of Barbs | 119 | P | F | VERIFIED (batch 5) aurafilter 0x10103 through filter 0x569100: the totem aura reaches the hero, the mercenary and the summoned minions inside aurarangecalc (minions through d2monsters.AuraBoost: damage, attack rating and life percent; thorns on minions not applied) |
 | 247 | Summon Grizzly | 119 | P | F | summon level (calc2) + MonLvl AC/AR now applied |

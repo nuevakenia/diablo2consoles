@@ -149,6 +149,12 @@ func (t *monsterTarget) Heal(amount int) {
 
 var _ d2missile.Healer = (*monsterTarget)(nil)
 
+// LifePoints implements d2skill.LifeHolder (Sacrifice caps its self cost by the life the target has).
+func (t *monsterTarget) LifePoints() int { return t.m.Vitals.HP }
+
+// LifePoints implements d2skill.LifeHolder for a player target.
+func (t *playerTarget) LifePoints() int { return t.p.Stats.Health }
+
 // ClassBit implements d2missile.ClassBitter: the MonStats2 flag bits the molten boulder reads (0xa small, 0xb
 // large; the other bits of the exe's flag array are not mapped here).
 func (t *monsterTarget) ClassBit(bit int) bool {
