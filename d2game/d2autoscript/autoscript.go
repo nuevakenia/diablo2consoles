@@ -101,7 +101,7 @@ type Step struct {
 }
 
 // Panels accepted by the panel step.
-var Panels = []string{"inventory", "character", "skills", "quest", "party", "close"}
+var Panels = []string{"inventory", "character", "skills", "quest", "party", "stash", "cube", "trade", "npcmenu", "golddlg", "close"}
 
 // SkillOps are accepted by the skill step.
 var SkillOps = []string{"left", "right", "popup", "hover", "click", "use", "spend", "nospend"}
