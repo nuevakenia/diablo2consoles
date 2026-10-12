@@ -3,7 +3,7 @@ package d2skill
 import "testing"
 
 // UNIT_GetTableDistance 0x642980 with unit sizes (VERIFIED w37).
-func TestTableDistanceSized(t *testing.T) {
+func TestTableDistanceSizedW37(t *testing.T) {
 	cases := []struct{ dx, dy, sa, sb, want int }{
 		{3, 0, 1, 1, TableDistance(3, 0)}, // size 1 equals the old table
 		{3, 0, 2, 1, TableDistance(3, 0)}, // one size below 2 keeps the +1
