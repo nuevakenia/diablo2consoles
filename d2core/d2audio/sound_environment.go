@@ -123,9 +123,22 @@ type envSink interface {
 	handle(index int) string
 }
 
-// resumeSink is implemented by sinks whose music can start inside the track.
+// resumeSink is implemented by sinks whose music can start inside the track
+// (ticks into it) and without the Fade In (noFade).
 type resumeSink interface {
-	loopFrom(index, ticks int) (stop func())
+	loopFrom(index, ticks int, noFade bool) (stop func())
+}
+
+// cueSink is implemented by sinks that know the cue blocks of a track (Sounds.txt
+// Block 1..3, in samples, -1 = unset) and whether any music entry is still active.
+type cueSink interface {
+	cues(index int) [3]int
+	musicActive() bool
+}
+
+// stingSink is implemented by sinks that can play a one-shot quest sting.
+type stingSink interface {
+	sting(index int)
 }
 
 type engineSink struct{ e *SoundEngine }
@@ -140,14 +153,28 @@ func (s engineSink) loop(index int) func() {
 }
 
 // loopFrom starts a looping sound ticks game ticks into the track.
-func (s engineSink) loopFrom(index, ticks int) func() {
-	snd := s.e.play(d2sfx.Request{Index: index, StartTicks: ticks}, PlayOpts{Kind: "music"})
+func (s engineSink) loopFrom(index, ticks int, noFade bool) func() {
+	snd := s.e.play(d2sfx.Request{Index: index, StartTicks: ticks, NoFade: noFade}, PlayOpts{Kind: "music"})
 	if snd == nil {
 		return func() {}
 	}
 
 	return snd.Stop
 }
+
+// cues are the Block 1..3 columns of the track's Sounds.txt row.
+func (s engineSink) cues(index int) [3]int {
+	row := s.e.Bank().Table().Get(index)
+	if row == nil {
+		return [3]int{-1, -1, -1}
+	}
+
+	return [3]int{row.Block1, row.Block2, row.Block3}
+}
+
+func (s engineSink) musicActive() bool { return s.e.MusicActive() }
+
+func (s engineSink) sting(index int) { s.e.PlaySoundKind(index, "music-sting") }
 
 func (s engineSink) musicEnabled() bool {
 	return s.e.MusicEnabled()
@@ -197,9 +224,17 @@ type SoundEnvironment struct {
 	songCur       int     // song held by the level music slot (the exe's DAT_007c0a60)
 	songPlaying   int     // song actually started (0 when stopped)
 	songStartedAt float64 // tick the playing song started
-	songStartPos  int     // track position (ticks) it started at
+	songStartPos  int     // track position (samples) it started at
+	beatAt        float64 // tick of the last resume position refresh (the exe's DAT_007c0a68)
 	resume        MusicResume
-	cur           Selection
+
+	// quest music (DRAWLIST_AddSoundLinkedEffect 0x4d9b20): the level music is silent until duckUntil,
+	// the sting plays at stingAt
+	duckOn    bool
+	duckUntil float64
+	stingAt   float64
+	stingIdx  int
+	cur       Selection
 
 	eventInterval float64 // game ticks between events
 	eventElapsed  float64 // game ticks since the last one
@@ -300,26 +335,52 @@ func (s *SoundEnvironment) apply(why string) {
 }
 
 // updateMusic runs the level music slot: the wanted song is adopted per
-// StepMusic and plays only while music is enabled.
+// StepMusic and plays only while music is enabled. While a quest sting holds
+// the music silent (QuestMusic) nothing else happens (the exe returns early).
 func (s *SoundEnvironment) updateMusic() {
+	if s.duckOn {
+		if st, ok := s.sink.(stingSink); ok && s.stingIdx != 0 && s.ticks >= s.stingAt {
+			st.sting(s.stingIdx)
+			s.logf("AMBIENT quest-sting %s(%d)", s.sink.handle(s.stingIdx), s.stingIdx)
+			s.stingIdx = 0
+		}
+
+		if s.ticks < s.duckUntil {
+			return
+		}
+
+		s.duckOn = false
+	}
+
 	on := s.sink.musicEnabled()
+	prev := s.songCur
 	s.songCur = StepMusic(s.songCur, s.cur.Song, s.ticks-s.levelChangeAt, on)
+
+	if s.songCur != prev {
+		s.beatAt = s.ticks
+	}
 
 	want := 0
 	if on {
 		want = s.songCur
 	}
 
+	s.refreshResume()
+
 	if want == s.songPlaying {
 		return
+	}
+
+	// the exe asks whether any music entry is active before it stops the old track
+	active := s.songPlaying != 0
+
+	if cs, ok := s.sink.(cueSink); ok {
+		active = active || cs.musicActive()
 	}
 
 	if s.stopMusic != nil {
 		s.stopMusic()
 		s.stopMusic = nil
-
-		// the track position is kept for the next visit (cue points, see MusicResume)
-		s.resume.Store(s.songPlaying, s.songStartPos+int(s.ticks-s.songStartedAt), 0)
 	}
 
 	s.songPlaying = want
@@ -328,17 +389,68 @@ func (s *SoundEnvironment) updateMusic() {
 	if want != 0 {
 		from = s.resume.Position(want)
 		s.songStartedAt, s.songStartPos = s.ticks, from
+		s.beatAt = s.ticks
 
-		if rs, ok := s.sink.(resumeSink); ok && from > 0 {
-			s.stopMusic = rs.loopFrom(want, from)
+		// a track with nothing before it and nothing to resume starts at once, otherwise its Fade In applies
+		noFade := !active && from == 0
+
+		if rs, ok := s.sink.(resumeSink); ok {
+			s.stopMusic = rs.loopFrom(want, SamplesToTicks(from), noFade)
 		} else {
 			s.stopMusic = s.sink.loop(want)
-			s.songStartPos = 0
 		}
 	}
 
 	s.logf("AMBIENT music playing=%s(%d) wanted=%s(%d) enabled=%v from=%d", s.sink.handle(want), want,
 		s.sink.handle(s.cur.Song), s.cur.Song, on, from)
+}
+
+// refreshResume stores, every MusicBeatTicks while a track plays, the cue point the track continues from when
+// it is started again: the next of its Block 1..3 after the stream position (0 after the last).
+func (s *SoundEnvironment) refreshResume() {
+	if s.songCur == 0 || s.songPlaying != s.songCur || s.stopMusic == nil || s.ticks <= s.beatAt+MusicBeatTicks {
+		return
+	}
+
+	blocks := [3]int{-1, -1, -1}
+	if cs, ok := s.sink.(cueSink); ok {
+		blocks = cs.cues(s.songCur)
+	}
+
+	pos := s.songStartPos + TicksToSamples(int(s.ticks-s.songStartedAt))
+	next := NextCue(pos, blocks)
+
+	s.resume.Set(s.songCur, next)
+	s.beatAt = s.ticks
+	s.logf("AMBIENT music cue song=%s(%d) pos=%d next=%d", s.sink.handle(s.songCur), s.songCur, pos, next)
+}
+
+// QuestMusic is a quest line with music: the level music stops (its resume position is set to cue block
+// plan.Cue first) and stays silent for plan.Silence ticks, the quest sting (a Sounds.txt index, 0 for none)
+// starts plan.StingDelay ticks from now. The hero's line is the caller's.
+func (s *SoundEnvironment) QuestMusic(plan QuestPlan, sting int) {
+	if s.songCur != 0 && s.stopMusic != nil && plan.Cue > 0 {
+		blocks := [3]int{-1, -1, -1}
+		if cs, ok := s.sink.(cueSink); ok {
+			blocks = cs.cues(s.songCur)
+		}
+
+		s.resume.Set(s.songCur, blocks[plan.Cue-1])
+		s.beatAt = s.ticks
+	}
+
+	if s.stopMusic != nil {
+		s.stopMusic()
+		s.stopMusic = nil
+	}
+
+	s.songPlaying = 0
+	s.duckOn = true
+	s.duckUntil = s.ticks + float64(plan.Silence)
+	s.stingAt = s.ticks + float64(plan.StingDelay)
+	s.stingIdx = sting
+	s.logf("AMBIENT quest-music silence=%d ticks sting=%s(%d) in %d ticks cue=%d", plan.Silence, s.sink.handle(sting), sting,
+		plan.StingDelay, plan.Cue)
 }
 
 func (s *SoundEnvironment) restart(stop func(), index int) func() {

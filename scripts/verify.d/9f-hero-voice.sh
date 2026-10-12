@@ -3,8 +3,8 @@ scenario_env() { echo 'export OD2_SOUNDLOG=1 OD2_AUTOMONSTER="zombie1,2" OD2_AUT
 scenario_check() {
   echo "hero voice lines:"
   grep -E "HEROVOICE" $log.txt | cut -c1-160 | sort | uniq -c | sort -rn | head -10
-  grep -qE "HEROVOICE id=0x15 handle=[a-z]+_needmana_1" $log.txt || { echo "FAIL: no needmana voice on a refused cast"; fail=1; }
-  grep -qE "SOUNDLOG .* kind=hero-voice .*handle=[a-z]+_needmana_1" $log.txt || { echo "FAIL: needmana never reached the sound bank"; fail=1; }
+  grep -qE "HEROVOICE id=0x15 handle=[a-z]+_needmana_[0-9]" $log.txt || { echo "FAIL: no needmana voice on a refused cast"; fail=1; }
+  grep -qE "SOUNDLOG .* kind=hero-voice .*handle=[a-z]+_needmana_[0-9]" $log.txt || { echo "FAIL: needmana never reached the sound bank"; fail=1; }
   grep -qE "HEROVOICE hit handle=[a-z]+_hit_1" $log.txt || { echo "FAIL: no hit grunt when the hero was struck"; fail=1; }
   # the hit grunt reaches the sound bank as the class row of the hero (record slot 0), once per hit
   grep -qE "SOUNDLOG .* kind=hero-voice .*handle=[a-z]+_hit_[1-5] .*decision=(played|stolen|queued|inaudible)" $log.txt || { echo "FAIL: hit grunt never reached the sound bank"; fail=1; }

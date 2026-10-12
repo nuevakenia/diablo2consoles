@@ -24,6 +24,9 @@ type Row struct {
 	Tracking  bool
 	Solo      bool
 	MusicVol  bool // scaled by the music volume instead of the sfx volume
+
+	// Block1..3 are the cue points of a music track in samples (-1 unset), record +0x54/+0x58/+0x5c.
+	Block1, Block2, Block3 int
 }
 
 // Table is an index-addressed set of rows with the group-head post-pass done.

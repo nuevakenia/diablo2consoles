@@ -8,10 +8,6 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 )
 
-// heroHitMinTicks spaces the hit grunts (UNVERIFIED: the exe plays the class
-// hit row on the hit-recovery mode start; this spacing is an engine choice).
-const heroHitMinTicks = 12
-
 // heroClassPrefix is the Sounds.txt voice prefix of the local hero.
 func (v *Game) heroClassPrefix() string {
 	if v.localPlayer == nil {
@@ -52,9 +48,10 @@ func (v *Game) soundIndexLookups() (func(string) (int, bool), func(int) string) 
 }
 
 // sayHero plays hero voice id (d2audio.Voice*) with the exe's suppression
-// rules (UNITSND_PlayUnitSoundById 0x4c8470). Whether a voice is still playing
-// is the hero's last voice sound (hit, death or line) still sounding: the "unit sound already playing" test of the
-// exe (what counts as a unit sound there is UNVERIFIED beyond the voices).
+// rules (UNITSND_PlayUnitSoundById 0x4c8470). "A unit sound is already playing" is the exe's
+// UNITSND_HasPlayingEntry: any speech entry (ids 0xb76..0x1230) holds a voice (VERIFIED, wave 37).
+// The quest lines that come with music (d2audio.QuestPlans) also stop the level music for a while and
+// play their sting (DRAWLIST_AddSoundLinkedEffect 0x4d9b20).
 func (v *Game) sayHero(id int) {
 	prefix := v.heroClassPrefix()
 	if prefix == "" || v.localPlayer == nil {
@@ -62,7 +59,7 @@ func (v *Game) sayHero(id int) {
 	}
 
 	dead := v.death.dead
-	if !v.heroVoiceGate.Allow(id, v.soundEngine.Ticks(), v.unitSounds.Playing(heroEmitter), dead) {
+	if !v.heroVoiceGate.Allow(id, v.soundEngine.Ticks(), v.soundEngine.SpeechPlaying(), dead) {
 		v.Infof("HEROVOICE id=%#x suppressed", id)
 		return
 	}
@@ -74,13 +71,31 @@ func (v *Game) sayHero(id int) {
 		return
 	}
 
+	delay := d2audio.VoiceDelay(id)
+
+	if plan, isPlan := d2audio.QuestPlans[id]; isPlan {
+		sting, _ := indexOf(plan.Sting)
+		v.soundEnv.QuestMusic(plan, sting)
+		v.Infof("HEROVOICE quest music id=%#x sting=%s silence=%d line=%v in %d ticks", id, plan.Sting, plan.Silence,
+			plan.Line, plan.LineDelay)
+
+		if !plan.Line {
+			return
+		}
+
+		delay = plan.LineDelay
+	}
+
 	v.Infof("HEROVOICE id=%#x handle=%s", id, h)
-	v.unitSounds.Note(heroEmitter, v.playSoundAtPosSound(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
-		Emitter: heroEmitter, Hero: true, Kind: "hero-voice", Who: v.localPlayer.Name(), Delay: d2audio.VoiceDelay(id),
-	}))
+	v.heroSoundTick = v.soundEngine.Ticks()
+	v.playSoundAtPos(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
+		Emitter: heroEmitter, Hero: true, Kind: "hero-voice", Who: v.localPlayer.Name(), Delay: delay,
+	})
 }
 
-// sayHeroVocal plays the hit (slot 0) or death (slot 1) vocal of the class record.
+// sayHeroVocal plays the hit (slot 0) or death (slot 1) vocal of the class record. The hit grunt plays
+// when the hero starts a hit recovery and no speech entry is playing (UNITSND_PlayUnitModeStartSound
+// 0x4c8e90, VERIFIED, wave 37): there is no time spacing in the exe.
 func (v *Game) sayHeroVocal(death bool) {
 	prefix := v.heroClassPrefix()
 	if prefix == "" || v.localPlayer == nil {
@@ -92,31 +107,26 @@ func (v *Game) sayHeroVocal(death bool) {
 	if death {
 		h, kind = prefix+"_death_1", "death"
 	} else {
-		if v.death.dead {
-			return // a dead hero does not grunt
+		if !d2audio.HitGruntPlays(v.soundEngine.SpeechPlaying(), v.death.dead) {
+			return
 		}
 
 		if rec := v.formSoundRecord(); rec != nil {
-			// the form's own hit sound (UNVERIFIED, see d2audio.FormMonSoundsID); a form row without one is silent
+			// the form's own hit sound (a shapeshifted hero is a monster for the sound code, VERIFIED);
+			// a form row without one is silent
 			if h = rec.HitSound; h == "" {
 				return
 			}
 
 			kind = "form-hit"
 		}
-
-		now := v.soundEngine.Ticks()
-		if now-v.heroHitTick < heroHitMinTicks && v.heroHitTick != 0 {
-			return
-		}
-
-		v.heroHitTick = now
 	}
 
 	v.Infof("HEROVOICE %s handle=%s", kind, h)
-	v.unitSounds.Note(heroEmitter, v.playSoundAtPosSound(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
+	v.heroSoundTick = v.soundEngine.Ticks()
+	v.playSoundAtPos(h, v.localPlayer.GetPosition(), d2audio.PlayOpts{
 		Emitter: heroEmitter, Hero: true, Kind: "hero-voice", Who: v.localPlayer.Name(),
-	}))
+	})
 }
 
 // onSkillRefused maps a refused cast to the hero's complaint (needmana, not in town).

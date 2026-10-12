@@ -46,19 +46,22 @@ func (v *Game) playSpeechKind(index int, kind string) *d2audio.Sound {
 	return v.speech
 }
 
-// questStingers maps a killed boss (its name in the monster tables) to its
-// Sounds.txt quest music. Which event the original plays each one on is not in
-// the notes (UNVERIFIED); the pairing follows the sound file names
-// (andarielaction.wav, bloodravenresolution.wav...).
-var questStingers = map[string]string{
-	"Andariel": "music_quest_andariel", "Blood Raven": "music_quest_bloodraven", "Radament": "music_quest_radament",
-	"Duriel": "music_quest_horadric", "Mephisto": "music_quest_mephisto", "Izual": "music_quest_izual",
-	"Diablo": "music_quest_diablo", "Baal": "music_quest_baal", "Nihlathak": "music_quest_nihlathak",
-	"Shenk the Overseer": "music_quest_shenk", "The Summoner": "music_quest_tainted",
+// questKillVoices maps a boss killed by the hero to the hero voice id the server sends (packet 0x2c
+// sound ids, UNITSND_PlayUnitSoundById 0x4c8470): the hero's completion line together with the quest
+// sting and the silence of the level music (d2audio.QuestPlans; the ids and what each plays are VERIFIED
+// in wave 37, that the kill is the event that sends them is UNVERIFIED but matches the line names).
+var questKillVoices = map[string]int{
+	"Andariel": 0x21, "Blood Raven": 0x22, "Radament": 0x32, "Mephisto": 0x42, "Diablo": 0x4b,
+	"Shenk the Overseer": 0x50, "Nihlathak": 0x52, "Baal": 0x53,
 }
 
-// denStinger is the quest music when the Den of Evil is cleared.
-const denStinger = "music_quest_den"
+// questStingers maps the other killed bosses to their Sounds.txt quest music. Which event the original
+// plays these on is not found in the exe (UNVERIFIED); the pairing follows the sound file names
+// (horadricaction.wav, izualaction.wav). The Summoner is not here: its kill is the hero line 0x33 and
+// the Tainted Sun sting belongs to the Amulet of the Viper (0x34, sent by the quest effects).
+var questStingers = map[string]string{
+	"Duriel": "music_quest_horadric", "Izual": "music_quest_izual",
+}
 
 // playStinger plays a quest or boss music sting over the area music.
 func (v *Game) playStinger(handle, why string) {
