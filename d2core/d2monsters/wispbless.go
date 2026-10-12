@@ -61,5 +61,13 @@ func (d *Director) TimedHeroStats(p *d2mapentity.Player) map[string]int {
 		out[wispStatNames[stat]] += ts.value
 	}
 
+	for k, v := range d.cursedStats(p) { // Cursed monsters (umodhooks.go)
+		if out == nil {
+			out = map[string]int{}
+		}
+
+		out[k] += v
+	}
+
 	return out
 }

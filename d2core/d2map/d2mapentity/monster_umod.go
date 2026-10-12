@@ -26,10 +26,15 @@ type UModBonus struct {
 	SpeedPct int
 	// Skills are the skills granted by Teleportation (184) and Aura Enchanted; AIFlag20 is the AI data flag
 	// Teleportation sets and TimerEvent the event of modifier 41. AIFlag20 opens the wounded teleport (Brain.CanTeleport) and the aura stats of
-	// Aura Enchanted are applied to the monster (wave 21); the timer event is still only recorded.
+	// Aura Enchanted are applied to the monster (wave 21); the timer event ticks from TimerAt (wave 22).
 	Skills     []UModSkill
 	AIFlag20   bool
 	TimerEvent bool
+	// NameSeed is the 16 bit name seed of the exe (monster data +0x14): the low word of the unit seed after the step
+	// of modifier 1. The random name of a rare monster is rolled from it (d2monreg.RollRareName).
+	NameSeed uint16
+	// TimerAt is the Director frame of the next tick of the timer event (modifier 41), 75 frames apart.
+	TimerAt int
 	// Applied is set once the init callbacks ran, so they never run twice on one unit.
 	Applied bool
 }

@@ -14,8 +14,8 @@ import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2rand"
 //	6 fast 0x59f470, 8/27/28 resist caps 0x59eee0, 9 fire 0x59f4f0, 16 champion 0x59ea20, 17 lightning 0x59f650,
 //	18 cold 0x59f7b0, 23 poison 0x59f930, 25 mana burn 0x59fab0, 26 teleport 0x59f160, 30 aura 0x59f1b0,
 //	36 ghostly 0x59ec20, 37 fanatic 0x59ed70, 38 possessed 0x59edb0, 39 berserk 0x59ee00, 41 timer event 0x59eea0.
-//	Ids without an entry (3 light, 7 curse, 29 multishot, ...) do nothing here; they act through hooks at hit /
-//	ai time (UNVERIFIED, not ported).
+//	Ids without an entry (3 light, 7 curse, 29 multishot, ...) do nothing here; they act through the hook table
+//	(umodhook.go, read in wave 22: Cursed, Multishot and the modifier 41 timer are ported there).
 //
 // The Ghidra names of 0x59eee0 / 0x59f1b0 / 0x59f160 were mislabelled; the table slots above are what the bytes say:
 // the Magic Resistant / Spectral Hit / Stone Skin rows all point at the resist-cap routine, Aura Enchanted at the

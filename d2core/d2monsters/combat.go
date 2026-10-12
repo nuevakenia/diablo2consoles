@@ -238,6 +238,8 @@ func (d *Director) resolveAttack(u *unit, p *d2mapentity.Player, mode d2monster.
 		d.Counters.AttackHits++
 		p.Stats.Health -= dmg
 
+		d.cursedHit(u, p) // hook type 3 of the modifiers: Cursed (umodhooks.go)
+
 		if d.opt.OnHeroHit != nil {
 			d.opt.OnHeroHit(p)
 		}
@@ -274,12 +276,27 @@ const shotCollideRadius = 1
 // aims at where the hero stands now; id 0 aims at the ground point of the
 // request (Blood Raven fires at random spots near the hero).
 func (d *Director) fireShot(u *unit, mode d2monster.Mode, atk d2mapentity.MonsterAttack) {
-	sx, sy := u.m.SubtilePos()
 	ax, ay := u.aimX, u.aimY
 
 	if p := d.playerFor(u.attackTarget); p != nil && d.targetable(p) {
 		ax, ay = playerSubtile(p)
 	}
+
+	if d.launchShot(u, mode, atk, ax, ay) {
+		d.multishot(u, mode, atk, ax, ay) // the Multishot hook runs when the missile was created
+		return
+	}
+
+	// a shot at point blank (same subtile) cannot fly: it lands at once
+	if p := d.playerFor(u.attackTarget); p != nil && d.targetable(p) {
+		d.Counters.Attacks++
+		d.resolveAttack(u, p, mode, atk, " shot")
+	}
+}
+
+// launchShot flies one shot from the monster to (ax, ay); false when it cannot fly.
+func (d *Director) launchShot(u *unit, mode d2monster.Mode, atk d2mapentity.MonsterAttack, ax, ay int) bool {
+	sx, sy := u.m.SubtilePos()
 
 	var struck *d2mapentity.Player
 
@@ -317,14 +334,10 @@ func (d *Director) fireShot(u *unit, mode d2monster.Mode, atk d2mapentity.Monste
 		d.emit("shot", "MONSTER shot name=%s id=%d mode=%s missile=%q from=(%d,%d) to=(%d,%d)",
 			u.m.Label(), u.b.ID, mode, shot.Missile, sx, sy, ax, ay)
 
-		return
+		return true
 	}
 
-	// a shot at point blank (same subtile) cannot fly: it lands at once
-	if p := d.playerFor(u.attackTarget); p != nil && d.targetable(p) {
-		d.Counters.Attacks++
-		d.resolveAttack(u, p, mode, atk, " shot")
-	}
+	return false
 }
 
 // missileVelocity is the flight speed in subtiles per frame: the missiles.txt

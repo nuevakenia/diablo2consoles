@@ -7,12 +7,15 @@ import (
 func uniqueAppellationsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 	records := make(UniqueAppellations)
 
+	var order []string
+
 	for d.Next() {
 		record := &UniqueAppellationRecord{
 			Name: d.String("Name"),
 		}
 
 		records[record.Name] = record
+		order = append(order, record.Name)
 	}
 
 	if d.Err != nil {
@@ -20,6 +23,7 @@ func uniqueAppellationsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 	}
 
 	r.Monster.Unique.Appellations = records
+	r.Monster.Name.AppellationOrder = order
 
 	r.Debugf("Loaded %d UniqueAppellation records", len(records))
 

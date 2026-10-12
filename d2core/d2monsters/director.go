@@ -101,6 +101,8 @@ type Counters struct {
 	MercSpawns, MercAttacks, MercHits, MercSkills, MercDeaths, MercRevives, MercTeleports, MercLevelUps int
 	// Shots is projectiles launched, ShotHits those that reached a hero.
 	Shots, ShotHits int
+	// Multishots, Curses and UModTimers count the run time hooks of the monster modifiers (umodhooks.go).
+	Multishots, Curses, UModTimers int
 	// BlockAnims counts hero block animations that played (cooldown rule).
 	BlockAnims int
 
@@ -217,6 +219,12 @@ type Director struct {
 	// it back as a packet); false leaves the kill to the killer alone.
 	PartyXP func(src *d2mapentity.Player, xp, monsterLevel int, monster string) bool
 
+	// HeroPortal, if set, answers PLAYER_GetLastPortalUnitId for a hero: the level id and the subtile position
+	// of the town portal she opened last in a field level (the portal object Diablo and Baal look for).
+	// HeroHasState, if set, says whether a hero has the states.txt state (Diablo and Baal read state 0xb, cold).
+	HeroPortal   func(p *d2mapentity.Player) (level, x, y int, ok bool)
+	HeroHasState func(p *d2mapentity.Player, state int) bool
+
 	pvp map[string]*d2rand.Seed // hero id -> its roller for swings at other heroes
 
 	areaLevel int // levels.txt MonLvl of the current area (0 = unknown)
@@ -239,6 +247,8 @@ type Director struct {
 	HeroAvoid func(p *d2mapentity.Player, attacker *d2mapentity.Monster, melee bool) (bool, string)
 
 	lastBlock map[*d2mapentity.Player]int // frame of the last hero block animation
+
+	curses map[*d2mapentity.Player]map[string]timedStat // curses of Cursed monsters by stat name (umodhooks.go)
 
 	// Counters are updated as events happen.
 	Counters Counters
@@ -385,6 +395,7 @@ func (d *Director) spawn(stat *d2records.MonStatRecord, subX, subY int, ally *al
 	d.units[b.ID] = u
 	d.byEntity[m.ID()] = u
 	d.engine.AddEntity(m)
+	d.noteSpawnForRite(stat.ID)
 
 	if ally != nil {
 		return m, nil
@@ -498,6 +509,8 @@ func (d *Director) step() {
 		}
 
 		if u.m.Alive() {
+			d.umodTimer(u)
+
 			if d.held(u) {
 				continue
 			}

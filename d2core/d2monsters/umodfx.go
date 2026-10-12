@@ -163,16 +163,17 @@ func (u *fxUnit) IsChampion() bool { return u.m.TypeFlags&d2mapentity.MonTypeCha
 
 func (u *fxUnit) OrTypeFlags(mask uint16) { u.m.TypeFlags |= mask }
 
-// AdvanceNameSeed: the engine does not keep the exe's name seed (the unit seed is the Brain's); the step is counted.
-func (u *fxUnit) AdvanceNameSeed() { u.steps++ }
+// AdvanceNameSeed is MONSTER_AdvanceSeedAndNameSeed 0x59e880 (VERIFIED): the unit's seed takes one step and the low
+// 16 bits of the new low word become the name seed (monster data +0x14). The Go unit seed is the Brain's.
+func (u *fxUnit) AdvanceNameSeed() {
+	u.steps++
 
-func (u *fxUnit) NameSeed() uint16 {
-	if u.m.Brain != nil {
-		return uint16(u.m.Brain.Seed.Lo)
+	if u.m.Brain != nil && u.m.Brain.Seed != nil {
+		u.m.UMod.NameSeed = uint16(u.m.Brain.Seed.Step())
 	}
-
-	return 0
 }
+
+func (u *fxUnit) NameSeed() uint16 { return u.m.UMod.NameSeed }
 
 func (u *fxUnit) Velocity() int {
 	if u.m.Stat == nil {
@@ -221,7 +222,10 @@ func (u *fxUnit) SetAIFlag20() {
 		u.m.Brain.CanTeleport = true
 	}
 }
-func (u *fxUnit) ScheduleTimerEvent() { u.m.UMod.TimerEvent = true }
+func (u *fxUnit) ScheduleTimerEvent() {
+	u.m.UMod.TimerEvent = true
+	u.m.UMod.TimerAt = u.d.frame + d2monreg.TimerPeriod // 0x59eea0: event 7 at frame + 0x4b
+}
 
 // finish turns the stats the callbacks left in extra into the engine's fields.
 func (u *fxUnit) finish() {

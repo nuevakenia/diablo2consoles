@@ -70,7 +70,9 @@ func (d *Director) BaalSituation(b *d2monster.Brain, s *d2monster.BaalSituation)
 			near++
 		}
 
-		if hasAnchor && b.LevelID == worldstoneChamberLevel && d2monster.Distance(ax-x, ay-y) <= d2monster.BaalFarDist {
+		// without a portal source: a hero near the anchor while Baal stands in level 0x84 (UNVERIFIED stand-in)
+		if d.HeroPortal == nil && hasAnchor && b.LevelID == worldstoneChamberLevel &&
+			d2monster.Distance(ax-x, ay-y) <= d2monster.BaalFarDist {
 			s.Worldstone = true
 		}
 	}
@@ -82,9 +84,35 @@ func (d *Director) BaalSituation(b *d2monster.Brain, s *d2monster.BaalSituation)
 	// w20: Nearby (the difficulty clamped to 2) and Far / VeryFar (the TARGET's
 	// edge distance to the anchor) are computed by the AI itself (baalDecide),
 	// VERIFIED against 0x5fb830 / 0x5fb630; the host no longer overrides them.
-	if b.HasTarget {
-		if p := d.playerFor(b.TargetID); p != nil {
-			s.Flag1 = heroDangerous(p)
+	//
+	// w22: the per-target inputs of 0x5fb830 come from the unit the decision is about (s.Target; the tick's target
+	// when the AI did not pass one): the target's life percent (table A, below 33 raises melee), her state 0xb (cold,
+	// table A zeroes three weights) and, for a hero, whether her last town portal lies in the Worldstone Chamber
+	// (level 0x84) within 0x4b of the anchor (table C).
+	var hero *d2mapentity.Player
+
+	switch {
+	case s.Target != nil && s.Target.IsPlayer:
+		hero = d.playerFor(s.Target.ID)
+	case b.HasTarget:
+		hero = d.playerFor(b.TargetID)
+	}
+
+	if hero == nil {
+		return
+	}
+
+	s.Flag1 = heroDangerous(hero)
+
+	if hero.Stats != nil && hero.Stats.MaxHealth > 0 {
+		s.TargetHP = hero.Stats.Health * 100 / hero.Stats.MaxHealth
+	}
+
+	s.TargetBlocked = d.heroHasState(hero, statColdState)
+
+	if d.HeroPortal != nil && s.Target != nil && s.Target.IsPlayer {
+		if lvl, px, py, ok := d.HeroPortal(hero); ok {
+			s.Worldstone = baalWorldstoneInput(lvl, px, py, ax, ay, hasAnchor)
 		}
 	}
 }

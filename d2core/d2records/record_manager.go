@@ -137,6 +137,9 @@ type RecordManager struct {
 		Name      struct {
 			Prefix UniqueMonsterAffixes
 			Suffix UniqueMonsterAffixes
+			// PrefixOrder, SuffixOrder and AppellationOrder are the string table keys of UniquePrefix.txt,
+			// UniqueSuffix.txt and UniqueAppellation.txt in file order (the exe's random name roll indexes rows).
+			PrefixOrder, SuffixOrder, AppellationOrder []string
 		}
 		Placements MonsterPlacements
 		Presets    MonPresets

@@ -158,6 +158,8 @@ type RiteState struct {
 	Started bool
 	// Portals is the portal count at +0xc.
 	Portals int
+	// Statues are the modes the three statues were left in (+0x30..+0x38); 0 = asleep. RiteIntroHeard sets them to 3.
+	Statues [3]int
 }
 
 // SetRiteState installs the Rite of Passage state. Without it the Ancients
