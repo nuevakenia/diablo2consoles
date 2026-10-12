@@ -53,8 +53,9 @@ func TestPvPParts(t *testing.T) {
 
 	got := PvPReceiveParts(PvPParts{Phys: 100, Fire: 100, Cold: 100, Light: 100, Magic: 100},
 		PvPDefender{PhysResist: 50, FireResist: 75, ColdResist: 0, LightResist: 100, MagicResist: 10, Reduce: 10, MagicReduce: 20})
-	// phys (100-10)*50% = 45, magic (100-20)*90% = 72, fire 25, cold 100, light 0
-	if got != 45+72+25+100 {
+	// phys (100-10)*50% = 45, magic (100-20)*90% = 72; fire, cold and lightning take the magic flat reduction too
+	// (wave 31, slot table 0x72ff38): fire (100-20)*25% = 20, cold 80, light 0
+	if got != 45+72+20+80 {
 		t.Fatalf("received %d", got)
 	}
 }

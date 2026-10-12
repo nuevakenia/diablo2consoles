@@ -92,6 +92,9 @@ type PvPHitPacket struct {
 	// its own resists to each. Empty for a melee swing (Damage is physical).
 	Skill string `json:"skill,omitempty"`
 	Parts []int  `json:"parts,omitempty"`
+	// Rate is the DamageRate of the missile that hit (0x579ef0): the defender scales its flat damage reductions by
+	// Rate / 1024 when it is above 0. Wave 31.
+	Rate int `json:"rate,omitempty"`
 	// Kill reverses the direction: the defender's client tells the killer
 	// (Target) that the sender (Attacker, the victim) died of its hit. Level
 	// and Class describe the victim; Hardcore says whether it was a hardcore

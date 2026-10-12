@@ -74,18 +74,46 @@ func PvPPartsFromSlice(s []int) (p PvPParts, ok bool) {
 type PvPDefender struct {
 	PhysResist, MagicResist, FireResist, ColdResist, LightResist int
 	Reduce, MagicReduce                                          int
+	// FlatRate is the DamageRate (missile stat 0x147) of the missile that hit: above 0 the flat reductions count
+	// only FlatRate / 1024 of their value per hit (VERIFIED 0x579ef0, wave 31). 0 keeps them whole.
+	FlatRate int
+}
+
+// PvPReceiveFlat is PvPReceive for one damage type with the flat reduction of the type: the exe's flat reduction
+// is stat 34 for physical and stat 35 for fire, lightning, cold and magic (VERIFIED descriptor table 0x72ff38,
+// slot per type); with a DamageRate above 0 it is scaled by rate / 1024 in 8.8 before it is subtracted
+// (0x579ef0, 0x579c90), so a standing fire (Fire Wall rate 41) pays about one 25th of it per hit.
+func PvPReceiveFlat(scaled, resist, flat, rate int) int {
+	if rate <= 0 {
+		return PvPReceive(scaled, resist, flat)
+	}
+
+	if scaled <= 0 {
+		return 0
+	}
+
+	f := ScaleFlatReduction(flat, int32(rate))
+
+	out, _ := ReduceComponent(scaled<<FixedShift, f, resist, false, false, 0, 0)
+	if out <= 0 {
+		return 0
+	}
+
+	// the exe keeps life in 8.8; the whole-point API rounds to the nearest point (UNVERIFIED rounding)
+	return (out + 1<<(FixedShift-1)) >> FixedShift
 }
 
 // PvPReceiveParts is what a defending hero loses from a scaled skill hit:
 // physical takes the flat reduction then the physical resist (as PvPReceive),
 // magic its flat reduction and resist, the elements their resist. Order of
-// reduction and resist is UNVERIFIED.
+// reduction and resist: flat first, then the percent (VERIFIED 0x579c90). Fire, cold and lightning take the
+// magic flat reduction (stat 35) like magic does (wave 31, VERIFIED slot table 0x72ff38; before they took none).
 func PvPReceiveParts(p PvPParts, d PvPDefender) int {
-	total := PvPReceive(p.Phys, d.PhysResist, d.Reduce)
-	total += PvPReceive(p.Magic, d.MagicResist, d.MagicReduce)
-	total += PvPReceive(p.Fire, d.FireResist, 0)
-	total += PvPReceive(p.Cold, d.ColdResist, 0)
-	total += PvPReceive(p.Light, d.LightResist, 0)
+	total := PvPReceiveFlat(p.Phys, d.PhysResist, d.Reduce, d.FlatRate)
+	total += PvPReceiveFlat(p.Magic, d.MagicResist, d.MagicReduce, d.FlatRate)
+	total += PvPReceiveFlat(p.Fire, d.FireResist, d.MagicReduce, d.FlatRate)
+	total += PvPReceiveFlat(p.Cold, d.ColdResist, d.MagicReduce, d.FlatRate)
+	total += PvPReceiveFlat(p.Light, d.LightResist, d.MagicReduce, d.FlatRate)
 
 	return total
 }
@@ -148,12 +176,15 @@ type PvPDefendCarry [3]int
 // ReceiveParts is PvPReceiveParts with the elemental fractions carried to the
 // next hit on the same defender.
 func (c *PvPDefendCarry) ReceiveParts(p PvPParts, d PvPDefender) int {
-	total := PvPReceive(p.Phys, d.PhysResist, d.Reduce)
-	total += PvPReceive(p.Magic, d.MagicResist, d.MagicReduce)
+	total := PvPReceiveFlat(p.Phys, d.PhysResist, d.Reduce, d.FlatRate)
+	total += PvPReceiveFlat(p.Magic, d.MagicResist, d.MagicReduce, d.FlatRate)
 
 	el := [3]struct{ v, resist int }{{p.Fire, d.FireResist}, {p.Light, d.LightResist}, {p.Cold, d.ColdResist}}
 	for i, e := range el {
-		if e.v <= 0 {
+		// the magic flat reduction (stat 35) comes off the element first, then the percent (0x579c90); in
+		// hundredths of a point so that a DamageRate scaled reduction keeps its fraction
+		left := flatLeft100(e.v, d.MagicReduce, d.FlatRate)
+		if left <= 0 {
 			continue
 		}
 
@@ -162,10 +193,30 @@ func (c *PvPDefendCarry) ReceiveParts(p PvPParts, d PvPDefender) int {
 			m = 0
 		}
 
-		sum := e.v*m + c[i]
+		sum := left*m/100 + c[i]
 		total += sum / 100
 		c[i] = sum % 100
 	}
 
 	return total
+}
+
+// flatLeft100 is what remains of a whole-point element hit after the flat reduction, in hundredths of a point (the
+// reduction is scaled by rate / 1024 when the rate is above 0), never below 0.
+func flatLeft100(v, flat, rate int) int {
+	if v <= 0 {
+		return 0
+	}
+
+	f := flat * 100
+
+	if f > 0 && rate > 0 {
+		f = f * rate / 0x400
+	}
+
+	if left := v*100 - f; left > 0 {
+		return left
+	}
+
+	return 0
 }

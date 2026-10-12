@@ -416,7 +416,7 @@ func (v *Game) onPartyHeal(p d2netpacket.PartyHealPacket) {
 // which checks the hostility and relays it to the defender.
 func (v *Game) sendSkillPvP(h d2skills.PvPHit) {
 	pkt, err := d2netpacket.CreatePvPHitPacket(d2netpacket.PvPHitPacket{Attacker: v.me(), Target: h.Target.ID(),
-		Damage: h.Parts.Total(), Raw: h.Raw, Skill: h.Skill, Parts: h.Parts.Slice()})
+		Damage: h.Parts.Total(), Raw: h.Raw, Skill: h.Skill, Parts: h.Parts.Slice(), Rate: h.Rate})
 	if err != nil {
 		v.Errorf("PVP skill packet: %v", err)
 		return
@@ -461,7 +461,7 @@ func (v *Game) onPvPHit(p d2netpacket.PvPHitPacket) {
 		def = d2combat.PvPDefender{
 			PhysResist: t.PhysResist, MagicResist: t.MagicResist, Reduce: t.DamageReduction, MagicReduce: t.MagicReduction,
 			FireResist: t.ResistShown[d2statlist.ResFire], ColdResist: t.ResistShown[d2statlist.ResCold],
-			LightResist: t.ResistShown[d2statlist.ResLight],
+			LightResist: t.ResistShown[d2statlist.ResLight], FlatRate: p.Rate,
 		}
 	}
 
