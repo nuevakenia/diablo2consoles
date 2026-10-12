@@ -174,7 +174,8 @@ func newGuardian() *Quest {
 // ---- Act 4 ----
 
 // A4Q1 The Fallen Angel (Tyrael): Izual in the Plains of Despair, +2 skill
-// points. UNVERIFIED: Izual's class (256 or the ghost 406) and the reward.
+// points. VERIFIED w25: the 2 points (0x5b15c0) and the kill (0x5b1c50: RP + goal for the killer, whoever sits in
+// Izual's room or the next ones). UNVERIFIED: Izual's class (256 or the ghost 406).
 func newFallenAngel() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestFallenAngel, slot: 25, act: 3, logIndex: 1, name: "The Fallen Angel", label: "A4Q1",
@@ -190,7 +191,7 @@ func newFallenAngel() *Quest {
 }
 
 // A4Q2 Terror's End (Tyrael): Diablo in the Chaos Sanctuary. The expansion
-// uses the SUCCESSEXP lines (tables 4 and 5). UNVERIFIED: level 108, class 243.
+// uses the SUCCESSEXP lines (tables 4 and 5). VERIFIED w25: Diablo is class 243 (0x5b2f10); UNVERIFIED: level 108.
 func newTerrorsEnd() *Quest {
 	return newSpecQuest(&spec{
 		id: QuestTerrorsEnd, slot: 26, act: 3, logIndex: 2, name: "Terror's End", label: "A4Q2",
