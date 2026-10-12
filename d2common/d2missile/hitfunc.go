@@ -112,6 +112,10 @@ func (s *Sim) hitFunc(m *Missile, t Target) (ret int, ok bool) {
 		return s.debrisHit(m), true
 	case 56:
 		return s.armageddonHit(m), true
+	case 15, 16, 19, 24, 31, 38, 43, 44, 45:
+		return s.w23Hit(m, t), true
+	case 52, 55, 58:
+		return s.w23HitB(m, t), true
 	}
 
 	return 0, false

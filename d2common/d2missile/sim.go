@@ -527,11 +527,11 @@ func (s *Sim) stepOne(m *Missile) {
 	}
 
 	switch {
-	case sp.SrvDoFunc == 7:
+	case sp.SrvDoFunc == 7 || sp.SrvDoFunc == 32:
 		if !s.guidedTurn(m) {
 			return
 		}
-	case m.Home != nil && m.Home.Alive():
+	case m.Home != nil && sp.SrvDoFunc != 11 && m.Home.Alive():
 		// legacy instant steering for callers that set Home on other missiles
 		// (Bone Spirit); the exe's turn rule is only known for SrvDoFunc 7.
 		if pt, ok := m.Home.(Positioned); ok {
