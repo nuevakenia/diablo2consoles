@@ -248,6 +248,9 @@ func (s *SoundEngine) SetListenerSubtile(x, y float64) {
 	s.SetListener(SubtileToSound(x, y))
 }
 
+// Ticks is the engine clock in game ticks (25/s).
+func (s *SoundEngine) Ticks() int64 { return int64(s.ticks) }
+
 // Listener returns the listener position in sound units.
 func (s *SoundEngine) Listener() (x, y float64) { return s.lx, s.ly }
 

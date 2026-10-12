@@ -66,6 +66,10 @@ func (v *Game) monsterDirector() *d2monsters.Director {
 			if v.gameControls != nil && p == v.localPlayer {
 				v.gameControls.OnHeroHit()
 			}
+
+			if p == v.localPlayer {
+				v.sayHeroVocal(false)
+			}
 		},
 		OnHeroStrike: func(p *d2mapentity.Player) {
 			if v.gameControls != nil && p == v.localPlayer {
