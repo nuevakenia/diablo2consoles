@@ -47,6 +47,9 @@ type MonsterVitals struct {
 	S1              MonsterAttack // S1MinD/S1MaxD/S1TH: the damage of modes SC and S1 (VERIFIED 0x5a2960)
 	Difficulty      d2monster.Difficulty
 	DeathSeedSource uint32
+	// Block is the block chance against a landed hit in percent (stat 0x14 gated as COMBAT_GetBlockChance does,
+	// d2monstats.MonsterBlock); 0 = cannot block.
+	Block int
 }
 
 // MonsterAttack is the damage profile of one attack mode.

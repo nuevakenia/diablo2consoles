@@ -157,6 +157,7 @@ type unit struct {
 	mirror              bool         // a realm unit drawn here: no AI, no local damage (mirror.go)
 	states              map[int]bool // AI-driven unit states (unitstate.go)
 	stats               map[int]int  // AI-scaled monster stats (unitstate.go)
+	regenFrac           int          // 1/256 life points below the whole life point (regen.go)
 }
 
 type moveIntent struct {
@@ -412,6 +413,7 @@ func (d *Director) spawn(stat *d2records.MonStatRecord, subX, subY int, ally *al
 	d.fp.Move(b.ID, subX, subY, d2path.FlagMonster)
 
 	u := &unit{m: m, b: b, ally: ally}
+	d.initRegen(u, stat)
 	m.ClientNear = func(dist int) bool { return d.targetWithin(u, dist) }
 	d.units[b.ID] = u
 	d.byEntity[m.ID()] = u
@@ -522,6 +524,8 @@ func (d *Director) step() {
 		if u.merc != nil {
 			d.stepMerc(u)
 		}
+
+		d.regenStep(u)
 
 		if u.ally != nil {
 			d.allyStep(u)

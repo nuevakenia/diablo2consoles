@@ -147,7 +147,7 @@ func (d *Director) SpawnMercHP(owner *d2mapentity.Player, save MercSave, hp int)
 
 func (d *Director) spawnMercAt(owner *d2mapentity.Player, stat *d2records.MonStatRecord, rec *d2hireling.Record,
 	save MercSave, level int, st d2hireling.Stats, hp, x, y int) (*d2mapentity.Monster, error) {
-	prof := profileFromRecord(stat, d.opt.Difficulty)
+	prof := profileWithBonus(stat, d.opt.Difficulty, 0) // hirelings: no difficulty skill bonus (0x571c26)
 	d.nextID++
 
 	b := d2monster.NewBrain(d.nextID, rec.Class, d.opt.Difficulty, prof, d.opt.Seed)
