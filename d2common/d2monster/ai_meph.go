@@ -14,8 +14,7 @@ package d2monster
 // flags, hostile by 0x552270) that reports the one with the lowest current
 // life and, only when the scanning unit is a player (type 0, never for
 // Mephisto), the nearest one. Callback 0x5f67a0 decoded in wave 20 (alive,
-// unit flag 4, hostile, squared distance <= 1024). UNVERIFIED which unit
-// types the walk of list index 1 visits; absent, the burst never retargets
+// unit flag 4, hostile, squared distance <= 1024). The walk of list index 1 visits every unit type (0x5dbba0); absent, the burst never retargets
 // and draws no extra roll. Hosted by Director.MephScan.
 type MephScanner interface {
 	MephScan(b *Brain) (weakest *Target, nearest *Target)

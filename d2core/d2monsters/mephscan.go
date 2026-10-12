@@ -19,6 +19,8 @@ const mephScanRadius2 = 0x400
 // filled when the scanning unit itself is a player (type 0), so for a monster
 // it stays empty and the second roll of the exe never happens.
 //
+// Callback 0x5f67a0 re-read w38: it also counts the accepted units (word 7) and those within squared distance
+// 0xe2 (word 2) and compares the weakest by life>>8; the think function ported here reads only the two unit slots.
 // UNVERIFIED: that the unit flag 4 is set on every unit the engine models
 // (assumed), and the hostility of a pet or merc to a monster (assumed).
 func (d *Director) MephScan(b *d2monster.Brain) (weakest, nearest *d2monster.Target) {

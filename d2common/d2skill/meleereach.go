@@ -1,5 +1,7 @@
 package d2skill
 
+import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
+
 // tableDistance is UNIT_GetTableDistance (VERIFIED, read in Game.exe) for two units of size 1: the table at
 // 0x6ec730 (8x8 entries indexed dx + dy*8 in subtiles, -1 means touching) plus 1. Beyond 7 subtiles on an
 // axis the exe uses 2*max+min with no +1. Unit sizes are not modelled by TableDistance (size 1 assumed); the full
@@ -144,4 +146,44 @@ func AttackInReach(monsterAttacker bool, meleeRange, dx, dy int) bool {
 	}
 
 	return WithinMeleeRange(dx, dy, meleeRange, extra)
+}
+
+// MeleeReachFull is the whole COMBAT_IsTargetWithinMeleeRange 0x622e40 (VERIFIED w38 from the decompile):
+//  1. a monster target of base class 0x102 / 0x105 is in reach when the sized table distance is below meleeRange+8
+//     (no line trace);
+//  2. otherwise in reach when the sized table distance is below 1 (no trace either);
+//  3. otherwise, when the distance is at most meleeRange+1+extra, in reach exactly when the line trace between the
+//     two units for collision mask 0x804 reports no blocker (COLLISION_CanTraceLineBetweenUnits, nonzero = blocked);
+//     farther away it is out of reach.
+//
+// blocked may be nil (no map): the trace then counts as clear, as before w38. The caller closes over the two
+// positions and returns true when the 0x804 trace is blocked.
+func MeleeReachFull(dx, dy, sa, sb, meleeRange, extra, targetClass int, blocked func() bool) bool {
+	d := TableDistanceSized(dx, dy, sa, sb)
+
+	if (targetClass == classWaterWatcherLimb || targetClass == classWaterWatcherHead) && d < meleeRange+8 {
+		return true
+	}
+
+	if d < 1 {
+		return true
+	}
+
+	if d > meleeRange+1+extra {
+		return false
+	}
+
+	return blocked == nil || !blocked()
+}
+
+// TraceBlocked804 reports whether the line between two subtile positions is blocked for collision mask 0x804
+// (the trace of 0x622e40). A nil grid never blocks.
+func TraceBlocked804(g d2path.Grid, ax, ay, bx, by int) bool {
+	if g == nil {
+		return false
+	}
+
+	clear, _ := d2path.TraceLine(g, 0x804, d2path.Point{X: ax, Y: ay}, d2path.Point{X: bx, Y: by})
+
+	return !clear
 }

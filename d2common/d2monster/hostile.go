@@ -6,7 +6,8 @@ package d2monster
 // monster's leader, a missile's owner), answers "not hostile" when both resolve to the same unit, uses the party
 // relation flag 8 for two players, and a monster hostility helper otherwise. The missile hit loop (common predicate
 // 0x5a6160) and the area scans (filter 0x569100) both call it, so a unit that is not hostile to the caster is never
-// hit by a missile that lacks CollideFriend. UNVERIFIED: the body of the monster helper; here every monster that
+// hit by a missile that lacks CollideFriend. The monster helper is UNIT_CompareStateStatACRelation 0x652230 (VERIFIED w38): related (not hostile) when the units are the same,
+// or both alignments are 0, or both are 2; any pairing involving alignment 1 is hostile, as is 0 against 2. Here every monster that
 // follows a hero (summon, golem, mercenary, converted monster) takes its owner's side, every other monster is on the
 // monsters' side, and two monsters of the same side never fight.
 

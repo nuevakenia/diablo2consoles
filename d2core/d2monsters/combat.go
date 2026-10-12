@@ -419,7 +419,18 @@ func (d *Director) HeroStrike(p *d2mapentity.Player, m *d2mapentity.Monster) boo
 	// range gate of COMBAT_RollAttackOutcome 0x57cc10 (VERIFIED w29): before the to-hit roll and any seed step
 	if d.opt.MeleeRange != nil {
 		mx, my := m.SubtilePos()
-		if !d2skill.AttackInReachSized(false, d.opt.MeleeRange(), mx-int(p.Position.X()), my-int(p.Position.Y()), d2skill.HeroUnitSize, monsterUnitSize(m)) {
+		hx, hy := int(p.Position.X()), int(p.Position.Y())
+		class := -1
+
+		if d.inClassFamily(u, 0x102) {
+			class = 0x102
+		} else if d.inClassFamily(u, 0x105) {
+			class = 0x105
+		}
+
+		// COMBAT_IsTargetWithinMeleeRange 0x622e40 whole (w38): special classes, then the 0x804 line trace
+		if !d2skill.MeleeReachFull(mx-hx, my-hy, d2skill.HeroUnitSize, monsterUnitSize(m), d.opt.MeleeRange(), 1, class,
+			func() bool { return d2skill.TraceBlocked804(d.grid, hx, hy, mx, my) }) {
 			d.emit("herohit", "HERO swing target=%s hit=false outofreach=true", m.Label())
 
 			return false
