@@ -361,7 +361,7 @@ func jarJarQuestActive(c *Ctx, node *Command, coords Point, has bool) {
 // with dx, dy the absolute coordinate differences, the larger plus half the
 // smaller. The coordinates are the path's own units, which the Go brain
 // shares (subtiles); the function's name suggests tiles but the exe does no
-// division by 5 (UNVERIFIED whether the path position is in subtiles).
+// division by 5; the function reads PATH_GetXPos/YPos of the unit (VERIFIED w37 decompile 0x5db310).
 func unitTileDist(b *Brain, x, y int) int {
 	dx, dy := b.X-x, b.Y-y
 	if dx < 0 {

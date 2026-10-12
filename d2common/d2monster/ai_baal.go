@@ -138,13 +138,13 @@ type Cloner interface{ SpawnBaalClone(b *Brain) bool }
 // cleared; after the fifth wave the next step morphs the throne into Baal.
 //
 // The announcement message (id from a game table by the counter, plus an extra
-// message for two special entries 0x3e/0x69) is UNVERIFIED and left to the host.
+// message for two special entries 0x3e/0x69) is left to the host: 0x5ee400 queues it through SUNITMSG_QueueMsgA4 with the superunique class of a table entry (VERIFIED w37 shape, text UNVERIFIED).
 func thinkBaalThrone(c *Ctx) {
 	b := c.B
 	now := c.W.Frame()
 
 	if b.Scratch[2] > now {
-		c.Sleep(b.Scratch[2] - now) // the exe passes frame-next (negative); UNVERIFIED which way it clamps
+		c.Sleep(b.Scratch[2] - now) // the exe passes frame-next (negative); MONAI_ScheduleWaitTicks 0x5dce70 only maps 0 to 1 and schedules at frame+n, so a past time fires at the next tick, same as the clamp to 1 here (VERIFIED w37)
 
 		return
 	}

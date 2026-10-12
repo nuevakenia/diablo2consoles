@@ -462,7 +462,7 @@ func TestDarkWanderer(t *testing.T) {
 
 	// arrival by distance
 	w2 := newF3(5)
-	w2.quest = &Point{X: 102, Y: 100}
+	w2.quest = &Point{X: 101, Y: 100} // w37: tile distance has no /5 (0x5db310), so 1 < 2 arrives
 	w2.dist = 10
 	b2 := f3Brain("DarkWanderer", 1, nil)
 	b2.Scratch[0] = 2

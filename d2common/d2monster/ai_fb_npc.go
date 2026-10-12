@@ -96,9 +96,9 @@ func fbnQuest(c *Ctx) FBNQuestHost {
 	return q
 }
 
-// fbnTiles is UNIT_IsWithinTileDistance(x, y): the distance in tiles
-// (subtiles / 5, UNVERIFIED rounding).
-func fbnTiles(b *Brain, x, y int) int { return Distance(b.X-x, b.Y-y) / 5 }
+// fbnTiles is UNIT_IsWithinTileDistance 0x5db310 (VERIFIED w37): max(|dx|,|dy|) + min/2 in the path's own units,
+// with no division by 5 (the earlier port divided by 5 and made every NPC threshold five times too loose).
+func fbnTiles(b *Brain, x, y int) int { return Distance(b.X-x, b.Y-y) }
 
 // fbnWalkPoint is MONAI_WalkToPoint: a walk to a map point.
 func fbnWalkPoint(c *Ctx, p Point) bool { return c.move(p, nil, 0, false) }
