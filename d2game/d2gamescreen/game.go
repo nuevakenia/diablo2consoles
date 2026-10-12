@@ -302,6 +302,7 @@ func (v *Game) OnLoad(_ d2screen.LoadingState) {
 		{"killnear", "kills the nearest monster as the hero (party experience tests)", []string{}, v.commandKillNear},
 		{"ritestart", "wakes the Ancients as the statues' introduction does (scenarios)", nil, v.commandRiteStart},
 		{"ritealtar", "uses the Ancients' altar without walking to it (scenarios)", nil, v.commandRiteAltar},
+		{"ritedoor", "uses the gate door to the Worldstone Keep without walking to it (scenarios)", nil, v.commandRiteDoor},
 		{"ritekill", "kills the woken Ancients as the hero (scenarios)", nil, v.commandRiteKill},
 		{"ritestatus", "logs the Rite of Passage fight state", nil, v.commandRiteStatus},
 		{"killgidbinn", "kills the fetish boss the Gidbinn object woke, as the hero (scenarios)", []string{}, v.commandKillGidbinn},
