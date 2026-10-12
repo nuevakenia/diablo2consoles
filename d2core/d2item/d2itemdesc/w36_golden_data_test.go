@@ -1,0 +1,30 @@
+package d2itemdesc
+
+// Reviewed golden tooltip lines for w36_golden_test.go (typical rolls, no hero context).
+var w36Golden = map[string][]string{
+	"Harlequin Crest":            {"Harlequin Crest", "Shako", "Defense: 120", "Durability: 12 of 12", "Required Strength: 50", "Required Level: 62", "+2 to All Skills", "+2 to Strength", "+2 to Life", "+2 to Mana", "Damage Reduced by 10%", "50% Better Chance of Getting Magic Items"},
+	"The Stone of Jordan":        {"The Stone of Jordan", "Ring", "Required Level: 29", "+1 to All Skills", "+25 to Mana"},
+	"Arachnid Mesh":              {"Arachnid Mesh", "Spiderweb Sash", "Defense: 100", "Durability: 12 of 12", "Required Strength: 50", "Required Level: 80", "+1 to All Skills", "+20% Increased Attack Speed", "+20% Faster Cast Rate"},
+	"Windforce":                  {"Windforce", "Hydra Bow", "Two-Hand Damage: 35 to 238", "Required Dexterity: 167", "Required Strength: 134", "Required Level: 73", "+20% Increased Attack Speed", "+250% Enhanced Damage", "5% Chance of Crushing Blow"},
+	"Skin of the Vipermagi":      {"Skin of the Vipermagi", "Serpentskin Armor", "Defense: 400", "Durability: 12 of 12", "Required Strength: 43", "Required Level: 29", "+1 to All Skills", "+30% Faster Cast Rate", "All Resistances +30", "Damage Reduced by 10%"},
+	"Tyrael's Might":             {"Tyrael's Might", "Sacred Armor", "Defense: 600", "Durability: 12 of 12", "Required Strength: 232", "Required Level: 84", "+30 to Strength"},
+	"Raven Frost":                {"Raven Frost", "Ring", "Required Level: 45", "+200 to Attack Rating", "+20 to Dexterity", "Cold Resist +30%"},
+	"The Cat's Eye":              {"The Cat's Eye", "Amulet", "Required Level: 50", "+25% Faster Run/Walk", "+25 to Dexterity"},
+	"Nagelring":                  {"Nagelring", "Ring", "Required Level: 7", "+100 to Attack Rating", "20% Better Chance of Getting Magic Items"},
+	"Highlord's Wrath":           {"Highlord's Wrath", "Amulet", "Required Level: 65", "+1 to All Skills", "+20% Increased Attack Speed"},
+	"Skullder's Ire":             {"Skullder's Ire", "Russet Armor", "Defense: 400", "Durability: 12 of 12", "Required Strength: 97", "Required Level: 42", "Fire Resist +30%", "80% Better Chance of Getting Magic Items"},
+	"Gheed's Fortune":            {"Gheed's Fortune", "Grand Charm", "Required Level: 62", "100% Extra Gold from Monsters", "30% Better Chance of Getting Magic Items"},
+	"Deaths's Web":               {"Death's Web", "Unearthed Wand", "One-Hand Damage: 22 to 28", "Durability: 60 of 60", "Required Strength: 25", "Required Level: 66", "+1 to All Skills"},
+	"Griffon's Eye":              {"Griffon's Eye", "Diadem", "Defense: 100", "Durability: 12 of 12", "Required Level: 76", "+1 to All Skills", "+25% Faster Cast Rate"},
+	"Bul Katho's Wedding Band":   {"Bul-Kathos' Wedding Band", "Ring", "Required Level: 58", "3% Life stolen per hit", "+50 to Life"},
+	"Crown of Ages":              {"Crown of Ages", "Corona", "Defense: 100", "Durability: 12 of 12", "Required Strength: 174", "Required Level: 82", "+1 to All Skills", "+15 to Strength"},
+	"Thunderstroke":              {"Thunderstroke", "Matriarchal Javelin", "One-Hand Damage: 30 to 54", "Throw Damage: 35 to 66", "Quantity: 0", "Durability: 40 of 40", "(Amazon Only)", "Required Dexterity: 151", "Required Strength: 107", "Required Level: 69", "+100 to Attack Rating"},
+	"Tal Rasha's Howling Wind":   {"Tal Rasha's Guardianship", "Lacquered Plate", "Defense: 300", "Durability: 12 of 12", "Required Strength: 208", "Required Level: 71", "+50 to Life", "", "Tal Rasha's Wrappings", "Tal Rasha's Fine-Spun Cloth", "Tal Rasha's Adjudication", "Tal Rasha's Lidless Eye", "Tal Rasha's Guardianship", "Tal Rasha's Horadric Crest"},
+	"Tal Rasha's Horadric Crest": {"Tal Rasha's Horadric Crest", "Death Mask", "Defense: 100", "Durability: 12 of 12", "Required Strength: 55", "Required Level: 66", "+50 to Life", "", "Tal Rasha's Wrappings", "Tal Rasha's Fine-Spun Cloth", "Tal Rasha's Adjudication", "Tal Rasha's Lidless Eye", "Tal Rasha's Guardianship", "Tal Rasha's Horadric Crest"},
+	"Sigon's Shelter":            {"Sigon's Shelter", "Gothic Plate", "Defense: 90", "Durability: 12 of 12", "Required Strength: 70", "Required Level: 6", "+10 to Life", "", "Sigon's Complete Steel", "Sigon's Gage", "Sigon's Visor", "Sigon's Shelter", "Sigon's Sabot", "Sigon's Wrap", "Sigon's Guard"},
+	"Civerb's Ward":              {"Civerb's Ward", "Large Shield", "Defense: 20", "Chance to Block: 12%", "Durability: 24 of 24", "Required Strength: 34", "Required Level: 9", "+10 to Life", "", "Civerb's Vestments", "Civerb's Ward", "Civerb's Icon", "Civerb's Cudgel"},
+	"Natalya's Totem":            {"Natalya's Totem", "Grim Helm", "Defense: 100", "Durability: 12 of 12", "Required Strength: 58", "Required Level: 59", "+10 to Life", "", "Natalya's Odium", "Natalya's Totem", "Natalya's Mark", "Natalya's Shadow", "Natalya's Soul"},
+	"Goldwrap":                   {"Goldwrap", "Heavy Belt", "Defense: 80", "Durability: 12 of 12", "Required Strength: 45", "Required Level: 27", "20% Better Chance of Getting Magic Items"},
+	"Dwarf Star":                 {"Dwarf Star", "Ring", "Required Level: 45", "Fire Resist +20%"},
+	"Spiritkeeper":               {"Spirit Keeper", "Earth Spirit", "Defense: 80", "Durability: 12 of 12", "(Druid Only)", "Required Strength: 104", "Required Level: 67", "+1 to All Skills"},
+}
