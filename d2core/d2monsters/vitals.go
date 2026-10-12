@@ -1,6 +1,7 @@
 package d2monsters
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2difficulty"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monstats"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2monster"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
@@ -9,7 +10,16 @@ import (
 
 // profileFromRecord converts a monstats row into the AI profile for a
 // difficulty.
+//
+// The skill levels get the DifficultyLevels MonsterSkillBonus of the difficulty (VERIFIED 0x00571af0: the unit's
+// skill is added at the monstats level plus the bonus, for skills whose level column is above 0).
 func profileFromRecord(r *d2records.MonStatRecord, diff d2monster.Difficulty) *d2monster.Profile {
+	return profileWithBonus(r, diff, d2difficulty.Default.Row(d2difficulty.Level(diff)).MonsterSkillBonus)
+}
+
+// profileWithBonus is profileFromRecord with an explicit skill level bonus. Hirelings take no bonus in the exe
+// (0x00571c26 zeroes the difficulty index of the hireling classes).
+func profileWithBonus(r *d2records.MonStatRecord, diff d2monster.Difficulty, skillBonus int) *d2monster.Profile {
 	pick := func(n, nm, h int) int { return [3]int{n, nm, h}[diff] }
 
 	p := &d2monster.Profile{
@@ -52,7 +62,7 @@ func profileFromRecord(r *d2records.MonStatRecord, diff d2monster.Difficulty) *d
 
 	for i := range names {
 		p.Skills[i].Name = names[i]
-		p.Skills[i].Level = levels[i]
+		p.Skills[i].Level = d2monstats.SkillLevel(levels[i], skillBonus)
 		p.Skills[i].Mode, _ = d2monster.ParseMode(modes[i])
 	}
 
@@ -115,6 +125,8 @@ func (d *Director) computeVitals(r *d2records.MonStatRecord, b *d2monster.Brain)
 	}
 
 	v.HP = v.MaxHP
+	v.Block = d2monstats.MonsterBlock(r.ID, r.CanBlockWithoutShield,
+		pick(r.ChanceToBlockNormal, r.ChanceToBlockNightmare, r.ChanceToBlockHell))
 	v.Defense = scale(lv.ac, pick(r.ArmorClassNormal, r.ArmorClassNightmare, r.ArmorClassHell))
 	v.Experience = scale(lv.xp, pick(r.ExperienceNormal, r.ExperienceNightmare, r.ExperienceHell))
 	v.Experience += d2monstats.MulDiv(v.Experience, xpPct, 100)
