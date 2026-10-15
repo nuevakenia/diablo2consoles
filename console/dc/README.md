@@ -339,3 +339,46 @@ Triage para la fase siguiente (rama DC-002):
 5. **Biblioteca estandar para SH-4** (DC-002): 51 paquetes y 337 simbolos medidos (seccion 10).
    Se empieza por los de puro calculo (fmt, strings, strconv, math, errors) para poder compilar
    y correr un paquete real del motor en la consola.
+
+## 11. DC-002.2: la biblioteca estandar minima en la consola (hasta donde llega hoy)
+
+La stdlib de la seccion 10 **compila para SH-4 y enlaza**: `scripts/console/build-std-gox.sh` la
+deja en `$DC_ROOT/gox` en seis archivos `.gox` (318 KB en total; el `.gox` de gccgo es a la vez la
+cabecera de importacion y el objeto con el codigo, por eso tambien va al enlace). El POC
+`console/dc/poc/stdlib` arma con eso un ELF de 3.086.004 bytes que Flycast arranca.
+
+El POC no lleva respuestas escritas a mano: `scripts/console/gen-std-casos.sh` corre
+`console/dc/std/cmd/gen-casos` **en el host**, donde esta la stdlib de verdad, y hornea la tabla de
+casos (25.999 bytes) con el resultado que dio la biblioteca estandar real. La consola solo comprueba
+que su implementacion da lo mismo.
+
+**Estado: arranca, escribe por la consola serie y se cae en el despacho de interfaces.**
+
+Lo que se midio con sondas (`console/dc/poc/sonda`, que imprime una marca antes de cada paso):
+
+| sonda | que probaba | resultado |
+| --- | --- | --- |
+| float64 y float32, `unsafe` | calculo con punto flotante | anda |
+| `strconv.Atoi("42")` | numero a texto | anda |
+| `errors.New("x")` y `.Error()` | error creado y usado en su propio paquete | anda |
+| `strconv.Atoi("abc")` y `.Error()` | error devuelto como interfaz | anda |
+| `fmt.Sprintf("%v", err)` | asercion `interface{}` -> `error` dentro de fmt | **no**: imprime `%!v(tipo no soportado=...)` |
+| `fmt.Errorf("ctx: %w", base)` | envolver un error | **no**: salta a la direccion 5 y muere |
+| `strconv.FormatFloat(3.5,'f',2,64)` | flotante a texto | **no**: da `350` (en el host da `3.50`) |
+
+El volcado del emulador dice donde: `Unhandled exception: PC 8c05e622` y esa direccion cae **dentro
+del descriptor de tipo** `_type.._2_2main_0miError` (8c05e60c) — o sea, una llamada por tabla de
+metodos fue a parar a los datos. Antes, el mismo programa habia muerto dentro de
+`runtime.ifaceI2T2P` (la conversion de interfaces del runtime).
+
+La causa **no** esta en nuestra stdlib ni en el SH-4: el control es la propia suite de libgodc, que
+pasa en el emulador (`test_types.elf`: "PASS: type switch", "PASS: method interface", "PASS: empty
+interface"). Pero sus pruebas son de **un solo archivo**: nunca cruzan paquetes por archivos `.gox`,
+que es justo lo que hace una biblioteca estandar. El sospechoso es entonces el camino
+inter-paquetes de gccgo/libgodc (descriptores de tipo e itabs de metodos entre objetos compilados
+por separado).
+
+Siguiente paso propuesto (DC-002.2b): bisectar con un caso minimo de **dos** paquetes (uno define un
+tipo con metodo, el otro le hace la asercion de interfaz) hasta aislar si es el enlace, la
+resolucion de itabs o el `get_itab` del runtime; y recien despues decidir entre parchear libgodc o
+evitar el cruce de paquetes. Evidencia cruda en `console/dc/evidencia/dc-002.2-consola.txt`.

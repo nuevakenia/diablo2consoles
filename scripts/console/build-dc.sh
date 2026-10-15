@@ -16,8 +16,25 @@ mkdir -p "$OUT"
 # Assets de Diablo II (si el POC trae bake.conf): se hornean al directorio de build, no al repo.
 bash "$HERE/bake-asset.sh" "$SRC" "$OUT"
 
+# Si el POC trae el archivo "genera-casos", se le hornea la tabla de casos de la stdlib: las
+# respuestas las calcula la biblioteca estandar real de Go en el host (ver gen-std-casos.sh).
+if [ -f "$SRC/genera-casos" ]; then
+    bash "$HERE/gen-std-casos.sh" "$OUT"
+fi
+
 echo "== 1/4 compilando Go ($SRC) =="
-sh-elf-gccgo $GODC_GOFLAGS -c "$SRC"/*.go -o "$OUT/main.o"
+# si existe el arbol .gox de la stdlib minima (scripts/console/build-std-gox.sh), se usa para
+# resolver "fmt", "strings", etc. en la consola
+GOX="${GODC_GOX:-$DC_ROOT/gox}"
+GOXI=""
+if [ -d "$GOX" ]; then
+    GOXI="-I $GOX"
+fi
+CASOS=""
+if [ -f "$OUT/gen/casos_gen.go" ]; then
+    CASOS="$OUT/gen/casos_gen.go"
+fi
+sh-elf-gccgo $GODC_GOFLAGS $GOXI -c "$SRC"/*.go $CASOS -o "$OUT/main.o"
 
 # Puentes a C (para funciones de KOS que el binding de Go no expone). Pueden vivir en
 # $SRC/*.c o en $SRC/csrc/*.c. Se enlazan aparte: gccgo los llama con el comentario //extern.
@@ -30,7 +47,13 @@ for f in "$SRC"/*.c "$SRC"/csrc/*.c; do
 done
 
 echo "== 2/4 enlazando ELF =="
-kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $EXTRA_OBJS $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
+# la stdlib minima: sus .gox son objetos de verdad y van al enlace. Solo se enlazan si el POC los
+# usa (si no, engordarian el binario al pedo).
+STD_OBJS=""
+if [ -f "$GOX/orden.txt" ] && grep -qE '"(fmt|strings|strconv|errors|io|unicode/utf8)"' "$SRC"/*.go 2>/dev/null; then
+    STD_OBJS="$(tr '\n' ' ' < "$GOX/orden.txt")"
+fi
+kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $EXTRA_OBJS $STD_OBJS $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
 
 echo "== 3/4 binario de arranque (1ST_READ.BIN) + IP.BIN =="
 sh-elf-objcopy -R .stack -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"

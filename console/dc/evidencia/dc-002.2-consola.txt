@@ -1,0 +1,28 @@
+=== DC-002.2: la stdlib minima en la Dreamcast emulada (Flycast) ===
+
+--- el POC stdlib compila y ENLAZA ---
+prog.elf 3086004 bytes
+tabla de casos generada por la stdlib real de Go: 25999 bytes
+
+--- arranca y escribe, pero se cae en el despacho de interfaces ---
+STD-TEST: arranca el autotest de la stdlib minima (DC-002.2)
+Unhandled exception: PC 8c02204a, code 1, evt 0180
+Encountered Illegal instruction. Use this template terminal command to help diagnose:
+
+--- sondeo: que funciona y que no en la consola ---
+sonda 1 (paso todo): float64, float32, unsafe, strconv.Atoi valido
+
+--- el fallo es la llamada por tabla de metodos (salta a .rodata) ---
+Unhandled exception: PC 8c05e622, code 1, evt 0180
+ R0-R7: 8c05e590 8c074ce8 8c074d64 8c05e0c0 8c097708 8c05e0c1 00000000 00000005
+ R8-R15: 00000020 8c05e590 8c097738 ffffe7f0 8c0117f0 00000002 8c05e094 8c4a75b8
+ SR 40000100 PR 8c05e59c
+Stack Trace: frame pointers not enabled!
+PC 8c05e622 cae DENTRO del descriptor de tipo _type.._2_2main_0miError (8c05e60c)
+
+--- control: la suite de libgodc SI pasa en el emulador ---
+  PASS: empty interface with int
+  PASS: empty interface with string
+  PASS: method interface
+  PASS: type switch
+(sus pruebas son de un solo archivo: nunca cruzan paquetes por archivos .gox)
