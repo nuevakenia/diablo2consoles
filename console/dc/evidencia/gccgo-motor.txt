@@ -1,0 +1,41 @@
+=== gccgo contra un paquete real del motor (d2common/d2util) ===
+d2common/d2util/debug_print.go:4:14: error: import file ‘image’ not found
+    4 |         "image"
+      |              ^
+d2common/d2util/debug_print.go:6:66: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2util/assets’ not found
+    6 |         "github.com/OpenDiablo2/OpenDiablo2/d2common/d2util/assets"
+      |                                                                  ^
+d2common/d2util/debug_print.go:8:41: error: import file ‘github.com/hajimehoshi/ebiten/v2’ not found
+    8 |         "github.com/hajimehoshi/ebiten/v2"
+      |                                         ^
+d2common/d2util/debug_print.go:22:55: error: expected package
+   22 |                 glyphs:          make(map[rune]*ebiten.Image),
+      |                                                       ^
+d2common/d2util/debug_print.go:30:32: error: expected package
+   30 |         glyphImageTable *ebiten.Image
+      |                                ^
+d2common/d2util/debug_print.go:31:41: error: expected package
+   31 |         glyphs          map[rune]*ebiten.Image
+      |                                         ^
+d2common/d2util/debug_print.go:41:34: error: expected package
+   41 |         p.PrintAt(target.(*ebiten.Image), str, 0, 0)
+      |                                  ^
+d2common/d2util/debug_print.go:49:40: error: expected package
+   49 |         p.drawDebugText(target.(*ebiten.Image), str, x, y, false)
+      |                                        ^
+d2common/d2util/debug_print.go:52:52: error: expected package
+   52 | func (p *GlyphPrinter) drawDebugText(target *ebiten.Image, str string, ox, oy int, shadow bool) {
+      |                                                    ^
+d2common/d2util/debug_print.go:53:39: error: expected ‘;’ or ‘}’ or newline
+   53 |         op := &ebiten.DrawImageOptions{}
+      |                                       ^
+d2common/d2util/debug_print.go:55:9: error: expected declaration
+   55 |         if shadow {
+      |         ^
+d2common/d2util/debug_print.go:57:9: error: expected declaration
+   57 |         }
+      |         ^
+d2common/d2util/debug_print.go:59:9: error: expected declaration
+   59 |         x := 0
+      |         ^
+d2common/d2util/debug_print.go:60:9: error: expected declaration

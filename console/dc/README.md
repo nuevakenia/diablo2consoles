@@ -250,7 +250,49 @@ sigue siendo el ciclo rapido de desarrollo; el GDI es para validar el arranque r
 
 Pendiente para la consola: el GDEMU lee sectores crudos de **2352** y este GDI usa 2048.
 
-## 10. Pendientes (con hipótesis)
+## 10. DC-001.6: la medida del muro (la biblioteca estandar)
+
+El motor son 2.713 archivos .go en 146 paquetes. Compilarlo para SH-4 con `sh-elf-gccgo` choca
+contra tres cosas, en este orden:
+
+```
+d2common/d2util/debug_print.go:4:14: error: import file 'image' not found
+d2common/d2util/debug_print.go:6:66: error: import file '.../d2common/d2util/assets' not found
+d2common/d2util/debug_print.go:8:41: error: import file 'github.com/hajimehoshi/ebiten/v2' not found
+```
+
+1. **No hay biblioteca estandar para sh-elf.** libgodc no la trae (sus ejemplos solo importan
+   `kos` y `unsafe`): hay que escribirla.
+2. **Los paquetes del proyecto hay que compilarlos a `.gox` en orden de dependencias** (es como
+   resuelve los imports gccgo). Es mecanico, no hay que escribir nada.
+3. **Ebitengine no existe en la consola**: se reemplaza por el backend nuevo.
+
+La medida del punto 1 (herramienta `scripts/console/audit-stdlib.py`, tabla completa en
+`evidencia/stdlib-que-falta.txt`):
+
+| que | numero |
+|---|---|
+| paquetes estandar que el motor usa **directo** | **51** |
+| simbolos distintos de esos paquetes que se tocan | **337** (proxy) |
+| los que mas archivos tocan | fmt 344, strings 260, errors 144, strconv 137, os 114, math 88, path/filepath 186, sort 115 |
+| paquetes estandar **transitivos** (entran por Ebitengine) | 185 (no cuentan para el porteo) |
+| archivos que tocan Ebiten (lo que hay que reemplazar) | **12**, en 4 paquetes: d2render/ebiten 6, d2audio/ebiten 3, d2input/ebiten 2, d2common/d2util 1 |
+
+Las dos buenas noticias de la medicion: el aislamiento del backend aguanta (12 archivos, no
+200) y 337 simbolos es un numero finito y acotado, no "hay que portear Go entero". Las malas:
+`os` (35 simbolos) y `syscall`/`net` no tienen sentido tal cual en la consola y hay que
+sustituirlos por un VFS minimo sobre el disco; y `reflect` + `sync` + `runtime` son los que
+dependen del runtime de Go, que en gccgo para sh-elf hay que ver cuanto aguanta.
+
+Triage para la fase siguiente (rama DC-002):
+
+| bucket | paquetes | que implica |
+|---|---|---|
+| puro calculo (sin sistema operativo) | fmt, strings, strconv, sort, math, errors, bytes, unicode/utf8, container/heap, hash/fnv, encoding/binary, encoding/hex, math/rand, image/color | se escriben en Go y se compilan a .gox: es trabajo acotado y verificable contra el host |
+| necesita sistema operativo (VFS minimo) | os, path/filepath, io, io/ioutil, bufio, log, time, flag, os/exec | se implementa contra el lector de disco de KOS; `os/exec` se tira |
+| depende del runtime o no aplica | reflect, sync, sync/atomic, runtime, net, syscall, os/signal, context, encoding/json, regexp, compress/gzip, crypto/sha256, encoding/csv, image/png, image | a medir: cuanto se puede reemplazar por el runtime de gccgo y cuanto hay que reescribir |
+
+## 11. Pendientes (con hipótesis)
 
 1. **Imagen para la consola real (GDEMU)** — DC-001.2b, segunda mitad. El arranque por disco
    ya funciona en el emulador con `.gdi` (ver sección 9), pero el GDI que usa el emulador lleva
@@ -262,5 +304,6 @@ Pendiente para la consola: el GDEMU lee sectores crudos de **2352** y este GDI u
    (DC-001.4): el objetivo del port depende de dibujar el arte con paleta, no RGBA.
 4. **Los tres números del go/no-go** (DC-001.5): tamaño del binario del motor,
    RAM libre con el motor cargado, ciclos por frame con ~300 sprites.
-5. **Compilar el motor con `sh-elf-gccgo`** (DC-001.6): se espera que falte la biblioteca
-   estándar; hay que listar qué paquetes fallan y ordenar por volumen de trabajo.
+5. **Biblioteca estandar para SH-4** (DC-002): 51 paquetes y 337 simbolos medidos (seccion 10).
+   Se empieza por los de puro calculo (fmt, strings, strconv, math, errors) para poder compilar
+   y correr un paquete real del motor en la consola.
