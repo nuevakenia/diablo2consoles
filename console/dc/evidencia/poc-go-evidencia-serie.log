@@ -1,0 +1,56 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:049 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 85 Hz (1024 x 768)
+00:00:307 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 85, size 640 x 480. Scaling by 1.00
+00:00:400 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:400 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:403 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:408 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:422 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f751b1f0000 RAM(16 MB) 0x7f75271f0000 VRAM64(8 MB) 0x7f751f1f0000 ARAM(2 MB) 0x7f753b1f0000
+00:00:428 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:436 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f751b1f0000 RAM(16 MB) 0x7f75271f0000 VRAM64(8 MB) 0x7f751f1f0000 ARAM(2 MB) 0x7f753b1f0000
+00:00:481 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:481 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:481 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  Mon Dec 29 19:59:11 UTC 2025
+  runner@runnervmdwttx.zlxcakwy2jjudj4ucvtnllunvd.bx.internal.cloudapp.net:/opt/toolchains/dc/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac0e6820
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+POC-GO: arranco Go en Dreamcast (DC-001.3)
+pvr: enabling vertical scaling for non-VGA
+POC-GO: PVR listo; vram libre en bytes: 5789440
+POC-GO: frame 120 us/frame 16386 fps 61 ciclos SH4 0
+POC-GO: mando botones 0 joy 0 0
+POC-GO: frame 240 us/frame 16723 fps 59 ciclos SH4 0
+POC-GO: mando botones 0 joy 0 0
+POC-GO: frame 360 us/frame 16723 fps 59 ciclos SH4 0
+POC-GO: mando botones 0 joy 0 0
+POC-GO: frame 480 us/frame 16723 fps 59 ciclos SH4 0
+POC-GO: mando botones 0 joy 0 0
+POC-GO: frame 600 us/frame 16723 fps 59 ciclos SH4 0
+POC-GO: mando botones 0 joy 0 0
+POC-GO: frame 720 us/frame 16744 fps 59 ciclos SH4 0
+POC-GO: mando botones 0 joy 0 0
+POC-GO: frame 840 us/frame 16723 fps 59 ciclos SH4 0
+POC-GO: mando botones 0 joy 0 0
+POC-GO: frame 960 us/frame 16723 fps 59 ciclos SH4 0
+POC-GO: mando botones 0 joy 0 0
