@@ -17,13 +17,13 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STD="${STD:-$HERE/../../console/dc/std}"
 GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 
-if [ ! -d "$STD/fmt" ]; then
-    echo "no encuentro la stdlib en $STD" >&2
-    exit 1
-fi
-
 # orden de dependencias: cada paquete necesita los .gox de los anteriores
 ORDEN="${ORDEN:-unicode/utf8 io errors strings strconv fmt}"
+
+if [ ! -d "$STD/${ORDEN%% *}" ]; then
+    echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2
+    exit 1
+fi
 
 rm -rf "$GEN"
 mkdir -p "$GEN/src" "$GEN/d2std"

@@ -1,0 +1,65 @@
+=== DC-002.2b: por que fallaban las aserciones de interfaz en la consola (y el arreglo) ===
+
+SINTOMA (medido, POC console/dc/poc/xpkg: dos paquetes, uno define el tipo y otro hace la asercion)
+    XP2 llamada al metodo del otro paquete ....... OK   (la interfaz directa anda)
+    XP3 asercion interface{} -> error ............ FALLO
+    XP4 metodo con puntero ....................... OK
+    XP5 asercion con puntero ..................... FALLO
+    XP6 asercion a tipo concreto ................. OK
+O sea: solo falla la asercion "interfaz vacia -> interfaz con metodos" (E2I), y solo cuando el tipo
+concreto viene de otro paquete compilado aparte (archivo .gox).
+
+SONDAS EN EL RUNTIME (libgodc, interface_dreamcast.c, con printf temporal)
+    DBGE2I2 inter=... type=... n_if=1 uncommon=... n_conc=2 impl=1 nom0=1
+    DBGGETITAB pidio=12 devolvio=0x8c083688
+es decir: la interfaz tiene 1 metodo, el tipo 2, los nombres coinciden, implements_interface da
+verdadero, la memoria para el itab se consigue... y el llamador igual ve ok=false. La funcion
+termina bien: el problema es DONDE escribe el resultado.
+
+DESENSAMBLADO DEL LLAMADOR que genera gccgo 15.1 (main.main del POC xpkg)
+    8c01028e: mov.l @r14,r14        ; el tipo concreto (el Eface)
+    8c010290: mov r15,r2            ; <-- la direccion del buffer de retorno va en r2
+    8c010292: mov.l _error..d,r4    ; 1er argumento: el descriptor de la interfaz error
+    8c010296: mov.l @(16,r15),r6
+    8c010298: jsr @r13              ; llama a _runtime.ifaceE2I2
+    8c01029c: mov #64,r2
+    8c01029e: add r15,r2            ; recalcula el buffer (r2 se pierde en la llamada)
+    8c0102a0: mov.l @(8,r2),r0      ; lee el "ok" del buffer
+    8c0102a2: mov.l @(0,r2),r1      ; lee el itab
+    8c0102a4: mov.l @(4,r2),r4      ; lee el data
+Resultado: 12 bytes de buffer {itab, data, ok}.
+
+COMPROBACION DE LA CONVENCION EN C (misma llamada escrita en C, sh-elf-gcc -O2 -m4-single -ml -S)
+    forma A (devolver la estructura por valor, como llama gccgo):
+        add #-12,r15
+        jsr @r1
+        mov r15,r2        <-- r2
+    forma B (punteros de salida, como declaraba libgodc):
+        mov r15,r1 / add #7,r1 / mov.l r1,@r15
+        mov r15,r7        <-- r7 y pila, nunca r2
+libgodc declaraba la forma B -> la funcion escribia el resultado en basura (de ahi tambien los
+crash "Illegal instruction" con el PC dentro de un descriptor de tipo cuando corre la stdlib).
+
+ARREGLO APLICADO (scripts/console/fix-libgodc-abi.py, reproducible)
+    runtime/interface_dreamcast.c: ifaceE2I2 devuelve la estructura por valor
+    runtime/runtime.h:            la declaracion pasa a "iface_ret runtime_ifaceE2I2(..., Eface e);"
+con
+    typedef struct iface_ret { Iface i; _Bool ok; } iface_ret;
+
+DESPUES DEL ARREGLO (misma prueba, mismo emulador)
+    XP2 llamada al metodo del otro paquete ....... OK
+    XP3 asercion interface{} -> error ............ OK -> valor
+    XP4 metodo con puntero ....................... OK
+    XP5 asercion con puntero ..................... OK -> puntero
+    XP6 asercion a tipo concreto ................. OK -> valor
+    XP7 fin
+
+PENDIENTE (misma familia, mismo metodo de diagnostico)
+    libgodc declara con punteros de salida otros ayudantes que gccgo 15 tambien llama:
+    ifaceE2T2, ifaceI2T2, ifaceI2T2P, assertitab, ifaceT2Ip. Cada uno hay que reescribirlo mirando el
+    desensamblado de una llamada real, igual que se hizo aca.
+
+CONTROL
+    La suite de libgodc (tests/test_types.elf) pasa en el emulador: sus pruebas son de un solo
+    archivo y nunca hacen una asercion de interfaz sobre un tipo de otro paquete, por eso no cazaron
+    el problema.

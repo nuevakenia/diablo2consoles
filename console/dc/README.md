@@ -378,7 +378,39 @@ que es justo lo que hace una biblioteca estandar. El sospechoso es entonces el c
 inter-paquetes de gccgo/libgodc (descriptores de tipo e itabs de metodos entre objetos compilados
 por separado).
 
-Siguiente paso propuesto (DC-002.2b): bisectar con un caso minimo de **dos** paquetes (uno define un
-tipo con metodo, el otro le hace la asercion de interfaz) hasta aislar si es el enlace, la
-resolucion de itabs o el `get_itab` del runtime; y recien despues decidir entre parchear libgodc o
-evitar el cruce de paquetes. Evidencia cruda en `console/dc/evidencia/dc-002.2-consola.txt`.
+### 11.1 La causa: la convencion de llamada de gccgo 15 no es la que libgodc espera
+
+Se aislo con un caso minimo de **dos** paquetes (`console/dc/poc/xpkg`: uno define el tipo y su
+metodo, el otro hace la asercion). Resultado:
+
+| prueba | antes | despues del arreglo |
+| --- | --- | --- |
+| llamar al metodo del otro paquete | bien | bien |
+| asercion `interface{}` -> `error` | **falla** (ok=false) | bien |
+| asercion con puntero | **falla** | bien |
+| asercion a tipo concreto | bien | bien |
+
+Solo falla la asercion de interfaz vacia a interfaz con metodos (E2I) sobre un tipo de otro paquete.
+Las sondas dentro del runtime dijeron que `implements_interface` da verdadero, los nombres de los
+metodos coinciden y la memoria del itab se consigue: la funcion terminaba bien, pero **escribia el
+resultado en basura**.
+
+gccgo 15 devuelve los dos valores (interfaz + ok) **por memoria**: el llamador reserva 12 bytes y
+pasa la direccion del buffer en **r2** (medido en el desensamblado de `main.main`). libgodc declaraba
+esos ayudantes con punteros de salida (`Iface *, bool *`), que el compilador de C deja en **r7 y la
+pila**: nunca coinciden. Queda comprobado compilando la misma llamada en C con las dos formas: la
+forma "devolver por valor" usa r2, la forma con punteros de salida usa r7 y pila. De ahi tambien los
+`Illegal instruction` con el PC dentro de un descriptor de tipo cuando corre la stdlib.
+
+El arreglo es mecanico y esta en `scripts/console/fix-libgodc-abi.py` (reescribe la definicion en
+`runtime/interface_dreamcast.c` y la declaracion en `runtime/runtime.h` para que `ifaceE2I2`
+devuelva `{Iface, bool}` por valor), y despues `make -C <libgodc> libgodc.a`. Con eso las cuatro
+pruebas del caso minimo pasan.
+
+**Falta la misma cirugia en los otros ayudantes** que libgodc declara con punteros de salida y que
+gccgo 15 tambien llama: `ifaceE2T2`, `ifaceI2T2`, `ifaceI2T2P`, `assertitab`, `ifaceT2Ip`. El metodo
+es el mismo: mirar el desensamblado de una llamada real para saber la forma que espera gccgo.
+Evidencia cruda en `console/dc/evidencia/dc-002.2b-abi-libgodc.txt`.
+
+Control que no alcanzaba: la suite de libgodc pasa en el emulador, pero sus pruebas son de un solo
+archivo y nunca hacen una asercion de interfaz sobre un tipo de otro paquete.

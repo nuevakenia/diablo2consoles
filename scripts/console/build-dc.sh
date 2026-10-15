@@ -50,8 +50,12 @@ echo "== 2/4 enlazando ELF =="
 # la stdlib minima: sus .gox son objetos de verdad y van al enlace. Solo se enlazan si el POC los
 # usa (si no, engordarian el binario al pedo).
 STD_OBJS=""
-if [ -f "$GOX/orden.txt" ] && grep -qE '"(fmt|strings|strconv|errors|io|unicode/utf8)"' "$SRC"/*.go 2>/dev/null; then
-    STD_OBJS="$(tr '\n' ' ' < "$GOX/orden.txt")"
+if [ -f "$GOX/orden.txt" ]; then
+    # se enlazan los .gox que el POC importe de verdad (los nombres salen del propio arbol)
+    IMPORTS="$(sed "s|^$GOX/||; s|\.gox$||" "$GOX/orden.txt" | tr '\n' '|' | sed 's/|$//')"
+    if grep -qE "\"($IMPORTS)\"" "$SRC"/*.go 2>/dev/null; then
+        STD_OBJS="$(tr '\n' ' ' < "$GOX/orden.txt")"
+    fi
 fi
 kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $EXTRA_OBJS $STD_OBJS $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
 
