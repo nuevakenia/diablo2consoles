@@ -21,7 +21,7 @@ El motor del host no se toca: lo nuevo vive en `console/` y `scripts/console/`.
 | PVR dibuja | OK | captura de pantalla: fondo `(89,0,140)` = el color pedido, + cuadro blanco |
 | consola serie (texto) | OK | `SERIAL-CHECK: rc=0 dev=scif` dentro del log del emulador |
 | mando (maple) | pendiente de verificar | el POC imprime el estado del puerto 0 |
-| imagen de disco arrancable | **falla** | el `.cue` arranca (REIOS lee el IP.BIN) pero el SH-4 tira excepción a los ~2,5 s |
+| imagen de disco arrancable | **OK con GDI** (en el emulador) | arranca y el POC corre desde el disco: misma salida serie y mismo asset pixel-perfect. Ver sección 9 |
 
 Números del binario (POC mínimo, con `println` de Go y dibujo por PVR): ver
 `evidencia/` de la corrida; el `prog.elf` con debug ronda los 2,7 MB y el
@@ -191,16 +191,46 @@ descriptor `console/dc/poc/<poc>/bake.conf`, nunca el arte.
 | `scripts/console/bake-asset.sh` | corre el horneador buscando solo la carpeta de Diablo II |
 | `scripts/console/compare-capture.py` | comparacion pixel a pixel contra la referencia |
 
-## 9. Pendientes (con hipótesis)
+## 9. Arrancar desde el disco (imagen de GD-ROM)
 
-1. **Imagen de disco arrancable** (bloquea probar en la Dreamcast real con GDEMU) — DC-001.2b.
-   El `.cue`/`.iso` con IP.BIN de `makeip` arranca pero el SH-4 tira excepción a los ~2,5 s,
-   justo cuando REIOS salta al bootstrap del IP.BIN (`reios_setup_state(0xac008300)`), en
-   cambio el camino ELF salta a `0x8C010000` y funciona. Ya se descartó que el IP.BIN esté
-   vacío: en el offset `0x300` hay código SH-4 real (el bootstrap con la marca `SCC80831`).
-   Próximo paso: comparar ese bootstrap con uno conocido, probar `scramble` sobre el
-   `1ST_READ.BIN`, y generar un `.cdi` (o `.gdi` con sectores de 2352) que es lo que lee el
-   GDEMU.
+Al principio el `.cue`/`.iso` no arrancaba: a los ~2,5 s el SH-4 tiraba
+`Fatal: SH4 exception when blocked`. La causa estaba en el propio emulador, no en la imagen:
+
+```c
+// core/reios/reios.cpp
+descrambl = disc->type != GdRom;
+...
+if (descrambl) { bootFile->read(buf.data(), size, offset);
+                 descrambl_buffer(buf.data(), dest, size); }   // DESCRAMBLA el binario
+```
+
+Un `.cue`/`.iso` se trata como CD-R (`type != GdRom`) y en ese camino reios **descrambla** el
+binario de arranque antes de ejecutarlo. Nuestro `1ST_READ.BIN` va sin scramble (como el de
+cualquier homebrew moderno), asi que quedaba descramblado = basura ejecutandose. Con un **GDI
+el disco es GD-ROM, no hay descrambling** y ademas es el formato que lee el GDEMU.
+
+`scripts/console/mkgdi.py` arma el GDI. Lo que espera el emulador (`core/imgread/gdi.cpp`):
+al menos 3 pistas, pista 1 datos, pista 2 audio, pista 3 datos **empezando en FAD 45000**; el
+sector de arranque se lee del FAD fijo **45150** (= pista 3 + 150), o sea el principio de la
+pista 3, donde va el IP.BIN. Segundo detalle del emulador (`core/imgread/isofs.cpp`): el PVD
+lo lee en `baseFad + 16`, pero **los directorios y los archivos los lee en `150 + lba` fijo**,
+o sea la pista 1 (en un GD-ROM real ahi esta la zona de baja densidad, con el ISO y el binario
+de arranque). Por eso las pistas 1 y 3 llevan el mismo ISO.
+
+Resultado medido: el POC arranca desde el GDI, imprime lo mismo por la consola serie
+(60 fps, VRAM, asset 118x52) y el asset sigue dando **4051/4051 pixeles identicos** y
+**2085/2085 transparentes correctos** contra la referencia del host. El arranque por `.elf`
+sigue siendo el ciclo rapido de desarrollo; el GDI es para validar el arranque real.
+
+Pendiente para la consola: el GDEMU lee sectores crudos de **2352** y este GDI usa 2048.
+
+## 10. Pendientes (con hipótesis)
+
+1. **Imagen para la consola real (GDEMU)** — DC-001.2b, segunda mitad. El arranque por disco
+   ya funciona en el emulador con `.gdi` (ver sección 9), pero el GDI que usa el emulador lleva
+   sectores de 2048 y el GDEMU lee **sectores crudos de 2352** (12 de sync + 4 de cabecera +
+   2048 de datos + 4 de EDC + 276 de ECC). Falta esa conversión (o armar el `.cdi` con una
+   herramienta hecha para eso, tipo `mkdcdisc`) y probar en la consola.
 2. **Mando**: confirmar que Flycast expone el control en el puerto 0 y que el POC lo lee.
 3. **Textura paletizada real (PAL8 + CLUT)** desde un asset de Diablo II horneado
    (DC-001.4): el objetivo del port depende de dibujar el arte con paleta, no RGBA.

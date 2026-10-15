@@ -39,6 +39,8 @@ sh-elf-objcopy -R .stack -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"
 
 echo "== 4/4 imagen =="
 "$DC_PYTHON" "$HERE/mkiso.py" "$OUT/disc.iso" "$OUT/IP.BIN" "$OUT/1ST_READ.BIN"
+# El .cue (CD-R) hace que el emulador descramble el binario: para arrancar de verdad, GDI.
+"$DC_PYTHON" "$HERE/mkgdi.py" "$OUT"
 
 echo
 echo "ELF:        $OUT/prog.elf   ($(stat -c%s "$OUT/prog.elf") bytes)"
