@@ -250,6 +250,38 @@ sigue siendo el ciclo rapido de desarrollo; el GDI es para validar el arranque r
 
 Pendiente para la consola: el GDEMU lee sectores crudos de **2352** y este GDI usa 2048.
 
+### La imagen para la consola real (GDEMU)
+
+El `.gdi` que uso para el ciclo rapido lleva sectores de 2048; el GDEMU (y la Dreamcast real)
+leen sectores crudos de **2352** y ademas el binario de arranque va scramblado. De eso se encarga
+**mkdcdisc**, que hace el camino entero de una: saca el binario del ELF, lo scrambla, arma el
+IP.BIN con el `1ST_READ.BIN`, arma el ISO y lo empaqueta en un `.cdi` de DiscJuggler.
+
+```
+scripts/console/build-mkdcdisc.sh                      # compila la herramienta (en ~/dreamcast/deps)
+scripts/console/mkcdi.sh <prog.elf> <salida.cdi>       # arma la imagen
+```
+
+Dos cosas que cuestan un rato si no se saben:
+
+1. **mkdcdisc necesita libisofs** y no hay forma de instalarla sin root: se compila en
+   `~/dreamcast/deps`. Tiene que ser **compartida** (`--disable-shared` NO): la estatica queda
+   con `acl_set_file`/`acl_free` sin resolver al enlazar.
+2. **mkdcdisc tiene un bug con las flags de Arch/CachyOS**: en `ElfSection` hace
+   `m_Data.resize(shdr.sh_size); memcpy(&m_Data[0], ...)` y para la seccion NULL de todo ELF
+   `sh_size` es 0, o sea `memcpy` de 0 bytes sobre un vector vacio. Con `_GLIBCXX_ASSERTIONS`
+   (que Arch/CachyOS traen por defecto) eso aborta con
+   `Assertion '__n < this->size()' failed`. Se compila con `-U_GLIBCXX_ASSERTIONS` y listo.
+   Y para correrlo hace falta `LD_LIBRARY_PATH=~/dreamcast/deps/lib`.
+
+Resultado medido: el `.cdi` de **2.486.473 bytes** (con `-N`, sin relleno; con relleno pasa de
+700 MB sin ninguna ventaja) arranca en el emulador y el asset da otra vez **100% de coincidencia**
+en las cuatro orientaciones. El IP.BIN sale con region **JUE** (arranca en cualquier consola) y
+el nombre del disco es el que se le pasa con `-n`.
+
+Para el GDEMU: copiar el `.cdi` a la SD en una carpeta numerada (el menu del GDEMU muestra una
+entrada por carpeta: `01/`, `02/`, ...) y encender. El POC no necesita ningun archivo aparte.
+
 ## 10. DC-001.6: la medida del muro (la biblioteca estandar)
 
 El motor son 2.713 archivos .go en 146 paquetes. Compilarlo para SH-4 con `sh-elf-gccgo` choca
