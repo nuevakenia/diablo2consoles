@@ -1,0 +1,33 @@
+File: od2
+Build ID: 8003eb52a8ec2b26a7f7fd4a58ae574414931eb6
+Type: inuse_space
+Time: 2026-10-15 15:27:15 -03
+Showing nodes accounting for 221.19MB, 89.48% of 247.19MB total
+Dropped 220 nodes (cum <= 1.24MB)
+Showing top 25 nodes out of 237
+      flat  flat%   sum%        cum   cum%
+  133.51MB 54.01% 54.01%   135.54MB 54.83%  github.com/hajimehoshi/ebiten/v2/internal/shareable.(*Image).replacePixels
+   39.29MB 15.90% 69.91%    39.80MB 16.10%  io.ReadAll
+   13.53MB  5.48% 75.38%    13.53MB  5.48%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc.(*DCCDirection).generateFrames
+    4.45MB  1.80% 77.18%    19.98MB  8.08%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine.(*MapEngine).ResetMap
+    3.55MB  1.43% 78.62%     3.55MB  1.43%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1.LoadDT1
+    2.51MB  1.01% 79.63%     2.51MB  1.01%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2records.monsterStatsLoader
+    2.43MB  0.98% 80.61%     2.43MB  0.98%  internal/bytealg.MakeNoZero
+       2MB  0.81% 81.42%        2MB  0.81%  runtime.mallocgc
+       2MB  0.81% 82.23%        2MB  0.81%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/ebiten.createEbitenSurface
+       2MB  0.81% 83.04%        2MB  0.81%  encoding/csv.(*Reader).readRecord
+    1.56MB  0.63% 83.67%     1.56MB  0.63%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset.(*DC6Animation).init
+    1.51MB  0.61% 84.28%     2.51MB  1.02%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2records.soundDetailsLoader
+    1.50MB  0.61% 84.89%        2MB  0.81%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2records.loadCommonItems
+    1.50MB  0.61% 85.50%     1.50MB  0.61%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset.(*DCCAnimation).init
+    1.50MB  0.61% 86.11%     1.50MB  0.61%  github.com/hajimehoshi/ebiten/v2/internal/packing.(*Page).alloc
+    1.50MB  0.61% 86.71%     1.50MB  0.61%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq.(*MPQ).readBlockTable
+    1.50MB  0.61% 87.32%     1.50MB  0.61%  github.com/robertkrimen/otto.(*_compiler).parseExpression
+    1.32MB  0.53% 87.85%    16.91MB  6.84%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine.(*MapEngine).addDT1
+       1MB  0.41% 88.26%        2MB  0.81%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2records.skillDetailsLoader
+       1MB   0.4% 88.66%    15.54MB  6.28%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc.CreateDCCDirection
+       1MB   0.4% 89.07%     1.50MB  0.61%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2calc.Compile
+    0.52MB  0.21% 89.28%     1.52MB  0.61%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2tbl.TextDictionary.loadHashEntry
+    0.51MB  0.21% 89.48%     2.01MB  0.81%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2records.monsterStats2Loader
+         0     0% 89.48%        2MB  0.81%  encoding/csv.(*Reader).Read
+         0     0% 89.48%    61.91MB 25.05%  github.com/OpenDiablo2/OpenDiablo2/d2app.(*App).Run

@@ -1,0 +1,92 @@
+
+===== /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2data.mpq =====
+archivos=11082 fallidos=271 total_descomprimido=343.7 MB
+-- por categoria --
+   monsters             128.18 MB  (4531 archivos)
+   ui                    49.74 MB  (628 archivos)
+   tiles/act2            34.65 MB  (516 archivos)
+   tiles/act1            29.52 MB  (662 archivos)
+   tiles/act3            29.12 MB  (557 archivos)
+   dcc                   17.94 MB  (513 archivos)
+   tiles/act4            16.25 MB  (219 archivos)
+   objects               16.09 MB  (2409 archivos)
+   otros                  8.51 MB  (53 archivos)
+   tiles/act0-global      7.37 MB  (24 archivos)
+   dc6                    3.19 MB  (609 archivos)
+   txt/tbl                1.60 MB  (34 archivos)
+   excel(tablas)          1.49 MB  (56 archivos)
+-- por extension --
+   .dcc           139.51 MB  (5319 archivos)
+   .dt1           103.25 MB  (206 archivos)
+   .dc6            75.16 MB  (1287 archivos)
+   .ds1            13.66 MB  (1771 archivos)
+   .pl2             6.34 MB  (15 archivos)
+   .txt             2.44 MB  (82 archivos)
+   .d2              2.11 MB  (10 archivos)
+   .tbl             0.71 MB  (18 archivos)
+   .cof             0.29 MB  (2017 archivos)
+   .dat             0.17 MB  (82 archivos)
+   .dn1             0.02 MB  (1 archivos)
+   .key             0.00 MB  (2 archivos)
+
+===== /home/dgalli/.wine-d2/drive_c/Games/Diablo II/patch_D2.mpq =====
+archivos=162 fallidos=6 total_descomprimido=7.8 MB
+-- por categoria --
+   excel(tablas)          6.27 MB  (129 archivos)
+   ui                     1.04 MB  (7 archivos)
+   tiles/act4             0.20 MB  (9 archivos)
+   sonido                 0.14 MB  (5 archivos)
+   tiles/act0-global      0.07 MB  (1 archivos)
+   txt/tbl                0.05 MB  (1 archivos)
+   monsters               0.03 MB  (2 archivos)
+   dc6                    0.00 MB  (1 archivos)
+   otros                  0.00 MB  (1 archivos)
+-- por extension --
+   .bin             3.56 MB  (67 archivos)
+   .txt             2.72 MB  (62 archivos)
+   .dc6             1.07 MB  (9 archivos)
+   .ds1             0.27 MB  (10 archivos)
+   .wav             0.14 MB  (5 archivos)
+   .tbl             0.05 MB  (1 archivos)
+   .cof             0.00 MB  (1 archivos)
+   (sin ext)        0.00 MB  (1 archivos)
+
+===== /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2exp.mpq =====
+archivos=9817 fallidos=50 total_descomprimido=291.6 MB
+-- por categoria --
+   dcc                  116.62 MB  (5199 archivos)
+   monsters              59.29 MB  (1663 archivos)
+   tiles/act0-global     51.29 MB  (536 archivos)
+   sonido                27.86 MB  (575 archivos)
+   ui                    14.24 MB  (208 archivos)
+   objects                7.33 MB  (813 archivos)
+   excel(tablas)          5.92 MB  (145 archivos)
+   otros                  3.68 MB  (336 archivos)
+   tiles/act3             1.37 MB  (17 archivos)
+   tiles/act4             1.12 MB  (47 archivos)
+   tiles/act1             0.98 MB  (59 archivos)
+   tiles/act2             0.86 MB  (6 archivos)
+   txt/tbl                0.79 MB  (9 archivos)
+   dc6                    0.29 MB  (154 archivos)
+-- por extension --
+   .dcc           178.72 MB  (6914 archivos)
+   .dt1            47.44 MB  (62 archivos)
+   .wav            27.86 MB  (575 archivos)
+   .dc6            18.85 MB  (367 archivos)
+   .ds1             8.18 MB  (603 archivos)
+   .bin             3.38 MB  (71 archivos)
+   .txt             3.20 MB  (85 archivos)
+   .d2              2.30 MB  (3 archivos)
+   .pl2             0.85 MB  (2 archivos)
+   .cof             0.64 MB  (1064 archivos)
+   .tbl             0.20 MB  (2 archivos)
+   .dat             0.03 MB  (17 archivos)
+
+===== /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2char.mpq =====
+archivos=10009 fallidos=0 total_descomprimido=255.6 MB
+-- por categoria --
+   dcc                  254.77 MB  (9484 archivos)
+   otros                  0.84 MB  (525 archivos)
+-- por extension --
+   .dcc           254.77 MB  (9484 archivos)
+   .cof             0.84 MB  (525 archivos)

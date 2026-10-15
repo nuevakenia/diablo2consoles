@@ -1,0 +1,41 @@
+# Mediciones del motor en el host (x86-64, 2026-10-15)
+
+## PERF del pueblo (nivel 1)
+[35m[Perf][32m[INFO][0m PERF mark renderer-created t_ms=9
+[35m[Perf][32m[INFO][0m PERF mark assets-ready t_ms=165
+[35m[Perf][32m[INFO][0m PERF span generate level=1 ms=0.0
+[35m[Perf][32m[INFO][0m PERF span generate level=1 ms=0.0
+[35m[Perf][32m[INFO][0m PERF mark first-frame t_ms=864
+[35m[Perf][32m[INFO][0m PERF span level-load id=2 provider=drlg-outdoor ms=164.9
+[35m[Perf][32m[INFO][0m PERF mark game-playable t_ms=1592
+[35m[Perf][32m[INFO][0m PERF span populate level=1 ms=0.0
+[35m[App][32m[INFO][0m PERF update frames=883 avg_ms=0.845 p95_ms=2.093 p99_ms=9.154 max_ms=31.130
+[35m[App][32m[INFO][0m PERF render frames=883 avg_ms=0.959 p95_ms=1.149 p99_ms=10.929 max_ms=18.909
+[35m[App][32m[INFO][0m PERF frame frames=882 avg_ms=11.319 p95_ms=18.923 p99_ms=172.549 max_ms=229.801
+[35m[App][32m[INFO][0m PERF runtime goroutines=7 heap_alloc_mb=465.8 heap_sys_mb=494.6 gc_cycles=1 gc_pause_total_ms=0.10 alloc_mb_per_s=37.0 mallocs_per_frame=2957 alloc_kb_per_frame=428
+[35m[App][32m[INFO][0m PERF load modeloads=250 modeload_total_ms=152.1 slow_loads=20 slow_total_ms=122.1 modeload_max_ms=30.7 prefetch_neutral_ms=0.0 prefetch=true
+[35m[App][32m[INFO][0m PERF cpu frames=883 cpu_ms_per_frame=9.239
+[35m[App][32m[INFO][0m PERF heap profile written to /home/dgalli/.hermes/cache/scratch/heap-steady1.pprof
+
+## PERF de Blood Moor (nivel 2)
+[35m[Perf][32m[INFO][0m PERF mark renderer-created t_ms=8
+[35m[Perf][32m[INFO][0m PERF mark assets-ready t_ms=183
+[35m[Perf][32m[INFO][0m PERF span generate level=2 ms=218.8
+[35m[Perf][32m[INFO][0m PERF span generate level=2 ms=66.0
+[35m[Perf][32m[INFO][0m PERF mark first-frame t_ms=1010
+[35m[Perf][32m[INFO][0m PERF span level-load id=1 provider=act1-town ms=57.6
+[35m[Perf][32m[INFO][0m PERF span level-load id=3 provider=drlg-outdoor ms=71.6
+[35m[Perf][32m[INFO][0m PERF mark game-playable t_ms=1806
+[35m[Perf][32m[INFO][0m PERF span populate level=2 ms=0.0
+[35m[Perf][32m[INFO][0m PERF span level-load id=1 provider=act1-town ms=27.5
+[35m[Perf][32m[INFO][0m PERF span populate level=1 ms=0.0
+[35m[App][32m[INFO][0m PERF slow update pass 55.4 ms at t=3.90s
+[35m[Perf][32m[INFO][0m PERF span level-load id=2 provider=drlg-outdoor ms=71.0
+[35m[App][32m[INFO][0m PERF slow render pass 394.6 ms at t=4.30s
+[35m[App][32m[INFO][0m PERF update frames=863 avg_ms=0.802 p95_ms=1.272 p99_ms=10.426 max_ms=55.370
+[35m[App][32m[INFO][0m PERF render frames=863 avg_ms=1.392 p95_ms=0.995 p99_ms=11.335 max_ms=394.624
+[35m[App][32m[INFO][0m PERF frame frames=862 avg_ms=11.579 p95_ms=16.488 p99_ms=191.313 max_ms=609.761
+[35m[App][32m[INFO][0m PERF runtime goroutines=7 heap_alloc_mb=299.7 heap_sys_mb=626.6 gc_cycles=4 gc_pause_total_ms=1.40 alloc_mb_per_s=78.0 mallocs_per_frame=4286 alloc_kb_per_frame=925
+[35m[App][32m[INFO][0m PERF load modeloads=318 modeload_total_ms=156.3 slow_loads=23 slow_total_ms=126.1 modeload_max_ms=23.4 prefetch_neutral_ms=0.0 prefetch=true
+[35m[App][32m[INFO][0m PERF cpu frames=863 cpu_ms_per_frame=9.198
+[35m[App][32m[INFO][0m PERF heap profile written to /home/dgalli/.hermes/cache/scratch/heap-steady2.pprof

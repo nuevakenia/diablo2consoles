@@ -1,0 +1,26 @@
+total simbolos medidos: 50.8 MB (incluye datos, no solo .text)
+  STDLIB/compilador                    39.63 MB  78.0%
+  d2core/d2records                      3.64 MB   7.2%
+  TERCERO: otros                        0.98 MB   1.9%
+  TERCERO: ebiten                       0.85 MB   1.7%
+  d2game/d2gamescreen                   0.81 MB   1.6%
+  d2game/d2player                       0.74 MB   1.4%
+  d2core/d2item                         0.37 MB   0.7%
+  d2common/d2monster                    0.33 MB   0.7%
+  d2core/d2monsters                     0.31 MB   0.6%
+  d2core/d2map                          0.29 MB   0.6%
+  d2common/d2drlg                       0.28 MB   0.6%
+  d2common/d2skill                      0.24 MB   0.5%
+  d2common/d2quest                      0.23 MB   0.5%
+  d2core/d2skills                       0.22 MB   0.4%
+  d2common/d2fileformats                0.20 MB   0.4%
+  d2core/d2hero                         0.15 MB   0.3%
+  d2networking/d2mp                     0.11 MB   0.2%
+  d2networking/d2client                 0.10 MB   0.2%
+  d2networking/d2server                 0.09 MB   0.2%
+  d2core/d2ui                           0.08 MB   0.2%
+  d2common/d2missile                    0.08 MB   0.2%
+  d2networking/d2realm                  0.07 MB   0.1%
+  d2core/d2asset                        0.07 MB   0.1%
+  d2core/d2audio                        0.06 MB   0.1%
+  d2common/d2data                       0.06 MB   0.1%

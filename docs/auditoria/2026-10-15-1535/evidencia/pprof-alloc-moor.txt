@@ -1,0 +1,33 @@
+File: od2
+Build ID: 8003eb52a8ec2b26a7f7fd4a58ae574414931eb6
+Type: alloc_space
+Time: 2026-10-15 15:27:15 -03
+Showing nodes accounting for 1.95GB, 89.00% of 2.19GB total
+Dropped 566 nodes (cum <= 0.01GB)
+Showing top 25 nodes out of 277
+      flat  flat%   sum%        cum   cum%
+    0.25GB 11.20% 11.20%     0.25GB 11.20%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc.(*DCCDirection).fillPixelBuffer
+    0.24GB 10.92% 22.12%     0.30GB 13.60%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapstamp.(*StampFactory).LoadStampPath
+    0.24GB 10.83% 32.95%     0.24GB 11.04%  github.com/hajimehoshi/ebiten/v2/internal/shareable.(*Image).replacePixels
+    0.23GB 10.66% 43.61%     0.23GB 10.66%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2util.ImgIndexToRGBA
+    0.21GB  9.43% 53.05%     0.21GB  9.43%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine.(*MapEngine).GetTiles
+    0.12GB  5.40% 58.44%     0.12GB  5.49%  github.com/hajimehoshi/ebiten/v2/internal/restorable.(*Image).ReplacePixels
+    0.10GB  4.73% 63.17%     0.20GB  8.95%  io.ReadAll
+    0.09GB  4.17% 67.35%     0.09GB  4.17%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2path.(*longSearch).add
+    0.06GB  2.72% 70.07%     0.06GB  2.72%  github.com/hajimehoshi/ebiten/v2/internal/graphics.vertexSlice
+    0.05GB  2.26% 72.32%     0.05GB  2.26%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq.(*Stream).sectorBytes
+    0.04GB  1.98% 74.30%     0.28GB 12.99%  github.com/hajimehoshi/ebiten/v2/internal/buffered.(*Image).ReplacePixels
+    0.04GB  1.97% 76.27%     0.04GB  1.99%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq.explode
+    0.04GB  1.75% 78.03%     0.04GB  1.75%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc.(*DCCDirectionFrame).recalculateCells
+    0.03GB  1.48% 79.50%     0.03GB  1.48%  strings.genSplit
+    0.03GB  1.18% 80.69%     0.21GB  9.82%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer.(*MapRenderer).generateWallCache
+    0.02GB  1.07% 81.76%     0.33GB 14.92%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer.(*MapRenderer).generateFloorCache
+    0.02GB  0.96% 82.72%     0.02GB  0.96%  github.com/hajimehoshi/ebiten/v2/internal/graphicsdriver/opengl.(*context).replacePixelsWithPBO.func1
+    0.02GB  0.94% 83.65%     0.05GB  2.34%  github.com/hajimehoshi/ebiten/v2/internal/graphicsdriver/opengl.(*Graphics).Draw
+    0.02GB   0.9% 84.56%     0.02GB   0.9%  github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine.nearestOpenCell.func1
+    0.02GB  0.87% 85.43%     0.02GB  0.87%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2path.newCellTable
+    0.02GB  0.87% 86.30%     0.03GB  1.34%  github.com/hajimehoshi/ebiten/v2/internal/graphicsdriver/opengl.(*Graphics).useProgram
+    0.02GB  0.73% 87.03%     0.02GB  0.73%  reflect.unsafe_New
+    0.02GB  0.71% 87.74%     0.02GB  0.71%  strconv.syntaxError
+    0.01GB  0.67% 88.42%     0.01GB  0.67%  github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc.(*DCCDirection).generateFrames
+    0.01GB  0.58% 89.00%     0.01GB  0.58%  encoding/csv.(*Reader).readRecord

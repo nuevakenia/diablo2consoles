@@ -1,0 +1,51 @@
+## build
+`go build ./...` -> exit 0;  `go build -o od2 .` -> 37425176 B
+`go build -ldflags="-s -w"` -> 27146024 B
+
+## secciones del binario sin strip
+/home/dgalli/.hermes/cache/scratch/od2-stripped  :
+section                  size       addr
+.note.gnu.build-id         36    4195264
+.note.go.buildid          100    4195300
+.interp                    28    4195400
+.gnu.hash                 192    4195432
+.dynsym                  6024    4195624
+.dynstr                  3725    4201648
+.gnu.version              502    4205374
+.gnu.version_r            272    4205880
+.rela.dyn                 120    4206152
+.rela.plt                5328    4206272
+.init                      27    4214784
+.plt                     3568    4214816
+.text                10979628    4218432
+.fini                      13   15198060
+.rodata                910576   15200256
+.gopclntab            8837510   16110832
+.go.type              2456728   24948352
+.go.func                12096   27405080
+.eh_frame_hdr            6148   27417176
+.eh_frame               25944   27423328
+.sframe                   160   27449272
+.note.gnu.property         32   27449464
+.note.ABI-tag              32   27449496
+.tbss                       8   27454528
+.init_array                 8   27454528
+.fini_array                 8   27454536
+.data.rel.ro              256   27454544
+.dynamic                  624   27454800
+.got                       40   27455424
+.got.plt                 1800   27455464
+.data                 3501400   27457280
+.go.buildinfo            2128   30958688
+.go.fipsinfo              120   30960832
+.go.module                568   30960960
+.noptrdata             379873   30961536
+.bss                   285296   31341440
+.noptrbss            34228592   31626752
+.comment                   54          0
+Total                61649564
+
+
+
+## VmHWM medido
+pueblo: 522-578 MB | Blood Moor: 692-812 MB
