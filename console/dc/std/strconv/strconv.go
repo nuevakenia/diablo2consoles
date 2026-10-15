@@ -382,6 +382,8 @@ func fixedDigits(f float64, prec int) string {
 	if prec < 0 {
 		prec = 0
 	}
+	var n uint64
+	exacto := false
 	// exacto con enteros si se puede: f*10^prec = m * 5^prec * 2^(e+prec)
 	if f != 0 && prec < len(pow5tab) {
 		m, e := decompose(f)
@@ -391,20 +393,36 @@ func fixedDigits(f float64, prec int) string {
 			sh := e + prec
 			if sh >= 0 {
 				if a <= ^uint64(0)>>uint(sh) {
-					return insertPoint(a<<uint(sh), prec)
+					n = a << uint(sh)
+					exacto = true
 				}
 			} else {
-				return insertPoint(roundShift(a, -sh), prec)
+				n = roundShift(a, -sh)
+				exacto = true
 			}
 		}
 	}
-	// camino aproximado (fuera del rango exacto): documentado arriba
-	scale := pow10f(prec)
-	n := f * scale
-	if n >= 1.8446744073709552e19 {
-		return bigApprox(f, prec)
+	if !exacto {
+		// camino aproximado (fuera del rango exacto): documentado arriba
+		scale := pow10f(prec)
+		aprox := f * scale
+		if aprox >= 1.8446744073709552e19 {
+			return bigApprox(f, prec)
+		}
+		n = uint64(aprox + 0.5)
 	}
-	return insertPoint(uint64(n+0.5), prec)
+	// La insercion del punto va escrita aca en el lugar a proposito: cuando vivia en su propia
+	// funcion (insertPoint), gccgo 15.1 para sh-elf la compilaba como una llamada pelada a
+	// FormatUint y tiraba el resto del cuerpo, asi que en la consola salia "150" en vez de "1.50".
+	// Medido en console/dc/evidencia/dc-002.2d-punto-flotantes.txt. Escrito asi, funciona.
+	s := FormatUint(n, 10)
+	if prec == 0 {
+		return s
+	}
+	if len(s) <= prec {
+		s = strings.Repeat("0", prec-len(s)+1) + s
+	}
+	return s[:len(s)-prec] + "." + s[len(s)-prec:]
 }
 
 // allZero dice si el texto no tiene ningun digito distinto de cero.

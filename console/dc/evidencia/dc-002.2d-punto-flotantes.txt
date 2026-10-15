@@ -1,0 +1,58 @@
+=== DC-002.2d: por que faltaba el punto decimal de los flotantes (y como quedo) ===
+
+SINTOMA
+    En la consola, strconv.FormatFloat(1.5, 'f', 2, 64) devolvia "150" en vez de "1.50"; con prec 6,
+    "1500000"; y FormatFloat(0.0,'f',2,64) devolvia "0" en vez de "0.00". En el host, el mismo codigo
+    daba lo correcto (la prueba diferencial estaba verde).
+
+CONTROLES QUE ACOTARON EL PROBLEMA
+    - Sonda console/dc/poc/concat, con el cuerpo de insertPoint copiado a mano dentro del POC:
+      insertLocal(150, 2) -> "1.50"          OK
+      insertLocal(0, 2)   -> "0.00"          OK
+      strconv.FormatUint(150,10) -> "150"    OK
+      strconv.FormatFloat(1.5,'f',2,64) -> "150"    MAL
+    - Impresion temporal dentro de strconv.insertPoint: "n= 150 prec= 0". Los digitos se calculan
+      bien (el llamador usa prec para escalar: 150 con prec 2, 1500000 con prec 6) pero la funcion
+      ve prec = 0 y toma la rama sin parte decimal.
+    - Desensamblado del llamador (fixedDigits, en el binario): pone n en r4/r5 y prec en r6 antes del
+      jsr, o sea que prec SI se pasa.
+
+LA CAUSA (medida en el objeto, no deducida)
+    sh-elf-objdump -d gox/strconv.gox -> _strconv.insertPoint es, literalmente:
+        17e4: sts.l pr,@-r15
+        17e6: mov.l <formatUint>,r0
+        17e8: mov #0,r7
+        17ea: jsr @r0
+        17ec: mov #10,r6
+        17ee: lds.l @r15+,pr
+        17f0: rts
+    Es decir: gccgo 15.1 (sh-elf) compilo la funcion como una llamada pelada a FormatUint y tiro
+    todo el resto del cuerpo (el `if prec == 0`, el relleno y la insercion del punto). No lee prec.
+    La fuente que se compilo es la correcta (gox/src/strconv/strconv.go tiene el cuerpo entero).
+    Pasa igual con -O2 y con -O0, asi que no es una optimizacion agresiva: el cuerpo se pierde en las
+    dos.
+    Control que explica por que la copia del POC si anda: en el POC insertLocal no existe como
+    simbolo en el binario, o sea que se inlino. El cuerpo, inlineado, es correcto; como llamada a su
+    propia funcion, el compilador lo rompe.
+
+EL ARREGLO
+    La insercion del punto quedo escrita en el lugar, dentro de fixedDigits (una sola salida, con la
+    bandera `exacto`), con el comentario que explica por que no vive en su propia funcion. La funcion
+    insertPoint queda en el archivo solo como referencia de lo que hay que evitar.
+    Resultado inmediato: los 139 casos de flotantes pasan.
+
+RESULTADO MEDIDO (misma prueba, mismo emulador, contando los tres numeros de la linea)
+    ANTES  de todo:                      560 casos, 404 bien, 156 mal   (ademas moria antes de llegar)
+    despues del arreglo del punto:       560 casos, 543 bien,  17 mal
+    despues de corregir el generador:    560 casos, 553 bien,   7 mal
+
+LOS 7 QUE QUEDAN (son de la biblioteca, no de la consola: el corpus del host no los cubre)
+    fmt "%c"  con un caracter no ASCII -> byte nulo  (1)
+    fmt "%t"  sobre un []uint8: Go formatea elemento por elemento ("[%!t(uint8=97) ...]") y nosotros
+              tratamos el verbo malo para el arreglo entero  (2)
+    strconv.Atoi en los bordes de int64 ("9223372036854775807", "-9223372036854775808" y el
+              desborde "9223372036854775808")  (3)
+    errors.Is  esperaba true y dio false  (1)
+    El camino correcto para estos es el de siempre: llevarlos al corpus de la prueba diferencial del
+    host (que hoy esta verde porque no los incluye), verlos fallar en rojo, arreglar el codigo y
+    volver a la consola. Tarjeta DC-002.2e.

@@ -423,11 +423,11 @@ de 8 bytes en r0/r1) y `assertitab` (devolvia el Itab crudo cuando el llamador e
 arreglo de metodos). Quedan mirados y sin tocar `ifaceE2T2`, `ifaceeq`, `ifaceT2Ip` e `ifaceE2T2P`,
 que ya coincidian. Todo en `scripts/console/fix-libgodc-abi.py`.
 
-Con eso **el autotest de la biblioteca estandar corre de punta a punta en la consola**: 964 casos,
-560 coinciden y 404 no. Los que no coinciden son, todos, de una sola forma: en la ruta de los
-flotantes falta el punto decimal (`"%.2f"` de 1.5 da `150` en vez de `1.50`), y `%c` con un caracter
-no ASCII da un byte nulo. Los enteros, los textos, `Itoa`/`Atoi`/`Quote`, `strings` y `errors`
-coinciden.
+Con eso **el autotest de la biblioteca estandar corre de punta a punta en la consola**: 560 casos,
+404 coinciden y 156 no (la linea `STD-TEST: casos A bien B mal C` lleva tres numeros: total, los que
+coinciden y los que no). De esos 156, 139 son de una sola forma: en la ruta de los flotantes falta el
+punto decimal (`"%.2f"` de 1.5 da `150` en vez de `1.50`); los otros 17 incluyen un error del
+generador de casos que ya se corrigio. Con las dos cosas arregladas quedan **7 de 560** (ver 11.3).
 
 El defecto quedo acotado con una sonda (`console/dc/poc/concat`): con el mismo codigo copiado a mano
 dentro del POC el resultado es correcto (`insertLocal(150, 2)` da `1.50`), y con una impresion
@@ -435,3 +435,21 @@ temporal dentro de `strconv.insertPoint` se ve que **`n` llega bien pero `prec` 
 funcion toma la rama sin parte decimal. Es una sola funcion en un solo paquete, no la convencion
 `(uint64, int)` en general. Detalle y caminos para seguir en
 `console/dc/evidencia/dc-002.2c-abi-ayudantes.txt`.
+
+### 11.3 El punto decimal de los flotantes (DC-002.2d)
+
+La causa esta en el objeto compilado, no en el codigo: `sh-elf-objdump -d strconv.gox` muestra que
+gccgo 15.1 (sh-elf) compila `insertPoint` como una llamada pelada a `FormatUint` y tira todo el resto
+del cuerpo (`if prec == 0`, el relleno y la insercion del punto), sin leer `prec`. Pasa igual con
+`-O2` y con `-O0`, y la fuente que se compila es la correcta. La copia de la sonda no existe como
+simbolo en el binario: se inlino. Inlineado el cuerpo esta bien; como funcion propia, el compilador lo
+rompe. El llamador si pasa `prec` en r6 (visto en el desensamblado).
+
+El arreglo fue escribir la insercion del punto **en el lugar**, dentro de `fixedDigits`, con una sola
+salida y una bandera `exacto`. Los 139 casos de flotantes pasaron. Contando bien la linea del
+autotest (total, bien, mal): 156 fallos → 17 (10 de ellos eran un error del generador de casos, ya
+corregido) → **7 de 560**, que son diferencias reales de la biblioteca que el corpus del host no
+cubria: `%c` con caracter no ASCII, `%t` sobre `[]uint8` (Go formatea elemento por elemento), `Atoi`
+en los bordes de `int64` y un caso de `errors.Is`. Tarjeta DC-002.2e; el camino es llevarlos al
+corpus de la prueba diferencial del host, verlos en rojo, arreglar y volver. Detalle en
+`console/dc/evidencia/dc-002.2d-punto-flotantes.txt`.

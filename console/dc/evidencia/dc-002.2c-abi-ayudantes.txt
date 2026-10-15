@@ -19,8 +19,10 @@ MIRADOS Y DEJADOS COMO ESTABAN (ya coincidian)
 RESULTADO MEDIDO (mismo autotest, mismo emulador)
     ANTES:  Unhandled exception PC 8c0733b0 (dentro de un itab) al arrancar errors.Is
     AHORA:  el autotest corre de punta a punta y termina:
-              STD-TEST: casos 560 bien 404 mal
+              STD-TEST: casos 560 bien 404 mal 156
               STD-TEST: RESULTADO MAL - hubo casos que no coincidieron
+    (la linea lleva tres numeros: 560 casos en total, 404 coinciden y 156 NO. Habia anotado 404
+     fallos por leer mal el formato; el numero correcto es 156, y de esos 139 eran de flotantes.)
 
 LO QUE FALLA (404 casos, todos con la misma forma)
     fmt "%c"     esperaba un caracter no ASCII y dio "\x00" (1 caso)
