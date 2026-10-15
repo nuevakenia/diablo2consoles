@@ -102,12 +102,11 @@ func main() {
 		fatal("no se pudo decodificar el frame %d", frameIdx)
 	}
 
-	// El decodificador del repo entrega las filas de abajo hacia arriba; el PVR necesita
-	// top-down, asi que se da vuelta aca y listo.
-	topDown := make([]byte, w*h)
-	for y := 0; y < h; y++ {
-		copy(topDown[y*w:(y+1)*w], idx[(h-1-y)*w:(h-y)*w])
-	}
+	// OJO: NO dar vuelta esto. dc6.DecodeFrame() arranca en y = height-1 y va bajando, o sea
+	// compensa que el DC6 guarda las lineas de abajo hacia arriba: lo que devuelve YA esta en
+	// orden de despliegue (fila 0 = arriba), que es como lo usa el motor con ImgIndexToRGBA y
+	// ReplacePixels. Darle una vuelta extra espeja el sprite verticalmente (me paso).
+	topDown := idx
 
 	// El PVR (y KOS) exigen texturas de lado potencia de dos. Se rellena con indice 0, que es
 	// transparente, y el quad dibuja solo el pedazo visible (W x H) con las coordenadas UV.
@@ -205,7 +204,8 @@ func main() {
 	}
 	f.Close()
 
-	fmt.Printf("asset: %s  %dx%d  frame %d/%d\n", dc6Path, w, h, frameIdx, len(dc6.Frames))
+	fmt.Printf("asset: %s  %dx%d  frame %d/%d  (flag Flipped del frame: %d)\n",
+		dc6Path, w, h, frameIdx, len(dc6.Frames), frame.Flipped)
 	fmt.Printf("  -> %s (%d bytes de indices + 512 de paleta; textura %dx%d)\n", hPath, len(padded), pw, ph)
 	fmt.Printf("  -> %s (referencia del host)\n", pngPath)
 }

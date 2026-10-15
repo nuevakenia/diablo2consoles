@@ -133,6 +133,7 @@ Medido en Flycast (evidencia en `console/dc/evidencia/`):
 | pixeles del arte identicos a la referencia del host | **4051/4051 (100%)**, diferencia maxima 7 por canal (lo que pierde ARGB1555 al guardar 5 bits) |
 | pixeles transparentes con el fondo visible | **2085/2085 (100%)** (indice 0 = transparente, la convencion de Diablo II) |
 | VRAM del asset | 6.136 bytes de indices (118x52 en 16 bits habrian sido 12.272) + la textura rellenada de 128x64 = 8.192 |
+| orientacion | identidad 100% (la primera version salia espejada vertical: ver abajo) |
 | rendimiento | 16.434-16.723 us/frame = 59-60 fps con el asset dibujado dos veces (1:1 y 4x) |
 
 Por que importa: el arte de Diablo II ya **es** paletizado (8 bits + CLUT). Mantenerlo asi
@@ -152,9 +153,13 @@ Y la verificacion no es a ojo: el horneador deja un PNG de referencia y
 donde el POC dibujo el asset y compara pixel a pixel:
 
 ```
-scripts/console/compare-capture.py --captura /tmp/dc-pal8/pantalla.png \
-    --referencia /tmp/dcbuild/pal8/gen/d2logo.png --pantalla 0 0 --pos 48 64 --fondo 89 0 140
+scripts/console/compare-capture.py --captura /tmp/dc-pal8/f10s.png \
+    --referencia /tmp/dcbuild/pal8/gen/d2logo.png --pos 48 64 --fondo 89 0 140
 ```
+
+La herramienta ubica sola la pantalla de la consola dentro de la captura buscando el color de
+fondo (KDE abre el emulador donde quiere: la primera vez estaba en 2752,456 y despues en
+2850,461) y ademas informa **en cual de las cuatro orientaciones** coincide la captura.
 
 ### Los datos del juego no entran al repo
 
@@ -163,6 +168,27 @@ el horneado corre **en tiempo de build**: `console/dc/bake` (herramienta del hos
 el MPQ de la instalacion de Diablo II y escribe el `.h` en el directorio de build
 (`/tmp/dcbuild/<poc>/gen`), que es descartable. El repo solo guarda el **horneador** y el
 descriptor `console/dc/poc/<poc>/bake.conf`, nunca el arte.
+
+### El volteo del sprite, y por que la comparacion no lo veia
+
+La primera version salia **espejada verticalmente** (me lo cazo el usuario mirando la pantalla:
+"el logo se ve volteado"), y la comparacion pixel a pixel daba 100% igual. El agujero de metodo:
+la referencia del host sale del **mismo** horneado que la textura, asi que un espejado se
+comparaba espejado contra espejado y daba perfecto. La herramienta ahora compara la captura
+contra la referencia en las cuatro orientaciones y avisa cual gano:
+
+```
+  orientacion de la captura contra la referencia:
+    identidad             17.8%
+    espejada horizontal   12.8%
+    espejada vertical    100.0%     <- asi se delata
+```
+
+Causa: `dc6.DecodeFrame()` arranca en `y = height-1` y va bajando porque el formato DC6 guarda
+las lineas de abajo hacia arriba: lo que devuelve **ya esta en orden de despliegue** (es lo que
+el motor mete en la superficie con `ImgIndexToRGBA` + `ReplacePixels`). Yo le daba una vuelta
+extra "para el PVR" y eso era exactamente el espejado. Moraleja para el horneado: no
+"arreglar" el orden de los pixeles que devuelve un decodificador del motor; usarlo tal cual.
 
 ### Tres piedras con las que me tope (van a volver a aparecer)
 
