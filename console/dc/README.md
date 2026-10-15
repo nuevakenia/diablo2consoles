@@ -120,7 +120,78 @@ pipeline (toolchain + imagen + emulador) está sano cuando algo falla en el lado
 | `console/dc/poc/serialcheck` | deja el resultado de `dbgio_dev_select("scif")` en el color de fondo |
 | `console/dc/poc/goquad` | **POC principal**: Go + PVR + sprite + mando + ciclos por serie |
 
-## 8. Pendientes (con hipótesis)
+## 8. DC-001.4: un asset REAL de Diablo II en 8 bits (PAL8 + paleta por hardware)
+
+Este es el paso que decide el port. El POC `console/dc/poc/pal8` toma un DC6 del MPQ
+(el logo de Diablo II), lo hornea **en tiempo de build** a indices de 8 bits + una paleta de
+256 colores ARGB1555, y lo dibuja con el PVR: textura paletizada + la paleta en hardware.
+
+Medido en Flycast (evidencia en `console/dc/evidencia/`):
+
+| que | numero |
+|---|---|
+| pixeles del arte identicos a la referencia del host | **4051/4051 (100%)**, diferencia maxima 7 por canal (lo que pierde ARGB1555 al guardar 5 bits) |
+| pixeles transparentes con el fondo visible | **2085/2085 (100%)** (indice 0 = transparente, la convencion de Diablo II) |
+| VRAM del asset | 6.136 bytes de indices (118x52 en 16 bits habrian sido 12.272) + la textura rellenada de 128x64 = 8.192 |
+| rendimiento | 16.434-16.723 us/frame = 59-60 fps con el asset dibujado dos veces (1:1 y 4x) |
+
+Por que importa: el arte de Diablo II ya **es** paletizado (8 bits + CLUT). Mantenerlo asi
+cuesta la mitad de VRAM que convertirlo a 16 bits, y el PowerVR2 hace el blending por
+hardware. La cuenta grande: los 898,7 MB de arte descomprimido, si fueran 16 bits, no entran
+ni en el disco; en 8 bits son la mitad.
+
+### Como se corre
+
+```
+scripts/console/build-dc.sh console/dc/poc/pal8        # hornea el asset y compila
+scripts/console/run-flycast.sh /tmp/dcbuild/pal8/prog.elf 15 /tmp/dc-pal8
+```
+
+Y la verificacion no es a ojo: el horneador deja un PNG de referencia y
+`scripts/console/compare-capture.py` recorta la captura del emulador en la posicion exacta
+donde el POC dibujo el asset y compara pixel a pixel:
+
+```
+scripts/console/compare-capture.py --captura /tmp/dc-pal8/pantalla.png \
+    --referencia /tmp/dcbuild/pal8/gen/d2logo.png --pantalla 0 0 --pos 48 64 --fondo 89 0 140
+```
+
+### Los datos del juego no entran al repo
+
+`scripts/check_repo_hygiene.sh` prohibe `.dc6/.dt1/.dcc/.ds1/...` y archivos grandes. Por eso
+el horneado corre **en tiempo de build**: `console/dc/bake` (herramienta del host, en Go) lee
+el MPQ de la instalacion de Diablo II y escribe el `.h` en el directorio de build
+(`/tmp/dcbuild/<poc>/gen`), que es descartable. El repo solo guarda el **horneador** y el
+descriptor `console/dc/poc/<poc>/bake.conf`, nunca el arte.
+
+### Tres piedras con las que me tope (van a volver a aparecer)
+
+1. **El PVR (y KOS) exigen texturas de lado potencia de dos.** El logo es 118x52: compilar el
+   poligono con ese ancho hace `pvr_poly_compile` abortar con
+   `Invalid texture U size`. Solucion: subir la textura rellenada a 128x64 (con indice 0, que
+   es transparente) y dibujar solo el arte visible usando las UV.
+2. **Las UV de las texturas twiddled van NORMALIZADAS (0..1), no en pixeles.** Si se pasan
+   en pixeles (118, 52) el PVR repite el patron y se ve cualquier cosa: en mi primera corrida
+   salieron dos manchas naranjas. La referencia esta en el propio KOS
+   (`examples/dreamcast/sound/ghettoplay-vorbis/bkg.c`: usa `u` de 0.0 a 1.0). Se agrega medio
+   texel de recorte para no muestrear el relleno del borde.
+3. **El binding de Go de libgodc no expone `pvr_txr_load_ex` ni `pvr_set_pal_entry`**, que son
+   justo las dos piezas de la textura paletizada. Va por el puente de C (`csrc/cshim.c`), el
+   mismo patron que la consola serie. Es ~90 lineas y es lo que hay que "portear" al backend
+   definitivo.
+
+### Piezas nuevas de esta etapa
+
+| archivo | que hace |
+|---|---|
+| `console/dc/bake/bake.go` | horneador: MPQ + DC6 + PL2 -> indices de 8 bits + paleta ARGB1555 + PNG de referencia |
+| `console/dc/poc/pal8/bake.conf` | que asset hornear (mpq, dc6, pal, frame, nombre) |
+| `console/dc/poc/pal8/main.go` | POC en Go: sube y dibuja el asset (1:1 y 4x) |
+| `console/dc/poc/pal8/csrc/cshim.c` | textura PAL8 + paleta por hardware + quad texturado |
+| `scripts/console/bake-asset.sh` | corre el horneador buscando solo la carpeta de Diablo II |
+| `scripts/console/compare-capture.py` | comparacion pixel a pixel contra la referencia |
+
+## 9. Pendientes (con hipótesis)
 
 1. **Imagen de disco arrancable** (bloquea probar en la Dreamcast real con GDEMU) — DC-001.2b.
    El `.cue`/`.iso` con IP.BIN de `makeip` arranca pero el SH-4 tira excepción a los ~2,5 s,

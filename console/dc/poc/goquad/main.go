@@ -1,6 +1,10 @@
+//go:build dreamcast
+// +build dreamcast
+
 // DC-001.3: primer POC en Go sobre Dreamcast.
 // Prueba la cadena completa sin nada de C propio mas que el puente a la consola serie:
-//   Go (gccgo sh-elf) -> runtime libgodc -> KOS -> PVR (dibujo) + maple (mando) + perf (ciclos)
+//
+//	Go (gccgo sh-elf) -> runtime libgodc -> KOS -> PVR (dibujo) + maple (mando) + perf (ciclos)
 //
 // Evidencia que deja:
 //   - texto por la consola serie (println -> SCIF, se lee en el log de Flycast)

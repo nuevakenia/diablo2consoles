@@ -13,6 +13,9 @@ SRC="${1:?uso: build-dc.sh <dir_con_main.go> [salida_dir]}"
 OUT="${2:-/tmp/dcbuild/$(basename "$SRC")}"
 mkdir -p "$OUT"
 
+# Assets de Diablo II (si el POC trae bake.conf): se hornean al directorio de build, no al repo.
+bash "$HERE/bake-asset.sh" "$SRC" "$OUT"
+
 echo "== 1/4 compilando Go ($SRC) =="
 sh-elf-gccgo $GODC_GOFLAGS -c "$SRC"/*.go -o "$OUT/main.o"
 
@@ -22,7 +25,7 @@ EXTRA_OBJS=""
 for f in "$SRC"/*.c "$SRC"/csrc/*.c; do
   [ -f "$f" ] || continue
   o="$OUT/$(basename "${f%.c}").o"
-  kos-cc -O2 -ml -m4-single -c "$f" -o "$o"
+  kos-cc -O2 -ml -m4-single -I"$SRC" -I"$SRC/csrc" -I"$OUT/gen" -c "$f" -o "$o"
   EXTRA_OBJS="$EXTRA_OBJS $o"
 done
 

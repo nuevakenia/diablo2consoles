@@ -1,3 +1,6 @@
+//go:build dreamcast
+// +build dreamcast
+
 // POC DC-001.1: el "hola mundo" de Go en Dreamcast.
 // Prueba que el camino completo funciona: gccgo (sh-elf) + runtime libgodc + arranque desde
 // la imagen (KOS) + salida por consola serie (println -> dc-tool / pantalla del emulador).
