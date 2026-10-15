@@ -414,3 +414,24 @@ Evidencia cruda en `console/dc/evidencia/dc-002.2b-abi-libgodc.txt`.
 
 Control que no alcanzaba: la suite de libgodc pasa en el emulador, pero sus pruebas son de un solo
 archivo y nunca hacen una asercion de interfaz sobre un tipo de otro paquete.
+
+### 11.2 Los ayudantes que devuelven dos valores (DC-002.2c)
+
+La misma cirugia se aplico a los otros tres que fallaban igual, cada uno verificado en el
+desensamblado de una llamada real: `ifaceI2I2` (buffer de 12 bytes en r2), `ifaceI2T2P` (resultado
+de 8 bytes en r0/r1) y `assertitab` (devolvia el Itab crudo cuando el llamador espera el puntero al
+arreglo de metodos). Quedan mirados y sin tocar `ifaceE2T2`, `ifaceeq`, `ifaceT2Ip` e `ifaceE2T2P`,
+que ya coincidian. Todo en `scripts/console/fix-libgodc-abi.py`.
+
+Con eso **el autotest de la biblioteca estandar corre de punta a punta en la consola**: 964 casos,
+560 coinciden y 404 no. Los que no coinciden son, todos, de una sola forma: en la ruta de los
+flotantes falta el punto decimal (`"%.2f"` de 1.5 da `150` en vez de `1.50`), y `%c` con un caracter
+no ASCII da un byte nulo. Los enteros, los textos, `Itoa`/`Atoi`/`Quote`, `strings` y `errors`
+coinciden.
+
+El defecto quedo acotado con una sonda (`console/dc/poc/concat`): con el mismo codigo copiado a mano
+dentro del POC el resultado es correcto (`insertLocal(150, 2)` da `1.50`), y con una impresion
+temporal dentro de `strconv.insertPoint` se ve que **`n` llega bien pero `prec` llega 0**, asi que la
+funcion toma la rama sin parte decimal. Es una sola funcion en un solo paquete, no la convencion
+`(uint64, int)` en general. Detalle y caminos para seguir en
+`console/dc/evidencia/dc-002.2c-abi-ayudantes.txt`.

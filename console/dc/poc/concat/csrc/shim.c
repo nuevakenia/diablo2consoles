@@ -1,0 +1,6 @@
+/* Caso minimo de dos paquetes: solo la consola serie. */
+#include <kos.h>
+
+void d2c_serial_init(void) {
+    dbgio_dev_select("scif");
+}

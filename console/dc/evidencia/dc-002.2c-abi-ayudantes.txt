@@ -1,0 +1,57 @@
+=== DC-002.2c: arreglo de ABI en los ayudantes del runtime (y el unico defecto que queda) ===
+
+QUE SE ARREGLO (libgodc, reproducible con scripts/console/fix-libgodc-abi.py)
+    1) ifaceE2I2  -> devuelve {Iface, bool} por valor (12 B, el llamador pone el buffer en r2)
+    2) ifaceI2I2  -> idem (lo verifique en el llamador de errors.Is:
+                     8c019bfa mov r15,r2 / jsr @r13 / lee @(36,r15) itab, @(40) data, @(44) ok)
+    3) ifaceI2T2P -> devuelve {void *, bool} por valor (8 B: valor en r0, ok en r1; el llamador de
+                     strconv.Atoi hace mov r0,r4 / mov r1,r0 / tst #255,r0)
+    4) assertitab -> devolvia el Itab crudo y el llamador espera el puntero al arreglo de metodos
+                     (methods[0] = tipo, methods[1..] = funciones). Con el Itab crudo el llamador
+                     lee "el metodo" en Itab+4 (que es el tipo) y salta a los datos. requireitab ya
+                     lo hacia bien; se igualo.
+    Control de la convencion de 8 bytes: compilando en C una funcion que devuelve {void *,_Bool} el
+    llamador lee el valor en r0 y el ok en r1, igual que el llamador de gccgo.
+
+MIRADOS Y DEJADOS COMO ESTABAN (ya coincidian)
+    ifaceE2T2, ifaceeq, assertitab (firma), ifaceT2Ip, ifaceE2T2P.
+
+RESULTADO MEDIDO (mismo autotest, mismo emulador)
+    ANTES:  Unhandled exception PC 8c0733b0 (dentro de un itab) al arrancar errors.Is
+    AHORA:  el autotest corre de punta a punta y termina:
+              STD-TEST: casos 560 bien 404 mal
+              STD-TEST: RESULTADO MAL - hubo casos que no coincidieron
+
+LO QUE FALLA (404 casos, todos con la misma forma)
+    fmt "%c"     esperaba un caracter no ASCII y dio "\x00" (1 caso)
+    floats       "%.2f" de 1.5 -> "150" (falta el punto),  "%f" -> "1500000",  "0.00" -> "0"
+    todo el resto: enteros, textos, Itoa/Atoi/Quote, strings y errors COINCIDEN.
+
+DONDE ESTA (medido, no sospechado)
+    Sonda aislada (console/dc/poc/concat) con el mismo codigo copiado a mano DENTRO del POC:
+        insertLocal(150, 2) -> "1.50"     y     insertLocal(0, 2) -> "0.00"       OK
+        strconv.FormatUint(150,10) -> "150"                                      OK
+        strconv.FormatFloat(1.5,'f',2,64) -> "150"   (deberia ser "1.50")        MAL
+        strconv.FormatFloat(1.5,'e',2,64) -> "150e+00"                            MAL
+    y con una impresion temporal dentro de strconv.insertPoint:
+        IP-DBG n= 150 prec= 0        <- n llega bien, prec llega 0
+        (idem con prec=6: n=1500000 pero prec=0)
+    O sea: los digitos se calculan bien (usan prec correctamente en el llamador) pero insertPoint
+    recibe prec = 0, entonces toma la rama "sin parte decimal" y devuelve los digitos pelados.
+    La copia local con la MISMA firma (uint64, int) y las MISMAS llamadas cruzadas
+    (strconv.FormatUint y strings.Repeat) da el resultado correcto: el problema esta acotado a la
+    compilacion/link de esa funcion dentro del paquete strconv, no a la convencion (uint64, int) en
+    general.
+
+COMO SEGUIR (candidatos, en orden de costo)
+    a) desensamblar el llamador de insertPoint dentro de strconv y ver en que registro pone prec
+       (el objetivo es comparar con el prologo del callee);
+    b) cambiar la firma para que no reciba (uint64, int) juntos (por ejemplo prec como texto o
+       empaquetado en el mismo uint64) y volver a medir;
+    c) evitar la llamada: escribir la insercion del punto en el lugar (los 5 renglones), que es lo
+       que ya funciona en la copia local.
+    Las tres son de una corrida de build + emulador cada una (~3 min).
+
+CONTROL QUE NO ALCANZA
+    La suite de libgodc pasa en el emulador (pruebas de un solo archivo, sin aserciones de interfaz
+    sobre tipos de otros paquetes).

@@ -26,10 +26,22 @@ USO
     python3 scripts/console/fix-libgodc-abi.py [ruta_libgodc]
     Despues: make -C <libgodc> libgodc.a   (y reenlazar los POC)
 
-PENDIENTE (misma familia, ver README seccion 11)
-    Los otros ayudantes que libgodc declara con punteros de salida siguen con el mismo problema:
-    ifaceE2T2, ifaceI2T2, ifaceI2T2P, assertitab, ifaceT2Ip. Cada uno hay que mirar el
-    desensamblado de una llamada real para saber la forma exacta que espera gccgo 15.
+ARREGLADOS ACA (forma verificada en el desensamblado del llamador real)
+    ifaceE2I2   interfaz{} -> interfaz     iface_ret {Iface, bool}    12 B, buffer en r2
+    ifaceI2I2   interfaz   -> interfaz     iface_ret {Iface, bool}    12 B, buffer en r2
+    ifaceI2T2P  interfaz   -> puntero      ptr_ret   {void *, bool}   8 B,  r0/r1
+    La forma de 8 bytes se comprobo compilando en C una funcion que devuelve {void *, _Bool}: el
+    llamador lee el valor en r0 y el ok en r1 (igual que el llamador de strconv.Atoi).
+
+YA ESTABAN BIEN (mirados en el desensamblado, no se tocan)
+    ifaceE2T2   bool f(typ, Eface, void *ret)  -> argumentos r4 / r5-r6 / r7, bool en r0
+    ifaceeq     bool f(Iface, Iface)           -> argumentos r4-r5 / r6-r7, bool en r0
+    assertitab  void *f(inter, typ)            -> devuelve el puntero en r0
+    ifaceE2T2P  ya devolvia su estructura por valor
+
+PENDIENTES (misma familia, sin verificar el llamador todavia)
+    ifaceI2E2, ifaceE2E2, assertE2I2, assertI2I2. Metodo: desensamblar la llamada real y comparar
+    con la forma que produce el compilador de C.
 """
 import subprocess
 import sys
@@ -39,7 +51,8 @@ C = LIB + "/runtime/interface_dreamcast.c"
 H = LIB + "/runtime/runtime.h"
 
 # parte del original, para que el arreglo sea repetible
-subprocess.run(["git", "-C", LIB, "checkout", "--", "runtime/interface_dreamcast.c"], check=True)
+subprocess.run(["git", "-C", LIB, "checkout", "--", "runtime/interface_dreamcast.c",
+                "runtime/runtime.h"], check=True)
 
 NUEVA = """iface_ret runtime_ifaceE2I2(struct __go_type_descriptor *inter, Eface e) __asm__("_runtime.ifaceE2I2");
 iface_ret runtime_ifaceE2I2(struct __go_type_descriptor *inter, Eface e)
@@ -101,3 +114,125 @@ if VIEJO_H in h:
     print("H: declaracion cambiada")
 else:
     print("H: no encontre la declaracion vieja (ya estaba cambiada?)")
+
+# ---------------------------------------------------------------------------------------------
+# ifaceI2I2 e ifaceI2T2P: el mismo problema. Se verifico en el desensamblado que
+#   - ifaceI2I2 (errors.Is) recibe el buffer de 12 bytes en r2 y lee {itab, data, ok}
+#   - ifaceI2T2P (strconv.Atoi) espera el valor en r0 y el ok en r1
+
+PTR_TYPEDEF = """// Resultado de un puntero + ok: gccgo lo devuelve en r0 (el puntero) y r1 (el ok).
+typedef struct ptr_ret {
+    void *p;
+    _Bool ok;
+} ptr_ret;
+"""
+
+h = open(H, encoding="utf-8").read()
+if "typedef struct ptr_ret" not in h:
+    ancla_h = "void runtime_ifaceI2E2(Iface iface, Eface *ret, bool *ok);"
+    if ancla_h in h:
+        h = h.replace(ancla_h, PTR_TYPEDEF + ancla_h, 1)
+    h = h.replace(
+        "void runtime_ifaceI2T2P(struct __go_type_descriptor *typ, Iface i, void **ret, bool *ok);",
+        "ptr_ret runtime_ifaceI2T2P(struct __go_type_descriptor *typ, Iface i);", 1)
+    h = h.replace(
+        "void runtime_ifaceI2I2(struct __go_type_descriptor *inter, Iface i, Iface *ret, bool *ok);",
+        "iface_ret runtime_ifaceI2I2(struct __go_type_descriptor *inter, Iface i);", 1)
+    open(H, "w", encoding="utf-8").write(h)
+    print("H: declaraciones de ifaceI2I2 e ifaceI2T2P cambiadas")
+
+
+def reemplazar_funcion(src, aguja, nuevo):
+    """Reemplaza la funcion que arranca en 'aguja' (cuenta llaves para el fin)."""
+    ini = src.index(aguja)
+    llave = src.index("{", ini)
+    n = 0
+    for i in range(llave, len(src)):
+        if src[i] == "{":
+            n += 1
+        elif src[i] == "}":
+            n -= 1
+            if n == 0:
+                return src[:ini] + nuevo + src[i + 1:]
+    return None
+
+
+CUERPO_I2I2 = """iface_ret runtime_ifaceI2I2(struct __go_type_descriptor *inter, Iface i) __asm__("_runtime.ifaceI2I2");
+iface_ret runtime_ifaceI2I2(struct __go_type_descriptor *inter, Iface i)
+{
+    iface_ret r;
+    r.i.itab = NULL;
+    r.i.data = NULL;
+    r.ok = false;
+
+    if (!i.itab)
+        return r;
+
+    // Conversion entre interfaces: el tipo concreto esta en i.itab[0] (methods[0]).
+    struct __go_type_descriptor *ctype = *((struct __go_type_descriptor **)i.itab);
+
+    Itab *new_tab = get_itab(inter, ctype);
+    if (!new_tab)
+        return r;
+
+    r.i.itab = itab_methods_ptr(new_tab);
+    r.i.data = i.data;
+    r.ok = true;
+    return r;
+}"""
+
+CUERPO_I2T2P = """ptr_ret runtime_ifaceI2T2P(struct __go_type_descriptor *typ, Iface i) __asm__("_runtime.ifaceI2T2P");
+ptr_ret runtime_ifaceI2T2P(struct __go_type_descriptor *typ, Iface i)
+{
+    ptr_ret r;
+    r.p = NULL;
+    r.ok = false;
+
+    if (!i.itab)
+        return r;
+
+    Itab *tab = itab_from_iface(i.itab);
+    if (itab_type(tab) != typ)
+        return r;
+
+    r.p = i.data;
+    r.ok = true;
+    return r;
+}"""
+
+src = open(C, encoding="utf-8").read()
+for aguja, nuevo in (
+    ("void runtime_ifaceI2I2(struct __go_type_descriptor *inter, Iface i, Iface *ret, bool *ok) __asm__(", CUERPO_I2I2),
+    ("void runtime_ifaceI2T2P(struct __go_type_descriptor *typ, Iface i, void **ret, bool *ok) __asm__(", CUERPO_I2T2P),
+):
+    if aguja in src:
+        actualizado = reemplazar_funcion(src, aguja, nuevo)
+        if actualizado:
+            src = actualizado
+            print("C: reescrita", aguja.split("(")[0].split(" ")[-1])
+    else:
+        print("NO ENCONTRE:", aguja[:60])
+# assertitab: devuelve el Itab crudo, pero el llamador espera el puntero al arreglo de metodos
+# (asignacion directa: methods[0] = tipo, methods[1..] = las funciones). Con el Itab crudo, el
+# llamador lee el "metodo" en Itab+4, que es el tipo, y salta a los datos. requireitab ya lo hacia
+# bien; aca se iguala.
+VIEJO_ASSERT = """        // implements_interface passed, so this is allocation failure
+        runtime_panicstring("runtime: failed to allocate itab");
+    }
+
+    return itab;
+}"""
+NUEVO_ASSERT = """        // implements_interface passed, so this is allocation failure
+        runtime_panicstring("runtime: failed to allocate itab");
+    }
+
+    // gccgo espera el puntero al arreglo de metodos, no al Itab: methods[0] = el tipo y
+    // methods[1..] = las funciones. Devolver el Itab crudo hace que el llamador salte a los datos.
+    return itab_methods_ptr(itab);
+}"""
+if VIEJO_ASSERT in src:
+    src = src.replace(VIEJO_ASSERT, NUEVO_ASSERT, 1)
+    print("C: assertitab devuelve el arreglo de metodos")
+else:
+    print("C: no encontre el final de assertitab")
+open(C, "w", encoding="utf-8").write(src)
