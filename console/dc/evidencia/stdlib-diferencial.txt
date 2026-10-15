@@ -1,0 +1,14 @@
+=== prueba diferencial de la stdlib minima contra la stdlib real de Go ===
+go test -v ./difftest/   (dentro de console/dc/std)
+    difftest_test.go:193: a mano: 86/86 coinciden
+--- PASS: TestFormatoAMano (0.00s)
+    difftest_test.go:256: generado: 39493/40000 coinciden, 507 fuera del dominio declarado (flotantes), 0 mal
+--- PASS: TestFormatoGenerado (0.03s)
+    difftest_test.go:390: strconv: 24153 coinciden, 0 mal, 1 fuera del dominio declarado (flotantes fuera del camino exacto)
+--- PASS: TestStrconvGenerado (0.00s)
+    difftest_test.go:502: strings: 67785 coinciden, 0 mal, 2810 fuera del dominio declarado (cambio de mayusculas fuera de ASCII)
+--- PASS: TestStringsGenerado (0.01s)
+--- PASS: TestErrorfConW (0.00s)
+--- PASS: TestLimitesDeclarados (0.00s)
+PASS
+ok  	d2std/difftest	(cached)
