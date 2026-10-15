@@ -77,7 +77,25 @@ Los aplica `scripts/console/fix-toolchain.sh` (idempotente):
 - El `environ.sh` de KOS referencia variables sin definir: con `set -u` activo el `source`
   aborta en silencio. En `scripts/console/env.sh` se apaga `-u` al entrar.
 
-## 5. Ciclo de desarrollo
+## 5. Puesta en marcha desde cero (4 comandos)
+
+```bash
+scripts/console/dl-toolchain.sh          # baja toolchain (471 MB) + Flycast a ~/dreamcast/dl
+tar -xzf ~/dreamcast/dl/dreamcast-toolchain-*.tar.gz -C ~/dreamcast    # deja sh-elf/ kos/ kos-ports/ libgodc/
+uv venv ~/dreamcast/venv && uv pip install --python ~/dreamcast/venv/bin/python pycdlib
+scripts/console/fix-toolchain.sh         # los dos arreglos del tarball (symlinks + perf.go)
+```
+
+Y para activar la consola serie del emulador, una sola vez, en `~/.config/flycast/emu.cfg`
+(fijarse que va bajo `[config]`, no bajo `[Debug]` — ver sección 4):
+
+```ini
+[config]
+Debug.SerialConsoleEnabled = yes
+Debug.SerialPTY = no
+```
+
+## 6. Ciclo de desarrollo
 
 ```
 source scripts/console/env.sh                 # toolchain en el PATH
@@ -92,7 +110,7 @@ frames, ciclos y estado del mando.
 Para el POC de C (sin Go) se usa `scripts/console/build-c.sh`, que es la prueba de que el
 pipeline (toolchain + imagen + emulador) está sano cuando algo falla en el lado de Go.
 
-## 6. POCs incluidos
+## 7. POCs incluidos
 
 | POC | qué prueba |
 |---|---|
@@ -102,15 +120,16 @@ pipeline (toolchain + imagen + emulador) está sano cuando algo falla en el lado
 | `console/dc/poc/serialcheck` | deja el resultado de `dbgio_dev_select("scif")` en el color de fondo |
 | `console/dc/poc/goquad` | **POC principal**: Go + PVR + sprite + mando + ciclos por serie |
 
-## 7. Pendientes (con hipótesis)
+## 8. Pendientes (con hipótesis)
 
-1. **Imagen de disco arrancable** (bloquea probar en la Dreamcast real con GDEMU).
+1. **Imagen de disco arrancable** (bloquea probar en la Dreamcast real con GDEMU) — DC-001.2b.
    El `.cue`/`.iso` con IP.BIN de `makeip` arranca pero el SH-4 tira excepción a los ~2,5 s,
    justo cuando REIOS salta al bootstrap del IP.BIN (`reios_setup_state(0xac008300)`), en
-   cambio el camino ELF salta a `0x8C010000` y funciona. Hipótesis: el bootstrap que genera
-   `makeip` no es el que espera el reios, o el `.cue` MODE1/2048 no entrega los sectores que
-   el bootstrap pide. Próximo paso: desensamblar el IP.BIN en el offset `0x300` y comparar
-   con un IP.BIN conocido, y probar `scramble` sobre el `1ST_READ.BIN`.
+   cambio el camino ELF salta a `0x8C010000` y funciona. Ya se descartó que el IP.BIN esté
+   vacío: en el offset `0x300` hay código SH-4 real (el bootstrap con la marca `SCC80831`).
+   Próximo paso: comparar ese bootstrap con uno conocido, probar `scramble` sobre el
+   `1ST_READ.BIN`, y generar un `.cdi` (o `.gdi` con sectores de 2352) que es lo que lee el
+   GDEMU.
 2. **Mando**: confirmar que Flycast expone el control en el puerto 0 y que el POC lo lee.
 3. **Textura paletizada real (PAL8 + CLUT)** desde un asset de Diablo II horneado
    (DC-001.4): el objetivo del port depende de dibujar el arte con paleta, no RGBA.
