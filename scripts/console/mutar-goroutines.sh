@@ -36,13 +36,31 @@ correr() {
         echo "  (la stdlib no compila: cuenta como cazado)"
         return 1
     fi
-    if ! bash scripts/console/build-dc.sh "$POC" >/dev/null 2>&1; then
+    # OJO: se BORRA el ELF antes de compilar. Sin eso, si el build falla el script corre el binario
+    # VIEJO y da VERDE con el mutante puesto: el mutante 4 (CAS que cambia sin coincidir) quedo verde
+    # por esto, y medido a mano el POC SI lo caza (GORO casos 35 bien 34 mal 1). Un mutador que miente
+    # es peor que no tenerlo.
+    rm -f /tmp/dcbuild/goroutines/prog.elf
+    if ! bash scripts/console/build-dc.sh "$POC" >"$OUT/build.log" 2>&1; then
         echo "  (el POC no compila: cuenta como cazado)"
         return 1
     fi
+    if ! grep -q '^ELF:' "$OUT/build.log"; then
+        echo "  (el build no llego a producir el ELF: cuenta como cazado)"
+        return 1
+    fi
     # 45 s de tope: si un mutante deja un candado trabado, la consola no llega al final y eso es ROJO
+    # OJO: se borra el log ANTES de cada corrida. Sin eso queda el "GORO RESULTADO OK" de la corrida
+    # anterior (el control sano) y el grep lo encuentra: el mutante 4 se reportaba VERDE aunque el POC
+    # diera RESULTADO MAL. Un mutador que miente es peor que no tenerlo.
+    rm -f "$LOG" "$LOG.limpio"
     timeout 120 bash scripts/console/run-flycast.sh /tmp/dcbuild/goroutines/prog.elf 45 "$OUT" >/dev/null 2>&1
     tr -d '\r' < "$LOG" > "$LOG.limpio" 2>/dev/null
+    # ROJO explicito: si el POC mismo dice que hay fallos, no alcanza con que no aparezca el "OK"
+    if grep -q 'GORO RESULTADO MAL' "$LOG.limpio"; then
+        echo "  (el POC dijo RESULTADO MAL)"
+        return 1
+    fi
     if grep -q 'GORO RESULTADO OK' "$LOG.limpio"; then
         return 0
     fi
@@ -132,10 +150,19 @@ probar "sync/atomic: AddInt64 que no suma" \
 }' \
     "atomic.AddInt64 da 800 exacto"
 
-# 4. sync/atomic: si CompareAndSwap cambia aunque no coincida, el caso del CAS que falla se cae
-probar "sync/atomic: CAS que cambia sin coincidir" \
+# 4. sync/atomic: si CompareAndSwap(32) cambia aunque no coincida, el caso del CAS que falla se cae
+#
+# OJO: el patron va por el NOMBRE DE LA FUNCION a proposito. La primera version buscaba el bloque
+# "if (*p == *esperado) { ... }" seguido de un comentario, y ese bloque aparece CUATRO veces en el
+# archivo (los CAS de 32 y 64 bits, con y sin signo): el mutante se aplicaba en cualquier lado menos
+# donde la prueba lo mira, y el mutador reportaba VERDE. Medido a mano con el mutante bien aplicado, el
+# POC SI lo caza (GORO casos 35 bien 34 mal 1). Un mutador que no aplica lo que dice es peor que nada.
+probar "sync/atomic: CAS (32 bits) que cambia sin coincidir" \
     "$STD/csrc/atomic_dc.c" \
-    '    if (*p == *esperado) {
+    'int d2c_at_cas32(int32_t *p, int32_t *esperado, int32_t nuevo) {
+    int irq = irq_disable();
+    int ok = 0;
+    if (*p == *esperado) {
         *p = nuevo;
         ok = 1;
     } else {
@@ -143,16 +170,15 @@ probar "sync/atomic: CAS que cambia sin coincidir" \
     }
     irq_restore(irq);
     return ok;
-}
-
-/* ------------------------------------------------ 64 bits' \
-    '    *p = nuevo;
-    ok = 1;
+}' \
+    'int d2c_at_cas32(int32_t *p, int32_t *esperado, int32_t nuevo) {
+    int irq = irq_disable();
+    int ok = 1;
+    *p = nuevo;
+    (void)esperado;
     irq_restore(irq);
     return ok;
-}
-
-/* ------------------------------------------------ 64 bits' \
+}' \
     "el CAS que no coincide deja el valor"
 
 # 5. runtime: si GOOS dice otra cosa, el caso del runtime lo caza

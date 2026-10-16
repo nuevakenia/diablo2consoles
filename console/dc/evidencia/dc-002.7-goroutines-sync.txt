@@ -81,3 +81,25 @@ patron correcto es ida y vuelta (el que cede manda y espera la devolucion).
   d) El lado de Go de "Unlock de un candado libre" NO se puede probar con recover: el sync de Go llama a
      internal/sync.fatal y ABORTA el proceso (medido). El limite se declara y se ejecuta solo el lado de
      la consola.
+
+7. EL MUTADOR 4 Y UN HALLAZGO QUE QUEDO ABIERTO (medido)
+--------------------------------------------------------
+Los mutadores (scripts/console/mutar-goroutines.sh) dan 4/5. El que NO se caza es el del CAS:
+"si CompareAndSwapInt32 cambia aunque no coincida". No es un defecto del mutador (se comprobo a mano,
+con el patron por nombre de funcion y el log limpio en cada corrida): es un hueco del POC, y la causa
+esta medida:
+
+    con d2c_at_cas32 mutado para devolver SIEMPRE false (no cambia nunca), el POC sigue diciendo
+    "4. CAS que coincide = true"
+
+o sea que el CompareAndSwapInt32 del POC NO pasa por el shim d2c_at_cas32 de este paquete. En cambio
+AddInt64 SI pasa: el mutante 3 (AddInt64 que no suma) se caza. Queda declarado como hallazgo abierto:
+hay que averiguar por donde va el CAS (probablemente el runtime de libgodc ya trae su propia
+implementacion de los atomicos y el enlace la prefiere) y entonces decidir si el paquete
+sync/atomic de la consola tiene que delegar en ella o si el POC tiene que llamar al shim de otra forma.
+
+Lo mismo vale para los otros tres casos del camino: dos comandos del mutador quedaron tambien
+arreglados en el camino, porque un mutador que MIENTE es peor que no tenerlo:
+  - no borraba el ELF antes de compilar: si el build fallaba, corria el binario viejo y daba VERDE.
+  - no borraba el log de Flycast: el "GORO RESULTADO OK" de la corrida anterior (el control sano) hacia
+    que el grep lo encontrara y el mutante saliera VERDE aunque el POC diera RESULTADO MAL.

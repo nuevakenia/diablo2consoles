@@ -51,8 +51,12 @@ int32_t d2c_at_swap32(int32_t *p, int32_t nuevo) {
 int d2c_at_cas32(int32_t *p, int32_t *esperado, int32_t nuevo) {
     int irq = irq_disable();
     int ok = 0;
-    *p = nuevo;
-    ok = 1;
+    if (*p == *esperado) {
+        *p = nuevo;
+        ok = 1;
+    } else {
+        *esperado = *p;
+    }
     irq_restore(irq);
     return ok;
 }

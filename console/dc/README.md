@@ -865,3 +865,16 @@ recursivo SI se traba: es un canal con buffer 1), `d2std/time` y `d2std/log` sin
 desde DC-002.6d (nadie habia corrido la prueba despues), el canal del candado creado en el primer uso
 (con goroutines paralelas del host dos crean canales distintos; en la consola no puede pasar) y el
 `Unlock` de un candado libre, que en Go **aborta el proceso** y no se puede probar con `recover`.
+
+**El mutador cazo un hallazgo que queda abierto:** de los cinco mutantes
+(`scripts/console/mutar-goroutines.sh`) se cazan cuatro. El del CAS no, y no es culpa del mutador (se
+comprobo a mano, con el patron por nombre de funcion y el log limpio): **el `CompareAndSwapInt32` del
+POC no pasa por el shim `d2c_at_cas32`** — mutado para devolver siempre `false`, el POC sigue diciendo
+`true`. `AddInt64` en cambio si pasa (ese mutante se caza). Hay que averiguar por donde va el CAS
+(probablemente el runtime de libgodc ya trae su implementacion de los atomicos y el enlace la prefiere)
+antes de dar por buena la capa de atomicos.
+
+**Dos defectos del propio mutador** que salieron en el camino, y que importan porque un mutador que
+miente es peor que no tenerlo: no borraba el ELF antes de compilar (si el build fallaba, corria el
+binario viejo y daba VERDE) y no borraba el log de Flycast (el `RESULTADO OK` de la corrida anterior
+hacia que el grep lo encontrara).
