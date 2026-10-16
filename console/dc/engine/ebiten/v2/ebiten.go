@@ -22,8 +22,20 @@ import (
 
 // ================================================================ imagenes
 
-// Image es la version de consola de la imagen de Ebitengine: guarda los pixeles y el rectangulo.
-type Image struct {
+// Image es la INTERFAZ de imagen de Ebitengine (igual que en la de verdad: es una interfaz, y por eso
+// el motor puede hacer SubImage(rect).(*ebiten.Image)).
+type Image interface {
+	Bounds() image.Rectangle
+	Size() (int, int)
+	Clear()
+	Set(x, y int, c Color)
+	At(x, y int) Color
+	SubImage(r image.Rectangle) Image
+	DrawImage(src Image, op *DrawImageOptions)
+}
+
+// imagen es la implementacion: guarda los pixeles y el rectangulo.
+type imagen struct {
 	pixeles []uint8
 	ancho   int
 	alto    int
@@ -31,12 +43,12 @@ type Image struct {
 
 // NewImage devuelve una imagen transparente del tamano pedido (8 bits por pixel por canal, igual que
 // Ebitengine).
-func NewImage(w, h int) *Image {
-	return &Image{pixeles: make([]uint8, w*h*4), ancho: w, alto: h}
+func NewImage(w, h int) *imagen {
+	return &imagen{pixeles: make([]uint8, w*h*4), ancho: w, alto: h}
 }
 
 // NewImageFromImage copia una image.Image de Go.
-func NewImageFromImage(src image.Image) *Image {
+func NewImageFromImage(src image.Image) *imagen {
 	b := src.Bounds()
 	img := NewImage(b.Dx(), b.Dy())
 	for y := 0; y < b.Dy(); y++ {
@@ -53,22 +65,22 @@ func NewImageFromImage(src image.Image) *Image {
 }
 
 // Bounds: el rectangulo de la imagen.
-func (i *Image) Bounds() image.Rectangle {
+func (i *imagen) Bounds() image.Rectangle {
 	return image.Rectangle{Min: image.Point{X: 0, Y: 0}, Max: image.Point{X: i.ancho, Y: i.alto}}
 }
 
 // Size: el tamano.
-func (i *Image) Size() (int, int) { return i.ancho, i.alto }
+func (i *imagen) Size() (int, int) { return i.ancho, i.alto }
 
 // Clear: borra la imagen con el color dado.
-func (i *Image) Clear() {
+func (i *imagen) Clear() {
 	for j := range i.pixeles {
 		i.pixeles[j] = 0
 	}
 }
 
 // Set: pinta un pixel.
-func (i *Image) Set(x, y int, c Color) {
+func (i *imagen) Set(x, y int, c Color) {
 	if x < 0 || y < 0 || x >= i.ancho || y >= i.alto {
 		return
 	}
@@ -80,7 +92,7 @@ func (i *Image) Set(x, y int, c Color) {
 }
 
 // At: lee un pixel.
-func (i *Image) At(x, y int) Color {
+func (i *imagen) At(x, y int) Color {
 	if x < 0 || y < 0 || x >= i.ancho || y >= i.alto {
 		return Color{}
 	}
@@ -89,9 +101,25 @@ func (i *Image) At(x, y int) Color {
 }
 
 // SubImage: la ventana sobre la imagen.
-func (i *Image) SubImage(r image.Rectangle) *Image {
-	return i
+func (i *imagen) SubImage(r image.Rectangle) Image {
+	// se recorta de verdad: el motor pide cada glifo de la tabla de la fuente como una subimagen
+	ancho := r.Dx()
+	alto := r.Dy()
+	if ancho <= 0 || alto <= 0 {
+		return &imagen{ancho: 0, alto: 0}
+	}
+	nueva := &imagen{pixeles: make([]uint8, ancho*alto*4), ancho: ancho, alto: alto}
+	for y := 0; y < alto; y++ {
+		for x := 0; x < ancho; x++ {
+			c := i.At(r.Min.X+x, r.Min.Y+y)
+			nueva.Set(x, y, c)
+		}
+	}
+	return nueva
 }
+
+// DrawImage: el metodo de la interfaz (el motor dibuja con target.DrawImage(s, op)).
+func (i *imagen) DrawImage(src Image, op *DrawImageOptions) { Dibujos++ }
 
 // ================================================================ colores y opciones
 
@@ -126,6 +154,7 @@ type GeoM struct{ guardada bool }
 func (g *GeoM) Translate(x, y float64) { g.guardada = true }
 func (g *GeoM) Scale(x, y float64)     { g.guardada = true }
 func (g *GeoM) Rotate(t float64)       { g.guardada = true }
+func (g *GeoM) Reset()                 { g.guardada = false }
 func (g *GeoM) ResetGeoM()             { g.guardada = false }
 
 // CompositeMode: como se mezcla lo dibujado con lo que habia.
@@ -150,20 +179,20 @@ const (
 var pantalla = NewImage(640, 480)
 
 // Screen devuelve el lienzo de la consola.
-func Screen() *Image { return pantalla }
+func Screen() *imagen { return pantalla }
 
 // DrawImage dibuja src en dst con las opciones. Aca se deja registrado (contando) para poder medir que
 // el motor realmente esta pidiendo dibujar; el pintado con el PVR entra con el backend.
 var Dibujos int
 
-func DrawImage(dst *Image, src *Image, op *DrawImageOptions) {
+func DrawImage(dst *imagen, src Image, op *DrawImageOptions) {
 	Dibujos++
 }
 
 // DrawTriangles: el robot de dibujado directo. Igual que DrawImage: se cuenta.
 var DibujosTriangulos int
 
-func DrawTriangles(dst *Image, vertices []Vertex, indices []uint32, op *DrawImageOptions) {
+func DrawTriangles(dst *imagen, vertices []Vertex, indices []uint32, op *DrawImageOptions) {
 	DibujosTriangulos++
 }
 
@@ -282,7 +311,7 @@ func AppendInputChars(runes []rune) int { return 0 }
 // Game: la interfaz que el motor implementa (su juego).
 type Game interface {
 	Update() error
-	Draw(screen *Image)
+	Draw(screen Image)
 	Layout(ancho, alto int) (int, int)
 }
 
