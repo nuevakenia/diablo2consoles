@@ -72,15 +72,19 @@ void d2c_menu_quad(float x, float y, float s, unsigned int argb) {
     (void)argb;
     pvr_prim(&hdr, sizeof(hdr));
 
-    v.flags = PVR_CMD_VERTEX;
     v.argb = 0xFFFFFFFF;
     v.oargb = 0;
     v.z = 1.0f;
+
+    /* El PVR dibuja TIRAS de triangulos: el quad son cuatro vertices en zigzag y la marca de fin de
+     * tira (PVR_CMD_VERTEX_EOL) va en el CUARTO, no en el tercero. Con el EOL en el tercero el PVR
+     * cierra la tira ahi y solo se dibuja el primer triangulo (medido: media pantalla en negro y un
+     * triangulo con la textura). */
+    v.flags = PVR_CMD_VERTEX;
     v.u = u0;   v.v = v0;   v.x = x;                v.y = y;                pvr_prim(&v, sizeof(v));
     v.u = u1;   v.v = v0;   v.x = x + ancho * s;    v.y = y;                pvr_prim(&v, sizeof(v));
-    v.flags = PVR_CMD_VERTEX_EOL;
     v.u = u0;   v.v = v1;   v.x = x;                v.y = y + alto * s;     pvr_prim(&v, sizeof(v));
-    v.flags = PVR_CMD_VERTEX;
+    v.flags = PVR_CMD_VERTEX_EOL;
     v.u = u1;   v.v = v1;   v.x = x + ancho * s;    v.y = y + alto * s;     pvr_prim(&v, sizeof(v));
 }
 

@@ -58,7 +58,13 @@ func main() {
 		println("POC-MENU: textura subida (8 bits por pixel + paleta por hardware)")
 	}
 
+	// La escala que LLENA sin salirse: la MENOR de las dos. Con solo ancho/alto el quad se sale de la
+	// pantalla y el PVR descarta el triangulo que queda afuera (medido: la imagen salia cortada en
+	// diagonal, con el resto en negro, porque el quad iba de 0,0 a 640,640 en una pantalla de 640x480).
 	esc := float32(640) / float32(ancho)
+	if sy := float32(480) / float32(alto); sy < esc {
+		esc = sy
+	}
 	println("POC-MENU: escala para llenar la pantalla, milesima:", int(esc*1000))
 	println("POC-MENU: dibujando")
 
