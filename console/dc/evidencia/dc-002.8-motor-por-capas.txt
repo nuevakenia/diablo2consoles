@@ -1,6 +1,6 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 58 de 142
+compilados: 61 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
@@ -11,7 +11,7 @@ d2common/d2act3 0
 d2common/d2animspeed 1
 d2common/d2automap 1
 d2common/d2boss 1
-d2common/d2cache 0
+d2common/d2cache 1
 d2common/d2calc 1
 d2common/d2calculation 1
 d2common/d2calculation/d2lexer 1
@@ -33,7 +33,7 @@ d2common/d2enum 1
 d2common/d2equip 0
 d2common/d2fileformats/d2animdata 1
 d2common/d2fileformats/d2cof 1
-d2common/d2fileformats/d2dat 0
+d2common/d2fileformats/d2dat 1
 d2common/d2fileformats/d2dc6 1
 d2common/d2fileformats/d2dcc 1
 d2common/d2fileformats/d2ds1 1
@@ -51,7 +51,7 @@ d2common/d2geom 1
 d2common/d2groundexp 1
 d2common/d2herostats 0
 d2common/d2hireling 0
-d2common/d2interface 0
+d2common/d2interface 1
 d2common/d2level 0
 d2common/d2loader 0
 d2common/d2loader/asset 0
@@ -153,26 +153,23 @@ d2thread 1
 d2app: /home/dgalli/Proyectos/diablo2consoles/d2app/app.go:7:22: error: import file ‘encoding/json’ not found
 d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:16: error: import file ‘os/exec’ not found
 d2common/d2act3: /home/dgalli/Proyectos/diablo2consoles/d2common/d2act3/act3.go:17:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2level’ not found
-d2common/d2cache: /home/dgalli/Proyectos/diablo2consoles/d2common/d2cache/cache.go:8:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface’ not found
 d2common/d2data/d2video: /home/dgalli/Proyectos/diablo2consoles/d2common/d2data/d2video/bink_audio.go:7:19: error: import file ‘math/cmplx’ not found
 d2common/d2difficulty: /home/dgalli/Proyectos/diablo2consoles/d2common/d2difficulty/gate.go:3:69: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s’ no
-d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/shotcheck.go:5:14: error: import file ‘image’ not found
+d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/shotcheck.go:15:30: error: reference to undefined identifier ‘image.Rect’
 d2common/d2equip: /home/dgalli/Proyectos/diablo2consoles/d2common/d2equip/tables.go:5:21: error: import file ‘encoding/csv’ not found
-d2common/d2fileformats/d2dat: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2dat/dat.go:6:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface’ no
-d2common/d2fileformats/d2font: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2font/font.go:5:20: error: import file ‘image/color’ not found
-d2common/d2fileformats/d2mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2mpq/mpq_data_stream.go:3:63: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2i
+d2common/d2fileformats/d2font: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2font/font.go:51:30: error: reference to undefined identifier ‘color.White’
+d2common/d2fileformats/d2mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2mpq/mpq.go:7:14: error: import file ‘io/fs’ not found
 d2common/d2fileformats/d2pl2: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2pl2/pl2.go:6:40: error: import file ‘github.com/go-restruct/restruct’ not found
 d2common/d2fileformats/d2s: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2s/itemtables.go:6:21: error: import file ‘encoding/csv’ not found
 d2common/d2fileformats/d2txt: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2txt/data_dictionary.go:5:21: error: import file ‘encoding/csv’ not found
 d2common/d2herostats: /home/dgalli/Proyectos/diablo2consoles/d2common/d2herostats/derive.go:5:63: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2statlist’ not foun
 d2common/d2hireling: /home/dgalli/Proyectos/diablo2consoles/d2common/d2hireling/gear.go:3:62: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2statlist’ not found
-d2common/d2interface: /home/dgalli/Proyectos/diablo2consoles/d2common/d2interface/animation.go:4:14: error: import file ‘image’ not found
 d2common/d2level: /home/dgalli/Proyectos/diablo2consoles/d2common/d2level/act3gates.go:6:70: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s’ no
 d2common/d2loader: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/loader.go:9:65: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/mpq’ not found
 d2common/d2loader/asset: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/asset/asset.go:7:73: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset/typ
 d2common/d2loader/asset/types: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/asset/types/source_types.go:7:72: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fil
 d2common/d2loader/filesystem: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/filesystem/asset.go:7:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asse
-d2common/d2loader/mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/mpq/asset.go:7:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface’ not fou
+d2common/d2loader/mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/mpq/asset.go:8:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset’ not 
 d2common/d2monstats: /home/dgalli/Proyectos/diablo2consoles/d2common/d2monstats/monstats.go:7:72: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2txt
 d2common/d2monster: /home/dgalli/Proyectos/diablo2consoles/d2common/d2monster/profile_txt.go:6:72: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2t
 d2common/d2object: /home/dgalli/Proyectos/diablo2consoles/d2common/d2object/apply.go:3:62: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2statlist’ not found
@@ -185,16 +182,16 @@ d2common/d2skill: /home/dgalli/Proyectos/diablo2consoles/d2common/d2skill/class.
 d2common/d2state: /home/dgalli/Proyectos/diablo2consoles/d2common/d2state/defs.go:6:72: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2txt’ not f
 d2common/d2statlist: /home/dgalli/Proyectos/diablo2consoles/d2common/d2statlist/bases.go:5:21: error: import file ‘encoding/csv’ not found
 d2common/d2summon: /home/dgalli/Proyectos/diablo2consoles/d2common/d2summon/roster.go:6:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill’ not found
-d2common/d2util: /home/dgalli/Proyectos/diablo2consoles/d2common/d2util/debug_print.go:4:14: error: import file ‘image’ not found
+d2common/d2util: /home/dgalli/Proyectos/diablo2consoles/d2common/d2util/debug_print.go:6:66: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2util/assets’ not f
 d2common/d2util/assets: /home/dgalli/Proyectos/diablo2consoles/d2common/d2util/assets/assets.go:24:22: error: import file ‘compress/gzip’ not found
-d2core/d2asset: /home/dgalli/Proyectos/diablo2consoles/d2core/d2asset/animation.go:5:14: error: import file ‘image’ not found
+d2core/d2asset: /home/dgalli/Proyectos/diablo2consoles/d2core/d2asset/asset_manager.go:6:18: error: import file ‘io/ioutil’ not found
 d2core/d2audio: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/sound_engine.go:12:58: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset’ not found
-d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebiten/ebiten_audio_provider.go:9:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2in
+d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebiten/ebiten_audio_provider.go:10:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2u
 d2core/d2config: /home/dgalli/Proyectos/diablo2consoles/d2core/d2config/d2config.go:4:22: error: import file ‘encoding/json’ not found
-d2core/d2gui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2gui/box.go:4:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface’ not found
+d2core/d2gui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2gui/box.go:6:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2util’ not found
 d2core/d2hero: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/containers.go:4:70: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s’ not 
 d2core/d2hero/herogen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/herogen/barbarian.go:3:69: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2
-d2core/d2input: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/d2input.go:6:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface’ not found
+d2core/d2input: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/input_manager.go:6:62: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2display’ not foun
 d2core/d2input/d2gamepad: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/d2gamepad/mapping.go:4:22: error: import file ‘encoding/json’ not found
 d2core/d2input/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/ebiten/ebiten_input.go:7:41: error: import file ‘github.com/hajimehoshi/ebiten/v2’ not found
 d2core/d2inventory: /home/dgalli/Proyectos/diablo2consoles/d2core/d2inventory/inventory_item_factory.go:7:58: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset’
@@ -202,8 +199,8 @@ d2core/d2item/d2cube: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2cub
 d2core/d2item/d2drop: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2drop/loader.go:8:15: error: import file ‘regexp’ not found
 d2core/d2item/d2itemdesc: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2itemdesc/describe.go:8:70: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/
 d2core/d2item/diablo2item: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/diablo2item/ground_label.go:5:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2dr
-d2core/d2map/d2mapengine: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapengine/doors.go:4:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface’ not 
-d2core/d2map/d2mapentity: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapentity/animated_entity.go:6:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2inter
+d2core/d2map/d2mapengine: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapengine/doors.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ 
+d2core/d2map/d2mapentity: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapentity/cast_overlay.go:7:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2records’ n
 d2core/d2map/d2mapgen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapgen/act1_overworld.go:14:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maps
 d2core/d2map/d2maprenderer: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2maprenderer/backdrop.go:4:62: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2display’ n
 d2core/d2map/d2mapstamp: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapstamp/factory.go:6:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’
@@ -215,8 +212,8 @@ d2core/d2render/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2render/e
 d2core/d2screen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2screen/d2screen.go:4:62: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2display’ not found
 d2core/d2skills: /home/dgalli/Proyectos/diablo2consoles/d2core/d2skills/actionclock.go:8:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2skill’ not found
 d2core/d2stats/diablo2stats: /home/dgalli/Proyectos/diablo2consoles/d2core/d2stats/diablo2stats/stat_factory.go:7:58: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset’ 
-d2core/d2term: /home/dgalli/Proyectos/diablo2consoles/d2core/d2term/d2term.go:5:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface’ not found
-d2core/d2ui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2ui/button.go:4:14: error: import file ‘image’ not found
+d2core/d2term: /home/dgalli/Proyectos/diablo2consoles/d2core/d2term/terminal.go:14:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2util’ not found
+d2core/d2ui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2ui/button.go:9:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2util’ not found
 d2core/d2vendor: /home/dgalli/Proyectos/diablo2consoles/d2core/d2vendor/catalog.go:8:70: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s’ not f
 d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/act3_live.go:10:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2act3’ not found
 d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/ammo_depleted.go:4:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2equip’ not found
