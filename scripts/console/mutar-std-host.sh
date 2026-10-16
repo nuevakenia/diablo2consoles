@@ -152,6 +152,68 @@ else
     rc=1
 fi
 
+echo "== 6. math: los ceros llevan el signo del argumento (Floor(-0.5) es -0, no +0) =="
+mutacion "math: Trunc devuelve float64(i) y pierde el signo del cero" \
+    "math/math.go" \
+    '	i, ok := truncAInt(x)
+	if !ok {
+		return x
+	}
+	return Copysign(float64(i), x) // el cero con el signo del argumento (ver Floor)' \
+    '	i, ok := truncAInt(x)
+	if !ok {
+		return x
+	}
+	return float64(i)' \
+    amd64
+
+echo "== 7. math: MaxFloat64 tiene que ser la constante hexadecimal, no el decimal =="
+mutacion "math: MaxFloat64 escrito como literal decimal" \
+    "math/math.go" \
+    '	MaxFloat64 = 0x1.fffffffffffffp1023' \
+    '	MaxFloat64 = 1.7976931348623157e308' \
+    amd64
+
+echo "== 8. math: el cuadrante del coseno no se puede equivocar =="
+mutacion "math: Cos con los cuadrantes 1 y 3 intercambiados" \
+    "math/transcend.go" \
+    '	case 1:
+		return -sinPoly(r)
+	case 2:
+		return -cosPoly(r)
+	}
+	return sinPoly(r)
+}' \
+    '	case 1:
+		return sinPoly(r)
+	case 2:
+		return -cosPoly(r)
+	}
+	return -sinPoly(r)
+}' \
+    amd64
+
+echo "== 9. math: la serie del logaritmo suma el termino 1 =="
+mutacion "math: Log sin el termino constante de la serie" \
+    "math/transcend.go" \
+    '	for j := 12; j >= 0; j-- {' \
+    '	for j := 12; j >= 1; j-- {' \
+    amd64
+
+echo "== 10. hash/fnv: el primo es parte del algoritmo =="
+mutacion "hash/fnv: primo de 32 bits equivocado" \
+    "hash/fnv/fnv.go" \
+    '	prime32  = 16777619' \
+    '	prime32  = 16777617' \
+    amd64
+
+echo "== 11. encoding/binary: el orden de bytes no se puede cambiar =="
+mutacion "encoding/binary: Uint32 leido como big endian" \
+    "encoding/binary/binary.go" \
+    '	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24' \
+    '	return uint32(b[3]) | uint32(b[2])<<8 | uint32(b[1])<<16 | uint32(b[0])<<24' \
+    386
+
 echo
 echo "== $cazados/$contador chequeos cazados =="
 if [ "$rc" -eq 0 ]; then

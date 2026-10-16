@@ -1,0 +1,110 @@
+DC-002.4 - los paquetes de puro calculo (math y compañia) compilando y corriendo en la Dreamcast
+=================================================================================================
+
+Que se hizo
+-----------
+Los paquetes del muro que son de puro calculo, medidos con scripts/console/audit-stdlib.py (el
+motor los importa en estos archivos):
+
+  math            88 archivos   Abs, Acos, Atan2, Ceil, Cos, Exp, Floor, Hypot, Inf, IsInf, IsNaN,
+                                Ldexp, Max, MaxFloat64, MaxInt32, MaxInt64, MaxUint16, Min, Pi,
+                                Pow, Round, RoundToEven, Sin, Sqrt, Sqrt2
+  math/rand       28            Int, Int63, Intn, New, NewSource, Rand, Seed, Source, Uint32
+  encoding/binary 28            LittleEndian, Read
+  hash/fnv         9            New32a, New64a
+  math/bits        2            OnesCount8, RotateLeft32
+  container/ring   1            New, Ring
+  encoding/hex     1            EncodeToString
+  hash             1            Hash64
+
+Se escribieron en console/dc/std/ (Go puro, sin la stdlib real) y ademas el bytes.Reader que
+encoding/binary.Read necesita para leer de un bloque en memoria. Los 16 paquetes de la stdlib
+minima compilan a .gox para SH-4 (406 KB -> 621 KB).
+
+La biblioteca minima paso de 8 paquetes a 16: unicode/utf8, errors, io, bytes, strings, strconv,
+fmt, log, math, math/bits, math/rand, hash, hash/fnv, encoding/binary, encoding/hex, container/ring.
+
+Los limites, declarados en el codigo (no escondidos)
+----------------------------------------------------
+- Las funciones EXACTAS (Abs, Floor, Ceil, Trunc, Round, RoundToEven, Min, Max, Ldexp, Signbit,
+  Copysign) coinciden BIT A BIT con las de Go: eso es lo que exige el corpus.
+- Las TRASCENDENTALES (Sqrt, Exp, Log, Sin, Cos, Atan, Atan2, Acos, Hypot, Pow) son polinomios
+  propios en Go puro, NO se llama a la libm del C (su resultado no es el de Go, y en la consola
+  seria la libm del SH-4). Coinciden a 12 cifras significativas; el corpus lo exige con 1e-12
+  relativo, y el mismo criterio usa la prueba diferencial del host.
+- Sin/Cos reducen el argumento: el dominio medido a 12 cifras es |x| <= 100; arriba el error crece
+  como |x|*1e-16 (medido: 1,6e-6 en x=1e10) y con |x| > 2^52 devuelven NaN, porque la reduccion ya
+  no es exacta y prefiero no mentir.
+- math/rand: la SECUENCIA no es la de Go. El generador de Go es un lagged Fibonacci con una tabla de
+  607 numeros generada en su dia para esa implementacion: son datos, no algoritmo. El generador de
+  aca es xorshift64* y lo que se prueba (host y consola) es lo que el motor necesita: determinismo
+  por semilla, Intn(n) en [0,n), cobertura, no negativos.
+- encoding/binary.Read lee ESCALARES (uint8/16/32/64, int8/16/32/64, float32/64 y []byte). Las
+  ESTRUCTURAS necesitan reflect y devuelven un error explicito en vez de cualquier cosa: ese camino
+  (leer el descriptor del tipo y recorrer los campos por offset) es la tarjeta DC-002.5.
+- math.MaxInt64 y compañia son constantes SIN TIPO, como en Go: usarlas donde va un int no compila
+  con int de 32 bits, que es exactamente lo que pasa con el Go de 32 bits (medido con GOARCH=386).
+
+Los defectos que se encontraron MIDIENDO (y como se cazaron)
+------------------------------------------------------------
+Los primeros dos son mios y los cazo el instrumento (go run ./cmd/medir-math, que compara contra la
+math de Go y reporta el error por funcion); el tercero lo cazo el corpus de la consola:
+
+1. MaxFloat64: escrito 1.7976931348623157e308 no es igual a la constante de Go. Go compara las
+   constantes de punto flotante de forma EXACTA (no redondeada): el literal decimal tiene los mismos
+   BITS al pasar a float64, pero no es el mismo numero racional. Medido con un programa minimo:
+   %x daba lo mismo en los dos y == daba false. Se escribe en hexadecimal (0x1.fffffffffffffp1023),
+   que es exacto.
+2. Cuatro polinomios mal escritos a mano: la serie del log se habia quedado sin el termino 1 (el
+   factor que multiplica), el seno y el coseno sin la mitad de los terminos, y la serie del
+   arcotangente sumaba todos los terminos positivos cuando ALTERNA los signos. Medido: errores de
+   1e-3 que el instrumento mostro en la primera corrida. Ahora los coeficientes se generan de los
+   factoriales, no se escriben a mano.
+3. El signo del cero: Floor/Ceil/Trunc/Round/RoundToEven devolvian float64(i), o sea +0, cuando Go
+   devuelve el cero CON EL SIGNO del argumento (Trunc(-0.1) es -0). Lo cazo el corpus de la consola
+   en la primera corrida completa: 7 casos en rojo. El arreglo es Copysign(float64(i), x), y el
+   mutante 6 del mutador lo vuelve a cazar.
+
+Medido en la consola (Flycast)
+------------------------------
+  STD-TEST: casos 1515 bien 1515 mal 0
+  STD-TEST: RESULTADO OK - coincidio con la stdlib real en la consola
+
+  (antes de DC-002.4 el corpus tenia 593 casos; los 922 nuevos son math 426, math/bits 394 y el
+  resto hash/fnv, encoding/hex, encoding/binary, container/ring, clases de Inf/NaN/cero con signo y
+  las propiedades de math/rand)
+
+Los casos de math se comparan por BITS (math.Float64bits) y no por texto: asi el corpus no depende
+de fmt y un ultimo bit distinto se ve.
+
+Costo de la aritmetica en la consola (lo imprime el autotest, con el reloj de KOS)
+----------------------------------------------------------------------------------
+  costo float64: 1e6 (mul+suma)      20 ms
+  costo float32: 1e6 (mul+suma)      20 ms
+  costo float64: 1e5 sqrt           132 ms     ~1,3 us por raiz
+  costo float64: 1e4 (exp+log)       51 ms     ~2,5 us por funcion
+  costo float64: 1e4 (sin+cos)       70 ms     ~3,5 us por funcion
+  costo float64: 1e4 (atan2+pow)     71 ms     ~3,5 us por operacion
+
+  O sea: la aritmetica basica de float64 no es el problema (20 ms por millon de multiplicacion+suma,
+  lo mismo que float32: la hace la FPU). Lo caro son las trascendentales de este paquete, que son
+  polinomios en Go. Dato para el motor: no llamar Sin/Cos/Sqrt adentro de un bucle por frame.
+
+Prueba diferencial del host
+---------------------------
+  scripts/console/test-std-host.sh  ->  verde en amd64 y en 386 (los dos anchos de int)
+  el mismo criterio que la consola: bits iguales para las exactas, 1e-12 relativo para las
+  trascendentales, y pruebas de propiedad para lo que no es comparable con Go (rand).
+
+Mutador
+-------
+  scripts/console/mutar-std-host.sh  ->  11/11 chequeos cazados, con control sano verde en los dos
+  anchos. Los seis nuevos son de este hito: el cero sin signo, MaxFloat64 en decimal, el cuadrante
+  del coseno, la serie del log sin el termino constante, el primo de fnv y el orden de bytes de
+  encoding/binary.
+
+Lo que queda declarado para despues
+-----------------------------------
+- encoding/binary.Read de ESTRUCTURAS (necesita el descriptor del tipo): DC-002.5.
+- math: no estan Log2/Log10/Log1p/Expm1/Modf/Frexp/Cbrt/Asin/Tan (el motor no los pide en los 337
+  simbolos medidos); se agregan si un paquete del motor los pide.

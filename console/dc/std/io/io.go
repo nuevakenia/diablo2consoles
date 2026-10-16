@@ -44,3 +44,45 @@ func WriteString(w Writer, s string) (n int, err error) {
 type ByteWriter interface {
 	WriteByte(c byte) error
 }
+
+// ErrUnexpectedEOF es lo que devuelve ReadFull cuando el archivo se corta a mitad de dato: el motor
+// lo usa para detectar archivos truncados (io.ErrUnexpectedEOF, en la lista de simbolos del muro).
+var ErrUnexpectedEOF = errors.New("unexpected EOF")
+
+// ReadFull lee len(buf) bytes de r. Devuelve EOF solo si no leyo NADA: si leyo una parte y se
+// corto, devuelve ErrUnexpectedEOF (es la semantica de Go, y es la que el motor espera para decir
+// "archivo truncado" en vez de "archivo vacio").
+func ReadFull(r Reader, buf []byte) (n int, err error) {
+	for n < len(buf) {
+		m, e := r.Read(buf[n:])
+		n += m
+		if e == EOF {
+			if n == 0 {
+				return 0, EOF
+			}
+			return n, ErrUnexpectedEOF
+		}
+		if e != nil {
+			return n, e
+		}
+	}
+	return n, nil
+}
+
+// ReadAll lee hasta EOF.
+func ReadAll(r Reader) ([]byte, error) {
+	var buf []byte
+	var tmp [4096]byte
+	for {
+		n, err := r.Read(tmp[:])
+		if n > 0 {
+			buf = append(buf, tmp[:n]...)
+		}
+		if err == EOF {
+			return buf, nil
+		}
+		if err != nil {
+			return buf, err
+		}
+	}
+}

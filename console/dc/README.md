@@ -555,6 +555,84 @@ Lo que **faltaba en la stdlib minima** (medido compilando, no adivinado): `d2dat
 `io.EOF`/`io.Reader`, `bytes.Buffer` y `log.Print`/`log.Panic`. Se agregaron los tres paquetes con lo
 justo (`io` paso a compilarse despues de `errors` porque `io.EOF` es un `errors.New`), y quedaron
 declarados sus limites: `bytes` no tiene las funciones de busqueda/comparacion y `log` no tiene fecha
-ni prefijos (en la consola no hay reloj). La stdlib minima son **8 paquetes** y el ELF del POC pesa
+ni prefijos (en la consola no hay reloj). (En ese momento la stdlib minima eran 8 paquetes: hoy son
+16, ver la seccion 13.) El ELF del POC pesa
 **3.259.236 bytes** (el autotest de la stdlib sola era 3.094.432: el motor + el resumen agregan
 ~165 KB). Detalle en `console/dc/evidencia/dc-002.3-motor-dc6.txt`.
+
+## 13. DC-002.4: los paquetes de puro calculo (math y compañia)
+
+Los paquetes del muro que no dependen de nada del sistema operativo, medidos con
+`scripts/console/audit-stdlib.py` (cuantos archivos del motor los importan y que simbolos tocan):
+
+| paquete | archivos | tiene que dar |
+|---|---|---|
+| `math` | 88 | exactas **bit a bit**; las trascendentales a 12 cifras |
+| `math/rand` | 28 | la secuencia es propia: se prueba determinismo y rango |
+| `encoding/binary` | 28 | igual a Go (escalares; las estructuras van en DC-002.5) |
+| `hash/fnv` | 9 | igual a Go (mismo algoritmo y mismos primos) |
+| `math/bits` | 2 | igual a Go |
+| `encoding/hex`, `container/ring`, `hash` | 1 cada uno | igual a Go |
+
+La biblioteca minima pasa de **8 a 16 paquetes** (`math`, `math/bits`, `math/rand`, `hash`,
+`hash/fnv`, `encoding/binary`, `encoding/hex`, `container/ring`) y de 406 KB a **621 KB** de `.gox`.
+Ademas se adelanto el `bytes.Reader` de DC-002.5, porque `encoding/binary.Read` lo necesita para
+leer de un bloque en memoria.
+
+```bash
+scripts/console/build-std-gox.sh          # los 16 paquetes a .gox para SH-4
+scripts/console/build-dc.sh console/dc/poc/stdlib
+scripts/console/run-flycast.sh /tmp/dcbuild/stdlib/prog.elf 40 /tmp/dc-run-24f
+```
+
+Resultado medido en la consola: **1515 casos, 1515 bien, 0 mal** (eran 593). Los 922 nuevos son
+math (426), math/bits (394), `hash/fnv`, `encoding/hex`, `encoding/binary` (incluido `Read` desde un
+`bytes.Reader`), `container/ring`, las clases de `Inf`/`NaN`/cero con signo y las propiedades de
+`math/rand`. Los resultados de math se comparan **por bits** (`math.Float64bits`), no por texto: asi
+el corpus no depende de `fmt` y un ultimo bit distinto se ve. Detalle en
+`console/dc/evidencia/dc-002.4-math-y-compania.txt`.
+
+Instrumento propio: `go run ./cmd/medir-math` compara cada funcion contra la de Go y reporta el
+error por funcion. Es lo que encontro los dos primeros defectos de abajo.
+
+**Los tres defectos que aparecieron midiendo** (los dos primeros mios, el tercero lo cazo el corpus
+de la consola):
+
+1. `MaxFloat64` escrito en decimal (`1.7976931348623157e308`) **no es igual** a la constante de Go:
+   Go compara las constantes de punto flotante de forma **exacta**, no redondeada, asi que el literal
+   decimal tiene los mismos bits al pasar a `float64` pero no es el mismo numero racional (medido con
+   un programa minimo: el mismo `%x` y `==` en false). Va en hexadecimal, que es exacto.
+2. Cuatro polinomios escritos a mano mal: la serie del log **sin el termino 1** (el factor que
+   multiplica), el seno y el coseno **sin la mitad de los terminos**, y el arcotangente **sin la
+   alternancia de signos**. Errores de 1e-3 que el instrumento mostro en la primera corrida. Ahora
+   los coeficientes se generan de los factoriales.
+3. **El signo del cero**: `Floor`/`Ceil`/`Trunc`/`Round`/`RoundToEven` devolvian `float64(i)`, o sea
+   `+0`, donde Go devuelve el cero **con el signo del argumento** (`Trunc(-0.1)` es `-0`). Lo cazo el
+   corpus en su primera corrida completa: **7 casos en rojo**. El arreglo es `Copysign(float64(i), x)`
+   y el mutante 6 lo vuelve a cazar.
+
+**Costo de la aritmetica en la consola** (lo imprime el autotest, con el reloj de KOS):
+
+| medicion | tiempo | por operacion |
+|---|---|---|
+| 1e6 multiplicacion+suma `float64` | 20 ms | ~20 ns |
+| 1e6 multiplicacion+suma `float32` | 20 ms | ~20 ns |
+| 1e5 `Sqrt` | 132 ms | ~1,3 us |
+| 1e4 `Exp`+`Log` | 51 ms | ~2,5 us por funcion |
+| 1e4 `Sin`+`Cos` | 70 ms | ~3,5 us por funcion |
+| 1e4 `Atan2`+`Pow` | 71 ms | ~3,5 us por operacion |
+
+O sea: la aritmetica basica de `float64` **no** es el problema (lo mismo que `float32`: la hace la
+FPU), y lo caro son las trascendentales de este paquete, que son polinomios en Go. Dato para el
+motor: no llamar `Sin`/`Cos`/`Sqrt` adentro de un bucle por frame.
+
+Verificacion: `scripts/console/test-std-host.sh` **verde en amd64 y 386** (mismo criterio que la
+consola mas pruebas de propiedad para lo no comparable), y `scripts/console/mutar-std-host.sh`
+**11/11 cazados** con control sano. Los seis mutantes nuevos: el cero sin signo, `MaxFloat64` en
+decimal, el cuadrante del coseno, la serie del log sin el termino constante, el primo de fnv y el
+orden de bytes de `encoding/binary`.
+
+**Lo que queda declarado**: `encoding/binary.Read` de **estructuras** necesita el descriptor del
+tipo y devuelve un error explicito en vez de cualquier cosa (es la tarjeta DC-002.5); y de `math` no
+estan `Log2`/`Log10`/`Modf`/`Frexp`/`Cbrt`/`Asin`/`Tan` porque el motor no toca esos simbolos (se
+agregan si algun paquete del motor los pide).
