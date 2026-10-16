@@ -31,7 +31,7 @@ GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 # "cannot use type []os.FileInfo as type []fs.FileInfo". El arreglo es alinear io/fs como dueno y que os
 # reusa por alias (~150 lineas); se midio que a mitad de camino el motor baja a 40 de 142 porque os deja
 # de compilar. Va como paso propio, no como parche. Ver evidencia dc-002.8-motor-por-capas.txt.
-ORDEN="${ORDEN:-unicode unicode/utf8 unicode/utf16 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv encoding/binary encoding/hex compress/zlib compress/gzip container/ring sort container/heap image/color image time io/fs os log bufio encoding/csv io/ioutil path/filepath runtime sync/atomic sync}"
+ORDEN="${ORDEN:-unicode unicode/utf8 unicode/utf16 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv encoding/binary encoding/hex compress/zlib compress/gzip container/ring sort container/heap image/color image image/draw time io/fs os log bufio encoding/csv io/ioutil path/filepath runtime sync/atomic sync}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2
