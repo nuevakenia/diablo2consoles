@@ -1,0 +1,153 @@
+DC-002.5b: flag y encoding/csv (los paquetes de formato) — MEDIDO
+===============================================================
+
+Fecha: 2026-10-16.  Rama DC-002.  Un solo agente sobre el repo.
+
+Lo que pide la tarjeta: flag (FlagSet, Bool/String/Var, Parse y los argumentos posicionales) y
+encoding/csv (Reader con comillas y comas adentro, ReadAll, Writer), con el mismo criterio que el
+resto de la stdlib minima: prueba diferencial en el host en los DOS anchos de int, casos horneados en
+el corpus de la consola, mutador que la ponga en rojo y los limites declarados en el codigo.
+
+ESTADO DE PARTIDA (medido, no supuesto)
+---------------------------------------
+El paquete ya estaba escrito por una corrida anterior y las dos puntas del hilo estaban SIN ATAR:
+
+  - console/dc/std/flag/flag.go            20.815 bytes (escrito, no integrado)
+  - console/dc/std/encoding/csv/csv.go     14.957 bytes (escrito, no integrado)
+  - console/dc/std/difftest/dc0025b_test.go  30.944 bytes (escrito, con 2 defectos propios)
+  - flag NO estaba en el ORDEN de build-std-gox.sh: la consola no tenia el paquete
+  - csv SI estaba en el ORDEN, pero el archivo decia (falso) que no compilaba
+  - el corpus de la consola no tenia ni un caso de flag ni de csv
+  - no habia ni un mutante de flag ni de csv
+
+Primera medicion del difftest del host: ROJO en TestFlagPrintDefaults (3 expectativas), y con eso
+arreglado el proceso MORIA en TestFlagGlobal (exit status 2, sin decir por que).
+
+
+LOS 7 DEFECTOS QUE APARECIERON MIDIENDO (y su arreglo)
+------------------------------------------------------
+1. TEST (no el paquete): las expectativas del texto de ayuda estaban escritas a mano y eran falsas.
+   La salida real del flag de Go (medida con un programa minimo, Go 1.27.1) dice:
+     - las booleanas de UNA letra llevan la ayuda en la MISMA linea con un tabulador:
+       "  -v\tShow version"  (no "  -v\n" + la ayuda abajo);
+     - un default que es el VALOR CERO no se imprime: no hay "(default 0)" para dedicated/players, y
+       si hay "(default 4)" para -l.
+   Arreglo: las expectativas pasan a ser las MEDIDAS y se le exigen a los DOS textos (el de Go y el
+   nuestro), asi el dia que Go cambie el formato la prueba lo dice.
+
+2. TEST (no el paquete): el caso "global con banderas" traia una bandera de nombre INEXISTENTE. Los
+   dos conjuntos de esa prueba son ExitOnError, asi que el flag REAL de Go termina el proceso con
+   os.Exit(2) ADENTRO de la prueba: la suite entera se cae sin imprimir un solo "--- FAIL" (medido:
+   exit status 2). Arreglo: el caso usa solo nombres definidos, con el comentario de por que.
+
+3. TEST (no el paquete): a NUESTRO csv se le daba el strings.Reader de la biblioteca estandar de Go.
+   El io.EOF de la stdlib de Go NO es el io.EOF de d2std (en la consola no hay stdlib de Go), asi que
+   el Reader nuestro veia un fin de entrada "ajeno". Medido: 255 de 429 combinaciones en rojo con
+   "err=EOF" donde Go da "err=" (vacio). Arreglo: nuestro lado lee de bytes.NewReader de la consola
+   (que es, ademas, el montaje fiel: en la consola el lector es de la consola).
+
+4. PAQUETE csv (defecto real de comportamiento): ReadAll devolvia el fin de la entrada como error.
+   Arreglo: la traduccion io.EOF -> nil (que ya estaba escrita) ahora se prueba: mutante 23.
+
+5. PAQUETE bufio (defecto real, cazado por la suite de csv): Flush NO detectaba el SHORT WRITE. Si la
+   salida de abajo acepta una parte del buffer y no dice nada (n < len, err == nil), Go marca
+   io.ErrShortWrite y guarda el error; el nuestro daba por buena la escritura, tiraba los bytes que
+   no salieron y PERDIA el error. Medido: csv.Writer.Error() daba nil donde el de Go da error.
+   Arreglo: Flush copia la semantica de Go (conserva los bytes que no salieron y guarda el error) y
+   se agrego io.ErrShortWrite al paquete io (mismo texto que el de Go). Mutante 24.
+
+6. SUITE del host (hueco de un hito anterior): test-std-host.sh estaba en ROJO desde el commit
+   4bc01457 (DC-002.8) con "missing function body" de compress/zlib y compress/gzip, que son puentes
+   //extern a la zlib de KOS y no compilan en el host (mismo caso que os/time/log). Nadie corrio esa
+   prueba desde entonces. Arreglo: los dos entran a la lista de excluidos, con el comentario del
+   porque y de cuando.
+
+7. CORPUS de la consola (lo cazo la propia consola): el caso "-n=123456789012" no puede vivir en el
+   corpus. El corpus se calcula con el int de 64 bits del host y en la consola el int es de 32.
+   Medido: la consola dio "value out of range" y quedo 1 caso en rojo (2355 casos, 1 mal).
+   El difftest tampoco lo puede cazar: compara Go contra nosotros CON EL MISMO ancho. Va solo al
+   difftest con GOARCH=386 (el ancho de la consola), y en el corpus queda el tope exacto de 32 bits
+   (2147483647), que da lo mismo en los dos anchos.
+
+
+PRUEBA DIFERENCIAL DEL HOST (scripts/console/test-std-host.sh) — VERDE en amd64 y 386
+------------------------------------------------------------------------------------
+  flag: 45/45 lineas de comandos identicas al flag de Go
+  flag: PrintDefaults identico en 2 conjuntos (618 bytes el del motor)
+  flag: ExitOnError comparado contra el PROCESO de Go en 5 lineas (codigo de salida de verdad)
+  flag: el conjunto global (CommandLine/Argumentos) coincide con Go en 3 lineas
+  csv Reader: 462/462 combinaciones identicas a Go (42 entradas x 11 juegos de opciones)
+  csv Reader de a uno: 10/10 identicas (filas, FieldPos y error)
+  csv: ReuseRecord comparte la rebanada en los dos (Go=true, nuestro=true)
+  csv Writer: 18/18 identicos a Go (bytes, error y error pegajoso)
+  csv: el error de la salida de abajo queda pegajoso en los dos (Go=true, nuestro=true)
+  csv: 6 tablas del motor (tabulador, campos libres, comillas perezosas) identicas
+  csv: los 2 limites declarados se comportan como estan escritos
+
+Los dos anchos importan: la corrida de 386 es la del int de 32 bits de la consola. Ahi viven los
+casos que el corpus no puede llevar (los valores que no entran en 32 bits).
+
+
+MUTADOR (scripts/console/mutar-std-host.sh) — 26/26 cazados, control sano, arbol restaurado
+-------------------------------------------------------------------------------------------
+Los 4 nuevos (los 22 anteriores siguen cazados):
+  23. csv: ReadAll devuelve el fin de la entrada como error        -> cazado
+  24. bufio: Flush no detecta el short write                       -> cazado (TestCSVWriterErrorPegajoso)
+  25. flag: la booleana sin valor se pone en false                 -> cazado (TestFlagParseContraGo)
+  26. csv: LazyQuotes ignorado (la comilla suelta es error)        -> cazado (TestCSVReaderContraGo)
+Los dos mutantes de los defectos reales (23 y 24) van a los paquetes, no a la prueba.
+
+Ajuste del propio mutador: los grep de detalle ahora van con -a. La salida del difftest trae los
+separadores de control del serializado de csv (\x01 y \x02) y sin -a grep la trata como binaria: el
+mutante 23 se cazaba pero imprimia "coincidencia en fichero binario" en vez de la linea del fallo.
+
+
+CORPUS DE LA CONSOLA (Flycast) — 2354 casos, 2354 bien, 0 mal
+-------------------------------------------------------------
+  STD-TEST: casos 2354 bien 2354 mal 0
+  STD-TEST: RESULTADO OK - coincidio con la stdlib real en la consola
+
+  casos nuevos: 504 (42 de flag + 462 de csv). El corpus venia en 1850.
+  El primer intento dio 2355 casos / 1 mal: el caso del int de 12 digitos (defecto 7 de arriba).
+  Lo que se compara, en las dos puntas: en flag el TEXTO armado (valor de cada bandera, argumentos
+  que quedan, cuantas se pusieron, Parsed, el error Y la salida de la ayuda); en csv las filas
+  serializadas, el texto del error (que trae linea y columna) y el avance de la entrada (InputOffset).
+
+
+TAMANOS
+-------
+  flag.gox              198.020 bytes
+  encoding/csv.gox       95.676 bytes
+  stdlib minima         37 archivos .gox, 2.094.200 bytes en total (antes de esta tarjeta:
+                        35 archivos, 1.800.504 bytes)  -> +293.696 bytes
+  build de la stdlib    6,2 s (34 paquetes de la stdlib + 4 de terceros)
+  POC stdlib (ELF)      3.736.640 bytes; 1ST_READ.BIN 748.556 bytes
+  POC motor-dc6 (ELF)   3.624.332 bytes
+
+BARRERA DEL HITO (scripts/console/compare-motor-dc6.sh): 31 lineas identicas, 30 frames. El POC del
+motor sigue IGUAL con la stdlib nueva (bufio e io tocados incluidos).
+
+
+ARCHIVOS TOCADOS
+----------------
+  console/dc/std/bufio/bufio.go          Flush: el short write (io.ErrShortWrite) como en Go
+  console/dc/std/io/io.go                nuevo io.ErrShortWrite
+  console/dc/std/difftest/dc0025b_test.go  los 3 defectos del test (1, 2 y 3)
+  console/dc/std/cmd/gen-casos/main.go   los casos de flag y csv (42 + 462) con los esperados de Go
+  console/dc/poc/stdlib/main.go          correrFlag() y correrCSV() (el mismo armado que el host)
+  scripts/console/test-std-host.sh       compress/zlib y compress/gzip a los excluidos
+  scripts/console/mutar-std-host.sh      mutantes 23-26 + grep -a
+  scripts/console/build-std-gox.sh       flag al ORDEN + los comentarios viejos de csv
+
+LO QUE QUEDA AFUERA, DECLARADO
+------------------------------
+  - flag.Duration / DurationVar no estan (pedirian time.ParseDuration): el motor las usa solo en
+    cmd/od2server y cmd/od2mpbot, que no son el binario del juego.
+  - flag no importa os ni time: los argumentos (Argumentos) y el terminar el proceso (Salir) son
+    variables que engancha el arranque. Es lo que deja que este paquete se pueda comparar contra el
+    flag de Go en el host.
+  - csv: el Writer esta y se prueba en el host (18 casos), pero NO va al corpus de la consola: el
+    motor solo LEE tablas. TrimLeadingSpace no saltea los espacios no-ASCII (no hay tablas de
+    Unicode) y esta declarado en la cabecera del paquete con su prueba.
+  - El corpus de la consola no puede llevar casos que dependan del ANCHO DE INT (el esperado se
+    calcula con el int de 64 bits del host): esos viven en el difftest del host, que corre en 386.

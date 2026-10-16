@@ -15,8 +15,10 @@ import (
 	"bytes"
 	"container/ring"
 	"encoding/binary"
+	"encoding/csv"
 	"encoding/hex"
 	"errors"
+	"flag"
 	"fmt"
 	"hash/fnv"
 	"math"
@@ -74,6 +76,8 @@ func main() {
 	correrHash()
 	correrBinary()
 	correrSort()
+	correrFlag()
+	correrCSV()
 	correrPropiedades()
 	medirCostoFloat64()
 
@@ -554,6 +558,87 @@ func correrBinary() {
 			valor = "bits " + hex64(bits64(v))
 		}
 		check("encoding/binary", "Read "+c.tipo, c.valor, valor)
+	}
+}
+
+// ---- flag y encoding/csv (DC-002.5b): los dos paquetes de formato ----
+//
+// El armado de abajo esta COPIADO del generador del host (console/dc/std/cmd/gen-casos), que usa el
+// flag y el encoding/csv REALES de Go para calcular los esperados que vienen horneados en casos_gen.go.
+// Si se cambia uno hay que cambiar el otro: si divergen, el corpus compararia dos armados distintos en
+// vez de comparar el paquete.
+
+// acumulaFlag es el flag.Value de las dos puntas.
+type acumulaFlag struct{ vals []string }
+
+func (a *acumulaFlag) String() string { return strings.Join(a.vals, ",") }
+
+func (a *acumulaFlag) Set(s string) error {
+	if s == "error" {
+		return errors.New("valor que no acepta")
+	}
+	a.vals = append(a.vals, s)
+	return nil
+}
+
+// textoArgv: como se nombra cada linea de comandos en el mensaje de fallo.
+func textoArgv(args []string) string {
+	if len(args) == 0 {
+		return "sin argumentos"
+	}
+	return strconv.Quote(strings.Join(args, " "))
+}
+
+func armarFlag(args []string) string {
+	fs := flag.NewFlagSet("corpus", flag.ContinueOnError)
+	var buf strings.Builder
+	fs.SetOutput(&buf)
+	var a acumulaFlag
+	fb := fs.Bool("b", false, "bandera b")
+	fo := fs.Bool("otra", true, "bandera otra")
+	fstr := fs.String("s", "def", "texto de la bandera s")
+	fn := fs.Int("n", 7, "numero de la bandera n")
+	fs.Var(&a, "v", "valor acumulado")
+	err := fs.Parse(args)
+	errTexto := ""
+	if err != nil {
+		errTexto = err.Error()
+	}
+	return fmt.Sprintf("b=%t otra=%t s=%q n=%d v=%q err=%q args=%q puestas=%d parsed=%t salida=%q",
+		*fb, *fo, *fstr, *fn, a.String(), errTexto, strings.Join(fs.Args(), "|"), fs.NFlag(), fs.Parsed(), buf.String())
+}
+
+func correrFlag() {
+	for _, c := range casosFlag {
+		check("flag", textoArgv(c.argv), c.esperado, armarFlag(c.argv))
+	}
+}
+
+// leerCSV: la lectura con el encoding/csv de la consola, con la MISMA forma de resumir que el host
+// (filas serializadas, texto del error y avance de la entrada).
+func leerCSV(c casoCSV) string {
+	r := csv.NewReader(bytes.NewReader([]byte(c.datos)))
+	r.Comma, r.Comment, r.FieldsPerRecord = c.coma, c.comentario, c.campos
+	r.LazyQuotes, r.TrimLeadingSpace, r.ReuseRecord = c.perezoso, c.espacios, c.reusa
+	filas, err := r.ReadAll()
+	errTexto := ""
+	if err != nil {
+		errTexto = err.Error()
+	}
+	return "filas=" + serialFilasCSV(filas) + " err=" + errTexto + " offset=" + strconv.FormatInt(r.InputOffset(), 10)
+}
+
+func serialFilasCSV(filas [][]string) string {
+	trozos := make([]string, len(filas))
+	for i, f := range filas {
+		trozos[i] = strings.Join(f, "\x01")
+	}
+	return strings.Join(trozos, "\x02")
+}
+
+func correrCSV() {
+	for _, c := range casosCSV {
+		check("encoding/csv", c.nombre, c.esperado, leerCSV(c))
 	}
 }
 

@@ -49,6 +49,14 @@ type ByteWriter interface {
 // lo usa para detectar archivos truncados (io.ErrUnexpectedEOF, en la lista de simbolos del muro).
 var ErrUnexpectedEOF = errors.New("unexpected EOF")
 
+// ErrShortWrite es lo que devuelve un Writer que escribio MENOS bytes de los que le pidieron sin dar
+// error. En Go lo arma bufio cuando la salida de abajo acepta una parte del buffer y no dice nada
+// (b.wr.Write devuelve n < len y err == nil): sin eso, el que escribe cree que escribio todo y el
+// error se pierde. Medido en DC-002.5b: el Writer de csv (que apoya en bufio.Writer) no guardaba el
+// error pegajoso que el de Go si guarda, porque el short write no se detectaba. Es el mismo texto que
+// el de Go.
+var ErrShortWrite = errors.New("short write")
+
 // ReadFull lee len(buf) bytes de r. Devuelve EOF solo si no leyo NADA: si leyo una parte y se
 // corto, devuelve ErrUnexpectedEOF (es la semantica de Go, y es la que el motor espera para decir
 // "archivo truncado" en vez de "archivo vacio").

@@ -178,6 +178,11 @@ func NewWriterSize(wr io.Writer, size int) *Writer {
 func (b *Writer) Buffered() int { return b.n }
 
 // Flush escribe lo que quedo en el buffer.
+//
+// El SHORT WRITE se detecta, como en Go: si la salida de abajo escribe menos bytes de los que le
+// pidieron SIN dar error, queda io.ErrShortWrite (y los bytes que no salieron se conservan en el
+// buffer). Sin esto el error se pierde: el que escribe cree que escribio todo y Error() devuelve nil.
+// Medido en DC-002.5b con el Writer de csv (ver io.ErrShortWrite).
 func (b *Writer) Flush() error {
 	if b.err != nil {
 		return b.err
@@ -185,8 +190,15 @@ func (b *Writer) Flush() error {
 	if b.n == 0 {
 		return nil
 	}
-	_, err := b.wr.Write(b.buf[:b.n])
+	n, err := b.wr.Write(b.buf[:b.n])
+	if n < b.n && err == nil {
+		err = io.ErrShortWrite
+	}
 	if err != nil {
+		if n > 0 && n < b.n {
+			copy(b.buf[0:b.n-n], b.buf[n:b.n])
+		}
+		b.n -= n
 		b.err = err
 		return err
 	}

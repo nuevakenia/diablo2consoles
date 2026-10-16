@@ -29,7 +29,12 @@ for arch in amd64 386; do
     # por ellos ("build failed"), porque nadie corrio esta prueba despues de escribir time y de darle a
     # log el import de os. Es exactamente para eso que esta la prueba. Se los excluye por
     # nombre y ademas se exige que NO compilen, para que el dia que eso cambie la prueba lo diga.
-    if ! (cd "$STD" && GOARCH="$arch" go test -timeout 60s $(go list ./... | grep -vE 'd2std/(os|time|log|runtime|sync/atomic)$') 2>&1 | tail -25); then
+    # compress/zlib y compress/gzip entraron a la lista en DC-002.5b: son un puente //extern a la zlib
+    # de KOS (commit 4bc01457, DC-002.8) y dejaron esta prueba en rojo con "missing function body"
+    # desde entonces, porque nadie la corrio hasta DC-002.5b. Mismo caso que time y log: el hueco lo
+    # ve el que corre la prueba.
+    EXCLUIDOS='d2std/(os|time|log|runtime|sync/atomic|compress/zlib|compress/gzip)$'
+    if ! (cd "$STD" && GOARCH="$arch" go test -timeout 60s $(go list ./... | grep -vE "$EXCLUIDOS") 2>&1 | tail -25); then
         rc=1
     fi
 done

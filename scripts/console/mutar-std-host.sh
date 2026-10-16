@@ -76,15 +76,18 @@ mutacion() { # <nombre> <archivo> <buscar> <poner> <goarch>
     # ROJO es que un test falle (--- FAIL), pero tambien lo es que el proceso se caiga: el mutante del
     # ancho del elemento de sort lee memoria con el ancho equivocado y revienta con SIGSEGV, sin llegar
     # a imprimir "--- FAIL". Las dos cosas son la suite cazando el defecto (medido: 0x3b47b99ec570).
-    if grep -qE -- "--- FAIL|^fatal error|SIGSEGV|^panic:" "$TMP/salida"; then
+    if grep -qaE -- "--- FAIL|^fatal error|SIGSEGV|^panic:" "$TMP/salida"; then
         echo "   cazado: la suite se puso rojo (aserto, caida o cuelgue):"
-        grep -m1 -- "--- FAIL" "$TMP/salida" | sed 's/^/     /'
-        grep -m1 -A1 -- "difftest_test.go:" "$TMP/salida" | tail -1 | cut -c1-150 | sed 's/^/     /'
+        # -a: la salida del difftest puede traer bytes de control (\x01 y \x02, los separadores del
+        # serializado de csv) y sin -a grep la trata como binaria y no muestra la linea del fallo
+        # ("coincidencia en fichero binario"): un cazado que no se puede leer es un cazado a medias.
+        grep -am1 -- "--- FAIL" "$TMP/salida" | sed 's/^/     /'
+        grep -am1 -A1 -- "difftest_test.go:" "$TMP/salida" | tail -1 | cut -c1-150 | sed 's/^/     /'
         cazados=$((cazados + 1))
-    elif grep -qE "build failed|cannot|undefined|syntax error" "$TMP/salida"; then
+    elif grep -qaE "build failed|cannot|undefined|syntax error" "$TMP/salida"; then
         # No es un mutante: es codigo que no compila. No prueba nada sobre la suite y ensucia el conteo.
         echo "   LA MUTACION NO COMPILA (no prueba nada de la suite):"
-        grep -m1 -E "build failed|cannot|undefined|syntax error" "$TMP/salida" | cut -c1-150 | sed 's/^/     /'
+        grep -am1 -E "build failed|cannot|undefined|syntax error" "$TMP/salida" | cut -c1-150 | sed 's/^/     /'
         rc=1
     else
         echo "   LA SUITE NO LO CAZO: paso igual con el mutante puesto (compilando)"
@@ -324,6 +327,39 @@ mutacion "bufio: Reader no rellena el buffer" \
     "bufio/bufio.go" \
     $'if b.Buffered() == 0 && b.err == nil {' \
     $'if false {' \
+    amd64
+
+echo
+echo "== 23. csv: ReadAll traduce el fin de la entrada a nil (no lo devuelve como error) =="
+# El defecto real de DC-002.5b: con el lector de la consola, ReadAll devolvia err=EOF donde Go da
+# err= (vacio). Medido: 255 de 429 combinaciones en rojo antes del arreglo.
+mutacion "csv: ReadAll devuelve el fin de la entrada como error" \
+    "encoding/csv/csv.go" \
+    $'\t\trecord, err := r.readRecord(nil)\n\t\tif err == io.EOF {\n\t\t\treturn records, nil\n\t\t}' \
+    $'\t\trecord, err := r.readRecord(nil)\n\t\tif err == io.EOF {\n\t\t\treturn records, err\n\t\t}' \
+    amd64
+
+echo "== 24. bufio: el short write de Flush queda con error pegado =="
+# El otro defecto real: la salida de abajo escribe MENOS bytes de los que le pidieron sin dar error, y
+# sin esto el error se pierde (csv.Writer.Error() devolvia nil donde el de Go devuelve error).
+mutacion "bufio: Flush no detecta el short write" \
+    "bufio/bufio.go" \
+    $'\tn, err := b.wr.Write(b.buf[:b.n])\n\tif n < b.n && err == nil {\n\t\terr = io.ErrShortWrite\n\t}' \
+    $'\tn, err := b.wr.Write(b.buf[:b.n])' \
+    amd64
+
+echo "== 25. flag: una booleana SIN valor vale true =="
+mutacion "flag: la booleana sin valor se pone en false" \
+    "flag/flag.go" \
+    $'\t\t\tif err := fv.Set("true"); err != nil {' \
+    $'\t\t\tif err := fv.Set("false"); err != nil {' \
+    amd64
+
+echo "== 26. csv: LazyQuotes es lo que deja pasar la comilla suelta (el motor la usa) =="
+mutacion "csv: LazyQuotes ignorado (la comilla suelta es error siempre)" \
+    "encoding/csv/csv.go" \
+    $'\t\t\tif !r.LazyQuotes {\n\t\t\t\tif j := bytes.IndexByte(field, \'"\'); j >= 0 {' \
+    $'\t\t\tif true {\n\t\t\t\tif j := bytes.IndexByte(field, \'"\'); j >= 0 {' \
     amd64
 
 echo

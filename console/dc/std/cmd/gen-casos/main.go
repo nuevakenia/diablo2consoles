@@ -12,7 +12,10 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/csv"
 	"encoding/hex"
+	"errors"
+	"flag"
 	"fmt"
 	"hash/fnv"
 	"math"
@@ -478,6 +481,36 @@ func main() {
 		fmt.Fprintf(&sb, "	{%s, %q, %q},\n", bytesLiteral(readBytes), t, valor)
 	}
 	fmt.Fprintf(&sb, "}\n\n")
+	// ---- flag y encoding/csv (DC-002.5b): los dos paquetes de formato ----
+	//
+	// El armado de las banderas y la lectura de csv son los MISMOS en las dos puntas: el POC de la
+	// consola tiene copiado el mismo codigo (poc/stdlib/main.go, armarFlag / leerCSV) pero con
+	// d2std/flag y d2std/encoding/csv. El corpus compara el TEXTO armado (valores, argumentos que
+	// quedan, cuantas se pusieron, el error y la salida de la ayuda) y, en csv, las filas, el texto
+	// del error y el avance de la entrada.
+	//
+	// Lo que NO va aca: los casos cuyo resultado depende del ANCHO DE INT (un Int con un valor que no
+	// entra en 32 bits, o el tope de int64). Este corpus se calcula con el int de 64 bits del host y
+	// en la consola el int es de 32: esos casos viven en la prueba diferencial del host
+	// (difftest/dc0025b_test.go), que corre en los dos anchos. Tampoco va el Writer de csv: el motor
+	// no lo usa (solo lee tablas) y sus bytes se comparan en el host.
+	fmt.Fprintf(&sb, "type casoFlag struct {\n	argv     []string\n	esperado string\n}\n\nvar casosFlag = []casoFlag{\n")
+	for _, argv := range argvsFlag {
+	fmt.Fprintf(&sb, "	{%s, %q},\n", strsLiteral(argv), armarFlag(argv))
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+
+	fmt.Fprintf(&sb, "type casoCSV struct {\n	nombre    string\n	datos     string\n	coma      rune\n	comentario rune\n	campos    int\n	perezoso  bool\n	espacios  bool\n	reusa     bool\n	esperado  string\n}\n\nvar casosCSV = []casoCSV{\n")
+	for _, e := range entradasCSV {
+	for _, op := range opcionesCSV {
+		fmt.Fprintf(&sb, "	{%q, %q, rune(%d), rune(%d), %d, %t, %t, %t, %q},\n",
+			e.nombre + " / " + op.nombre, e.datos, op.coma, op.comentario, op.campos, op.perezoso, op.espacios, op.reusa,
+			leerCSVHost(e.datos, op))
+	}
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+	fmt.Fprintf(&sb, "// resumen de lo medido en el host: flag %d casos, csv %d combinaciones\\n", len(argvsFlag), len(entradasCSV)*len(opcionesCSV))
+
 	fmt.Fprintf(&sb, "// resumen de lo medido en el host: math %d casos, bits %d casos\n", nMath, nBits)
 
 	fmt.Print(sb.String())
@@ -619,4 +652,202 @@ func floatLiteral(f float64) string {
 func hex2(b byte) string {
 	const hex = "0123456789abcdef"
 	return string([]byte{hex[b>>4], hex[b&0xF]})
+}
+
+// ============================================================================
+// flag y encoding/csv (DC-002.5b)
+//
+// El armado de abajo (armarFlag y leerCSVHost) esta COPIADO en el POC de la consola
+// (console/dc/poc/stdlib/main.go) con d2std/flag y d2std/encoding/csv: son las dos puntas del mismo
+// instrumento. Si se cambia aca, hay que cambiarlo alla: si divergen, el corpus deja de comparar el
+// paquete y empieza a comparar dos armados distintos.
+// ============================================================================
+
+// acumulaFlag es el flag.Value de las dos puntas (String y Set, que es el contrato de flag.Value).
+type acumulaFlag struct{ vals []string }
+
+func (a *acumulaFlag) String() string { return strings.Join(a.vals, ",") }
+
+func (a *acumulaFlag) Set(s string) error {
+	if s == "error" {
+		return errors.New("valor que no acepta")
+	}
+	a.vals = append(a.vals, s)
+	return nil
+}
+
+// armarFlag corre el argv con el flag REAL de Go y devuelve el texto medible.
+func armarFlag(args []string) string {
+	fs := flag.NewFlagSet("corpus", flag.ContinueOnError)
+	var buf strings.Builder
+	fs.SetOutput(&buf)
+	var a acumulaFlag
+	fb := fs.Bool("b", false, "bandera b")
+	fo := fs.Bool("otra", true, "bandera otra")
+	fstr := fs.String("s", "def", "texto de la bandera s")
+	fn := fs.Int("n", 7, "numero de la bandera n")
+	fs.Var(&a, "v", "valor acumulado")
+	err := fs.Parse(args)
+	errTexto := ""
+	if err != nil {
+		errTexto = err.Error()
+	}
+	return fmt.Sprintf("b=%t otra=%t s=%q n=%d v=%q err=%q args=%q puestas=%d parsed=%t salida=%q",
+		*fb, *fo, *fstr, *fn, a.String(), errTexto, strings.Join(fs.Args(), "|"), fs.NFlag(), fs.Parsed(), buf.String())
+}
+
+// argvsFlag: las lineas de comandos que se prueban en las DOS puntas. Las mismas del difftest del
+// host, menos las que dependen del ancho de int (ahi estan marcadas soloHost).
+var argvsFlag = [][]string{
+	nil,
+	{},
+	{"-b"},
+	{"-b=true"},
+	{"-b=false"},
+	{"-b=0"},
+	{"-b=1"},
+	{"-b=T"},
+	{"--b"},
+	{"-b=quizas"},
+	{"-s=hola"},
+	{"-s", "hola mundo"},
+	{"-s="},
+	{"-s", "-b"},
+	{"--s=a\\b"},
+	{"-s=con\nsalto"},
+	{"-n=42"},
+	{"-n", "-42"},
+	{"-n=0x1f"},
+	{"-n=0o17"},
+	{"-n=017"},
+	{"-n=+5"},
+	{"-n=0b101"},
+	{"-n=abc"},
+	// el tope exacto del int de 32 bits SI va: entra en los dos anchos y da el mismo valor en texto.
+	// El de 12 digitos (123456789012) NO: en el host (int de 64 bits) entra y en la consola (int de 32)
+	// es "value out of range". Medido: lo cazo la corrida en la consola (2355 casos, 1 en rojo) y no lo
+	// puede cazar el difftest, que compara Go contra nosotros CON EL MISMO ancho. Ese caso vive solo en
+	// el difftest con GOARCH=386, que es el ancho de la consola.
+	{"-n=2147483647"},
+	{"-n=1", "-n=2"},
+	{"-v=a", "-v=b"},
+	{"-v=a", "-v=error"},
+	{"-v"},
+	{"-z"},
+	{"--zz=1"},
+	{"-h"},
+	{"--help"},
+	{"-"},
+	{"-b", "--", "-n", "3"},
+	{"---b"},
+	{"-=1"},
+	{"uno", "dos"},
+	{"uno", "-b"},
+	{"-1"},
+	{"-s"},
+	{"-b", "-n", "3", "arg1", "-s=x"},
+}
+
+func strsLiteral(v []string) string {
+	partes := make([]string, 0, len(v))
+	for _, s := range v {
+		partes = append(partes, strconv.Quote(s))
+	}
+	return "[]string{" + strings.Join(partes, ", ") + "}"
+}
+
+// opcionesCSV / entradasCSV: los mismos juegos de opciones y las mismas entradas que el difftest del
+// host (difftest/dc0025b_test.go). El del motor va primero: tabulador, campos libres y comillas
+// perezosas, que es como el motor lee sus tablas de texto.
+type opcionCSV struct {
+	nombre     string
+	coma       rune
+	comentario rune
+	campos     int
+	perezoso   bool
+	espacios   bool
+	reusa      bool
+}
+
+var opcionesCSV = []opcionCSV{
+	{"por defecto (coma)", ',', 0, 0, false, false, false},
+	{"del motor (tabulador, campos libres, perezoso)", '	', 0, -1, true, false, false},
+	{"campos fijos en 3", ',', 0, 3, false, false, false},
+	{"con comentario #", ',', '#', 0, false, false, false},
+	{"salteando el espacio del principio", ',', 0, 0, false, true, false},
+	{"reusando la rebanada", ',', 0, 0, false, false, true},
+	{"punto y coma", ';', 0, 0, false, false, false},
+	{"separador invalido (la coma es el comentario)", ',', ',', 0, false, false, false},
+	{"separador invalido (el comentario es una comilla)", ',', '"', 0, false, false, false},
+	{"separador cero", 0, 0, 0, false, false, false},
+	{"separador de mas de un byte", '\u2022', 0, 0, false, false, false},
+}
+
+var entradasCSV = []struct {
+	nombre string
+	datos  string
+}{
+	{"vacia", ""},
+	{"solo salto", "\n"},
+	{"solo dos saltos", "\n\n"},
+	{"una fila", "a,b,c\n"},
+	{"una fila sin salto final", "a,b,c"},
+	{"dos filas", "a,b,c\nd,e,f\n"},
+	{"dos filas sin salto final", "a,b,c\nd,e,f"},
+	{"finales de Windows", "a,b\r\nc,d\r\n"},
+	{"finales de Windows sin salto final", "a,b\r\nc,d"},
+	{"campo entre comillas", "a,\"b\",c\n"},
+	{"coma adentro de comillas", "\"a,b\",c\n"},
+	{"comilla doble adentro", "\"a\"\"b\",c\n"},
+	{"campo de varias lineas", "\"multi\nlinea\",x\n"},
+	{"campo de varias lineas con Windows", "\"multi\r\nlinea\",x\r\n"},
+	{"varias lineas y salto final", "\"a\nb\nc\",d\n"},
+	{"comilla que cierra y sigue texto", "\"a\"b,c\n"},
+	{"comilla suelta en el medio", "a\"b,c\n"},
+	{"comilla suelta al final", "ab\",c\n"},
+	{"campo vacio entre comillas", "\"\"\n"},
+	{"cuatro comillas", "\"\"\"\"\n"},
+	{"comilla sola", "\"\n"},
+	{"comilla sin cerrar con linea nueva", "\"a\n"},
+	{"comilla sin cerrar al final", "\"a"},
+	{"comilla y nada", "\""},
+	{"fila de distinto largo", "a,b\nc\n"},
+	{"fila de distinto largo al reves", "a\nc,d,e\n"},
+	{"lineas vacias en el medio", "a,b\n\n\nd,e\n"},
+	{"saltos de sobra al final", "a,b\n\n\n"},
+	{"espacios alrededor", "  a , b \n"},
+	{"espacios adentro del campo", "a b,c\n"},
+	{"comentario", "#comentario\na,b\n"},
+	{"comentario con espacio adelante", " #no comentario\na,b\n"},
+	{"comentario al final", "a,b\n#chau\n"},
+	{"todo comentarios", "#uno\n#dos\n"},
+	{"con tabuladores", "a	b	c\nd	e	f\n"},
+	{"tabulador adentro de comillas", "\"a	b\",c\n"},
+	{"campo vacio al final", "a,b,\n"},
+	{"fila de un separador", ",\n"},
+	{"no ascii", "café,niño\n"},
+	{"BOM al principio", "\ufeffa,b\n"},
+	{"byte nulo adentro", "a,b\x00c\n"},
+	{"campo con salto de Windows suelto", "a\rb,c\n"},
+}
+
+// leerCSVHost: la misma corrida que hace el POC de la consola, con el encoding/csv REAL de Go.
+func leerCSVHost(datos string, op opcionCSV) string {
+	r := csv.NewReader(strings.NewReader(datos))
+	r.Comma, r.Comment, r.FieldsPerRecord = op.coma, op.comentario, op.campos
+	r.LazyQuotes, r.TrimLeadingSpace, r.ReuseRecord = op.perezoso, op.espacios, op.reusa
+	filas, err := r.ReadAll()
+	errTexto := ""
+	if err != nil {
+		errTexto = err.Error()
+	}
+	return "filas=" + serialFilasHost(filas) + " err=" + errTexto + " offset=" + strconv.FormatInt(r.InputOffset(), 10)
+}
+
+func serialFilasHost(filas [][]string) string {
+	trozos := make([]string, len(filas))
+	for i, f := range filas {
+		trozos[i] = strings.Join(f, "\x01")
+	}
+	return strings.Join(trozos, "\x02")
 }

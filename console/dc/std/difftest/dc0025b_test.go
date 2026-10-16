@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	mybytes "d2std/bytes"
 	mycsv "d2std/encoding/csv"
 	myflag "d2std/flag"
 )
@@ -127,7 +128,7 @@ var argvs = []struct {
 	{"int con signo", []string{"-n=+5"}, false},
 	{"int binario", []string{"-n=0b101"}, false},
 	{"int malo", []string{"-n=abc"}, false},
-	{"int doce digitos (entra en 32 y en 64)", []string{"-n=123456789012"}, false},
+	{"int de doce digitos (NO entra en el int de 32: en la consola es out of range)", []string{"-n=123456789012"}, true},
 	{"int del tope de 32 bits", []string{"-n=2147483647"}, false},
 	{"int mas grande que el tope de 32 (esto lo ve el int de 32)", []string{"-n=4294967296"}, true},
 	{"int que desborda 64", []string{"-n=99999999999999999999"}, true},
@@ -213,17 +214,29 @@ func TestFlagPrintDefaults(t *testing.T) {
 	if quiero != tengo {
 		t.Errorf("PrintDefaults del motor:\n--- Go ---\n%s\n--- nuestro ---\n%s", quiero, tengo)
 	}
-	// el texto del motor tiene que traer los siete nombres y los defaults con valor
-	for _, esperado := range []string{
-		"  -profile string\n", "  -dedicated\n", "  -players int\n",
-		"  -l int\n", "  -lang string\n", "  -v\n", "  -h\n",
-		`  -profile string`, `(default 0)`,
-	} {
-		if !strings.Contains(quiero, esperado) {
-			t.Errorf("el texto del motor no trae %q", esperado)
+	// El texto del motor tiene que traer las siete banderas. Los textos esperados NO van escritos a
+	// mano: estan MEDIDOS contra la salida del flag de Go (2026-10-16, Go 1.27.1):
+	//   - las booleanas de UNA letra llevan la ayuda en la MISMA linea, separadas por un tabulador
+	//     ("  -v	Show version"), no en la linea de abajo;
+	//   - un default que es el VALOR CERO no se imprime: no hay "(default 0)" para dedicated/players,
+	//     y si hay "(default 4)" para l.
+	// Se le exige a los DOS textos (el de Go y el nuestro): si Go cambia el formato algun dia, esta
+	// prueba lo dice en vez de quedar comparando contra un recuerdo.
+	for _, caso := range []struct {
+		nombre string
+		texto  string
+	}{{"Go", quiero}, {"nuestro", tengo}} {
+		for _, esperado := range []string{
+			"  -profile string\n", "  -dedicated\n", "  -players int\n",
+			"  -l int\n", "  -lang string\n", "  -v	Show version\n", "  -h	Show help\n",
+			"(default 4)",
+		} {
+			if !strings.Contains(caso.texto, esperado) {
+				t.Errorf("el texto del motor (%s) no trae %q", caso.nombre, esperado)
+			}
 		}
 	}
-	t.Logf("flag: PrintDefaults identico en %d conjuntos (%d bytes el del motor)", 2, len(quiero))
+	t.Logf("flag: PrintDefaults identico en 2 conjuntos (%d bytes el del motor)", len(quiero))
 }
 
 // ponerBanderasDeJuguete: los casos raros del formato de ayuda.
@@ -353,9 +366,14 @@ func TestFlagGlobal(t *testing.T) {
 		args   []string
 	}{
 		{"global vacio", nil},
-		{"global con banderas", []string{"-b", "-n", "9", "-s=hola", "-v=uno", "resto"}},
+		{"global con banderas", []string{"-b", "-n", "9", "-s=hola", "--b=false", "resto"}},
 		{"global con dos guiones y despues", []string{"--s=x", "uno", "dos"}},
 	}
+	// OJO: ningun nombre que NO este definido en estos casos. Los dos conjuntos (el de Go y el
+	// nuestro) son ExitOnError, y con una bandera desconocida el proceso TERMINA: el de Go de
+	// verdad con os.Exit(2) adentro de la prueba, y la suite entera se cae sin decir por que (asi
+	// quedo este caso escrito a mano: con una bandera de nombre inexistente). El manejo ExitOnError
+	// se prueba en TestFlagExitOnError, que corre a Go en un subproceso justamente por eso.
 	for _, c := range casos {
 		// Go: un conjunto nuevo con los MISMOS nombres, manejando como el global (ExitOnError) y
 		// con un argv que no falla (si fallara, Go mataria la prueba)
@@ -498,11 +516,19 @@ var entradasCSV = []struct {
 	{"campo con salto de Windows suelto", "a\rb,c\n"},
 }
 
+// El lector de NUESTRO lado: bytes.NewReader de la consola. NO se le da el strings.Reader de Go ni
+// siquiera en el host, y no es un detalle: la entrada de abajo termina devolviendo io.EOF, y el
+// io.EOF de la biblioteca estandar de Go NO es el io.EOF de d2std (en la consola no existe la stdlib
+// de Go). Medido: con strings.NewReader el csv nuestro veia un EOF "ajeno", no lo reconocia y ReadAll
+// devolvia 255 de 429 combinaciones con err=EOF donde Go da err= (vacio). En la consola el lector real
+// es de la consola, asi que este es tambien el montaje fiel.
+func miLector(datos string) *mybytes.Reader { return mybytes.NewReader([]byte(datos)) }
+
 // leerMio / leerGo: la misma corrida por los dos lados. Devuelve el texto medible: las filas
 // serializadas, el error y el avance de la entrada (InputOffset), que dice cuantos bytes se
 // consumieron de verdad.
 func leerMio(datos string, op opcionesCSV) string {
-	r := mycsv.NewReader(strings.NewReader(datos))
+	r := mycsv.NewReader(miLector(datos))
 	r.Comma, r.Comment, r.FieldsPerRecord = op.coma, op.comentario, op.campos
 	r.LazyQuotes, r.TrimLeadingSpace, r.ReuseRecord = op.perezoso, op.espacios, op.reusa
 	filas, err := r.ReadAll()
@@ -568,7 +594,7 @@ func TestCSVReaderDeAUno(t *testing.T) {
 				}
 				return strings.Join(trozos, " ")
 			}
-			rm := mycsv.NewReader(strings.NewReader(datos))
+			rm := mycsv.NewReader(miLector(datos))
 			rm.LazyQuotes = perezoso
 			rg := realcsv.NewReader(strings.NewReader(datos))
 			rg.LazyQuotes = perezoso
@@ -602,7 +628,7 @@ func TestCSVReuseRecord(t *testing.T) {
 	}
 	rg := realcsv.NewReader(strings.NewReader(datos))
 	rg.ReuseRecord = true
-	rm := mycsv.NewReader(strings.NewReader(datos))
+	rm := mycsv.NewReader(miLector(datos))
 	rm.ReuseRecord = true
 	goComparte := comparte(leer(rg.Read))
 	mioComparte := comparte(leer(rm.Read))
@@ -754,7 +780,7 @@ func TestCSVTablasDelMotor(t *testing.T) {
 		rg.Comma, rg.FieldsPerRecord, rg.LazyQuotes = '\t', -1, true
 		filasGo, errGo := rg.ReadAll()
 
-		rm := mycsv.NewReader(strings.NewReader(tanda.datos))
+		rm := mycsv.NewReader(miLector(tanda.datos))
 		rm.Comma, rm.FieldsPerRecord, rm.LazyQuotes = '\t', -1, true
 		filasMio, errMio := rm.ReadAll()
 
@@ -776,7 +802,7 @@ func TestCSVLimitesDeclarados(t *testing.T) {
 	rg := realcsv.NewReader(strings.NewReader(datos))
 	rg.TrimLeadingSpace = true
 	filasGo, _ := rg.ReadAll()
-	rm := mycsv.NewReader(strings.NewReader(datos))
+	rm := mycsv.NewReader(miLector(datos))
 	rm.TrimLeadingSpace = true
 	filasMio, _ := rm.ReadAll()
 	if len(filasGo) != 1 || len(filasMio) != 1 {
