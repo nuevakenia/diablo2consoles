@@ -1,0 +1,118 @@
+DC-002.6 - EL SISTEMA DE ARCHIVOS DE LA CONSOLA (os contra el VFS de KOS)
+=======================================================================
+
+QUE SE MIDIO
+------------
+En la Dreamcast emulada (Flycast), por la consola serie:
+
+  VFS: casos 18 bien 18 mal 0
+  VFS: ReadDir /rd -> binario.bin grande.txt hola.txt  | tipos: 8 8 8
+  VFS: RESULTADO OK - el sistema de archivos de la consola existe y lee
+
+Y la barrera del hito sigue intacta con la stdlib nueva:
+
+  == IGUAL: 31 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4) ==
+     frames comparados: 30
+
+Mutadores del paquete os en la CONSOLA (mutar-os-consola.sh): 4/4 cazados, control sano
+(18/18) y os.go restaurado con el mismo sha256 (811c4e43...).
+
+POR QUE EL PAQUETE os ES OTRO PROBLEMA QUE LOS DEMAS
+----------------------------------------------------
+El motor usa os en 114 archivos y de 35 simbolos distintos. Medido en el motor:
+
+  os.Getenv      461 usos      os.ReadFile    216      os.WriteFile    26
+  os.Open         25           os.Stat        23       os.Exit         22
+  os.IsNotExist   10           os.MkdirAll     9       os.ReadDir       7
+  os.Create        7           os.UserHomeDir  5       os.Rename        5
+  os.Remove        4           os.OpenFile     2       os.IsExist       2, os.FileInfo 2
+
+Los paquetes de puro calculo (DC-002.4) se prueban comparando contra el Go del host bit a bit. os NO:
+su implementacion habla con el VFS de KOS, asi que en el host no existe. La unica forma de probarlo
+es correrlo en la consola, y eso es lo que hace el POC (console/dc/poc/vfs).
+
+EL VFS: LOS ARCHIVOS VIAJAN ADENTRO DEL ELF
+-------------------------------------------
+En la consola no hay disco ni particiones al alcance: el romdisk es una imagen que se hornea DENTRO
+del binario. La cadena, medida:
+
+  genromfs  -> romdisk.img (7168 bytes para 3 archivos + el manifiesto)
+  bin2o     -> romdisk.o con los simbolos romdisk / romdisk_end
+  libgodc   -> runtime/romdisk_init.c declara "extern const uint8 romdisk[] __attribute__((weak))" y
+               apunta __kos_romdisk ahi: si el programa enlaza romdisk.o, KOS monta ESA imagen en /rd
+               al arrancar; si no, no monta nada.
+  os.ReadFile("/rd/x") -> fs_open + fs_read + fs_total del VFS de KOS.
+
+Ojo: NO hay que poner KOS_INIT_ROMDISK en el C del POC. libgodc ya lo trae y ponerlo otra vez da
+"multiple definition of __kos_romdisk" (medido).
+
+TRES COSAS QUE HUBO QUE MEDIR EN VEZ DE SUPONER
+-----------------------------------------------
+1. El binario horneado se corrompio SIN QUE NADIE LO TOCARA: el archivo de 256 bytes (0..255) salio de
+   384 bytes porque la herramienta de escritura lo guardo en UTF-8 (los bytes >= 128 ocupan 2). Lo
+   destapo el POC: "esperaba 256 bytes suma 32640 y dio 384 bytes suma 53440". Los archivos de prueba
+   con bytes crudos se generan con python, no con la herramienta de texto.
+
+2. Los directorios de KOS NO son los POSIX de newlib: opendir/readdir/closedir no llegan al VFS
+   (fs_dir_t tampoco existe). La API de verdad esta en kos/fs.h: se ABRE con fs_open y se recorre con
+   fs_readdir(file_t), y la entrada es "struct kos_dirent { int size; char name[NAME_MAX]; time_t time;
+   uint32 attr; }" (el nombre esta en "name", no en "d_name").
+
+3. Y lo mas importante: EL ROMDISK NO SE PUEDE LISTAR. Medido con la sonda-i (console/dc/poc/sonda-i,
+   C puro) y con el POC del VFS, con romdisk montado y con la ruta de todas las formas:
+
+     fs_open("/rd")   = INVALID        fs_open("/rd/")  = INVALID
+     fs_open("/")     = INVALID        fs_open("rd:/")  = INVALID
+     stat("/rd")      = -1
+     fs_readdir(...)  = NULL
+
+   mientras que los ARCHIVOS de adentro si se abren y se leen perfecto. No es un problema del POC: es
+   que el handler del FS ROM no contesta pedidos de directorio.
+
+   Solucion: el listado (os.ReadDir) sale de un ".manifiesto" que hornea el MISMO build que arma el
+   romdisk, con una linea por archivo (nombre TAB bytes TAB tipo). Como lo genera el mismo paso, no
+   puede desincronizarse del contenido del romdisk. El manifiesto no se lista a si mismo.
+
+   Lo que NO esta: el GD-ROM (/cd) por ISO9660, que otro FS y otro camino (y en este POC no existe: el
+   caso lo dice en voz alta en la salida).
+
+LO QUE EL PAQUETE os DE LA CONSOLA HACE, Y LO QUE ADMITE QUE NO HACE
+--------------------------------------------------------------------
+HACE:
+  - ReadFile, Open, Read, Write, Close, Size, Name y las funciones de File (mas Stat del archivo).
+  - Stat / FileInfo (Name, Size, IsDir, Mode).
+  - ReadDir / DirEntry (Name, Size, Info, IsDir) desde el manifiesto.
+  - IsNotExist / IsExist (10 + 2 usos en el motor).
+  - Existe (helper propio), Stdout/Stdout por la consola serie (dbgio), Exit (no vuelve: no hay
+    procesos), UserHomeDir = "/rd".
+
+NO HACE, Y ESTA DICHO EN EL CODIGO:
+  - Escribir: el romdisk es de SOLO LECTURA y no hay otro FS enganchado (ni VMU ni GD-ROM). MkdirAll,
+    Mkdir, Remove, Rename y Create devuelven error, no fingen exito. El motor las usa para los saves:
+    cuando se llegue a los saves, este es el primer limite con el que se va a chocar.
+  - Getenv: devuelve vacio SIEMPRE, y es la llamada mas usada del motor (461). Cualquier cosa que
+    dependa de una variable de entorno (paths de datos, CASCAL) va a llegar vacia: hay que saberlo.
+  - Args: una lista fija con el nombre del programa. No hay argumentos de linea de comandos.
+  - ModTime / Chtimes / Chmod / FindProcess: no estan (FileInfo no tiene ModTime porque eso pediria el
+    paquete time, que es la parte que falta de esta tarjeta).
+
+EL POC, CASO POR CASO (console/dc/poc/vfs)
+------------------------------------------
+  1. ReadFile de un texto del romdisk (37 bytes, contenido exacto).
+  2. ReadFile de un binario de 256 bytes: tamano y SUMA de los bytes (32640), no solo el largo.
+  3. ReadFile de algo que no esta: error y no se cuelga.
+  4. Open + Size + Read en trozos de 8 + Close: el texto sale entero.
+  5. ReadFile de 6000 bytes (mas grande que el buffer interno de 4096): en varias vueltas, byte a byte
+     contra el esperado.
+  6. ReadDir de /rd: los 3 archivos con sus tamanos (y sin el manifiesto).
+  7. /cd: declarado que no existe en este POC.
+  8. Stat de un archivo (tamano 37, no es directorio) y IsNotExist de algo que falta.
+  9. Existe, Getenv (vacio), Args.
+ 10. La salida de texto por os.Stdout y os.Stderr.
+
+MUTADORES (la suite tiene que ponerse ROJA)
+-------------------------------------------
+  1. ReadFile que se queda con la primera vuelta      -> cae el caso del archivo de 6000 bytes.
+  2. ReadDir que no trae los tamanos del manifiesto   -> cae el caso de los tamanos.
+  3. Stat que miente con el tamano                    -> cae el caso de Stat.
+  4. IsNotExist que dice siempre que no falta         -> caen dos casos.

@@ -1,0 +1,39 @@
+Sos Hermes en corrida autonoma sobre el repo /home/dgalli/Proyectos/diablo2consoles, rama DC-002
+(port de Go del motor de Diablo II a la Sega Dreamcast con gccgo). NO preguntes nada: decidi y
+ejecuta. Responde en espanol de Chile.
+
+PASO 1 - QUE HACER
+  hermes kanban --board dreamcast ls
+Las tarjetas `ready` de la tanda DC-002 son el trabajo (idempotency-key dc-002.5b, dc-002.6, dc-002.7,
+dc-002.8, dc-002.9). Elegi la de idempotency-key mas baja que siga abierta, lee su cuerpo COMPLETO
+(hermes kanban --board dreamcast show <id>) y trabaja ESA tarjeta hasta cerrarla.
+
+PASO 2 - EL METODO (obligatorio, `skill_view dreamcast-godc` y console/dc/README.md)
+  - Medir primero, no deducir: lo que no esta medido no esta hecho.
+  - Todo defecto se lleva al corpus (host y consola), se ve en ROJO, se arregla y se vuelve a medir.
+  - Una suite verde no prueba nada: cada defecto conocido tiene su MUTANTE que exige que la suite se
+    ponga roja (scripts/console/mutar-std-host.sh). Si un mutante queda verde, el hueco es de la suite.
+  - Evidencia con numeros EXACTOS en console/dc/evidencia/dc-002.x-*.txt, seccion nueva en
+    console/dc/README.md, y la tarjeta se cierra con `hermes kanban --board dreamcast complete <id>
+    --summary "<lo medido>"` despues de `edit` con el cuerpo final (incluido el bloque PLAN con las
+    lineas marcadas).
+  - Commit al final de cada tarjeta (mensaje con los numeros medidos). NO hacer git push.
+  - Corre un solo agente a la vez sobre el repo: si el lock no te deja, no insistas.
+  - Los archivos de ~/dreamcast/libgodc (vendorizado, fuera del repo) se tocan con los scripts
+    idempotentes de scripts/console/fix-libgodc-*.py, nunca a mano y nunca con `git checkout --`.
+
+PASO 3 - COMANDOS
+  source scripts/console/env.sh
+  bash scripts/console/build-std-gox.sh              # la stdlib minima a .gox para SH-4
+  bash scripts/console/build-dc.sh console/dc/poc/<poc>
+  bash scripts/console/run-flycast.sh /tmp/dcbuild/<poc>/prog.elf <segundos> /tmp/dc-run-x
+  grep -a 'STD-TEST' /tmp/dc-run-x/flycast.log | tr -d '\r'
+  bash scripts/console/test-std-host.sh              # prueba diferencial en amd64 y 386
+  bash scripts/console/mutar-std-host.sh             # mutadores (control sano + cazados)
+  bash scripts/console/compare-motor-dc6.sh          # la barrera: el POC del motor sigue IGUAL
+
+PASO 4 - AL TERMINAR UNA TARJETA
+Empeza la siguiente. Si algo te bloquea de verdad (falta un dato del motor, algo no compila por el
+compilador y no hay salida), deja el bloqueo escrito con `hermes kanban --board dreamcast comment`
+en la tarjeta y pasa a la siguiente en vez de quedarte quieto. No dejes trabajo a medias sin
+declararlo en la tarjeta.

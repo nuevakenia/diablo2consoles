@@ -22,6 +22,30 @@ if [ -f "$SRC/genera-casos" ]; then
     bash "$HERE/gen-std-casos.sh" "$OUT"
 fi
 
+# romdisk: los archivos que viajan ADENTRO del ELF. Es el sistema de archivos de la consola (KOS lo
+# monta en /rd al arrancar con KOS_INIT_ROMDISK, que llama el csrc del POC). Se arma con el genromfs de
+# KOS y se convierte a objeto con bin2o. Medido: genromfs deja una imagen de 1024 bytes para un
+# archivo chico, y bin2o genera los simbolos romdisk / romdisk_end.
+ROMDISK_OBJ=""
+if [ -d "$SRC/romdisk" ]; then
+    ARRIBA="$OUT/romdisk-arriba"
+    rm -rf "$ARRIBA"
+    mkdir -p "$ARRIBA"
+    cp -r "$SRC/romdisk/." "$ARRIBA/"
+    # El .manifiesto: el FS ROM de KOS no deja ABRIR un directorio (medido: fs_open("/rd") da INVALID y
+    # fs_readdir no llega), asi que os.ReadDir no puede listar el sistema de archivos. El listado se
+    # arma con el MISMO build que hornea el romdisk, asi que no se puede desincronizar de su contenido.
+    # Formato: nombre TAB bytes TAB tipo, una linea por entrada.
+    : > "$ARRIBA/.manifiesto"
+    for f in "$SRC/romdisk"/*; do
+        printf '%s\t%s\tarchivo\n' "$(basename "$f")" "$(stat -c%s "$f")" >> "$ARRIBA/.manifiesto"
+    done
+    "$KOS_BASE/utils/genromfs/genromfs" -f "$OUT/romdisk.img" -d "$ARRIBA" -V d2romdisk >/dev/null
+    "$KOS_BASE/utils/bin2o/bin2o" "$OUT/romdisk.img" romdisk "$OUT/romdisk.o"
+    ROMDISK_OBJ="$OUT/romdisk.o"
+    echo "   romdisk: $(stat -c%s "$OUT/romdisk.img") bytes, $(ls "$SRC/romdisk" | wc -l) archivos + manifiesto -> /rd"
+fi
+
 echo "== 1/4 compilando Go ($SRC) =="
 # si existe el arbol .gox de la stdlib minima (scripts/console/build-std-gox.sh), se usa para
 # resolver "fmt", "strings", etc. en la consola
@@ -60,7 +84,7 @@ if [ -f "$GOX/orden.txt" ]; then
         STD_OBJS="$(tr '\n' ' ' < "$GOX/orden.txt")"
     fi
 fi
-kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $EXTRA_OBJS $STD_OBJS $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
+kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $ROMDISK_OBJ $EXTRA_OBJS $STD_OBJS $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
 
 echo "== 3/4 binario de arranque (1ST_READ.BIN) + IP.BIN =="
 sh-elf-objcopy -R .stack -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"

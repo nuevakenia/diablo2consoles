@@ -684,3 +684,58 @@ quede una lista muerta).
 
 Detalle completo en `console/dc/evidencia/dc-002.5-sort-bytes-strings.txt`. `flag` y `encoding/csv`
 pasan a una tarjeta propia (son paquetes de formato, no de ordenar ni de recorrer).
+
+## 15. DC-002.6: el sistema de archivos de la consola (os contra el VFS de KOS)
+
+El motor usa `os` en 114 archivos y 35 simbolos. Este hito escribe ese paquete contra el VFS de KOS y
+lo prueba en la consola, porque `os` no se puede probar en el host: su implementacion habla con el FS
+de la Dreamcast. Evidencia completa: `evidencia/dc-002.6-vfs-os.txt`.
+
+**Los archivos viajan adentro del ELF.** No hay disco al alcance: el romdisk se hornea en el binario.
+
+    genromfs (3 archivos + manifiesto) -> romdisk.img (7168 bytes)
+    bin2o                              -> romdisk.o (simbolos romdisk / romdisk_end)
+    libgodc                            -> runtime/romdisk_init.c: "extern const uint8 romdisk[]
+                                          __attribute__((weak))" + __kos_romdisk: si el programa
+                                          enlaza romdisk.o, KOS monta ESA imagen en /rd al arrancar
+    os.ReadFile("/rd/x")               -> fs_open + fs_read + fs_total
+
+No hay que poner `KOS_INIT_ROMDISK` en el C: libgodc ya lo trae y ponerlo otra vez da
+"multiple definition of __kos_romdisk" (medido).
+
+**El romdisk no se puede listar.** Medido con la sonda-i (C puro) en Flycast, con el romdisk montado y
+la ruta de todas las formas: `fs_open("/rd")`, `fs_open("/rd/")`, `fs_open("/")`, `fs_open("rd:/")` dan
+INVALID; `stat("/rd")` da -1; `fs_readdir` da NULL. Los ARCHIVOS de adentro se abren y se leen bien.
+El handler del FS ROM no contesta pedidos de directorio.
+
+Solucion: `os.ReadDir` sale de un `.manifiesto` que hornea el MISMO build que arma el romdisk (nombre
+TAB bytes TAB tipo por linea). Al generarlos juntos no se pueden desincronizar. El GD-ROM (`/cd`, por
+ISO9660) queda para cuando se llegue: es otro FS y otro camino.
+
+**Medido en la consola (Flycast, consola serie):**
+
+    VFS: casos 18 bien 18 mal 0
+    VFS: ReadDir /rd -> binario.bin grande.txt hola.txt  | tipos: 8 8 8
+    VFS: RESULTADO OK - el sistema de archivos de la consola existe y lee
+
+Los 18 casos: leer un texto, un binario (tamano Y suma de bytes), algo que no esta, Open/Size/Read en
+trozos/Close, un archivo de 6000 bytes (mas grande que el buffer interno de 4096: varias vueltas),
+ReadDir con tamanos, `Stat` + `IsNotExist`, `Existe`, `Getenv`, `Args` y la salida por
+`os.Stdout`/`os.Stderr`.
+
+**Mutadores** (`scripts/console/mutar-os-consola.sh`, 4/4 cazados, control sano y sha256 restaurado):
+ReadFile que se queda con la primera vuelta, ReadDir sin tamanos, Stat que miente con el tamano e
+IsNotExist siempre falso. Es el equivalente en la consola de `mutar-std-host.sh`: `os` no entra en el
+corpus del host.
+
+**Limites declarados en el codigo** (no fingidos): no se puede escribir (el romdisk es de solo lectura y
+no hay otro FS enganchado: `MkdirAll`/`Remove`/`Rename`/`Create` devuelven error, y el motor las usa
+para los saves); `Getenv` devuelve vacio siempre (es la llamada mas usada del motor, 461: CASCAL y los
+paths de datos van a llegar vacios); `Args` es una lista fija; `FileInfo` no tiene `ModTime` (eso pide
+`time`, que es la parte que sigue de esta tarjeta).
+
+La barrera del hito sigue igual con la stdlib nueva: `compare-motor-dc6.sh` da 31 lineas identicas y 30
+frames.
+
+**Alcance:** esta tarjeta hizo `os` y el VFS. `time`, `path/filepath`, `bufio` y `log` son de formato y
+de reloj, no del sistema de archivos, y pasan a la tarjeta dc-002.6b (recorte declarado).
