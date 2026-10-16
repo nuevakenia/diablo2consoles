@@ -112,15 +112,14 @@ func ParseInt(s string, base int, bitSize int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	var lim uint64
+	// bitSize 0 significa "el ancho de int de ESTA plataforma" (64 bits en el host, 32 en el SH-4:
+	// es la misma cuenta que hace Atoi). Antes el tope se calculaba siempre a 64 bits y al desbordar
+	// se devolvia maxInt64/minInt64: en la consola, un int de 32 bits, esos topes truncados daban -1
+	// y 0 en vez de MaxInt32 y MinInt32 (medido: sonda DC-002.2e, E19-E23).
 	if bitSize == 0 {
-		lim = 1<<63 - 1
-		if neg {
-			lim = 1 << 63
-		}
-	} else {
-		lim = maxForBitSize(neg, bitSize)
+		bitSize = intSize
 	}
+	lim := maxForBitSize(neg, bitSize)
 	var n uint64
 	for i := 0; i < len(digits); i++ {
 		v, ok := digitValue(digits[i])
@@ -128,10 +127,8 @@ func ParseInt(s string, base int, bitSize int) (int64, error) {
 			return 0, syntaxError(fn, s)
 		}
 		if n > (lim-v)/uint64(baseEf) {
-			if neg {
-				return minInt64, rangeError(fn, s)
-			}
-			return maxInt64, rangeError(fn, s)
+			// al desbordar, Go satura al tope DEL ANCHO pedido (con su signo), no al de 64 bits
+			return maxInt64For(neg, bitSize), rangeError(fn, s)
 		}
 		n = n*uint64(baseEf) + v
 	}
@@ -189,7 +186,10 @@ func ParseUint(s string, base int, bitSize int) (uint64, error) {
 		return 0, err
 	}
 	lim := ^uint64(0)
-	if bitSize != 0 && bitSize < 64 {
+	if bitSize == 0 {
+		bitSize = intSize // bitSize 0 = uint de esta plataforma (lo mismo que en ParseInt)
+	}
+	if bitSize < 64 {
 		lim = 1<<uint(bitSize) - 1
 	}
 	var n uint64

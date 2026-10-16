@@ -544,6 +544,55 @@ func byteList(b []byte) string {
 	return sb.String()
 }
 
+// listaDeElementos arma un arreglo elemento por elemento, que es lo que hace Go cuando el verbo no
+// trata al arreglo como un todo: Sprintf("%t", []byte("abc")) da
+// "[%!t(uint8=97) %!t(uint8=98) %!t(uint8=99)]", no el aviso del arreglo entero. Medido en la
+// consola (sonda DC-002.2e, E15-E17), donde dabamos "%!t([]uint8=[97 98 99])".
+//
+// Solo []byte y []string: son los arreglos que el motor usa y los unicos que se pueden recorrer sin
+// reflect. Los verbos que tratan al []byte como texto o como bytes crudos (%v, %s, %q, %x, %X) no
+// pasan por aca: ya tienen su camino en convert.
+func (f *formatter) listaDeElementos(arg interface{}, verb byte, fl flags, width, prec int) (string, bool) {
+	var elems []interface{}
+	switch x := arg.(type) {
+	case []byte:
+		switch verb {
+		case 'v', 's', 'q', 'x', 'X':
+			return "", false
+		}
+		elems = make([]interface{}, len(x))
+		for i := range x {
+			elems[i] = x[i]
+		}
+	case []string:
+		switch verb {
+		case 'v', 's', 'q', 'x', 'X':
+			return "", false
+		}
+		elems = make([]interface{}, len(x))
+		for i := range x {
+			elems[i] = x[i]
+		}
+	default:
+		return "", false
+	}
+	var sb strings.Builder
+	sb.WriteByte('[')
+	for i, e := range elems {
+		if i > 0 {
+			sb.WriteByte(' ')
+		}
+		// cada elemento con su propio formateador: asi el ancho, las banderas y la precision caen
+		// sobre el elemento y no sobre el arreglo, y los avisos de verbo invalido salen por dentro
+		// ("[%!t(uint8=   97)]" con ancho 5, como Go).
+		sub := newFormatter()
+		sub.printArg(e, verb, fl, width, prec, true)
+		sb.WriteString(sub.b.String())
+	}
+	sb.WriteByte(']')
+	return sb.String(), true
+}
+
 // precBytes: en %x/%X la precision cuenta bytes mostrados, no caracteres del texto hex.
 func precBytes(b []byte, prec int) []byte {
 	if prec >= 0 && prec < len(b) {
@@ -755,6 +804,13 @@ func (f *formatter) convert(arg interface{}, verb byte, fl flags, prec int) (str
 		return f.badVerb(verb, arg, fl, f.w, prec), false
 	}
 
+	// un arreglo con un verbo que no lo trata como texto/binario (los de %v, %s, %q, %x y %X ya
+	// volvieron arriba) se arma elemento por elemento, como en Go
+	if s, ok := f.listaDeElementos(arg, verb, fl, f.w, prec); ok {
+		f.armado = true // el ancho ya se aplico a cada elemento
+		return s, false
+	}
+
 	switch verb {
 	case 'd':
 		if s, ok := formatIntBase(arg, 10, false, fl, prec); ok {
@@ -763,7 +819,15 @@ func (f *formatter) convert(arg interface{}, verb byte, fl flags, prec int) (str
 		return f.badVerb(verb, arg, fl, f.w, prec), false
 	case 'c':
 		if n, ok := toInt64(arg); ok {
-			return string(rune(n)), false
+			// Go mira el valor SIN SIGNO y, si se sale del rango de un caracter valido, imprime
+			// U+FFFD. Sin ese control, un int64 negativo (o un uint64 enorme) se truncaba a 32 bits
+			// al convertirlo a rune y salia un byte cualquiera: en la consola %c de
+			// int64(-9223372036854775808) daba "\x00" en vez de "\uFFFD" (sonda DC-002.2e, E19).
+			r := rune(n)
+			if uint64(n) > utf8.MaxRune {
+				r = utf8.RuneError
+			}
+			return string(r), false
 		}
 		return f.badVerb(verb, arg, fl, f.w, prec), false
 	case 'b':

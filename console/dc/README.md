@@ -453,3 +453,36 @@ cubria: `%c` con caracter no ASCII, `%t` sobre `[]uint8` (Go formatea elemento p
 en los bordes de `int64` y un caso de `errors.Is`. Tarjeta DC-002.2e; el camino es llevarlos al
 corpus de la prueba diferencial del host, verlos en rojo, arreglar y volver. Detalle en
 `console/dc/evidencia/dc-002.2d-punto-flotantes.txt`.
+
+### 11.4 Los casos que quedaban (DC-002.2e): 6 arreglados, 1 que no es de la stdlib
+
+El autotest de la consola queda en **590 casos, 589 coinciden, 1 no** (los 590 son porque el corpus
+sumo casos nuevos). Los 6 se arreglaron con el metodo de siempre: llevados al corpus del host, vistos
+en rojo, arreglado el codigo y medido otra vez en la consola. El que falta no es de nuestra
+biblioteca: es un defecto del runtime de libgodc (**DC-002.2f**).
+
+| caso | donde estaba el defecto | arreglo |
+|---|---|---|
+| `%c` de `int64(min)` → byte nulo | nuestra `fmt`: `string(rune(n))` sin mirar el rango | `convert()` mira el valor sin signo y usa `utf8.RuneError` si se sale de `MaxRune`, como Go |
+| `%t` (y `%d`, `%c`) sobre `[]byte` → aviso del arreglo entero | nuestra `fmt`: el verbo malo se armaba para el arreglo | `listaDeElementos`: el verbo cae sobre cada elemento (`[%!t(uint8=97) ...]`), con ancho/banderas/precision por elemento |
+| `Atoi` en los bordes: `-1`/`0` con error | `strconv`: `bitSize 0` se trataba como 64 bits **y** al desbordar devolvia los topes de 64 bits | `bitSize 0` = `intSize` de la plataforma; al desbordar satura al tope **del ancho pedido** |
+| lo mismo, pero en el **corpus** | `gen-casos` calculaba el esperado de `Atoi` con el `int` de 64 bits del host | el corpus usa el ancho de int de la consola (32) y lo dice |
+
+Dos cosas que quedaron como parte del metodo (y que antes no existian):
+
+- **`scripts/console/test-std-host.sh`**: la prueba diferencial del host corre en los **dos anchos**
+  de `int` (`GOARCH=amd64` y `GOARCH=386`, que es el ancho del SH-4). Los dos defectos de `strconv` no
+  se ven en el host de 64 bits: con una sola corrida el hueco queda abierto.
+- **`scripts/console/mutar-std-host.sh`**: control sano verde y **5/5 mutantes cazados**. Un mutante
+  por arreglo (el de `bitSize 0` se juzga en 386, porque en amd64 no cambia nada) y uno que exige que
+  el corpus declare la semantica de int de la consola.
+
+El que queda (**`errors.Is`**) es del runtime: `runtime/interface_dreamcast.c` (`implements_interface`)
+compara el **nombre** del metodo y no la **firma**, asi que `*wrapErrors` —cuyo `Unwrap()` devuelve
+`[]error`— "implementa" tambien `interface{ Unwrap() error }`: el itab queda con el metodo equivocado y
+la llamada devuelve basura. Medido con la sonda `console/dc/poc/sonda-e` (E29-E32): las dos aserciones
+dicen `ok`, el type switch elige el case equivocado y la comparacion de interfaces, en cambio, anda
+bien (E28). Es el mismo linaje que DC-002.2b/2c, pero del otro lado: alla era la **convencion de
+llamada**, aca el **chequeo de implementacion**. Ese caso queda **rojo y a la vista** en el autotest
+hasta que se arregle el runtime: sacarlo del corpus seria esconder un defecto que el motor puede
+pisar. Detalle y evidencia cruda en `console/dc/evidencia/dc-002.2e-casos-restantes.txt`.

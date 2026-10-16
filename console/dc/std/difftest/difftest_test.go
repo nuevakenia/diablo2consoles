@@ -177,6 +177,30 @@ func TestFormatoAMano(t *testing.T) {
 		{"%2.1f", []interface{}{3.14}},
 		{"%08.2f", []interface{}{3.14}},
 		{"%.1f", []interface{}{float32(3.14)}},
+
+		// %c fuera del rango de un caracter valido: Go imprime U+FFFD (mira el valor sin signo,
+		// asi que un int64 negativo tambien cae ahi). Aca el corpus de la consola fallaba con un
+		// byte nulo porque nuestro %c confiaba en la conversion rune -> texto sin ese control.
+		{"%c", []interface{}{int64(-9223372036854775808)}},
+		{"%c", []interface{}{int64(9223372036854775807)}},
+		{"%c", []interface{}{int(255)}},
+		{"%c", []interface{}{int(233)}},
+		{"%c", []interface{}{uint64(1 << 63)}},
+		{"%c", []interface{}{uint32(0x1F600)}},
+		{"%c", []interface{}{0xD800}},
+		{"%c", []interface{}{-1}},
+		{"%c", []interface{}{0x4E2D}},
+
+		// un verbo que no aplica al tipo del elemento: Go recorre el arreglo y aplica el verbo a
+		// cada elemento ("[%!t(uint8=97) ...]"), no al arreglo entero.
+		{"%t", []interface{}{[]byte("abc")}},
+		{"%t", []interface{}{[]byte{0x00, 0xff, 0x7f}}},
+		{"%d", []interface{}{[]byte("abc")}},
+		{"%c", []interface{}{[]byte("abc")}},
+		{"%b", []interface{}{[]byte{1, 2}}},
+		{"%5d", []interface{}{[]byte{1, 2}}},
+		{"%.2d", []interface{}{[]byte{1, 2}}},
+		{"%t", []interface{}{[]string{"a", "b"}}},
 	}
 
 	ok, malos := 0, 0
@@ -519,6 +543,58 @@ func boolStr(b bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+// ---- 4b. el ancho del entero: bitSize 0 significa "el ancho de int de la plataforma" ----
+
+// TestEnterosPorAncho: Atoi es ParseInt(s, 10, 0), y el bitSize 0 quiere decir "el ancho de int de
+// la plataforma": 64 bits en el host, 32 en la consola (medido en la sonda DC-002.2e, E24). Por eso
+// el camino honesto de probarlo en el host es por bitSize explicito: 32 hace la misma cuenta que
+// Atoi en la consola. Al desbordar, Go satura al tope DEL ANCHO pedido y devuelve error de rango;
+// nosotros devolviamos los topes de 64 bits, que en un int de 32 bits quedan truncados a -1 y 0.
+func TestEnterosPorAncho(t *testing.T) {
+	muestras := []string{"0", "-0", "42", "-42", "127", "128", "255", "32767", "32768",
+		"2147483647", "2147483648", "-2147483648", "-2147483649",
+		"9223372036854775807", "9223372036854775808", "-9223372036854775808", "-9223372036854775809",
+		"18446744073709551615", "18446744073709551616", "999999999999999999999999", "abc", ""}
+	ok, malos := 0, 0
+	for _, s := range muestras {
+		for _, bits := range []int{0, 8, 16, 32, 64} {
+			ri, re := realstrconv.ParseInt(s, 10, bits)
+			mi, me := mystrconv.ParseInt(s, 10, bits)
+			if ri != mi || (re == nil) != (me == nil) {
+				malos++
+				if malos < 15 {
+					t.Errorf("ParseInt(%q, 10, %d): Go (%d, %v) nuestro (%d, %v)", s, bits, ri, re, mi, me)
+				}
+			} else {
+				ok++
+			}
+			ru, rue := realstrconv.ParseUint(s, 10, bits)
+			mu, mue := mystrconv.ParseUint(s, 10, bits)
+			if ru != mu || (rue == nil) != (mue == nil) {
+				malos++
+				if malos < 15 {
+					t.Errorf("ParseUint(%q, 10, %d): Go (%d, %v) nuestro (%d, %v)", s, bits, ru, rue, mu, mue)
+				}
+			} else {
+				ok++
+			}
+		}
+		// Atoi, con el ancho de int del host (64). El de 32 bits de la consola lo cubre la misma
+		// cuenta via ParseInt(...,32) de arriba, y la corrida entera en 386 (ver test-std-host.sh).
+		ra, rea := realstrconv.Atoi(s)
+		ma, mea := mystrconv.Atoi(s)
+		if ra != ma || (rea == nil) != (mea == nil) {
+			malos++
+			if malos < 15 {
+				t.Errorf("Atoi(%q): Go (%d, %v) nuestro (%d, %v)", s, ra, rea, ma, mea)
+			}
+		} else {
+			ok++
+		}
+	}
+	t.Logf("anchos de entero: %d coinciden, %d mal", ok, malos)
 }
 
 // ---- 5. errores y el %w ----

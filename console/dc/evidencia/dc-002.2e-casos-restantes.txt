@@ -1,0 +1,116 @@
+=== DC-002.2e: los casos que quedaban del autotest de la stdlib (y el que no es de la stdlib) ===
+
+PUNTO DE PARTIDA (medido, no heredado del resumen)
+    El autotest corrido en Flycast antes de tocar nada:
+        STD-TEST FALLO: fmt "%c" esperaba "ÿ" y dio "\x00"
+        STD-TEST FALLO: fmt "%t" esperaba "[%!t(uint8=97) %!t(uint8=98) %!t(uint8=99)]" y dio "%!t([]uint8=[97 98 99])"
+        STD-TEST FALLO: fmt "%t" esperaba "[%!t(uint8=0) %!t(uint8=255) %!t(uint8=127)]" y dio "%!t([]uint8=[0 255 127])"
+        STD-TEST FALLO: strconv Atoi("9223372036854775807") esperaba "9223372036854775807 error=false" y dio "-1 error=true"
+        STD-TEST FALLO: strconv Atoi("-9223372036854775808") esperaba "-9223372036854775808 error=false" y dio "0 error=true"
+        STD-TEST FALLO: strconv Atoi("9223372036854775808") esperaba "9223372036854775807 error=true" y dio "-1 error=true"
+        STD-TEST FALLO: errors Is esperaba "true" y dio "false"
+        STD-TEST: casos 560 bien 553 mal 7
+
+SONDA (console/dc/poc/sonda-e): separa los caminos, para no adivinar cual de nuestros pedazos falla
+    Los cuatro caminos medidos por separado en la consola (E = linea de la sonda):
+
+    La conversion rune -> texto (el camino de %c) esta BIEN en la consola:
+        E4  string(rune 233))  hex= c3a9      E5 string(rune 255))  hex= c3bf
+        E6  string(rune 0x4E2D)) hex= e4b8ad  E7 string(rune -1))   hex= efbfbd
+        E8  utf8.EncodeRune(255) n= 2 hex= c3bf   E10 utf8.AppendRune(233) len= 2 hex= c3a9
+    El verbo, con los valores que la sonda le pasa directo, tambien:
+        E11 fmt %c de int(255) hex= c3bf     E12 fmt %c de int(233) hex= c3a9
+
+    El verbo malo sobre un arreglo, mal (es nuestro):
+        E15 fmt %t de []byte(abc) = %!t([]uint8=[97 98 99])    (Go: [%!t(uint8=97) %!t(uint8=98) %!t(uint8=99)])
+        E16 fmt %d de []byte(abc) = %!d([]uint8=[97 98 99])    (Go: [97 98 99])
+        E17 fmt %c de []byte(abc) = %!c([]uint8=[97 98 99])    (Go: [a b c])
+
+    Atoi:
+        E19 Atoi(maxint64) = -1 err= true    E20 Atoi(minint64) = 0 err= true    E21 Atoi(desborde) = -1 err= true
+        E22 ParseInt(desborde,10,32) = 9223372036854775807     <- el tope sale de 64 bits, no del ancho pedido
+        E23 ParseInt(-desborde,10,32) = -9223372036854775808
+        E24 el ancho de int de la consola es 32: true
+
+    errors.Is y las interfaces (el camino que NO es nuestro):
+        E25 Error() de Errorf con %w: contexto: base (codigo 7)     <- el texto esta bien
+        E26 errors.Is(e, base) = false
+        E27 Unwrap(e) = base                                       <- por el camino de Unwrap() error
+        E28 dos variables error con el mismo valor: true           <- la comparacion de interfaces anda
+        E29 error == el error guardado en interface{}: false       <- una asercion devuelve algo que no compara igual
+        E30 asercion a Unwrap() []error: ok cuantos= 0             <- deberia ser 1
+        E31 asercion a Unwrap() error: ok -> base                  <- y NO deberia ser ok
+        E32 type switch eligio Unwrap() error -> base              <- eligio el case equivocado
+
+EL ARREGLO DEL LADO DE LA STDLIB (3 defectos, 6 de los 7 casos)
+
+    1. fmt, %c de un valor que no es un caracter valido  (caso 1 -> en realidad es el %c de int64(min))
+       Go mira el valor SIN SIGNO y si se sale del rango de un caracter valido imprime U+FFFD. Nosotros
+       haciamos string(rune(n)) a secas: rune(int64(-9223372036854775808)) trunca a 32 bits y da 0, o sea
+       un byte nulo. Es el caso del corpus que decia "esperaba ÿ y dio \x00" (el "ÿ" del log era el U+FFFD
+       que no se imprime en el terminal). Arreglado con el control de utf8.MaxRune en convert().
+       Nota: el %c de int(255) y de int(233) siempre anduvo; el que fallaba era el de int64(min).
+
+    2. fmt, un verbo que no aplica al elemento de un arreglo  (casos 2 y 3)
+       Go recorre el arreglo y aplica el verbo a cada elemento ("[%!t(uint8=97) ...]"). Nosotros armabamos
+       el aviso para el arreglo entero. Se agrego formatter.listaDeElementos ([]byte y []string, que son
+       los unicos que se pueden recorrer sin reflect), con el ancho, las banderas y la precision cayendo
+       sobre cada elemento como en Go ("[%!t(uint8=   97)]" con ancho 5, "[    1     2]" con %5d).
+
+    3. strconv, el ancho del entero  (casos 4, 5 y 6)
+       Atoi es ParseInt(s, 10, 0) y bitSize 0 significa "el ancho de int de ESTA plataforma": 64 bits en el
+       host, 32 en el SH-4. Dos defectos en uno:
+         a) ParseInt trataba bitSize 0 como 64 bits siempre (ahora usa intSize, que ya estaba declarado).
+         b) al desbordar devolvia maxInt64/minInt64 en vez del tope DEL ANCHO pedido; en un int de 32 bits
+            esos topes truncados dan -1 y 0, que es exactamente lo que se veia en la consola.
+       Con (a) y (b): ParseInt(...,32) satura a MaxInt32/MinInt32 con error de rango, y Atoi en la consola
+       devuelve eso mismo (que es lo que hace Go de 32 bits).
+
+EL CORPUS MAL CALCULADO (parte de los casos 4, 5 y 6)
+    gen-casos calculaba el esperado de Atoi con strconv.ParseInt(s, 10, 64) en el host: exigia que
+    "9223372036854775807" entrara SIN error, cosa imposible en la consola (Atoi devuelve un int de 32
+    bits) y que Go de 32 bits tampoco hace. Ahora usa el ancho de int de la consola (32) y esta escrito
+    por que. Es el unico numero del corpus que depende de la plataforma destino.
+
+LA PRUEBA DEL HOST, EN LOS DOS ANCHOS (que es lo que faltaba)
+    El defecto de (b) no se ve en el host con el int de 64 bits, y el de (a) tampoco. Por eso:
+      scripts/console/test-std-host.sh   -> corre la prueba diferencial con GOARCH=amd64 y con GOARCH=386
+                                            (int de 32 bits, el ancho del SH-4)
+      scripts/console/mutar-std-host.sh  -> exige que la suite cace sus regresiones: control sano verde y
+                                            despues 4 mutantes (uno por arreglo, con el bitSize 0 juzgado en
+                                            386 porque en amd64 no cambia nada) + 1 chequeo del corpus.
+    Casos agregados al corpus del host (difftest): %c con int64(min/max), int(255), int(233), uint64(1<<63),
+    uint32(0x1F600), 0xD800, -1, 0x4E2D; %t/%d/%c/%b/%5d/%.2d sobre []byte; %t sobre []string; y
+    TestEnterosPorAncho (ParseInt y ParseUint con bitSize 0, 8, 16, 32 y 64 contra la biblioteca real).
+
+RESULTADO MEDIDO
+    prueba diferencial del host:  amd64 verde y 386 verde (antes de los casos nuevos ya era verde: el hueco
+                                 era que no cubria estos casos)
+    mutador:                     5/5 chequeos cazados, con el control sano verde en los dos anchos
+    autotest en Flycast:         ANTES  560 casos, 553 bien, 7 mal
+                                 DESPUES 590 casos, 589 bien, 1 mal
+                                 (los 590 son por los casos nuevos que se agregaron al corpus)
+
+EL QUE NO ES DE LA STDLIB (caso 7: errors.Is)  ->  tarjeta DC-002.2f
+    Causa raiz medida en el codigo de libgodc, no deducida:
+      ~/dreamcast/libgodc/runtime/interface_dreamcast.c:67  implements_interface()
+      linea 113:  if (strings_equal_ptr(lhsMethod->__name, rhsMethod->__name))  -> break
+    O sea: el chequeo de "este tipo implementa esta interfaz" compara el NOMBRE del metodo y nada mas, no
+    la FIRMA. *wrapErrors (el envoltorio de fmt.Errorf con %w) tiene Unwrap() []error, y una interfaz que
+    pide Unwrap() error se considera implementada igual: el itab queda armado con el puntero al metodo de
+    firma distinta y la llamada devuelve basura (E30/E31/E32: las DOS aserciones dicen ok; el type switch
+    elige Unwrap() error; Unwrap() []error "devuelve" 0 elementos).
+    En Go de verdad las dos aserciones son excluyentes: un metodo entra en la interfaz solo si coinciden el
+    nombre y la firma.
+    Control que confirma el diagnostico: E28 (comparar dos interfaces del mismo valor) da true, asi que la
+    comparacion de interfaces esta bien; lo que esta mal es la ASERCION.
+    No se toca en esta tarjeta: es el runtime compartido (y su chequeo sostiene los otros 589 casos), asi
+    que va con su propia medicion en DC-002.2f.
+
+    Mientras tanto, este caso queda ROJO y a la vista en el autotest (la pantalla sigue roja): taparlo
+    sacandolo del corpus seria esconder un defecto de la plataforma que el motor puede pisar.
+
+EVIDENCIA CRUDA
+    Console serie de la corrida de la sonda:  /tmp/dc-sonda-e/flycast.log  (lineas E0-E35)
+    Console serie del autotest (antes):      /tmp/dc-run/flycast.log
+    Console serie del autotest (despues):    /tmp/dc-run2/flycast.log  (STD-TEST: casos 590 bien 589 mal 1)

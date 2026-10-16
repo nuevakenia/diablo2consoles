@@ -31,8 +31,8 @@ func main() {
 	verbos := []string{"%d", "%5d", "%-5d|", "%05d", "%+d", "% d", "%2d", "%10d", "%x", "%#x",
 		"%04x", "%016x", "%X", "%o", "%b", "%c", "%t", "%q", "%v", "%s", "%10s|", "%-10s|",
 		"%.3s", "%f", "%.0f", "%.1f", "%.2f", "%.3f", "%e", "%g", "%2.1f", "%08.2f", "%.0d"}
-	enteros := []interface{}{0, 1, -1, 42, -42, 255, 1000, int64(-9223372036854775808), int64(9223372036854775807), uint8(9)}
-	textos := []interface{}{"", "hola", "con \"comillas\" y \\barra", "salto\nde linea\ttab", "no ascii: \xc3\xa9", "a"}
+	enteros := []interface{}{0, 1, -1, 42, -42, 255, 1000, 233, 0x4E2D, int64(-9223372036854775808), int64(9223372036854775807), uint8(9)}
+	textos := []interface{}{"", "hola", "con \"comillas\" y \\barra", "salto\nde linea	tab", "no ascii: \xc3\xa9", "a"}
 	flotantes := []interface{}{0.0, 1.5, 2.5, 3.14159265, 99.95, 0.145, 8.835, 1.0 / 3.0, -1.005, 100.0, 1e10, 1e15, -0.0}
 	otros := []interface{}{true, false, []byte("abc"), []byte{0x00, 0xff, 0x7f}}
 
@@ -56,7 +56,8 @@ func main() {
 		}
 	}
 	for _, v := range otros {
-		for _, f := range []string{"%v", "%s", "%t", "%x", "%X", "%q"} {
+		// %d y %c sobre un []byte: el verbo aplica al elemento, no al arreglo (Go recorre)
+		for _, f := range []string{"%v", "%s", "%t", "%x", "%X", "%q", "%d", "%c"} {
 			casoFmt = append(casoFmt, cFmt{f, []interface{}{v}})
 		}
 	}
@@ -79,16 +80,22 @@ func main() {
 	fmt.Fprintf(&sb, "}\n\n")
 
 	// ---- strconv ----
-	fmt.Fprintf(&sb, "type casoItoa struct {\n\tn       int64\n\tesperado string\n}\n\nvar casosItoa = []casoItoa{\n")
+	// El esperado de Atoi se calcula con el ancho de int de la CONSOLA (32 bits), no con el del
+	// host: Atoi devuelve un int y en el SH-4 ese int es de 32 bits. Calculado con el int de 64 bits
+	// del host, el corpus exigia que "9223372036854775807" entrara sin error, cosa que en la consola
+	// es imposible (Go de 32 bits tampoco lo hace: satura a MaxInt32 con error de rango).
+	// Medido: sonda DC-002.2e, E22-E24.
+	const anchoIntConsola = 32
+	fmt.Fprintf(&sb, "type casoItoa struct {\n	n       int64\n	esperado string\n}\n\nvar casosItoa = []casoItoa{\n")
 	for _, n := range []int64{0, 1, -1, 42, -42, 1000, 9223372036854775807, -9223372036854775808, 255} {
-		fmt.Fprintf(&sb, "\t{%d, %q},\n", n, strconv.FormatInt(n, 10))
+		fmt.Fprintf(&sb, "	{%d, %q},\n", n, strconv.FormatInt(n, 10))
 	}
 	fmt.Fprintf(&sb, "}\n\n")
 
 	fmt.Fprintf(&sb, "type casoAtoi struct {\n	s        string\n	esperado int64\n	hayError bool\n}\n\nvar casosAtoi = []casoAtoi{\n")
-	for _, s := range []string{"0", "1", "-1", "42", "-42", "9999999", "abc", "", " 7", "12abc", "9223372036854775807", "-9223372036854775808", "9223372036854775808", "007"} {
-		v, err := strconv.ParseInt(s, 10, 64)
-		fmt.Fprintf(&sb, "\t{%q, %d, %t},\n", s, v, err != nil)
+	for _, s := range []string{"0", "1", "-1", "42", "-42", "9999999", "abc", "", " 7", "12abc", "9223372036854775807", "-9223372036854775808", "9223372036854775808", "007", "2147483647", "2147483648"} {
+		v, err := strconv.ParseInt(s, 10, anchoIntConsola)
+		fmt.Fprintf(&sb, "	{%q, %d, %t},\n", s, v, err != nil)
 	}
 	fmt.Fprintf(&sb, "}\n\n")
 
