@@ -15,46 +15,43 @@ type BitSet struct {
 	palabras []uint64
 }
 
-// NewBitSet arma un conjunto vacio, como el de akara.
-func NewBitSet() *BitSet {
-	return &BitSet{}
+// NewBitSet arma un conjunto. En akara recibe los indices que van prendidos desde el arranque
+// (NewBitSet(indicesToSetTrue ...int)): se respeta esa firma, porque el motor la usa asi.
+func NewBitSet(indicesToSetTrue ...int) *BitSet {
+	b := &BitSet{}
+	for _, i := range indicesToSetTrue {
+		b.Set(i, true)
+	}
+	return b
 }
 
-// Set prende el bit i y devuelve true si cambio (si ya estaba prendido, false).
-func (b *BitSet) Set(i uint32) bool {
-	p := int(i / 64)
+// Set prende o apaga el bit idx (la firma de akara: Set(idx int, b bool)).
+func (b *BitSet) Set(idx int, v bool) {
+	if idx < 0 {
+		return
+	}
+	p := idx / 64
 	for len(b.palabras) <= p {
 		b.palabras = append(b.palabras, 0)
 	}
-	mascara := uint64(1) << (i % 64)
-	if b.palabras[p]&mascara != 0 {
-		return false
+	mascara := uint64(1) << uint(idx%64)
+	if v {
+		b.palabras[p] |= mascara
+	} else {
+		b.palabras[p] &^= mascara
 	}
-	b.palabras[p] |= mascara
-	return true
 }
 
-// Clear apaga el bit i.
-func (b *BitSet) Clear(i uint32) bool {
-	p := int(i / 64)
+// Get: si el bit idx esta prendido (asi se llama en akara).
+func (b *BitSet) Get(idx int) bool {
+	if idx < 0 {
+		return false
+	}
+	p := idx / 64
 	if p >= len(b.palabras) {
 		return false
 	}
-	mascara := uint64(1) << (i % 64)
-	if b.palabras[p]&mascara == 0 {
-		return false
-	}
-	b.palabras[p] &^= mascara
-	return true
-}
-
-// IsSet: si el bit i esta prendido.
-func (b *BitSet) IsSet(i uint32) bool {
-	p := int(i / 64)
-	if p >= len(b.palabras) {
-		return false
-	}
-	return b.palabras[p]&(uint64(1)<<(i%64)) != 0
+	return b.palabras[p]&(uint64(1)<<uint(idx%64)) != 0
 }
 
 // Len: la cantidad de bits que entran.
@@ -73,5 +70,17 @@ func (b *BitSet) Count() int {
 	return total
 }
 
-// Reset: la deja vacia.
-func (b *BitSet) Reset() { b.palabras = b.palabras[:0] }
+// Clear: la deja vacia (la firma de akara, sin argumentos).
+func (b *BitSet) Clear() { b.palabras = b.palabras[:0] }
+
+// Flip: da vuelta el bit idx.
+func (b *BitSet) Flip(idx int) {
+	b.Set(idx, !b.Get(idx))
+}
+
+// Clone: una copia independiente.
+func (b *BitSet) Clone() *BitSet {
+	nuevo := &BitSet{palabras: make([]uint64, len(b.palabras))}
+	copy(nuevo.palabras, b.palabras)
+	return nuevo
+}
