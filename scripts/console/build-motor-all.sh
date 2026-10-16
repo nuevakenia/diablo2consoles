@@ -34,7 +34,12 @@ PENDIENTES="$PAQ"
 for CAPA in $(seq 1 20); do
     FALLARON=""
     for p in $PENDIENTES; do
-        srcs=$(ls "$REPO/$p"/*.go 2>/dev/null | grep -v _test.go)
+        # gccgo NO filtra por sufijo de plataforma como hace el go de verdad: si se le pasan
+        # _darwin.go o _windows.go los intenta compilar (uno importa "C") y el paquete "falla" por un
+        # archivo que no tiene nada que ver con la Dreamcast. Se excluyen a mano.
+        srcs=$(ls "$REPO/$p"/*.go 2>/dev/null | grep -v _test.go |
+            grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
+            grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$')
         [ -n "$srcs" ] || continue
         out="$GEN/$PREFIJO/$p.gox"
         mkdir -p "$(dirname "$out")"
@@ -68,6 +73,16 @@ echo "== bloqueados: $(echo "$PENDIENTES" | wc -w) =="
     echo "compilados: $OK de $TOTAL"
     echo
     echo "## los simbolos que faltan, ordenados por cuantos paquetes bloquean"
+    echo "## el avance, paquete por paquete (1 = compila)"
+    for p in $PAQ; do
+        if grep -qxF "$GEN/$PREFIJO/$p.gox" "$GEN/orden-motor.txt" 2>/dev/null; then
+            echo "$p 1"
+        else
+            echo "$p 0"
+        fi
+    done
+    echo
+    echo "## los simbolos que faltan (undefined:), ordenados por cuantos paquetes bloquean"
     grep -h 'undefined:' "$LOG"/*.log 2>/dev/null |
         sed 's/.*undefined: //' | sed 's/[[:space:]]*$//' |
         sort | uniq -c | sort -rn | head -40

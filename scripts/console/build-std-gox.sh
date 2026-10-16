@@ -19,7 +19,11 @@ GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 
 # orden de dependencias: cada paquete necesita los .gox de los anteriores
 # (io va despues de errors porque io.EOF es un errors.New, DC-002.3)
-ORDEN="${ORDEN:-unicode/utf8 errors io bytes strings strconv fmt math math/bits math/rand hash hash/fnv encoding/binary encoding/hex container/ring sort os log time bufio path/filepath runtime sync/atomic sync}"
+# Orden de dependencias. ojo: heap importa sort, y csv importa encoding.
+# OJO: encoding/csv NO va todavia: el paquete que quedo escrito (a medias) no compila en SH-4
+# ("non-integer len argument to make" en csv.go:344). Bloquea a d2equip, d2statlist, d2txt y d2s, asi
+# que hay que arreglarlo, pero primero el resto.
+ORDEN="${ORDEN:-unicode unicode/utf8 errors io bytes strings strconv fmt math math/bits math/rand hash hash/fnv encoding/binary encoding/hex container/ring sort container/heap os log time bufio path/filepath runtime sync/atomic sync}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2

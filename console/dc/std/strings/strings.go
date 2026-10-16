@@ -485,3 +485,74 @@ func (b *Builder) WriteRune(r rune) (int, error) {
 // el Builder tambien sirve donde se espera un io.Writer
 var _ io.Writer = (*Builder)(nil)
 var _ io.StringWriter = (*Builder)(nil)
+
+// ---------------------------------------------------------------- Replacer
+
+// Replacer: el reemplazador de Go, con la misma idea y las mismas reglas (los pares se prueban en el
+// orden en que se dieron, y el que gana es el primero que coincide en esa posicion).
+//
+// Límite declarado: se implementa con una lista de pares y una busqueda por posicion; el de Go usa
+// tablas de bytes para ir rapido. El RESULTADO es el mismo (y se prueba contra el de verdad en el
+// host), lo que cambia es la velocidad: para los textos del juego (rutas y tablas de textos) alcanza.
+type Replacer struct {
+	pares []string
+}
+
+// NewReplacer arma el reemplazador con los pares viejo, nuevo, viejo, nuevo...
+func NewReplacer(oldnew ...string) *Replacer {
+	if len(oldnew)%2 != 0 {
+		panic("strings.NewReplacer: cantidad impar de argumentos")
+	}
+	return &Replacer{pares: append([]string(nil), oldnew...)}
+}
+
+// Replace devuelve s con todas las sustituciones aplicadas.
+func (r *Replacer) Replace(s string) string {
+	if len(r.pares) == 0 || s == "" {
+		return s
+	}
+	// el largo del reemplazo mas largo: no hace falta mirar mas alla
+	maxLargo := 0
+	for i := 0; i < len(r.pares); i += 2 {
+		if l := len(r.pares[i]); l > maxLargo {
+			maxLargo = l
+		}
+	}
+	var b []byte
+	for i := 0; i < len(s); {
+		cual := -1
+		for p := 0; p < len(r.pares); p += 2 {
+			if r.pares[p] == "" {
+				continue
+			}
+			if len(r.pares[p]) > len(s)-i {
+				continue
+			}
+			if s[i:i+len(r.pares[p])] == r.pares[p] {
+				cual = p
+				break
+			}
+		}
+		if cual >= 0 {
+			if b == nil {
+				b = []byte(s[:i])
+			}
+			b = append(b, r.pares[cual+1]...)
+			i += len(r.pares[cual])
+		} else {
+			if b != nil {
+				b = append(b, s[i])
+			}
+			i++
+		}
+	}
+	if b == nil {
+		return s
+	}
+	return string(b)
+}
+
+// WriteString escribe el reemplazo en un Writer.
+func (r *Replacer) WriteString(w interface{ Write([]byte) (int, error) }, s string) (int, error) {
+	return w.Write([]byte(r.Replace(s)))
+}

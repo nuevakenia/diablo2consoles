@@ -86,3 +86,52 @@ func ReadAll(r Reader) ([]byte, error) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------- Seek
+
+// Las constantes de Seek, con los MISMOS valores que en Go (un Seeker del motor las usa para
+// posicionarse en un archivo del MPQ).
+const (
+	SeekStart   = 0 // busca desde el principio del archivo
+	SeekCurrent = 1 // busca desde el offset actual
+	SeekEnd     = 2 // busca desde el final
+)
+
+// Seeker es la interfaz de Go, igual.
+type Seeker interface {
+	Seek(offset int64, whence int) (int64, error)
+}
+
+// ReadSeeker, ReadWriteSeeker y ReadCloser: las combinaciones que usa el motor.
+type ReadSeeker interface {
+	Reader
+	Seeker
+}
+
+type ReadWriteSeeker interface {
+	Reader
+	Writer
+	Seeker
+}
+
+type ReadCloser interface {
+	Reader
+	Closer
+}
+
+type Closer interface {
+	Close() error
+}
+
+type ReadWriteCloser interface {
+	Reader
+	Writer
+	Closer
+}
+
+// NopCloser: devuelve un Closer que no hace nada (el equivalente al de Go, para envolver un Reader).
+func NopCloser(r Reader) ReadCloser { return nopCloser{r} }
+
+type nopCloser struct{ Reader }
+
+func (nopCloser) Close() error { return nil }
