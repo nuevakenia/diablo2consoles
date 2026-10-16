@@ -343,7 +343,7 @@ Triage para la fase siguiente (rama DC-002):
 ## 11. DC-002.2: la biblioteca estandar minima en la consola (hasta donde llega hoy)
 
 La stdlib de la seccion 10 **compila para SH-4 y enlaza**: `scripts/console/build-std-gox.sh` la
-deja en `$DC_ROOT/gox` en seis archivos `.gox` (318 KB en total; el `.gox` de gccgo es a la vez la
+deja en `$DC_ROOT/gox` en ocho archivos `.gox` (406 KB en total; el `.gox` de gccgo es a la vez la
 cabecera de importacion y el objeto con el codigo, por eso tambien va al enlace). El POC
 `console/dc/poc/stdlib` arma con eso un ELF de 3.086.004 bytes que Flycast arranca.
 

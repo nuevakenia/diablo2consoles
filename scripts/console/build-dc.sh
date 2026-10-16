@@ -30,17 +30,14 @@ GOXI=""
 if [ -d "$GOX" ]; then
     GOXI="-I $GOX"
 fi
-CASOS=""
-if [ -f "$OUT/gen/casos_gen.go" ]; then
-    CASOS="$OUT/gen/casos_gen.go"
-fi
 # Todo lo que haya en gen/ es generado en el build (la tabla de casos de la stdlib, los bytes de un
-# asset horneado): se compila junto con el POC.
+# asset horneado): se compila junto con el POC. Se listan UNA sola vez: antes casos_gen.go se pasaba
+# ademas por separado y gccgo lo veia dos veces (redefinition).
 GEN_GO=""
 for g in "$OUT"/gen/*.go; do
     [ -f "$g" ] && GEN_GO="$GEN_GO $g"
 done
-sh-elf-gccgo $GODC_GOFLAGS $GOXI -c "$SRC"/*.go $CASOS $GEN_GO -o "$OUT/main.o"
+sh-elf-gccgo $GODC_GOFLAGS $GOXI -c "$SRC"/*.go $GEN_GO -o "$OUT/main.o"
 
 # Puentes a C (para funciones de KOS que el binding de Go no expone). Pueden vivir en
 # $SRC/*.c o en $SRC/csrc/*.c. Se enlazan aparte: gccgo los llama con el comentario //extern.
