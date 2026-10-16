@@ -1,0 +1,153 @@
+DC-002.8: el motor compilando por capas — 93 de 142, y los bloqueos reales
+=========================================================================
+
+Fecha: 2026-10-16.  Rama DC-002.  Un solo agente sobre el repo.
+
+Lo que pide la tarjeta: compilar los paquetes REALES del motor para SH-4 y reportar N/M con el bloqueo
+concreto de cada uno (que simbolo falta, que import no aparece), en vez de suponer cuanto falta. Y de
+cada bloqueo que sea de NUESTRA stdlib, sacar el simbolo, probarlo contra Go y desbloquear el paquete.
+
+CUANTO COMPILA (medido, scripts/console/build-motor-all.sh)
+----------------------------------------------------------
+  142 paquetes del motor con .go (sin los de prueba)
+  ANTES de esta tarjeta:  90 de 142, 52 bloqueados
+  DESPUES:                93 de 142, 49 bloqueados
+  capas: 57 -> 75 -> 87 -> 91 -> 93 -> 93   (la ultima no desbloquea nada nuevo: se corta ahi)
+
+Los paquetes que SE DESBLOQUEARON con los simbolos de esta tarjeta:
+  d2core/d2term        -> bufio.NewReader(&bytes.Buffer) pedia Buffer.Read (no existia)
+  d2networking/d2mp    -> binary.LittleEndian.AppendUint16 (no existia)
+  d2common/d2display   -> image.Uniform, y despues Rectangle.Union / Inset / In
+
+LOS 49 BLOQUEADOS, POR CAUSA (no por paquete: lo que hay que escribir para destrabarlos)
+  9  encoding/json         (d2app, d2config, d2replay, d2gamepad, d2netpacket, d2mpq, ...) — la decision
+                           medida ya esta tomada (commit 48912a00: NO se escribe json)
+  6  dependencias INTERNAS en cascada (dgame/dcore/dcommon que dependen de los de arriba)
+  2  net                   (d2networking)
+  2  dcommon/dquest        (embed adentro)
+  1  regexp                (d2drop)
+  1  os/exec               (d2setup)
+  1  embed                 (d2quest)
+  1  github.com/robertkrimen/otto   (d2script: es un interprete de JavaScript ENTERO)
+  1  github.com/go-restruct/restruct (d2pl2: un tercero)
+  resto: los que importan a los anteriores (cascada)
+
+SIMBOLOS AGREGADOS EN ESTA TARJETA (todos medidos contra Go, no de memoria)
+--------------------------------------------------------------------------
+  encoding/binary.AppendUint16 / AppendUint32 / AppendUint64  (+ los tres en la interfaz ByteOrder)
+  bytes.Buffer.Read                                            (Buffer es un io.Reader, como en Go)
+  image.Uniform                                                (el color uniforme, sin memoria)
+  image.Rectangle.Union / Rectangle.Inset / Rectangle.In
+  ebiten: 37 teclas que el motor nombra (KeyApostrophe ... KeySlash), 4 de ellas alias de las Arrow
+
+AppendByte NO se agrego: Go no lo tiene en ByteOrder. Lo cazo la prueba diferencial contra Go en el
+primer intento y se saco. (Agregar un simbolo "de mas" tambien es un defecto: la stdlib tiene que ser
+la de Go, no una parecida.)
+
+PRUEBA DIFERENCIAL DEL HOST (scripts/console/test-std-host.sh) — VERDE en amd64 y 386
+------------------------------------------------------------------------------------
+  difftest/dc0028_test.go:
+    encoding/binary.Append*:  148 casos (4 prefijos x 6 valores x 3 anchos x 2 ordenes + el encadenado)
+    bytes.Buffer.Read:        7 tamanos de lectura, comparando el RASTRO entero (cuantos bytes y con que
+                              error en cada lectura) mas el texto leido, Bytes() despues de leer, Write
+                              despues de leer y Reset; y el caso borde de p vacio sobre buffer vacio
+    image.Uniform:            5 colores x 4 puntos + Opaque + Bounds + ColorModel, y 4 DIBUJADOS
+                              comparados pixel a pixel (Src y Over, sobre todo y en un rectangulo)
+    image/color:              26 colores de los OCHO tipos (RGBA, NRGBA, RGBA64, NRGBA64, Gray, Gray16,
+                              Alpha, Alpha16) con alfa al tope, al medio y en cero, mas RGBAModel
+    image.Rectangle:          207 casos sobre 9 rectangulos: 81 Union + 81 In + 45 Inset (incluye
+                              vacios, degenerados y los de suma impar, donde el medio trunca hacia cero)
+
+  Y la suite se corre varias veces para cazar el azar (medido):
+    GOARCH=amd64 go test -count=20 ./difftest/   -> ok
+    GOARCH=386   go test -count=20 ./difftest/   -> ok  (3 rondas: 3,358 s / 3,157 s / 3,168 s)
+    GOARCH=amd64 go test -run TestWaitGroupContraGo -count=50 ./difftest/  -> ok
+
+CORPUS DE LA CONSOLA (Flycast) — 2746 casos, 2746 bien, 0 mal
+-------------------------------------------------------------
+  STD-TEST: casos 2746 bien 2746 mal 0
+  STD-TEST: RESULTADO OK - coincidio con la stdlib real en la consola
+  ANTES: 2354.  +392 = 144 de append + 30 de color + 7 de buffer + 4 de uniform + 207 de rect.
+  Los esperados los calcula el host con la biblioteca estandar REAL (cmd/gen-casos) y el POC los
+  recalcula con d2std: los bytes, el rastro de las lecturas, los 16 bits de cada color, los pixeles
+  dibujados y los rectangulos (Union/In/Inset).
+
+TAMANOS
+-------
+  POC stdlib (ELF)       3.850.120 -> 3.855.192 bytes ; 1ST_READ.BIN 815.052 -> 821.292 bytes
+  La stdlib minima sigue compilando completa para SH-4 (build-std-gox.sh sin errores).
+
+BARRERA DEL HITO (scripts/console/compare-motor-dc6.sh): 31 lineas identicas, 30 frames. El POC del
+motor sigue IGUAL aunque se tocaron color, bytes, binary e image.
+
+LOS DEFECTOS QUE APARECIERON MIDIENDO
+-------------------------------------
+1. color.RGBA.RGBA() PREMULTIPLICABA por el alfa (era una copia de NRGBA). En Go, RGBA es un color YA
+   premultiplicado y RGBA() solo escala a 16 bits. Medido: RGBA{1,2,3,128} daba (129,258,387,32896)
+   donde Go da (257,514,771,32896), y con alfa 0 daba negro donde Go da el color. Se veia en el
+   dibujado: Over con RGBA{0x11,0x22,0x33,0x80} sobre 0xc0 daba (50,59,61) donde Go da (71,82,93).
+   Lo cazo la prueba de image.Uniform DIBUJADO (el dibujado de Go usa RGBA()). Arreglado.
+2. color.RGBA64.RGBA() tenia el mismo defecto en 16 bits (RGBA64{1,2,3,32768} daba (0,1,1,32768) donde
+   Go da (1,2,3,32768)). Arreglado.
+3. image/draw importaba "image" y "image/color" DE GO (no "d2std/..."): compilaba en la consola (el
+   build reescribe "d2std/" -> "") pero en el HOST traia los tipos de Go, asi que la prueba diferencial
+   del host NO estaba probando lo nuestro. Es justo lo que dice la cabecera de build-std-gox.sh que hay
+   que hacer. Arreglado en image/draw y en image.
+4. Rectangle.Inset NO era el de Go: medido, cuando el inset invertiria el lado (Min+n > Max-n) Go
+   COLAPSA ese eje en el punto medio ((Min+Max)/2, con la division truncada hacia cero). Nuestro Inset
+   solo sumaba y restaba y dejaba el rectangulo invertido. Medido: Inset((-3,-3)-(0,0), 2) da
+   (-1,-1)-(-1,-1) en Go (el medio de (-3,0) es -1, no -2); nosotros dabamos (-1,-1)-(-2,-2).
+   Lo cazo el difftest nuevo. Arreglado.
+5. cmd/gen-casos: el resumen de flag/csv se emitia terminando con \\n (DOS caracteres, no un salto), asi
+   que ese comentario se COMIA la linea siguiente. Estaba latente (se comia otro comentario) y se
+   destapo al insertar el bloque de DC-002.8 justo despues: el `type casoAppend struct` quedaba
+   comentado y el compilador de la consola se quejaba con "expected declaration" lejos de la causa.
+   Arreglado.
+6. TestWaitGroupContraGo estaba FLAKY y ademas NO COMPARABA NADA (defecto de DC-002.7, cazado aca):
+   el contador lo incrementaban DIEZ goroutines con n++ sin sincronizar, y la funcion devolvia `n, n`
+   (el mismo contador dos veces, con el parametro usarConsola ignorado por un `_ = usarConsola`).
+   Medido: `-count=30` daba "WaitGroup: Go 29, consola 29 (los dos tienen que dar 30)" en 2 de 30
+   corridas. Un test asi no solo hace fallar la suite al azar: hace que el MUTADOR cace mutantes por
+   casualidad (el mutante 27 del RGBA "cazo" por esto antes del arreglo). Arreglado: un contador por
+   lado con sync/atomic y 15 en cada uno (3 vueltas de 5 goroutines).
+7. DECLARADO (no arreglado): el control de costo de float64 del POC imprime 0 en "no tiene que ser 0"
+   (bits64(suma)&1). Un control que siempre da 0 no discrimina nada.
+
+MUTADOR (scripts/console/mutar-std-host.sh) — 32/32 cazados, control sano, arbol restaurado
+--------------------------------------------------------------------------------------------
+Los 6 nuevos (los 26 anteriores siguen cazados):
+  27. image/color: RGBA premultiplica de mas (como NRGBA)       -> cazado (TestImageUniformContraGo)
+  28. bytes: Buffer.Read no avisa el fin de la entrada          -> cazado (la suite SE CUELGA: sin EOF
+                                                                  los lectores no terminan nunca)
+  29. encoding/binary: AppendUint16 big endian escribe al reves -> cazado (TestBinaryAppendContraGo)
+  30. image: Inset no colapsa al punto medio                    -> cazado (TestColorTodosContraGo)
+  31. image: Uniform.Opaque dice lo contrario                   -> cazado (TestImageUniformContraGo)
+  32. image: Rectangle.In con la contencion al reves            -> cazado (TestColorTodosContraGo)
+
+Dos defectos del PROPIO mutador, que salieron al revisar los resultados (un mutador que miente es peor
+que no tenerlo):
+  - el test corria con -timeout 25s: con la maquina cargada el rojo podia ser por TIEMPO y no por un
+    aserto, y el mutante se daba por cazado igual (medido: dos mutantes salieron rojos por
+    "panic: test timed out after 1m0s"/25s sin que la suite dijera nada). Ahora es -timeout 60s y el
+    script IMPRIME el motivo cuando el rojo es por tiempo o caida, para que se vea cual de los dos es.
+  - el mutante de Uniform.Opaque estaba escrito `return true`, que NI COMPILA (la variable `a` queda sin
+    usar): el script lo reportaba como "LA MUTACION NO COMPILA (no prueba nada de la suite)" y eso
+    hundia el conteo. Se corrigio a `return a != 0xffff`, que compila y la suite caza.
+
+LO QUE QUEDA DECLARADO (no silencioso)
+--------------------------------------
+  A. os y io/fs tienen TIPOS DISTINTOS para lo mismo (FileInfo, DirEntry, FileMode) y en Go son el
+     mismo tipo. Sintoma: d2mpq/mpq.go:205 "cannot use type []os.FileInfo as type []fs.FileInfo". El
+     arreglo es alinear io/fs como dueno y que os reuse por alias (~150 lineas): medido a mitad de
+     camino el motor BAJA a 40 de 142 porque os deja de compilar. Va como paso propio.
+  B. io/ioutil, os, compress/zlib y compress/gzip importan paquetes de Go ("io", "os", "sort") en vez de
+     d2std/...: es el defecto 3 en los archivos que NO se tocaron. En zlib/gzip da igual (son //extern a
+     KOS y no compilan en el host), pero en ioutil y os SI importa: la prueba del host de ioutil
+     escribe con el os de Go. Se arregla junto con A (os es el que no compila en el host).
+  C. El Write de csv no va al corpus de la consola (el motor solo LEE tablas) y el control de costo del
+     POC no discrimina (defecto 7).
+  D. Un cuelgue intermitente de la suite en 386: medido 1 vez en 80 corridas (una corrida de
+     `-count=20` en 386 se quedo en el -timeout de 300s; las otras tres verdes en 3,2 s). Es de la
+     familia de los tests de goroutines/canales de DC-002.7, que es lo que el comentario del archivo ya
+     advierte que puede colgarse con el scheduler del host. Frecuencia medida: ~1,25% de las corridas
+     de la suite completa en 386. Declarado: cuando se cuelga, el que lo mire va a saber por que.

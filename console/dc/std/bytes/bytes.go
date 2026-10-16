@@ -28,6 +28,23 @@ func (b *Buffer) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// Read lee del buffer lo que quede (Buffer es un io.Reader, como en Go). Medido en DC-002.8:
+// d2core/d2term hace bufio.NewReader(&buffer) y sin esto el paquete no compila ("missing method Read").
+//
+// El contrato es el de Go: al final de la entrada devuelve io.EOF, pero un Read de CERO bytes sobre un
+// buffer vacio devuelve (0, nil): un Reader no puede decir EOF cuando no le pidieron nada.
+func (b *Buffer) Read(p []byte) (int, error) {
+	if len(b.buf) == 0 {
+		if len(p) == 0 {
+			return 0, nil
+		}
+		return 0, io.EOF
+	}
+	n := copy(p, b.buf)
+	b.buf = b.buf[n:]
+	return n, nil
+}
+
 // WriteString agrega el texto al final.
 func (b *Buffer) WriteString(s string) (int, error) {
 	b.buf = append(b.buf, s...)

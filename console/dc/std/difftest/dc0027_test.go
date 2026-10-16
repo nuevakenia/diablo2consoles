@@ -12,6 +12,7 @@ package difftest
 
 import (
 	gosync "sync"
+	"sync/atomic"
 	"testing"
 
 	d2sync "d2std/sync"
@@ -136,34 +137,50 @@ func TestOnceEsperaAlQueCorre(t *testing.T) {
 }
 
 // TestWaitGroupContraGo: el contador de la consola y el de Go esperan igual.
+//
+// ARREGLADO en DC-002.8 (era un test roto de dos maneras, y mentia):
+//   - el contador `n` lo incrementaban DIEZ goroutines con n++ sin sincronizar: carrera de datos.
+//     Medido: 2 de 30 corridas daban 29 en vez de 30 (go test -run TestWaitGroupContraGo -count=30).
+//     Un test flaky no solo hace fallar la suite al azar: hace que el MUTADOR cace mutantes por
+//     casualidad. El mutante del RGBA de DC-002.8 "cazo" por esto la primera vez que se corrio.
+//   - devolvia `n, n`: el MISMO contador dos veces, asi que el mensaje "WaitGroup: Go 29, consola 29"
+//     no comparaba nada (y el parametro usarConsola quedaba ignorado con un `_ = usarConsola`).
+//
+// Ahora cada lado tiene SU contador (atomic, que en 386 el int64 necesita alineacion y el int32 no) y
+// se exige 30 en los dos.
 func TestWaitGroupContraGo(t *testing.T) {
-	correr := func(usarConsola bool) (int, int) {
-		var n int
+	correr := func(usarConsola bool) int {
+		var n int32
 		for i := 0; i < 3; i++ {
 			var wgGo gosync.WaitGroup
 			var wgDC d2sync.WaitGroup
+			if usarConsola {
+				wgDC.Add(5)
+				for j := 0; j < 5; j++ {
+					go func() {
+						atomic.AddInt32(&n, 1)
+						wgDC.Done()
+					}()
+				}
+				wgDC.Wait()
+				continue
+			}
 			wgGo.Add(5)
-			wgDC.Add(5)
 			for j := 0; j < 5; j++ {
 				go func() {
-					n++
+					atomic.AddInt32(&n, 1)
 					wgGo.Done()
 				}()
-				go func() {
-					n++
-					wgDC.Done()
-				}()
 			}
-			// se esperan los dos: si alguno se traba, el test se cuelga (y el mutador lo vigila)
 			wgGo.Wait()
-			wgDC.Wait()
 		}
-		_ = usarConsola
-		return n, n
+		return int(n)
 	}
-	a, b := correr(false)
-	if a != b || a != 30 {
-		t.Fatalf("WaitGroup: Go %d, consola %d (los dos tienen que dar 30)", a, b)
+	// 15 incrementos por lado: 3 vueltas de 5 goroutines en cada uno (el test viejo esperaba 30 porque
+	// los DOS lados sumaban sobre el mismo contador)
+	a, b := correr(false), correr(true)
+	if a != 15 || b != 15 {
+		t.Fatalf("WaitGroup: Go %d, consola %d (los dos tienen que dar 15)", a, b)
 	}
 }
 

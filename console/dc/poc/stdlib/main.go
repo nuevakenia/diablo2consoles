@@ -21,6 +21,9 @@ import (
 	"flag"
 	"fmt"
 	"hash/fnv"
+	"image"
+	"image/color"
+	"image/draw"
 	"math"
 	"math/bits"
 	"math/rand"
@@ -78,6 +81,7 @@ func main() {
 	correrSort()
 	correrFlag()
 	correrCSV()
+	correrDC28()
 	correrPropiedades()
 	medirCostoFloat64()
 
@@ -640,6 +644,139 @@ func correrCSV() {
 	for _, c := range casosCSV {
 		check("encoding/csv", c.nombre, c.esperado, leerCSV(c))
 	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// DC-002.8: los simbolos que se agregaron a la stdlib minima porque BLOQUEABAN paquetes del motor
+// (medido con scripts/console/build-motor-all.sh), mas el defecto de color.RGBA que cazo la prueba
+// de image.Uniform. Los casos vienen horneados del host (cmd/gen-casos) con las respuestas de la
+// biblioteca estandar REAL: aca se recalcula con d2std y se compara.
+//
+// Lo que se compara: los BYTES de los Append*, el rastro de las lecturas del Buffer (cuantos bytes y
+// con que error en cada una), los 16 bits de cada color y los PIXELES que quedan despues de dibujar.
+// ------------------------------------------------------------------------------------------------
+
+// textoColorCuatro: el mismo resumen que el host (r,g,b,a en decimal, separados por coma).
+func textoColorCuatro(r, g, b, a uint32) string {
+	return strconv.FormatUint(uint64(r), 10) + "," + strconv.FormatUint(uint64(g), 10) + "," +
+		strconv.FormatUint(uint64(b), 10) + "," + strconv.FormatUint(uint64(a), 10)
+}
+
+// rastroLecturas: lee de a pedazos y arma el rastro "cuantos:que error" de cada lectura.
+func rastroLecturas(texto string, tam int) string {
+	b := bytes.NewBufferString(texto)
+	partes := []string{}
+	chico := make([]byte, tam)
+	for i := 0; i < 24; i++ {
+		n, err := b.Read(chico)
+		e := "sin error"
+		if err != nil {
+			e = err.Error()
+		}
+		partes = append(partes, strconv.Itoa(n)+":"+e)
+		if n == 0 {
+			break
+		}
+	}
+	return strings.Join(partes, "|") + "|"
+}
+
+func correrDC28() {
+	// encoding/binary.Append*: el motor lo usa en d2mp/events.go (armar los paquetes de red)
+	for _, c := range casosAppend {
+		prefijo := append([]byte(nil), c.prefijo...)
+		var tengo []byte
+		switch c.tipo {
+		case "u16":
+			if c.grande {
+				tengo = binary.BigEndian.AppendUint16(prefijo, uint16(c.valor))
+			} else {
+				tengo = binary.LittleEndian.AppendUint16(prefijo, uint16(c.valor))
+			}
+		case "u32":
+			if c.grande {
+				tengo = binary.BigEndian.AppendUint32(prefijo, uint32(c.valor))
+			} else {
+				tengo = binary.LittleEndian.AppendUint32(prefijo, uint32(c.valor))
+			}
+		default:
+			if c.grande {
+				tengo = binary.BigEndian.AppendUint64(prefijo, c.valor)
+			} else {
+				tengo = binary.LittleEndian.AppendUint64(prefijo, c.valor)
+			}
+		}
+		nombre := "Append" + c.tipo + " sobre " + strconv.Itoa(len(c.prefijo)) + " bytes, valor " +
+			strconv.FormatUint(c.valor, 10) + ", grande=" + strconv.FormatBool(c.grande)
+		check("encoding/binary", nombre, hex.EncodeToString(c.esperado), hex.EncodeToString(tengo))
+	}
+
+	// image/color: los ocho tipos. Aca vivia el DEFECTO (RGBA premultiplicaba como NRGBA)
+	for _, c := range casosColor {
+		var r, g, b, a uint32
+		switch c.tipo {
+		case "RGBA":
+			r, g, b, a = color.RGBA{uint8(c.v1), uint8(c.v2), uint8(c.v3), uint8(c.v4)}.RGBA()
+		case "NRGBA":
+			r, g, b, a = color.NRGBA{uint8(c.v1), uint8(c.v2), uint8(c.v3), uint8(c.v4)}.RGBA()
+		case "RGBA64":
+			r, g, b, a = color.RGBA64{uint16(c.v1), uint16(c.v2), uint16(c.v3), uint16(c.v4)}.RGBA()
+		case "NRGBA64":
+			r, g, b, a = color.NRGBA64{uint16(c.v1), uint16(c.v2), uint16(c.v3), uint16(c.v4)}.RGBA()
+		case "Gray":
+			r, g, b, a = color.Gray{uint8(c.v1)}.RGBA()
+		case "Gray16":
+			r, g, b, a = color.Gray16{uint16(c.v1)}.RGBA()
+		case "Alpha":
+			r, g, b, a = color.Alpha{uint8(c.v1)}.RGBA()
+		default:
+			r, g, b, a = color.Alpha16{uint16(c.v1)}.RGBA()
+		}
+		check("image/color", c.nombre, c.esperado, textoColorCuatro(r, g, b, a))
+	}
+
+	// bytes.Buffer como lector: el motor lo usa en d2term (bufio.NewReader(&buffer))
+	for _, c := range casosBuffer {
+		check("bytes", "Buffer.Read de a "+strconv.Itoa(c.tam)+" bytes", c.rastro, rastroLecturas(c.texto, c.tam))
+	}
+
+	// image.Uniform con image/draw: el motor lo usa en d2display (el fondo del cuadro)
+	for _, c := range casosUniform {
+		d := image.NewRGBA(image.Rect(0, 0, 8, 4))
+		for i := range d.Pix {
+			d.Pix[i] = 0x40
+		}
+		r := d.Bounds()
+		if c.rect == "adentro" {
+			r = image.Rect(2, 1, 6, 3)
+		}
+		op := draw.Src
+		if c.op == "Over" {
+			op = draw.Over
+		}
+		draw.Draw(d, r, &image.Uniform{C: color.RGBA{c.r, c.g, c.b, c.a}}, image.Point{}, op)
+		check("image/draw", "Uniform "+c.nombre, hex.EncodeToString(c.esperado), hex.EncodeToString(d.Pix))
+	}
+
+	// image.Rectangle.Union, In e Inset: el motor los usa en d2display/shotcheck.go
+	for _, c := range casosRect {
+		a := image.Rect(c.a[0], c.a[1], c.a[2], c.a[3])
+		b := image.Rect(c.b[0], c.b[1], c.b[2], c.b[3])
+		nombre := c.nombre + " de (" + textoRectCuatro(a) + ")"
+		switch c.op {
+		case "Union":
+			check("image", nombre, c.esperado, textoRectCuatro(a.Union(b)))
+		case "In":
+			check("image", nombre, c.esperado, strconv.FormatBool(a.In(b)))
+		default:
+			check("image", nombre, c.esperado, textoRectCuatro(a.Inset(c.n)))
+		}
+	}
+}
+
+// textoRectCuatro: el mismo resumen del rectangulo que el host (minX,minY,maxX,maxY).
+func textoRectCuatro(r image.Rectangle) string {
+	return strconv.Itoa(r.Min.X) + "," + strconv.Itoa(r.Min.Y) + "," + strconv.Itoa(r.Max.X) + "," + strconv.Itoa(r.Max.Y)
 }
 
 // correrPropiedades: lo que NO se puede comparar contra Go (el generador de rand es propio, ver el

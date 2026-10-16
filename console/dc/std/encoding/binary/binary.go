@@ -27,6 +27,11 @@ type ByteOrder interface {
 	PutUint16([]byte, uint16)
 	PutUint32([]byte, uint32)
 	PutUint64([]byte, uint64)
+	// los Append* son los que el motor usa en d2networking/d2mp/events.go (Go los tiene desde 1.19).
+	// AppendByte NO va: Go no lo tiene en ByteOrder (lo caza la prueba diferencial contra Go).
+	AppendUint16([]byte, uint16) []byte
+	AppendUint32([]byte, uint32) []byte
+	AppendUint64([]byte, uint64) []byte
 	String() string
 }
 
@@ -60,6 +65,16 @@ func (littleEndian) PutUint64(b []byte, v uint64) {
 	b[6] = byte(v >> 48)
 	b[7] = byte(v >> 56)
 }
+func (littleEndian) AppendUint16(b []byte, v uint16) []byte {
+	return append(b, byte(v), byte(v>>8))
+}
+func (littleEndian) AppendUint32(b []byte, v uint32) []byte {
+	return append(b, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
+}
+func (littleEndian) AppendUint64(b []byte, v uint64) []byte {
+	return append(b, byte(v), byte(v>>8), byte(v>>16), byte(v>>24),
+		byte(v>>32), byte(v>>40), byte(v>>48), byte(v>>56))
+}
 func (littleEndian) String() string { return "LittleEndian" }
 
 type bigEndian struct{}
@@ -91,6 +106,16 @@ func (bigEndian) PutUint64(b []byte, v uint64) {
 	b[2] = byte(v >> 40)
 	b[1] = byte(v >> 48)
 	b[0] = byte(v >> 56)
+}
+func (bigEndian) AppendUint16(b []byte, v uint16) []byte {
+	return append(b, byte(v>>8), byte(v))
+}
+func (bigEndian) AppendUint32(b []byte, v uint32) []byte {
+	return append(b, byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
+}
+func (bigEndian) AppendUint64(b []byte, v uint64) []byte {
+	return append(b, byte(v>>56), byte(v>>48), byte(v>>40), byte(v>>32),
+		byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
 }
 func (bigEndian) String() string { return "BigEndian" }
 

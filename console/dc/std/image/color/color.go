@@ -64,6 +64,13 @@ func modelAlphaToAlpha(c Color) Color {
 }
 
 // ---------------------------------------------------------------- RGBA (premultiplicado)
+//
+// OJO (DC-002.8, medido contra Go el 2026-10-16): RGBA es un color YA premultiplicado: sus valores
+// vienen con el alfa aplicado. RGBA() entonces solo los ESCALA a 16 bits, no los multiplica por el
+// alfa otra vez. La version anterior era una copia de NRGBA: multiplicaba por A y oscurecia el color
+// (medido: RGBA{1,2,3,128} daba (129,258,387,32896) donde Go da (257,514,771,32896), y con alfa 0
+// daba negro donde Go da el color). Eso se veia en el dibujado: Over con RGBA{0x11,0x22,0x33,0x80}
+// daba 50,59,61 donde Go da 71,82,93.
 type RGBA struct {
 	R, G, B, A uint8
 }
@@ -71,18 +78,12 @@ type RGBA struct {
 func (c RGBA) RGBA() (r, g, b, a uint32) {
 	r = uint32(c.R)
 	r |= r << 8
-	r *= uint32(c.A)
-	r /= 0xff
 
 	g = uint32(c.G)
 	g |= g << 8
-	g *= uint32(c.A)
-	g /= 0xff
 
 	b = uint32(c.B)
 	b |= b << 8
-	b *= uint32(c.A)
-	b /= 0xff
 
 	a = uint32(c.A)
 	a |= a << 8
@@ -146,23 +147,16 @@ func (c Alpha16) RGBA() (r, g, b, a uint32) {
 	return a, a, a, a
 }
 
+// RGBA64: el mismo caso que RGBA, en 16 bits (Go devuelve los valores tal cual: medido,
+// RGBA64{1,2,3,32768} -> (1,2,3,32768)). NRGBA64 si premultiplica (es el que viene sin premultiplicar).
 type RGBA64 struct {
 	R, G, B, A uint16
 }
 
 func (c RGBA64) RGBA() (r, g, b, a uint32) {
 	r = uint32(c.R)
-	r *= uint32(c.A)
-	r /= 0xffff
-
 	g = uint32(c.G)
-	g *= uint32(c.A)
-	g /= 0xffff
-
 	b = uint32(c.B)
-	b *= uint32(c.A)
-	b /= 0xffff
-
 	a = uint32(c.A)
 	return
 }

@@ -944,3 +944,113 @@ argumentos y el terminar el proceso son variables que engancha el arranque, y es
 compararse contra el flag de Go en el host—; el Writer de `csv` esta y se prueba en el host (18 casos)
 pero no va al corpus de la consola porque el motor solo LEE tablas; y `TrimLeadingSpace` no saltea los
 espacios no-ASCII (no hay tablas de Unicode), declarado en la cabecera del paquete con su prueba.
+
+## 21. DC-002.8: el motor compilando por capas — 92 de 142, y los bloqueos reales
+
+La tarjeta no pide escribir paquetes: pide MEDIR cuanto del motor compila para SH-4 y con que se traba
+cada paquete que no compila. La herramienta es `scripts/console/build-motor-all.sh`: intenta compilar
+los 142 paquetes del motor (los directorios con `.go`, sin los de prueba) y reintenta los que fallaron
+en capas, porque lo mas probable es que fallaran por una dependencia que si compilo en la pasada
+anterior. Se corta cuando una capa no desbloquea nada. Evidencia completa:
+`evidencia/dc-002.8-motor-por-capas.txt`.
+
+    ANTES de esta tarjeta:  90 de 142   (52 bloqueados)
+    DESPUES:                93 de 142   (capas: 57 -> 75 -> 87 -> 91 -> 93 -> 93; 49 bloqueados)
+
+Y lo que importa no es el numero: es QUE falta. Leyendo los 49 bloqueos por causa (no por paquete) sale
+que casi todos son **cuatro cosas**, y tres de ellas no son nuestra stdlib:
+
+  - 9 paquetes por `encoding/json` (y por ahi arrastran los `d2config`, `d2replay`, `d2gamepad`, ...):
+    la decision ya esta tomada y medida (commit `48912a00`): NO se escribe json.
+  - `net` (2), `regexp` (1), `os/exec` (1), `embed` (1): stdlib de Go que no tiene sentido portar.
+  - `github.com/robertkrimen/otto` (d2script: un interprete de JavaScript entero) y `restruct` (d2pl2).
+  - y el resto son paquetes INTERNOS que importan a los de arriba (cascada).
+
+Lo unico que SI era nuestro y bloqueaba paquetes del motor se saco de los errores exactos de
+compilacion, se probo contra Go y se agrego:
+
+    encoding/binary.AppendUint16 / AppendUint32 / AppendUint64   -> desbloqueo d2networking/d2mp
+    bytes.Buffer.Read (Buffer es un io.Reader)                   -> desbloqueo d2core/d2term
+    image.Uniform                                                -> d2common/d2display
+    image.Rectangle.Union / Inset / In                           -> d2common/d2display
+    ebiten: 37 teclas que el motor nombra (4 son alias de las Arrow, como en Ebitengine)
+
+Cada simbolo nace de un error de compilacion con archivo y linea (`d2mp/events.go:89`,
+`terminal_logger.go:22`, `shotcheck.go:34`), no de una lista de deseos. `AppendByte` no se agrego
+porque **Go no lo tiene en `ByteOrder`**: lo cazo la prueba diferencial contra Go en el primer intento.
+
+**Los tres defectos que aparecieron al medir el avance** (y que son de la stdlib, no del motor):
+
+- `color.RGBA.RGBA()` **premultiplicaba por el alfa**: era una copia de `NRGBA`. En Go, `RGBA` es un
+  color YA premultiplicado y su `RGBA()` solo escala a 16 bits. Medido: `RGBA{1,2,3,128}` daba
+  `(129,258,387,32896)` donde Go da `(257,514,771,32896)`, y con alfa 0 daba negro donde Go da el
+  color. Se veia en el dibujado: `Over` con `RGBA{0x11,0x22,0x33,0x80}` sobre `0xc0` daba
+  `(50,59,61)` donde Go da `(71,82,93)`. `color.RGBA64.RGBA()` tenia el mismo defecto, en 16 bits.
+  Lo cazo la prueba de `image.Uniform` **dibujado** (el dibujado de Go usa `RGBA()`), no una prueba de
+  colores: la prueba de los ocho colores que faltaba ahora esta (`TestColorTodosContraGo`) y es la que
+  lo habria cazado antes.
+- `image/draw` (y `image`) importaban `"image"` y `"image/color"` **de Go** en vez de `"d2std/..."`: en
+  la consola compilaba igual (el build reescribe `d2std/` -> `""`), pero en el HOST traia los tipos de
+  Go, asi que la prueba diferencial del host **no estaba probando lo nuestro**. Es exactamente lo que
+  dice la cabecera de `build-std-gox.sh` que hay que hacer, y estos dos archivos no lo cumplian.
+- `Rectangle.Inset` **no era el de Go**: medido, cuando el inset invertiria el lado (`Min+n > Max-n`)
+  Go COLAPSA ese eje en el punto medio (`(Min+Max)/2`, division truncada hacia cero). Nuestro `Inset`
+  solo sumaba y restaba y dejaba el rectangulo invertido: `Inset((-3,-3)-(0,0), 2)` da `(-1,-1)-(-1,-1)`
+  en Go (el medio de `(-3,0)` es `-1`, no `-2`) y nosotros dabamos `(-1,-1)-(-2,-2)`.
+- `Rectangle.In` (la contencion de RECTANGULOS, que no es el `In` de `Point` que ya estaba) **no
+  existia**: lo pide `d2display/shotcheck.go:53`. Medido contra Go: un rectangulo VACIO esta dentro de
+  cualquiera (incluso del vacio) y uno no vacio no esta dentro de uno vacio. Con eso, `d2display` cerro y
+  el motor paso de 92 a 93.
+
+**Y dos defectos de la propia suite**, los dos de la clase que mas envenena: los que hacen parecer que
+todo esta probado.
+
+- `cmd/gen-casos` emitia el resumen de flag/csv terminando con `\\n` (DOS caracteres) en vez de un
+  salto de linea, asi que ese comentario se **comia la linea siguiente**. Estaba latente (se comia otro
+  comentario) y se destapo al insertar el bloque de DC-002.8 justo despues: el `type casoAppend struct`
+  quedaba comentado y el compilador de la consola se quejaba con "expected declaration" lejos de la
+  causa.
+- `TestWaitGroupContraGo` estaba **flaky** y ademas **no comparaba nada**: el contador lo incrementaban
+  DIEZ goroutines con `n++` sin sincronizar, y la funcion devolvia `n, n` (el mismo contador dos veces,
+  con el parametro `usarConsola` ignorado por un `_ = usarConsola`). Medido:
+  `-count=30` daba fallos con "Go 29, consola 29" (2 de 30). Un test asi no solo hace fallar la suite al
+  azar: hace que el MUTADOR cace mutantes por casualidad — el mutante del `RGBA` "cazo" por esto la
+  primera vez. Arreglado: un contador por lado, con `sync/atomic`, y 15 en cada uno. Despues del
+  arreglo: `-run TestWaitGroupContraGo -count=50` verde, y la suite entera `-count=20` verde en amd64 y
+  en 386 (3 rondas).
+
+Cierre medido de la suite y del corpus con todo esto adentro:
+
+    host:    prueba diferencial verde en amd64 Y 386 (y -count=20 verde en los dos)
+    consola: STD-TEST: casos 2746 bien 2746 mal 0   (eran 2354: +392)
+    mutador: 32/32 cazados, control sano y arbol restaurado
+    barrera: compare-motor-dc6.sh — 31 lineas identicas, 30 frames
+
+**Los bloqueos que quedan, declarados** (van como paso propio, ninguno se deja en silencio):
+
+- `os` y `io/fs` tienen TIPOS DISTINTOS para lo mismo (`FileInfo`, `DirEntry`, `FileMode`) y en Go son
+  el MISMO tipo. Sintoma: `d2mpq/mpq.go:205` "cannot use `[]os.FileInfo` as `[]fs.FileInfo`". El
+  arreglo es alinear `io/fs` como dueno y que `os` reuse por alias (~150 lineas): medido a mitad de
+  camino, el motor **baja a 40 de 142** porque `os` deja de compilar. Por eso va como paso propio y no
+  como parche de pasada.
+- `io/ioutil`, `os`, `compress/zlib` y `compress/gzip` tienen el mismo defecto de import que tenian
+  `image` y `image/draw` (`"io"`, `"os"`, `"sort"` en vez de `"d2std/..."`). En zlib/gzip da igual (son
+  `//extern` a KOS y no compilan en el host), pero en `ioutil` y `os` no: la prueba del host de `ioutil`
+  escribe con el `os` de Go. Se arregla junto con lo anterior, porque `os` es el que no compila en el
+  host.
+- El control de costo del POC (`bits64(suma)&1`, "no tiene que ser 0") **siempre da 0**: un control que
+  no discrimina no es un control.
+- Un cuelgue **intermitente** de la suite en 386: medido 1 vez en 80 corridas (una corrida de
+  `-count=20` en 386 se quedo en el `-timeout` de 300 s; las otras tres dieron verde en 3,2 s). Es de la
+  familia de los tests de goroutines y canales de DC-002.7, que es lo que el propio archivo advierte que
+  puede colgarse con el scheduler del host.
+
+**Y dos defectos del propio mutador**, que salieron al revisar los resultados (un mutador que miente es
+peor que no tenerlo):
+
+- El test del mutador corria con `-timeout 25s`: con la maquina cargada el rojo podia ser por TIEMPO y
+  no por un aserto, y el mutante se contaba como cazado igual. Ahora es `-timeout 60s` y el script
+  **imprime el motivo** cuando el rojo es por tiempo o caida, para que se vea cual de los dos es.
+- El mutante de `Uniform.Opaque` estaba escrito `return true`, que **ni compila** (la variable `a` queda
+  sin usar): el script lo reportaba como "LA MUTACION NO COMPILA (no prueba nada de la suite)" y eso
+  hundia el conteo. Se corrigio a `return a != 0xffff`.

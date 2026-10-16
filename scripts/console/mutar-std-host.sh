@@ -72,7 +72,11 @@ mutacion() { # <nombre> <archivo> <buscar> <poner> <goarch>
         rc=1
         return
     fi
-    (cd "$STD" && GOARCH="$arch_go" go test -timeout 25s ./difftest/ >"$TMP/salida" 2>&1)
+    # El timeout del test es de 60s (era 25s): con la maquina cargada, 25s alcanzaba para que el test se
+    # cayera por tiempo y el mutante se diera por "cazado" sin que la suite hubiera dicho nada (medido
+    # en DC-002.8: dos mutantes salieron rojos por "test timed out" y no por un aserto). El control sano
+    # de arriba (que corre la suite sin mutar) es el que dice si el tiempo alcanza.
+    (cd "$STD" && GOARCH="$arch_go" go test -timeout 60s ./difftest/ >"$TMP/salida" 2>&1)
     # ROJO es que un test falle (--- FAIL), pero tambien lo es que el proceso se caiga: el mutante del
     # ancho del elemento de sort lee memoria con el ancho equivocado y revienta con SIGSEGV, sin llegar
     # a imprimir "--- FAIL". Las dos cosas son la suite cazando el defecto (medido: 0x3b47b99ec570).
@@ -83,6 +87,9 @@ mutacion() { # <nombre> <archivo> <buscar> <poner> <goarch>
         # ("coincidencia en fichero binario"): un cazado que no se puede leer es un cazado a medias.
         grep -am1 -- "--- FAIL" "$TMP/salida" | sed 's/^/     /'
         grep -am1 -A1 -- "difftest_test.go:" "$TMP/salida" | tail -1 | cut -c1-150 | sed 's/^/     /'
+        # si el rojo fue por TIEMPO y no por un aserto, se dice: un cuelgue puede ser del mutante, pero
+        # tambien puede ser la maquina. Que se vea cual de los dos es.
+        grep -am1 -E "test timed out|^panic:|^fatal error|SIGSEGV" "$TMP/salida" | cut -c1-150 | sed 's/^/     (por tiempo o caida) /'
         cazados=$((cazados + 1))
     elif grep -qaE "build failed|cannot|undefined|syntax error" "$TMP/salida"; then
         # No es un mutante: es codigo que no compila. No prueba nada sobre la suite y ensucia el conteo.
@@ -360,6 +367,62 @@ mutacion "csv: LazyQuotes ignorado (la comilla suelta es error siempre)" \
     "encoding/csv/csv.go" \
     $'\t\t\tif !r.LazyQuotes {\n\t\t\t\tif j := bytes.IndexByte(field, \'"\'); j >= 0 {' \
     $'\t\t\tif true {\n\t\t\t\tif j := bytes.IndexByte(field, \'"\'); j >= 0 {' \
+    amd64
+
+echo "== 27. image/color: RGBA premultiplica por el alfa (el defecto que cazo la prueba de Uniform) =="
+# El defecto real de DC-002.8: color.RGBA es un color YA premultiplicado, asi que su RGBA() solo escala
+# a 16 bits. La version con la multiplicacion es la que estaba escrita (era una copia de NRGBA) y
+# oscurecia el color. Medido: RGBA{1,2,3,128} daba (129,258,387,32896) donde Go da (257,514,771,32896),
+# y el dibujado con alfa daba 50,59,61 donde Go da 71,82,93.
+mutacion "image/color: RGBA premultiplica de mas (como NRGBA)" \
+    "image/color/color.go" \
+    $'func (c RGBA) RGBA() (r, g, b, a uint32) {\n\tr = uint32(c.R)\n\tr |= r << 8\n\n\tg = uint32(c.G)\n\tg |= g << 8\n\n\tb = uint32(c.B)\n\tb |= b << 8\n\n\ta = uint32(c.A)\n\ta |= a << 8\n\treturn\n}' \
+    $'func (c RGBA) RGBA() (r, g, b, a uint32) {\n\tr = uint32(c.R)\n\tr |= r << 8\n\tr *= uint32(c.A)\n\tr /= 0xff\n\n\tg = uint32(c.G)\n\tg |= g << 8\n\tg *= uint32(c.A)\n\tg /= 0xff\n\n\tb = uint32(c.B)\n\tb |= b << 8\n\tb *= uint32(c.A)\n\tb /= 0xff\n\n\ta = uint32(c.A)\n\ta |= a << 8\n\treturn\n}' \
+    amd64
+
+echo "== 28. bytes: Buffer.Read de un buffer vacio devuelve (0, nil) aunque p no este vacio =="
+# El contrato de io: sobre un buffer vacio, un Read de CERO bytes da (0, nil) y uno de mas de cero da
+# (0, io.EOF). El mutante borra el EOF: el llamador (bufio, csv, d2term) se queda esperando datos.
+mutacion "bytes: Buffer.Read no avisa el fin de la entrada" \
+    "bytes/bytes.go" \
+    $'\tif len(b.buf) == 0 {\n\t\tif len(p) == 0 {\n\t\t\treturn 0, nil\n\t\t}\n\t\treturn 0, io.EOF\n\t}' \
+    $'\tif len(b.buf) == 0 {\n\t\treturn 0, nil\n\t}' \
+    amd64
+
+echo "== 29. encoding/binary: AppendUint16 del orden grande escribe al reves =="
+# El motor arma los paquetes de red con Append (d2mp/events.go). El mutante hace que BigEndian escriba
+# como el chico: los mismos bytes con el mismo prefijo, pero al reves.
+mutacion "encoding/binary: AppendUint16 big endian escribe little endian" \
+    "encoding/binary/binary.go" \
+    $'func (bigEndian) AppendUint16(b []byte, v uint16) []byte {\n\treturn append(b, byte(v>>8), byte(v))\n}' \
+    $'func (bigEndian) AppendUint16(b []byte, v uint16) []byte {\n\treturn append(b, byte(v), byte(v>>8))\n}' \
+    amd64
+
+echo "== 30. image: Rectangle.Inset suma y resta, sin el colapso al punto medio =="
+# Medido contra Go (2026-10-16): cuando el inset invertiria el lado, Go COLAPSA ese eje en el punto
+# medio. El mutante vuelve a la cuenta directa y deja el rectangulo invertido.
+mutacion "image: Inset no colapsa al punto medio cuando se invierte" \
+    "image/image.go" \
+    $'\tif r.Min.X+n > r.Max.X-n {\n\t\tm := (r.Min.X + r.Max.X) / 2\n\t\tr.Min.X, r.Max.X = m, m\n\t} else {\n\t\tr.Min.X += n\n\t\tr.Max.X -= n\n\t}' \
+    $'\tr.Min.X += n\n\tr.Max.X -= n' \
+    amd64
+
+echo "== 31. image: Uniform.Opaque siempre dice que si =="
+# El motor pregunta Opaque para saltear la mezcla. El mutante dice siempre "si" (aunque el color tenga
+# alfa), que es exactamente lo que no se puede creer de una imagen uniforme.
+mutacion "image: Uniform.Opaque siempre true" \
+    "image/image.go" \
+    $'\treturn a == 0xffff' \
+    $'\treturn a != 0xffff' \
+    amd64
+
+echo "== 32. image: Rectangle.In con la contencion al reves =="
+# El motor pregunta si el contenido esta DENTRO de la region. El mutante contesta lo contrario (si la
+# region esta dentro del contenido), que para rectangulos distintos da lo mismo que estar fuera.
+mutacion "image: Rectangle.In con la contencion al reves" \
+    "image/image.go" \
+    $'\treturn s.Min.X <= r.Min.X && s.Min.Y <= r.Min.Y && r.Max.X <= s.Max.X && r.Max.Y <= s.Max.Y' \
+    $'\treturn r.Min.X <= s.Min.X && r.Min.Y <= s.Min.Y && r.Max.X <= s.Max.X && r.Max.Y <= s.Max.Y' \
     amd64
 
 echo

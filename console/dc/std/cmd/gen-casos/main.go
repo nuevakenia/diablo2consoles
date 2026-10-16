@@ -18,6 +18,9 @@ import (
 	"flag"
 	"fmt"
 	"hash/fnv"
+	"image"
+	"image/color"
+	"image/draw"
 	"math"
 	"math/bits"
 	"sort"
@@ -509,7 +512,204 @@ func main() {
 	}
 	}
 	fmt.Fprintf(&sb, "}\n\n")
-	fmt.Fprintf(&sb, "// resumen de lo medido en el host: flag %d casos, csv %d combinaciones\\n", len(argvsFlag), len(entradasCSV)*len(opcionesCSV))
+	fmt.Fprintf(&sb, "// resumen de lo medido en el host: flag %d casos, csv %d combinaciones\n", len(argvsFlag), len(entradasCSV)*len(opcionesCSV))
+
+	// ---- los simbolos que se agregaron en DC-002.8 (salidos de los bloqueos MEDIDOS del motor) ----
+	//
+	// Cada uno de estos paquetes/API no existia en la stdlib minima y bloqueaba paquetes del motor:
+	//   encoding/binary.Append*  d2networking/d2mp/events.go:89
+	//   bytes.Buffer.Read        d2core/d2term/terminal_logger.go:22
+	//   image.Uniform (+ draw)   d2common/d2display
+	//   color.RGBA / RGBA64      el defecto que cazo la prueba de Uniform (premultiplicaban de mas)
+	//
+	// El mismo codigo esta copiado en el POC de la consola (poc/stdlib/main.go, correrDC28) con los
+	// paquetes de d2std: el corpus compara los BYTES, el rastro de las lecturas, los 16 bits de cada
+	// color y los PIXELES que quedan despues de dibujar.
+	fmt.Fprintf(&sb, "type casoAppend struct {\n	prefijo  []byte\n	valor    uint64\n	tipo     string\n	grande   bool\n	esperado []byte\n}\n\nvar casosAppend = []casoAppend{\n")
+	prefijosAppend := [][]byte{{}, {0xaa}, {1, 2, 3, 4, 5, 6, 7, 8}}
+	valoresAppend := []uint64{0, 1, 0x1234, 0xffff, 0x12345678, 0xffffffff, 0x123456789abcdef0, 0xffffffffffffffff}
+	appendCon := func(tipo string, grande bool, pre []byte, v uint64) []byte {
+		copia := append([]byte(nil), pre...)
+		switch tipo {
+		case "u16":
+			if grande {
+				return binary.BigEndian.AppendUint16(copia, uint16(v))
+			}
+			return binary.LittleEndian.AppendUint16(copia, uint16(v))
+		case "u32":
+			if grande {
+				return binary.BigEndian.AppendUint32(copia, uint32(v))
+			}
+			return binary.LittleEndian.AppendUint32(copia, uint32(v))
+		}
+		if grande {
+			return binary.BigEndian.AppendUint64(copia, v)
+		}
+		return binary.LittleEndian.AppendUint64(copia, v)
+	}
+	nAppend := 0
+	for _, tipo := range []string{"u16", "u32", "u64"} {
+		for _, grande := range []bool{false, true} {
+			for _, pre := range prefijosAppend {
+				for _, v := range valoresAppend {
+					nAppend++
+					fmt.Fprintf(&sb, "	{%s, %d, %q, %t, %s},\n", bytesLiteral(pre), v, tipo, grande, bytesLiteral(appendCon(tipo, grande, pre, v)))
+				}
+			}
+		}
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+
+	// color: los ocho tipos, con el alfa al tope, al medio y en cero. Los 16 bits son el contrato.
+	fmt.Fprintf(&sb, "type casoColor struct {\n	nombre   string\n	tipo     string\n	v1       uint64\n	v2       uint64\n	v3       uint64\n	v4       uint64\n	esperado string\n}\n\nvar casosColor = []casoColor{\n")
+	nColor := 0
+	textoColor := func(r, g, b, a uint32) string {
+		return strconv.FormatUint(uint64(r), 10) + "," + strconv.FormatUint(uint64(g), 10) + "," +
+			strconv.FormatUint(uint64(b), 10) + "," + strconv.FormatUint(uint64(a), 10)
+	}
+	for _, tipo := range []string{"RGBA", "NRGBA", "RGBA64", "NRGBA64"} {
+		for _, alfa := range []uint64{0, 128, 32768, 255, 65535} {
+			var r, g, b, a uint32
+			switch tipo {
+			case "RGBA":
+				r, g, b, a = color.RGBA{1, 2, 3, uint8(alfa)}.RGBA()
+			case "NRGBA":
+				r, g, b, a = color.NRGBA{1, 2, 3, uint8(alfa)}.RGBA()
+			case "RGBA64":
+				r, g, b, a = color.RGBA64{1, 2, 3, uint16(alfa)}.RGBA()
+			default:
+				r, g, b, a = color.NRGBA64{1, 2, 3, uint16(alfa)}.RGBA()
+			}
+			nColor++
+			fmt.Fprintf(&sb, "	{%q, %q, 1, 2, 3, %d, %q},\n", tipo+" con alfa "+strconv.FormatUint(alfa, 10), tipo, alfa, textoColor(r, g, b, a))
+		}
+	}
+	for _, otro := range []struct {
+		nombre string
+		tipo   string
+		v      uint64
+	}{
+		{"Gray 0", "Gray", 0}, {"Gray 0x7f", "Gray", 0x7f}, {"Gray 0xff", "Gray", 0xff},
+		{"Gray16 0x1234", "Gray16", 0x1234}, {"Gray16 0xffff", "Gray16", 0xffff},
+		{"Alpha 0", "Alpha", 0}, {"Alpha 0x7f", "Alpha", 0x7f}, {"Alpha 0xff", "Alpha", 0xff},
+		{"Alpha16 0x1234", "Alpha16", 0x1234}, {"Alpha16 0xffff", "Alpha16", 0xffff},
+	} {
+		var r, g, b, a uint32
+		switch otro.tipo {
+		case "Gray":
+			r, g, b, a = color.Gray{uint8(otro.v)}.RGBA()
+		case "Gray16":
+			r, g, b, a = color.Gray16{uint16(otro.v)}.RGBA()
+		case "Alpha":
+			r, g, b, a = color.Alpha{uint8(otro.v)}.RGBA()
+		default:
+			r, g, b, a = color.Alpha16{uint16(otro.v)}.RGBA()
+		}
+		nColor++
+		fmt.Fprintf(&sb, "	{%q, %q, %d, 0, 0, 0, %q},\n", otro.nombre, otro.tipo, otro.v, textoColor(r, g, b, a))
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+
+	// bytes.Buffer como lector: el rastro de las lecturas (cuantos bytes y con que error en cada una)
+	fmt.Fprintf(&sb, "type casoBuffer struct {\n	texto  string\n	tam    int\n	rastro string\n}\n\nvar casosBuffer = []casoBuffer{\n")
+	textoBuffer := "hola mundo: 0123456789 abcdefghijklmnopqrstuvwxyz"
+	rastroBuffer := func(tam int) string {
+		b := bytes.NewBufferString(textoBuffer)
+		var partes []string
+		chico := make([]byte, tam)
+		for i := 0; i < 24; i++ {
+			n, err := b.Read(chico)
+			e := "sin error"
+			if err != nil {
+				e = err.Error()
+			}
+			partes = append(partes, strconv.Itoa(n)+":"+e)
+			if n == 0 {
+				break
+			}
+		}
+		return strings.Join(partes, "|") + "|"
+	}
+	tamsBuffer := []int{0, 1, 3, 7, 16, 64, 200}
+	for _, tam := range tamsBuffer {
+		fmt.Fprintf(&sb, "	{%q, %d, %q},\n", textoBuffer, tam, rastroBuffer(tam))
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+
+	// image.Uniform con image/draw: los pixeles que quedan, que es lo que ve el juego
+	fmt.Fprintf(&sb, "type casoUniform struct {\n	nombre   string\n	r, g, b, a uint8\n	op       string\n	rect     string\n	esperado []byte\n}\n\nvar casosUniform = []casoUniform{\n")
+	dibujaUniform := func(col color.RGBA, op draw.Op, todo bool) []byte {
+		d := image.NewRGBA(image.Rect(0, 0, 8, 4))
+		for i := range d.Pix {
+			d.Pix[i] = 0x40
+		}
+		r := d.Bounds()
+		if !todo {
+			r = image.Rect(2, 1, 6, 3)
+		}
+		draw.Draw(d, r, &image.Uniform{C: col}, image.Point{}, op)
+		return d.Pix
+	}
+	casosUnif := []struct {
+		nombre string
+		col    color.RGBA
+		op     draw.Op
+		todo   bool
+	}{
+		{"Src sobre todo, negro opaco", color.RGBA{0, 0, 0, 0xff}, draw.Src, true},
+		{"Over sobre todo, alfa 0x80", color.RGBA{0x11, 0x22, 0x33, 0x80}, draw.Over, true},
+		{"Src en el rectangulo de adentro", color.RGBA{0x11, 0x22, 0x33, 0xff}, draw.Src, false},
+		{"Over con alfa 0x40", color.RGBA{0x11, 0x22, 0x33, 0x40}, draw.Over, true},
+	}
+	for _, c := range casosUnif {
+		op := "Src"
+		if c.op == draw.Over {
+			op = "Over"
+		}
+		rect := "todo"
+		if !c.todo {
+			rect = "adentro"
+		}
+		fmt.Fprintf(&sb, "	{%q, %d, %d, %d, %d, %q, %q, %s},\n",
+			c.nombre, c.col.R, c.col.G, c.col.B, c.col.A, op, rect, bytesLiteral(dibujaUniform(c.col, c.op, c.todo)))
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+
+	// image.Rectangle.Union e Inset: los dos que pide d2common/d2display (shotcheck.go)
+	fmt.Fprintf(&sb, "type casoRect struct {\n	nombre   string\n	a        [4]int\n	b        [4]int\n	n        int\n	op       string\n	esperado string\n}\n\nvar casosRect = []casoRect{\n")
+	textoRect := func(r image.Rectangle) string {
+		return strconv.Itoa(r.Min.X) + "," + strconv.Itoa(r.Min.Y) + "," + strconv.Itoa(r.Max.X) + "," + strconv.Itoa(r.Max.Y)
+	}
+	rectsHost := []image.Rectangle{
+		image.Rect(0, 0, 4, 4),
+		image.Rect(2, 2, 6, 6),
+		image.Rect(-3, -3, -1, -1),
+		image.Rect(4, 0, 4, 4),
+		image.Rect(0, 0, 0, 0),
+		image.Rect(10, 10, 20, 30),
+		image.Rect(-3, -3, 0, 0),   // la suma de los bordes es impar: el medio trunca hacia CERO
+		image.Rect(0, 0, 3, 3),     // idem, del lado positivo
+		image.Rect(-3, -2, -3, -2), // degenerado en los dos ejes
+	}
+	nRect := 0
+	for _, a := range rectsHost {
+		for _, b := range rectsHost {
+			nRect++
+			fmt.Fprintf(&sb, "	{%q, [4]int{%d, %d, %d, %d}, [4]int{%d, %d, %d, %d}, 0, %q, %q},\n",
+				"Union", a.Min.X, a.Min.Y, a.Max.X, a.Max.Y, b.Min.X, b.Min.Y, b.Max.X, b.Max.Y, "Union", textoRect(a.Union(b)))
+			nRect++
+			fmt.Fprintf(&sb, "	{%q, [4]int{%d, %d, %d, %d}, [4]int{%d, %d, %d, %d}, 0, %q, %q},\n",
+				"In", a.Min.X, a.Min.Y, a.Max.X, a.Max.Y, b.Min.X, b.Min.Y, b.Max.X, b.Max.Y, "In", strconv.FormatBool(a.In(b)))
+		}
+		for _, n := range []int{-2, -1, 0, 1, 3} {
+			nRect++
+			fmt.Fprintf(&sb, "	{%q, [4]int{%d, %d, %d, %d}, [4]int{}, %d, %q, %q},\n",
+				"Inset", a.Min.X, a.Min.Y, a.Max.X, a.Max.Y, n, "Inset", textoRect(a.Inset(n)))
+		}
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+
+	fmt.Fprintf(&sb, "// los casos de DC-002.8 medidos en el host: append %d, color %d, buffer %d, uniform %d, rect %d\n", nAppend, nColor, len(tamsBuffer), len(casosUnif), nRect)
 
 	fmt.Fprintf(&sb, "// resumen de lo medido en el host: math %d casos, bits %d casos\n", nMath, nBits)
 

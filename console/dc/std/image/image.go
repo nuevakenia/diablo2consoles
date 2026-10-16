@@ -10,7 +10,7 @@
 package image
 
 import (
-	"image/color"
+	"d2std/image/color"
 )
 
 // Point y Rectangle: las dos coordenadas que usa el motor.
@@ -28,6 +28,72 @@ func (r Rectangle) Dx() int      { return r.Max.X - r.Min.X }
 func (r Rectangle) Dy() int      { return r.Max.Y - r.Min.Y }
 func (r Rectangle) Size() Point  { return Point{r.Dx(), r.Dy()} }
 func (r Rectangle) Empty() bool  { return r.Max.X <= r.Min.X || r.Max.Y <= r.Min.Y }
+
+// Union e Inset: los dos los pide d2common/d2display (shotcheck.go:34 y :53) — medido en DC-002.8.
+//
+// Union es el de siempre (un rectangulo vacio no aporta: devuelve el otro).
+//
+// Inset NO es "correr los cuatro bordes y listo": medido contra Go (2026-10-16), cuando el inset
+// daria un lado INVERTIDO (Min+n > Max-n) ese eje se COLAPSA en el punto medio ((Min+Max)/2, con la
+// division truncada hacia cero, la de Go). Ejemplos medidos:
+//
+//	Inset((0,0)-(4,4), 1) = (1,1)-(3,3)     no hay inversion
+//	Inset((0,0)-(4,4), 3) = (2,2)-(2,2)     inversion: 3 > 1 -> el medio de (0,4)
+//	Inset((-3,-3)-(0,0), 2) = (-1,-1)-(-1,-1)  inversion: -1 > -2 -> el medio de (-3,0) es -1 (no -2)
+//	Inset((4,0)-(4,4), 1) = (4,1)-(4,3)     el eje X no se toca: ya era degenerado (4,4)
+//
+// Con n negativo no hay inversion (el rectangulo crece) y sale la cuenta directa.
+func (r Rectangle) Union(s Rectangle) Rectangle {
+	if r.Empty() {
+		return s
+	}
+	if s.Empty() {
+		return r
+	}
+	if r.Min.X > s.Min.X {
+		r.Min.X = s.Min.X
+	}
+	if r.Min.Y > s.Min.Y {
+		r.Min.Y = s.Min.Y
+	}
+	if r.Max.X < s.Max.X {
+		r.Max.X = s.Max.X
+	}
+	if r.Max.Y < s.Max.Y {
+		r.Max.Y = s.Max.Y
+	}
+	return r
+}
+
+func (r Rectangle) Inset(n int) Rectangle {
+	if r.Min.X+n > r.Max.X-n {
+		m := (r.Min.X + r.Max.X) / 2
+		r.Min.X, r.Max.X = m, m
+	} else {
+		r.Min.X += n
+		r.Max.X -= n
+	}
+	if r.Min.Y+n > r.Max.Y-n {
+		m := (r.Min.Y + r.Max.Y) / 2
+		r.Min.Y, r.Max.Y = m, m
+	} else {
+		r.Min.Y += n
+		r.Max.Y -= n
+	}
+	return r
+}
+
+// In: si el rectangulo esta DENTRO de s (ojo: es el In del RECTANGULO, no el de Point, que ya estaba).
+// Lo pide d2display/shotcheck.go:53 (`if !content.In(region.Inset(-tol))`).
+//
+// Medido contra Go (2026-10-16): un rectangulo VACIO esta dentro de CUALQUIERA (incluso del vacio), y
+// uno no vacio no esta dentro de uno vacio. Con esa regla la contencion es la de siempre.
+func (r Rectangle) In(s Rectangle) bool {
+	if r.Empty() {
+		return true
+	}
+	return s.Min.X <= r.Min.X && s.Min.Y <= r.Min.Y && r.Max.X <= s.Max.X && r.Max.Y <= s.Max.Y
+}
 func (r Rectangle) Add(p Point) Rectangle {
 	return Rectangle{Point{r.Min.X + p.X, r.Min.Y + p.Y}, Point{r.Max.X + p.X, r.Max.Y + p.Y}}
 }
@@ -55,6 +121,34 @@ type Image interface {
 	ColorModel() color.Model
 	Bounds() Rectangle
 	At(x, y int) color.Color
+}
+
+// Uniform: una imagen de un solo color, sin memoria (como la de Go). Medido en DC-002.8: la usa
+// d2common/d2display para pintar el fondo (draw.Draw(out, out.Bounds(), &image.Uniform{C: color.Black},
+// ...)) y sin ella el paquete no compila.
+//
+// Los limites son los de Go (un rectangulo enorme alrededor del origen): dibujar un Uniform sobre
+// cualquier rectangulo vale, porque At devuelve el color este donde este.
+type Uniform struct {
+	C color.Color
+}
+
+func (c *Uniform) ColorModel() color.Model {
+	return color.ModelFunc(func(x color.Color) color.Color { return c.C })
+}
+
+func (c *Uniform) Bounds() Rectangle {
+	return Rectangle{Point{-1e9, -1e9}, Point{1e9, 1e9}}
+}
+
+func (c *Uniform) At(x, y int) color.Color { return c.C }
+
+func (c *Uniform) Opaque() bool {
+	if c.C == nil {
+		return true
+	}
+	_, _, _, a := c.C.RGBA()
+	return a == 0xffff
 }
 
 // ---------------------------------------------------------------- Paletted: indices + paleta

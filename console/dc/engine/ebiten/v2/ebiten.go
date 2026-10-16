@@ -309,6 +309,54 @@ const (
 	KeyPageDown
 )
 
+// Las teclas que el motor nombra y NO estaban. Medido con:
+//   grep -oh "ebiten\.Key[A-Za-z0-9]*" d2core/d2input/ebiten/*.go | sed 's/ebiten\.//' | sort -u
+// y comparado contra las de arriba: 37 nombres (medido el 2026-10-16). Los cuatro KeyUp/KeyDown/
+// KeyLeft/KeyRight son ALIAS de los Arrow, exactamente como en Ebitengine (ahi siguen por
+// compatibilidad). El resto son valores nuevos.
+const (
+	KeyUp    Key = KeyArrowUp
+	KeyDown  Key = KeyArrowDown
+	KeyLeft  Key = KeyArrowLeft
+	KeyRight Key = KeyArrowRight
+)
+
+const (
+	KeyApostrophe Key = 1000 + iota
+	KeyBackslash
+	KeyCapsLock
+	KeyComma
+	KeyEqual
+	KeyF5
+	KeyF6
+	KeyF7
+	KeyF8
+	KeyF9
+	KeyF10
+	KeyF11
+	KeyF12
+	KeyGraveAccent
+	KeyInsert
+	KeyKPAdd
+	KeyKPDecimal
+	KeyKPDivide
+	KeyKPEnter
+	KeyKPEqual
+	KeyKPMultiply
+	KeyKPSubtract
+	KeyLeftBracket
+	KeyMenu
+	KeyMinus
+	KeyNumLock
+	KeyPause
+	KeyPeriod
+	KeyPrintScreen
+	KeyRightBracket
+	KeyScrollLock
+	KeySemicolon
+	KeySlash
+)
+
 // el estado de las teclas: hoy lo llena nadie (el backend de la consola lo va a llenar con el joystick)
 var teclas = map[Key]bool{}
 

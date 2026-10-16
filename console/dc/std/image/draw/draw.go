@@ -9,8 +9,8 @@
 package draw
 
 import (
-	"image"
-	"image/color"
+	"d2std/image"
+	"d2std/image/color"
 )
 
 // Op es la operacion de dibujado.
