@@ -151,3 +151,44 @@ func (r *Reader) WriteTo(w io.Writer) (int64, error) {
 	r.i += int64(n)
 	return int64(n), err
 }
+
+// ---------------------------------------------------------------- ReadFrom / WriteTo del Buffer
+//
+// Los pide d2mpq/mpq_stream.go:378 al descomprimir un bloque (buffer.ReadFrom(el zlib.Reader)). El
+// Buffer de Go los tiene por la interfaz io.ReaderFrom/io.WriterTo; aca se implementan igual de simple:
+// leer todo y pegar, y escribir todo y vaciar.
+
+// ReadFrom lee todo lo que pueda de r y lo agrega al buffer. Devuelve cuantos bytes leyo.
+//
+// OJO: el Buffer de esta consola es lo mas simple que se puede (un solo slice, sin puntero de lectura
+// separado), asi que ReadFrom es "leer todo del origen y pegarlo al final" y WriteTo "escribir todo y
+// vaciar". Para el uso del motor (acumular un bloque descomprimido y sacarlo entero) alcanza y sobra.
+func (b *Buffer) ReadFrom(r interface{ Read([]byte) (int, error) }) (n int64, err error) {
+	bloque := make([]byte, 4096)
+	for {
+		c, e := r.Read(bloque)
+		if c > 0 {
+			b.buf = append(b.buf, bloque[:c]...)
+			n += int64(c)
+		}
+		if e != nil {
+			if e.Error() == "EOF" {
+				return n, nil
+			}
+			return n, e
+		}
+	}
+}
+
+// WriteTo escribe todo el buffer en w y lo vacia.
+func (b *Buffer) WriteTo(w interface{ Write([]byte) (int, error) }) (n int64, err error) {
+	if len(b.buf) > 0 {
+		c, err := w.Write(b.buf)
+		n = int64(c)
+		if err != nil {
+			return n, err
+		}
+	}
+	b.Reset()
+	return n, nil
+}

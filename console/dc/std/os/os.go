@@ -21,16 +21,18 @@ import (
 	"errors"
 	"io"
 	"unsafe"
+	"d2std/io/fs"
+	"d2std/time"
 )
 
-// FileMode es el tipo de Go (los permisos no se usan en la consola, pero el tipo tiene que existir
-// porque el motor lo nombra).
-type FileMode uint32
+// FileMode y las constantes: los de io/fs (en la stdlib de verdad os solo les pone el nombre corto).
+// Tiene que ser EL MISMO tipo: si no, un FileMode de aca no sirve donde se pide el de io/fs, y el motor
+// pide los dos (d2mpq/mpq.go).
+type FileMode = fs.FileMode
 
-// Los modos que el motor nombra.
 const (
-	ModeDir FileMode = 1 << (32 - 1 - iota)
-	ModePerm FileMode = 0777
+	ModeDir  = fs.ModeDir
+	ModePerm = fs.ModePerm
 )
 
 // ErrNotExist es el error de "no esta" (el motor lo compara con errors.Is).
@@ -236,15 +238,9 @@ func d2c_stat_tam(ruta string) int
 //extern d2c_stat_es_dir
 func d2c_stat_es_dir(ruta string) int
 
-// FileInfo es lo que devuelve Stat. NO tiene ModTime: eso pediria el paquete time, que en la consola
-// es el reloj de KOS y todavia no esta enganchado (si el motor lo pide, se ve al compilar y se
-// declara, en vez de inventar una fecha).
-type FileInfo interface {
-	Name() string
-	Size() int64
-	IsDir() bool
-	Mode() FileMode
-}
+// FileInfo es el de io/fs (alias de verdad, no un tipo parecido: asi el []os.FileInfo de aca y el
+// []fs.FileInfo que pide el motor son el MISMO tipo).
+type FileInfo = fs.FileInfo
 
 type infoArchivo struct {
 	nombre string
@@ -252,10 +248,12 @@ type infoArchivo struct {
 	dir    bool
 }
 
-func (i infoArchivo) Name() string  { return i.nombre }
-func (i infoArchivo) Size() int64   { return i.tam }
-func (i infoArchivo) IsDir() bool   { return i.dir }
-func (i infoArchivo) Mode() FileMode { return ModePerm }
+func (i infoArchivo) Name() string     { return i.nombre }
+func (i infoArchivo) Size() int64      { return i.tam }
+func (i infoArchivo) IsDir() bool      { return i.dir }
+func (i infoArchivo) Mode() FileMode   { return ModePerm }
+func (i infoArchivo) ModTime() time.Time { return time.Time{} }
+func (i infoArchivo) Sys() interface{}   { return nil }
 
 // Stat mira un archivo o directorio sin abrirlo.
 func Stat(nombre string) (FileInfo, error) {
@@ -302,34 +300,41 @@ type Signal interface {
 	Signal()
 }
 
-// DirEntry es una entrada de directorio (lo que devuelve ReadDir).
-//
-// El tipo viene de KOS crudo: es la convencion POSIX de dirent.h (DT_DIR = 4, DT_REG = 8), la misma
-// que documenta libgodc/kos/fs.go. En el romdisk medido en Flycast las entradas dan DT_UNKNOWN (0):
-// la imagen no guarda el tipo, asi que IsDir() no puede saberlo y eso queda declarado.
-type DirEntry struct {
+// DirEntry es el de io/fs (alias). El tipo concreto de aca abajo (dirEntryOS) es el que implementa la
+// interfaz: el que devuelve ReadDir.
+type DirEntry = fs.DirEntry
+
+type dirEntryOS struct {
 	nombre string
 	tam    int64
 	tipo   int
 }
 
 // Size: el tamano que trae el manifiesto.
-func (d DirEntry) Size() int64 { return d.tam }
+func (d dirEntryOS) Size() int64 { return d.tam }
 
 // Info: la misma info que Stat, sin abrir nada.
-func (d DirEntry) Info() (FileInfo, error) {
+func (d dirEntryOS) Info() (FileInfo, error) {
 	return infoArchivo{nombre: d.nombre, tam: d.tam, dir: d.tipo == 4}, nil
 }
 
 // Name es el nombre de la entrada.
-func (d DirEntry) Name() string { return d.nombre }
+func (d dirEntryOS) Name() string { return d.nombre }
 
 // IsDir: 4 es DT_DIR (POSIX). En el romdisk da false aunque el archivo sea un directorio: el tipo
 // viene DT_UNKNOWN y se dice aca en vez de mentir.
-func (d DirEntry) IsDir() bool { return d.tipo == 4 }
+func (d dirEntryOS) IsDir() bool { return d.tipo == 4 }
+
+// Type: 4 = DT_DIR, 8 = DT_REG (POSIX). En el romdisk viene DT_UNKNOWN (0), y eso queda declarado.
+func (d dirEntryOS) Type() FileMode {
+	if d.tipo == 4 {
+		return ModeDir
+	}
+	return 0
+}
 
 // TipoCrudo es el valor de KOS sin interpretar (para diagnostico y para el corpus).
-func (d DirEntry) TipoCrudo() int { return d.tipo }
+func (d dirEntryOS) TipoCrudo() int { return d.tipo }
 
 // ReadDir lista un directorio. EN LA CONSOLA SALE DE UN MANIFIESTO, no del sistema de archivos:
 //
@@ -377,7 +382,7 @@ func ReadDir(nombre string) ([]DirEntry, error) {
 				if campos[2] == "directorio" {
 					tipo = 4 // DT_DIR
 				}
-				salida = append(salida, DirEntry{nombre: campos[0], tam: int64(tam), tipo: tipo})
+				salida = append(salida, dirEntryOS{nombre: campos[0], tam: int64(tam), tipo: tipo})
 			}
 		}
 		linea = ""

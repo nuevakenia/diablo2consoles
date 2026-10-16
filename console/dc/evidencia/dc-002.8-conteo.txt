@@ -1,6 +1,6 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 79 de 142
+compilados: 84 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
@@ -41,7 +41,7 @@ d2common/d2fileformats/d2dt1 1
 d2common/d2fileformats/d2font 0
 d2common/d2fileformats/d2font/d2fontglyph 1
 d2common/d2fileformats/d2key 1
-d2common/d2fileformats/d2mpq 0
+d2common/d2fileformats/d2mpq 1
 d2common/d2fileformats/d2palshift 1
 d2common/d2fileformats/d2pl2 0
 d2common/d2fileformats/d2s 1
@@ -54,10 +54,10 @@ d2common/d2hireling 1
 d2common/d2interface 1
 d2common/d2level 1
 d2common/d2loader 0
-d2common/d2loader/asset 0
-d2common/d2loader/asset/types 0
-d2common/d2loader/filesystem 0
-d2common/d2loader/mpq 0
+d2common/d2loader/asset 1
+d2common/d2loader/asset/types 1
+d2common/d2loader/filesystem 1
+d2common/d2loader/mpq 1
 d2common/d2loadscreen 1
 d2common/d2locale 1
 d2common/d2math 1
@@ -155,13 +155,8 @@ d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:
 d2common/d2act3: /home/dgalli/Proyectos/diablo2consoles/d2common/d2act3/act3.go:18:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
 d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/shotcheck.go:15:30: error: reference to undefined identifier ‘image.Rect’
 d2common/d2fileformats/d2font: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2font/font.go:51:30: error: reference to undefined identifier ‘color.White’
-d2common/d2fileformats/d2mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2mpq/mpq_stream.go:5:22: error: import file ‘compress/zlib’ not found
 d2common/d2fileformats/d2pl2: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2pl2/pl2.go:6:40: error: import file ‘github.com/go-restruct/restruct’ not found
-d2common/d2loader: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/loader.go:9:65: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/mpq’ not found
-d2common/d2loader/asset: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/asset/asset.go:7:73: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset/typ
-d2common/d2loader/asset/types: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/asset/types/source_types.go:7:72: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2fil
-d2common/d2loader/filesystem: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/filesystem/asset.go:7:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asse
-d2common/d2loader/mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/mpq/asset.go:8:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset’ not 
+d2common/d2loader: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/loader.go:18:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2util’ not found
 d2common/d2quest: /home/dgalli/Proyectos/diablo2consoles/d2common/d2quest/speech.go:4:9: error: import file ‘embed’ not found
 d2common/d2replay: /home/dgalli/Proyectos/diablo2consoles/d2common/d2replay/replay.go:5:22: error: import file ‘encoding/json’ not found
 d2common/d2reward: /home/dgalli/Proyectos/diablo2consoles/d2common/d2reward/npc.go:4:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
@@ -213,28 +208,3 @@ d2networking/d2server: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2ser
 d2networking/d2server/d2tcpclientconnection: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/d2tcpclientconnection/tcp_client_connection.go:5:22: error: import file ‘encoding/json’ not found
 d2networking/d2server/d2udpclientconnection: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/d2udpclientconnection/udp_client_connection.go:6:22: error: import file ‘compress/gzip’ not found
 d2script: /home/dgalli/Proyectos/diablo2consoles/d2script/engine.go:9:37: error: import file ‘github.com/robertkrimen/otto’ not found
-
-== EL HALLAZGO QUE QUEDA ABIERTO: os y io/fs tienen TIPOS DISTINTOS para lo mismo ==
-
-Medido al intentar destrabar d2mpq: d2mpq/mpq.go:205 hace
-
-    lista, err := fs.ReadDir(archivo, ruta)     // el motor pide []fs.DirEntry
-    ... esto devuelve []os.FileInfo            // y el os de la consola devuelve otro tipo
-
-y gccgo corta con: incompatible types in assignment (cannot use type []os.FileInfo as type []fs.FileInfo).
-
-Por que pasa: se escribio io/fs (las interfaces de archivos que pide d2mpq) y os (el de la consola)
-por separado, cada uno con SU FileInfo / DirEntry / FileMode. En la stdlib de verdad NO son parecidos:
-son EL MISMO tipo (os.FileInfo ES fs.FileInfo, es un alias). Con dos tipos distintos, cualquier funcion
-que devuelva uno no sirve donde se pide el otro -- y eso va a volver a aparecer en cada paquete que toque
-archivos, no solo en d2mpq.
-
-El arreglo (que NO es un parche, es alinear): io/fs es el dueno de los tipos y os los reusa con alias
-(type FileInfo = fs.FileInfo, type DirEntry = fs.DirEntry, type FileMode = fs.FileMode), y os se queda
-solo con lo que es suyo (los metodos de File, las funciones). Son ~150 lineas entre los dos paquetes, y
-se probo que a mitad de camino el motor BAJA (os deja de compilar y se cae todo lo que lo usa: medido,
-40 de 142 con el os roto). Se hizo una vez, se midio, y se revirtio os.go y io/fs.go a lo commiteado
-para no dejar el arbol roto -- el resto de este commit quedo.
-
-Se hace como su propio paso, con su medicion, y con la prueba del host al lado: los tipos de archivos
-los usa todo el proyecto.
