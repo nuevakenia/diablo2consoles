@@ -26,7 +26,12 @@ GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 # encoding/csv: compila a mano (con el sed aplicado) pero NO desde el build: al entrar en el orden, el
 # build de la stdlib se corta ahi y no genera los paquetes siguientes (quedo en 9 .gox en vez de ~20).
 # Hay que ver por que (sospecha: el dst/src le queda un archivo con los imports sin el sed). Anotado.
-ORDEN="${ORDEN:-unicode unicode/utf8 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv encoding/binary encoding/hex container/ring sort container/heap image/color image os log time bufio encoding/csv io/fs io/ioutil path/filepath runtime sync/atomic sync}"
+# PENDIENTE MEDIDO (DC-002.8): os y io/fs tienen TIPOS DISTINTOS para lo mismo (FileInfo, DirEntry,
+# FileMode), y en la stdlib de verdad son el mismo tipo. Sintoma: d2mpq/mpq.go:205 falla con
+# "cannot use type []os.FileInfo as type []fs.FileInfo". El arreglo es alinear io/fs como dueno y que os
+# reusa por alias (~150 lineas); se midio que a mitad de camino el motor baja a 40 de 142 porque os deja
+# de compilar. Va como paso propio, no como parche. Ver evidencia dc-002.8-motor-por-capas.txt.
+ORDEN="${ORDEN:-unicode unicode/utf8 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv encoding/binary encoding/hex compress/zlib container/ring sort container/heap image/color image time io/fs os log bufio encoding/csv io/ioutil path/filepath runtime sync/atomic sync}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2

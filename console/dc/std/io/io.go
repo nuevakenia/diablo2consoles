@@ -219,3 +219,15 @@ var (
 )
 
 // ioEOF ya esta declarado arriba? si no, se declara aca.
+
+// ---------------------------------------------------------------- las interfaces de copiado
+
+// ReaderFrom / WriterTo: las que usa io.Copy para copiar rapido cuando el destino o el origen saben
+// hacerlo mejor. El motor las usa al escribir un MPQ.
+type ReaderFrom interface {
+	ReadFrom(r Reader) (n int64, err error)
+}
+
+type WriterTo interface {
+	WriteTo(w Writer) (n int64, err error)
+}

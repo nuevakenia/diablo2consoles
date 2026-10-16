@@ -69,6 +69,12 @@ func d2c_cerrar(fd int) int
 //extern d2c_tam
 func d2c_tam(fd int) int
 
+//extern d2c_buscar
+func d2c_buscar(fd int, offset int, whence int) int
+
+//extern d2c_estoy
+func d2c_estoy(fd int) int
+
 //extern d2c_hay
 func d2c_hay(ruta string) int
 
@@ -394,4 +400,49 @@ func partirTab(s string) []string {
 	}
 	partes = append(partes, actual)
 	return partes
+}
+
+// ---------------------------------------------------------------- Seek y ReadAt
+//
+// Los pide d2mpq para leer adentro del MPQ (se posiciona en un bloque y lee un pedazo). El sistema de
+// archivos de KOS sabe hacer las dos cosas (fs_seek), asi que van contra d2c_buscar del C de la stdlib
+// (csrc/os_dc.c), igual que el resto de os.
+//
+// Las constantes son las de io, con los MISMOS valores (0, 1, 2).
+
+const (
+	SeekStart   = 0
+	SeekCurrent = 1
+	SeekEnd     = 2
+)
+
+// Seek mueve la posicion de lectura.
+func (f *File) Seek(offset int64, whence int) (int64, error) {
+	if f == nil || f.fd < 0 {
+		return 0, ErrNotExist
+	}
+	r := d2c_buscar(f.fd, int(offset), whence)
+	if r < 0 {
+		return 0, ErrNotExist
+	}
+	return int64(r), nil
+}
+
+// ReadAt lee en una posicion concreta sin dejar movida la posicion actual (guarda y restaura).
+func (f *File) ReadAt(p []byte, off int64) (n int, err error) {
+	if f == nil || f.fd < 0 {
+		return 0, ErrNotExist
+	}
+	actual := d2c_estoy(f.fd)
+	if actual < 0 {
+		return 0, ErrNotExist
+	}
+	if _, err := f.Seek(off, SeekStart); err != nil {
+		return 0, err
+	}
+	n, err = f.Read(p)
+	if _, err2 := f.Seek(int64(actual), SeekStart); err2 != nil && err == nil {
+		err = err2
+	}
+	return n, err
 }

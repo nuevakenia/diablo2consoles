@@ -73,7 +73,9 @@ STD_C_OBJS=""
 for f in "$HERE/../../console/dc/std/csrc"/*.c; do
   [ -f "$f" ] || continue
   o="$OUT/stdlib-$(basename "${f%.c}").o"
-  kos-cc -O2 -ml -m4-single -c "$f" -o "$o"
+  # -I del zlib de KOS: el puente de compress/zlib lo necesita (kos-ports/zlib)
+  ZLIB_INC="${ZLIB_INC:-$DC_ROOT/kos-ports/zlib/inst/include}"
+  kos-cc -O2 -ml -m4-single -I"$ZLIB_INC" -c "$f" -o "$o"
   STD_C_OBJS="$STD_C_OBJS $o"
 done
 

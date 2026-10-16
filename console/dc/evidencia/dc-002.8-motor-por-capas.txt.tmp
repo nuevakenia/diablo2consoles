@@ -155,7 +155,7 @@ d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:
 d2common/d2act3: /home/dgalli/Proyectos/diablo2consoles/d2common/d2act3/act3.go:18:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
 d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/shotcheck.go:15:30: error: reference to undefined identifier ‘image.Rect’
 d2common/d2fileformats/d2font: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2font/font.go:51:30: error: reference to undefined identifier ‘color.White’
-d2common/d2fileformats/d2mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2mpq/mpq_stream.go:5:22: error: import file ‘compress/zlib’ not found
+d2common/d2fileformats/d2mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2mpq/mpq_stream.go:378:24: error: reference to undefined field or method ‘ReadFrom’
 d2common/d2fileformats/d2pl2: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2pl2/pl2.go:6:40: error: import file ‘github.com/go-restruct/restruct’ not found
 d2common/d2loader: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/loader.go:9:65: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/mpq’ not found
 d2common/d2loader/asset: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/asset/asset.go:7:73: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset/typ
