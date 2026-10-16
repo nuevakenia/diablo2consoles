@@ -215,3 +215,55 @@ func Sleep(d Duration) {
 	}
 	d2c_dormir(int(ms))
 }
+
+// ---------------------------------------------------------------- canales de tiempo
+
+// After: devuelve un canal que recibe la hora despues de d. La usa el reproductor de video del motor
+// para esperar entre cuadros.
+//
+// Como funciona en la consola: no hay temporizadores de hardware, asi que se usa una goroutine que
+// duerme con el reloj de KOS (thd_sleep, el mismo que usa Sleep) y despues manda por el canal. El canal
+// tiene buffer 1 para que la goroutine no quede colgada si nadie lee.
+func After(d Duration) <-chan Time {
+	ch := make(chan Time, 1)
+	go func() {
+		Sleep(d)
+		ch <- Now()
+	}()
+	return ch
+}
+
+// Tick: lo mismo, pero repetido cada d. El canal se cierra nunca (igual que en Go, y por eso hay que
+// cuidar de no dejarlo suelto: en un juego es un chorro de goroutines).
+func Tick(d Duration) <-chan Time {
+	ch := make(chan Time, 1)
+	go func() {
+		for {
+			Sleep(d)
+			select {
+			case ch <- Now():
+			default:
+			}
+		}
+	}()
+	return ch
+}
+
+// NewTimer devuelve un temporizador de un solo disparo.
+type Timer struct {
+	C <-chan Time
+}
+
+// NewTimer: el temporizador que dispara una vez tras d.
+func NewTimer(d Duration) *Timer {
+	return &Timer{C: After(d)}
+}
+
+// NewTicker: el que dispara cada d.
+type Ticker struct {
+	C <-chan Time
+}
+
+func NewTicker(d Duration) *Ticker {
+	return &Ticker{C: Tick(d)}
+}

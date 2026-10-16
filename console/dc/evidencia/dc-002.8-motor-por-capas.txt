@@ -1,6 +1,6 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 78 de 142
+compilados: 79 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
@@ -19,7 +19,7 @@ d2common/d2calculation/d2parser 1
 d2common/d2combat 1
 d2common/d2data 1
 d2common/d2data/d2compression 1
-d2common/d2data/d2video 0
+d2common/d2data/d2video 1
 d2common/d2datautils 1
 d2common/d2daynight 1
 d2common/d2difficulty 1
@@ -153,10 +153,9 @@ d2thread 1
 d2app: /home/dgalli/Proyectos/diablo2consoles/d2app/app.go:7:22: error: import file ‘encoding/json’ not found
 d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:16: error: import file ‘os/exec’ not found
 d2common/d2act3: /home/dgalli/Proyectos/diablo2consoles/d2common/d2act3/act3.go:18:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
-d2common/d2data/d2video: /home/dgalli/Proyectos/diablo2consoles/d2common/d2data/d2video/bink_audio.go:7:19: error: import file ‘math/cmplx’ not found
 d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/shotcheck.go:15:30: error: reference to undefined identifier ‘image.Rect’
 d2common/d2fileformats/d2font: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2font/font.go:51:30: error: reference to undefined identifier ‘color.White’
-d2common/d2fileformats/d2mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2mpq/mpq.go:7:14: error: import file ‘io/fs’ not found
+d2common/d2fileformats/d2mpq: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2mpq/mpq_stream.go:5:22: error: import file ‘compress/zlib’ not found
 d2common/d2fileformats/d2pl2: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2pl2/pl2.go:6:40: error: import file ‘github.com/go-restruct/restruct’ not found
 d2common/d2loader: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/loader.go:9:65: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/mpq’ not found
 d2common/d2loader/asset: /home/dgalli/Proyectos/diablo2consoles/d2common/d2loader/asset/asset.go:7:73: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset/typ
@@ -168,7 +167,7 @@ d2common/d2replay: /home/dgalli/Proyectos/diablo2consoles/d2common/d2replay/repl
 d2common/d2reward: /home/dgalli/Proyectos/diablo2consoles/d2common/d2reward/npc.go:4:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
 d2common/d2util: /home/dgalli/Proyectos/diablo2consoles/d2common/d2util/debug_print.go:6:66: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2util/assets’ not f
 d2common/d2util/assets: /home/dgalli/Proyectos/diablo2consoles/d2common/d2util/assets/assets.go:24:22: error: import file ‘compress/gzip’ not found
-d2core/d2asset: /home/dgalli/Proyectos/diablo2consoles/d2core/d2asset/asset_manager.go:6:18: error: import file ‘io/ioutil’ not found
+d2core/d2asset: /home/dgalli/Proyectos/diablo2consoles/d2core/d2asset/asset_manager.go:16:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2util’ not found
 d2core/d2audio: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/sound_engine.go:12:58: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset’ not found
 d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebiten/ebiten_audio_provider.go:10:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2u
 d2core/d2config: /home/dgalli/Proyectos/diablo2consoles/d2core/d2config/d2config.go:4:22: error: import file ‘encoding/json’ not found
@@ -213,33 +212,4 @@ d2networking/d2realm: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2real
 d2networking/d2server: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/client_connection.go:4:57: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero’ no
 d2networking/d2server/d2tcpclientconnection: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/d2tcpclientconnection/tcp_client_connection.go:5:22: error: import file ‘encoding/json’ not found
 d2networking/d2server/d2udpclientconnection: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/d2udpclientconnection/udp_client_connection.go:6:22: error: import file ‘compress/gzip’ not found
-d2script: /home/dgalli/Proyectos/diablo2consoles/d2script/engine.go:6:18: error: import file ‘io/ioutil’ not found
-
-== LA DECISION MEDIDA SOBRE encoding/json (el externo que mas bloquea) ==
-
-Se midio COMO lo usa el motor, porque eso es lo que decide si es barato o no:
-  88 archivos del motor importan encoding/json
-  72 llamadas: json.Marshal / json.Unmarshal / MarshalIndent / NewEncoder / NewDecoder
-  y TODAS son sobre structs (json.Marshal(o), json.Unmarshal(data, &o), Decode(&l))
-
-Conclusion: para structs arbitrarios hace falta REFLEXION (mapear campos por nombre y leer los tags
-`json:"..."`). O sea que encoding/json NO es un paquete barato: arrastra reflect, que son 43 paquetes de
-la biblioteca estandar (ya medido antes: no entran).
-
-Las tres salidas, y cual se elige:
-  (a) escribir reflect            -- descartada: 43 paquetes, y el motor usa de reflect mucho menos
-                                     que lo que costaria.
-  (b) escribir un json minimo     -- solo sirve para map/slice de tipos conocidos, y el motor usa
-                                     structs: no alcanza para desbloquear los paquetes.
-  (c) DECIDIR POR USO             -- es la que va: mirar PARA QUE lo usan los paquetes bloqueados.
-                                     El uso real es archivos de CONFIGURACION (d2config), REPLAYS
-                                     (d2replay), el perfil del joystick (d2input/d2gamepad) y el estado
-                                     del heroe (d2hero). Ninguno de esos es el juego corriendo: son
-                                     guardar y leer estado en disco. En la consola no hay disco y no hay
-                                     donde guardar la config: se puede portar el juego SIN json, y los
-                                     paquetes que solo lo usan para eso se dejan fuera del camino
-                                     critico con esa razon escrita (no porque "no compila").
-
-Lo que sigue entonces: los paquetes que NO dependen de json ni de reflect, que son la mayoria de los
-que hoy estan bloqueados por dependencias internas (d2mapentity, d2records, d2ui, d2inventory y los que
-se desbloquean con ellos).
+d2script: /home/dgalli/Proyectos/diablo2consoles/d2script/engine.go:9:37: error: import file ‘github.com/robertkrimen/otto’ not found

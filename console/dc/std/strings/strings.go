@@ -556,3 +556,115 @@ func (r *Replacer) Replace(s string) string {
 func (r *Replacer) WriteString(w interface{ Write([]byte) (int, error) }, s string) (int, error) {
 	return w.Write([]byte(r.Replace(s)))
 }
+
+// ---------------------------------------------------------------- Reader
+
+// Reader: la version de strings.Reader de Go (un texto que se lee como si fuera un archivo). La usa
+// d2mpq para leer el (listfile) del MPQ como si fuera un archivo.
+//
+// Límite declarado: estan Read, ReadByte, ReadAt, Seek, Len, Size y Reset; no estan ReadRune ni
+// ReadLastRune (el motor no las usa, y en la consola no hay utf8 completo).
+type Reader struct {
+	s        string
+	i        int64
+	prevRune int
+}
+
+// NewReader devuelve un Reader que lee s.
+func NewReader(s string) *Reader { return &Reader{s: s, i: 0, prevRune: -1} }
+
+// Len: lo que queda por leer.
+func (r *Reader) Len() int {
+	if r.i >= int64(len(r.s)) {
+		return 0
+	}
+	return int(int64(len(r.s)) - r.i)
+}
+
+// Size: el largo original (no cambia con la lectura).
+func (r *Reader) Size() int64 { return int64(len(r.s)) }
+
+func (r *Reader) Read(b []byte) (n int, err error) {
+	if r.i >= int64(len(r.s)) {
+		return 0, ioEOF
+	}
+	n = copy(b, r.s[r.i:])
+	r.i += int64(n)
+	return n, nil
+}
+
+func (r *Reader) ReadByte() (byte, error) {
+	if r.i >= int64(len(r.s)) {
+		return 0, ioEOF
+	}
+	b := r.s[r.i]
+	r.i++
+	return b, nil
+}
+
+func (r *Reader) ReadAt(b []byte, off int64) (n int, err error) {
+	if off < 0 {
+		return 0, errorsNew("strings.Reader.ReadAt: offset negativo")
+	}
+	if off >= int64(len(r.s)) {
+		return 0, ioEOF
+	}
+	n = copy(b, r.s[off:])
+	if n < len(b) {
+		err = ioEOF
+	}
+	return n, nil
+}
+
+func (r *Reader) Seek(offset int64, whence int) (int64, error) {
+	abs := r.i
+	switch whence {
+	case ioSeekStart:
+		abs = offset
+	case ioSeekCurrent:
+		abs += offset
+	case ioSeekEnd:
+		abs = int64(len(r.s)) + offset
+	default:
+		return 0, errorsNew("strings.Reader.Seek: whence invalido")
+	}
+	if abs < 0 {
+		return 0, errorsNew("strings.Reader.Seek: posicion negativa")
+	}
+	r.i = abs
+	return abs, nil
+}
+
+// Reset vuelve al principio.
+func (r *Reader) Reset(s string) {
+	r.s = s
+	r.i = 0
+	r.prevRune = -1
+}
+
+// WriteTo: para que el Reader sirva donde se pide un io.WriterTo.
+func (r *Reader) WriteTo(w interface{ Write([]byte) (int, error) }) (int64, error) {
+	if r.i >= int64(len(r.s)) {
+		return 0, nil
+	}
+	n, err := w.Write([]byte(r.s[r.i:]))
+	r.i += int64(n)
+	return int64(n), err
+}
+
+// las constantes y el error, sin depender de io ni de errors (regla de la casa: los paquetes de aca no
+// importan la biblioteca estandar de verdad)
+const (
+	ioSeekStart   = 0
+	ioSeekCurrent = 1
+	ioSeekEnd     = 2
+)
+
+// ioEOF es el error de fin de archivo, con el mismo texto que el de Go.
+type errorString string
+
+func (e errorString) Error() string { return string(e) }
+
+func errorsNew(s string) error { return errorString(s) }
+
+var ioEOF error = errorString("EOF")

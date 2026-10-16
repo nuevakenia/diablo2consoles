@@ -26,7 +26,7 @@ GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 # encoding/csv: compila a mano (con el sed aplicado) pero NO desde el build: al entrar en el orden, el
 # build de la stdlib se corta ahi y no genera los paquetes siguientes (quedo en 9 .gox en vez de ~20).
 # Hay que ver por que (sospecha: el dst/src le queda un archivo con los imports sin el sed). Anotado.
-ORDEN="${ORDEN:-unicode unicode/utf8 errors io bytes strings strconv fmt math math/bits math/rand hash hash/fnv encoding/binary encoding/hex container/ring sort container/heap image/color image os log time bufio encoding/csv path/filepath runtime sync/atomic sync}"
+ORDEN="${ORDEN:-unicode unicode/utf8 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv encoding/binary encoding/hex container/ring sort container/heap image/color image os log time bufio encoding/csv io/fs io/ioutil path/filepath runtime sync/atomic sync}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2

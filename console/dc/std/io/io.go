@@ -135,3 +135,87 @@ func NopCloser(r Reader) ReadCloser { return nopCloser{r} }
 type nopCloser struct{ Reader }
 
 func (nopCloser) Close() error { return nil }
+
+// ---------------------------------------------------------------- SectionReader
+
+// SectionReader: la version de io.SectionReader de Go: una ventana sobre un ReaderAt. La usa d2mpq
+// para leer una parte del MPQ.
+type SectionReader struct {
+	r     ReaderAt
+	base  int64
+	off   int64
+	limit int64
+}
+
+// ReaderAt es la interfaz de Go, igual.
+type ReaderAt interface {
+	ReadAt(p []byte, off int64) (n int, err error)
+}
+
+// NewSectionReader devuelve un Reader que lee n bytes del ReaderAt r empezando en off.
+func NewSectionReader(r ReaderAt, off int64, n int64) *SectionReader {
+	return &SectionReader{r: r, base: off, off: off, limit: off + n}
+}
+
+func (s *SectionReader) Read(p []byte) (n int, err error) {
+	if s.off >= s.limit {
+		return 0, ioEOF
+	}
+	if max := s.limit - s.off; int64(len(p)) > max {
+		p = p[0:max]
+	}
+	n, err = s.r.ReadAt(p, s.off)
+	s.off += int64(n)
+	return
+}
+
+// Size: el tamano de la ventana.
+func (s *SectionReader) Size() int64 { return s.limit - s.base }
+
+// Seek: se mueve dentro de la ventana (con las mismas constantes que io).
+func (s *SectionReader) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case SeekStart:
+		s.off = s.base + offset
+	case SeekCurrent:
+		s.off += offset
+	case SeekEnd:
+		s.off = s.limit + offset
+	default:
+		return 0, errWhence
+	}
+	if s.off < s.base {
+		return 0, errOffset
+	}
+	if s.off > s.limit {
+		return 0, errOffset
+	}
+	return s.off - s.base, nil
+}
+
+// ReadAt: lee dentro de la ventana sin mover la posicion.
+func (s *SectionReader) ReadAt(p []byte, off int64) (n int, err error) {
+	off += s.base
+	if max := s.limit - off; int64(len(p)) > max {
+		p = p[0:max]
+		n, err = s.r.ReadAt(p, off)
+		if err == nil {
+			err = ioEOF
+		}
+		return n, err
+	}
+	return s.r.ReadAt(p, off)
+}
+
+var ioEOF error = stringError("EOF")
+
+type stringError string
+
+func (e stringError) Error() string { return string(e) }
+
+var (
+	errWhence = stringError("Seek: invalid whence")
+	errOffset = stringError("Seek: invalid offset")
+)
+
+// ioEOF ya esta declarado arriba? si no, se declara aca.
