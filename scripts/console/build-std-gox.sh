@@ -80,5 +80,7 @@ compilar_tercero() {
 echo "== los paquetes de terceros reescritos para la consola =="
 # ebiten: el esqueleto del backend grafico/input/audio (d2core/d2render, d2input, d2audio y d2util)
 compilar_tercero "github.com/hajimehoshi/ebiten/v2" "$HERE/../../console/dc/engine/ebiten/v2/ebiten.go"
+# inpututil: la parte de input (teclas y textos). Va despues de ebiten, que es de quien depende.
+compilar_tercero "github.com/hajimehoshi/ebiten/v2/inpututil" "$HERE/../../console/dc/engine/ebiten/v2/inpututil/inpututil.go"
 # x/image/bmp: el BMP con los glifos de la fuente del juego (d2util/assets)
 compilar_tercero "golang.org/x/image/bmp" "$HERE/../../console/dc/engine/x/image/bmp/bmp.go"

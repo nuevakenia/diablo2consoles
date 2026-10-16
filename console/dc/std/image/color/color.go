@@ -265,3 +265,24 @@ func rgbToYCbCr(r, g, b uint8) (uint8, uint8, uint8) {
 	cr := (32768*uint32(r) + (1<<16-27440)*uint32(g) + (1<<16-5328)*uint32(b) + 257<<15) >> 16
 	return uint8(yy), uint8(cb), uint8(cr)
 }
+
+// ---------------------------------------------------------------- los colores con nombre y los modelos de 16 bits
+//
+// Los pide el motor directamente: color.White en d2common/d2display y color.RGBA64Model en d2util. Los
+// modelos de 8 bits (RGBAModel, NRGBAModel, GrayModel, AlphaModel) ya estaban arriba.
+
+// White, Black y Transparent: los mismos de go.
+var (
+	White       = Gray16{0xffff}
+	Black       = Gray16{0x0000}
+	Transparent = Alpha16{0x0000}
+)
+
+// Los modelos de 16 bits: en go cada uno tiene su conversion; aca se apoyal en las de 8 bits, que es
+// como los usa el motor (redibujar la paleta y poco mas).
+var (
+	RGBA64Model  Model = ModelFunc(modelRGBAToRGBA)
+	NRGBA64Model Model = ModelFunc(modelNRGBAToNRGBA)
+	Alpha16Model Model = ModelFunc(modelAlphaToAlpha)
+	Gray16Model  Model = ModelFunc(modelGrayToGray)
+)

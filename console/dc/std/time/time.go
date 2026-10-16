@@ -267,3 +267,72 @@ type Ticker struct {
 func NewTicker(d Duration) *Ticker {
 	return &Ticker{C: Tick(d)}
 }
+
+// ---------------------------------------------------------------- fechas
+
+// Location: la zona horaria. En la consola el reloj es UTC (KOS no trae zonas): se declara la zona y
+// las dos de siempre, para que el codigo que las nombra compile.
+type Location struct{}
+
+var (
+	UTC   = &Location{}
+	Local = &Location{}
+)
+
+func (l *Location) String() string { return "UTC" }
+
+// Month: el mes.
+type Month int
+
+const (
+	January Month = 1 + iota
+	February
+	March
+	April
+	May
+	June
+	July
+	August
+	September
+	October
+	November
+	December
+)
+
+// Weekday: el dia de la semana (0 = domingo, igual que go).
+type Weekday int
+
+const (
+	Sunday Weekday = iota
+	Monday
+	Tuesday
+	Wednesday
+	Thursday
+	Friday
+	Saturday
+)
+
+// Date arma una fecha. El motor la usa para los relojes internos del juego (que son de datos, no del
+// sistema: no hace falta que sea exacta, solo consistente).
+func Date(year int, month Month, day, hour, min, sec, nsec int, loc *Location) Time {
+	// los segundos desde 1970 por el algoritmo de siempre (dias civiles), que es el de go
+	anio := year
+	m := int(month)
+	if m <= 2 {
+		anio--
+		m += 12
+	}
+	era := 0
+	if anio >= 0 {
+		era = anio / 400
+	} else {
+		era = (anio - 399) / 400
+	}
+	ye := anio - era*400
+	mp := (m + 9) % 12
+	dy := (153*mp+2)/5 + day - 1
+	do := ye*365 + ye/4 - ye/100 + dy
+	seg := int64(era)*146097*86400 + int64(do)*86400 +
+		int64(hour)*3600 + int64(min)*60 + int64(sec)
+	return Time{sec: seg, nsec: int32(nsec)}
+}

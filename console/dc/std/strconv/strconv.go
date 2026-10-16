@@ -1054,3 +1054,17 @@ func hex4(v uint16) string {
 func hex8(v uint32) string {
 	return hex4(uint16(v>>16)) + hex4(uint16(v))
 }
+
+// AppendUint agrega el numero sin signo en texto al slice.
+func AppendUint(dst []byte, u uint64, base int) []byte {
+	return append(dst, FormatUint(u, base)...)
+}
+
+// AppendUint16 agrega el numero en texto al slice. El motor lo usa al serializar.
+func AppendUint16(dst []byte, v uint16) []byte { return AppendUint(dst, uint64(v), 10) }
+
+// AppendUint32 agrega el numero en texto al slice.
+func AppendUint32(dst []byte, v uint32) []byte { return AppendUint(dst, uint64(v), 10) }
+
+// AppendUint64 agrega el numero en texto al slice.
+func AppendUint64(dst []byte, v uint64) []byte { return AppendUint(dst, v, 10) }

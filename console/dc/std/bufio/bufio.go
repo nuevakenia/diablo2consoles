@@ -431,3 +431,31 @@ func ScanBytes(data []byte, atEOF bool) (advance int, token []byte, err error) {
 }
 
 func esBlanco(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }
+
+// ReadLine: la version de go (devuelve la linea sin el fin de linea y avisa si hubo mas de lo que
+// entra). El motor la usa al leer texto.
+//
+// Se arma leyendo byte a byte con ReadByte, que es lo que este Reader si sabe hacer: no hay ReadSlice
+// ni buffer de "hasta el delimitador" en esta implementacion, y agregarlos solo para esto no vale la
+// pena mientras el uso sea leer texto de configuracion.
+func (b *Reader) ReadLine() (line []byte, isPrefix bool, err error) {
+	for {
+		c, e := b.ReadByte()
+		if e != nil {
+			if len(line) > 0 {
+				return line, false, nil
+			}
+			return nil, false, e
+		}
+		if c == '\n' {
+			if n := len(line); n >= 1 && line[n-1] == '\r' {
+				line = line[:n-1]
+			}
+			return line, false, nil
+		}
+		line = append(line, c)
+		if len(line) >= 65536 {
+			return line, true, nil
+		}
+	}
+}

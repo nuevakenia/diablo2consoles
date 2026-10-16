@@ -1,6 +1,6 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 87 de 142
+compilados: 88 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
@@ -38,7 +38,7 @@ d2common/d2fileformats/d2dc6 1
 d2common/d2fileformats/d2dcc 1
 d2common/d2fileformats/d2ds1 1
 d2common/d2fileformats/d2dt1 1
-d2common/d2fileformats/d2font 0
+d2common/d2fileformats/d2font 1
 d2common/d2fileformats/d2font/d2fontglyph 1
 d2common/d2fileformats/d2key 1
 d2common/d2fileformats/d2mpq 1
@@ -153,8 +153,7 @@ d2thread 1
 d2app: /home/dgalli/Proyectos/diablo2consoles/d2app/app.go:7:22: error: import file ‘encoding/json’ not found
 d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:16: error: import file ‘os/exec’ not found
 d2common/d2act3: /home/dgalli/Proyectos/diablo2consoles/d2common/d2act3/act3.go:18:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
-d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/shotcheck.go:32:36: error: reference to undefined identifier ‘color.RGBA64Model’
-d2common/d2fileformats/d2font: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2font/font.go:51:30: error: reference to undefined identifier ‘color.White’
+d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/window_frame.go:6:19: error: import file ‘image/draw’ not found
 d2common/d2fileformats/d2pl2: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2pl2/pl2.go:6:40: error: import file ‘github.com/go-restruct/restruct’ not found
 d2common/d2quest: /home/dgalli/Proyectos/diablo2consoles/d2common/d2quest/speech.go:4:9: error: import file ‘embed’ not found
 d2common/d2replay: /home/dgalli/Proyectos/diablo2consoles/d2common/d2replay/replay.go:5:22: error: import file ‘encoding/json’ not found
@@ -165,10 +164,10 @@ d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebi
 d2core/d2config: /home/dgalli/Proyectos/diablo2consoles/d2core/d2config/d2config.go:4:22: error: import file ‘encoding/json’ not found
 d2core/d2gui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2gui/box.go:7:58: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset’ not found
 d2core/d2hero: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/containers.go:6:69: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item’ not f
-d2core/d2hero/herogen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/herogen/generate.go:156:32: error: reference to undefined identifier ‘time.Date’
+d2core/d2hero/herogen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/herogen/items.go:11:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop’ not fo
 d2core/d2input: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/input_manager.go:6:62: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2display’ not foun
 d2core/d2input/d2gamepad: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/d2gamepad/mapping.go:4:22: error: import file ‘encoding/json’ not found
-d2core/d2input/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/ebiten/ebiten_input.go:8:51: error: import file ‘github.com/hajimehoshi/ebiten/v2/inpututil’ not found
+d2core/d2input/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/ebiten/ebiten_input.go:53:48: error: reference to undefined identifier ‘ebiten.KeyApostrophe’
 d2core/d2inventory: /home/dgalli/Proyectos/diablo2consoles/d2core/d2inventory/inventory_item_factory.go:7:58: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset’
 d2core/d2item/d2cube: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2cube/catalog.go:7:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop’ not fo
 d2core/d2item/d2drop: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2drop/loader.go:8:15: error: import file ‘regexp’ not found
@@ -186,7 +185,7 @@ d2core/d2render/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2render/e
 d2core/d2screen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2screen/d2screen.go:4:62: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2display’ not found
 d2core/d2skills: /home/dgalli/Proyectos/diablo2consoles/d2core/d2skills/autoform.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ not fo
 d2core/d2stats/diablo2stats: /home/dgalli/Proyectos/diablo2consoles/d2core/d2stats/diablo2stats/stat_factory.go:7:58: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset’ 
-d2core/d2term: /home/dgalli/Proyectos/diablo2consoles/d2core/d2term/terminal_logger.go:23:36: error: reference to undefined field or method ‘ReadLine’
+d2core/d2term: /home/dgalli/Proyectos/diablo2consoles/d2core/d2term/terminal_logger.go:22:35: error: argument 1 has incompatible type (missing method ‘Read’)
 d2core/d2ui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2ui/d2ui.go:6:58: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset’ not found
 d2core/d2vendor: /home/dgalli/Proyectos/diablo2consoles/d2core/d2vendor/catalog.go:10:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2records’ not found
 d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/act3_live.go:10:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2act3’ not found
