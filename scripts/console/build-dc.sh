@@ -65,6 +65,18 @@ sh-elf-gccgo $GODC_GOFLAGS $GOXI -c "$SRC"/*.go $GEN_GO -o "$OUT/main.o"
 
 # Puentes a C (para funciones de KOS que el binding de Go no expone). Pueden vivir en
 # $SRC/*.c o en $SRC/csrc/*.c. Se enlazan aparte: gccgo los llama con el comentario //extern.
+# El C de la STDLIB (console/dc/std/csrc/*.c): los shims que no pueden ser Go (p.ej. los atomicos
+# del SH-4, que necesitan irq_disable/irq_restore de KOS). Se compilan siempre: son pocas funciones y
+# el enlace solo se queda con las que se usan.
+# OJO: DC_ROOT es el arbol del toolchain (~/dreamcast), no el repo. La raiz del repo es $HERE/../..
+STD_C_OBJS=""
+for f in "$HERE/../../console/dc/std/csrc"/*.c; do
+  [ -f "$f" ] || continue
+  o="$OUT/stdlib-$(basename "${f%.c}").o"
+  kos-cc -O2 -ml -m4-single -c "$f" -o "$o"
+  STD_C_OBJS="$STD_C_OBJS $o"
+done
+
 EXTRA_OBJS=""
 for f in "$SRC"/*.c "$SRC"/csrc/*.c; do
   [ -f "$f" ] || continue
@@ -84,7 +96,7 @@ if [ -f "$GOX/orden.txt" ]; then
         STD_OBJS="$(tr '\n' ' ' < "$GOX/orden.txt")"
     fi
 fi
-kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $ROMDISK_OBJ $EXTRA_OBJS $STD_OBJS $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
+kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $ROMDISK_OBJ $EXTRA_OBJS $STD_C_OBJS $STD_OBJS $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
 
 echo "== 3/4 binario de arranque (1ST_READ.BIN) + IP.BIN =="
 sh-elf-objcopy -R .stack -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"

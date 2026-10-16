@@ -1,0 +1,83 @@
+DC-002.7 - sync, sync/atomic y runtime EN LA CONSOLA (goroutines y atomicos, medidos)
+=====================================================================================
+
+QUE SE MIDIO
+------------
+  Consola (Flycast, consola serie): GORO casos 35 bien 35 mal 0
+  La prueba en contra: sin candado, cediendo en medio, el contador pierde 600 de 800 incrementos.
+  Con sync.Mutex: 800 exacto. Con atomic.AddInt64: 800 exacto.
+  Host (prueba diferencial de d2std/sync contra el sync de Go): verde en amd64 y 386.
+  Mutadores (scripts/console/mutar-goroutines.sh): ver el cierre de la tarjeta.
+
+1. LO PRIMERO FUE MEDIR COMO CEDE UNA GOROUTINE (no deducirlo)
+-------------------------------------------------------------
+El scheduler de libgodc es COOPERATIVO sobre UN hilo de KOS: scheduler.c usa thd_pass y gopark/goready
+y NO crea hilos (no hay thd_create en el runtime). Con eso, la sonda (console/dc/poc/goroutines) midio:
+
+    caso 1  cuatro goroutines sumando sin candado y SIN ceder   -> 8000 exacto  (NO hay preempcion)
+    caso 2  thd_pass() en medio del incremento                  -> 8000        (thd_pass NO releva)
+    caso 3  canal CON buffer 1 como rendija                     -> 8000        (el buffer no se llena solo)
+    caso 6  canal SIN buffer                                    -> releva de verdad (00012301)
+    caso 7  sin candado, con relevo pero sin ceder en el medio   -> 2000        (no pierde: la cesion
+                                                                                esta ANTES de leer)
+    caso 8  mutex de canal (buffer 1)                           -> 2000 exacto
+
+De ahi sale el diseño: el candado es un CANAL CON BUFFER 1 (si esta libre no cede, y no hace falta que
+ceda: nadie puede meterse en el medio; si esta tomado, el Lock se BLOQUEA y ahi el scheduler releva).
+
+2. LO QUE YA TRAIA libgodc (medido en su codigo, no supuesto)
+-------------------------------------------------------------
+  - runtime/dreamcast_support.c: los atomicos de GCC para SH-4 (__atomic_*), de 1, 2 y 4 bytes, todos
+    con irq_disable/irq_restore. NO hay ninguno de 64 bits: el SH-4 es de 32 bits y un atomico de 64 son
+    dos accesos. Se agregaron en C (console/dc/std/csrc/atomic_dc.c), con la misma seccion critica.
+  - El SH-4 NO tiene atomicos de hardware (ni load-linked/store-conditional ni CAS) y el Makefile del
+    runtime compila con -matomic-model=soft-imask: la unica primitiva es apagar las interrupciones.
+    Alcanza porque la Dreamcast tiene UN procesador.
+  - runtime/gc_runtime.c ya define _runtime.GC y proc.c ya define _runtime.NumGoroutine.
+  - NO hay semaforos ni locks en el runtime (el grep de Semacquire/semaphore/mutex/spinlock no
+    encuentra nada): por eso sync se escribe aca y no se reusa el de Go.
+
+3. QUE SE ESCRIBIO
+-------------------
+  console/dc/std/sync/         Mutex (canal con buffer 1), RWMutex (exclusivo), Once, WaitGroup, Pool.
+  console/dc/std/sync/atomic/  Add/Load/Store/Swap/CompareAndSwap de int32, int64, uint32, uint64, los
+                               tipos Int32/Int64/Uint32/Uint64/Bool, y las funciones sueltas.
+  console/dc/std/runtime/      GOOS="dreamcast", GOARCH="sh4", NumCPU=1, GOMAXPROCS, Gosched (no hace
+                               nada, declarado), ReadMemStats (ceros, declarado), LockOSThread, y GC y
+                               NumGoroutine que SE LLAMAN al runtime de libgodc (por un puente de C,
+                               porque el simbolo lleva un punto: _runtime.GC).
+  console/dc/std/csrc/         atomic_dc.c (los atomicos del SH-4) y runtime_dc.c (los dos puentes).
+
+4. UN HALLAZGO QUE ROMPIO EL ENLACE, Y COMO SE ARREGLO
+-----------------------------------------------------
+Definir GC() y NumGoroutine() en el paquete runtime de la consola NO se puede: gccgo nombra sus
+simbolos "runtime.GC" y libgodc ya los define, asi que el enlace muere por "multiple definition of
+runtime.GC". Se DECLARAN sin cuerpo (//extern) y el puente de C las resuelve contra el runtime: asi el
+motor puede seguir llamando runtime.GC() y runtime.NumGoroutine() como en Go.
+
+5. LA PRUEBA EN CONTRA (el defecto TIENE que verse)
+---------------------------------------------------
+El POC corre el mismo lazo de cuatro goroutines dos veces:
+
+    sin candado, cediendo en medio (canal sin buffer)   -> n = 200, perdidos = 600 de 800
+    con sync.Mutex y la misma cesion                    -> n = 800, exacto
+
+Esa es la aceptacion del hito. Y el primer intento del POC se COLGO y no imprimio ni el caso 1: el
+relevador que escribi mandaba al canal en vez de devolverlo y los dos quedaban bloqueados mandando. El
+patron correcto es ida y vuelta (el que cede manda y espera la devolucion).
+
+6. DEFECTOS MIOS QUE CAZO LA PRUEBA DEL HOST
+--------------------------------------------
+  a) Mi comentario del RWMutex decia que en la consola el RLock recursivo "no se traba". FALSO: el
+     RWMutex es un Mutex de canal con buffer 1 y el segundo RLock se bloquea. Se cazo porque el test de
+     limites se colgo (60 s = -timeout) y la declaracion se corrigio.
+  b) d2std/time y d2std/log NO compilaban en el host desde DC-002.6d (time por sus //extern del reloj,
+     log por importar os) y nadie habia corrido esta prueba despues: el host venia en ROJO por los dos
+     ("build failed"). Se excluyeron por nombre, como os, runtime y sync/atomic, y queda dicho por que.
+  c) El canal del candado se crea en el primer uso: con goroutines REALES en paralelo (el host) dos
+     pueden crear dos canales distintos y una suelta un candado que la otra no ve. En la consola no
+     puede pasar (cooperativo). Es un limite declarado en sync.go y el difftest prepara el candado antes
+     de usarlo. Se cazo porque el difftest se colgo 60 s.
+  d) El lado de Go de "Unlock de un candado libre" NO se puede probar con recover: el sync de Go llama a
+     internal/sync.fatal y ABORTA el proceso (medido). El limite se declara y se ejecuta solo el lado de
+     la consola.

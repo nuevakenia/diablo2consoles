@@ -828,3 +828,40 @@ que `time` todavia no tiene (la libc de KOS las da con `gmtime_r`). Queda declar
 
 **Lo que NO hay en `time`, y esta dicho en el paquete:** `Format`/`Parse`, las conversiones de calendario
 (`Year`/`Month`/`Day`/...) y `LoadLocation`/`UTC`: no hay zona horaria en la consola.
+
+## 19. DC-002.7: sync, sync/atomic y runtime (goroutines y atomicos en la consola)
+
+Con esto la consola tiene la capa de concurrencia. Evidencia completa:
+`evidencia/dc-002.7-goroutines-sync.txt`.
+
+    Consola: GORO casos 35 bien 35 mal 0
+    Prueba en contra: sin candado y cediendo en medio, el contador pierde 600 de 800 incrementos
+    Con sync.Mutex: 800 exacto. Con atomic.AddInt64: 800 exacto.
+    Host: difftest de d2std/sync contra el sync de Go, verde en amd64 y 386.
+
+**Primero se midio como cede una goroutine** (sonda en `console/dc/poc/goroutines`), y el resultado
+manda el diseño: el scheduler de libgodc es **cooperativo sobre un hilo de KOS** (`thd_pass` +
+`gopark`/`goready`, sin `thd_create`). Medido: cuatro goroutines sumando sin candado dan **8000
+exacto** (no hay preempcion, ni el timer interrumpe), `thd_pass()` **no** releva goroutines, un canal
+**con** buffer nunca se llena solo (no es punto de cesion) y uno **sin** buffer si lo es. Por eso el
+candado es un canal con buffer 1: libre no cede, tomado se bloquea y ahi el scheduler releva.
+
+**Lo que ya traia libgodc** (medido en su codigo): los atomicos de GCC para SH-4 en
+`runtime/dreamcast_support.c`, de 1/2/4 bytes, todos con `irq_disable` — y **ninguno de 64 bits**. El
+SH-4 no tiene atomicos de hardware y el runtime compila con `-matomic-model=soft-imask`: la unica
+primitiva es apagar interrupciones, y alcanza porque la Dreamcast tiene un solo procesador. Los de 64
+bits se agregaron en C. Tampoco hay semaforos ni locks en el runtime: por eso `sync` se escribe aca.
+
+**Un hallazgo que rompio el enlace:** definir `GC` y `NumGoroutine` en el paquete `runtime` de la
+consola da "multiple definition", porque gccgo nombra sus simbolos `runtime.GC` y libgodc ya los define.
+Se declaran sin cuerpo (`//extern`) y un puente de C los resuelve contra el runtime: el motor puede
+seguir llamando `runtime.GC()` como en Go.
+
+**La prueba en contra** (la aceptacion): el mismo lazo de cuatro goroutines, sin candado y cediendo en
+medio, pierde 600 de 800 incrementos; con `sync.Mutex` da 800 exacto.
+
+**Cuatro defectos que cazo la prueba del host**, todos mios: la declaracion del `RWMutex` (el `RLock`
+recursivo SI se traba: es un canal con buffer 1), `d2std/time` y `d2std/log` sin compilar en el host
+desde DC-002.6d (nadie habia corrido la prueba despues), el canal del candado creado en el primer uso
+(con goroutines paralelas del host dos crean canales distintos; en la consola no puede pasar) y el
+`Unlock` de un candado libre, que en Go **aborta el proceso** y no se puede probar con `recover`.

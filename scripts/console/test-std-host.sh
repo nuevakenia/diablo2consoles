@@ -23,7 +23,13 @@ for arch in amd64 386; do
     echo "== prueba diferencial con GOARCH=$arch =="
     # os queda afuera a proposito (necesita KOS); se corre el resto y ademas se exige que os NO compile,
     # para que el dia que alguien le ponga una implementacion de host la prueba lo diga.
-    if ! (cd "$STD" && GOARCH="$arch" go test $(go list ./... | grep -v 'd2std/os$') 2>&1 | tail -25); then
+    # os, time, log, runtime y sync/atomic quedan afuera a proposito: hablan con KOS por //extern (el VFS,
+    # el reloj de la RTC, el GC del runtime y los atomicos del SH-4), asi que en el host no compilan.
+    # Los paquetes time y log entraron a esta lista en DC-002.7: hasta entonces el host venia fallando
+    # por ellos ("build failed"), porque nadie corrio esta prueba despues de escribir time y de darle a
+    # log el import de os. Es exactamente para eso que esta la prueba. Se los excluye por
+    # nombre y ademas se exige que NO compilen, para que el dia que eso cambie la prueba lo diga.
+    if ! (cd "$STD" && GOARCH="$arch" go test -timeout 60s $(go list ./... | grep -vE 'd2std/(os|time|log|runtime|sync/atomic)$') 2>&1 | tail -25); then
         rc=1
     fi
 done
