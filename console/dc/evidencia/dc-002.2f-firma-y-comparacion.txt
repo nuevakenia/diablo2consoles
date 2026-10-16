@@ -1,0 +1,111 @@
+=== DC-002.2f: la firma del metodo y la comparacion de interfaces en el runtime ===
+
+QUE SE MIDIO
+    El ultimo caso en rojo del autotest de la stdlib en la consola: errors.Is no encontraba el error
+    envuelto por fmt.Errorf("%w"). No era uno, eran DOS defectos de ~/dreamcast/libgodc (el runtime
+    compartido de Go para Dreamcast), y el primero TAPABA al segundo.
+
+    Tarjeta: t_638b5794. Sondas nuevas: console/dc/poc/sonda-f (la firma) y console/dc/poc/sonda-g
+    (el caso del corpus paso a paso).
+
+DEFECTO 1: implements_interface miraba el NOMBRE del metodo, no la FIRMA
+    runtime/interface_dreamcast.c, implements_interface(). El bucle comparaba strings_equal_ptr de los
+    nombres y seguia; el propio codigo tenia un NOTE diciendo que faltaba comparar
+    (lhsMethod->__typ == rhsMethod->__mtyp) "porque gccgo valida las firmas al compilar". Eso vale para
+    el codigo que compila el compilador, no para las ASERCIONES de interfaz contra interface{}: un tipo
+    con Unwrap() []error "implementaba" interface{ Unwrap() error } y el itab quedaba armado con la
+    funcion equivocada.
+
+    MEDIDO con sonda-f, antes del arreglo (consola, Flycast):
+        F13 ASERCION MALA DICE ok=true (el defecto)      <- ConMuchos (Unwrap() []error) contra
+                                                            interface{ Unwrap() error }
+        F14 en el itab del caso malo: imethod.typ= 8c059ddc  igual a mtyp de ConUno? true
+        F15   imethod.typ == mtyp(ConMuchos)? false  == typ(ConMuchos)? false
+    Despues del arreglo:
+        F13 ASERCION MALA DICE ok=false (el defecto no esta)
+        F16 asercion buena dice ok=true
+
+    CUAL DE LOS DOS CAMPOS DEL METODO ES EL QUE SE COMPARA (medido, no deducido):
+        method.Unwrap de *ConUno:  mtyp = 8c059ddc  "func() error"                    <- este
+                                   typ  = 8c06405c  "func(*...paq1.ConUno) error"
+    O sea: __mtyp es el tipo del metodo SIN el receptor y __typ es el tipo CON el receptor como primer
+    parametro. El comentario de runtime/type_descriptors.h los documentaba AL REVES; se corrigio ahi
+    mismo (medido con la sonda, que lee los dos campos y los imprime con su reflexion).
+
+    Y el descriptor del tipo de funcion es el MISMO PUNTERO entre paquetes (el metodo se compila en
+    paq1, la interfaz se declara en main): F14 dio true. Ese era el riesgo anotado en la tarjeta
+    ("puede romper todas las aserciones de interfaz entre paquetes") y quedo descartado por medicion:
+    comparar por puntero es seguro, y si algun dia no coincide se compara por forma (method_types_equal
+    baja a como son los tipos: tipos con nombre por nombre y paquete, funciones por entradas/salidas,
+    punteros/arreglos/slices/canales por el elemento, interfaces por sus metodos). Un tipo que no
+    sabemos comparar NO se acepta: un falso negativo se ve (el corpus lo canta), un falso positivo es
+    el defecto que estabamos arreglando.
+
+DEFECTO 2 (el que tapaba el caso): runtime_ifaceeq comparaba los PUNTEROS de itab
+    Al arreglar (1) el corpus siguio en 590/589/1: el unico caso que fallaba no cambio. Medido con
+    sonda-g, la cascada completa del caso del corpus:
+        G0  tipo de envuelto = *fmt.wrapError
+        G1  method.Unwrap: mtyp= 8c05ee9c func() error
+        G3  asercion Unwrap() error -> ok=true          (correcta: *wrapError tiene esa firma)
+        G4  Unwrap() -> *errors.errorString   igual a base? false   <- ACA ESTA
+        G6  imethod.typ == mtyp ? true                  (la comparacion de firmas anda)
+        G7  asercion Unwrap() []error -> ok=false       (correcta)
+        G8  errors.Unwrap(envuelto) == nil ? false
+        G9  errors.Is(envuelto, base) = false           (el caso del corpus)
+        G12 e2 == base ? false
+        G13 itab(e2)   = 8c0991ec  data(e2)   = 8c099158
+        G14 itab(base) = 8c0676e4  data(base) = 8c099158
+        G15 mismos datos? true   mismo itab? false      <- LOS DATOS SON EL MISMO PUNTERO
+        G16 itab(e2)   palabras 0..3: 8c0676ec 8c011160 0     14000010
+        G17 itab(base) palabras 0..3: 8c0676ec 8c011160 4     4
+    El mismo par (interfaz error, tipo *errors.errorString) tiene DOS tablas: una que armo el
+    compilador para una conversion estatica (8c0676e4, junto a los descriptores) y otra que armo el
+    runtime en el heap (8c0991ec). Las dos tienen el mismo tipo concreto en su palabra 0 y la misma
+    funcion en la palabra 1. runtime_ifaceeq empezaba con:
+
+        if (i1.itab != i2.itab) return false;     // <- el defecto
+
+    Arreglo: comparar el TIPO CONCRETO (itab_type de cada tabla) y despues el dato, que es lo que hace
+    el runtime de Go (mira el tipo, no la direccion de la tabla). Despues:
+        G9  errors.Is(envuelto, base) = true
+        G12 e2 == base ? true
+        G15 mismo itab? false      (las dos tablas siguen existiendo: eso no cambio, y esta bien)
+
+LO QUE FALTABA EN LA SUITE (y por eso el mutante del arreglo (1) no se cazaba)
+    El corpus no tenia NINGUN caso con el mismo nombre de metodo y otra firma: el caso de errors.Is que
+    fallaba se rompia por (2), no por (1). Con el arreglo (1) solo, el mutante quedaba verde. Se
+    agregaron tres casos (console/dc/poc/stdlib/main.go, correrErrores; los mismos en la prueba
+    diferencial del host, TestErrorfConW) con el esperado de Go real:
+        asercion Unwrap() []error sobre un envoltorio de varios -> true
+        asercion Unwrap() error   sobre un envoltorio de varios -> false
+        errors.Is con dos envueltos                             -> true
+
+RESULTADO MEDIDO
+    consola (Flycast):  590 casos, 589 bien, 1 mal  ->  593 casos, 593 bien, 0 mal
+    host:               prueba diferencial verde en amd64 y en 386
+    POC del motor:      dc-002.3 sigue con las 31 lineas identicas al host (ver su evidencia)
+
+    Los dos arreglos son de runtime/interface_dreamcast.c (el header type_descriptors.h solo corrige el
+    comentario de __mtyp/__typ). Se aplican con scripts/console/fix-libgodc-iface.py, que deja el arbol
+    pristino con `git checkout`, aplica PRIMERO el arreglo de ABI (fix-libgodc-abi.py, que toca el mismo
+    archivo) y despues los dos de aca. Idempotente: dos corridas seguidas dejan el mismo
+    sha256 de interface_dreamcast.c (913451f06aa8c454 = el arbol que midio 593/593).
+    Despues: make -C ~/dreamcast/libgodc libgodc.a   y reenlazar los POC.
+
+MUTADOR (que los dos arreglos se cacen)
+    scripts/console/mutar-libgodc-2f.sh saca cada arreglo por separado, recompila el runtime y corre el
+    corpus completo en la consola; el mutante tiene que ponerlo en ROJO:
+
+        mutante 'firma'   (implements_interface sin mirar la firma)  -> 591 bien, 2 mal   cazado
+        mutante 'itabeq'  (runtime_ifaceeq por punteros de itab)     -> 591 bien, 2 mal   cazado
+        control sano     (runtime restaurado)                       -> 593 bien, 0 mal
+        2/2 chequeos cazados
+
+    La primera version del mutante de la firma quedo VERDE y eso era un hueco de la suite, no un
+    arreglo de adorno: el corpus no tenia ningun caso con el mismo nombre de metodo y otra firma (los
+    tres casos que se agregaron son los que lo cazan ahora).
+
+PENDIENTE, DECLARADO EN EL CODIGO
+    implements_interface sigue sin comparar el pkgPath de los metodos NO exportados (un metodo no
+    exportado de otro paquete no deberia contar). No se toco porque no esta medido y podria romper
+    aserciones que hoy andan; queda como NOTE en el lugar exacto.

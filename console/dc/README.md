@@ -487,6 +487,46 @@ llamada**, aca el **chequeo de implementacion**. Ese caso queda **rojo y a la vi
 hasta que se arregle el runtime: sacarlo del corpus seria esconder un defecto que el motor puede
 pisar. Detalle y evidencia cruda en `console/dc/evidencia/dc-002.2e-casos-restantes.txt`.
 
+### 11.5 El runtime tenia DOS defectos de interfaces (DC-002.2f)
+
+El caso que quedaba en rojo (`errors.Is` no encontraba el error envuelto) resulto no ser uno sino dos
+defectos del runtime, y el primero **tapaba** al segundo:
+
+1. **`implements_interface` comparaba el nombre del metodo y no la firma**
+   (`~/dreamcast/libgodc/runtime/interface_dreamcast.c`). Un tipo con `Unwrap() []error`
+   "implementaba" `interface{ Unwrap() error }`: el itab quedaba armado con la funcion equivocada y la
+   asercion decia `ok`. Arreglo: `method_types_equal` compara el tipo del metodo (`__typ` del imethod
+   contra `__mtyp` del metodo, medido como el campo correcto: el header de `type_descriptors.h` lo
+   documentaba **al reves** y ahora lo dice bien), por puntero y, si no coinciden, por forma.
+2. **`runtime_ifaceeq` comparaba los PUNTEROS de itab.** El mismo par (interfaz, tipo concreto) puede
+   tener dos tablas: la que arma el compilador para una conversion estatica y la que arma el runtime
+   en el heap. Medido con la sonda `sonda-g`: `e2 == base` daba `false` con los dos datos apuntando al
+   mismo `*errorString` (itabs `8c0991ec` y `8c0676e4`, con el mismo tipo en su palabra 0 y la misma
+   funcion en la palabra 1). Arreglo: comparar el tipo concreto (lo que hace el runtime de Go), no la
+   direccion de la tabla.
+
+Por que el arreglo (1) solo no cambiaba nada: el envoltorio de `%w` con UN error es un `wrapError`
+con la firma correcta, asi que la cadena se cortaba en (2). Y por que el corpus no cazaba (1) hasta
+ahora: no habia ningun caso con **el mismo nombre de metodo y otra firma**. Ahora hay tres casos
+nuevos (`poc/stdlib/main.go`, `correrErrores`), con el mismo esperado que da Go: la asercion de
+`[]error` da `true`, la de `Unwrap() error` da `false`, y `Is` con dos envueltos encuentra el error.
+
+Medido, todo en la consola:
+
+| | antes | despues |
+|---|---|---|
+| corpus | 590 casos, 589 bien, 1 mal | **593 casos, 593 bien, 0 mal** |
+| asercion con firma equivocada (sonda-f F13) | `ok=true` | `ok=false` |
+| asercion con la firma justa (sonda-f F16) | `ok=true` | `ok=true` |
+| `errors.Is(envuelto, base)` (sonda-g G9) | `false` | `true` |
+| `e2 == base` (sonda-g G12) | `false` | `true` (los itabs siguen siendo dos: G15) |
+
+El mutador `scripts/console/mutar-libgodc-2f.sh` saca cada arreglo por separado y exige que el corpus
+se ponga rojo: **2/2 cazados**, con control sano `593/593` verde. Los dos arreglos se aplican con
+`scripts/console/fix-libgodc-iface.py` (idempotente: deja el arbol pristino y vuelve a aplicar, primero
+el arreglo de ABI y despues estos dos; dos corridas seguidas dan el mismo sha256). Sigue pendiente,
+declarado en el codigo: `implements_interface` no compara el `pkgPath` de los metodos no exportados.
+
 ## 12. DC-002.3: el decodificador DC6 del motor en la consola (medido)
 
 El primer paquete **real** del motor corriendo en la Dreamcast emulada. No hay codigo del motor

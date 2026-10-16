@@ -615,6 +615,32 @@ func TestErrorfConW(t *testing.T) {
 		t.Errorf("Unwrap no devuelve el error original")
 	}
 
+	// La FIRMA del metodo tambien decide si un tipo implementa una interfaz (DC-002.2f). Con varios %w
+	// el envoltorio tiene Unwrap() []error, asi que tiene que dar lo mismo que en Go: la asercion de
+	// []error da true y la de Unwrap() error da false. (En el host esto no puede fallar por el runtime:
+	// los itabs son los de Go; el juez de esta parte es la consola.)
+	doble := myfmt.Errorf("contexto: %w y %w", base, myerrors.New("otro"))
+	realDoble := realfmt.Errorf("contexto: %w y %w", realBase, realerrors.New("otro"))
+
+	_, miVarias := doble.(interface{ Unwrap() []error })
+	_, realVarias := realDoble.(interface{ Unwrap() []error })
+	if miVarias != realVarias {
+		t.Errorf("aserción Unwrap() []error: Go %t, nuestro %t", realVarias, miVarias)
+	}
+
+	_, miSolo := doble.(interface{ Unwrap() error })
+	_, realSolo := realDoble.(interface{ Unwrap() error })
+	if miSolo != realSolo {
+		t.Errorf("aserción Unwrap() error: Go %t, nuestro %t", realSolo, miSolo)
+	}
+
+	if !myerrors.Is(doble, base) {
+		t.Errorf("errors.Is con dos envueltos no encuentra el error envuelto: %v", doble)
+	}
+	if !realerrors.Is(realDoble, realBase) {
+		t.Errorf("el propio Go no encuentra el error envuelto (esto no deberia pasar)")
+	}
+
 	// sin %w no hay cadena
 	simple := myfmt.Errorf("solo texto %d", 1)
 	if myerrors.Unwrap(simple) != nil {

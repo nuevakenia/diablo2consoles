@@ -35,7 +35,7 @@ fi
 # ademas por separado y gccgo lo veia dos veces (redefinition).
 GEN_GO=""
 for g in "$OUT"/gen/*.go; do
-    [ -f "$g" ] && GEN_GO="$GEN_GO $g"
+    if [ -f "$g" ]; then GEN_GO="$GEN_GO $g"; fi
 done
 sh-elf-gccgo $GODC_GOFLAGS $GOXI -c "$SRC"/*.go $GEN_GO -o "$OUT/main.o"
 

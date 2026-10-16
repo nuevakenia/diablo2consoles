@@ -142,4 +142,17 @@ func correrErrores() {
 	check("errors", "Is", "true", strconv.FormatBool(errors.Is(e, base)))
 	check("errors", "Unwrap", "base", errors.Unwrap(e).Error())
 	check("errors", "Join", "a\nb", errors.Join(errors.New("a"), nil, errors.New("b")).Error())
+
+	// La FIRMA del metodo decide si un tipo implementa una interfaz (DC-002.2f): un envoltorio de
+	// VARIOS %w tiene Unwrap() []error, asi que implementa interface{ Unwrap() []error } y NO
+	// interface{ Unwrap() error }. Los esperados son los de Go real.
+	//
+	// Este caso es el que caza al mutante del runtime: si implements_interface vuelve a mirar solo el
+	// nombre del metodo, la asercion de abajo dice true y el corpus se pone rojo.
+	doble := fmt.Errorf("contexto: %w y %w", base, errors.New("otro"))
+	_, varias := doble.(interface{ Unwrap() []error })
+	_, solo := doble.(interface{ Unwrap() error })
+	check("errors", "aserción Unwrap() []error sobre un envoltorio de varios", "true", strconv.FormatBool(varias))
+	check("errors", "aserción Unwrap() error sobre un envoltorio de varios", "false", strconv.FormatBool(solo))
+	check("errors", "Is con dos envueltos", "true", strconv.FormatBool(errors.Is(doble, base)))
 }
