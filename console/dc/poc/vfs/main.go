@@ -14,9 +14,11 @@ package main
 
 import (
 	"bufio"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 )
 
 //extern d2c_serial_init
@@ -40,6 +42,24 @@ func relleno4(n int) string {
 		s = "0" + s
 	}
 	return s
+}
+
+// bufLog: un io.Writer que acumula, para medir el texto exacto que escribe el log.
+type bufLog struct{ datos []byte }
+
+func (b *bufLog) Write(p []byte) (int, error) {
+	b.datos = append(b.datos, p...)
+	return len(p), nil
+}
+
+func (b *bufLog) texto() string { return string(b.datos) }
+
+// si: un bool a texto (para los casos que comparan booleanos).
+func si(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }
 
 // primero y segundo: las dos partes de Split (que devuelve dos valores).
@@ -260,6 +280,54 @@ func main() {
 		}
 	}
 
+	// 4h. time en la consola: el reloj de KOS (RTC + timer) y la aritmetica, con los valores que da Go
+	a := time.Now()
+	check("time: Now no es cero", "true", strconv.FormatBool(!a.IsZero()))
+	check("time: Now es un instante razonable (despues de 2020)", "true",
+		strconv.FormatBool(a.Unix() > 1577836800))
+	check("time: Unix(1e9)", "1000000000", strconv.FormatInt(time.Unix(1000000000, 0).Unix(), 10))
+	t0 := time.Unix(1000, 0)
+	check("time: Add(1s)", "1001", strconv.FormatInt(t0.Add(time.Second).Unix(), 10))
+	check("time: Sub da 1s", "1s", time.Unix(1001, 0).Sub(t0).String())
+	check("time: Before", "true", si(t0.Before(time.Unix(1001, 0))))
+	check("time: Equal", "true", si(t0.Equal(time.Unix(1000, 0))))
+	check("time: After", "true", si(time.Unix(1001, 0).After(t0)))
+	// Duration.String: los mismos textos que da Go
+	check("time: Duration 90m", "1h30m0s", (90 * time.Minute).String())
+	check("time: Duration 1500ms", "1.5s", (1500 * time.Millisecond).String())
+	check("time: Duration 300ms", "300ms", (300 * time.Millisecond).String())
+	check("time: Duration 2.5ms", "2.5ms", (2500 * time.Microsecond).String())
+	check("time: Duration 1500ns", "1.5us", (1500 * time.Nanosecond).String())
+	check("time: Duration 0", "0s", (0 * time.Second).String())
+	check("time: Duration negativo", "-1.5s", (-1500 * time.Millisecond).String())
+	check("time: Duration 1h", "1h0m0s", time.Hour.String())
+	// Sleep: que duerma DE VERDAD, medido con el reloj
+	antes := time.Now()
+	time.Sleep(50 * time.Millisecond)
+	durmió := time.Since(antes)
+	check("time: Sleep(50ms) durmio entre 50 y 500 ms", "true",
+		si(durmió >= 50*time.Millisecond && durmió < 500*time.Millisecond))
+	a1 := time.Now()
+	time.Sleep(20 * time.Millisecond)
+	check("time: Now avanza", "true", si(time.Now().After(a1)))
+
+	// 4i. log en la consola: los mensajes por la consola serie y el prefijo
+	log.SetPrefix("VFS-LOG: ")
+	log.Print("un mensaje de log")
+	log.Printf("con formato: %d %s", 42, "hola")
+	log.Println("con Println")
+	check("log: el prefijo quedo puesto", "VFS-LOG: ", log.Prefix())
+	log.SetPrefix("")
+	check("log: se saco el prefijo", "", log.Prefix())
+	sumideroLog := &bufLog{}
+	log.SetOutput(sumideroLog)
+	log.SetPrefix("P: ")
+	log.Print("hola")
+	log.Printf("%d-%s", 7, "x")
+	log.SetPrefix("")
+	log.SetOutput(os.Stderr)
+	check("log: el texto exacto", "P: hola\nP: 7-x\n", sumideroLog.texto())
+
 	// 5. Existe, Getenv y Args
 	check("Existe /rd/hola.txt", "true", strconv.FormatBool(os.Existe("/rd/hola.txt")))
 	check("Existe /rd/nada", "false", strconv.FormatBool(os.Existe("/rd/nada")))
@@ -276,6 +344,11 @@ func main() {
 	} else {
 		println("VFS: RESULTADO MAL")
 	}
+
+	// 4j. log.Fatal: tiene que imprimir y NO volver (en la consola os.Exit se queda en un lazo). Se prueba
+	// al final, porque despues de esto no corre nada mas.
+	log.Print("VFS: antes del Fatal")
+	log.Fatal("VFS: Fatal imprime y no vuelve")
 
 	d2c_pantalla_init()
 	if mal == 0 {

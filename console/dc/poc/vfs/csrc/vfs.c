@@ -99,6 +99,27 @@ int d2c_stat_es_dir(const char *ruta) {
 // ruta y tambien con fs_readdir sobre un file_t; fs_total y stat de un directorio dan -1. Los
 // ARCHIVOS de /rd si se abren y se leen. Por eso el listado (os.ReadDir) sale de un .manifiesto que
 // el build hornea DENTRO del romdisk junto con los archivos.
+// El reloj de KOS, medido en sus cabeceras (kernel/arch/dreamcast/include/arch/):
+//   - rtc_unix_secs()  -> los segundos Unix que trae la RTC del hardware (el doc avisa que puede fallar:
+//     si la RTC no esta seteada devuelve 0, y ese 0 es "1970").
+//   - timer_us_gettime64() -> microsegundos desde que arranco la consola.
+//   - thd_sleep(ms)    -> el sleep de hilos, en MILISEGUNDOS.
+#include <arch/rtc.h>
+#include <arch/timer.h>
+#include <kos/thread.h>
+
+int64_t d2c_reloj_unix(void) {
+    return (int64_t)rtc_unix_secs();
+}
+
+uint64_t d2c_reloj_us(void) {
+    return timer_us_gettime64();
+}
+
+void d2c_dormir(int ms) {
+    thd_sleep(ms);
+}
+
 // d2c_escribir_consola: la salida de os.Stdout en la consola serie. dbgio_xlate convierte el salto
 // de linea LF en CRLF, que es lo que espera el terminal del emulador.
 void d2c_escribir_consola(unsigned buf, int n) {

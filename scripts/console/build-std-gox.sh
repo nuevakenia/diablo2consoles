@@ -19,7 +19,7 @@ GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 
 # orden de dependencias: cada paquete necesita los .gox de los anteriores
 # (io va despues de errors porque io.EOF es un errors.New, DC-002.3)
-ORDEN="${ORDEN:-unicode/utf8 errors io bytes strings strconv fmt log math math/bits math/rand hash hash/fnv encoding/binary encoding/hex container/ring sort os bufio path/filepath}"
+ORDEN="${ORDEN:-unicode/utf8 errors io bytes strings strconv fmt math math/bits math/rand hash hash/fnv encoding/binary encoding/hex container/ring sort os log time bufio path/filepath}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2

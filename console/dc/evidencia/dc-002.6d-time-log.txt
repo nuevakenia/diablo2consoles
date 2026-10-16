@@ -1,0 +1,56 @@
+DC-002.6d - time (el reloj de KOS) y log EN LA CONSOLA
+====================================================
+
+QUE SE MIDIO
+------------
+  Consola (Flycast, consola serie): VFS: casos 60 bien 60 mal 0
+  Mutadores de consola (mutar-os-consola.sh): 7/7 cazados, control sano, los TRES archivos restaurados
+  con su sha256.
+
+EL RELOJ, MEDIDO EN LAS CABECERAS DE KOS
+----------------------------------------
+  rtc_unix_secs()       -> los segundos Unix de la RTC del hardware (el doc avisa que puede fallar: si
+                           la RTC no esta seteada devuelve 0, y ese 0 es "1970")
+  timer_us_gettime64()  -> microsegundos desde que arranco la consola
+  thd_sleep(ms)         -> el sleep de hilos, en MILISEGUNDOS
+
+Now los combina: rtc_unix_secs() + (timer_us_gettime64() - timer del arranque). Asi avanza con el timer
+(que no se desajusta) y arranca en la fecha de la RTC. EN LA CONSOLA NO HAY ZONA HORARIA: la hora que se
+lee es la de la RTC del hardware, que va en UTC, y eso queda declarado en el paquete (no se inventa un
+offset).
+
+UN DEFECTO MIO, CAZADO EN LA CONSOLA
+------------------------------------
+Duration.String(1h) daba "1h0s" y Go da "1h0m0s": los minutos van aunque sean 0 si ya hay horas (y los
+segundos siempre que haya horas o minutos). El caso quedo en el POC y el mutante 5 lo vigila. Mi primera
+version del String tambien estaba mal en la fraccion (dividia por una escala): 1500ms daba "1.5ms" en vez
+de "1.5s" y 2.5ms daba "2ms". Se reescribio con el algoritmo de Go (fmtFrac/fmtInt): la fraccion son los
+ultimos `prec` digitos de los NANOSEGUNDOS, sin los ceros del final.
+
+QUE HAY Y QUE NO EN time
+------------------------
+  HAY: Now, Unix, Add, Sub, Before, After, Equal, IsZero, Since (suelta y como metodo), Sleep, Duration
+  con sus constantes, Seconds/Milliseconds/Microseconds/Nanoseconds/Hours/Minutes y Duration.String.
+  NO (declarado en el paquete): Format y Parse (el "layout" de Go es un formateador entero), las
+  conversiones de calendario (Year/Month/Day/Hour/Minute/Second, Date, weekday) y LoadLocation/UTC: no
+  hay zona horaria en la consola.
+
+log
+---
+Ya existia de DC-002.3 (Print/Printf/Println y los Panic). Se le agrego lo que el motor usa y faltaba:
+Fatal/Fatalf/Fatalln (que imprimen y despues os.Exit, que en la consola se queda en un lazo y NO vuelve:
+medido en el POC, "VFS: Fatal imprime y no vuelve" es la ultima linea que sale), SetOutput/Writer
+(Sobre fmt.Output) y SetPrefix/Prefix (el prefijo va delante de CADA linea, como en Go: medido, el texto
+exacto es "P: hola\nP: 7-x\n").
+NO esta el ENCABEZADO de Go ("2009/01/23 01:23:23 "): eso necesita las conversiones de calendario, que
+time todavia no tiene (la libc de KOS las da: gmtime_r esta en kos/time.h). Los flags se guardan y se
+devuelven, pero el encabezado no cambia. Queda declarado.
+
+EL POC, LOS CASOS NUEVOS (console/dc/poc/vfs)
+---------------------------------------------
+  - Now no es cero y es un instante posterior a 2020; Unix(1e9); Add/Sub/Before/After/Equal.
+  - Duration.String: 90m -> "1h30m0s", 1500ms -> "1.5s", 300ms -> "300ms", 2.5ms -> "2.5ms",
+    1500ns -> "1.5us", 0 -> "0s", -1500ms -> "-1.5s", 1h -> "1h0m0s".
+  - Sleep(50ms) duerme de verdad (medido entre 50 y 500 ms con Since) y Now avanza.
+  - log con prefijo medido por el TEXTO exacto (con un sumidero propio), y log.Fatal al final: imprime y
+    no vuelve.

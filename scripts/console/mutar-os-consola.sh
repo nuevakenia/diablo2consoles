@@ -21,9 +21,13 @@ mkdir -p /tmp/mutar-os
 cp "$OS" "$RESP"
 SHA0="$(sha256sum "$OS" | cut -d' ' -f1)"
 echo "os.go de partida: sha256 $SHA0"
+for f in console/dc/std/os/os.go console/dc/std/time/time.go console/dc/std/log/log.go; do
+    sha256sum "$f" | cut -d' ' -f1 > "/tmp/mutar-os/sha-$(echo "$f" | tr / -).orig"
+done
 
-muta() {  # $1 = nombre, $2 = buscar, $3 = reemplazar
-    python3 - "$OS" "$2" "$3" <<'PY'
+muta() {  # $1 = nombre, $2 = buscar, $3 = reemplazar, $4 = archivo (por defecto os.go)
+    local arch="${4:-$OS}"
+    python3 - "$arch" "$2" "$3" <<'PY'
 import sys
 ruta, buscar, poner = sys.argv[1], sys.argv[2], sys.argv[3]
 texto = open(ruta).read()
@@ -62,12 +66,14 @@ fi
 
 cazados=0
 total=0
-probar() {  # $1 nombre, $2 buscar, $3 poner, $4 que tiene que romper
+probar() {  # $1 nombre, $2 archivo, $3 buscar, $4 poner, $5 que tiene que romper
     total=$((total + 1))
+    local arch="$2"
     echo
-    echo "== mutante $total: $1 ($4) =="
-    cp "$RESP" "$OS"
-    if ! muta "$1" "$2" "$3"; then
+    echo "== mutante $total: $1 ($5) =="
+    cp "$OS" /tmp/mutar-os/os.go.resp
+    cp "$arch" "/tmp/mutar-os/resp-$(basename "$arch")"
+    if ! muta "$1" "$3" "$4" "$arch"; then
         echo "  NO SE PUDO APLICAR (se saltea)"
         cp "$RESP" "$OS"
         return
@@ -80,11 +86,12 @@ probar() {  # $1 nombre, $2 buscar, $3 poner, $4 que tiene que romper
         echo "  ROJO: cazado."
         cazados=$((cazados + 1))
     fi
-    cp "$RESP" "$OS"
+    cp "/tmp/mutar-os/resp-$(basename "$arch")" "$arch"
 }
 
 # 1. ReadFile que se queda con la primera vuelta (el archivo grande no entra en el buffer de 4096)
 probar "ReadFile de una sola vuelta" \
+    "console/dc/std/os/os.go" \
     "		if err != nil {
 			break
 		}
@@ -100,31 +107,63 @@ probar "ReadFile de una sola vuelta" \
 
 # 2. ReadDir que no trae el tamano del manifiesto
 probar "ReadDir sin tamanos" \
+    "console/dc/std/os/os.go" \
     "salida = append(salida, DirEntry{nombre: campos[0], tam: int64(tam), tipo: tipo})" \
     "salida = append(salida, DirEntry{nombre: campos[0], tam: 0, tipo: tipo})" \
     "los tamanos del manifiesto"
 
 # 3. Stat que miente con el tamano
 probar "Stat con tamano cero" \
+    "console/dc/std/os/os.go" \
     "return infoArchivo{nombre: nombre, tam: int64(tam), dir: d2c_stat_es_dir(nombre) == 1}, nil" \
     "return infoArchivo{nombre: nombre, tam: 0, dir: d2c_stat_es_dir(nombre) == 1}, nil" \
     "Stat de hola.txt (37 bytes)"
 
 # 4. IsNotExist que dice siempre que no falta
 probar "IsNotExist siempre falso" \
+    "console/dc/std/os/os.go" \
     "return err == ErrNotExist || err == ErrSoloLectura" \
     "return false" \
     "IsNotExist de un archivo que no esta"
 
+# 5. time: Duration.String tiene que imprimir los minutos aunque sean 0 si hay horas (Go da "1h0m0s")
+probar "time: Duration sin el 0m de las horas" \
+    "console/dc/std/time/time.go" \
+    "	if d >= Minute || s != \"\" {" \
+    "	if d >= Minute {" \
+    "Duration.String(1h) = 1h0m0s"
+
+# 6. time: Sub tiene que mirar los nanosegundos tambien, no solo los segundos
+probar "time: Sub que devuelve solo los segundos" \
+    "console/dc/std/time/time.go" \
+    "	return Duration((t.sec-u.sec)*1000000000 + int64(t.nsec-u.nsec))" \
+    "	return Duration(t.sec - u.sec)" \
+    "time.Sub(1s) = 1s (no 1ns)"
+
+# 7. log: el prefijo tiene que salir delante del mensaje
+probar "log: el prefijo no sale en el mensaje" \
+    "console/dc/std/log/log.go" \
+    "	fmt.Fprint(fmt.Output, prefijo+s)" \
+    "	fmt.Fprint(fmt.Output, s)" \
+    "el texto exacto del log con prefijo"
+
 echo
 echo "== restauro y verifico =="
 cp "$RESP" "$OS"
-SHA1="$(sha256sum "$OS" | cut -d' ' -f1)"
-if [ "$SHA0" != "$SHA1" ]; then
-    echo "MAL: os.go no quedo igual (sha256 $SHA1, era $SHA0)"
-    exit 1
-fi
-echo "os.go restaurado, sha256 $SHA1 (igual al de partida)"
+mal=""
+for f in console/dc/std/os/os.go console/dc/std/time/time.go console/dc/std/log/log.go; do
+    sha="$(sha256sum "$f" | cut -d' ' -f1)"
+    guardado="/tmp/mutar-os/sha-$(echo "$f" | tr / -).orig"
+    if [ -f "$guardado" ]; then
+        if [ "$sha" != "$(cat "$guardado")" ]; then
+            echo "MAL: $f no quedo igual (sha256 $sha, era $(cat "$guardado"))"
+            mal="si"
+        else
+            echo "$f restaurado, sha256 $sha"
+        fi
+    fi
+done
+[ -z "$mal" ] || exit 1
 echo
 echo "== mutantes cazados $cazados/$total =="
 [ "$cazados" = "$total" ] || exit 1

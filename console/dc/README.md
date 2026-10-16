@@ -801,3 +801,30 @@ tiene un trap que restaura el archivo mutado cuando muere.
 
 **Alcance:** esta tarjeta hizo `bufio`. `time` (el reloj de KOS) y `log` pasan a dc-002.6d (recorte
 declarado).
+
+## 18. DC-002.6d: time (el reloj de KOS) y log
+
+Con esto se cierra el bucket de sistema operativo de DC-002: `os` (y su VFS), `path/filepath`, `bufio`,
+`time` y `log`. Evidencia completa: `evidencia/dc-002.6d-time-log.txt`.
+
+    Consola: VFS: casos 60 bien 60 mal 0
+    Mutador de consola: 7/7 cazados, control sano, los tres archivos restaurados con sha256
+
+**El reloj, medido en las cabeceras de KOS:** `rtc_unix_secs()` (los segundos Unix de la RTC del
+hardware: el doc avisa que puede fallar y devolver 0), `timer_us_gettime64()` (microsegundos desde que
+arranco la consola) y `thd_sleep(ms)` (el sleep de hilos, en milisegundos). `Now` combina los dos
+primeros: avanza con el timer y arranca en la fecha de la RTC. **En la consola no hay zona horaria**: la
+hora es la de la RTC, que va en UTC, y eso queda declarado (no se inventa un offset).
+
+**Un defecto mio, cazado en la consola:** `Duration.String(1h)` daba `"1h0s"` y Go da `"1h0m0s"` (los
+minutos van aunque sean 0 si ya hay horas). La fraccion tambien estaba mal al principio (dividia por una
+escala: 1500ms daba `"1.5ms"`); se reescribio con el algoritmo de Go (`fmtFrac`/`fmtInt`): es los
+ultimos `prec` digitos de los NANOSEGUNDOS, sin los ceros del final.
+
+**`log`** ya existia de DC-002.3; se le agrego `Fatal`/`Fatalf`/`Fatalln` y `SetOutput`/`SetPrefix`. El
+`Fatal` imprime y despues `os.Exit` (que en la consola se queda en un lazo): medido, es la ultima linea
+que sale. El ENCABEZADO de Go (`2009/01/23 01:23:23 `) NO esta: necesita las conversiones de calendario,
+que `time` todavia no tiene (la libc de KOS las da con `gmtime_r`). Queda declarado.
+
+**Lo que NO hay en `time`, y esta dicho en el paquete:** `Format`/`Parse`, las conversiones de calendario
+(`Year`/`Month`/`Day`/...) y `LoadLocation`/`UTC`: no hay zona horaria en la consola.
