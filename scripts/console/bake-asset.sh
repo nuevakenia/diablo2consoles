@@ -57,8 +57,19 @@ fi
 GEN="$OUT/gen"
 mkdir -p "$GEN"
 
-echo "== hornendo asset: $DC6 (frame $FRAME) desde $MPQNAME =="
+if [ "$FRAME" = compuesto ]; then
+  echo "== hornendo asset: $DC6 (TODOS los frames compuestos) desde $MPQNAME =="
+else
+  echo "== hornendo asset: $DC6 (frame $FRAME) desde $MPQNAME =="
+fi
 cd "$REPO"
 # el horneador es una herramienta del host: se compila con el Go normal, no con el cruzado
 go build -o "$OUT/.bake" ./console/dc/bake
-"$OUT/.bake" -mpq "$D2DIR/$MPQNAME" -dc6 "$DC6" -pal "$PAL" -frame "$FRAME" -out "$GEN" -name "$NAME"
+# frame=compuesto: los DC6 de la interfaz son celdas sueltas que hay que pegar con sus offsets; el
+# horneador las compone en un lienzo y ESO es lo que se sube como textura. Con un frame suelto sale
+# una pieza (el frame 0 del fondo del menu, por ejemplo, es solo la "D" del logo).
+if [ "$FRAME" = compuesto ]; then
+  "$OUT/.bake" -mpq "$D2DIR/$MPQNAME" -dc6 "$DC6" -pal "$PAL" -compuesto -out "$GEN" -name "$NAME"
+else
+  "$OUT/.bake" -mpq "$D2DIR/$MPQNAME" -dc6 "$DC6" -pal "$PAL" -frame "$FRAME" -out "$GEN" -name "$NAME"
+fi

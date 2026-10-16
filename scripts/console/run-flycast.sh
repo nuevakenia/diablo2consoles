@@ -6,7 +6,19 @@
 #   - Se le puede pasar un .elf directo: Flycast lo arranca con su propio loader (reios_loadElf),
 #     sin IP.BIN ni ISO. Es el ciclo rapido de desarrollo.
 #   - En KDE/Wayland las capturas se hacen con spectacle (x11grab sale negro: es XWayland).
+#     OJO: spectacle -f fotografía la PANTALLA ENTERA, asi que la ventana de Flycast tiene que estar
+#     ADELANTE cuando se toman las capturas (a los 3, 6, 10 y 15 s). Si queda atras sale el escritorio.
+#   - No hace falta "source env.sh" a mano: este script carga el entorno solo. (env.sh es de bash: en
+#     fish no se puede sourcear, tira "case builtin usado fuera de un bloque switch" y nada queda en el
+#     entorno. De ahi que el source sea interno.)
 set -uo pipefail
+
+# entorno del toolchain (idempotente y silencioso: se puede volver a cargar sin problema)
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -z "${DC_ROOT:-}" ] && [ -f "$HERE/env.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$HERE/env.sh" >/dev/null 2>&1
+fi
 IMG="${1:?uso: run-flycast.sh <archivo> [segundos] [dir_salida]}"
 SECS="${2:-30}"
 OUT="${3:-/tmp/dcframes}"

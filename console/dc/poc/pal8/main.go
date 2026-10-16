@@ -16,7 +16,10 @@
 //   - el fondo violeta se ve a traves de las zonas transparentes del asset (indice 0)
 package main
 
-import "kos"
+import (
+	"kos"
+	"runtime"
+)
 
 //extern d2c_serial_init
 func d2cSerialInit()
@@ -36,6 +39,7 @@ func d2cAssetH() int32
 func main() {
 	d2cSerialInit()
 	println("POC-PAL8: arranco (DC-001.4, asset real de Diablo II en 8 bits)")
+	println("POC-PAL8: runtime", runtime.GOOS, runtime.GOARCH)
 
 	kos.PvrInitDefaults()
 	// violeta: tiene que verse alrededor del logo (zonas transparentes del asset)
