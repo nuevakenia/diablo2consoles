@@ -10,6 +10,16 @@
 #
 # Uso:  scripts/console/noche-002.sh            (una corrida)
 #       scripts/console/noche-002.sh --ver      (muestra el estado del lock y el log)
+#       scripts/console/noche-002.sh --reservar (toma el lock para la sesion actual y se queda)
+#
+# EL LOCK Y SU VIDA (esto costo una correccion, y queda escrito):
+#   El lock lo sostiene el PROCESO que tiene el descriptor abierto. Si la sesion que lo reserva es la
+#   que esta trabajando, tiene que quedar atado a la VIDA DE ESA SESION: cuando la sesion muere, el
+#   kernel cierra el descriptor y el lock se libera solo, y ahi el cron puede reanudar.
+#   Lo que NO hay que hacer: reservarlo con "flock -c 'sleep 100000'" (un tope arbitrario de 27,7 h).
+#   Ese sleep es un proceso aparte que NO muere con la sesion: si la sesion se cierra, el sleep sigue
+#   vivo y el cron queda frenado hasta que termine. Paso, se midio (10 h de sleep con el lock tomado) y
+#   por eso ahora --reservar usa el descriptor del propio shell.
 set -uo pipefail
 
 REPO=/home/dgalli/Proyectos/diablo2consoles
@@ -19,9 +29,31 @@ PROMPT="$REPO/scripts/console/prompt-noche.txt"
 TOPE_MIN=150   # tope de la corrida (minutos); Hermes corta solo si se pasa
 
 if [ "${1:-}" = "--ver" ]; then
-    echo "lock: $( [ -f "$LOCK" ] && cat "$LOCK" || echo 'libre' )"
+    # quien tiene el lock: el archivo esta vacio a proposito (es un candado, no un dato); lo que importa
+    # es QUE PROCESO lo tiene, y eso lo dice fuser.
+    duenio="$(fuser "$LOCK" 2>/dev/null | tr -s ' ')"
+    if [ -n "$duenio" ]; then
+        echo "lock $LOCK: TOMADO por los pid:$duenio"
+        for p in $duenio; do ps -o pid,etime,cmd -p "$p" 2>/dev/null | tail -1; done
+    else
+        echo "lock $LOCK: libre"
+    fi
     echo "log ($LOG): $( [ -f "$LOG" ] && wc -l < "$LOG" || echo 0 ) lineas"
     tail -20 "$LOG" 2>/dev/null
+    exit 0
+fi
+
+# --reservar: toma el lock y SE QUEDA (no lanza al agente). El descriptor queda abierto en el shell que
+# lo llama, asi que el lock vive exactamente lo que viva esa sesion. Es lo que usa el agente cuando
+# tiene que trabajar sin que el cron le mande un segundo agente encima.
+if [ "${1:-}" = "--reservar" ]; then
+    exec 9>"$LOCK"
+    if ! flock -n 9; then
+        duenio="$(fuser "$LOCK" 2>/dev/null | tr -s ' ')"
+        echo "no reserve: el lock ya lo tiene el pid:$duenio"
+        exit 1
+    fi
+    echo "$(date -Is) lock reservado por esta sesion (pid $$). Se libera cuando esta sesion termine."
     exit 0
 fi
 
