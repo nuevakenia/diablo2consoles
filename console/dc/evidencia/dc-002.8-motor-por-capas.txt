@@ -214,3 +214,32 @@ d2networking/d2server: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2ser
 d2networking/d2server/d2tcpclientconnection: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/d2tcpclientconnection/tcp_client_connection.go:5:22: error: import file ‘encoding/json’ not found
 d2networking/d2server/d2udpclientconnection: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/d2udpclientconnection/udp_client_connection.go:6:22: error: import file ‘compress/gzip’ not found
 d2script: /home/dgalli/Proyectos/diablo2consoles/d2script/engine.go:6:18: error: import file ‘io/ioutil’ not found
+
+== LA DECISION MEDIDA SOBRE encoding/json (el externo que mas bloquea) ==
+
+Se midio COMO lo usa el motor, porque eso es lo que decide si es barato o no:
+  88 archivos del motor importan encoding/json
+  72 llamadas: json.Marshal / json.Unmarshal / MarshalIndent / NewEncoder / NewDecoder
+  y TODAS son sobre structs (json.Marshal(o), json.Unmarshal(data, &o), Decode(&l))
+
+Conclusion: para structs arbitrarios hace falta REFLEXION (mapear campos por nombre y leer los tags
+`json:"..."`). O sea que encoding/json NO es un paquete barato: arrastra reflect, que son 43 paquetes de
+la biblioteca estandar (ya medido antes: no entran).
+
+Las tres salidas, y cual se elige:
+  (a) escribir reflect            -- descartada: 43 paquetes, y el motor usa de reflect mucho menos
+                                     que lo que costaria.
+  (b) escribir un json minimo     -- solo sirve para map/slice de tipos conocidos, y el motor usa
+                                     structs: no alcanza para desbloquear los paquetes.
+  (c) DECIDIR POR USO             -- es la que va: mirar PARA QUE lo usan los paquetes bloqueados.
+                                     El uso real es archivos de CONFIGURACION (d2config), REPLAYS
+                                     (d2replay), el perfil del joystick (d2input/d2gamepad) y el estado
+                                     del heroe (d2hero). Ninguno de esos es el juego corriendo: son
+                                     guardar y leer estado en disco. En la consola no hay disco y no hay
+                                     donde guardar la config: se puede portar el juego SIN json, y los
+                                     paquetes que solo lo usan para eso se dejan fuera del camino
+                                     critico con esa razon escrita (no porque "no compila").
+
+Lo que sigue entonces: los paquetes que NO dependen de json ni de reflect, que son la mayoria de los
+que hoy estan bloqueados por dependencias internas (d2mapentity, d2records, d2ui, d2inventory y los que
+se desbloquean con ellos).
