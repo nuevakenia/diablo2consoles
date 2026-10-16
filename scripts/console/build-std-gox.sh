@@ -18,7 +18,8 @@ STD="${STD:-$HERE/../../console/dc/std}"
 GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 
 # orden de dependencias: cada paquete necesita los .gox de los anteriores
-ORDEN="${ORDEN:-unicode/utf8 io errors strings strconv fmt}"
+# (io va despues de errors porque io.EOF es un errors.New, DC-002.3)
+ORDEN="${ORDEN:-unicode/utf8 errors io bytes strings strconv fmt log}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2

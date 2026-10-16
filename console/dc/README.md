@@ -486,3 +486,35 @@ bien (E28). Es el mismo linaje que DC-002.2b/2c, pero del otro lado: alla era la
 llamada**, aca el **chequeo de implementacion**. Ese caso queda **rojo y a la vista** en el autotest
 hasta que se arregle el runtime: sacarlo del corpus seria esconder un defecto que el motor puede
 pisar. Detalle y evidencia cruda en `console/dc/evidencia/dc-002.2e-casos-restantes.txt`.
+
+## 12. DC-002.3: el decodificador DC6 del motor en la consola (medido)
+
+El primer paquete **real** del motor corriendo en la Dreamcast emulada. No hay codigo del motor
+copiado al lado de la consola: el POC importa `d2common/d2fileformats/d2dc6` **tal como esta en el
+repo** (con su `pkgpath` de verdad) y lo unico que aporta la consola son los bytes del DC6,
+horneados del MPQ en el build porque en la Dreamcast no hay sistema de archivos.
+
+```bash
+scripts/console/build-motor-dc6.sh      # DC6 crudo + stdlib + paquetes del motor + ELF  (2,6 s)
+scripts/console/compare-motor-dc6.sh    # el host y la consola, con diff                   (17,2 s)
+```
+
+Resultado: **31 lineas de resumen identicas, 30 frames** decodificados del logo de Battle.net, cada
+uno con su tamano, offsets, cantidad de pixeles opacos y un hash FNV-1a de 32 bits de los indices
+decodificados (`frame 0: 118x52 off=(-63,11) bloque=4618 pixeles=6136 opacos=4051 hash=2884d1c0`).
+
+| pieza | lo que mide |
+|---|---|
+| `console/dc/bake-dc6/` | hornea el DC6 **crudo** del MPQ: el `.dc6` (para el host) y su var de Go (para la consola) |
+| `console/dc/motorresumen/` | el resumen medible, en **un solo paquete**: lo importan los dos lados, asi que una diferencia entre los lados es de plataforma y no de dos copias del instrumento |
+| `console/dc/motorcmp/` | el mismo codigo del motor corriendo en el host (x86-64) |
+| `console/dc/poc/motor-dc6/` | el POC de la consola; `asset.conf` dice que DC6 hornear |
+| `scripts/console/build-motor-gox.sh` | compila los paquetes del motor a `.gox` para SH-4 (saltea los `_test.go`: gccgo no filtra y piden `testing`) |
+
+Lo que **faltaba en la stdlib minima** (medido compilando, no adivinado): `d2datautils` pide
+`io.EOF`/`io.Reader`, `bytes.Buffer` y `log.Print`/`log.Panic`. Se agregaron los tres paquetes con lo
+justo (`io` paso a compilarse despues de `errors` porque `io.EOF` es un `errors.New`), y quedaron
+declarados sus limites: `bytes` no tiene las funciones de busqueda/comparacion y `log` no tiene fecha
+ni prefijos (en la consola no hay reloj). La stdlib minima son **8 paquetes** y el ELF del POC pesa
+**3.259.236 bytes** (el autotest de la stdlib sola era 3.094.432: el motor + el resumen agregan
+~165 KB). Detalle en `console/dc/evidencia/dc-002.3-motor-dc6.txt`.

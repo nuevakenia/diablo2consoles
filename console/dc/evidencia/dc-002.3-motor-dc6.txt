@@ -1,0 +1,68 @@
+=== DC-002.3: el primer paquete REAL del motor corriendo en la Dreamcast emulada ===
+
+QUE SE MIDIO
+    El decodificador DC6 del motor (d2common/d2fileformats/d2dc6: Load + DecodeFrame) compilado para
+    SH-4 con sh-elf-gccgo, corriendo en Flycast, decodificando los 30 frames de un DC6 de verdad
+    (el logo de Battle.net del MPQ), y dando EXACTAMENTE el mismo resultado que el mismo codigo
+    corriendo en el host.
+
+    No hay codigo del motor copiado al lado de la consola: el POC importa el paquete tal como esta en
+    el repo (con su pkgpath de verdad) y lo unico que aporta la consola son los bytes del DC6,
+    horneados del MPQ al build porque en la Dreamcast no hay sistema de archivos.
+
+    Resultado: 31 lineas de resumen identicas, 30 frames comparados.
+        version=6 flags=1 encoding=0 dirs=1 framesPorDir=30 frames=30
+        frame 0: 118x52 off=(-63,11) flipeado=0 bloque=4618 pixeles=6136 opacos=4051 hash=2884d1c0
+        frame 1: 118x53 off=(-63,11) flipeado=0 bloque=4713 pixeles=6254 opacos=4127 hash=09066a5d
+        ...
+        frame 28: 118x52 off=(-63,11) flipeado=0 bloque=4576 pixeles=6136 opacos=3987 hash=4be27602
+    El hash es FNV-1a de 32 bits sobre los indices decodificados de cada frame: un pixel distinto en
+    cualquier frame lo cambia, asi que "decodifica bien" es un numero y no una impresion.
+    Los dos lados crudos: evidencia/dc-002.3-motor-dc6-host.txt y ...-consola.txt (identicos).
+
+COMO SE CORRE
+    scripts/console/build-motor-dc6.sh      # hornea el DC6 crudo + stdlib + paquetes del motor + ELF
+    scripts/console/compare-motor-dc6.sh    # host vs consola, con diff de las lineas del resumen
+    (build-motor-dc6.sh tardo 2,6 s; la comparacion entera 17,2 s con el emulador adentro)
+
+QUE FALTABA EN LA STDLIB MINIMA (medido compilando, no adivinado)
+    d2dc6 importa fmt y d2common/d2datautils; d2datautils importa io, bytes, log y fmt.
+      io.EOF, io.Reader      -> no estaban (nuestro io solo tenia Writer). Se agregaron. io.EOF es un
+                                errors.New, asi que io pasó a compilarse DESPUES de errors.
+      bytes.Buffer           -> no estaba. Se agrego el subconjunto que el motor usa (Write, WriteString,
+                                WriteByte, Bytes, Len, Reset, String). Las funciones de busqueda y
+                                comparacion NO estan y quedan declaradas como limite.
+      log.Print / log.Panic  -> no estaba. Se agrego el minimo (Print/Printf/Println y los tres Panic),
+                                sin fecha ni prefijos porque en la consola no hay reloj; escribe al
+                                mismo destino que fmt.Output.
+    La stdlib minima quedo en 8 paquetes (unicode/utf8, errors, io, bytes, strings, strconv, fmt, log):
+      unicode/utf8.gox 11276 · errors.gox 31240 · io.gox 29368 · bytes.gox 30816
+      strings.gox 69548 · strconv.gox 60428 · fmt.gox 124024 · log.gox 9084
+    Los paquetes del motor, compilados con su pkgpath real
+    (github.com/OpenDiablo2/OpenDiablo2/...), sin tocarles una linea:
+      d2common/d2datautils.gox 167356 · d2common/d2fileformats/d2dc6.gox 67804 · motorresumen.gox 17260
+    Los _test.go del motor se saltean: gccgo no filtra por sufijo y piden "testing" y testify.
+
+DEL ENLACE
+    ELF: 3.259.236 bytes (el del autotest de la stdlib sola era 3.094.432: el motor + el resumen
+    agregan ~165 KB). El .gox de gccgo es a la vez la cabecera de importacion y el objeto, asi que los
+    mismos archivos van al -I y al linker.
+
+COMO SE EVITO QUE LA COMPARACION MIENTA
+    El resumen medible vive en UN solo paquete (console/dc/motorresumen), que importan los dos lados:
+    el POC de la consola y el comparador del host (console/dc/motorcmp). Si el resumen estuviera
+    escrito dos veces, una diferencia entre las dos copias se veria como "diferencia de plataforma":
+    seria una mentira del instrumento, no del codigo. Lo unico que cambia entre los dos lados es el
+    compilador y la plataforma.
+
+    Y el script compara por diff: si el POC de la consola no imprime nada (no arranco, se cayo, o el
+    resumen cambio de forma), lo dice y muestra el log del emulador en vez de dar un OK vacio.
+
+PIEZAS NUEVAS
+    console/dc/bake-dc6/          horneador del DC6 crudo (bytes del MPQ -> .dc6 + var de Go)
+    console/dc/motorresumen/      el resumen medible (un solo lugar, lo usan los dos lados)
+    console/dc/motorcmp/          comparador del host (mismo codigo, x86-64)
+    console/dc/poc/motor-dc6/     el POC de la consola (asset.conf con el DC6 a hornear)
+    scripts/console/build-motor-gox.sh    compila los paquetes del motor a .gox para SH-4
+    scripts/console/build-motor-dc6.sh    horneado + stdlib + motor + ELF
+    scripts/console/compare-motor-dc6.sh  host vs consola, con diff

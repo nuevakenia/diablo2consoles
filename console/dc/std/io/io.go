@@ -1,8 +1,19 @@
-// Package io: solo lo que necesita nuestro fmt para escribir (Writer y sus variantes).
+// Package io: lo que el motor usa de verdad (Reader, Writer y EOF) mas lo que necesita nuestro fmt.
 //
-// En la consola el destino final lo enchufa el arranque (consola serie o pantalla); aca solo
-// vive el contrato.
+// Lo que el motor pide (medido al compilar d2common/d2datautils y d2dc6 para SH-4, DC-002.3):
+// io.EOF, io.Reader y io.Writer. En la consola el destino final lo enchufa el arranque (consola
+// serie o pantalla); aca solo vive el contrato.
 package io
+
+import "d2std/errors"
+
+// EOF es el error que devuelve un Reader cuando no queda nada por leer.
+var EOF = errors.New("EOF")
+
+// Reader es el contrato de lectura, igual que en Go.
+type Reader interface {
+	Read(p []byte) (n int, err error)
+}
 
 // Writer es el contrato de escritura, igual que en Go.
 type Writer interface {
