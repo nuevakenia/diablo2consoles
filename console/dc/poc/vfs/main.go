@@ -13,6 +13,7 @@
 package main
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -214,6 +215,49 @@ func main() {
 	}
 	for _, c := range pares {
 		check("filepath "+c.nombre, c.esperado, c.tengo)
+	}
+
+	// 4f. bufio en la consola: el archivo grande del romdisk partido en lineas con un Scanner. Es lo
+	// que hace el motor para leer los textos de tablas (NewScanner 18 usos).
+	fa, err := os.Open("/rd/grande.txt")
+	if err != nil {
+		check("bufio: Open grande.txt", "sin error", "error: "+err.Error())
+	} else {
+		esc := bufio.NewScanner(fa)
+		lineas := 0
+		primera, ultima, mala := "", "", ""
+		for esc.Scan() {
+			lineas++
+			switch lineas {
+			case 1:
+				primera = esc.Text()
+			case 200:
+				ultima = esc.Text()
+			}
+		}
+		if err := esc.Err(); err != nil {
+			mala = err.Error()
+		}
+		fa.Close()
+		check("bufio: lineas de grande.txt", "200", strconv.Itoa(lineas))
+		check("bufio: primera linea", "linea 0000 del archivo grande", primera)
+		check("bufio: ultima linea", "linea 0199 del archivo grande", ultima)
+		check("bufio: Scanner sin error", "", mala)
+	}
+
+	// 4g. bufio.Reader por trozos: la primera linea con ReadString
+	fb, err := os.Open("/rd/hola.txt")
+	if err != nil {
+		check("bufio: Open hola.txt", "sin error", "error: "+err.Error())
+	} else {
+		lector := bufio.NewReaderSize(fb, 16)
+		txt, err := lector.ReadString('\n')
+		fb.Close()
+		if err != nil && txt == "" {
+			check("bufio: ReadString de hola.txt", "el texto", "error: "+err.Error())
+		} else {
+			check("bufio: ReadString de hola.txt", "hola desde el romdisk de la Dreamcast", txt)
+		}
 	}
 
 	// 5. Existe, Getenv y Args

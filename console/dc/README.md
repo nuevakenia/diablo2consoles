@@ -771,3 +771,33 @@ de bash se cierra y el mutante llega roto a python).
 
 **Alcance:** esta tarjeta hizo `path/filepath`. `time`, `bufio` y `log` pasan a dc-002.6c (recorte
 declarado).
+
+## 17. DC-002.6c: bufio (el Scanner y el Reader sobre cualquier io.Reader)
+
+`NewScanner` 18 veces y `NewReader` 10 en el motor: es como lee los textos de tablas. Evidencia completa
+en `evidencia/dc-002.6c-bufio.txt`.
+
+    Host:    prueba diferencial verde en amd64 y en 386
+    Consola: VFS: casos 39 bien 39 mal 0   (34 + 5 de bufio, 84 KB de .gox)
+    Mutador: 22/22 cazados, control sano
+
+**Como se prueba un Scanner:** el contrato es el de Go (`Scan()` da false al final O por un error, y
+despues hay que mirar `Err()`), asi que se compara token por token contra el Scanner de Go — pero al mio
+se le da un Reader propio que sirve el archivo DE A POCO (de a 1, 3, 7 y 13 bytes). Con el archivo de a
+un byte, cualquier error de "cuando corto el token" aparece enseguida.
+
+**Dos defectos mios que cazo la prueba:** (1) `ScanLines` dejaba el `\r` de los finales de Windows (Go
+tiene un `dropCR`: si el `\r` esta pegado al `\n`, se saca) — medido: Go daba `"con retorno"` y el mio
+`"con retorno\r"`; (2) `ScanWords` cortaba la palabra sin esperar el blanco o el final, asi que con el
+archivo de a un byte `"una linea"` salia como 8 tokens (`"u","n","a",...`) donde Go da 2. Los dos estan
+en el mutador (20 y 21).
+
+**Dos cosas del mutador que salieron de aca:** (1) un mutante puede COLGAR el test, no solo fallarlo o
+hacerlo caer — el mutante "el Reader no rellena su buffer" deja al Scanner pidiendo datos para siempre,
+asi que los tests del mutador ahora corren con `-timeout 25s` y un cuelgue cuenta como rojo; (2) y lo
+mas importante: si el mutador muere a la mitad, el archivo queda MUTADO (paso: lo mato un timeout con el
+mutante 22 aplicado y despues el control sano se colgaba sin que se entendiera por que). El script ahora
+tiene un trap que restaura el archivo mutado cuando muere.
+
+**Alcance:** esta tarjeta hizo `bufio`. `time` (el reloj de KOS) y `log` pasan a dc-002.6d (recorte
+declarado).

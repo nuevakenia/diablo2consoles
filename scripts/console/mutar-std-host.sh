@@ -11,7 +11,20 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 STD="${STD:-$REPO/console/dc/std}"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+# EN_CURSO: el archivo que esta mutado ahora mismo. Si el script muere a la mitad (lo mata un timeout, un
+# Ctrl-C, lo que sea), el trap lo restaura: si no, el archivo queda MUTADO en el arbol y el proximo
+# control sano se cae sin que se entienda por que (paso: el mutante 22 dejo bufio.go con "if false" y el
+# control se colgo 25 s). Restaurar es copiar la copia propia, nunca `git checkout --`.
+EN_CURSO=""
+trap 'restaurar_al_morir' EXIT
+
+restaurar_al_morir() {
+    if [ -n "$EN_CURSO" ] && [ -f "$TMP/orig" ]; then
+        cp "$TMP/orig" "$STD/$EN_CURSO"
+        echo "== el script murio a la mitad: $EN_CURSO restaurado (revisar el sha256) =="
+    fi
+    rm -rf "$TMP"
+}
 
 rc=0
 contador=0
@@ -24,6 +37,7 @@ cazados=0
 aplicar() { # <archivo> <buscar> <poner>
     local arch="$1" buscar="$2" poner="$3"
     cp "$STD/$arch" "$TMP/orig"
+    EN_CURSO="$arch"
     sha256sum "$TMP/orig" | awk '{print $1}' > "$TMP/orig.sha"
     python3 - "$STD/$arch" "$buscar" "$poner" <<'PY' || return 1
 import sys
@@ -44,6 +58,7 @@ restaurar() { # <archivo>
         echo "   EL ARBOL QUEDO MUTADO: no coinciden los sha256 de $arch"
         return 1
     fi
+    EN_CURSO=""
     return 0
 }
 
@@ -57,12 +72,12 @@ mutacion() { # <nombre> <archivo> <buscar> <poner> <goarch>
         rc=1
         return
     fi
-    (cd "$STD" && GOARCH="$arch_go" go test ./difftest/ >"$TMP/salida" 2>&1)
+    (cd "$STD" && GOARCH="$arch_go" go test -timeout 25s ./difftest/ >"$TMP/salida" 2>&1)
     # ROJO es que un test falle (--- FAIL), pero tambien lo es que el proceso se caiga: el mutante del
     # ancho del elemento de sort lee memoria con el ancho equivocado y revienta con SIGSEGV, sin llegar
     # a imprimir "--- FAIL". Las dos cosas son la suite cazando el defecto (medido: 0x3b47b99ec570).
     if grep -qE -- "--- FAIL|^fatal error|SIGSEGV|^panic:" "$TMP/salida"; then
-        echo "   cazado: la suite se puso rojo con el aserto:"
+        echo "   cazado: la suite se puso rojo (aserto, caida o cuelgue):"
         grep -m1 -- "--- FAIL" "$TMP/salida" | sed 's/^/     /'
         grep -m1 -A1 -- "difftest_test.go:" "$TMP/salida" | tail -1 | cut -c1-150 | sed 's/^/     /'
         cazados=$((cazados + 1))
@@ -81,7 +96,7 @@ mutacion() { # <nombre> <archivo> <buscar> <poner> <goarch>
 
 echo "== control sano: la suite tiene que estar VERDE antes de mutar nada =="
 for arch in amd64 386; do
-    if (cd "$STD" && GOARCH="$arch" go test ./difftest/ >"$TMP/sano-$arch" 2>&1); then
+    if (cd "$STD" && GOARCH="$arch" go test -timeout 25s ./difftest/ >"$TMP/sano-$arch" 2>&1); then
         echo "   GOARCH=$arch verde"
     else
         echo "   GOARCH=$arch ROJO sin mutar nada: arreglar eso primero (no se puede medir el mutador)"
@@ -286,6 +301,29 @@ mutacion "filepath: Join no ignora los vacios" \
     "path/filepath/filepath.go" \
     $'\t\tif e != "" {\n\t\t\tpartes = append(partes, e)\n\t\t}' \
     $'\t\tpartes = append(partes, e)' \
+    amd64
+
+echo "== 20. bufio: ScanLines saca el \r pegado al salto (dropCR) =="
+mutacion "bufio: ScanLines deja el \r de los finales de Windows" \
+    "bufio/bufio.go" \
+    $'return i + 1, sinCR(data[:i]), nil' \
+    $'return i + 1, data[:i], nil' \
+    amd64
+
+echo "== 21. bufio: ScanWords espera el blanco o el final antes de dar la palabra =="
+# El defecto real que cazo la prueba diferencial: con el archivo servido de a un byte, cada trozo de
+# palabra salia como token ("u","n","a",... en vez de "una").
+mutacion "bufio: ScanWords corta la palabra sin esperar el blanco" \
+    "bufio/bufio.go" \
+    $'if atEOF && len(data) > empieza {' \
+    $'if true {' \
+    amd64
+
+echo "== 22. bufio: el Reader rellena su buffer cuando se queda sin nada =="
+mutacion "bufio: Reader no rellena el buffer" \
+    "bufio/bufio.go" \
+    $'if b.Buffered() == 0 && b.err == nil {' \
+    $'if false {' \
     amd64
 
 echo

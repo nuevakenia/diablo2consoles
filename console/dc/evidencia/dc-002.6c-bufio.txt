@@ -1,0 +1,55 @@
+DC-002.6c - bufio (Scanner y Reader) EN LA CONSOLA
+==================================================
+
+QUE SE MIDIO
+------------
+  Host (prueba diferencial contra bufio de Go, en los DOS anchos de int):
+      == prueba diferencial con GOARCH=amd64 ==  ok
+      == prueba diferencial con GOARCH=386   ==  ok
+      == los dos anchos: verde ==
+
+  Consola (Flycast, el MISMO codigo para SH-4, 84 KB de .gox):
+      VFS: casos 39 bien 39 mal 0      (34 + 5 de bufio)
+      VFS: RESULTADO OK
+
+  Mutadores del host: 22/22 cazados, control sano.
+
+COMO SE PRUEBA UN SCANNER (la parte que importa)
+------------------------------------------------
+El contrato de bufio.Scanner es el de Go: Scan() devuelve false al final O por un error, y despues hay
+que mirar Err() para saber cual de las dos cosas paso. La prueba compara token por token contra el
+Scanner de Go, pero con una diferencia clave en la entrada: al mio se le da un Reader propio que sirve
+los bytes DE A POCO (de a 1, 3, 7 y 13 bytes, y entero tambien). El de Go se prueba con strings.Reader.
+
+Eso es lo que hace que la prueba valga: con el archivo de a un byte, cualquier error de "cuando corto el
+token" aparece en la primera corrida.
+
+DOS DEFECTOS MIOS, LOS DOS CAZADOS POR LA PRUEBA DIFERENCIAL
+------------------------------------------------------------
+1. ScanLines dejaba el "\r" de los finales de linea de Windows. Go tiene un dropCR: si el "\r" esta
+   pegado al "\n", se saca. Medido: Go daba "con retorno" y el mio "con retorno\r" (en 5 trozos
+   distintos), y con el archivo "a\r\n\r\nb" Go daba ["a", ""] y el mio ["a\r", "\r"].
+2. ScanWords cortaba la palabra SIN esperar el blanco o el final. Con el archivo servido de a un byte,
+   "una linea" salia como 8 tokens ("u","n","a","l","i","n","e","a") donde Go da 2. La regla de Go es
+   que la palabra sale cuando aparece un blanco, o cuando se llego al final del archivo.
+
+Los dos estan en el mutador (20 y 21) para que no vuelvan.
+
+DOS COSAS DEL MUTADOR QUE SALIERON DE ACA
+------------------------------------------
+1. UN MUTANTE PUEDE COLGAR EL TEST, no solo fallarlo o hacerlo caer: el mutante "el Reader no rellena su
+   buffer" deja el Scanner pidiendo datos para siempre. Ahora los tests del mutador corren con
+   `go test -timeout 25s` y un cuelgue (panic: test timed out) cuenta como ROJO, igual que un FAIL o un
+   SIGSEGV.
+
+2. Y LO MAS IMPORTANTE: si el mutador muere a la mitad, el archivo queda MUTADO. Paso: el primer intento
+   lo mato un timeout del lado del que lo lanzo, con el mutante 22 ya aplicado; despues el "control
+   sano" se colgo 25 s y no se entendia por que (era bufio.go con `if false`). El script ahora tiene un
+   trap que restaura el archivo que estaba mutado cuando el script muere. Medido despues: 22/22 cazados
+   y el arbol sano.
+
+EL POC (console/dc/poc/vfs), LOS CASOS NUEVOS
+---------------------------------------------
+  - grande.txt (6000 bytes, 200 lineas) partido con un Scanner: 200 lineas, la primera y la ultima
+    exactas, y Err() sin error.
+  - hola.txt leido con bufio.NewReaderSize(16) + ReadString: el texto entero.
