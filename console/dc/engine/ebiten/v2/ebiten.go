@@ -18,24 +18,16 @@ package ebiten
 
 import (
 	"image"
+	"image/color"
 )
 
 // ================================================================ imagenes
 
-// Image es la INTERFAZ de imagen de Ebitengine (igual que en la de verdad: es una interfaz, y por eso
-// el motor puede hacer SubImage(rect).(*ebiten.Image)).
-type Image interface {
-	Bounds() image.Rectangle
-	Size() (int, int)
-	Clear()
-	Set(x, y int, c Color)
-	At(x, y int) Color
-	SubImage(r image.Rectangle) Image
-	DrawImage(src Image, op *DrawImageOptions)
-}
-
-// imagen es la implementacion: guarda los pixeles y el rectangulo.
-type imagen struct {
+// Image es la imagen de Ebitengine. MEDIDO en la de verdad (v2.0.2, con la que el motor declara en
+// go.mod): es un STRUCT, no una interfaz, y su SubImage devuelve image.Image (la interfaz de Go, no
+// *Image). Las dos cosas importan, porque el motor hace SubImage(rect).(*ebiten.Image): esa asercion
+// solo es legal porque SubImage devuelve una INTERFAZ.
+type Image struct {
 	pixeles []uint8
 	ancho   int
 	alto    int
@@ -43,12 +35,12 @@ type imagen struct {
 
 // NewImage devuelve una imagen transparente del tamano pedido (8 bits por pixel por canal, igual que
 // Ebitengine).
-func NewImage(w, h int) *imagen {
-	return &imagen{pixeles: make([]uint8, w*h*4), ancho: w, alto: h}
+func NewImage(w, h int) *Image {
+	return &Image{pixeles: make([]uint8, w*h*4), ancho: w, alto: h}
 }
 
 // NewImageFromImage copia una image.Image de Go.
-func NewImageFromImage(src image.Image) *imagen {
+func NewImageFromImage(src image.Image) *Image {
 	b := src.Bounds()
 	img := NewImage(b.Dx(), b.Dy())
 	for y := 0; y < b.Dy(); y++ {
@@ -64,23 +56,38 @@ func NewImageFromImage(src image.Image) *imagen {
 	return img
 }
 
+// ColorModel: parte de la interfaz image.Image (la pide SubImage al devolver image.Image).
+func (i *Image) ColorModel() color.Model { return color.RGBAModel }
+
 // Bounds: el rectangulo de la imagen.
-func (i *imagen) Bounds() image.Rectangle {
+func (i *Image) Bounds() image.Rectangle {
 	return image.Rectangle{Min: image.Point{X: 0, Y: 0}, Max: image.Point{X: i.ancho, Y: i.alto}}
 }
 
 // Size: el tamano.
-func (i *imagen) Size() (int, int) { return i.ancho, i.alto }
+func (i *Image) Size() (int, int) { return i.ancho, i.alto }
 
 // Clear: borra la imagen con el color dado.
-func (i *imagen) Clear() {
+func (i *Image) Clear() {
 	for j := range i.pixeles {
 		i.pixeles[j] = 0
 	}
 }
 
+// SetRGBA: pinta un pixel con los valores crudos de 8 bits (es lo que usa SubImage al recortar).
+func (i *Image) SetRGBA(x, y int, c color.RGBA) {
+	if x < 0 || y < 0 || x >= i.ancho || y >= i.alto {
+		return
+	}
+	j := (y*i.ancho + x) * 4
+	i.pixeles[j+0] = c.R
+	i.pixeles[j+1] = c.G
+	i.pixeles[j+2] = c.B
+	i.pixeles[j+3] = c.A
+}
+
 // Set: pinta un pixel.
-func (i *imagen) Set(x, y int, c Color) {
+func (i *Image) Set(x, y int, c Color) {
 	if x < 0 || y < 0 || x >= i.ancho || y >= i.alto {
 		return
 	}
@@ -91,8 +98,18 @@ func (i *imagen) Set(x, y int, c Color) {
 	i.pixeles[j+3] = uint8(c.A)
 }
 
-// At: lee un pixel.
-func (i *imagen) At(x, y int) Color {
+// At: lee un pixel. Devuelve color.Color (no Color) porque es la firma que pide image.Image, y
+// SubImage devuelve image.Image como en la Ebitengine de verdad.
+func (i *Image) At(x, y int) color.Color {
+	if x < 0 || y < 0 || x >= i.ancho || y >= i.alto {
+		return color.RGBA{}
+	}
+	j := (y*i.ancho + x) * 4
+	return color.RGBA{R: i.pixeles[j+0], G: i.pixeles[j+1], B: i.pixeles[j+2], A: i.pixeles[j+3]}
+}
+
+// ColorAt: la version que devuelve el Color de Ebitengine (0 a 1), que es lo que usa el motor.
+func (i *Image) ColorAt(x, y int) Color {
 	if x < 0 || y < 0 || x >= i.ancho || y >= i.alto {
 		return Color{}
 	}
@@ -101,25 +118,28 @@ func (i *imagen) At(x, y int) Color {
 }
 
 // SubImage: la ventana sobre la imagen.
-func (i *imagen) SubImage(r image.Rectangle) Image {
+func (i *Image) SubImage(r image.Rectangle) image.Image {
 	// se recorta de verdad: el motor pide cada glifo de la tabla de la fuente como una subimagen
 	ancho := r.Dx()
 	alto := r.Dy()
 	if ancho <= 0 || alto <= 0 {
-		return &imagen{ancho: 0, alto: 0}
+		return &Image{ancho: 0, alto: 0}
 	}
-	nueva := &imagen{pixeles: make([]uint8, ancho*alto*4), ancho: ancho, alto: alto}
+	nueva := &Image{pixeles: make([]uint8, ancho*alto*4), ancho: ancho, alto: alto}
 	for y := 0; y < alto; y++ {
 		for x := 0; x < ancho; x++ {
 			c := i.At(r.Min.X+x, r.Min.Y+y)
-			nueva.Set(x, y, c)
+			if cu, ok := c.(color.RGBA); ok {
+				nueva.SetRGBA(x, y, cu)
+			}
 		}
 	}
 	return nueva
 }
 
-// DrawImage: el metodo de la interfaz (el motor dibuja con target.DrawImage(s, op)).
-func (i *imagen) DrawImage(src Image, op *DrawImageOptions) { Dibujos++ }
+// DrawImage: el metodo con el que el motor dibuja (target.DrawImage(s, op)). Src es *Image (el motor
+// pasa lo que le devolvio la asercion de SubImage).
+func (i *Image) DrawImage(src *Image, op *DrawImageOptions) { Dibujos++ }
 
 // ================================================================ colores y opciones
 
@@ -179,20 +199,20 @@ const (
 var pantalla = NewImage(640, 480)
 
 // Screen devuelve el lienzo de la consola.
-func Screen() *imagen { return pantalla }
+func Screen() *Image { return pantalla }
 
 // DrawImage dibuja src en dst con las opciones. Aca se deja registrado (contando) para poder medir que
 // el motor realmente esta pidiendo dibujar; el pintado con el PVR entra con el backend.
 var Dibujos int
 
-func DrawImage(dst *imagen, src Image, op *DrawImageOptions) {
+func DrawImage(dst, src *Image, op *DrawImageOptions) {
 	Dibujos++
 }
 
 // DrawTriangles: el robot de dibujado directo. Igual que DrawImage: se cuenta.
 var DibujosTriangulos int
 
-func DrawTriangles(dst *imagen, vertices []Vertex, indices []uint32, op *DrawImageOptions) {
+func DrawTriangles(dst *Image, vertices []Vertex, indices []uint32, op *DrawImageOptions) {
 	DibujosTriangulos++
 }
 
@@ -311,7 +331,7 @@ func AppendInputChars(runes []rune) int { return 0 }
 // Game: la interfaz que el motor implementa (su juego).
 type Game interface {
 	Update() error
-	Draw(screen Image)
+	Draw(screen *Image)
 	Layout(ancho, alto int) (int, int)
 }
 
