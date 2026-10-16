@@ -103,7 +103,9 @@ var (
 // errTipo es el error de un tipo que Read todavia no sabe leer (ver el limite declarado arriba).
 type errTipo struct{ que string }
 
-func (e errTipo) Error() string { return "encoding/binary: Read no soporta " + e.que + " (ver DC-002.5)" }
+func (e errTipo) Error() string {
+	return "encoding/binary: Read no soporta " + e.que + " (ver DC-002.5)"
+}
 
 // ErrTipoDeDato es el error exportado, por si el llamador lo quiere distinguir.
 var ErrTipoDeDato error = errTipo{"ese tipo de dato"}

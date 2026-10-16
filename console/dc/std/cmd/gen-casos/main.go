@@ -17,6 +17,7 @@ import (
 	"hash/fnv"
 	"math"
 	"math/bits"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -114,13 +115,22 @@ func main() {
 	}
 	fmt.Fprintf(&sb, "}\n\n")
 
-	fmt.Fprintf(&sb, "var casosFormatFloat = []struct {\n\tf       float64\n\tprec    int\n\tesperado string\n}{\n")
-	for _, f := range []float64{0, 1.5, 2.5, 3.14159265, 99.95, 0.145, 8.835, 1.0 / 3.0, -1.005, 100, 1e10, 1e14, -0.0} {
+	fmt.Fprintf(&sb, "var casosFormatFloat = []struct {\n\tf       float64\n\tform    byte\n\tprec    int\n\tesperado string\n}{\n")
+	flotantesFmt := []float64{0, 1.5, 2.5, 3.14159265, 99.95, 0.145, 8.835, 1.0 / 3.0, -1.005, 100, 1e10, 1e14, -0.0}
+	for _, f := range flotantesFmt {
 		for _, p := range []int{0, 1, 2, 3, 4, 6} {
 			if f == 1e14 && p > 2 {
 				continue
 			}
-			fmt.Fprintf(&sb, "\t{%s, %d, %q},\n", floatLiteral(f), p, strconv.FormatFloat(f, 'f', p, 64))
+			fmt.Fprintf(&sb, "\t{%s, 'f', %d, %q},\n", floatLiteral(f), p, strconv.FormatFloat(f, 'f', p, 64))
+		}
+	}
+	// 'g': la forma mas corta y con precision explicita. El exponente decide la notacion (cientifica
+	// si es menor que -4 o mayor o igual que 6 con precision corta, o que la precision pedida).
+	// Esta parte del corpus es la que destapo el defecto: la forma 'g' no se probaba.
+	for _, f := range []float64{0, 1.5, 2.5, 3.14159265, 99.95, 0.145, 8.835, 1.0 / 3.0, -1.005, 100, 1e10, 1e14, 1e-5, 1e-4, 123456789.0, 5e-324, 1234.5678, -0.0, 1e21} {
+		for _, p := range []int{-1, 1, 2, 3, 5} {
+			fmt.Fprintf(&sb, "\t{%s, 'g', %d, %q},\n", floatLiteral(f), p, strconv.FormatFloat(f, 'g', p, 64))
 		}
 	}
 	fmt.Fprintf(&sb, "}\n\n")
@@ -150,7 +160,118 @@ func main() {
 	for _, j := range [][]string{{"a", "b", "c"}, nil, {"uno"}, {"", ""}} {
 		fmt.Fprintf(&sb, "\t{%q, %q, %q, 0, %q},\n", "Join", strings.Join(j, "|"), "", strings.Join(j, "|"))
 	}
+	// ---- strings: lo que se sumo en DC-002.5 (Compare, IndexAny, LastIndexAny, Title, Cut) y
+	// ---- bytes: las mismas operaciones sobre []byte (el campo a y b son los bytes como texto y el
+	// POC los pasa a []byte) ----
+	for _, s := range textosStr {
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "Compare", s, "a", strconv.Itoa(strings.Compare(s, "a")))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "IndexAny", s, "a,", strconv.Itoa(strings.IndexAny(s, "a,")))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "LastIndexAny", s, "a,", strconv.Itoa(strings.LastIndexAny(s, "a,")))
+		if esASCII(s) {
+			// Title de Go usa las tablas de Unicode: en la consola no hay y el limite esta declarado
+			fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "Title", s, "", strings.Title(s))
+		}
+		antes, despues, hay := strings.Cut(s, ",")
+		encontrado := 0
+		if hay {
+			encontrado = 1
+		}
+		fmt.Fprintf(&sb, "	{%q, %q, %q, %d, %q},\n", "Cut", s, ",", encontrado, antes+"\x01"+despues)
+
+		bs := []byte(s)
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.Contains", s, "a", strconv.FormatBool(bytes.Contains(bs, []byte("a"))))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.Equal", s, s, strconv.FormatBool(bytes.Equal(bs, []byte(s))))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.HasPrefix", s, "a", strconv.FormatBool(bytes.HasPrefix(bs, []byte("a"))))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.HasSuffix", s, "a", strconv.FormatBool(bytes.HasSuffix(bs, []byte("a"))))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.IndexByte", s, "a", strconv.Itoa(bytes.IndexByte(bs, 'a')))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.Index", s, "a", strconv.Itoa(bytes.Index(bs, []byte("a"))))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.LastIndex", s, "a", strconv.Itoa(bytes.LastIndex(bs, []byte("a"))))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.ReplaceAll", s, ",", string(bytes.ReplaceAll(bs, []byte(","), []byte("-"))))
+		fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.TrimSpace", s, "", string(bytes.TrimSpace(bs)))
+		if esASCII(s) {
+			// bytes.ToUpper de Go, con texto no ASCII, usa las tablas de Unicode
+			fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.ToUpper", s, "", string(bytes.ToUpper(bs)))
+			fmt.Fprintf(&sb, "	{%q, %q, %q, 0, %q},\n", "b.ToLower", s, "", string(bytes.ToLower(bs)))
+		}
+		{
+			var trozos []string
+			for _, t := range bytes.Split(bs, []byte(",")) {
+				trozos = append(trozos, string(t))
+			}
+			fmt.Fprintf(&sb, "	{%q, %q, %q, -1, %q},\n", "b.Split", s, ",", strings.Join(trozos, "|"))
+		}
+	}
+
 	fmt.Fprintf(&sb, "}\n")
+
+	// ---- sort (DC-002.5) ----
+	// El orden NO se puede comparar con Go cuando hay claves repetidas y el algoritmo no es estable
+	// (Slice, Sort e Ints no lo son: dos ordenes distintos son los dos validos). Por eso:
+	//   - casosOrden y casosInterfaz usan claves DISTINTAS: ahi el resultado es unico;
+	//   - casosEstable usa claves REPETIDAS y guarda la posicion original de cada elemento: es el
+	//     unico resultado que SliceStable puede dar.
+	fmt.Fprintf(&sb, "type casoOrden struct {\n	nombre   string\n	datos    []int\n	esperado []int\n}\n\nvar casosOrden = []casoOrden{\n")
+	secuencias := [][]int{
+		{}, {1}, {2, 1}, {3, 1, 2}, {1, 2, 3, 4, 5}, {5, 4, 3, 2, 1},
+		{9, 7, 5, 3, 1, 2, 4, 6, 8, 0},
+		{100, -3, 0, 7, -2147483648, 2147483647, 42, -1},
+	}
+	for _, sec := range secuencias {
+		d := append([]int(nil), sec...)
+		sort.Ints(d)
+		fmt.Fprintf(&sb, "	{%q, %s, %s},\n", "ints "+strconv.Itoa(len(sec)), intsLiteral(sec), intsLiteral(d))
+	}
+	// una secuencia larga con claves distintas (para que el quicksort haga trabajo de verdad)
+	larga := make([]int, 200)
+	for i := range larga {
+		larga[i] = (i*7919 + 13) % 200
+	}
+	largaOrd := append([]int(nil), larga...)
+	sort.Ints(largaOrd)
+	fmt.Fprintf(&sb, "	{%q, %s, %s},\n", "ints 200", intsLiteral(larga), intsLiteral(largaOrd))
+	fmt.Fprintf(&sb, "}\n\n")
+
+	fmt.Fprintf(&sb, "type casoEstable struct {\n	nombre   string\n	claves   []int\n	esperado []int\n}\n\nvar casosEstable = []casoEstable{\n")
+	clavesCasos := [][]int{
+		{2, 1, 2, 1, 2, 1},
+		{5, 5, 5, 5},
+		{3, 1, 2, 3, 1, 2, 3, 1},
+		{1, 2, 3, 4, 5, 6, 7, 8, 9},
+		{9, 8, 7, 6, 5, 4, 3, 2, 1},
+	}
+	// 60 claves con repetidos, deterministicas
+	var largaRep []int
+	for i := 0; i < 60; i++ {
+		largaRep = append(largaRep, (i*13+5)%7)
+	}
+	clavesCasos = append(clavesCasos, largaRep)
+	for _, cl := range clavesCasos {
+		type par struct {
+			clave   int
+			orden   int
+			relleno [2]int // para que el elemento no sea de 8 bytes justos
+		}
+		pares := make([]par, len(cl))
+		for i, c := range cl {
+			pares[i] = par{clave: c, orden: i}
+		}
+		sort.SliceStable(pares, func(i, j int) bool { return pares[i].clave < pares[j].clave })
+		orden := make([]int, len(pares))
+		for i, p := range pares {
+			orden[i] = p.orden
+		}
+		fmt.Fprintf(&sb, "	{%q, %s, %s},\n", "estable "+strconv.Itoa(len(cl)), intsLiteral(cl), intsLiteral(orden))
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+
+	fmt.Fprintf(&sb, "type casoBusca struct {\n	ordenados []int\n	x         int\n	esperado  int\n}\n\nvar casosBusca = []casoBusca{\n")
+	busca := []int{1, 3, 5, 7, 9, 11, 13, 13, 20}
+	for _, x := range []int{-5, 0, 1, 2, 3, 13, 14, 20, 21, 100} {
+		fmt.Fprintf(&sb, "	{%s, %d, %d},\n", intsLiteral(busca), x, sort.SearchInts(busca, x))
+	}
+	fmt.Fprintf(&sb, "}\n\n")
+
+	fmt.Fprintf(&sb, "// resumen de lo medido en el host: orden %d casos, estable %d, busca %d\n", len(secuencias)+1, len(clavesCasos), 10)
 
 	// ---- math, math/bits, hash/fnv, encoding/hex, encoding/binary (DC-002.4) ----
 	// Los resultados de math se comparan por BITS (math.Float64bits), no por texto: asi el corpus
@@ -397,6 +518,21 @@ func claseDe(fn string, a float64) string {
 		return strconv.FormatBool(math.Signbit(a))
 	}
 	return "fn desconocida"
+}
+
+// intsLiteral escribe un []int como expresion Go.
+func intsLiteral(v []int) string {
+	if len(v) == 0 {
+		return "[]int{}"
+	}
+	s := "[]int{"
+	for i, n := range v {
+		if i > 0 {
+			s += ", "
+		}
+		s += strconv.Itoa(n)
+	}
+	return s + "}"
 }
 
 func bytesLiteral(b []byte) string {

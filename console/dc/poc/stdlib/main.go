@@ -22,6 +22,7 @@ import (
 	"math"
 	"math/bits"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -65,12 +66,14 @@ func main() {
 	correrFmt()
 	correrStrconv()
 	correrStrings()
+	correrBytes()
 	correrErrores()
 	correrMath()
 	correrClase()
 	correrBits()
 	correrHash()
 	correrBinary()
+	correrSort()
 	correrPropiedades()
 	medirCostoFloat64()
 
@@ -115,12 +118,15 @@ func correrStrconv() {
 		check("strconv", "Quote", c.esperado, strconv.Quote(c.s))
 	}
 	for _, c := range casosFormatFloat {
-		check("strconv", "FormatFloat", c.esperado, strconv.FormatFloat(c.f, 'f', c.prec, 64))
+		check("strconv", "FormatFloat "+string([]byte{c.form}), c.esperado, strconv.FormatFloat(c.f, c.form, c.prec, 64))
 	}
 }
 
 func correrStrings() {
 	for _, c := range casosStr {
+		if len(c.fn) > 2 && c.fn[0] == 'b' && c.fn[1] == '.' {
+			continue // los casos de bytes los corre correrBytes
+		}
 		var tengo string
 		switch c.fn {
 		case "TrimSpace":
@@ -147,11 +153,194 @@ func correrStrings() {
 			tengo = strconv.Itoa(len(strings.Fields(c.a)))
 		case "Join":
 			tengo = strings.Join(strings.Split(c.a, "|"), "|")
+		case "Compare":
+			tengo = strconv.Itoa(strings.Compare(c.a, c.b))
+		case "IndexAny":
+			tengo = strconv.Itoa(strings.IndexAny(c.a, c.b))
+		case "LastIndexAny":
+			tengo = strconv.Itoa(strings.LastIndexAny(c.a, c.b))
+		case "Title":
+			tengo = strings.Title(c.a)
+		case "Cut":
+			antes, despues, hay := strings.Cut(c.a, c.b)
+			tengo = antes + "\x01" + despues
+			if hay {
+				tengo = tengo // el esperado lleva el 1 en n, no en el texto
+			}
 		default:
 			tengo = "funcion desconocida: " + c.fn
 		}
 		check("strings", c.fn, c.esperado, tengo)
 	}
+}
+
+// correrBytes: las mismas operaciones de busqueda sobre []byte (DC-002.5). El campo a es el texto y
+// se pasa a []byte; el resultado se compara como texto.
+func correrBytes() {
+	for _, c := range casosStr {
+		if len(c.fn) < 2 || c.fn[0] != 'b' || c.fn[1] != '.' {
+			continue
+		}
+		a := []byte(c.a)
+		b := []byte(c.b)
+		var tengo string
+		switch c.fn[2:] {
+		case "Contains":
+			tengo = strconv.FormatBool(bytes.Contains(a, b))
+		case "Equal":
+			tengo = strconv.FormatBool(bytes.Equal(a, b))
+		case "HasPrefix":
+			tengo = strconv.FormatBool(bytes.HasPrefix(a, b))
+		case "HasSuffix":
+			tengo = strconv.FormatBool(bytes.HasSuffix(a, b))
+		case "IndexByte":
+			tengo = strconv.Itoa(bytes.IndexByte(a, b[0]))
+		case "Index":
+			tengo = strconv.Itoa(bytes.Index(a, b))
+		case "LastIndex":
+			tengo = strconv.Itoa(bytes.LastIndex(a, b))
+		case "ReplaceAll":
+			tengo = string(bytes.ReplaceAll(a, b, []byte("-")))
+		case "TrimSpace":
+			tengo = string(bytes.TrimSpace(a))
+		case "ToUpper":
+			tengo = string(bytes.ToUpper(a))
+		case "ToLower":
+			tengo = string(bytes.ToLower(a))
+		case "Split":
+			var trozos []string
+			for _, t := range bytes.Split(a, b) {
+				trozos = append(trozos, string(t))
+			}
+			tengo = strings.Join(trozos, "|")
+		default:
+			tengo = "funcion desconocida: " + c.fn
+		}
+		check("bytes", c.fn, c.esperado, tengo)
+	}
+}
+
+// correrSort: el orden (DC-002.5). El contraste con Go es el siguiente:
+//   - casosOrden/casosInterfaz/casosBusca: claves DISTINTAS o listas ya ordenadas, donde el resultado
+//     es unico (Slice y Sort no son estables: con claves repetidas dos ordenes distintos valen).
+//   - casosEstable: claves REPETIDAS y la posicion original de cada una: es lo que tiene que dar
+//     SliceStable (ese SI es estable, y su resultado es unico).
+//
+// Ademas Slice se prueba con elementos de 12 bytes (una estructura) y con textos, para que el ancho
+// del elemento salga del descriptor del tipo y no de un supuesto (es lo que se midio en la sonda-h).
+func correrSort() {
+	for _, c := range casosOrden {
+		a := append([]int(nil), c.datos...)
+		sort.Ints(a)
+		check("sort", "Ints "+c.nombre, intsTexto(c.esperado), intsTexto(a))
+
+		// el mismo caso por las tres puertas: Slice, Sort (interfaz) y SliceStable
+		b := append([]int(nil), c.datos...)
+		sort.Slice(b, func(i, j int) bool { return b[i] < b[j] })
+		check("sort", "Slice "+c.nombre, intsTexto(c.esperado), intsTexto(b))
+
+		d := append([]int(nil), c.datos...)
+		sort.Sort(tipoLista(d))
+		check("sort", "Sort "+c.nombre, intsTexto(c.esperado), intsTexto(d))
+
+		e := append([]int(nil), c.datos...)
+		sort.SliceStable(e, func(i, j int) bool { return e[i] < e[j] })
+		check("sort", "SliceStable "+c.nombre, intsTexto(c.esperado), intsTexto(e))
+
+		// la lista ordenada tiene que dar IsSorted verdadero
+		check("sort", "IsSorted "+c.nombre, "true", strconv.FormatBool(sort.IntsAreSorted(a)))
+		if !sort.SliceIsSorted(a, func(i, j int) bool { return a[i] < a[j] }) {
+			check("sort", "SliceIsSorted "+c.nombre, "true", "false")
+		} else {
+			check("sort", "SliceIsSorted "+c.nombre, "true", "true")
+		}
+	}
+
+	// SliceStable con claves repetidas: el resultado es unico y tiene que dar EXACTO
+	for _, c := range casosEstable {
+		type par struct {
+			clave   int
+			orden   int
+			relleno [2]int
+		}
+		pares := make([]par, len(c.claves))
+		for i, k := range c.claves {
+			pares[i] = par{clave: k, orden: i}
+		}
+		sort.SliceStable(pares, func(i, j int) bool { return pares[i].clave < pares[j].clave })
+		orden := make([]int, len(pares))
+		for i, p := range pares {
+			orden[i] = p.orden
+		}
+		check("sort", "SliceStable "+c.nombre, intsTexto(c.esperado), intsTexto(orden))
+	}
+
+	// la busqueda binaria
+	for _, c := range casosBusca {
+		tengo := sort.SearchInts(c.ordenados, c.x)
+		check("sort", "SearchInts "+strconv.Itoa(c.x), strconv.Itoa(c.esperado), strconv.Itoa(tengo))
+	}
+
+	// un slice de estructuras de 12 bytes y uno de textos (el ancho del elemento cambia)
+	tipoPunto := []punto{{3, 1, 9}, {1, 2, 8}, {2, 3, 7}, {-1, 0, 6}, {3, 0, 5}}
+	sort.Slice(tipoPunto, func(i, j int) bool { return tipoPunto[i].id < tipoPunto[j].id })
+	tengo := ""
+	for i, p := range tipoPunto {
+		if i > 0 {
+			tengo += "|"
+		}
+		tengo += strconv.Itoa(int(p.id))
+	}
+	check("sort", "Slice []punto (12 bytes)", "5|6|7|8|9", tengo)
+
+	ss := []string{"pera", "manzana", "banana", "kiwi"}
+	sort.Slice(ss, func(i, j int) bool { return ss[i] < ss[j] })
+	check("sort", "Slice []string", "banana|kiwi|manzana|pera", strings.Join(ss, "|"))
+
+	// la interfaz de Go, con un tipo de la consola
+	fl := []float64{2.5, -1.5, 0, 1e10, -0.25}
+	sort.Sort(tipoFloat(fl))
+	check("sort", "Sort []float64 por interfaz", "-1.5|-0.25|0|2.5|1e+10", floatsTexto(fl))
+}
+
+// tipoLista y tipoFloat implementan sort.Interface (Len/Less/Swap).
+type tipoLista []int
+
+func (t tipoLista) Len() int           { return len(t) }
+func (t tipoLista) Less(i, j int) bool { return t[i] < t[j] }
+func (t tipoLista) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
+
+type tipoFloat []float64
+
+func (t tipoFloat) Len() int           { return len(t) }
+func (t tipoFloat) Less(i, j int) bool { return t[i] < t[j] }
+func (t tipoFloat) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
+
+type punto struct {
+	x, y int32
+	id   int32
+}
+
+func intsTexto(v []int) string {
+	var b []byte
+	for i, n := range v {
+		if i > 0 {
+			b = append(b, '|')
+		}
+		b = strconv.AppendInt(b, int64(n), 10)
+	}
+	return string(b)
+}
+
+func floatsTexto(v []float64) string {
+	var b []byte
+	for i, f := range v {
+		if i > 0 {
+			b = append(b, '|')
+		}
+		b = append(b, strconv.FormatFloat(f, 'g', -1, 64)...)
+	}
+	return string(b)
 }
 
 // ---- DC-002.4: math, math/bits, hash/fnv, encoding/hex, encoding/binary ----

@@ -1,0 +1,112 @@
+DC-002.5 - Ordenar y recorrer: sort sin reflect, bytes y strings completos
+==========================================================================
+
+Que se hizo
+-----------
+1. sort: Ints, Sort(Interface), Slice, SliceStable, SliceIsSorted, IsSorted, Search, SearchInts,
+   SearchFloat64s, SearchStrings, Float64s, Strings, Stable, Reverse. El motor lo usa en 86 archivos.
+2. bytes completo: Contains, Equal, Compare, Index, IndexByte, LastIndex, HasPrefix, HasSuffix,
+   IndexAny, ReplaceAll, TrimSpace, TrimCutset, Split, Join, ToUpper, ToLower (ademas del Buffer y el
+   Reader que ya estaban).
+3. strings: Compare, IndexAny, LastIndexAny, Title, Map (el resto ya estaba de DC-002.2).
+4. unicode/utf8: DecodeRune sobre bytes (para no copiar a string) y DecodeLastRuneInString.
+5. strconv: AppendInt, y los arreglos de FormatFloat que salieron de medir (abajo).
+
+EL PROBLEMA INTERESANTE: sort.Slice sin reflect
+-----------------------------------------------
+sort.Slice y sort.SliceStable en Go arman el intercambio con el paquete reflect. En la consola no hay
+reflect, y portarlo es inviable: MEDIDO, el paquete reflect de Go depende de 43 paquetes, 32 de ellos
+del runtime del compilador (internal/*), y el runtime de la consola no los tiene.
+
+La solucion es leer el descriptor de tipo del argumento con unsafe. Antes de escribir una linea se
+MIDIO el terreno con una sonda (console/dc/poc/sonda-h), y lo medido en la consola fue:
+
+  1. Un slice pasado a interface{} tiene como dato un puntero a su CABECERA {ptr, len, cap}: la sonda
+     lo comparo con &s[0], con len y con cap, y coincidio.
+  2. El descriptor del tipo del slice tiene el TAMANO DEL ELEMENTO en su campo 10 (offset 40 bytes).
+     Probado con 7 tipos distintos y con tamanos que NO son potencias de dos, para que no fuera una
+     coincidencia: []int 4, []int64 8, []struct{a,b int32} 8, []struct{a,b,c int32} 12,
+     []struct{a..e int32} 20, []struct{a int32} 4, []string 8. El tamano del slice mismo da 12
+     (tres palabras) siempre.
+  3. El intercambio de dos elementos de ancho desconocido se hace de a 4 bytes (medido con 4 y 32).
+
+Y despues aparecieron TRES obstaculos que la sonda no habia mostrado, todos medidos:
+
+  a. EL LAYOUT NO ES EL MISMO EN LOS DOS COMPILADORES. En gccgo (la consola) el campo TIENE el tamano
+     del elemento; en gc (el host, que es donde corre la prueba diferencial) ese mismo campo es un
+     PUNTERO al descriptor del elemento, y el tamano es el primer campo del apuntado. Ademas el
+     offset depende del ancho de palabra (40 en la consola, 48 en el host de 64 bits).
+     Solucion: el layout se DETECTA una vez al arrancar, midiendo: se toma un slice cuyo elemento mide
+     20 bytes (un tamano que no se confunde con ningun campo del descriptor: los que se repiten son 0,
+     1, 4, 8, 12, 16, 24 y los punteros) y se busca en que offset aparece ese 20, primero como valor y
+     despues como el MISMO puntero que tiene el descriptor de un valor suelto de ese tipo. Si no lo
+     reconoce, el paquete AVISA con un panic y no sigue: un sort que ordena con el ancho equivocado
+     corrompe memoria, que es mucho peor que un programa que no arranca.
+     (Un primer intento detectaba el puntero probando si el campo valia mas de 4096 y desreferenciando:
+     reventaba, porque el descriptor tiene campos que son enteros chicos, como el indice del nombre
+     del tipo, que midio 57997. Por eso la deteccion compara contra el descriptor del elemento, que se
+     consigue sin desreferenciar nada a ciegas.)
+  b. EL RUNTIME DE LA CONSOLA NO TIENE LOS DESCRIPTORES DEL TIPO unsafe.POINTER. Una clausura o un
+     campo con un unsafe.Pointer obliga al compilador a referenciar los simbolos `unsafe.Pointer..p` y
+     `..d`, y el link fallaba con "undefined reference to unsafe.Pointer..p". Solucion: donde antes
+     habia un unsafe.Pointer que se guardaba (la base del slice, los campos de la cabecera, el
+     parametro de la funcion de intercambio) ahora hay uintptr, y la conversion a puntero se hace solo
+     en el momento de leer o escribir memoria.
+  c. LA ESTABILIDAD. Slice y Sort de Go NO son estables: dos ordenes distintos son los dos validos, y
+     comparar contra Go seria mentir. Por eso el corpus usa claves DISTINTAS en los casos de Slice/Sort
+     (donde el resultado es unico) y claves REPETIDAS con la posicion original de cada elemento en los
+     de SliceStable (que si es estable y por lo tanto tiene un solo resultado posible).
+
+MEDIDO EN LA CONSOLA (Flycast)
+------------------------------
+  STD-TEST: casos 1850 bien 1850 mal 0
+  STD-TEST: RESULTADO OK - coincidio con la stdlib real en la consola
+
+  (eran 1515 en DC-002.4: los 335 nuevos son sort 138, bytes 132, strings nuevos 50 y los casos de
+  FormatFloat 'g' 75)
+
+Los casos de sort incluyen: listas vacias, de 1 y de 2; secuencias ya ordenadas y al reves; 9, 10 y
+200 elementos con claves distintas; listas de 6 a 60 claves repetidas para la estabilidad; un slice de
+estructuras de 12 bytes; uno de textos; y busqueda binaria con x menor, igual, mayor y ausente.
+
+LOS CINCO DEFECTOS QUE APARECIERON MIDIENDO
+--------------------------------------------
+Los dos primeros son obstaculos del port (arriba, a y b). Los otros tres son MIOS, en strconv, y los
+destapo el corpus de la consola (no la prueba del host, porque la forma 'g' no estaba cubierta):
+
+  1. FormatFloat con 'g' (la forma mas corta) pasaba a notacion cientifica con el umbral 21 en vez del
+     6 de Go: 1e10 salia "10000000000" donde Go escribe "1e+10". Es un hueco de la suite de DC-002.2
+     (fmt solo pedia "%g" y con eso alcanzaba para el motor).
+  2. La mantisa en notacion cientifica arrancaba con ceros de relleno: 1e-5 salia "0.00001e-05" en vez
+     de "1e-05" (faltaba arrancar en el primer digito significativo).
+  3. Los denormales no salian: 5e-324 daba "0.00000000000000000" (la forma fija con 17 decimales no
+     alcanza para el numero mas chico del float64).
+  Con los arreglos, la forma 'g' se cubre con 75 casos nuevos en el corpus de la consola y con
+  TestFormatFloatG en el host (que ademas prueba las formas f, e, E, g y G de punta a punta).
+
+  LIMITE DECLARADO (no oculto): la forma 'f' con pocos decimales sobre valores mas chicos que el
+  ultimo digito redondea mal: 1e-5 con 0 o 2 decimales da "1" y "0.01" donde Go da "0" y "0.00". El
+  motor no la usa y queda registrada en TestFormatFloatLimitesConocidos, que pide sacarla de la lista
+  si algun dia se arregla (si el limite ya no esta, el test falla).
+
+Verificacion del host
+---------------------
+  scripts/console/test-std-host.sh        ->  verde en amd64 y en 386 (los dos anchos de int)
+  scripts/console/mutar-std-host.sh       ->  15/15 cazados, con control sano verde en los dos anchos
+  los cuatro mutantes nuevos de este hito: el ancho del elemento no sale del descriptor del tipo, el
+  SliceStable que usa el quicksort (o sea NO estable), la forma 'g' con el umbral 21, y la mantisa
+  cientifica con ceros de relleno.
+
+BARRERA DEL HITO
+-----------------
+  scripts/console/compare-motor-dc6.sh  ->  IGUAL: 31 lineas identicas, 30 frames
+  (el POC del motor de DC-002.3 sigue dando lo mismo con la stdlib nueva: 16 -> 17 paquetes,
+  621 KB -> 674 KB de .gox)
+
+Lo que queda para otra tarjeta
+------------------------------
+- flag y encoding/csv (estaban en el alcance de esta tarjeta y se pasan a una propia: son paquetes de
+  formato, no de ordenar ni de recorrer).
+- bytes.ToUpper/ToLower y strings.Title/ToUpper/ToLower solo cambian ASCII: para los no-ASCII Go usa
+  las tablas de Unicode, que en la consola no estan (el corpus los prueba solo con ASCII y el limite
+  queda dicho en el codigo).

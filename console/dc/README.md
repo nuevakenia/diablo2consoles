@@ -636,3 +636,51 @@ orden de bytes de `encoding/binary`.
 tipo y devuelve un error explicito en vez de cualquier cosa (es la tarjeta DC-002.5); y de `math` no
 estan `Log2`/`Log10`/`Modf`/`Frexp`/`Cbrt`/`Asin`/`Tan` porque el motor no toca esos simbolos (se
 agregan si algun paquete del motor los pide).
+
+## 14. DC-002.5: ordenar y recorrer (sort sin reflect, bytes y strings completos)
+
+`sort` (86 archivos del motor), `bytes` y `strings` completos, mas `utf8.DecodeRune` sobre bytes y
+`strconv.AppendInt`. La biblioteca minima pasa de 16 a 17 paquetes (674 KB de `.gox`).
+
+**El problema interesante: `sort.Slice` sin `reflect`.** En Go, `Slice`/`SliceStable` arman su
+intercambio con `reflect`, y portarlo es inviable: medido, `reflect` de Go depende de 43 paquetes, 32
+de ellos del runtime del compilador, que la consola no tiene. La solucion es leer el descriptor de
+tipo del argumento con `unsafe`, y eso se MIDIO antes de escribirlo con una sonda
+(`console/dc/poc/sonda-h`): un slice pasado a `interface{}` tiene como dato un puntero a su cabecera
+`{ptr, len, cap}`, y el descriptor del tipo del slice tiene el TAMANO DEL ELEMENTO en su campo 10
+(offset 40), probado con 7 tipos incluidos tamanos que no son potencias de dos (4, 8, 12, 20).
+
+Tres cosas que la sonda no habia mostrado y que salieron en el camino:
+
+1. **El layout no es el mismo en los dos compiladores**: en gccgo el campo tiene el tamano del
+   elemento; en gc ese campo es un puntero al descriptor del elemento. Y el offset depende del ancho
+   de palabra (40 en la consola, 48 en el host de 64 bits). Solucion: el layout se detecta una vez al
+   arrancar, midiendo con un tipo de 20 bytes (un tamano que no se confunde con ningun campo del
+   descriptor: los que se repiten son 0, 1, 4, 8, 12, 16, 24 y los punteros). Si no lo reconoce,
+   `panic` en vez de ordenar con el ancho equivocado (que corromperia memoria).
+2. **El runtime de la consola no tiene los descriptores del tipo `unsafe.Pointer`**: una clausura o un
+   campo con un `unsafe.Pointer` obliga a referenciar los simbolos `unsafe.Pointer..p`/`..d` y el link
+   falla. Por eso la base del slice, los campos de la cabecera y los parametros de la funcion de
+   intercambio son `uintptr`, y la conversion a puntero se hace solo al leer o escribir memoria.
+3. **La estabilidad**: `Slice` y `Sort` de Go no son estables (dos ordenes distintos son validos), asi
+   que el corpus usa claves distintas en esos casos y claves repetidas con la posicion original de
+   cada elemento en los de `SliceStable`.
+
+Medido en la consola: **1850 casos, 1850 bien, 0 mal** (eran 1515). El host sigue verde en amd64 y
+386 y el mutador queda en **15/15** con control sano.
+
+**Los tres defectos de `strconv` que destapo el corpus** (la forma `%g` no estaba cubierta: hueco de
+la suite de DC-002.2):
+
+1. `'g'` (la forma mas corta) pasaba a notacion cientifica con el umbral 21 en vez del 6 de Go: 1e10
+   salia `10000000000` donde Go escribe `1e+10`.
+2. La mantisa en notacion cientifica arrancaba con ceros de relleno: 1e-5 daba `0.00001e-05`.
+3. Los denormales no salian: 5e-324 daba `0.00000000000000000`.
+
+**Limite declarado**: la forma `'f'` con pocos decimales sobre valores mas chicos que el ultimo digito
+redondea mal (1e-5 con 0 o 2 decimales da `1` y `0.01` donde Go da `0` y `0.00`). El motor no la usa y
+queda registrado en `TestFormatFloatLimitesConocidos` (que falla si algun dia se arregla, para que no
+quede una lista muerta).
+
+Detalle completo en `console/dc/evidencia/dc-002.5-sort-bytes-strings.txt`. `flag` y `encoding/csv`
+pasan a una tarjeta propia (son paquetes de formato, no de ordenar ni de recorrer).

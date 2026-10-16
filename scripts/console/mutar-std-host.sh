@@ -214,6 +214,36 @@ mutacion "encoding/binary: Uint32 leido como big endian" \
     '	return uint32(b[3]) | uint32(b[2])<<8 | uint32(b[1])<<16 | uint32(b[0])<<24' \
     386
 
+
+echo "== 12. sort: el ancho del elemento sale del descriptor del tipo =="
+mutacion "sort: no se usa el descriptor del elemento" \
+    "sort/sort.go" \
+    '	if elemPtr {' \
+    '	if false {' \
+    amd64
+
+echo "== 13. sort: SliceStable tiene que ser estable =="
+mutacion "sort: SliceStable usa el quicksort" \
+    "sort/sort.go" \
+    '	stable(n, less, swapDe(base, ancho))' \
+    '	quickSort(0, n, less, swapDe(base, ancho), pdqDepth(n))' \
+    amd64
+
+echo "== 14. strconv: la forma g pasa a cientifica con el umbral de Go (6, no 21) =="
+mutacion "strconv: FormatFloat g con umbral 21" \
+    "strconv/strconv.go" \
+    '			return shortest(f, 6, upper)' \
+    '			return shortest(f, 21, upper)' \
+    amd64
+
+echo "== 15. strconv: la mantisa cientifica arranca en el primer digito significativo =="
+mutacion "strconv: mantisa con ceros de relleno (0.00001e-05)" \
+    "strconv/strconv.go" \
+    '	digits = strings.TrimLeft(digits, "0") // los ceros delanteros no son digitos significativos
+' \
+    '' \
+    amd64
+
 echo
 echo "== $cazados/$contador chequeos cazados =="
 if [ "$rc" -eq 0 ]; then

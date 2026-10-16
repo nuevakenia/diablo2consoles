@@ -28,8 +28,8 @@ package math
 
 // Constantes (las que el motor toca: MaxFloat64, MaxInt32, MaxInt64, MaxUint16, Pi, Sqrt2).
 const (
-	Pi         = 3.14159265358979323846264338327950288419716939937510582097494459
-	Sqrt2      = 1.41421356237309504880168872420969807856967187537694807317667974
+	Pi    = 3.14159265358979323846264338327950288419716939937510582097494459
+	Sqrt2 = 1.41421356237309504880168872420969807856967187537694807317667974
 	// MaxFloat64 va en hexadecimal a proposito: Go compara las constantes de punto flotante de
 	// forma EXACTA (no redondeada), asi que el literal decimal 1.7976931348623157e308 no es igual a
 	// esta constante aunque al pasar a float64 tenga los mismos bits (medido: mismo %x, == false).

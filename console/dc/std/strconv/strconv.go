@@ -6,8 +6,8 @@
 // Los flotantes van con la cuenta hecha en enteros, para que el redondeo sea el correcto y no el
 // que sale de multiplicar floats:
 //
-//  f = m * 2^e  (m < 2^53, exacto)
-//  f * 10^p = m * 5^p * 2^(e+p)   ->  entero exacto mientras no desborde uint64
+//	f = m * 2^e  (m < 2^53, exacto)
+//	f * 10^p = m * 5^p * 2^(e+p)   ->  entero exacto mientras no desborde uint64
 //
 // Eso da el mismo resultado que Go para precisiones 0..4 en el rango que usa el motor
 // (porcentajes y multiplicadores: %.0f, %.1f, %.2f, %.3f). FUERA de ese rango (precisones
@@ -343,17 +343,23 @@ func FormatFloat(f float64, fmt byte, prec, bitSize int) string {
 	switch fmt {
 	case 'f', 'F':
 		if prec < 0 {
-			return shortest(f, false)
+			// 'f' es siempre notacion fija (umbral negativo = nunca pasa a cientifica)
+			return shortest(f, -1, false)
 		}
 		return formatFScaled(f, prec)
 	case 'e', 'E':
 		if prec < 0 {
-			prec = 6
+			// Go con 'e' y la precision mas corta NO usa 6 decimales: da la forma mas corta en
+			// notacion cientifica (1.5e+00, no 1.500000e+00). Medido en el host.
+			return shortestCientifica(f, upper)
 		}
 		return formatE(f, prec, upper)
 	case 'g', 'G':
 		if prec < 0 {
-			return shortest(f, upper)
+			// 'g' con la precision mas corta: Go pasa a notacion cientifica cuando el exponente es
+			// menor que -4 o MAYOR O IGUAL QUE 6 (no 21: ese umbral es de otro camino). Medido: el
+			// caso 1e10 lo destapo en la consola (escribia 10000000000 donde Go escribe 1e+10).
+			return shortest(f, 6, upper)
 		}
 		if prec == 0 {
 			prec = 1
@@ -521,7 +527,7 @@ func bigApprox(f float64, prec int) string {
 }
 
 // shortest busca la representacion mas corta que se lea de vuelta igual (lo de Go con prec -1).
-func shortest(f float64, upper bool) string {
+func shortest(f float64, umbralCientifica int, upper bool) string {
 	if f == 0 {
 		if float64bits(f)>>63 == 1 {
 			return "-0"
@@ -531,14 +537,22 @@ func shortest(f float64, upper bool) string {
 	for p := 0; p <= 17; p++ {
 		s := formatFScaled(f, p)
 		if v, err := ParseFloat(s, 64); err == nil && v == f {
-			return canonical(f, s, upper)
+			return canonical(f, s, umbralCientifica, upper)
+		}
+	}
+	// Los denormales (el mas chico es 5e-324) no se pueden escribir en notacion fija con 17
+	// decimales: ahi va la cientifica, con los digitos justos (medido: 5e-324 salia 0.00000000000000000).
+	for p := 0; p <= 16; p++ {
+		s := formatE(f, p, upper)
+		if v, err := ParseFloat(s, 64); err == nil && v == f {
+			return limpiarExponente(s)
 		}
 	}
 	return formatFScaled(f, 17)
 }
 
 // canonical decide la notacion como Go (fija para exponentes chicos, cientifica para el resto).
-func canonical(f float64, s string, upper bool) string {
+func canonical(f float64, s string, umbralCientifica int, upper bool) string {
 	neg := false
 	t := s
 	if len(t) > 0 && t[0] == '-' {
@@ -572,7 +586,7 @@ func canonical(f float64, s string, upper bool) string {
 		}
 		exp = e - 1
 	}
-	if exp >= -4 && exp < 21 {
+	if umbralCientifica < 0 || (exp >= -4 && exp < umbralCientifica) {
 		return s
 	}
 	// notacion cientifica: primer digito, punto, el resto sin ceros de cola
@@ -581,6 +595,7 @@ func canonical(f float64, s string, upper bool) string {
 		b.WriteByte('-')
 	}
 	digits := strings.ReplaceAll(t, ".", "")
+	digits = strings.TrimLeft(digits, "0") // los ceros delanteros no son digitos significativos
 	digits = strings.TrimRight(digits, "0")
 	if len(digits) == 0 {
 		return s
@@ -675,14 +690,75 @@ func expSuffix(e int, upper bool) string {
 	return string(c) + s + es
 }
 
-// formatG: la mas corta de 'f' y 'e'.
+// formatG es 'g' con precision explicita: prec digitos significativos, con la notacion de Go (pasa a
+// cientifica si el exponente es menor que -4 o mayor o igual que prec).
+//
+// Antes esta funcion ignoraba la precision (devolvia la forma mas corta): el corpus no la cubria
+// porque fmt solo pide "%g" sin precision. Es un defecto declarado y ahora cubierto por el corpus.
 func formatG(f float64, prec int, upper bool) string {
+	if prec <= 0 {
+		prec = 1
+	}
 	if f == 0 {
 		return "0"
 	}
-	a := shortest(f, upper)
-	_ = prec
-	return a
+	// el exponente decimal del primer digito significativo: lo da la forma 'e' con prec-1 decimales
+	e := formatE(f, prec-1, upper)
+	i := strings.IndexByte(e, 'e')
+	if i < 0 {
+		i = strings.IndexByte(e, 'E')
+	}
+	if i < 0 {
+		return e
+	}
+	exp, _ := ParseInt(e[i+1:], 10, 64)
+	if exp < -4 || exp >= int64(prec) {
+		// cientifica: la mantisa sin los ceros de cola
+		return quitarCerosDeCola(e[:i]) + e[i:]
+	}
+	// fija: con los decimales justos para tener prec digitos significativos
+	return quitarCerosDeCola(formatFScaled(f, prec-1-int(exp)))
+}
+
+// shortestCientifica devuelve la forma cientifica mas corta que represente f exactamente (los mismos
+// digitos que la forma corta, pero en notacion cientifica).
+func shortestCientifica(f float64, upper bool) string {
+	if f == 0 {
+		return formatE(f, 0, upper)
+	}
+	for p := 0; p <= 17; p++ {
+		s := formatE(f, p, upper)
+		if v, err := ParseFloat(s, 64); err == nil && v == f {
+			return limpiarExponente(s)
+		}
+	}
+	return formatE(f, 17, upper)
+}
+
+// limpiarExponente saca los ceros de cola de la mantisa de una forma ya cientifica ("5.000e-324" ->
+// "5e-324").
+func limpiarExponente(s string) string {
+	i := strings.IndexByte(s, 'e')
+	if i < 0 {
+		i = strings.IndexByte(s, 'E')
+	}
+	if i < 0 {
+		return s
+	}
+	return quitarCerosDeCola(s[:i]) + s[i:]
+}
+
+// quitarCerosDeCola saca los ceros que no agregan nada ("1.50" -> "1.5", "2.0" -> "2").
+func quitarCerosDeCola(s string) string {
+	if strings.IndexByte(s, '.') < 0 {
+		return s
+	}
+	t := strings.TrimRight(s, "0")
+	t = strings.TrimSuffix(t, ".")
+	if t == "" || t == "-" {
+		return "0"
+	}
+	return t
 }
 
 // ---- flotantes: lectura ----
@@ -846,6 +922,11 @@ func IsPrint(r rune) bool {
 }
 
 // Quote pone comillas y escapa como Go.
+// AppendInt agrega el entero en base 10 al final de dst (evita armar un string por numero).
+func AppendInt(dst []byte, i int64, base int) []byte {
+	return append(dst, FormatInt(i, base)...)
+}
+
 func Quote(s string) string { return quoteWith(s, false) }
 
 // QuoteToASCII es como Quote pero con salida solo ASCII (lo que pide la bandera + de %q en Go).
@@ -973,4 +1054,3 @@ func hex4(v uint16) string {
 func hex8(v uint32) string {
 	return hex4(uint16(v>>16)) + hex4(uint16(v))
 }
-

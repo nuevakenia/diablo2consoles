@@ -163,13 +163,13 @@ func Seed(seed int64) {
 }
 
 // Int63, Int, Int31, Uint32, Intn, Float64, Perm y Shuffle usan la fuente global.
-func Int63() int64        { return global.Int63() }
-func Int() int            { return global.Int() }
-func Int31() int32        { return global.Int31() }
-func Uint32() uint32      { return global.Uint32() }
-func Uint64() uint64      { return global.Uint64() }
-func Intn(n int) int      { return global.Intn(n) }
-func Int63n(n int64) int64 { return global.Int63n(n) }
-func Float64() float64    { return global.Float64() }
-func Perm(n int) []int    { return global.Perm(n) }
+func Int63() int64                       { return global.Int63() }
+func Int() int                           { return global.Int() }
+func Int31() int32                       { return global.Int31() }
+func Uint32() uint32                     { return global.Uint32() }
+func Uint64() uint64                     { return global.Uint64() }
+func Intn(n int) int                     { return global.Intn(n) }
+func Int63n(n int64) int64               { return global.Int63n(n) }
+func Float64() float64                   { return global.Float64() }
+func Perm(n int) []int                   { return global.Perm(n) }
 func Shuffle(n int, swap func(i, j int)) { global.Shuffle(n, swap) }
