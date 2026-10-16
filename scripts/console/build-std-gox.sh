@@ -82,5 +82,7 @@ echo "== los paquetes de terceros reescritos para la consola =="
 compilar_tercero "github.com/hajimehoshi/ebiten/v2" "$HERE/../../console/dc/engine/ebiten/v2/ebiten.go"
 # inpututil: la parte de input (teclas y textos). Va despues de ebiten, que es de quien depende.
 compilar_tercero "github.com/hajimehoshi/ebiten/v2/inpututil" "$HERE/../../console/dc/engine/ebiten/v2/inpututil/inpututil.go"
+# akara: el BitSet (d2records/monster_unique_affix_*). Medido: es lo unico que se usa de esa libreria.
+compilar_tercero "github.com/gravestench/akara" "$HERE/../../console/dc/engine/akara/akara/akara.go"
 # x/image/bmp: el BMP con los glifos de la fuente del juego (d2util/assets)
 compilar_tercero "golang.org/x/image/bmp" "$HERE/../../console/dc/engine/x/image/bmp/bmp.go"

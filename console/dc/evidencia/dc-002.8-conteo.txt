@@ -153,7 +153,7 @@ d2thread 1
 d2app: /home/dgalli/Proyectos/diablo2consoles/d2app/app.go:7:22: error: import file ‘encoding/json’ not found
 d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:16: error: import file ‘os/exec’ not found
 d2common/d2act3: /home/dgalli/Proyectos/diablo2consoles/d2common/d2act3/act3.go:18:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
-d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/window_frame.go:6:19: error: import file ‘image/draw’ not found
+d2common/d2display: /home/dgalli/Proyectos/diablo2consoles/d2common/d2display/window_frame.go:20:45: error: reference to undefined identifier ‘image.Uniform’
 d2common/d2fileformats/d2pl2: /home/dgalli/Proyectos/diablo2consoles/d2common/d2fileformats/d2pl2/pl2.go:6:40: error: import file ‘github.com/go-restruct/restruct’ not found
 d2common/d2quest: /home/dgalli/Proyectos/diablo2consoles/d2common/d2quest/speech.go:4:9: error: import file ‘embed’ not found
 d2common/d2replay: /home/dgalli/Proyectos/diablo2consoles/d2common/d2replay/replay.go:5:22: error: import file ‘encoding/json’ not found
@@ -180,7 +180,7 @@ d2core/d2map/d2mapstamp: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2m
 d2core/d2map/d2objspawn: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2objspawn/spawn.go:13:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2records’ not foun
 d2core/d2monsters: /home/dgalli/Proyectos/diablo2consoles/d2core/d2monsters/afraid.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ not fo
 d2core/d2playertrade: /home/dgalli/Proyectos/diablo2consoles/d2core/d2playertrade/pending.go:3:56: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero’ not found
-d2core/d2records: /home/dgalli/Proyectos/diablo2consoles/d2core/d2records/monster_unique_affix_loader.go:6:37: error: import file ‘github.com/gravestench/akara’ not found
+d2core/d2records: /home/dgalli/Proyectos/diablo2consoles/d2core/d2records/monster_unique_affix_loader.go:95:53: error: argument 1 has incompatible type (cannot use type int as ty
 d2core/d2render/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2render/ebiten/ebiten_panic_screen.go:5:52: error: import file ‘github.com/hajimehoshi/ebiten/v2/ebitenutil’ not 
 d2core/d2screen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2screen/d2screen.go:4:62: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2display’ not found
 d2core/d2skills: /home/dgalli/Proyectos/diablo2consoles/d2core/d2skills/autoform.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ not fo
