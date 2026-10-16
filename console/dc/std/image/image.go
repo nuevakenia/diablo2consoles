@@ -212,3 +212,15 @@ func ToRGBA(src Image) *RGBA {
 
 // IndicesDePaletted devuelve los indices crudos, que es lo que se sube al PVR como textura.
 func IndicesDePaletted(p *Paletted) []byte { return p.Pix }
+
+// Rect devuelve el rectangulo que va de (x0,y0) a (x1,y1), con los minimos y maximos bien puestos
+// (igual que go). El motor lo usa en muchos lugares, y ebiten.Bounds tambien.
+func Rect(x0, y0, x1, y1 int) Rectangle {
+	if x0 > x1 {
+		x0, x1 = x1, x0
+	}
+	if y0 > y1 {
+		y0, y1 = y1, y0
+	}
+	return Rectangle{Min: Point{X: x0, Y: y0}, Max: Point{X: x1, Y: y1}}
+}

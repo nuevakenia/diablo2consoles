@@ -31,7 +31,7 @@ GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 # "cannot use type []os.FileInfo as type []fs.FileInfo". El arreglo es alinear io/fs como dueno y que os
 # reusa por alias (~150 lineas); se midio que a mitad de camino el motor baja a 40 de 142 porque os deja
 # de compilar. Va como paso propio, no como parche. Ver evidencia dc-002.8-motor-por-capas.txt.
-ORDEN="${ORDEN:-unicode unicode/utf8 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv encoding/binary encoding/hex compress/zlib container/ring sort container/heap image/color image time io/fs os log bufio encoding/csv io/ioutil path/filepath runtime sync/atomic sync}"
+ORDEN="${ORDEN:-unicode unicode/utf8 unicode/utf16 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv encoding/binary encoding/hex compress/zlib compress/gzip container/ring sort container/heap image/color image time io/fs os log bufio encoding/csv io/ioutil path/filepath runtime sync/atomic sync}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2
@@ -56,3 +56,29 @@ for pkg in $ORDEN; do
 done
 
 echo "stdlib minima compilada para SH-4 en $GEN"
+
+# ============================================================================
+# Los paquetes de TERCEROS que el motor importa y que se reescribieron para la consola. No son stdlib,
+# pero van al mismo directorio de .gox porque para gccgo da lo mismo: son paquetes con su ruta.
+#
+# Va aca (y no en un script aparte) para que cualquier build que arme la stdlib los tenga: si faltan,
+# el motor se cae en d2util y en los paquetes que lo usan, y el error se ve lejos de la causa.
+# ============================================================================
+compilar_tercero() {
+    local pkgpath="$1" archivo="$2"
+    local salida="$DC_ROOT/gox/${pkgpath}.gox"
+    mkdir -p "$(dirname "$salida")"
+    if sh-elf-gccgo $GODC_GOFLAGS -I "$DC_ROOT/gox" -fgo-pkgpath="$pkgpath" -c "$archivo" -o "$salida" 2>"$salida.log"; then
+        echo "  ${pkgpath##*/}.gox  $(stat -c%s "$salida") bytes"
+        rm -f "$salida.log"
+    else
+        echo "  ERROR en $pkgpath:"
+        head -4 "$salida.log"
+    fi
+}
+
+echo "== los paquetes de terceros reescritos para la consola =="
+# ebiten: el esqueleto del backend grafico/input/audio (d2core/d2render, d2input, d2audio y d2util)
+compilar_tercero "github.com/hajimehoshi/ebiten/v2" "$HERE/../../console/dc/engine/ebiten/v2/ebiten.go"
+# x/image/bmp: el BMP con los glifos de la fuente del juego (d2util/assets)
+compilar_tercero "golang.org/x/image/bmp" "$HERE/../../console/dc/engine/x/image/bmp/bmp.go"
