@@ -14,6 +14,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -38,6 +39,16 @@ func relleno4(n int) string {
 		s = "0" + s
 	}
 	return s
+}
+
+// primero y segundo: las dos partes de Split (que devuelve dos valores).
+func primero(a, b string) string  { return a }
+func segundo(a, b string) string  { return b }
+
+// absDe: Abs sin el error (en la consola no hay directorio actual: ver el paquete).
+func absDe(p string) string {
+	r, _ := filepath.Abs(p)
+	return r
 }
 
 // tamanos: la lista de tamanos que trae el manifiesto, en orden.
@@ -179,6 +190,30 @@ func main() {
 		check("IsNotExist(ReadDir de algo que no esta)", "true", strconv.FormatBool(os.IsNotExist(err3)))
 	} else {
 		check("ReadDir de algo que no esta", "error", strconv.Itoa(len(e3))+" entradas")
+	}
+
+	// 4e. path/filepath compilado para SH-4: los mismos casos que la prueba diferencial del host
+	// (difftest/dc0026b_test.go), con el resultado que da el filepath de Go.
+	pares := []struct{ nombre, esperado, tengo string }{
+		{"Join(/rd, hola.txt)", "/rd/hola.txt", filepath.Join("/rd", "hola.txt")},
+		{"Join(a,..,b)", "b", filepath.Join("a", "..", "b")},
+		{"Join de vacios", "", filepath.Join("", "")},
+		{"Clean(a/b/../c)", "a/c", filepath.Clean("a/b/../c")},
+		{"Clean(/../a)", "/a", filepath.Clean("/../a")},
+		{"Clean(//a//b//)", "/a/b", filepath.Clean("//a//b//")},
+		{"Dir(/a/b/)", "/a/b", filepath.Dir("/a/b/")},
+		{"Dir(a)", ".", filepath.Dir("a")},
+		{"Base(/a/b.txt)", "b.txt", filepath.Base("/a/b.txt")},
+		{"Ext(a.txt)", ".txt", filepath.Ext("a.txt")},
+		{"Ext(.bashrc)", ".bashrc", filepath.Ext(".bashrc")},
+		{"Split(a/b/) dir", "a/b/", primero(filepath.Split("a/b/"))},
+		{"Split(a/b/) arch", "", segundo(filepath.Split("a/b/"))},
+		{"IsAbs(/rd)", "true", strconv.FormatBool(filepath.IsAbs("/rd"))},
+		{"IsAbs(rd/x)", "false", strconv.FormatBool(filepath.IsAbs("rd/x"))},
+		{"Abs(a/b)", "/a/b", absDe("a/b")},
+	}
+	for _, c := range pares {
+		check("filepath "+c.nombre, c.esperado, c.tengo)
 	}
 
 	// 5. Existe, Getenv y Args

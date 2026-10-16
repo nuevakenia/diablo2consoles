@@ -57,14 +57,23 @@ mutacion() { # <nombre> <archivo> <buscar> <poner> <goarch>
         rc=1
         return
     fi
-    if (cd "$STD" && GOARCH="$arch_go" go test ./difftest/ >"$TMP/salida" 2>&1); then
-        echo "   LA SUITE NO LO CAZO: paso igual con el mutante puesto"
-        rc=1
-    else
+    (cd "$STD" && GOARCH="$arch_go" go test ./difftest/ >"$TMP/salida" 2>&1)
+    # ROJO es que un test falle (--- FAIL), pero tambien lo es que el proceso se caiga: el mutante del
+    # ancho del elemento de sort lee memoria con el ancho equivocado y revienta con SIGSEGV, sin llegar
+    # a imprimir "--- FAIL". Las dos cosas son la suite cazando el defecto (medido: 0x3b47b99ec570).
+    if grep -qE -- "--- FAIL|^fatal error|SIGSEGV|^panic:" "$TMP/salida"; then
         echo "   cazado: la suite se puso rojo con el aserto:"
         grep -m1 -- "--- FAIL" "$TMP/salida" | sed 's/^/     /'
         grep -m1 -A1 -- "difftest_test.go:" "$TMP/salida" | tail -1 | cut -c1-150 | sed 's/^/     /'
         cazados=$((cazados + 1))
+    elif grep -qE "build failed|cannot|undefined|syntax error" "$TMP/salida"; then
+        # No es un mutante: es codigo que no compila. No prueba nada sobre la suite y ensucia el conteo.
+        echo "   LA MUTACION NO COMPILA (no prueba nada de la suite):"
+        grep -m1 -E "build failed|cannot|undefined|syntax error" "$TMP/salida" | cut -c1-150 | sed 's/^/     /'
+        rc=1
+    else
+        echo "   LA SUITE NO LO CAZO: paso igual con el mutante puesto (compilando)"
+        rc=1
     fi
     restaurar "$arch" || rc=1
     echo
@@ -242,6 +251,41 @@ mutacion "strconv: mantisa con ceros de relleno (0.00001e-05)" \
     '	digits = strings.TrimLeft(digits, "0") // los ceros delanteros no son digitos significativos
 ' \
     '' \
+    amd64
+
+echo "== 16. filepath: Dir corta en la ULTIMA barra y deja que Clean saque las del final =="
+# Este fue un defecto REAL, cazado por la prueba diferencial: yo sacaba las barras del final ANTES de
+# cortar, y entonces Dir("/a/b/") daba "a" en vez de "a/b", y Dir("/") daba "." en vez de "/".
+#
+# OJO con los patrones: van entre $'...' y NO entre '...'. Con comillas simples, un patron que lleva una
+# barra entre comillas (path[i] != '/') cierra el string de bash y llega roto a python: el mutante no se
+# aplica o el codigo mutado no compila, y "caza" por la razon equivocada.
+mutacion "filepath: Dir borra las barras finales antes de cortar" \
+    "path/filepath/filepath.go" \
+    $'i := len(path) - 1\n\tfor i >= 0 && path[i] != \'/\' {\n\t\ti--\n\t}\n\treturn Clean(path[:i+1])' \
+    $'i := len(path)\n\tfor i > 0 && path[i-1] == \'/\' {\n\t\ti--\n\t}\n\tfor i > 0 && path[i-1] != \'/\' {\n\t\ti--\n\t}\n\treturn Clean(path[:i])' \
+    amd64
+
+echo "== 17. filepath: Split NO limpia (corta en la ultima barra y devuelve el resto tal cual) =="
+# El otro defecto real: Split("a/b/") tiene que dar ("a/b/", ""), no ("a/", "b/").
+mutacion "filepath: Split limpia las barras del final" \
+    "path/filepath/filepath.go" \
+    $'return path[:i+1], path[i+1:]' \
+    $'for i > 0 && path[i-1] == \'/\' {\n\t\ti--\n\t}\n\treturn path[:i+1], path[i+1:]' \
+    amd64
+
+echo "== 18. filepath: Clean resuelve los .. =="
+mutacion "filepath: Clean no resuelve los .." \
+    "path/filepath/filepath.go" \
+    $'\t\tif el == ".." {' \
+    $'\t\tif el == ".." && false {' \
+    amd64
+
+echo "== 19. filepath: Join ignora los elementos vacios =="
+mutacion "filepath: Join no ignora los vacios" \
+    "path/filepath/filepath.go" \
+    $'\t\tif e != "" {\n\t\t\tpartes = append(partes, e)\n\t\t}' \
+    $'\t\tpartes = append(partes, e)' \
     amd64
 
 echo

@@ -739,3 +739,35 @@ frames.
 
 **Alcance:** esta tarjeta hizo `os` y el VFS. `time`, `path/filepath`, `bufio` y `log` son de formato y
 de reloj, no del sistema de archivos, y pasan a la tarjeta dc-002.6b (recorte declarado).
+
+## 16. DC-002.6b: path/filepath (los paths del motor)
+
+`Join` 317 veces, `Base` 26, `Clean` 21, `Dir` 16, `Ext` 12: el paquete de paths es el mas usado de la
+stdlib minima despues de `fmt` y `strings`. Es PURO TEXTO, asi que se puede probar de la manera mas
+fuerte: comparando contra el `path/filepath` de Go, caso por caso, en el host. Evidencia completa:
+`evidencia/dc-002.6b-filepath.txt`.
+
+    Host:    prueba diferencial verde en amd64 y en 386
+    Consola: VFS: casos 34 bien 34 mal 0   (18 del sistema de archivos + 16 de filepath)
+    Mutador: 19/19 cazados, control sano
+
+**Dos defectos mios que cazo la prueba diferencial:** `Dir` y `Split` sacaban las barras del final
+antes de cortar, y Go corta en la ULTIMA barra (y `Split` no limpia nada). Medido: `Dir("/a/b/")` daba
+`"a"` donde Go da `"a/b"`; `Split("a/b/")` daba `("a/", "b/")` donde Go da `("a/b/", "")`. Los dos
+estan ahora en el mutador (16 y 17).
+
+**Lo que queda afuera:** `Glob` (13) y `Walk` (2) necesitan listar directorios (o sea el paquete `os`),
+y si este archivo importara `os` el paquete entero dejaria de poder probarse en el host; van con el
+bucket de datos (DC-002.9). Tampoco estan `EvalSymlinks`, `Rel`, `VolumeName` ni `Match`: en la consola
+no hay enlaces, ni directorio actual, ni volumenes.
+
+**Dos cosas del mutador que valen solas:** (1) ahora "cazado" exige que la suite se ponga ROJA de
+verdad — un `--- FAIL` o que el proceso se caiga (SIGSEGV/panic) — porque antes bastaba con que
+`go test` saliera distinto de cero y eso daba por buenos mutantes que solo rompian la compilacion; (2)
+al endurecerlo se vio que el mutante del ancho del elemento de `sort` SI se caza, pero reventando con
+SIGSEGV en vez de fallar un test. Las dos formas de rojo son validas y quedaron aceptadas en el script.
+Los patrones de los mutantes que llevan barras entre comillas van entre `$'...'` (con `'...'` el string
+de bash se cierra y el mutante llega roto a python).
+
+**Alcance:** esta tarjeta hizo `path/filepath`. `time`, `bufio` y `log` pasan a dc-002.6c (recorte
+declarado).

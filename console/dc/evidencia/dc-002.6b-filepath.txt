@@ -1,0 +1,65 @@
+DC-002.6b - path/filepath EN LA CONSOLA (puro texto, probado contra el Go del host)
+===============================================================================
+
+QUE SE MIDIO
+------------
+  Host (prueba diferencial contra path/filepath de Go, en los DOS anchos de int):
+      == prueba diferencial con GOARCH=amd64 ==  ok d2std/difftest
+      == prueba diferencial con GOARCH=386   ==  ok d2std/difftest
+      == los dos anchos: verde ==
+
+  Consola (Flycast, consola serie, el MISMO codigo compilado para SH-4):
+      VFS: casos 34 bien 34 mal 0
+      VFS: RESULTADO OK - el sistema de archivos de la consola existe y lee
+      (34 = los 18 del sistema de archivos + 16 de filepath)
+
+  Mutadores del host (mutar-std-host.sh): 19/19 cazados, control sano.
+
+POR QUE ESTE PAQUETE ES EL MAS BARATO DE TODOS
+---------------------------------------------
+Es PURO TEXTO: no toca el sistema de archivos ni depende de la plataforma. Eso permite la prueba mas
+fuerte que hay: comparar cada funcion contra la de Go, caso por caso, en el host. El motor lo usa mucho
+(medido): Join 317, Base 26, Clean 21, Dir 16, Glob 13, Ext 12, Walk 2, SplitList 2, Abs 1.
+
+En la consola el separador es "/" y no hay volumenes ("C:") ni "\\", asi que el codigo es mas corto que
+el de Go; pero el RESULTADO tiene que ser identico, y es lo que se mide.
+
+DOS DEFECTOS MIOS QUE CAZO LA PRUEBA DIFERENCIAL (los dos en el mismo rato)
+--------------------------------------------------------------------------
+1. Dir. Yo sacaba las barras del final ANTES de cortar, y Go corta en la ULTIMA barra y deja que Clean
+   saque las del final. Diferencia medida: Dir("/a/b/") daba "a" donde Go da "a/b"; Dir("/") daba "."
+   donde Go da "/"; Dir("//a//b//") daba "/a" donde Go da "/a/b".
+2. Split. Yo hacia lo mismo (sacaba las barras del final) y Split NO limpia NADA: corta y devuelve el
+   resto tal cual. Diferencia medida: Split("a/b/") daba ("a/", "b/") donde Go da ("a/b/", ""), y
+   Split("/") daba ("", "/") donde Go da ("/", "").
+
+Los dos estan ahora en el mutador (mutantes 16 y 17) para que no vuelvan.
+
+LO QUE QUEDA AFUERA, DICHO DE FRENTE
+------------------------------------
+Glob (13 llamadas) y Walk (2) NO estan: necesitan LISTAR directorios, o sea el paquete os, y si este
+archivo importara os el paquete entero dejaria de poder probarse en el host (que es donde esta la
+prueba fuerte). Van con el bucket de datos (DC-002.9), que es donde el motor los usa. Tampoco estan
+EvalSymlinks, Rel, VolumeName ni Match: en la consola no hay enlaces, ni directorio actual (no hay
+procesos), ni volumenes.
+
+Abs: en la consola no hay directorio actual, asi que un camino relativo se resuelve contra la raiz del
+romdisk ("/rd" es el "home"). El test del host solo exige lo que vale en los dos lados: que el
+resultado sea absoluto y este limpio.
+
+DOS COSAS DEL MUTADOR QUE VALEN POR SI SOLAS
+--------------------------------------------
+1. El criterio de "cazado" ahora exige que la suite se ponga ROJA DE VERDAD: que un test falle
+   ("--- FAIL") o que el proceso se caiga ("fatal error" / SIGSEGV / panic). Antes bastaba con que
+   `go test` saliera distinto de cero, y eso daba por cazados mutantes que solo habian roto la
+   COMPILACION (el mutante 17 "cazaba" sin compilar). Un mutante que no compila no prueba nada.
+2. Y al endurecerlo aparecio lo contrario: el mutante del ancho del elemento de sort (mutante 12)
+   SI es cazado, pero se cae con SIGSEGV en vez de imprimir "--- FAIL" (medido:
+   "unexpected fault address 0x3b47b99ec570 ... d2std/sort.swapBytes"). Con el criterio viejo pasaba
+   por casualidad; con el nuevo hay que aceptar las dos formas de rojo, y ahora esta dicho en el
+   codigo del mutador.
+
+Aparte: los patrones de los mutantes con barras entre comillas van entre $'...' y no entre '...'. Con
+comillas simples, un patron como path[i] != '/' cierra el string de bash y llega roto a python: el
+mutante no se aplica (0 coincidencias) o el codigo mutado no compila. medido: paso con los mutantes 16
+y 17.
