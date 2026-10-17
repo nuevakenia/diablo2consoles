@@ -95,6 +95,13 @@ func main() {
 	println("MOTOR-ARRANQUE arranca (DC-002.13: el entry point del motor en la consola)")
 	println("MOTOR-ARRANQUE runtime", "sh4")
 
+	// DC-002.18: el instrumento de la serializacion. Desde aca, CADA llamada de serializacion del motor
+	// (Marshal, MarshalIndent, Unmarshal, Encode, Decode) imprime por la serial por donde paso y sobre que
+	// tipo, y si ese tipo sabe serializarse solo. Es lo que mide esta tarjeta: cuantas serializaciones hace
+	// el arranque y sobre que tipos. Va ANTES de Create()/Run() a proposito: el arranque pide y guarda su
+	// configuracion ahi adentro.
+	instrumentoJSON()
+
 	// el video: sin esto el motor no tiene pantalla. Se arranca ANTES de Run() para que un fallo del video
 	// se vea como un numero (y no como un cuelgue dentro del motor).
 	if err := ebiten.IniciarPantalla(640, 480); err != nil {

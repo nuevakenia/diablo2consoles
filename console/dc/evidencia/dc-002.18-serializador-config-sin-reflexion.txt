@@ -1,0 +1,293 @@
+DC-002.18 - el motor arranca su entorno y lo frenaba el SERIALIZADOR (encoding/json sin reflexion)
+==================================================================================================
+
+Rama DC-002 del repo diablo2consoles. Todo lo de abajo se midio en este host (gccgo sh-elf + Flycast), con
+el log crudo al lado de cada numero. Lo que no esta medido no aparece.
+
+Los comandos, en orden, estan en la seccion 8. El defecto del que sale esta tarjeta y sus mediciones previas
+estan en `dc-002.17-video-y-overlay.txt` y en la seccion 33 del README.
+
+
+1. EL NUMERO QUE PIDE LA TARJETA: ANTES Y DESPUES, MISMO BINARIO Y MISMO EMULADOR
+----------------------------------------------------------------------------------
+
+El "antes" NO es una deduccion: es el arreglo SACADO (el mutante 'sin-marshal' deja
+`Configuration.MarshalJSON` fuera, que es exactamente el estado del arbol en DC-002.17, commit 34e35a36).
+Los dos numeros salen de la misma maquina, del mismo POC y de la misma ventana de 25 s.
+
+    bash scripts/console/medir-arranque-218.sh /tmp/gox-00218 /tmp/dcbuild/motor-218 25
+
+  marcas MOTOR-ARRANQUE .............. 10 ANTES  ->  10 DESPUES
+  serializaciones (JSON-CONSOLA) ..... 1 ANTES   ->  1 DESPUES
+  el tipo ............................ *d2config.Configuration en las dos
+  ese tipo sabe serializarse? ........ sabe= false ANTES -> sabe= true DESPUES
+  el overlay del motor ............... archivos= 1, bytes= 0 ANTES -> archivos= 1, bytes= 549 DESPUES
+
+  EL ERROR EXACTO QUE QUEDA:
+
+    ANTES:   MOTOR-ARRANQUE Run() termino con error: json: en la consola no hay reflexion: solo se
+             pueden serializar los tipos que saben hacerlo ellos mismos (MarshalJSON/UnmarshalJSON)
+    DESPUES: MOTOR-ARRANQUE Run() termino con error: reported to the user: no Diablo II game files
+             were selected
+
+Las 10 marcas MOTOR-ARRANQUE del DESPUES, enteras (del log de la corrida):
+
+    MOTOR-ARRANQUE arranca (DC-002.13: el entry point del motor en la consola)
+    MOTOR-ARRANQUE runtime sh4
+    MOTOR-ARRANQUE video listo, VRAM de la pantalla 1048576 bytes
+    MOTOR-ARRANQUE llamando a d2app.Create().Run()
+    MOTOR-ARRANQUE marca 1: entrando a d2app.Create()
+    MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+    MOTOR-ARRANQUE Run() termino con error: reported to the user: no Diablo II game files were selected
+    MOTOR-ARRANQUE overlay del motor: archivos= 1 bytes= 549 dirs= 2
+    MOTOR-ARRANQUE marca 3: Run() volvio
+    MOTOR-ARRANQUE fin
+
+LECTURA DE LOS NUMEROS (lo que cambia y lo que NO):
+
+  - El serializador queda arreglado: el config se guarda. El error ya NO es de serializacion sino de la
+    falta de los archivos del juego ("no Diablo II game files were selected"), que es justo lo que la
+    tarjeta deja FUERA de alcance (los MPQ y el mapa son otra tarjeta). El motor paso de no poder escribir
+    nada a dejar su configuracion escrita en el FS del motor.
+  - El overlay lo dice con bytes: `bytes= 0` ANTES (el error caia antes del `Write`) y `bytes= 549`
+    DESPUES (el archivo completo). El archivo es el `/rd/OpenDiablo2/config.json` que crea `d2app`.
+  - El numero de marcas es el MISMO (10) y eso es lo esperado: la marca que cambia es la del ERROR. Contar
+    marcas no alcanzaba para ver el arreglo; lo que lo ve son el TEXTO del error y los bytes del overlay.
+  - El arranque hace UNA sola serializacion (el `Save`), y es el mismo numero antes y despues: el camino de
+    LECTURA (`json.NewDecoder(...).Decode(config)` en app.go:277) no se ejecuta en este arranque porque el
+    archivo no existia todavia y el motor arma el default. Ese camino se mide aparte, en el corpus de la
+    consola (seccion 4, control 2), que usa el MISMO tipo del motor y el MISMO `Decoder`.
+  - El instrumento imprime el tipo (nombre y descriptor) leido del descriptor de gccgo, y el dato que
+    importa es `sabe=`: ANTES el tipo NO sabia serializarse y DESPUES si. Es el mismo dato que el error,
+    medido por otro lado.
+
+El instrumento, en las dos corridas:
+
+    ANTES:   JSON-CONSOLA MarshalIndent tipo= *<...>d2config.Configuration desc= 2349581368 sabe= false n= 1
+    DESPUES: JSON-CONSOLA MarshalIndent tipo= *<...>d2config.Configuration desc= 2349581368 sabe= true  n= 1
+
+(el nombre viene con el mangling de gccgo: `* github_0com_1OpenDiablo2_1OpenDiablo2_1d2core_1d2config
+d2config.Configuration`; el `sabe=` lo calcula el json de la consola probando `json.Marshaler`, no el POC).
+
+
+2. EL DEFECTO, LOCALIZADO (era el serializador, no el entorno)
+--------------------------------------------------------------
+
+La cadena, ya medida en DC-002.17 y confirmada aca: `d2app/app.go:265` no encuentra `config.json`, arma el
+default y llama `config.Save()` (`d2core/d2config/d2config.go:50`), que hace `MkdirAll` (ya andaba),
+`os.Create` (ya andaba) y despues `json.MarshalIndent(c, "", "  ")` en la linea 57: ESE era el que devolvia
+el error, porque `d2config.Configuration` no tenia `MarshalJSON` y el `encoding/json` de la consola no tiene
+reflexion (libgodc no la trae).
+
+DEFECTO ESCONDIDO que la tarjeta anota y esta corrida encontro igual de real: el `Decoder.Decode` del json
+de la consola devolvia `ErrSinReflexion` SIEMPRE (no probaba el `Unmarshaler` del tipo). O sea que el mismo
+motor, con un `config.json` que YA existiera, se caia al LEER. Medido con el mutante 'sin-decode' (seccion
+5): con el `Decode` como estaba, el control 2 se pone ROJO con este error exacto:
+
+    JSON-CONFIG prueba FALLO: Decode: json: en la consola no hay reflexion: solo se pueden serializar los
+      tipos que saben hacerlo ellos mismos (MarshalJSON/UnmarshalJSON)
+
+Los DOS caminos, entonces: ESCRIBIR (MarshalIndent -> MarshalJSON) y LEER (Decode -> UnmarshalJSON).
+
+
+3. EL ARREGLO ELEGIDO (y por que este, medido)
+----------------------------------------------
+
+SE ELIGIO LA OPCION (a) DE LA TARJETA: `MarshalJSON`/`UnmarshalJSON` escritos a mano en el paquete del
+motor (`d2core/d2config/d2config_json.go`, 1101 lineas), por el script idempotente
+`scripts/console/fix-d2config-json-218.py`. Los motivos, medidos:
+
+  - ES LO MAS CHICO. Los dos caminos del motor pasan por el `Marshaler`/`Unmarshaler` del tipo: con los dos
+    metodos escritos a mano alcanza sin tocar NADA mas del motor ni del json de la consola (ademas del
+    `Decoder`, que ya era un defecto por si solo).
+  - La opcion (b) (serializacion "por tipo" en el json de la consola) exigia un registro de tipos en el json
+    y una tabla por tipo del motor: mas superficie y mas lugares donde el json de la consola sepa de tipos
+    del motor. Lo que ya estaba escrito en el json de la consola es el `Indent`, que es lo unico que
+    `MarshalIndent` necesita y que se puede hacer sin reflexion (opera sobre el TEXTO json, no sobre la
+    estructura de Go).
+  - El script es idempotente y NO pisa un archivo distinto: se probo (salida medida)
+
+        $ python3 scripts/console/fix-d2config-json-218.py
+           ya estaba (sha256 8714a9674b5448406c081a10f5dc0fa0b2770b43d795da2fc674367102c23b43): sin cambios
+           gofmt: limpio
+        $ python3 scripts/console/fix-d2config-json-218.py /tmp/prueba-quitar-218.go     # archivo distinto
+           EL ARCHIVO EXISTE Y NO ES EL DE ESTE SCRIPT: ... (rc=1, no lo pisa)
+        $ python3 scripts/console/fix-d2config-json-218.py /tmp/prueba-desde-cero-218b.go  # desde cero
+           escrito: 1101 lineas, sha256 8714a96...
+        $ sha256sum d2core/d2config/d2config_json.go /tmp/prueba-desde-cero-218b.go
+           8714a9674b5448406c081a10f5dc0fa0b2770b43d795da2fc674367102c23b43  (los dos iguales)
+
+COMPORTAMIENTO QUE EL ARREGLO TUERCA Y HABIA QUE RESPETAR (todo medido contra el json de Go en el host
+antes de escribirlo; esta en el difftest de la seccion 5):
+
+  - bytes UTF-8 invalidos dentro de una cadena: Go NO los escapa con `\ufffd`, escribe los BYTES de U+FFFD.
+    Medido: `json.Marshal("mitad \xe4\xb8 fin")` -> `22 6d 69 74 61 64 20 EF BF BD EF BF BD 20 66 69 6e 22`.
+  - `null` en un campo que no es puntero: NO cambia el valor (queda el que estaba).
+  - `null` en una lista/mapa: deja `nil` (no una lista vacia).
+  - los nombres de campo se emparejan SIN distinguir mayusculas, como Go.
+  - `omitempty` en `Options`/`KeyBindings`/`Language`: una `Language` vacia no sale, y las listas nil
+    tampoco.
+  - los flotantes salen con la forma `g` y la menor cantidad de digitos (`strconv.FormatFloat(v, 'g', -1, 64)`),
+    que es lo que hace Go.
+
+El `Indent` de la consola (`console/dc/std/encoding/json/indent.go`) se escribio mirando el de Go y quedo
+con DOS defectos que el difftest cazo al escribirlo (los dos corregidos, los dos con evidencia en la
+seccion 5):
+
+  - los blancos (espacios y saltos) DESPUES del valor raiz se copian TAL CUAL: el scanner de Go devuelve
+    `scanEnd`, no `scanSkipSpace` (medido: Go devuelve `"}\r\n"` con su blanco atras).
+  - el `]` de cierre solo vale en el estado de VALOR, no despues de una coma (una coma de mas no puede
+    cerrar el arreglo).
+
+
+4. EL CORPUS DE LA CONSOLA: el config.json del motor, byte a byte contra el host
+---------------------------------------------------------------------------------
+
+`scripts/console/checar-json-218.sh` (POC: `console/dc/poc/json-config`, con el `d2config.Configuration` del
+motor de verdad y su `Save`/`Decode`). Los bytes esperados NO los dice la consola: los HORNEA el host con el
+json de Go sobre una struct ESPEJO de los mismos campos y etiquetas (`console/dc/gen-config-json`), porque
+comparar contra `json.Marshal(c)` seria comparar el arreglo contra si mismo (el json de Go llama a nuestro
+`MarshalJSON`).
+
+  bytes esperados horneados por el host:  prueba= 574    variante= 441
+
+CONTROLES (log `/tmp/checar-218-sano/flycast.log`, 574 bytes comparados uno por uno):
+
+  control 1 (guardar el config) ......... VERDE  JSON-CONFIG prueba guardado bytes= 574 esperados= 574 igual= true
+  control 2 (leerlo con el Decoder) ..... VERDE  JSON-CONFIG prueba vuelta bytes= 574 igual= true
+  control 3 (el Encoder del json) ....... VERDE  JSON-CONFIG prueba encoder bytes= 422 vuelta igual= true
+  control 4 (la variante de bordes) ..... VERDE  JSON-CONFIG variante guardado bytes= 441 esperados= 441 igual= true
+                                                 JSON-CONFIG variante vuelta bytes= 441 igual= true
+                                                 JSON-CONFIG variante encoder bytes= 342 vuelta igual= true
+
+  y al final de la corrida: `JSON-CONFIG fin` (sin ningun `FALLO:` en el log).
+
+La "variante" es la configuracion de los bordes, que es la que ejerce los caminos que el caso tipico no
+toca: lista `nil` (que en json es `null`), `MpqPath` vacio, numeros negativos (`FpsCap: -60`), un `Backend`
+con comillas, barra invertida y `<html>`, un mapa con una lista VACIA (`"sola": []`) y otro con una clave
+fuera de `omitempty`. Los 441 bytes salen del json de Go, no nuestros.
+
+SERIALIZACIONES QUE HIZO EL CORPUS (marcas del instrumento, 12 en la corrida, 6 por cada configuracion):
+6 `MarshalIndent`, 2 `Decode`, 2 `Encode` y 2 `Unmarshal`; TODAS sobre el tipo del motor
+`*d2config.Configuration` y todas con `sabe= true`. O sea que el corpus no mide una copia del tipo: mide el
+tipo del motor y el `Decoder` del motor.
+
+
+5. LOS MUTANTES: cada defecto conocido exige que su suite se ponga ROJA
+-----------------------------------------------------------------------
+
+A) EN LA CONSOLA (`scripts/console/checar-json-218.sh`, 4/4 cazados). Cada mutante se aplica con una copia
+propia + sha256 y el arbol se verifica restaurado al final; la ultima corrida dio `4/4 mutantes cazados` y
+`exit=0`, y el control sano de vuelta quedo 4/4 VERDE.
+
+  'sin-marshal'  `Configuration.MarshalJSON` fuera (ES el estado de DC-002.17)
+      -> 1, 2, 3 y 4 ROJOS, con el error exacto del defecto original:
+         JSON-CONFIG prueba FALLO: Save: json: en la consola no hay reflexion: ...
+  'sin-decode'   `Decoder.Decode` vuelve a devolver `ErrSinReflexion`
+      -> control 1 VERDE (guardar no lo usa) y 2, 3 y 4 ROJOS:
+         JSON-CONFIG prueba FALLO: Decode: json: en la consola no hay reflexion: ...
+  'sin-indent'   `MarshalIndent` devuelve el compacto sin reacomodar
+      -> 1, 2, 3 y 4 ROJOS: `guardado bytes= 421 esperados= 574 igual= false`, `primera diferencia en el byte 1`
+  'sin-campo'    el marshaller se olvida de `D2SDir`
+      -> 1, 2, 3 y 4 ROJOS: `guardado bytes= 558 esperados= 574 igual= false`, `primera diferencia en el byte 385`
+
+  El mutante 'sin-campo' es el que dice que la comparacion byte a byte DISCRIMINA: 16 bytes de diferencia
+  (un campo del medio) no se parecen a nada, y el control los ve.
+
+  NOTA MEDIDA (y corregida): la primera version del mutante 'sin-decode' no compilaba (dejaba `datos` sin
+  usar) y el script lo contaba como "cazado de otra forma". Un mutante que no compila no prueba nada, asi
+  que el script ahora exige que el control caiga CON EL ARBOL COMPILANDO; si no compila, es hueco del
+  mutante y se dice.
+
+B) EN EL HOST (`scripts/console/mutar-std-host.sh`, mutantes 37, 38 y 39 de DC-002.18; el mutador entero dio
+   `39/39`):
+
+  mutante 37 `json: MarshalIndent devuelve el compacto`  -> cazado (`--- FAIL` de la prueba de MarshalIndent)
+  mutante 38 `json: Decode no prueba el Unmarshaler`     -> cazado (`--- FAIL: TestDC00218DecodeEncode`)
+  mutante 39 `json: el instrumento queda mudo`           -> cazado
+
+  La prueba diferencial del host (`go test ./difftest/ -run DC00218`) tiene 5 pruebas y compara contra el
+  `encoding/json` de Go de verdad:
+
+    TestDC00218IndentContraGo     44 casos de Indent comparados byte a byte (0 declarados como limite)
+    TestDC00218MarshalContraGo    Marshal y MarshalIndent
+    TestDC00218UnmarshalContraGo  Unmarshal
+    TestDC00218DecodeEncode       Decoder/Encoder (incluido el EOF propio de la consola)
+    TestDC00218Instrumento        el punto de enganche avisa por donde paso
+
+  Los limites del `Indent` quedaron DECLARADOS y VACIOS: los mensajes de error no son los de Go, y el limite
+  de UTF-8 que yo habia puesto NO era limite (`json.Indent` de Go tampoco valida: medido). Una lista de
+  limites que no es la real es una mentira con formato de dato.
+
+  El juez del motor en el host (`go test ./d2core/d2config/`) compara `MarshalJSON`/`UnmarshalJSON` contra
+  una struct ESPEJO sin metodos (para no compararse consigo mismo) y paso: `ok ... 0.003s`.
+
+
+6. LA BARRERA Y EL MOTOR
+------------------------
+
+  - EL MOTOR COMPILA COMPLETO: 142 de 142 paquetes, 0 bloqueados (build-motor-all.sh, /tmp/gox-00218).
+  - LA BARRERA: `bash scripts/console/compare-motor-dc6.sh /tmp/dcbuild/motor-dc6-218` (el POC del motor
+    reenlazado con el `d2config.gox` NUEVO) -> `== IGUAL: 31 lineas identicas (mismo DC6, mismo codigo del
+    motor, x86-64 y SH-4)` con `frames comparados: 30`.
+  - LA STDLIB EN EL HOST: `bash scripts/console/test-std-host.sh` -> `== los dos anchos: verde (y los 13 que
+    hablan con KOS siguen sin compilar en el host) ==` (amd64 y 386).
+
+
+7. LO QUE NO ENTRA (y queda anotado)
+------------------------------------
+
+  - El motor no llega a dibujar un cuadro del JUEGO: necesita los MPQ y el mapa. El error que queda
+    (`reported to the user: no Diablo II game files were selected`) ES esa falta, no un defecto de
+    serializacion.
+  - El camino de LECTURA del arranque (`app.go:277`) no se ejecuta en esta corrida porque el archivo no
+    existia y el motor arma el default; queda medido por el corpus de la consola (control 2), que usa el
+    MISMO tipo y el MISMO `Decoder` del motor.
+  - El canal de audio AICA sigue sin conectar (otra tarjeta).
+
+
+8. LOS COMANDOS (reproducible, en este orden)
+---------------------------------------------
+
+    source scripts/console/env.sh
+    export GODC_GOX=/tmp/gox-00218
+    # 1) el motor entero a .gox (142/142) y el arranque medido antes/despues
+    bash scripts/console/build-std-gox.sh
+    bash scripts/console/build-motor-all.sh /tmp/gox-00218 /tmp/dcbuild/motor-all-218
+    bash scripts/console/medir-arranque-218.sh /tmp/gox-00218 /tmp/dcbuild/motor-218 25
+    # 2) el corpus de la consola (4 controles + 4 mutantes + control sano de vuelta)
+    bash scripts/console/checar-json-218.sh /tmp/gox-json218 /tmp/dcbuild/json-config-218 20
+    # 3) el host: la prueba diferencial, su mutador y el juez del motor
+    bash scripts/console/test-std-host.sh
+    bash scripts/console/mutar-std-host.sh
+    (cd console/dc/std && go test ./difftest/ -run DC00218 -v)
+    go test ./d2core/d2config/
+    # 4) la barrera
+    SALTAR_STDLIB=1 bash scripts/console/build-motor-dc6.sh /tmp/dcbuild/motor-dc6-218
+    bash scripts/console/compare-motor-dc6.sh /tmp/dcbuild/motor-dc6-218
+    # 5) el arreglo del motor, idempotente
+    python3 scripts/console/fix-d2config-json-218.py
+
+
+9. LOS ARCHIVOS QUE TRAE ESTA TARJETA
+-------------------------------------
+
+  NUEVOS (consola):
+    console/dc/std/encoding/json/indent.go              el Indent sin reflexion (los blancos fuera de las cadenas)
+    console/dc/std/difftest/dc00218_test.go             la prueba diferencial del host (5 pruebas, 44 casos de Indent)
+    console/dc/poc/json-config/{main.go,marca.go,csrc/cshim.c}   el corpus de la consola
+    console/dc/gen-config-json/main.go                  hornea la configuracion y los bytes esperados (json de Go)
+  MODIFICADOS (consola):
+    console/dc/std/encoding/json/json.go                el instrumento + Decoder/Encoder por Marshal/Unmarshal
+  NUEVOS (motor):
+    d2core/d2config/d2config_json.go                    MarshalJSON/UnmarshalJSON a mano (1101 lineas)
+    d2core/d2config/json_consola_test.go                el juez del host (struct espejo)
+  SCRIPTS:
+    scripts/console/fix-d2config-json-218.py            el arreglo del motor, idempotente (no pisa otro archivo)
+    scripts/console/checar-json-218.sh                  el corpus de la consola + sus 4 mutantes
+    scripts/console/medir-arranque-218.sh               la medicion antes/despues del arranque
+  MODIFICADOS (scripts):
+    scripts/console/mutar-std-host.sh                   mutantes 37, 38 y 39 (DC-002.18)
+  POC:
+    console/dc/poc/motor-arranque/marca.go              el instrumento del arranque (lectura del descriptor)
+    console/dc/poc/motor-arranque/main.go               llama al instrumento antes de Create()/Run()

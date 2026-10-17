@@ -472,6 +472,36 @@ mutacion "regexp: (?i) no pliega los literales (intercambio de caso)" \
     $'\t\treturn alternarMayus(a) == alternarMayus(b)' \
     amd64
 
+echo "== 37. json: MarshalIndent tiene que REACOMODAR (no alcanza con el compacto) =="
+# Defecto que cazo el difftest de DC-002.18 al escribirlo: MarshalIndent devolvia los bytes del compacto
+# (el `Indent` no estaba hecho todavia). El corpus del motor no lo veria -- Guardar compara bytes y el
+# compacto es json valido -- pero el archivo del motor quedaria distinto al del host, que es lo que se
+# esta midiendo.
+mutacion "json: MarshalIndent devuelve el compacto (sin reacomodar)" \
+    "encoding/json/json.go" \
+    $'	return Indent(b, prefijo, sangria)\n}' \
+    $'	return b, nil // MUTANTE sin-indent\n}' \
+    amd64
+
+echo "== 38. json: el Decode tiene que probar el Unmarshaler del tipo =="
+# Antes de DC-002.18 el Decode devolvia ErrSinReflexion SIEMPRE (el motor no podia leer su config.json).
+# El mutante vuelve a ese estado: la firma del Decode no cambia, asi que lo unico que lo ve es la prueba.
+mutacion "json: Decode no prueba el Unmarshaler (vuelve a ErrSinReflexion)" \
+    "encoding/json/json.go" \
+    $'	return unmarshal(datos, v)\n}' \
+    $'	_ = datos\n	return ErrSinReflexion // MUTANTE sin-decode\n}' \
+    amd64
+
+echo "== 39. json: el instrumento tiene que avisar por donde paso =="
+# El instrumento es lo que permite decir con numeros cuantas serializaciones hace el arranque del motor y
+# sobre que tipos. El mutante lo deja mudo: el punto de enganche existe, pero no avisa. Si la prueba del
+# instrumento no se pone roja, los numeros de la evidencia no estarian apoyados en nada.
+mutacion "json: el instrumento queda mudo (no avisa)" \
+    "encoding/json/json.go" \
+    $'	Instrumento(punto, v, sabe)' \
+    $'	_, _, _ = punto, v, sabe // MUTANTE instrumento-mudo' \
+    amd64
+
 echo
 echo "== $cazados/$contador chequeos cazados =="
 if [ "$rc" -eq 0 ]; then
