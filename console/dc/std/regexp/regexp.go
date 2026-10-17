@@ -54,9 +54,13 @@ func Compile(patron string) (*Regexp, error) {
 	r := &Regexp{patron: patron}
 
 	p := patron
+	// DC-002.16: el prefijo de la bandera mide CUATRO bytes ("(?i)" = '(' '?' 'i' ')'), no tres. Con
+	// p[3:] quedaba "i)a" y el parser se plantaba en el ')' -> Compile devolvia
+	// `regexp: sobra )a en (?i)a`, un MustCompile de nivel de paquete paniqueaba y el arranque del motor
+	// no llegaba ni a main (medido en la consola: panic con un *regexp.Error, 0 lineas MOTOR-ARRANQUE).
 	if strings.HasPrefix(p, "(?i)") {
 		r.sinMayus = true
-		p = p[3:]
+		p = p[4:]
 	}
 
 	raiz, resto, err := parseAlternancia(p, r)
@@ -155,6 +159,22 @@ func alternarMayus(r rune) rune {
 	return r
 }
 
+// plegarMayus: lleva la letra a minuscula. Es lo que hace falta para COMPARAR dos caracteres con (?i)
+// ("A" y "a" tienen que dar igual). Ojo: no confundir con alternarMayus, que es un INTERCAMBIO de caso
+// (a->A, A->a) -- es biyectivo, asi que alternarMayus(x) == alternarMayus(y) solo cuando x == y, y usado
+// para comparar deja la bandera (?i) MUERTA. Ese fue el segundo defecto de DC-002.16: `(?i)a` no
+// encontraba la "A" de "BANANA" ni con el prefijo ya cortado bien.
+// Solo ASCII, a proposito: la consola no tiene las tablas de plegado de Unicode (limite declarado en
+// TestLimitesConocidos).
+func plegarMayus(r rune) rune {
+	if r >= 'A' && r <= 'Z' {
+		return r + 32
+	}
+	return r
+}
+
+// alternativaMayus: el intercambio de caso, para preguntar "¿el OTRO caso cae en esta clase?" (el
+// test simetrico que usa contiene para [a-z] y [A-Z]; ahi el intercambio es lo correcto y el plegado no).
 func alternativaMayus(r rune) rune { return alternarMayus(r) }
 
 // ================================================================ parseo
@@ -513,12 +533,16 @@ func deduplicar(pos []int) []int {
 }
 
 // igual compara dos caracteres, respetando el flag (?i).
+//
+// DC-002.16: pliega los DOS al mismo caso (minuscula). Antes usaba alternarMayus en los dos lados, que
+// es un intercambio: alternarMayus(a) == alternarMayus(b) solo si a == b, asi que la bandera (?i) no
+// plegaba NADA en los literales y el patron del motor seguia siendo sensible a mayusculas.
 func (r *Regexp) igual(a, b rune) bool {
 	if a == b {
 		return true
 	}
 	if r.sinMayus {
-		return alternarMayus(a) == alternarMayus(b)
+		return plegarMayus(a) == plegarMayus(b)
 	}
 	return false
 }

@@ -32,11 +32,34 @@ var casos = []struct {
 	{`^(tes|ceh|bet|fed)`, []string{"tesx", "ceh", "bet", "fed", "x", ""}},
 	{`[0-9]{2,3}`, []string{"12", "123", "1234", "1", ""}},
 	{`a+b*c?`, []string{"aab", "ac", "b", "aaabbb", ""}},
+	// DC-002.16: la bandera de plegado de mayusculas (?i). El motor la usa en
+	// d2core/d2map/d2mapgen/real_maze_gen.go:33 y ninguno de los casos de arriba la cubria: la suite
+	// estaba verde y el arranque del motor paniqueaba con un *regexp.Error de nivel de paquete.
+	// MEDIDO antes del arreglo: Compile(`(?i)a`) devolvia `regexp: sobra )a en (?i)a`, porque el corte
+	// del prefijo era p[3:] y "(?i)" mide CUATRO bytes (quedaba "i)a" y el parser se plantaba en el ')'.
+	{`(?i)a`, []string{"A", "a", "b", "aAa", "BANANA", ""}},
+	{`(?i)^abc$`, []string{"ABC", "abc", "AbC", "abcd", ""}},
+	{`(?i)[a-z]\d*\.ds1$`, []string{"A1.ds1", "z.ds1", "Z9.DS1", "1.ds1", ""}},
+	{`(?i)(pre|prev|up|ent|exit)\d*\.ds1$`, []string{
+		"PRE1.ds1", "pre1.ds1", "Up.ds1", "EXIT34.ds1", "ent.ds1", "prev2.ds1",
+		"data/global/tiles/PRE1.ds1", "x.ds1", "exit.ds2", "PrE.ds1", ""}},
+	// el patron VACIO y "(?i)" solo: NO son un limite (se midieron contra Go: MatchString, FindString y
+	// FindAllString sobre "", "a" y "abc" dan lo mismo). "(?i)" solo queda vacio al sacarle la bandera,
+	// asi que es el mismo camino con el flag puesto.
+	{``, []string{"", "a", "abc"}},
+	{`(?i)`, []string{"", "a", "abc"}},
 }
 
 func TestContraElRegexpDeGo(t *testing.T) {
 	for _, caso := range casos {
-		nuestro := MustCompile(caso.patron)
+		// Compile (y no MustCompile) para que un patron que no compila se informe como un fallo del
+		// corpus y no se lleve puesto el proceso de test entero: con MustCompile, un `(?i)` mal cortado
+		// abortaba TODA la suite con un panic y los demas casos no se corrian (medido en DC-002.16).
+		nuestro, errComp := Compile(caso.patron)
+		if errComp != nil {
+			t.Errorf("Compile(%q) fallo: %v", caso.patron, errComp)
+			continue
+		}
 		verdadero := goregexp.MustCompile(caso.patron)
 
 		for _, texto := range caso.textos {
@@ -151,5 +174,30 @@ func TestCompilePedorro(t *testing.T) {
 		if _, err := Compile(patron); err == nil {
 			t.Errorf("Compile(%q) deberia fallar y no fallo", patron)
 		}
+	}
+}
+
+// TestLimitesConocidos: las divergencias con el regexp de Go que estan DECLARADAS (no escondidas).
+// Si alguna deja de cumplirse, este test FALLA: asi la lista no queda muerta ni tapada.
+//
+// El plegado de mayusculas con (?i) es SOLO ASCII: Go pliega con las tablas de Unicode (el signo Kelvin
+// U+212A es "k" para (?i)) y la consola no tiene esas tablas ni las va a tener (el regexp de la consola
+// es un motor chico escrito a mano para los 16 patrones del motor, todos ASCII). El patron VACIO, en
+// cambio, NO es un limite: se probo contra Go (MatchString, FindString y FindAllString sobre "", "a" y
+// "abc") y da lo mismo, asi que va en el corpus comparado como un caso mas, no aca.
+func TestLimitesConocidos(t *testing.T) {
+	re, err := Compile(`(?i)k`)
+	if err != nil {
+		// con el defecto del prefijo puesto esto es lo primero que se cae; se informa como fallo del
+		// corpus y no como panic, para que el mutador lea el aserto y no el desborde.
+		t.Errorf("Compile(`(?i)k`) fallo: %v", err)
+		return
+	}
+	if re.MatchString("\u212a") {
+		t.Errorf("(?i)k matchea el signo Kelvin (U+212A): el plegado dejo de ser solo ASCII, hay que medirlo contra Go y sacar el limite")
+	}
+	// y el de siempre: los patrones que no se entienden no se aceptan a medias
+	if _, err := Compile(`(?i)[abc`); err == nil {
+		t.Errorf("Compile(`(?i)[abc`) deberia fallar (clase sin cerrar) y no fallo")
 	}
 }

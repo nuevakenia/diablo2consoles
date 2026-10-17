@@ -1779,3 +1779,95 @@ grep -a 'SONDA-REGEXP\|panic' /tmp/dc-run-sonda-regexp/flycast.log | tr -d '\r'
 Evidencia con las salidas crudas (traza, addr2line, la sonda y el corpus):
 `evidencia/dc-002.15-init-mapa-nil.txt`.
 
+## 32. DC-002.16: la bandera (?i) del regexp de la consola — dos defectos, y el arranque que llega a main
+
+DC-002.15 dejo identificado el defecto siguiente: con el mapa nil arreglado, el arranque moria **antes de
+`main`** con un panic cuyo valor era un `*regexp.Error` (0 lineas `MOTOR-ARRANQUE`), o sea un
+`regexp.MustCompile` de nivel de paquete. El unico patron del motor con bandera es el de
+`d2core/d2map/d2mapgen/real_maze_gen.go:33`. Esta tarjeta lo midio y lo cerro — y el arranque del motor
+ahora **llega a `main`**.
+
+**1. La causa: un off-by-one en el corte del prefijo.** El regexp de la consola es codigo propio
+(`console/dc/std/regexp`). `Compile` sacaba la bandera con `p[3:]`, pero `"(?i)"` mide **cuatro** bytes
+(`( ? i )`): quedaba `"i)a"` y el parser se plantaba en el `)`. Medido — el error exacto, y el mismo en el
+host y en la consola porque el `.gox` sale de este archivo:
+
+    regexp: sobra )a en (?i)a
+    regexp: sobra )(pre|prev|up|ent|exit)\d*\.ds1$ en (?i)(pre|prev|up|ent|exit)\d*\.ds1$
+
+No era el parser de banderas, ni las tablas de plegado de `unicode`, ni el motor de ejecucion: era el
+corte del prefijo. Los 9 patrones de nivel de paquete del motor pasaron de **8 de 9** a **9 de 9**.
+
+**2. El segundo defecto: la bandera estaba MUERTA.** Con el prefijo ya cortado bien, `(?i)a` compilaba
+pero **no encontraba la "A"**: `igual` comparaba con `alternarMayus` en los dos lados, y esa funcion es un
+**intercambio** de caso (a->A, A->a), biyectivo: `alternarMayus(x) == alternarMayus(y)` solo si `x == y`.
+Medido contra el regexp de Go: `MatchString("(?i)a")` en `"BANANA"` daba `false` (Go: `true`) y
+`FindAllString` en `"aAa"` daba 2 de 3. El arreglo agrega `plegarMayus` (a minuscula) para comparar; en
+`claseChar.contiene` el intercambio **si** es lo correcto (ahi la pregunta es simetrica, "¿el otro caso
+cae en el rango?", y es lo que hace que `[a-z]` acepte `"Z"`), por eso no se toco.
+
+**3. Por que ninguna suite lo veia.** Los 13 casos del corpus diferencial del regexp eran **sin bandera**:
+la suite estaba verde y el motor paniqueaba igual. El hueco era del corpus. Ahora hay 6 casos nuevos con
+el patron real del motor (`(?i)a`, `(?i)^abc$`, `(?i)[a-z]\d*\.ds1$`, `(?i)(pre|prev|up|ent|exit)\d*\.ds1$`
+con 11 textos: `PRE1.ds1`, `Up.ds1`, `EXIT34.ds1`, `data/global/tiles/PRE1.ds1`, `x.ds1`, `exit.ds2`, ...),
+el aserto paso a `Compile` (con `MustCompile`, el panic se llevaba puesto el proceso de test y el mutador
+leia un desborde en vez del aserto), y el patron **vacio** se midio contra Go: **no es un limite**, va al
+corpus. El limite que queda declarado y vigilado (`TestLimitesConocidos`) es que el plegado es **solo
+ASCII** (para `(?i)` el signo Kelvin U+212A es una "k" en Go; la consola no tiene esas tablas).
+
+**4. La consola, medida con la sonda** `console/dc/poc/sonda-regexp` (los 9 patrones del motor con
+`Compile` — el error, no el panic — y despues el plegado del patron real, 6 de 6 y 0 de 2):
+
+    ROJO  (gox con el defecto, sha256 d5ca2cb1…): 8 de 9 compilan; el de la bandera: el error de arriba;
+                                                  y el MustCompile final paniquea (mismo sintoma del motor)
+    VERDE (gox de cierre,    sha256 f990b831…):   9 de 9, plegado 6 de 6 y 0 de 2, sin panic
+
+**5. El arranque del motor, re-medido.** `checar-init-215.sh` se **aprieta** en esta tarjeta: su control
+ya no acepta "cualquier panic que no sea el del mapa nil", ahora **exige llegar a `main`** (N marcas
+`MOTOR-ARRANQUE`) y 0 lineas con `panic:`; el panic del regexp es un ROJO explicito. Medido: **9 marcas y
+0 panics** (antes: 0 marcas + panic), 1/1 en el mutante del mapa nil. Las 9 marcas dicen ademas **donde
+llega**: `d2app.Create()`, `Run()`, y `Run() termino con error: operation not supported on read-only
+filesystem`, con el video sin arrancar (`no se pudo arrancar la pantalla del PVR (codigo -3)`). Ese es el
+defecto siguiente, de otra tarjeta: lo que frena al motor ya no es el codigo ni la stdlib, es el entorno.
+
+**6. Los mutantes.** `mutar-std-host.sh`: **36/36** (antes 34/34); los dos nuevos son el corte del prefijo
+y el plegado (`--- FAIL: TestContraElRegexpDeGo`). Y uno nuevo, `mutar-regexp-216.sh`, que mide la otra
+punta: recompila **solo** `regexp.gox`, reenlaza el motor-arranque y corre Flycast — control sano (9
+marcas, 0 panics), mutante `p[3:]` (**0 marcas + el panic del regexp, cazado 1/1**) y control de vuelta
+con el **mismo sha256** de la gox. La barrera no se movio: `compare-motor-dc6.sh`, **31 lineas identicas,
+30 frames**.
+
+**Nota del arnes (dos trampas medidas, que vuelven a aparecer):** (a) `build-std-gox.sh` arranca con un
+`rm -rf` de su directorio de salida, asi que **rehacer la stdlib borra la gox del motor** (los 142
+paquetes + `orden-motor.txt`) que vive en el mismo directorio: el enlace se cae con "falta
+orden-motor.txt" y hay que recomputar el motor (5 min). El mutador de esta tarjeta recompila **un solo**
+`.gox` (copia las fuentes a un temporal, reescribe `d2std/` -> `""` y compila con su pkgpath), igual que
+hace `checar-init-215.sh` con `d2common/d2skill`. (b) Los paquetes de **terceros** (ebiten, otto, akara,
+colornames, uuid, bmp, wav) van a `${GODC_GOX:-$DC_ROOT/gox}`, no al directorio que se pasa como
+argumento: hay que **exportar `GODC_GOX`** o quedan en la gox compartida. Medido: sin exportarlo el motor
+se corta en **100 de 142**; con `export GODC_GOX=/tmp/gox-00216`, **142 de 142**.
+
+```bash
+# La causa y el corpus, en el host
+cd console/dc/std && GOARCH=amd64 go test ./regexp/     # y GOARCH=386
+bash scripts/console/test-std-host.sh                   # los dos anchos, verde
+bash scripts/console/mutar-std-host.sh                  # 36/36 cazados
+
+# La consola: la sonda (9 patrones del motor + el plegado)
+export GODC_GOX=/tmp/gox-00216
+bash scripts/console/build-dc.sh console/dc/poc/sonda-regexp
+CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/sonda-regexp/prog.elf 15 /tmp/dc-run-regexp
+grep -a 'SONDA-REGEXP' /tmp/dc-run-regexp/flycast.log | tr -d '\r'
+
+# El mutante de la consola (control sano + p[3:] + control de vuelta) y el corpus del arranque
+bash scripts/console/mutar-regexp-216.sh /tmp/gox-00216 /tmp/dcbuild/motor-216-mut 15
+bash scripts/console/checar-init-215.sh /tmp/gox-00216 /tmp/dcbuild/motor-216 15
+
+# La barrera
+GODC_GOX=/tmp/gox-00216 SALTAR_STDLIB=1 bash scripts/console/build-motor-dc6.sh /tmp/dcbuild/motor-dc6-216
+bash scripts/console/compare-motor-dc6.sh /tmp/dcbuild/motor-dc6-216 d2logo
+```
+
+Evidencia con las salidas crudas (los dos errores del host, la sonda roja y verde, los tres mutadores y
+las 9 marcas del arranque): `evidencia/dc-002.16-regexp-bandera-i.txt`.
+

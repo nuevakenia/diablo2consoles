@@ -1,18 +1,20 @@
 #!/bin/bash
-# CORPUS DE DC-002.15: el init que escribia en un mapa nil, su arreglo y el panic que queda.
+# CORPUS DE DC-002.15 (apretado en DC-002.16): el init que escribia en un mapa nil, su arreglo y el
+# arranque del motor que quedo detras.
 #
 # Lo que mide:
-#  1. CONTROL SANO -- el panic del mapa nil NO vuelve: el arranque recompilado corre y su panic, si hay,
-#     es OTRO, y la traza de libgodc lo identifica (hoy: un *regexp.Error, o sea un MustCompile de nivel
-#     de paquete que no compila en la consola).
+#  1. CONTROL SANO -- el panic del mapa nil NO vuelve y el arranque LLEGA A MAIN: el veredicto tiene que
+#     ser "arranca N marcas" (N lineas MOTOR-ARRANQUE) y el log no puede tener ningun panic. Desde
+#     DC-002.16 el segundo defecto que estaba delante (el regexp con (?i) de d2mapgen) esta cerrado, asi
+#     que el control ya puede pedir esto: si el panic del regexp vuelve, este control se pone ROJO.
 #  2. MUTANTE `init-de-archivo` -- se deshace el arreglo (doTable vuelve a crearse dentro de un init() de
 #     class.go) y el corpus se tiene que poner ROJO: el arranque vuelve a morir en
-#     "assignment to entry in nil map". Es el mutante del defecto de esta tarjeta.
+#     "assignment to entry in nil map". Es el mutante del defecto de DC-002.15.
 #  3. CONTROL SANO DE VUELTA -- con el arreglo repuesto, vuelve el veredicto del punto 1.
 #
-# Por que el control no pide "MOTOR-ARRANQUE > 0": el arranque del motor tiene OTRO defecto delante (el
-# regexp de d2mapgen, medido y declarado en la tarjeta DC-002.16). Lo que esta tarjeta mide es que el mapa
-# nil dejo de ser el que corta, no que el motor llegue a main.
+# Medido, con la gox de DC-002.16 (/tmp/gox-00216: la stdlib minima con el regexp arreglado):
+#   antes  (gox de DC-002.15): "otro-panico pc=8c44b4ba dato=<_regexp.Error..p>" y 0 marcas MOTOR-ARRANQUE
+#   ahora  (gox de DC-002.16): "arranca 9 marcas", 0 lineas con "panic:"
 #
 # Uso:  bash scripts/console/checar-init-215.sh [dir_gox] [dir_build] [segundos]
 set -uo pipefail
@@ -68,7 +70,7 @@ correr() { # $1 = dir de la corrida -> imprime el veredicto
     fi
 }
 
-echo "== 1. control sano: el panic del mapa nil no vuelve"
+echo "== 1. control sano: el panic del mapa nil no vuelve, y el arranque llega a main"
 v="$(correr /tmp/checar-215-sano)"
 echo "   veredicto: $v"
 case "$v" in
@@ -76,15 +78,31 @@ mapa-nil*)
     echo "   EL CONTROL 1 NO DA: sigue muriendo en el mapa nil" >&2
     exit 1
     ;;
-otro-panico*regexp*)
-    echo "   OK: el mapa nil quedo atras y el panic que queda esta identificado (regexp)"
+otro-panico*regexp*|otro-panico*_regexp*)
+    echo "   EL CONTROL 1 NO DA: VOLVIO el panic del regexp que cerro DC-002.16 (el arranque no llega a main):" >&2
+    echo "     $v" >&2
+    exit 1
+    ;;
+arranca*)
+    echo "   OK: el arranque llega a main ($v)"
+    # y que no sea "llega a main y despues paniquea": las marcas no alcanzan si el log tiene un panic
+    n_panic="$(grep -ac 'panic:' /tmp/checar-215-sano/flycast.log)"
+    echo "   lineas con \"panic:\" en el log: $n_panic (tienen que ser 0)"
+    if [ "$n_panic" -ne 0 ]; then
+        grep -am1 'PANIC-TRAZA\|panic:' /tmp/checar-215-sano/flycast.log | tr -d '\r' | sed 's/^/     /' >&2
+        echo "   EL CONTROL 1 NO DA: el arranque llega a main pero despues paniquea" >&2
+        exit 1
+    fi
+    # las marcas, para que queden en la corrida: el motor entra a d2app y su Run() vuelve con el error
+    # que da el sistema de archivos de solo lectura (el defecto que sigue, de otra tarjeta)
+    grep -a 'MOTOR-ARRANQUE' /tmp/checar-215-sano/flycast.log | tr -d '\r' | sed 's/^/     /'
     ;;
 otro-panico*)
-    echo "   OK a medias: el mapa nil quedo atras, pero el panic nuevo NO se identifico como regexp:" >&2
+    echo "   OK a medias: el mapa nil quedo atras, pero el panic nuevo NO es del regexp:" >&2
     echo "     $v" >&2
     ;;
 *)
-    echo "   el arranque paso de largo (revisar el log antes de creerlo): $v"
+    echo "   veredicto inesperado (revisar el log antes de creerlo): $v" >&2
     ;;
 esac
 

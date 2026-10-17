@@ -449,6 +449,29 @@ mutacion "regexp: la clase negada [^...] no niega" \
     $'\tif c.negada {\n\t\treturn esta\n\t}' \
     amd64
 
+# --- el regexp: la bandera (?i). DOS defectos de DC-002.16, uno por mutante.
+#
+# 34) el corte del prefijo. "(?i)" mide CUATRO bytes; con p[3:] queda "i)a", Compile devuelve
+#     `regexp: sobra )a en (?i)a` y el MustCompile de nivel de paquete de d2mapgen paniquea (medido en la
+#     consola: el arranque del motor no llegaba ni a main). Lo caza el corpus al pedir Compile(`(?i)a`).
+echo "== 34. regexp: el corte del prefijo (?i) vuelve a 3 bytes (el defecto de DC-002.16) =="
+mutacion "regexp: el prefijo (?i) cortado en 3 bytes" \
+    "regexp/regexp.go" \
+    $'if strings.HasPrefix(p, "(?i)") {\n\t\tr.sinMayus = true\n\t\tp = p[4:]\n\t}' \
+    $'if strings.HasPrefix(p, "(?i)") {\n\t\tr.sinMayus = true\n\t\tp = p[3:]\n\t}' \
+    amd64
+
+# 35) la comparacion de literales. Con el prefijo ya cortado bien, (?i) seguia sin plegar NADA en los
+#     literales, porque comparaba con alternarMayus (un INTERCAMBIO de caso, biyectivo) en vez de plegar
+#     los dos al mismo caso. Es el defecto que el compilador no ve y la captura tampoco: `(?i)a` no
+#     encontraba la "A" de "BANANA". Lo caza el mismo corpus, por el aserto de MatchString.
+echo "== 35. regexp: (?i) compara con un intercambio de caso en vez de plegar =="
+mutacion "regexp: (?i) no pliega los literales (intercambio de caso)" \
+    "regexp/regexp.go" \
+    $'\t\treturn plegarMayus(a) == plegarMayus(b)' \
+    $'\t\treturn alternarMayus(a) == alternarMayus(b)' \
+    amd64
+
 echo
 echo "== $cazados/$contador chequeos cazados =="
 if [ "$rc" -eq 0 ]; then
