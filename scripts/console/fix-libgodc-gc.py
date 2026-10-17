@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fija el SEMIESPACIO DEL GC de libgodc para la Dreamcast (el recorte que s¡ hace entrar el arranque).
+"""Fija el SEMIESPACIO DEL GC de libgodc para la Dreamcast (el recorte que hace entrar el arranque).
 
 SINTOMA
     El motor entero enlazado (205 .gox, 13.910.992 bytes cargados de los 16 MB) muere ANTES de una sola
@@ -25,8 +25,10 @@ SINTOMA
         256                     512 KB      igual que 512 (arena mas chica: 1.915.772 contra 2.440.060)
 
 ARREGLO
-    `GC_SEMISPACE_SIZE_KB` en runtime/godc_config.h, con el valor que se pida (por defecto 512 KB, que es
-    el semiespacio mas grande que deja atras TODAS las paredes de RAM). El
+    `GC_SEMISPACE_SIZE_KB` en runtime/godc_config.h, con el valor que se pida (por defecto **256 KB**: es el
+    valor que dejo DC-002.21, medido con el arranque de hoy). DC-002.14 dejo 512 KB, que era el semiespacio
+    mas grande que dejaba atras TODAS las paredes de RAM de ese momento; con el gzip y el atlas de texto
+    andando (DC-002.20) 512 ya no alcanza: el arranque muere en la imagen del atlas (`diff 98304`). El
     runtime lo lee para el semiespacio y para el umbral de objetos grandes; no se toca nada mas.
 
 COSTO (declarado, no escondido)
@@ -52,7 +54,7 @@ import re
 import subprocess
 import sys
 
-KB = 512
+KB = 256
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 if args:
     KB = int(args[0])
@@ -87,8 +89,9 @@ else:
     print(f"   GC_SEMISPACE_SIZE_KB: {anterior} -> {KB}")
 
 print(f"   {CONFIG}: sha256 {sha(CONFIG)}")
-print(f"   lo que el GC pide al arrancar ahora: 2 x {KB} KB = {2 * KB * 1024} bytes")
-print("   (medido en el arranque del binario de 13.910.992 bytes: quedan libres 610.304)")
+print(f"   lo que el GC pide al arrancar ahora: 2 x {KB} KB = {2 * KB * 1024} bytes del MISMO monton")
+print("   (DC-002.14 midio 610.304 libres con el binario de 13.910.992 bytes y 512 KB; DC-002.21 midio que el")
+print("    arranque de HOY necesita 256 KB: con 512 muere en la imagen del atlas de texto, diff 98304)")
 
 print("== 3/3 el runtime")
 if "--build" in sys.argv:

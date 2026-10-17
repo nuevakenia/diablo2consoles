@@ -2242,3 +2242,63 @@ del puente C, ventana de la zlib) ponen rojo el control 2. Resultado: **7/7 cont
 Barreras: `test-std-host.sh` verde en amd64 y 386 (13/13 excluidos), `mutar-std-host.sh` con **39/39**
 chequeos cazados y `compare-motor-dc6.sh` con **31 lineas identicas y 30 frames**. Evidencia cruda:
 `evidencia/dc-002.20-gzip-asset-embebido.txt`.
+
+## 37. DC-002.21: el atlas de texto ENTRA — el semiespacio del GC (512 -> 256 KB) y las dos paredes de RAM
+
+El arranque ya descomprimia el atlas de texto (DC-002.20) y moria pidiendo **98.304 bytes contiguos** para su
+imagen (un BMP de 256 x 128 x 24 = 98.358 bytes), con **3.096 libres** en el monton de C. Esta tarjeta midio de
+donde sale ese presupuesto, movio la unica palanca que lo paga y **re-midio**: esa pared desaparecio y la que
+queda es un pedido del MOTOR de **1.916.928 bytes**.
+
+**1. La palanca y por que se paga doble.** `gc_init` (`runtime/gc_heap.c`) pide **DOS** bloques del MISMO
+monton (`memalign(32, GC_SEMISPACE_SIZE)` x 2), asi que el semiespacio se paga dos veces: 512 -> 256 KB libera
+**524.288** bytes de verdad. Medido con el motor entero en Flycast (las dos lineas son la re-medicion de esta
+tarjeta; la corrida de DC-002.20 con 512 KB dio `arena=2579164 used=2576068 free=3096` — el `used` es
+identico):
+
+    KB=512   Out of memory ... diff 98304     Memory: arena=2579324 used=2576068 free=3256
+    KB=256   Out of memory ... diff 1916928   Memory: arena=2415484 used=2372348 free=43136
+
+La pared de 98.304 **desaparece** (la imagen del atlas de texto entra) y la arena queda 163.840 bytes mas
+chica, que NO es lo que libera el semiespacio: con 256 KB el arranque llega mas lejos y vuelve a consumir (el
+atlas entra y el motor sigue cargando). Se declara tal cual, sin repartir esa diferencia a mano.
+
+**2. La pared nueva esta declarada, NO atribuida.** Los 1.916.928 bytes (0x1D4000) son del motor pidiendo
+memoria para sus datos, y **no esta medido que estructura es** (candidato medido en DC-002.14: la tabla de
+`d2core/d2records`, 1.672.892 bytes, el 95,0% del `.data`). Tampoco es cosa de seguir bajando el semiespacio:
+el ELF enlazado carga **13.992.908** bytes (0xd583cc) de los 16.777.216 — `.text` 4.997.464, `.rodata`
+5.916.360, `.eh_frame` 1.073.276, `.gcc_except_table` 20.600, `.data` 1.760.444, `.bss` 224.640 — asi que la
+palanca grande sigue siendo recortar el binario (la linea de DC-002.14) o leer los datos del disco en vez de
+tenerlos en `.data`. 256 KB es el piso razonable *para esta etapa*: mas abajo el GC copia cada vez menos
+memoria y ademas no alcanza (faltan 1,9 MB).
+
+**3. Un hecho nuevo, medido: despues del OOM la consola REARRANCA.** El log con 256 KB tiene la secuencia del
+arranque **cinco veces** (50 marcas `MOTOR-ARRANQUE` y 5 lineas `MOTOR-ARRANQUE arranca`); con 512 KB, una
+(10 marcas). Por eso el corpus cuenta las marcas por ARRANQUE COMPLETO (total = 10 x arranques) y no "hasta el
+primer OOM", que mediria el bucle de reinicio.
+
+**4. El corpus (`scripts/console/checar-gc-221.sh`): 6 controles y su mutante.** El mutante de una tarjeta
+cuyo defecto es un PRESUPUESTO es el **valor viejo del vendor** (512 KB), aplicado con el script idempotente
+`fix-libgodc-gc.py 512 --build`. Los controles: (1) las 10 marcas por arranque completo; (2) la seleccion de
+archivos sigue verde (`Complete= true Validate.OK()= true archivos que ve= 7 faltan= 0`); (3) el config lo lee
+el motor; (4) **NO** esta la pared de 98.304; (5) **SI** esta la de 1.916.928; (6) el monton de C medido (arena
+2.415.484 con 43.136 libres). El par 4+5 es el que no se puede pasar por verde solo: uno exige que la pared
+vieja no este y el otro que la nueva si, con su numero. Resultado: **6/6 controles verdes y 1/1 mutante
+cazado** (`fix-libgodc-gc.py` deja el vendor en 256 KB y rehace `libgodc.a`, que es lo que el Makefile no hace
+solo: `%.o: %.c` no tiene dependencias de cabeceras).
+
+**5. El corpus de DC-002.14 que quedo muerto, alineado.** `checar-recorte-214.sh` clavaba `KB_OK=512` y
+salia con error si el vendor no estaba en 512: con el valor nuevo el corpus **no arrancaba**. Se alineo
+(`KB_OK=256`, y el control 3 acepta las dos formas de "el arranque paso las paredes del runtime", con los
+numeros de las dos etapas declarados en el propio script). Ademas sus dos reenlaces compilan el POC de HOY y
+el gox de DC-002.14 ya no lo puede compilar (le faltan `os.RamfsResumen` de DC-002.17 y `json.Instrumento` de
+DC-002.18), asi que usan el gox de la rama (`GOX_ACTUAL`). Corrida de esta tarjeta: **4 controles sanos y 2/2
+mutantes cazados**. El mutante `gc-2048` (el valor de fabrica del vendor) es el comodin que vigila esta
+tarjeta y sigue cazando: **con el GC en 2048 KB el arranque de hoy vuelve a morir en `gc_init` (diff
+2097152)**. Tambien se corrigio el defecto del script del vendor que seguia imprimiendo un numero de DC-002.14
+("quedan libres 610.304") y su valor por defecto paso de 512 a **256 KB** (el medido para el arranque de hoy).
+
+Barreras: `test-std-host.sh` verde en amd64 y 386 (13/13 excluidos), `mutar-std-host.sh` con **39/39**
+chequeos cazados y el arbol sano, `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas y 30 frames) y
+`checar-gzip-220.sh` con el control sano 7/7 y 3/3 mutantes (el gzip de DC-002.20 no se toca de rebote).
+Evidencia cruda: `evidencia/dc-002.21-monton-semiespacio.txt`.

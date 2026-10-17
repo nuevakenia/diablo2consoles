@@ -1,0 +1,204 @@
+DC-002.21 — EL MONTON DEL MOTOR: EL SEMIESPACIO DEL GC CONTRA LAS DOS PAREDES DE RAM
+====================================================================================
+
+Rama DC-002. Fecha: 2026-10-17. Medido en Flycast con el motor entero (POC `console/dc/poc/motor-arranque`).
+Tarjeta abierta al cerrar DC-002.20 con el OOM de 98.304 bytes (`evidencia/dc-002.20-gzip-asset-embebido.txt`).
+
+COMANDOS
+
+    bash scripts/console/checar-gc-221.sh /tmp/gox-00220 30       # el corpus: 6 controles + el mutante
+    python3 scripts/console/fix-libgodc-gc.py 256 --build        # el arreglo, a mano (nunca sobre el vendor)
+    sh-elf-size -A /tmp/dcbuild/arranque-221/prog.elf            # el reparto del binario
+    bash scripts/console/compare-motor-dc6.sh                    # la barrera
+    bash scripts/console/test-std-host.sh                        # la prueba diferencial en amd64 y 386
+    bash scripts/console/checar-gzip-220.sh /tmp/gox-00220 20    # el gzip no se toca de rebote
+    bash scripts/console/checar-recorte-214.sh                   # el corpus de DC-002.14, alineado
+
+
+1. LO QUE SE MIDIO Y LO QUE SE MOVIO
+-----------------------------------
+
+Con el gzip arreglado (DC-002.20) el arranque moria asi, con el semiespacio del GC en **512 KB** (el valor
+que dejo DC-002.14):
+
+    loaded configuration file from /rd/OpenDiablo2/config.json
+    Out of memory. Requested sbrk_base 0x8cff6000, was 0x8cfde000, diff 98304
+    fatal error: gc_external_alloc: OOM
+    Memory: arena=2579164 used=2576068 free=3096        (la corrida de DC-002.20)
+
+O sea: el atlas de texto YA se descomprime y lo que no entra es su imagen (98.358 bytes de BMP, el pedido de
+98.304 por el alineado). El monton de C (newlib) estaba usado al limite: 3.096 bytes libres de 2.579.164.
+
+El semiespacio del GC son **dos** bloques del MISMO monton (`gc_init` pide `2 x GC_SEMISPACE_SIZE`), asi que
+bajarlo libera RAM de verdad: 512 -> **256 KB** libera 524.288 bytes. Con eso:
+
+    Out of memory. Requested sbrk_base 0x8d18a000, was 0x8cfb6000, diff 1916928
+    fatal error: gc_external_alloc: OOM
+    Memory: arena=2415484 used=2372348 free=43136
+
+**La pared de 98.304 bytes desaparecio** (la imagen del atlas de texto entra) y la pared nueva es un pedido de
+**1.916.928 bytes** (0x1D4000) que ya no es del arranque ni del gzip: es el motor pidiendo memoria para sus
+datos. El monton queda con **43.136 bytes libres** contra 3.256, y la arena queda 163.840 bytes MAS CHICA
+(2.415.484 contra 2.579.324) — que NO es lo que libera el semiespacio (524.288): con 256 KB el arranque llega
+mas lejos y vuelve a consumir (el atlas de texto entra y el motor sigue cargando). Se declara tal cual, sin
+repartir esa diferencia a mano.
+
+Las dos corridas, con los numeros EXACTOS de cada estado (re-medidas en esta tarjeta, corpus §4):
+
+    KB=512   Out of memory ... diff 98304     Memory: arena=2579324 used=2576068 free=3256
+    KB=256   Out of memory ... diff 1916928   Memory: arena=2415484 used=2372348 free=43136
+
+Declarado, sin deducir de mas: **no esta medido que estructura es** la de 1.916.928 bytes. Lo que si esta
+medido (DC-002.14) es que `d2core/d2records` tiene un solo dato de 1.672.892 bytes y que el binario los
+carga en `.data`. El numero es del mismo orden, y la tarjeta siguiente lo tiene que medir, no suponer.
+
+
+2. POR QUE NO ALCANZA CON EL SEMIESPACIO: EL BINARIO SE COME 13,99 MB DE LOS 16
+-------------------------------------------------------------------------------
+
+Reparto del ELF que se enlaza (`sh-elf-size -A`, el de 0xd583cc):
+
+    .text                4.997.464
+    .rodata              5.916.360
+    .eh_frame            1.073.276
+    .gcc_except_table       20.600
+    .data                1.760.444      (+ .got 12, .ctors 8, .dtors 8)
+    .bss                   224.640
+    --------------------------------
+    cargado             13.992.908 bytes (0xd583cc) de 16.777.216
+
+    (sh-elf-size: text 12.007.796  data 1.760.472  bss 224.640  ->  13.992.908)
+
+Con 13,99 MB de binario, 0,5 MB de semiespacios y el monton de C, no queda RAM para un pedido de 1,9 MB: el
+`break` ya esta en 0x8cfb6000 y el pedido lo llevaria a 0x8d18a000, pasado el techo de la RAM. La palanca
+real de aca en adelante es **recortar el binario** (la linea de DC-002.14: `.eh_frame` de 1,07 MB y las
+tablas en `.rodata`/`.data`), o **leer los datos del disco** en vez de tenerlos en `.data`. Se declara como
+la frontera, con los numeros, en vez de seguir bajando el semiespacio: 256 KB es el piso razonable (mas abajo
+el GC copia cada vez menos memoria y el arranque se vuelve lentisimo, y ademas no alcanza: faltan 1,9 MB).
+
+
+3. UN HECHO NUEVO, MEDIDO: DESPUES DEL OOM LA CONSOLA REARRANCA
+---------------------------------------------------------------
+
+El log de la corrida con 256 KB tiene la secuencia del arranque **cinco veces** (50 marcas `MOTOR-ARRANQUE`
+y 5 lineas `MOTOR-ARRANQUE arranca`), porque al morir por OOM la consola se resetea y el programa vuelve a
+correr. Con 512 KB el log tiene 10 marcas y 1 arranque. El corpus cuenta las marcas por ARRANQUE COMPLETO
+(total = 10 x arranques) para no medir el bucle de reinicio ni depender de cuantas veces rearranco.
+
+
+4. EL CORPUS (`scripts/console/checar-gc-221.sh`): 6 CONTROLES Y SU MUTANTE
+---------------------------------------------------------------------------
+
+El mutante de esta tarjeta es el **valor viejo del vendor** (512 KB), el unico honesto cuando el defecto es
+un presupuesto y no una linea: se aplica con el script idempotente `fix-libgodc-gc.py 512 --build`.
+
+Los 6 controles, sobre la corrida con KB=256: (1) las 10 marcas por arranque completo; (2) la seleccion de
+archivos sigue verde (`Complete= true Validate.OK()= true archivos que ve= 7 faltan= 0`); (3) el config lo
+lee el motor (`loaded configuration file from /rd/OpenDiablo2/config.json`); (4) NO esta la pared de 98.304
+(el atlas de texto ENTRA); (5) SI esta la pared nueva de 1.916.928, declarada; (6) el monton de C medido
+(arena 2.415.484 con 43.136 libres). Los controles 4 y 5 son el par que hace que este corpus no se pueda
+pasar por verde solo: uno exige que la pared vieja NO este y el otro que la nueva SI, con su numero.
+
+Salida medida (corrida de esta tarjeta, 12:14):
+
+    == 1. semiespacio 512 KB (el valor de DC-002.14: la pared de la imagen del atlas)
+       libgodc.a: 206.328 bytes, sha256 de9156ba6a48723d
+       el MUTANTE cae: con 512 KB vuelve la pared de 98.304 bytes (el atlas de texto no entra)
+         Out of memory ... diff 98304
+         Memory: arena=2579324 used=2576068 free=3256
+
+    == 2. semiespacio 256 KB (esta tarjeta)
+       libgodc.a: 206.328 bytes, sha256 7166eff889bd7892
+       control 1 (las 10 marcas):              VERDE
+       control 2 (la seleccion):               VERDE
+       control 3 (el config):                  VERDE
+       control 4 (el atlas de texto ENTRA):    VERDE
+       control 5 (la pared nueva declarada):   VERDE
+       control 6 (el monton de C medido):      VERDE
+       OK: 6/6 controles verdes
+
+    == 3. el vendor queda en 256 KB (idempotente)
+    == 1/1 mutantes cazados ==
+
+
+5. LAS TRES BARRERAS, RE-MEDIDAS CON ESTE CAMBIO
+------------------------------------------------
+
+    test-std-host.sh          verde en amd64 Y en 386; los 13 paquetes que hablan con KOS siguen sin
+                              compilar en el host (13 de 13), exit 0
+    mutar-std-host.sh         39/39 chequeos cazados y el arbol queda sano (el mutante 39 es el del
+                              instrumento de json; el 38 el Unmarshaler del Decode)
+    compare-motor-dc6.sh      IGUAL: 31 lineas identicas y 30 frames comparados, exit 0
+                              (el motor en x86-64 y en SH-4 da el mismo resumen del DC6)
+    checar-gzip-220.sh        control sano 7/7 VERDE y 3/3 mutantes cazados, exit 0
+                              (el gzip de DC-002.20 no se toca de rebote)
+
+Las tres salen por los mismos scripts que dejo DC-002.20, sin tocarlos: el cambio de esta tarjeta es un
+numero del vendor (el semiespacio), no una linea de codigo del repo.
+
+`libgodc.a` con el semiespacio en 256 KB: 206.328 bytes (sha256 d3526c6c83c45d52 en la ultima corrida; el
+sha256 de `ar` NO es reproducible byte a byte entre corridas -- lo que si es estable es el tamano y el
+`GC_SEMISPACE_SIZE_KB` del `godc_config.h`).
+
+
+6. EL CORPUS DE DC-002.14, ALINEADO (NO SE PODIA DEJAR MUERTO)
+--------------------------------------------------------------
+
+`scripts/console/checar-recorte-214.sh` clavaba `KB_OK=512` y salia con error si el vendor no estaba en 512:
+desde esta tarjeta el vendor vive en 256, asi que el corpus **no arrancaba**. Se alineo (y se declara, en el
+propio script): `KB_OK=256` y el control 3 acepta las dos formas de "el arranque paso las paredes del
+runtime", con los numeros de las dos etapas:
+
+    KB=512  ->  Out of memory ... diff 98304      (la imagen del atlas, medido en DC-002.21)
+    KB=256  ->  Out of memory ... diff 1916928    (el pedido del MOTOR, la tabla de records)
+
+El control 3 corre el ELF BASELINE (el de DC-002.13, sin el gzip ni el atlas andando), asi que su veredicto
+sigue siendo el panic de Go del init (medido: `pasa-el-techo-de-RAM panic='assignment to entry in nil map'`).
+El caso nuevo (`cae-gc-external diff 1916928`) es el del arranque de hoy y queda aceptado DECLARADO; el corpus
+sigue ROJO si el arranque muere en `gc_init` o si vuelve la pared del atlas. Ademas, sus DOS reenlaces (el
+mutante y la vuelta) compilan el POC de HOY y el gox de DC-002.14 ya no lo puede compilar (le faltan
+`os.RamfsResumen`, DC-002.17, y `json.Instrumento`, DC-002.18: medido, "undefined identifier
+os.RamfsResumen"), asi que esos dos reenlaces usan el gox de la rama (`GOX_ACTUAL`); el gox del recorte se
+sigue usando para el control 2 y su ELF para el control 4.
+
+Corrida completa de esta tarjeta (13:3x, `/tmp/log-checar-214-c.txt`):
+
+    == 1. control sano: el instrumento NO imprime la tabla solapada
+       pesar-motor.py sobre /tmp/dcbuild/motor-arranque/prog.elf: exit 2
+           .text: suma=14215564 > seccion=4962328  (2.86x)
+           .bss: suma=412208 > seccion=204256  (2.02x)
+
+    == 2. control sano: el dato mas pesado del motor, medido por dos caminos
+       el .gox de d2core/d2records pesa 2281930 bytes (secciones ALLOC)
+       el dato mas grande (.data.go..C3111): 1672892 bytes en el .gox, 1672892 en el ELF
+       .data entero del ELF: 1760156 bytes -- coinciden, y son el 95.0% del .data
+
+    == 3. control sano: el arranque del motor pasa TODAS las paredes de RAM
+       cargado: 13910992 bytes   el GC pide: 524288 (2 x 256 KB)
+       arranque: pasa-el-techo-de-RAM panic='assignment to entry in nil map'
+
+    == 4. control sano (registro del limite): gc-sections NO baja el binario
+       secciones que el linker tira: 38491
+       cargado baseline: 13910992   cargado del recorte: 13913308   delta: -2316 bytes
+
+    == mutante 'sin-guard'      -> cazado (imprime la tabla solapada)
+    == mutante 'gc-2048'        -> cazado: con el GC en 2048 KB (pide 4 MB) el arranque de HOY
+                                   vuelve a morir en gc_init (diff 2097152)
+    == control sano de vuelta   -> arranque con 256 KB: cae-gc-external diff 1916928
+                                   control sano VERDE (la pared que queda es del MOTOR)
+    == 2/2 mutantes cazados ==
+
+El mutante 'gc-2048' es el comodin que vigila ESTA tarjeta: es el valor del vendor de fabrica y con el el
+arranque de hoy no pasa ni gc_init. Medido: diff 2097152 (4 MB pedidos).
+
+
+7. LO QUE QUEDA DECLARADO
+-------------------------
+
+  - El pedido de 1.916.928 bytes NO esta atribuido a una estructura concreta: hay que medirlo (candidato
+    medido en DC-002.14: la tabla de `d2core/d2records`, 1.672.892 bytes).
+  - El costo del semiespacio de 256 KB es mas recoleccion: el GC copia cada 256 KB de allocacion. Sirve para
+    el arranque (que es lo que esta medido) y hay que volver a subirlo cuando el binario se recorte.
+  - El recorte del binario (`.eh_frame` 1.073.276 bytes, `.rodata` 5.916.360, `.data` 1.760.444) es la
+    palanca grande y es trabajo aparte: con 13.992.908 bytes cargados de 16.777.216 no hay semiespacio que
+    pague una estructura de 1,9 MB en RAM.

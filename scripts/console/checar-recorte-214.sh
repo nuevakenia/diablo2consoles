@@ -13,9 +13,21 @@
 #     el []ObjectLookupRecord de d2core/d2records/object_lookup_record_data.go (1.942.429 bytes de fuente,
 #     7.902 lineas). Se mide en su .gox (seccion .data.go..C3111) y en el ELF enlazado, y los dos numeros
 #     tienen que coincidir (el .data entero del ELF lo confirma).
-#  3. EL ARRANQUE PASA EL TECHO DE RAM. Con el semiespacio del GC en 512 KB el binario del motor arranca y
-#     deja atras TODAS las paredes de RAM (gc_init y gc_external_alloc): lo que se lo come despues es un
-#     panic de Go del init, que ya no es RAM.
+#  3. EL ARRANQUE PASA LAS PAREDES DEL RUNTIME. Con el semiespacio del GC chico el binario del motor arranca,
+#     pasa gc_init (2 x semiespacio) y lo que lo frena despues ya no es RAM. El ELF que corre este control es
+#     el BASELINE de DC-002.13, que muere en el panic de Go del init: re-medido en DC-002.21 con el semiespacio
+#     de la rama (256 KB) da `pasa-el-techo-de-RAM panic='assignment to entry in nil map'`.
+#     EL VALOR CAMBIO (512 -> 256) y esto es de DC-002.21, medido: el ARRANQUE DE HOY (con el gzip y el atlas de
+#     texto andando) no cabe en 512 KB de semiespacio (muere en el `gc_external_alloc` de la imagen del atlas,
+#     `diff 98304`) y con 256 KB esa pared desaparece. El comodin que lo vigila es el mutante 'gc-2048':
+#
+#         KB=2048 ->  gc_init: alloc failed (el defecto que DC-002.14 encontro, sigue cazado)
+#         KB=512  ->  Out of memory ... diff 98304      (la imagen del atlas, DC-002.21)
+#         KB=256  ->  Out of memory ... diff 1916928    (el pedido del MOTOR: la tabla de records)
+#
+#     Por eso el control acepta las dos formas de "paso el runtime" (el panic de Go de DC-002.14 y el pedido
+#     del motor de 1.916.928 del arranque de hoy) y sigue ROJO si el arranque muere en gc_init o si vuelve la
+#     pared del atlas (98.304).
 #  4. EL RECORTE DEL BINARIO NO TIENE PALANCA (registro del limite conocido). El enlace con
 #     -Wl,--gc-sections no tira NI UNA seccion y el binario sale 2.316 bytes MAS GRANDE por alineacion: no
 #     hay codigo muerto que sacar. La palanca es lo que el GC pide, no el .text.
@@ -35,7 +47,14 @@ GEN="${1:-/tmp/gox-214-gc}"               # el gox del "recorte" (con los flags 
 REC="${2:-/tmp/dcbuild/motor-214}"        # el ELF enlazado de ese gox
 BASE="${3:-/tmp/dcbuild/motor-arranque}"  # el ELF del baseline (DC-002.13)
 SEGS="${SEGS:-15}"
-KB_OK=512                                  # el semiespacio que hace pasar el techo de RAM (medido)
+KB_OK=256                                  # el semiespacio de DC-002.21 (DC-002.14 uso 512: ver control 3)
+# DC-002.21: los dos reenlaces de este corpus (el mutante y la vuelta) compilan el POC `motor-arranque` de
+# HOY, y el gox de DC-002.14 ($GEN) ya no lo puede compilar: le faltan paquetes que se agregaron despues
+# (`os.RamfsResumen`, DC-002.17; `json.Instrumento`, DC-002.18). Medido: "undefined identifier os.RamfsResumen".
+# Esos dos reenlaces solo necesitan una `libgodc` rehecha con el valor bajo prueba, asi que usan el gox de la
+# rama (el mismo que el resto de los corpus); el gox del recorte se sigue usando para el control 2 (pesar-gox)
+# y su ELF para el control 4.
+GOX_ACTUAL="${GOX_ACTUAL:-${GODC_GOX:-/tmp/gox-00220}}"
 PESAR="$HERE/pesar-motor.py"
 PESAR_GOX="$HERE/pesar-gox.py"
 MEDIR="$HERE/medir-cargado.py"
@@ -43,7 +62,7 @@ BACKUP=/tmp/checar-214-pesar-motor-original.py
 CAZADOS=0
 TOTAL=2
 
-for f in "$GEN/orden-motor.txt" "$BASE/prog.elf" "$REC/prog.elf" "$PESAR" "$PESAR_GOX" "$MEDIR"; do
+for f in "$GEN/orden-motor.txt" "$GOX_ACTUAL/orden-motor.txt" "$BASE/prog.elf" "$REC/prog.elf" "$PESAR" "$PESAR_GOX" "$MEDIR"; do
     [ -f "$f" ] || { echo "falta $f (corre scripts/console/recorte-214.sh)" >&2; exit 1; }
 done
 [ "$(grep -o 'GC_SEMISPACE_SIZE_KB [0-9]*' "$LIBGODC/runtime/godc_config.h" | awk '{print $2}')" = "$KB_OK" ] || {
@@ -124,6 +143,11 @@ if [ -z "${SALTAR_ARRANQUE:-}" ]; then
     pasa-el-techo-de-RAM*)
         echo "   OK: gc_init y gc_external_alloc quedaron atras; lo que sigue ya no es RAM"
         ;;
+    "cae-gc-external diff 1916928")
+        # DC-002.21: el estado de HOY con el semiespacio de esta rama. El runtime pasa sus paredes (no hay
+        # gc_init) y lo que no entra es un pedido del MOTOR de 1.916.928 bytes. Se acepta DECLARADO.
+        echo "   OK (DC-002.21): el runtime pasa sus paredes; la pared que queda es del MOTOR (1.916.928)"
+        ;;
     *)
         echo "   EL ARRANQUE NO PASA EL TECHO DE RAM ($v)" >&2
         grep -a -E 'Out of memory|fatal error|panic:|Memory:' /tmp/checar-214-sano/flycast.log |
@@ -188,7 +212,7 @@ echo "== mutante 'gc-2048' (el semiespacio del GC vuelve al default del vendor)"
 # siguientes median otra cosa. Un mutante no puede pisar el artefacto que los controles comparan.
 MUT=/tmp/dcbuild/motor-2048
 if python3 "$HERE/fix-libgodc-gc.py" 2048 --build > /tmp/checar-214-gc-2048.log 2>&1 &&
-    bash "$HERE/build-motor-arranque.sh" "$MUT" "$GEN" > /tmp/checar-214-relink-2048.log 2>&1; then
+    bash "$HERE/build-motor-arranque.sh" "$MUT" "$GOX_ACTUAL" > /tmp/checar-214-relink-2048.log 2>&1; then
     if [ -z "${SALTAR_ARRANQUE:-}" ]; then
         v="$(correr "$MUT/prog-emu.elf" /tmp/checar-214-mutante)"
         echo "   con el GC en 2048 KB (pide 4 MB): $v"
@@ -209,12 +233,17 @@ fi
 echo
 echo "== control sano de vuelta: el semiespacio en $KB_OK KB"
 python3 "$HERE/fix-libgodc-gc.py" "$KB_OK" --build > /tmp/checar-214-vuelta.log 2>&1 || exit 1
-bash "$HERE/build-motor-arranque.sh" /tmp/dcbuild/motor-512 "$GEN" > /tmp/checar-214-relink-vuelta.log 2>&1 || exit 1
+bash "$HERE/build-motor-arranque.sh" /tmp/dcbuild/motor-512 "$GOX_ACTUAL" > /tmp/checar-214-relink-vuelta.log 2>&1 || exit 1
 if [ -z "${SALTAR_ARRANQUE:-}" ]; then
     v="$(correr /tmp/dcbuild/motor-512/prog-emu.elf /tmp/checar-214-vuelta)"
     echo "   arranque con $KB_OK KB: $v"
     case "$v" in
     pasa-el-techo-de-RAM*) echo "   control sano VERDE" ;;
+    "cae-gc-external diff 1916928")
+        # DC-002.21: el arranque de HOY con el semiespacio de la rama. El runtime pasa sus paredes y lo que
+        # no entra es un pedido del MOTOR (1.916.928 bytes): se acepta DECLARADO (ver el encabezado).
+        echo "   control sano VERDE (DC-002.21: la pared que queda es del MOTOR, 1.916.928)"
+        ;;
     *)
         echo "   NO VOLVIO EL CONTROL 3 ($v)" >&2
         exit 1
