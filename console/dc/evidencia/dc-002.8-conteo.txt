@@ -1,10 +1,10 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 123 de 142
+compilados: 142 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
-d2app 0
+d2app 1
 d2app/d2setup 1
 d2common 1
 d2common/d2act3 1
@@ -92,14 +92,14 @@ d2core/d2audio 1
 d2core/d2audio/d2pcm 1
 d2core/d2audio/d2sfx 1
 d2core/d2audio/d2soundpath 1
-d2core/d2audio/ebiten 0
+d2core/d2audio/ebiten 1
 d2core/d2config 1
 d2core/d2gui 1
 d2core/d2hero 1
 d2core/d2hero/herogen 1
-d2core/d2input 0
+d2core/d2input 1
 d2core/d2input/d2gamepad 1
-d2core/d2input/ebiten 0
+d2core/d2input/ebiten 1
 d2core/d2inventory 1
 d2core/d2item 1
 d2core/d2item/d2cube 1
@@ -118,7 +118,7 @@ d2core/d2map/d2objspawn 1
 d2core/d2monsters 1
 d2core/d2playertrade 1
 d2core/d2records 1
-d2core/d2render/ebiten 0
+d2core/d2render/ebiten 1
 d2core/d2screen 1
 d2core/d2skills 1
 d2core/d2stats 1
@@ -127,45 +127,26 @@ d2core/d2term 1
 d2core/d2ui 1
 d2core/d2vendor 1
 d2game/d2autoscript 1
-d2game/d2gamescreen 0
-d2game/d2player 0
-d2networking 0
-d2networking/d2client 0
+d2game/d2gamescreen 1
+d2game/d2player 1
+d2networking 1
+d2networking/d2client 1
 d2networking/d2client/d2clientconnectiontype 1
-d2networking/d2client/d2localclient 0
-d2networking/d2client/d2realmclient 0
-d2networking/d2client/d2remoteclient 0
+d2networking/d2client/d2localclient 1
+d2networking/d2client/d2realmclient 1
+d2networking/d2client/d2remoteclient 1
 d2networking/d2gs 1
-d2networking/d2gsnet 0
+d2networking/d2gsnet 1
 d2networking/d2mp 1
-d2networking/d2netpacket 0
+d2networking/d2netpacket 1
 d2networking/d2netpacket/d2netpackettype 1
-d2networking/d2realm 0
-d2networking/d2server 0
-d2networking/d2server/d2tcpclientconnection 0
-d2networking/d2server/d2udpclientconnection 0
-d2script 0
+d2networking/d2realm 1
+d2networking/d2server 1
+d2networking/d2server/d2tcpclientconnection 1
+d2networking/d2server/d2udpclientconnection 1
+d2script 1
 d2thread 1
 
 ## los simbolos que faltan (undefined:), ordenados por cuantos paquetes bloquean
 
 ## los paquetes bloqueados (primera linea de error de cada uno)
-d2app: /home/dgalli/Proyectos/diablo2consoles/d2app/app.go:14:18: error: import file ‘image/gif’ not found
-d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebiten/ebiten_audio_provider.go:14:47: error: import file ‘github.com/hajimehoshi/ebiten/v2/audio’ not fou
-d2core/d2input: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/input_manager.go:9:9: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/ebiten’ not fo
-d2core/d2input/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/ebiten/ebiten_input.go:119:54: error: reference to undefined identifier ‘ebiten.MouseButton’
-d2core/d2render/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2render/ebiten/ebiten_panic_screen.go:5:52: error: import file ‘github.com/hajimehoshi/ebiten/v2/ebitenutil’ not 
-d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/act_travel.go:14:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2game/d2player’ not foun
-d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/game_controls.go:1495:14: error: reference to undefined identifier ‘time.AfterFunc’
-d2networking: /home/dgalli/Proyectos/diablo2consoles/d2networking/client_listener.go:3:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket’ no
-d2networking/d2client: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/game_client.go:32:79: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2client/
-d2networking/d2client/d2localclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2localclient/local_client_connection.go:10:56: error: import file ‘github.com/OpenDiablo2/OpenDiab
-d2networking/d2client/d2realmclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2realmclient/bridge.go:13:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/
-d2networking/d2client/d2remoteclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2remoteclient/remote_client_connection.go:9:12: error: import file ‘net’ not found
-d2networking/d2gsnet: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2gsnet/env.go:6:12: error: import file ‘net’ not found
-d2networking/d2netpacket: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2netpacket/net_packet.go:15:20: error: reference to undefined identifier ‘json.RawMessage’
-d2networking/d2realm: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2realm/client.go:7:12: error: import file ‘net’ not found
-d2networking/d2server: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/client_connection.go:6:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2ne
-d2networking/d2server/d2tcpclientconnection: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/d2tcpclientconnection/tcp_client_connection.go:6:12: error: import file ‘net’ not found
-d2networking/d2server/d2udpclientconnection: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2server/d2udpclientconnection/udp_client_connection.go:9:12: error: import file ‘net’ not found
-d2script: /home/dgalli/Proyectos/diablo2consoles/d2script/engine.go:9:37: error: import file ‘github.com/robertkrimen/otto’ not found

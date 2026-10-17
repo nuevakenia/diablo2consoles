@@ -197,13 +197,28 @@ func sortUnits(ids []uint32) {
 }
 
 // Explain turns a refused create or join into a sentence for the player.
+// comoErrorDePedido: saca el *d2realm.RequestError de un error, mirando tambien los que venga envuelven.
+//
+// POR QUE ESTA FUNCION Y NO errors.As: en la consola NO hay errors.As, porque pide reflexion y el port no
+// tiene reflexion (ver el paquete errors del port). La asercion de tipo sola no alcanza porque el error
+// puede venir envuelto con %w, asi que se recorre la cadena con errors.Unwrap -- que es lo que hace
+// errors.As por dentro, sin la parte que necesita reflexion.
+func comoErrorDePedido(err error) *d2realm.RequestError {
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if re, ok := e.(*d2realm.RequestError); ok {
+			return re
+		}
+	}
+	return nil
+}
+
 func Explain(err error) string {
 	if err == nil {
 		return ""
 	}
 
-	var re *d2realm.RequestError
-	if !errors.As(err, &re) {
+	re := comoErrorDePedido(err)
+	if re == nil {
 		return fmt.Sprintf("could not reach the game: %v", err)
 	}
 
@@ -245,8 +260,7 @@ func retryJoin(try func() (d2realm.GameJoined, error), deadline time.Time, wait 
 			return j, nil
 		}
 
-		var re *d2realm.RequestError
-		if errors.As(err, &re) && re.Code != d2realm.CodeGameNotFound {
+		if re := comoErrorDePedido(err); re != nil && re.Code != d2realm.CodeGameNotFound {
 			return j, err
 		}
 

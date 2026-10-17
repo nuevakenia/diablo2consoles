@@ -76,6 +76,34 @@ func (ip IP) String() string {
 	return "ipv6"
 }
 
+// To4: la direccion como IPv4. Si no es una IPv4 (no tiene 4 bytes), no hay nada que devolver.
+//
+// OJO CON EL CASO QUE IMPORTA: en la consola la busqueda de direcciones (LookupIP) no encuentra ninguna
+// --no hay red--, asi que este metodo no se llega a usar con datos. Existe porque el motor pregunta por
+// cada direccion que encuentra (d2gamescreen/main_menu.go:694) y el codigo tiene que poder compilar y
+// recorrer una lista vacia sin caerse.
+func (ip IP) To4() IP {
+	if len(ip) == 4 {
+		return ip
+	}
+	return nil
+}
+
+// To16: lo mismo para IPv6.
+func (ip IP) To16() IP {
+	if len(ip) == 4 {
+		// una IPv4 tambien se puede ver como IPv6 (los primeros 12 bytes son el prefijo)
+		d := make(IP, 16)
+		d[10], d[11] = 0xff, 0xff
+		copy(d[12:], ip)
+		return d
+	}
+	if len(ip) == 16 {
+		return ip
+	}
+	return nil
+}
+
 // TCPAddr: una direccion TCP.
 type TCPAddr struct {
 	IP   IP
@@ -295,6 +323,11 @@ type TCPConn struct {
 type UDPConn struct {
 	Conn
 }
+
+// WriteToUDP / ReadFromUDP: mandar y recibir un paquete a una direccion. Sin red, no se puede: devuelven
+// el error con el motivo. Lo pide d2networking/d2server/d2udpclientconnection.
+func (c *UDPConn) WriteToUDP(datos []byte, direccion *UDPAddr) (int, error) { return 0, ErrSinRed }
+func (c *UDPConn) ReadFromUDP(datos []byte) (int, *UDPAddr, error)         { return 0, nil, ErrSinRed }
 
 // SetReadBuffer / SetWriteBuffer: el tamano de los buffers del sistema. Sin red no hay buffers que ajustar.
 func (c *TCPConn) SetReadBuffer(bytes int) error  { return ErrSinRed }

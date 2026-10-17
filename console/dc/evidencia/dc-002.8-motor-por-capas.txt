@@ -151,3 +151,84 @@ LO QUE QUEDA DECLARADO (no silencioso)
      familia de los tests de goroutines/canales de DC-002.7, que es lo que el comentario del archivo ya
      advierte que puede colgarse con el scheduler del host. Frecuencia medida: ~1,25% de las corridas
      de la suite completa en 386. Declarado: cuando se cuelga, el que lo mire va a saber por que.
+
+
+=========================================================================
+TRAMO 2: de 108 a 124 de 142, y los backends de la consola
+=========================================================================
+
+CUANTO COMPILA (medido, scripts/console/build-motor-all.sh)
+----------------------------------------------------------
+  108 -> 111 -> 119 -> 123 -> 124 de 142 ; bloqueados 34 -> 18
+  La progresion completa de la tarjeta: 90 -> 93 -> ... -> 108 -> 124.
+
+QUE DESBLOQUEO CADA COSA
+-----------------------
+  111  encoding/json MINIMO (sin reflexion) + os.Fd/Name + os.CreateTemp/Chmod/Sync
+  119  os/user + os.UserConfigDir/UserCacheDir   -> entro d2config, y con el d2hero ENTERO (+8 de una)
+  123  fmt.Sscanf + filepath.Glob + los getters de fecha de time (Year/Month/Day/Weekday)
+  124  time.AfterFunc                              -> entro d2game/d2player
+
+  ANTES: 104 -> 108 con Rand.Seed (que go elimino), google/uuid (reescrito: el motor usa UN solo simbolo,
+  uuid.New) y los metodos de bytes del regexp (Find/FindIndex/FindAll/FindAllIndex).
+
+EL JSON: POR QUE MINIMO Y NO EL DE GO (decision medible, no pereza)
+------------------------------------------------------------------
+  Serializar structs pide REFLEXION (las etiquetas `json:"heroName"`): reflect son 43 paquetes de la
+  biblioteca estandar que no estan portados. Medido antes de escribir: 88 archivos del motor importan
+  encoding/json con 72 llamadas, casi todas sobre structs.
+  Lo que SI se puede: los tipos que saben escribirse solos (MarshalJSON/UnmarshalJSON). Todo lo demas
+  devuelve ErrSinReflexion, con ese nombre para que se entienda de una. No se finge que funciono.
+  Alcanza porque en la consola el guardado no puede funcionar de todos modos: el romdisk es de solo
+  lectura. El guardado esta fuera de la ruta critica por decision escrita (opcion C, single player).
+
+LOS BACKENDS DE LA CONSOLA (esto es lo que reemplaza a ebiten)
+-------------------------------------------------------------
+  Los paquetes del motor que dependen de ebiten NO se pueden compilar con el ebiten de la PC: hay que
+  escribir el de la consola. Escritos en este tramo:
+
+    console/dc/engine/ebiten/v2/entrada.go   joystick -> mouse y teclado (la traduccion que hace que el
+                                             juego se pueda jugar: palanca -> CursorPosition, boton A ->
+                                             clic izquierdo, boton B -> derecho, cruceta -> flechas)
+    console/dc/engine/ebiten/v2/ebitenutil   DrawLine y DrawRect DIBUJAN de verdad sobre la imagen que va
+                                             al PVR. DebugPrint va a la CONSOLA SERIE (que en la Dreamcast
+                                             es el equivalente exacto de la ventana de depuracion).
+    console/dc/engine/ebiten/v2/audio         COMPILA y lleva estado, pero TODAVIA NO SUENA: el AICA
+                                             (el chip de audio) se conecta despues, igual que se hizo con
+                                             el PVR para el video. No se finge: esta escrito en la
+                                             cabecera del paquete.
+
+  Y una correccion en el build que hacia falta: compilar_tercero() compilaba UN archivo; cuando el paquete
+  paso a tener dos (ebiten.go + entrada.go) los simbolos del otro no existian ("undefined type
+  CursorMode"). Ahora, si le pasan un directorio, compila todos los .go de adentro.
+
+DEFECTOS CAZADOS EN ESTE TRAMO (todos por medir, no por leer)
+-------------------------------------------------------------
+1. fmt.Sscanf: habia implementado el comodin "%*d" (leer y descartar). Es de C, NO de go: el Sscanf de Go
+   contesta "bad verb '%*' for integer" y no lee nada. Lo cazo la prueba diferencial en la PRIMERA
+   corrida. Se saco. (Es el cuarto defecto que caza la prueba contra Go: los tres primeros fueron el "+"
+   no greedy del regexp, un grupo con "+" que capturaba la primera repeticion, y el indice del grupo.)
+2. os.Name y os.Stat: los agregue SIN MIRAR si ya estaban (estaban: lineas 128 y 268). gccgo los canto
+   como redefinition y con el os roto se cayeron 68 paquetes de golpe: 111 -> 43. La regla: antes de
+   agregar un simbolo a un paquete de la consola, grep. Despues de escribirlo, grep OTRA VEZ.
+3. Un script mio que agregaba 4 metodos tenia el if mal escrito (comparaba una cadena contra una LISTA de
+   nombres: falso siempre), asi que escribia el archivo SIN agregar nada y avisaba "agregados: 4". El
+   conteo no se movia y parecia un problema del motor. Leccion: el mensaje de un script no es evidencia;
+   el archivo es la evidencia.
+4. El MUTADOR corria solo "go test ./difftest/" y las pruebas que viven en su propio paquete (como la del
+   regexp) no se ejecutaban: dos mutantes reales salieron "NO CAZADOS" sin serlo. Se corrigio, y al
+   corregirlo use $EXCLUIDOS, que estaba definido SOLO en test-std-host.sh: el mutador corrio los 34
+   mutantes contra una lista vacia y reporto 1/34. Ahora la lista vive en scripts/console/kos-lista.sh y
+   la cargan los dos. (Un mutador que mide mal es peor que no tenerlo: da una respuesta que parece dato.)
+
+LOS 18 QUE QUEDAN, POR CAUSA
+----------------------------
+  10  multijugador y scripting, FUERA por la decision escrita (opcion C, single player):
+        d2networking (+8 subpaquetes: net, d2netpacket, d2client, d2realm, d2server...) y d2script
+        (otto: un interprete de JavaScript entero)
+   8  single player, en curso:
+        d2app                     image/gif (es la GRABACION DE CAPTURAS del juego, no la ruta critica)
+        d2core/d2input/ebiten     ebiten.MouseButton (escrito en entrada.go)
+        d2core/d2render/ebiten    ebitenutil (escrito)
+        d2core/d2audio/ebiten     ebiten/v2/audio (escrito)
+        y los que dependen de esos

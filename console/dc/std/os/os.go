@@ -565,3 +565,12 @@ func SenalDeNombre(nombre string) Signal {
 // sea que cualquiera que escriba ahi va a fallar -- y eso es correcto, no un descuido. Lo pide
 // d2app/autoclass.go:78 para sacar los archivos de clasificacion.
 func TempDir() string { return "/rd" }
+
+// Hostname: el nombre de la maquina. En la consola no hay nombre de maquina configurado (no hay sistema de
+// archivos donde tenga uno, ni red por la que lo pregunten), asi que se devuelve el de la consola misma.
+//
+// POR QUE NO SE DEVUELVE UN ERROR: lo pide d2gamescreen/main_menu.go:690 para armar la direccion IP local
+// (pregunta el nombre y despues busca sus direcciones). Si devolviera error, el nombre quedaria vacio y la
+// busqueda seria la de "" -- el resultado es el mismo (no hay ninguna direccion, porque no hay red), pero
+// devolver un nombre conocido deja el codigo del motor en su camino normal.
+func Hostname() (string, error) { return "dreamcast", nil }

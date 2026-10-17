@@ -65,7 +65,13 @@ done
 
 echo
 echo "== RESULTADO: $OK de $TOTAL paquetes del motor compilan para SH-4 =="
-echo "== bloqueados: $(echo "$PENDIENTES" | wc -w) =="
+# el conteo de bloqueados: OJO, con la lista vacia `echo | wc -w` da 1 (el echo manda una linea vacia).
+# Medido cuando el motor llego a 142: decia "bloqueados: 1" con la lista vacia.
+if [ -z "${PENDIENTES// /}" ]; then
+    echo "== bloqueados: 0 (el motor compila COMPLETO) =="
+else
+    echo "== bloqueados: $(echo "$PENDIENTES" | wc -w) =="
+fi
 
 {
     echo "# DC-002.8: el motor compilando por capas"
