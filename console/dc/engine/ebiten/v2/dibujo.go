@@ -250,6 +250,49 @@ func (i *Image) Huella() uint32 {
 // HuellaDePantalla: la huella de la pantalla del juego (la que se le pasa a Draw).
 func HuellaDePantalla() uint32 { return pantalla.Huella() }
 
+// CentroDeMasa: DONDE esta el contenido claro de la pantalla, en un par de numeros.
+//
+// POR QUE HACE FALTA, SI YA ESTA LA HUELLA: la huella dice si el cuadro CAMBIO, no DONDE. Y para probar que
+// el control mueve el logo hace falta el DONDE: con la huella sola, "el logo no se movio" y "el logo se movio
+// y la huella no lo vio" son la misma respuesta. Esto lo dice sin ambiguedad: es el promedio de las
+// posiciones de los pixeles claros, asi que un logo que se corre 300 pixeles a la derecha mueve el promedio
+// a la derecha, y uno que esta donde estaba lo deja donde estaba.
+//
+// EL MARGEN DE 10 PIXELES NO ES DECORACION: el POC dibuja un marco amarillo en el borde (para que "el logo
+// se fue de la pantalla" no se confunda con "no se dibujo nada"), y el amarillo es CLARO: si se contara,
+// arrastraria el promedio hacia los cuatro bordes a la vez -- o sea hacia el centro, que es justo el valor
+// que hay que distinguir.
+func (i *Image) CentroDeMasa() (int, int) {
+	if i == nil || len(i.pixeles) == 0 {
+		return 0, 0
+	}
+
+	const margen = 10
+	const umbral = 150 // rojo + verde + azul: el fondo es negro (0) y el logo es claro
+
+	var sumaX, sumaY, cuantos int
+
+	for y := margen; y < i.alto-margen; y++ {
+		for x := margen; x < i.ancho-margen; x++ {
+			j := (y*i.ancho + x) * 4
+			luz := int(i.pixeles[j]) + int(i.pixeles[j+1]) + int(i.pixeles[j+2])
+			if luz > umbral {
+				sumaX += x
+				sumaY += y
+				cuantos++
+			}
+		}
+	}
+
+	if cuantos == 0 {
+		return 0, 0
+	}
+	return sumaX / cuantos, sumaY / cuantos
+}
+
+// CentroDeMasaDePantalla: lo mismo, para la pantalla del juego.
+func CentroDeMasaDePantalla() (int, int) { return pantalla.CentroDeMasa() }
+
 // copiarMovida: el dibujado cuando la transformacion es SOLO MOVER (sin escala, sin giro, sin inclinacion).
 //
 // POR QUE ESTA DE APARTE: es el caso del motor casi siempre (poner un sprite en una posicion y nada mas), y

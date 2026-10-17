@@ -11,10 +11,11 @@
 // directo. Si el dibujado de la consola tuviera el rojo y el azul cambiados, o el quad al reves, se ve en la
 // comparacion y no "en un rato mirando la pantalla".
 //
-// LO QUE SE MUEVE: el logo cruza la pantalla de izquierda a derecha y vuelve a entrar. Eso no es adorno: es
-// la unica forma de probar que la MATRIZ DE GEOMETRIA de verdad posiciona. Con la matriz de mentira (la que
-// habia antes, que solo guardaba "hubo un cambio") el logo apareceria siempre en el mismo lugar, y el
-// defecto no se notaria hasta tener el juego entero andando.
+// LO QUE SE MUEVE: el logo sigue al CURSOR, y el cursor lo mueve el CONTROL DE LA DREAMCAST (leido del bus
+// maple por el backend de entrada). Eso no es adorno: es la unica forma de probar dos cosas que, si no, se
+// notarian recien con el juego entero andando -- que la MATRIZ DE GEOMETRIA de verdad posiciona (con la
+// matriz de mentira que habia antes el logo aparecia siempre en el mismo lugar) y que el control de la
+// consola llega hasta el motor.
 //
 // Y el LOOP es el del motor (ebiten.RunGame): esperar el cuadro, actualizar, dibujar, cerrar la lista del
 // PVR. Es el mismo loop que va a correr el juego.
@@ -47,8 +48,13 @@ func d2cAssetPal(i int) uint
 type juego struct {
 	logo    *ebiten.Image
 	x       float64
+	y       float64
 	cuadros int
 	vueltas int
+	// botonesAntes: el estado del control en el cuadro anterior, para avisar CUANDO CAMBIA y no cada 60
+	// cuadros. Un toque corto de boton dura pocos cuadros: si se informara cada 60, un toque se perderia
+	// entre dos avisos y la prueba diria "el control no hizo nada" cuando en realidad si hizo.
+	botonesAntes uint32
 }
 
 // Layout: el tamano de la pantalla.
@@ -59,15 +65,32 @@ func (j *juego) Layout(ancho, alto int) (int, int) { return 640, 480 }
 func (j *juego) Update() error {
 	j.cuadros++
 
-	j.x += 3
-	if j.x > 640 {
-		j.x = -256
-		j.vueltas++
-	}
+	// EL LOGO SE MUEVE CON EL CONTROL, y el camino es el de verdad: el backend de la consola leyo el control
+	// (bus maple) y lleno el CURSOR del motor; aca se lee ese cursor, que es lo que el juego de PC llama "el
+	// mouse". Con la cruceta o la palanca el logo se mueve; con el boton A se salta al centro.
+	cx, cy := ebiten.PosicionDelCursor()
+	j.x = float64(cx - 128)
+	j.y = float64(cy - 128)
 
 	if j.cuadros%60 == 0 {
-		println("MOTOR-PANTALLA cuadros", j.cuadros, "x", int(j.x), "vueltas", j.vueltas,
-			"dibujos", ebiten.Dibujos, "huella", int(ebiten.HuellaDePantalla()))
+		// el centro de masa dice DONDE esta el contenido: es lo que prueba que el control movio el logo (la
+		// huella sola no alcanza, ver CentroDeMasa en dibujo.go)
+		mx, my := ebiten.CentroDeMasaDePantalla()
+		println("MOTOR-PANTALLA cuadros", j.cuadros, "x", int(j.x), "cursor", cx, cy,
+			"dibujos", ebiten.Dibujos, "huella", int(ebiten.HuellaDePantalla()), "centro", mx, my)
+	}
+
+	// CADA VEZ QUE EL CONTROL CAMBIA, QUEDA ESCRITO: es la unica forma de probar que los botones llegan sin
+	// estar mirando la pantalla. El numero de los botones es el del control de la Dreamcast (los bits de
+	// dc/maple/controller.h), asi que la consola serie dice EXACTAMENTE que boton se apreto.
+	if b := ebiten.BotonesParaLaEvidencia(); b != j.botonesAntes {
+		println("MOTOR-CONTROL botones", int(b), "cursor", cx, cy, "cuadro", j.cuadros)
+		j.botonesAntes = b
+	}
+
+	// y el flanco (lo que el motor pregunta para los menus): se avisa cuando A se acaba de apretar
+	if ebiten.TeclaSeApreto(ebiten.KeyEnter) {
+		println("MOTOR-CONTROL A se apreto en este cuadro, cuadro", j.cuadros)
 	}
 
 	return nil
@@ -80,7 +103,7 @@ func (j *juego) Update() error {
 // mueve, y asi "se movio el logo" se distingue de "se dejo de dibujar".
 func (j *juego) Draw(pantalla *ebiten.Image) {
 	var op ebiten.DrawImageOptions
-	op.GeoM.Translate(j.x, 112)
+	op.GeoM.Translate(j.x, j.y)
 	pantalla.DrawImage(j.logo, &op)
 
 	marca := color.RGBA{R: 255, G: 255, B: 0, A: 255}
@@ -99,6 +122,14 @@ func main() {
 
 	println("MOTOR-PANTALLA arranca (DC-002.10: el cuadro del motor en la consola)")
 	println("MOTOR-PANTALLA runtime", runtime.GOOS, runtime.GOARCH)
+
+	// el control: si no hay, se dice. Un "no hay control" es un dato, no un fallo: el juego tiene que poder
+	// mostrar su pantalla sin control enchufado.
+	if ebiten.HayControl() {
+		println("MOTOR-PANTALLA hay control en el puerto 0")
+	} else {
+		println("MOTOR-PANTALLA NO hay control en el puerto 0 (el loop corre igual)")
+	}
 
 	ancho, alto := d2cAssetW(), d2cAssetH()
 	println("MOTOR-PANTALLA asset", ancho, "x", alto)

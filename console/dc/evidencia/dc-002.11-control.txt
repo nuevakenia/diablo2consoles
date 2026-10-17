@@ -1,0 +1,70 @@
+MOTOR-PANTALLA arranca (DC-002.10: el cuadro del motor en la consola)
+MOTOR-PANTALLA runtime dreamcast sh4
+MOTOR-PANTALLA hay control en el puerto 0
+MOTOR-PANTALLA asset 256 x 256
+MOTOR-PANTALLA imagen del motor armada, bytes de RGBA 262144
+MOTOR-PANTALLA la pantalla del juego ocupa en la VRAM, bytes 1048576
+MOTOR-PANTALLA cuadros 60 x 192 cursor 320 240 dibujos 59 huella -1192069352 centro 293 174
+MOTOR-PANTALLA cuadros 120 x 192 cursor 320 240 dibujos 119 huella -1192069352 centro 293 174
+MOTOR-PANTALLA cuadros 180 x 192 cursor 320 240 dibujos 179 huella -1192069352 centro 293 174
+MOTOR-PANTALLA cuadros 240 x 192 cursor 320 240 dibujos 239 huella -1192069352 centro 293 174
+MOTOR-CONTROL botones 128 cursor 332 240 cuadro 299
+MOTOR-PANTALLA cuadros 300 x 216 cursor 344 240 dibujos 299 huella 1996575903 centro 304 174
+MOTOR-CONTROL botones 0 cursor 344 240 cuadro 300
+MOTOR-CONTROL botones 128 cursor 356 240 cuadro 302
+MOTOR-CONTROL botones 0 cursor 368 240 cuadro 304
+MOTOR-CONTROL botones 128 cursor 380 240 cuadro 306
+MOTOR-CONTROL botones 0 cursor 404 240 cuadro 309
+MOTOR-CONTROL botones 128 cursor 416 240 cuadro 311
+MOTOR-CONTROL botones 0 cursor 440 240 cuadro 314
+MOTOR-CONTROL botones 128 cursor 452 240 cuadro 316
+MOTOR-CONTROL botones 0 cursor 476 240 cuadro 319
+MOTOR-CONTROL botones 128 cursor 488 240 cuadro 321
+MOTOR-CONTROL botones 0 cursor 512 240 cuadro 324
+MOTOR-CONTROL botones 128 cursor 524 240 cuadro 326
+MOTOR-CONTROL botones 0 cursor 548 240 cuadro 329
+MOTOR-CONTROL botones 128 cursor 560 240 cuadro 331
+MOTOR-CONTROL botones 0 cursor 596 240 cuadro 335
+MOTOR-CONTROL botones 128 cursor 608 240 cuadro 337
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 341
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 343
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 346
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 349
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 353
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 355
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 358
+MOTOR-PANTALLA cuadros 360 x 511 cursor 639 240 dibujos 359 huella 819719798 centro 549 177
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 360
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 363
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 365
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 368
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 371
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 375
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 377
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 380
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 383
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 387
+MOTOR-CONTROL botones 128 cursor 639 240 cuadro 389
+MOTOR-CONTROL botones 0 cursor 639 240 cuadro 392
+MOTOR-CONTROL botones 32 cursor 639 252 cuadro 395
+MOTOR-CONTROL botones 0 cursor 639 276 cuadro 398
+MOTOR-CONTROL botones 32 cursor 639 288 cuadro 400
+MOTOR-CONTROL botones 0 cursor 639 324 cuadro 404
+MOTOR-CONTROL botones 32 cursor 639 336 cuadro 407
+MOTOR-CONTROL botones 0 cursor 639 360 cuadro 410
+MOTOR-CONTROL botones 32 cursor 639 372 cuadro 413
+MOTOR-CONTROL botones 0 cursor 639 396 cuadro 416
+MOTOR-CONTROL botones 32 cursor 639 408 cuadro 419
+MOTOR-PANTALLA cuadros 420 x 511 cursor 639 420 dibujos 419 huella -1729079485 centro 558 257
+MOTOR-CONTROL botones 0 cursor 639 420 cuadro 421
+MOTOR-CONTROL botones 32 cursor 639 432 cuadro 423
+MOTOR-CONTROL botones 0 cursor 639 468 cuadro 427
+MOTOR-CONTROL botones 32 cursor 639 479 cuadro 430
+MOTOR-CONTROL botones 0 cursor 639 479 cuadro 434
+MOTOR-CONTROL botones 32 cursor 639 479 cuadro 437
+MOTOR-CONTROL botones 0 cursor 639 479 cuadro 440
+MOTOR-CONTROL botones 32 cursor 639 479 cuadro 443
+MOTOR-CONTROL botones 0 cursor 639 479 cuadro 447
+MOTOR-CONTROL botones 32 cursor 639 479 cuadro 450
+MOTOR-CONTROL botones 0 cursor 639 479 cuadro 455
+MOTOR-PANTALLA cuadros 480 x 511 cursor 639 479 dibujos 479 huella -1487941904 centro 560 291

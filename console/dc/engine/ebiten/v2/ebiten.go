@@ -858,7 +858,16 @@ func RunGame(g Game) error {
 	if ancho <= 0 || alto <= 0 {
 		ancho, alto = 640, 480
 	}
-	pantalla := NewImage(ancho, alto)
+	// LA PANTALLA ES LA MISMA QUE VE EL JUEGO, Y ESTO ERA UN DEFECTO DE VERDAD (no del instrumento): aca
+	// decia `pantalla := NewImage(...)`, que crea una imagen NUEVA y LOCAL que tapa a la del paquete durante
+	// el resto de la funcion. El dibujado y la subida a la VRAM usaban esa, asi que la pantalla SE VEIA bien;
+	// pero `Screen()` (que el motor usa para saber que esta mostrando, por ejemplo para saber donde hizo clic
+	// el jugador) y las cuentas de la evidencia leian la GLOBAL, que quedaba vacia.
+	//
+	// COMO SE DESTAPO: el centro de masa del contenido daba 0 0 en todos los cuadros, con el logo dibujado y
+	// visible en la captura. O sea: la pantalla que se medía estaba toda negra. Un instrumento que mide otra
+	// cosa que la que se ve es peor que no tener instrumento, porque da un numero y el numero parece un dato.
+	pantalla = NewImage(ancho, alto)
 
 	// el video: 640x480 en RGB565, y la textura de la pantalla en la VRAM. Si esto falla se devuelve el
 	// error y no se entra al loop: seguir dibujando en memoria daria una pantalla negra, que desde afuera
@@ -893,6 +902,12 @@ func RunGame(g Game) error {
 		// el estado del input del cuadro anterior pasa a ser "el anterior" (para las teclas que se
 		// acaban de soltar)
 		CerrarCuadro()
+
+		// Y LA ENTRADA SE LEE ACA, ENTRE CerrarCuadro Y Update, QUE ES EL UNICO LUGAR DONDE ANDA: si se
+		// leyera antes de CerrarCuadro, el cuadro anterior quedaria guardado YA con la tecla nueva y
+		// Update no veria ningun cambio -- o sea que "se apreto" (el flanco, lo que mueve los menus)
+		// nunca seria verdad. Y si se leyera despues de Update, el motor ya habria preguntado.
+		LeerControl()
 
 		if err := g.Update(); err != nil {
 			kos.PvrListFinish()
