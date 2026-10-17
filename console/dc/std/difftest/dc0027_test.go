@@ -92,25 +92,95 @@ func TestRWMutexContraGo(t *testing.T) {
 	// dos lectores juntos: en Go entran los dos, en la consola (scheduler cooperativo, declarado) el
 	// RLock es exclusivo. Lo que SI tiene que coincidir es que ninguno se traba y que el valor no se
 	// corrompe.
-	var nGo, nDC int
-	var wgGo, wgDC gosync.WaitGroup
+	//
+	// DC-002.8b: este bloque tenia DOS huecos que lo dejaban verde sin probar nada (medido: con el
+	// candado sin preparar pasaba con 2 y 2, y el mutador del cuelgue reportaba 1/2).
+	//
+	//   1. La corrupcion no se podia VER: dos goroutines que suman 1 cada una dan 2 aunque el candado no
+	//      excluya. Ahora cada una suma `porGoroutine` veces y el total de la consola tiene que dar
+	//      EXACTO: sin exclusion se pierden incrementos y el total no da.
+	//   2. Los dos lectores tienen que entrar JUNTOS: sin barrera, la segunda goroutine puede arrancar
+	//      despues de que la primera termino y el bloque no prueba paralelismo. Ahora las dos esperan en
+	//      una puerta y arrancan cuando la ultima esta lista.
+	//
+	// Y el aserto de "el candado esta preparado" va ADENTRO del ayudante, no en un preparar() suelto:
+	// sacar la llamada a preparar() (el defecto original, y el mutante de mutar-cuelgue-386.sh) tiene que
+	// poner la suite ROJA. Con el aserto solo adentro de preparar(), sacar la llamada sacaba tambien el
+	// aserto y el mutante quedaba verde.
 	var mGo gosync.RWMutex
 	var mDC d2sync.RWMutex
-	// ESTE es el candado que el test se olvidaba de preparar (DC-002.8b): el preparar() de arriba es
-	// para rwDC, y el bloque de abajo usa mDC, que nace con el canal sin crear. Preparado (y exigido)
-	// aca, la carrera de creacion no existe y el cuelgue de 1-en-40-corridas no puede aparecer.
 	preparar(t, &mDC)
+	nDC := dosLectoresConsola(t, &mDC)
+
+	// El mismo escenario contra el RWMutex de Go, con contador ATOMICO: en Go los dos RLock SI entran a
+	// la vez y un `n++` ahi es carrera de verdad, asi que se suma con sync/atomic y el total tiene que
+	// dar el mismo. La comparacion es de TOTALES, con cada lado contando como corresponde.
+	var nGo int32
+	var wgGo, apuntoGo gosync.WaitGroup
+	puertaGo := make(chan struct{})
 	wgGo.Add(2)
-	wgDC.Add(2)
+	apuntoGo.Add(2)
 	for i := 0; i < 2; i++ {
-		go func() { mGo.RLock(); nGo++; mGo.RUnlock(); wgGo.Done() }()
-		go func() { mDC.RLock(); nDC++; mDC.RUnlock(); wgDC.Done() }()
+		go func() {
+			apuntoGo.Done()
+			<-puertaGo
+			mGo.RLock()
+			for j := 0; j < porGoroutine; j++ {
+				atomic.AddInt32(&nGo, 1)
+			}
+			mGo.RUnlock()
+			wgGo.Done()
+		}()
 	}
+	apuntoGo.Wait()
+	close(puertaGo)
 	wgGo.Wait()
-	wgDC.Wait()
-	if nGo != nDC || nDC != 2 {
-		t.Fatalf("RLock: Go %d, consola %d (los dos tienen que terminar en 2)", nGo, nDC)
+
+	if nDC != 2*porGoroutine {
+		t.Fatalf("RLock de la consola: sin exclusion el contador pierde incrementos (dio %d, tiene que dar %d)", nDC, 2*porGoroutine)
 	}
+	if int(nGo) != nDC {
+		t.Fatalf("RLock: Go %d, consola %d (los dos tienen que terminar en %d)", nGo, nDC, 2*porGoroutine)
+	}
+}
+
+// porGoroutine: cuantas veces suma cada uno de los dos lectores juntos (ver dosLectoresConsola).
+const porGoroutine = 2000
+
+// dosLectoresConsola: dos goroutines entran JUNTAS al RLock de un RWMutex de la consola y suman
+// porGoroutine veces cada una sobre un contador comun. Devuelve el contador: con el RLock exclusivo (el
+// limite declarado en d2std/sync) tiene que dar 2*porGoroutine EXACTO.
+//
+// EXIGE QUE EL CANDADO ESTE PREPARADO, y a proposito el aserto vive aca: es lo que tiene que cazar el
+// mutante de scripts/console/mutar-cuelgue-386.sh (un candado usado en paralelo sin preparar), que es el
+// defecto real de DC-002.8b. Si el aserto estuviera solo adentro de preparar(), sacar la llamada a
+// preparar() sacaria tambien el aserto y la suite quedaria verde con el defecto puesto (paso: 1/2).
+func dosLectoresConsola(t *testing.T, rw *d2sync.RWMutex) int {
+	t.Helper()
+	if !rw.Preparado() {
+		t.Fatal("el candado quedo SIN preparar (limite declarado en d2std/sync): usarlo en paralelo asi pierde incrementos y se cuelga cada tanto en el Unlock")
+	}
+	var n int
+	var wg, apunto gosync.WaitGroup
+	puerta := make(chan struct{})
+	wg.Add(2)
+	apunto.Add(2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			apunto.Done()
+			<-puerta
+			rw.RLock()
+			for j := 0; j < porGoroutine; j++ {
+				n++
+			}
+			rw.RUnlock()
+			wg.Done()
+		}()
+	}
+	apunto.Wait()
+	close(puerta)
+	wg.Wait()
+	return n
 }
 
 // TestOnceContraGo: la funcion corre UNA sola vez, y Do no vuelve hasta que termino.

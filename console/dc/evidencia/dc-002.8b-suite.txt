@@ -1,0 +1,197 @@
+DC-002.8b - LOS DOS DEFECTOS DE LA SUITE: el control que no discriminaba, el cuelgue de 386, y el
+hueco del mutador que vigilaba el cuelgue
+=====================================================================================================
+
+QUE SE MIDIO (numeros, y de donde salen)
+----------------------------------------
+  control de costo del POC    ANTES: "STD-TEST: costo float64 (control, no tiene que ser 0): 0"
+                              (siempre, en todas las corridas)
+                              DESPUES: "1 (piso 1e7; suma_bits=4174392dddcd686a)"
+  casos de la suite del POC   2746 bien / 2746 mal 0  (identico antes y despues: no era un problema de
+                              casos, era el CONTROL el que no podia ponerse en rojo)
+  costos de float64 medidos   20 / 20 / 132 / 51 / 70 / 71 ms (1e6 mul+suma, float32 1e6, 1e5 sqrt,
+                              1e4 exp+log, 1e4 sin+cos, 1e4 atan2+pow): IDENTICOS antes y despues, o sea
+                              que el control nuevo no cambio la medicion, cambio su capacidad de cazar
+  mutador del control         scripts/console/mutar-std-consola.sh (nuevo): 2/2 cazados
+                                raiz-sin-acumular -> control=0            (cazado por el PISO)
+                                exp-distinto      -> digest=4174399a3d683b3a (cazado por el DIGEST)
+                              y el control sano vuelve a dar 1 con el digest de referencia
+  el cuelgue de 386           ANTES (candado sin preparar): 4 cuelgues en 40 corridas de
+                              "GOARCH=386 go test -count=20 -timeout 60s ./difftest/" (= 800 ejecuciones
+                              del test), las cuatro con "panic: test timed out after 1m0s" (60,2-60,8 s)
+                              y el volcado nombrando TestRWMutexContraGo. Total de las 40: 379 s
+                              DESPUES (HEAD): 0 cuelgues en 80 corridas (= 1600 ejecuciones), peor
+                              corrida 4.476 ms, 305 s las 80
+  el hueco del mutador        ANTES: 1/2 ("la suite NO lo cazo: paso igual con el mutante puesto")
+                              DESPUES: 20/20 invocaciones ROJAS con el mutante puesto y 20/20 verdes
+                              sin el; mutar-cuelgue-386.sh completo: 2/2, rc=0
+  suite del host              verde en amd64 y en 386 (-count=20: 2,406 s y 3,481 s); los 13 paquetes que
+                              hablan con KOS siguen sin compilar en el host (13 de 13 en las dos
+                              anchuras)
+  mutador general del std     scripts/console/mutar-std-host.sh: 34/34 cazados, rc=0 ("OK: la suite caza
+                              todos los defectos conocidos y el arbol quedo sano")
+  barrera del motor           scripts/console/compare-motor-dc6.sh: 31 lineas identicas, 30 frames
+                              (x86-64 y SH-4, el mismo DC6 del MPQ) -- el motor no se movio
+
+METODO: POR QUE LAS MEDICIONES VAN SOBRE UN ARBOL CONGELADO
+-----------------------------------------------------------
+Las dos mediciones de 386 se hicieron sobre una copia de console/dc/std sacada de git
+(cp -a del arbol + verificacion archivo por archivo contra los blobs de HEAD: 77 archivos, 0 distintos).
+Razon medida, no precaucion teorica: la PRIMERA corrida se contamino. Habia otra sesion de Hermes
+corriendo el mutador de la stdlib sobre console/dc/std en paralelo (se vio por los mtime de fmt.go,
+math.go, sort.go, ..., bytes.go con 1 s de diferencia entre uno y otro) y mi corrida 1 compilo el
+paquete d2std/bytes CON UN MUTANTE PUESTO. Resultado: el test que quedo girando 100 s no era el del
+candado, era otro:
+
+    --- corrida 1: ROJA (rc=1, 100159ms) ---
+    d2std/difftest.TestBytesBufferReadContraGo(0xc084dc8)
+    d2std/difftest.TestBytesBufferReadContraGo.func4(...)
+
+O sea: la corrida 1 no mide el defecto de esta tarjeta, mide un mutante ajeno. Se rehizo todo sobre la
+copia congelada (que ademas deja el numero reproducible: mismo sha256 de cada archivo que HEAD). El
+arbol del repo se verifico igual a la copia antes y despues ("diff -r": sin diferencias).
+
+Otras dos cosas del metodo, para que el numero se pueda repetir igual:
+  - Las 40 corridas del "antes" corrieron con el mutador general de la stdlib y el build del motor de
+    otra sesion encima (carga del host ~4-6). Los 4 cuelgues son cuelgues de verdad (los cuatro con su
+    "panic: test timed out" y el volcado que nombra el test) y NO corridas lentas por carga: una corrida
+    lenta tarda 4 s, el tope son 60 s.
+  - Una segunda pasada (para guardar los volcados COMPLETOS, porque la primera guardaba solo las lineas
+    que nombran el test) tuvo una corrida roja con la salida VACIA: rc distinto de cero y cero lineas de
+    salida. Esa corrida no se cuenta como cuelgue (no hay evidencia de que lo sea) y el numero que se
+    reporta sale de la primera pasada, donde las 4 rojas se verificaron una por una. Los volcados
+    completos que se citan arriba son los de la segunda pasada.
+
+1. EL CONTROL DE COSTO DEL POC MIRABA UN BIT QUE NO CAMBIA (defecto 1)
+----------------------------------------------------------------------
+El POC de la stdlib mide el costo de las operaciones de float64 en la consola y cierra con un CONTROL
+para que la medicion no pueda mentir. El control miraba `bits64(suma)&1`: el bit mas bajo de la suma de
+los bucles. Medido: ese bit es SIEMPRE 0 (la suma de los seis bucles termina par), asi que el control
+imprimia 0 en todas las corridas y no se ponia en rojo ni sacando un bucle entero: no controlaba nada.
+
+Arreglo (console/dc/poc/stdlib/main.go): el control compara la suma contra un VALOR CONOCIDO y ademas
+imprime el digest de la suma, que cambia si cambia cualquier resultado.
+  - PISO: los 1e5 terminos de la raiz (sqrt de 0,6 a 1e5) dan ~2,1e7 por si solos y los otros bucles
+    agregan ~1e5, asi que con el piso en 1e7 cualquier bucle que falte hace que la suma no llegue
+    (control=0). `suma == suma` descarta explicitamente el NaN.
+  - DIGEST: `suma_bits=` en hex, para cazar lo que el piso tapa (un resultado distinto que sigue por
+    encima del piso).
+Medido en la consola (Flycast, 25 s de corrida): control=1, digest=4174392dddcd686a, casos 2746/2746.
+
+Los dos mutantes del control (scripts/console/mutar-std-consola.sh, script nuevo) y que los caza:
+    raiz-sin-acumular   el bucle de la raiz corre pero no acumula  -> PISO     (control 1 -> 0)
+    exp-distinto        un termino da otro valor sin bajar el piso -> DIGEST   (digest cambia)
+Medido: 2/2, control sano 1 antes y despues, y el arbol restaurado con su sha256 (el script nunca usa
+`git checkout --`: el respaldo es copia propia, porque en el hito hay WIP sin commitear en ese archivo).
+
+2. EL CUELGUE INTERMITENTE DE 386: CUAL TEST, POR QUE Y CUANTO (defecto 2)
+--------------------------------------------------------------------------
+CUAL: TestRWMutexContraGo, el bloque de dos lectores (dos goroutines con RLock/RUnlock sobre el mismo
+RWMutex de la consola). El volcado completo (abajo) lo nombra, y muestra donde quedo clavada la
+goroutine: RWMutex.RUnlock -> Mutex.Unlock -> <-m.libre, o sea ESPERANDO UN TESTIGO QUE NADIE VA A
+SOLTAR, mientras el test espera en el WaitGroup.
+
+    panic: test timed out after 1m0s
+        running tests:
+            TestRWMutexContraGo (58s)
+    goroutine 1316 [sync.WaitGroup.Wait]:
+    d2std/difftest.TestRWMutexContraGo(0xc414008)
+        /tmp/8b-std-antes/difftest/dc0027_test.go:109      <- wgDC.Wait()
+    goroutine 1160 [chan receive]:
+    d2std/sync.(*Mutex).Unlock(...)
+        /tmp/8b-std-antes/sync/sync.go:69                  <- <-m.libre
+    d2std/sync.(*RWMutex).RUnlock(...)
+        /tmp/8b-std-antes/sync/sync.go:109
+    d2std/difftest.TestRWMutexContraGo.func2()
+        /tmp/8b-std-antes/difftest/dc0027_test.go:106
+
+POR QUE: el canal del candado de la consola se crea en el PRIMER USO (no hay constructor). En el host,
+dos goroutines que lo usan en paralelo por primera vez pueden crear DOS canales a la vez, y cada una se
+queda con su testigo: una suelta un candado que la otra no ve. Ese bloque usaba un candado (`mDC`) al
+que nadie le habia creado el canal. En la consola no puede pasar (scheduler cooperativo sobre un hilo,
+medido en DC-002.7).
+
+CUANTO (medido sobre la copia congelada, con el candado sin preparar y el aserto debil de antes):
+    4 cuelgues en 40 corridas de -count=20  =  1 cuelgue cada 10 corridas (~1 cada 200 ejecuciones del
+    test). El tope de cada cuelgue es 60 s (el -timeout), asi que en tiempo de pared las 40 corridas
+    tardaron 379 s: 36 verdes x ~3,9 s + 4 x 60 s.
+    (La referencia que traia la tarjeta era 1 en 40 corridas: se midio 1 en 10. La diferencia no cambia
+    el diagnostico, lo refuerza: sigue siendo raro pero no es "una vez en la vida".)
+Y con el arreglo (HEAD): 0 en 80 corridas = 1600 ejecuciones, 0 rojas, peor corrida 4.476 ms.
+
+3. EL HUECO QUE ESTABA DEBAJO: EL ASERTO VIVIA DENTRO DE LO QUE EL MUTANTE SACABA
+---------------------------------------------------------------------------------
+Este es el hallazgo que la tarjeta no pedia explicitamente y que salio de correr el mutador:
+`scripts/console/mutar-cuelgue-386.sh` terminaba en 1/2 con el arbol arreglado:
+
+    == mutante 1: difftest: candado del bloque de 2 goroutines sin preparar
+       LA SUITE NO LO CAZO: paso igual con el mutante puesto (compilando)
+    == 1/2 chequeos cazados
+    == HAY HUECOS (arriba)
+
+Por que: la exigencia de `Preparado()` (que es lo que caza a un candado sin preparar) vivia ADENTRO de
+`preparar()`, y el mutante saca la llamada a `preparar()`. Sacaba la llamada y con ella el aserto: la
+suite quedaba verde con el defecto puesto. Y el aserto viejo del bloque no podia verlo por otra razon:
+con UN incremento por goroutine, dos goroutines que suman 1 cada una dan 2 aunque el candado no excluya.
+
+Arreglo (console/dc/std/difftest/dc0027_test.go), dos cosas y las dos medidas:
+  a) El aserto de "el candado esta preparado" se mudo al ayudante `dosLectoresConsola()`, que es quien
+     usa el candado en paralelo y que el mutante NO toca. Ahora la exigencia es independiente de la
+     llamada que la prepara.
+  b) El bloque de los dos lectores suma 2000 veces cada uno y se exige el total EXACTO (4000) del lado
+     de la consola, con una BARRERA para que los dos entren a la vez (sin barrera la segunda goroutine
+     puede arrancar despues de que la primera termino, y el bloque no probaba paralelismo). El lado de
+     Go usa contador atomico: ahi los dos RLock SI entran juntos y un `n++` pelado seria carrera.
+
+Medido, 20 invocaciones separadas (sin cache) de "GOARCH=386 go test -run TestRWMutexContraGo ./difftest/":
+    con el mutante (candado sin preparar):  20 rojas / 0 verdes
+        --- FAIL: TestRWMutexContraGo (0.01s)
+        dc0027_test.go:112: el candado quedo SIN preparar (limite declarado en d2std/sync): usarlo en
+        paralelo asi pierde incrementos y se cuelga cada tanto en el Unlock
+    sin el mutante:                          20 verdes / 0 rojas
+Y el mutador completo, con el arbol arreglado: 2/2 cazados, rc=0 ("OK: la suite caza el candado sin
+preparar y el candado que no excluye, y el arbol quedo sano").
+
+4. UN DATO APARTE QUE APARECIO AL MEDIR (y que queda declarado, no tapado)
+--------------------------------------------------------------------------
+Con un mutante del paquete `bytes` puesto (mutante de OTRA sesion, ver METODO), el difftest de 386 no se
+pone rojo rapido: GIRA. Medido: la corrida 1 quedo 100 s girando en TestBytesBufferReadContraGo hasta que
+se le mando SIGQUIT a mano, y el `go test` de la otra sesion que corria ese mismo mutante tardo 61 s
+(el tope de 60 s) entre restaurar `image/color/color.go` y restaurar `bytes/bytes.go`.
+No es el defecto de esta tarjeta y no se arregla aca: queda escrito para que el proximo que lo vea no lo
+confunda con el cuelgue del candado. Lo que si muestra es que un test que gira en vez de fallar se come
+el tope entero del `go test`, que es exactamente por lo que esta tarjeta insiste con los asertos que
+fallan en el acto.
+
+QUE COMANDOS DEJAN ESTOS NUMEROS
+--------------------------------
+    # el control del POC, en la consola (25 s)
+    bash scripts/console/build-dc.sh console/dc/poc/stdlib /tmp/dcbuild/stdlib
+    bash scripts/console/run-flycast.sh /tmp/dcbuild/stdlib/prog.elf 25 /tmp/dc-run-stdlib
+    grep -a 'STD-TEST' /tmp/dc-run-stdlib/flycast.log | tr -d '\r'
+
+    # los dos mutantes del control (4 corridas de Flycast)
+    bash scripts/console/mutar-std-consola.sh
+
+    # la suite del host, los dos anchos
+    bash scripts/console/test-std-host.sh
+
+    # el cuelgue: 80 corridas de -count=20 en 386 sobre un arbol congelado, contando cuelgues
+    STD=/tmp/8b-std-tree bash /tmp/mide-386.sh 80 20 /tmp/dc-386-8b.log
+
+    # el mutador del cuelgue y el del candado (sano + 2 mutantes)
+    bash scripts/console/mutar-cuelgue-386.sh
+
+    # la barrera del motor
+    bash scripts/console/compare-motor-dc6.sh
+
+CIERRE MEDIDO (lo que tiene que dar esto de aca en adelante)
+------------------------------------------------------------
+    control del POC (consola)     control=1 (piso 1e7, suma_bits=4174392dddcd686a) y casos 2746/2746
+    mutador del control           2/2 (raiz-sin-acumular por el PISO, exp-distinto por el DIGEST)
+    el cuelgue de 386             0 en 80 corridas de -count=20 (1600 ejecuciones); con el candado sin
+                                  preparar: 4 en 40 (800 ejecuciones), los cuatro nombrando
+                                  TestRWMutexContraGo
+    mutador del cuelgue           2/2 y el mutante del candado sin preparar: 20/20 ROJO (antes: 1/2)
+    suite del host                verde en amd64 y 386, y mutar-std-host.sh 34/34
+    barrera del motor             31 lineas identicas, 30 frames

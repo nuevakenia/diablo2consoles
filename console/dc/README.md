@@ -1214,3 +1214,85 @@ bash scripts/console/mutar-motor-pvr.sh                  # media: 1 m 25 s (4 mu
 
 Evidencia con los numeros crudos: `evidencia/dc-002.9-motor-pvr.txt`, y los dos lados del resumen
 (`...-host.txt` y `...-consola.txt`, identicos).
+
+## 24. DC-002.8b: los dos defectos de la propia suite, y el mutador que no mordia
+
+La tarjeta no era del motor ni de la stdlib: eran **dos defectos de la suite**, de la clase que hace
+parecer que algo esta probado cuando no lo esta. Salieron medidos en DC-002.8 (seccion 21) y quedaron
+declarados sin arreglar. Los dos estan cerrados. Evidencia cruda:
+`evidencia/dc-002.8b-suite.txt`.
+
+**1. El control de costo de float64 del POC miraba un bit que no cambia.** El control imprimia
+`bits64(suma)&1`, y la suma de los seis bucles termina **par**: el bit bajo es siempre 0. Medido, el
+control daba `0` en todas las corridas y no se ponia en rojo ni sacando un bucle entero, o sea que las
+mediciones de costo no estaban controladas por nada. Ahora el control compara la suma contra un **valor
+conocido**: los 1e5 terminos de la raiz dan ~2,1e7 por si solos, asi que con el piso en **1e7** cualquier
+bucle que falte deja la suma corta y el control da 0; y ademas se imprime el **digest** de la suma, para
+lo que el piso tapa (un resultado distinto que sigue por encima del piso). Medido en la consola:
+`control=1 (piso 1e7; suma_bits=4174392dddcd686a)` con los mismos 2746 casos de siempre
+(`2746 bien / 2746 mal 0`) y los mismos ms de costo (20/20/132/51/70/71 ms): el control cambio su
+capacidad de cazar, no la medicion. El mutador nuevo `scripts/console/mutar-std-consola.sh` mete los dos
+defectos posibles —el bucle que no acumula (**lo caza el piso**: control 1 → 0) y un termino con otro
+valor (**lo caza el digest**: `4174399a3d683b3a` ≠ `4174392dddcd686a`)— y da **2/2**.
+
+**2. El cuelgue intermitente de 386: `TestRWMutexContraGo`, 1 cada 10 corridas.** El test que se colgaba
+es el bloque de **dos lectores** (dos goroutines con `RLock`/`RUnlock` sobre el mismo `RWMutex` de la
+consola). El canal de un candado de la consola se crea en el **primer uso** (limite declarado en
+`d2std/sync`): en el host, dos goroutines que lo usan en paralelo por primera vez pueden crear **dos
+canales** a la vez, y cada una se queda con su testigo. Ese bloque usaba un candado (`mDC`) al que nadie
+le habia creado el canal. El volcado completo lo dice sin adivinar: la goroutine queda clavada en
+`RWMutex.RUnlock -> Mutex.Unlock -> <-m.libre` (un testigo que nadie va a soltar) mientras el test espera
+en el `WaitGroup`. Medido con el candado sin preparar: **4 cuelgues en 40 corridas** de
+`-count=20 -timeout 60s` (= 800 ejecuciones, tope de 60 s cada uno; la referencia que traia la tarjeta era
+1 en 40 corridas). Con el arreglo: **0 cuelgues en 80 corridas** (= 1600 ejecuciones).
+
+**3. El hueco que estaba debajo: el aserto del mutador vivia adentro de lo que el mutante sacaba.** Este
+es el hallazgo que no estaba en la tarjeta y que salio de correr su propio mutador: `mutar-cuelgue-386.sh`
+terminaba en **1/2** con la suite arreglada — el mutante que quita el `preparar()` del candado quedaba
+**VERDE**. Por que: la exigencia de `Preparado()` (que es lo que caza un candado sin preparar) vivia
+**adentro** de `preparar()`, y el mutante saca la llamada a `preparar()`. Sacaba la llamada y con ella el
+aserto. Y el aserto viejo del bloque tenia el otro problema: con **un** incremento por goroutine, dos
+goroutines que suman 1 cada una dan 2 aunque el candado no excluya, asi que la corrupcion no se podia ver.
+Arreglado en `console/dc/std/difftest/dc0027_test.go`:
+
+- el aserto de "el candado esta preparado" se mudo al ayudante `dosLectoresConsola()`, que es quien usa el
+  candado en paralelo y **que el mutante no toca**: la exigencia ya no vive en la misma llamada que la
+  prepara;
+- los dos lectores suman **2000 veces cada uno** y el total de la consola se exige **exacto (4000)**, con
+  una **barrera** para que los dos entren a la vez (sin barrera, la segunda goroutine puede arrancar
+  despues de que la primera termino y el bloque no probaba paralelismo). El lado de Go suma con
+  `sync/atomic`: ahi los dos `RLock` entran juntos y un `n++` pelado seria carrera de verdad.
+
+Medido, 20 invocaciones separadas (sin cache) del test en 386: **con el mutante 20 rojas / 0 verdes** (el
+mensaje es el del candado sin preparar, no un fallo de casualidad) y **sin el mutante 20 verdes / 0
+rojas**. El mutador completo: **2/2, rc=0**.
+
+**Como se midio esto (y por que importa).** Todo lo de 386 corrio sobre **una copia de `console/dc/std`
+sacada de git** (verificada archivo por archivo contra los blobs de HEAD: 77 archivos, 0 distintos), no
+sobre el arbol de trabajo. La razon es un defecto medido, no una precaucion teorica: la primera corrida se
+**contamino**, porque habia otra sesion de Hermes corriendo el mutador de la stdlib sobre el mismo arbol y
+mi corrida compilo `d2std/bytes` con un mutante puesto. El test que giraba 100 s entonces **no era el del
+candado**, era `TestBytesBufferReadContraGo`. Ese dato queda declarado: **un test que gira en vez de fallar
+se come el tope entero del `go test`** (la otra sesion tardo 61 s en esa misma corrida), y es exactamente
+por lo que esta tarjeta insiste con asertos que fallan en el acto y con nombres propios.
+
+Cierre medido de la tarjeta:
+
+```
+control del POC (consola)   control=1 (piso 1e7; suma_bits=4174392dddcd686a), casos 2746 bien 2746 mal 0
+mutador del control         2/2 (piso y digest)
+el cuelgue de 386           antes: 4 cuelgues en 40 corridas (800 ejecuciones), TestRWMutexContraGo
+                            despues: 0 en 80 corridas (1600 ejecuciones), peor corrida 4.476 ms
+mutador del cuelgue         2/2, y el mutante del candado sin preparar: 20/20 rojo (antes quedaba verde)
+suite del host              verde en amd64 y 386; mutar-std-host.sh 34/34 y arbol sano
+barrera del motor           compare-motor-dc6.sh: 31 lineas identicas, 30 frames
+```
+
+```
+bash scripts/console/mutar-std-consola.sh   # el control del POC: 2/2, 4 corridas de Flycast (medido: 1 m 59 s)
+bash scripts/console/mutar-cuelgue-386.sh   # el cuelgue: 5x -count=20 + 2 mutantes (medido: 19,5 s)
+bash scripts/console/test-std-host.sh       # los dos anchos del host (medido: 0,7 s con el cache de go caliente)
+bash scripts/console/mutar-std-host.sh      # el general: 34/34 y arbol sano (medido: 2 m 11 s)
+bash scripts/console/compare-motor-dc6.sh   # la barrera (medido: 17,1 s, con el build del POC aparte)
+```
+

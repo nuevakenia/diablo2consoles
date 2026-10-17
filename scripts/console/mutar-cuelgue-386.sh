@@ -132,13 +132,18 @@ fi
 echo
 
 echo "== 1. un candado usado en paralelo SIN preparar tiene que cazarse (era el defecto) =="
-# Este es EXACTAMENTE el defecto de DC-002.8b: el bloque de dos goroutines usa un candado al que nadie
-# le creo el canal. Antes se colgaba 1 vez cada 40 corridas; ahora la exigencia de Preparado() lo caza
-# en el acto, todas las veces.
-mutacion "difftest: candado del bloque de 2 goroutines sin preparar" \
+# Este es EXACTAMENTE el defecto de DC-002.8b: el bloque de los dos lectores usa un candado al que nadie
+# le creo el canal. Antes se colgaba 1 vez cada 40 corridas.
+#
+# OJO CON DONDE VIVE EL ASERTO (esto estaba mal y el mutante salia VERDE): la exigencia de Preparado()
+# tiene que estar DENTRO de dosLectoresConsola(), que es el ayudante que usa el candado en paralelo.
+# Cuando el unico aserto vivia adentro de preparar(), este mutante sacaba la llamada a preparar() y CON
+# ELLA el aserto: la suite quedaba verde con el defecto puesto. Medido: 1/2 cazados (el mutante 1 verde).
+# Despues del arreglo: 20/20 invocaciones ROJAS con este mutante y 20/20 verdes sin el.
+mutacion "difftest: candado de los dos lectores sin preparar" \
     "difftest/dc0027_test.go" \
-    $'\tpreparar(t, &mDC)\n\twgGo.Add(2)' \
-    $'\twgGo.Add(2)'
+    $'\tpreparar(t, &mDC)\n\tnDC := dosLectoresConsola(t, &mDC)' \
+    $'\tnDC := dosLectoresConsola(t, &mDC)'
 
 echo "== 2. un candado que crea un canal nuevo en cada uso deja de excluir =="
 # Es el estrago de los dos testigos, pero deterministico: con un canal nuevo por uso, el Lock nunca
