@@ -495,6 +495,8 @@ int d2c_ramfs_manifiesto(char *buf, int max, const char *ruta) {
 // DT_REG = 8), pero el POC imprime el valor crudo para medirlo en vez de suponerlo.
 // Stat por nombre: fs_stat (KOS) llena el struct stat de newlib; solo se usan tamano y modo.
 // Devuelve -1 si la ruta no esta.
+static int tam_por_apertura(const char *ruta);
+
 int d2c_stat_tam(const char *ruta) {
     struct stat st;
     int i = ramfs_indice(ruta);
@@ -502,9 +504,36 @@ int d2c_stat_tam(const char *ruta) {
         return ramfs_archivos[i].tam;
     }
     if (stat(ruta, &st) < 0) {
-        return -1;
+        return tam_por_apertura(ruta);
     }
     return (int)st.st_size;
+}
+
+// DC-002.27: EL RESPALDO QUE HACE QUE EL MOTOR VEA LOS ARCHIVOS DEL DISCO.
+//
+// Medido con el POC motor-disco (disco.gdi, /cd): `stat("/cd/JUEGO/PATCH_D2.MPQ")` de newlib/KOS da -1
+// -- el mismo `stat()` que SI contesta el romdisk (/rd) -- mientras que `fs_open` + `fs_total` del MISMO
+// archivo dan 5.022.588 bytes, el tamano exacto del MPQ del PC. El camino del motor que decide "los
+// archivos del juego estan" es `d2setup.Complete`, que usa `os.Stat`: sin este respaldo el arranque del
+// disco se queda en "game files not found at /cd/juego". El respaldo abre y pregunta el tamano, que es lo
+// que el driver del iso9660 si implementa (fs_total -> iso_total); si el archivo no esta, `fs_open` falla
+// igual y el Stat devuelve el error que corresponde.
+static int tam_por_apertura(const char *ruta) {
+    int fd = fs_open(ruta, O_RDONLY);
+    int64_t total;
+
+    if (fd < 0) {
+        return -1;
+    }
+
+    total = fs_total(fd);
+    fs_close(fd);
+
+    if (total < 0) {
+        return -1;
+    }
+
+    return (int)total;
 }
 
 int d2c_stat_es_dir(const char *ruta) {
@@ -516,6 +545,12 @@ int d2c_stat_es_dir(const char *ruta) {
         }
     }
     if (stat(ruta, &st) < 0) {
+        // el mismo respaldo, para los directorios: en el disco el que contesta es iso_open con O_DIR
+        int fd = fs_open(ruta, O_RDONLY | O_DIR);
+        if (fd >= 0) {
+            fs_close(fd);
+            return 1;
+        }
         return -1;
     }
     return (st.st_mode & S_IFDIR) ? 1 : 0;

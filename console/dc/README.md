@@ -2785,3 +2785,54 @@ misma corrida con el tope viejo de 40 s: no llega al cuadro 300 y el control 1 s
 Barreras: `test-std-host.sh` **verde en amd64 y 386** (13/13 excluidos), `mutar-std-host.sh` **39/39 chequeos
 cazados** y `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas, 30 frames comparados).
 Evidencia cruda: `evidencia/dc-002.24b-el-corte-era-el-instrumento.txt`.
+
+## 44. DC-002.27: los assets del juego en el DISCO — el ISO9660 sin Joliet, el `stat` que no contesta el disco, y la barrera que queda
+
+El arranque del motor buscaba sus MPQ en `/rd/juego` (el romdisk, dentro del ELF) y ahí no pueden estar: el
+binario ya carga **13.992.908 de los 16.777.216** bytes de RAM. Los datos van al **disco** y el motor los lee
+**por partes** (`Seek` + `ReadAt`: `d2common/d2fileformats/d2mpq/`), así que no hay pared de RAM.
+
+**Los números del juego (medidos con `stat`, la tarjeta citaba 515 MB):** `patch_D2.mpq` **5.022.588**,
+`d2data.mpq` **267.330.019**, `d2char.mpq` **267.704.443** = **540.057.050** bytes (515,0 MB). El ISO con los
+tres adentro sale de **553.893.888** bytes (528,2 MB): entra en un CD de 700 MB y en un GD-ROM.
+
+**Lo que se agregó (todo apagado por defecto, el camino de DC-002.19 sale byte por byte igual — el
+`config.json` del romdisk sigue dando el mismo sha256 `8305595f…`):** en `gen-config-consola`, `-ruta-consola
+/cd/juego` y `-mpq a,b,c` (los nombres se filtran contra `d2setup.CoreMPQs`: uno que el motor no conoce se
+rechaza en el build); en `mkiso.py`, `origen:ruta_interna` con creación de carpetas (pycdlib contesta
+`Could not find path` sin el padre: medido) y `MKISO_JOLIET=0`; `mkdisco.sh` (ISO + GDI con la carpeta del
+juego en `/JUEGO`), `leer-iso.py` (sha256 de un archivo de adentro del ISO) y el POC `motor-disco`.
+
+**Defecto 1 — el driver ISO9660 de KOS no encuentra ningún nombre si el ISO trae árbol Joliet.** Con el
+disco de 540.440.576 bytes: `nmmgr_lookup("/cd")` da el handler, y **todo** lo que se abra da `errno=2`
+(ENOENT). No es el montaje: `init_percd` falla con `ENODEV` (19) y acá da 2, o sea que el driver monta y lo
+que no encuentra es el nombre. Con `MKISO_JOLIET=0`, el mismo POC: `fs_open("/cd/JUEGO/PATCH_D2.MPQ") -> 3`
+y `fs_total -> 5.022.588` (el tamaño exacto del PC). El driver compara sin distinguir mayúsculas
+(`fncompare` usa `tolower`), así que el ISO va en mayúsculas (lo único que acepta el nivel 3) y el motor
+pide en minúsculas: da igual.
+
+**Defecto 2 — `stat()` de KOS no contesta ninguna ruta del disco, y el motor decide con `os.Stat`.** Sin
+arreglo, el arranque imprimía `game files not found at "/cd/juego", starting first-run setup` (lo que mira
+`d2setup.Complete` es `os.Stat`). Arreglo en `console/dc/std/csrc/os_dc.c`: `d2c_stat_tam` cae a abrir y
+preguntar el tamaño (`fs_open` + `fs_total`), porque el driver ISO9660 sí implementa `fs_total` mientras que
+`stat` da -1. Después: `stat /cd/juego/patch_d2.mpq -> 5022588` y `Complete= true` (**el control negativo
+`/cd/juego/no-existe.mpq` sigue fallando**). Declarado: el `stat` de un **directorio** y el `ReadDir` del
+disco siguen por el camino del `.manifiesto` (0 entradas), por eso `d2setup.Validate.Ok()` sigue en false y
+el arranque usa `Complete`.
+
+**Defecto 3 — la barrera que queda: el motor pasa la selección y sigue con su cartel en la pantalla.** La
+consola serie ya **no** dice `game files not found` ni `file not found` (0 ocurrencias) y el motor **entra a
+su loop** (`EBITEN-LOOP cuadro 0/1/2`, `cuadro_us 311843`), pero la captura (`f60s.png`) sigue mostrando el
+cuadro de error del motor (fondo rojo oscuro con su texto). O sea: el pedido que falla ahora no es el de la
+selección, es el del **cargador de assets** cuando empieza a leer el contenido de los MPQ. Ese es el tramo
+siguiente, y el corpus `checar-disco-227.sh` (5 controles + el mutante `DC_SIN_JUEGO=1`) queda escrito para
+él.
+
+**El control fuerte del horneado (sin grises):** los tres MPQ leídos **de adentro** de la ISO dan el sha256
+del archivo del PC (`patch_D2` `eb7db78b…`, `d2data` `97c452b1…`, `d2char` `29078a10…`) y la consola lee de
+verdad (suma de los dos extremos de cada archivo, 256 KiB arriba y abajo, con el `os` del motor). Y el mapa
+de FADs queda medido: el sector 0 del ISO (el IP.BIN) está en FAD **150** y el PVD (`\x01CD001`) en FAD
+**166**, justo donde el driver los busca (suma 150 por dentro, `fs_iso9660.c:280`). Velocidad del GD-ROM
+**emulado**: 4 MiB en 34.245 ms = **122 KB/s** (cota del emulador, declarada).
+
+Evidencia cruda: `evidencia/dc-002.27-disco-iso9660.txt`.

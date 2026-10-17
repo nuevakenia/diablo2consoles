@@ -51,6 +51,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2app/d2setup"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2config"
@@ -86,25 +87,82 @@ type espejo struct {
 	KeyBindings     map[string][]string `json:",omitempty"`
 }
 
+// estaEnLaTablaDelMotor: si el nombre no esta en la tabla del motor, la config nombra algo que el motor
+// no conoce y el arranque se frena mas adelante sin decir por que. Se rechaza ACA, en el build.
+func estaEnLaTablaDelMotor(nombre string) bool {
+	for _, n := range d2setup.CoreMPQs {
+		if n == nombre {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Espejo del filtro del `-mpq`: la lista que tiene que decir el config (los nombres pedidos, en el
+// orden en que el MOTOR los lista, que es el de `d2setup.CoreMPQs`). Un nombre que no este en la tabla
+// del motor se rechaza: la config no puede nombrar algo que el motor no conoce.
+func ordenDelMotor(pedidos string) ([]string, error) {
+	if strings.TrimSpace(pedidos) == "" {
+		return append([]string{}, d2setup.CoreMPQs...), nil
+	}
+
+	quiero := map[string]bool{}
+
+	for _, n := range strings.Split(pedidos, ",") {
+		n = strings.TrimSpace(n)
+		if n == "" {
+			continue
+		}
+
+		if !estaEnLaTablaDelMotor(n) {
+			return nil, fmt.Errorf("%q no esta en d2setup.CoreMPQs (%v)", n, d2setup.CoreMPQs)
+		}
+
+		quiero[n] = true
+	}
+
+	orden := []string{}
+	for _, n := range d2setup.CoreMPQs {
+		if quiero[n] {
+			orden = append(orden, n)
+		}
+	}
+
+	if len(orden) != len(quiero) {
+		return nil, fmt.Errorf("quedaron %d nombres de %d: %v", len(orden), len(quiero), orden)
+	}
+
+	return orden, nil
+}
+
 func main() {
 	datos := flag.String("datos", "", "directorio de datos del juego EN EL HOST (el que se hornea en el romdisk)")
 	config := flag.String("config", "", "donde se escribe el config.json (ruta del HOST)")
+	rutaConsola := flag.String("ruta-consola", rutaDatosConsola, "donde el ARRANQUE de la consola busca los datos: /rd/juego (el romdisk, por defecto) o /cd/juego (el disco, DC-002.27)")
+	mpq := flag.String("mpq", "", "nombres del MpqLoadOrder separados por coma (por defecto: los 7 de d2setup.CoreMPQs). El orden final es el del MOTOR, no el de esta lista")
 	sinSellos := flag.Bool("sin-sellos", false, "escribe la configuracion pero no crea los archivos del juego")
 	verificar := flag.Bool("verificar", false, "control del host: no escribe nada, revisa el config.json que ya esta")
 	flag.Parse()
 
 	if *datos == "" || *config == "" {
-		fmt.Fprintln(os.Stderr, "uso: gen-config-consola -datos <dir> -config <config.json> [-sin-sellos|-verificar]")
+		fmt.Fprintln(os.Stderr, "uso: gen-config-consola -datos <dir> -config <config.json> [-ruta-consola /cd/juego] [-mpq a,b,c] [-sin-sellos|-verificar]")
+		os.Exit(2)
+	}
+
+	orden, err := ordenDelMotor(*mpq)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "la lista de MPQ no cierra:", err)
 		os.Exit(2)
 	}
 
 	if *verificar {
-		os.Exit(verificarConfig(*datos, *config))
+		os.Exit(verificarConfig(*datos, *config, *rutaConsola, orden))
 	}
 
 	cfg := d2config.DefaultConfig()
-	cfg.MpqPath = rutaDatosConsola
-	cfg.MpqLoadOrder = append([]string{}, d2setup.CoreMPQs...)
+	cfg.MpqPath = *rutaConsola
+	cfg.MpqLoadOrder = orden
 	cfg.SetPath(*config)
 
 	if err := os.MkdirAll(filepath.Dir(*config), 0750); err != nil {
@@ -125,7 +183,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		for _, nombre := range d2setup.CoreMPQs {
+		for _, nombre := range orden {
 			f, err := os.Create(filepath.Join(*datos, nombre))
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "no pude crear el archivo del juego", nombre+":", err)
@@ -151,15 +209,15 @@ func main() {
 	fmt.Printf("CONFIG-CONSOLA config=%s bytes=%d sha256=%s\n", rutaConfigConsola, len(datosBytes),
 		hex.EncodeToString(suma[:]))
 	fmt.Printf("CONFIG-CONSOLA datos=%s archivos=%d de %d (vacios: el instrumento de la frontera)\n",
-		rutaDatosConsola, sellos, len(d2setup.CoreMPQs))
+		*rutaConsola, sellos, len(orden))
 	fmt.Printf("CONFIG-CONSOLA MpqLoadOrder=%d nombres: el mismo orden que crea los archivos, de %s\n",
-		len(d2setup.CoreMPQs), "d2setup.CoreMPQs")
+		len(orden), "d2setup.CoreMPQs (filtrado por -mpq)")
 }
 
 // verificarConfig: EL CONTROL DEL HOST. Lee el config del romdisk con el json DE VERDAD y exige tres
 // cosas: que se parsee, que diga la ruta y el orden del arranque de la consola, y que TODOS los archivos
 // que nombra existan en el directorio de datos. Devuelve el codigo de salida (0 = OK).
-func verificarConfig(datos, config string) int {
+func verificarConfig(datos, config, rutaEsperada string, ordenEsperado []string) int {
 	criollo, err := os.ReadFile(config)
 	if err != nil {
 		fmt.Println("CONFIG-CONSOLA verificacion FALLO: no pude leer", config+":", err)
@@ -174,19 +232,19 @@ func verificarConfig(datos, config string) int {
 
 	ok := true
 
-	if e.MpqPath != rutaDatosConsola {
-		fmt.Printf("CONFIG-CONSOLA verificacion FALLO: MpqPath=%q (tiene que ser %q)\n", e.MpqPath, rutaDatosConsola)
+	if e.MpqPath != rutaEsperada {
+		fmt.Printf("CONFIG-CONSOLA verificacion FALLO: MpqPath=%q (tiene que ser %q)\n", e.MpqPath, rutaEsperada)
 		ok = false
 	}
 
-	if len(e.MpqLoadOrder) != len(d2setup.CoreMPQs) {
-		fmt.Printf("CONFIG-CONSOLA verificacion FALLO: MpqLoadOrder tiene %d nombres, el motor pide %d\n",
-			len(e.MpqLoadOrder), len(d2setup.CoreMPQs))
+	if len(e.MpqLoadOrder) != len(ordenEsperado) {
+		fmt.Printf("CONFIG-CONSOLA verificacion FALLO: MpqLoadOrder tiene %d nombres, se esperan %d\n",
+			len(e.MpqLoadOrder), len(ordenEsperado))
 		ok = false
 	} else {
-		for i, nombre := range d2setup.CoreMPQs {
+		for i, nombre := range ordenEsperado {
 			if e.MpqLoadOrder[i] != nombre {
-				fmt.Printf("CONFIG-CONSOLA verificacion FALLO: MpqLoadOrder[%d]=%q (el motor lista %q)\n",
+				fmt.Printf("CONFIG-CONSOLA verificacion FALLO: MpqLoadOrder[%d]=%q (se espera %q)\n",
 					i, e.MpqLoadOrder[i], nombre)
 				ok = false
 			}

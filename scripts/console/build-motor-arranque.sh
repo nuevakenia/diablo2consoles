@@ -64,9 +64,18 @@ if [ "${DC_SIN_ROMDISK:-0}" != "1" ]; then
 
     if [ "${DC_SIN_CONFIG:-0}" != "1" ]; then
         echo "== 1/5 el config del arranque (lo escribe el motor, con los datos del juego puestos) =="
-        if ! (cd "$REPO" && go run ./console/dc/gen-config-consola \
-                -datos "$ROMSRC/juego" -config "$ROMSRC/OpenDiablo2/config.json" \
-                ${DC_SIN_SELLOS:+-sin-sellos}) > "$OUT/config-consola.log" 2>&1; then
+        # DC-002.27: los dos parametros del DISCO, apagados por defecto (sin las tres variables, la linea
+        # de siempre: la ruta del romdisk, los 7 CoreMPQs y los sellos vacios de DC-002.19, byte por byte).
+        #   DC_RUTA_DATOS=/cd/juego  -> el arranque busca los datos en el disco (GD-ROM, ISO9660)
+        #   DC_MPQ_JUEGO=a,b,c       -> los MPQ de la config, de la tabla de d2setup (el orden lo pone el motor)
+        #   DC_SIN_SELLOS=1          -> no crea los archivos vacios (con los MPQ de verdad en el disco no hay
+        #                               nada que sellar: el sello era el instrumento cuando no habia disco)
+        #   DC_DISCO_JUEGO=<dir>     -> ademas hornea esos MPQ en la ISO, en /JUEGO (paso 5b)
+        ARGS_CONFIG=(-datos "$ROMSRC/juego" -config "$ROMSRC/OpenDiablo2/config.json"
+            -ruta-consola "${DC_RUTA_DATOS:-/rd/juego}")
+        [ -n "${DC_MPQ_JUEGO:-}" ] && ARGS_CONFIG+=(-mpq "$DC_MPQ_JUEGO")
+        [ "${DC_SIN_SELLOS:-0}" = "1" ] && ARGS_CONFIG+=(-sin-sellos)
+        if ! (cd "$REPO" && go run ./console/dc/gen-config-consola "${ARGS_CONFIG[@]}") > "$OUT/config-consola.log" 2>&1; then
             echo "   EL GENERADOR DE LA CONFIGURACION FALLO (ver $OUT/config-consola.log)" >&2
             tail -5 "$OUT/config-consola.log" >&2
             exit 1
@@ -135,6 +144,14 @@ sh-elf-objcopy -R .stack -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"
 "$DC_MAKEIP" -f "$OUT/IP.BIN" >/dev/null
 "$DC_PYTHON" "$HERE/mkiso.py" "$OUT/disc.iso" "$OUT/IP.BIN" "$OUT/1ST_READ.BIN"
 "$DC_PYTHON" "$HERE/mkgdi.py" "$OUT"
+
+# DC-002.27: la imagen del disco CON los assets del juego adentro (/JUEGO). Va despues del ISO del paso
+# 5/5 a proposito: la imagen se rearma con los MPQ, y el ISO del paso 5 (el binario solo) queda como el
+# control negativo de la tarjeta -- el mismo POC, con y sin la carpeta del juego.
+if [ -n "${DC_DISCO_JUEGO:-}" ]; then
+    echo "== 5b/5 la imagen del disco con los MPQ del juego (DC-002.27) =="
+    bash "$HERE/mkdisco.sh" "$OUT" "$DC_DISCO_JUEGO" | sed 's/^/   /'
+fi
 
 # prog-emu.elf: el MISMO binario sin el debug ni el .go_export, para correrlo en Flycast.
 #
