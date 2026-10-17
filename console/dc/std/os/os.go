@@ -18,11 +18,11 @@
 package os
 
 import (
-	"errors"
-	"io"
-	"unsafe"
+	"d2std/errors"
+	"d2std/io"
 	"d2std/io/fs"
 	"d2std/time"
+	"unsafe"
 )
 
 // FileMode y las constantes: los de io/fs (en la stdlib de verdad os solo les pone el nombre corto).
@@ -333,8 +333,12 @@ func (d dirEntryOS) Type() FileMode {
 	return 0
 }
 
-// TipoCrudo es el valor de KOS sin interpretar (para diagnostico y para el corpus).
-func (d dirEntryOS) TipoCrudo() int { return d.tipo }
+// NO hay TipoCrudo: el valor de KOS sin interpretar se fue con el alias. os.DirEntry ES fs.DirEntry, y
+// esa interfaz no declara TipoCrudo, asi que un metodo de mas en el tipo concreto (que no se puede
+// nombrar desde afuera) no se podia pedir de ninguna manera: era codigo que no se alcanzaba. Lo que
+// queda es Type() e IsDir(), que son los de Go y son los que el corpus mide. Medido en DC-002.8a: el
+// POC del VFS pedia e.TipoCrudo() y e.Size() (del interfaces viejo, mas ancho) y NO COMPILABA desde el
+// alias (commit 95e0ef74, DC-002.8): el corpus de os en la consola quedo muerto sin que nadie lo viera.
 
 // ReadDir lista un directorio. EN LA CONSOLA SALE DE UN MANIFIESTO, no del sistema de archivos:
 //
@@ -386,6 +390,18 @@ func ReadDir(nombre string) ([]DirEntry, error) {
 			}
 		}
 		linea = ""
+	}
+
+	// Go ordena las entradas de ReadDir POR NOMBRE (os.ReadDir: "sorted by filename"); el manifiesto,
+	// en cambio, sale en el orden que le da el build. Medido en DC-002.8a con /rd/desorden/.manifiesto
+	// escrito a proposito como zulu-alfa-mike: nuestro os.ReadDir devolvia "zulu.txt alfa.txt mike.txt "
+	// donde el de Go devuelve "alfa.txt mike.txt zulu.txt ". Se ordena aca, a mano y no con sort: os es
+	// el paquete mas bajo de todos y no importa nada que no sea imprescindible (la misma razon por la que
+	// existe partirTab). Lo exige el corpus (poc/vfs, seccion 4c-bis) y su mutante.
+	for i := 1; i < len(salida); i++ {
+		for j := i; j > 0 && salida[j].Name() < salida[j-1].Name(); j-- {
+			salida[j], salida[j-1] = salida[j-1], salida[j]
+		}
 	}
 	return salida, nil
 }

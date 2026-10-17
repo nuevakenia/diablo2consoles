@@ -2,7 +2,7 @@
 // Title y Map). Va aparte para no tocar lo que ya estaba medido en DC-002.2/Dc-002.4.
 package strings
 
-import "unicode/utf8"
+import "d2std/unicode/utf8"
 
 // Compare es -1, 0 o 1 segun el orden de a respecto de b (la misma regla que Go: comparacion de
 // bytes, no de runas).

@@ -1,0 +1,166 @@
+DC-002.8a: los tipos de os alineados con io/fs (alias) y los imports de la stdlib minima
+========================================================================================
+Tarjeta t_27473489. Rama DC-002. Fecha de la corrida: 2026-10-16.
+
+QUE PEDIA LA TARJETA, Y QUE SE MIDIO
+------------------------------------
+La tarjeta nace de dos pendientes que la evidencia de DC-002.8 (dc-002.8-motor-por-capas.txt, seccion
+"LO QUE QUEDA DECLARADO") dejo anotados:
+
+  A. os y io/fs tendrian TIPOS DISTINTOS para lo mismo (FileInfo, DirEntry, FileMode) y en Go son el
+     MISMO tipo. Sintoma: d2mpq/mpq.go:205 "cannot use type []os.FileInfo as type []fs.FileInfo".
+  B. io/ioutil, os, compress/zlib y compress/gzip importan la biblioteca de Go ("io", "os", "sort") en
+     vez de "d2std/...".
+
+MEDIDO, ANTES DE TOCAR NADA:
+
+  A. NO ERA CIERTO YA: el alias esta hecho y commiteado en 95e0ef74 ("DC-002.8: 84 de 142 -- los tipos
+     de archivos alineados con io/fs"), anterior a la nota. Lo que quedo del pendiente fue el COMENTARIO
+     viejo en scripts/console/build-std-gox.sh (que el propio mensaje del commit decia haber borrado:
+     "El pendiente que estaba anotado en build-std-gox.sh queda hecho; se borra de ahi") y el hecho de
+     que nadie volvio a compilar el corpus de os en la consola despues del alias. Y ahi si habia un
+     defecto grande, el 1 de la lista de abajo.
+
+  B. SI ERA CIERTO, y mas grande de lo deducido: no eran 4 archivos, eran 8 (12 imports).
+
+--
+1. LO QUE NO COMPILABA Y NADIE LO VEIA: EL CORPUS DE os EN LA CONSOLA
+---------------------------------------------------------------------
+`bash scripts/console/build-dc.sh console/dc/poc/vfs` ANTES de esta tarjeta:
+
+    console/dc/poc/vfs/main.go:79:41: error: reference to undefined field or method 'Size'
+    console/dc/poc/vfs/main.go:191:48: error: reference to undefined field or method 'TipoCrudo'
+
+El POC del VFS es el corpus de `os` (60 casos, DC-002.6d) y NO COMPILABA desde 95e0ef74: usaba un
+os.DirEntry propio mas ancho (con Size() y TipoCrudo()) que el alias elimino. Como el corpus no se
+corrio despues del alias, el hueco quedo tapado por dos cosas verdes: la suite del host (que excluye
+os) y la barrera del motor (que usa ReadFile, no ReadDir). Lo cazo este trabajo por el camino mas
+directo: ir a correr el corpus de os.
+
+2. ANTES Y DESPUES, NUMERO POR NUMERO
+-------------------------------------
+                                          ANTES                       DESPUES
+checar-imports-d2std.sh (nuevo)           12 violaciones / 8 archivos  0 violaciones (VERDE)
+test-std-host.sh (amd64 + 386)            verde en los dos             verde en los dos +
+                                                                       "excluidos que NO compilan: 9 de 9"
+.gox de la consola (build-std-gox.sh)     --                           tamanos IDENTICOS byte a byte
+build-motor-all.sh (el motor)             93 de 142 (49 bloqueados)    93 de 142 (los MISMOS 142
+                                                                       paquetes, mismo estado: diff vacio)
+poc/vfs (el corpus de os)                 NO COMPILA                   77 casos, 77 bien, 0 mal
+mutar-os-consola.sh                       no se podia correr           10/10 cazados, control verde
+mutar-tipos-os.sh (nuevo)                 no existia                   4/4 cazados
+mutar-std-host.sh                         32/32                        32/32 cazados (arbol sano)
+test-std-host.sh: "excluidos NO compilan" prometido en un comentario   verificado + control del control
+compare-motor-dc6.sh (la barrera)         31 lineas identicas          31 lineas identicas, 30 frames
+poc/stdlib (corpus de la stdlib)          2746 casos                   2746 casos, 2746 bien, 0 mal
+
+Los dos "ANTES" del motor y del corpus del host se midieron en esta misma corrida (no se copiaron de
+la evidencia vieja): build-motor-all.sh antes de tocar nada dio 93 de 142, igual que despues.
+
+3. LAS 12 VIOLACIONES DE IMPORT (lo que el ajuste caza)
+-------------------------------------------------------
+    bytes/buscar.go:9              import "unicode/utf8"
+    compress/gzip/gzip.go:13       import "io"
+    compress/zlib/zlib.go:14       import "io"
+    container/heap/heap.go:11      import "sort"
+    io/fs/fs.go:11                 import "time"
+    io/ioutil/ioutil.go:8,9,10     import "io", "os", "sort"
+    math/cmplx/cmplx.go:11         import "math"
+    os/os.go:21,22                 import "errors", "io"
+    strings/strings-extra.go:5     import "unicode/utf8"
+
+POR QUE IMPORTA (el defecto es INVISIBLE donde se mide): en la CONSOLA el nombre desnudo "io" resuelve
+a NUESTRO io.gox (el build reescribe `"d2std/` -> `"`), o sea que el binario de la consola era
+correcto. En el HOST el mismo texto resuelve a la biblioteca de Go: la prueba diferencial compilaba
+ioutil contra el `os` de Go y no lo decia. Con "d2std/..." el nombre no puede significar dos cosas.
+
+Consecuencia declarada del ajuste: io/fs (por d2std/time) e io/ioutil (por d2std/os) dejan de compilar
+en el host. NO se pierde ningun test (los dos estaban solo compilando: no tienen archivos de prueba),
+se cambia "compila en el host contra Go" por "corre en la consola sobre lo nuestro" (poc/vfs) y por un
+limite DECLARADO Y VERIFICADO en test-std-host.sh:
+
+    -- los que hablan con KOS tienen que NO compilar en el host --
+    excluidos que NO compilan en el host (amd64): 9 de 9
+    excluidos que NO compilan en el host (386): 9 de 9
+    == los dos anchos: verde (y los 9 que hablan con KOS siguen sin compilar en el host) ==
+
+(el comentario de ese script prometia desde DC-002.5b que exigia "que NO compilen"; el codigo solo los
+excluia: la promesa estaba escrita y la verificacion no existia. Ahora existe y es una de las dos
+mitades de la prueba. CONTROL DEL CONTROL, para que no sea una asercion de adorno: agregando un paquete
+que SI compila en el host a la lista ("flag"), la prueba se pone roja sola:
+
+    STD=.../console/dc/std bash /tmp/test-std-host-control.sh
+    OJO: d2std/flag COMPILA en el host (386) y esta en la lista de excluidos:
+         la lista quedo vieja (o alguien le puso una implementacion de host sin decirlo).
+    excluidos que NO compilan en el host (386): 9 de 10
+    == HAY FALLOS (arriba) ==   (exit 1))
+
+4. LOS DEFECTOS QUE APARECIERON MIDIENDO (y como se cierran)
+------------------------------------------------------------
+1. EL CORPUS DE os EN LA CONSOLA NO COMPILABA (seccion 1). Arreglado: el POC usa `e.Info().Size()` y
+   `e.Type()` (los metodos de Go), y os.go pierde el metodo TipoCrudo(), que era INALCANZABLE: os.DirEntry
+   ES fs.DirEntry, esa interfaz no lo declara, y el tipo concreto (dirEntryOS) no se puede nombrar desde
+   afuera para asertarlo.
+2. os.ReadDir NO ORDENABA POR NOMBRE y Go SI. Medido con el fixture /rd/desorden (su .manifiesto dice
+   zulu, alfa, mike a proposito): antes daba "zulu.txt alfa.txt mike.txt " donde Go da "alfa.txt
+   mike.txt zulu.txt ". Arreglado en os.go (ordenamiento a mano, sin importar sort: os es el paquete
+   mas bajo y no importa nada que no sea imprescindible). Antes de este fixture el orden no estaba
+   probado: el manifiesto de /rd sale alfabetico de casualidad (asi lo expande el glob del build), asi
+   que un mutante "sin ordenar" quedaba VERDE.
+3. EL MANIFIESTO NO DISTINGUIA DIRECTORIOS: build-dc.sh escribia "archivo" para todo, asi que la rama
+   `campos[2] == "directorio"` de os.ReadDir era CODIGO MUERTO y DirEntry.IsDir()/Type()==fs.ModeDir no
+   tenian ningun caso. Ahora el manifiesto marca "directorio" (con tamano 0: el tamano de un directorio
+   lo pone el sistema de archivos que lo hospeda, medido 4096 en /tmp, y no es un dato del contenido) y
+   el romdisk del POC tiene el subdirectorio desorden: 4 entradas en /rd.
+4. EL MUTADOR DE LA CONSOLA ESTABA ROTO EN SILENCIO: su mutante 2 buscaba `DirEntry{nombre: ...}` y el
+   tipo concreto se llama `dirEntryOS` desde 95e0ef74, asi que se reportaba "NO SE PUDO APLICAR (se
+   saltea)" y el conteo final (cazados == total) se caia. Arreglado.
+5. DOS NOTAS VIEJAS QUE SE CONTRADECIAN CON LA REALIDAD: el "PENDIENTE MEDIDO (DC-002.8)" de
+   build-std-gox.sh (ya hecho en 95e0ef74) y la promesa sin verificar de test-std-host.sh (punto 3).
+   Las dos se corrigieron en su lugar.
+6. LAS 12 VIOLACIONES DE IMPORT (seccion 3), con el ajuste scripts/console/checar-imports-d2std.sh para
+   que no vuelvan.
+
+5. LOS MUTANTES (lo que exige que el corpus se ponga ROJO)
+----------------------------------------------------------
+a) scripts/console/mutar-tipos-os.sh (NUEVO, 4/4 cazados; solo compilacion, sin Flycast):
+   control:      stdlib OK + d2mpq OK + POC del VFS OK
+   mutante 1:    os.FileInfo con tipo propio -> la STDLIB no compila:
+                 /tmp/mutar-tipos/gox/src/os/os.go:396:57: error: argument 2 has incompatible type
+                 (incompatible type for method 'Info' (different result types))
+   mutante 2:    os.FileInfo propio + os parcheado para compilar (el estado "a mitad de camino" que
+                 describe el tablero) -> d2mpq no compila CON EL ERROR EXACTO DEL TABLERO:
+                 d2common/d2fileformats/d2mpq/mpq.go:205:28: error: incompatible types in assignment
+                 (cannot use type []os.FileInfo as type []fs.FileInfo)
+   mutante 3:    os.DirEntry con tipo propio -> el POC del VFS no compila:
+                 console/dc/poc/vfs/main.go:123:11: error: incompatible types in assignment
+                 (cannot use type []fs.DirEntry as type []os.DirEntry)
+   mutante 4:    os.FileMode con tipo propio -> la stdlib no compila:
+                 /tmp/mutar-tipos/gox/src/os/os.go:264:16: error: incompatible type for return value 1
+                 (incompatible type for method 'Mode' (different result types))
+   Al final: os.go restaurado con sha256 verificado (b0086343b0f8...) y la stdlib de produccion SIN
+   tocar (las mutaciones se compilan en /tmp/mutar-tipos/gox porque build-std-gox.sh hace `rm -rf` de
+   su salida y en el arbol de produccion se llevaria puestos los .gox del motor).
+
+b) scripts/console/mutar-os-consola.sh (10/10 cazados; eran 7, los tres nuevos son de esta tarjeta):
+   control           77 casos, 77 bien, 0 mal
+   mutante 8          ReadDir sin ordenar                     -> 75 bien, 2 mal
+   mutante 9          el directorio del manifiesto como archivo -> 75 bien, 2 mal
+   mutante 10         ioutil.ReadDir con el comparador invertido -> 74 bien, 3 mal
+   (los mutantes 1..7 siguen cazados: ReadFile de una sola vuelta 1 mal, ReadDir sin tamanos 4 mal,
+   Stat con tamano cero 1 mal, IsNotExist siempre falso 2 mal, time Duration 1 mal, time Sub, log.)
+   Arbol restaurado: sha256 de os.go, time.go, log.go e ioutil.go verificados.
+
+6. LA BARRERA Y EL CORPUS DE LA STDLIB
+--------------------------------------
+Para medir la barrera con MI stdlib hubo que apartar el WIP de DC-002.9 que quedo sin commitear en el
+arbol (motorresumen/motorcmp/bake-dc6 + los dos scripts de build del motor): ese WIP no compila
+(motorresumen usa d2util.ImgIndexToRGBA y build-motor-gox.sh todavia no incluye d2common/d2util en su
+lista de paquetes), asi que la barrera se midio con `git stash push` de SOLO esos archivos, es decir el
+pipeline commiteado + mis cambios:
+
+    bash scripts/console/build-motor-dc6.sh        -> ELF nuevo
+    bash scripts/console/compare-motor-dc6.sh      -> IGUAL: 31 lineas identicas, 30 frames
+
+Despues se restauro el WIP (`git stash pop`) y queda declarado en la tarjeta t_1677ebe0 (DC-002.9),
+que es la que tiene que terminarlo.

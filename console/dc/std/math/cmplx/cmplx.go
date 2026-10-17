@@ -8,7 +8,7 @@
 // las que se usan.
 package cmplx
 
-import "math"
+import "d2std/math"
 
 // Abs: el modulo (hipotenusa de la parte real e imaginaria).
 func Abs(x complex128) float64 { return math.Hypot(real(x), imag(x)) }

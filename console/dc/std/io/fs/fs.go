@@ -8,7 +8,7 @@
 // de archivos se resuelve con el .manifiesto, que es la forma que ya se uso para el resto.
 package fs
 
-import "time"
+import "d2std/time"
 
 // FileMode y FileInfo: los mismos tipos de Go (alias a lo que usa os).
 type FileMode uint32

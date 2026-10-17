@@ -6,7 +6,7 @@
 // justo lo que un motor de juego no quiere hacer por frame).
 package bytes
 
-import "unicode/utf8"
+import "d2std/unicode/utf8"
 
 // isSpaceByte son los blancos que usa bytes.TrimSpace, con los codigos escritos a mano (sin escapes
 // de texto para que no dependan de como se copie el archivo).

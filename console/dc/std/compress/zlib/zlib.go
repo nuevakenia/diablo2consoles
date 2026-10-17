@@ -11,7 +11,7 @@
 package zlib
 
 import (
-	"io"
+	"d2std/io"
 )
 
 // extern del puente en C (csrc/zlib_dc.c), que a su vez llama a la zlib de KOS.

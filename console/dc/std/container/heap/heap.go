@@ -8,7 +8,7 @@
 // monticulo no tiene por que coincidir con el de Go (el de Go tampoco lo garantiza).
 package heap
 
-import "sort"
+import "d2std/sort"
 
 // Interface es la interfaz de Go, igual: el tipo que se guarda tiene que saber ordenarse.
 type Interface interface {

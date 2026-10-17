@@ -5,9 +5,9 @@
 package ioutil
 
 import (
-	"io"
-	"os"
-	"sort"
+	"d2std/io"
+	"d2std/os"
+	"d2std/sort"
 )
 
 // ReadAll lo mismo que io.ReadAll.

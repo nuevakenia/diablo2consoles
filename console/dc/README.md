@@ -1054,3 +1054,97 @@ peor que no tenerlo):
 - El mutante de `Uniform.Opaque` estaba escrito `return true`, que **ni compila** (la variable `a` queda
   sin usar): el script lo reportaba como "LA MUTACION NO COMPILA (no prueba nada de la suite)" y eso
   hundia el conteo. Se corrigio a `return a != 0xffff`.
+
+## 22. DC-002.8a: los tipos de `os` alineados con `io/fs`, y los imports de la stdlib minima
+
+La tarjeta nacia de dos pendientes de DC-002.8. Medido antes de tocar nada, los dos habia que
+reescribirlos:
+
+- **A ("os y io/fs tienen tipos distintos") ya NO era cierto**: el alias (`os.FileInfo = fs.FileInfo`,
+  etc.) esta hecho y commiteado en `95e0ef74`. Lo que quedaba era el COMENTARIO "PENDIENTE MEDIDO" en
+  `build-std-gox.sh` —el propio mensaje del commit decia haberlo borrado: "El pendiente que estaba
+  anotado en build-std-gox.sh queda hecho; se borra de ahi"— y, sobre todo, un defecto grande que ese
+  commit dejo y nadie vio.
+- **B ("4 archivos importan la biblioteca de Go") era cierto y mas grande**: eran **8 archivos con 12
+  imports** (`bytes`, `compress/gzip`, `compress/zlib`, `container/heap`, `io/fs`, `io/ioutil`, `math/cmplx`,
+  `os`, `strings`).
+
+**El defecto grande (y por que nadie lo veia): el corpus de `os` en la consola NO COMPILABA.**
+
+    $ bash scripts/console/build-dc.sh console/dc/poc/vfs
+    console/dc/poc/vfs/main.go:79:41: error: reference to undefined field or method 'Size'
+    console/dc/poc/vfs/main.go:191:48: error: reference to undefined field or method 'TipoCrudo'
+
+El POC del VFS (60 casos de DC-002.6d) usaba un `os.DirEntry` propio mas ancho, con `Size()` y
+`TipoCrudo()`, que el alias elimino al convertirlo en `fs.DirEntry`. Desde `95e0ef74` el corpus de `os`
+estaba muerto y **las dos cosas verdes que se miraban no podian verlo**: la prueba del host excluye `os`
+(no compila contra KOS) y la barrera del motor usa `ReadFile`, no `ReadDir`. Aparecio por el camino mas
+directo: ir a correr el corpus de `os`.
+
+    ANTES                                         DESPUES
+    checar-imports-d2std.sh (nuevo)  12 viol./8   0 (VERDE)
+    test-std-host.sh (amd64 + 386)   verde        verde + "excluidos que NO compilan: 9 de 9"
+    .gox de la consola               --           tamanos IDENTICOS byte a byte
+    build-motor-all.sh               93/142       93/142 (los MISMOS 142, mismo estado: diff vacio)
+    poc/vfs (el corpus de os)        NO COMPILA   77 casos, 77 bien, 0 mal (eran 60)
+    mutar-os-consola.sh              no se podia  10/10 cazados (eran 7)
+    mutar-tipos-os.sh (nuevo)        no existia   4/4 cazados
+    mutar-std-host.sh                32/32        32/32
+    compare-motor-dc6.sh             31 lineas    31 lineas identicas, 30 frames
+    poc/stdlib                       2746         2746 casos, 2746 bien, 0 mal
+
+**Por que los imports hay que escribirlos como `"d2std/..."`** (y por que el defecto era invisible): en
+la consola, el nombre desnudo `"io"` resuelve a NUESTRO `io.gox` porque el build reescribe `"d2std/` ->
+`"`. En el host, el mismo texto resuelve a la biblioteca de Go: la prueba diferencial compilaba `ioutil`
+contra el `os` de Go **y no lo decia**. Con el prefijo explicito el nombre ya no puede significar dos
+cosas. El ajuste lo exige ahora `scripts/console/checar-imports-d2std.sh` (37 paquetes, 41 archivos;
+`unsafe` es lo unico de afuera que se permite, `difftest/` y `cmd/` quedan afuera porque son las
+herramientas del host y comparar contra la biblioteca real es su trabajo).
+
+Consecuencia declarada: `io/fs` (por `d2std/time`) y `io/ioutil` (por `d2std/os`) **dejan de compilar en
+el host**. No se pierde ningun test (los dos solo compilaban: no tienen archivos de prueba); el corpus
+de `ioutil` pasa a la consola, sobre NUESTRO `os`, y el limite queda **declarado y verificado** en
+`test-std-host.sh`, que ahora tiene dos mitades: los no excluidos corren la prueba diferencial y los
+excluidos tienen que NO compilar (el comentario lo prometia desde DC-002.5b; el codigo solo los
+excluia). Con un paquete que si compila metido a mano en la lista, la prueba se pone roja sola.
+
+**Los defectos que aparecieron midiendo** (los tres ultimos no estaban en la tarjeta; salieron del
+camino):
+
+- `os.ReadDir` **no ordenaba por nombre** y el de Go si (`os.ReadDir`: *sorted by filename*). Medido con
+  un fixture nuevo, `/rd/desorden/.manifiesto`, escrito a proposito como `zulu, alfa, mike`: nuestro
+  `ReadDir` daba `"zulu.txt alfa.txt mike.txt "` donde Go da `"alfa.txt mike.txt zulu.txt "`. Antes de
+  ese fixture el orden **no estaba probado**: el manifiesto de `/rd` sale alfabetico de casualidad (asi
+  lo expande el glob del build), asi que un mutante "sin ordenar" quedaba verde. Se ordena a mano en
+  `os.go` (sin importar `sort`: `os` es el paquete mas bajo y no importa nada que no sea imprescindible,
+  la misma razon por la que existe `partirTab`).
+- El **manifiesto no distinguia directorios**: `build-dc.sh` escribia "archivo" para todo, asi que la
+  rama `campos[2] == "directorio"` de `os.ReadDir` era **codigo muerto** y `DirEntry.IsDir()` /
+  `Type() == fs.ModeDir` no tenian ningun caso. Ahora marca "directorio" (tamano 0: el de un directorio
+  lo pone el sistema de archivos que lo hospeda —medido 4096 en `/tmp`— y no es un dato del contenido) y
+  el romdisk del POC tiene ese subdirectorio: `/rd` paso de 3 a 4 entradas.
+- El **mutador de la consola estaba roto en silencio**: su mutante 2 buscaba `DirEntry{nombre: ...}` y el
+  tipo concreto se llama `dirEntryOS` desde `95e0ef74`, asi que se reportaba "NO SE PUDO APLICAR (se
+  saltea)" y el conteo final se caia. Arreglado.
+- `os.TipoCrudo()` era **inalcanzable**: `os.DirEntry` ES `fs.DirEntry`, esa interfaz no lo declara, y
+  el tipo concreto no se puede nombrar desde afuera. Se fue; quedan `Type()` e `IsDir()`, que son los de
+  Go. La seccion 4k/4l del POC del VFS ahora mide `ioutil` sobre el `os` de la consola (incluida la
+  asignacion exacta del motor, `var files []fs.FileInfo; files, err = ioutil.ReadDir(dir)` de
+  `d2mpq/mpq.go:204`, que es el sintoma del tablero) y las identidades de tipo que exige el compilador.
+
+**Los mutantes nuevos** de la alineacion viven en `scripts/console/mutar-tipos-os.sh` (solo compilacion,
+sin Flycast) y los tres de ioutil/orden en `scripts/console/mutar-os-consola.sh` (8, 9 y 10). El
+control del mutador de tipos exige, sin mutar, que compilen los tres: la stdlib, `d2mpq` y el POC del
+VFS. Y el mutante mas útil es el que reproduce el estado **"a mitad de camino"** que el tablero
+advierte: con `os.FileInfo` propio y `os` parcheado para que compile, el que se cae es el motor, con el
+error exacto de DC-002.8:
+
+    d2common/d2fileformats/d2mpq/mpq.go:205:28: error: incompatible types in assignment
+    (cannot use type []os.FileInfo as type []fs.FileInfo)
+
+Nota de arbol: al medir la barrera, el WIP de DC-002.9 que quedo sin commitear (motorresumen,
+motorcmp, bake-dc6 y los dos scripts del motor) **no compila** (`motorresumen` usa
+`d2util.ImgIndexToRGBA` y `build-motor-gox.sh` todavia no incluye `d2common/d2util` en su lista de
+paquetes). La barrera se midio apartando ese WIP con `git stash` (el pipeline commiteado + los cambios
+de esta tarjeta) y despues se restauro; el WIP queda declarado en la tarjeta `t_1677ebe0`, que es la que
+lo tiene que terminar. Evidencia completa: `evidencia/dc-002.8a-os-iofs-imports.txt`.

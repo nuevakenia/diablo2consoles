@@ -10,7 +10,7 @@
 package gzip
 
 import (
-	"io"
+	"d2std/io"
 )
 
 //extern d2c_zlib_inflate

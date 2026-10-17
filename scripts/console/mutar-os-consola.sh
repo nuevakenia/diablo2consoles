@@ -1,10 +1,11 @@
 #!/bin/bash
-# Mutadores del paquete os de la consola (DC-002.6): cada uno rompe UNA cosa que el POC del VFS mide.
-# Si el POC sigue VERDE con el mutante puesto, el hueco es del POC y hay que taparlo.
+# Mutadores del paquete os de la consola (DC-002.6, ampliado en DC-002.8a con ioutil y el orden de
+# ReadDir): cada uno rompe UNA cosa que el POC del VFS mide. Si el POC sigue VERDE con el mutante
+# puesto, el hueco es del POC y hay que taparlo.
 #
-# Es el equivalente en la CONSOLA de mutar-std-host.sh: os no se puede probar en el host, porque su
-# implementacion habla con el VFS de KOS. Cada mutante cuesta compilar la stdlib + el POC (gccgo y
-# kos-cc) y ~30 s de Flycast.
+# Es el equivalente en la CONSOLA de mutar-std-host.sh: os y ioutil no se pueden probar en el host,
+# porque ioutil camina sobre el os de la consola y el os habla con el VFS de KOS. Cada mutante cuesta
+# compilar la stdlib + el POC (gccgo y kos-cc) y ~30 s de Flycast.
 #
 # Restaurar NO se hace con git checkout --: se respalda el archivo en /tmp y se verifica con sha256sum
 # (regla del proyecto: el arbol del hito puede tener arreglos sin commitear).
@@ -16,12 +17,15 @@ cd "$HERE/../.." || exit 1
 source scripts/console/env.sh
 
 OS=console/dc/std/os/os.go
+IUTIL=console/dc/std/io/ioutil/ioutil.go
 RESP=/tmp/mutar-os/os.go
+# los archivos que un mutante toca y que hay que dejar iguales al terminar
+ARCHIVOS="$OS console/dc/std/time/time.go console/dc/std/log/log.go $IUTIL"
 mkdir -p /tmp/mutar-os
 cp "$OS" "$RESP"
 SHA0="$(sha256sum "$OS" | cut -d' ' -f1)"
 echo "os.go de partida: sha256 $SHA0"
-for f in console/dc/std/os/os.go console/dc/std/time/time.go console/dc/std/log/log.go; do
+for f in $ARCHIVOS; do
     sha256sum "$f" | cut -d' ' -f1 > "/tmp/mutar-os/sha-$(echo "$f" | tr / -).orig"
 done
 
@@ -108,8 +112,8 @@ probar "ReadFile de una sola vuelta" \
 # 2. ReadDir que no trae el tamano del manifiesto
 probar "ReadDir sin tamanos" \
     "console/dc/std/os/os.go" \
-    "salida = append(salida, DirEntry{nombre: campos[0], tam: int64(tam), tipo: tipo})" \
-    "salida = append(salida, DirEntry{nombre: campos[0], tam: 0, tipo: tipo})" \
+    "salida = append(salida, dirEntryOS{nombre: campos[0], tam: int64(tam), tipo: tipo})" \
+    "salida = append(salida, dirEntryOS{nombre: campos[0], tam: 0, tipo: tipo})" \
     "los tamanos del manifiesto"
 
 # 3. Stat que miente con el tamano
@@ -147,11 +151,39 @@ probar "log: el prefijo no sale en el mensaje" \
     "	fmt.Fprint(fmt.Output, s)" \
     "el texto exacto del log con prefijo"
 
+# 8. ReadDir SIN ORDENAR (DC-002.8a): Go ordena por nombre y el manifiesto sale en el orden del build.
+#    Lo caza el fixture /rd/desorden, que esta escrito zulu-alfa-mike a proposito: si el manifiesto de
+#    /rd alcanzara (sale alfabetico de casualidad, por el glob del build) este mutante quedaria VERDE.
+probar "ReadDir sin ordenar (el manifiesto sale como viene)" \
+    "console/dc/std/os/os.go" \
+    "	for i := 1; i < len(salida); i++ {
+		for j := i; j > 0 && salida[j].Name() < salida[j-1].Name(); j-- {
+			salida[j], salida[j-1] = salida[j-1], salida[j]
+		}
+	}
+" \
+    "" \
+    "el orden por nombre del fixture /rd/desorden"
+
+# 9. el manifiesto trata los DIRECTORIOS como archivos (el tipo es lo unico que los distingue)
+probar "el directorio del manifiesto como archivo" \
+    "console/dc/std/os/os.go" \
+    "if campos[2] == \"directorio\" {" \
+    "if campos[2] == \"nunca\" {" \
+    "la entrada \"desorden\" es un directorio (IsDir/Type)"
+
+# 10. ioutil.ReadDir con el comparador al reves (sigue ordenando, pero mal)
+probar "ioutil.ReadDir con el comparador invertido" \
+    "console/dc/std/io/ioutil/ioutil.go" \
+    "sort.Slice(list, func(i, j int) bool { return list[i].Name() < list[j].Name() })" \
+    "sort.Slice(list, func(i, j int) bool { return list[i].Name() > list[j].Name() })" \
+    "el orden por nombre de ioutil.ReadDir"
+
 echo
 echo "== restauro y verifico =="
 cp "$RESP" "$OS"
 mal=""
-for f in console/dc/std/os/os.go console/dc/std/time/time.go console/dc/std/log/log.go; do
+for f in $ARCHIVOS; do
     sha="$(sha256sum "$f" | cut -d' ' -f1)"
     guardado="/tmp/mutar-os/sha-$(echo "$f" | tr / -).orig"
     if [ -f "$guardado" ]; then

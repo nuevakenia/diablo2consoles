@@ -14,6 +14,8 @@ package main
 
 import (
 	"bufio"
+	"io/fs"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -72,13 +74,59 @@ func absDe(p string) string {
 	return r
 }
 
-// tamanos: la lista de tamanos que trae el manifiesto, en orden.
+// tamanos: la lista de tamanos del manifiesto, en orden. Va por Info() y no por un Size() de la
+// interfaz: os.DirEntry ES fs.DirEntry (alias, DC-002.8) y esa interfaz no declara Size. Antes del
+// alias el POC usaba un os.DirEntry propio mas ancho (con Size y TipoCrudo) y el alias lo dejo sin
+// compilar: medido en DC-002.8a, este POC no compilaba desde 95e0ef74.
 func tamanos(entradas []os.DirEntry) string {
 	s := ""
 	for _, e := range entradas {
-		s += strconv.FormatInt(e.Size(), 10) + " "
+		info, err := e.Info()
+		if err != nil {
+			return "info: " + err.Error()
+		}
+		s += strconv.FormatInt(info.Size(), 10) + " "
 	}
 	return s
+}
+
+// dirs: cuales de las entradas son directorios, en orden. Es el tipo que trae el manifiesto.
+func dirs(entradas []os.DirEntry) string {
+	s := ""
+	for _, e := range entradas {
+		s += si(e.IsDir()) + " "
+	}
+	return s
+}
+
+// modos: para cada entrada, si su Type() es fs.ModeDir (lo mismo que IsDir, por el otro camino).
+func modos(entradas []os.DirEntry) string {
+	s := ""
+	for _, e := range entradas {
+		s += si(e.Type() == fs.ModeDir) + " "
+	}
+	return s
+}
+
+// identidades: os.FileInfo/DirEntry/FileMode tienen que ser EL MISMO tipo que los de io/fs (alias).
+// No mide nada en tiempo de ejecucion: si dejan de serlo, el POC NO COMPILA, y eso es exactamente el
+// sintoma que bloqueaba al motor (d2mpq/mpq.go:204: "cannot use type []os.FileInfo as type
+// []fs.FileInfo" al asignar lo que devuelve ioutil.ReadDir). El mutante que lo exige vive en
+// scripts/console/mutar-tipos-os.sh.
+func identidades() {
+	var a []os.FileInfo
+	var b []fs.FileInfo
+	a = b
+	b = a
+	var c []os.DirEntry
+	var d []fs.DirEntry
+	c = d
+	d = c
+	var e os.FileMode
+	var f fs.FileMode
+	e = f
+	f = e
+	_, _, _, _, _, _ = a, b, c, d, e, f
 }
 
 // igualdad: donde difieren dos textos (vacio = iguales).
@@ -94,6 +142,24 @@ func igualdad(a []byte, b string) string {
 	return "igual"
 }
 
+// errTxt: un error a texto ("nil" si no hay), para los casos que comparan errores.
+func errTxt(e error) string {
+	if e == nil {
+		return "nil"
+	}
+	return e.Error()
+}
+
+// grandeEsperado: las 200 lineas de grande.txt (30 bytes cada una = 6000).
+func grandeEsperado() string {
+	s := ""
+	for i := 0; i < 200; i++ {
+		s += "linea " + relleno4(i) + " del archivo grande\n"
+	}
+	return s
+}
+
+// check: un caso del corpus: compara el texto esperado con el medido.
 func check(nombre, esperado, tengo string) {
 	if esperado == tengo {
 		bien++
@@ -163,17 +229,16 @@ func main() {
 		check("ReadFile /rd/grande.txt", "sin error", "error: "+err.Error())
 	} else {
 		// 200 lineas de "linea NNNN del archivo grande\n" = 30 bytes por linea = 6000
-		esperado := ""
-		for i := 0; i < 200; i++ {
-			esperado += "linea " + relleno4(i) + " del archivo grande\n"
-		}
+		esperado := grandeEsperado()
 		check("ReadFile grande.txt (6000 bytes en varias vueltas)", strconv.Itoa(len(esperado)),
 			strconv.Itoa(len(gr)))
 		check("grande.txt contenido", "igual", igualdad(gr, esperado))
 	}
 
 	// 4c. os.ReadDir del romdisk: sale del .manifiesto horneado (el FS ROM no deja listar) y tiene que
-	// dar los TRES archivos, sin el propio manifiesto. Se mide tambien /cd, que en este POC no existe.
+	// dar las CUATRO entradas, sin el propio manifiesto, ORDENADAS por nombre como en Go (os.ReadDir de
+	// Go ordena; el manifiesto lo escribe el build en el orden que le sale). Se mide tambien /cd, que en
+	// este POC no existe.
 	if e2, err2 := os.ReadDir("/cd"); err2 != nil {
 		println("VFS: ReadDir /cd ->", err2.Error(), "(declarado: el GD-ROM no esta en este POC)")
 	} else {
@@ -183,18 +248,38 @@ func main() {
 	if err != nil {
 		check("ReadDir /rd", "sin error", "error: "+err.Error())
 	} else {
-		check("ReadDir /rd", "3", strconv.Itoa(len(entradas)))
+		// 4 entradas: los tres archivos de siempre + el subdirectorio "desorden", que es el fixture del
+		// orden de ReadDir y el unico caso de DIRECTORIO del manifiesto.
+		check("ReadDir /rd", "4", strconv.Itoa(len(entradas)))
 		nombres := ""
-		tipos := ""
 		for _, e := range entradas {
 			nombres += e.Name() + " "
-			tipos += strconv.Itoa(e.TipoCrudo()) + " "
 		}
-		println("VFS: ReadDir /rd ->", nombres, "| tipos:", tipos)
-		if len(entradas) == 3 {
-			check("ReadDir /rd nombres", "binario.bin grande.txt hola.txt ", nombres)
-			check("ReadDir /rd tamanos", "256 6000 37 ", tamanos(entradas))
+		println("VFS: ReadDir /rd ->", nombres, "| dirs:", dirs(entradas))
+		if len(entradas) == 4 {
+			check("ReadDir /rd nombres", "binario.bin desorden grande.txt hola.txt ", nombres)
+			check("ReadDir /rd tamanos", "256 0 6000 37 ", tamanos(entradas))
+			check("ReadDir /rd directorios", "false true false false ", dirs(entradas))
+			check("ReadDir /rd Type()==fs.ModeDir", "false true false false ", modos(entradas))
 		}
+	}
+
+	// 4c-bis. el fixture del ORDEN: /rd/desorden/.manifiesto esta escrito A PROPOSITO fuera de orden
+	// (zulu, alfa, mike), asi que el orden alfabetico solo puede venir del ordenamiento de ReadDir. Es
+	// lo que exige el mutante "sin ordenar" de scripts/console/mutar-os-consola.sh: sin este fixture el
+	// mutante quedaba VERDE y el orden no estaba probado (el manifiesto de /rd sale alfabetico de pedo,
+	// porque asi lo expande el glob del build).
+	des, err := os.ReadDir("/rd/desorden")
+	if err != nil {
+		check("os.ReadDir /rd/desorden", "sin error", "error: "+err.Error())
+	} else {
+		nombresD := ""
+		for _, e := range des {
+			nombresD += e.Name() + " "
+		}
+		check("os.ReadDir /rd/desorden cantidad", "3", strconv.Itoa(len(des)))
+		check("os.ReadDir /rd/desorden ordenado por nombre", "alfa.txt mike.txt zulu.txt ", nombresD)
+		check("os.ReadDir /rd/desorden tamanos", "5 5 5 ", tamanos(des))
 	}
 
 	// 4d. os.Stat y los errores del motor (IsNotExist)
@@ -327,6 +412,97 @@ func main() {
 	log.SetPrefix("")
 	log.SetOutput(os.Stderr)
 	check("log: el texto exacto", "P: hola\nP: 7-x\n", sumideroLog.texto())
+
+	// 4k. ioutil sobre NUESTRO os (DC-002.8a). Hasta esta tarjeta ioutil importaba "io", "os" y "sort"
+	// DESNUDOS: en la consola esos nombres resuelven a los nuestros (el build reescribe "d2std/" -> ""),
+	// pero en el host eran los de la biblioteca de Go, asi que no habia ningun corpus que probara
+	// ioutil sobre el os de la consola. Los imports son explicitos y el corpus vive aca.
+	txtI, errI := ioutil.ReadFile("/rd/hola.txt")
+	if errI != nil {
+		check("ioutil.ReadFile hola.txt", "sin error", "error: "+errI.Error())
+	} else {
+		check("ioutil.ReadFile hola.txt", "hola desde el romdisk de la Dreamcast", string(txtI))
+	}
+
+	fr, errI := os.Open("/rd/grande.txt")
+	if errI != nil {
+		check("ioutil.ReadAll: Open grande.txt", "sin error", "error: "+errI.Error())
+	} else {
+		todoI, errL := ioutil.ReadAll(fr)
+		fr.Close()
+		if errL != nil {
+			check("ioutil.ReadAll grande.txt", "sin error", "error: "+errL.Error())
+		} else {
+			check("ioutil.ReadAll grande.txt (6000 en varias vueltas)", "igual",
+				igualdad(todoI, grandeEsperado()))
+		}
+	}
+
+	// Lo mismo que hace el motor en d2mpq/mpq.go:204-205:
+	//     var files []fs.FileInfo
+	//     files, err = ioutil.ReadDir(mpqDir)
+	// La asignacion de []os.FileInfo a []fs.FileInfo COMPILA porque los tipos son alias: era el error
+	// que bloqueaba d2mpq ("cannot use type []os.FileInfo as type []fs.FileInfo").
+	var infosI []fs.FileInfo
+	infosI, errI = ioutil.ReadDir("/rd")
+	if errI != nil {
+		check("ioutil.ReadDir /rd", "sin error", "error: "+errI.Error())
+	} else {
+		nombresI := ""
+		tamanosI := ""
+		for _, fi := range infosI {
+			nombresI += fi.Name() + " "
+			tamanosI += strconv.FormatInt(fi.Size(), 10) + " "
+		}
+		check("ioutil.ReadDir /rd ([]os.FileInfo -> []fs.FileInfo)", "4", strconv.Itoa(len(infosI)))
+		check("ioutil.ReadDir /rd nombres ordenados", "binario.bin desorden grande.txt hola.txt ", nombresI)
+		check("ioutil.ReadDir /rd tamanos", "256 0 6000 37 ", tamanosI)
+	}
+	infosD, errI := ioutil.ReadDir("/rd/desorden") // el manifiesto esta fuera de orden a proposito
+	if errI != nil {
+		check("ioutil.ReadDir /rd/desorden", "sin error", "error: "+errI.Error())
+	} else {
+		nombresDI := ""
+		tamanosDI := ""
+		for _, fi := range infosD {
+			nombresDI += fi.Name() + " "
+			tamanosDI += strconv.FormatInt(fi.Size(), 10) + " "
+		}
+		check("ioutil.ReadDir /rd/desorden ordenado por nombre", "alfa.txt mike.txt zulu.txt ", nombresDI)
+		check("ioutil.ReadDir /rd/desorden tamanos", "5 5 5 ", tamanosDI)
+	}
+
+	// NopCloser y Discard: los dos que ioutil saca de io.
+	frN, errI := os.Open("/rd/hola.txt")
+	if errI != nil {
+		check("ioutil.NopCloser: Open", "sin error", "error: "+errI.Error())
+	} else {
+		rcI := ioutil.NopCloser(frN)
+		trozoI := make([]byte, 4)
+		nI, errN := rcI.Read(trozoI)
+		rcI.Close()
+		check("ioutil.NopCloser: 4 bytes", "hola", string(trozoI[:nI]))
+		check("ioutil.NopCloser: sin error", "nil", errTxt(errN))
+	}
+	nD, errD := ioutil.Discard.Write([]byte("lo que sea"))
+	check("ioutil.Discard.Write", "10 nil", strconv.Itoa(nD)+" "+errTxt(errD))
+
+	// TempDir y TempFile: declarados (en la consola no hay donde escribir).
+	if _, errT := ioutil.TempDir("", "x"); errT != nil {
+		check("ioutil.TempDir declarado (devuelve error)", "si", "si")
+	} else {
+		check("ioutil.TempDir declarado (devuelve error)", "si", "no: devolvio nil")
+	}
+	if _, errT := ioutil.TempFile("", "x"); errT != nil {
+		check("ioutil.TempFile declarado (devuelve error)", "si", "si")
+	} else {
+		check("ioutil.TempFile declarado (devuelve error)", "si", "no: devolvio nil")
+	}
+
+	// 4l. las identidades de tipos (os.X ES fs.X): lo dice el COMPILADOR, no el runtime. Si os.FileInfo,
+	// os.DirEntry o os.FileMode dejan de ser alias de los de io/fs, este POC no compila, que es el
+	// sintoma del motor (d2mpq/mpq.go:204). El mutante que lo exige: scripts/console/mutar-tipos-os.sh.
+	identidades()
 
 	// 5. Existe, Getenv y Args
 	check("Existe /rd/hola.txt", "true", strconv.FormatBool(os.Existe("/rd/hola.txt")))

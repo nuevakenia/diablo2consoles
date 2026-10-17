@@ -38,7 +38,14 @@ if [ -d "$SRC/romdisk" ]; then
     # Formato: nombre TAB bytes TAB tipo, una linea por entrada.
     : > "$ARRIBA/.manifiesto"
     for f in "$SRC/romdisk"/*; do
-        printf '%s\t%s\tarchivo\n' "$(basename "$f")" "$(stat -c%s "$f")" >> "$ARRIBA/.manifiesto"
+        # Un DIRECTORIO se marca "directorio" y su tamano va 0: el tamano de un directorio lo pone el
+        # sistema de archivos que lo hospeda (medido: 4096 con el romdisk del POC armado en /tmp), no es
+        # un dato del contenido, y os.ReadDir no lo usa. Se declara 0 en vez de inventar un numero.
+        if [ -d "$f" ]; then
+            printf '%s\t0\tdirectorio\n' "$(basename "$f")" >> "$ARRIBA/.manifiesto"
+        else
+            printf '%s\t%s\tarchivo\n' "$(basename "$f")" "$(stat -c%s "$f")" >> "$ARRIBA/.manifiesto"
+        fi
     done
     "$KOS_BASE/utils/genromfs/genromfs" -f "$OUT/romdisk.img" -d "$ARRIBA" -V d2romdisk >/dev/null
     "$KOS_BASE/utils/bin2o/bin2o" "$OUT/romdisk.img" romdisk "$OUT/romdisk.o"
