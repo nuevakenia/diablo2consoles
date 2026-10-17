@@ -252,6 +252,11 @@ func Tick(d Duration) <-chan Time {
 // NewTimer devuelve un temporizador de un solo disparo.
 type Timer struct {
 	C <-chan Time
+
+	// los de AfterFunc: el canal para pararlo y la funcion a llamar. En los de NewTimer quedan vacios (y
+	// por eso Stop no los puede parar: ver el comentario de Stop).
+	parar   chan struct{}
+	funcion func()
 }
 
 // NewTimer: el temporizador que dispara una vez tras d.
@@ -470,4 +475,68 @@ func (t Time) Truncate(d Duration) Time {
 		resto += n
 	}
 	return Time{sec: t.sec - resto, nsec: 0}
+}
+
+// ---------------------------------------------------------------- AfterFunc (lo pide el motor)
+//
+// d2game/d2player/game_controls.go:1495 lo usa para programar algo "en un rato": es asi como el juego
+// agenda cosas que pasan solas (el temporizador que espera antes de actuar).
+//
+// OJO CON UNA COSA DEL MODELO DE LA CONSOLA: no hay hilos de verdad ni interrupciones que corten lo que
+// esta corriendo. El planificador de libgodc es cooperativo: una goroutine corre hasta que se duerme o
+// espera. Asi que "despues de d" quiere decir "cuando a esta goroutine le toque de nuevo y ya hayan pasado
+// d" -- igual que After y Tick de este paquete. Para el motor alcanza (son esperas de decimas de segundo,
+// no de milisegundos criticos), pero no es un temporizador de tiempo real.
+
+// AfterFunc: llama a f despues de d. Devuelve un temporizador que se puede parar antes de que dispare.
+func AfterFunc(d Duration, f func()) *Timer {
+	parar := make(chan struct{}, 1)
+	t := &Timer{C: nil, parar: parar, funcion: f}
+
+	go func() {
+		select {
+		case <-After(d):
+			// lo pueden haber parado justo antes de disparar: se mira una ultima vez
+			select {
+			case <-parar:
+				return
+			default:
+			}
+			f()
+		case <-parar:
+			// lo pararon mientras esperaba
+		}
+	}()
+
+	return t
+}
+
+// Stop: lo para, si todavia no disparo. Devuelve si se pudo parar.
+//
+// LIMITE: solo funciona con los temporizadores que salen de AfterFunc. Los de NewTimer (que avisan por un
+// canal) no se pueden parar, porque el canal no tiene quien lo corte: si el motor necesita pararlos, se ve
+// al medir.
+func (t *Timer) Stop() bool {
+	if t.parar == nil {
+		return false
+	}
+	select {
+	case t.parar <- struct{}{}:
+		return true
+	default:
+		// ya estaba parado o ya disparo
+		return false
+	}
+}
+
+// Reset: lo vuelve a programar para dentro de d. Solo para los de AfterFunc (ver Stop).
+func (t *Timer) Reset(d Duration) bool {
+	if t.funcion == nil {
+		return false
+	}
+	t.Stop()
+	// se arma otro igual: el de antes ya se desarmo o ya disparo
+	nuevo := AfterFunc(d, t.funcion)
+	t.parar = nuevo.parar
+	return true
 }
