@@ -52,7 +52,10 @@ if [ "${1:-}" = "--todos" ]; then
     # los que ya tienen .gox son los que compilan; el resto es lo que falta
     for p in $(cd "$REPO" && go list ./d2core/... ./d2game/... ./d2app/... ./d2common/... ./d2script/... 2>/dev/null |
         sed 's|github.com/OpenDiablo2/OpenDiablo2/||'); do
-        [ -f "$GEN/$p.gox" ] && continue
+        # los .gox del motor NO estan en $GEN/<pkg>.gox sino en $GEN/<pkgpath completo>.gox (asi los
+        # escribe build-motor-all.sh): buscar en el primero daba que ninguno estaba compilado y el
+        # --todos listaba los 142.
+        [ -f "$GEN/$PREFIJO/$p.gox" ] && continue
         [ -d "$REPO/$p" ] || continue
         un_paquete "$p"
         echo

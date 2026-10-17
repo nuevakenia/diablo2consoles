@@ -924,7 +924,21 @@ func medirCostoFloat64() {
 	t1 = d2c_us()
 	println("STD-TEST: costo float64: 1e4 (atan2+pow)", strconv.FormatUint((t1-t0)/1000, 10), "ms")
 
-	println("STD-TEST: costo float64 (control, no tiene que ser 0):", strconv.FormatUint(bits64(suma)&1, 10))
+	// CONTROL de la medicion (DC-002.8b). Un control que siempre da lo mismo no controla nada: la
+	// version anterior miraba bits64(suma)&1 y daba SIEMPRE 0 (medido en DC-002.4 y DC-002.8: la suma
+	// de los bucles termina par), asi que no se ponia en rojo aunque el compilador se comiera un bucle y
+	// la medicion fuera mentira. Ahora se compara contra un VALOR CONOCIDO (el piso de la suma): los 1e5
+	// terminos de la raiz (sqrt de 0,6 a 1e5) dan ~2,1e7 por si solos, y los otros bucles agregan ~1e5.
+	// Con el piso en 1e7, si falta CUALQUIER bucle de los de arriba la suma no llega y el control da 0.
+	// `suma == suma` descarta el NaN (una raiz rota daria NaN, y NaN > 1e7 ya es falso; queda explicito).
+	// Ademas se imprime el digest de la suma: cambia si cambia cualquier resultado aunque el piso lo tape.
+	piso := 1e7
+	control := uint64(0)
+	if suma > piso && suma == suma {
+		control = 1
+	}
+	println("STD-TEST: costo float64 (control, no tiene que ser 0):", strconv.FormatUint(control, 10),
+		"(piso 1e7; suma_bits="+hex64(bits64(suma))+")")
 }
 
 func correrErrores() {
