@@ -425,6 +425,22 @@ mutacion "image: Rectangle.In con la contencion al reves" \
     $'\treturn r.Min.X <= s.Min.X && r.Min.Y <= s.Min.Y && r.Max.X <= s.Max.X && r.Max.Y <= s.Max.Y' \
     amd64
 
+
+# --- el regexp: el + deja de ser greedy (es el defecto que aparecio de verdad al escribir el motor de
+#     vuelta atras: "aaa+" devolvia "a"). Si la prueba contra el regexp de Go no lo caza, no sirve.
+chequeo "regexp: el + no es greedy (devuelve la coincidencia mas corta)" \
+    "regexp/regexp.go" \
+    $'\tvar salida []int\n\tif n.max < 0 || hechas < n.max {\n\t\tsalidas := r.coincide(n.sub[0], texto, pos, caps)\n\t\tfor _, p := range salidas {\n\t\t\tif p == pos {\n\t\t\t\tcontinue\n\t\t\t}\n\t\t\tsalida = append(salida, r.repetir(n, texto, p, caps, hechas+1)...)\n\t\t}\n\t}\n\tsalida = append(salida, pos)' \
+    $'\tvar salida []int\n\tsalida = append(salida, pos)\n\t_ = hechas' \
+    amd64
+
+# --- el regexp: la clase negada deja de negar (\D pasaria a ser \d)
+chequeo "regexp: la clase negada [^...] no niega" \
+    "regexp/regexp.go" \
+    $'\tif c.negada {\n\t\treturn !esta\n\t}' \
+    $'\tif c.negada {\n\t\treturn esta\n\t}' \
+    amd64
+
 echo
 echo "== $cazados/$contador chequeos cazados =="
 if [ "$rc" -eq 0 ]; then

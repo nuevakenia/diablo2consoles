@@ -1,6 +1,6 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 101 de 142
+compilados: 104 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
@@ -96,14 +96,14 @@ d2core/d2audio/ebiten 0
 d2core/d2config 0
 d2core/d2gui 0
 d2core/d2hero 0
-d2core/d2hero/herogen 0
+d2core/d2hero/herogen 1
 d2core/d2input 0
 d2core/d2input/d2gamepad 0
 d2core/d2input/ebiten 0
 d2core/d2inventory 1
 d2core/d2item 1
 d2core/d2item/d2cube 0
-d2core/d2item/d2drop 0
+d2core/d2item/d2drop 1
 d2core/d2item/d2ground 1
 d2core/d2item/d2itemdesc 1
 d2core/d2item/diablo2item 0
@@ -125,7 +125,7 @@ d2core/d2stats 1
 d2core/d2stats/diablo2stats 1
 d2core/d2term 1
 d2core/d2ui 0
-d2core/d2vendor 0
+d2core/d2vendor 1
 d2game/d2autoscript 1
 d2game/d2gamescreen 0
 d2game/d2player 0
@@ -157,13 +157,11 @@ d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebi
 d2core/d2config: /home/dgalli/Proyectos/diablo2consoles/d2core/d2config/d2config.go:4:22: error: import file ‘encoding/json’ not found
 d2core/d2gui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2gui/box.go:8:55: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui’ not found
 d2core/d2hero: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/containers.go:6:69: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item’ not f
-d2core/d2hero/herogen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/herogen/items.go:11:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop’ not fo
 d2core/d2input: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/input_manager.go:9:9: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/ebiten’ not fo
 d2core/d2input/d2gamepad: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/d2gamepad/mapping.go:4:22: error: import file ‘encoding/json’ not found
 d2core/d2input/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/ebiten/ebiten_input.go:119:54: error: reference to undefined identifier ‘ebiten.MouseButton’
-d2core/d2item/d2cube: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2cube/catalog.go:7:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop’ not fo
-d2core/d2item/d2drop: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2drop/loader.go:8:15: error: import file ‘regexp’ not found
-d2core/d2item/diablo2item: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/diablo2item/ground_label.go:5:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2dr
+d2core/d2item/d2cube: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2cube/match.go:149:25: error: reference to undefined field or method ‘Day’
+d2core/d2item/diablo2item: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/diablo2item/ground_label.go:6:55: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui’ not f
 d2core/d2map/d2mapengine: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapengine/doors.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ 
 d2core/d2map/d2mapentity: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapentity/factory.go:6:31: error: import file ‘github.com/google/uuid’ not found
 d2core/d2map/d2mapgen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapgen/act1_overworld.go:14:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maps
@@ -174,10 +172,9 @@ d2core/d2playertrade: /home/dgalli/Proyectos/diablo2consoles/d2core/d2playertrad
 d2core/d2render/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2render/ebiten/ebiten_panic_screen.go:5:52: error: import file ‘github.com/hajimehoshi/ebiten/v2/ebitenutil’ not 
 d2core/d2screen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2screen/screen_manager.go:7:56: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2gui’ not found
 d2core/d2skills: /home/dgalli/Proyectos/diablo2consoles/d2core/d2skills/autoform.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ not fo
-d2core/d2ui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2ui/label.go:5:15: error: import file ‘regexp’ not found
-d2core/d2vendor: /home/dgalli/Proyectos/diablo2consoles/d2core/d2vendor/gamble.go:6:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop’ not found
+d2core/d2ui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2ui/label.go:133:33: error: reference to undefined field or method ‘FindAll’
 d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/act3_live.go:13:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ 
-d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/ammo_depleted.go:5:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop’ not f
+d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/ammo_depleted.go:6:69: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item’ 
 d2networking: /home/dgalli/Proyectos/diablo2consoles/d2networking/client_listener.go:3:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket’ no
 d2networking/d2client: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/game_client.go:13:57: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero’ not fou
 d2networking/d2client/d2localclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2localclient/local_client_connection.go:4:31: error: import file ‘github.com/google/uuid’ not foun
