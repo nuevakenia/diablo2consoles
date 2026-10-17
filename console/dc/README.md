@@ -1381,6 +1381,11 @@ causas distintas, cada una medida:
 - **`pvr_txr_load_ex` twiddlea la textura con una DIVISION POR PIXEL** y el SH-4 no tiene instruccion de
   division: el twiddle paso a una tabla con corrimientos y la subida a copia plana por Store Queues.
   Medido: **302.549 us -> 2.624 us (115 veces)**.
+  **OJO (DC-002.26): el twiddle propio que se escribio aca quedó con los bits de X y de Y AL REVES** (la
+  convencion del PVR, la de KOS `pvr_texture.c:34`, pone la X en los bits IMPARES) **y la tabla era de 512**
+  cuando el motor pide una textura 1024x1024. Eso hizo que el cuadro del motor se viera ROTADO 90 grados
+  hasta la seccion 42. El numero de arriba (302 us -> 2.624 us) no esta en duda: lo que estaba mal era la
+  orientacion del cuadro y el tamano de la tabla.
 - **Pintar: 2 us.** O sea que el PVR no era el problema en ningun momento.
 
 Los flags `PVR_TXRLOAD_SQ` y `PVR_TXRLOAD_DMA` del header de KOS **no hacen nada**: mismo tiempo exacto
@@ -1954,7 +1959,11 @@ se deja en cero una vez en el arranque (512 bloques).
 cuadro: si un bloque fuera al indice equivocado, la pantalla se veria mal y el arranque no se enteraria (el
 video "arranca" igual). `scripts/console/medir-twiddle-217.py` compara el indice de **cada** pixel visible
 calculado por la formula vieja contra la nueva: **307.200/307.200 iguales y 300/300 bloques con 1.024 indices
-contiguos y sin repetir**. El costo, medido con el `EBITEN-PERFIL` del POC del cuadro:
+contiguos y sin repetir**. **OJO (DC-002.26): esa cuenta compara la conversion del cuadro entero contra la
+conversion por bloques y las DOS usan la misma convencion, asi que no puede ver una traspuesta** (los bits de
+X y de Y estaban al reves y las dos puntas coincidian igual: el cuadro salia rotado 90 grados; ver la seccion
+42, que agrega `verificar-twiddle-226.py`, que compara contra la convencion de KOS). El costo, medido con el
+`EBITEN-PERFIL` del POC del cuadro:
 
 | | dibujar_us | convertir_us | subir_us | cuadro_us |
 |---|---|---|---|---|
@@ -2652,3 +2661,69 @@ la era del defecto y re-medirlos es tarjeta aparte.
 Barreras: `test-std-host.sh` **verde en amd64 y 386** (13/13 excluidos), `mutar-std-host.sh` **39/39 chequeos
 cazados** (el arbol queda sano) y `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas, 30 frames comparados).
 Evidencia cruda: `evidencia/dc-002.25-escalera-gc-sano.txt`.
+
+## 42. DC-002.26: el cuadro del motor salia **ROTADO 90 grados** — el twiddle de la pantalla tenia los bits de x e y **al reves** (y la tabla corta para el motor)
+
+El sintoma lo trajo la captura de Papu (2026-10-17 18:56): el arranque del motor llega al loop y dibuja su
+cuadro de error (`updateInitError`, texto blanco sobre rojo), pero **las lineas de texto corren de arriba
+abajo**. Esta tarjeta lo mide, encuentra **dos** defectos en la misma funcion (`armar_twiddle`/`indice_tile`
+de `console/dc/std/csrc/pvr_pantalla.c`) y deja los dos con corpus y mutante.
+
+**1. El instrumento (captura contra el cuadro, no contra el ojo).** `scripts/console/medir-volteo-226.py`
+ubica la pantalla de la consola dentro de la captura por el rojo del cuadro de error, cuenta la TINTA (los
+pixeles que no son ese fondo) por fila y por columna, y reporta las dos varianzas. Un texto horizontal da
+**picos por filas** (varianza grande) y columnas parejas; uno rotado 90 grados, al reves. Medido:
+
+    captura con el defecto (f10s, 483x453):   tinta 5604 px   var_filas    27.5   var_columnas 1351.1  -> ROTADO
+    captura arreglada    (f6s,  604x453):     tinta 3196 px   var_filas   788.0   var_columnas   43.5  -> DERECHO
+    texto de la captura arreglada (transcripto):  file not found: "/rd/juego/patch_d2.mpq" / Please check
+    your config file at "/rd/OpenDiablo2/config.json" / Also, verify that the MPQ files exist at /rd/juego /
+    Capitalization in the file name matters.
+
+**2. Defecto A: el lugar de los bits estaba al reves.** La convencion del PVR es la del propio KOS
+(`kernel/arch/dreamcast/hardware/pvr/pvr_texture.c:34`): `TWIDOUT(x, y) = TWIDTAB(y) | (TWIDTAB(x) << 1)`,
+o sea **los bits de x van a los IMPARES**. En `pvr_pantalla.c` estaban al reves (la y a los impares), y eso no
+es una diferencia de estilo: intercambiar el lugar de los bits del indice es escribir la textura
+**traspuesta** — el hardware lee el pixel que espera en (x, y) y se encuentra el de (y, x). De ahi la rotacion
+de 90 grados. Como se midio, con el instrumento nuevo
+`scripts/console/verificar-twiddle-226.py` (compara el indice de **cada** pixel visible contra la convencion
+de KOS, en las dos texturas del proyecto):
+
+    POC 640x480 (textura 1024x512):  indice nuestro contra el del PVR: 0 distintos de 307.200
+                                     la variante vieja (y en los impares): 306.592 distintos (99,8%)
+    MOTOR 800x600 (textura 1024x1024): indice nuestro: 0 distintos de 480.000
+                                     la variante vieja: 479.400 distintos (99,9%)
+
+La progresion medida en la consola, corrigiendo de a una cosa (misma captura, mismo instrumento):
+
+    sin arreglo (y en los impares, tabla 512):      var_filas   27.5  var_columnas 1351.1  ROTADO
+    solo la tabla a 1024 (sigue al reves):          var_filas   47.0  var_columnas  605.1  ROTADO
+    bits bien + tabla 1024:                         var_filas  788.0  var_columnas   43.5  DERECHO
+
+**3. Defecto B: la tabla del twiddle no cubria el lado menor.** El indice del bloque sale de `x0 & (lado_min-1)`
+y `y0 & (lado_min-1)`, asi que la tabla necesita `lado_min` entradas; con **512** estaba justo para el POC
+(1024x512) pero no para el motor (1024x1024, `twid_mask` = 1023): las lecturas con x0 o y0 >= 512 **salian de
+la tabla** (leian el .bss de atras) y el bloque se escribia en cualquier parte. Medido: **219 de los 475
+bloques de 32x32** del cuadro del motor. La tabla pasa a **1024** entradas (el macro `TWIDTAB` ya cubre los 10
+bits). Declarado: este defecto **no** se caza mirando la rotacion — con la tabla corta y los bits bien el
+texto sale **derecho pero con artefactos** (medido en el mutante: tinta **5831** px contra **3196** del sano, y
+la pantalla roja que ubica el instrumento mide **483** px de ancho contra **604**). Lo caza el instrumento de
+host, que compara la tabla contra el requisito del tamano (`1024 >= 1024`).
+
+**4. El corpus (`scripts/console/checar-twiddle-226.sh`) y su mutador (`mutar-twiddle-226.py`).** Cinco
+controles (indice = el del PVR; la tabla cubre el lado menor; la captura sale DERECHA; hay tinta; el motor
+llega al loop) y **dos mutantes**: `--al-reves` (el lugar de los bits vuelve atras -> el instrumento de host
+dice NO y la captura vuelve a salir ROTADA) y `--tabla-512` (la tabla vuelve a 512 -> el instrumento de host
+dice NO). El mutador es idempotente y el corpus termina comprobando que `pvr_pantalla.c` queda con el mismo
+`sha256` que al empezar. Resultado de la corrida: **2/2 mutantes cazados y 5/5 controles verdes**.
+
+**5. Lo que este defecto esconde del registro viejo.** La formula se escribio en **DC-002.10** y nunca se
+comparo en la orientacion: las comparaciones que dieron **identidad 100%** (DC-001.3 y DC-002.12) son de
+**sprites**, que no pasan por esta funcion; y `medir-twiddle-217.py` compara la conversion del cuadro entero
+contra la conversion **por bloques**, las dos con la misma convencion — nuestra contra nuestra no puede ver una
+traspuesta. Es la leccion de siempre (DC-002.8b, DC-002.10): el instrumento tiene que tener una referencia de
+afuera, y aca esa referencia es la convencion de KOS y la captura del emulador.
+
+Barreras: `test-std-host.sh` **verde en amd64 y 386** (13/13 excluidos), `mutar-std-host.sh` **39/39 chequeos
+cazados** (el arbol queda sano) y `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas, 30 frames comparados).
+Evidencia cruda: `evidencia/dc-002.26-cuadro-rotado.txt`.

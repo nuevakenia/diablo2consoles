@@ -1,0 +1,194 @@
+================================================================================
+DC-002.26 -- EL CUADRO DEL MOTOR SALIA ROTADO 90 GRADOS
+(el twiddle de la pantalla tenia los bits de x e y al reves, y la tabla corta)
+================================================================================
+Rama DC-002. Host: CachyOS x86-64. Consola emulada: Flycast (reios), POC
+`motor-arranque` (el arranque del motor de verdad, `d2app.Create().Run()`), 15-30 s
+por corrida, capturas con `spectacle` (KDE/Wayland: x11grab da negro).
+El vendor (`~/dreamcast/libgodc`) queda con el semiespacio del GC en 512 KB (DC-002.25).
+
+FECHA: 2026-10-17 (corrida autonoma, ramp DC-002).
+
+SINTOMA (captura de Papu, 2026-10-17 18:56, ventana "Flycast - prog-emu"): el arranque
+llega al loop y dibuja su cuadro de error (`updateInitError`: texto BLANCO sobre rojo),
+pero las lineas de texto corren de ARRIBA ABAJO.
+
+--------------------------------------------------------------------------------
+1. EL INSTRUMENTO DE LA CAPTURA (captura contra el cuadro, no contra el ojo)
+--------------------------------------------------------------------------------
+    python3 scripts/console/medir-volteo-226.py <captura.png> [--logico FILAS COLUMNAS]
+
+Ubica la pantalla de la consola dentro de la captura por el rojo del cuadro de error,
+cuenta la TINTA (los pixeles que no son ese fondo dominante) por fila y por columna y
+compara las dos varianzas: un texto horizontal da picos por FILAS; rotado 90 grados, por
+COLUMNAS.
+
+CON EL DEFECTO (captura f10s del baseline, /tmp/dc226-base):
+captura: /tmp/dc226-base/f10s.png
+  pantalla de la consola: 483x453 en 79,231 (captura 3584x1080)
+  fondo dominante de la pantalla: rgb(136,8,8)
+  pixeles de tinta (no son el fondo): 5604
+  varianza por FILAS (lo que tendria que ser grande): 27.5
+  varianza por COLUMNAS (lo que tendria que ser chica): 1351.1
+  pico de tinta: fila 29 en una fila, columna 218 en una columna
+  VEREDICTO: ROTADO 90 GRADOS (las lineas corren de arriba abajo)
+
+Y el mapa en texto de esa misma captura (la tinta corre en VERTICAL: las "lineas" del
+texto son columnas de 2 px de ancho que bajan 5-9 celdas):
+
+......................................................##........................
+............................................##..................................
+......................................................##........................
+............................................##........#.........................
+..............##...............................................................
+....#.........#..............##.................................................
+....#........................##.................................................
+....#...........................................................................
+
+--------------------------------------------------------------------------------
+2. LA PROGRESION DE LOS ARREGLOS (mismo instrumento, misma consola)
+--------------------------------------------------------------------------------
+Los dos defectos estan en `console/dc/std/csrc/pvr_pantalla.c` (`armar_twiddle` /
+`indice_tile` / la celda del bloque). Corrigiendo de a uno:
+
+  (a) SIN ARREGLO = los dos defectos puestos (bits al reves + tabla 512):
+      pantalla 483x453  tinta 5604  var_filas 27.5   var_columnas 1351.1  -> ROTADO
+  (b) SOLO la tabla a 1024 (los bits siguen al reves):
+      pantalla 566x453  tinta 3129  var_filas 47.0   var_columnas  605.1  -> ROTADO
+  (c) BITS BIEN (x a los impares) + tabla 1024:
+      pantalla 604x453  tinta 3196  var_filas 788.0  var_columnas   43.5  -> DERECHO
+
+El texto de (c), transcripto de la captura (el cuadro de error del motor de verdad):
+
+    file not found: "/rd/juego/patch_d2.mpq"
+    Please check your config file at "/rd/OpenDiablo2/config.json"
+    Also, verify that the MPQ files exist at "/rd/juego"
+    Capitalization in the file name matters.
+
+O sea: el texto sale DERECHO y legible, y es el error del motor (no hay MPQ en el romdisk
+de la consola), que es lo que tiene que dibujar ahi.
+
+--------------------------------------------------------------------------------
+3. DEFECTO A: EL LUGAR DE LOS BITS (la rotacion)
+--------------------------------------------------------------------------------
+La convencion del PVR es la de KOS, `kernel/arch/dreamcast/hardware/pvr/pvr_texture.c:34`:
+
+    #define TWIDOUT(x, y) ( TWIDTAB((y)) | (TWIDTAB((x)) << 1) )     <- la X a los IMPARES
+
+y en `pvr_pantalla.c` estaba al reves (la Y a los impares). Cambiar el lugar de los bits
+del indice es escribir la textura TRASPUESTA: el hardware lee el pixel que espera en
+(x, y) y encuentra el de (y, x) -> el cuadro se ve rotado 90 grados.
+
+INSTRUMENTO DE HOST (segundos, sin emulador): `scripts/console/verificar-twiddle-226.py`
+compara el indice de CADA pixel visible calculado como lo hace el C contra el que pide el
+PVR (la convencion de KOS), y de paso dice cuanto difiere la variante vieja (para probar
+que el instrumento discrimina):
+
+    $ python3 scripts/console/verificar-twiddle-226.py
+    POC 640x480: textura 1024x512, lado menor 512 (mask 511, bits 9, salto 262144)
+      pixeles visibles comparados (640x480): 307200
+      indices NUESTROS distintos del PVR: 0
+      indices con la Y en los impares (el defecto): 306592 distintos del PVR (99.8%)
+    MOTOR 800x600: textura 1024x1024, lado menor 1024 (mask 1023, bits 10, salto 1048576)
+      pixeles visibles comparados (800x600): 480000
+      indices NUESTROS distintos del PVR: 0
+      indices con la Y en los impares (el defecto): 479400 distintos del PVR (99.9%)
+    FUENTE pvr_pantalla.c: la tabla del twiddle tiene 1024 entradas (el motor necesita 1024)
+      1024 >= 1024: OK
+      la X va a los bits impares (`twid_tabla[x...] << 1`): OK
+    RESULTADO: OK (el twiddle de la pantalla es el del PVR y la tabla lo cubre)
+
+NOTA de metodo: ese script tiene DOS partes y las dos hacen falta. La primera es un espejo
+en Python de la formula (compara la formula contra la de KOS); la segunda mira el C DE
+VERDAD (el tamano de la tabla y de que coordenada es el `<< 1`): si solo estuviera el
+espejo, un C al reves con un espejo bien escrito pasaria verde -- es la trampa de comparar
+algo contra si mismo (DC-002.8b: "una suite verde no prueba nada").
+
+--------------------------------------------------------------------------------
+4. DEFECTO B: LA TABLA DEL TWIDDLE NO CUBRIA EL LADO MENOR
+--------------------------------------------------------------------------------
+El indice del bloque sale de `x0 & (lado_min - 1)` y `y0 & (lado_min - 1)`, asi que la
+tabla necesita `lado_min` entradas. El POC de la pantalla pide 640x480 -> textura
+1024x512 -> lado menor 512 -> la tabla de 512 alcanzaba JUSTO. El MOTOR pide 800x600 ->
+textura 1024x1024 -> lado menor 1024 -> `twid_mask` = 1023 -> las lecturas con x0 o y0 >=
+512 salian de la tabla (leian el .bss de atras: twid_lista, twid_bits, twid_mask,
+twid_salto...) y el bloque se escribia en cualquier parte de la textura.
+
+CONTADOS (los bloques de 32x32 del cuadro del motor, 800x600 = 25 columnas x 19 filas):
+    bloques con x0 >= 512: 9 columnas x 19 filas = 171
+    bloques con y0 >= 512: 3 filas   x 25 columnas = 75
+    los que estan en las dos: 9 x 3 = 27
+    totales con la lectura fuera de la tabla: 171 + 75 - 27 = 219 de 475
+
+Y el sintoma de ESTE defecto, medido con el mutante (tabla 512, bits ya bien):
+    pantalla 483x453  tinta 5831  var_filas 1651.1  var_columnas 27.0  -> DERECHO
+    (contra el sano: pantalla 604x453, tinta 3196, var_filas 788.0, var_columnas 43.5)
+O sea: el texto queda DERECHO pero con ARTEFACTOS (mas tinta y la pantalla roja mas
+angosta: los bloques de la mitad de arriba/derecha se escriben donde no van). DECLARADO:
+la metrica de rotacion NO caza este defecto; lo caza el instrumento de host, que compara
+la tabla contra el requisito del tamano de la textura (1024 >= 1024).
+
+--------------------------------------------------------------------------------
+5. EL CORPUS Y SU MUTADOR
+--------------------------------------------------------------------------------
+    bash scripts/console/checar-twiddle-226.sh /tmp/gox-222 15
+
+MUTADOR: `scripts/console/mutar-twiddle-226.py` (--al-reves | --tabla-512 | --restaurar |
+--estado), que cambia EXACTAMENTE las lineas del arreglo y es idempotente.
+EL CORPUS: 5 controles en la corrida sana, 2 mutantes, y al final comprueba que
+`pvr_pantalla.c` queda con el mismo sha256 que al empezar.
+
+CORPUS (corrida del 2026-10-17, `/tmp/gox-222`, 15 s por corrida):
+
+== 1. mutante A (--al-reves): el lugar de los bits del twiddle vuelve atras
+     [el instrumento de host: "la X va a los bits impares: NO: esta al reves", RESULTADO: NO]
+     pantalla 566x453  tinta 3129  var_filas 47.0  var_columnas 605.1  -> ROTADO
+   cuadros del loop: 3
+   CAZADO: el instrumento de host dice NO y la captura vuelve a salir ROTADA
+
+== 2. mutante B (--tabla-512): la tabla del twiddle vuelve a 512 entradas
+     [el instrumento de host: "512 >= 1024: NO: las lecturas con x0 o y0 >= 512 salen de la tabla"]
+     pantalla 483x453  tinta 5831  var_filas 1651.1  var_columnas 27.0  -> DERECHO
+   cuadros del loop: 3
+   CAZADO por el instrumento de host (la tabla no cubre el lado menor del motor)
+   DECLARADO: la captura sola sale DERECHO -- con la tabla corta el texto queda DERECHO pero con
+   ARTEFACTOS; la pantalla roja mide 483 px de ancho
+
+== 3. control sano (el twiddle arreglado: X a los bits impares y la tabla de 1024)
+   control 1 (el indice es el del PVR):        VERDE
+   control 2 (la tabla cubre el lado menor):   VERDE
+   control 3 (la captura sale DERECHA):        VERDE
+   control 4 (hay tinta, 3196 px):             VERDE
+   control 5 (el motor llega al loop: 3 cuadros): VERDE
+
+== 4. el arbol queda sin mutaciones (idempotente)
+pvr_pantalla.c: 05f2c51dd9bd9bc0  (23597 bytes)
+  mutaciones puestas: ninguna
+   OK: pvr_pantalla.c con el mismo sha256 que al empezar (05f2c51dd9bd9bc0)
+
+== 2/2 mutantes cazados, 5/5 controles verdes ==
+
+--------------------------------------------------------------------------------
+6. LO QUE ESTE DEFECTO DEJO PASAR ANTES (para el registro)
+--------------------------------------------------------------------------------
+- La formula se escribio en DC-002.10 y nunca se comparo en la ORIENTACION: las
+  comparaciones que dieron identidad 100% (DC-001.3, DC-002.12) son de SPRITES, que no
+  pasan por esta funcion.
+- `scripts/console/medir-twiddle-217.py` (DC-002.17) compara la conversion del cuadro
+  entero contra la conversion POR BLOQUES: las dos usan la MISMA convencion, asi que una
+  traspuesta no la ve.
+- El corpus de la pantalla (DC-002.22, `checar-pantalla-222.sh`) mira VRAM, OOM, el loop y
+  la escritura byte a byte: nada de eso mira la ORIENTACION del cuadro.
+La referencia de afuera (la convencion de KOS + la captura del emulador) es lo que este
+defecto pedia a gritos.
+
+--------------------------------------------------------------------------------
+7. BARRERAS
+--------------------------------------------------------------------------------
+    bash scripts/console/test-std-host.sh      -> VERDE en amd64 y 386 (13/13 excluidos); los 13 que hablan
+                                                  con KOS siguen sin compilar en el host
+    bash scripts/console/mutar-std-host.sh     -> 39/39 chequeos cazados; "OK: la suite caza todos los
+                                                  defectos conocidos y el arbol quedo sano"
+    bash scripts/console/compare-motor-dc6.sh  -> "== IGUAL: 31 lineas identicas (mismo DC6, mismo codigo
+                                                  del motor, x86-64 y SH-4)"; frames comparados: 30
+    bash scripts/console/checar-twiddle-226.sh -> 2/2 mutantes cazados + 5/5 controles verdes (arriba)

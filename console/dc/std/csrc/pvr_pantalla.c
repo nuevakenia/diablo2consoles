@@ -52,10 +52,22 @@ static uint16_t conv_tile[LADO_TILE * LADO_TILE] __attribute__((aligned(32)));
  * vale 87.381, que NO ENTRA en 16 bits. Con la tabla de 16 bits los valores de la mitad de arriba se
  * truncaban, y el resultado medido fue una pantalla con ruido en bloques y una franja de colores: los
  * pixeles escritos en el lugar equivocado. Las cuentas del indice final tampoco entran en 16 bits (la
- * textura tiene 524.288 pixeles). */
+ * textura tiene 524.288 pixeles).
+ *
+ * DC-002.26: LA TABLA TIENE QUE CUBRIR EL LADO MENOR, Y ERA DE 512. El indice del bloque sale de
+ * `y0 & (lado_menor - 1)` y `x0 & (lado_menor - 1)`, o sea que la tabla necesita `lado_menor` entradas. Con
+ * el POC de 640x480 la textura es 1024x512, el lado menor es 512 y la tabla de 512 alcanzaba justo. Con el
+ * MOTOR (800x600) la textura es 1024x1024, el lado menor es 1024 y `twid_mask` vale 1023: las lecturas
+ * `twid_tabla[x0 & 1023]` / `twid_tabla[y0 & 1023]` con x0 o y0 >= 512 SALIAN DE LA TABLA (leian lo que hay
+ * detras en .bss) y el bloque se escribia en cualquier parte de la textura. Medido: de los 475 bloques de
+ * 32x32 que tiene el cuadro del motor, 219 caian en esa zona y el cuadro salia con ARTEFACTOS (bloques
+ * repetidos donde no van: la tinta de la captura sube de 3.196 a 5.831 pixeles). La tabla pasa a 1024
+ * entradas (TWIDTAB ya cubre los 10 bits: su ultimo termino es (x&512)<<9). La ROTACION de 90 grados era
+ * OTRO defecto de esta misma funcion: el lugar de los bits en `indice_tile` (ver ahi abajo). */
+#define TWID_TABLA_N 1024
 #define TWIDTAB(x) ( (x&1)|((x&2)<<1)|((x&4)<<2)|((x&8)<<3)|((x&16)<<4)| \
                      ((x&32)<<5)|((x&64)<<6)|((x&128)<<7)|((x&256)<<8)|((x&512)<<9) )
-static uint32_t twid_tabla[512];
+static uint32_t twid_tabla[TWID_TABLA_N];
 static int twid_lista = 0;   /* si la tabla ya se armo */
 static int twid_bits = 0;    /* log2 del lado menor (cuantos bits hay que correr para dividir por el) */
 static int twid_mask = 0;    /* lado menor menos 1 (el modulo, que es un AND) */
@@ -68,7 +80,7 @@ static void armar_twiddle(void) {
         return;
     }
 
-    for (i = 0; i < 512; i++) {
+    for (i = 0; i < TWID_TABLA_N; i++) {
         twid_tabla[i] = (uint32_t)TWIDTAB(i);
     }
 
@@ -86,14 +98,24 @@ static void armar_twiddle(void) {
 /* El indice, DENTRO DE LA TEXTURA, del primer pixel del bloque que empieza en (x0, y0).
  *
  * La formula es la de la conversion de siempre (ver abajo) aplicada a la esquina: los bits de x van a las
- * posiciones PARES del indice y los de y a las impares, y el lado mayor parte la textura en bloques de
+ * posiciones IMPARES del indice y los de y a las PARES, y el lado mayor parte la textura en bloques de
  * 512x512 (twid_salto). Con x0 e y0 multiplos de 32 los 5 bits bajos son cero, asi que los 1.024 pixeles
  * del bloque caen SEGUIDOS en la textura, desde este indice. Eso es lo que hace posible subir de a un
- * bloque sin tener el cuadro entero en memoria. */
+ * bloque sin tener el cuadro entero en memoria.
+ *
+ * DC-002.26: LAS DOS POSICIONES ESTABAN AL REVES, Y ESO ES UNA ROTACION DE 90 GRADOS. La convencion del
+ * PVR es la del propio KOS (`pvr_texture.c:34`, la que usan todos los homebrew):
+ *
+ *     TWIDOUT(x, y) = TWIDTAB(y) | (TWIDTAB(x) << 1)      <- los bits de X van a los IMPARES
+ *
+ * y aca estaban al reves (los de y a los impares). Cambiar el lugar de los bits del indice es cambiar la
+ * textura por su TRASPUESTA: el hardware lee el pixel que espera en (x, y) y se encuentra el que se escribio
+ * en (y, x). Medido en la captura del motor: el texto del cuadro de error salia ROTADO 90 grados (las
+ * lineas corriendo de arriba abajo) -- el mismo sintoma que se ve en la captura de Papu del 2026-10-17. */
 static uint32_t indice_tile(int x0, int y0) {
     armar_twiddle();
-    return (uint32_t)(twid_tabla[y0 & twid_mask] << 1)
-         + (uint32_t)twid_tabla[x0 & twid_mask]
+    return (uint32_t)(twid_tabla[x0 & twid_mask] << 1)
+         + (uint32_t)twid_tabla[y0 & twid_mask]
          + (uint32_t)(x0 >> twid_bits) * (uint32_t)twid_salto
          + (uint32_t)(y0 >> twid_bits) * (uint32_t)twid_salto;
 }
@@ -262,15 +284,16 @@ int d2c_pvr_pantalla_convertir(unsigned int rgba, int w, int h) {
 
             for (int yy = 0; yy < alto_tile; yy++) {
                 const unsigned char *p = src + (size_t)(y0 + yy) * (size_t)w * 4 + (size_t)x0 * 4;
-                uint32_t fila = (uint32_t)twid_tabla[yy] << 1;   /* solo depende de la fila del bloque */
+                uint32_t fila = (uint32_t)twid_tabla[yy];        /* solo depende de la fila del bloque */
 
                 for (int xx = 0; xx < ancho_tile; xx++) {
                     unsigned int r = p[0];
                     unsigned int g = p[1];
                     unsigned int b = p[2];
 
-                    /* el color, en el formato del hardware: 5 bits de rojo, 6 de verde y 5 de azul */
-                    conv_tile[fila | (uint32_t)twid_tabla[xx]] =
+                    /* el color, en el formato del hardware: 5 bits de rojo, 6 de verde y 5 de azul.
+                     * DC-002.26: la x va a los bits IMPARES (<< 1) y la y a los pares, como `TWIDOUT`. */
+                    conv_tile[(uint32_t)twid_tabla[xx] << 1 | fila] =
                         (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
 
                     p += 4;
