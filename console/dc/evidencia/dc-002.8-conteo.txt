@@ -151,17 +151,17 @@ d2thread 1
 
 ## los paquetes bloqueados (primera linea de error de cada uno)
 d2app: /home/dgalli/Proyectos/diablo2consoles/d2app/app.go:7:22: error: import file ‘encoding/json’ not found
-d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:16: error: import file ‘os/exec’ not found
+d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/discover.go:112:26: error: reference to undefined identifier ‘filepath.Glob’
 d2common/d2replay: /home/dgalli/Proyectos/diablo2consoles/d2common/d2replay/replay.go:5:22: error: import file ‘encoding/json’ not found
 d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebiten/ebiten_audio_provider.go:14:47: error: import file ‘github.com/hajimehoshi/ebiten/v2/audio’ not fou
 d2core/d2config: /home/dgalli/Proyectos/diablo2consoles/d2core/d2config/d2config.go:4:22: error: import file ‘encoding/json’ not found
-d2core/d2hero: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/d2s_integrity.go:5:22: error: import file ‘crypto/sha256’ not found
+d2core/d2hero: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/d2s_save.go:115:25: error: reference to undefined identifier ‘os.CreateTemp’
 d2core/d2input: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/input_manager.go:9:9: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/ebiten’ not fo
 d2core/d2input/d2gamepad: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/d2gamepad/mapping.go:4:22: error: import file ‘encoding/json’ not found
 d2core/d2input/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/ebiten/ebiten_input.go:119:54: error: reference to undefined identifier ‘ebiten.MouseButton’
 d2core/d2item/d2cube: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2cube/match.go:149:25: error: reference to undefined field or method ‘Day’
 d2core/d2map/d2mapengine: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapengine/doors.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ 
-d2core/d2map/d2mapentity: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapentity/factory.go:6:31: error: import file ‘github.com/google/uuid’ not found
+d2core/d2map/d2mapentity: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapentity/factory.go:14:57: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero’ not foun
 d2core/d2map/d2mapgen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapgen/act1_overworld.go:14:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maps
 d2core/d2map/d2maprenderer: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2maprenderer/backdrop.go:7:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapeng
 d2core/d2map/d2mapstamp: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapstamp/factory.go:6:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’
@@ -173,7 +173,7 @@ d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/
 d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/automap.go:15:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine’ not fo
 d2networking: /home/dgalli/Proyectos/diablo2consoles/d2networking/client_listener.go:3:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket’ no
 d2networking/d2client: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/game_client.go:13:57: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero’ not fou
-d2networking/d2client/d2localclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2localclient/local_client_connection.go:4:31: error: import file ‘github.com/google/uuid’ not foun
+d2networking/d2client/d2localclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2localclient/local_client_connection.go:8:57: error: import file ‘github.com/OpenDiablo2/OpenDiabl
 d2networking/d2client/d2realmclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2realmclient/bridge.go:13:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/
 d2networking/d2client/d2remoteclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2remoteclient/remote_client_connection.go:5:22: error: import file ‘encoding/json’ not found
 d2networking/d2gsnet: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2gsnet/env.go:6:12: error: import file ‘net’ not found
