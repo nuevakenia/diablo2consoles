@@ -1525,3 +1525,66 @@ bash scripts/console/mutar-motor-pvr.sh                           # 1 m 19 s: 4/
 
 Evidencia con los numeros crudos: `evidencia/dc-002.12-motor-pvr-y-el-aviso.txt`.
 
+## 29. DC-002.13: el arranque del motor de verdad (compila, enlaza, y se cae en los 16 MB)
+
+Lo que faltaba saber despues de DC-002.12: el motor compila paquete por paquete (142/142 en DC-002.8) y
+pinta (DC-002.9/.10) y lee el control (DC-002.11), pero **nadie habia probado el entry point de verdad**:
+`main.go` de la raiz -> `d2app.Create(...).Run()` -> `d2app/d2setup`, con el motor entero enlazado. Esta
+tarjeta lo hizo, y el resultado tiene tres numeros y una caida con nombre.
+
+**1. Compila** (el paquete del entry point, con el `.gox` completo del motor):
+
+    sh-elf-gccgo $GODC_GOFLAGS -fmax-errors=100 -I <gox> -fgo-pkgpath=main \
+        -c main.go doc.go bundle_other.go -o main.o      ->  0,119 s, main.o = 55.216 bytes
+
+**2. Enlaza, y el ultimo escalon fueron 5 simbolos del runtime.** El enlace del motor entero
+(`scripts/console/build-motor-arranque.sh`: los **205 `.gox`** — 142 del motor + 63 de stdlib/terceros) se
+cae con **15 referencias en 5 simbolos**: `runtime.memhash` (6), `memhash32` (3), `f64hash` (3),
+`strhash` (1), `memhash8` (1). Los cinco son los hash que gccgo pone en el **descriptor de tipo** de las
+claves de mapa que no son de los tipos rapidos. libgodc SI los tiene, pero con el sufijo `..f` (el nombre
+de cuando se la LLAMA); el nombre **pelado** no estaba definido para los hash.
+
+Las firmas se leyeron del envoltorio que arma el compilador (`sh-elf-objdump -dr`), no se adivinaron: para
+una clave `struct{string;uint32;int}` llama `strhash(clave,h)` y despues `memhash32(campo,h)` —**dos**
+argumentos—; para una `struct{int;int;int}` llama `memhash(clave,h)` con `mov #12,r6` en el slot de
+retardo, o sea **tres** argumentos con el tamano. `console/dc/std/csrc/hash_dc.c` define los 5 nombres
+pelados: los de dos argumentos delegan en lo que libgodc ya tiene y el de tres en `map_memhash` — **el
+mismo algoritmo que libgodc usa en sus caminos rapidos de mapa**, que es lo que hace que la clave se
+encuentre. Se hizo en el C de la stdlib minima (repo) y no en el runtime vendorizado: los
+`fix-libgodc-*.py` empiezan dejando el arbol pristino y un cambio a mano ahi se pierde. Re-medido: enlaza,
+exit 0, en **1,458 s**.
+
+**3. El instrumento tenia un limite que no estaba escrito: Flycast rechaza todo ELF de mas de 16 MB.** Lo
+unico que contesta es `Flycast has stopped: Failed to open ELF <ruta>`, y en su fuente esta el porque
+(`core/reios/reios_elf.cpp:18`: `if (size == 0 || size > 16_MB) return false;`). Con el motor entero el ELF
+sale de **43.876.988 bytes** (11.963.527 son `.go_export` y ~14 MB de `.debug_*`, que no se cargan), asi que
+`build-motor-arranque.sh` deja `prog-emu.elf` sin ellos: **13.707.552 bytes**. Lo que se carga de verdad
+son las secciones ALLOC: **13.910.992 bytes = 13,27 MB de los 16** (82,9%).
+
+**4. Y ahi se cae, con el numero exacto**: KOS 2.2.1 arranca, monta el maple, y el runtime de Go de la
+consola muere **antes de ejecutar una sola linea del motor** (no hay ni una linea `MOTOR-ARRANQUE`):
+
+    Out of memory. Requested sbrk_base 0x8d16b000, was 0x8cf6b000, diff 2097152
+    fatal error: gc_init: alloc failed
+
+O sea: el binario deja el break en 0x8CF6B000 (16.166.912 bytes = **96,36% de la RAM**), al GC le quedan
+610.304 bytes (0,58 MB) y pide su semiespacio de **2 MB** (`gc_semispace.h:21`): **faltan 1.486.848 bytes
+= 1,42 MB**. No es cosa de agrandar o achicar el heap: con un semiespacio de 1 MB seguirian faltando
+438.272 bytes, y el semiespacio mas grande que entra son 610.304 bytes (**596 KB**). Lo que no entra es el
+**binario**, no el GC.
+
+**El veredicto**: el motor entero compila, enlaza y **casi arranca**: le faltan 1,42 MB de los 16, y lo que
+hay que recortar se puede medir en el ELF enlazado (recortar el binario o arrancar por partes). Mientras
+tanto, las dos piezas que ya andan en la consola siguen andando: el cuadro del motor (DC-002.10/.12) y el
+control (DC-002.11) no enlazan el motor entero.
+
+```bash
+# El arranque del motor de verdad, de punta a punta (medido: 1,5 s el enlace, 27,0 s la corrida)
+bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/motor-arranque /tmp/gox-0028
+CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/motor-arranque/prog-emu.elf 20 /tmp/dc-run-arranque2
+grep -a 'fatal error\|Out of memory\|Memory:' /tmp/dc-run-arranque2/flycast.log
+```
+
+Evidencia con los numeros crudos, las firmas leidas del binario y la aritmetica:
+`evidencia/dc-002.13-arranque-del-motor.txt`.
+

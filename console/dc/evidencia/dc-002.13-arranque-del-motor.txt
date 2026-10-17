@@ -1,0 +1,127 @@
+=== DC-002.13: el arranque del motor de verdad (main.go -> d2app.Run) en la Dreamcast ===
+
+QUE SE MIDIO
+    Si el ENTRY POINT REAL del motor compila, si ENLAZA, y hasta donde llega CORRIENDO en la consola
+    emulada. Piezas nuevas: console/dc/poc/motor-arranque (el POC), scripts/console/build-motor-arranque.sh
+    (el build del motor ENTERO) y console/dc/std/csrc/hash_dc.c (los 5 simbolos de hash que faltaban).
+
+1. COMPILA (medido)
+
+    sh-elf-gccgo $GODC_GOFLAGS -fmax-errors=100 -I /tmp/gox-0028 -fgo-pkgpath=main \
+        -c main.go doc.go bundle_other.go -o main.o
+      0,119 s, exit 0   ->   main.o = 55.216 bytes
+
+    main.go es el de la raiz del repo (d2app.Create(...).Run()). bundle_other.go entra a mano porque
+    gccgo NO filtra por build tags y ahi vive runBundleSupervisor; el bundle_darwin.go se excluye.
+
+2. LO QUE FALTABA PARA ENLAZAR: 5 SIMBOLOS DE HASH DEL RUNTIME (medido, y el por que)
+
+    bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/motor-arranque /tmp/gox-0028
+      -> 15 referencias en 5 simbolos:
+           6 x undefined reference to runtime.memhash      3 x runtime.memhash32
+           3 x runtime.f64hash                            1 x runtime.strhash
+           1 x runtime.memhash8
+    (205 .gox = los 142 del motor, medidos en DC-002.8, + los 63 de stdlib/terceros; el gox completo es
+    /tmp/gox-0028)
+
+    libgodc SI tiene esas funciones, pero SOLO con el sufijo `..f` (`_runtime.memhash32..f`, ...), que es el
+    nombre que usa cuando la funcion se LLAMA como funcion de Go. El nombre PELADO es el que el compilador
+    pone en el DESCRIPTOR DE TIPO de la clave del mapa, y libgodc no lo define para los hash (si para otras
+    cosas: `_runtime.memequal`, `_runtime_typedmemmove`).
+
+    Las firmas NO se adivinaron: se leyeron del envoltorio que el compilador arma para cada clave, con
+    `sh-elf-objdump -dr` sobre el .gox que no enlazaba:
+
+      d2monsters.gox, clave struct{ string; uint32; int }:
+        mov.l fc48,r0  ! _runtime.strhash    ; jsr @r0     (r4 = clave, r5 = h)
+        mov r0,r5 ; mov r8,r4 ; add #8,r4    ; jsr @r9     (r9 = _runtime.memhash32)
+        mov r0,r5 ; mov r8,r4 ; add #12,r4   ; jsr @r9
+        -> DOS argumentos: (puntero al campo, h)
+
+      d2gamescreen.gox, clave struct{ int; int; int }:
+        mov.l 2b388,r0 ! _runtime.memhash    ; jsr @r0
+        mov #12,r6                            <-- TERCER argumento = el TAMANO de la clave (12 bytes)
+        -> TRES argumentos: (clave, h, tamano)
+
+    ARREGLO: console/dc/std/csrc/hash_dc.c define los 5 nombres pelados. Los de DOS argumentos delegan en
+    la implementacion que libgodc ya tiene (los `..f`), y el de TRES en `map_memhash`, que es EL MISMO
+    algoritmo que libgodc usa en sus caminos rapidos de mapa (map_dreamcast.c lo exige en su cabecera:
+    "These MUST use the same algorithm as runtime_memhash32..f"): asi el hash que sale por el descriptor de
+    tipo y el que usa el mapa dan lo mismo y la clave se encuentra. Se hizo en el C de la stdlib minima (que
+    viaja en el repo) y NO en el runtime vendorizado, porque los scripts fix-libgodc-*.py empiezan dejando
+    el arbol de libgodc pristino: un cambio a mano ahi se pierde en la proxima corrida.
+
+    RE-MEDIDO: el mismo comando enlaza, exit 0, en 1,458 s.
+
+3. EL BINARIO (medido)
+
+    ELF (con debug):        43.876.988 bytes
+    ELF (emu, sin debug):   13.707.552 bytes   <- el que abre Flycast
+    1ST_READ.BIN:           13.706.888 bytes
+    secciones que SE CARGAN en los 16 MB (sh-elf-size -A):
+      .text             4.962.328        .rodata          5.896.816
+      .eh_frame         1.066.804        .gcc_except_table   20.508
+      .ctors/.dtors            16        .data            1.760.156
+      .got                     12        .bss               204.256
+      TOTAL            13.910.992 bytes = 13,27 MB de 16 MB (82,9%)
+    (el .go_export de 11.963.527 bytes y los .debug_* de ~14 MB NO se cargan: son del enlazado)
+    2 segmentos PT_LOAD: el de codigo en 0x8C010000 y el RW en 0x8CB74ABC. Entry point 0x8C010000.
+
+    DEFECTO DEL INSTRUMENTO que costo una corrida: Flycast RECHAZA todo ELF de mas de 16 MB y lo unico que
+    contesta es "Flycast has stopped: Failed to open ELF <ruta>". Medido en su fuente:
+    core/reios/reios_elf.cpp:18 -> `if (size == 0 || size > 16_MB) { fclose; return false; }`.
+    Con los 43,9 MB la corrida no pasaba de "REIOS: Booting up" (medido: 14 lineas de log y 5,0 s).
+    Por eso build-motor-arranque.sh deja prog-emu.elf sin .go_export y sin debug (43.876.988 -> 13.707.552)
+    y ESE es el que corre el emulador.
+
+4. HASTA DONDE LLEGA (el numero de la tarjeta)
+
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/motor-arranque/prog-emu.elf 20 /tmp/dc-run-arranque2
+      (27,0 s de corrida)
+
+    El log: KOS 2.2.1 arranca, imprime su version y el mapa de drivers maple, y despues el runtime de Go de
+    la consola se cae ANTES DE EJECUTAR UNA SOLA LINEA DEL MOTOR (no hay ni una linea MOTOR-ARRANQUE):
+
+        Out of memory. Requested sbrk_base 0x8d16b000, was 0x8cf6b000, diff 2097152
+        fatal error: gc_init: alloc failed
+        Stack Trace: frame pointers not enabled!
+        Memory: arena=93052 used=92036 free=1016
+
+    Los numeros, traducidos (la aritmetica es sobre los valores medidos):
+
+        RAM de la consola                16.777.216 bytes (16,0 MB)
+        break al llegar al gc_init       16.166.912 bytes (0x8CF6B000) = 96,36% de la RAM
+        le queda libre                      610.304 bytes (0,58 MB)
+        el GC pide                        2.097.152 bytes (2,00 MB) = GC_SEMISPACE_SIZE (gc_semispace.h:21,
+                                          `#define GC_SEMISPACE_SIZE (2 * 1024 * 1024)`, dos semiespacios)
+        FALTAN                            1.486.848 bytes = 1,42 MB
+
+    Y el desglose de donde esta el break: 0x8C010000 (donde carga el ELF) + 13,27 MB de secciones +
+    lo que ya habia pedido KOS y el runtime hasta el gc_init.
+
+    No es cosa de bajar el heap, y esto tambien es aritmetica sobre lo medido: con un semiespacio de 1 MB
+    seguirian faltando 438.272 bytes; el semiespacio mas grande que entra en lo que queda libre son
+    610.304 bytes (596 KB), o sea que el problema es el TAMANO DEL BINARIO, no el GC.
+
+5. EL VEREDICTO CON NUMEROS
+
+    - El motor ENTERO compila (142 de 142, DC-002.8) y AHORA TAMBIEN ENLAZA: 205 .gox, y el ultimo escalon
+      fueron 5 simbolos de hash del runtime (medidos y con su motivo), no codigo del motor.
+    - No arranca por RAM: faltan 1.486.848 bytes (1,42 MB) de los 16 MB, y lo que no entra es el minimo del
+      GC de Go, no el motor.
+    - La proxima tarjeta tiene tres caminos, todos medibles: (a) recortar el BINARIO (los candidatos se
+      miden en el ELF enlazado, no por .gox: los .gox de arriba traen debug);
+      (b) que el arranque no necesite el motor entero (cargar por partes, como el host con sus fases);
+      (c) tocar el heap del GC solo no alcanza (medido arriba).
+
+LOS COMANDOS, PARA REPETIR TODO
+
+    source scripts/console/env.sh
+    bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/motor-arranque /tmp/gox-0028
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/motor-arranque/prog-emu.elf 20 /tmp/dc-run-arranque2
+    grep -a 'fatal error\|Out of memory\|Memory:' /tmp/dc-run-arranque2/flycast.log
+
+LO QUE NO SE TOCO
+    Nada de ~/dreamcast/libgodc: los 5 simbolos se resuelven desde el repo (console/dc/std/csrc/hash_dc.c).
+    La barrera de DC-002.3 y el POC del color no dependen de este cambio (no enlazan el motor entero), y se
+    re-midieron en DC-002.12 en la misma noche.
