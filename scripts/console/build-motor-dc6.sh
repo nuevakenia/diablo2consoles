@@ -73,7 +73,10 @@ bash "$HERE/build-motor-gox.sh"
 
 echo
 echo "== 4/4 ELF del POC"
-bash "$HERE/build-dc.sh" "$SRC" "$OUT"
+# POC_ASSET_CRUDO=1: este POC trae asset.conf (bytes CRUDOS), o sea que el guard de build-dc.sh que
+# avisa "esto no se arma por aca" tiene que dejar pasar la llamada. El aviso existe porque armar un POC
+# crudo con build-dc.sh a mano falla con un error que manda a buscar el problema donde no esta.
+POC_ASSET_CRUDO=1 bash "$HERE/build-dc.sh" "$SRC" "$OUT"
 
 echo
 echo "elf:   $OUT/prog.elf"

@@ -23,7 +23,14 @@ OUT="${2:?falta el directorio de salida}"
 CONF="$SRC/bake.conf"
 
 if [ ! -f "$CONF" ]; then
-    echo "== sin bake.conf en $SRC: no hay assets que hornear =="
+    # Un POC de asset CRUDO (asset.conf) no hornea un .h: los bytes del MPQ entran al binario como var de
+    # Go, y eso lo hace build-motor-dc6.sh. Se dice cual es el caso en vez de dejar un "no hay assets" que
+    # se lee como si al POC le faltara algo.
+    if [ -f "$SRC/asset.conf" ]; then
+        echo "== $SRC trae asset.conf (asset CRUDO): lo hornea build-motor-dc6.sh, no este script"
+    else
+        echo "== sin bake.conf en $SRC: no hay assets que hornear =="
+    fi
     exit 0
 fi
 

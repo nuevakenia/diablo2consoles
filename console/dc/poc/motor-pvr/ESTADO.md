@@ -1,38 +1,53 @@
-ESTADO DE ESTE POC: NO COMPILA (le falta el horneado del asset)
+ESTADO DE ESTE POC: COMPILA, CORRE Y DA LO MISMO QUE EL HOST (medido en DC-002.12)
 
-Medido, no supuesto:
+Este archivo decia "NO COMPILA (le falta el horneado del asset)" y ese diagnostico era FALSO: lo que
+fallaba era el SCRIPT con el que se lo intento armar. Se reescribe con lo medido, porque el error que
+sale cuando se usa el script equivocado es el mismo de antes y va a volver a aparecer.
 
-    $ bash scripts/console/build-dc.sh console/dc/poc/motor-pvr /tmp/dcbuild/motor-pvr-check
-    console/dc/poc/motor-pvr/main.go:70:9: error: range clause must have array, slice, string, map, or
-    channel type
-    (y antes de eso, el import de console/dc/motorresumen no se resuelve)
+LO QUE DECIA, Y POR QUE ESTABA MAL
 
-LAS DOS COSAS QUE FALTAN
+  Decia: "bash scripts/console/build-dc.sh console/dc/poc/motor-pvr" fallaba (import de motorresumen sin
+  resolver y "range clause must have array, slice, string, map, or channel type"), y de ahi concluia dos
+  cosas: que el horneador no genera los bytes crudos (`assetDC6`/`assetPAL`) y que motorresumen no esta
+  en el arbol .gox. Las dos conclusiones son falsas, y lo que falto fue mirar el camino que el POC ya
+  tenia:
 
-1. EL ASSET CRUDO. main.go usa dos variables de Go (`assetDC6` y `assetPAL`) que deberian tener los bytes
-   del .dc6 y del .pal tal cual salen del MPQ -- para que los decodifique el MOTOR adentro de la consola
-   (d2dc6.Load + d2dat.Load). Pero el horneador (scripts/console/bake-asset.sh) NO las genera: lee
-   `bake.conf` y lo que escribe es un header de C con los indices YA decodificados y la paleta ya armada.
-   Este POC tiene un archivo `asset.conf`, y NINGUN script lee ese nombre. Por eso las dos variables no
-   existen.
+  1. ESTE POC NO SE ARMA CON build-dc.sh. Tiene su propio build desde DC-002.9, y los bytes crudos los
+     hornea `console/dc/bake-dc6` (que los escribe como var de Go, package main) — no `bake-asset.sh`,
+     que es el que escribe el `.h` con los indices ya decodificados. El nombre `asset.conf` SI lo lee un
+     script: `build-motor-dc6.sh` (y por eso `build-motor-pvr.sh`, que lo llama).
+  2. `motorresumen` SI estaba en el .gox: esta en la lista PAQUETES de `build-motor-gox.sh` desde
+     DC-002.9, y despues de un build queda en el arbol
+     (`<gox>/github.com/OpenDiablo2/OpenDiablo2/console/dc/motorresumen.gox`, 23.760 bytes).
 
-2. EL PAQUETE `motorresumen`. Es un paquete de la consola (console/dc/motorresumen) que este POC importa y
-   que no esta en el arbol .gox: no es de terceros (los que compila build-std-gox.sh) ni del motor (los que
-   compila build-motor-all.sh). Habria que compilarlo DESPUES del motor, porque depende de el (d2dc6,
-   d2interface).
+EL CAMINO CORRECTO, Y LO QUE DA (medido: 2026-10-17)
 
-   El horneado del `.h` no cubre este caso: motorresumen.LineasRGBA existe justamente para comparar el
-   color que da el motor contra el que da el host, y para eso hacen falta los bytes crudos.
+    $ bash scripts/console/build-motor-pvr.sh /tmp/dcbuild/motor-pvr
+      (hornea el DC6 crudo 140.740 B + el pal.dat crudo 768 B, compila la stdlib minima y los 11
+       paquetes del motor para SH-4, y arma el ELF)
+      ELF: /tmp/dcbuild/motor-pvr/prog.elf   7.198.516 bytes
+      1ST_READ.BIN                           1.300.936 bytes
 
-EL CAMINO CORTO PARA ARREGLARLO
+    $ bash scripts/console/compare-motor-pvr.sh
+      == IGUAL: 61 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4)
+         frames comparados: 30
+      pixeles de arte:        4051/4051 (100.0%) iguales (tolerancia +/-8)
+      pixeles transparentes:  2085/2085 (100.0%) con el fondo visible
+      identidad 100.0% (espejada horizontal 17.5%, vertical 16.7%, rotada 180 11.9%: no hay volteo)
+      RESULTADO: OK        (18,58 s el ciclo entero, con el emulador adentro)
 
-- Generar `assetDC6`/`assetPAL` como Go desde el horneado (el horneador ya tiene los bytes a mano: hoy los
-  decodifica el, hay que pedirle que ademas los escriba crudos como un archivo .go), y renombrar
-  `asset.conf` a `bake.conf` (o ensenarle a bake-asset.sh a leer los dos nombres).
-- Compilar motorresumen al .gox al final de build-motor-all.sh.
+EL DEFECTO DE VERDAD (y su arreglo)
 
-MIENTRAS TANTO
+  No era del POC: era de build-dc.sh, que no decia nada y dejaba que el compilador contestara
+  "reference to undefined name 'assetDC6'", un error que manda a buscar el problema donde no esta (fue
+  exactamente lo que paso aca: se escribio este archivo culpando al horneador). Ahora build-dc.sh AVISA
+  antes de compilar y con el nombre del script correcto (exit 2) cuando el POC trae `asset.conf`;
+  `build-motor-dc6.sh` se lo saltea con POC_ASSET_CRUDO=1. La prueba: `scripts/console/checar-poc-crudo.sh`
+  (control sano que exige el aviso + el mutante que lo saca y exige que vuelva el error viejo: 1/1 cazado).
 
-El POC `motor-pantalla` (DC-002.10) SI compila, corre y esta verificado en Flycast: dibuja un asset del
-motor por el camino del motor (imagen -> DrawImage -> pantalla -> VRAM) y el logo se mueve. Lo que hay que
-mirar para ver el motor pintando es ese.
+MIENTRAS TANTO (esto si quedo cierto)
+
+  El POC `motor-pantalla` (DC-002.10) y este `motor-pvr` (DC-002.9) son los dos que pintan en la consola:
+  motor-pantalla dibuja por el camino del motor (imagen -> DrawImage -> pantalla -> VRAM) y motor-pvr
+  dibuja el frame decodificado como textura PAL8. Este ultimo es el que compara pixel a pixel contra la
+  referencia del host.

@@ -13,6 +13,20 @@ SRC="${1:?uso: build-dc.sh <dir_con_main.go> [salida_dir]}"
 OUT="${2:-/tmp/dcbuild/$(basename "$SRC")}"
 mkdir -p "$OUT"
 
+# Un POC con asset.conf (los bytes CRUDOS del MPQ como var de Go, los hornea console/dc/bake-dc6) NO se
+# arma con este script: sus assets no salen de un .h y ademas necesita los .gox del MOTOR, que este
+# script no compila. Sin este aviso el error que sale es "reference to undefined name 'assetDC6'", que
+# manda a buscar el problema donde no esta (medido: DC-002.10 lo diagnostico como "el horneador no
+# genera los bytes" cuando el camino correcto ya existia). Ese camino se declara con POC_ASSET_CRUDO=1,
+# que es lo que pone build-motor-dc6.sh cuando llama aca en su paso 4/4.
+if [ -f "$SRC/asset.conf" ] && [ "${POC_ASSET_CRUDO:-0}" != "1" ]; then
+    echo "ERROR: $SRC es un POC de asset CRUDO (trae asset.conf), no de un .h horneado." >&2
+    echo "       Se arma con:  scripts/console/build-motor-dc6.sh [dir_salida]" >&2
+    echo "                     scripts/console/build-motor-pvr.sh [dir_salida]   (para motor-pvr)" >&2
+    echo "       build-dc.sh solo compila y enlaza: los bytes crudos y los .gox del motor los pone ese." >&2
+    exit 2
+fi
+
 # Assets de Diablo II (si el POC trae bake.conf): se hornean al directorio de build, no al repo.
 bash "$HERE/bake-asset.sh" "$SRC" "$OUT"
 

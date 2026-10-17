@@ -1351,3 +1351,177 @@ grep -a 'MOTOR-300' /tmp/dc-run-8b-300d/flycast.log | tr -d '\r'
 source scripts/console/env.sh && sh-elf-size -A /tmp/dcbuild/8b-motor-300/prog.elf   # (a)
 ```
 
+## 26. DC-002.10: el cuadro del motor en la pantalla de la Dreamcast (y 7,4 veces mas rapido)
+
+> Esta seccion se escribe en DC-002.12: la tarjeta DC-002.10 se cerro sin su seccion del README (y lo
+> mismo paso con DC-002.11), que es lo que el metodo pide. Los numeros son los de su evidencia
+> (`evidencia/dc-002.10-motor-pantalla.txt` y `dc-002.10-pantalla.png`) y el resumen de cierre de la
+> tarjeta; no se midio nada nuevo para escribirla.
+
+El POC `console/dc/poc/motor-pantalla` dibuja **por el camino del motor completo**: una imagen del motor
+(`ebiten.Image`) -> `DrawImage` sobre la pantalla -> la pantalla a la VRAM del PVR -> el PVR la pinta. Es
+el paso que cierra la pregunta "¿el motor puede pintar en la consola?" con un cuadro en pantalla, y queda
+claro por que hizo falta: el camino tiene tres costos distintos y los tres se midieron por separado.
+
+Lo que imprime la consola serie (crudo en la evidencia):
+
+    MOTOR-PANTALLA arranca (DC-002.10: el cuadro del motor en la consola)
+    MOTOR-PANTALLA runtime dreamcast sh4
+    MOTOR-PANTALLA asset 256 x 256
+    MOTOR-PANTALLA imagen del motor armada, bytes de RGBA 262144
+    MOTOR-PANTALLA la pantalla del juego ocupa en la VRAM, bytes 1048576
+    EBITEN-LOOP cuadro 0 esperando el cuadro del PVR / ... subo el cuadro a la VRAM / cuadro 0 listo
+    EBITEN-PERFIL dibujar_us 27376 convertir_us 47807 subir_us 2624 pintar_us 3 cuadro_us 77810
+
+**El cuadro bajo de 590.087 us a 77.810 us** (de 1,7 a 12,8 cuadros por segundo): **7,4 veces**, por tres
+causas distintas, cada una medida:
+
+- **La FPU del SH-4 es de 32 bits y el bucle de dibujado usaba `float64`**, que en la consola se hace por
+  software: 260 ms -> 59 ms -> 27 ms al pasar a `float32` con un caso rapido para solo mover.
+- **`pvr_txr_load_ex` twiddlea la textura con una DIVISION POR PIXEL** y el SH-4 no tiene instruccion de
+  division: el twiddle paso a una tabla con corrimientos y la subida a copia plana por Store Queues.
+  Medido: **302.549 us -> 2.624 us (115 veces)**.
+- **Pintar: 2 us.** O sea que el PVR no era el problema en ningun momento.
+
+Los flags `PVR_TXRLOAD_SQ` y `PVR_TXRLOAD_DMA` del header de KOS **no hacen nada**: mismo tiempo exacto
+con los dos (probado).
+
+**Tres defectos que solo aparecieron midiendo** (dos de ellos MIRANDO la pantalla, porque la huella se
+calcula antes del twiddle y no los veia): `vid_set_mode` despues de `pvr_init_defaults()` **cuelga**
+`pvr_wait_ready()` para siempre (se ve un cuadro pintado y despues silencio, indistinguible de "anda
+bien"); `a | b + c` en C suma antes del OR; y la tabla del twiddle en `uint16` **trunca** (los bits se
+esparcen: `TWIDTAB(511) = 87.381` no entra en 16 bits).
+
+Arreglos de fondo de la misma tarjeta, porque el instrumento tambien estaba mal: `build-dc.sh` nunca
+linkeaba los terceros (los compilaba y no entraba a `orden.txt`) y `preflight.sh` usaba
+`-fsyntax-only`, bandera con la que **gccgo se cae** cuando el paquete tiene un struct con un campo slice
+(`internal compiler error in fill_in_array`): la herramienta contestaba "no compila" por un defecto del
+compilador. Commits 565987e3 y 457c6cfc.
+
+**Lo que quedo pendiente y se cerro en DC-002.12**: al lado de la evidencia se dejo escrito
+`poc/motor-pvr/ESTADO.md` diciendo que el POC `motor-pvr` **no compilaba** y culpando al horneador. Era
+un diagnostico falso (se habia usado el script equivocado): el POC compila y corre desde DC-002.9 y sigue
+dando las mismas 61 lineas. Esta contado en la seccion 28.
+
+## 27. DC-002.11: el control de la Dreamcast (el bus maple) y el instrumento que medía otra cosa
+
+> Misma aclaracion que la seccion 26: la seccion se escribe en DC-002.12 con los numeros que ya estaban
+> medidos en `evidencia/dc-002.11-control.txt` y `dc-002.11-control.png` (commits 63372cb3 y 6e317504).
+
+El control de la Dreamcast se lee del **bus maple** (`maple_enum_type` + `maple_dev_status`) y se traduce
+al motor: la palanca y la cruceta mueven el **cursor**, A es el clic izquierdo, B el derecho, la cruceta
+son las **flechas** del teclado (es lo que hace que los menus se puedan navegar), Start es Enter, los
+gatillos son Q y E, y los mismos botones se llenan como botones de joystick.
+
+**Cuando se lee la entrada importa, y se midio**: va **entre `CerrarCuadro()` y `Update()`**. Antes de
+`CerrarCuadro` el estado del cuadro anterior queda guardado ya con la tecla nueva y el flanco
+(`just pressed`, lo que mueve los MENUS) **nunca es verdad**; despues de `Update` el motor ya pregunto.
+
+Lo que da la corrida (crudo en la evidencia):
+
+    MOTOR-PANTALLA hay control en el puerto 0
+    MOTOR-CONTROL botones 128 cursor 332 240        (128/64/16/32 = cruceta, un bit por direccion)
+    MOTOR-CONTROL botones 4   cursor ...            (4 = boton A; el flanco "A se apreto en este cuadro" anda)
+    MOTOR-PANTALLA cuadros 300 x 216 cursor 344 240 dibujos 299 huella 1996575903 centro 304 174
+    MOTOR-PANTALLA cuadros 480 x 511 cursor 639 479 dibujos 479 huella -1487941904 centro 560 291
+
+o sea que la **huella** cambia (el cuadro se movio) y el **centro de masa del contenido** se fue de
+293,174 a 560,291: **267 px a la derecha y 117 abajo**, movidos por el control. Mapeo del teclado del
+emulador, tambien medido: flechas -> cruceta, `Z` -> A (4), `X` -> B (2), `C` -> Start (8), `V` -> X
+(1024). Y como se le mandan las teclas: en KDE/Wayland **no hay xdotool** y `wtype` **no sirve** ("el
+compositor no tiene el protocolo de teclado virtual"), pero `/dev/uinput` es del kernel y esta
+escribible: `scripts/console/teclas-virtuales.py` crea un teclado virtual y lo **destruye al terminar**
+(si no, queda un teclado fantasma). La prueba completa es `scripts/console/probar-control.sh`.
+
+**El defecto de fondo que tapaba toda la evidencia** (y que vale mas que el control): en `RunGame` decia
+`pantalla := NewImage(...)`. El `:=` crea una imagen **local** que tapa a la del paquete, asi que el
+dibujado y la VRAM usaban esa (la pantalla SE VEIA bien y la captura mostraba el logo), pero `Screen()` y
+las cuentas de la evidencia leian la **GLOBAL, vacia**: el instrumento medía otra cosa que la que se ve.
+Se desperto porque la huella daba **el mismo numero con el logo en x=192 y en x=511**; se confirmo con
+`Image.CentroDeMasa()` (promedio de las posiciones de los pixeles claros), que daba 0 0 con el logo
+dibujado y visible en la captura. Leccion: **la huella dice SI el cuadro cambio, no DONDE**.
+
+## 28. DC-002.12: el POC del motor que "no compilaba" (el diagnostico falso) y el aviso que faltaba
+
+Cuando arranco esta tarjeta el tablero **no tenia ninguna tarjeta ready**: la tanda DC-002.5b..DC-002.9
+estaba cerrada y DC-002.10/DC-002.11 tambien. Lo que quedaba abierto no estaba en el tablero sino en el
+repo: (a) `console/dc/poc/motor-pvr/ESTADO.md` afirmaba que ese POC **no compila**, y (b) el README no
+tenia las secciones de DC-002.10 ni DC-002.11, que es lo que el metodo pide para cerrar una tarjeta. Las
+dos cosas se cerraron midiendo.
+
+**1. El POC si compila, y da lo mismo que el host.** El camino existe desde DC-002.9 y no se habia usado
+al diagnosticar:
+
+    $ bash scripts/console/build-motor-pvr.sh /tmp/dcbuild/motor-pvr
+      ELF: /tmp/dcbuild/motor-pvr/prog.elf   7.198.516 bytes   1ST_READ.BIN  1.300.936 bytes
+      (hornea el DC6 crudo de 140.740 B y el pal.dat de 768 B, compila la stdlib minima y 11 paquetes
+       del motor para SH-4)
+    $ bash scripts/console/compare-motor-pvr.sh
+      == IGUAL: 61 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4)
+         frames comparados: 30
+      pixeles de arte: 4051/4051 (100.0%)   diferencia maxima: 7 por canal
+      pixeles transparentes: 2085/2085 (100.0%) con el fondo visible
+      identidad 100.0% (espejada horizontal 17.5%, vertical 16.7%, rotada 180 11.9%)
+      RESULTADO: OK      (18,58 s el ciclo entero, emulador adentro)
+
+Asi que los dos "huecos" que el ESTADO.md declaraba no existian: `asset.conf` **si** lo lee un script
+(`build-motor-dc6.sh`, que hornea los bytes crudos con `console/dc/bake-dc6`) y `motorresumen` **si**
+estaba en el `.gox` (lista PAQUETES de `build-motor-gox.sh` desde DC-002.9; el archivo queda en
+`<gox>/github.com/OpenDiablo2/OpenDiablo2/console/dc/motorresumen.gox`, 23.760 bytes).
+
+**2. El defecto de verdad: el error ponia la culpa donde no era.** `build-dc.sh` no decia nada y el
+compilador contestaba lo suyo por dos variables que ese script no puede generar:
+
+    $ bash scripts/console/build-dc.sh console/dc/poc/motor-pvr /tmp/dcbuild/motor-pvr-check
+    console/dc/poc/motor-pvr/main.go:53:30: error: reference to undefined name ‘assetDC6’
+    console/dc/poc/motor-pvr/main.go:59:35: error: reference to undefined name ‘assetPAL’
+
+Ese mensaje manda a buscar el problema en el horneador (y es exactamente el diagnostico falso que quedo
+escrito). Ahora **`build-dc.sh` avisa antes de compilar** (exit 2, con el nombre del script correcto)
+cuando el POC trae `asset.conf`, y `build-motor-dc6.sh` se lo saltea con `POC_ASSET_CRUDO=1`. De paso,
+`bake-asset.sh` distingue los dos casos al no encontrar `bake.conf`: dice que el asset es CRUDO y quien
+lo hornea, en vez del "no hay assets que hornear" que se lee como si al POC le faltara algo.
+
+**La prueba es un corpus con su mutante**, `scripts/console/checar-poc-crudo.sh`:
+
+    == control sano (el aviso puesto)
+       build-dc.sh sobre console/dc/poc/motor-pvr: avisado (exit 2)
+         ERROR: ... es un POC de asset CRUDO (trae asset.conf), no de un .h horneado.
+                Se arma con:  scripts/console/build-motor-dc6.sh [dir_salida]
+                              scripts/console/build-motor-pvr.sh [dir_salida]   (para motor-pvr)
+    == mutante 'sin-aviso' (se saca la condicion del aviso en scripts/console/build-dc.sh)
+       build-dc.sh con el aviso sacado: crudo (exit 1)
+       cazado: sin el aviso el error vuelve a ser el que manda a buscar donde no esta
+         .../main.go:53:30: error: reference to undefined name ‘assetDC6’
+    == control sano de vuelta (el aviso repuesto)  ->  avisado (exit 2)
+    == 1/1 mutantes cazados ==        (0,167 s todo)
+
+El mutante se aplica por reemplazo EXACTO de texto sobre `build-dc.sh` con respaldo propio y `sha256`
+(no `git checkout --`: el arbol puede tener trabajo de otra tarjeta encima) y se verifica que el archivo
+vuelva al original.
+
+**3. Lo que no se movio** (nada de esto podia romper el resto, y se midio): la barrera siguio IGUAL,
+**31 lineas identicas** entre host y consola y 30 frames comparados (`compare-motor-dc6.sh`, 17,110 s);
+el POC del color siguio verde con la captura 4051/4051 (18,58 s); y los **4/4 mutantes** del camino del
+color se cazaron otra vez con el control sano verde (`mutar-motor-pvr.sh`, 1 m 19 s):
+
+    alpha0  arte=4051/4051 transparentes=0/2085    veredicto=NO
+    uv1     arte=572/4051  transparentes=1492/2085 veredicto=NO
+    pal1    arte=0/4051    transparentes=2085/2085 veredicto=NO
+    frame1  arte=1437/4051 transparentes=1837/2085 veredicto=NO
+    control sano (restaurado) arte=4051/4051 transparentes=2085/2085 veredicto=OK
+
+(y `alpha0` se sigue viendo en la TRANSPARENCIA y no en el arte: sacarle el indice 0 transparente no
+mueve ni un pixel de arte, que fue el hueco del primer mutador).
+
+```bash
+# El POC que "no compilaba", medido de punta a punta
+bash scripts/console/build-motor-pvr.sh /tmp/dcbuild/motor-pvr    # media: 3,1 s con SALTAR_STDLIB=1
+bash scripts/console/compare-motor-pvr.sh /tmp/dcbuild/motor-pvr  # 18,58 s: 61 lineas + 4051/4051 px
+bash scripts/console/checar-poc-crudo.sh                          # 0,167 s: control sano + 1 mutante
+bash scripts/console/compare-motor-dc6.sh                         # la barrera: 17,110 s, 31 lineas igual
+bash scripts/console/mutar-motor-pvr.sh                           # 1 m 19 s: 4/4 cazados + control sano
+```
+
+Evidencia con los numeros crudos: `evidencia/dc-002.12-motor-pvr-y-el-aviso.txt`.
+

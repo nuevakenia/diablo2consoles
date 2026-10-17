@@ -1,0 +1,139 @@
+=== DC-002.12: el POC del motor que "no compilaba" (el diagnostico falso) y el aviso que faltaba ===
+
+QUE PIDE LA TARJETA
+    Cerrar lo que estaba declarado abierto cuando arranco la corrida. El tablero NO tenia ninguna
+    tarjeta ready (la tanda DC-002.5b..DC-002.9 esta cerrada y DC-002.10/DC-002.11 tambien, verificado
+    con `hermes kanban --board dreamcast stats`: ready=0): lo que quedaba abierto estaba en el repo:
+      (a) console/dc/poc/motor-pvr/ESTADO.md afirmaba que ese POC NO COMPILA, y
+      (b) el README no tenia las secciones de DC-002.10 ni de DC-002.11 (el metodo las pide).
+    Todo lo de abajo esta medido en esta corrida (2026-10-17, rama DC-002, un solo agente: el lock
+    /tmp/dc-002-noche.lock lo tenia esta misma sesion).
+
+1. EL POC SI COMPILA Y DA LO MISMO QUE EL HOST (el diagnostico era falso)
+
+    $ bash scripts/console/build-motor-pvr.sh /tmp/dcbuild/motor-pvr        (SALTAR_STDLIB=1)
+      == 3/4 paquetes del motor para SH-4
+        d2common/d2enum.gox                          235328 bytes
+        d2common/d2math.gox                           57036 bytes
+        d2common/d2math/d2vector.gox                 158400 bytes
+        d2networking/d2client/d2clientconnectiontype.gox     5228 bytes
+        d2common/d2interface.gox                     259796 bytes
+        d2common/d2util/assets.gox                    13324 bytes
+        d2common/d2util.gox                          138584 bytes
+        d2common/d2datautils.gox                     167848 bytes
+        d2common/d2fileformats/d2dc6.gox              67888 bytes
+        d2common/d2fileformats/d2dat.gox              56580 bytes
+        console/dc/motorresumen.gox                   23760 bytes
+      ELF:        /tmp/dcbuild/motor-pvr/prog.elf   (7198516 bytes)
+      1ST_READ:   /tmp/dcbuild/motor-pvr/1ST_READ.BIN   (1300936 bytes)
+      (los bytes crudos que hornea bake-dc6: d2logo.dc6 = 140740, d2logo.pal = 768)
+
+    $ bash scripts/console/compare-motor-pvr.sh                              (18,58 s, emulador adentro)
+      == consola: el mismo codigo, compilado para SH-4, en Flycast
+      == resumen del host (61 lineas) y de la consola (61 lineas)
+      == IGUAL: 61 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4) ==
+         frames comparados: 30
+      == 2) la captura contra la referencia del host (el frame 0, los RGBA del motor)
+      pantalla encontrada en 210,238 (ancho 446)
+      captura:    /tmp/dcbuild/motor-pvr/run/f15s.png  (pantalla en 210,238; asset dibujado en 40,300)
+        pixeles de arte:      4051/4051 (100.0%) iguales (tolerancia +/-8)
+        diferencia maxima:    7 por canal
+        pixeles transparentes: 2085/2085 (100.0%) con el fondo visible
+        orientacion de la captura contra la referencia:
+          identidad            100.0%
+          espejada horizontal   17.5%
+          espejada vertical     16.7%
+          rotada 180            11.9%
+      RESULTADO: OK
+
+    Los dos "huecos" que el ESTADO.md declaraba NO EXISTIAN. Medido:
+      - `asset.conf` SI lo lee un script: scripts/console/build-motor-dc6.sh:20 (CONF="$SRC/asset.conf"),
+        y es el que hornea los bytes crudos con console/dc/bake-dc6 (que los escribe como var de Go,
+        package main: assetDC6 / assetPAL). bake-asset.sh es el OTRO horneador (el que escribe el .h con
+        los indices ya decodificados) y solo lo usa build-dc.sh.
+      - `motorresumen` SI estaba en el .gox: `grep -c motorresumen scripts/console/build-motor-gox.sh`
+        = 2 (comentario + lista PAQUETES, desde DC-002.9), y el archivo queda en
+        <gox>/github.com/OpenDiablo2/OpenDiablo2/console/dc/motorresumen.gox = 23760 bytes.
+
+2. EL DEFECTO DE VERDAD: EL ERROR PONIA LA CULPA DONDE NO ERA (y su aviso)
+
+    Antes (medido SIN el aviso nuevo; es lo que dejaba el script equivocado):
+      $ bash scripts/console/build-dc.sh console/dc/poc/motor-pvr /tmp/dcbuild/motor-pvr-check
+      == sin bake.conf en console/dc/poc/motor-pvr: no hay assets que hornear ==
+      console/dc/poc/motor-pvr/main.go:51:65: error: reference to undefined name ‘assetDC6’
+      console/dc/poc/motor-pvr/main.go:51:107: error: reference to undefined name ‘assetPAL’
+      console/dc/poc/motor-pvr/main.go:53:30: error: reference to undefined name ‘assetDC6’
+      console/dc/poc/motor-pvr/main.go:59:35: error: reference to undefined name ‘assetPAL’
+      (4 errores, 0,06 s)
+
+    Ese mensaje manda a buscar el problema en el horneador — y es EXACTAMENTE el diagnostico falso que
+    quedo escrito en ESTADO.md ("el horneador no genera los bytes crudos y hay que ensenarle a leer
+    asset.conf"). El arreglo es que build-dc.sh lo dice ANTES de compilar (exit 2) cuando el POC trae
+    asset.conf; build-motor-dc6.sh le pone POC_ASSET_CRUDO=1 para que su propio paso 4/4 pase.
+
+    CORPUS CON SU MUTANTE: scripts/console/checar-poc-crudo.sh        (0,167 s todo)
+
+    $ bash scripts/console/checar-poc-crudo.sh
+    respaldo: /tmp/checar-poc-crudo-build-dc-original.sh (c9102f9e28f2f27733fe3084cf3960ab364380c16f87731774ba46f9660ee1e3)
+
+    == control sano (el aviso puesto)
+       build-dc.sh sobre console/dc/poc/motor-pvr: avisado (exit 2)
+         ERROR: .../console/dc/poc/motor-pvr es un POC de asset CRUDO (trae asset.conf), no de un .h horneado.
+                Se arma con:  scripts/console/build-motor-dc6.sh [dir_salida]
+                              scripts/console/build-motor-pvr.sh [dir_salida]   (para motor-pvr)
+
+    == mutante 'sin-aviso' (se saca la condicion del aviso en scripts/console/build-dc.sh)
+       build-dc.sh con el aviso sacado: crudo (exit 1)
+       cazado: sin el aviso el error vuelve a ser el que manda a buscar donde no esta
+         .../main.go:53:30: error: reference to undefined name ‘assetDC6’
+
+    == control sano de vuelta (el aviso repuesto)
+       build-dc.sh: avisado (exit 2)
+       control sano VERDE (avisado, exit 2)
+
+    == 1/1 mutantes cazados ==
+
+    El mutante se aplica por reemplazo EXACTO de texto sobre build-dc.sh, con respaldo propio + sha256 y
+    verificacion de que el archivo volvio al original (no se usa `git checkout --`: el arbol puede tener
+    trabajo de otra tarjeta encima). El camino legitimo se probo DESPUES del cambio: build-motor-pvr.sh
+    completo + compare-motor-pvr.sh, los dos de arriba (ELF 7198516 bytes, 61 lineas, 4051/4051).
+
+3. LO QUE NO SE MOVIO (medido, no supuesto)
+
+    a) LA BARRERA (el POC del motor de DC-002.3 sigue IGUAL):
+       $ bash scripts/console/compare-motor-dc6.sh
+       == resumen del host (31 lineas) y de la consola (31 lineas)
+       == IGUAL: 31 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4) ==
+          frames comparados: 30
+       17,110 s.
+
+    b) EL POC DEL COLOR, otra vez de punta a punta (seccion 1) y sus MUTANTES:
+       $ bash scripts/console/mutar-motor-pvr.sh                    (1 m 19 s)
+       respaldos: cshim.c fa980ff24878db941d82905bfacfdf083a36dd05d94ddc2fc39d7124c8fe9665
+                  main.go 723de295b8fc9555b690c2758e1ec8ace5ba35a413ee70122a1b184fb26ec014
+       == mutante 'alpha0'  arte=4051/4051 transparentes=0/2085    veredicto=NO   -> cazado
+       == mutante 'uv1'     arte=572/4051  transparentes=1492/2085 veredicto=NO   -> cazado
+       == mutante 'pal1'    arte=0/4051    transparentes=2085/2085 veredicto=NO   -> cazado
+       == mutante 'frame1'  arte=1437/4051 transparentes=1837/2085 veredicto=NO   -> cazado
+       == control sano (todo restaurado) arte=4051/4051 transparentes=2085/2085 veredicto=OK
+       == 4/4 mutantes cazados ==
+       (los dos archivos del POC quedaron con el MISMO sha256 del respaldo: la mutacion se deshizo)
+
+4. LO QUE SE ESCRIBIO
+
+    - scripts/console/build-dc.sh: el aviso (exit 2) para los POC con asset.conf + POC_ASSET_CRUDO=1 como
+      escape para quien hornea los bytes crudos.
+    - scripts/console/build-motor-dc6.sh: exporta POC_ASSET_CRUDO=1 en su paso 4/4.
+    - scripts/console/bake-asset.sh: al no encontrar bake.conf distingue "el asset es CRUDO, lo hornea
+      build-motor-dc6.sh" de "no hay assets que hornear".
+    - scripts/console/checar-poc-crudo.sh (nuevo): el corpus del aviso + su mutante.
+    - console/dc/poc/motor-pvr/ESTADO.md: reescrito con lo medido (era el que mentia).
+    - console/dc/README.md: secciones 26 (DC-002.10), 27 (DC-002.11) y 28 (esta).
+
+LOS COMANDOS, PARA REPETIR TODO
+    source scripts/console/env.sh
+    SALTAR_STDLIB=1 bash scripts/console/build-motor-pvr.sh /tmp/dcbuild/motor-pvr
+    bash scripts/console/compare-motor-pvr.sh /tmp/dcbuild/motor-pvr
+    bash scripts/console/checar-poc-crudo.sh
+    bash scripts/console/compare-motor-dc6.sh
+    bash scripts/console/mutar-motor-pvr.sh
