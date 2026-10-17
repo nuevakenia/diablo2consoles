@@ -2078,3 +2078,40 @@ imprimir `tipo=` y `sabe=`. En el host queda en `nil` y no imprime nada.
 
 Evidencia cruda (los logs de las dos corridas del arranque, el del corpus con sus mutantes y el de la
 barrera): `evidencia/dc-002.18-serializador-config-sin-reflexion.txt`.
+
+## 35. DC-002.19 (MEDICION, tarjeta abierta): la seleccion de los archivos del juego en la consola
+
+Cerrada DC-002.18, el error que queda es `reported to the user: no Diablo II game files were selected`
+(`d2app/firstrun.go:32` -> `d2setup.EnsureGameFiles`). Esta seccion es la MEDICION de esa frontera hecha
+ANTES de tocar nada; el arreglo todavia no esta.
+
+**1. Los caminos de seleccion que el motor ya tiene NO SIRVEN en la consola, y esta medido por que.**
+`d2setup.DefaultUI()` elige entre `ScriptedUI` (sin dialogos, con la carpeta de `OD2_SETUP_AUTOPICK`) y
+`OsaUI` (dialogos nativos por `osascript`; `ui_native_other.go`). Medido: `os.Getenv("OD2_SETUP_AUTOPICK")`
+devuelve **""** (el `os.Getenv` de la stdlib minima es un stub), y `OsaUI.ChooseFolder` devuelve
+**`cancelled by user`**. O sea que en la consola no hay quien elija la carpeta, ni por env ni por dialogo.
+
+**2. Un defecto NUEVO del `os` de la consola, medido contra el motor de verdad.** Sobre la MISMA carpeta con
+los siete MPQ creados:
+
+    Validate(dir).OK() = false   archivos que ve = 0     <- os.ReadDir del overlay de RAM
+    Complete(dir, orden) = true                          <- os.Stat de cada nombre
+
+No es cosmetico: el camino de la seleccion del motor (`Validate` -> `Resolve`) pregunta justamente por el
+contenido del directorio, asi que la carpeta buena se veria VACIA aunque hubiera quien la eligiera.
+
+**3. La frontera se movio: el motor PASA la seleccion y el error nuevo es de otro paquete.** Con el config
+escrito por el motor (`DefaultConfig` + `MpqPath` + `MpqLoadOrder` + `Save`, o sea lo que dejaria una
+seleccion exitosa) y los MPQ presentes (vacios: `Complete` mira nombres, no contenido):
+
+    [File Loader][INFO] Loaded /rd/OpenDiablo2 -> config.json
+    [App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json
+    panic: assets: bmp.Decode failed: gzip: invalid header
+
+Dos cosas para quedarse: **el camino de LECTURA del arranque quedo medido en el motor de verdad** (era el
+hueco que DC-002.18 dejo declarado: el `Decode` lee el config y el motor lo dice), y la frontera nueva es el
+`compress/gzip` de la consola sobre un asset EMBEBIDO (`d2common/d2util/assets.CreateTextImage`), ANTES de
+cualquier lectura del MPQ.
+
+Ejecutable: `bash scripts/console/medir-setup-219.sh /tmp/gox-00218 /tmp/dcbuild/setup-219 25`
+(POC `console/dc/poc/setup-archivos`). Evidencia cruda: `evidencia/dc-002.19-seleccion-de-archivos.txt`.

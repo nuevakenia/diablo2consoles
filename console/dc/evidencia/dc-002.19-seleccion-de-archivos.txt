@@ -1,0 +1,110 @@
+DC-002.19 - la SELECCION de los archivos del juego, medida en la consola (fase de medicion)
+=============================================================================================
+
+Rama DC-002. El arranque ya guarda su config (DC-002.18, commit 8bf54810) y lo que queda delante es
+`d2app/firstrun.go:32` -> `d2setup.EnsureGameFiles`. Esta es la medicion de esa frontera, en Flycast, con
+los 142 paquetes del motor, antes de tocar nada: NADA de lo de abajo esta deducido del codigo.
+
+    bash scripts/console/medir-setup-219.sh /tmp/gox-00218 /tmp/dcbuild/setup-219 25
+
+POC: `console/dc/poc/setup-archivos` (build-motor-arranque.sh con POC=setup-archivos).
+
+
+1. LOS CAMINOS DE SELECCION QUE EL MOTOR YA TIENE, Y QUE HACE CADA UNO EN LA CONSOLA
+------------------------------------------------------------------------------------
+
+`d2setup.DefaultUI()` (d2setup/dialog.go:110) elige entre dos:
+
+  - `OD2_SETUP_AUTOPICK=<dir>` -> `ScriptedUI` (no abre dialogos, elige esa carpeta). DEPENDE de
+    `os.Getenv`. MEDIDO en la consola:
+
+        SETUP-ARCHIVOS A: os.Getenv(OD2_SETUP_AUTOPICK) = <vacio>
+
+    El `os.Getenv` de la stdlib minima es un stub que devuelve "" siempre (`console/dc/std/os`), asi que
+    ESTE CAMINO NO EXISTE EN LA CONSOLA. No es un defecto de la tarjeta: es un dato que decide el arreglo.
+
+  - `OD2_NO_SETUP=1` -> saltea el setup entero (firstrun.go:28). Mismo problema: tambien sale de `os.Getenv`.
+
+  - Sin env: `nativeUI()` = `OsaUI` (ui_native_other.go), que usa `osascript` (dialogos de macOS). El motor
+    se traga el error y devuelve `ErrNoGameFiles`, asi que el texto no se ve en el arranque. Pedido a mano
+    en el POC, el error EXACTO es:
+
+        SETUP-ARCHIVOS A: OsaUI.ChooseFolder devolvio error: cancelled by user
+
+    O sea: en la consola la seleccion no tiene quien elija la carpeta. El arranque anterior (DC-002.18)
+    terminaba en `reported to the user: no Diablo II game files were selected` por este camino.
+
+
+2. LOS DOS CAMINOS QUE MIRAN LA CARPETA, SOBRE LA MISMA CARPETA (7 MPQ vacios creados)
+-------------------------------------------------------------------------------------
+
+    SETUP-ARCHIVOS archivos del juego creados: 7 de 7 en /rd/juego
+    SETUP-ARCHIVOS A: Validate(dir).OK() = false archivos que ve = 0
+    SETUP-ARCHIVOS A: Complete(dir, orden) = true
+
+Los dos caminos son del motor y miran lo mismo de dos formas distintas:
+
+    d2setup/discover.go:97  Complete(dir, orden): os.Stat de cada nombre -> TRUE (los siete estan)
+    d2setup/discover.go:56  Validate(dir): os.ReadDir(dir) -> ve CERO archivos -> OK() = FALSE
+
+DEFECTO MEDIDO (nuevo, del `os` de la consola, no del motor): `os.ReadDir` del overlay en RAM devuelve una
+lista VACIA en un directorio que tiene siete archivos (que `os.Stat` si encuentra). Y no es cosmetico: el
+camino de la seleccion del motor (`Validate` -> `Resolve`) pregunta justamente eso, asi que aunque hubiera
+quien eligiera la carpeta, la carpeta buena se veria como vacia. Es la clase de defecto que solo aparece
+midiendo el paquete contra el motor de verdad.
+
+
+3. LA FRONTERA SE MOVIO: EL MOTOR PASA LA SELECCION (por el camino del config) Y EL ERROR NUEVO
+-----------------------------------------------------------------------------------------------
+
+Con el config escrito con el MISMO motor (`d2config.DefaultConfig()` + `MpqPath` + `MpqLoadOrder` +
+`Save`, que es lo que dejaria una seleccion exitosa) y los siete MPQ presentes:
+
+    JSON-CONSOLA MarshalIndent ... sabe= true n= 1
+    SETUP-ARCHIVOS B: config escrito en /rd/OpenDiablo2/config.json bytes= 450
+    [File Loader][INFO] Adding source: '/rd'
+    [File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+    [File Loader][INFO] Loaded /rd/OpenDiablo2 -> config.json
+    JSON-CONSOLA Decode ... sabe= true n= 2
+    [App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json
+    panic: assets: bmp.Decode failed: gzip: invalid header
+    Memory: arena=2552700 used=2511772 free=40928
+
+TRES COSAS MEDIDAS ACA, las tres importantes:
+
+  a) El motor PASA la seleccion cuando el config ya apunta a los archivos (`Complete` = true y
+     `EnsureGameFiles` no pregunta nada). O sea: el arreglo de esta tarjeta no tiene que "hacer elegir", tiene
+     que hacer que el config del arranque apunte a donde el juego tiene sus datos.
+  b) EL CAMINO DE LECTURA DEL ARRANQUE ANDA: `d2app.LoadConfig` lee el archivo con
+     `json.NewDecoder(...).Decode(config)` y el motor loguea `loaded configuration file from ...`. Es el
+     camino que DC-002.18 NO habia podido medir (en esa corrida el archivo no existia y el motor armaba el
+     default); aca quedo medido, en el motor de verdad, CON el arreglo del `Decoder`: `sabe= true` y sin
+     error. Cierra el hueco que DC-002.18 dejo declarado.
+  c) LA FRONTERA NUEVA, con nombre y apellido: `panic: assets: bmp.Decode failed: gzip: invalid header`, de
+     `d2common/d2util/assets.CreateTextImage()` (`assets.go:49`), que descomprime con `compress/gzip` la
+     tabla de texto del debug EMBEBIDA en el binario (`CompressedDebugText`, un BMP comprimido que el
+     `go:generate` del paquete deja como bytes en el codigo). El `gzip` de la consola es el puente a la zlib
+     de KOS (`console/dc/std/compress/gzip`) con la ventana 15+32 para que decida entre zlib y gzip. El
+     panic es ANTES de cualquier lectura del MPQ, o sea que no lo causan los MPQ vacios.
+
+NO ESTA MEDIDO TODAVIA (y por eso no se afirma): si el defecto del gzip es el puente a la zlib de KOS, la
+lectura de la cabecera o los bytes del asset embebido tal como salen del compilador para SH-4.
+
+
+4. LO QUE QUEDA PARA CERRAR ESTA TARJETA
+----------------------------------------
+
+  - El arreglo mas chico que haga que el arranque PASE de la seleccion: el config del motor, en la consola,
+    con los datos del juego puestos (sin dialogos y sin depender de `os.Getenv`, que es un stub).
+  - El defecto de `os.ReadDir` medido en el punto 2 (es parte del mismo camino: la seleccion mira el
+    directorio).
+  - Su corpus con el control que hoy se ve ROJO y su mutante, la evidencia y la seccion del README.
+
+Y la tarjeta siguiente ya tiene su defecto medido (el punto 3c).
+
+
+5. LOS ARCHIVOS DE ESTA FASE
+----------------------------
+
+    console/dc/poc/setup-archivos/{main.go,marca.go,csrc/cshim.c}   el POC de la medicion
+    scripts/console/medir-setup-219.sh                             la medicion, reproducible

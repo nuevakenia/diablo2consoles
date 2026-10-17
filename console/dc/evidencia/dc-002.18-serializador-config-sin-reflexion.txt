@@ -243,6 +243,10 @@ B) EN EL HOST (`scripts/console/mutar-std-host.sh`, mutantes 37, 38 y 39 de DC-0
   - El camino de LECTURA del arranque (`app.go:277`) no se ejecuta en esta corrida porque el archivo no
     existia y el motor arma el default; queda medido por el corpus de la consola (control 2), que usa el
     MISMO tipo y el MISMO `Decoder` del motor.
+    MEDIDO DESPUES (DC-002.19, `evidencia/dc-002.19-seleccion-de-archivos.txt`): con un config escrito a
+    mano y presente en el arranque, el motor de verdad lo LEE y lo dice —
+    `[App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json` con `sabe= true` y sin error:
+    el camino de lectura del arranque quedo medido, no solo el del corpus.
   - El canal de audio AICA sigue sin conectar (otra tarjeta).
 
 
