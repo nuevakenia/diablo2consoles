@@ -18,10 +18,13 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/OpenDiablo2/OpenDiablo2/d2app"
+	"github.com/OpenDiablo2/OpenDiablo2/d2app/d2setup"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2config"
 )
 
 //extern d2c_serial_init
@@ -89,6 +92,86 @@ func pruebaDeEscritura() {
 	println("OS-RAMFS prueba: despues de borrar -> archivos=", archivos, "bytes=", bytes, "dirs=", dirs)
 }
 
+// seleccionDeArchivos: DC-002.19 -- LOS NUMEROS DE LA FRONTERA QUE ESTA TARJETA DESTRABA.
+//
+// El arranque del motor se frenaba en `d2setup.EnsureGameFiles` ("no Diablo II game files were selected")
+// porque en la consola no hay quien elija la carpeta de los MPQ: los dos caminos del motor que no
+// preguntan salen de `os.Getenv` (un stub en la consola, devuelve "") y sin env queda `OsaUI`
+// (osascript), que devuelve `cancelled by user`. El camino que NO pregunta es el que el arranque ya tiene:
+// `Complete(cfg.MpqPath, cfg.MpqLoadOrder)` = true, o sea la CONFIGURACION completa apuntando a los datos
+// del juego. Por eso el romdisk del build hornea `/rd/OpenDiablo2/config.json` (lo escribe el motor) y el
+// directorio de datos `/rd/juego`.
+//
+// Lo que imprime, y por que cada uno:
+//   - el MpqPath y cuantos archivos pide el config que el arranque LEYO del romdisk
+//   - `Complete(dir, orden)` (os.Stat por nombre) y `Validate(dir).OK()` (os.ReadDir del directorio) con
+//     cuantos archivos ve cada uno: los DOS caminos de la seleccion del motor, sobre el mismo directorio
+//   - el ReadDir de un directorio CREADO ACA (el overlay de la RAM de DC-002.17): es el defecto que
+//     arregla esta tarjeta (antes veia CERO archivos en un directorio del overlay)
+func seleccionDeArchivos() {
+	const rutaConf = "/rd/OpenDiablo2/config.json"
+	const dirPrueba = "/rd/prueba-seleccion"
+
+	conf, err := os.Open(rutaConf)
+	if err != nil {
+		println("MOTOR-ARRANQUE seleccion: no pude abrir el config del arranque:", err.Error())
+	} else {
+		cfg := &d2config.Configuration{}
+		cfg.SetPath(rutaConf)
+
+		if errDec := json.NewDecoder(conf).Decode(cfg); errDec != nil {
+			println("MOTOR-ARRANQUE seleccion: el Decode del config fallo:", errDec.Error())
+		} else {
+			println("MOTOR-ARRANQUE config del arranque: MpqPath=", cfg.MpqPath,
+				"archivos en el orden=", len(cfg.MpqLoadOrder))
+
+			v := d2setup.Validate(cfg.MpqPath)
+			println("MOTOR-ARRANQUE seleccion: Complete=", d2setup.Complete(cfg.MpqPath, cfg.MpqLoadOrder),
+				"Validate.OK()=", v.OK(), "archivos que ve=", len(v.LoadOrder), "faltan=", len(v.MissingCore))
+		}
+
+		conf.Close()
+	}
+
+	// el mismo camino, pero sobre un directorio del OVERLAY (creado por el programa y no horneado)
+	if err := os.MkdirAll(dirPrueba, 0750); err != nil {
+		println("MOTOR-ARRANQUE seleccion: MkdirAll fallo:", err.Error())
+
+		return
+	}
+
+	uno, err := os.Create(dirPrueba + "/uno.txt")
+	if err != nil {
+		println("MOTOR-ARRANQUE seleccion: Create fallo:", err.Error())
+
+		return
+	}
+
+	_, _ = uno.Write([]byte("doce bytes!\n"))
+	_ = uno.Close()
+
+	entradas, err := os.ReadDir(dirPrueba)
+
+	// DC-002.19: el estado del overlay JUSTO DESPUES de listar (y con el listado ya hecho): si el
+	// listado del C no ve lo que el overlay tiene, los dos numeros lo dicen sin ambiguedad.
+	nArch, nBytes, nDirs := os.RamfsResumen()
+	println("MOTOR-ARRANQUE overlay del listado: archivos=", nArch, "bytes=", nBytes, "dirs=", nDirs)
+
+	if err != nil {
+		println("MOTOR-ARRANQUE seleccion overlay: ReadDir dio error:", err.Error())
+
+		return
+	}
+
+	nombres := ""
+	for _, e := range entradas {
+		nombres += e.Name() + " "
+	}
+
+	println("MOTOR-ARRANQUE seleccion overlay: ReadDir de", dirPrueba, "->", len(entradas),
+		"entradas:", nombres)
+}
+
 func main() {
 	d2cSerialInit()
 
@@ -114,6 +197,10 @@ func main() {
 
 	// DC-002.17: la prueba del sistema de archivos escribible, con el mismo os del motor.
 	pruebaDeEscritura()
+
+	// DC-002.19: los numeros de la seleccion de los archivos del juego (el config del romdisk y el
+	// ReadDir del overlay), ANTES de arrancar el motor: es lo que esta tarjeta destraba.
+	seleccionDeArchivos()
 
 	d2cArranqueMarca(1)
 

@@ -346,6 +346,150 @@ int d2c_ramfs_tam(void) {
     return (int)(sizeof(ramfs_archivos) + sizeof(ramfs_dirs) + sizeof(int));
 }
 
+/* DC-002.19: EL LISTADO DEL OVERLAY DE LA RAM (os.ReadDir de un directorio del overlay).
+ *
+ * POR QUE EXISTE: el os.ReadDir de la consola salia SOLO del ".manifiesto" que el build hornea en el
+ * romdisk, asi que un directorio que existe en el OVERLAY (lo que el programa creo, o lo que el motor
+ * escribio) se veia VACIO. Medido en DC-002.19 con el motor de verdad, sobre una carpeta con siete
+ * archivos que d2c_stat_tam SI encontraba:
+ *
+ *     SETUP-ARCHIVOS A: Validate(dir).OK() = false archivos que ve = 0
+ *     SETUP-ARCHIVOS A: Complete(dir, orden) = true
+ *
+ * Y no es cosmetico: el camino de la seleccion de los archivos del juego del motor (d2setup.Validate ->
+ * Resolve) pregunta justamente por el contenido del directorio.
+ *
+ * QUE HACE: escribe en `buf` el MISMO formato del manifiesto del build (nombre TAB bytes TAB
+ * archivo|directorio, una linea por entrada DIRECTA de ese directorio; no baja a los subdirectorios) y
+ * devuelve los BYTES escritos. Devuelve -1 si no entran en `max` -- mejor fallar que devolver una lista
+ * cortada y que el que la lea crea que el directorio tiene menos de lo que tiene.
+ *
+ * LO QUE NO LISTA: ".manifiesto" (es el INDICE del romdisk, no una entrada; el ReadDir de Go no lo
+ * veria porque en el romdisk no es un archivo del usuario) ni el propio directorio.
+ */
+/*
+ * OJO MEDIDO (DC-002.19): la RUTA VA ULTIMA. Con la firma `(const char *ruta, char *buf, int max)` el C
+ * recibia los argumentos CORRIDOS y el guardia de abajo devolvia -2 (medido: "OS-RAMFS
+ * manifiesto-de-la-ram: no se pudo armar para /rd/ov219 codigo -2" con `max` llegando como un puntero
+ * negativo). La convencion que funciona es escalares primero y la ruta al final: el orden de esta firma
+ * es el CONTRATO con la declaracion del paquete os (os.go) y no se puede cambiar de un lado solo.
+ * La comprobacion `ruta[0] != '/'` es a proposito: si la ruta no llega como una cadena de verdad
+ * (puntero a los bytes), esto lo dice con un -5 en vez de listar cualquier cosa.
+ */
+int d2c_ramfs_manifiesto(char *buf, int max, const char *ruta) {
+    int i, usados = 0, escritos = 0;
+    size_t n;
+    char prefijo[D2C_RAMFS_RUTA + 1];
+
+    // Codigos NEGATIVOS distintos por salida: el que llama los distingue y los imprime (es el instrumento
+    // que encontro el desajuste de ABI de arriba).
+    if (ruta == 0 || buf == 0 || max <= 0) {
+        return -2;
+    }
+    if (ruta[0] != '/') {
+        return -5;
+    }
+    // el prefijo "<ruta>/" que tienen que empezar las entradas directas de ese directorio
+    n = strlen(ruta);
+    if (n + 1 >= sizeof(prefijo)) {
+        return -3;
+    }
+    memcpy(prefijo, ruta, n);
+    prefijo[n] = '/';
+    prefijo[n + 1] = '\0';
+
+    for (i = 0; i < D2C_RAMFS_ARCHIVOS + D2C_RAMFS_DIRS; i++) {
+        const char *nombre;
+        const char *tipo;
+        int tam;
+        size_t k, l;
+
+        if (i < D2C_RAMFS_ARCHIVOS) {
+            if (!ramfs_archivos[i].usado) {
+                continue;
+            }
+            nombre = ramfs_archivos[i].ruta;
+            tam = ramfs_archivos[i].tam;
+            tipo = "archivo";
+        } else {
+            int d = i - D2C_RAMFS_ARCHIVOS;
+            if (d >= ramfs_ndirs) {
+                continue;
+            }
+            nombre = ramfs_dirs[d];
+            tam = 0;
+            tipo = "directorio";
+        }
+
+        l = strlen(nombre);
+        if (l <= n + 1 || strncmp(nombre, prefijo, n + 1) != 0) {
+            continue;   // no esta adentro de este directorio
+        }
+        nombre += n + 1;    // el nombre, sin la ruta del directorio
+        l -= n + 1;
+        for (k = 0; k < l; k++) {
+            if (nombre[k] == '/') {
+                break;      // esta en un subdirectorio: no es una entrada DIRECTA
+            }
+        }
+        if (k < l) {
+            continue;
+        }
+        if (l == 12 && strncmp(nombre, ".manifiesto", 11) == 0) {
+            continue;       // el indice del romdisk no se lista
+        }
+        if (l >= D2C_RAMFS_RUTA) {
+            continue;
+        }
+
+        // "<nombre>\t<tam>\t<tipo>\n" (el tamano en decimal, armado a mano: no hay snprintf aca)
+        {
+            char numero[12];
+            int p = 0, q;
+            char cifra[12];
+
+            if (tam == 0) {
+                cifra[p++] = '0';
+            }
+            while (tam > 0 && p < (int)sizeof(cifra)) {
+                cifra[p++] = (char)('0' + (tam % 10));
+                tam /= 10;
+            }
+            for (q = 0; q < p; q++) {
+                numero[q] = cifra[p - 1 - q];
+            }
+            numero[p] = '\0';
+            if (escritos + (int)l + (int)strlen(numero) + (int)strlen(tipo) + 3 > max) {
+                return -1;
+            }
+            memcpy(buf + escritos, nombre, l);
+            escritos += (int)l;
+            buf[escritos++] = '\t';
+            for (q = 0; q < p; q++) {
+                buf[escritos++] = numero[q];
+            }
+            buf[escritos++] = '\t';
+            memcpy(buf + escritos, tipo, strlen(tipo));
+            escritos += (int)strlen(tipo);
+            buf[escritos++] = '\n';
+        }
+        usados++;
+    }
+    (void)usados;
+    if (escritos == 0) {
+        // INSTRUMENTO: nadie matcheo. Se devuelve el ESTADO del overlay (cuantos archivos usados y
+        // cuantos directorios ve ESTE codigo) para poder leerlo desde Go: -(100 + 10*archivos + dirs).
+        int narch = 0;
+        for (i = 0; i < D2C_RAMFS_ARCHIVOS; i++) {
+            if (ramfs_archivos[i].usado) {
+                narch++;
+            }
+        }
+        return -(100 + 10 * narch + ramfs_ndirs);
+    }
+    return escritos;
+}
+
 // Directorios (os.ReadDir). El nombre se copia al buffer de Go y el tipo se devuelve crudo: la
 // convencion de KOS es la POSIX (dirent.h), la misma que documenta libgodc/kos/fs.go (DT_DIR = 4,
 // DT_REG = 8), pero el POC imprime el valor crudo para medirlo en vez de suponerlo.

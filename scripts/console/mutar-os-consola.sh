@@ -20,7 +20,7 @@ OS=console/dc/std/os/os.go
 IUTIL=console/dc/std/io/ioutil/ioutil.go
 RESP=/tmp/mutar-os/os.go
 # los archivos que un mutante toca y que hay que dejar iguales al terminar
-ARCHIVOS="$OS console/dc/std/time/time.go console/dc/std/log/log.go $IUTIL"
+ARCHIVOS="$OS console/dc/std/time/time.go console/dc/std/log/log.go $IUTIL console/dc/std/csrc/os_dc.c"
 mkdir -p /tmp/mutar-os
 cp "$OS" "$RESP"
 SHA0="$(sha256sum "$OS" | cut -d' ' -f1)"
@@ -178,6 +178,26 @@ probar "ioutil.ReadDir con el comparador invertido" \
     "sort.Slice(list, func(i, j int) bool { return list[i].Name() < list[j].Name() })" \
     "sort.Slice(list, func(i, j int) bool { return list[i].Name() > list[j].Name() })" \
     "el orden por nombre de ioutil.ReadDir"
+
+# 11. ReadDir que NO mezcla el listado del OVERLAY de la RAM (DC-002.19): es el defecto de la tarjeta.
+#     Lo caza el caso 4m del POC (el directorio que el programa crea en la RAM, con sus entradas) y, en el
+#     motor de verdad, el control 3 de checar-arranque-219.sh.
+probar "ReadDir sin el overlay de la RAM" \
+    "console/dc/std/os/os.go" \
+    "	// El overlay TAPA al romdisk con el mismo nombre (la misma regla que os.Open y d2c_hay).
+	for _, nueva := range deRAM {" \
+    "	// MUTANTE overlay-no-lista
+	for _, nueva := range []DirEntry(nil) {" \
+    "las entradas del overlay en el caso 4m"
+
+# 12. el listado del overlay del lado del C que no matchea ninguna ruta (DC-002.19): el MISMO defecto, pero
+#     del otro lado del puente con KOS (d2c_ramfs_manifiesto). El POC tiene que caer igual: si quedara verde,
+#     el puente C no estaria cubierto y el arreglo de Go solo probaria la mitad.
+probar "el listado del overlay que no matchea (C)" \
+    "console/dc/std/csrc/os_dc.c" \
+    "if (l <= n + 1 || strncmp(nombre, prefijo, n + 1) != 0) {" \
+    "if (l <= n + 1 || 1) {   /* MUTANTE: no matchea */" \
+    "las entradas del overlay en el caso 4m"
 
 echo
 echo "== restauro y verifico =="

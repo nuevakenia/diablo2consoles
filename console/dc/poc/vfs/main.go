@@ -504,6 +504,89 @@ func main() {
 	// sintoma del motor (d2mpq/mpq.go:204). El mutante que lo exige: scripts/console/mutar-tipos-os.sh.
 	identidades()
 
+	// 4m. ReadDir DEL OVERLAY DE LA RAM (DC-002.19). Hasta esta tarjeta os.ReadDir salia SOLO del
+	// ".manifiesto" del romdisk, asi que un directorio creado en la consola (el overlay de DC-002.17) se
+	// veia VACIO: medido con el motor de verdad, `Validate(dir).OK() = false archivos que ve = 0` sobre
+	// una carpeta con siete archivos que os.Stat SI encontraba. El camino de la seleccion de los
+	// archivos del juego pregunta justamente por el contenido del directorio.
+	//
+	// Los casos, y por que cada uno:
+	//   a) un directorio del overlay con tres entradas DIRECTAS: dos archivos (uno de 12 bytes y uno de
+	//      0) y un subdirectorio. Prueba el listado, el TAMANO de cada entrada, el tipo del
+	//      subdirectorio y que NO baje al subdirectorio (tres.txt vive adentro de sub/).
+	//   b) el archivo del overlay que TAPA al del romdisk con el mismo nombre: se lista UNA vez (no dos,
+	//      que es lo que pasaria sin juntar por nombre) y con el tamano del overlay.
+	//   c) un directorio que NO esta: tiene que dar error, no una lista vacia (eso no cambio).
+	// El mutante que lo exige: "ReadDir que no mira el overlay" en scripts/console/mutar-os-consola.sh.
+	// OJO (declarado): el MkdirAll de la consola anota la ruta FINAL, no crea los padres; alcanza para
+	// los casos de aca porque lo que se lista es /rd/ov219 y el subdirectorio es una entrada de /rd/ov219.
+	if errO := os.MkdirAll("/rd/ov219/sub", 0750); errO != nil {
+		check("overlay: MkdirAll /rd/ov219/sub", "sin error", "error: "+errO.Error())
+	}
+	if fo, errO := os.Create("/rd/ov219/uno.txt"); errO != nil {
+		check("overlay: Create uno.txt", "sin error", "error: "+errO.Error())
+	} else {
+		fo.Write([]byte("doce bytes!\n"))
+		fo.Close()
+	}
+	if fo, errO := os.Create("/rd/ov219/dos.txt"); errO != nil {
+		check("overlay: Create dos.txt", "sin error", "error: "+errO.Error())
+	} else {
+		fo.Close()
+	}
+	if fo, errO := os.Create("/rd/ov219/sub/tres.txt"); errO != nil {
+		check("overlay: Create sub/tres.txt", "sin error", "error: "+errO.Error())
+	} else {
+		fo.Write([]byte("adentro del subdirectorio\n"))
+		fo.Close()
+	}
+
+	ovo, errO := os.ReadDir("/rd/ov219")
+	if errO != nil {
+		check("ReadDir del overlay", "sin error", "error: "+errO.Error())
+	} else {
+		nombresO := ""
+		for _, e := range ovo {
+			nombresO += e.Name() + " "
+		}
+		check("ReadDir del overlay cantidad", "3", strconv.Itoa(len(ovo)))
+		check("ReadDir del overlay nombres ordenados", "dos.txt sub uno.txt ", nombresO)
+		check("ReadDir del overlay tamanos", "0 0 12 ", tamanos(ovo))
+		check("ReadDir del overlay el subdirectorio es dir", "false true false ", dirs(ovo))
+		check("ReadDir del overlay Type()==fs.ModeDir", "false true false ", modos(ovo))
+	}
+
+	// b) el overlay TAPA al romdisk: /rd/hola.txt del romdisk tiene 37 bytes; el de la RAM, 3.
+	if fo, errO := os.Create("/rd/hola.txt"); errO != nil {
+		check("overlay: Create /rd/hola.txt", "sin error", "error: "+errO.Error())
+	} else {
+		fo.Write([]byte("Ram"))
+		fo.Close()
+		tapa, errT := os.ReadDir("/rd")
+		if errT != nil {
+			check("ReadDir /rd con el overlay", "sin error", "error: "+errT.Error())
+		} else {
+			// las MISMAS cuatro entradas de 4c (el overlay no agrega una quinta "hola.txt"), y el
+			// tamano de hola.txt es el del OVERLAY porque es el que tapa
+			check("ReadDir /rd con el overlay: 4 entradas, sin repetir", "4", strconv.Itoa(len(tapa)))
+			check("ReadDir /rd con el overlay: el que tapa manda", "256 0 6000 3 ", tamanos(tapa))
+			if txtH, errH := os.ReadFile("/rd/hola.txt"); errH == nil {
+				check("el overlay tapa al romdisk en ReadFile", "Ram", string(txtH))
+			}
+		}
+		os.Remove("/rd/hola.txt")
+		if txtH, errH := os.ReadFile("/rd/hola.txt"); errH == nil {
+			check("y al borrarlo vuelve el del romdisk", "hola desde el romdisk de la Dreamcast", string(txtH))
+		}
+	}
+
+	// c) un directorio que no esta: error (no una lista vacia)
+	if e4, err4 := os.ReadDir("/rd/ov219/no-esta"); err4 != nil {
+		check("ReadDir de un directorio que no esta", "true", strconv.FormatBool(os.IsNotExist(err4)))
+	} else {
+		check("ReadDir de un directorio que no esta", "error", strconv.Itoa(len(e4))+" entradas")
+	}
+
 	// 5. Existe, Getenv y Args
 	check("Existe /rd/hola.txt", "true", strconv.FormatBool(os.Existe("/rd/hola.txt")))
 	check("Existe /rd/nada", "false", strconv.FormatBool(os.Existe("/rd/nada")))

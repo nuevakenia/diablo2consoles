@@ -2079,11 +2079,13 @@ imprimir `tipo=` y `sabe=`. En el host queda en `nil` y no imprime nada.
 Evidencia cruda (los logs de las dos corridas del arranque, el del corpus con sus mutantes y el de la
 barrera): `evidencia/dc-002.18-serializador-config-sin-reflexion.txt`.
 
-## 35. DC-002.19 (MEDICION, tarjeta abierta): la seleccion de los archivos del juego en la consola
+## 35. DC-002.19: el arranque PASA la seleccion de los archivos del juego (`os.ReadDir` del overlay y el romdisk que hornea la config)
 
 Cerrada DC-002.18, el error que queda es `reported to the user: no Diablo II game files were selected`
-(`d2app/firstrun.go:32` -> `d2setup.EnsureGameFiles`). Esta seccion es la MEDICION de esa frontera hecha
-ANTES de tocar nada; el arreglo todavia no esta.
+(`d2app/firstrun.go:32` -> `d2setup.EnsureGameFiles`). La seccion tiene las tres partes: lo MEDIDO antes
+de tocar nada (35.1), el ARREGLO (35.2) y lo medido despues, con los controles y los mutantes (35.3).
+
+### 35.1 Lo medido ANTES del arreglo (no se toco nada todavia)
 
 **1. Los caminos de seleccion que el motor ya tiene NO SIRVEN en la consola, y esta medido por que.**
 `d2setup.DefaultUI()` elige entre `ScriptedUI` (sin dialogos, con la carpeta de `OD2_SETUP_AUTOPICK`) y
@@ -2113,5 +2115,73 @@ hueco que DC-002.18 dejo declarado: el `Decode` lee el config y el motor lo dice
 `compress/gzip` de la consola sobre un asset EMBEBIDO (`d2common/d2util/assets.CreateTextImage`), ANTES de
 cualquier lectura del MPQ.
 
-Ejecutable: `bash scripts/console/medir-setup-219.sh /tmp/gox-00218 /tmp/dcbuild/setup-219 25`
+Ejecutable (la medicion): `bash scripts/console/medir-setup-219.sh /tmp/gox-00218 /tmp/dcbuild/setup-219 25`
 (POC `console/dc/poc/setup-archivos`). Evidencia cruda: `evidencia/dc-002.19-seleccion-de-archivos.txt`.
+
+### 35.2 El arreglo: dos defectos, uno de la consola y uno del arranque
+
+**(a) `os.ReadDir` del OVERLAY de la RAM.** El `ReadDir` de la consola salia SOLO del `.manifiesto` que el
+build hornea en el romdisk, asi que un directorio creado o escrito por el programa (el overlay en RAM de
+DC-002.17) se veia VACIO. Ahora hay dos fuentes y se juntan:
+
+- en C, `d2c_ramfs_manifiesto(buf, max, ruta)` (`console/dc/std/csrc/os_dc.c`) arma el MISMO formato del
+  manifiesto (`nombre TAB bytes TAB archivo|directorio`) con las entradas DIRECTAS del directorio del
+  overlay, sin bajar a los subdirectorios, sin listar `.manifiesto` y devolviendo NEGATIVOS distintos por
+  cada salida (`-1` no entra, `-2` argumentos, `-3` ruta larga, `-5` la ruta no llega como cadena, y
+  `-(100 + 10*archivos + dirs)` como instrumento cuando no matcheo nada). Ojo con la FIRMA: la ruta va
+  ULTIMA (escalares primero) -- con la ruta primero el C recibia los argumentos corridos y devolvia `-2`.
+- en Go, `os.ReadDir` (`console/dc/std/os/os.go`) junta el listado del overlay con el del romdisk: el
+  overlay TAPA al romdisk por nombre (la misma regla de `os.Open`/`d2c_hay`) y el resultado se ordena por
+  nombre (Go lo promete). Un directorio que no esta en ninguno de los dos da `ErrNotExist`, no lista vacia.
+
+**(b) La configuracion del arranque, horneada.** `scripts/console/build-motor-arranque.sh` arma un romdisk
+con `/rd/OpenDiablo2/config.json` y `/rd/juego`, y el `config.json` lo escribe `console/dc/gen-config-consola`
+con el `d2config.Save` DEL MOTOR (el `MarshalJSON` de DC-002.18) usando la tabla del motor
+(`d2setup.CoreMPQs`) como unica fuente de los nombres. Con eso `Complete(MpqPath, MpqLoadOrder)` = true y
+`EnsureGameFiles` no pregunta nada. Los siete MPQ se crean VACIOS: es el instrumento que corre la frontera
+hacia adelante (los MPQ reales no entran en el romdisk; el camino de lectura real es el disco).
+
+El generador tiene tres salidas mas: `-sin-sellos` (config sin archivos: el mutante de la seleccion),
+`-verificar` (EL CONTROL DEL HOST: lee el config con el `json` de verdad y exige ruta, orden y archivos).
+Y `build-motor-arranque.sh` acepta `DC_SIN_ROMDISK=1` / `DC_SIN_CONFIG=1` para reproducir el estado
+anterior al arreglo.
+
+### 35.3 Lo medido DESPUES: 6/6 controles, 5/5 mutantes, 87/87 casos y la barrera igual
+
+    bash scripts/console/checar-arranque-219.sh /tmp/gox-00219 /tmp/dcbuild/arranque-219 25
+
+       OK: 6/6 controles verdes con el codigo de ahora
+         MOTOR-ARRANQUE config del arranque: MpqPath= /rd/juego archivos en el orden= 7
+         MOTOR-ARRANQUE seleccion: Complete= true Validate.OK()= true archivos que ve= 7 faltan= 0
+         MOTOR-ARRANQUE overlay del listado: archivos= 1 bytes= 12 dirs= 2
+         MOTOR-ARRANQUE seleccion overlay: ReadDir de /rd/prueba-seleccion -> 1 entradas: uno.txt
+         [App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json
+         panic: assets: bmp.Decode failed: gzip: invalid header
+         (marcas MOTOR-ARRANQUE de la corrida: 10)
+    == 5/5 mutantes cazados ==
+
+Los seis controles son: 1 la config del arranque, 2 la seleccion (`Complete` **y** `Validate`, que es el
+que mira el CONTENIDO del directorio), 3 el `ReadDir` del overlay, 4 la lectura del config POR EL MOTOR
+(`loaded configuration file from ...`), 5 la FRONTERA declarada (el `gzip` del asset embebido, que es
+DC-002.20: el control se pone ROJO a proposito el dia que se arregle) y 6 el numero exacto de marcas.
+
+Los cinco mutantes: `DC_SIN_ROMDISK=1` (el estado del arbol antes del arreglo: caen 1, 2, 4 y 6),
+`DC_SIN_CONFIG=1` (caen 1, 2, 4 y 6), `DC_SIN_SELLOS=1` (cae 2 y 6; el 1 sigue verde, la config esta),
+`overlay-no-lista` en Go (cae 3) y `ramfs-no-matchea` en C (cae 3). Los dos ultimos son el mismo defecto
+de los dos lados del puente con KOS.
+
+El corpus del paquete (`console/dc/poc/vfs`, caso 4m) queda en **87/87** casos y
+`scripts/console/mutar-os-consola.sh` en **12/12** mutantes cazados (los dos nuevos bajan el POC a
+`81/87` y `81/83`), con `os.go` (sha256 `99e3041f…`) y `os_dc.c` (`b7afa0c6…`) restaurados.
+
+Las barreras del host siguen verde: `test-std-host.sh` en amd64 y 386 (13/13 excluidos que no compilan en
+el host) y `mutar-std-host.sh` con **39/39** chequeos cazados. Y la del motor, `compare-motor-dc6.sh`:
+**31 lineas identicas, 30 frames**.
+
+Evidencia cruda del arreglo: `evidencia/dc-002.19-arreglo-seleccion.txt`.
+
+**Lo que queda, declarado.** La frontera nueva es el `compress/gzip` de la consola sobre un asset
+EMBEBIDO (`d2common/d2util/assets.CreateTextImage`), antes de cualquier lectura del MPQ: es DC-002.20. Los
+MPQ del romdisk estan vacios: la lectura de los datos del juego (disco u horneada) es otra tarjeta. El
+`os.Getenv` de la consola sigue siendo un stub; no se toco porque el arranque ya no lo necesita para la
+seleccion.

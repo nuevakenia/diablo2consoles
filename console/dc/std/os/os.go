@@ -104,6 +104,13 @@ func d2c_ramfs_resumen(archivos uintptr, bytes uintptr, dirs uintptr) int
 //extern d2c_ramfs_tam
 func d2c_ramfs_tam() int
 
+// DC-002.19: el listado del overlay de la RAM (os.ReadDir de un directorio creado en la consola). El C
+// escribe el MISMO formato del manifiesto del build y devuelve los bytes escritos, o -1 si no entran.
+// El buffer lo pone Go (local, de tamano fijo): en este arranque el monton esta justo.
+//
+//extern d2c_ramfs_manifiesto
+func d2c_ramfs_manifiesto(buf uintptr, max int, ruta string) int
+
 //extern d2c_escribir_consola
 func d2c_escribir_consola(buf uintptr, n int)
 
@@ -442,27 +449,99 @@ func (d dirEntryOS) Type() FileMode {
 // POC del VFS pedia e.TipoCrudo() y e.Size() (del interfaces viejo, mas ancho) y NO COMPILABA desde el
 // alias (commit 95e0ef74, DC-002.8): el corpus de os en la consola quedo muerto sin que nadie lo viera.
 
-// ReadDir lista un directorio. EN LA CONSOLA SALE DE UN MANIFIESTO, no del sistema de archivos:
+// ReadDir lista un directorio. EN LA CONSOLA SALE DE DOS LADOS, y hay que juntarlos:
 //
-// Medido en Flycast (poc/sonda-i y el POC del VFS): el FS ROM de KOS NO deja abrir un directorio.
-// fs_open("/rd") da INVALID con las tres formas de la ruta ("/rd", "/rd/", "/") y tambien con
-// (kos/fs.h) fs_readdir sobre un file_t, mientras que los ARCHIVOS de /rd se abren y se leen sin
-// problema. Como el romdisk lo arma este mismo build, el listado se hornea con el: build-dc.sh escribe
-// un ".manifiesto" (nombre, tamano y tipo por linea, separados por TAB) DENTRO del romdisk. Se generan
-// juntos, asi que no pueden desincronizarse.
+//  1. EL ROMDISK, de un ".manifiesto" horneado por el build. Medido en Flycast (poc/sonda-i y el POC del
+//     VFS): el FS ROM de KOS NO deja abrir un directorio. fs_open("/rd") da INVALID con las tres formas de
+//     la ruta ("/rd", "/rd/", "/") y tambien con (kos/fs.h) fs_readdir sobre un file_t, mientras que los
+//     ARCHIVOS de /rd se abren y se leen sin problema. Como el romdisk lo arma este mismo build, el
+//     listado se hornea con el: build-dc.sh escribe un ".manifiesto" (nombre, tamano y tipo por linea,
+//     separados por TAB) DENTRO del romdisk. Se generan juntos, asi que no pueden desincronizarse.
 //
-// El ".manifiesto" no se lista a si mismo. Para /cd (el GD-ROM por ISO9660) esto no aplica y hay que
-// resolverlo cuando se llegue ahi.
+//  2. EL OVERLAY DE LA RAM (lo que el programa creo o escribio, DC-002.17), que TAPA al romdisk con el
+//     mismo nombre. Su listado lo da el C (d2c_ramfs_manifiesto) en el mismo formato, y SIN el un
+//     directorio del overlay se veia VACIO: medido en DC-002.19 con el motor de verdad,
+//     `Validate(dir).OK() = false archivos que ve = 0` sobre una carpeta con siete archivos que os.Stat
+//     SI encontraba (y el camino de la seleccion del motor pregunta justamente por el contenido).
+//
+// El ".manifiesto" no se lista a si mismo (ni el del romdisk ni el del overlay). Para /cd (el GD-ROM por
+// ISO9660) esto no aplica y hay que resolverlo cuando se llegue ahi.
 func ReadDir(nombre string) ([]DirEntry, error) {
 	base := nombre
 	for len(base) > 0 && base[len(base)-1] == '/' {
 		base = base[:len(base)-1]
 	}
+	if base == "" {
+		base = "/"
+	}
+
+	// (1) el overlay de la RAM: lo que se creo o se escribio en la consola (DC-002.17). El buffer es
+	// LOCAL y de tamano fijo: una lista de directorio no puede pedirle memoria al monton en este
+	// arranque. 1024 bytes alcanzan para el presupuesto entero del overlay (8 archivos + 8 directorios
+	// con nombres de hasta 95 caracteres).
+	var bufRAM [1024]byte
+
+	deRAM := []DirEntry(nil)
+	if n := d2c_ramfs_manifiesto(uintptr(unsafe.Pointer(&bufRAM[0])), len(bufRAM), base); n >= 0 {
+		deRAM = entradasDelManifiesto(bufRAM[:n])
+	} else {
+		// El instrumento: el C devuelve un NEGATIVO por cada salida (ver os_dc.c). Solo se imprime cuando
+		// el listado del overlay no se pudo armar. OJO: se imprime con ARGUMENTOS SUELTOS, nunca
+		// concatenando: en el arranque del motor el monton esta justo y una cadena armada no se ve
+		// (la leccion de DC-002.17).
+		println("OS-RAMFS manifiesto-de-la-ram: no se pudo armar para", base, "codigo", n)
+	}
+
+	// (2) el romdisk: el ".manifiesto" que hornea el build
 	datos, err := ReadFile(base + "/.manifiesto")
-	if err != nil {
+
+	if err != nil && len(deRAM) == 0 && d2c_stat_es_dir(base) != 1 {
+		// ni manifiesto, ni entradas en la RAM, ni el directorio: para Go esto no esta
 		return nil, ErrNotExist
 	}
+
+	salida := entradasDelManifiesto(datos)
+
+	// El overlay TAPA al romdisk con el mismo nombre (la misma regla que os.Open y d2c_hay).
+	for _, nueva := range deRAM {
+		puesta := false
+
+		for i, vieja := range salida {
+			if vieja.Name() == nueva.Name() {
+				salida[i] = nueva
+				puesta = true
+
+				break
+			}
+		}
+
+		if !puesta {
+			salida = append(salida, nueva)
+		}
+	}
+
+	// Go ordena las entradas de ReadDir POR NOMBRE (os.ReadDir: "sorted by filename"); el manifiesto,
+	// en cambio, sale en el orden que le da el build. Medido en DC-002.8a con /rd/desorden/.manifiesto
+	// escrito a proposito como zulu-alfa-mike: nuestro os.ReadDir devolvia "zulu.txt alfa.txt mike.txt "
+	// donde el de Go devuelve "alfa.txt mike.txt zulu.txt ". Se ordena aca, a mano y no con sort: os es
+	// el paquete mas bajo de todos y no importa nada que no sea imprescindible (la misma razon por la que
+	// existe partirTab). Lo exige el corpus (poc/vfs, seccion 4c-bis) y su mutante.
+	for i := 1; i < len(salida); i++ {
+		for j := i; j > 0 && salida[j].Name() < salida[j-1].Name(); j-- {
+			salida[j], salida[j-1] = salida[j-1], salida[j]
+		}
+	}
+
+	return salida, nil
+}
+
+// entradasDelManifiesto lee el formato del manifiesto -- "nombre TAB bytes TAB archivo|directorio", una
+// entrada por linea -- y devuelve las entradas. Es el MISMO formato para el romdisk (lo hornea el build)
+// y para el overlay de la RAM (lo arma el C), asi que los dos se leen con el mismo codigo: si el de la
+// RAM se saliera del formato, el corpus lo veria como una entrada menos.
+func entradasDelManifiesto(datos []byte) []DirEntry {
 	var salida []DirEntry
+
 	linea := ""
 	for i := 0; i <= len(datos); i++ {
 		var c byte
@@ -494,18 +573,7 @@ func ReadDir(nombre string) ([]DirEntry, error) {
 		linea = ""
 	}
 
-	// Go ordena las entradas de ReadDir POR NOMBRE (os.ReadDir: "sorted by filename"); el manifiesto,
-	// en cambio, sale en el orden que le da el build. Medido en DC-002.8a con /rd/desorden/.manifiesto
-	// escrito a proposito como zulu-alfa-mike: nuestro os.ReadDir devolvia "zulu.txt alfa.txt mike.txt "
-	// donde el de Go devuelve "alfa.txt mike.txt zulu.txt ". Se ordena aca, a mano y no con sort: os es
-	// el paquete mas bajo de todos y no importa nada que no sea imprescindible (la misma razon por la que
-	// existe partirTab). Lo exige el corpus (poc/vfs, seccion 4c-bis) y su mutante.
-	for i := 1; i < len(salida); i++ {
-		for j := i; j > 0 && salida[j].Name() < salida[j-1].Name(); j-- {
-			salida[j], salida[j-1] = salida[j-1], salida[j]
-		}
-	}
-	return salida, nil
+	return salida
 }
 
 // partirTab parte por TAB (el manifiesto lo usa como separador; no se usa strings para no meter una

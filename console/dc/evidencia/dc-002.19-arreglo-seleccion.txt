@@ -1,0 +1,214 @@
+DC-002.19 — EL ARRANQUE PASA LA SELECCION DE LOS ARCHIVOS DEL JUEGO (arreglo medido)
+=====================================================================================
+
+Rama DC-002. Fecha: 2026-10-17. Todo lo de abajo esta MEDIDO en este host (Flycast para la consola,
+x86-64 para el host). Los comandos exactos van al final de cada bloque.
+
+La medicion ANTES del arreglo (el defecto tal como se cerro DC-002.18) esta en
+`dc-002.19-seleccion-de-archivos.txt`; este archivo es el DESPUES.
+
+
+1. LOS DOS DEFECTOS QUE ESTA TARJETA ARREGLA
+--------------------------------------------
+
+(a) `os.ReadDir` de un directorio del OVERLAY DE LA RAM devolvia CERO entradas, aunque `os.Stat` si
+    encontrara los archivos. Antes (medido sobre la misma carpeta con los siete MPQ creados):
+
+        SETUP-ARCHIVOS A: Validate(dir).OK() = false archivos que ve = 0
+        SETUP-ARCHIVOS A: Complete(dir, orden) = true
+
+    El camino de la seleccion del motor (`d2setup.Validate` -> `Resolve`) pregunta por el CONTENIDO del
+    directorio, asi que la carpeta buena se veia vacia. Causa: el `ReadDir` de la consola salia SOLO del
+    `.manifiesto` que el build hornea en el romdisk; el overlay de la RAM (DC-002.17) no tenia listado.
+    Arreglo: `d2c_ramfs_manifiesto()` en `console/dc/std/csrc/os_dc.c` (el C arma el MISMO formato del
+    manifiesto para las entradas DIRECTAS de un directorio del overlay) y `os.ReadDir` junta los dos
+    listados, con el overlay TAPANDO al romdisk por nombre y ordenando por nombre como el `os` de Go.
+
+(b) En la consola no hay quien elija la carpeta de los MPQ: los dos caminos del motor que no preguntan
+    salen de `os.Getenv` (stub en la consola, devuelve "") y sin env queda `OsaUI` (osascript), que
+    devuelve `cancelled by user`. Arreglo: el romdisk del arranque HORNEA `/rd/OpenDiablo2/config.json`
+    (escrito por la herramienta `console/dc/gen-config-consola`, que usa el `d2config.Save` del MOTOR) y
+    el directorio `/rd/juego` con los nombres de `d2setup.CoreMPQs`. Con la configuracion completa,
+    `Complete(cfg.MpqPath, cfg.MpqLoadOrder)` = true y `EnsureGameFiles` vuelve sin dialogos.
+
+LIMITE DECLARADO, no escondido: los siete MPQ del romdisk se crean VACIOS. Son el instrumento que corre
+la frontera hacia adelante: los MPQ de verdad no entran en los 16 MB de RAM del romdisk, y el camino de
+lectura real (disco) es otra tarjeta. Lo que compra este instrumento es medir que el arranque PASA la
+seleccion y cual es el error que queda detras. Y ese error quedo medido: el `gzip` de un asset EMBEBIDO
+(DC-002.20).
+
+
+2. LA CONFIGURACION DEL ARRANQUE (control del host, `-verificar`)
+-----------------------------------------------------------------
+
+    CONFIG-CONSOLA config=/rd/OpenDiablo2/config.json bytes=450 sha256=8305595f55e6132f125eaf776e65f21a39d0c285d831a9d28999c048407fe959
+    CONFIG-CONSOLA datos=/rd/juego archivos=7 de 7 (vacios: el instrumento de la frontera)
+    CONFIG-CONSOLA MpqLoadOrder=7 nombres: el mismo orden que crea los archivos, de d2setup.CoreMPQs
+    romdisk: 2048 bytes -> /rd
+
+    CONFIG-CONSOLA verificacion: MpqPath=/rd/juego orden=7 archivos_en_el_directorio=7 de 7 Complete(dir, orden)=true bytes=450 json-de-Go=OK
+    CONFIG-CONSOLA verificacion OK: el config del arranque nombra lo que el romdisk trae
+
+O sea: el `config.json` del romdisk lo lee el `json` DE VERDAD de Go (struct espejo, sin metodos) y dice
+exactamente lo que el arranque de la consola necesita. Reproducible:
+
+    go run ./console/dc/gen-config-consola \
+        -datos /tmp/dcbuild/arranque-219/romdisk/juego \
+        -config /tmp/dcbuild/arranque-219/romdisk/OpenDiablo2/config.json -verificar
+
+
+3. EL CORPUS DE LA CONSOLA: 6 CONTROLES VERDES CON EL MOTOR DE VERDAD
+---------------------------------------------------------------------
+
+    bash scripts/console/checar-arranque-219.sh /tmp/gox-00219 /tmp/dcbuild/arranque-219 25
+
+    == 1. control sano: con el arreglo puesto, los 6 controles
+       control 1 (la config del arranque):     VERDE
+       control 2 (la seleccion de archivos):   VERDE
+       control 3 (el ReadDir del overlay):     VERDE
+       control 4 (la lectura del motor):       VERDE
+       control 5 (la frontera declarada):      VERDE
+       control 6 (las 10 marcas exactas):       VERDE
+       OK: 6/6 controles verdes con el codigo de ahora
+         MOTOR-ARRANQUE arranca (DC-002.13: el entry point del motor en la consola)
+         MOTOR-ARRANQUE runtime sh4
+         MOTOR-ARRANQUE video listo, VRAM de la pantalla 1048576 bytes
+         MOTOR-ARRANQUE llamando a d2app.Create().Run()
+         MOTOR-ARRANQUE config del arranque: MpqPath= /rd/juego archivos en el orden= 7
+         MOTOR-ARRANQUE seleccion: Complete= true Validate.OK()= true archivos que ve= 7 faltan= 0
+         MOTOR-ARRANQUE overlay del listado: archivos= 1 bytes= 12 dirs= 2
+         MOTOR-ARRANQUE seleccion overlay: ReadDir de /rd/prueba-seleccion -> 1 entradas: uno.txt 
+         MOTOR-ARRANQUE marca 1: entrando a d2app.Create()
+         MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+         [App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json
+         panic: assets: bmp.Decode failed: gzip: invalid header
+         Memory: arena=2555452 used=2512228 free=43224
+         (marcas MOTOR-ARRANQUE de la corrida: 10)
+
+Los seis numeros que importan:
+  - `MpqPath= /rd/juego` con 7 archivos en el orden del motor (control 1);
+  - `Complete= true` Y `Validate.OK()= true` con 7 archivos vistos y 0 faltantes (control 2: el camino
+    que mira el CONTENIDO del directorio, el que antes daba `false` con 0 archivos);
+  - el ReadDir de un directorio CREADO EN LA RAM devuelve su entrada, con el overlay diciendo
+    `archivos= 1 bytes= 12` (control 3, el defecto (a));
+  - `loaded configuration file from /rd/OpenDiablo2/config.json`: el camino de LECTURA del motor, no un
+    POC paralelo (control 4, el hueco que DC-002.18 dejo declarado);
+  - `panic: ... gzip: invalid header` como FRONTERA declarada (control 5: es DC-002.20, y el dia que se
+    arregle este control se pone ROJO a proposito para que la frontera se mueva a mano);
+  - 10 marcas `MOTOR-ARRANQUE` exactas (control 6: ni una mas sin querer).
+
+
+4. LOS MUTANTES DE LA CONSOLA: 5/5 CAZADOS
+------------------------------------------
+
+Cada mutante tiene que poner ROJO el control que le toca; si quedara verde, el hueco seria del corpus.
+
+    == mutante 'sin-romdisk'      (DC_SIN_ROMDISK=1: el estado del arranque ANTES del arreglo)
+       control 1 ROJO   control 2 ROJO   control 4 ROJO   control 6 ROJO (13 marcas)
+       cazado
+    == mutante 'sin-config'       (DC_SIN_CONFIG=1: romdisk sin config -> el motor arma su default)
+       control 1 ROJO   control 2 ROJO   control 4 ROJO   control 6 ROJO (13 marcas)
+       cazado
+    == mutante 'sin-sellos'       (DC_SIN_SELLOS=1: config puesta, archivos del juego no)
+       control 1 VERDE  control 2 ROJO   control 4 VERDE  control 6 ROJO (14 marcas)
+       cazado
+    == mutante 'overlay-no-lista' (Go: os.ReadDir no mezcla el listado del overlay)
+       control 3 ROJO    los otros cinco VERDE
+       cazado   /  arbol restaurado (os.go)
+    == mutante 'ramfs-no-matchea' (C: d2c_ramfs_manifiesto no matchea ninguna ruta)
+       control 3 ROJO    los otros cinco VERDE
+       cazado   /  arbol restaurado (os_dc.c)
+
+    == 3. control sano de vuelta (el arbol entero, sin mutar): 6/6 VERDE
+    == 5/5 mutantes cazados ==
+
+El mutante `sin-romdisk` es el que reproduce el estado del arbol antes del arreglo (DC-002.18): ahi caen
+los controles 1, 2 y 4. El control 3 (el ReadDir del overlay) NO cae con el, porque el overlay no necesita
+romdisk: ese defecto se midio aparte con el POC `setup-archivos` (evidencia anterior) y su rojo esta en el
+caso 4m del POC del VFS, abajo.
+
+
+5. EL CORPUS DEL POC DEL VFS: 87/87 CASOS, Y LOS 12 MUTANTES CAZADOS
+--------------------------------------------------------------------
+
+    bash scripts/console/compilar-paquete-std.sh os /tmp/gox-00219
+    bash scripts/console/build-dc.sh console/dc/poc/vfs
+    bash scripts/console/run-flycast.sh /tmp/dcbuild/vfs/prog.elf 30 /tmp/dc-run-vfs219
+
+    OS-RAMFS mkdir-ok path= /rd/ov219/sub
+    OS-RAMFS create-ok path= /rd/ov219/uno.txt
+    OS-RAMFS create-ok path= /rd/ov219/dos.txt
+    OS-RAMFS create-ok path= /rd/ov219/sub/tres.txt
+    OS-RAMFS manifiesto-de-la-ram: no se pudo armar para /rd/ov219/no-esta codigo -131
+    VFS: casos 87 bien 87 mal 0
+
+El caso 4m (nuevo) prueba tres cosas del listado del overlay: tres entradas DIRECTAS con sus TAMANOS
+(0, 0, 12), el subdirectorio marcado como directorio y sin bajar a el (`tres.txt` no aparece); el archivo
+del overlay que TAPA al del romdisk se lista UNA sola vez con el tamano del overlay (`256 0 6000 3` para
+/rd) y al borrarlo vuelve el del romdisk; y un directorio que no esta da `IsNotExist`, no una lista vacia.
+La linea `codigo -131` es el instrumento del C: `-(100 + 10*archivos + dirs)` con 3 archivos y 1
+directorio en el overlay, o sea que el C miro el overlay y no matcheo la ruta pedida.
+
+    bash scripts/console/mutar-os-consola.sh
+
+    == control: sin mutar tiene que salir VERDE ==
+      VFS: casos 87 bien 87 mal 0
+    ...
+    == mutante 11: ReadDir sin el overlay de la RAM (las entradas del overlay en el caso 4m) ==
+      VFS: casos 87 bien 81 mal 6
+      ROJO: cazado.
+    == mutante 12: el listado del overlay que no matchea (C) (las entradas del overlay en el caso 4m) ==
+      VFS: casos 83 bien 81 mal 2
+      ROJO: cazado.
+    == restauro y verifico ==
+    console/dc/std/os/os.go restaurado, sha256 99e3041f2ff0b9504a3801c202a1884a316a351c1bdf7babc0c96fd2994f26d3
+    console/dc/std/csrc/os_dc.c restaurado, sha256 b7afa0c61d453a3d8f3980576520bd22ae9a586f1902cb70dc1a8b5c8ddb57ea
+    == mutantes cazados 12/12 ==
+
+Los dos mutantes NUEVOS son el defecto de esta tarjeta de los dos lados del puente con KOS: uno en Go
+(`86 -> 81` de 87 casos) y uno en C (`81` de 83 casos: el mutante del C corta el listado entero, por eso
+el POC reporta menos casos). Los otros diez son los de DC-002.6/DC-002.8a y siguen cayendo: 12/12.
+
+
+6. LA BARRERA DEL HOST: LAS DOS CORRIDAS DIFERENCIALES
+------------------------------------------------------
+
+    bash scripts/console/test-std-host.sh
+    == los dos anchos: verde (y los 13 que hablan con KOS siguen sin compilar en el host) ==
+    excluidos que NO compilan en el host (amd64): 13 de 13
+    excluidos que NO compilan en el host (386): 13 de 13
+
+    bash scripts/console/mutar-std-host.sh
+    == control sano: la suite tiene que estar VERDE antes de mutar nada ==
+    == 39/39 chequeos cazados ==
+    == OK: la suite caza todos los defectos conocidos y el arbol quedo sano ==
+
+(`TestDC00218Instrumento` imprime FAIL a proposito: es el test que vigila un defecto conocido y exige que
+siga fallando.)
+
+
+7. LA BARRERA DEL MOTOR (`compare-motor-dc6.sh`): IGUAL
+-------------------------------------------------------
+
+    bash scripts/console/build-motor-dc6.sh
+    bash scripts/console/compare-motor-dc6.sh
+    == IGUAL: 31 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4) ==
+       frames comparados: 30
+
+El decodificador del motor y su resumen no cambiaron con el arreglo del `os`: mismo asset, mismos 30
+frames, mismas 31 lineas de numeros en las dos plataformas.
+
+
+8. QUE QUEDA (declarado, no escondido)
+--------------------------------------
+
+  - `panic: assets: bmp.Decode failed: gzip: invalid header`, de `d2common/d2util/assets.CreateTextImage`
+    sobre el `CompressedDebugText` EMBEBIDO: es el `compress/gzip` de la consola sobre la zlib de KOS.
+    Es la tarjeta DC-002.20, ya abierta con este defecto medido, y el control 5 de este corpus se pone
+    ROJO el dia que se arregle (a proposito).
+  - Los MPQ del romdisk estan VACIOS: la LECTURA de los datos del juego (disco o horneado) no entra en
+    esta tarjeta.
+  - El audio (AICA) sigue sin conectar.
+  - `os.Getenv` de la consola sigue siendo un stub: no se toco, porque el arranque ya no lo necesita para
+    la seleccion. Queda como defecto conocido del paquete (el motor lo usa para `OD2_SETUP_AUTOPICK` y
+    `OD2_NO_SETUP`, que en la consola no aplican).
