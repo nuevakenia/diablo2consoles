@@ -45,7 +45,11 @@ func Load(data []byte) (*PL2, error) {
 	}
 
 	result := &PL2{}
-	destino := unsafe.Slice((*byte)(unsafe.Pointer(result)), largo)
+	// OJO, ACA NO SE PUEDE USAR unsafe.Slice: el go.mod del repo dice go 1.16, y unsafe.Slice existe recien
+	// en go 1.17. Con unsafe.Slice, el compilador del HOST (el que hornea los assets, go build ./console/dc/bake)
+	// rechaza el paquete entero con "unsafe.Slice requires go1.17 or later" y el horneado de assets no corre.
+	// La forma de antes es la misma cosa: un puntero al arreglo, recortado al largo pedido.
+	destino := (*[1 << 30]byte)(unsafe.Pointer(result))[:largo:largo]
 	copy(destino, data[:largo])
 
 	return result, nil
@@ -54,7 +58,7 @@ func Load(data []byte) (*PL2, error) {
 // Marshal arma los bytes del pl2 (lo inverso de Load).
 func (p *PL2) Marshal() []byte {
 	largo := int(unsafe.Sizeof(PL2{}))
-	origen := unsafe.Slice((*byte)(unsafe.Pointer(p)), largo)
+	origen := (*[1 << 30]byte)(unsafe.Pointer(p))[:largo:largo]
 
 	salida := make([]byte, largo)
 	copy(salida, origen)

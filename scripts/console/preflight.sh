@@ -2,11 +2,24 @@
 # preflight.sh -- muestra TODOS los errores de un paquete del motor de una sola vez.
 #
 # POR QUE EXISTE: compilar el motor entero tarda minutos y gccgo se detiene en el PRIMER error, asi que el
-# ciclo natural es "arreglo un simbolo, espero 4 minutos, aparece el siguiente". Con -fmax-errors y
-# -fsyntax-only el compilador tira TODOS los errores del paquete de una vez y en segundos, asi que se
-# arreglan todos juntos.
+# ciclo natural es "arreglo un simbolo, espero 4 minutos, aparece el siguiente". Con -fmax-errors el
+# compilador tira TODOS los errores del paquete de una vez y en segundos, asi que se arreglan todos juntos.
 #
 # MEDIDO: d2render/ebiten paso de 4 minutos por simbolo a 6 simbolos en 8 segundos.
+#
+# OJO, ACA HABIA UN DEFECTO GRAVE (medido y arreglado): esto compilaba con -fsyntax-only, y GCCGO SE CAE con
+# -fsyntax-only en cuanto el paquete tiene un struct con un campo que es un slice ([]uint8 y compania):
+#
+#   internal compiler error: in fill_in_array, at go/go-gcc.cc:1184
+#
+# SIN DECIR NADA DEL CODIGO. O sea que la herramienta para saber "que le falta a este paquete" contestaba
+# "no compila" con un defecto del compilador, y el que la usaba se ponia a buscar un simbolo que no faltaba.
+# Medido con un paquete de 6 lineas (`type T struct { p []uint8 }`): con -fsyntax-only, el ICE; con -c,
+# compila y sale un .o de 10.828 bytes.
+#
+# POR ESO AHORA COMPILA DE VERDAD (-c a un archivo temporal). Es un poco mas lento, pero un numero que
+# miente no sirve de nada. Y si aparece el ICE igual, se avisa como defecto del compilador y NO como error
+# del paquete: son dos cosas distintas y confundirlas cuesta horas.
 #
 # Uso:  scripts/console/preflight.sh <paquete>      (ej: d2core/d2render/ebiten)
 #       scripts/console/preflight.sh --todos        (todos los que todavia no compilan)
@@ -41,11 +54,16 @@ un_paquete() {
     fi
     echo "=== $p ==="
     # shellcheck disable=SC2086
-    (cd "$REPO/$p" && sh-elf-gccgo $GODC_GOFLAGS -I "$GEN" -fgo-pkgpath="$PREFIJO/$p" \
-        -fmax-errors=200 -fsyntax-only $srcs 2>&1) |
-        grep -E 'error:' |
-        sed "s|$REPO/||" |
-        head -60
+    salida="$(cd "$REPO/$p" && sh-elf-gccgo $GODC_GOFLAGS -I "$GEN" -fgo-pkgpath="$PREFIJO/$p" \
+        -fmax-errors=200 -c $srcs -o "$GEN/$PREFIJO/$p.preflight.o" 2>&1)"
+
+    # el ICE del compilador NO es un error del paquete: se dice aparte, con el nombre que tiene
+    if echo "$salida" | grep -q 'internal compiler error'; then
+        echo "$p: DEFECTO DEL COMPILADOR (no del codigo): $(echo "$salida" | grep -m1 'internal compiler error')"
+        return 0
+    fi
+
+    echo "$salida" | grep -E 'error:' | sed "s|$REPO/||" | head -60
 }
 
 if [ "${1:-}" = "--todos" ]; then

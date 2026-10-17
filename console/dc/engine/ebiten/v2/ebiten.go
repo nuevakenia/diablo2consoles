@@ -169,9 +169,8 @@ func (i *Image) SubImage(r image.Rectangle) image.Image {
 	return nueva
 }
 
-// DrawImage: el metodo con el que el motor dibuja (target.DrawImage(s, op)). Src es *Image (el motor
-// pasa lo que le devolvio la asercion de SubImage).
-func (i *Image) DrawImage(src *Image, op *DrawImageOptions) { Dibujos++ }
+// DrawImage (el metodo) y su contador estan en dibujo.go: es el dibujado de verdad (la matriz inversa, el
+// recorte, el color y el modo de composicion). Aca estaba el stub que solo contaba.
 
 // ================================================================ colores y opciones
 
@@ -645,14 +644,6 @@ var pantalla = NewImage(640, 480)
 // Screen devuelve el lienzo de la consola.
 func Screen() *Image { return pantalla }
 
-// DrawImage dibuja src en dst con las opciones. Aca se deja registrado (contando) para poder medir que
-// el motor realmente esta pidiendo dibujar; el pintado con el PVR entra con el backend.
-var Dibujos int
-
-func DrawImage(dst, src *Image, op *DrawImageOptions) {
-	Dibujos++
-}
-
 // DrawTriangles: dibuja triangulos. Es lo que usa el motor para las superficies con textura
 // (d2render/ebiten/ebiten_surface.go:610).
 //
@@ -869,15 +860,35 @@ func RunGame(g Game) error {
 	}
 	pantalla := NewImage(ancho, alto)
 
-	kos.PvrInitDefaults()
+	// el video: 640x480 en RGB565, y la textura de la pantalla en la VRAM. Si esto falla se devuelve el
+	// error y no se entra al loop: seguir dibujando en memoria daria una pantalla negra, que desde afuera
+	// se ve igual que "el juego anda pero no dibuja".
+	if err := IniciarPantalla(ancho, alto); err != nil {
+		return err
+	}
 	kos.PvrSetBgColor(0, 0, 0)
 
+	// OJO: los tres primeros cuadros se anuncian en la consola serie. Es a proposito y se queda: si el
+	// loop se cuelga, lo que se ve desde afuera es "la pantalla muestra algo y la consola no dice mas
+	// nada", que es indistinguible de "anda bien". Con el anuncio, el ultimo mensaje dice exactamente en
+	// que paso se quedo.
+	cuadros := 0
+
 	for {
+		if cuadros < 3 {
+			println("EBITEN-LOOP cuadro", cuadros, "esperando el cuadro del PVR")
+		}
+
 		// el cuadro lo marca el PVR: PvrWaitReady espera a que el anterior haya terminado (es la
 		// sincronizacion con la pantalla; sin esto se dibujaria encima del cuadro que se esta mostrando)
 		kos.PvrWaitReady()
+
+		if cuadros < 3 {
+			println("EBITEN-LOOP cuadro", cuadros, "el PVR dio el cuadro, abro la lista")
+		}
+
 		kos.PvrSceneBegin()
-		kos.PvrListBegin(kos.PVR_LIST_TR_POLY)
+		kos.PvrListBegin(kos.PVR_LIST_OP_POLY)
 
 		// el estado del input del cuadro anterior pasa a ser "el anterior" (para las teclas que se
 		// acaban de soltar)
@@ -889,10 +900,53 @@ func RunGame(g Game) error {
 			return err
 		}
 
+		t0 := d2cPvrUs()
 		g.Draw(pantalla)
+		t1 := d2cPvrUs()
+
+		if cuadros < 3 {
+			println("EBITEN-LOOP cuadro", cuadros, "dibujado, subo el cuadro a la VRAM")
+		}
+
+		// el cuadro del motor a la VRAM, y a la pantalla (los dos pasos, medidos por separado)
+		if err := ConvertirPantalla(pantalla); err != nil {
+			kos.PvrListFinish()
+			kos.PvrSceneFinish()
+			return err
+		}
+		t2 := d2cPvrUs()
+		if err := SubirVram(); err != nil {
+			kos.PvrListFinish()
+			kos.PvrSceneFinish()
+			return err
+		}
+		t3 := d2cPvrUs()
+		PintarPantalla()
+		t4 := d2cPvrUs()
+
+		// el cuadro 11 (ya con todo caliente) se mide por dentro: cuanto tarda DIBUJAR, cuanto CONVERTIR,
+		// cuanto SUBIR a la VRAM y cuanto PINTAR. Son las partes de un cuadro y saber cual se lleva el
+		// tiempo es lo unico que permite decir por que el juego va a los cuadros por segundo que va.
+		if cuadros == 11 {
+			println("EBITEN-PERFIL dibujar_us", int(t1-t0), "convertir_us", int(t2-t1),
+				"subir_us", int(t3-t2), "pintar_us", int(t4-t3), "cuadro_us", int(t4-t0))
+		}
+
+		if cuadros < 3 {
+			println("EBITEN-LOOP cuadro", cuadros, "listo")
+		}
 
 		kos.PvrListFinish()
 		kos.PvrSceneFinish()
+
+		// cada 60 cuadros (un segundo) el backend deja constancia de que sigue vivo. Si la aplicacion
+		// deja de imprimir pero esto sigue, el problema es de la aplicacion; si esto tambien se corta,
+		// el loop se cuelga y hay que buscar aca.
+		if cuadros > 0 && cuadros%300 == 0 {
+			println("EBITEN-LOOP, cuadros", cuadros, "huella", int(pantalla.Huella()), "dibujos", Dibujos)
+		}
+
+		cuadros++
 	}
 }
 

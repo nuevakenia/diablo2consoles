@@ -98,6 +98,13 @@ compilar_tercero() {
     if sh-elf-gccgo $GODC_GOFLAGS -I "$GOX_TERCEROS" -fgo-pkgpath="$pkgpath" -c "${archivos[@]}" -o "$salida" 2>"$salida.log"; then
         echo "  ${pkgpath##*/}.gox  $(stat -c%s "$salida") bytes  (${#archivos[@]} archivo(s))"
         rm -f "$salida.log"
+        # Y AL ORDEN DE ENLACE. Esto faltaba, y era un defecto que no se veia: los terceros se compilaban
+        # (quedaban como .gox) pero NO entraban a orden.txt, que es la unica lista que build-dc.sh usa para
+        # pasarle objetos al enlazador. Un POC que usara ebiten compilaba y despues moria en el enlace con
+        # "undefined reference to ...ebiten_1v2.RunGame": como si el paquete no existiera, cuando existia y
+        # estaba compilado. Se ve recien cuando un POC usa un tercero -- o sea, justo ahora que el motor
+        # grafico entra en juego.
+        echo "$salida" >> "$GOX_TERCEROS/orden.txt"
     else
         echo "  ERROR en $pkgpath:"
         head -4 "$salida.log"

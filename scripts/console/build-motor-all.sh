@@ -54,9 +54,18 @@ for CAPA in $(seq 1 20); do
         fi
     done
     echo "capa $CAPA: compilados $OK de $TOTAL"
-    [ -z "${FALLARON// /}" ] && break
+
+    # OJO CON EL ORDEN, QUE ESTABA MAL: PENDIENTES guarda lo que FALTA y ANTERIOR lo de la vuelta previa.
+    # El `break` salia ANTES de guardar los que fallaron, asi que el resumen de abajo informaba la lista de
+    # la vuelta ANTERIOR: con el motor completo decia "bloqueados: 1" (el que quedaba en la lista vieja) en
+    # vez de 0. Un numero de cierre que habla de otro momento es peor que no tenerlo.
+    ANTERIOR="$PENDIENTES"
+    PENDIENTES="$FALLARON"
+
+    [ -z "${PENDIENTES// /}" ] && break
+
     # si una capa no desbloqueo nada, seguir no sirve: se corta y se reporta lo que falta
-    [ "$FALLARON" = "$PENDIENTES" ] && {
+    [ -n "${ANTERIOR// /}" ] && [ "$PENDIENTES" = "$ANTERIOR" ] && {
         echo "capa $CAPA: no se desbloqueo nada nuevo, corto aca"
         break
     }
