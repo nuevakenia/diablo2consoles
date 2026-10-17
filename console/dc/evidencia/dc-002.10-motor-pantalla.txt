@@ -1,0 +1,38 @@
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+MOTOR-PANTALLA arranca (DC-002.10: el cuadro del motor en la consola)
+MOTOR-PANTALLA runtime dreamcast sh4
+MOTOR-PANTALLA asset 256 x 256
+MOTOR-PANTALLA imagen del motor armada, bytes de RGBA 262144
+pvr: enabling vertical scaling for non-VGA
+MOTOR-PANTALLA la pantalla del juego ocupa en la VRAM, bytes 1048576
+EBITEN-LOOP cuadro 0 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 0 el PVR dio el cuadro, abro la lista
+EBITEN-LOOP cuadro 0 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 0 listo
+EBITEN-LOOP cuadro 1 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 1 el PVR dio el cuadro, abro la lista
+EBITEN-LOOP cuadro 1 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 1 listo
+EBITEN-LOOP cuadro 2 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 2 el PVR dio el cuadro, abro la lista
+EBITEN-LOOP cuadro 2 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 2 listo
+EBITEN-LOOP, cuadros 10 huella 854551148 dibujos 11
+EBITEN-PERFIL dibujar_us 27376 convertir_us 47807 subir_us 2624 pintar_us 3 cuadro_us 77810
+EBITEN-LOOP, cuadros 20 huella -408507456 dibujos 21
+EBITEN-LOOP, cuadros 30 huella -1389717228 dibujos 31
+EBITEN-LOOP, cuadros 40 huella -1462816152 dibujos 41
+EBITEN-LOOP, cuadros 50 huella -1410828356 dibujos 51
+MOTOR-PANTALLA cuadros 60 x 180 vueltas 0 dibujos 59 huella -1555472384
+EBITEN-LOOP, cuadros 60 huella 868903184 dibujos 61
+EBITEN-LOOP, cuadros 70 huella 1774782052 dibujos 71
+EBITEN-LOOP, cuadros 80 huella 590892984 dibujos 81
+EBITEN-LOOP, cuadros 90 huella -512998132 dibujos 91
+EBITEN-LOOP, cuadros 100 huella -776411552 dibujos 101
+EBITEN-LOOP, cuadros 110 huella -848153676 dibujos 111
+MOTOR-PANTALLA cuadros 120 x 360 vueltas 0 dibujos 119 huella -1555472384
+EBITEN-LOOP, cuadros 120 huella 1508650248 dibujos 121
+EBITEN-LOOP, cuadros 130 huella -1476547200 dibujos 131
+EBITEN-LOOP, cuadros 140 huella -1166699037 dibujos 141
+EBITEN-LOOP, cuadros 150 huella 172239000 dibujos 151
+EBITEN-LOOP, cuadros 160 huella -1694571616 dibujos 161
