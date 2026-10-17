@@ -21,6 +21,8 @@ import (
 	"image"
 	"image/color"
 	"math"
+
+	"kos"
 )
 
 // ================================================================ imagenes
@@ -461,18 +463,160 @@ type DrawImageOptions struct {
 	DisableMipmaps   bool
 }
 
-// GeoM: la matriz de geometria.
-type GeoM struct{ guardada bool }
+// GeoM: la matriz de geometria (donde y como se dibuja una imagen: la posicion, el tamano, el giro y la
+// inclinacion). Es lo que hace que un sprite se mueva por la pantalla.
+//
+// ES LA CUENTA DE VERDAD, no una marca de "hubo cambio". Los campos y las cuentas estan COPIADOS de
+// ebiten v2.0.2 (geom.go:28), incluido el detalle de guardar a-1 y d-1 (que es una optimizacion de
+// Ebitengine: la identidad queda en ceros). El orden importa: `Apply` calcula (a*x + b*y + tx,
+// c*x + d*y + ty), y si los campos se leyeran al reves, todo apareceria espejado.
+type GeoM struct {
+	a1 float64 // el 'a' de verdad menos 1
+	b  float64
+	c  float64
+	d1 float64 // el 'd' de verdad menos 1
+	tx float64
+	ty float64
+}
 
-// Translate / Scale / Rotate: las que arma el motor.
-func (g *GeoM) Translate(x, y float64) { g.guardada = true }
-func (g *GeoM) Scale(x, y float64)     { g.guardada = true }
-func (g *GeoM) Rotate(t float64)       { g.guardada = true }
-// Skew: inclina la figura. MEDIDO en ebiten v2.0.2 (geom.go:149): Skew(skewX, skewY float64). Lo pide
-// d2core/d2render/ebiten/ebiten_surface.go:347.
-func (g *GeoM) Skew(x, y float64)       { g.guardada = true }
-func (g *GeoM) Reset()                 { g.guardada = false }
-func (g *GeoM) ResetGeoM()             { g.guardada = false }
+// Reset: vuelve a la identidad (que en esta forma son todos ceros).
+func (g *GeoM) Reset() {
+	g.a1, g.b, g.c, g.d1, g.tx, g.ty = 0, 0, 0, 0, 0, 0
+}
+
+// ResetGeoM: el mismo nombre que usa Ebitengine cuando quiere aclarar que resetea la geometria y no otra
+// cosa.
+func (g *GeoM) ResetGeoM() { g.Reset() }
+
+// Apply: donde cae el punto (x, y) despues de la transformacion. MEDIDO (geom.go:55):
+// (a*x + b*y + tx, c*x + d*y + ty). Lo pide d2core/d2render/ebiten/ebiten_surface.go:597.
+func (g *GeoM) Apply(x, y float64) (float64, float64) {
+	return (g.a1+1)*x + g.b*y + g.tx, g.c*x + (g.d1+1)*y + g.ty
+}
+
+// Element: un numero de la matriz, en la posicion (fila, columna). MEDIDO (geom.go:64).
+func (g *GeoM) Element(i, j int) float64 {
+	switch {
+	case i == 0 && j == 0:
+		return g.a1 + 1
+	case i == 0 && j == 1:
+		return g.b
+	case i == 0 && j == 2:
+		return g.tx
+	case i == 1 && j == 0:
+		return g.c
+	case i == 1 && j == 1:
+		return g.d1 + 1
+	case i == 1 && j == 2:
+		return g.ty
+	}
+	return 0
+}
+
+// SetElement: escribe un numero de la matriz (los que no existen se ignoran).
+func (g *GeoM) SetElement(i, j int, v float64) {
+	switch {
+	case i == 0 && j == 0:
+		g.a1 = v - 1
+	case i == 0 && j == 1:
+		g.b = v
+	case i == 0 && j == 2:
+		g.tx = v
+	case i == 1 && j == 0:
+		g.c = v
+	case i == 1 && j == 1:
+		g.d1 = v - 1
+	case i == 1 && j == 2:
+		g.ty = v
+	}
+}
+
+// Translate: mueve (es lo que hace caminar a un sprite por la pantalla).
+func (g *GeoM) Translate(tx, ty float64) {
+	g.tx += tx
+	g.ty += ty
+}
+
+// Scale: agranda o achica.
+func (g *GeoM) Scale(x, y float64) {
+	a := (g.a1 + 1) * x
+	b := g.b * x
+	tx := g.tx * x
+	c := g.c * y
+	d := (g.d1 + 1) * y
+	ty := g.ty * y
+
+	g.a1, g.b, g.c, g.d1, g.tx, g.ty = a-1, b, c, d-1, tx, ty
+}
+
+// Rotate: gira (en radianes). MEDIDO (geom.go:126).
+func (g *GeoM) Rotate(theta float64) {
+	if theta == 0 {
+		return
+	}
+
+	seno, coseno := math.Sincos(theta)
+
+	a := coseno*(g.a1+1) - seno*g.c
+	b := coseno*g.b - seno*(g.d1+1)
+	tx := coseno*g.tx - seno*g.ty
+	c := seno*(g.a1+1) + coseno*g.c
+	d := seno*g.b + coseno*(g.d1+1)
+	ty := seno*g.tx + coseno*g.ty
+
+	g.a1, g.b, g.c, g.d1, g.tx, g.ty = a-1, b, c, d-1, tx, ty
+}
+
+// Skew: inclina (en radianes). MEDIDO (geom.go:149). Lo pide d2render/ebiten/ebiten_surface.go:347.
+func (g *GeoM) Skew(skewX, skewY float64) {
+	sx := math.Tan(skewX)
+	sy := math.Tan(skewY)
+
+	a := (g.a1 + 1) + g.c*sx
+	b := g.b + (g.d1+1)*sx
+	c := (g.a1+1)*sy + g.c
+	d := g.b*sy + (g.d1 + 1)
+	tx := g.tx + g.ty*sx
+	ty := g.ty + g.tx*sy
+
+	g.a1, g.b, g.c, g.d1, g.tx, g.ty = a-1, b, c, d-1, tx, ty
+}
+
+// Concat: pega otra transformacion despues de esta (medido en geom.go:85).
+func (g *GeoM) Concat(otra GeoM) {
+	a := (otra.a1+1)*(g.a1+1) + otra.b*g.c
+	b := (otra.a1+1)*g.b + otra.b*(g.d1+1)
+	tx := (otra.a1+1)*g.tx + otra.b*g.ty + otra.tx
+	c := otra.c*(g.a1+1) + (otra.d1+1)*g.c
+	d := otra.c*g.b + (otra.d1+1)*(g.d1+1)
+	ty := otra.c*g.tx + (otra.d1+1)*g.ty + otra.ty
+
+	g.a1, g.b, g.c, g.d1, g.tx, g.ty = a-1, b, c, d-1, tx, ty
+}
+
+// IsInvertible: si se puede dar vuelta (si el determinante no es cero).
+func (g *GeoM) IsInvertible() bool {
+	return math.Abs((g.a1+1)*(g.d1+1)-g.b*g.c) > 1e-12
+}
+
+// Invert: da vuelta la transformacion (para saber que pixel de la imagen corresponde a un punto de la
+// pantalla: asi se resuelve "el jugador hizo clic aca"). Si no se puede, no se toca nada.
+func (g *GeoM) Invert() {
+	det := (g.a1+1)*(g.d1+1) - g.b*g.c
+	if math.Abs(det) <= 1e-12 {
+		return
+	}
+
+	a := (g.d1 + 1) / det
+	b := -g.b / det
+	c := -g.c / det
+	d := (g.a1 + 1) / det
+	// el desplazamiento invertido: -inversa * traslacion
+	tx := -(a*g.tx + b*g.ty)
+	ty := -(c*g.tx + d*g.ty)
+
+	g.a1, g.b, g.c, g.d1, g.tx, g.ty = a-1, b, c, d-1, tx, ty
+}
 
 // CompositeMode: como se mezcla lo dibujado con lo que habia.
 type CompositeMode int
@@ -703,10 +847,53 @@ type Game interface {
 	Layout(ancho, alto int) (int, int)
 }
 
-// RunGame arranca el loop. Aca el loop es de la consola: KOS da los cuadros y quien lo llame tiene que
-// ceder con el resto del sistema (asi ya corre el resto de los POCs).
-func RunGame(g Game, ancho, alto int) error {
-	return nil
+// RunGame: el loop principal. Es la parte que hace CORRER al juego: por cada cuadro actualiza el estado
+// (Update) y dibuja (Draw), y el cuadro se lo lleva el PVR.
+//
+// LA FIRMA ES LA DE EBITEN y estaba mal: RunGame(game Game), con UN solo argumento (medido en ebiten
+// v2.0.2, run.go:162). Aca pedia tambien el ancho y el alto, y el motor no compilaba por eso. El tamano no
+// se pasa: se le pregunta a la propia aplicacion con Layout, que es como lo hace Ebitengine.
+//
+// EL ORDEN DE UN CUADRO (esto es lo que hay que hacer bien): se espera al cuadro con PvrWaitReady, se
+// toma el estado del input que dejo el cuadro anterior (CerrarCuadro, que es lo que permite saber que una
+// tecla "se acaba de apretar"), se actualiza, se dibuja, y se cierra la lista del PVR.
+//
+// LO QUE FALTA (y es el tramo que sigue, no un olvido): subir la imagen de la pantalla a la VRAM del PVR.
+// Hoy el dibujado llena la imagen en memoria y el PVR no la ve; engancharlo es el paso "el motor pinta".
+// Ya esta probado aparte que el PVR pinta (el POC motor-pvr lo hace con el mismo KOS que se usa aca).
+func RunGame(g Game) error {
+	// el tamano lo pide la aplicacion, como en Ebitengine
+	ancho, alto := g.Layout(640, 480)
+	if ancho <= 0 || alto <= 0 {
+		ancho, alto = 640, 480
+	}
+	pantalla := NewImage(ancho, alto)
+
+	kos.PvrInitDefaults()
+	kos.PvrSetBgColor(0, 0, 0)
+
+	for {
+		// el cuadro lo marca el PVR: PvrWaitReady espera a que el anterior haya terminado (es la
+		// sincronizacion con la pantalla; sin esto se dibujaria encima del cuadro que se esta mostrando)
+		kos.PvrWaitReady()
+		kos.PvrSceneBegin()
+		kos.PvrListBegin(kos.PVR_LIST_TR_POLY)
+
+		// el estado del input del cuadro anterior pasa a ser "el anterior" (para las teclas que se
+		// acaban de soltar)
+		CerrarCuadro()
+
+		if err := g.Update(); err != nil {
+			kos.PvrListFinish()
+			kos.PvrSceneFinish()
+			return err
+		}
+
+		g.Draw(pantalla)
+
+		kos.PvrListFinish()
+		kos.PvrSceneFinish()
+	}
 }
 
 // SetScreenSize: el tamano de la ventana. En la consola es fijo (640x480, lo que da el PVR).

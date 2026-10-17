@@ -34,7 +34,7 @@ GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 # de los cambios de esta tarjeta, y el que vigila la alineacion es scripts/console/mutar-tipos-os.sh.
 # Lo que SI se agrego aca (DC-002.8a): los imports de los paquetes de d2std van como "d2std/..." y no
 # con el nombre desnudo; el que lo exige es scripts/console/checar-imports-d2std.sh.
-ORDEN="${ORDEN:-unicode unicode/utf8 unicode/utf16 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv crypto/sha256 encoding/json encoding/binary encoding/hex compress/zlib compress/gzip container/ring sort container/heap image/color image image/draw image/png image/gif regexp time io/fs embed os os/user os/exec os/signal syscall log bufio flag encoding/csv io/ioutil path/filepath runtime runtime/pprof sync/atomic sync context net}"
+ORDEN="${ORDEN:-unicode unicode/utf8 unicode/utf16 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv hash/crc32 crypto/sha256 encoding/json encoding/binary encoding/hex compress/zlib compress/gzip container/ring sort container/heap image/color image image/draw image/png image/gif regexp time io/fs embed os os/user os/exec os/signal syscall log bufio flag encoding/csv io/ioutil path/filepath runtime runtime/pprof sync/atomic sync context net}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2
@@ -124,6 +124,15 @@ compilar_tercero "github.com/hajimehoshi/ebiten/v2/audio/wav" "$HERE/../../conso
 # pkg/profile: el perfilador de CPU/memoria (d2app). Es un stub: un perfil se escribe a un archivo, y en
 # la consola no se puede escribir (romdisk de solo lectura). Para medir tiempos ya esta la consola serie.
 compilar_tercero "github.com/pkg/profile" "$HERE/../../console/dc/engine/pkg/profile"
+# otto: el interprete de JavaScript (d2script y d2networking/d2server). Es un stub DECLARADO: el scripting
+# no es parte del juego de un jugador, y un interprete de JavaScript entero es otro trabajo (el camino, el
+# dia que haga falta, es compilar otto tal cual, que es Go puro). Y ojo: d2server importa otto, asi que sin
+# esto NO compila d2networking, y sin d2networking no compila d2app: el juego entero.
+compilar_tercero "github.com/robertkrimen/otto" "$HERE/../../console/dc/engine/otto"
+# otto/underscore: el agregado de underscore.js. d2script lo importa con un guion bajo, o sea que el solo
+# hecho de importarlo es el uso (registraria las funciones al arrancar el interprete). Sin interprete no
+# tiene nada adentro, y esta dicho por que.
+compilar_tercero "github.com/robertkrimen/otto/underscore" "$HERE/../../console/dc/engine/otto/underscore"
 # google/uuid: los identificadores de las entidades del mapa (d2mapentity/factory.go). Medido: solo se
 # usa uuid.New.
 compilar_tercero "github.com/google/uuid" "$HERE/../../console/dc/engine/uuid"

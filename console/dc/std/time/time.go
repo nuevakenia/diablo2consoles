@@ -266,11 +266,27 @@ func NewTimer(d Duration) *Timer {
 
 // NewTicker: el que dispara cada d.
 type Ticker struct {
-	C <-chan Time
+	C      <-chan Time
+	parado bool
 }
 
 func NewTicker(d Duration) *Ticker {
 	return &Ticker{C: Tick(d)}
+}
+
+// Stop: para el tic. Lo pide d2networking (d2server/hitqueue.go:180 y d2realm/gameplay.go:35), que arma un
+// tic para vaciar las listas de golpes cada tanto y lo corta al terminar.
+//
+// OJO CON LO QUE ESTE Stop NO HACE, y esta declarado a proposito: NO corta el canal del tic. El canal lo
+// produce Tick(), que es una goroutine que ya quedo andando, y cortarla pidiendo que termine necesita que
+// el bucle de Tick mire una senal de corte. Lo que si hace es dejar de entregar valores, que es lo que
+// evita que un bucle que ya no importa siga despertando.
+func (t *Ticker) Stop() {
+	if t == nil {
+		return
+	}
+	t.parado = true
+	t.C = nil
 }
 
 // ---------------------------------------------------------------- fechas

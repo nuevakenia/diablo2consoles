@@ -267,3 +267,10 @@ func Ldexp(frac float64, exp int) float64 {
 func Sincos(x float64) (float64, float64) {
 	return Sin(x), Cos(x)
 }
+
+// Tan: la tangente. Se calcula como seno sobre coseno.
+//
+// OJO CON UN CASO: cerca de pi/2 el coseno se hace muy chico y el resultado se va al infinito (o da NaN
+// justo en pi/2). Es el comportamiento del calculo, no un defecto: si el motor inclina una figura
+// exactamente 90 grados, la tangente no existe. Lo pide el Skew de la matriz de geometria.
+func Tan(x float64) float64 { return Sin(x) / Cos(x) }
