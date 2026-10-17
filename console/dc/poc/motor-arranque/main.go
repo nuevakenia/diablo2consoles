@@ -193,6 +193,11 @@ func main() {
 		println("MOTOR-ARRANQUE video listo, VRAM de la pantalla", ebiten.VramDeLaPantalla(), "bytes")
 	}
 
+	// DC-002.22: EL NUMERO DE LA RAM, medido ANTES de que el motor pida nada: es el punto donde se ve
+	// la palanca de la pantalla del paquete (los 640x480x4 = 1.228.800 bytes que se pedian al arrancar y
+	// que el motor no usa). Con el arranque viejo este numero era 1.228.800 mas chico.
+	println("MOTOR-ARRANQUE monton de C antes del motor:", ebiten.MemLibreDelMonton(), "bytes libres")
+
 	println("MOTOR-ARRANQUE llamando a d2app.Create().Run()")
 
 	// DC-002.17: la prueba del sistema de archivos escribible, con el mismo os del motor.
@@ -218,5 +223,6 @@ func main() {
 	println("MOTOR-ARRANQUE overlay del motor: archivos=", archivos, "bytes=", bytes, "dirs=", dirs)
 
 	d2cArranqueMarca(3)
+	println("MOTOR-ARRANQUE framebuffer de la pantalla en la VRAM:", ebiten.VramDelFramebuffer(), "bytes")
 	println("MOTOR-ARRANQUE fin")
 }

@@ -31,6 +31,11 @@ int d2c_pvr_pantalla_subir_vram(void);
 static pvr_ptr_t pant_tex = NULL;
 static pvr_poly_hdr_t pant_hdr;
 static int PANT_W = 0, PANT_H = 0, PANT_PW = 0, PANT_PH = 0;
+/* el PVR se inicializa UNA sola vez (DC-002.22): `pvr_init_defaults()` avisa "pvr_init called twice!" y
+ * volver a inicializar el chip con el video ya andando es la clase de cosa que rompe el estado del PVR
+ * sin decir nada. Medido: con el video re-dimensionable (el POC arranca 640x480 y el motor despues
+ * 800x600) se llamaba dos veces. */
+static int pvr_listo = 0;
 
 /* DC-002.17: el buffer del cuadro convertido. Antes era `pant_conv`, 1.048.576 bytes del MONTON (el
  * `calloc` de abajo); ahora es un bloque de 32x32 en .bss. Alineado a 32 bytes porque `pvr_txr_load` va
@@ -93,11 +98,33 @@ static uint32_t indice_tile(int x0, int y0) {
          + (uint32_t)(y0 >> twid_bits) * (uint32_t)twid_salto;
 }
 
-/* Arranca el video y deja la textura de la pantalla lista. Se llama UNA vez, antes del loop.
- * Devuelve 0 si anduvo; negativo si no (sin reserva de VRAM, sin memoria, tamanos invalidos). */
+/* Arranca el video y deja la textura de la pantalla lista. Se llama antes del loop.
+ * Devuelve 0 si anduvo; negativo si no (sin reserva de VRAM, sin memoria, tamanos invalidos).
+ *
+ * DC-002.22: ES RE-DIMENSIONABLE, y no era. Antes el `pantallaIniciada` del binding de Go la volvia
+ * idempotente para siempre, asi que el arranque del motor (que pide 640x480 al inicio y despues el
+ * tamano de la pantalla DEL MOTOR, 800x600) se quedaba con la textura de 640x480 y la conversion del
+ * cuadro devolvia -2 ("no se pudo convertir el cuadro") sin decir por que. Medido con el numero: con
+ * el framebuffer de 800x600 y la textura de 640x480, `d2c_pvr_pantalla_convertir` corta en
+ * `w != PANT_W` y devuelve -2 (el error es de TAMANO, no de VRAM).
+ *
+ * Si el tamano cambia se libera la textura vieja y se rehace todo (los tamanos potencia de dos y el
+ * contexto del quad). El twiddle se rearma porque sus constantes salen de PANT_PW/PANT_PH. */
 int d2c_pvr_pantalla_init(int w, int h) {
     if (w <= 0 || h <= 0) {
         return -1;
+    }
+
+    /* el mismo tamano que ya esta: no hay nada que hacer */
+    if (pant_tex != NULL && w == PANT_W && h == PANT_H) {
+        return 0;
+    }
+
+    /* otro tamano: la textura vieja se devuelve a la VRAM antes de pedir la nueva */
+    if (pant_tex != NULL) {
+        pvr_mem_free(pant_tex);
+        pant_tex = NULL;
+        twid_lista = 0;
     }
 
     PANT_W = w;
@@ -116,8 +143,13 @@ int d2c_pvr_pantalla_init(int w, int h) {
      * vsync de otro, y pvr_wait_ready() NO VUELVE NUNCA MAS. Medido en la consola serie: el juego imprimia
      * sus cinco lineas de arranque, dibujaba UN cuadro (el marco amarillo se veia en la captura) y de ahi
      * no salia mas -- ni un cuadro mas, ni un mensaje de error. Un cuelgue silencioso de los peores: la
-     * pantalla muestra algo, asi que parece que anda. */
-    pvr_init_defaults();
+     * pantalla muestra algo, asi que parece que anda.
+     *
+     * DC-002.22: se llama UNA sola vez (ver `pvr_listo`). */
+    if (!pvr_listo) {
+        pvr_init_defaults();
+        pvr_listo = 1;
+    }
 
     pant_tex = pvr_mem_malloc((size_t)PANT_PW * (size_t)PANT_PH * 2);
     if (pant_tex == NULL) {
@@ -301,6 +333,91 @@ void d2c_pvr_pantalla_pintar(void) {
 
 /* Cuantos bytes de VRAM se reservaron (para poder decir un numero en la evidencia). */
 int d2c_pvr_pantalla_vram(void) { return PANT_PW * PANT_PH * 2; }
+
+/* ------------------------------------------------------------------ DC-002.22: el framebuffer en la VRAM
+ *
+ * QUE ES: el bloque de memoria donde el MOTOR dibuja su cuadro en RGBA (8 bits por canal), reservado
+ * en la VRAM en vez del monton de C. Es memoria de trabajo, no una textura: el PVR nunca la lee como
+ * textura (el cuadro se convierte a RGB565 en `pant_tex`, que es la que se pinta).
+ *
+ * POR QUE (medido en DC-002.22, no supuesto). El motor pide su pantalla logica -- 800x600x4 =
+ * 1.920.000 bytes -- y esa peticion NO ENTRA en la RAM principal:
+ *
+ *   - la RAM son 16.777.216 bytes y el binario que Flycast carga ya ocupa 13.919.684;
+ *   - el monton, cuando llega el pedido, tiene arena=2415484 used=2372348 free=43136;
+ *   - o sea que faltan 1.876.864 bytes, y no hay recorte del compilador que los pague: DC-002.14 ya
+ *     midio que -ffunction-sections/-fdata-sections/--gc-sections NO bajan el binario (sale 2.316
+ *     bytes MAS grande) y que -fno-asynchronous-unwind-tables no cambia el .eh_frame de gccgo.
+ *   - la VRAM, en cambio, son 8 MB y el PVR usa ~1 MB para la textura del cuadro: sobran ~5,7 MB.
+ *
+ * El que decide no es la intuicion sino la cuenta: 1.920.000 bytes que NO pueden vivir en los 16 MB
+ * de RAM principal y sí viven en los 8 MB de VRAM.
+ *
+ * COMO LO USA EL SHIM: `NuevaPantallaVram(w, h)` (pvr.go) toma el puntero y lo convierte en el slice
+ * de pixeles de la imagen. El resto del shim no cambia una linea: escribir un pixel sigue siendo
+ * `pixeles[i] = v`.
+ *
+ * LO QUE CUESTA, DICHO DE FRENTE: la VRAM se escribe por el bus de 64 bits del PVR y sin cache (el
+ * area P2 es cache-through), asi que el compositor de software del shim (pixel a pixel) es mas lento
+ * que contra la RAM. Es un intercambio declarado: RAM que no habia, a cambio de velocidad de
+ * dibujado. El costo se mide en la tarjeta de rendimiento, no aca.
+ *
+ * Si no hay VRAM, `fb_init` devuelve negativo y el shim se queda con la imagen del monton (como
+ * estaba antes): el POC chico sigue andando y el que mide dice cual de los dos caminos tomo. */
+static void *pant_fb = NULL;
+static int pant_fb_bytes = 0;
+
+int d2c_pvr_pantalla_fb_init(int w, int h) {
+    size_t bytes;
+
+    if (w <= 0 || h <= 0) {
+        return -1;
+    }
+    if (pant_tex == NULL) {
+        /* el PVR todavia no arranco: sin pvr_init_defaults no hay VRAM que repartir */
+        return -3;
+    }
+
+    bytes = (size_t)w * (size_t)h * 4;
+
+    if (pant_fb != NULL && (size_t)pant_fb_bytes == bytes) {
+        return 0;
+    }
+    if (pant_fb != NULL) {
+        pvr_mem_free(pant_fb);
+        pant_fb = NULL;
+        pant_fb_bytes = 0;
+    }
+
+    pant_fb = pvr_mem_malloc(bytes);
+    if (pant_fb == NULL) {
+        return -2;
+    }
+
+    /* el cuadro arranca en negro: la pantalla se pinta entera una vez para no leer basura de la VRAM */
+    memset(pant_fb, 0, bytes);
+    pant_fb_bytes = (int)bytes;
+
+    return 0;
+}
+
+/* El puntero al framebuffer de la pantalla (0 si no hay). Cruza a Go como uintptr. */
+unsigned int d2c_pvr_pantalla_fb(void) { return (unsigned int)pant_fb; }
+
+/* Cuantos bytes de VRAM ocupa el framebuffer (0 si vive en el monton: el numero que lo dice). */
+int d2c_pvr_pantalla_fb_bytes(void) { return pant_fb_bytes; }
+
+/* Cuantos bytes LIBRES tiene el MONTON DE C en este momento.
+ *
+ * Es mallinfo(), la MISMA fuente que el "Memory: arena=%d used=%d free=%d" con el que el runtime de la
+ * consola cuenta el OOM (runtime/defer_dreamcast.c:138). O sea: el numero que se lee aca es comparable
+ * con el que dio el defecto. Se expone a Go porque el hito de esta tarjeta ES ese numero: cuanto queda
+ * en el monton cuando el motor pide su pantalla. */
+int d2c_pvr_pantalla_mem_libre(void) {
+    struct mallinfo mi = mallinfo();
+
+    return mi.fordblks;
+}
 
 /* El reloj, en microsegundos. No es parte del dibujado: es para poder DECIR cuanto tarda cada etapa en vez
  * de suponerlo. Un cuadro de 640x480 en un SH-4 tiene tres partes que pueden ser la lenta (dibujar en

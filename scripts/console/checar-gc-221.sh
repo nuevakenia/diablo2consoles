@@ -1,5 +1,10 @@
 #!/bin/bash
-# CORPUS DE DC-002.21: EL MONTON DEL MOTOR -- el semiespacio del GC contra las DOS paredes de RAM.
+# CORPUS DE DC-002.21: EL MONTON DEL MOTOR -- el semiespacio del GC contra las paredes de RAM.
+# ALINEADO EN DC-002.22: el motor ya no pide su pantalla al monton (vive en la VRAM), asi que la pared de
+# 1.916.928 bytes DEJO DE EXISTIR y el arranque ENTRA AL LOOP. Los controles 5 y 6, y las marcas por
+# arranque (10 -> 11), se movieron con la medicion. Ademas `GEN` pasa a ser el gox de la rama: el POC de
+# hoy usa `ebiten.MemLibreDelMonton`/`VramDelFramebuffer`, que NO estan en el gox de DC-002.20 y el
+# reenlace no enlazaba (medido: "reference to undefined identifier 'ebiten.MemLibreDelMonton'").
 #
 # El arranque del motor, con el gzip ya arreglado (DC-002.20), moria pidiendo 98.304 bytes contiguos para
 # la imagen del atlas de texto, con 3.096 bytes libres en el monton de C (newlib: arena 2.579.164). Esta
@@ -8,19 +13,22 @@
 #
 #   KB=512  (el valor que dejo DC-002.14)  ->  Out of memory ... diff 98304    (la imagen del atlas)
 #   KB=256  (esta tarjeta)                 ->  Out of memory ... diff 1916928  (el atlas ya entra, y lo que
-#                                              no entra es la tabla de records del motor)
+#                                              no entra es la pantalla del motor -- MEDIDO en DC-002.22:
+#                                              800x600x4 = 1.920.000 bytes; hoy esa pantalla vive en la
+#                                              VRAM y el OOM no esta)
 #
 # El "mutante" de esta tarjeta es el valor VIEJO: volver a 512 tiene que hacer reaparecer la pared de 98.304
 # bytes. Es el unico mutante honesto aca, porque el defecto no es una linea de codigo sino un PRESUPUESTO:
 # el que lo cambia es un numero del vendor y se aplica con su script idempotente.
 #
 # CONTROLES (sobre la corrida con KB=256):
-#  1. las 10 marcas MOTOR-ARRANQUE (el arranque no cambio de forma)
+#  1. las 11 marcas MOTOR-ARRANQUE por arranque (el arranque no cambio de forma)
 #  2. la seleccion de archivos sigue verde (Complete y Validate.OK con 7 vistos)
 #  3. el config lo lee el motor (loaded configuration file from ...)
 #  4. NO esta la pared de 98.304 bytes: el atlas de texto ENTRA
-#  5. SI esta la pared nueva de 1.916.928 bytes, declarada (la tabla de records del motor)
-#  6. el monton de C despues del OOM: arena de 2.415.484 bytes con 43.136 libres (contra 2.579.164 y 3.096)
+#  5. el motor ENTRA AL LOOP (DC-002.22): pide el cuadro 0 al PVR (la pared de 1.916.928 ya no esta)
+#  6. el monton de C medido: 4.128 libres antes del motor y 40.936 al crear la pantalla (el pedido grande
+#     ya no sale de ahi)
 #
 # Uso:  bash scripts/console/checar-gc-221.sh [dir_gox] [segundos]
 set -uo pipefail
@@ -28,7 +36,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$HERE/env.sh"
 
-GEN="${1:-/tmp/gox-00220}"
+GEN="${1:-/tmp/gox-222}"
 SEGS="${2:-30}"
 REPO="${REPO:-$(cd "$HERE/../.." && pwd)}"
 LIB=/home/dgalli/dreamcast/libgodc
@@ -61,22 +69,24 @@ c_marcas() {
     local total arranques
     total=$(grep -ac 'MOTOR-ARRANQUE' "$1")
     arranques=$(grep -ac 'MOTOR-ARRANQUE arranca' "$1")
-    [ "$arranques" -ge 1 ] && [ "$total" = "$((10 * arranques))" ]
+    [ "$arranques" -ge 1 ] && [ "$total" = "$((11 * arranques))" ]
 }
 c_seleccion()  { grep -qaF 'MOTOR-ARRANQUE seleccion: Complete= true Validate.OK()= true archivos que ve= 7 faltan= 0' "$1"; }
 c_config()     { grep -qaF 'loaded configuration file from /rd/OpenDiablo2/config.json' "$1"; }
 c_sin_98304()  { ! grep -qaF 'diff 98304' "$1"; }
-c_con_1916928(){ grep -qaF 'diff 1916928' "$1"; }
-c_arena()      { grep -qaF 'Memory: arena=2415484 used=2372348 free=43136' "$1"; }
+c_loop()       { grep -qaF 'EBITEN-LOOP cuadro 0 esperando el cuadro del PVR' "$1" \
+                   && grep -qaF 'EBITEN-LOOP cuadro 0 el PVR dio el cuadro, abro la lista' "$1"; }
+c_monton()     { grep -qaF 'monton de C: libre 40936 bytes' "$1" \
+                   && grep -qaF 'monton de C antes del motor: 4128 bytes libres' "$1"; }
 
 controles() { # $1 = log; imprime los seis y devuelve cuantos dan bien (en la ultima linea)
     local log="$1" bien=0
-    if c_marcas "$log";      then echo "   control 1 (las 10 marcas):              VERDE"; bien=$((bien + 1)); else echo "   control 1 (las 10 marcas):              ROJO ($(grep -ac 'MOTOR-ARRANQUE' "$log"))"; fi
+    if c_marcas "$log";      then echo "   control 1 (las 11 marcas):              VERDE"; bien=$((bien + 1)); else echo "   control 1 (las 11 marcas):              ROJO ($(grep -ac 'MOTOR-ARRANQUE' "$log"))"; fi
     if c_seleccion "$log";   then echo "   control 2 (la seleccion):               VERDE"; bien=$((bien + 1)); else echo "   control 2 (la seleccion):               ROJO"; fi
     if c_config "$log";      then echo "   control 3 (el config):                  VERDE"; bien=$((bien + 1)); else echo "   control 3 (el config):                  ROJO"; fi
     if c_sin_98304 "$log";   then echo "   control 4 (el atlas de texto ENTRA):    VERDE"; bien=$((bien + 1)); else echo "   control 4 (el atlas de texto ENTRA):    ROJO"; fi
-    if c_con_1916928 "$log"; then echo "   control 5 (la pared nueva declarada):   VERDE"; bien=$((bien + 1)); else echo "   control 5 (la pared nueva declarada):   ROJO"; fi
-    if c_arena "$log";       then echo "   control 6 (el monton de C medido):      VERDE"; bien=$((bien + 1)); else echo "   control 6 (el monton de C medido):      ROJO"; fi
+    if c_loop "$log";        then echo "   control 5 (el motor ENTRA al loop):     VERDE"; bien=$((bien + 1)); else echo "   control 5 (el motor ENTRA al loop):     ROJO"; fi
+    if c_monton "$log";      then echo "   control 6 (el monton de C medido):      VERDE"; bien=$((bien + 1)); else echo "   control 6 (el monton de C medido):      ROJO"; fi
     echo "$bien"
 }
 

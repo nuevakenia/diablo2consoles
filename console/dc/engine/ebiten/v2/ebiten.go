@@ -639,10 +639,26 @@ const (
 
 // ================================================================ el lienzo y el loop
 
-var pantalla = NewImage(640, 480)
+// LA PANTALLA DEL PAQUETE YA NO SE CREA AL ARRANCAR (DC-002.22), Y ESTO ES UN AHORRO MEDIDO, no una
+// limpieza de estilo: era `var pantalla = NewImage(640, 480)`, o sea 640x480x4 = 1.228.800 bytes del
+// monton de C que se pedian ANTES de que el motor pidiera nada y que NUNCA se liberan (una asignacion
+// grande de libgodc va a `malloc` externo: el GC no la recicla). Y el motor NO usa `ebiten.Screen()`:
+// una busqueda en todo el motor no encuentra ni una llamada (las de la interfaz `Game` de Ebitengine
+// reciben la pantalla por PARAMETRO en `Draw`), asi que era RAM pagada al pedo. Ahora se crea la
+// primera vez que alguien la pide (`Screen()`), y en el arranque del motor eso quiere decir nunca: la
+// que se usa es la del loop, que ademas vive en la VRAM.
+var pantalla *Image
 
-// Screen devuelve el lienzo de la consola.
-func Screen() *Image { return pantalla }
+// Screen devuelve el lienzo de la consola. Si todavia no existe se crea aca (asi el POC que la mide
+// antes de entrar al loop no encuentra nil: sigue andando como antes, nada mas que el gasto ahora es
+// perezoso).
+func Screen() *Image {
+	if pantalla == nil {
+		pantalla = NewImage(PantallaAncho, PantallaAlto)
+	}
+
+	return pantalla
+}
 
 // DrawTriangles: dibuja triangulos. Es lo que usa el motor para las superficies con textura
 // (d2render/ebiten/ebiten_surface.go:610).
@@ -858,6 +874,14 @@ func RunGame(g Game) error {
 	if ancho <= 0 || alto <= 0 {
 		ancho, alto = 640, 480
 	}
+	// EL VIDEO PRIMERO (DC-002.22): la textura de la pantalla se arma con ESTE tamano (y si venia de otro,
+	// se rehace: ver IniciarPantalla). Despues se crea la pantalla logica -- y sus pixeles van a la VRAM,
+	// porque sus 800x600x4 = 1.920.000 bytes no entran en los 16 MB de la RAM principal con el binario
+	// entero cargado (1.919.684 de los 16.777.216 se los lleva el binario).
+	if err := IniciarPantalla(ancho, alto); err != nil {
+		return err
+	}
+
 	// LA PANTALLA ES LA MISMA QUE VE EL JUEGO, Y ESTO ERA UN DEFECTO DE VERDAD (no del instrumento): aca
 	// decia `pantalla := NewImage(...)`, que crea una imagen NUEVA y LOCAL que tapa a la del paquete durante
 	// el resto de la funcion. El dibujado y la subida a la VRAM usaban esa, asi que la pantalla SE VEIA bien;
@@ -867,14 +891,11 @@ func RunGame(g Game) error {
 	// COMO SE DESTAPO: el centro de masa del contenido daba 0 0 en todos los cuadros, con el logo dibujado y
 	// visible en la captura. O sea: la pantalla que se medía estaba toda negra. Un instrumento que mide otra
 	// cosa que la que se ve es peor que no tener instrumento, porque da un numero y el numero parece un dato.
-	pantalla = NewImage(ancho, alto)
+	//
+	// DC-002.22: la pantalla vive en la VRAM (NuevaPantallaVram). Si la VRAM no da, la imagen sale del
+	// monton como antes y el arranque se cae donde se caia: el que mide dice cual de los dos caminos tomo.
+	pantalla = NuevaPantallaVram(ancho, alto)
 
-	// el video: 640x480 en RGB565, y la textura de la pantalla en la VRAM. Si esto falla se devuelve el
-	// error y no se entra al loop: seguir dibujando en memoria daria una pantalla negra, que desde afuera
-	// se ve igual que "el juego anda pero no dibuja".
-	if err := IniciarPantalla(ancho, alto); err != nil {
-		return err
-	}
 	kos.PvrSetBgColor(0, 0, 0)
 
 	// OJO: los tres primeros cuadros se anuncian en la consola serie. Es a proposito y se queda: si el

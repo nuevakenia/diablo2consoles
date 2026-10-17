@@ -1,0 +1,169 @@
+DC-002.22 — LA PANTALLA DEL MOTOR DEJA DE PAGARSE EN EL MONTON (EL FRAMEBUFFER EN LA VRAM)
+=========================================================================================
+
+Rama DC-002. Fecha: 2026-10-17. Medido en Flycast con el motor entero (POC `console/dc/poc/motor-arranque`).
+Tarjeta abierta al cerrar DC-002.21 con el OOM de 1.916.928 bytes (`evidencia/dc-002.21-monton-semiespacio.txt`).
+
+COMANDOS
+
+    source scripts/console/env.sh
+    bash scripts/console/checar-pantalla-222.sh /tmp/gox-222 30    # el corpus: 7 controles + 2 mutantes
+    python3 scripts/console/mutar-pantalla-222.py --estado        # los mutantes, puestos y sacados
+    sh-elf-gccgo $GODC_GOFLAGS -I /tmp/gox-222 -fgo-pkgpath=...   # el shim, recompilado en el gox propio
+    bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/pan222-sano /tmp/gox-222
+    CAPTURE=none bash scripts/console/run-flycast.sh .../prog-emu.elf 30 /tmp/pan222-sano
+    sh-elf-addr2line -e /tmp/dcbuild/pan222-sano/prog.elf -f -C 8c445a90
+    bash scripts/console/test-std-host.sh                         # la barrera del host
+    bash scripts/console/compare-motor-dc6.sh                     # la barrera del POC del motor
+
+
+1. LO QUE PIDIO EL PUNTO 1 DEL PLAN: QUE ESTRUCTURA PIDE LOS 1.916.928 BYTES
+----------------------------------------------------------------------------
+
+No era la tabla de `d2core/d2records` (1.672.892, el candidato de DC-002.14). El pedido es **la pantalla
+logica del motor**: el `RunGame` del shim crea la imagen de dibujo con el tamaño que devuelve el `Layout`
+del motor, que es **800 x 600**, y en RGBA son **800 x 600 x 4 = 1.920.000 bytes** exactos. El numero del
+OOM cuadra al byte:
+
+    1.920.000  el pedido de la pantalla (800x600x4)
+    -    3.072  lo que el sbrk ya tenia disponible en ese momento
+    = 1.916.928  = 0x1D4000, el `diff 1916928` del OOM
+
+Y encaja con lo ya medido en DC-002.21: el arranque pasa el atlas de texto y despues muere, o sea el
+pedido es POSTERIOR al atlas (es lo que pide `RunGame` al armar el cuadro) y no la tabla de records.
+
+No hay recorte del compilador que lo pague, y eso ya estaba medido en DC-002.14: el binario carga
+**13.919.684** de los **16.777.216** bytes de RAM y el monton libre eran **43.136**. La palanca tenia que
+ser de otra memoria, y la consola tiene **8 MB de VRAM** con el PVR usando ~1 MB.
+
+
+2. LA PALANCA: EL FRAMEBUFFER EN LA VRAM (Y POR QUE NO `vid_set_mode`)
+---------------------------------------------------------------------
+
+El arreglo tiene dos partes, las dos en el shim (repo) y ninguna en el vendor:
+
+  a) `d2c_pvr_pantalla_fb_init(w, h)` (pvr_pantalla.c): reserva **w*h*4 bytes CONTIGUOS** con
+     `pvr_mem_malloc` y deja el puntero a Go con `unsafe` (la forma clasica
+     `(*[1<<30]byte)(unsafe.Pointer(p))[:n:n]`, porque el `go.mod` declara Go < 1.17 y `unsafe.Slice` no
+     esta). `NuevaPantallaVram(w, h)` es el que la usa.
+  b) `IniciarPantalla` pasa a ser **re-dimensionable**: el POC arranca el video en 640x480 y el motor
+     despues lo vuelve a arrancar en 800x600 (de ahi que la textura quedara de 640x480 con un framebuffer
+     de 800x600 y la conversion devolviera -2, que es un defecto propio de DC-002.20/21 que esta tarjeta
+     arreglo). Con esto la textura y el framebuffer son del mismo tamaño.
+
+El PVR se inicializa **UNA sola vez** (`pvr_listo`): volver a llamar a `pvr_init_defaults()` con el video
+andando imprimia "pvr_init called twice!". Y queda PROHIBIDO `vid_set_mode` despues de inicializar el PVR:
+deja al chip dibujando sobre un framebuffer y esperando el vsync de otro, o sea `pvr_wait_ready()` no
+vuelve nunca (cuelgue silencioso, sin error).
+
+Tercera parte, del paquete: `var pantalla = NewImage(640, 480)` creaba **1.228.800 bytes** al arrancar
+para una imagen que el motor **no usa** (nadie llama `ebiten.Screen()` en todo el arbol: el `Draw` de la
+interfaz `Game` recibe la pantalla por parametro). Ahora `pantalla` es perezosa (`var pantalla *Image` y
+se crea dentro de `Screen()`).
+
+Costo medido de la palanca: **0 bytes de RAM** (la pantalla del motor ya no esta en el monton) y los
+**1.920.000 bytes** del framebuffer pasan a la VRAM.
+
+
+3. LO MEDIDO DESPUES (el OOM se va y el motor ENTRA AL LOOP)
+------------------------------------------------------------
+
+    PVR-FRAMEBUFFER la pantalla vive en la VRAM: 1920000 bytes
+    PVR-FRAMEBUFFER monton de C: libre 40936 bytes (el runtime lo imprime como free)
+    PVR-FRAMEBUFFER escribiendo 65536 bytes en la VRAM...
+    PVR-FRAMEBUFFER escritos, leyendo de vuelta...
+    PVR-FRAMEBUFFER ida y vuelta: 65536 bytes, distintos: 0
+    EBITEN-LOOP cuadro 0 esperando el cuadro del PVR
+    EBITEN-LOOP cuadro 0 el PVR dio el cuadro, abro la lista
+    Unhandled exception: PC 0000000b, code 1, evt 00e0
+    kernel panic: unhandled IRQ/Exception
+
+Los numeros del arranque, sano contra el defecto:
+
+    ANTES (DC-002.21)   Out of memory ... diff 1916928     Memory: arena=2415484 used=2372348 free=43136
+                        el motor NO llegaba al loop (se reiniciaba: 5 arranques)
+    AHORA (DC-002.22)   SIN OOM                            monton de C al crear la pantalla: 40.936 libres
+                        monton de C antes del motor: 4.128 libres   (esta al tope, y igual entra)
+                        el motor ENTRA al loop: cuadro 0, y pide el cuadro al PVR
+                        arranques del motor: 1   (ya no se reinicia)
+
+El `free` de las dos lineas es la misma fuente (`mallinfo().fordblks`, la que el runtime de la consola
+imprime como `free=` en su mensaje de OOM), asi que los dos numeros son comparables.
+
+Dos mediciones que valian por si solas (y que estaban SUPUESTAS hasta aca):
+
+  - **La VRAM se escribe de a un byte**: la prueba de ida y vuelta escribe 65.536 bytes con un patron y
+    los relee: **0 distintos**. El compositor del shim escribe la pantalla pixel a pixel
+    (`i.pixeles[j] = v`) y el PVR guarda su VRAM como memoria de bloques: si eso no aguantara, el sintoma
+    seria una excepcion del SH-4 DENTRO del motor, sin pila que leer. Queda como instrumento y como
+    control del corpus.
+  - **El PVR se inicializa una sola vez**: la linea "pvr_init called twice!" no esta (antes si).
+
+
+4. EL ERROR QUE QUEDA: EL CUADRO DE ERROR DEL MOTOR (declarado, con su direccion)
+----------------------------------------------------------------------------------
+
+El `Layout` del motor devuelve 800x600 y el motor entra a `updateInitError` (el motor no tiene los assets,
+asi que muestra el error de init). El cuadro 0 hace:
+
+    target.Clear(colornames.Darkred)                  -> `Image.Fill` COMPLETA (medido con una sonda en
+                                                         el shim: SHIM-OP 1 Fill-entra, 2 Fill-RGBA-ok,
+                                                         3 Fill-fin; despues, NINGUNA operacion mas del
+                                                         shim, o sea no llega ni a `Size()`)
+    target.PushTranslation(errMsgPadding, ...)
+    target.DrawTextf(a.errorMessage.Error())           <- aca: la excepcion
+
+    Unhandled exception: PC 0000000b, code 1, evt 00e0  ("Data address error (read)")
+    PR=8c445a90 -> sh-elf-addr2line -> d2app.App.updateInitError (app.go:718, la linea del DrawTextf)
+
+O sea: el pedido de 1,92 MB **entro** y el tramo que queda es el **texto del cuadro de error del motor**
+(`d2render/ebiten/ebiten_surface.go:404` -> `s.Renderer().PrintAt(...)` -> `d2util/debug_print.go:48`).
+No es un OOM: es un salto a una direccion basura (PC 0x0b) en el camino de la interfaz del renderer. No
+esta medido cual de los dos lados es (el itab del metodo o el estado del `GlyphPrinter`); se declara como
+el defecto ABIERTO de la tarjeta siguiente.
+
+
+5. EL HALLAZGO DEL MUTANTE B: EL CRASH ES SENSIBLE AL LAYOUT, NO A LA RAM
+------------------------------------------------------------------------
+
+El mutante B devuelve la pantalla del paquete al arranque (los 1.228.800 bytes). La hipotesis era "no
+entran y el arranque se cae": **es FALSA, y el resultado es mas interesante que la hipotesis**:
+
+    MUTANTE B (la pantalla del paquete puesta)   cuadros completos del loop: 0, 1 y 2  (NO se cae)
+                                                 monton antes del motor: 3.928 libres
+    SANO (la pantalla perezosa)                  cuadros completos del loop: ninguno
+                                                 monton antes del motor: 4.128 libres
+
+Cuesta **200 bytes** (no 1,2 MB: el monton crece por sbrk cuando se le pide) y con la gemela puesta el
+arranque **llega mas lejos**. O sea: el crash del cuadro 0 NO es falta de memoria, es el **layout del
+monton** (un descriptor/putero que se lee distinto segun donde caiga todo). Eso cambia el diagnostico del
+tramo siguiente y por eso el corpus lo IMPRIME como hallazgo en vez de exigir que el mutante caiga: un
+mutante que no cae es informacion, no un verde que se aprueba sin mirar.
+
+Lo que el corpus protege del arreglo de esta tarjeta es el mutante A: con el framebuffer de vuelta en el
+monton, vuelve el OOM (`diff 1921024` en la corrida del corpus, el mismo pedido con el monton en otro
+estado) y el motor no llega al loop.
+
+
+6. EL CORPUS (`scripts/console/checar-pantalla-222.sh`): 7 CONTROLES Y SUS MUTANTES
+----------------------------------------------------------------------------------
+
+Los 7 controles del control sano: (1) la pantalla vive en la VRAM con sus 1.920.000 bytes; (2) NO esta el
+OOM; (3) el motor ENTRA al loop (cuadro 0); (4) el motor **abre la lista** del cuadro 0 en el PVR; (5) la
+VRAM se escribe de a un byte (ida y vuelta de 64 KB, 0 distintos); (6) el PVR se inicializa UNA vez; (7) la
+seleccion de archivos del juego sigue verde. Los controles 1+2 son el par que no se puede pasar por verde
+solo: uno exige que el buffer este en la VRAM y el otro que el pedido NO este en el monton.
+
+Mutante A (`mutar-pantalla-222.py --pantalla-al-monton`, idempotente y con el sha256 verificado):
+**CAZADO**, vuelve el OOM. Mutante B (`--paquete-al-arranque`): **NO CAZADO** y declarado, con el hallazgo
+del punto 5. El script deja los dos archivos con el MISMO sha256 que al empezar (el corpus verifica que no
+quede un mutante puesto: sin eso, la tentacion es commitear el mutante).
+
+El gox de esta tarjeta es propio (`/tmp/gox-222`) porque **`build-std-gox.sh` borra el directorio entero**:
+se copia el gox de la corrida anterior y se recompila **solo el shim**
+(`sh-elf-gccgo ... -fgo-pkgpath="github.com/hajimehoshi/ebiten/v2" -c console/dc/engine/ebiten/v2/*.go`).
+Y un defecto de instrumento, medido: el gox copiado tenia `orden.txt` y `orden-motor.txt` con las rutas
+ABSOLUTAS del directorio viejo, o sea el enlace usaba los `.gox` viejos y la corrida seguia dando el
+defecto como si el arreglo no existiera (la primera corrida de esta tarjeta, 0 lineas `PVR-FRAMEBUFFER`).
+El corpus lo chequea antes de arrancar: si `orden.txt` no apunta todo a su propio directorio, sale con
+error en vez de medir el shim viejo.

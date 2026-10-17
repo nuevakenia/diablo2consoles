@@ -248,7 +248,11 @@ func (i *Image) Huella() uint32 {
 }
 
 // HuellaDePantalla: la huella de la pantalla del juego (la que se le pasa a Draw).
-func HuellaDePantalla() uint32 { return pantalla.Huella() }
+//
+// DC-002.22: usa Screen() (que la crea si no existe) en vez de la variable pelada: la pantalla del
+// paquete ya no se crea al arrancar, asi que leerla directo daria un panic de puntero nil si alguien
+// mide antes del loop.
+func HuellaDePantalla() uint32 { return Screen().Huella() }
 
 // CentroDeMasa: DONDE esta el contenido claro de la pantalla, en un par de numeros.
 //
@@ -291,7 +295,7 @@ func (i *Image) CentroDeMasa() (int, int) {
 }
 
 // CentroDeMasaDePantalla: lo mismo, para la pantalla del juego.
-func CentroDeMasaDePantalla() (int, int) { return pantalla.CentroDeMasa() }
+func CentroDeMasaDePantalla() (int, int) { return Screen().CentroDeMasa() }
 
 // copiarMovida: el dibujado cuando la transformacion es SOLO MOVER (sin escala, sin giro, sin inclinacion).
 //
