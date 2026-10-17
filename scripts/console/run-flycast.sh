@@ -44,6 +44,10 @@ shot() {
 }
 
 echo "== Flycast: $IMG (capturas: $CAPTURE, consola serie: si) =="
+# la captura de pantalla entera solo ve el emulador si su ventana esta arriba: se la fuerza por KWin
+# (DC-002.9: Diablo II en fullscreen dentro de gamescope tapaba al emulador y las capturas salian con
+# el juego, no con la consola). Si no hay KWin disponible, esto no hace nada.
+[ "$CAPTURE" != "none" ] && bash "$HERE/flycast-adelante.sh" arriba
 setsid env DISPLAY="$DISP" "$FLY" -config "window:fullscreen=no" -config "$CFG" "$IMG" >"$OUT/flycast.log" 2>&1 &
 PID=$!
 echo "pid=$PID"
@@ -60,6 +64,7 @@ done
 sleep 1
 kill -TERM -"$PID" 2>/dev/null || kill -TERM "$PID" 2>/dev/null
 sleep 1; kill -KILL -"$PID" 2>/dev/null
+bash "$HERE/flycast-adelante.sh" sacar
 
 echo "== pantalla =="; ls -la "$OUT"/f*.png 2>/dev/null | awk '{print $5" bytes  "$9}'
 echo "== consola serie / avisos del emulador =="

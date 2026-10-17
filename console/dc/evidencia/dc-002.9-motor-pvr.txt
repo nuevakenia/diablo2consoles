@@ -1,0 +1,146 @@
+=== DC-002.9: el motor PINTANDO en la consola (DC6 + paleta del MPQ por el PVR) ===
+
+QUE PIDE LA TARJETA Y COMO SE MIDIO
+    Aceptacion: "en Flycast se ve el logo de Battle.net decodificado y paletizado por el codigo del
+    motor, con la captura guardada y el hash de los pixeles identico al del host".
+
+    Se midieron DOS cosas, y las dos tienen numero:
+      A. el resumen de texto: los indices decodificados del DC6 y los RGBA finales de cada frame, con
+         hash FNV-1a -> 61 lineas IDENTICAS entre x86-64 y SH-4 (30 frames por los dos caminos).
+      B. la captura del emulador contra la referencia en PNG que deja el comparador del host (el frame 0
+         tal como lo decodifica el motor) -> 4051/4051 pixeles de arte iguales (100%), 2085/2085
+         transparentes con el fondo a la vista, y en las cuatro orientaciones la identidad gana 100%.
+
+    Nada de esto es un horneador nuestro: el DC6 y la paleta entran CRUDOS del MPQ (140.740 y 768
+    bytes), los decodifica el codigo del motor (d2dc6.Load + DecodeFrame, d2dat.Load y
+    d2util.ImgIndexToRGBA) compilado con sh-elf-gccgo para SH-4, y lo unico que aporta la consola es el
+    PVR (la textura de 1 byte por pixel y la paleta en el banco 0 del hardware).
+
+EL BLOQUEO QUE LA TARJETA TENIA DECLARADO (cerrado)
+    La tarjeta decia: "build-motor-gox.sh tiene la lista fija PAQUETES=... y motorresumen ahora importa
+    d2util. Error exacto: console/dc/motorresumen/resumen.go:105:25: error: reference to undefined name
+    'd2util'". Cierto, y ademas faltaba todo lo que d2util arrastra.
+
+    La lista se armo MIDIENDO la clausura con `go list -deps` (no adivinando):
+        go list -deps ./d2common/d2fileformats/d2dc6 ./d2common/d2fileformats/d2dat \
+            ./d2common/d2interface ./d2common/d2util ./console/dc/motorresumen
+    dan 11 paquetes internos del repo, ni uno mas. PAQUETES paso de 3 a esos 11, en orden de
+    dependencias, y el .gox de cada uno midio:
+        d2common/d2enum.gox                              235.292 B
+        d2common/d2math.gox                               57.036 B
+        d2common/d2math/d2vector.gox                     158.364 B
+        d2networking/d2client/d2clientconnectiontype.gox   5.228 B
+        d2common/d2interface.gox                         259.796 B
+        d2common/d2util/assets.gox                        12.564 B
+        d2common/d2util.gox                              133.300 B
+        d2common/d2datautils.gox                         167.836 B
+        d2common/d2fileformats/d2dc6.gox                  67.888 B
+        d2common/d2fileformats/d2dat.gox                  56.580 B
+        console/dc/motorresumen.gox                       23.616 B
+    y el ELF quedo de 6.899.820 bytes (motor + stdlib minima + terceros enlazados).
+
+    EL SEGUNDO HUECO, que aparecio al enlazar: los paquetes de TERCEROS los compila build-std-gox.sh
+    pero no los anota en orden.txt, y eso alcanzaba mientras nadie los usara. Medido: d2util llama a
+    ebiten (debug_print.go: NewImageFromImage, ebiten.Image, DrawImageOptions) y d2util/assets a
+    x/image/bmp (zipbmp.go); si esos .gox no van al enlace, el linker se cae por simbolos UNDEFINED.
+    Ahora build-motor-gox.sh los anota (ebiten, inpututil, akara, uuid, bmp).
+
+    Y una tercera: build-motor-gox.sh anotaba en orden.txt sin mirar si ya estaba, asi que correrlo dos
+    veces sin rehacer la stdlib le pasaba el mismo objeto dos veces al linker (definiciones multiples).
+    Se anota una sola vez.
+
+EL RESUMEN DE TEXTO: 61 LINEAS IDENTICAS
+    Los dos lados, crudos: evidencia/dc-002.9-motor-pvr-host.txt y ...-consola.txt (5.032 bytes
+    cada uno, `diff` sin diferencias). Extracto:
+        MOTOR-DC6 version=6 flags=1 encoding=0 dirs=1 framesPorDir=30 frames=30
+        MOTOR-DC6 frame 0: 118x52 off=(-63,11) flipeado=0 bloque=4618 pixeles=6136 opacos=4051 hash=2884d1c0
+        MOTOR-PVR rgba frame 0: pixeles=6136 opacos=4051 hash=85c68d20
+        MOTOR-PVR rgba frame 29: pixeles=6136 opacos=4010 hash=660a6fd1
+    Son 61 lineas: la de version + los 30 frames por indices + los 30 frames por RGBA. La de indices
+    ya la media DC-002.3 (y sigue dando lo mismo); la de RGBA es lo nuevo: dice que el COLOR tambien
+    salio igual, o sea que la paleta del MPQ se decodifico igual en las dos plataformas y que el indice
+    0 quedo transparente de los dos lados.
+
+LA CAPTURA: 100% DE LOS PIXELES
+    La consola serie del emulador, del mismo arranque:
+        MOTOR-PVR arranca: el motor decodifica el DC6 y la paleta, el PVR lo pinta (DC-002.9)
+        MOTOR-PVR consola dc6bytes= 140740 palbytes= 768
+        MOTOR-PVR textura PVR 118 x 52 pixeles del frame 6136 bytes en VRAM (16 bits/pixel habrian sido 12272 )
+        MOTOR-PVR frames dibujados 600
+    El POC dibuja el frame 0 dos veces: a escala 3 en (40,40) y 1:1 en (40,300). La comparacion usa la
+    copia 1:1 (la que se puede comparar pixel a pixel) contra el PNG del host:
+        pantalla encontrada en 210,238 (ancho 640)      <- 1:1, sin escalado del emulador
+        pixeles de arte:      4051/4051 (100.0%) iguales (tolerancia +/-8)
+        diferencia maxima:    7 por canal                <- lo que pierde ARGB1555 (3 bits por canal)
+        pixeles transparentes: 2085/2085 (100.0%) con el fondo visible
+        orientacion: identidad 100.0% | espejada h 17.5% | espejada v 16.7% | rotada 180 11.9%
+        RESULTADO: OK
+    Las cuatro orientaciones se miden porque una referencia que sale del mismo horneado no puede
+    delatar un volteo (paso en DC-001.4b): aca la identidad gana con 100%, asi que no hay volteo.
+    La captura recortada a la pantalla de la consola (640x480) esta en evidencia/dc-002.9-consola.png.
+
+EL DEFECTO QUE APARECIO: LA CAPTURA NO SALIA (y como se cazo)
+    Las primeras cuatro capturas del POC salieron CON CERO PIXELES del POC: en la pantalla estaba
+    Diablo II. Medido en el apilado de KWin (ventana por ventana, de abajo hacia arriba):
+        [11] flycast  | Flycast - prog | keepAbove=true  fullScreen=false activa=false geom=2830,385 640x508
+        [12] gamescope| Diablo II      | keepAbove=false fullScreen=true  activa=true  geom=2560,312 1024x768
+    O sea: el emulador abre su ventana en la pantalla de 1024x768, el juego corre ahi en fullscreen
+    dentro de gamescope, y el juego ACTIVO queda arriba aunque la ventana del emulador tenga keepAbove.
+    Lo que se probo, medido:
+      - keepAbove = true: se aplica, NO alcanza (medido arriba).
+      - workspace.activeWindow = la ventana del emulador: funciona, pero le roba el foco al juego de
+        Daniel por los segundos de la corrida. Descartado.
+      - SDL_VIDEO_WINDOW_POS=64,64: sin efecto (la ventana quedo igual en 2830,385).
+      - w.move(x,y): no existe (TypeError: not a function). w.output: de solo lectura.
+        Qt.rect: `Qt` no existe en el motor de scripts de KWin 6.
+      - w.frameGeometry = {x, y, width, height}: SI. Medido: la ventana paso de 2830,385 a 210,210 con
+        su mismo tamano (no se redimensiona: el emulador sigue pintando 1:1).
+    La ventana es X11 (aparece como `KWin::X11Window`): el emulador corre por XWayland.
+    Arreglo: scripts/console/flycast-adelante.sh (mueve la ventana al monitor principal y la deja
+    arriba) y run-flycast.sh lo llama solo cuando va a sacar capturas. Re-medido despues: pantalla
+    encontrada en 210,238 (ancho 640) y 4051/4051 pixeles, o sea el defecto quedo cerrado y medido.
+
+LOS MUTANTES: 4/4 CAZADOS + CONTROL SANO
+    scripts/console/mutar-motor-pvr.sh cambia UNA cosa por vez en el camino del color, recompila, corre
+    el emulador y exige que la comparacion de la captura se ponga ROJA:
+        alpha0 : el indice 0 deja de ser transparente
+                 arte=4051/4051  transparentes=0/2085     veredicto=NO    cazado
+        uv1    : la UV derecha pasa a 1.0 (muestrea el relleno de la textura)
+                 arte=572/4051   transparentes=1492/2085   veredicto=NO    cazado
+        pal1   : la textura usa el BANCO 1 de la paleta, que esta vacio (todo transparente)
+                 arte=0/4051     transparentes=2085/2085   veredicto=NO    cazado
+        frame1 : se dibuja el frame 1 con la referencia del frame 0
+                 arte=1437/4051  transparentes=1837/2085   veredicto=NO    cazado
+        control sano (todo restaurado): arte=4051/4051 transparentes=2085/2085 veredicto=OK
+        == 4/4 mutantes cazados ==
+    OJO, y queda escrito en el mutador: la PRIMERA version de este script leia solo los pixeles de arte
+    y el mutante alpha0 le quedaba VERDE (arte=4051/4051 igual), porque sacar la transparencia del
+    indice 0 no cambia NI UN pixel de arte: el hueco estaba en el mutador, no en la comparacion (el
+    comparador ya daba NO COINCIDE). Por eso ahora lee las dos lineas y el veredicto.
+    Los archivos se respaldan con copia propia + sha256 y se restauran verificando el hash.
+
+COMO SE CORRE
+    source scripts/console/env.sh
+
+    # 1) la stdlib minima para SH-4 (44 paquetes; medido: 7,3 s)
+    bash scripts/console/build-std-gox.sh
+
+    # 2) hornea el DC6 crudo + la paleta del MPQ, compila los 11 paquetes del motor y enlaza el ELF
+    #    (medido: 3,1 s)
+    bash scripts/console/build-motor-pvr.sh /tmp/dcbuild/motor-pvr
+
+    # 3) la medida: resumen de texto (host vs consola) + captura contra la referencia (medido: 20,0 s)
+    bash scripts/console/compare-motor-pvr.sh /tmp/dcbuild/motor-pvr
+
+    # 4) los mutantes (medido: 1 m 25 s)
+    bash scripts/console/mutar-motor-pvr.sh
+
+    D2_DIR='/ruta/Diablo II' si el juego no esta en los caminos tipicos de Wine.
+
+NOTA DE ARBOL (medida, no supuesta): mientras se midio esta tarjeta habia OTRA sesion de Hermes viva
+trabajando el mismo repo (una sesion `hermes --yolo` de VS Code, con commits propios: 22:25 "DC-002.8:
+111 de 142", 22:52 "la lista de paquetes KOS a un solo lugar"). Esa sesion rehace
+$HOME/dreamcast/gox con un `rm -rf` (build-std-gox.sh), asi que esta tarjeta se midio con SU PROPIA
+gox (GODC_GOX=/tmp/dcgox-dc0029) y con SALTAR_STDLIB=1, que es el parametro nuevo de
+build-motor-dc6.sh para no rehacer la compartida. Instruccion del proyecto: un agente a la vez sobre
+el repo; aca se trabajo en su propia carpeta de .gox sin tocar la ajena.

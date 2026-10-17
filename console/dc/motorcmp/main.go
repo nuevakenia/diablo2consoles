@@ -1,7 +1,7 @@
 // Comparador del host: corre el MISMO codigo del motor (d2dc6.Load + el resumen) que corre en la
 // consola, sobre los MISMOS bytes horneados del MPQ, y escribe el resumen por stdout.
 //
-// Uso:  go run ./console/dc/motorcmp -dc6 <dir_de_build>/<name>.dc6
+// Uso:  go run ./console/dc/motorcmp -dc6 <dir_de_build>/<name>.dc6 [-pal <name>.pal] [-png ref.png]
 //
 // La comparacion contra la consola la hace scripts/console/compare-motor-dc6.sh: las lineas
 // "MOTOR-DC6 frame ..." tienen que salir identicas de los dos lados.
@@ -10,16 +10,22 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 
 	"github.com/OpenDiablo2/OpenDiablo2/console/dc/motorresumen"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dc6"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 )
 
 func main() {
 	dc6Path := flag.String("dc6", "", "DC6 crudo horneado del MPQ")
 	palPath := flag.String("pal", "", "pal.dat crudo horneado del MPQ (si esta, tambien sale el resumen RGBA)")
+	pngPath := flag.String("png", "", "si esta, escribe los RGBA del frame -frame como PNG (la referencia con la que se compara la captura de la consola)")
+	frameN := flag.Int("frame", 0, "que frame se escribe con -png")
 	flag.Parse()
 
 	if *dc6Path == "" {
@@ -60,9 +66,47 @@ func main() {
 		for _, l := range motorresumen.LineasRGBA(d, pal) {
 			fmt.Println(l)
 		}
+
+		// la referencia en PNG: el mismo camino que la consola sube al PVR (DecodeFrame +
+		// ImgIndexToRGBA), para que "se ve el logo" sea un numero y no una impresion. La captura del
+		// emulador se compara contra este PNG pixel a pixel (scripts/console/compare-capture.py).
+		if *pngPath != "" {
+			escribirPNG(d, pal, *frameN, *pngPath)
+		}
 	}
 
 	fmt.Println("MOTOR-DC6 fin")
+}
+
+// escribirPNG deja el frame pedido como PNG RGBA. Usa image/png de la biblioteca estandar REAL: esto
+// corre en el host (x86-64), no en la consola.
+func escribirPNG(d *d2dc6.DC6, pal d2interface.Palette, n int, ruta string) {
+	if n < 0 || n >= len(d.Frames) || d.Frames[n] == nil {
+		fatal("el frame %d no existe en el DC6", n)
+	}
+
+	idx := d.DecodeFrame(n)
+	if idx == nil {
+		fatal("el frame %d no decodifico", n)
+	}
+
+	f := d.Frames[n]
+	rgba := d2util.ImgIndexToRGBA(idx, pal)
+
+	img := image.NewRGBA(image.Rect(0, 0, int(f.Width), int(f.Height)))
+	copy(img.Pix, rgba)
+
+	out, err := os.Create(ruta)
+	if err != nil {
+		fatal("creando %s: %v", ruta, err)
+	}
+	defer out.Close()
+
+	if err := png.Encode(out, img); err != nil {
+		fatal("escribiendo el PNG: %v", err)
+	}
+
+	fmt.Printf("MOTOR-PVR png=%s frame=%d %dx%d\n", ruta, n, f.Width, f.Height)
 }
 
 func fatal(format string, args ...interface{}) {

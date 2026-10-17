@@ -1148,3 +1148,69 @@ motorcmp, bake-dc6 y los dos scripts del motor) **no compila** (`motorresumen` u
 paquetes). La barrera se midio apartando ese WIP con `git stash` (el pipeline commiteado + los cambios
 de esta tarjeta) y despues se restauro; el WIP queda declarado en la tarjeta `t_1677ebe0`, que es la que
 lo tiene que terminar. Evidencia completa: `evidencia/dc-002.8a-os-iofs-imports.txt`.
+
+## 23. DC-002.9: el motor pintando en la consola (DC6 + paleta del MPQ por el PVR)
+
+El paso visual del port: que el **codigo del motor** —no un horneador nuestro— decodifique un DC6 con
+su paleta y lo dibuje el PVR de la Dreamcast. El DC6 y el `pal.dat` entran **crudos** del MPQ (140.740
+y 768 bytes), los parsea `d2dc6.Load` + `DecodeFrame`, `d2dat.Load` y `d2util.ImgIndexToRGBA`
+compilados con `sh-elf-gccgo`, y lo unico que aporta la consola es el PVR: textura de 1 byte por pixel
+(PAL8) con la paleta del motor en el banco 0 del hardware.
+
+Se mide **dos veces y por caminos distintos**, porque ninguna de las dos alcanza sola:
+
+- **El resumen de texto**: el POC imprime los indices decodificados y los RGBA finales de cada frame con
+  su hash FNV-1a. Medido: **61 lineas identicas** entre x86-64 y SH-4 (la linea de version + 30 frames
+  por indices + 30 frames por RGBA). La de indices ya la media DC-002.3; la de RGBA es lo nuevo y dice
+  que el COLOR salio igual: la paleta se decodifico igual en las dos plataformas y el indice 0 quedo
+  transparente en las dos. (Frame 0: indices `hash=2884d1c0`, RGBA `hash=85c68d20`.)
+- **La captura**: el comparador del host deja la referencia del frame 0 en PNG (`motorcmp -png`, el
+  mismo camino `DecodeFrame` + `ImgIndexToRGBA`) y la captura del emulador se compara **pixel a pixel**
+  contra ella, incluida la transparencia y en las cuatro orientaciones. Medido: **4051/4051 pixeles de
+  arte (100%)**, diferencia maxima **7 por canal** (lo que pierde ARGB1555), **2085/2085 pixeles
+  transparentes** con el fondo violeta a la vista y **identidad 100%** contra 17,5% espejada
+  horizontal, 16,7% espejada vertical y 11,9% rotada 180 (o sea: no hay volteo). La captura recortada
+  esta en `evidencia/dc-002.9-consola.png`.
+
+**Tres huecos que aparecieron en el camino y quedaron cerrados:**
+
+- `build-motor-gox.sh` tenia 3 paquetes y el color necesita 11. La lista se armo **midiendo** la
+  clausura con `go list -deps` (no adivinando): `d2enum`, `d2math`, `d2math/d2vector`,
+  `d2clientconnectiontype`, `d2interface`, `d2util/assets`, `d2util`, `d2datautils`, `d2dc6`, `d2dat` y
+  `motorresumen`. El ELF quedo de 6.899.820 bytes.
+- Los **paquetes de terceros no iban al enlace**: `build-std-gox.sh` los compila y los deja en el `-I`,
+  pero no los anota en `orden.txt`, y eso alcanzaba mientras nadie los usara. Medido: `d2util` llama a
+  ebiten (`debug_print.go`) y `d2util/assets` a `x/image/bmp` (`zipbmp.go`); sin esos `.gox` en el
+  enlace el linker se cae por simbolos UNDEFINED. Ahora se anotan (y una sola vez: correr el script dos
+  veces le pasaba el mismo objeto dos veces al linker).
+- **La captura no salia**, y este es el defecto que vale contar. Las primeras cuatro capturas salieron
+  con **cero pixeles del POC**: en la pantalla estaba Diablo II. Medido en el apilado de KWin:
+  `gamescope | Diablo II | fullScreen=true activa=true` arriba de `flycast | Flycast - prog |
+  keepAbove=true`; el emulador abre su ventana en la pantalla de 1024x768 donde el juego corre en
+  fullscreen, y el juego **activo** gana aunque la ventana del emulador tenga keep-above. Lo que se
+  probo, medido: `keepAbove` se aplica pero no alcanza; activar la ventana funciona pero le roba el foco
+  al juego; `SDL_VIDEO_WINDOW_POS` no tiene efecto; `w.move()` no existe, `w.output` es de solo lectura
+  y `Qt` no existe en el motor de scripts de KWin 6; **`w.frameGeometry = {x,y,width,height}` si** (la
+  ventana paso de 2830,385 a 210,210 con su mismo tamano, asi que el emulador sigue pintando 1:1). El
+  arreglo es `scripts/console/flycast-adelante.sh`, que `run-flycast.sh` llama solo cuando va a sacar
+  capturas. Re-medido: pantalla encontrada en 210,238 (ancho 640, o sea 1:1) y 4051/4051 pixeles.
+
+**Los mutantes** viven en `scripts/console/mutar-motor-pvr.sh` y son los del camino del color: `alpha0`
+(el indice 0 deja de ser transparente), `uv1` (la UV derecha pasa a 1.0 y muestrea el relleno de la
+textura), `pal1` (la textura usa el banco 1 de la paleta, que esta vacio) y `frame1` (se dibuja el
+frame 1 con la referencia del frame 0). Medido: **4/4 cazados** y control sano verde
+(`arte=4051/4051 transparentes=2085/2085 veredicto=OK`). El detalle que dejo el primer intento:
+`alpha0` daba `arte=4051/4051` y quedaba **verde** —sacar la transparencia del indice 0 no mueve NI UN
+pixel de arte, solo los transparentes— asi que el mutador ahora lee las dos lineas y el veredicto. El
+hueco estaba en el mutador, no en la comparacion (que ya daba NO COINCIDE).
+
+```
+source scripts/console/env.sh
+bash scripts/console/build-std-gox.sh                    # media: 7,3 s (44 paquetes)
+bash scripts/console/build-motor-pvr.sh /tmp/dcbuild/motor-pvr   # media: 3,1 s
+bash scripts/console/compare-motor-pvr.sh /tmp/dcbuild/motor-pvr # media: 20,0 s (texto + captura)
+bash scripts/console/mutar-motor-pvr.sh                  # media: 1 m 25 s (4 mutantes + control)
+```
+
+Evidencia con los numeros crudos: `evidencia/dc-002.9-motor-pvr.txt`, y los dos lados del resumen
+(`...-host.txt` y `...-consola.txt`, identicos).
