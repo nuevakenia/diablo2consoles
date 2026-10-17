@@ -513,6 +513,3 @@ func Truncate(nombre string, tam int64) error { return ErrNoSePuede }
 // syscall.Flock (que aca no bloquea nada) siga andando. Si alguna vez algo lo usara para leer de verdad,
 // tendria que fallar -- y no lo hace nadie: medido, el unico uso es el lock de d2hero.
 func (f *File) Fd() uintptr { return 0 }
-
-// Name: el nombre del archivo.
-func (f *File) Name() string { return f.nombre }
