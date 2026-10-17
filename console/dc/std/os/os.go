@@ -559,3 +559,9 @@ func SenalDeNombre(nombre string) Signal {
 	}
 	return nil
 }
+
+// TempDir: el directorio de temporales. En Go es "/tmp" (o lo que diga TMPDIR); aca es el romdisk, que es
+// el unico camino que EXISTE en la consola. Esta declarado a proposito: el romdisk es de SOLO LECTURA, o
+// sea que cualquiera que escriba ahi va a fallar -- y eso es correcto, no un descuido. Lo pide
+// d2app/autoclass.go:78 para sacar los archivos de clasificacion.
+func TempDir() string { return "/rd" }

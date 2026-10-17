@@ -12,7 +12,7 @@
 # que se excluyen del test del host y se prueban en la CONSOLA (console/dc/poc/vfs y los mutadores
 # mutar-os-consola.sh).
 
-KOS="os time log runtime sync/atomic compress/zlib compress/gzip io/fs io/ioutil os/signal embed"
+KOS="os time log runtime sync/atomic compress/zlib compress/gzip io/fs io/ioutil os/signal embed net context"
 # El patron de go list: d2std/os$ o d2std/time$ etc. Se ancla al final para que d2std/os/user NO quede
 # excluido por d2std/os.
 EXCLUIDOS="d2std/($(echo "$KOS" | tr ' ' '|'))\$"

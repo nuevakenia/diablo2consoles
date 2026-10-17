@@ -124,3 +124,8 @@ func UnlockOSThread() {}
 
 // SetFinalizer: no esta. El runtime de la consola no tiene finalizadores (medido: no hay
 // runtime.SetFinalizer en libgodc). Si el motor lo pide, se ve como tarjeta aparte.
+
+// SetCPUProfileRate: la frecuencia con que se toma la muestra del perfil de CPU. En la consola no se
+// perfila (un perfil se escribe a un archivo y el romdisk es de solo lectura), asi que no hace nada. Lo
+// pide d2app/autoperf.go:105.
+func SetCPUProfileRate(hz int) {}

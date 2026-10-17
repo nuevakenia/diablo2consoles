@@ -215,3 +215,62 @@ func (p *Pool) Put(x interface{}) {
 // necesita esperar/despertar con predicado; en la consola eso se puede hacer con un canal, pero no
 // esta hecho. Si el motor lo pide, va como tarjeta aparte en vez de inventar una version a medias.
 // Tampoco hay Map ni los tipos de atomicos de Go (esos estan en sync/atomic).
+
+// ---------------------------------------------------------------- las condiciones
+//
+// PARA QUE SE USA: d2networking/d2realm/client.go usa una Cond para que un hilo espere a que llegue un
+// mensaje sin quedarse dando vueltas gastando el procesador. Es la herramienta clasica para eso.
+//
+// COMO ESTA HECHA: con un canal por el que espera cada uno. Wait() se anota en la cola, suelta el candado,
+// espera su canal y lo vuelve a tomar; Signal() despierta al primero de la cola y Broadcast() a todos.
+// Es la misma cuenta que hace Go, con el candado de la cola aparte para que anotarse y despertar no se
+// pisen.
+
+// Locker: lo que se puede tomar y soltar (un Mutex, o un RWMutex por su lado de escritura).
+type Locker interface {
+	Lock()
+	Unlock()
+}
+
+// Cond: una condicion para esperar a que pase algo.
+type Cond struct {
+	L       Locker
+	cola    []chan struct{}
+	candado Mutex
+}
+
+// NewCond: arma la condicion, con el candado que la protege.
+func NewCond(l Locker) *Cond { return &Cond{L: l} }
+
+// Wait: suelta el candado y espera a que alguien avise. Al volver, el candado esta TOMADO otra vez (eso es
+// lo que hace util a la Cond: la condicion se revisa con el candado puesto).
+func (c *Cond) Wait() {
+	canal := make(chan struct{})
+	c.candado.Lock()
+	c.cola = append(c.cola, canal)
+	c.candado.Unlock()
+
+	c.L.Unlock()
+	<-canal
+	c.L.Lock()
+}
+
+// Signal: despierta a UNO de los que estan esperando (el que llego primero).
+func (c *Cond) Signal() {
+	c.candado.Lock()
+	if len(c.cola) > 0 {
+		close(c.cola[0])
+		c.cola = c.cola[1:]
+	}
+	c.candado.Unlock()
+}
+
+// Broadcast: despierta a TODOS.
+func (c *Cond) Broadcast() {
+	c.candado.Lock()
+	for _, canal := range c.cola {
+		close(canal)
+	}
+	c.cola = nil
+	c.candado.Unlock()
+}

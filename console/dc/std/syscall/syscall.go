@@ -56,3 +56,53 @@ var (
 	SIGHUP  = Signal{nombre: "hangup"}
 	SIGQUIT = Signal{nombre: "quit"}
 )
+
+// ---------------------------------------------------------------- los tiempos del proceso
+//
+// PARA QUE SE USA: d2app/autoperf_unix.go mide cuanto tiempo de CPU gasto el proceso (que, a diferencia
+// del reloj de pared, no se infla cuando otra cosa usa la maquina). Es una herramienta de medicion del
+// que programa, no parte del juego.
+//
+// POR QUE ES UN STUB: la Dreamcast no tiene procesos de sistema operativo ni contabilidad de tiempos de
+// CPU por proceso (no hay kernel POSIX). El valor que devuelve es CERO, y esta dicho: no se finge una
+// medicion que no existe. Para medir de verdad en la consola estan el reloj del hardware (TimerUsGettime64)
+// y la consola serie.
+
+// Rusage: el uso de recursos del proceso. Rusage = "resource usage".
+type Rusage struct {
+	Utime Timeval // tiempo en modo usuario
+	Stime Timeval // tiempo en modo sistema
+}
+
+// RUSAGE_SELF: "el propio proceso" (el unico valor que tiene sentido en la consola).
+const RUSAGE_SELF = 0
+
+// Getrusage: llena el uso de recursos. En la consola deja todo en cero (ver arriba) y devuelve nil, que
+// es lo que el que llama espera cuando hay respuesta; el cero es el valor.
+func Getrusage(quien int, uso *Rusage) error {
+	if uso != nil {
+		*uso = Rusage{}
+	}
+	return nil
+}
+
+// GetCurrentProcess: el identificador del proceso. En la consola hay uno solo: 1.
+func GetCurrentProcess() int { return 1 }
+
+// Timeval: un tiempo en segundos y microsegundos, como en POSIX.
+type Timeval struct {
+	Sec  int64
+	Usec int64
+}
+
+// Nano: los nanosegundos totales (asi se usa en Go: ru.Utime.Nano()).
+func (t Timeval) Nano() int64 { return t.Sec*1e9 + t.Usec*1e3 }
+
+// Los errores de red. En la consola no hay red (ver el paquete net), pero el motor los NOMBRA al comparar
+// el error que devolvio una conexion (d2networking/d2gsnet/env.go:29: si el error es ECONNRESET, la
+// conexion se corto de golpe). Existen para poder comparar; nunca los va a devolver nadie.
+var (
+	ECONNRESET   = errors.New("connection reset by peer")
+	ECONNREFUSED = errors.New("connection refused")
+	ETIMEDOUT    = errors.New("connection timed out")
+)

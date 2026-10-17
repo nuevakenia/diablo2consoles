@@ -27,6 +27,15 @@ func ProfilePath(ruta string) func(*Profile) {
 func Quiet(p *Profile) {}
 func TraceProfile(p *Profile) {}
 
+// Los tipos de perfil que el motor puede pedir. En Go cada uno le dice al perfilador QUE juntar; aca no
+// juntan nada (ver el comentario del principio: un perfil se escribe a un archivo y el romdisk es de solo
+// lectura), pero tienen que existir porque el motor los nombra (d2app/app.go:687-703).
+func BlockProfile(p *Profile)            {}
+func GoroutineProfile(p *Profile)        {}
+func MutexProfile(p *Profile)            {}
+func ThreadcreationProfile(p *Profile)   {}
+func ClockProfile(p *Profile)            {}
+
 // Start: arranca el perfil. En la consola no hay archivo donde escribirlo, asi que no arranca nada y
 // devuelve un perfil vacio (para que el codigo que lo guarda y despues llama a Stop siga su curso).
 func Start(opciones ...func(*Profile)) *Profile {

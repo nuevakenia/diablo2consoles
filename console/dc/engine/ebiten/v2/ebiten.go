@@ -86,6 +86,18 @@ func (i *Image) LlenarDeRGBA(c color.RGBA) {
 	}
 }
 
+// ReplacePixels: cambia TODOS los pixeles de una vez. MEDIDO en ebiten v2.0.2 (image.go:699): recibe los
+// bytes en RGBA (4 por pixel, en el orden rojo, verde, azul, alfa) y el largo tiene que ser el de la
+// imagen; si no, Ebitengine revienta. Aca, si el largo no da, no se hace nada (en la consola se prefiere no
+// cambiar nada antes que corromper la pantalla o caerse).
+// Lo pide d2core/d2render/ebiten/ebiten_surface.go:450, que es como el motor sube un cuadro al PVR.
+func (i *Image) ReplacePixels(pixeles []byte) {
+	if len(pixeles) != len(i.pixeles) {
+		return
+	}
+	copy(i.pixeles, pixeles)
+}
+
 func (i *Image) Clear() {
 	for j := range i.pixeles {
 		i.pixeles[j] = 0

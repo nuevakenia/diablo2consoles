@@ -122,3 +122,30 @@ func (d *Decoder) Decode(v interface{}) error { return ErrSinReflexion }
 
 // DisallowUnknownFields: sin efecto.
 func (d *Decoder) DisallowUnknownFields() {}
+
+// RawMessage: un pedazo de JSON guardado tal cual, sin interpretarlo.
+//
+// PARA QUE SE USA: d2networking/d2netpacket lo usa para el contenido del mensaje (el sobre se sabe leer, y
+// adentro va el paquete que se manda tal como lo armo el que lo escribio). Es justo el caso en el que NO
+// hace falta reflexion: nadie mira adentro, solo lo guarda y lo vuelve a mandar.
+//
+// Las dos funciones son las de Go, tal cual: si esta vacio se escribe `null`, y al leer se guarda una copia
+// (copiar importa: el pedazo que llega se puede reusar arriba y quedaria cambiando solo).
+type RawMessage []byte
+
+// MarshalJSON: lo devuelve tal cual (o `null` si esta vacio).
+func (m RawMessage) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return []byte("null"), nil
+	}
+	return m, nil
+}
+
+// UnmarshalJSON: guarda una copia de lo que llego.
+func (m *RawMessage) UnmarshalJSON(datos []byte) error {
+	if m == nil {
+		return errors.New("json.RawMessage: UnmarshalJSON sobre un puntero nil")
+	}
+	*m = append((*m)[0:0], datos...)
+	return nil
+}
