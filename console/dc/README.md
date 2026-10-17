@@ -1657,6 +1657,14 @@ misma imagen (13.910.992 cargados, 610.304 libres) la escalera medida es:
     512                       1 MB      pasa las DOS paredes de RAM y llega al panic de Go del init
     256                     512 KB      igual que 512 (con arena mas chica: 1.915.772 contra 2.440.060)
 
+**OJO — RE-MEDIDO EN DC-002.25 (seccion 41): las filas de 512 y 256 de esa tabla se midieron con la copia
+por Store Queue del GC ROTA** (DC-002.24 la encontro: el area de la Store Queue salia 0 = la BIOS, las
+escrituras se descartaban y el conjunto vivo del GC era practicamente VACIO, no se copiaba nada). Con la
+copia arreglada la escalera **se da vuelta**: con el semiespacio en **256 KB el arranque ya NO alcanza**
+(`fatal error: out of memory`, 10 marcas de 11, 0 cuadros del loop) y con **512 KB completa cuadros** (3,
+11 marcas, sin OOM). La tabla se deja tal como se midio, con su fecha; la medicion corregida esta en la
+seccion 41.
+
 El recorte es entonces de configuracion del runtime, con el script idempotente que ya usa el proyecto para el
 vendor: **`scripts/console/fix-libgodc-gc.py 512 --build`** (por defecto 512 KB, el semiespacio mas grande
 que llega hasta el fondo). Costo declarado: un heap de 512 KB GC-ea mucho mas seguido; sirve para el arranque
@@ -2259,6 +2267,15 @@ identico):
     KB=512   Out of memory ... diff 98304     Memory: arena=2579324 used=2576068 free=3256
     KB=256   Out of memory ... diff 1916928   Memory: arena=2415484 used=2372348 free=43136
 
+**OJO — RE-MEDIDO EN DC-002.25 (seccion 41): las DOS lineas de arriba se midieron con el defecto de la copia
+por Store Queue del GC PUESTO** (las escrituras de la copia se descartaban, el area salia siempre 0 = la
+BIOS: ver la seccion 40). Con la copia rota el conjunto vivo del GC era practicamente VACIO y por eso "256 KB
+alcanzaba". Con el GC SANO la escalera se da vuelta: **256 KB ya no alcanza** (`fatal error: out of memory`
+durante `Create()`, 10 marcas de 11, 0 cuadros) y **512 KB completa cuadros** (3, 11 marcas, sin OOM, monton
+de C: 3968 libres antes del motor y 40.776 al crear la pantalla). El resto de esta seccion (la palanca, el
+corpus, las paredes declaradas) sigue valiendo; lo que cambia es el VALOR, y el corpus de la seccion 41 ya
+no deja pasar un 256 KB como verde.
+
 La pared de 98.304 **desaparece** (la imagen del atlas de texto entra) y la arena queda 163.840 bytes mas
 chica, que NO es lo que libera el semiespacio: con 256 KB el arranque llega mas lejos y vuelve a consumir (el
 atlas entra y el motor sigue cargando). Se declara tal cual, sin repartir esa diferencia a mano.
@@ -2285,7 +2302,8 @@ el motor; (4) **NO** esta la pared de 98.304; (5) **SI** esta la de 1.916.928; (
 2.415.484 con 43.136 libres). El par 4+5 es el que no se puede pasar por verde solo: uno exige que la pared
 vieja no este y el otro que la nueva si, con su numero. Resultado: **6/6 controles verdes y 1/1 mutante
 cazado** (`fix-libgodc-gc.py` deja el vendor en 256 KB y rehace `libgodc.a`, que es lo que el Makefile no hace
-solo: `%.o: %.c` no tiene dependencias de cabeceras).
+solo: `%.o: %.c` no tiene dependencias de cabeceras). **DC-002.25 movio esa aguja: con el GC sano el vendor
+queda en 512 KB y el mutante del corpus es ahora el 256 KB de esta seccion (ver la 41).**
 
 **5. El corpus de DC-002.14 que quedo muerto, alineado.** `checar-recorte-214.sh` clavaba `KB_OK=512` y
 salia con error si el vendor no estaba en 512: con el valor nuevo el corpus **no arrancaba**. Se alineo
@@ -2532,3 +2550,105 @@ motor (`monton de C antes del motor: 3968 bytes libres`), la pared de RAM de DC-
 Barreras: `test-std-host.sh` **verde en amd64 y 386** y `compare-motor-dc6.sh` **IGUAL** (31 lineas
 identicas, 30 frames comparados). Evidencia cruda:
 `evidencia/dc-002.24-copia-por-store-queue.txt`.
+
+## 41. DC-002.25: la escalera del GC re-medida con el **GC sano** (512 KB es el valor, 256 ya no alcanza) y la cadena del vendor que **no era idempotente**
+
+DC-002.24 cerro dejando dos cosas pendientes por escrito (§40, punto 5): con la copia por Store Queue del GC
+**arreglada**, el conjunto vivo del GC ya no es vacio (~270 KB) y **toda** medicion hecha con el defecto
+puesto hay que re-medir. Esta tarjeta re-mide la escalera del semiespacio (DC-002.21) y el corpus del recorte
+(DC-002.14), corrige los numeros que quedaron mal en las secciones 30 y 37, y de paso encuentra **un defecto
+nuevo**: la cadena de arreglos del vendor **no era idempotente**.
+
+**1. La escalera, medida con el GC sano (mismo POC `motor-arranque`, mismo gox, 30 s; solo cambia
+`GC_SEMISPACE_SIZE_KB`).** El escenario completo es 512 -> 384 -> 256 KB:
+
+    KB     cuadros del loop   marcas MOTOR-ARRANQUE   OOM                          monton de C antes del motor   PVR-FRAMEBUFFER   cuadro
+    512    3                 11 (1 arranque)         no                           3968 bytes libres             40776 libres      306.939 us
+    384    3                 11 (1 arranque)         no                           3968 bytes libres             40776 libres      309.410 us
+    256    0                 10 (1 arranque)         fatal error: out of memory   3968 bytes libres             --                --
+
+Con 256 KB el arranque muere **dentro de `d2app.Create()`** (despues de la marca 1 y del `[App][INFO]`, antes
+de la marca 2) y el OOM de newlib lo imprime con su cuenta: `Memory: arena=688700 used=684732 free=3968`. Es
+**determinista**: 3 corridas del mismo binario dieron las tres veces 0 cuadros, 10 marcas y el mismo
+`Memory:`. Con 384 KB y 512 KB el arranque entra al loop y completa **3 cuadros** (el corte silencioso
+despues del cuadro 2 es el defecto ABIERTO de DC-002.24b, no de esta tarjeta: el arranque llega y pinta).
+
+**2. Lo que hay que corregir en el registro (la historia se deja, la medicion se corrige).** La seccion 37
+(DC-002.21) y la seccion 30 (DC-002.14) dicen que **256 KB alcanza** y que 512 KB muere en la imagen del
+atlas (`diff 98304`). Las dos mediciones se hicieron **con el defecto de la copia por Store Queue puesto**:
+con la copia rota no se copiaba nada, el conjunto vivo del GC era practicamente vacio y por eso un semiespacio
+chico "alcanzaba". Con el GC sano **la escalera se da vuelta**: 512 KB es el valor (llega al loop, y el
+conjunto vivo queda al 51%: `copiado=269784 antes=524288`, DC-002.24), 384 KB arranca sin margen medido y
+256 KB **no alcanza**. Las dos secciones llevan ahora una nota en el lugar donde estaba el numero viejo,
+apuntando aca; **no se borro ninguna medicion**.
+
+**3. El corpus de la escalera, re-escrito (`scripts/console/checar-gc-221.sh`).** Los controles ahora corren
+sobre el valor que anda (512 KB) y el **mutante es el valor viejo (256 KB)**, que tiene que caer:
+
+    control 1 (las 11 marcas por arranque):        VERDE
+    control 2 (la seleccion de archivos):          VERDE
+    control 3 (el config lo lee el motor):         VERDE
+    control 4 (NO esta la pared de 98.304):        VERDE
+    control 5 (el motor ENTRA al loop):            VERDE
+    control 6 (el monton de C medido):             VERDE   <- los numeros se re-midieron: 3968 y 40.776
+    mutante 256 KB:                                CAZADO  <- `fatal error: out of memory`, 0 cuadros, 10 marcas
+    resultado: 6/6 controles verdes, 1/1 mutante cazado
+
+El corpus es ademas **el vigia del GC**: el par *512-arranca / 256-no-alcanza* solo se sostiene si la copia por
+Store Queue esta sana. Si alguien la vuelve a romper, el conjunto vivo se vacia, 256 KB vuelve a "alcanzar" y
+el mutante queda **verde** -> el corpus sale ROJO por mutante no cazado (no se puede pasar por verde con un GC
+que no copia). Se declara en el encabezado del propio script.
+
+**4. UN DEFECTO NUEVO: la cadena del vendor no era idempotente.** La regla del proyecto (y la promesa escrita
+de `fix-libgodc-gc.py`, "correrlo dos veces deja el mismo sha256") no se cumplia: `reemplazar()` de
+`fix-libgodc-sq.py` miraba **primero el texto viejo**, y `VIEJO_FIN` (el `if (remainder > 0) memcpy(...)`) es
+una **SUBCADENA** de `NUEVO_FIN`, asi que despues de aplicar el arreglo el conteo del texto viejo seguia dando
+1 (el de adentro del nuevo) y **cada corrida insertaba otra invalidacion de cache**. Medido:
+
+    gc_copy.c pristino (git show HEAD:)                43749 bytes, 1 `dcache_inval_range`
+    cadena canonica (una corrida sobre el pristino)    44509 bytes, 2
+    gc_copy.c que habia en el vendor (acumulado)       46699 bytes, 8   <- 2.190 bytes de invalidaciones repetidas
+    libgodc.a por corrida de la cadena (acumulado)     206364 -> 206372 -> 206380 -> 206384 -> 206392 ... (crecia)
+
+El arreglo es **una comprobacion en el orden correcto** (mirar primero el RESULTADO: si el texto nuevo ya
+esta, la cadena ya paso por aca). Re-medido con su corpus nuevo
+(`scripts/console/checar-idempotencia-vendor.sh`, que arranca de un reset pristino por LECTURA -- `git show
+HEAD:runtime/gc_copy.c`, no un `git checkout`):
+
+    control 1 (dos corridas dejan el mismo gc_copy.c):        VERDE  (44509 bytes, sha 379271ee57d1dd61, 2)
+    mutante (el orden viejo del guard):                        CAZADO (44509 -> 44874 bytes, 2 -> 3)
+    control 2 (de vuelta: la cadena vuelve al mismo estado):   VERDE
+    resultado: 2/2 controles verdes, 1/1 mutante cazado
+
+Declarado: el `sha256` de `libgodc.a` **no** es reproducible (su tamano sigue al del fuente -- crecio con las
+invalidaciones acumuladas --, pero `ar` guarda el mtime de cada objeto, asi que dos builds del MISMO fuente
+dan sha distinto con el mismo tamano); por eso el corpus compara `gc_copy.c`, que es la fuente.
+
+**5. El corpus del recorte (DC-002.14): lo que se corrigio y lo que quedo declarado.**
+`checar-recorte-214.sh` tenia clavado el veredicto del arranque en las dos formas de la era del defecto
+(`pasa-el-techo-de-RAM panic=...` y `cae-gc-external diff 1916928`). Con el GC sano el veredicto del arranque
+de hoy con 512 KB es **`arranca 11 marcas`** (llega al motor), asi que ese caso se agrego al control 3 y a la
+vuelta, y el encabezado se re-escribio con la historia corregida. **No se pudo correr de punta a punta**: sus
+dos artefactos viven en `/tmp` y no sobrevivieron (faltaban `/tmp/dcbuild/motor-214` y
+`/tmp/dcbuild/motor-arranque`), y el gox del recorte (`/tmp/gox-214-gc`, de DC-002.14) **no enlaza el POC de
+hoy**:
+
+    console/dc/poc/motor-arranque/main.go:54:57: error: reference to undefined identifier 'os.RamfsTam'
+    main.go:199:71: error: reference to undefined identifier 'ebiten.MemLibreDelMonton'
+    main.go:226:81: error: reference to undefined identifier 'ebiten.VramDelFramebuffer'
+
+Para re-correrlo hay que rehacer el gox del recorte con sus flags (`recorte-214.sh` sin `SALTAR_GOX`), que es
+trabajo de esa tarjeta y no de esta. Lo que **si** se re-midio es la parte que depende del GC: que el arranque
+pase las paredes de RAM con el semiespacio en 512 KB es el mismo hecho que mide el control sano de
+`checar-gc-221.sh` (11 marcas, 3 cuadros). Los controles 1, 2 y 4 de ese corpus (el instrumento que se niega a
+mentir, el peso del dato por dos caminos y el registro del linker) no dependen del semiespacio.
+
+**6. Los valores por defecto que estaban al reves.** `fix-libgodc-gc.py` tenia **256 KB por defecto** (el valor
+del defecto) y su texto lo justificaba con las mediciones malas: el default pasa a **512 KB** y el encabezado
+dice de donde sale. Declarado, y **no** re-medido aca: los dos instrumentos de traza del GC
+(`fix-libgodc-alloc-traza.py`, `fix-libgodc-campo-traza.py`) siguen clavando 256 KB en sus llamadas -- son de
+la era del defecto y re-medirlos es tarjeta aparte.
+
+Barreras: `test-std-host.sh` **verde en amd64 y 386** (13/13 excluidos), `mutar-std-host.sh` **39/39 chequeos
+cazados** (el arbol queda sano) y `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas, 30 frames comparados).
+Evidencia cruda: `evidencia/dc-002.25-escalera-gc-sano.txt`.

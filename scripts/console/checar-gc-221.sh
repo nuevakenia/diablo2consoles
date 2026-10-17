@@ -1,34 +1,38 @@
 #!/bin/bash
-# CORPUS DE DC-002.21: EL MONTON DEL MOTOR -- el semiespacio del GC contra las paredes de RAM.
-# ALINEADO EN DC-002.22: el motor ya no pide su pantalla al monton (vive en la VRAM), asi que la pared de
-# 1.916.928 bytes DEJO DE EXISTIR y el arranque ENTRA AL LOOP. Los controles 5 y 6, y las marcas por
-# arranque (10 -> 11), se movieron con la medicion. Ademas `GEN` pasa a ser el gox de la rama: el POC de
-# hoy usa `ebiten.MemLibreDelMonton`/`VramDelFramebuffer`, que NO estan en el gox de DC-002.20 y el
-# reenlace no enlazaba (medido: "reference to undefined identifier 'ebiten.MemLibreDelMonton'").
+# CORPUS DEL SEMIESPACIO DEL GC -- RE-MEDIDO EN DC-002.25 CON EL GC SANO.
 #
-# El arranque del motor, con el gzip ya arreglado (DC-002.20), moria pidiendo 98.304 bytes contiguos para
-# la imagen del atlas de texto, con 3.096 bytes libres en el monton de C (newlib: arena 2.579.164). Esta
-# tarjeta mide el semiespacio del GC (2 x GC_SEMISPACE_SIZE_KB, que sale del MISMO monton) y las paredes que
-# quedan en cada valor:
+# HISTORIA (se corrige la medicion, no se borra): DC-002.21 midio esta escalera con el defecto de la copia
+# por Store Queue PUESTO (las escrituras de la copia se descartaban: el area salia siempre 0 = la BIOS, ver
+# scripts/console/fix-libgodc-sq.py). Con la copia rota el conjunto vivo del GC era PRACTICAMENTE VACIO (no
+# se copiaba nada), asi que los numeros de entonces -- "256 KB alcanza", "512 KB muere en la imagen del
+# atlas (diff 98304)" -- NO valen para un GC sano. DC-002.24 arreglo la copia y DC-002.25 re-midio la
+# escalera: con el GC sano la escalera se DA VUELTA.
 #
-#   KB=512  (el valor que dejo DC-002.14)  ->  Out of memory ... diff 98304    (la imagen del atlas)
-#   KB=256  (esta tarjeta)                 ->  Out of memory ... diff 1916928  (el atlas ya entra, y lo que
-#                                              no entra es la pantalla del motor -- MEDIDO en DC-002.22:
-#                                              800x600x4 = 1.920.000 bytes; hoy esa pantalla vive en la
-#                                              VRAM y el OOM no esta)
+# LO MEDIDO EN DC-002.25 (mismo POC `motor-arranque`, mismo gox, 30 s; solo cambia GC_SEMISPACE_SIZE_KB):
 #
-# El "mutante" de esta tarjeta es el valor VIEJO: volver a 512 tiene que hacer reaparecer la pared de 98.304
-# bytes. Es el unico mutante honesto aca, porque el defecto no es una linea de codigo sino un PRESUPUESTO:
-# el que lo cambia es un numero del vendor y se aplica con su script idempotente.
+#   KB=512  cuadros 3, 11 marcas / 1 arranque, SIN OOM, monton de C antes del motor 3968 libres,
+#           PVR-FRAMEBUFFER 40776 libres   <- EL VALOR (deja el conjunto vivo al 51%, DC-002.24)
+#   KB=384  cuadros 3, 11 marcas, SIN OOM, mismos 3968/40776  (arranca, pero sin margen medido)
+#   KB=256  cuadros 0, 10 marcas: `fatal error: out of memory`
+#           (Memory: arena=688700 used=684732 free=3968)     <- EL VALOR VIEJO (DC-002.21): ya NO alcanza
 #
-# CONTROLES (sobre la corrida con KB=256):
-#  1. las 11 marcas MOTOR-ARRANQUE por arranque (el arranque no cambio de forma)
-#  2. la seleccion de archivos sigue verde (Complete y Validate.OK con 7 vistos)
-#  3. el config lo lee el motor (loaded configuration file from ...)
+# CONTROLES (sobre la corrida con KB=512):
+#  1. las 11 marcas MOTOR-ARRANQUE por arranque (total = 11 x arranques)
+#  2. la seleccion de archivos sigue verde (Complete= true Validate.OK()= true con 7 vistos)
+#  3. el config lo lee el motor (loaded configuration file from /rd/OpenDiablo2/config.json)
 #  4. NO esta la pared de 98.304 bytes: el atlas de texto ENTRA
-#  5. el motor ENTRA AL LOOP (DC-002.22): pide el cuadro 0 al PVR (la pared de 1.916.928 ya no esta)
-#  6. el monton de C medido: 4.128 libres antes del motor y 40.936 al crear la pantalla (el pedido grande
-#     ya no sale de ahi)
+#  5. el motor ENTRA AL LOOP (pide el cuadro 0 al PVR; DC-002.22 saco la pantalla del monton)
+#  6. el monton de C medido: 3968 libres antes del motor y 40.776 al crear la pantalla
+#
+# MUTANTE (1): el valor VIEJO del vendor, `fix-libgodc-gc.py 256 --build`. Tiene que CAER (fatal error:
+# out of memory, sin llegar al loop). Es el unico mutante honesto aca porque el defecto no es una linea de
+# codigo sino un PRESUPUESTO: el que lo cambia es un numero del vendor y se aplica con su script
+# idempotente.
+#
+#   OJO, ESTE CORPUS ES ADEMAS EL VIGIA DEL GC: el par 512-arranca / 256-no-alcanza solo se sostiene con la
+#   copia por Store Queue ARREGLADA. Si alguien la vuelve a romper, el conjunto vivo se vacia, 256 KB
+#   vuelve a "alcanzar" y el mutante queda VERDE -> el corpus sale ROJO por mutante no cazado. El hueco no
+#   se tapa: se declara (el corpus no puede pasar por verde con un GC que no copia).
 #
 # Uso:  bash scripts/console/checar-gc-221.sh [dir_gox] [segundos]
 set -uo pipefail
@@ -60,11 +64,10 @@ correr() { # $1 = dir de build, $2 = dir de la corrida
 }
 
 # ---------------------------------------------------------------- los seis controles
-# OJO (medido): despues del OOM la consola REARRANCA y el programa vuelve a correr, asi que el log repite la
-# secuencia (medido: 50 marcas = 5 arranques). Y el texto del OOM NO sale en todos los arranques: en 4 de 5
-# solo quedo la secuencia de marcas (medido). Por eso la marca no se cuenta "hasta el primer OOM" sino por
-# ARRANQUE COMPLETO: cada arranque imprime sus 10 marcas y su linea "MOTOR-ARRANQUE arranca", asi que se
-# exige que las dos cuentas cierren (total = 10 x arranques).
+# OJO (medido en DC-002.21): despues de un OOM la consola REARRANCA y el programa vuelve a correr, asi que
+# el log puede repetir la secuencia. Por eso la marca no se cuenta "hasta el primer OOM" sino por ARRANQUE
+# COMPLETO: cada arranque que llega al motor imprime sus 11 marcas y su linea "MOTOR-ARRANQUE arranca", asi
+# que se exige que las dos cuentas cierren (total = 11 x arranques).
 c_marcas() {
     local total arranques
     total=$(grep -ac 'MOTOR-ARRANQUE' "$1")
@@ -76,8 +79,9 @@ c_config()     { grep -qaF 'loaded configuration file from /rd/OpenDiablo2/confi
 c_sin_98304()  { ! grep -qaF 'diff 98304' "$1"; }
 c_loop()       { grep -qaF 'EBITEN-LOOP cuadro 0 esperando el cuadro del PVR' "$1" \
                    && grep -qaF 'EBITEN-LOOP cuadro 0 el PVR dio el cuadro, abro la lista' "$1"; }
-c_monton()     { grep -qaF 'monton de C: libre 40936 bytes' "$1" \
-                   && grep -qaF 'monton de C antes del motor: 4128 bytes libres' "$1"; }
+# DC-002.25: los dos numeros son la re-medicion con el GC sano (con el defecto eran 4128 y 40936).
+c_monton()     { grep -qaF 'monton de C: libre 40776 bytes' "$1" \
+                   && grep -qaF 'monton de C antes del motor: 3968 bytes libres' "$1"; }
 
 controles() { # $1 = log; imprime los seis y devuelve cuantos dan bien (en la ultima linea)
     local log="$1" bien=0
@@ -94,45 +98,56 @@ mostrar() {
     grep -a 'MOTOR-ARRANQUE seleccion\|Out of memory\|fatal error\|Memory:\|loaded config' "$1" | tr -d '\r' | sed 's/^/     /'
 }
 
-# ---------------------------------------------------------------- 1. la pared de 512 KB (el valor viejo)
-echo "== 1. semiespacio 512 KB (el valor de DC-002.14: la pared de la imagen del atlas)"
+cuadros() { grep -ac 'EBITEN-LOOP cuadro [0-9]* listo' "$1"; }
+
+# el valor viejo NO alcanza: OOM + sin loop + las marcas no cierran (10 en vez de 11)
+mutante_cae() { # $1 = log
+    grep -qaF 'fatal error: out of memory' "$1" || return 1
+    grep -qaF 'EBITEN-LOOP cuadro 0 esperando el cuadro del PVR' "$1" && return 1
+    local total arranques
+    total=$(grep -ac 'MOTOR-ARRANQUE' "$1")
+    arranques=$(grep -ac 'MOTOR-ARRANQUE arranca' "$1")
+    [ "$arranques" -ge 1 ] && [ "$total" != "$((11 * arranques))" ]
+}
+
+# ---------------------------------------------------------------- 1. el control sano, con el valor que anda
+echo "== 1. semiespacio 512 KB (el valor que deja fix-libgodc-sq.py: el conjunto vivo al 51%)"
 python3 "$HERE/fix-libgodc-gc.py" 512 --build 2>&1 | sed 's/^/   /' | tail -4
 compilar /tmp/dcbuild/gc221-kb512 || exit 1
 correr /tmp/dcbuild/gc221-kb512 /tmp/gc221-kb512 || exit 1
-if grep -qaF 'diff 98304' /tmp/gc221-kb512/flycast.log; then
-    echo "   el MUTANTE cae: con 512 KB vuelve la pared de 98.304 bytes (el atlas de texto no entra)"
-    CAZADOS=$((CAZADOS + 1))
-else
-    CUADROS512="$(grep -ac 'EBITEN-LOOP cuadro [0-9]* listo' /tmp/gc221-kb512/flycast.log)"
-    echo "   NO LO CAZO, Y LA RAZON ES BUENA (medida en DC-002.22): con el framebuffer del motor YA FUERA"
-    echo "   del monton, 512 KB no lo ahoga -- completa $CUADROS512 cuadros del loop (el control sano se cae en"
-    echo "   el cuadro 0). O sea: el valor viejo del semiespacio dejo de ser un defecto. El presupuesto del GC"
-    echo "   lo sigue vigilando el comodin de checar-recorte-214.sh (el GC en 2048 KB muere en gc_init)."
-    echo "   Se declara (no se esconde): un mutante que no cae es informacion, no un verde que se aprueba."
-fi
+BIEN="$(controles /tmp/gc221-kb512/flycast.log | sed -n '$p')"
+controles /tmp/gc221-kb512/flycast.log | sed -n '1,6p'
+echo "   cuadros del loop completos: $(cuadros /tmp/gc221-kb512/flycast.log)"
 mostrar /tmp/gc221-kb512/flycast.log
-
-# ---------------------------------------------------------------- 2. el valor de esta tarjeta
-echo
-echo "== 2. semiespacio 256 KB (esta tarjeta)"
-python3 "$HERE/fix-libgodc-gc.py" 256 --build 2>&1 | sed 's/^/   /' | tail -4
-compilar /tmp/dcbuild/gc221-kb256 || exit 1
-correr /tmp/dcbuild/gc221-kb256 /tmp/gc221-kb256 || exit 1
-BIEN="$(controles /tmp/gc221-kb256/flycast.log | sed -n '$p')"
-controles /tmp/gc221-kb256/flycast.log | sed -n '1,6p'
-mostrar /tmp/gc221-kb256/flycast.log
 if [ "$BIEN" -ne "$TOTAL_CTRL" ]; then
     echo "   EL CONTROL SANO NO DA ($BIEN/$TOTAL_CTRL)" >&2
     exit 1
 fi
 echo "   OK: $BIEN/$TOTAL_CTRL controles verdes"
 
-# ---------------------------------------------------------------- 3. el arbol queda en 256
+# ---------------------------------------------------------------- 2. el mutante: el valor VIEJO (256 KB)
 echo
-echo "== 3. el vendor queda en 256 KB (idempotente) y se verifica"
-python3 "$HERE/fix-libgodc-gc.py" 256 2>&1 | grep -a 'GC_SEMISPACE\|semiespacio' | sed 's/^/   /'
+echo "== 2. mutante: semiespacio 256 KB (el valor de DC-002.21, medido con la copia rota)"
+python3 "$HERE/fix-libgodc-gc.py" 256 --build 2>&1 | sed 's/^/   /' | tail -4
+compilar /tmp/dcbuild/gc221-kb256 || exit 1
+correr /tmp/dcbuild/gc221-kb256 /tmp/gc221-kb256 || exit 1
+if mutante_cae /tmp/gc221-kb256/flycast.log; then
+    echo "   el MUTANTE cae: con 256 KB el arranque muere en 'fatal error: out of memory' y no llega al loop"
+    echo "   ($(cuadros /tmp/gc221-kb256/flycast.log) cuadros, $(grep -ac 'MOTOR-ARRANQUE' /tmp/gc221-kb256/flycast.log) marcas de 11)"
+    CAZADOS=$((CAZADOS + 1))
+else
+    echo "   NO LO CAZO: con 256 KB el arranque ENTRA igual -- el GC no esta copiando como debe" >&2
+    echo "   (mirar scripts/console/fix-libgodc-sq.py: con la copia por Store Queue rota el conjunto vivo" >&2
+    echo "    del GC queda vacio y cualquier semiespacio 'alcanza')" >&2
+fi
+mostrar /tmp/gc221-kb256/flycast.log
+
+# ---------------------------------------------------------------- 3. el arbol queda en 512
+echo
+echo "== 3. el vendor queda en 512 KB (idempotente) y se rehace libgodc"
+python3 "$HERE/fix-libgodc-gc.py" 512 --build 2>&1 | grep -a 'GC_SEMISPACE\|libgodc.a:' | sed 's/^/   /'
 
 echo
 echo "== $CAZADOS/$TOTAL_MUT mutantes cazados, $BIEN/$TOTAL_CTRL controles verdes =="
-echo "   (el mutante del semiespacio queda declarado NO cazado con su razon medida: DC-002.22 lo dejo sin causa)"
-[ "$BIEN" -eq "$TOTAL_CTRL" ]
+echo "   (un mutante verde = el valor viejo dejo de ser defecto O el GC dejo de copiar: las dos cosas se miran)"
+[ "$BIEN" -eq "$TOTAL_CTRL" ] && [ "$CAZADOS" -eq "$TOTAL_MUT" ]

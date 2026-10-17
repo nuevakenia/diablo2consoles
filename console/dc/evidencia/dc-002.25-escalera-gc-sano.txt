@@ -1,0 +1,167 @@
+================================================================================
+DC-002.25 -- LA ESCALERA DEL SEMIESPACIO DEL GC RE-MEDIDA CON EL GC SANO
+(y la cadena del vendor que no era idempotente)
+================================================================================
+Rama DC-002. Host: CachyOS x86-64. Consola emulada: Flycast (reios), POC
+`motor-arranque` (el arranque del motor de verdad). Todo con el runtime del vendor
+YA ARREGLADO: copia por Store Queue (fix-libgodc-sq.py, DC-002.24) + semiespacio
+del GC en 512 KB. El binario cargado es el mismo en las tres corridas: solo cambia
+`GC_SEMISPACE_SIZE_KB` en ~/dreamcast/libgodc/runtime/godc_config.h.
+
+FECHA: 2026-10-17 (corrida autonoma, ramp DC-002).
+
+COMANDOS (los de la tarjeta), por KB:
+    python3 scripts/console/fix-libgodc-gc.py <KB> --build
+    POC=motor-arranque bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/dc225-kb<KB> /tmp/gox-222
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/dc225-kb<KB>/prog-emu.elf 30 /tmp/dc225-kb<KB>
+
+--------------------------------------------------------------------------------
+1. LA ESCALERA (lo medido)
+--------------------------------------------------------------------------------
+KB=512  (2026-10-17 18:52:10)
+    cuadros del loop completos: 3   marcas MOTOR-ARRANQUE: 11   arranques: 1
+    OOM / paredes: (ninguna)
+    MOTOR-ARRANQUE monton de C antes del motor: 3968 bytes libres
+    PVR-FRAMEBUFFER monton de C: libre 40776 bytes (el runtime lo imprime como free)
+    [App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json
+    MOTOR-ARRANQUE seleccion: Complete= true Validate.OK()= true archivos que ve= 7 faltan= 0
+    EBITEN-LOOP cuadro 0/1/2 listo
+    EBITEN-PERFIL dibujar_us 251772 convertir_us 55164 subir_us 0 pintar_us 3 cuadro_us 306939
+    excepcion: (ninguna)
+
+KB=384  (2026-10-17 18:52:42)
+    cuadros del loop completos: 3   marcas MOTOR-ARRANQUE: 11   arranques: 1
+    OOM / paredes: (ninguna)
+    MOTOR-ARRANQUE monton de C antes del motor: 3968 bytes libres
+    PVR-FRAMEBUFFER monton de C: libre 40776 bytes (el runtime lo imprime como free)
+    EBITEN-PERFIL dibujar_us 254277 convertir_us 55130 subir_us 1 pintar_us 2 cuadro_us 309410
+    excepcion: (ninguna)
+
+KB=256  (2026-10-17 18:53:14)
+    cuadros del loop completos: 0   marcas MOTOR-ARRANQUE: 10   arranques: 1
+    fatal error: out of memory
+    Memory: arena=688700 used=684732 free=3968
+    (las 10 marcas: se pierde la marca 2 = el motor muere DENTRO de d2app.Create(), despues de
+     "marca 1: entrando a d2app.Create()" y del "[App][INFO] OpenDiablo2 - Open source Diablo 2 engine")
+    excepcion: (ninguna)
+
+--------------------------------------------------------------------------------
+2. EL MUTANTE, REPETIDO (determinismo)
+--------------------------------------------------------------------------------
+Mismo ELF de 256 KB (/tmp/dcbuild/gc221-kb256/prog-emu.elf), 3 corridas de 30 s:
+    corrida 1: cuadros=0 marcas=10 oom=1  Memory: arena=688668 used=684732 free=3936   <- ver nota
+    corrida 2: cuadros=0 marcas=10 oom=1  Memory: arena=688668 used=684732 free=3936
+    corrida 3: cuadros=0 marcas=10 oom=1  Memory: arena=688668 used=684732 free=3936
+    (las 3 identicas: el defecto no es intermitente)
+NOTA DECLARADA: con la cadena canonica (2 invalidaciones en gc_copy.c) el mismo 256 KB imprime
+`arena=688700 free=3968`; con el binario de la corrida previa (gc_copy.c con 8 invalidaciones
+acumuladas) imprimia `arena=688668 free=3936`. Son 32 bytes de diferencia: lo que NO cambia es que
+256 KB no alcanza (0 cuadros, 10 marcas, OOM). El numero fino del arena depende del layout exacto
+del runtime -- por eso el corpus compara lo que tiene que ser igual (marcas, cuadros, OOM) y no el byte.
+
+--------------------------------------------------------------------------------
+3. EL CORPUS DE LA ESCALERA, RE-ESCRITO: 6/6 + 1/1
+--------------------------------------------------------------------------------
+    bash scripts/console/checar-gc-221.sh /tmp/gox-222 30
+
+== 1. semiespacio 512 KB (el valor que deja fix-libgodc-sq.py: el conjunto vivo al 51%)
+   control 1 (las 11 marcas):              VERDE
+   control 2 (la seleccion):               VERDE
+   control 3 (el config):                  VERDE
+   control 4 (el atlas de texto ENTRA):    VERDE
+   control 5 (el motor ENTRA al loop):     VERDE
+   control 6 (el monton de C medido):      VERDE
+   cuadros del loop completos: 3
+   OK: 6/6 controles verdes
+
+== 2. mutante: semiespacio 256 KB (el valor de DC-002.21, medido con la copia rota)
+   el MUTANTE cae: con 256 KB el arranque muere en 'fatal error: out of memory' y no llega al loop
+   (0 cuadros, 10 marcas de 11)
+     fatal error: out of memory
+     Memory: arena=688700 used=684732 free=3968
+
+== 3. el vendor queda en 512 KB (idempotente) y se rehace libgodc
+      GC_SEMISPACE_SIZE_KB: 256 -> 512
+      /home/dgalli/dreamcast/libgodc/libgodc.a: 206364 bytes
+
+== 1/1 mutantes cazados, 6/6 controles verdes ==
+   (un mutante verde = el valor viejo dejo de ser defecto O el GC dejo de copiar: las dos cosas se miran)
+
+--------------------------------------------------------------------------------
+4. EL DEFECTO NUEVO: LA CADENA DEL VENDOR NO ERA IDEMPOTENTE (y su corpus)
+--------------------------------------------------------------------------------
+MEDIDO EN ROJO (antes del arreglo; el archivo venia acumulado de las corridas previas):
+    gc_copy.c pristino (git show HEAD:runtime/gc_copy.c)   43749 bytes   1  invalidacion
+    gc_copy.c que habia en el vendor (acumulado)           46699 bytes   8  invalidaciones
+    libgodc.a por corrida de la cadena (KB=512, seguidas)  206364 -> 206372 -> 206380 -> 206384 -> 206392 -> 206396 -> 206404 bytes
+    (y el `arena` del arranque de 256 KB se movia 32 bytes entre builds identicos: 688700 <-> 688668)
+
+ARREGLO: `reemplazar()` de fix-libgodc-sq.py mira primero el RESULTADO (`if nuevo in t`), no el texto viejo.
+DESPUES DEL ARREGLO, con su corpus (que arranca de un reset pristino por LECTURA):
+
+    bash scripts/console/checar-idempotencia-vendor.sh
+== 0. el reset pristino (una LECTURA del vendor, no un git checkout)
+   pristino: sha 130de73608ca7776  43749 bytes  invalidaciones 1
+== 1. control 1: dos corridas de la cadena dejan el mismo gc_copy.c
+   corrida 1: sha 379271ee57d1dd61  44509 bytes  invalidaciones 2
+   corrida 2: sha 379271ee57d1dd61  44509 bytes  invalidaciones 2
+   control 1 (la cadena es idempotente):        VERDE
+== 2. mutante: se le devuelve el ORDEN VIEJO al guard de reemplazar()
+   corrida con el orden viejo: sha 5ae716c7967a8210  44874 bytes  invalidaciones 3
+   CAZADO: con el orden viejo el archivo CRECE (44509 -> 44874 bytes, invalidaciones 2 -> 3)
+== 3. control 2 (de vuelta): se restaura el guard y el archivo sano, y la cadena vuelve al mismo sha
+   gc_copy.c restaurado del estado sano: sha 379271ee57d1dd61  44509 bytes
+   la cadena de vuelta: sha 379271ee57d1dd61  44509 bytes  invalidaciones 2
+   control 2 (la cadena vuelve al mismo estado): VERDE
+    runtime/gc_copy.c | 13 +++++++++++--   1 file changed, 11 insertions(+), 2 deletions(-)
+== 1/1 mutantes cazados, 2/2 controles verdes ==
+
+OJO (declarado): el sha256 de `libgodc.a` NO es reproducible (`ar` guarda el mtime de cada objeto): dos
+builds del MISMO fuente dan sha distinto con el mismo tamano. Por eso el corpus compara `gc_copy.c`, que es
+la fuente, y el tamano del `.a`.
+
+--------------------------------------------------------------------------------
+5. LA ESCALERA Y EL CORPUS, RE-CORRIDOS CON EL VENDOR CANONICO
+--------------------------------------------------------------------------------
+Los numeros de (1), (2) y (3) son de la corrida con gc_copy.c canonico (44509 bytes, 2 invalidaciones):
+mismos 3 cuadros y 11 marcas con 512 KB, mismo `Memory: arena=688700` con 256 KB y el mutante cazado.
+O sea: el defecto de idempotencia NO movia las conclusiones, pero si el byte fino -- se declara.
+
+--------------------------------------------------------------------------------
+6. LO QUE NO SE PUDO CORRER, DECLARADO (el corpus del recorte, DC-002.14)
+--------------------------------------------------------------------------------
+`bash scripts/console/checar-recorte-214.sh` necesita dos artefactos que viven en /tmp y NO sobrevivieron:
+    /tmp/dcbuild/motor-214      (el ELF del recorte)  -> FALTABA
+    /tmp/dcbuild/motor-arranque (el baseline)         -> FALTABA
+Rehacerlo con SALTAR_GOX=1 y el gox del recorte de DC-002.14 NO enlaza el POC de hoy:
+    SALTAR_GOX=1 bash scripts/console/recorte-214.sh /tmp/gox-214-gc /tmp/dcbuild/motor-214 A   -> EXIT 1
+    console/dc/poc/motor-arranque/main.go:54:57: error: reference to undefined identifier 'os.RamfsTam'
+    console/dc/poc/motor-arranque/main.go:91:37: error: reference to undefined identifier 'os.RamfsResumen'
+    console/dc/poc/motor-arranque/main.go:199:71: error: reference to undefined identifier 'ebiten.MemLibreDelMonton'
+    console/dc/poc/motor-arranque/main.go:226:81: error: reference to undefined identifier 'ebiten.VramDelFramebuffer'
+Para re-correrlo hay que rehacer el gox del recorte con sus flags (`recorte-214.sh` sin SALTAR_GOX), que es
+trabajo de esa tarjeta. Lo que SI se corrigio ahi: sus veredictos del arranque (que estaban clavados en la
+era del defecto) aceptan ahora el veredicto medido con el GC sano (`arranca 11 marcas`), y su encabezado
+lleva la historia corregida + los comandos para rehacer los artefactos.
+
+--------------------------------------------------------------------------------
+7. BARRERAS
+--------------------------------------------------------------------------------
+    bash scripts/console/test-std-host.sh         -> VERDE en amd64 y 386 (13/13 excluidos)
+    bash scripts/console/mutar-std-host.sh        -> 39/39 chequeos cazados;
+                                                     "OK: la suite caza todos los defectos conocidos y el
+                                                     arbol quedo sano"
+    bash scripts/console/compare-motor-dc6.sh     -> "== IGUAL: 31 lineas identicas (mismo DC6, mismo codigo
+                                                     del motor, x86-64 y SH-4)"; frames comparados: 30
+    bash scripts/console/checar-gc-221.sh         -> 6/6 controles verdes + 1/1 mutante cazado (arriba)
+    bash scripts/console/checar-idempotencia-vendor.sh -> 2/2 controles verdes + 1/1 mutante cazado (arriba)
+
+CONFIRMACION DEL 384 KB CON EL VENDOR CANONICO (la fila del medio de la escalera, re-medida despues de
+arreglar la cadena: mismos numeros que la corrida previa, o sea el defecto de idempotencia no movia esto):
+    KB=384  cuadros=3  marcas=11  oom=0
+    PVR-FRAMEBUFFER la pantalla vive en la VRAM: 1920000 bytes
+    PVR-FRAMEBUFFER monton de C: libre 40776 bytes (el runtime lo imprime como free)
+    PVR-FRAMEBUFFER ida y vuelta: 65536 bytes, distintos: 0
+    EBITEN-PERFIL dibujar_us 254277 convertir_us 55130 subir_us 0 pintar_us 3 cuadro_us 309410
+    (identico a la corrida con el runtime acumulado: la escalera no depende del byte fino del gc_copy.c;
+     lo que si depende es el numero exacto del `arena` del OOM, declarado en (2))

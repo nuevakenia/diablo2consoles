@@ -14,20 +14,29 @@
 #     7.902 lineas). Se mide en su .gox (seccion .data.go..C3111) y en el ELF enlazado, y los dos numeros
 #     tienen que coincidir (el .data entero del ELF lo confirma).
 #  3. EL ARRANQUE PASA LAS PAREDES DEL RUNTIME. Con el semiespacio del GC chico el binario del motor arranca,
-#     pasa gc_init (2 x semiespacio) y lo que lo frena despues ya no es RAM. El ELF que corre este control es
-#     el BASELINE de DC-002.13, que muere en el panic de Go del init: re-medido en DC-002.21 con el semiespacio
-#     de la rama (256 KB) da `pasa-el-techo-de-RAM panic='assignment to entry in nil map'`.
-#     EL VALOR CAMBIO (512 -> 256) y esto es de DC-002.21, medido: el ARRANQUE DE HOY (con el gzip y el atlas de
-#     texto andando) no cabe en 512 KB de semiespacio (muere en el `gc_external_alloc` de la imagen del atlas,
-#     `diff 98304`) y con 256 KB esa pared desaparece. El comodin que lo vigila es el mutante 'gc-2048':
+#     pasa gc_init (2 x semiespacio) y lo que lo frena despues ya no es RAM.
+#     RE-MEDIDO EN DC-002.25, CON EL GC SANO (la copia por Store Queue arreglada en DC-002.24): las dos
+#     afirmaciones que eran de DC-002.21 en esta parte -- "256 KB alcanza" y "512 KB muere en la imagen del
+#     atlas (diff 98304)" -- se midieron con el DEFECTO de la copia puesto, cuando el conjunto vivo del GC era
+#     practicamente vacio. Con el GC sano el arranque de hoy, con el semiespacio en 512 KB, no muere en ninguna
+#     pared de RAM: llega al motor y completa cuadros (`arranca 11 marcas`, 3 cuadros del loop; ver
+#     checar-gc-221.sh y la seccion 41 del README). El veredicto que este control acepta es entonces `arranca*`
+#     ademas de las dos formas historicas (el panic de Go de DC-002.14 y el pedido del motor de 1.916.928), y
+#     sigue ROJO si el arranque muere en gc_init o si vuelve la pared del atlas (98.304). El comodin que vigila
+#     el PRESUPUESTO sigue siendo el mutante 'gc-2048':
 #
 #         KB=2048 ->  gc_init: alloc failed (el defecto que DC-002.14 encontro, sigue cazado)
-#         KB=512  ->  Out of memory ... diff 98304      (la imagen del atlas, DC-002.21)
-#         KB=256  ->  Out of memory ... diff 1916928    (el pedido del MOTOR: la tabla de records)
+#         KB=512  ->  arranca: 11 marcas y cuadros del loop (el valor, con el GC sano)
+#         KB=256  ->  fatal error: out of memory (el valor de DC-002.21 ya no alcanza; corpus: checar-gc-221.sh)
 #
-#     Por eso el control acepta las dos formas de "paso el runtime" (el panic de Go de DC-002.14 y el pedido
-#     del motor de 1.916.928 del arranque de hoy) y sigue ROJO si el arranque muere en gc_init o si vuelve la
-#     pared del atlas (98.304).
+#     OJO, ARTEFACTOS: los dos binarios que este corpus compara viven en /tmp y NO sobreviven a un reinicio
+#     (medido al re-correrlo en DC-002.25: faltaban /tmp/dcbuild/motor-214 y /tmp/dcbuild/motor-arranque, y el
+#     gox del recorte /tmp/gox-214-gc es de antes de DC-002.18 -- no tiene `json`, asi que el POC de HOY no
+#     enlaza contra el). Para re-correrlo: `SALTAR_GOX=1 bash scripts/console/recorte-214.sh /tmp/gox-214-gc
+#     /tmp/dcbuild/motor-214 A` + `bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/motor-arranque
+#     /tmp/gox-222`; si el gox del recorte no enlaza, hay que rehacerlo con los flags (recorte-214.sh sin
+#     SALTAR_GOX). Los controles 1, 2 y 4 y el mutante no dependen del semiespacio; el control 3 con el GC sano
+#     se re-midio por separado (checar-gc-221.sh: 6/6 verdes con 512 KB, 11 marcas y 3 cuadros).
 #  4. EL RECORTE DEL BINARIO NO TIENE PALANCA (registro del limite conocido). El enlace con
 #     -Wl,--gc-sections no tira NI UNA seccion y el binario sale 2.316 bytes MAS GRANDE por alineacion: no
 #     hay codigo muerto que sacar. La palanca es lo que el GC pide, no el .text.
@@ -144,6 +153,13 @@ if [ -z "${SALTAR_ARRANQUE:-}" ]; then
     echo "   cargado: $(cargado "$BASE/prog.elf") bytes   el GC pide: $((2 * KB_OK * 1024)) (2 x $KB_OK KB)"
     echo "   arranque: $v"
     case "$v" in
+    arranca*)
+        # DC-002.25 (GC SANO, 512 KB): el arranque de HOY no muere en ninguna pared de RAM -- llega al motor y
+        # completa cuadros. Es el mismo hecho que mide el control sano de checar-gc-221.sh (11 marcas, 3
+        # cuadros). Los dos casos de abajo son la HISTORIA (medidos con el defecto de la copia por Store Queue
+        # puesto) y se dejan para que se vea de donde venia el numero.
+        echo "   OK (DC-002.25, GC sano): el arranque pasa las paredes de RAM y llega al motor ($v)"
+        ;;
     pasa-el-techo-de-RAM*)
         echo "   OK: gc_init y gc_external_alloc quedaron atras; lo que sigue ya no es RAM"
         ;;
@@ -242,6 +258,7 @@ if [ -z "${SALTAR_ARRANQUE:-}" ]; then
     v="$(correr /tmp/dcbuild/motor-512/prog-emu.elf /tmp/checar-214-vuelta)"
     echo "   arranque con $KB_OK KB: $v"
     case "$v" in
+    arranca*) echo "   control sano VERDE (DC-002.25: con el GC sano llega al motor)" ;;
     pasa-el-techo-de-RAM*) echo "   control sano VERDE" ;;
     "cae-gc-external diff 1916928")
         # DC-002.21: el arranque de HOY con el semiespacio de la rama. El runtime pasa sus paredes y lo que

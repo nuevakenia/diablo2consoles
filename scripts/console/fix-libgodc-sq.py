@@ -136,10 +136,16 @@ def sha(p):
 
 def reemplazar(path, viejo, nuevo):
     t = path.read_text()
-    n = t.count(viejo)
-    if n == 0 and nuevo in t:
+    # DC-002.25 (MEDIDO): el orden de estas dos comprobaciones era el defecto de idempotencia de esta
+    # cadena. Con la comprobacion de `viejo` PRIMERO, `VIEJO_FIN` (el `if (remainder > 0) memcpy(...)`)
+    # sigue apareciendo UNA vez despues de aplicar el arreglo, porque es una SUBCADENA de `NUEVO_FIN`: la
+    # cadena volvia a insertar otro `dcache_inval_range` en cada corrida (medido: gc_copy.c crecia 7
+    # llamadas y el `arena` del arranque se movia 32 bytes entre dos builds idénticos de KB). Se mira
+    # primero el resultado: si el texto nuevo ya esta, la cadena ya paso por aca.
+    if nuevo in t:
         print("  ya estaba %s" % path.name)
         return
+    n = t.count(viejo)
     if n != 1:
         sys.exit("ERROR: el texto a reemplazar aparece %d veces (esperaba 1) en %s" % (n, path))
     path.write_text(t.replace(viejo, nuevo, 1))

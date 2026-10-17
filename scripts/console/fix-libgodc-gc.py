@@ -24,28 +24,38 @@ SINTOMA
         512                     1 MB        pasa las DOS paredes de RAM y llega al panic de Go del init
         256                     512 KB      igual que 512 (arena mas chica: 1.915.772 contra 2.440.060)
 
+    OJO (DC-002.25): esa escalera se midio con el defecto de la copia por Store Queue PUESTO (el conjunto
+    vivo del GC era practicamente vacio). Con el GC SANO se da vuelta: 256 KB ya no alcanza (fatal error:
+    out of memory durante Create()) y 512 KB completa cuadros. La tabla se deja con su fecha.
+
 ARREGLO
-    `GC_SEMISPACE_SIZE_KB` en runtime/godc_config.h, con el valor que se pida (por defecto **256 KB**: es el
-    valor que dejo DC-002.21, medido con el arranque de hoy). DC-002.14 dejo 512 KB, que era el semiespacio
-    mas grande que dejaba atras TODAS las paredes de RAM de ese momento; con el gzip y el atlas de texto
-    andando (DC-002.20) 512 ya no alcanza: el arranque muere en la imagen del atlas (`diff 98304`). El
-    runtime lo lee para el semiespacio y para el umbral de objetos grandes; no se toca nada mas.
+    `GC_SEMISPACE_SIZE_KB` en runtime/godc_config.h, con el valor que se pida (por defecto **512 KB**: es el
+    valor que dejo DC-002.25 re-midiendo la escalera CON EL GC SANO -- la copia por Store Queue arreglada en
+    DC-002.24, ver fix-libgodc-sq.py). DC-002.14 habia dejado 512 KB; DC-002.21 lo bajo a 256 KB MIDIENDO CON
+    EL DEFECTO de la copia puesto (con la copia rota no se copiaba nada, el conjunto vivo del GC era
+    practicamente vacio y 256 KB "alcanzaba"); con el GC sano el arranque muere en `Create()` con
+    `fatal error: out of memory` en 256 KB (medido: 0 cuadros, 10 marcas de 11) y completa cuadros en 512 KB
+    (11 marcas, 3 cuadros). El runtime lo lee para el semiespacio y para el umbral de objetos grandes; no se
+    toca nada mas. El corpus es scripts/console/checar-gc-221.sh (control sano en 512 + el mutante de 256).
 
 COSTO (declarado, no escondido)
-    Un semiespacio de 256 KB es un heap chico: el GC copia cada 256 KB de allocacion, asi que la consola
-    recolecta muchas mas veces. Sirve para el ARRANQUE (que es lo que esta tarjeta mide) y para saber que
-    el motor llega a correr; para jugar hay que volver a subirlo a medida que el binario se recorte (o
-    que el motor lea sus datos del disco en vez de tenerlos en .data, que es donde esta el peso real:
-    d2core/d2records tiene UN dato de 1.672.892 bytes).
+    Un semiespacio de 512 KB es un heap chico: el GC copia cada 512 KB de allocacion, asi que la consola
+    recolecta muchas mas veces que en un heap grande. Sirve para el ARRANQUE (que es lo que esta tarjeta mide)
+    y para saber que el motor llega a correr; para jugar hay que volver a subirlo a medida que el binario se
+    recorte (o que el motor lea sus datos del disco en vez de tenerlos en .data, que es donde esta el peso
+    real: d2core/d2records tiene UN dato de 1.672.892 bytes).
 
 USO
-    python3 scripts/console/fix-libgodc-gc.py [KB] [ruta_libgodc]
-    python3 scripts/console/fix-libgodc-gc.py 256 --build      # fija y rehace libgodc.a
+    python3 scripts/console/fix-libgodc-gc.py [KB] [ruta_libgodc]     (KB por defecto: 512)
+    python3 scripts/console/fix-libgodc-gc.py 512 --build      # fija y rehace libgodc.a
     Despues: reenlazar (scripts/console/recorte-214.sh, o build-motor-arranque.sh / build-motor-dc6.sh).
 
 ORDEN E IDEMPOTENCIA
     Deja el arbol pristino con `git checkout`, aplica PRIMERO fix-libgodc-iface.py (que a su vez aplica el
-    de ABI) y DESPUES este cambio: correrlo dos veces deja el mismo sha256.
+    de ABI) y DESPUES este cambio: correrlo dos veces deja el mismo sha256. OJO: para los archivos de la copia
+    por Store Queue (runtime/gc_copy.c) este script NO hace el `git checkout` (quien llama lo deja pristino);
+    si no se resetea, el arreglo de ahi tiene que ser idempotente el mismo -- lo es desde DC-002.25
+    (scripts/console/checar-idempotencia-vendor.sh lo vigila con su mutante).
 """
 import hashlib
 import os
@@ -54,7 +64,7 @@ import re
 import subprocess
 import sys
 
-KB = 256
+KB = 512
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 if args:
     KB = int(args[0])
