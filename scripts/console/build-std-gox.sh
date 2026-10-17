@@ -48,6 +48,9 @@ for pkg in $ORDEN; do
     mkdir -p "$dst"
     for f in "$STD/$pkg"/*.go; do
         [ -f "$f" ] || continue
+        # los _test.go van SOLO al host (son la prueba contra la biblioteca de verdad): si entran al
+        # build de la consola, gccgo intenta compilar un paquete de prueba que importa al de go.
+        case "$f" in *_test.go) continue ;; esac
         sed 's|"d2std/|"|g' "$f" > "$dst/$(basename "$f")"
     done
     mkdir -p "$(dirname "$GEN/$pkg")"

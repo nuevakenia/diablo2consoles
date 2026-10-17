@@ -766,3 +766,93 @@ func (r *Regexp) grupo(caps *capturas, texto []rune, g int) string {
 	}
 	return string(texto[ini:fin])
 }
+
+// FindStringIndex ya esta arriba. Faltaban las versiones con bytes, que d2ui usa.
+
+// Find: la primera coincidencia, en bytes.
+func (r *Regexp) Find(b []byte) []byte {
+	ix := r.FindIndex(b)
+	if ix == nil {
+		return nil
+	}
+	return b[ix[0]:ix[1]]
+}
+
+// FindIndex: donde empieza y termina la primera coincidencia, en bytes.
+func (r *Regexp) FindIndex(b []byte) []int {
+	// el indice que devuelve FindStringIndex es sobre el texto de la cadena; si hay caracteres de mas
+	// de un byte, la posicion no coincide con la de los bytes, asi que se cuenta aparte.
+	texto := []rune(string(b))
+	caps := &capturas{}
+	for i := 0; i <= len(texto); i++ {
+		salidas := r.coincide(r.raiz, texto, i, caps)
+		if len(salidas) > 0 {
+			return []int{len(string(texto[:i])), len(string(texto[:salidas[0]]))}
+		}
+	}
+	return nil
+}
+
+// FindAll: todas las coincidencias, en bytes.
+func (r *Regexp) FindAll(b []byte, n int) [][]byte {
+	texto := []rune(string(b))
+	var salida [][]byte
+	desde := 0
+	for desde <= len(texto) {
+		caps := &capturas{}
+		encontrado := false
+		for i := desde; i <= len(texto); i++ {
+			salidas := r.coincide(r.raiz, texto, i, caps)
+			if len(salidas) > 0 {
+				ini := len(string(texto[:i]))
+				fin := len(string(texto[:salidas[0]]))
+				salida = append(salida, b[ini:fin])
+				if salidas[0] > i {
+					desde = salidas[0]
+				} else {
+					desde = i + 1
+				}
+				encontrado = true
+				break
+			}
+		}
+		if !encontrado {
+			break
+		}
+		if n > 0 && len(salida) >= n {
+			break
+		}
+	}
+	return salida
+}
+
+// FindAllIndex: todas las coincidencias, con posiciones.
+func (r *Regexp) FindAllIndex(b []byte, n int) [][]int {
+	texto := []rune(string(b))
+	var salida [][]int
+	desde := 0
+	for desde <= len(texto) {
+		caps := &capturas{}
+		encontrado := false
+		for i := desde; i <= len(texto); i++ {
+			salidas := r.coincide(r.raiz, texto, i, caps)
+			if len(salidas) > 0 {
+				salida = append(salida, []int{len(string(texto[:i])), len(string(texto[:salidas[0]]))})
+				if salidas[0] > i {
+					desde = salidas[0]
+				} else {
+					desde = i + 1
+				}
+				encontrado = true
+				break
+			}
+		}
+		if !encontrado {
+			break
+		}
+		if n > 0 && len(salida) >= n {
+			break
+		}
+	}
+	return salida
+}

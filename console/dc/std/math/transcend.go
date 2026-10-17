@@ -186,11 +186,11 @@ func Cos(x float64) float64 {
 	case 0:
 		return cosPoly(r)
 	case 1:
-		return sinPoly(r)
+		return -sinPoly(r)
 	case 2:
 		return -cosPoly(r)
 	}
-	return -sinPoly(r)
+	return sinPoly(r)
 }
 
 // sinPoly es sin(r) para |r| <= pi/4: la serie de Taylor hasta r**19, con los coeficientes
