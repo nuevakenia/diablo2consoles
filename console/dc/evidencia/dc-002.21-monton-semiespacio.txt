@@ -161,7 +161,7 @@ mutante y la vuelta) compilan el POC de HOY y el gox de DC-002.14 ya no lo puede
 os.RamfsResumen"), asi que esos dos reenlaces usan el gox de la rama (`GOX_ACTUAL`); el gox del recorte se
 sigue usando para el control 2 y su ELF para el control 4.
 
-Corrida completa de esta tarjeta (13:3x, `/tmp/log-checar-214-c.txt`):
+Corrida completa de esta tarjeta (las 12:26, `/tmp/log-checar-214-c.txt`):
 
     == 1. control sano: el instrumento NO imprime la tabla solapada
        pesar-motor.py sobre /tmp/dcbuild/motor-arranque/prog.elf: exit 2
