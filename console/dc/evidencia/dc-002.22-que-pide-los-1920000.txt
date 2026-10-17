@@ -1,0 +1,102 @@
+DC-002.22 — QUE PIDe LOS 1.916.928 BYTES: NO ES LA TABLA DE RECORDS, ES LA PANTALLA DE 800x600
+=============================================================================================
+
+Rama DC-002. Fecha: 2026-10-17. Medido en Flycast con el motor entero (POC `console/dc/poc/motor-arranque`).
+Tarjeta DC-002.22, abierta al cerrar DC-002.21. Esta es la MEDICION (el plan de la tarjeta, punto 1); el
+arreglo y el corpus siguen abiertos.
+
+COMANDOS
+
+    python3 scripts/console/fix-libgodc-alloc-traza.py --solo-grande --build   # el instrumento minimo
+    python3 scripts/console/fix-libgodc-alloc-traza.py --build                 # el de cinco entradas
+    python3 scripts/console/fix-libgodc-gc.py 256 --build                     # deja el vendor SIN instrumento
+    POC=motor-arranque bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/sologrande-222 /tmp/gox-00220
+    bash scripts/console/run-flycast.sh /tmp/dcbuild/sologrande-222/prog-emu.elf 25 /tmp/dc-run-sologrande222
+    grep -a 'ALLOC-TRAZA\|Out of memory\|Memory:' /tmp/dc-run-sologrande222/flycast.log | tr -d '\r'
+    sh-elf-addr2line -f -e /tmp/dcbuild/sologrande-222/prog.elf 8c03e52a   # el llamado esta en pc-4
+
+
+1. EL INSTRUMENTO Y SU TRAMPA (medido)
+--------------------------------------
+
+`fix-libgodc-alloc-traza.py` instrumenta las entradas del runtime donde TODAVIA se sabe de quien es la
+asignacion (`runtime_makeslice`, `runtime_mallocgc`, `runtime_growslice`, la puerta de `gc_alloc` y
+`gc_external_alloc`) y cada linea dice tamano, TIPO (del descriptor `__uncommon->__name`), tamano del
+elemento y el pc de retorno del llamado DESDE EL CODIGO GO.
+
+El instrumento **cambia el camino del arranque**, y eso quedo medido (mismo motor, mismo gox, cuatro
+variantes del runtime; `arranques` = lineas `MOTOR-ARRANQUE arranca`):
+
+    variante          instrumento                        arranques  renderer-created  pedido 1,92 MB  final
+    C pristino        ninguno                                  5            4             si          OOM diff 1916928
+                      (el runtime de la rama)                                                        arena=2415484 free=43136
+    D solo-grande     UN log en la puerta de gc_alloc           2            2             SI          OOM diff 1921024
+                                                                                                   arena=2415196 free=42848
+    A cuatro entradas makeslice+mallocgc+growslice+external     1            1             NO          panic nil pointer
+                                                                                                   arena=2414876 free=42528
+    B cinco entradas  A + la puerta de gc_alloc                 2            2             NO          panic nil pointer
+                                                                                                   arena=2414716 free=42368
+
+O sea: con las CUATRO/CINCO entradas el arranque se va por otro lado (panic de puntero nil, sin pedir los
+1,92 MB) y **la medicion buena es la del instrumento MINIMO (D)**, que reproduce la misma pared que el
+runtime de la rama (C: el OOM en `gc_external_alloc`). La causa de que A/B cambien el camino NO esta
+medida (lo que si esta medido es que cambia, y que el tamaño de `libgodc.a` se mueve: 206.328 / 206.796 /
+208.012 / 208.288 bytes). Queda declarado como lo primero a resolver si hay que volver a instrumentar aca.
+
+Los numeros del arranque (C, sin instrumento) son los mismos que midio el corpus de DC-002.21: arena
+2.415.484, usado 2.372.348, libres 43.136, y las 10 marcas por arranque.
+
+
+2. LO MEDIDO (D): EL PEDIDO Y DE QUIEN ES
+-----------------------------------------
+
+    ALLOC-TRAZA gc_alloc-grande size=1228800 tipo=uint8 elemsize=1 len=-1 cap=-1 pc=8c03e52e
+    MOTOR-ARRANQUE arranca ...
+    [Perf][INFO] PERF mark renderer-created t_ms=672
+    ALLOC-TRAZA gc_alloc-grande size=1920000 tipo=uint8 elemsize=1 len=-1 cap=-1 pc=8c03e52e
+    Out of memory. Requested sbrk_base 0x8d18b000, was 0x8cfb6000, diff 1921024
+    fatal error: gc_external_alloc: OOM
+    Memory: arena=2415196 used=2372348 free=42848
+
+**El pedido es `make([]uint8, 1920000)`**: un slice de bytes de 1.920.000, o sea una imagen de
+**800 x 600 x 4** bytes (RGBA). Y el pc lo resuelve el propio ELF:
+
+    $ sh-elf-addr2line -f -e prog.elf 8c03e52a
+    github_0com_1hajimehoshi_1ebiten_1v2.NewImage
+    /home/dgalli/Proyectos/diablo2consoles/console/dc/engine/ebiten/v2/ebiten.go:43
+
+`NewImage(w, h)` es `&Image{pixeles: make([]uint8, w*h*4)}` (`ebiten.go:42-44`), y en el shim hay dos
+sitios que crean la PANTALLA:
+
+    console/dc/engine/ebiten/v2/ebiten.go:642   var pantalla = NewImage(640, 480)     <- 640x480x4 = 1.228.800
+    console/dc/engine/ebiten/v2/ebiten.go:870   pantalla = NewImage(ancho, alto)     <- el de RunGame
+
+El de 1.920.000 es el de `RunGame`: `ancho, alto := g.Layout(640, 480)`, y `Layout` del renderer devuelve
+`d2display.BaseW, d2display.BaseH` = **800 x 600** (`d2common/d2display/display.go:26-27`), que es el tamaño
+del interfaz original (los menus). O sea: el pedido de 1,92 MB son **los 800x600x4 pixeles de la pantalla
+logica**, y con 43.136 bytes libres no entra.
+
+DOS CONSECUENCIAS MEDIDAS, que es lo que la tarjeta necesitaba:
+
+  1. **El candidato de la tarjeta NO es el que pide**: la tabla de `d2core/d2records` pesa 1.672.892 bytes y
+     el pedido es 1.920.000 con tipo `uint8` (una imagen, no una tabla de records). El 1.916.928 del
+     mensaje de OOM **no es el tamaño pedido**: es el `diff` de `sbrk` (1.920.000 + lo que redondee el
+     monton, menos lo que ya estaba alineado). Medido en las dos puntas: el MISMO pedido de 1.920.000 da
+     `diff 1916928` en el runtime de la rama y `diff 1921024` en el instrumentado (los `sbrk_base` difieren
+     en 4096: 0x8d18a000 contra 0x8d18b000).
+  2. **La pantalla se crea DOS veces y las dos van al monton de C** (1.228.800 + 1.920.000 = 3.148.800
+     bytes, los dos `malloc` porque pasan el umbral de objeto grande de libgodc, 64 KB): la del paquete
+     (640x480) al arrancar y la del loop (800x600) al entrar a `RunGame`. El comentario del propio shim dice
+     que subir la pantalla a la VRAM es el tramo que sigue: la imagen en RAM y la textura del PVR son dos
+     cosas distintas y hoy se paga la de RAM.
+
+
+3. LO QUE QUEDA ABIERTO (declarado, no hecho)
+---------------------------------------------
+
+  - El ARREGLO (punto 2 de la tarjeta): que el pedido entre, con la palanca medida. Los numeros de esta
+    tarjeta cambian el mapa: la palanca no es la tabla de records (no es el que pide) sino la pantalla de
+    800x600x4 y su gemela de 640x480; hay que medir cual de las dos sale mas barata (una sola pantalla,
+    liberar la vieja, o escribir la imagen directamente en la textura de la VRAM).
+  - El corpus con el control ROJO del OOM y su mutante.
+  - Por que A/B (cuatro/cinco entradas) cambian el camino del arranque: no esta medido.
