@@ -21,9 +21,9 @@
 package fmt
 
 import (
-	"errors"
-	"strconv"
-	"strings"
+	"d2std/errors"
+	"d2std/strconv"
+	"d2std/strings"
 )
 
 // ErrSscan: no se pudo leer lo que pedia el formato.

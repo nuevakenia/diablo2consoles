@@ -668,3 +668,41 @@ func (e errorString) Error() string { return string(e) }
 func errorsNew(s string) error { return errorString(s) }
 
 var ioEOF error = errorString("EOF")
+
+// FieldsFunc: parte el texto por los separadores que diga la funcion. La forma es la de Go:
+// `strings.FieldsFunc(spec, func(r rune) bool { return r == '+' || r == ' ' })`. Lo pide
+// d2game/d2gamescreen/game_ai_also.go:29 (parte una lista de tags).
+//
+// OJO CON UNA COSA QUE EN GO CAMBIA (y aca se copia igual): los separadores del principio y del final NO
+// producen campos vacios, y dos separadores seguidos tampoco. O sea que "a++b" da ["a","b"], no
+// ["a","","b"]. Si no fuera asi, el motor veria tags vacios.
+func FieldsFunc(s string, separador func(rune) bool) []string {
+	// nil quiere decir "el separador de siempre" (los espacios), como en Go
+	if separador == nil {
+		separador = func(r rune) bool {
+			return r == ' ' || r == '\t' || r == '\n' || r == '\v' || r == '\f' || r == '\r' ||
+				r == 0x85 || r == 0xA0
+		}
+	}
+
+	var campos []string
+	enCampo := false
+	inicio := 0
+	for i, r := range s {
+		if separador(r) {
+			if enCampo {
+				campos = append(campos, s[inicio:i])
+				enCampo = false
+			}
+			continue
+		}
+		if !enCampo {
+			inicio = i
+			enCampo = true
+		}
+	}
+	if enCampo {
+		campos = append(campos, s[inicio:])
+	}
+	return campos
+}

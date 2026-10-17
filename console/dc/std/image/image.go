@@ -318,3 +318,11 @@ func Rect(x0, y0, x1, y1 int) Rectangle {
 	}
 	return Rectangle{Min: Point{X: x0, Y: y0}, Max: Point{X: x1, Y: y1}}
 }
+
+// Config: el formato y el tamano de una imagen, sin los pixeles. Lo pide image/gif (su estructura del
+// archivo lo tiene adentro) y es de la biblioteca estandar: ColorModel, Width y Height.
+type Config struct {
+	ColorModel color.Model
+	Width      int
+	Height     int
+}

@@ -17,8 +17,10 @@
 package ebiten
 
 import (
+	"fmt"
 	"image"
 	"image/color"
+	"math"
 )
 
 // ================================================================ imagenes
@@ -68,6 +70,22 @@ func (i *Image) Bounds() image.Rectangle {
 func (i *Image) Size() (int, int) { return i.ancho, i.alto }
 
 // Clear: borra la imagen con el color dado.
+// Fill: pinta toda la imagen de un color. MEDIDO en ebiten v2.0.2 (image.go): la firma es
+// Fill(clr color.Color). Lo pide d2render/ebiten/ebiten_panic_screen.go:44 (pinta la pantalla de error).
+func (i *Image) Fill(clr color.Color) {
+	r, g, b, a := clr.RGBA()
+	i.LlenarDeRGBA(color.RGBA{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: uint8(a >> 8)})
+}
+
+// LlenarDeRGBA: pinta todo de un color (la parte de adentro, sin la conversion).
+func (i *Image) LlenarDeRGBA(c color.RGBA) {
+	for y := 0; y < i.alto; y++ {
+		for x := 0; x < i.ancho; x++ {
+			i.SetRGBA(x, y, c)
+		}
+	}
+}
+
 func (i *Image) Clear() {
 	for j := range i.pixeles {
 		i.pixeles[j] = 0
@@ -146,17 +164,281 @@ func (i *Image) DrawImage(src *Image, op *DrawImageOptions) { Dibujos++ }
 // Color: el color de Ebitengine (RGBA de 0 a 1).
 type Color struct{ R, G, B, A float64 }
 
-// ColorM: la matriz de color. Aca se guarda tal cual y no se aplica: el filtrado de color real entra
-// con el backend (el motor la usa para oscurecer y para las transiciones).
+// ColorM: la matriz de color (4x4 mas el desplazamiento), la misma cuenta que hace Ebitengine.
+//
+// PARA QUE SE USA: el motor la usa para oscurecer la pantalla cuando se abre un menu, para las
+// transiciones (fundidos), y para el destello rojo cuando te pegan.
+//
+// ES LA CUENTA DE VERDAD, no una marca de "hubo cambio". La forma esta COPIADA de la implementacion real
+// medida en ebiten v2.0.2 (internal/affine/colorm.go): los 16 numeros de la matriz mas los 4 del
+// desplazamiento, y el mismo orden de indices (SetElement(i, j) escribe body[i + j*4], y con j==4 escribe
+// el desplazamiento i). Si el orden fuera otro, un tinte daria otro color y nadie lo notaria hasta verlo
+// en pantalla.
 type ColorM struct {
 	guardada bool
+	cuerpo   [16]float64
+	traslado [4]float64
 }
 
-// Scale / Translate / ScaleAlpha: las operaciones que arma el motor. Se guardan como "hubo cambio".
-func (c *ColorM) Scale(r, g, b, a float64)   { c.guardada = true }
-func (c *ColorM) Translate(r, g, b, a float64) { c.guardada = true }
-func (c *ColorM) ScaleAlpha(a float64)       { c.guardada = true }
-func (c *ColorM) Reset()                     { c.guardada = false }
+// la identidad: la matriz que deja los colores como estan
+var coloresIdentidad = [16]float64{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
+
+// iniciar: deja la matriz lista para escribir (partiendo de la identidad).
+func (c *ColorM) iniciar() {
+	if c.guardada {
+		return
+	}
+	c.cuerpo = coloresIdentidad
+	c.traslado = [4]float64{0, 0, 0, 0}
+	c.guardada = true
+}
+
+// Reset: vuelve a la identidad.
+func (c *ColorM) Reset() { c.guardada = false }
+
+// Scale: multiplica cada canal por su factor (así se oscurece: Scale(0.5, 0.5, 0.5, 1)).
+func (c *ColorM) Scale(r, g, b, a float64) {
+	c.iniciar()
+	factores := [4]float64{r, g, b, a}
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 4; j++ {
+			c.cuerpo[i+j*4] *= factores[j]
+		}
+	}
+}
+
+// ScaleAlpha: escala solo el canal del alfa (la transparencia).
+func (c *ColorM) ScaleAlpha(a float64) { c.Scale(1, 1, 1, a) }
+
+// Translate: suma un valor a cada canal (así se aclara: Translate(0.2, 0.2, 0.2, 0)).
+func (c *ColorM) Translate(r, g, b, a float64) {
+	c.iniciar()
+	c.traslado[0] += r
+	c.traslado[1] += g
+	c.traslado[2] += b
+	c.traslado[3] += a
+}
+
+// Element: un numero de la matriz. Con j==4 es el desplazamiento del canal i.
+// MEDIDO (internal/affine/colorm.go:323): Element(i, j) es body[i+j*4] y con j==4 es traslado[i].
+func (c *ColorM) Element(i, j int) float64 {
+	if i < 0 || i >= 4 || j < 0 || j >= 5 {
+		return 0
+	}
+	if !c.guardada {
+		if j < 4 {
+			return coloresIdentidad[i+j*4]
+		}
+		return 0
+	}
+	if j < 4 {
+		return c.cuerpo[i+j*4]
+	}
+	return c.traslado[i]
+}
+
+// SetElement: escribe un numero de la matriz.
+func (c *ColorM) SetElement(i, j int, elemento float64) {
+	if i < 0 || i >= 4 || j < 0 || j >= 5 {
+		return
+	}
+	c.iniciar()
+	if j < 4 {
+		c.cuerpo[i+j*4] = elemento
+	} else {
+		c.traslado[i] = elemento
+	}
+}
+
+// Concat: multiplica esta matriz por la otra (en ese orden). Es como se combinan dos cambios de color.
+func (c *ColorM) Concat(otra ColorM) {
+	c.iniciar()
+	var nuevo [16]float64
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 4; j++ {
+			suma := 0.0
+			for k := 0; k < 4; k++ {
+				suma += c.cuerpo[i+k*4] * otra.Element(k, j)
+			}
+			nuevo[i+j*4] = suma
+		}
+		// el desplazamiento tambien se arrastra
+		suma := c.traslado[i]
+		for k := 0; k < 4; k++ {
+			suma += c.cuerpo[i+k*4] * otra.Element(k, 4)
+		}
+		c.traslado[i] = suma
+	}
+	c.cuerpo = nuevo
+}
+
+// Apply: aplica la matriz a un color. La cuenta es la de Ebitengine, medida en
+// internal/affine/colorm.go:118: se desmultiplica el alfa (Go guarda los colores ya multiplicados por el
+// alfa), se multiplica el vector (r, g, b, a, 1) por la matriz, y se recorta a [0, 1].
+func (c *ColorM) Apply(clr color.Color) color.Color {
+	if !c.guardada {
+		return clr
+	}
+
+	r, g, b, a := clr.RGBA()
+	rf, gf, bf, af := 0.0, 0.0, 0.0, 0.0
+	if a > 0 {
+		rf = float64(r) / float64(a)
+		gf = float64(g) / float64(a)
+		bf = float64(b) / float64(a)
+		af = float64(a) / 0xffff
+	}
+
+	r2 := c.cuerpo[0]*rf + c.cuerpo[4]*gf + c.cuerpo[8]*bf + c.cuerpo[12]*af + c.traslado[0]
+	g2 := c.cuerpo[1]*rf + c.cuerpo[5]*gf + c.cuerpo[9]*bf + c.cuerpo[13]*af + c.traslado[1]
+	b2 := c.cuerpo[2]*rf + c.cuerpo[6]*gf + c.cuerpo[10]*bf + c.cuerpo[14]*af + c.traslado[2]
+	a2 := c.cuerpo[3]*rf + c.cuerpo[7]*gf + c.cuerpo[11]*bf + c.cuerpo[15]*af + c.traslado[3]
+
+	return color.NRGBA64{
+		R: uint16(recortar01(r2) * 0xffff),
+		G: uint16(recortar01(g2) * 0xffff),
+		B: uint16(recortar01(b2) * 0xffff),
+		A: uint16(recortar01(a2) * 0xffff),
+	}
+}
+
+// recortar01: deja el valor entre 0 y 1 (asi lo hace Ebitengine).
+func recortar01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+// Los dos cambios de base del matiz, con los numeros de Ebitengine (internal/affine/colorm.go:547 y 555).
+var (
+	rgbAYCbCr = [16]float64{
+		0.2990, -0.1687, 0.5000, 0,
+		0.5870, -0.3313, -0.4187, 0,
+		0.1140, 0.5000, -0.0813, 0,
+		0, 0, 0, 1,
+	}
+	yCbCrARgb = [16]float64{
+		1, 1, 1, 0,
+		0, -0.34414, 1.77200, 0,
+		1.40200, -0.71414, 0, 0,
+		0, 0, 0, 1,
+	}
+)
+
+// matrizDe: arma una ColorM con esos numeros (para el ChangeHSV).
+func matrizDe(cuerpo [16]float64) ColorM {
+	return ColorM{guardada: true, cuerpo: cuerpo}
+}
+
+// ChangeHSV: cambia el matiz (el angulo), la saturacion y el brillo.
+//
+// Es la cuenta de Ebitengine, copiada de internal/affine/colorm.go:566: pasa el color a YCbCr (donde el
+// matiz es un giro), gira, escala, y vuelve a RGB. Los tres pasos son: Concat(rgbToYCbCr),
+// Concat(el giro), Scale(brillo, sat*brillo, sat*brillo, 1), Concat(yCbCrToRgb).
+func (c *ColorM) ChangeHSV(anguloMatiz, escalaSaturacion, escalaBrillo float64) {
+	seno, coseno := math.Sincos(anguloMatiz)
+
+	c.iniciar()
+	c.Concat(matrizDe(rgbAYCbCr))
+	c.Concat(matrizDe([16]float64{
+		1, 0, 0, 0,
+		0, coseno, seno, 0,
+		0, -seno, coseno, 0,
+		0, 0, 0, 1,
+	}))
+	c.Scale(escalaBrillo, escalaSaturacion*escalaBrillo, escalaSaturacion*escalaBrillo, 1)
+	c.Concat(matrizDe(yCbCrARgb))
+}
+
+// RotateHue: gira el matiz (es ChangeHSV con saturacion y brillo en 1).
+func (c *ColorM) RotateHue(angulo float64) { c.ChangeHSV(angulo, 1, 1) }
+
+// IsInvertible: si la matriz se puede invertir (si su determinante no es cero).
+func (c *ColorM) IsInvertible() bool {
+	if !c.guardada {
+		return true
+	}
+	return math.Abs(c.determinante3x3()) > 1e-12
+}
+
+// Invert: da vuelta la matriz. Si no se puede, no hace nada (en Ebitengine esto explota; aca se prefiere
+// dejar el color como estaba antes que caerse en la consola).
+func (c *ColorM) Invert() {
+	if !c.IsInvertible() {
+		return
+	}
+	// resolver A * X = I por eliminacion de Gauss (4x4), y arrastrar el desplazamiento
+	a := [4][8]float64{}
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 4; j++ {
+			a[i][j] = c.cuerpo[i+j*4]
+		}
+		a[i][4+i] = 1
+	}
+	for col := 0; col < 4; col++ {
+		pivote := col
+		for f := col + 1; f < 4; f++ {
+			if math.Abs(a[f][col]) > math.Abs(a[pivote][col]) {
+				pivote = f
+			}
+		}
+		a[col], a[pivote] = a[pivote], a[col]
+		escala := a[col][col]
+		for j := 0; j < 8; j++ {
+			a[col][j] /= escala
+		}
+		for f := 0; f < 4; f++ {
+			if f == col {
+				continue
+			}
+			factor := a[f][col]
+			for j := 0; j < 8; j++ {
+				a[f][j] -= factor * a[col][j]
+			}
+		}
+	}
+
+	var nueva [16]float64
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 4; j++ {
+			nueva[i+j*4] = a[i][4+j]
+		}
+	}
+
+	// el desplazamiento invertido es "-inversa * traslado"
+	var nuevoTraslado [4]float64
+	for i := 0; i < 4; i++ {
+		suma := 0.0
+		for j := 0; j < 4; j++ {
+			suma += nueva[i+j*4] * c.traslado[j]
+		}
+		nuevoTraslado[i] = -suma
+	}
+
+	c.cuerpo = nueva
+	c.traslado = nuevoTraslado
+}
+
+// determinante3x3: el determinante de la parte de color (3x3), que es lo que decide si se puede invertir.
+func (c *ColorM) determinante3x3() float64 {
+	m := c.cuerpo
+	return m[0]*(m[5]*m[10]-m[9]*m[6]) -
+		m[4]*(m[1]*m[10]-m[9]*m[2]) +
+		m[8]*(m[1]*m[6]-m[5]*m[2])
+}
+
+// String: el texto de la matriz, con el mismo formato que Ebitengine.
+func (c *ColorM) String() string {
+	return fmt.Sprintf("[[%f, %f, %f, %f, %f], [%f, %f, %f, %f, %f], [%f, %f, %f, %f, %f], [%f, %f, %f, %f, %f]]",
+		c.Element(0, 0), c.Element(0, 1), c.Element(0, 2), c.Element(0, 3), c.Element(0, 4),
+		c.Element(1, 0), c.Element(1, 1), c.Element(1, 2), c.Element(1, 3), c.Element(1, 4),
+		c.Element(2, 0), c.Element(2, 1), c.Element(2, 2), c.Element(2, 3), c.Element(2, 4),
+		c.Element(3, 0), c.Element(3, 1), c.Element(3, 2), c.Element(3, 3), c.Element(3, 4))
+}
 
 // DrawImageOptions: las opciones de dibujado (posicion, escala, color).
 type DrawImageOptions struct {
@@ -174,6 +456,9 @@ type GeoM struct{ guardada bool }
 func (g *GeoM) Translate(x, y float64) { g.guardada = true }
 func (g *GeoM) Scale(x, y float64)     { g.guardada = true }
 func (g *GeoM) Rotate(t float64)       { g.guardada = true }
+// Skew: inclina la figura. MEDIDO en ebiten v2.0.2 (geom.go:149): Skew(skewX, skewY float64). Lo pide
+// d2core/d2render/ebiten/ebiten_surface.go:347.
+func (g *GeoM) Skew(x, y float64)       { g.guardada = true }
 func (g *GeoM) Reset()                 { g.guardada = false }
 func (g *GeoM) ResetGeoM()             { g.guardada = false }
 
@@ -184,6 +469,9 @@ const (
 	CompositeModeSourceOver CompositeMode = iota
 	CompositeModeCopy
 	CompositeModeLighter
+	// Multiply: el motor lo pide (d2render/ebiten/ebiten_surface.go:251, para oscurecer). Medido en
+	// ebiten v2.0.2 (graphics.go:88): ahi existe ademas de Lighter y SourceOver.
+	CompositeModeMultiply
 )
 
 // Filter: el filtro de escalado.
@@ -209,11 +497,31 @@ func DrawImage(dst, src *Image, op *DrawImageOptions) {
 	Dibujos++
 }
 
-// DrawTriangles: el robot de dibujado directo. Igual que DrawImage: se cuenta.
+// DrawTriangles: dibuja triangulos. Es lo que usa el motor para las superficies con textura
+// (d2render/ebiten/ebiten_surface.go:610).
+//
+// MEDIDO en ebiten v2.0.2 (image.go:264): es un METODO de Image, los indices son uint16 (no uint32) y el
+// ultimo parametro es otro *Image (la textura):
+//
+//	func (i *Image) DrawTriangles(vertices []Vertex, indices []uint16, img *Image, options *DrawTrianglesOptions)
+//
+// Aca estaba escrito como una funcion suelta con indices uint32, y el motor no compilaba por eso.
 var DibujosTriangulos int
 
-func DrawTriangles(dst *Image, vertices []Vertex, indices []uint32, op *DrawImageOptions) {
+func (i *Image) DrawTriangles(vertices []Vertex, indices []uint16, img *Image, options *DrawTrianglesOptions) {
 	DibujosTriangulos++
+}
+
+// DrawTrianglesOptions: las opciones del dibujado de triangulos. MEDIDO en ebiten v2.0.2 (image.go:229):
+// el motor las arma con la matriz de color, el modo de composicion y el filtro.
+type DrawTrianglesOptions struct {
+	ColorM        ColorM
+	CompositeMode CompositeMode
+	Filter        Filter
+	AntiAlias     bool
+	// Address: el modo de direccionamiento de la textura. En la consola el PVR no lo necesita (las
+	// texturas del juego no se salen de su marco); esta para que la estructura tenga la misma forma.
+	Address int
 }
 
 // Vertex: el vertice de Ebitengine.
@@ -399,7 +707,7 @@ func SetVsyncEnabled(v bool)    {}
 func SetWindowTitle(s string)   {}
 func SetWindowResizingMode(m int) {}
 func SetTPS(tps int)            {}
-func SetCursorMode(m int)       {}
+func SetCursorMode(m CursorMode) { cursorModo = m }
 
 // IsFullscreen / WindowSize: para que el motor pueda preguntar.
 func IsFullscreen() bool       { return true }

@@ -239,3 +239,31 @@ type ReaderFrom interface {
 type WriterTo interface {
 	WriteTo(w Writer) (n int64, err error)
 }
+
+// MultiWriter: escribe a todos los writers a la vez (d2gamescreen/autoscript.go lo usa para grabar el log
+// de la partida en pantalla y ademas guardarlo). Devuelve error apenas uno falla, con cuantos bytes se
+// escribieron (igual que el de Go).
+func MultiWriter(writers ...Writer) Writer {
+	// si hay uno solo, se devuelve ese mismo (como hace Go, que se ahorra el envoltorio)
+	if len(writers) == 1 {
+		return writers[0]
+	}
+	return &multiWriter{writers: writers}
+}
+
+type multiWriter struct {
+	writers []Writer
+}
+
+func (m *multiWriter) Write(p []byte) (n int, err error) {
+	for _, w := range m.writers {
+		n, err = w.Write(p)
+		if err != nil {
+			return n, err
+		}
+		if n != len(p) {
+			return n, ErrShortWrite
+		}
+	}
+	return len(p), nil
+}

@@ -23,7 +23,7 @@
 // (Marshal, Unmarshal, MarshalIndent, NewEncoder, NewDecoder), y practicamente todas son sobre structs.
 package json
 
-import "errors"
+import "d2std/errors"
 
 // ErrSinReflexion: el motor pidio serializar algo que en la consola no se puede (un struct, un mapa, un
 // puntero a struct). No es un error de programacion: es el limite declarado de este paquete.

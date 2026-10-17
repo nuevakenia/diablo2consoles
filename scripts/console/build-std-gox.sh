@@ -34,7 +34,7 @@ GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
 # de los cambios de esta tarjeta, y el que vigila la alineacion es scripts/console/mutar-tipos-os.sh.
 # Lo que SI se agrego aca (DC-002.8a): los imports de los paquetes de d2std van como "d2std/..." y no
 # con el nombre desnudo; el que lo exige es scripts/console/checar-imports-d2std.sh.
-ORDEN="${ORDEN:-unicode unicode/utf8 unicode/utf16 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv crypto/sha256 encoding/json encoding/binary encoding/hex compress/zlib compress/gzip container/ring sort container/heap image/color image image/draw regexp time io/fs embed os os/user os/exec syscall log bufio flag encoding/csv io/ioutil path/filepath runtime sync/atomic sync}"
+ORDEN="${ORDEN:-unicode unicode/utf8 unicode/utf16 errors io bytes strings strconv fmt math math/bits math/rand math/cmplx hash hash/fnv crypto/sha256 encoding/json encoding/binary encoding/hex compress/zlib compress/gzip container/ring sort container/heap image/color image image/draw image/png image/gif regexp time io/fs embed os os/user os/exec os/signal syscall log bufio flag encoding/csv io/ioutil path/filepath runtime sync/atomic sync}"
 
 if [ ! -d "$STD/${ORDEN%% *}" ]; then
     echo "no encuentro el primer paquete ($STD/${ORDEN%% *})" >&2
@@ -72,7 +72,13 @@ echo "stdlib minima compilada para SH-4 en $GEN"
 # ============================================================================
 compilar_tercero() {
     local pkgpath="$1" fuente="$2"
-    local salida="$DC_ROOT/gox/${pkgpath}.gox"
+    # El destino SALE DE GODC_GOX, igual que la stdlib de arriba. Antes estaba fijo en $DC_ROOT/gox y eso
+    # rompia medir con un gox aparte: la stdlib se compilaba en el gox propio pero los paquetes de
+    # terceros se iban al compartido, asi que el gox propio quedaba a medias y el motor acusaba
+    # "import file ... not found" por paquetes que si estaban compilados (medido: 99 de 142 en vez de 127).
+    # Con GODC_GOX puesto, los dos agentes pueden medir sin pisarse la gox del otro.
+    local GOX_TERCEROS="${GODC_GOX:-$DC_ROOT/gox}"
+    local salida="$GOX_TERCEROS/${pkgpath}.gox"
     mkdir -p "$(dirname "$salida")"
 
     # Si lo que se pasa es un DIRECTORIO, se compilan todos los .go de adentro. Hacia falta: un paquete de
@@ -89,7 +95,7 @@ compilar_tercero() {
         archivos=("$fuente")
     fi
 
-    if sh-elf-gccgo $GODC_GOFLAGS -I "$DC_ROOT/gox" -fgo-pkgpath="$pkgpath" -c "${archivos[@]}" -o "$salida" 2>"$salida.log"; then
+    if sh-elf-gccgo $GODC_GOFLAGS -I "$GOX_TERCEROS" -fgo-pkgpath="$pkgpath" -c "${archivos[@]}" -o "$salida" 2>"$salida.log"; then
         echo "  ${pkgpath##*/}.gox  $(stat -c%s "$salida") bytes  (${#archivos[@]} archivo(s))"
         rm -f "$salida.log"
     else
@@ -109,6 +115,15 @@ compilar_tercero "github.com/hajimehoshi/ebiten/v2/audio" "$HERE/../../console/d
 compilar_tercero "github.com/hajimehoshi/ebiten/v2/inpututil" "$HERE/../../console/dc/engine/ebiten/v2/inpututil"
 # akara: el BitSet (d2records/monster_unique_affix_*). Medido: es lo unico que se usa de esa libreria.
 compilar_tercero "github.com/gravestench/akara" "$HERE/../../console/dc/engine/akara/akara"
+# x/image/colornames: los nombres de los colores (d2render/ebiten pinta la pantalla de error de rojo).
+# El archivo esta GENERADO desde la tabla real de Go (cmd/gen-colornames), no copiado a mano.
+compilar_tercero "golang.org/x/image/colornames" "$HERE/../../console/dc/engine/x/image/colornames"
+# audio/wav: el decodificador de WAV (d2audio/ebiten). Este SI decodifica de verdad; lo que falta es el
+# chip de audio (el AICA), que es trabajo aparte del video.
+compilar_tercero "github.com/hajimehoshi/ebiten/v2/audio/wav" "$HERE/../../console/dc/engine/ebiten/v2/audio/wav"
+# pkg/profile: el perfilador de CPU/memoria (d2app). Es un stub: un perfil se escribe a un archivo, y en
+# la consola no se puede escribir (romdisk de solo lectura). Para medir tiempos ya esta la consola serie.
+compilar_tercero "github.com/pkg/profile" "$HERE/../../console/dc/engine/pkg/profile"
 # google/uuid: los identificadores de las entidades del mapa (d2mapentity/factory.go). Medido: solo se
 # usa uuid.New.
 compilar_tercero "github.com/google/uuid" "$HERE/../../console/dc/engine/uuid"

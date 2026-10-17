@@ -527,3 +527,35 @@ func UserConfigDir() (string, error) { return "/rd", nil }
 
 // UserCacheDir: lo mismo (no hay cache: el romdisk no se escribe).
 func UserCacheDir() (string, error) { return "/rd", nil }
+
+// Las senales: en la consola no hay senales de sistema operativo (no hay procesos), pero el motor las
+// NOMBRA al armar el apagado ordenado (d2app/app.go:156: signal.Notify(c, os.Interrupt, syscall.SIGTERM)).
+// Existen para que el codigo compile y para que la tabla de senales de os/signal tenga algo que nombrar.
+var (
+	Interrupt Signal = senal{nombre: "interrupt"}
+	Kill      Signal = senal{nombre: "killed"}
+	Terminate Signal = senal{nombre: "terminated"}
+)
+
+// senal: una senal con nombre (no hay numeros de senal en la consola).
+type senal struct {
+	nombre string
+}
+
+func (s senal) String() string { return s.nombre }
+
+// Signal: la senal.
+func (s senal) Signal() {}
+
+// SeñalDeNombre: busca una senal por su nombre (lo usa os/signal).
+func SenalDeNombre(nombre string) Signal {
+	switch nombre {
+	case "interrupt":
+		return Interrupt
+	case "killed":
+		return Kill
+	case "terminated":
+		return Terminate
+	}
+	return nil
+}

@@ -9,7 +9,7 @@
 // juego). Eso hace que los paths de configuracion apunten a un lugar real y no a una carpeta inventada.
 package user
 
-import "errors"
+import "d2std/errors"
 
 // ErrNoExiste: el usuario que se busca no esta (existe para la forma de la biblioteca).
 var ErrNoExiste = errors.New("user: unknown user")

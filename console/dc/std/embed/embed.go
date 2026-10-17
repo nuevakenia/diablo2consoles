@@ -13,8 +13,8 @@
 package embed
 
 import (
-	"errors"
-	"io/fs"
+	"d2std/errors"
+	"d2std/io/fs"
 )
 
 // FS es el sistema de archivos embebido. Aca no embebe nada: existe para que el codigo que lo declara

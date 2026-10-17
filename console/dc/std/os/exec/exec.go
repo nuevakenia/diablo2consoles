@@ -9,7 +9,7 @@
 // (y en la consola no hace falta: el guardado no existe).
 package exec
 
-import "errors"
+import "d2std/errors"
 
 // ErrNoSePuede es el error de "en la consola no se ejecutan programas".
 var ErrNoSePuede = errors.New("exec: en la consola no hay programas externos que ejecutar")

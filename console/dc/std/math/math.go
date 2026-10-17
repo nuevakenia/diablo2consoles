@@ -257,3 +257,13 @@ func Ldexp(frac float64, exp int) float64 {
 	}
 	return frac * pow2(exp)
 }
+
+// Sincos: el seno y el coseno del mismo angulo, juntos. La forma es la de Go:
+// `func Sincos(x float64) (sin, cos float64)` -- devuelve el seno PRIMERO.
+//
+// Lo pide el cambio de matiz de la matriz de color (ebiten v2.0.2, internal/affine/colorm.go:567, que usa
+// math.Sincos). Se calcula cada uno por separado; juntarlos para calcularlos de una sola vez es una
+// optimizacion que la consola no necesita.
+func Sincos(x float64) (float64, float64) {
+	return Sin(x), Cos(x)
+}

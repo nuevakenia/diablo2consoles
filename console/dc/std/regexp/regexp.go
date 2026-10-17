@@ -20,8 +20,8 @@
 package regexp
 
 import (
-	"errors"
-	"strings"
+	"d2std/errors"
+	"d2std/strings"
 )
 
 // Regexp: el patron ya compilado.

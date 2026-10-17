@@ -10,7 +10,7 @@
 // las pide, se ven al medir.
 package sha256
 
-import "math/bits"
+import "d2std/math/bits"
 
 // Las constantes de la ronda: los primeros 32 bits de las partes fraccionarias de las raices cubicas de
 // los primeros 64 numeros primos. Son las del estandar, no se inventan.
