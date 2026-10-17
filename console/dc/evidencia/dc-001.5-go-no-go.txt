@@ -1,0 +1,139 @@
+# DC-001.5: los tres numeros del go/no-go (medidos en la emulada, no deducidos)
+
+QUE PIDE LA TARJETA Y COMO SE MIDIO
+    Entregable: "(a) tamano del ELF del motor compilado con sh-elf-gccgo, (b) MB de los 16 libres con el
+    motor cargado, (c) ciclos por frame dibujando 300 sprites paletizados. Aceptacion: los tres numeros
+    escritos en docs/ con el comando que los produce y el veredicto go/no-go."
+
+    Se midio con un POC nuevo (console/dc/poc/motor-300) que:
+      - carga el MOTOR de verdad: los bytes CRUDOS del MPQ (140.740 del DC6 y 768 de la paleta) los
+        decodifica d2dc6.Load + DecodeFrame y d2dat.Load compilados para SH-4, igual que DC-002.9;
+      - sube la textura PAL8 al PVR (1 byte por pixel + la paleta del motor en el banco 0 del hardware);
+      - dibuja 300 sprites por frame (rejilla de 20x15, paso de 15 px, escala 0,13 -> 15x6 px cada
+        sprite: los 300 entran en pantalla tambien a 320x240);
+      - mide con el reloj de KOS (d2c_us = timer_us_gettime64) y mide APARTE el tiempo de CPU que la
+        consola se gasta SOMETIENDO los 300 sprites dentro del frame;
+      - arranca y lee los contadores de rendimiento del SH-4 (kos.PerfCntrStart / PerfCntrCycles);
+      - lee el modo de video que QUEDO en efecto (vid_mode del hardware), no el que pidio;
+      - pide RAM a malloc de a 1 MB hasta que falla (d2c_ram_tope) para contestar (b) sin suponer cuanto
+        se reservan KOS y el runtime.
+
+    Cada modo de video se corre DOS veces en el mismo arranque: sincronizado al vblank (como corre un
+    juego) y a fondo (sin esperar el vblank). Los dos modos son 640x480 (el que fijo DC-002.9) y 320x240
+    (el cambio se hace en caliente con vid_set_mode y la textura se vuelve a subir porque el cambio de
+    modo rearma la VRAM; el POC imprime el ancho y el alto EN EFECTO en cada fase).
+
+
+LOS TRES NUMEROS
+
+  (a) EL TAMANO DEL ELF
+      comando:  source scripts/console/env.sh && sh-elf-size -A /tmp/dcbuild/8b-motor-300/prog.elf
+
+        archivo .elf                    7.025.836 bytes
+                                        (5.485.147 de eso es el debug: .debug_info, .debug_line,
+                                         .debug_abbrev, .debug_aranges y .go_export, que NO se cargan
+                                         en la consola: el .elf es para GDB, lo que viaja al disco es
+                                         el 1ST_READ.BIN)
+        lo que SE CARGA en los 16 MB    1.390.948 bytes  (11 secciones)
+                                          .text      642.032
+                                          .rodata    362.740
+                                          .data      156.156
+                                          .bss       183.648
+                                          .eh_frame   45.844
+                                          el resto     1.528   (.init, .fini, .gcc_except_table,
+                                                               .ctors, .dtors, .got)
+        1ST_READ.BIN (el del disco)     1.207.432 bytes  (= lo que se carga sin el .bss + la cabecera)
+        disc.iso                        1.269.760 bytes
+
+      El ELF medido es el POC del motor con el PVR, que es el programa MAS GRANDE del port que enlaza
+      hoy. El motor completo todavia no enlaza como un solo binario: falta el main del juego y quedan
+      fuera los paquetes de la decision de single player (d2networking y d2script). O sea que 1,39 MB es
+      un piso medido, no el techo del motor entero.
+
+  (b) LA RAM LIBRE CON EL MOTOR CARGADO
+      comando:  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/8b-motor-300/prog.elf 32 \
+                    /tmp/dc-run-8b-300d
+                grep -a 'RAM-TOPE' /tmp/dc-run-8b-300d/flycast.log | tr -d '\r'
+
+        MOTOR-300 RAM-TOPE con_el_motor_cargado_y_el_pvr_andando libre_bytes= 10485760
+                 vram_libre_bytes= 5781192
+
+        RAM principal:  10.485.760 bytes libres = 10,00 MB de los 16 MB, medidos CON EL MOTOR CARGADO y
+                        con el PVR andando (se piden bloques de 1 MB: el bloque 11 falla, o sea que hay
+                        10 MB enteros y el resto del bloque 11 no alcanza; despues se liberan todos).
+        VRAM (8 MB aparte de los 16):  5.781.192 bytes libres = 5,51 MB, con la textura del motor arriba.
+
+      De donde sale el resto de los 16 MB: 10,00 MB libres + 4.355.580 del heap de Go (la arena de
+      malloc que el runtime se queda al arrancar) + 1.390.948 del ELF cargado; el resto se lo llevan KOS
+      y el sonido.
+
+      OJO CON EL DATO EQUIVOCADO (por eso (b) se mide asi): mallinfo().fordblks ("el libre del heap de
+      KOS") marca 1.288 bytes en la misma corrida, porque el runtime de Go toma la arena de una sola vez
+      y deja el heap de newlib casi sin nada. Ese 1.288 NO es la RAM que le queda al programa; el numero
+      que contesta la tarjeta es el del RAM-TOPE. Las dos lecturas de mallinfo del POC (antes de cargar
+      el motor y despues) dan lo mismo, que es otro dato: el motor cargado en esta fase (el DC6 de
+      140.740 bytes va compilado en el .rodata del ELF, no en el heap) no mueve el heap de KOS.
+
+  (c) EL FRAME CON 300 SPRITES PALETIZADOS
+      comando:  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/8b-motor-300/prog.elf 32 \
+                    /tmp/dc-run-8b-300d
+                grep -a 'MOTOR-300 FASE' /tmp/dc-run-8b-300d/flycast.log | tr -d '\r'
+
+        MOTOR-300 FASE default vblank  fin modo_ancho= 640 modo_alto= 480 sprites_por_frame= 300
+                frames= 302 us_total= 5011680 us_por_frame= 16594 ms_por_frame= 16 fps= 60
+                us_cpu_sometiendo_300_sprites= 683 ciclos_por_frame_derivados= 3318800
+                contador_sh4_ciclos= 0
+        MOTOR-300 FASE default a_fondo fin modo_ancho= 640 modo_alto= 480 sprites_por_frame= 300
+                frames= 301 us_total= 5003977 us_por_frame= 16624 ms_por_frame= 16 fps= 60
+                us_cpu_sometiendo_300_sprites= 683 ciclos_por_frame_derivados= 3324800
+                contador_sh4_ciclos= 0
+        MOTOR-300 FASE 320x240 vblank  fin modo_ancho= 320 modo_alto= 240 sprites_por_frame= 300
+                frames= 301 us_total= 5010117 us_por_frame= 16644 ms_por_frame= 16 fps= 60
+                us_cpu_sometiendo_300_sprites= 683 ciclos_por_frame_derivados= 3328800
+                contador_sh4_ciclos= 0
+        MOTOR-300 FASE 320x240 a_fondo fin modo_ancho= 320 modo_alto= 240 sprites_por_frame= 300
+                frames= 301 us_total= 5013924 us_por_frame= 16657 ms_por_frame= 16 fps= 60
+                us_cpu_sometiendo_300_sprites= 683 ciclos_por_frame_derivados= 3331400
+                contador_sh4_ciclos= 0
+
+      LO QUE ESTOS NUMEROS DICEN, con sus dos limites declarados:
+
+        1. El frame con 300 sprites ENTRA en 60 Hz en los dos modos: 302 frames en 5.011.680 us (16.594
+           us por frame) a 640x480 y 301 en 5.010.117 us (16.644) a 320x240, o sea 60,0 fps. No se cayo
+           ni un frame y los 300 sprites estan todos dentro de la pantalla.
+        2. El costo de CPU de SOMETER los 300 sprites es 683 us por frame, y da IGUAL en las cuatro
+           fases (683, 683, 683, 683): 683 us son 136.600 ciclos del SH-4 a 200 MHz, un 4,1% del
+           presupuesto de un frame de 60 Hz (16.667 us). El resto del frame no es CPU: es el render del
+           PVR y el tope del emulador.
+        3. LIMITE 1, medido: el emulador TOPEA a 60 fps. La fase "a_fondo" (sin esperar el vblank) da
+           16.624 y 16.657 us por frame, o sea lo mismo que la fase sincronizada: no se puede medir el
+           frame libre en Flycast porque el emulador lo limita. Lo que si se puede afirmar es que NO se
+           cae de 60 Hz.
+        4. LIMITE 2, medido: los CONTADORES DEL SH-4 DAN 0 en el emulador (contador_sh4_ciclos= 0 en las
+           cuatro fases), asi que los "ciclos por frame" que imprime el POC son DERIVADOS del reloj
+           (us x 200), no medidos con el contador. El numero medido es el tiempo; el de ciclos es una
+           cota que se cierra en la consola real -- justo la tarjeta DC-001.2d, que esta esperando a
+           Daniel y no a codigo.
+
+
+EL VEREDICTO (go/no-go)
+    GO, con los numeros de arriba:
+      - el binario cargado se lleva 1,39 MB de los 16 (8,7%) y quedan 10,00 MB libres para el motor con
+        el PVR andando: el plan F1 pedia "~8 MB libres" y hay 10,00;
+      - un frame de 300 sprites paletizados entra de sobra en 60 Hz (683 us de CPU de 16.667) y en
+        320x240 tambien;
+      - la VRAM no es la que aprieta (5,51 MB libres de 8 con la textura arriba).
+    Lo unico que NO queda cerrado en el emulador son los ciclos por frame (los contadores dan 0 y
+    Flycast topea a 60 fps): ese numero necesita la consola real, y el POC ya esta listo para correrla
+    ahi (es el mismo binario, con el serial por el que salen las lineas MOTOR-300).
+
+
+REPETIRLO ENTERO
+    POC=motor-300 bash scripts/console/build-motor-dc6.sh /tmp/dcbuild/8b-motor-300
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/8b-motor-300/prog.elf 32 /tmp/dc-run-8b-300d
+    grep -a 'MOTOR-300' /tmp/dc-run-8b-300d/flycast.log | tr -d '\r'
+    # y en el host, para (a):
+    source scripts/console/env.sh && sh-elf-size -A /tmp/dcbuild/8b-motor-300/prog.elf
+
+    El asset sale del MPQ (D2_DIR=... si no esta en los caminos tipicos de Wine) y NO entra al repo. El
+    POC imprime 20 lineas MOTOR-300; con 32 s de emulador alcanzan las cuatro fases de 5 s y el RAM-TOPE.

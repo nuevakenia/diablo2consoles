@@ -334,8 +334,9 @@ Triage para la fase siguiente (rama DC-002):
 2. **Mando**: confirmar que Flycast expone el control en el puerto 0 y que el POC lo lee.
 3. **Textura paletizada real (PAL8 + CLUT)** desde un asset de Diablo II horneado
    (DC-001.4): el objetivo del port depende de dibujar el arte con paleta, no RGBA.
-4. **Los tres números del go/no-go** (DC-001.5): tamaño del binario del motor,
-   RAM libre con el motor cargado, ciclos por frame con ~300 sprites.
+4. **Los tres números del go/no-go** (DC-001.5): **medidos** — 1,39 MB de binario cargado, 10,00 MB
+   libres de los 16 con el motor cargado, y 300 sprites paletizados a 60,0 fps gastando 683 µs de CPU
+   por frame. El detalle y el veredicto están en la sección 25.
 5. **Biblioteca estandar para SH-4** (DC-002): 51 paquetes y 337 simbolos medidos (seccion 10).
    Se empieza por los de puro calculo (fmt, strings, strconv, math, errors) para poder compilar
    y correr un paquete real del motor en la consola.
@@ -1294,5 +1295,59 @@ bash scripts/console/mutar-cuelgue-386.sh   # el cuelgue: 5x -count=20 + 2 mutan
 bash scripts/console/test-std-host.sh       # los dos anchos del host (medido: 0,7 s con el cache de go caliente)
 bash scripts/console/mutar-std-host.sh      # el general: 34/34 y arbol sano (medido: 2 m 11 s)
 bash scripts/console/compare-motor-dc6.sh   # la barrera (medido: 17,1 s, con el build del POC aparte)
+```
+
+## 25. DC-001.5: los tres numeros del go/no-go, medidos (y el veredicto)
+
+Los tres numeros que el plan por fases pedia para decidir si el port se hace o se corta estaban
+pendientes desde la fase DC-001 y son los que mas pesan de todo el trabajo: sin ellos, "se puede" es una
+opinion. Se midieron con un POC nuevo, `console/dc/poc/motor-300`, que carga el motor de verdad (los
+bytes crudos del MPQ los decodifica `d2dc6.Load` + `DecodeFrame` y `d2dat.Load` compilados para SH-4, con
+la textura PAL8 y la paleta del motor en el banco 0 del PVR) y despues dibuja **300 sprites por frame**
+en una rejilla de 20x15 (paso de 15 px, escala 0,13: los 300 entran en pantalla tambien a 320x240).
+
+Los tres numeros, en una linea cada uno:
+
+    (a) EL BINARIO        1.390.948 bytes es lo que SE CARGA en los 16 MB (11 secciones: .text 642.032,
+                          .rodata 362.740, .data 156.156, .bss 183.648, .eh_frame 45.844). El .elf en
+                          disco pesa 7.025.836 bytes, pero 5.485.147 son el debug y el .go_export, que
+                          no se cargan: lo que viaja al disco es el 1ST_READ.BIN, 1.207.432 bytes.
+    (b) LA RAM LIBRE       10.485.760 bytes = 10,00 MB de los 16 MB, medidos CON EL MOTOR CARGADO y el
+                          PVR andando, pidiendo bloques de 1 MB a malloc hasta que uno falla. La VRAM
+                          (8 MB aparte) queda en 5.781.192 libres = 5,51 MB con la textura arriba.
+    (c) EL FRAME CON       60,0 fps sostenidos: 302 frames en 5.011.680 us (16.594 us por frame) a
+        300 SPRITES        640x480 y 301 en 5.010.117 us (16.644) a 320x240. El costo de CPU de SOMETER
+                          los 300 sprites es 683 us por frame en las cuatro fases: 136.600 ciclos del
+                          SH-4, un 4,1% del presupuesto de un frame de 60 Hz.
+
+Tres cosas del metodo, porque son las que hacen que los numeros signifiquen algo:
+
+- **(b) no se responde con el "libre" del heap de KOS.** `mallinfo().fordblks` marca 1.288 bytes en esa
+  misma corrida, porque el runtime de Go se queda la arena de malloc de una sola vez (4.355.580 bytes) y
+  deja el heap de newlib sin nada. Ese dato NO es la RAM que le queda al programa: el numero que
+  contesta la tarjeta se mide pidiendo RAM hasta que falla, y por eso el POC mide las dos cosas e imprime
+  las dos. Las dos lecturas de `mallinfo` (antes de cargar el motor y despues) dan lo mismo, que es otro
+  dato: el DC6 de esta fase va compilado en el `.rodata` del ELF, no en el heap.
+- **El frame se mide a fondo y sincronizado, y los dos dan igual.** El emulador TOPEA a 60 fps: la fase
+  sin esperar el vblank da 16.624 y 16.657 us por frame, o sea lo mismo que la sincronizada. Se puede
+  afirmar que el frame **no se cae** de 60 Hz; medir el frame libre necesita la consola real.
+- **Los ciclos NO son un numero medido.** Los contadores del SH-4 (`PerfCntr*`) devuelven **0** en Flycast
+  (medido en las cuatro fases), asi que el POC imprime los ciclos aparte, **derivados** del reloj (us x
+  200 MHz). El numero medido es el tiempo. Los ciclos por frame se cierran en la tarjeta DC-001.2d, que
+  es la que esta esperando la consola real: el mismo binario imprime las lineas `MOTOR-300` por el
+  puerto serie y ahi los contadores existen.
+
+El veredicto es **GO**: el codigo se lleva 1,39 MB de los 16 (8,7%) y deja 10,00 MB libres con el PVR
+andando (el plan pedia ~8 MB), y un frame de 300 sprites paletizados gasta 683 us de CPU de los 16.667
+que hay en 60 Hz. Ni la RAM ni la VRAM son las que aprietan.
+
+Evidencia cruda y los comandos exactos: `evidencia/dc-001.5-go-no-go.txt`. El resumen para el repo (el
+que pedia la tarjeta "en docs/"): `docs/dreamcast-go-no-go.md`.
+
+```
+POC=motor-300 bash scripts/console/build-motor-dc6.sh /tmp/dcbuild/8b-motor-300
+CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/8b-motor-300/prog.elf 32 /tmp/dc-run-8b-300d
+grep -a 'MOTOR-300' /tmp/dc-run-8b-300d/flycast.log | tr -d '\r'
+source scripts/console/env.sh && sh-elf-size -A /tmp/dcbuild/8b-motor-300/prog.elf   # (a)
 ```
 
