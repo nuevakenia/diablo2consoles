@@ -485,3 +485,34 @@ const (
 	O_SYNC   int = 0x101000
 	O_TRUNC  int = 0x200
 )
+
+// ---------------------------------------------------------------- CreateTemp y Chmod
+//
+// Los pide d2hero al guardar (d2s_save.go: escribe a un temporal y despues lo mueve, que es la forma
+// correcta de guardar sin dejar el archivo a medias). En la consola no hay disco donde escribir, asi que
+// CreateTemp falla con el mismo error de solo lectura que el resto de las escrituras de este paquete: no
+// se finge un archivo que no existe.
+//
+// Chmod no aplica (no hay permisos que cambiar en un romdisk): dice que si, que es lo que corresponde
+// cuando no hay nada que hacer.
+
+// CreateTemp: no hay donde crear temporales (el romdisk es de solo lectura).
+func CreateTemp(dir, pattern string) (*File, error) { return nil, ErrNoSePuede }
+
+// Chmod: en la consola no hay permisos que cambiar.
+func Chmod(nombre string, modo FileMode) error { return nil }
+
+// Chown: lo mismo.
+func Chown(nombre string, uid, gid int) error { return nil }
+
+// Truncate: no se puede (solo lectura).
+func Truncate(nombre string, tam int64) error { return ErrNoSePuede }
+
+// Fd: el descriptor del archivo. En la consola no hay descriptores: el VFS lee del romdisk por dentro, y
+// no hay nada del sistema operativo que necesite uno. Devuelve 0 para que el codigo que lo pase a
+// syscall.Flock (que aca no bloquea nada) siga andando. Si alguna vez algo lo usara para leer de verdad,
+// tendria que fallar -- y no lo hace nadie: medido, el unico uso es el lock de d2hero.
+func (f *File) Fd() uintptr { return 0 }
+
+// Name: el nombre del archivo.
+func (f *File) Name() string { return f.nombre }
