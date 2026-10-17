@@ -52,7 +52,13 @@ setsid env DISPLAY="$DISP" "$FLY" -config "window:fullscreen=no" -config "$CFG" 
 PID=$!
 echo "pid=$PID"
 ult=0
-for t in 3 6 10 15 25 40; do
+# EL TOPE DE LA CORRIDA ES ESTA LISTA, NO `$SECS` (DC-002.24b, medido): con `run-flycast.sh <elf> 150` la
+# corrida se terminaba igual a los ~41 s, porque el bucle de capturas se acababa en t=40 y de ahi saltaba
+# al SIGTERM. Eso ya confundio una medicion ("la corrida dura los 30 s completos"): con SECS=30 el tope real
+# es ~26 s (el bucle rompe en t=40 > 30 DESPUES de dormir hasta t=25). La lista va hasta 600 s para que un
+# SECS largo sea de verdad largo (el motor completa un cuadro cada ~0,3 s: el heartbeat del loop recien
+# imprime a los 300 cuadros, o sea ~100 s de corrida).
+for t in 3 6 10 15 25 40 60 90 120 150 180 240 300 360 420 480 540 600; do
   [ "$t" -gt "$SECS" ] && break
   sleep $(( t - ult )); ult=$t
   if kill -0 "$PID" 2>/dev/null; then

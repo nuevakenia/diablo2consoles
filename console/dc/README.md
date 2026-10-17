@@ -2727,3 +2727,61 @@ afuera, y aca esa referencia es la convencion de KOS y la captura del emulador.
 Barreras: `test-std-host.sh` **verde en amd64 y 386** (13/13 excluidos), `mutar-std-host.sh` **39/39 chequeos
 cazados** (el arbol queda sano) y `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas, 30 frames comparados).
 Evidencia cruda: `evidencia/dc-002.26-cuadro-rotado.txt`.
+
+## 43. DC-002.24b: el "corte despues de los cuadros" era el **instrumento** (y la sonda del PC del SH-4)
+
+DC-002.24 dejo el arranque en 3 cuadros y dos hilos abiertos: un "corte silencioso" despues de los cuadros y
+una `Unhandled exception: PC 64800008, code 1` **intermitente**. Esta tarjeta midio los dos con una **sonda del
+PC** nueva — un `.c` del runtime, nada de Go (una sonda en Go mueve el monton, que es lo que mueve el defecto de
+forma: la leccion de DC-002.22/23/24) — y el resultado es que **el corte no existe**: el loop sigue dando
+cuadros.
+
+**1. La sonda (`runtime/sonda_pc.c` + `scripts/console/fix-libgodc-sonda-pc.py`, idempotente).** Engancha el
+manejador **global** de excepciones de KOS (`irq_set_global_handler`) y muestrea el contexto del hilo
+**interrumpido** en el tick del sistema de hilos (TMU0, `THD_SCHED_HZ` = 100 Hz, que KOS ya tiene armado: no se
+toca ningun timer). Cada 1 s imprime los 4 PC que mas se repitieron en la ventana y el `pc`/`pr`/`fp`/`sp` del
+ultimo muestreo; grita `RACHA` (el mismo PC 0,3 s seguidos) y `FUERA` (PC fuera de la RAM, 0x8c000000-0x8d000000).
+Cuesta 1.095 bytes de `.text` y 552 de `.bss` y **no mueve la aguja**: el cuadro 11 del loop mide
+`cuadro_us 309308` sin la sonda y `309326` con ella (**+18 us de 309 ms**). Los PC se resuelven con
+`scripts/console/resolver-pc.py` contra **`prog.elf`** — el `prog-emu.elf` que corre Flycast esta **sin
+simbolos** (`nm` dice "no symbols" y `addr2line` contesta `?? ??:0`).
+
+**2. Medido: el corte no es un corte.** El loop solo imprime los cuadros 0-2, el PERFIL del 11 y un heartbeat
+cada 300 (`ebiten.go`), asi que entre el cuadro 12 y el 299 el log queda mudo **por diseno**:
+
+    corrida de 140 s:  EBITEN-LOOP, cuadros 300 huella 2011487124 dibujos 58394    (entre las ventanas t=94 y t=95)
+    corrida de 250 s:  EBITEN-LOOP, cuadros 600 huella 2011487124 dibujos 116594   (entre las ventanas t=187 y t=188)
+
+600 cuadros en 187,5 s = **3,20 cuadros/s**, que es exactamente lo que el loop mide por dentro (`cuadro_us
+309326` = 3,23 cuadros/s). Y la huella **no cambia** entre el cuadro 300 y el 600: es la misma pantalla
+redibujada.
+
+**3. Medido: que hace el motor ahi (a que altura del arranque esta).** No esta cargando el mapa ni el atlas: el
+motor **fallo su `initialize()` y esta sentado en su pantalla de error** (`d2app/app.go:328` ->
+`d2core/d2render/ebiten/ebiten_renderer.go:271` -> `PanicScreen.Draw`: `Clear()` + `Fill(Darkred)` +
+`DebugPrint(errorMessage)`, cuadro tras cuadro). El **censo** de la sonda sobre 118 ventanas: **`Image.SetRGBA`
+50,4%**, **`d2c_pvr_pantalla_convertir` 28,4%** (el twiddle del cuadro), **`Image.Fill`/`LlenarDeRGBA` 20,9%**,
+y **0** muestras fuera de la RAM y **0** rachas clavadas. El presupuesto del cuadro que mide el propio loop
+dice lo mismo desde el otro lado: `dibujar_us 251796` (81,4%) + `convertir_us 57527` (18,6%) = `cuadro_us
+309326`. O sea: el cuadro del arranque se paga **pixel a pixel en Go** (`LlenarDeRGBA` llama a `SetRGBA` por
+pixel, y `SetRGBA` chequea bordes y calcula el indice por pixel) mas la conversion del twiddle por bloques de
+32x32.
+
+**4. La excepcion intermitente `PC 64800008` no aparecio.** 7 corridas, **~11 minutos de emulacion (~2.000
+cuadros)**: 0 `Unhandled exception`, 0 `SONDA-PC FUERA`, 0 `RACHA`. Declarado: las "2 de 3 corridas" de
+DC-002.24 salieron con la cadena del vendor **no idempotente** (el defecto de DC-002.25: el arbol tenia ~2.190
+bytes de invalidaciones duplicadas), un estado que ya no existe; y **un corpus de corridas fijas no prueba que
+un defecto intermitente no exista**. La receta para cazarlo queda escrita (sonda puesta + corrida larga + el
+volcado completo de KOS, que imprime PC/registros/PR y la plantilla de `KOS_ADDR2LINE`).
+
+**5. El defecto de instrumento que esta tarjeta arregla.** El tope de la corrida en `run-flycast.sh` era la
+**lista de capturas** (t=3..40), no `$SECS`: `run-flycast.sh <elf> 150` se cortaba a los ~41 s, y una corrida
+"de 30 s" duraba **26 s** (el dato que DC-002.25 habia escrito —"la corrida dura los 30 s completos"— no era
+cierto). Con ese tope el heartbeat del cuadro 300 (t~95 s) no podia aparecer **nunca**. La lista ahora llega a
+600 s.
+
+Corpus: `scripts/console/checar-cuadros-24b.sh` — **6/6 controles verdes, 1/1 mutante cazado** (el mutante es la
+misma corrida con el tope viejo de 40 s: no llega al cuadro 300 y el control 1 se pone ROJO).
+Barreras: `test-std-host.sh` **verde en amd64 y 386** (13/13 excluidos), `mutar-std-host.sh` **39/39 chequeos
+cazados** y `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas, 30 frames comparados).
+Evidencia cruda: `evidencia/dc-002.24b-el-corte-era-el-instrumento.txt`.

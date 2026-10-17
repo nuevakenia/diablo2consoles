@@ -1,0 +1,275 @@
+================================================================================
+DC-002.24b -- EL "CORTE DESPUES DE LOS CUADROS" ERA EL INSTRUMENTO, NO EL MOTOR
+(la sonda del PC del SH-4: donde esta la CPU, segundo a segundo)
+================================================================================
+Rama DC-002. Host: CachyOS x86-64. Consola emulada: Flycast (reios). POC
+`motor-arranque` (el arranque del motor de verdad: `d2app.Create().Run()`), corridas
+de 26 s a 241 s. El vendor (`~/dreamcast/libgodc`) con la cadena CANONICA: copia por
+Store Queue arreglada (DC-002.24) + semiespacio del GC en 512 KB (DC-002.25), mas el
+instrumento de esta tarjeta (la sonda del PC).
+
+FECHA: 2026-10-17 (corrida autonoma, ramp DC-002).
+
+--------------------------------------------------------------------------------
+0. LO QUE SE HEREDO (el cuerpo de esta tarjeta)
+--------------------------------------------------------------------------------
+DC-002.24 (la copia por Store Queue del GC) dejo el arranque en 3 cuadros completos y
+dejo ABIERTO: "con el arreglo puesto el motor entra al loop, completa los cuadros 0/1/2
+y despues aparece, A VECES, `Unhandled exception: PC 64800008, code 1`". La tarjeta pedia
+medir DONDE salta y A QUE ALTURA del arranque. Y traia otro dato: en varias corridas el
+log se terminaba sin ninguna excepcion (un "corte silencioso" despues de los cuadros).
+
+Lo medido en esta tarjeta: el corte silencioso NO ES UN DEFECTO DEL MOTOR (seccion 2) y
+la excepcion intermitente NO APARECIO en ninguna de las corridas de esta tarjeta
+(seccion 4). El instrumento con el que se midio es nuevo y queda en el repo (seccion 1).
+
+--------------------------------------------------------------------------------
+1. EL INSTRUMENTO: LA SONDA DEL PC (y el resolvedor de PC)
+--------------------------------------------------------------------------------
+LO QUE HACE
+    `runtime/sonda_pc.c` es un archivo C NUEVO del runtime de libgodc, y se engancha con
+    una llamada al principio de `main()` del runtime (`runtime/go-main.c`). Las dos cosas
+    las escribe `scripts/console/fix-libgodc-sonda-pc.py` (idempotente; `--quitar` lo
+    saca; `--build` ademas rehace `libgodc.a`). No toca una sola linea de Go, por la
+    leccion medida de DC-002.22/23/24: una sonda en Go mueve el layout del monton, que es
+    justo lo que mueve el defecto de forma.
+
+    La sonda engancha el MANEJADOR GLOBAL de excepciones de KOS
+    (`irq_set_global_handler`) y muestrea el contexto del hilo INTERRUMPIDO en el tick
+    del sistema de hilos (TMU0, `THD_SCHED_HZ` = 100 Hz, que KOS ya tiene armado: no se
+    toca ningun timer). De ese contexto usa `pc`, `pr` (direccion de retorno del ultimo
+    llamado), `r[14]` (frame pointer) y `r[15]` (pila). Lo que imprime por la consola
+    serie (o sea, el `flycast.log`):
+
+        SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), 64 ranuras de histograma
+        SONDA-PC t=95 top 8c013348:15 8c03f680:13 8c03c6d0:12 8c03db72:12 pc=8c03db30 pr=8c03f680 fp=8c45508c sp=8ce900b8 fuera=0
+        SONDA-PC RACHA pc=... racha=30 ...        el MISMO PC 0,3 s seguidos (clavado)
+        SONDA-PC FUERA pc=...                     el PC cayo FUERA de la RAM (0x8c000000-0x8d000000)
+
+    `t=` son segundos de sonda (muestras / 100). El volcado va cada 1 s: los 4 PC que mas
+    se repitieron en la ventana y el `pc`/`pr`/`fp`/`sp` del ultimo muestreo, mas un
+    contador acumulado `fuera=`.
+
+COSTO (declarado, no escondido)
+    1.095 bytes de `.text` y 552 bytes de `.bss` (64 ranuras x 8 bytes, chico a proposito:
+    el monton de C queda con ~4 KB libres antes del motor). MEDIDO que no mueve la aguja:
+    el cuadro 11 del loop mide `cuadro_us 309308` sin la sonda y `309326` con la sonda
+    (+18 us de 309 ms = 0,006%), y el mismo valor 309326 se repite identico en las cuatro
+    corridas con sonda.
+
+COMO SE LEEN LOS PC (y un defecto del ELF que hay que conocer)
+    `scripts/console/resolver-pc.py <elf> <flycast.log> [--censo]` resuelve cada PC contra
+    la tabla de simbolos y la linea. OJO, MEDIDO: hay que resolver contra `prog.elf`, NO
+    contra `prog-emu.elf` -- el que corre Flycast esta SIN simbolos (`sh-elf-nm
+    prog-emu.elf` dice "no symbols" y el `addr2line` contesta "?? ??:0"). El enlazado
+    completo con los 143.882 simbolos es `prog.elf` (44 MB), que el build deja al lado.
+
+--------------------------------------------------------------------------------
+2. MEDIDO: EL "CORTE SILENCIOSO" NO ES UN CORTE -- EL LOOP SIGUE DANDO CUADROS
+--------------------------------------------------------------------------------
+EL LOOP NO IMPRIME NADA ENTRE EL CUADRO 11 Y EL 300. Es la politica de impresion del
+propio loop (`console/dc/engine/ebiten/v2/ebiten.go`):
+
+    if cuadros < 3                       -> los tres primeros cuadros, paso por paso
+    if cuadros == 11                     -> el PERFIL (dibujar/convertir/subir/pintar)
+    if cuadros%300 == 0                  -> el heartbeat: "EBITEN-LOOP, cuadros N huella H dibujos D"
+
+O sea: entre el cuadro 12 y el 299 el log queda MUDO por diseno. Con el motor a ~0,3 s
+por cuadro, el heartbeat cae en t~95 s de corrida. MEDIDO con la sonda puesta:
+
+    /tmp/dc-run-24bsonda-140 (140 s pedidos):   EBITEN-LOOP, cuadros 300 huella 2011487124 dibujos 58394
+    /tmp/dc-hunt24b-250    (250 s pedidos):   EBITEN-LOOP, cuadros 600 huella 2011487124 dibujos 116594
+
+y las dos entre las ventanas de la sonda (el heartbeat del 300, entre `t=94` y `t=95`;
+el del 600, entre `t=187` y `t=188`). La aritmetica cierra con lo que el loop mide por
+dentro: `cuadro_us 309326` en el cuadro 11 = 3,23 cuadros/s, y 600 cuadros en 187,5 s =
+3,20 cuadros/s. Los `dibujos` crecen en la misma proporcion: 58.394 en 300 cuadros y
+116.594 en 600 = 194 dibujos por cuadro.
+
+CONCLUSION MEDIDA: el motor NO se cuelga despues de los cuadros. Sigue dibujando a
+~3,2 cuadros/s; lo que se acababa era la CORRIDA (y el instrumento no decia nada).
+
+--------------------------------------------------------------------------------
+3. MEDIDO: QUE HACE EL MOTOR AHI (a que altura del arranque esta)
+--------------------------------------------------------------------------------
+NO esta cargando el mapa ni el atlas de texto: el motor FALLO su `initialize()` y esta
+sentado en su PANTALLA DE ERROR. El camino, en el codigo:
+
+    d2app/app.go:328      if err := a.initialize(); err != nil {
+    d2app/app.go:333          gameErr := a.renderer.Run(a.updateInitError, updateNOOP, 800, 600, ...)
+    d2core/d2render/ebiten/ebiten_renderer.go:271   err := ebiten.RunGame(errorScreen)
+    d2core/d2render/ebiten/ebiten_panic_screen.go:42  Draw: screen.Clear(); screen.Fill(colornames.Darkred);
+                                                            ebitenutil.DebugPrint(screen, s.errorMessage)
+
+y ese `Draw` es lo que corre cuadro tras cuadro (es el cuadro rojo con texto blanco que
+DC-002.23 midio y que DC-002.26 encontro ROTADO 90 grados).
+
+EL CENSO DE LA SONDA dice donde se va el tiempo del SH-4 (`resolver-pc.py --censo` sobre
+la corrida de 140 s: 118 ventanas, 5.823 muestras del top de cada ventana):
+
+        50,4%    2.932   ebiten/v2.Image.SetRGBA            (ebiten.go:110-118)
+        28,4%    1.651   d2c_pvr_pantalla_convertir         (pvr_pantalla.c:271-305, el twiddle del cuadro)
+        20,9%    1.218   ebiten/v2.Image.Fill -> LlenarDeRGBA (ebiten.go:77-89)
+         0,2%       12   ebiten/v2.Image.Huella             (dibujo.go:244)
+         0,1%        6   gc_update_pointer_field            (gc_copy.c, la barrera de escritura del GC)
+         0,1%        4   memset                              (libc)
+
+    DECLARADO: es una muestra APROXIMADA -- el histograma tiene 64 ranuras y 5.823 de las
+    11.800 muestras entraron en el top de su ventana (la otra mitad cayo en ranuras
+    ocupadas por otro PC y no se conto). Lo robusto es el ORDEN y que en ninguna ventana
+    de 118 aparece algo fuera de ese trio.
+
+Y el presupuesto del cuadro que mide el PROPIO loop (cuadro 11, 309.326 us) dice lo mismo
+desde el otro lado: `dibujar_us 251796` (81,4%), `convertir_us 57527` (18,6%),
+`subir_us 1`, `pintar_us 2`. O sea: el cuadro del arranque se paga PIXEL A PIXEL en Go
+(`LlenarDeRGBA` llama a `SetRGBA` por pixel, y `SetRGBA` chequea los bordes y calcula el
+indice por pixel) mas la conversion del twiddle por bloques de 32x32.
+
+DATO QUE LO CONFIRMA DESDE AFUERA: la `huella` del cuadro es la MISMA a los cuadros 300 y
+600 (2011487124) y los `dibujos` siguen creciendo -- es la misma pantalla redibujada, no
+una pantalla nueva: el motor no avanzo de su cuadro de error en 600 cuadros.
+
+--------------------------------------------------------------------------------
+4. MEDIDO: LA EXCEPCION INTERMITENTE `PC 64800008` NO APARECIO
+--------------------------------------------------------------------------------
+LAS CORRIDAS DE ESTA TARJETA (todas con la cadena canonica, semiespacio 512 KB):
+
+    corrida                                    segs pedidos  heartbeat   excepcion  sonda
+    /tmp/dc-run-24bbase1  (SIN sonda)               30        -            0          -
+    /tmp/dc-run-24bbase2  (SIN sonda)               30        -            0          -
+    /tmp/dc-run-24bsonda1 (con sonda)               30        -            0        24 ventanas
+    /tmp/dc-run-24bsonda-140                        140       cuadros 300   0       118 ventanas
+    /tmp/dc-hunt24b-250                             250       cuadros 300   0       238 ventanas
+                                                              cuadros 600
+    /tmp/dc-hunt24b-140b                            140       cuadros 300   0       118 ventanas
+
+    ~11 minutos de emulacion (~2.000 cuadros del loop) y CERO `Unhandled exception`, CERO
+    `SONDA-PC FUERA` (el PC nunca se fue de la RAM) y CERO `SONDA-PC RACHA` (nunca se
+    clavo en una instruccion).
+
+DONDE SE MIDIO LA EXCEPCION (y por que no se reprodujo aca)
+    Las "2 de 3 corridas" de DC-002.24 salieron con la cadena del vendor NO IDEMPOTENTE
+    (el hallazgo de DC-002.25: `gc_copy.c` crecia en cada corrida y ese arbol tenia ~2.190
+    bytes de invalidaciones duplicadas). Ese estado ya no existe: la cadena de hoy deja
+    `gc_copy.c` canonico (44.509 bytes). Este corpus NO PUEDE probar que un defecto
+    intermitente no existe: lo que se puede afirmar es que con el estado canonico no
+    aparecio en ~11 minutos de corridas.
+
+COMO SE CAZA SI VUELVE A SALIR (el instrumento ya esta)
+    1. la sonda puesta:  python3 scripts/console/fix-libgodc-sonda-pc.py --build
+    2. reenlazar:        POC=motor-arranque bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/dc24b /tmp/gox-222
+    3. correr largo:     CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/dc24b/prog-emu.elf 240 /tmp/dc-run-24b
+    4. mirar:            grep -a 'SONDA-PC\|Unhandled\|Stack\| R0-R7\| SR ' /tmp/dc-run-24b/flycast.log
+    Cuando el SH-4 se va al pasto, KOS imprime el volcado completo
+    (`kernel/arch/dreamcast/kernel/irq.c:163`: PC, los 16 registros, SR y PR, y la
+    plantilla de `KOS_ADDR2LINE`) y la sonda deja las ultimas ventanas ANTES del salto:
+    con las dos cosas se sabe desde que funcion salto y con que registro.
+    Por que `PC 64800008` huele a salto a la basura: 0x64800008 no cae en ninguna region
+    del mapa del SH-4 (la RAM es 0x8c000000-0x8cffffff, la VRAM 0xa5000000+, el area 0 es
+    la BIOS). La sonda lo vigila con el contador `fuera=`: si el PC se va de la RAM, la
+    linea `SONDA-PC FUERA` lo dice en el mismo segundo.
+
+--------------------------------------------------------------------------------
+5. EL DEFECTO DE INSTRUMENTO QUE ESTA TARJETA ARREGLA (`run-flycast.sh`)
+--------------------------------------------------------------------------------
+EL TOPE DE LA CORRIDA ERA LA LISTA DE CAPTURAS, NO `$SECS`. El bucle de capturas
+terminaba en `t=40` y de ahi saltaba al SIGTERM, asi que:
+
+    run-flycast.sh <elf> 150   ->  la corrida se cortaba a los ~41 s
+    run-flycast.sh <elf> 30    ->  la corrida duraba ~26 s (el bucle rompe en t=40 DESPUES de dormir hasta t=25)
+
+Con ese tope, el heartbeat del cuadro 300 (t~95 s) no podia aparecer NUNCA: "el log se
+corta despues de los cuadros" era el instrumento, no el motor (y el dato "la corrida dura
+los 30 s completos" que se habia escrito en DC-002.25 no era cierto: duraba 26 s). La
+lista de capturas ahora llega a 600 s y el comentario del script lo declara.
+
+--------------------------------------------------------------------------------
+6. EL CORPUS: `checar-cuadros-24b.sh`
+--------------------------------------------------------------------------------
+CONTROLES (corrida sana):
+ 1. la corrida larga LLEGA AL CUADRO 300 (el heartbeat del loop): el corte no es un corte
+ 2. la sonda esta puesta y MUESTREA (>= 90 ventanas de 1 s) y no grita (0 FUERA, 0 RACHA)
+ 3. el CPU vive en el dibujado del cuadro (el censo: SetRGBA/convertir/Fill en el top)
+ 4. 0 `Unhandled exception` (DECLARADO: un corpus de corridas fijas no prueba que un
+    defecto intermitente no exista; este control lo vigila, no lo demuestra)
+ 5. la cadena de la sonda es idempotente (dos corridas dejan el MISMO sha256)
+
+MUTANTE: el TOPE VIEJO de `run-flycast.sh`. La MISMA corrida pedida con 40 s se corta a
+los ~41 s y NO llega al cuadro 300 -> el control 1 se pone ROJO. Ese es, medido, el
+defecto de instrumento que esta tarjeta encontro (y el corpus lo caza).
+
+RESULTADO DE LA CORRIDA (2026-10-17): **6/6 controles verdes y 1/1 mutante cazado**. Los
+numeros de la corrida larga del corpus:
+
+    control 1  el loop llega al cuadro 300:            VERDE  (el heartbeat esta en el log)
+    control 2  la sonda muestrea: 119 ventanas:        VERDE
+    control 2b la sonda no grita: 0 FUERA / 0 RACHA:   VERDE
+    control 3  el CPU vive en el dibujado: 119 ventanas VERDE
+    control 4  0 excepciones del SH-4:                 VERDE
+    control 5  la cadena de la sonda es idempotente:   VERDE
+    mutante    la corrida de 40 s se queda sin el heartbeat: CAZADO
+
+    y el censo de la corrida del corpus (119 ventanas, 5.851 muestras): SetRGBA 51,1%,
+    `pvr_pantalla_convertir` 28,2%, `Image.Fill` 20,4% -- el mismo trio y el mismo orden
+    que la corrida de 140 s suelta (50,4% / 28,4% / 20,9%).
+
+    y al final el corpus deja el instrumento COMO LO ENCONTRO: si la sonda no estaba
+    puesta al empezar, la saca y rehace `libgodc.a` (los 552 bytes de `.bss` de la sonda
+    mueven el monton de C un pelo, y hay corpora que comparan numeros exactos).
+
+--------------------------------------------------------------------------------
+6b. LAS BARRERAS (no se toco nada del motor ni del runtime, pero se corren igual)
+--------------------------------------------------------------------------------
+    test-std-host.sh     verde en amd64 y 386 (los 13 que hablan con KOS siguen sin compilar en el host)
+    mutar-std-host.sh    (los 39 chequeos cazados)
+    compare-motor-dc6.sh IGUAL: 31 lineas identicas, 30 frames comparados
+
+--------------------------------------------------------------------------------
+7. LO QUE QUEDA ABIERTO (declarado, sin adornos)
+--------------------------------------------------------------------------------
+ a. LA EXCEPCION INTERMITENTE `PC 64800008`: no se reprodujo con la cadena canonica. El
+    instrumento y la receta para cazarla quedan puestos (seccion 4). Es el unico hilo de
+    "defecto" que la tarjeta no puede cerrar por medicion.
+ b. LA VELOCIDAD DEL CUADRO: 3,2 cuadros/s. El 81% del cuadro es el dibujado pixel a
+    pixel en Go (`Image.Fill` -> `LlenarDeRGBA` -> `SetRGBA`, con el chequeo de bordes por
+    pixel) y el 19% la conversion del twiddle. No es un defecto del arranque (el motor
+    esta en su pantalla de error a proposito), pero es la pared que se va a ver cuando el
+    motor tenga algo que dibujar de verdad: se mide y se declara aca, se arregla aparte.
+ c. EL ERROR QUE EL MOTOR MUESTRA: el arranque se frena en `initialize()` y el motor
+    dibuja su cuadro de error. Cual es el error es la frontera siguiente del arranque
+    (los datos del juego / los MPQ), no de esta tarjeta.
+ d. EL MONTON DE C CON ~4 KB LIBRES antes del motor (de DC-002.21/22): sigue igual.
+
+--------------------------------------------------------------------------------
+8. COMO SE REPRODUCE TODO ESTO
+--------------------------------------------------------------------------------
+    source scripts/console/env.sh
+    # la sonda (instrumento) + libgodc con el semiespacio de 512 KB:
+    python3 scripts/console/fix-libgodc-gc.py 512 --build
+    python3 scripts/console/fix-libgodc-sonda-pc.py --build
+    POC=motor-arranque bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/dc24b /tmp/gox-222
+    # la corrida larga (el heartbeat del cuadro 300 cae en t~95 s):
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/dc24b/prog-emu.elf 140 /tmp/dc-run-24b
+    grep -a 'EBITEN-LOOP, cuadros\|Unhandled exception' /tmp/dc-run-24b/flycast.log
+    # el censo (que funcion se lleva el tiempo del SH-4):
+    python3 scripts/console/resolver-pc.py /tmp/dcbuild/dc24b/prog.elf /tmp/dc-run-24b/flycast.log --censo
+    # el corpus entero (controles + el mutante del tope viejo):
+    bash scripts/console/checar-cuadros-24b.sh /tmp/gox-222 140
+
+NOTA DE ESTADO DEL VENDOR: al cerrar esta tarjeta la sonda se saca del vendor
+(`fix-libgodc-sonda-pc.py --quitar --build`) y `~/dreamcast/libgodc` queda con la cadena
+canonica de DC-002.24/25 (medido: `sonda_pc.c` borrado, `go-main.c` sin el enganche,
+`libgodc.a` 206.364 bytes). Los scripts de la tarjeta quedan en el repo y se re-ponen con
+una corrida.
+
+NOTA DE COLISION (declarado, no escondido): la tarjeta **DC-002.27** ("los assets del
+juego en el DISCO") estaba corriendo EN PARALELO en la MISMA carpeta y la MISMA rama
+mientras se cerraba esta: modifico `scripts/console/mkiso.py` a las 20:30 (su trabajo en
+curso, sin comitear; esta tarjeta no lo toco ni lo comiteo). Tambien el `/tmp` (tmpfs de
+16 GB) estaba **100% lleno** -- la primera corrida del corpus fallo con "No space left on
+device" -- y se liberaron 2,6 GB recortando `prog.elf`/`prog-emu.elf`/`disc.iso` de
+builds VIEJOS de `/tmp/dcbuild` y `/tmp/corpus-223` (regenerables; `/tmp/dcbuild/motor-dc6`
+se re-enlazo y su barrera volvio a dar IGUAL). La cadencia medida (3,20 cuadros/s) es
+tiempo VIRTUAL de la consola, no reloj del host: los `cuadro_us` salen identicos (309308
+sin sonda, 309326 con sonda) en corridas hechas a horas distintas, asi que la contencion
+de la maquina compartida no la mueve.
