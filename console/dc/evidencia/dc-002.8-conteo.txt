@@ -1,13 +1,13 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 98 de 142
+compilados: 101 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
 d2app 0
 d2app/d2setup 0
 d2common 1
-d2common/d2act3 0
+d2common/d2act3 1
 d2common/d2animspeed 1
 d2common/d2automap 1
 d2common/d2boss 1
@@ -72,10 +72,10 @@ d2common/d2object 1
 d2common/d2party 1
 d2common/d2path 1
 d2common/d2portal 1
-d2common/d2quest 0
+d2common/d2quest 1
 d2common/d2replay 0
 d2common/d2resource 1
-d2common/d2reward 0
+d2common/d2reward 1
 d2common/d2skill 1
 d2common/d2skilldesc 1
 d2common/d2state 1
@@ -152,10 +152,7 @@ d2thread 1
 ## los paquetes bloqueados (primera linea de error de cada uno)
 d2app: /home/dgalli/Proyectos/diablo2consoles/d2app/app.go:7:22: error: import file ‘encoding/json’ not found
 d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:16: error: import file ‘os/exec’ not found
-d2common/d2act3: /home/dgalli/Proyectos/diablo2consoles/d2common/d2act3/act3.go:18:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
-d2common/d2quest: /home/dgalli/Proyectos/diablo2consoles/d2common/d2quest/speech.go:4:9: error: import file ‘embed’ not found
 d2common/d2replay: /home/dgalli/Proyectos/diablo2consoles/d2common/d2replay/replay.go:5:22: error: import file ‘encoding/json’ not found
-d2common/d2reward: /home/dgalli/Proyectos/diablo2consoles/d2common/d2reward/npc.go:4:60: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest’ not found
 d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebiten/ebiten_audio_provider.go:14:47: error: import file ‘github.com/hajimehoshi/ebiten/v2/audio’ not fou
 d2core/d2config: /home/dgalli/Proyectos/diablo2consoles/d2core/d2config/d2config.go:4:22: error: import file ‘encoding/json’ not found
 d2core/d2gui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2gui/box.go:8:55: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui’ not found
@@ -179,7 +176,7 @@ d2core/d2screen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2screen/screen_m
 d2core/d2skills: /home/dgalli/Proyectos/diablo2consoles/d2core/d2skills/autoform.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ not fo
 d2core/d2ui: /home/dgalli/Proyectos/diablo2consoles/d2core/d2ui/label.go:5:15: error: import file ‘regexp’ not found
 d2core/d2vendor: /home/dgalli/Proyectos/diablo2consoles/d2core/d2vendor/gamble.go:6:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop’ not found
-d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/act3_live.go:10:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2common/d2act3’ not found
+d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/act3_live.go:13:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ 
 d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/ammo_depleted.go:5:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2drop’ not f
 d2networking: /home/dgalli/Proyectos/diablo2consoles/d2networking/client_listener.go:3:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket’ no
 d2networking/d2client: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/game_client.go:13:57: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero’ not fou

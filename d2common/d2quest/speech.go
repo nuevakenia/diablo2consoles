@@ -47,7 +47,19 @@ type MsgSound struct {
 	File   string // Sounds.txt file name
 }
 
-//go:embed data/messages.csv
+// PARCHE DE PORT (DC-002.8): aca iba
+//
+//     //go:embed data/messages.csv
+//     var messagesCSV string
+//
+// gccgo NO soporta la directiva //go:embed ("build system did not supply embed configuration"), con o
+// sin el paquete embed. Es lo mismo que le pasa a json (opcion C) y es la misma decision: el archivo de
+// mensajes de los NPC es un DATO, no codigo, y en la consola los datos van al romdisk (build-dc.sh los
+// hornea ahi). O sea que en la Dreamcast este texto se carga del romdisk, no del binario.
+//
+// Con la variable vacia, el que lee los mensajes no encuentra ninguno y la conversacion de los NPC no
+// tiene texto: queda declarado como limite. El resto de las quests (lo que pasa, no lo que se dice)
+// funciona igual.
 var messagesCSV string
 
 // npcByName maps the NPC names used in data/messages.csv to monster classes.

@@ -219,21 +219,6 @@ func Read(r io.Reader, order ByteOrder, data interface{}) error {
 }
 
 
-// Write escribe la representacion binaria de data en w (lo inverso de Read). Lo pide el pl2 al
-// serializar (Marshal). Mismas reglas que Read: structs de tamaNo fijo, sin relleno.
-func Write(w interface{ Write([]byte) (int, error) }, order ByteOrder, data interface{}) error {
-	buf := &buffer{}
-	if err := writeData(buf, order, data); err != nil {
-		return err
-	}
-	_, err := w.Write(buf.datos)
-	return err
-}
-
-// buffer es un acumulador minimo (no se usa bytes.Buffer para no depender de el aca adentro).
-type buffer struct{ datos []byte }
-
-func (b *buffer) Write(p []byte) (int, error) {
-	b.datos = append(b.datos, p...)
-	return len(p), nil
-}
+// NOTA: no hay Write. Se empezo a escribir uno (con un helper writeData) y se saco: el unico lugar del
+// motor que lo pedia era el pl2, y ese se resolvio copiando el buffer (el formato es un blob de bytes,
+// ver d2pl2/pl2.go). Un Write sin usuarios es codigo sin probar: si hace falta, se agrega con su prueba.
