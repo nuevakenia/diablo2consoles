@@ -513,3 +513,17 @@ func Truncate(nombre string, tam int64) error { return ErrNoSePuede }
 // syscall.Flock (que aca no bloquea nada) siga andando. Si alguna vez algo lo usara para leer de verdad,
 // tendria que fallar -- y no lo hace nadie: medido, el unico uso es el lock de d2hero.
 func (f *File) Fd() uintptr { return 0 }
+
+// Sync: vacia lo escrito al disco. En la consola no se escribe (el romdisk es de solo lectura), asi que no
+// hay nada que vaciar. Existe para que el guardado compile: lo pide d2hero al cerrar el archivo temporal.
+func (f *File) Sync() error { return nil }
+
+// Truncate: acortar el archivo. No se puede (solo lectura).
+func (f *File) Truncate(tam int64) error { return ErrNoSePuede }
+
+// UserConfigDir: donde vive la configuracion del usuario. En la consola es el romdisk (lo unico que se
+// puede leer), asi que apunta ahi en vez de a un home que no existe.
+func UserConfigDir() (string, error) { return "/rd", nil }
+
+// UserCacheDir: lo mismo (no hay cache: el romdisk no se escribe).
+func UserCacheDir() (string, error) { return "/rd", nil }

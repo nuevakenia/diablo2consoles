@@ -55,7 +55,17 @@ fi
 
 echo
 echo "== 2/4 stdlib minima para SH-4"
-bash "$HERE/build-std-gox.sh"
+# SALTAR_STDLIB=1 usa la stdlib minima que YA este compilada en $GODC_GOX en vez de rehacerla (el
+# build de la stdlib arranca con un `rm -rf` del directorio de .gox). Para que sirve: cuando en la
+# misma maquina hay otra sesion trabajando el repo y esa gox es COMPARTIDA, rehacerla le rompe el
+# build a la otra sesion. Este build de DC-002.9 corrio asi, con su propia gox
+# (GODC_GOX=/tmp/dcgox-dc0029) para no tocar la compartida. Medido: la stdlib minima son 41
+# paquetes y se compila en 7 s, asi que saltearla es una comodidad, no una necesidad.
+if [ "${SALTAR_STDLIB:-0}" = "1" ]; then
+    echo "   (salteada: SALTAR_STDLIB=1, se usa la ya compilada en ${GODC_GOX:-$DC_ROOT/gox})"
+else
+    bash "$HERE/build-std-gox.sh"
+fi
 
 echo
 echo "== 3/4 paquetes del motor para SH-4"

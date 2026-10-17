@@ -21,10 +21,21 @@ STD_GOX="${GODC_GOX:-$DC_ROOT/gox}"
 PREFIJO="github.com/OpenDiablo2/OpenDiablo2"
 
 # En orden de dependencias: cada paquete necesita los .gox de los anteriores y los de la stdlib.
-#   d2common/d2datautils -> io, bytes, log, fmt
-#   d2dc6                -> fmt, d2datautils
-#   motorresumen         -> fmt, strconv, d2dc6   (el resumen medible del POC, en un solo lugar)
-PAQUETES="${PAQUETES:-d2common/d2datautils d2common/d2fileformats/d2dc6 console/dc/motorresumen}"
+# La lista la amplio DC-002.9 (el motor PINTANDO): para el COLOR hacen falta d2util
+# (ImgIndexToRGBA, el camino del propio motor) y d2dat (la paleta del MPQ), y esos arrastran
+# d2interface -> d2enum, d2math/d2vector y el tipo de conexion de red. Medido con `go list -deps`:
+# son 11 paquetes internos y ni uno mas.
+#   d2enum                 -> fmt, log, strconv
+#   d2math, d2math/d2vector -> fmt, math
+#   d2clientconnectiontype  -> (nada)
+#   d2interface            -> d2enum, d2math/d2vector, d2clientconnectiontype, image, image/color
+#   d2util/assets          -> bytes, compress/gzip, fmt, image, log, x/image/bmp
+#   d2util                 -> d2interface, d2util/assets, ebiten, image/color, sync/atomic, ...
+#   d2datautils            -> io, bytes, log, fmt
+#   d2dc6                  -> fmt, d2datautils
+#   d2dat                  -> fmt, d2interface
+#   motorresumen           -> fmt, strconv, d2dc6, d2interface, d2util  (el resumen medible del POC)
+PAQUETES="${PAQUETES:-d2common/d2enum d2common/d2math d2common/d2math/d2vector d2networking/d2client/d2clientconnectiontype d2common/d2interface d2common/d2util/assets d2common/d2util d2common/d2datautils d2common/d2fileformats/d2dc6 d2common/d2fileformats/d2dat console/dc/motorresumen}"
 
 [ -f "$STD_GOX/fmt.gox" ] || {
     echo "falta la stdlib minima en $STD_GOX: corre scripts/console/build-std-gox.sh primero" >&2
@@ -39,7 +50,27 @@ for p in $PAQUETES; do
     # shellcheck disable=SC2086
     sh-elf-gccgo $GODC_GOFLAGS -I "$STD_GOX" -I "$GEN" -fgo-pkgpath="$PREFIJO/$p" -c $srcs -o "$out"
     printf "  %-42s %8s bytes\n" "$p.gox" "$(stat -c%s "$out")"
+    # orden.txt: cada .gox se anota UNA sola vez. Si el script se corre dos veces sin rehacer la
+    # stdlib (SALTAR_STDLIB=1), el linker recibiria el mismo objeto dos veces y se quejaria de
+    # definiciones multiples.
+    if [ -f "$GEN/orden.txt" ]; then
+        # shellcheck disable=SC2086
+        grep -vxF "$out" "$GEN/orden.txt" > "$GEN/orden.txt.nuevo" || true
+        mv "$GEN/orden.txt.nuevo" "$GEN/orden.txt"
+    fi
     echo "$out" >> "$GEN/orden.txt"
+done
+
+# Los paquetes de TERCEROS tambien tienen que ir al ENLACE, no solo al -I. build-std-gox.sh los
+# compila pero no los anota en orden.txt, y eso alcanzaba mientras nadie los usara. Medido en
+# DC-002.9: un POC que pasa por d2util deja UNDEFINED los simbolos de ebiten (debug_print.go llama
+# NewImageFromImage y usa ebiten.Image/DrawImageOptions) y los de x/image/bmp (d2util/assets,
+# zipbmp.go). Se anotan al final, que es de quien dependen.
+for t in github.com/hajimehoshi/ebiten/v2 github.com/hajimehoshi/ebiten/v2/inpututil \
+         github.com/gravestench/akara github.com/google/uuid golang.org/x/image/bmp; do
+    f="$GEN/$t.gox"
+    [ -f "$f" ] || continue
+    grep -qxF "$f" "$GEN/orden.txt" 2>/dev/null || echo "$f" >> "$GEN/orden.txt"
 done
 
 echo "paquetes del motor compilados para SH-4 en $GEN"
