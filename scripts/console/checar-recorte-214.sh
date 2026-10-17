@@ -47,7 +47,11 @@ GEN="${1:-/tmp/gox-214-gc}"               # el gox del "recorte" (con los flags 
 REC="${2:-/tmp/dcbuild/motor-214}"        # el ELF enlazado de ese gox
 BASE="${3:-/tmp/dcbuild/motor-arranque}"  # el ELF del baseline (DC-002.13)
 SEGS="${SEGS:-15}"
-KB_OK=256                                  # el semiespacio de DC-002.21 (DC-002.14 uso 512: ver control 3)
+KB_OK=512                                  # el semiespacio del arranque con el GC SANO (DC-002.24). DC-002.14
+                                           # tambien uso 512; DC-002.21 lo recorto a 256 MIDIENDO con el
+                                           # defecto de la copia por Store Queue puesto (con la copia sana el
+                                           # conjunto vivo del arranque es ~270 KB y 256 no alcanza: ver
+                                           # scripts/console/fix-libgodc-sq.py).
 # DC-002.21: los dos reenlaces de este corpus (el mutante y la vuelta) compilan el POC `motor-arranque` de
 # HOY, y el gox de DC-002.14 ($GEN) ya no lo puede compilar: le faltan paquetes que se agregaron despues
 # (`os.RamfsResumen`, DC-002.17; `json.Instrumento`, DC-002.18). Medido: "undefined identifier os.RamfsResumen".

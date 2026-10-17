@@ -1,0 +1,130 @@
+DC-002.24: QUIEN ESCRIBIA EN App+156 -- LA COPIA POR STORE QUEUE DEL GC, Y SU ARREGLO
+
+PREGUNTA (tarjeta DC-002.24, abierta por DC-002.23)
+    DC-002.23 midio QUE el campo `errorMessage` del `App` (offset 156 de struct de 168 bytes) amanece con
+    basura de OTRO objeto entre `Create` y `loadEngine`, y dejo abierto QUIEN lo escribe. La tarjeta pide la
+    causa (no otro sintoma) y el arreglo con el rojo medido antes.
+
+RESPUESTA MEDIDA (Flycast, rama DC-002, POC motor-arranque)
+    Lo escribe el GC de libgodc: NO lo escribe el motor. El GC copia OTRO objeto ENCIMA del App porque el
+    App queda con su ENCABEZADO en CERO, y el encabezado queda en cero porque la copia por Store Queue de
+    `gc_sq_copy()` NO ESCRIBE NADA en el destino.
+
+LA CADENA DE TRAZAS (instrumento: scripts/console/fix-libgodc-campo-traza.py, que va en el RUNTIME C y no
+en el codigo Go, para no mover el layout de los objetos -- que es justo lo que mueve el defecto de forma)
+
+  1. El App queda vigilado por el NOMBRE de su descriptor de tipo (no por una direccion fija) y el GC lo
+     alcanza desde la pila:
+
+        CAMPO-TRAZA el App quedo vigilado en 8cdd2778 (168 bytes, tipo App)
+        CAMPO-TRAZA pila sp=8ce102a4 hi=8ce10e48 usado=2980 ventana=2980 puntero-al-App: dentro=4 fuera=0
+        CAMPO-TRAZA copia: el GC llega al App (8cd85028)
+        CAMPO-TRAZA el App SE COPIA (176 bytes) desde 8cd85028 -- el GC lo alcanzo
+
+  2. Pero la copia del GC deja el DESTINO EN CERO (dst_cab = las dos palabras del encabezado del destino):
+
+        CAMPO-TRAZA sq entrada:   dst=8cdc5040 src=8cd85020 tam=176 via_sq=1 dst_cab= 00000000 00000000 src_cab= 190000b0 8ca5f598
+        CAMPO-TRAZA sq salida-SQ: dst=8cdc5040 src=8cd85020 tam=176 via_sq=1 dst_cab= 00000000 00000000 src_cab= 190000b0 8ca5f598
+
+  3. Con el encabezado en cero el GC siguiente RECHAZA al App...
+
+        CAMPO-TRAZA rechazo: el encabezado del App (8cdc5040) NO paso la validacion: tamano fuera de rango
+
+     ... y como la pila SI lo referencia pero el GC lo da por basura, el GC siguiente escribe OTRO objeto
+     encima:
+
+        CAMPO-TRAZA PISADO: el GC escribe un bloque de 288 bytes en 8cdc5048 que CUBRE el App
+
+     Ese bloque es el que ensucia el offset 156 -> `a.errorMessage.Error()` salta a 0x0b y el motor muere
+     en el cuadro 0 (DC-002.22/23).
+
+CAUSA DE FONDO: EL AREA DE LA STORE QUEUE (medida contra el KOS de este toolchain)
+    `gc_sq_copy()` (runtime/gc_copy.c) elige el area de la Store Queue asi:
+
+        *QACR0 = (dst_addr >> 26) & 0x1C;     /* 0x8cdc5040 >> 26 & 0x1C = 0x00 */
+        *QACR1 = (dst_addr >> 26) & 0x1C;
+
+    El KOS del mismo toolchain usa otra formula ($KOS_BASE/kernel/arch/dreamcast/hardware/sq.c):
+
+        #define QACR_EXTERN_BITS(dest) ((((uintptr_t)(dest)) >> 24) & 0x1c)   /* 0x8cdc5040 -> 0x0C */
+
+    Con 0x08 (el resultado de la formula del runtime) el area que queda es la 0, que
+    (`sq.cpp`/`CCN_QACR_write`, y la tabla del SH-4) es la BIOS: SOLO LECTURA. Las escrituras de la Store
+    Queue se DESCARTAN en silencio -- por eso el destino queda como estaba (en cero la primera vuelta de
+    cada semiespacio) y no hay excepcion que lo delate. Corriendo `>> 26` sobre una direccion del monton
+    (0x8C......) el area sale SIEMPRE 0: la via rapida por Store Queue estaba rota para TODO el monton.
+
+EL ARREGLO (scripts/console/fix-libgodc-sq.py; integrado en la cadena del runtime)
+    1. `>> 26` -> `>> 24` en los dos QACR (la formula del KOS): 2 lineas.
+    2. `dcache_inval_range((uintptr_t)dst, size - remainder)` antes del remanente que va por memcpy.
+       DECLARADO: la Store Queue escribe SIN pasar por la cache D, asi que el destino puede quedar con
+       lineas viejas -- pero Flycast NO emula la cache D, asi que en el emulador invalidad o no da igual
+       (medido: con `--sin-inval`, o sea sin esta invalidacion, el arranque tambien da 3 cuadros). Se deja
+       puesta por el hardware real; no se puede validar en el emulador y asi queda escrito.
+    3. `--sin-sq` apaga la via rapida entera (todo por memcpy): la salida conservadora.
+
+ANTES Y DESPUES (los dos con el MISMO instrumento; POC motor-arranque, 30 s de Flycast)
+    ANTES (defecto crudo)   ->  0 cuadros completos del loop y `Unhandled exception: PC 0000000b, code 1`
+                                (`el App SE COPIA (176 bytes) ... dst_cab= 00000000 00000000`)
+    DESPUES (este arreglo)  ->  3 cuadros completos (`EBITEN-LOOP cuadro 0/1/2 listo`, 306.951 us el
+                                cuadro 2) y el loop sigue cuando se acaba la corrida; el `jsr @0x0b`
+                                desaparece. El App se copia con su encabezado sano a los dos lados:
+                                `sq salida-SQ: dst_cab= 190000b0 8ca5f680 src_cab= 190000b0 8ca5f680`.
+                                OJO (declarado): despues de los cuadros aparece A VECES OTRA caida
+                                (`Unhandled exception: PC 64800008, code 1`) que NO es el campo del App y que
+                                sale tambien con el defecto puesto: es otro defecto, va como tarjeta nueva.
+
+RESULTADO FINAL MEDIDO (esta tarjeta)
+    - POC motor-arranque: 0 -> **3 cuadros completos** del loop (el rojo de DC-002.23 desaparece).
+    - El campo del App: 3 lecturas NIL y **0 BASURA** (DC-002.23 medía basura).
+    - `checar-error-223.sh`: **11 controles verdes, 0 fallos** (4 controles + 2 mutantes: el del offset,
+      que ya estaba, y el nuevo `--sq-roto 256`, que devuelve 0 cuadros -> CAZADO).
+    - Barreras: `test-std-host.sh` **verde en amd64 y 386**; `compare-motor-dc6.sh` **IGUAL** (31 lineas
+      identicas, 30 frames comparados).
+    - El corpus ahora se asegura el estado del runtime solo (paso 0: `fix-libgodc-gc.py 512 --build`) y
+      aprieta el grep del control 1, que contaba los `itab= 0x0` (los nil) como "basura".
+
+LA PARED SIGUIENTE, DECLARADA: EL SEMIESPACIO DEL GC (y por que DC-002.21 lo habia recortado)
+    Con las copias sanas el conjunto vivo del arranque se puede medir (antes no: no se copiaba nada):
+
+        GC-TRAZA n=1  from=8cd80980 copiado=183776 antes=262144      <- semiespacio de 256 KB (DC-002.21)
+        GC-TRAZA n=16 from=8cdc09a0 copiado=260288 antes=262144
+        GC-TRAZA OOM: pedido=4008 usado=260288 ptr=8cdc0240 limite=8cdc0980
+
+    Con 256 KB el conjunto vivo (260 KB) NO entra en el semiespacio y el motor muere DURANTE `Create()`
+    con `fatal error: out of memory`. Con 384 KB y con 512 KB el arranque completa sus cuadros y el
+    conjunto vivo queda en el 51% del semiespacio (con 512 KB: `copiado=269784 antes=524288`, 4
+    recolecciones en la corrida, contra 12 con 384 KB y el MISMO tiempo por cuadro: el GC no es el cuello
+    de botella, lo es el dibujado del emulador).
+
+    Esto NO contradice a DC-002.21: **esa medicion se hizo con el defecto de la Store Queue puesto**. Con
+    la copia rota el conjunto vivo del GC era practicamente vacio (nada se copiaba), asi que "256 KB
+    alcanza" era cierto solo para un GC que no copiaba. Con el GC sano el valor que anda es **512 KB** (el
+    de DC-002.14). Por eso el arreglo trae tambien el semiespacio: `fix-libgodc-sq.py` y la cadena lo
+    dejan en 512 KB, y el corpus de DC-002.21 (`checar-gc-221.sh`) y el de DC-002.14
+    (`checar-recorte-214.sh`, KB_OK) quedan por re-medir con el GC sano (van como tarjeta siguiente).
+
+COMO SE REPRODUCE
+    source scripts/console/env.sh
+    # el estado del runtime de la rama (cadena + arreglo de la Store Queue, 512 KB)
+    git -C ~/dreamcast/libgodc checkout -- runtime/gc_heap.c runtime/gc_copy.c runtime/go-memmove.c runtime/go-memclr.c
+    python3 scripts/console/fix-libgodc-gc.py 512 --build      # la cadena ya aplica el arreglo (2b/3)
+    # el corpus de DC-002.23/24 (3 controles + 2 mutantes)
+    bash scripts/console/checar-error-223.sh /tmp/gox-222 30
+    # y el arranque, a mano
+    POC=motor-arranque bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/motor-arranque /tmp/gox-222
+    bash scripts/console/run-flycast.sh /tmp/dcbuild/motor-arranque/prog-emu.elf 30 /tmp/dc-run-arranque
+    grep -ac 'EBITEN-LOOP cuadro [0-9]* listo' /tmp/dc-run-arranque/flycast.log     # 3
+    # con el defecto puesto (el mutante): vuelve a 0 cuadros y PC 0000000b
+    python3 scripts/console/mutar-error-223.py --sq-roto
+    POC=motor-arranque bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/arranque-mut-sq /tmp/gox-222
+    bash scripts/console/run-flycast.sh /tmp/dcbuild/arranque-mut-sq/prog-emu.elf 30 /tmp/dc-run-mut-sq
+    python3 scripts/console/mutar-error-223.py --volver
+
+PITFALL QUE COSTO UNA CORRIDA (medido)
+    `fix-libgodc-gc.py` (la cadena documentada) reverte SOLO sus archivos (`interface_dreamcast.c`,
+    `runtime.h`, `type_descriptors.h`, `godc_config.h`): NO saca los instrumentos que viven en
+    `gc_heap.c` / `gc_copy.c` / `go-memmove.c` / `go-memclr.c`. Un "control sin instrumento" que solo
+    corra la cadena queda con el instrumento dentro y mide otra cosa (paso: el `dc224ctrl` "control" daba
+    0 cuadros/OOM mientras el binario sin instrumento de verdad daba el rojo del App). Antes de un control
+    hay que hacer `git checkout` de esos cuatro archivos.

@@ -90,8 +90,21 @@ else:
 
 print(f"   {CONFIG}: sha256 {sha(CONFIG)}")
 print(f"   lo que el GC pide al arrancar ahora: 2 x {KB} KB = {2 * KB * 1024} bytes del MISMO monton")
-print("   (DC-002.14 midio 610.304 libres con el binario de 13.910.992 bytes y 512 KB; DC-002.21 midio que el")
-print("    arranque de HOY necesita 256 KB: con 512 muere en la imagen del atlas de texto, diff 98304)")
+print("   (DC-002.14 midio 610.304 libres con el binario de 13.910.992 bytes y 512 KB. OJO: la medicion de")
+print("    DC-002.21 [512 KB muere en la imagen del atlas, diff 98304] se hizo CON EL DEFECTO de la copia por")
+print("    Store Queue puesto: con la copia rota el conjunto vivo del GC era casi vacio y 256 KB 'alcanzaba'.")
+print("    Con la copia ARREGLADA [DC-002.24] el arranque tiene un conjunto vivo de ~270 KB y 512 KB es el")
+print("    valor que anda: 3 cuadros completos del loop. Ver scripts/console/fix-libgodc-sq.py.)")
+
+print("== 2b/3 el arreglo de la copia por Store Queue (fix-libgodc-sq.py)")
+# DC-002.24: integrarlo ACA hace que CUALQUIER corrida de la cadena deje el runtime arreglado (el motor,
+# los POC y los corpus no tienen que saber de esto).
+r = subprocess.run([sys.executable, os.path.join(AQUI, "fix-libgodc-sq.py"), LIB, "--sin-pristino"],
+                   capture_output=True, text=True)
+if r.returncode != 0:
+    print(r.stdout + r.stderr)
+    sys.exit("fix-libgodc-sq.py fallo")
+print("   " + (r.stdout.strip().splitlines() or ["(sin salida)"])[-1])
 
 print("== 3/3 el runtime")
 if "--build" in sys.argv:

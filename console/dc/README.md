@@ -2451,3 +2451,84 @@ Barreras: `test-std-host.sh` verde en amd64 y 386, `compare-motor-dc6.sh` **IGUA
 30 frames) y `checar-pantalla-222.sh` con sus **7/7** controles verdes y el mutante del OOM cazado (el
 mutante B sigue declarado NO cazado, con su hallazgo). Evidencia cruda:
 `evidencia/dc-002.23-error-del-motor.txt`.
+
+## 40. DC-002.24: quien escribia en `App+156` — la copia por **Store Queue** del GC (y el arranque que vuelve a dar cuadros)
+
+DC-002.23 midio **que** el campo `errorMessage` del `App` (offset 156 de 168) amanece con basura de otro
+objeto y dejo abierto **quien** lo escribe. Esta tarjeta lo mide en el **runtime** (no en el codigo Go: una
+sonda en Go mueve el layout del monton, que es justo lo que mueve el defecto de forma) y **lo arregla**.
+
+**1. Quien escribe: el GC, no el motor — y escribe OTRO objeto encima del App.** La traza del runtime
+(`scripts/console/fix-libgodc-campo-traza.py`, que reconoce el `App` por el **nombre de su descriptor de
+tipo** y no por una direccion fija) muestra la cadena completa:
+
+    el App quedo vigilado en 8cdd2778 (168 bytes, tipo App)
+    pila sp=8ce102a4 hi=8ce10e48 usado=2980 puntero-al-App: dentro=4 fuera=0
+    copia: el GC llega al App (8cd85028)  ->  el App SE COPIA (176 bytes)
+    sq entrada:   dst=8cdc5040 src=8cd85020 tam=176 via_sq=1 dst_cab= 00000000 00000000
+    sq salida-SQ: dst=8cdc5040 src=8cd85020 tam=176 via_sq=1 dst_cab= 00000000 00000000   <- el destino QUEDA EN CERO
+    rechazo: el encabezado del App (8cdc5040) NO paso la validacion: tamano fuera de rango
+    PISADO: el GC escribe un bloque de 288 bytes en 8cdc5048 que CUBRE el App
+
+El App **si** esta referenciado por la pila (el GC lo alcanza, lo copia y actualiza el puntero), pero como
+su **encabezado** quedo en cero el GC siguiente lo **rechaza** y copia otro objeto **encima**: ese bloque es
+el que ensucia el offset 156 y el que hace saltar `a.errorMessage.Error()` a `PC 0000000b`.
+
+**2. La causa de fondo: la formula del AREA de la Store Queue.** `gc_sq_copy()` (runtime/gc_copy.c) elige
+el area de la Store Queue con `*QACR0 = (dst_addr >> 26) & 0x1C`. El KOS de este mismo toolchain usa
+`QACR_EXTERN_BITS(dest) = ((dest) >> 24) & 0x1c` (`kernel/arch/dreamcast/hardware/sq.c`). Con `>> 26` sobre
+una direccion del monton (`0x8C......`) el area sale **siempre 0**, y el area 0 es la **BIOS**: solo
+lectura. Las escrituras de la Store Queue se **descartan en silencio** (por eso el destino queda como
+estaba, en cero la primera vuelta de cada semiespacio, y no hay excepcion que lo delate): la via rapida
+estaba rota para **todo** el monton.
+
+**3. El arreglo: 2 lineas** (`scripts/console/fix-libgodc-sq.py`, ya **encadenado** dentro de
+`fix-libgodc-gc.py`, asi que cualquier corrida de la cadena del runtime lo deja puesto):
+
+    *QACR0 = (dst_addr >> 24) & 0x1C;    *QACR1 = (dst_addr >> 24) & 0x1C;
+
+y ademas la invalidacion del destino (`dcache_inval_range`) antes del remanente que va por `memcpy`:
+la Store Queue escribe **sin pasar por la cache D**. Declarado: Flycast **no emula la cache D**, asi que en
+el emulador invalidad o no da igual (medido: con `--sin-inval` tambien da los mismos cuadros); se deja
+puesta por el hardware real. `--sin-sq` apaga la via rapida entera (todo `memcpy`), la salida conservadora.
+
+**4. Antes y despues (mismo instrumento, POC motor-arranque, 30 s de Flycast).** Antes: **0 cuadros**
+completos del loop y `Unhandled exception: PC 0000000b, code 1`, con el destino de la copia en cero.
+Despues: **3 cuadros completos** (`cuadro 0/1/2 listo`, 306.951 us el cuadro 2) y la copia del App con su
+encabezado sano a los dos lados (`dst_cab= 190000b0 8ca5f680 src_cab= 190000b0 8ca5f680`). El `jsr @0x0b`
+desaparece.
+
+**5. La pared siguiente, que el defecto tapaba: el SEMIESPACIO del GC.** Con las copias sanas se puede
+medir el conjunto vivo del arranque (antes no: no se copiaba nada):
+
+    GC-TRAZA n=1  copiado=183776 antes=262144        <- semiespacio de 256 KB (DC-002.21)
+    GC-TRAZA n=16 copiado=260288 antes=262144
+    GC-TRAZA OOM: pedido=4008 usado=260288 limite=8cdc0980
+
+Con 256 KB el conjunto vivo (260 KB) no entra y el motor muere **durante `Create()`** con
+`fatal error: out of memory`. Con 384 KB y con 512 KB el arranque completa cuadros (con 512 KB el conjunto
+vivo queda en el 51% del semiespacio: `copiado=269784 antes=524288`, 4 recolecciones contra 12 con 384 KB y
+el **mismo** tiempo por cuadro: el cuello de botella es el dibujado del emulador, no el GC). O sea:
+**la medicion de DC-002.21 (512 -> 256 KB) se hizo con el defecto de la Store Queue puesto**, cuando el
+conjunto vivo del GC era practicamente vacio; con el GC sano el valor que anda es el **512 KB** de
+DC-002.14. Quedan por re-medir con el GC sano la escalera de DC-002.21 (`checar-gc-221.sh`) y el corpus del
+recorte (`checar-recorte-214.sh`).
+
+**6. El corpus y sus DOS mutantes.** `scripts/console/checar-error-223.sh` queda con 4 controles (las 14
+formas del `error`; el campo del `App`: 3 NIL y **0 BASURA** con el arreglo; el **arranque con el arreglo**:
+entra al loop y completa **3 cuadros**; y el mutante del instrumento del offset, que ya existia) y un
+**mutante nuevo del arreglo**: `mutar-error-223.py --sq-roto 256` le devuelve la formula vieja a
+`gc_sq_copy` y rehace libgodc.a con el semiespacio de DC-002.21, y exige que el arranque **vuelva a 0
+cuadros** (medido: `panic: growslice: cap out of range` — la forma de la caida cambia con el layout, como
+en DC-002.23, asi que lo que se exige es el 0 cuadros). El `--volver` rehace la cadena y deja el arreglo
+puesto. En el mismo pase se aprieto el grep del control 1, que contaba los `itab= 0x0` (los nil) como
+"basura": ahora cuenta solo los `esnil= no` con el itab fuera de `.rodata`.
+
+**7. Lo que queda ABIERTO, declarado.** Despues de los 3 cuadros aparece **otra** caida
+(`Unhandled exception: PC 64800008`) en los dos estados (con y sin el arreglo) y de forma intermitente:
+**no es el campo del `App`** y va como tarjeta siguiente. Y el monton de C queda con ~4 KB libres antes del
+motor (`monton de C antes del motor: 3968 bytes libres`), la pared de RAM de DC-002.21/22.
+
+Barreras: `test-std-host.sh` **verde en amd64 y 386** y `compare-motor-dc6.sh` **IGUAL** (31 lineas
+identicas, 30 frames comparados). Evidencia cruda:
+`evidencia/dc-002.24-copia-por-store-queue.txt`.
