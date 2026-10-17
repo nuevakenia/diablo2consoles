@@ -336,3 +336,138 @@ func Date(year int, month Month, day, hour, min, sec, nsec int, loc *Location) T
 		int64(hour)*3600 + int64(min)*60 + int64(sec)
 	return Time{sec: seg, nsec: int32(nsec)}
 }
+
+// ---------------------------------------------------------------- los getters de la fecha
+//
+// Los pide el motor: d2item/d2cube (el cubo Horadric) mira el DIA para decidir recetas, y varias partes
+// miran anio/mes. Los segundos guardados son desde 1970; estos getters hacen la cuenta al reves que Date:
+// de segundos a fecha civil.
+//
+// El algoritmo es el mismo que usa la biblioteca de go (Howard Hinnant): se cuenta por eras de 400 anios,
+// que es lo que hace que el calendario gregoriano cierre exacto. No es una aproximacion.
+
+// segundosEnDia: los que tiene un dia (constante, para no repetir el numero).
+const segundosEnDia = 86400
+
+// diasDesdeUnix: en que dia (desde 1970-01-01) cae este instante. Se redondea hacia abajo, para que los
+// segundos anteriores a 1970 tambien den el dia correcto.
+func diasDesdeUnix(sec int64) int64 {
+	if sec >= 0 {
+		return sec / segundosEnDia
+	}
+	return (sec - segundosEnDia + 1) / segundosEnDia
+}
+
+// civilDeDias: el anio, mes y dia del dia numero "dias" desde 1970-01-01 (el algoritmo de las eras).
+func civilDeDias(dias int64) (anio int, mes Month, dia int) {
+	z := dias + 719468
+	era := z / 146097
+	if z < 0 && z%146097 != 0 {
+		era--
+	}
+	doe := z - era*146097                                          // [0, 146096]
+	yoe := (doe - doe/1460 + doe/36524 - doe/146096) / 365          // [0, 399]
+	y := yoe + era*400
+	doy := doe - (365*yoe + yoe/4 - yoe/100)                        // [0, 365]
+	mp := (5*doy + 2) / 153                                         // [0, 11]
+	dd := doy - (153*mp+2)/5 + 1                                    // [1, 31]
+	mm := mp + 3
+	if mp >= 10 {
+		mm = mp - 9
+	}
+	if mm <= 2 {
+		y++
+	}
+	return int(y), Month(mm), int(dd)
+}
+
+// Date devuelve el anio, mes y dia (es la version del metodo, distinta de la funcion Date de mas arriba).
+func (t Time) Date() (year int, month Month, day int) {
+	return civilDeDias(diasDesdeUnix(t.sec))
+}
+
+// Year: el anio.
+func (t Time) Year() int {
+	a, _, _ := civilDeDias(diasDesdeUnix(t.sec))
+	return a
+}
+
+// Month: el mes.
+func (t Time) Month() Month {
+	_, m, _ := civilDeDias(diasDesdeUnix(t.sec))
+	return m
+}
+
+// Day: el dia del mes (lo usa el cubo Horadric).
+func (t Time) Day() int {
+	_, _, d := civilDeDias(diasDesdeUnix(t.sec))
+	return d
+}
+
+// Weekday: el dia de la semana. El 1970-01-01 fue jueves (4).
+func (t Time) Weekday() Weekday {
+	d := diasDesdeUnix(t.sec)
+	// el modulo de go no es como el de las matematicas: con dias negativos hay que corregir
+	wd := (d + 4) % 7
+	if wd < 0 {
+		wd += 7
+	}
+	return Weekday(wd)
+}
+
+// YearDay: que dia del anio es (1 = 1 de enero).
+func (t Time) YearDay() int {
+	a, _, _ := civilDeDias(diasDesdeUnix(t.sec))
+	inicio := Date(a, January, 1, 0, 0, 0, 0, nil).sec
+	return int(t.sec-inicio)/segundosEnDia + 1
+}
+
+// Clock: la hora, el minuto y el segundo.
+func (t Time) Clock() (hour, min, sec int) {
+	delDia := t.sec % segundosEnDia
+	if delDia < 0 {
+		delDia += segundosEnDia
+	}
+	return int(delDia / 3600), int(delDia % 3600 / 60), int(delDia % 60)
+}
+
+// Hour: la hora.
+func (t Time) Hour() int { h, _, _ := t.Clock(); return h }
+
+// Minute: el minuto.
+func (t Time) Minute() int { _, m, _ := t.Clock(); return m }
+
+// Second: el segundo.
+func (t Time) Second() int { _, _, s := t.Clock(); return s }
+
+// Nanosecond: los nanosegundos de ese segundo.
+func (t Time) Nanosecond() int { return int(t.nsec) }
+
+// AddDate: le suma anios, meses y dias (como el de go: primero anios y meses, despues los dias).
+func (t Time) AddDate(anios, meses, dias int) Time {
+	a, m, d := t.Date()
+	h, mi, s := t.Clock()
+	// el mes se pasa de 12 y se lleva a los anios
+	mTotal := int(m) - 1 + meses
+	a += anios + mTotal/12
+	mTotal %= 12
+	if mTotal < 0 {
+		mTotal += 12
+		a--
+	}
+	return Date(a, Month(mTotal+1), d, h, mi, s, int(t.nsec), nil).Add(Duration(dias) * 24 * Hour)
+}
+
+// Truncate: redondea hacia abajo a un multiplo de d (solo funciona bien con d menor a un dia, que es el
+// caso del motor).
+func (t Time) Truncate(d Duration) Time {
+	if d <= 0 {
+		return t
+	}
+	n := int64(d)
+	resto := t.sec % n
+	if resto < 0 {
+		resto += n
+	}
+	return Time{sec: t.sec - resto, nsec: 0}
+}

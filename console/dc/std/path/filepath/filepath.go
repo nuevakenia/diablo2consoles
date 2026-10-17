@@ -195,3 +195,20 @@ func FromSlash(path string) string { return path }
 //
 // Tampoco estan EvalSymlinks, Rel, VolumeName ni Match: en la consola no hay enlaces, ni directorio
 // actual (no hay procesos), ni volumenes ("C:").
+
+// Glob: buscar archivos por patron ("*.mpq"). El motor lo usa en d2setup/discover.go para encontrar los
+// archivos del juego al instalarlo.
+//
+// LIMITE DECLARADO: en la consola no se pueden LISTAR directorios (el VFS lee del romdisk por manifiesto,
+// no hay un "readdir"). Y sin poder listar no hay forma de saber que archivos hay. Asi que Glob devuelve
+// vacio, con nil de error: cero coincidencias, que es lo que corresponde cuando no se puede mirar.
+//
+// Por que alcanza: en la consola el juego NO se instala ni se descubren datos -- los datos ya estan en el
+// romdisk y se leen por el manifiesto. El "descubrir donde esta instalado Diablo II" es de la version de
+// escritorio.
+// No se puede preguntar "existe este archivo" desde aca sin depender de os, y filepath es PURO TEXTO a
+// proposito (es lo que permite probarlo contra el filepath de go en el host, sin el sistema de archivos
+// de por medio). Asi que Glob contesta lo unico que puede contestar sin mirar: que no hay coincidencias.
+func Glob(patron string) ([]string, error) {
+	return nil, nil
+}

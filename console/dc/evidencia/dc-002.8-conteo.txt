@@ -1,11 +1,11 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 119 de 142
+compilados: 123 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
 d2app 0
-d2app/d2setup 0
+d2app/d2setup 1
 d2common 1
 d2common/d2act3 1
 d2common/d2animspeed 1
@@ -102,7 +102,7 @@ d2core/d2input/d2gamepad 1
 d2core/d2input/ebiten 0
 d2core/d2inventory 1
 d2core/d2item 1
-d2core/d2item/d2cube 0
+d2core/d2item/d2cube 1
 d2core/d2item/d2drop 1
 d2core/d2item/d2ground 1
 d2core/d2item/d2itemdesc 1
@@ -110,7 +110,7 @@ d2core/d2item/diablo2item 1
 d2core/d2map/d2lightmap 1
 d2core/d2map/d2mapengine 1
 d2core/d2map/d2mapentity 1
-d2core/d2map/d2mapgen 0
+d2core/d2map/d2mapgen 1
 d2core/d2map/d2mapgen/d2wilderness 1
 d2core/d2map/d2maprenderer 1
 d2core/d2map/d2mapstamp 1
@@ -120,7 +120,7 @@ d2core/d2playertrade 1
 d2core/d2records 1
 d2core/d2render/ebiten 0
 d2core/d2screen 1
-d2core/d2skills 0
+d2core/d2skills 1
 d2core/d2stats 1
 d2core/d2stats/diablo2stats 1
 d2core/d2term 1
@@ -151,18 +151,14 @@ d2thread 1
 
 ## los paquetes bloqueados (primera linea de error de cada uno)
 d2app: /home/dgalli/Proyectos/diablo2consoles/d2app/app.go:14:18: error: import file ‘image/gif’ not found
-d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/discover.go:112:26: error: reference to undefined identifier ‘filepath.Glob’
 d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebiten/ebiten_audio_provider.go:14:47: error: import file ‘github.com/hajimehoshi/ebiten/v2/audio’ not fou
 d2core/d2input: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/input_manager.go:9:9: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/ebiten’ not fo
 d2core/d2input/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/ebiten/ebiten_input.go:119:54: error: reference to undefined identifier ‘ebiten.MouseButton’
-d2core/d2item/d2cube: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2cube/match.go:149:25: error: reference to undefined field or method ‘Day’
-d2core/d2map/d2mapgen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapgen/real_maze_gen.go:437:29: error: reference to undefined identifier ‘fmt.Sscanf’
 d2core/d2render/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2render/ebiten/ebiten_panic_screen.go:5:52: error: import file ‘github.com/hajimehoshi/ebiten/v2/ebitenutil’ not 
-d2core/d2skills: /home/dgalli/Proyectos/diablo2consoles/d2core/d2skills/engine.go:265:26: error: reference to undefined identifier ‘fmt.Sscanf’
 d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/act_travel.go:14:59: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2game/d2player’ not foun
-d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/cube_auto.go:7:64: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/d2cube’ not found
+d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/game_controls.go:1495:14: error: reference to undefined identifier ‘time.AfterFunc’
 d2networking: /home/dgalli/Proyectos/diablo2consoles/d2networking/client_listener.go:3:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket’ no
-d2networking/d2client: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/game_client.go:15:65: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapgen’
+d2networking/d2client: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/game_client.go:32:79: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2client/
 d2networking/d2client/d2localclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2localclient/local_client_connection.go:10:56: error: import file ‘github.com/OpenDiablo2/OpenDiab
 d2networking/d2client/d2realmclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2realmclient/bridge.go:13:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/
 d2networking/d2client/d2remoteclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2remoteclient/remote_client_connection.go:9:12: error: import file ‘net’ not found
