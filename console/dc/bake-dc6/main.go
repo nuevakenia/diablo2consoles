@@ -28,11 +28,13 @@ func main() {
 	var (
 		mpqPath string
 		dc6Path string
+		palPath string
 		outDir  string
 		name    string
 	)
 	flag.StringVar(&mpqPath, "mpq", "", "archivo MPQ de entrada")
 	flag.StringVar(&dc6Path, "dc6", "", "ruta del DC6 dentro del MPQ")
+	flag.StringVar(&palPath, "pal", "", "ruta del pal.dat dentro del MPQ (opcional: DC-002.9, para el color)")
 	flag.StringVar(&outDir, "out", "", "directorio de salida")
 	flag.StringVar(&name, "name", "asset", "nombre base de los archivos de salida")
 	flag.Parse()
@@ -60,13 +62,46 @@ func main() {
 		fatal("escribiendo %s: %v", rawPath, err)
 	}
 
+	goPath := filepath.Join(outDir, "gen", name+"_dc6.go")
+	if err := os.WriteFile(goPath, []byte(varGo(dc6Path, "assetDC6", raw)), 0o644); err != nil {
+		fatal("escribiendo %s: %v", goPath, err)
+	}
+
+	fmt.Printf("dc6 crudo: %s (%d bytes)\n", rawPath, len(raw))
+	fmt.Printf("  -> %s (para la consola)\n", goPath)
+
+	// --- la paleta (DC-002.9) ---
+	if palPath != "" {
+		pal, err := mpq.ReadFile(palPath)
+		if err != nil {
+			fatal("leyendo %s del MPQ: %v", palPath, err)
+		}
+
+		palRawPath := filepath.Join(outDir, name+".pal")
+		if err := os.WriteFile(palRawPath, pal, 0o644); err != nil {
+			fatal("escribiendo %s: %v", palRawPath, err)
+		}
+
+		palGoPath := filepath.Join(outDir, "gen", name+"_pal.go")
+		if err := os.WriteFile(palGoPath, []byte(varGo(palPath, "assetPAL", pal)), 0o644); err != nil {
+			fatal("escribiendo %s: %v", palGoPath, err)
+		}
+
+		fmt.Printf("pal crudo: %s (%d bytes)\n", palRawPath, len(pal))
+		fmt.Printf("  -> %s (para la consola)\n", palGoPath)
+	}
+}
+
+// varGo arma el archivo de Go con los bytes crudos como una var. El POC de la consola no tiene sistema
+// de archivos: los bytes entran en el binario.
+func varGo(origen, varName string, raw []byte) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "// GENERADO por console/dc/bake-dc6 desde %s. NO EDITAR A MANO.\n", dc6Path)
-	fmt.Fprintf(&sb, "// Son los bytes crudos del DC6 tal como estan en el MPQ (%d bytes): la consola los parsea con\n", len(raw))
-	fmt.Fprintf(&sb, "// el mismo d2dc6.Load que usa el host.\n\npackage main\n\nvar assetDC6 = []byte{\n")
+	fmt.Fprintf(&sb, "// GENERADO por console/dc/bake-dc6 desde %s. NO EDITAR A MANO.\n", origen)
+	fmt.Fprintf(&sb, "// Son los bytes crudos tal como estan en el MPQ (%d bytes): la consola los parsea con\n", len(raw))
+	fmt.Fprintf(&sb, "// el mismo codigo del motor que usa el host.\n\npackage main\n\nvar %s = []byte{\n", varName)
 	for i, b := range raw {
 		if i%12 == 0 {
-			sb.WriteString("\t")
+			sb.WriteString("	")
 		}
 		fmt.Fprintf(&sb, "0x%02x,", b)
 		if i%12 == 11 {
@@ -78,13 +113,7 @@ func main() {
 	}
 	sb.WriteString("}\n")
 
-	goPath := filepath.Join(outDir, "gen", name+"_dc6.go")
-	if err := os.WriteFile(goPath, []byte(sb.String()), 0o644); err != nil {
-		fatal("escribiendo %s: %v", goPath, err)
-	}
-
-	fmt.Printf("dc6 crudo: %s (%d bytes)\n", rawPath, len(raw))
-	fmt.Printf("  -> %s (para la consola)\n", goPath)
+	return sb.String()
 }
 
 func fatal(format string, args ...interface{}) {

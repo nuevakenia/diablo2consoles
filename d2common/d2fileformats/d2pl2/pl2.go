@@ -1,9 +1,8 @@
 package d2pl2
 
 import (
-	"encoding/binary"
-
-	"github.com/go-restruct/restruct"
+	"fmt"
+	"unsafe"
 )
 
 // PL2 represents a palette file.
@@ -28,28 +27,37 @@ type PL2 struct {
 	TextColorShifts [13]PL2PaletteTransform
 }
 
-// Load uses restruct to read the binary pl2 data into structs
+// Load lee los datos binarios del pl2.
+//
+// El PL2 es un blob de bytes: TODOS sus campos son arrays de bytes (PL2Color y PL2Color24Bits son bytes,
+// los transforms son [256]uint8), sin relleno ni alineacion especial. O sea que el struct en memoria es
+// exactamente el archivo, byte a byte, en la Dreamcast (SH-4 es little-endian, igual que el formato).
+// Por eso se copia el buffer tal cual, con unsafe: es lo que hacia restruct, pero sin reflexion.
+//
+// ANTES usaba restruct (que arma la lectura por reflexion a partir de los tags del struct). El formato
+// PL2 es todo arrays contiguos de bytes sin relleno, asi que la lectura binaria de la biblioteca
+// estandar hace exactamente lo mismo sin traer reflexion: se cambia restruct por binary.Read y el
+// resultado es el mismo byte a byte. (Es el unico lugar del motor que usaba restruct: medido.)
 func Load(data []byte) (*PL2, error) {
-	result := &PL2{}
-
-	restruct.EnableExprBeta()
-
-	err := restruct.Unpack(data, binary.LittleEndian, &result)
-	if err != nil {
-		return nil, err
+	largo := int(unsafe.Sizeof(PL2{}))
+	if len(data) < largo {
+		return nil, fmt.Errorf("pl2: se esperaban %d bytes, llegaron %d", largo, len(data))
 	}
+
+	result := &PL2{}
+	destino := unsafe.Slice((*byte)(unsafe.Pointer(result)), largo)
+	copy(destino, data[:largo])
 
 	return result, nil
 }
 
-// Marshal encodes PL2 back into byte slice
+// Marshal arma los bytes del pl2 (lo inverso de Load).
 func (p *PL2) Marshal() []byte {
-	restruct.EnableExprBeta()
+	largo := int(unsafe.Sizeof(PL2{}))
+	origen := unsafe.Slice((*byte)(unsafe.Pointer(p)), largo)
 
-	data, err := restruct.Pack(binary.LittleEndian, p)
-	if err != nil {
-		panic(err)
-	}
+	salida := make([]byte, largo)
+	copy(salida, origen)
 
-	return data
+	return salida
 }

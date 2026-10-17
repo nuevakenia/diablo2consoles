@@ -13,11 +13,13 @@ import (
 	"os"
 
 	"github.com/OpenDiablo2/OpenDiablo2/console/dc/motorresumen"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dc6"
 )
 
 func main() {
 	dc6Path := flag.String("dc6", "", "DC6 crudo horneado del MPQ")
+	palPath := flag.String("pal", "", "pal.dat crudo horneado del MPQ (si esta, tambien sale el resumen RGBA)")
 	flag.Parse()
 
 	if *dc6Path == "" {
@@ -38,6 +40,26 @@ func main() {
 
 	for _, l := range motorresumen.Lineas(d) {
 		fmt.Println(l)
+	}
+
+	// DC-002.9: el color. La paleta la decodifica el mismo d2dat.Load del motor y los RGBA salen del
+	// mismo d2util.ImgIndexToRGBA: lo unico que cambia del lado de la consola es el compilador.
+	if *palPath != "" {
+		palRaw, err := os.ReadFile(*palPath)
+		if err != nil {
+			fatal("leyendo %s: %v", *palPath, err)
+		}
+
+		pal, err := d2dat.Load(palRaw)
+		if err != nil {
+			fatal("parseando la paleta: %v", err)
+		}
+
+		fmt.Printf("MOTOR-PVR origen=host palbytes=%d\n", len(palRaw))
+
+		for _, l := range motorresumen.LineasRGBA(d, pal) {
+			fmt.Println(l)
+		}
 	}
 
 	fmt.Println("MOTOR-DC6 fin")

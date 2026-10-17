@@ -20,12 +20,19 @@
 // que un candado mal puesto puede no notarse hasta que alguien cede adentro (por ejemplo en un canal
 // o en un Sleep). Por eso la prueba en contra del hito fuerza la cesion en el medio.
 //
-// LIMITE DECLARADO (el segundo): el canal del candado se crea en el primer uso (no hay constructor).
-// En la consola eso no puede fallar: el scheduler es cooperativo sobre un hilo y nadie crea el canal
-// en medio de otro (medido). Con goroutines REALES en paralelo si podria pasar que dos creen dos
-// canales distintos, y por eso el difftest del host prepara el candado antes de usarlo (ver
-// difftest/dc0027_test.go). Un candado del motor, en la consola, se toca por primera vez sin
-// paralelismo: el limite no aplica ahi.
+// LIMITE DECLARADO (el segundo), y este tiene numero: el canal del candado se crea en el primer uso (no
+// hay constructor). En la consola eso no puede fallar: el scheduler es cooperativo sobre un hilo y nadie
+// crea el canal en medio de otro (medido). Con goroutines REALES en paralelo SI pasa, y no es teoria:
+// dos goroutines que crean el canal a la vez se quedan con DOS testigos distintos, una suelta un candado
+// que la otra no ve y una de las dos se cuelga en el Unlock. MEDIDO (DC-002.8b, 2026-10-16): con una
+// copia instrumentada del candado, 300 rondas de 16 goroutines sobre un candado SIN preparar dieron 2
+// cuelgues y hasta 2 canales creados para el mismo candado; con 2, 4 u 8 goroutines, 0 cuelgues en 300
+// rondas. Es raro, y por eso vivio escondido: el difftest del host se colgo 1 vez en 40 corridas de
+// "go test -count=20" (una corrida = 20 ejecuciones del test), con la goroutine clavada en
+// RWMutex.RUnlock -> Mutex.Unlock -> <-m.libre. Por eso la prueba del host NO se apoya en "correrlo
+// muchas veces": prepara el candado antes de usarlo en paralelo y lo EXIGE con Preparado(), para que un
+// candado sin preparar falle al instante y con nombre propio en vez de colgarse cada tanto. Un candado
+// del motor, en la consola, se toca por primera vez sin paralelismo: el limite no aplica ahi.
 //
 // La prueba en el HOST compara contra el sync de Go (Mutex, RWMutex, Once, WaitGroup tienen la misma
 // semantica observable) y en la CONSOLA corre el POC de goroutines con el contador exacto y el caso
@@ -73,6 +80,14 @@ func (m *Mutex) TryLock() bool {
 	}
 }
 
+// Preparado dice si el candado ya creo su canal (ver el segundo limite declarado, arriba).
+//
+// PARA QUE EXISTE: la prueba del host usa goroutines reales y necesita EXIGIR que el candado este
+// preparado antes de usarlo en paralelo. Sin esto, un candado sin preparar no falla: se cuelga cada
+// tanto (medido: 1 vez en 40 corridas de la suite con -count=20), que es lo peor que le puede pasar a
+// una suite, porque el que lo mira cree que fue la maquina.
+func (m *Mutex) Preparado() bool { return m.libre != nil }
+
 // RWMutex: en la consola es un candado EXCLUSIVO (RLock y Lock son lo mismo).
 //
 // LIMITE DECLARADO, y es el limite mas importante de este paquete: en Go dos lectores pueden entrar
@@ -93,6 +108,9 @@ func (rw *RWMutex) Unlock()       { rw.m.Unlock() }
 func (rw *RWMutex) RLock()        { rw.m.Lock() }
 func (rw *RWMutex) RUnlock()      { rw.m.Unlock() }
 func (rw *RWMutex) TryLock() bool { return rw.m.TryLock() }
+
+// Preparado: lo mismo que en Mutex (el RWMutex de la consola es un Mutex exclusivo).
+func (rw *RWMutex) Preparado() bool { return rw.m.Preparado() }
 
 // Once: corre la funcion una sola vez, y los que llegan despues ESPERAN a que termine (como Go).
 type Once struct {

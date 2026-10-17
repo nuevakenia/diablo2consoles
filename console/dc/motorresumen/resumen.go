@@ -11,6 +11,8 @@ import (
 	"strconv"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dc6"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 )
 
 // Lineas devuelve el resumen del DC6 como lineas de texto, todas con el prefijo MOTOR-DC6.
@@ -73,4 +75,47 @@ func Hash(b []byte) string {
 	}
 
 	return fmt.Sprintf("%08x", h)
+}
+
+// LineasRGBA: el segundo resumen, el del COLOR. Pasa los indices de cada frame por la paleta usando el
+// camino del propio motor (d2util.ImgIndexToRGBA: el indice 0 queda transparente y el resto toma su
+// color de la paleta) y reporta cuantos pixeles opacos quedaron y el hash FNV-1a de los RGBA.
+//
+// Por que aparte del hash de indices (DC-002.9): el de indices dice que el DECODIFICADOR del DC6 hizo
+// lo mismo en las dos plataformas. Este dice que el COLOR tambien. Si la paleta se decodificara
+// distinto, o el indice 0 se pintara en vez de dejar el hueco transparente, los indices seguirian
+// identicos y los RGBA no: el hash de indices solo no alcanza.
+func LineasRGBA(d *d2dc6.DC6, palette d2interface.Palette) []string {
+	out := []string{}
+
+	for i, f := range d.Frames {
+		linea := "MOTOR-PVR rgba frame " + strconv.Itoa(i) + ":"
+
+		if f == nil {
+			out = append(out, linea+" nil")
+			continue
+		}
+
+		idx := d.DecodeFrame(i)
+		if idx == nil {
+			out = append(out, linea+" indices=nil")
+			continue
+		}
+
+		rgba := d2util.ImgIndexToRGBA(idx, palette)
+
+		opacos := 0
+		for j := 3; j < len(rgba); j += 4 {
+			if rgba[j] != 0 {
+				opacos++
+			}
+		}
+
+		out = append(out, linea+
+			" pixeles="+strconv.Itoa(len(rgba)/4)+
+			" opacos="+strconv.Itoa(opacos)+
+			" hash="+Hash(rgba))
+	}
+
+	return out
 }

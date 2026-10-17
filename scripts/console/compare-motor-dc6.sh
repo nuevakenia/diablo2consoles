@@ -13,15 +13,24 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/env.sh"
 
 REPO="$(cd "$HERE/../.." && pwd)"
-OUT="${1:-/tmp/dcbuild/motor-dc6}"
+# El POC se elige por variable: por defecto el de DC-002.3 (motor-dc6).
+POC="${POC:-motor-dc6}"
+OUT="${1:-/tmp/dcbuild/$POC}"
 NAME="${2:-d2logo}"
 SECS="${SECS:-20}"
 
 [ -f "$OUT/prog.elf" ] || { echo "falta $OUT/prog.elf: corre scripts/console/build-motor-dc6.sh" >&2; exit 1; }
 [ -f "$OUT/$NAME.dc6" ] || { echo "falta el DC6 horneado $OUT/$NAME.dc6" >&2; exit 1; }
 
+# DC-002.9: si el POC horneo la paleta, el comparador del host tambien calcula el resumen del COLOR
+# (los RGBA finales), que es lo que se mira en el POC del PVR.
+HOST=(-dc6 "$OUT/$NAME.dc6")
+if [ -f "$OUT/$NAME.pal" ]; then
+    HOST+=(-pal "$OUT/$NAME.pal")
+fi
+
 echo "== host: el mismo d2dc6.Load + el mismo resumen, en x86-64"
-(cd "$REPO" && go run ./console/dc/motorcmp -dc6 "$OUT/$NAME.dc6") > "$OUT/host.txt" 2> "$OUT/host.err"
+(cd "$REPO" && go run ./console/dc/motorcmp "${HOST[@]}") > "$OUT/host.txt" 2> "$OUT/host.err"
 if [ $? -ne 0 ]; then
     echo "el comparador del host fallo:"; sed -n '1,10p' "$OUT/host.err"; exit 1
 fi
@@ -29,11 +38,11 @@ fi
 echo "== consola: el mismo codigo, compilado para SH-4, en Flycast"
 CAPTURE="${CAPTURE:-none}" bash "$HERE/run-flycast.sh" "$OUT/prog.elf" "$SECS" "$OUT/run" > "$OUT/flycast.out" 2>&1
 # las lineas de la consola serie terminan en \r y el emulador mete avisos suyos: se filtra
-grep -a '^MOTOR-DC6' "$OUT/run/flycast.log" | tr -d '\r' > "$OUT/consola.txt"
+grep -aE '^MOTOR-(DC6|PVR)' "$OUT/run/flycast.log" | tr -d '\r' > "$OUT/consola.txt"
 
 # solo las lineas del resumen (sin la de arranque, la de origen y la de fin)
 for f in host consola; do
-    grep -E '^MOTOR-DC6 (version=|frame )' "$OUT/$f.txt" > "$OUT/$f.resumen.txt"
+    grep -E '^MOTOR-(DC6 (version=|frame )|PVR rgba frame )' "$OUT/$f.txt" > "$OUT/$f.resumen.txt"
 done
 
 N_HOST=$(wc -l < "$OUT/host.resumen.txt")

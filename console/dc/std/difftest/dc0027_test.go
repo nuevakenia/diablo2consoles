@@ -18,20 +18,31 @@ import (
 	d2sync "d2std/sync"
 )
 
-// preparar: crea el canal del candado ANTES de que lo usen varias goroutines.
+// preparar: crea el canal del candado ANTES de que lo usen varias goroutines, y LO EXIGE.
 //
-// POR QUE HACE FALTA (medido): el canal del candado se crea en el primer uso. En la consola no hay
-// carrera posible, porque el scheduler es cooperativo sobre un hilo (medido en el POC de goroutines).
-// En el host, en cambio, dos goroutines pueden crear DOS canales distintos, y ahi una suelta un
-// candado que la otra no ve: el test se cuelga (paso: "FAIL d2std/difftest 60.004s", o sea el -timeout).
-// El difftest prepara el candado y asi lo que se compara es el comportamiento, no esa carrera, que es
-// un limite declarado de la consola.
-func preparar(l interface {
+// POR QUE HACE FALTA (medido, DC-002.8b): el canal del candado se crea en el primer uso. En la consola
+// no hay carrera posible, porque el scheduler es cooperativo sobre un hilo (medido en el POC de
+// goroutines). En el host, en cambio, dos goroutines pueden crear DOS canales distintos: cada una se
+// queda con su testigo, una suelta un candado que la otra no ve y una de las dos se cuelga en el Unlock.
+// Paso de verdad: "go test -count=20 ./difftest/" se colgo 1 vez en 40 corridas, con la goroutine clavada
+// en RWMutex.RUnlock -> Mutex.Unlock -> <-m.libre (sonda instrumentada: 2 cuelgues en 300 rondas de 16
+// goroutines, y hasta 2 canales creados para el mismo candado).
+//
+// POR QUE ADEMAS LO EXIGE: el cuelgue es rarisimo (1 en 40 corridas, o sea 1 en ~800 ejecuciones del
+// test), asi que "correrlo muchas veces" no lo caza y un test que se cuelga cada tanto se lee como "fue
+// la maquina". Con la exigencia de Preparado(), un candado sin preparar falla en el acto y con su
+// nombre. El mutante de scripts/console/mutar-cuelgue-386.sh es precisamente un candado sin preparar.
+func preparar(t *testing.T, l interface {
 	Lock()
 	Unlock()
+	Preparado() bool
 }) {
+	t.Helper()
 	l.Lock()
 	l.Unlock()
+	if !l.Preparado() {
+		t.Fatal("el candado quedo SIN preparar (limite declarado en d2std/sync): en el host hay que crear su canal antes de usarlo en paralelo, o se cuelga cada tanto en el Unlock")
+	}
 }
 
 // escenario corre 8 goroutines sumando 2000 veces cada una sobre un contador protegido.
@@ -60,7 +71,7 @@ func escenario(locker interface {
 func TestMutexContraGo(t *testing.T) {
 	var mGo gosync.Mutex
 	var mDC d2sync.Mutex
-	preparar(&mDC)
+	preparar(t, &mDC)
 	if a, b := escenario(&mGo), escenario(&mDC); a != b {
 		t.Fatalf("Mutex: Go dio %d y la consola %d", a, b)
 	}
@@ -74,7 +85,7 @@ func TestMutexContraGo(t *testing.T) {
 func TestRWMutexContraGo(t *testing.T) {
 	var rwGo gosync.RWMutex
 	var rwDC d2sync.RWMutex
-	preparar(&rwDC)
+	preparar(t, &rwDC)
 	if a, b := escenario(&rwGo), escenario(&rwDC); a != b {
 		t.Fatalf("RWMutex: Go dio %d y la consola %d", a, b)
 	}
@@ -85,6 +96,10 @@ func TestRWMutexContraGo(t *testing.T) {
 	var wgGo, wgDC gosync.WaitGroup
 	var mGo gosync.RWMutex
 	var mDC d2sync.RWMutex
+	// ESTE es el candado que el test se olvidaba de preparar (DC-002.8b): el preparar() de arriba es
+	// para rwDC, y el bloque de abajo usa mDC, que nace con el canal sin crear. Preparado (y exigido)
+	// aca, la carrera de creacion no existe y el cuelgue de 1-en-40-corridas no puede aparecer.
+	preparar(t, &mDC)
 	wgGo.Add(2)
 	wgDC.Add(2)
 	for i := 0; i < 2; i++ {

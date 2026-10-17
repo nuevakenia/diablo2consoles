@@ -12,14 +12,18 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/env.sh"
 
 REPO="$(cd "$HERE/../.." && pwd)"
-SRC="$REPO/console/dc/poc/motor-dc6"
-OUT="${1:-/tmp/dcbuild/motor-dc6}"
+# El POC se elige por variable: por defecto el de DC-002.3 (motor-dc6). motor-pvr usa el mismo flujo
+# con otro POC (scripts/console/build-motor-pvr.sh), asi que la barrera del hito no cambia.
+POC="${POC:-motor-dc6}"
+SRC="$REPO/console/dc/poc/$POC"
+OUT="${1:-/tmp/dcbuild/$POC}"
 CONF="$SRC/asset.conf"
 
 get() { sed -n "s/^$1=//p" "$CONF" | head -1; }
 
 MPQNAME="$(get mpq)"
 DC6="$(get dc6)"
+PAL="$(get pal)"
 NAME="$(get name)"
 : "${MPQNAME:?falta mpq= en $CONF}"
 : "${DC6:?falta dc6= en $CONF}"
@@ -42,7 +46,12 @@ fi
 echo "== 1/4 horneando el DC6 crudo del MPQ ($D2DIR/$MPQNAME)"
 mkdir -p "$OUT/gen"
 (cd "$REPO" && go build -o "$OUT/.bake-dc6" ./console/dc/bake-dc6)
-"$OUT/.bake-dc6" -mpq "$D2DIR/$MPQNAME" -dc6 "$DC6" -out "$OUT" -name "$NAME"
+BAKE=(-mpq "$D2DIR/$MPQNAME" -dc6 "$DC6" -out "$OUT" -name "$NAME")
+# si el POC declara pal=... en su asset.conf, se hornea tambien la paleta (DC-002.9: el color)
+if [ -n "$PAL" ]; then
+    BAKE+=(-pal "$PAL")
+fi
+"$OUT/.bake-dc6" "${BAKE[@]}"
 
 echo
 echo "== 2/4 stdlib minima para SH-4"
