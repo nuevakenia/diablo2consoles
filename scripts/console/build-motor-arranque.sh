@@ -60,10 +60,13 @@ for f in "$SRC"/*.c "$SRC"/csrc/*.c; do
 done
 
 echo "== 3/4 enlazando el MOTOR ENTERO ($N_MOTOR paquetes del motor + $N_STD de stdlib/terceros) =="
-# shellcheck disable=SC2046
+# DC-002.14: DC_LDEXTRA existe para medir el RECORTE del binario (-Wl,--gc-sections, que necesita los .gox
+# compilados con -ffunction-sections -fdata-sections) sin duplicar este script. Vacio por defecto: el
+# binario de siempre (el que mide la tarjeta DC-002.13) sale con la MISMA linea de enlace que antes.
+# shellcheck disable=SC2046,SC2086
 kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $EXTRA_OBJS $STD_C_OBJS \
     $(tr '\n' ' ' < "$GEN/orden.txt") $(tr '\n' ' ' < "$GEN/orden-motor.txt") \
-    $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
+    ${DC_LDEXTRA:-} $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
 
 echo "== 4/4 binario de arranque (1ST_READ.BIN) + IP.BIN + imagen =="
 sh-elf-objcopy -R .stack -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"

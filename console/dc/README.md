@@ -1403,7 +1403,7 @@ compilador. Commits 565987e3 y 457c6cfc.
 un diagnostico falso (se habia usado el script equivocado): el POC compila y corre desde DC-002.9 y sigue
 dando las mismas 61 lineas. Esta contado en la seccion 28.
 
-## 27. DC-002.11: el control de la Dreamcast (el bus maple) y el instrumento que medía otra cosa
+## 27. DC-002.11: el control de la Dreamcast (el bus maple) y el instrumento que media otra cosa
 
 > Misma aclaracion que la seccion 26: la seccion se escribe en DC-002.12 con los numeros que ya estaban
 > medidos en `evidencia/dc-002.11-control.txt` y `dc-002.11-control.png` (commits 63372cb3 y 6e317504).
@@ -1436,7 +1436,7 @@ escribible: `scripts/console/teclas-virtuales.py` crea un teclado virtual y lo *
 **El defecto de fondo que tapaba toda la evidencia** (y que vale mas que el control): en `RunGame` decia
 `pantalla := NewImage(...)`. El `:=` crea una imagen **local** que tapa a la del paquete, asi que el
 dibujado y la VRAM usaban esa (la pantalla SE VEIA bien y la captura mostraba el logo), pero `Screen()` y
-las cuentas de la evidencia leian la **GLOBAL, vacia**: el instrumento medía otra cosa que la que se ve.
+las cuentas de la evidencia leian la **GLOBAL, vacia**: el instrumento media otra cosa que la que se ve.
 Se desperto porque la huella daba **el mismo numero con el logo en x=192 y en x=511**; se confirmo con
 `Image.CentroDeMasa()` (promedio de las posiciones de los pixeles claros), que daba 0 0 con el logo
 dibujado y visible en la captura. Leccion: **la huella dice SI el cuadro cambio, no DONDE**.
@@ -1587,4 +1587,114 @@ grep -a 'fatal error\|Out of memory\|Memory:' /tmp/dc-run-arranque2/flycast.log
 
 Evidencia con los numeros crudos, las firmas leidas del binario y la aritmetica:
 `evidencia/dc-002.13-arranque-del-motor.txt`.
+
+## 30. DC-002.14: donde se van los 13,27 MB y que recorte hace arrancar (el semiespacio del GC)
+
+DC-002.13 cerro con un numero y una promesa: el motor entero enlaza, arranca y muere en el `gc_init` porque
+**faltan 1.486.848 bytes** de los 16 MB, y "lo que hay que recortar se puede medir en el ELF enlazado". Esta
+tarjeta midio de donde sale el peso, probo las palancas del compilador y del enlazador, y encontro que **el
+recorte que hace arrancar no esta en el binario: esta en lo que el GC reserva antes de la primera linea del
+motor**.
+
+**1. La herramienta con la que se iba a recortar media mal, y lo dijo su propio control.** `pesar-motor.py`
+atribuia el peso por paquete sumando el tamano de los simbolos del ELF enlazado. Medido en modo
+`--secciones`:
+
+    seccion   suma de tamanos   tamano REAL de la seccion   suma/seccion
+    .text          14.215.564            4.962.328               2,86x
+    .data           1.918.399            1.760.156               1,09x
+    .bss              412.208              204.256               2,02x
+    .rodata         4.959.484            5.896.816               0,84x
+    simbolos de .text: 21.266;  los que ARRANCAN DENTRO del anterior: 21.242
+    UNION de los intervalos de .text: 4.971.334 = 100,2% de la seccion
+
+Los tamanos son ciertos pero **no son exclusivos** (el ultimo del grupo se lleva el resto de la seccion), asi
+que sumarlos por paquete reparte bytes ajenos. **La tabla "por paquete" de DC-002.8/.13/.14 (datos del
+compilador 3.964.602, d2game 1.098.252, d2common 996.244, ...; total 9.555.553) queda retirada.** Ahora el
+tool detecta el solape y **sale con exit 2 sin imprimir tabla**, y el peso por paquete se mide con
+`pesar-gox.py`: las secciones ALLOC de cada `.gox`, donde cada byte se cuenta una sola vez (y sin los
+`.debug_*` ni el `.go_export`, que engañan: un `.gox` de 4,6 MB puede tener 2,28 MB de codigo y datos).
+
+**2. El peso honesto, y la sorpresa: lo mas pesado es UN DATO, no codigo.** 205 `.gox`, **13.604.164 bytes**
+(el ELF enlazado carga 13.910.992: los 306.828 de diferencia son libc/KOS/libgodc y alineacion).
+
+    bytes      gox  paquete
+    2281930   6033  d2core/d2records        <- de esos, 1.672.892 son UN dato
+    1326100  12841  d2game/d2gamescreen
+    1248929  14729  d2game/d2player
+     555773   6001  d2core/d2monsters
+     378544   3902  d2common/d2monster
+     362657   3778  d2core/d2skills
+     349228   3327  d2common/d2skill
+     247392   2539  d2core/d2hero
+     237757   2456  d2common/d2quest
+     227221   2281  d2common/d2drlg/drlgoutdoor
+     ... (los 25 primeros en la evidencia)
+
+El dato de 1.672.892 bytes (**95,0% del `.data` del motor entero**) es la tabla `var objectLookups =
+[]ObjectLookupRecord{...}` de `d2core/d2records/object_lookup_record_data.go` (1.942.429 bytes de fuente,
+7.902 lineas, 7.892 elementos: el volcado de `objectLookups.txt`). Se usa de verdad --
+`record_manager.go:285` llama `r.initObjectRecords(objectLookups)` en el init -- asi que **no es codigo
+muerto que se pueda tirar**: es el tipo de dato que en la consola no deberia estar en `.data` sino leerse del
+disco. Queda anotado para mas adelante.
+
+**3. Las dos palancas del compilador/enlazador: medidas y muertas.**
+
+| palanca | resultado medido |
+|---|---|
+| `-ffunction-sections -fdata-sections` + `-Wl,--gc-sections` | cargado 13.910.992 -> **13.913.308 (+2.316, no baja)**. El linker SI tira 38.491 secciones, todas diminutas (stubs `..eq..f`, `.data` vacias de `crtbegin.o`). gccgo no parte la salida por funcion: el ELF tiene 0 secciones `.text.*` |
+| `-fno-asynchronous-unwind-tables` (el `.eh_frame` son 1.066.804 bytes = 7,67%) | en un paquete real el `.eh_frame` queda **identico** (3.544 con y sin la bandera); en el motor entero sale 480 bytes **mas grande** |
+| sacar paquetes que el entry point no usa | 142 enlaces, uno sin cada paquete: **8 MUERTO** (d2common, d2common/d2data, d2common/d2replay, d2thread, ...) y **134 NECESARIO**. Los MUERTO son paquetes sin codigo y el ELF sale del MISMO tamano (43.888.556): **no ahorran RAM** |
+
+**4. La cuenta corregida: `gc_init` pide DOS semiespacios, no uno.** La cuenta de DC-002.13 media solo la
+primera peticion. En el runtime vendorizado (`libgodc/runtime/gc_heap.c:37-38`) el init hace dos
+`memalign(32, GC_SEMISPACE_SIZE)`, asi que lo que necesita para arrancar es `2 x GC_SEMISPACE_SIZE`. Con la
+misma imagen (13.910.992 cargados, 610.304 libres) la escalera medida es:
+
+    GC_SEMISPACE_SIZE_KB   el GC pide   el arranque
+    2048 (default)            4 MB      muere en gc_init: alloc failed (diff 2097152)
+    1024                      2 MB      pasa gc_init, muere despues en gc_external_alloc: OOM (diff 1228800)
+    512                       1 MB      pasa las DOS paredes de RAM y llega al panic de Go del init
+    256                     512 KB      igual que 512 (con arena mas chica: 1.915.772 contra 2.440.060)
+
+El recorte es entonces de configuracion del runtime, con el script idempotente que ya usa el proyecto para el
+vendor: **`scripts/console/fix-libgodc-gc.py 512 --build`** (por defecto 512 KB, el semiespacio mas grande
+que llega hasta el fondo). Costo declarado: un heap de 512 KB GC-ea mucho mas seguido; sirve para el arranque
+y para seguir midiendo, no es la configuracion de un juego corriendo.
+
+**5. El arranque, entero, con el semiespacio en 512 KB.** El MISMO binario de DC-002.13 (sin recortarle un
+byte) ahora deja atras las dos paredes de RAM y muere mas adelante, con un defecto **distinto**:
+
+    panic: assignment to entry in nil map
+
+    goroutine 1 [running]:
+    Stack Trace: frame pointers not enabled!
+
+    Memory: arena=2440060 used=2436340 free=3720
+
+Ni una linea `Out of memory` ni `gc_init: alloc failed`, y tampoco ni una linea `MOTOR-ARRANQUE`: el panic es
+**antes de `main`**, en el init del runtime o de los paquetes. Eso ya no es RAM (es el defecto siguiente) y va
+como tarjeta nueva.
+
+**6. El corpus y la barrera.** `scripts/console/checar-recorte-214.sh` deja 4 controles sanos (el instrumento
+que se niega a mentir, el dato medido por los dos caminos, el arranque que pasa el techo de RAM, y el registro
+del limite del linker) y caza **2/2 mutantes**: `sin-guard` (se saca el aviso de solape: la tabla solapada
+vuelve y el control 1 se cae) y `gc-2048` (el semiespacio vuelve al default del vendor: el arranque vuelve a
+morir en `gc_init` con diff 2097152). La barrera no se movio: **31 lineas identicas** entre host y consola
+(`compare-motor-dc6.sh`), con el runtime nuevo adentro.
+
+```bash
+# Donde esta el peso y que recorte hace arrancar (todo medido)
+bash scripts/console/recorte-214.sh                    # los .gox con los flags + el enlace (medido: no baja)
+python3 scripts/console/pesar-motor.py <elf> --secciones # el instrumento que se niega a mentir (exit 2)
+python3 scripts/console/pesar-gox.py /tmp/gox-214-gc   # el peso por paquete, sin solapes
+bash scripts/console/medir-alcance-motor.sh /tmp/gox-214-gc   # 8 MUERTO / 134 NECESARIO (142 enlaces)
+bash scripts/console/medir-gc-semiespacio-214.sh       # la escalera 2048/1024/512/256 en Flycast
+python3 scripts/console/fix-libgodc-gc.py 512 --build  # el recorte del GC que hace arrancar
+bash scripts/console/checar-recorte-214.sh             # el corpus: 4 controles + 2/2 mutantes
+bash scripts/console/compare-motor-dc6.sh              # la barrera: 31 lineas iguales
+```
+
+Evidencia con todas las salidas crudas (incluida la del corpus y la de la barrera):
+`evidencia/dc-002.14-peso-y-recorte.txt`.
 
