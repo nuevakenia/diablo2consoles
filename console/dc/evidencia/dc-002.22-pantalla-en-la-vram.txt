@@ -145,8 +145,43 @@ monton, vuelve el OOM (`diff 1921024` en la corrida del corpus, el mismo pedido 
 estado) y el motor no llega al loop.
 
 
-6. EL CORPUS (`scripts/console/checar-pantalla-222.sh`): 7 CONTROLES Y SUS MUTANTES
-----------------------------------------------------------------------------------
+6. EL CORPUS DE DC-002.21, ALINEADO (y su mutante quedo sin causa: otra vez el layout)
+----------------------------------------------------------------------------------------
+
+`checar-gc-221.sh` tenia que moverse: su control 5 exigia la pared de 1.916.928 (que esta tarjeta quita) y
+el POC de hoy no enlazaba contra el gox de DC-002.20 (`ebiten.MemLibreDelMonton` / `VramDelFramebuffer` no
+existen ahi: `reference to undefined identifier`). Se alineo como DC-002.21 alineo el de 214: `GEN` pasa a
+ser el gox de la rama, las marcas por arranque pasan de 10 a 11 (la marca nueva del monton), el control 5
+pasa a ser "el motor ENTRA al loop" y el 6 los numeros del monton de hoy (4.128 / 40.936). Corrida:
+**6/6 controles verdes**.
+
+Y **su mutante (el semiespacio en 512 KB, el valor viejo) NO CAE**, con una razon medida que es el tercer
+dato del mismo patron:
+
+    KB=512    cuadros completos del loop: 7   (NO se cae, NO hay OOM)
+    KB=256    cuadros completos del loop: 0   (se cae en el cuadro 0, la excepcion de siempre)
+
+O sea: con el framebuffer del motor fuera del monton, el valor viejo del semiespacio **dejo de ser un
+defecto**. El corpus lo declara en vez de exigir un verde, y el presupuesto del GC lo sigue vigilando el
+comodin de `checar-recorte-214.sh` (con el GC en 2048 KB el arranque muere en `gc_init`). El mutante queda
+NO cazado y anotado; no se borra, porque el dia que la pantalla vuelva al monton ese mutante tiene que
+volver a morder.
+
+Tres mediciones del mismo cuadro 0 del motor, con tres layouts distintos del monton:
+
+    sano (perezosa, KB=256)                     0 cuadros    se cae (PC 0000000b)
+    la pantalla del paquete puesta (mutante B)  3 cuadros    no se cae
+    semiespacio en 512 KB (mutante del 221)     7 cuadros    no se cae
+
+El monton cambia 200 bytes entre las dos primeras (4.128 contra 3.928 libres) y el semiespacio cambia
+524.288 entre la primera y la tercera. La conclusión honesta: **el fallo del cuadro 0 es de LAYOUT**
+(algo se lee distinto segun donde caiga todo), no de cantidad de RAM. Con eso, la tarjeta siguiente
+(DC-002.23) arranca con un dato que ahorra dias: hay que buscar un puntero/descriptor mal resuelto, no
+seguir peleando por bytes.
+
+
+7. EL CORPUS DE DC-002.22 (`scripts/console/checar-pantalla-222.sh`): 7 CONTROLES Y SUS MUTANTES
+----------------------------------------------------------------------------------------------
 
 Los 7 controles del control sano: (1) la pantalla vive en la VRAM con sus 1.920.000 bytes; (2) NO esta el
 OOM; (3) el motor ENTRA al loop (cuadro 0); (4) el motor **abre la lista** del cuadro 0 en el PVR; (5) la

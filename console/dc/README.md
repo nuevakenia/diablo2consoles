@@ -2365,6 +2365,17 @@ monton** (algo se lee distinto segun donde caiga todo). Un mutante que no cae es
 imprime y lo declara en vez de exigir un verde. El mutador es idempotente y el corpus verifica que los dos
 archivos queden con el **mismo sha256** del principio (para que no se commitee un mutante puesto).
 
+**5b. El tercer dato del mismo patron, en el corpus de DC-002.21.** `checar-gc-221.sh` se **alineo** (su
+control 5 exigia la pared de 1.916.928 que esta tarjeta quita, y el POC de hoy no enlazaba contra el gox de
+DC-002.20: `reference to undefined identifier 'ebiten.MemLibreDelMonton'`): `GEN` es el gox de la rama, las
+marcas por arranque pasan de 10 a 11 (la marca nueva del monton), el control 5 es "el motor ENTRA al loop" y
+el 6 los numeros de hoy (4.128 / 40.936). Corrida: **6/6 controles verdes**. Y **su mutante (el semiespacio
+en 512 KB, el valor viejo) queda NO CAZADO, con su razon medida**: con el framebuffer ya fuera del monton,
+512 KB no ahoga nada y el arranque **completa 7 cuadros** del loop. Tres layouts, tres resultados del mismo
+cuadro 0: **0 cuadros** (sano), **3** (la pantalla del paquete puesta), **7** (el semiespacio en 512 KB). El
+presupuesto del GC lo sigue vigilando el comodin de `checar-recorte-214.sh` (con el GC en 2048 KB el arranque
+muere en `gc_init`).
+
 **6. Un defecto de instrumento, medido y anotado para no repetirlo.** El gox de esta tarjeta es propio
 (`/tmp/gox-222`, porque `build-std-gox.sh` borra el directorio entero) y copiarlo arrastra las rutas
 ABSOLUTAS de `orden.txt`/`orden-motor.txt`: la primera corrida enlazo los `.gox` **viejos** y dio el
