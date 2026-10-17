@@ -37,8 +37,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STD="${STD:-$HERE/../../console/dc/std}"
 
-KOS="os time log runtime sync/atomic compress/zlib compress/gzip io/fs io/ioutil"
-EXCLUIDOS="d2std/($(echo "$KOS" | tr ' ' '|'))\$"
+# la lista de los que hablan con KOS: compartida con el mutador (ver kos-lista.sh)
+source "$HERE/kos-lista.sh"
 N_KOS=$(echo "$KOS" | wc -w)
 
 rc=0

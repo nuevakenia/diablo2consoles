@@ -10,6 +10,9 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 STD="${STD:-$REPO/console/dc/std}"
+# la lista de los que hablan con KOS: la misma que usa test-std-host.sh (ver kos-lista.sh). Antes estaba
+# copiada SOLO en test-std-host.sh y al mutador le faltaba: corria los mutantes contra una lista vacia.
+source "$HERE/kos-lista.sh"
 TMP="$(mktemp -d)"
 # EN_CURSO: el archivo que esta mutado ahora mismo. Si el script muere a la mitad (lo mata un timeout, un
 # Ctrl-C, lo que sea), el trap lo restaura: si no, el archivo queda MUTADO en el arbol y el proximo

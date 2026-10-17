@@ -71,11 +71,26 @@ echo "stdlib minima compilada para SH-4 en $GEN"
 # el motor se cae en d2util y en los paquetes que lo usan, y el error se ve lejos de la causa.
 # ============================================================================
 compilar_tercero() {
-    local pkgpath="$1" archivo="$2"
+    local pkgpath="$1" fuente="$2"
     local salida="$DC_ROOT/gox/${pkgpath}.gox"
     mkdir -p "$(dirname "$salida")"
-    if sh-elf-gccgo $GODC_GOFLAGS -I "$DC_ROOT/gox" -fgo-pkgpath="$pkgpath" -c "$archivo" -o "$salida" 2>"$salida.log"; then
-        echo "  ${pkgpath##*/}.gox  $(stat -c%s "$salida") bytes"
+
+    # Si lo que se pasa es un DIRECTORIO, se compilan todos los .go de adentro. Hacia falta: un paquete de
+    # verdad tiene varios archivos (ebiten: ebiten.go + entrada.go), y compilando de a uno los simbolos de
+    # los otros no existen ("undefined type CursorMode").
+    local archivos=()
+    if [ -d "$fuente" ]; then
+        for f in "$fuente"/*.go; do
+            [ -f "$f" ] || continue
+            case "$f" in *_test.go) continue ;; esac
+            archivos+=("$f")
+        done
+    else
+        archivos=("$fuente")
+    fi
+
+    if sh-elf-gccgo $GODC_GOFLAGS -I "$DC_ROOT/gox" -fgo-pkgpath="$pkgpath" -c "${archivos[@]}" -o "$salida" 2>"$salida.log"; then
+        echo "  ${pkgpath##*/}.gox  $(stat -c%s "$salida") bytes  (${#archivos[@]} archivo(s))"
         rm -f "$salida.log"
     else
         echo "  ERROR en $pkgpath:"
@@ -85,13 +100,17 @@ compilar_tercero() {
 
 echo "== los paquetes de terceros reescritos para la consola =="
 # ebiten: el esqueleto del backend grafico/input/audio (d2core/d2render, d2input, d2audio y d2util)
-compilar_tercero "github.com/hajimehoshi/ebiten/v2" "$HERE/../../console/dc/engine/ebiten/v2/ebiten.go"
+compilar_tercero "github.com/hajimehoshi/ebiten/v2" "$HERE/../../console/dc/engine/ebiten/v2"
+# ebitenutil: las ayudas de dibujo (d2render/ebiten: DebugPrint, DrawLine, DrawRect). Despues de ebiten.
+compilar_tercero "github.com/hajimehoshi/ebiten/v2/ebitenutil" "$HERE/../../console/dc/engine/ebiten/v2/ebitenutil"
+# audio: el sonido (d2audio/ebiten). Compila y lleva estado, pero el AICA todavia no esta conectado.
+compilar_tercero "github.com/hajimehoshi/ebiten/v2/audio" "$HERE/../../console/dc/engine/ebiten/v2/audio"
 # inpututil: la parte de input (teclas y textos). Va despues de ebiten, que es de quien depende.
-compilar_tercero "github.com/hajimehoshi/ebiten/v2/inpututil" "$HERE/../../console/dc/engine/ebiten/v2/inpututil/inpututil.go"
+compilar_tercero "github.com/hajimehoshi/ebiten/v2/inpututil" "$HERE/../../console/dc/engine/ebiten/v2/inpututil"
 # akara: el BitSet (d2records/monster_unique_affix_*). Medido: es lo unico que se usa de esa libreria.
-compilar_tercero "github.com/gravestench/akara" "$HERE/../../console/dc/engine/akara/akara/akara.go"
+compilar_tercero "github.com/gravestench/akara" "$HERE/../../console/dc/engine/akara/akara"
 # google/uuid: los identificadores de las entidades del mapa (d2mapentity/factory.go). Medido: solo se
 # usa uuid.New.
-compilar_tercero "github.com/google/uuid" "$HERE/../../console/dc/engine/uuid/uuid.go"
+compilar_tercero "github.com/google/uuid" "$HERE/../../console/dc/engine/uuid"
 # x/image/bmp: el BMP con los glifos de la fuente del juego (d2util/assets)
-compilar_tercero "golang.org/x/image/bmp" "$HERE/../../console/dc/engine/x/image/bmp/bmp.go"
+compilar_tercero "golang.org/x/image/bmp" "$HERE/../../console/dc/engine/x/image/bmp"
