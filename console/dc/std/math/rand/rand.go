@@ -173,3 +173,15 @@ func Int63n(n int64) int64               { return global.Int63n(n) }
 func Float64() float64                   { return global.Float64() }
 func Perm(n int) []int                   { return global.Perm(n) }
 func Shuffle(n int, swap func(i, j int)) { global.Shuffle(n, swap) }
+
+// Seed vuelve a sembrar este generador. Se agrega porque el motor lo usa (d2item/diablo2item lo llama
+// al fabricar items raros) y el go de ahora ELIMINO Rand.Seed: el motor se escribio cuando existia, y
+// gccgo es go 15. Sin esto, el paquete del motor no compila.
+//
+// OJO (limite ya declarado para todo este paquete): la secuencia NO es la misma que la del rand de go.
+// Sembrar dos veces aca da una secuencia distinta de la que daria Go, asi que los items "al azar" del
+// juego salen distintos. Para jugar da igual (y el azar tiene que existir); para comparar bit a bit
+// contra el host, no.
+func (r *Rand) Seed(seed int64) {
+	r.src = NewSource(seed)
+}

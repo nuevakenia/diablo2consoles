@@ -1,6 +1,6 @@
 # DC-002.8: el motor compilando por capas
 
-compilados: 107 de 142
+compilados: 108 de 142
 
 ## los simbolos que faltan, ordenados por cuantos paquetes bloquean
 ## el avance, paquete por paquete (1 = compila)
@@ -106,7 +106,7 @@ d2core/d2item/d2cube 0
 d2core/d2item/d2drop 1
 d2core/d2item/d2ground 1
 d2core/d2item/d2itemdesc 1
-d2core/d2item/diablo2item 0
+d2core/d2item/diablo2item 1
 d2core/d2map/d2lightmap 1
 d2core/d2map/d2mapengine 0
 d2core/d2map/d2mapentity 0
@@ -155,12 +155,11 @@ d2app/d2setup: /home/dgalli/Proyectos/diablo2consoles/d2app/d2setup/dialog.go:7:
 d2common/d2replay: /home/dgalli/Proyectos/diablo2consoles/d2common/d2replay/replay.go:5:22: error: import file ‘encoding/json’ not found
 d2core/d2audio/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2audio/ebiten/ebiten_audio_provider.go:14:47: error: import file ‘github.com/hajimehoshi/ebiten/v2/audio’ not fou
 d2core/d2config: /home/dgalli/Proyectos/diablo2consoles/d2core/d2config/d2config.go:4:22: error: import file ‘encoding/json’ not found
-d2core/d2hero: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/containers.go:6:69: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item’ not f
+d2core/d2hero: /home/dgalli/Proyectos/diablo2consoles/d2core/d2hero/d2s_integrity.go:5:22: error: import file ‘crypto/sha256’ not found
 d2core/d2input: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/input_manager.go:9:9: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/ebiten’ not fo
 d2core/d2input/d2gamepad: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/d2gamepad/mapping.go:4:22: error: import file ‘encoding/json’ not found
 d2core/d2input/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2input/ebiten/ebiten_input.go:119:54: error: reference to undefined identifier ‘ebiten.MouseButton’
 d2core/d2item/d2cube: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/d2cube/match.go:149:25: error: reference to undefined field or method ‘Day’
-d2core/d2item/diablo2item: /home/dgalli/Proyectos/diablo2consoles/d2core/d2item/diablo2item/item.go:774:23: error: reference to undefined field or method ‘Seed’
 d2core/d2map/d2mapengine: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapengine/doors.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ 
 d2core/d2map/d2mapentity: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapentity/factory.go:6:31: error: import file ‘github.com/google/uuid’ not found
 d2core/d2map/d2mapgen: /home/dgalli/Proyectos/diablo2consoles/d2core/d2map/d2mapgen/act1_overworld.go:14:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maps
@@ -171,7 +170,7 @@ d2core/d2playertrade: /home/dgalli/Proyectos/diablo2consoles/d2core/d2playertrad
 d2core/d2render/ebiten: /home/dgalli/Proyectos/diablo2consoles/d2core/d2render/ebiten/ebiten_panic_screen.go:5:52: error: import file ‘github.com/hajimehoshi/ebiten/v2/ebitenutil’ not 
 d2core/d2skills: /home/dgalli/Proyectos/diablo2consoles/d2core/d2skills/autoform.go:5:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ not fo
 d2game/d2gamescreen: /home/dgalli/Proyectos/diablo2consoles/d2game/d2gamescreen/act3_live.go:13:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity’ 
-d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/ammo_depleted.go:6:69: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2item/diablo2item’ 
+d2game/d2player: /home/dgalli/Proyectos/diablo2consoles/d2game/d2player/automap.go:15:68: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine’ not fo
 d2networking: /home/dgalli/Proyectos/diablo2consoles/d2networking/client_listener.go:3:67: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket’ no
 d2networking/d2client: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/game_client.go:13:57: error: import file ‘github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero’ not fou
 d2networking/d2client/d2localclient: /home/dgalli/Proyectos/diablo2consoles/d2networking/d2client/d2localclient/local_client_connection.go:4:31: error: import file ‘github.com/google/uuid’ not foun
