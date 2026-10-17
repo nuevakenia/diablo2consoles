@@ -1698,3 +1698,84 @@ bash scripts/console/compare-motor-dc6.sh              # la barrera: 31 lineas i
 Evidencia con todas las salidas crudas (incluida la del corpus y la de la barrera):
 `evidencia/dc-002.14-peso-y-recorte.txt`.
 
+## 31. DC-002.15: el init que escribia en un mapa nil (y el regexp que habia detras)
+
+DC-002.14 dejo el arranque del motor pasando las paredes de RAM y muriendo en un panic de Go ANTES de
+`main`. Esta tarjeta encontro QUIEN lo disparaba y lo arreglo, y en el camino dejo identificado el defecto
+siguiente.
+
+**1. Quien, sin pila que leer.** El mensaje lo imprime libgodc y el runtime minimo no sabe armar la pila
+(`Stack Trace: frame pointers not enabled!`), asi que no habia a quien preguntarle. El instrumento es una
+traza en los TRES sitios que paniquean por mapa nil (`runtime/map_dreamcast.c` y el macro de
+`map_fast_internal.h`) y en la entrada del panic (`runtime_gopanic_impl`), con el script idempotente
+`scripts/console/fix-libgodc-map-traza.py`: imprimen por la consola serie el **pc de retorno** y el tipo del
+dato. El pc se resuelve contra el ELF enlazado (que lleva simbolos), descontando 4 (en SH-4 el registro de
+retorno apunta a la instruccion siguiente, y las instrucciones son de 2 bytes):
+
+    MAP-NIL-TRAZA runtime_mapassign_fast32 pc=8c148c14 t=8c666058
+    -> sh-elf-addr2line 8c148c10: github_..._d2common_1d2skill..init0   d2common/d2skill/class_abc.go:17
+    -> sh-elf-nm 8c666058: _type..map_6int_7..._d2skill_0doFn
+
+**2. La causa, y por que el codigo se veia bien.** `d2common/d2skill/class.go` declaraba
+`var doTable map[int]doFn` (nil) y lo creaba **dentro de su `init()`**; `class_abc.go` escribia
+`doTable[15] = ...` **desde su propio `init()`**, con este comentario: *"Go runs the init functions of a
+package in file name order and "class.go" comes before this file"*. Eso ultimo es comportamiento de la
+**herramienta** de Go, no del lenguaje: el spec solo garantiza que la inicializacion de las **variables**
+termina antes de que corra **cualquier** `init()`. Medido: la linea de compilacion presenta los archivos en
+orden (`ls *.go`), pero gccgo numeró el init de `class_abc.go` como `..init0`, o sea **primero** — el orden
+de los `init()` de archivo no es el orden de la linea de compilacion.
+
+**3. El arreglo (en el motor, no en el vendor).** El mapa pasa a crearse en la inicializacion de la
+variable, que es lo que el spec si garantiza:
+
+    var doTable = map[int]doFn{ ... }     // antes: var ... + func init() { doTable = ... }
+
+    $ python3 scripts/console/fix-d2skill-dotable-215.py        # idempotente
+    $ git diff --stat d2common/d2skill/class.go                 # 101 inserciones, 98 borrados (el dedent)
+    $ gofmt -l d2common/d2skill/                                # vacio
+
+Efecto medido, recompilando solo ese paquete y reenlazando: **0** lineas `nil map` y **0** `MAP-NIL-TRAZA`
+(el panic del mapa nil quedo atras).
+
+**4. El defecto siguiente, ya identificado: un `regexp` que no compila.** Con la traza tambien en la
+entrada del panic, el arranque arreglado ahora dice:
+
+    PANIC-TRAZA pc=8c44b4ba tipo=8c4ef00c kind=54 dato=8cda6680
+    panic: (value of kind 22 at 0x8cda6680)
+
+`kind 22` = `GO_PTR` y el tipo en 8c4ef00c esta declarado en el ELF como `_regexp.Error..p`: el panic es con
+un `*regexp.Error`. Sigue siendo antes de `main`, asi que lo dispara un `regexp.MustCompile` de **nivel de
+paquete** (el motor tiene nueve). La sonda `console/dc/poc/sonda-regexp` compila los nueve y dice cual se la
+lleva: los cuatro sin bandera compilan, y el quinto —`d2core/d2map/d2mapgen/real_maze_gen.go:33`,
+`(?i)(pre|prev|up|ent|exit)\d*\.ds1$`— paniquea. Aislado en una segunda corrida: **`(?i)a` sola ya rompe el
+regexp de la consola**, o sea la bandera de plegado de mayusculas. Es el unico patron del motor que la usa.
+El veredicto fino (parser de banderas, tablas de unicode o el motor de ejecucion) va como tarjeta propia.
+
+**5. El corpus.** `scripts/console/checar-init-215.sh`: control sano (el panic del mapa nil no vuelve y el
+que queda viene identificado por la traza) + **mutante `init-de-archivo`** (se deshace el arreglo: `doTable`
+vuelve a crearse en el `init()` de `class.go` y el arranque **vuelve a morir en el mapa nil** → cazado
+1/1). El corpus no pide `MOTOR-ARRANQUE > 0` a proposito: el defecto del regexp esta delante y es de otra
+tarjeta; lo que se mide aca es que el mapa nil dejo de ser el que corta. La barrera no se movio:
+`compare-motor-dc6.sh`, 31 lineas identicas host/consola.
+
+```bash
+# Quien paniquea, en la consola (sin pila que leer)
+python3 scripts/console/fix-libgodc-map-traza.py --build       # la traza en libgodc (idempotente)
+bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/motor-traza /tmp/gox-0028
+CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/motor-traza/prog-emu.elf 15 /tmp/dc-run-215-traza
+grep -a 'MAP-NIL-TRAZA\|PANIC-TRAZA' /tmp/dc-run-215-traza/flycast.log | tr -d '\r'
+sh-elf-addr2line -f -e /tmp/dcbuild/motor-traza/prog.elf 8c148c10    # el llamado esta en pc-4
+
+# El arreglo del motor y su corpus
+python3 scripts/console/fix-d2skill-dotable-215.py             # doTable como variable, no en init()
+bash scripts/console/checar-init-215.sh                        # 1 control + 1/1 mutantes
+
+# El defecto siguiente (regexp), medido
+bash scripts/console/build-dc.sh console/dc/poc/sonda-regexp
+CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/sonda-regexp/prog.elf 15 /tmp/dc-run-sonda-regexp
+grep -a 'SONDA-REGEXP\|panic' /tmp/dc-run-sonda-regexp/flycast.log | tr -d '\r'
+```
+
+Evidencia con las salidas crudas (traza, addr2line, la sonda y el corpus):
+`evidencia/dc-002.15-init-mapa-nil.txt`.
+

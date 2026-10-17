@@ -28,104 +28,107 @@ type doFn func(c *cast)
 // skills.txt columns and the documented in-game effect, not read from the
 // binary. The handlers share the helpers below (strike, castN, area effects,
 // state builders, summon orders).
-var doTable map[int]doFn
+// DC-002.15: el mapa se crea ACA, en la inicializacion de la variable, y no dentro de un init(). El
+// spec garantiza que la inicializacion de las variables del paquete termina ANTES de que corra
+// cualquier init(); con el mapa creado en el init() de este archivo, class_abc.go (que lo usa desde
+// el suyo) dependia de que los init() de un paquete corran en orden de nombre de archivo, que es
+// comportamiento de la herramienta de Go y no una garantia del lenguaje. Medido en gccgo: corria
+// primero el init de class_abc.go y el mapa todavia era nil (panic "assignment to entry in nil map",
+// class_abc.go:17).
+var doTable = map[int]doFn{
+	doAttack:   doAttackFn,
+	doMelee:    doMeleeFn,
+	doThrow:    doThrowFn,
+	doLHThrow:  doThrowFn,
+	doInner:    doInnerFn,
+	doJab:      doJabFn,
+	doCharged:  func(c *cast) { c.p.doChargedBolt(c.u, c.sk, c.lvl, c.tgt, c.env, c.res) },
+	doFrozenAr: doArmorFn,
+	doStatic: func(c *cast) {
+		c.res.Effects = append(c.res.Effects, Effect{
+			Kind: "area_damage", Radius: c.env.eval(c.sk.AuraRangeCalc), Filter: c.sk.AuraFilter,
+			Pct: c.env.eval(c.sk.Calc[1]), MinDamage: c.env.eval(c.sk.Calc[2]) /* raw 8.8, see StaticFieldDamage */, FloorPct: c.p.Opt.StaticFieldMinPct,
+			EType: c.sk.EType, ELen: c.sk.ElemLen(c.env, c.lvl),
+		})
+	},
+	doNova: func(c *cast) { c.p.doNovaRing(c.u, c.sk, c.lvl, c.tgt, c.env, c.res) },
 
-func init() {
-	doTable = map[int]doFn{
-		doAttack:   doAttackFn,
-		doMelee:    doMeleeFn,
-		doThrow:    doThrowFn,
-		doLHThrow:  doThrowFn,
-		doInner:    doInnerFn,
-		doJab:      doJabFn,
-		doCharged:  func(c *cast) { c.p.doChargedBolt(c.u, c.sk, c.lvl, c.tgt, c.env, c.res) },
-		doFrozenAr: doArmorFn,
-		doStatic: func(c *cast) {
-			c.res.Effects = append(c.res.Effects, Effect{
-				Kind: "area_damage", Radius: c.env.eval(c.sk.AuraRangeCalc), Filter: c.sk.AuraFilter,
-				Pct: c.env.eval(c.sk.Calc[1]), MinDamage: c.env.eval(c.sk.Calc[2]) /* raw 8.8, see StaticFieldDamage */, FloorPct: c.p.Opt.StaticFieldMinPct,
-				EType: c.sk.EType, ELen: c.sk.ElemLen(c.env, c.lvl),
-			})
-		},
-		doNova: func(c *cast) { c.p.doNovaRing(c.u, c.sk, c.lvl, c.tgt, c.env, c.res) },
+	// Barbarian
+	9:  doStrikeBuffFn, // Frenzy (SRVDO_009_Frenzy) and, with 120, Maul / Feral Rage
+	68: doShoutFn,      // Shout, Battle Orders, Battle Command, War Cry
+	70: doDoubleSwingFn,
+	71: doTauntFn, // Taunt
+	74: doDoubleThrowFn,
+	77: doLeapFn,
+	78: doLeapAttackFn,
 
-		// Barbarian
-		9:  doStrikeBuffFn, // Frenzy (SRVDO_009_Frenzy) and, with 120, Maul / Feral Rage
-		68: doShoutFn,      // Shout, Battle Orders, Battle Command, War Cry
-		70: doDoubleSwingFn,
-		71: doTauntFn, // Taunt
-		74: doDoubleThrowFn,
-		77: doLeapFn,
-		78: doLeapAttackFn,
+	// Amazon
+	8:  doFanFn,    // Multiple Shot, Teeth, Shock Wave (SRVDO_008_MultipleShot)
+	10: doHomingFn, // Guided Arrow, Bone Spirit
+	11: doChargedStrikeFn,
+	12: doStrafeFn,
+	13: doMultiHitFn, // Zeal, Fury, Fend
+	14: doLightningStrikeFn,
 
-		// Amazon
-		8:  doFanFn,    // Multiple Shot, Teeth, Shock Wave (SRVDO_008_MultipleShot)
-		10: doHomingFn, // Guided Arrow, Bone Spirit
-		11: doChargedStrikeFn,
-		12: doStrafeFn,
-		13: doMultiHitFn, // Zeal, Fury, Fend
-		14: doLightningStrikeFn,
+	// Sorceress
+	19: doStreamFn, // Inferno, Arctic Blast
+	23: doBlazeFn,  // Blaze, Energy Shield
+	24: doFireWallFn,
+	25: doArmorFn, // Enchant (a timed self state)
+	26: doChainFn,
+	27: doTeleportFn,
+	28: doRainFn, // Meteor, Blizzard
+	29: doStormFn,
 
-		// Sorceress
-		19: doStreamFn, // Inferno, Arctic Blast
-		23: doBlazeFn,  // Blaze, Energy Shield
-		24: doFireWallFn,
-		25: doArmorFn, // Enchant (a timed self state)
-		26: doChainFn,
-		27: doTeleportFn,
-		28: doRainFn, // Meteor, Blizzard
-		29: doStormFn,
+	// Necromancer
+	30: doCurseFn, // Amplify Damage, Dim Vision, Weaken, Iron Maiden, Terror, Life Tap, Decrepify, Lower Resist
+	31: doSummonFn,
+	32: doMeleeFn, // Poison Dagger: melee, poison from EType
+	33: doPsychicHammerFn,
+	55: doCorpseExplosionFn,
+	56: doSummonFn, // golems
+	58: doSummonFn, // Revive
+	59: doCurseFn,  // Attract
+	60: doWallFn,
+	61: doCurseFn, // Confuse
+	62: doWallFn,  // Bone Prison
+	63: doCorpseExplosionFn,
 
-		// Necromancer
-		30: doCurseFn, // Amplify Damage, Dim Vision, Weaken, Iron Maiden, Terror, Life Tap, Decrepify, Lower Resist
-		31: doSummonFn,
-		32: doMeleeFn, // Poison Dagger: melee, poison from EType
-		33: doPsychicHammerFn,
-		55: doCorpseExplosionFn,
-		56: doSummonFn, // golems
-		58: doSummonFn, // Revive
-		59: doCurseFn,  // Attract
-		60: doWallFn,
-		61: doCurseFn, // Confuse
-		62: doWallFn,  // Bone Prison
-		63: doCorpseExplosionFn,
+	// Paladin
+	64:  doSacrificeFn,
+	65:  doAuraFn,
+	66:  doAuraFn,
+	67:  doChargeFn,
+	73:  doBlessedHammerFn,
+	80:  doFistFn,
+	81:  doAuraFn,
+	82:  doAuraFn,
+	150: doSmiteFn,
 
-		// Paladin
-		64:  doSacrificeFn,
-		65:  doAuraFn,
-		66:  doAuraFn,
-		67:  doChargeFn,
-		73:  doBlessedHammerFn,
-		80:  doFistFn,
-		81:  doAuraFn,
-		82:  doAuraFn,
-		150: doSmiteFn,
+	// Druid
+	114: doSummonFn, // Raven
+	116: doArmorFn,  // Werewolf / Werebear: a timed form state
+	117: doFirestormFn,
+	118: doTwisterFn,
+	119: doSummonFn, // Oak Sage, Heart of Wolverine, Spirit of Barbs, spirit wolves, grizzly
+	120: doStrikeBuffFn,
+	121: doRabiesFn,
+	123: doVolcanoFn,
+	124: doStormFn, // Hurricane, Armageddon
 
-		// Druid
-		114: doSummonFn, // Raven
-		116: doArmorFn,  // Werewolf / Werebear: a timed form state
-		117: doFirestormFn,
-		118: doTwisterFn,
-		119: doSummonFn, // Oak Sage, Heart of Wolverine, Spirit of Barbs, spirit wolves, grizzly
-		120: doStrikeBuffFn,
-		121: doRabiesFn,
-		123: doVolcanoFn,
-		124: doStormFn, // Hurricane, Armageddon
-
-		// Assassin
-		34: doChargeUpFn, // Tiger Strike, Cobra Strike, Royal Strike
-		35: doChargeUpFn, // Fists of Fire, Claws of Thunder, Blades of Ice
-		42: doDragonFn,   // Dragon Talon
-		43: doMineFn,     // Shock Web
-		44: doSummonFn,   // Blade Sentinel
-		45: doSummonFn,   // sentries
-		46: doDragonFn,   // Dragon Claw
-		47: doCloakFn,    // Cloak of Shadows
-		49: doSummonFn,   // Shadow Warrior / Master
-		50: doDragonFn,   // Dragon Tail
-		51: doMindBlastFn,
-		54: doArmorFn, // Blade Shield
-	}
+	// Assassin
+	34: doChargeUpFn, // Tiger Strike, Cobra Strike, Royal Strike
+	35: doChargeUpFn, // Fists of Fire, Claws of Thunder, Blades of Ice
+	42: doDragonFn,   // Dragon Talon
+	43: doMineFn,     // Shock Web
+	44: doSummonFn,   // Blade Sentinel
+	45: doSummonFn,   // sentries
+	46: doDragonFn,   // Dragon Claw
+	47: doCloakFn,    // Cloak of Shadows
+	49: doSummonFn,   // Shadow Warrior / Master
+	50: doDragonFn,   // Dragon Tail
+	51: doMindBlastFn,
+	54: doArmorFn, // Blade Shield
 }
 
 // Implemented reports whether the pipeline can run a skill: passives are not

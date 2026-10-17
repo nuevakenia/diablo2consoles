@@ -1,0 +1,183 @@
+DC-002.15 -- EL INIT QUE ESCRIBIA EN UN MAPA NIL (y el panic que habia detras)
+Medido el 2026-10-17, CachyOS x86-64, Flycast arrancando el ELF directo, consola serie a scif.
+Rama DC-002. Binario: el motor entero, 205 .gox, semiespacio del GC en 512 KB (DC-002.14).
+
+==============================================================================
+[0] EL ROJO DE PARTIDA
+==============================================================================
+
+$ CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/motor-arranque/prog-emu.elf 20 /tmp/dc-run-gc-512
+  vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+  Rom disk image at 0x0 is not a ROMFS image
+  maple: attached devices: A0 Dreamcast Controller, A1/A2 Visual Memory
+
+  panic: assignment to entry in nil map
+
+  goroutine 1 [running]:
+  Stack Trace: frame pointers not enabled!
+
+  Memory: arena=2440060 used=2436340 free=3720
+
+  lineas MOTOR-ARRANQUE: 0
+  (console/dc/poc/motor-arranque/main.go imprime "MOTOR-ARRANQUE arranca" en su PRIMERA linea, asi que el
+   panic es ANTES de main: lo dispara un init o un inicializador de paquete.)
+
+==============================================================================
+[1] QUIEN: LA TRAZA EN EL PROPIO RUNTIME (no hay pila que leer)
+==============================================================================
+
+El mensaje lo imprime libgodc (runtime/map_dreamcast.c:1051 y el macro de map_fast_internal.h:245), no el
+runtime de Go, y el runtime minimo no sabe armar la pila ("frame pointers not enabled"). La traza se mete
+en los tres sitios que paniquean (scripts/console/fix-libgodc-map-traza.py, idempotente) y la corre:
+
+$ python3 scripts/console/fix-libgodc-map-traza.py --build
+  map_dreamcast.c sha256=9cbdcd93dddf68d6   map_fast_internal.h sha256=cbc07774ac753564
+  /home/dgalli/dreamcast/libgodc/libgodc.a: 206232 bytes, sha256 e0f3b7b5cf509b0f
+
+$ bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/motor-traza /tmp/gox-0028
+$ CAPTURE=none bash scripts/console/run-flycast.sh .../motor-traza/prog-emu.elf 15 /tmp/dc-run-215-traza
+  MAP-NIL-TRAZA runtime_mapassign_fast32 pc=8c148c14 t=8c666058
+  panic: assignment to entry in nil map
+
+El pc es el de RETORNO; en SH-4 las instrucciones son de 2 bytes y el registro de retorno apunta a la
+siguiente, asi que el LLAMADO esta en pc-4 = 8c148c10:
+
+$ sh-elf-addr2line -f -e /tmp/dcbuild/motor-traza/prog.elf 8c148c10
+  github_0com_1OpenDiablo2_1OpenDiablo2_1d2common_1d2skill..init0
+  /home/dgalli/Proyectos/diablo2consoles/d2common/d2skill/class_abc.go:17
+
+$ sh-elf-nm -n /tmp/dcbuild/motor-traza/prog.elf | awk '$1<="8c666058"' | tail -1
+  8c666058 V _type..map_6int_7github_0com_1OpenDiablo2_1OpenDiablo2_1d2common_1d2skill_0doFn
+
+O sea: el init del archivo class_abc.go, linea 17, escribiendo en un map[int]doFn que todavia es nil.
+
+==============================================================================
+[2] LA CAUSA: ORDEN DE LOS init() ENTRE ARCHIVOS (no es una garantia del lenguaje)
+==============================================================================
+
+d2common/d2skill/class.go decia:
+
+    var doTable map[int]doFn          <- nil
+    func init() { doTable = map[int]doFn{ ... } }
+
+y d2common/d2skill/class_abc.go:
+
+    func init() {
+        doTable[15] = doDopplezonFn   <- linea 17: aqui murio
+        ...
+    }
+
+con este comentario en class_abc.go (lineas 10-12):
+
+    "The registration lives here (not in the table of class.go) so the class files of the other classes
+     stay untouched; Go runs the init functions of a package in file name order and "class.go" comes
+     before this file."
+
+Esa ultima parte es comportamiento de la HERRAMIENTA de Go, no del lenguaje: el spec garantiza que la
+inicializacion de las VARIABLES del paquete termina antes de que corra cualquier init(), y del orden de
+los init() de un paquete solo dice que van "en el orden en que son presentados al compilador" (y pide a
+los sistemas de build que los presenten en orden de nombre de archivo).
+
+Medido: la linea de compilacion SI presenta los archivos en orden (build-motor-all.sh usa `ls *.go`, que
+ordena), pero gccgo numeró el init de class_abc.go como `..init0`, o sea PRIMERO (addr2line del punto 1):
+el orden de los init de archivo no es el orden de la linea de compilacion. Con el init de class_abc.go
+adelante, el mapa todavia era nil.
+
+==============================================================================
+[3] EL ARREGLO (en el motor, no en el vendor)
+==============================================================================
+
+El mapa pasa a crearse en la INICIALIZACION DE LA VARIABLE, que es lo que el spec si garantiza:
+
+    // DC-002.15: el mapa se crea ACA, en la inicializacion de la variable, y no dentro de un init() ...
+    var doTable = map[int]doFn{ ... }
+
+$ python3 scripts/console/fix-d2skill-dotable-215.py     # idempotente sobre el texto de hoy
+$ git diff --stat d2common/d2skill/class.go
+   d2common/d2skill/class.go | 199 ++++++++++----------   (101 inserciones, 98 borrados)
+$ gofmt -l d2common/d2skill/        (vacio: el paquete queda formateado)
+
+Efecto medido (mismo arbol de gox, solo se recompila d2common/d2skill y se reenlaza):
+
+$ bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/motor-fix /tmp/gox-0028
+$ CAPTURE=none bash scripts/console/run-flycast.sh .../motor-fix/prog-emu.elf 20 /tmp/dc-run-215-fix
+  MAP-NIL-TRAZA: 0 lineas        "nil map": 0 lineas
+  panic: (value of kind 22 at 0x8cda6620)
+
+El panic del mapa nil quedo atras. (El binario del "antes" y el del "despues" se diferencian en este
+arreglo y nada mas: /tmp/dcbuild/motor-arranque vs /tmp/dcbuild/motor-fix.)
+
+==============================================================================
+[4] EL DEFECTO SIGUIENTE, IDENTIFICADO: UN regexp QUE NO COMPILA
+==============================================================================
+
+Con la traza tambien en la entrada del panic (runtime_gopanic_impl):
+
+$ CAPTURE=none bash scripts/console/run-flycast.sh .../motor-fix2/prog-emu.elf 20 /tmp/dc-run-215-fix2
+  PANIC-TRAZA pc=8c44b4ba tipo=8c4ef00c kind=54 dato=8cda6680
+  panic: (value of kind 22 at 0x8cda6680)
+
+$ sh-elf-nm -n .../motor-fix2/prog.elf | awk '$1<="8c4ef00c"' | tail -1
+  8c4ef00c V _regexp.Error..p
+
+kind 22 = GO_PTR (runtime/type_descriptors.h:29): el panic es con un *regexp.Error, o sea de un
+regexp.Compile que fallo. Sigue siendo ANTES de main (0 lineas MOTOR-ARRANQUE), asi que lo dispara un
+`regexp.MustCompile` de nivel de paquete: el motor tiene NUEVE (los _test.go no se compilan).
+
+==============================================================================
+[5] LA SONDA: CUAL DE LOS NUEVE, Y POR QUE
+==============================================================================
+
+$ bash scripts/console/build-dc.sh console/dc/poc/sonda-regexp
+$ CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/sonda-regexp/prog.elf 15 /tmp/dc-run-sonda-regexp
+  SONDA-REGEXP: compilando 9 patrones de nivel de paquete del motor
+  SONDA-REGEXP probando d2core/d2item/d2drop/loader.go:351 ^-?\d+$            -> ok
+  SONDA-REGEXP probando d2core/d2item/diablo2item/item_factory.go:443 \d+     -> ok
+  SONDA-REGEXP probando d2core/d2item/diablo2item/item_factory.go:450 \D      -> ok
+  SONDA-REGEXP probando d2core/d2item/diablo2item/item_log.go:87 \[[a-z]+\]   -> ok
+  SONDA-REGEXP probando d2core/d2map/d2mapgen/real_maze_gen.go:33 (?i)(pre|prev|up|ent|exit)\d*\.ds1$
+  panic: (value of kind 22 at 0x8c09c898)
+
+Segunda corrida de la sonda, con las caracteristicas separadas (la primera que prueba ya se lo lleva):
+
+  SONDA-REGEXP2 probando solo la bandera (?i) con una letra (?i)a
+  panic: (value of kind 22 at 0x8c09be10)
+
+O sea: el regexp de la consola no compila la bandera `(?i)`. El unico patron del motor que la usa es el de
+d2core/d2map/d2mapgen/real_maze_gen.go:33; los otros ocho compilan (cuatro probados arriba; los otros
+cuatro son la misma forma \[[a-z]+\] y no la usan). El veredicto fino (si es el parser de banderas, las
+tablas de plegado de mayusculas de unicode o el motor de ejecucion) va en su propia tarjeta: aca queda
+medido QUIEN corta y POR QUE caracteristica.
+
+==============================================================================
+[6] EL CORPUS
+==============================================================================
+
+== 1. control sano: el panic del mapa nil no vuelve
+   veredicto: otro-panico pc=8c44b4ba (el llamado, pc-4, es: _runtime.gopanic ??:? ) dato=<_regexp.Error..p>
+   OK: el mapa nil quedo atras y el panic que queda esta identificado (regexp)
+
+== mutante 'init-de-archivo' (doTable vuelve a crearse en un init() de class.go)
+   class.go mutado: doTable vuelve al init() del archivo
+   veredicto: mapa-nil
+   cazado: el arranque vuelve a morir en el mapa nil, que es el defecto de esta tarjeta
+
+== control sano de vuelta (el arreglo repuesto)
+   veredicto: otro-panico pc=8c44b4ba (el llamado, pc-4, es: _runtime.gopanic ??:? ) dato=<_regexp.Error..p>
+   control sano VERDE
+
+== 1/1 mutantes cazados ==
+
+==============================================================================
+[7] LO QUE NO SE MOVIO
+==============================================================================
+
+== host: el mismo d2dc6.Load + el mismo resumen, en x86-64
+== consola: el mismo codigo, compilado para SH-4, en Flycast
+
+== resumen del host (31 lineas) y de la consola (31 lineas)
+   host.txt:     /tmp/dcbuild/motor-dc6/host.txt
+   consola.txt:  /tmp/dcbuild/motor-dc6/consola.txt
+
+== IGUAL: 31 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4) ==
+   frames comparados: 30
