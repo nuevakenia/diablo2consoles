@@ -2384,3 +2384,70 @@ defecto como si el arreglo no existiera (0 lineas `PVR-FRAMEBUFFER`). El corpus 
 Barreras: `test-std-host.sh` verde en amd64 y 386, `mutar-std-host.sh` con 39/39 chequeos cazados,
 `compare-motor-dc6.sh` **IGUAL** y `checar-gzip-220.sh` / `checar-gc-221.sh` siguen verdes (ni el gzip ni
 el atlas se tocan de rebote). Evidencia cruda: `evidencia/dc-002.22-pantalla-en-la-vram.txt`.
+
+## 39. DC-002.23: de que lado se rompe el error del motor — no es el texto, es el campo `errorMessage` del App
+
+DC-002.22 dejo abierta una pregunta con direccion: el cuadro 0 del motor se caia con
+`Unhandled exception: PC 0000000b` pintando el texto de su cuadro de error, y habia que medir si el salto
+estaba en el **itab del metodo `PrintAt`** del renderer (la familia de DC-002.2b/2c/2f) o en el estado del
+**`GlyphPrinter`** (`glyphImageTable`). Esta tarjeta lo mide y **la respuesta es: ninguno de los dos**.
+
+**1. Lo medido, con la direccion del salto y sin deducir el offset.** El `jsr @r0` que se cae es el de la
+**evaluacion del argumento** `a.errorMessage.Error()` de `d2app.App.updateInitError`: el motor ni llega a
+`DrawTextf`. La sonda temporal dentro de `d2app` (que se quito al cerrar; ver
+`evidencia/dc-002.23-error-del-motor.txt`) imprime las dos palabras del campo en los tres puntos del camino:
+
+    loadEngine: errorMessage NO es nil   itab= 0x9         data= 0x8c912590  m0= 0x0
+    updateInitError entra                itab= 0x9         data= 0x8c912590  m0= 0x0
+    updateInitError antes de DrawTextf    itab= 0x9         data= 0x8c912590  m0= 0x0
+
+Los **tres** puntos leen **lo mismo**: el campo ya viene mal, no se pisa entre que se guarda y se usa. El
+`itab= 0x9` no es una tabla de metodos (un valor chico) y `m0 = *(itab+4) = 0`, asi que el salto del `jsr`
+no es de ninguna funcion. Y el offset **no** es una deduccion del desensamblado: medido con
+`unsafe.Offsetof` dentro del paquete, `errorMessage= 156`, `renderer= 124`, `config= 148`, `logger= 152`,
+`options= 164`, `size= 168`. La lectura por offset del POC (`156`) y la del compilador coinciden.
+
+**2. El valor que aparece en el campo dice que NO es un `error`.** En el layout que lo muestra, el campo
+vale `itab= 0x8c4f3c60` / `data= 0xff000000`, y `sh-elf-nm` resuelve esa direccion contra el binario:
+
+    8c4f3c60 R _image_1color.RGBA..d
+
+O sea el **descriptor de tipo de `image/color.RGBA`**, con un color opaco (alfa 0xff) al lado: el par de
+palabras de una **interfaz con un color**, no una tabla de metodos de `error`. El defecto no es "el error
+del motor": es **memoria del `App` corrompida**, y por eso el sintoma cambia de forma segun el layout.
+
+**3. La interfaz `error` de la consola esta BIEN, y por eso el defecto no esta ahi.** El POC nuevo
+`console/dc/poc/iface-error` (sin el motor) mide **14 formas** de toparse con un `error` (multi-retorno con
+literal nil, con variable nil, por dos niveles, con error real, error como primer valor, campo de struct,
+tipo local, nil pelado y la **asignacion multiple a CAMPOS DE STRUCT** que es literalmente la forma de
+`app.go:134`). Las nueve nil dan `itab= 0x0 data= 0x0`, las seis con error real dan itab en `.rodata` y
+`m0` en `.text`, y el despacho devuelve los textos (`-> uno`, `-> guardado en un campo`). Los tres
+constructores del arranque (`d2loader`, `d2records`, `d2asset`) devuelven error nil, medido con el motor.
+
+**4. El mismo codigo, CUATRO sintomas: es el layout del monton.** Corriendo el motor entero en Flycast y
+moviendo solo el layout (sondas de distinto tamano), el cuadro 0 se cae de cuatro formas distintas: el
+`PC 0000000b` de DC-002.22 (binario de la rama, 0 cuadros completos, monton de C con 4.128 libres antes del
+motor y 40.936 al crear la pantalla), `panic: growslice: cap out of range`, `panic: nil pointer dereference`
+(cuando el campo queda nil, el motor **pasa** `loadEngine` y muere mas adelante) y `fatal error: concurrent
+map read and map write`. Es el hallazgo de DC-002.22 (200 bytes de diferencia cambian el resultado) medido
+ahora desde el otro lado: **no es el texto ni la interfaz del renderer, es memoria pisada**.
+
+**5. El corpus (`scripts/console/checar-error-223.sh`) y su instrumento.** Tres controles (las 14 formas
+del `error`; el campo del `App` con el motor: nil en los tres puntos y los tres constructores; y el
+**defecto vigilado** del binario de la rama: llega al loop, abre el cuadro 0 y queda con **0 cuadros** y
+`PC 0000000b` -- si algun dia deja de caerse asi, el control FALLA y hay que actualizar la medicion) y un
+mutante: `mutar-error-223.py --offset-vecino` mueve el offset del POC de 156 a 152 (el campo `logger`, un
+puntero no nil) y exige que las lecturas dejen de dar NIL -- si el POC siguiera diciendo NIL, el
+instrumento no mediria lo que dice medir (la leccion de DC-002.8b).
+
+**6. Lo que queda ABIERTO, declarado.** Esta tarjeta cierra la pregunta que la abrio y **no** cierra el
+defecto: no esta identificado quien escribe en el campo entre `Create` y `loadEngine`. Lo medido para el
+que siga: el valor escrito es una interfaz con `color.RGBA`, el `App` vive en el monton (`0x8cd8a218`,
+`0x8cd91288`, `0x8cdc4490` en las tres corridas) y la escritura cae en su offset 156. El arreglo va como
+tarjeta siguiente (por el flujo acordado: el defecto que aparece al cerrar una tarjeta se abre como tarjeta
+nueva).
+
+Barreras: `test-std-host.sh` verde en amd64 y 386, `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas,
+30 frames) y `checar-pantalla-222.sh` con sus **7/7** controles verdes y el mutante del OOM cazado (el
+mutante B sigue declarado NO cazado, con su hallazgo). Evidencia cruda:
+`evidencia/dc-002.23-error-del-motor.txt`.

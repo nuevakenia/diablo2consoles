@@ -1,0 +1,166 @@
+EVIDENCIA DE DC-002.23 -- DE QUE LADO SE ROMPE EL ERROR DEL MOTOR EN EL CUADRO 0
+=================================================================================
+Rama DC-002, POC console/dc/poc/motor-arranque (el motor entero), console/dc/poc/motor-error (el
+instrumento que mide el campo sin tocar el motor) y console/dc/poc/iface-error (las formas de interfaz
+`error` sin el motor). Flycast, 2026-10-17. Todo lo de abajo es salida cruda de la consola serie.
+
+LA PREGUNTA (de DC-002.22)
+-------------------------
+El cuadro 0 del motor se caia pintando el texto de su cuadro de error, y quedo abierto de que lado estaba
+el salto: el itab del metodo `PrintAt` del renderer (la familia de DC-002.2b/2c/2f) o el estado del
+`GlyphPrinter`. Lo que ya estaba medido:
+
+    EBITEN-LOOP cuadro 0 esperando el cuadro del PVR
+    EBITEN-LOOP cuadro 0 el PVR dio el cuadro, abro la lista
+    Unhandled exception: PC 0000000b, code 1, evt 00e0
+    kernel panic: unhandled IRQ/Exception
+    PR=8c445a90 -> sh-elf-addr2line -> d2app.App.updateInitError (app.go:718)
+
+
+1. LA RESPUESTA: NO ES NINGUNO DE LOS DOS. ES EL CAMPO `errorMessage` DEL APP
+---------------------------------------------------------------------------
+Sonda temporal dentro del paquete d2app (d2app/sonda_e23.go + 4 llamadas en app.go; DESPUES SE QUITO, no
+esta en el commit) sobre el arranque del motor con el romdisk de DC-002.19 y el POC motor-arranque
+(/tmp/dcbuild/pan223-sonda, gox /tmp/gox-222 con el d2app recompilado):
+
+    SONDA-E23 loadEngine: errorMessage NO es nil (se entra al cuadro de error) app= 0x8cd854e8 esnil= no itab= 0x9 data= 0x8c912590 m0= 0x0
+    SONDA-E23 updateInitError entra                                   app= 0x8cd854e8 esnil= no itab= 0x9 data= 0x8c912590 m0= 0x0
+    SONDA-E23 updateInitError antes de DrawTextf                       app= 0x8cd854e8 esnil= no itab= 0x9 data= 0x8c912590 m0= 0x0
+
+Los TRES puntos leen LO MISMO: el campo ya viene mal, no se pisa entre esos puntos. Y no es una tabla de
+metodos: `itab= 0x9` (un valor chico) con `m0 = *(itab+4) = 0`, o sea el `jsr @r0` que se cae evaluando
+`a.errorMessage.Error()` salta a una direccion que no es de ninguna funcion. Lo que NO se cae es el
+argumento del texto: el motor ni llega a `DrawTextf`.
+
+En el MISMO instrumento, con OTRO layout del monton (mas sondas), el campo toma otra basura:
+
+    SONDA-E23 loadEngine: errorMessage NO es nil ... itab= 0x8c4f3c60 data= 0xff000000 m0= 0x0
+    SONDA-E23 loadEngine: errorMessage NO es nil ... itab= 0x8c4f3c60 data= 0xffffffff m0= 0x0     (2do arranque)
+    SONDA-E23 Create: despues de NewAssetManager (el campo recien asignado) esnil= si itab= 0x0 data= 0x0
+
+Y con el MISMO instrumento (el binario de esta tarjeta), la lectura del POC desde AFUERA del paquete:
+
+    MOTOR-ERROR 4 App.errorMessage tras Create      app= 0x8cd91288 estado= NIL itab= 0x0 data= 0x0
+    MOTOR-ERROR 4 el App vive en 0x8cd91288
+    MOTOR-ERROR video listo, VRAM de la pantalla 1048576 bytes
+    MOTOR-ERROR 5 App.errorMessage DESPUES del video app= 0x8cd91288 estado= NIL itab= 0x0 data= 0x0
+    MOTOR-ERROR llamando a Run()
+    SONDA-E23 loadEngine: errorMessage NO es nil      app= 0x8cd91288 itab= 0x8c4f3c60 data= 0xff000000
+
+O sea: el campo se GUARDA nil (`Create`, y el mismo dato leido por offset desde el POC: `itab= 0x0`) y en
+`loadEngine` ya tiene basura. Alguien escribe en el medio, y el que escribe depende del layout del monton.
+
+QUE ES 0x8c4f3c60 -- resuelto con el binario, no supuesto:
+
+    sh-elf-nm -n --defined-only /tmp/dcbuild/motor-error2/prog.elf
+    simbolo previo a 0x8c4f3c60:  8c4f3c60 R _image_1color.RGBA..d
+
+Es el DESCRIPTOR DE TIPO de `image/color.RGBA` (una direccion de .rodata), o sea el par de palabras que
+queda en el campo es una INTERFAZ con un color, no un `error`. El defecto no es "el error del motor": es
+memoria del `App` que se corrompe.
+
+
+2. EL OFFSET 156 NO ES UNA DEDUCCION: medido con el compilador
+-------------------------------------------------------------
+El 156 salio antes de leer el desensamblado (`mov.l @(32,r4),r1` con `r4 = a+124`). Se midio con
+`unsafe.Offsetof` DENTRO del paquete (sonda temporal):
+
+    SONDA-E23 OFFSETS errorMessage= 156  renderer= 124  config= 148  logger= 152  options= 164
+                     asset= 92  captureFrames= 40  capturePath= 32  size= 168
+
+El instrumento estaba bien: `errorMessage` esta en 156/160 y el App mide 168 bytes. La lectura por offset
+del POC (156) y la del compilador (`a.errorMessage`) coinciden en los tres puntos de arriba.
+
+
+3. LAS INTERFACES `error` DE LA CONSOLA ESTAN BIEN (POC iface-error, sin el motor)
+---------------------------------------------------------------------------------
+14 formas de toparse con un `error`, leidas por dentro con `unsafe` (itab, data y m0 = *(itab+4), que en
+la interfaz `error` es `Error()`), corriendo en Flycast:
+
+    IFACE-ERROR 1 errors.New               esnil= no itab= 0x8c066b14 data= 0x8c09ab18 m0= 0x8c0115b4
+    IFACE-ERROR 2 multi literal nil        esnil= si itab= 0x0 data= 0x0 m0= 0x0
+    IFACE-ERROR 3 multi var nil            esnil= si itab= 0x0 data= 0x0 m0= 0x0
+    IFACE-ERROR 4 multi por 2 niveles      esnil= si itab= 0x0 data= 0x0 m0= 0x0
+    IFACE-ERROR 5 multi error real         esnil= no itab= 0x8c066b14 data= 0x8c09abe8 m0= 0x8c0115b4
+    IFACE-ERROR 6 error como 1er valor     esnil= no itab= 0x8c066b14 data= 0x8c09abf8 m0= 0x8c0115b4
+    IFACE-ERROR 7 campo de struct          esnil= no itab= 0x8c066b14 data= 0x8c09ac08 m0= 0x8c0115b4
+    IFACE-ERROR 8 tipo local               esnil= no itab= 0x8c05e93c data= 0x8c12ac38 m0= 0x8c010228
+    IFACE-ERROR 9 nil pelado               esnil= si itab= 0x0 data= 0x0 m0= 0x0
+    IFACE-FORMA 10 campo, var nil (forma app.go:134: `app.asset, app.errorMessage = d2asset.NewAssetManager(...)`)
+                                           esnil= si itab= 0x0 data= 0x0 m0= 0x0
+    IFACE-FORMA 11 campo, literal nil      esnil= si itab= 0x0 data= 0x0 m0= 0x0
+    IFACE-FORMA 12 campo, error real       esnil= no itab= 0x8c066b14 data= 0x8c09b200 m0= 0x8c0115b4
+    IFACE-FORMA 13 campo, por 2 niveles    esnil= si itab= 0x0 data= 0x0 m0= 0x0
+    IFACE-FORMA 14 campo, error como 1er valor (3 valores)
+                                           esnil= si itab= 0x0 data= 0x0 m0= 0x0
+    IFACE-ERROR despacho 1 -> uno
+    IFACE-ERROR 2 es nil: no se despacha
+    IFACE-ERROR 3 -> guardado en un campo
+
+Los nueve caminos nil dan una interfaz NIL de verdad (las dos palabras en 0), los seis con error real dan
+itab en .rodata y m0 en .text, y el despacho devuelve el texto. Las interfaces `error` de la consola (y la
+ASIGNACION MULTIPLE A CAMPOS DE STRUCT, que era el candidato por `app.go:134`) estan BIEN: el defecto no
+esta ahi.
+
+
+4. EL MISMO CODIGO, CUATRO SINTOMAS: la corrupcion es del LAYOUT DEL MONTON
+---------------------------------------------------------------------------
+Medido con el motor entero en Flycast, cambiando solo el layout del monton (sondas de distinto tamano):
+
+  a) motor-arranque (el binario de la rama, SIN sondas) -- el defecto que vigila el corpus 222:
+       EBITEN-LOOP cuadro 0 esperando el cuadro del PVR
+       EBITEN-LOOP cuadro 0 el PVR dio el cuadro, abro la lista
+       Unhandled exception: PC 0000000b, code 1, evt 00e0
+       kernel panic: unhandled IRQ/Exception
+       monton de C antes del motor: 4128 bytes libres
+       monton de C al crear la pantalla: 40936 bytes libres
+       VRAM de la pantalla: 1920000 bytes
+       arranques del motor: 1
+       cuadros completos del loop: 0
+
+  b) POC motor-error (constructores + Create + Run, sin video):
+       PANIC-TRAZA pc=8c4534d6 tipo=8cd2d360 kind=24 dato=8cdd5ea8
+       panic: growslice: cap out of range
+       Memory: arena=1186364 used=1143516 free=42848
+
+  c) POC motor-error + video (el que pisa el campo):
+       el campo con itab= 0x8c4f3c60 data= 0xff000000 (y 0xffffffff en el 2do arranque)
+       + 3 arranques de la consola
+
+  d) POC motor-error + video + mas sondas (el campo NUNCA se pisa):
+       10 lecturas del campo: todas `estado=NIL`
+       [Perf][INFO] PERF mark renderer-created t_ms=2005
+       PANIC-TRAZA pc=8c453a4a tipo=8cd2de20 kind=24 dato=8cd8e150
+       panic: nil pointer dereference
+       Memory: arena=1183612 used=1143540 free=40072
+
+  e) motor-arranque CON la sonda (mas codigo todavia):
+       8 arranques de la consola
+       fatal error: concurrent map read and map write
+       Memory: arena=1186908 used=1143540 free=43368
+
+Cuatro sintomas distintos (data address error en el texto del cuadro de error, growslice con cap fuera de
+rango, nil pointer dereference y el detector de mapas del runtime) del MISMO cuadro 0, segun donde caiga
+todo en el monton. Es el hallazgo de DC-002.22 (200 bytes de diferencia cambian el resultado) medido ahora
+desde el otro lado: no es el texto ni la interfaz del renderer, es MEMORIA PISADA.
+
+
+5. LO QUE QUEDA ABIERTO (declarado, no escondido)
+-------------------------------------------------
+Esta tarjeta cierra la PREGUNTA que la abrio (no es el itab de `PrintAt` ni el `GlyphPrinter`: es el campo
+`errorMessage` del App con basura) y NO cierra el defecto: no esta identificado QUIEN escribe en el campo.
+Lo medido para el que siga: el valor escrito es una interfaz con `color.RGBA` (descriptor 0x8c4f3c60, dato
+0xff000000 / 0xffffffff, que es un color opaco con alfa en 0xff), el App vive en el monton (0x8cd8a218 /
+0x8cd91288 / 0x8cdc4490 en las corridas) y la escritura cae en su offset 156, entre `Create` y `loadEngine`.
+El arreglo queda como tarjeta siguiente (por el flujo acordado: un defecto que aparece despues de cerrar
+una tarjeta se abre como tarjeta nueva, no se reabre la vieja).
+
+
+6. BARRERAS (todas corridas en esta tarjeta, con el arbol de la rama)
+--------------------------------------------------------------------
+  - test-std-host.sh: VERDE en amd64 y 386 (13 de 13 excluidos que hablan con KOS siguen sin compilar).
+  - mutar-std-host.sh: 39/39 chequeos cazados y el arbol quedo sano (el ultimo: el instrumento del json
+    queda mudo y la suite se pone rojo).
+  - compare-motor-dc6.sh: IGUAL -- 31 lineas identicas (host x86-64 contra SH-4), 30 frames comparados.
+  - checar-pantalla-222.sh: 7/7 controles verdes y 1/2 mutantes (el mutante B -- la pantalla del paquete
+    al arranque -- sigue declarado NO cazado, con su hallazgo: tres layouts, tres resultados del cuadro 0).
