@@ -1,0 +1,153 @@
+DC-002.17 (EN CURSO) -- QUE PIDE ESCRIBIR EL MOTOR Y POR QUE NO ARRANCA EL VIDEO
+Medido el 2026-10-17, CachyOS x86-64, Flycast arrancando el ELF directo, consola serie a scif.
+Rama DC-002. El motor arranca con 9 marcas MOTOR-ARRANQUE (el arranque que dejo DC-002.16).
+
+Esto es la MEDICION del punto 1 del plan de la tarjeta (que operacion de escritura frena el arranque).
+NO es el arreglo: la tarjeta sigue abierta. Los otros dos hallazgos (la memoria y la ceguera del medidor)
+salen de la misma corrida y valen por separado.
+
+=====================================================================================================
+[1] EL ARRANQUE, MEDIDO (lo que frena a Run())
+=====================================================================================================
+
+    $ source scripts/console/env.sh && export GODC_GOX=/tmp/gox-00216
+    $ bash scripts/console/medir-escritura-217.sh /tmp/gox-00216 /tmp/dcbuild/motor-217 20
+      == 1. recompilando SOLO os.gox en /tmp/gox-00216 (con el medidor)
+         os.gox 132080 bytes  sha256=1456869e4393d55dd079c5625a6980ce4686c4ccbb66c874fe6cd24761bbc0da
+         recompilando el paquete del motor d2core/d2config (la llamada inlinada vuelve a la vista)
+            d2config.gox 103064 bytes  sha256=cc2374ff867fe60e371b4da5361c3aa53789787062c1fde8d2843727e3910435
+      == 2. reenlazando el motor-arranque en /tmp/dcbuild/motor-217
+         prog-emu.elf 13710848 bytes
+      == 4. el arranque, en orden (marcas y pedidos de escritura)
+         MOTOR-ARRANQUE arranca (DC-002.13: el entry point del motor en la consola)
+         MOTOR-ARRANQUE runtime sh4
+         MOTOR-ARRANQUE el video no arranco: no se pudo arrancar la pantalla del PVR (codigo -3)
+         MOTOR-ARRANQUE llamando a d2app.Create().Run()
+         MOTOR-ARRANQUE marca 1: entrando a d2app.Create()
+         MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+         OS-ESCRITURA MkdirAll path= /rd/OpenDiablo2
+         MOTOR-ARRANQUE Run() termino con error: operation not supported on read-only filesystem
+         MOTOR-ARRANQUE marca 3: Run() volvio
+         MOTOR-ARRANQUE fin
+
+      == RESUMEN MEDIDO
+         marcas MOTOR-ARRANQUE: 9
+         pedidos de escritura OS-ESCRITURA: 1
+         lineas con panic:: 0
+         el que pide escribir (unico por operacion+path):
+           OS-ESCRITURA MkdirAll path= /rd/OpenDiablo2
+
+El pedido es UNO y es `MkdirAll` sobre `/rd/OpenDiablo2`, y el error que devuelve frena `Run()`:
+
+    [File Loader] [INFO] Adding source: '/rd'
+    [File Loader] [INFO] Adding source: '/rd/OpenDiablo2'
+    [Asset Manager] [ERROR] could not load file stream config.json (file not found: config.json)
+    [App] [INFO] creating default configuration file at /rd/OpenDiablo2/config.json...
+    MOTOR-ARRANQUE Run() termino con error: operation not supported on read-only filesystem
+
+La cadena, con el codigo a la vista:
+  d2app/app.go:264-274  no encuentra `config.json` -> arma el default y lo guarda:
+                          fullPath := filepath.Join(config.Dir(), config.Base())   // /rd/OpenDiablo2/config.json
+                          a.Infof("creating default configuration file at %s...", fullPath)
+                          saveErr := config.Save()
+  d2core/d2config/d2config.go:50-54  Save() lo PRIMERO que hace es el directorio:
+                          configDir := filepath.Dir(c.path)
+                          if err := os.MkdirAll(configDir, 0750); err != nil { return err }
+El unico error de esa funcion es el que devuelve `os.MkdirAll` (el resto es json.MarshalIndent y
+configFile.Write, que devuelven otros textos), asi que el `Run()` que muere es ese: **el motor no
+arranca porque no puede crear el directorio donde guarda su configuracion**. No es del juego ni del
+codigo del motor: es de que el romdisk de KOS es de SOLO LECTURA y el motor quiere escribir la config.
+
+OJO, otro dato de la misma corrida (y del mismo tipo de causa):
+
+    Rom disk image at 0x0 is not a ROMFS image
+
+o sea que el romdisk del ELF **no es una imagen ROMFS valida**: el motor no lee la config porque no esta,
+y si estuviera en el romdisk (que no lo esta) el arranque seguiria queriendo escribir.
+
+=====================================================================================================
+[2] EL VIDEO NO ARRANCA POR MEMORIA, NO POR EL PVR
+=====================================================================================================
+
+Dos lineas antes del fallo del video, en la misma corrida:
+
+    pvr: enabling vertical scaling for non-VGA
+    Out of memory. Requested sbrk_base 0x8d0a9000, was 0x8cfa9000, diff 1048576
+
+1048576 = 1 MiB exactos: el `sbrk` del monton pide 1 MiB mas y no los hay. El mensaje lo tira el runtime
+de KOS (no nuestro codigo), y sale JUSTO entre el arranque de la pantalla y el "el video no arranco: ...
+(codigo -3)". O sea que el `codigo -3` del PVR es el sintoma y la causa medida es la memoria: al ELF le
+falta 1 MiB para poder arrancar la pantalla. Eso ata el punto 2 de la tarjeta (el sistema de archivos
+escribible) con el punto 3 (el video): cualquier `tmpfs`/disco en RAM que se agregue tiene que salir de
+la MISMA memoria que ya no alcanza.
+
+Cuenta de la memoria en juego: el ELF medido para el emulador es de 13.710.848 bytes y la Dreamcast tiene
+16 MiB de RAM principal; el `.gox` del motor entero adentro son 142 paquetes.
+
+=====================================================================================================
+[3] POR QUE EL MEDIDOR NO SE VEIA (leccion de medicion, costo 3 corridas)
+=====================================================================================================
+
+El medidor (`OS-ESCRITURA`, en console/dc/std/os/os.go) imprime al pedir escribir. Se recompilo `os.gox`
+y el binario lo LLEVABA ADENTRO (medido: `strings prog-emu.elf | grep -c OS-ESCRITURA` = 1) pero no
+imprimia NADA: 0 pedidos de escritura en el log, con el arranque muriendo igual. Dos causas, las dos
+medidas:
+
+  a) LA LLAMADA ESTABA INLINADA. gccgo compila con `-O2` (scripts/console/env.sh: GODC_GOFLAGS="-O2 ...")
+     y `os.MkdirAll` es una funcion de una linea: al compilar `d2config`, la llamada quedo inlinada
+     DENTRO de d2config.gox, con una copia del cuerpo hecha ANTES del medidor. Medido con `sh-elf-nm`:
+
+         $ sh-elf-nm --undefined-only $GEN/github.com/OpenDiablo2/OpenDiablo2/d2core/d2config.gox
+                  U _os.ErrNoSePuede           <- referencia la VARIABLE del error
+                  U _os.File.Close
+                  U _os.File.Write
+                  (y NO hay `U _os.MkdirAll`)
+
+     recompilando solo `os.gox` la copia vieja seguia adentro. Arreglo del instrumento: recompilar
+     tambien el paquete del motor que la tenga inlinada (misma receta que build-motor-gox.sh). Eso es lo
+     que agrega `compilar_paquete_motor()` en el medidor, y por eso el pedido aparece.
+
+  b) EL println NO PUEDE CONCATENAR ACA. La primera version imprimia
+     `println("OS-ESCRITURA " + que + " path=" + donde)`: eso ARMA una cadena nueva en el monton y el
+     monton no tiene 1 MiB (punto [2]). Con argumentos sueltos (`println("OS-ESCRITURA", que, "path=",
+     donde)`) no hay nada que reservar y sale. Regla para los medidores de aca en adelante: imprimir con
+     argumentos sueltos, no concatenando.
+
+=====================================================================================================
+[4] DOS TRAMPAS DEL ARNES, MEDIDAS (una bloqueaba esta medicion)
+=====================================================================================================
+
+4.1 `build-motor-arranque.sh` NO PODIA ENLAZAR. El enlace salio con:
+
+    multiple definition of `github_0com_1OpenDiablo2_1OpenDiablo2_1d2common_1d2fileformats_1d2dat.Load..f';
+      /tmp/gox-00216/github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dat.gox: first defined here
+
+el MISMO .gox dos veces. Causa medida: `orden.txt` tenia **74 lineas** (63 de la stdlib + 11 del motor)
+porque `build-motor-gox.sh` anota los paquetes del MOTOR en `orden.txt` (lo hace a proposito: los POC del
+motor se enlazan con un solo -I), y `build-motor-arranque.sh` enlaza con orden.txt **y** orden-motor.txt.
+`grep -vxF -f orden-motor.txt orden.txt` deja 64 lineas y la interseccion VACIA. Arreglado en el script
+(no-op cuando orden.txt esta limpio), con las otras dos copias del patron anotadas:
+`checar-recorte-214.sh:146` y `medir-alcance-motor.sh:34`.
+(Como se contamino: el ultimo enlace del arranque de DC-002.16 salio BIEN y despues corrio la barrera
+`build-motor-dc6.sh`, que recompila gox del motor con build-motor-gox.sh; por eso la contaminacion se vio
+recien ahora, en el primer enlace posterior.)
+
+4.2 `os.gox` y el pkgpath: el build de verdad compila los 44 paquetes de la stdlib con
+`-fgo-pkgpath="<nombre pelado>"` (build-std-gox.sh:59) y las fuentes copiadas a `$GEN/src/<pkg>/` con
+`"d2std/` -> `"` (linea 54). El medidor recompila `os` con esa misma receta, asi que el .gox encaja con
+el resto del motor y no hay dos juegos de paquetes.
+
+=====================================================================================================
+[5] LO QUE SIGUE (plan de la tarjeta, todavia sin hacer)
+=====================================================================================================
+
+  - El sistema de archivos escribible minimo (o el camino que el motor espera) para que `MkdirAll` y
+    `Create` de `/rd/OpenDiablo2/config.json` dejen de ser el punto donde muere el arranque. OJO: tiene
+    que salir de la MISMA memoria que ya no alcanza para el PVR ([2]).
+  - El video: por que `ebiten.IniciarPantalla(640, 480)` pide 1 MiB que no hay (los POC del PVR si
+    pintan). Medido que NO es el PVR en si sino la memoria.
+  - El corpus con su control rojo y su mutante, y la barrera (`compare-motor-dc6.sh`) IGUAL.
+
+El instrumento queda puesto (`console/dc/std/os/os.go` + `scripts/console/medir-escritura-217.sh`): es
+Reproducible con un comando y sirve para medir el arreglo (tiene que pasar de "1 pedido y error" a "0
+errores y el arranque sigue").

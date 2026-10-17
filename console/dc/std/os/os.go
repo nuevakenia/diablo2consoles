@@ -80,6 +80,30 @@ func d2c_estoy(fd int) int
 //extern d2c_hay
 func d2c_hay(ruta string) int
 
+// DC-002.17: el sistema de archivos ESCRIBIBLE (en RAM, ver console/dc/std/csrc/os_dc.c). Lo que el
+// romdisk no puede hacer -- crear directorios, crear y escribir archivos -- lo hace el overlay de la RAM
+// con un presupuesto fijo en .bss. Las firmas son las mismas que usa el resto del paquete: rutas como
+// string (gccgo las pasa como char*), y los contadores del resumen como uintptr (una palabra, sin ABI
+// ambiguo).
+//
+//extern d2c_mkdir
+func d2c_mkdir(ruta string) int
+
+//extern d2c_borrar_archivo
+func d2c_borrar_archivo(ruta string) int
+
+//extern d2c_renombrar
+func d2c_renombrar(viejo string, nuevo string) int
+
+//extern d2c_truncar
+func d2c_truncar(ruta string, tam int) int
+
+//extern d2c_ramfs_resumen
+func d2c_ramfs_resumen(archivos uintptr, bytes uintptr, dirs uintptr) int
+
+//extern d2c_ramfs_tam
+func d2c_ramfs_tam() int
+
 //extern d2c_escribir_consola
 func d2c_escribir_consola(buf uintptr, n int)
 
@@ -163,6 +187,11 @@ func (f *File) Write(p []byte) (int, error) {
 	n := d2c_escribir_archivo(f.fd, uintptr(unsafe.Pointer(&p[0])), len(p))
 	if n < 0 {
 		return 0, ErrSoloLectura
+	}
+	// DC-002.17: la marca del overlay de la RAM (se ve en el log de la consola y es la evidencia de que
+	// el motor guardo su archivo). Argumentos sueltos, sin concatenar: ver el comentario de noSePuede.
+	if n > 0 {
+		println("OS-RAMFS", "escribe", "bytes=", n)
 	}
 	return n, nil
 }
@@ -285,11 +314,84 @@ func IsExist(err error) bool { return !IsNotExist(err) }
 // finge: se devuelve el error y queda declarado. El motor las usa para los saves (9 + 7 + 5 + 4).
 var ErrNoSePuede = errors.New("operation not supported on read-only filesystem")
 
-func MkdirAll(nombre string, perm FileMode) error { return ErrNoSePuede }
-func Mkdir(nombre string, perm FileMode) error    { return ErrNoSePuede }
-func Remove(nombre string) error                  { return ErrNoSePuede }
-func Rename(viejo, nuevo string) error            { return ErrNoSePuede }
-func Create(nombre string) (*File, error)         { return nil, ErrNoSePuede }
+// MEDIDOR DE DC-002.17: dice QUE operacion de escritura pide el motor y con QUE camino. Con esto se
+// midio que el arranque del motor se frena en `Run()` por una de estas llamadas (no por el regexp ni por
+// el mapa nil, que ya quedaron atras). Se queda en el paquete a proposito: imprime SOLO cuando alguien
+// pide escribir, y en la consola eso hoy siempre termina en error, asi que no ensucia nada y hace que la
+// proxima medicion sea correr y leer. Es el mismo camino que las marcas MOTOR-ARRANQUE del POC.
+//
+// OJO MEDIDO: el println va con ARGUMENTOS SUELTOS y no con `"a" + que + "b"`. La version que concatenaba
+// NO IMPRIMIA NADA: concatenar arma una cadena nueva en el monton, y en este arranque la consola ya esta
+// sin memoria (el log dice `Out of memory. Requested sbrk_base ... diff 1048576`), asi que la cadena no se
+// puede armar. Con argumentos sueltos no hay nada que reservar y el medidor sale. (Se descubrio midiendo:
+// el medidor estaba en el binario y no se veia, y el codigo que llama SI estaba -- era el println.)
+func noSePuede(que, donde string) error {
+	println("OS-ESCRITURA", que, "path=", donde)
+	return ErrNoSePuede
+}
+
+// DC-002.17: LAS FUNCIONES DE ESCRITURA YA NO SON STUBS. El romdisk de KOS es de solo lectura, pero el
+// motor ESCRIBE su configuracion en /rd/OpenDiablo2/config.json y sin eso `Run()` no arranca (medido en
+// evidencia/dc-002.17-escritura-config.txt). Lo que se crea o se escribe va a un overlay EN RAM con
+// presupuesto fijo (console/dc/std/csrc/os_dc.c), que tapa al romdisk con el mismo nombre; lo que no
+// esta en ese overlay se sigue leyendo de KOS. El limite queda declarado: 8 archivos de 2.048 bytes y 8
+// directorios; si no entra, se devuelve el error de siempre (ErrNoSePuede) y no se miente.
+//
+// Hay marcas "OS-RAMFS" a proposito: son la evidencia medible de que el motor pudo guardar su config. Se
+// imprimen con ARGUMENTOS SUELTOS y no concatenando (concatenar arma una cadena en el monton, y en este
+// arranque el monton esta justo: ver el comentario de noSePuede).
+func MkdirAll(nombre string, perm FileMode) error {
+	if d2c_mkdir(nombre) == 0 {
+		println("OS-RAMFS", "mkdir-ok", "path=", nombre)
+		return nil
+	}
+	return noSePuede("MkdirAll", nombre)
+}
+
+func Mkdir(nombre string, perm FileMode) error {
+	if d2c_mkdir(nombre) == 0 {
+		println("OS-RAMFS", "mkdir-ok", "path=", nombre)
+		return nil
+	}
+	return noSePuede("Mkdir", nombre)
+}
+
+func Remove(nombre string) error {
+	if d2c_borrar_archivo(nombre) == 0 {
+		println("OS-RAMFS", "remove-ok", "path=", nombre)
+		return nil
+	}
+	return noSePuede("Remove", nombre)
+}
+
+func Rename(viejo, nuevo string) error {
+	if d2c_renombrar(viejo, nuevo) == 0 {
+		println("OS-RAMFS", "rename-ok", "path=", viejo)
+		return nil
+	}
+	return noSePuede("Rename", viejo)
+}
+
+func Create(nombre string) (*File, error) {
+	fd := d2c_abrir_crear(nombre)
+	if fd < 0 {
+		return nil, noSePuede("Create", nombre)
+	}
+	println("OS-RAMFS", "create-ok", "path=", nombre)
+	return &File{fd: fd, nombre: nombre}, nil
+}
+
+// RamfsResumen: cuantos archivos y bytes tiene el overlay de la RAM y cuantos directorios (para la
+// evidencia del arranque: dice que el motor guardo su config de verdad y no solo que no hubo error).
+func RamfsResumen() (archivos int, bytes int, dirs int) {
+	var a, b, d int
+	d2c_ramfs_resumen(uintptr(unsafe.Pointer(&a)), uintptr(unsafe.Pointer(&b)), uintptr(unsafe.Pointer(&d)))
+	return a, b, d
+}
+
+// RamfsTam: cuantos bytes de .bss ocupa el overlay (cero del monton).
+func RamfsTam() int { return d2c_ramfs_tam() }
+
 
 // UserHomeDir: el motor lo usa para armar paths de datos. En la consola el "home" es el romdisk.
 func UserHomeDir() (string, error) { return "/rd", nil }
@@ -497,7 +599,7 @@ const (
 // cuando no hay nada que hacer.
 
 // CreateTemp: no hay donde crear temporales (el romdisk es de solo lectura).
-func CreateTemp(dir, pattern string) (*File, error) { return nil, ErrNoSePuede }
+func CreateTemp(dir, pattern string) (*File, error) { return nil, noSePuede("CreateTemp", dir+"/"+pattern) }
 
 // Chmod: en la consola no hay permisos que cambiar.
 func Chmod(nombre string, modo FileMode) error { return nil }
@@ -506,7 +608,14 @@ func Chmod(nombre string, modo FileMode) error { return nil }
 func Chown(nombre string, uid, gid int) error { return nil }
 
 // Truncate: no se puede (solo lectura).
-func Truncate(nombre string, tam int64) error { return ErrNoSePuede }
+// Truncate: corta el archivo. Ahora puede: los archivos del overlay de la RAM se cortan (o se estiran
+// con ceros) y los del romdisk siguen devolviendo el error declarado.
+func Truncate(nombre string, tam int64) error {
+	if d2c_truncar(nombre, int(tam)) == 0 {
+		return nil
+	}
+	return noSePuede("Truncate", nombre)
+}
 
 // Fd: el descriptor del archivo. En la consola no hay descriptores: el VFS lee del romdisk por dentro, y
 // no hay nada del sistema operativo que necesite uno. Devuelve 0 para que el codigo que lo pase a
@@ -519,7 +628,15 @@ func (f *File) Fd() uintptr { return 0 }
 func (f *File) Sync() error { return nil }
 
 // Truncate: acortar el archivo. No se puede (solo lectura).
-func (f *File) Truncate(tam int64) error { return ErrNoSePuede }
+func (f *File) Truncate(tam int64) error {
+	if f.consola || f.cerrado {
+		return errors.New("file already closed")
+	}
+	if d2c_truncar(f.nombre, int(tam)) == 0 {
+		return nil
+	}
+	return noSePuede("File.Truncate", f.nombre)
+}
 
 // UserConfigDir: donde vive la configuracion del usuario. En la consola es el romdisk (lo unico que se
 // puede leer), asi que apunta ahi en vez de a un home que no existe.

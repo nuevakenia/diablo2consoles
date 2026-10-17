@@ -1,0 +1,251 @@
+DC-002.17 (2 de 2) -- EL VIDEO (el pedido de 1 MiB) Y EL SISTEMA DE ARCHIVOS ESCRIBIBLE (el overlay en RAM)
+Medido el 2026-10-17, CachyOS x86-64, Flycast arrancando el ELF directo, consola serie a scif, rama DC-002.
+
+La primera parte de la tarjeta (que operacion de escritura frena el arranque, por que el PVR devuelve -3 y
+las dos causas por las que el medidor no se veia) esta en dc-002.17-escritura-config.txt. Esto es el ARREGLO
+de los dos defectos y su corpus.
+
+=====================================================================================================
+[1] ANTES (la linea base, corrida de las 06:10 con el codigo de DC-002.16)
+=====================================================================================================
+
+    $ bash scripts/console/medir-escritura-217.sh /tmp/gox-00216 /tmp/dcbuild/motor-217 20
+      MOTOR-ARRANQUE arranca (DC-002.13: el entry point del motor en la consola)
+      MOTOR-ARRANQUE runtime sh4
+      Out of memory. Requested sbrk_base 0x8d0a9000, was 0x8cfa9000, diff 1048576
+      MOTOR-ARRANQUE el video no arranco: no se pudo arrancar la pantalla del PVR (codigo -3)
+      MOTOR-ARRANQUE llamando a d2app.Create().Run()
+      MOTOR-ARRANQUE marca 1: entrando a d2app.Create()
+      MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+      OS-ESCRITURA MkdirAll path= /rd/OpenDiablo2
+      MOTOR-ARRANQUE Run() termino con error: operation not supported on read-only filesystem
+      MOTOR-ARRANQUE marca 3: Run() volvio
+      MOTOR-ARRANQUE fin
+
+    9 marcas MOTOR-ARRANQUE, 1 pedido de escritura, video en -3, 0 bytes escritos.
+
+=====================================================================================================
+[2] EL VIDEO: 1.048.576 bytes del MONTON -> 2.048 bytes de .bss y 300 subidas de 2 KiB
+=====================================================================================================
+
+El `-3` NO era el PVR: era NUESTRO `calloc` del buffer del cuadro entero. En el C
+(console/dc/std/csrc/pvr_pantalla.c) el unico `-3` que existe es este:
+
+    pant_conv = (uint16_t *)calloc((size_t)PANT_PW * (size_t)PANT_PH, sizeof(uint16_t));
+    if (pant_conv == NULL) { return -3; }
+
+y 1024 x 512 x 2 = 1.048.576, exactamente el `diff` del mensaje de KOS. `pvr_init_defaults()` y
+`pvr_mem_malloc()` de la VRAM habian andado: lo que no entraba era el buffer del monton.
+
+LA CUENTA DE LA MEMORIA (medida, no estimada):
+
+    segmentos que carga el ELF      0xb656f8 (11.950.840) + 0x1dfa08 (1.964.552) = 13.915.392 B
+    fin del .bss (arranque del monton)   0x8cd5b500  (13.939.968 B desde 0x8c010000)
+    tope del sbrk                       0x8cff0000  = 16 MiB - 64 KiB de pila del kernel
+                                                    (mm.c: _arch_mem_top - THD_KERNEL_STACK_SIZE)
+    monton disponible                   2.706.176 B
+    usado cuando fallo el pedido        2.439.936 B   (el mensaje dice "was 0x8cfaf000")
+    libre cuando fallo el pedido          266.240 B
+    lo que pedia el calloc              1.048.576 B   = 3,94 veces lo libre
+
+EL ARREGLO: subir la textura POR BLOQUES. Un bloque de 32x32 pixeles SI es contiguo en la textura
+twiddleada (el twiddle pone los bits de x en las posiciones pares del indice y los de y en las impares, asi
+que los 5 bits bajos de cada coordenada dan los 10 bits bajos del indice = 1.024 pixeles seguidos). Se arma
+un bloque en `conv_tile` (2.048 bytes en .bss, alineado a 32 para las Store Queues) y se sube con
+`pvr_txr_load`. Resultado: 1.048.576 B del monton -> 2.048 B de .bss, 300 subidas de 2.048 B por cuadro, y
+el relleno de la textura (de 640 a 1023 y de 480 a 511) se deja en cero UNA vez en el arranque (512 bloques).
+
+LA PRUEBA DE QUE LOS PIXELES CAEN DONDE CAIAN (script reproducible, 307.200 pixeles):
+
+    $ python3 scripts/console/medir-twiddle-217.py
+      pixeles visibles comparados: 307200
+      indices distintos: 0
+      bloques visibles: 300 bloques con 1024 indices contiguos: 300
+      pixeles de la textura: 524288 visibles: 307200 relleno: 217088
+      bytes del monton antes (1024x512x2): 1048576
+      bytes en .bss ahora (32x32x2): 2048
+      subidas a la VRAM por cuadro: 300 de 2048 bytes
+      RESULTADO: COINCIDE (los 307200 pixeles van al mismo indice que antes)
+
+DESPUES (misma corrida del arranque del motor):
+
+      MOTOR-ARRANQUE video listo, VRAM de la pantalla 1048576 bytes      <- 0 lineas "Out of memory"
+                                                                         <- 0 lineas "codigo -3"
+
+EL COSTO, MEDIDO EN EL POC DEL CUADRO (console/dc/poc/motor-pantalla, EBITEN-PERFIL):
+
+    antes (DC-002.10)   dibujar_us 27376  convertir_us 47807  subir_us 2624  cuadro_us 77810
+    ahora              dibujar_us 27418  convertir_us 35100  subir_us    0  cuadro_us 62521
+
+La conversion baja 26,6% porque ya no recorre el relleno (217.088 de los 524.288 pixeles: se convierte el
+72,4% que el quad pinta) y la subida queda en 0 porque ahora va DENTRO de la conversion, bloque por bloque.
+El cuadro entero queda 1,24x mas rapido (77.810 -> 62.521 us) y la huella de la pantalla es la misma
+(-1192069352), o sea que la imagen que arma el motor no cambio.
+
+(El "antes" no es el numero de otra tarjeta: el MISMO POC, recompilado con el pvr_pantalla.c viejo
+(`git show HEAD:...`), mide convertir_us 47806, subir_us 2625, cuadro_us 77848 en esta misma sesion y esta
+misma maquina. O sea que los dos numeros de arriba son el mismo instrumento con el mismo binario de
+alrededor.)
+
+=====================================================================================================
+[3] EL SISTEMA DE ARCHIVOS ESCRIBIBLE: EL OVERLAY EN RAM (18.020 bytes de .bss, 0 del monton)
+=====================================================================================================
+
+En console/dc/std/csrc/os_dc.c, con el presupuesto FIJO y declarado:
+
+    D2C_RAMFS_ARCHIVOS 8 x D2C_RAMFS_BYTES_ARCHIVO 2048 + D2C_RAMFS_DIRS 8 x 96 + contador
+    = 18.020 bytes en .bss  (medido en la consola: "el overlay ocupa 18020 bytes de .bss")
+
+Soporta crear/truncar, escribir, leer con posicion y seek, tamano, borrar, renombrar, truncar y "existe". Los
+archivos de la RAM TAPAN a los del romdisk con el mismo nombre (asi un config guardado se lee de vuelta) y lo
+que no esta en RAM se busca en KOS como siempre. Los descriptores de la RAM arrancan en 1000 para no
+confundirse con los de KOS.
+
+NO usa el monton A PROPOSITO: al motor le quedan 266.240 B libres y el GC se lleva 1 MB de semiespacios; un
+tmpfs con malloc volveria a pelear por la memoria que falta. Con presupuesto estatico no crece, no fragmenta
+y el limite se puede decir con un numero.
+
+LA PRUEBA DIRECTA (el propio arranque la corre, con el MISMO paquete os del motor: mkdir, create, escribir 67
+bytes, cerrar, leer de vuelta, comparar y borrar):
+
+      OS-RAMFS prueba: el overlay ocupa 18020 bytes de .bss
+      OS-RAMFS mkdir-ok path= /rd/prueba-217
+      OS-RAMFS create-ok path= /rd/prueba-217/prueba.txt
+      OS-RAMFS escribe bytes= 67
+      OS-RAMFS prueba: escribi 67 bytes, lei 67 igual= true
+      OS-RAMFS remove-ok path= /rd/prueba-217/prueba.txt
+      OS-RAMFS prueba: despues de borrar -> archivos= 0 bytes= 0 dirs= 1
+
+Existe porque el motor NO llega a escribir: su `d2config.Save()` se cae antes (punto [4]). Sin esta prueba, la
+escritura quedaria probada por nadie.
+
+Y EL MOTOR, en su propio camino:
+
+      MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+      OS-RAMFS mkdir-ok path= /rd/OpenDiablo2
+      OS-RAMFS create-ok path= /rd/OpenDiablo2/config.json
+      MOTOR-ARRANQUE Run() termino con error: json: en la consola no hay reflexion: ...
+      MOTOR-ARRANQUE overlay del motor: archivos= 1 bytes= 0 dirs= 2
+
+o sea: el mkdir y el create de `d2config.Save()` YA funcionan (antes moria en el mkdir). El archivo queda en 0
+bytes porque el error siguiente es del MARSHAL, no del sistema de archivos.
+
+=====================================================================================================
+[4] EL DEFECTO QUE QUEDA, CON NOMBRE: json.MarshalIndent sin reflexion
+=====================================================================================================
+
+    d2core/d2config/d2config.go:57   buf, err := json.MarshalIndent(c, "", "  ")
+    error:  json: en la consola no hay reflexion: solo se pueden serializar los tipos que saben
+            hacerlo ellos mismos (MarshalJSON/UnmarshalJSON)
+
+`Configuration` no tiene `MarshalJSON` propio, asi que el `encoding/json` de la stdlib minima no puede
+serializarlo (no hay reflect en libgodc). NO es un defecto del sistema de archivos ni del motor: es del paquete
+`encoding/json` de la consola. Va como tarjeta nueva; aca queda declarado con el texto EXACTO para que la
+proxima no tenga que descubrirlo.
+
+Consecuencia honesta: el arranque NO pasa de ahi en esta tarjeta. Lo que se cerro es el ENTORNO (video y
+sistema de archivos escribible), que era el objetivo de DC-002.17; lo que sigue es serializacion.
+
+=====================================================================================================
+[5] EL CORPUS: scripts/console/checar-entorno-217.sh -- 3 controles y 2/2 mutantes cazados
+=====================================================================================================
+
+    == 1. control sano: el video arranca y el motor puede escribir su configuracion
+       control 1 (video):            VERDE
+       control 2 (config del motor): VERDE
+       control 3 (escritura):        VERDE
+       OK: 3/3 controles verdes con el codigo de ahora
+         MOTOR-ARRANQUE arranca (DC-002.13: el entry point del motor en la consola)
+         MOTOR-ARRANQUE runtime sh4
+         MOTOR-ARRANQUE video listo, VRAM de la pantalla 1048576 bytes
+         MOTOR-ARRANQUE llamando a d2app.Create().Run()
+         OS-RAMFS prueba: el overlay ocupa 18020 bytes de .bss
+         OS-RAMFS mkdir-ok path= /rd/prueba-217
+         OS-RAMFS create-ok path= /rd/prueba-217/prueba.txt
+         OS-RAMFS escribe bytes= 67
+         OS-RAMFS prueba: escribi 67 bytes, lei 67 igual= true
+         OS-RAMFS remove-ok path= /rd/prueba-217/prueba.txt
+         OS-RAMFS prueba: despues de borrar -> archivos= 0 bytes= 0 dirs= 1
+         MOTOR-ARRANQUE marca 1: entrando a d2app.Create()
+         MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+         OS-RAMFS mkdir-ok path= /rd/OpenDiablo2
+         OS-RAMFS create-ok path= /rd/OpenDiablo2/config.json
+         MOTOR-ARRANQUE Run() termino con error: json: en la consola no hay reflexion: ...
+         MOTOR-ARRANQUE overlay del motor: archivos= 1 bytes= 0 dirs= 2
+         MOTOR-ARRANQUE marca 3: Run() volvio
+         MOTOR-ARRANQUE fin
+
+    == mutante 'sin-overlay' (el sistema de archivos escribible vuelve a fallar como en DC-002.16)
+       os_dc.c mutado: d2c_mkdir -> -1, d2c_abrir_crear -> invalido
+       control 1 (video):            VERDE
+       control 2 (config del motor): ROJO
+       control 3 (escritura):        ROJO
+       cazado: sin el overlay el motor no puede con su config y la escritura no existe
+         (en el log: "OS-RAMFS prueba FALLO: MkdirAll: operation not supported on read-only filesystem" y
+          "Run() termino con error: operation not supported on read-only filesystem")
+
+    == mutante 'calloc-1mib' (vuelve el buffer del cuadro entero en el monton: el defecto del video)
+       pvr_pantalla.c mutado: vuelve el calloc de 1.048.576 bytes
+       control 1 (video):            ROJO
+       control 2 (config del motor): VERDE
+       control 3 (escritura):        VERDE
+       cazado: el video vuelve a caer (codigo -3 / Out of memory)
+         Out of memory. Requested sbrk_base 0x8d0af000, was 0x8cfaf000, diff 1048576
+         MOTOR-ARRANQUE el video no arranco: no se pudo arrancar la pantalla del PVR (codigo -3)
+
+    == control sano de vuelta (el overlay y el buffer por bloques repuestos)
+       control 1 (video):            VERDE
+       control 2 (config del motor): VERDE
+       control 3 (escritura):        VERDE
+       control sano VERDE
+
+    == 2/2 mutantes cazados ==
+
+Los mutantes son de C (os_dc.c y pvr_pantalla.c), o sea que no obligan a recompilar los .gox: cada corrida es
+compilar el C + enlazar + 20 s de Flycast.
+
+=====================================================================================================
+[6] LA BARRERA: scripts/compare-motor-dc6.sh -- IGUAL, 31 lineas
+=====================================================================================================
+
+    $ bash scripts/console/build-motor-dc6.sh /tmp/dcbuild/motor-dc6-217
+      ELF: 7202612 bytes   1ST_READ: 1297832 bytes
+    $ bash scripts/console/compare-motor-dc6.sh /tmp/dcbuild/motor-dc6-217 d2logo
+      == resumen del host (31 lineas) y de la consola (31 lineas)
+      == IGUAL: 31 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4)
+         frames comparados: 30
+
+Y LA BARRERA DEL HOST (la stdlib minima, que es donde se tocaron dos paquetes: os y el C de os_dc.c):
+
+    $ bash scripts/console/test-std-host.sh
+      excluidos que NO compilan en el host (386): 13 de 13
+      == los dos anchos: verde (y los 13 que hablan con KOS siguen sin compilar en el host) ==
+    $ bash scripts/console/mutar-std-host.sh
+      == 36/36 chequeos cazados ==
+      == OK: la suite caza todos los defectos conocidos y el arbol quedo sano ==
+
+(`os` sigue en la lista de los que NO compilan en el host: las funciones nuevas de escritura son `//extern`,
+o sea que el paquete sigue hablando con KOS y no se puede compilar contra la biblioteca de Go. El corpus de
+la consola de todo esto es console/dc/poc/vfs, con sus mutadores en mutar-os-consola.sh.)
+
+=====================================================================================================
+[7] LO QUE QUEDA ANOTADO (no entra en esta tarjeta)
+=====================================================================================================
+
+1. `encoding/json` sin reflexion (punto [4]): el `Save()` de la configuracion se cae en el marshal. Es la
+   proxima pared del arranque y no es de esta tarjeta.
+2. El relleno de la textura son 217.088 pixeles (41% del area) que se suben una vez y nunca se pintan. Se
+   podria pedir una textura de 640x512 (640 no es potencia de dos: el PVR no lo acepta) o reusar el area para
+   otro cuadro. Queda anotado con el numero.
+3. `Rom disk image at 0x0 is not a ROMFS image`: el romdisk del arranque no es una imagen ROMFS valida (el
+   arranque no hornea assets a proposito). El overlay de la RAM no lo necesita; cuando el motor pida assets de
+   verdad, hay que hornear un romdisk de verdad.
+4. La captura de pantalla del POC motor-pantalla NO se uso como control para este arreglo: la ventana de
+   Flycast en esta sesion mide 446x334 (escala 0,6969 sobre 640x480) y el marco de 1 pixel del POC queda
+   mezclado con el fondo por el reescalado, asi que un borde "desaparece" sin que la imagen este mal. Medido
+   con la MISMA captura y el MISMO procedimiento, y con A/B: con el C viejo (git HEAD) el borde de arriba da
+   446/446 px amarillos y el de abajo 0/446, y con el C de esta tarjeta da exactamente lo mismo (446/446 y
+   0/446 en el top-left de la pantalla, porque el borde de abajo y el de la derecha no entran en la ventana).
+   O sea: NO es del cambio, es del instrumento. El que si dice la verdad sobre la colocacion de los pixeles
+   es medir-twiddle-217.py (307.200/307.200 indices iguales), que compara la cuenta y no los pixeles ya
+   reescalados. El instrumento del POC (marco + posicion) queda pendiente de una ventana 1:1.

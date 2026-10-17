@@ -1871,3 +1871,138 @@ bash scripts/console/compare-motor-dc6.sh /tmp/dcbuild/motor-dc6-216 d2logo
 Evidencia con las salidas crudas (los dos errores del host, la sonda roja y verde, los tres mutadores y
 las 9 marcas del arranque): `evidencia/dc-002.16-regexp-bandera-i.txt`.
 
+## 33. DC-002.17: el motor ya llega a `main` y lo frenaba el ENTORNO — el video pedia 1 MiB que no habia y el romdisk no dejaba escribir
+
+DC-002.16 dejo el arranque del motor llegando a `main` con **9 marcas `MOTOR-ARRANQUE` y 0 panics**. Esta
+tarjeta cerro los dos defectos del ENTORNO que quedaban delante (no del codigo del motor): el video que no
+arrancaba porque el backend pedia 1 MiB del monton que no existen, y el `Run()` que moria porque el romdisk
+de KOS es de solo lectura y el motor escribe su configuracion. El resultado medido: **10 marcas, video
+arrancado, el motor creando y guardando su configuracion**, y el defecto siguiente identificado con nombre y
+apellido (`json.MarshalIndent` no puede sin reflexion).
+
+**1. El pedido, medido.** El arranque llega a `main`, llama a `d2app.Create().Run()` y muere con
+`operation not supported on read-only filesystem`. Con el medidor puesto en los stubs de escritura de
+`console/dc/std/os`, el log dice cual es, y es UNO:
+
+    OS-ESCRITURA MkdirAll path= /rd/OpenDiablo2
+    MOTOR-ARRANQUE Run() termino con error: operation not supported on read-only filesystem
+
+La cadena: `d2app/app.go:264` no encuentra `config.json`, arma el default y lo guarda
+(`creating default configuration file at /rd/OpenDiablo2/config.json...`), y `d2core/d2config/d2config.go:52`
+lo primero que hace en `Save()` es `os.MkdirAll(filepath.Dir(c.path), 0750)`. Ese `MkdirAll` es el unico
+error de esa funcion: **el motor no arranca porque no puede crear el directorio donde guarda su
+configuracion**. De la misma corrida: `Rom disk image at 0x0 is not a ROMFS image` (el romdisk del ELF no
+es una imagen ROMFS valida).
+
+**2. El video no arranca por MEMORIA, no por el PVR.** Dos lineas antes del `codigo -3`:
+
+    Out of memory. Requested sbrk_base 0x8d0a9000, was 0x8cfa9000, diff 1048576
+
+1 MiB exactos que el monton pide y no hay; lo dice el runtime de KOS, no nuestro codigo. El `-3` del PVR
+es el sintoma. Esto ata los puntos 2 y 3 de la tarjeta: cualquier sistema de archivos en RAM tiene que
+salir de la MISMA memoria que ya falta. Para dimensionarlo: el ELF que abre Flycast mide 13.710.848 bytes
+y la Dreamcast tiene 16 MiB.
+
+**3. Por que el medidor no se veia (dos causas, las dos medidas; costo 3 corridas).**
+
+  a) **La llamada estaba INLINADA.** gccgo compila con `-O2` (`env.sh`), asi que `os.MkdirAll` (una linea)
+     quedo copiada adentro de `d2config.gox`, compilada ANTES del medidor. Medido con `sh-elf-nm`:
+     `d2config.gox` tiene `U _os.ErrNoSePuede` y **no** tiene `U _os.MkdirAll`. Recompilar solo `os.gox`
+     no alcanza: hay que recompilar tambien el paquete del motor que la tenga inlinada (lo hace
+     `compilar_paquete_motor()` del medidor, misma receta que `build-motor-gox.sh`).
+  b) **El `println` no puede concatenar aca.** `println("a" + que + "b")` arma una cadena nueva en el
+     monton, y el monton no tiene 1 MiB ([2]): la version que concatenaba no imprimia NADA. Con
+     argumentos sueltos (`println("OS-ESCRITURA", que, "path=", donde)`) sale. Regla para los medidores de
+     aca en adelante: **imprimir con argumentos sueltos, nunca concatenando**.
+
+**4. Una trampa del arnes (bloqueaba la medicion, arreglada).** `build-motor-arranque.sh` no podia
+enlazar: `multiple definition of ..._d2dat.Load..f` con el MISMO `d2dat.gox` como "first defined here".
+Causa: `orden.txt` tenia **74 lineas** (63 de stdlib + 11 del motor) porque `build-motor-gox.sh` anota a
+proposito los paquetes del motor en `orden.txt`, y el enlace del arranque usa orden.txt **y**
+orden-motor.txt. `grep -vxF -f orden-motor.txt orden.txt` deja **64 lineas** con la interseccion vacia, y
+el script ahora filtra (no-op cuando orden.txt esta limpio). El mismo patron esta en
+`checar-recorte-214.sh:146` y `medir-alcance-motor.sh:34`, anotado y sin tocar. Se contamino sin que nadie
+lo viera porque el ultimo enlace bueno de DC-002.16 fue ANTES de la barrera `build-motor-dc6.sh`.
+
+```bash
+# La medicion completa (recompila os.gox con el medidor + d2config, reenlaza y corre Flycast)
+export GODC_GOX=/tmp/gox-00216
+bash scripts/console/medir-escritura-217.sh /tmp/gox-00216 /tmp/dcbuild/motor-217 20
+```
+
+Evidencia cruda (log, la cadena del codigo y los `sh-elf-nm`): `evidencia/dc-002.17-escritura-config.txt`.
+
+**5. El video: 1.048.576 bytes del MONTON a 2.048 bytes de .bss y 300 subidas de 2 KiB.** El `-3` no era el
+PVR: era nuestro `calloc` del cuadro entero (`1024x512x2 = 1.048.576`, exactamente el `diff` del mensaje de
+KOS). La cuenta de la memoria, medida: los segmentos que carga el ELF son **13.915.392 B**, el `.bss` termina
+en `0x8cd5b500`, el tope del `sbrk` es `0x8cff0000` (16 MiB menos los 64 KiB de pila del kernel, `mm.c`), o
+sea **2.706.176 B de monton** de los que el motor tenia **266.240 libres** y pedia **1.048.576** (3,94 veces
+lo libre). El arreglo: un bloque de 32x32 SI es contiguo en la textura twiddleada (los 5 bits bajos de cada
+coordenada dan los 10 bits bajos del indice), asi que el cuadro se arma **de a un bloque** en `conv_tile`
+(2.048 B de `.bss`, alineado a 32 para las Store Queues) y cada bloque se sube con `pvr_txr_load`. El relleno
+se deja en cero una vez en el arranque (512 bloques).
+
+**6. La colocacion de los pixeles, probada con una cuenta y no con un ojo.** 300 subidas por cuadro mueven el
+cuadro: si un bloque fuera al indice equivocado, la pantalla se veria mal y el arranque no se enteraria (el
+video "arranca" igual). `scripts/console/medir-twiddle-217.py` compara el indice de **cada** pixel visible
+calculado por la formula vieja contra la nueva: **307.200/307.200 iguales y 300/300 bloques con 1.024 indices
+contiguos y sin repetir**. El costo, medido con el `EBITEN-PERFIL` del POC del cuadro:
+
+| | dibujar_us | convertir_us | subir_us | cuadro_us |
+|---|---|---|---|---|
+| con el `pvr_pantalla.c` viejo | 27415 | 47806 | 2625 | 77848 |
+| con el de esta tarjeta | 27418 | 35100 | 0 | 62521 |
+
+La conversion baja 26,6% (ya no recorre el relleno: 217.088 de los 524.288 pixeles, el 41%) y la subida queda
+en 0 porque va dentro de la conversion. **El cuadro queda 1,24x mas rapido** y la huella de la pantalla es la
+misma (`-1192069352`).
+
+**7. El sistema de archivos escribible: un overlay en RAM de 18.020 B de `.bss`, cero del monton.** En
+`os_dc.c`: 8 archivos x 2.048 B + 8 directorios, con crear/truncar, escribir, leer con seek, tamano, borrar,
+renombrar, truncar y "existe"; lo que se escribe en la RAM **tapa** al romdisk con el mismo nombre y lo que no
+esta en RAM se lee de KOS. **No usa el monton a proposito**: quedan 266.240 B y el GC se lleva 1 MB de
+semiespacios, asi que un tmpfs con `malloc` volveria a pelear por la memoria que falta; con presupuesto
+estatico el limite se dice con un numero. Medido en el arranque del motor: `OS-RAMFS mkdir-ok path=
+/rd/OpenDiablo2` y `create-ok .../config.json` (antes moria en el `MkdirAll`).
+
+**8. La escritura probada de verdad, porque el motor no llega a escribir.** `d2config.Save()` se cae en
+`json.MarshalIndent` (el `encoding/json` de la consola no tiene reflexion) **antes** de escribir un byte, asi
+que el arranque solo prueba el mkdir y el create. El propio arranque corre una prueba directa con el mismo
+paquete `os`: mkdir, create, escribir 67 bytes, cerrar, leer de vuelta, comparar y borrar -> `escribi 67 bytes,
+lei 67 igual= true` y `archivos= 0 bytes= 0` despues de borrar. **El defecto que queda, con el texto exacto**:
+`json: en la consola no hay reflexion: solo se pueden serializar los tipos que saben hacerlo ellos mismos
+(MarshalJSON/UnmarshalJSON)` -> tarjeta nueva: no es del sistema de archivos ni del motor, es del paquete
+`encoding/json` de la consola.
+
+**9. El corpus y la barrera.** `scripts/console/checar-entorno-217.sh`: **3 controles** (video sin `-3` ni
+`Out of memory`; el motor pudo con su config y no hay `read-only filesystem`; la prueba de escritura y lectura
+de vuelta) y **2/2 mutantes cazados** — `sin-overlay` (se deshace el overlay en el C y los controles 2 y 3 se
+ponen ROJOS: vuelve el "operation not supported on read-only filesystem") y `calloc-1mib` (vuelve el buffer
+del cuadro entero y el control 1 se pone ROJO con el `diff 1048576` y el `codigo -3`). Los dos mutantes son de
+C, asi que cada corrida no recompila los `.gox`. La barrera **no se movio: 31 lineas identicas** entre host y
+consola (`compare-motor-dc6.sh`, 30 frames), y del lado del host `test-std-host.sh` quedo **verde en amd64 y en
+386** (los 13 paquetes que hablan con KOS siguen sin compilar en el host: `os` incluido) con
+`mutar-std-host.sh` en **36/36 chequeos cazados**.
+
+```bash
+# El arreglo y su corpus: 3 controles + 2 mutantes + control sano de vuelta
+export GODC_GOX=/tmp/gox-00216
+bash scripts/console/checar-entorno-217.sh /tmp/gox-00216 /tmp/dcbuild/motor-217 20
+# La prueba de que los pixeles caen donde caian (307.200/307.200)
+python3 scripts/console/medir-twiddle-217.py
+# La barrera
+bash scripts/console/build-motor-dc6.sh /tmp/dcbuild/motor-dc6-217
+bash scripts/console/compare-motor-dc6.sh /tmp/dcbuild/motor-dc6-217 d2logo
+```
+
+**Una trampa de instrumento, medida con A/B (no es del arreglo).** La captura del POC `motor-pantalla` daba
+el borde de arriba del marco amarillo completo (446/446 px) y el de abajo en **0/446**: la ventana de Flycast
+en esta sesion mide 446x334 (escala 0,6969 sobre 640x480) y el marco de 1 pixel queda mezclado por el
+reescalado. Con el C VIEJO (`git show HEAD:...`) la misma captura da exactamente lo mismo, asi que el defecto
+es del instrumento y no del cambio: por eso la colocacion se prueba con la cuenta (307.200/307.200)
+y no con los pixeles reescalados.
+
+Evidencia cruda (los logs, las cuentas de la memoria, el corpus y la barrera):
+`evidencia/dc-002.17-video-y-overlay.txt` (el arreglo) y `evidencia/dc-002.17-escritura-config.txt` (la
+medicion que lo abrio).
+

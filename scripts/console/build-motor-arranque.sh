@@ -60,12 +60,23 @@ for f in "$SRC"/*.c "$SRC"/csrc/*.c; do
 done
 
 echo "== 3/4 enlazando el MOTOR ENTERO ($N_MOTOR paquetes del motor + $N_STD de stdlib/terceros) =="
+# DC-002.17: orden.txt puede traer los paquetes del MOTOR adentro si antes se corrio build-motor-gox.sh
+# (ese los anota a proposito: los POC del motor se enlazan con un solo -I y esa lista). Como el enlace de
+# aca suma orden.txt + orden-motor.txt, el mismo .gox entraba DOS veces y el linker moria con
+#   multiple definition of `..._d2fileformats_1d2dat.Load..f'
+# apuntando a d2dat.gox como "first defined here". Medido: orden.txt con 74 lineas (63 de la stdlib + 11
+# del motor) y el enlace del arranque sin poder salir. Se filtra orden.txt contra orden-motor.txt: mismo
+# orden, y cuando orden.txt esta limpio es un no-op (el binario sale byte por byte igual).
+ORDEN_STD="$OUT/orden-std.txt"
+grep -vxF -f "$GEN/orden-motor.txt" "$GEN/orden.txt" > "$ORDEN_STD" || true
+N_REPETIDOS="$((N_STD - $(wc -l < "$ORDEN_STD")))"
+[ "$N_REPETIDOS" -eq 0 ] || echo "   (orden.txt traia $N_REPETIDOS paquetes del motor ya listados: filtrados)"
 # DC-002.14: DC_LDEXTRA existe para medir el RECORTE del binario (-Wl,--gc-sections, que necesita los .gox
 # compilados con -ffunction-sections -fdata-sections) sin duplicar este script. Vacio por defecto: el
 # binario de siempre (el que mide la tarjeta DC-002.13) sale con la MISMA linea de enlace que antes.
 # shellcheck disable=SC2046,SC2086
 kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $EXTRA_OBJS $STD_C_OBJS \
-    $(tr '\n' ' ' < "$GEN/orden.txt") $(tr '\n' ' ' < "$GEN/orden-motor.txt") \
+    $(tr '\n' ' ' < "$ORDEN_STD") $(tr '\n' ' ' < "$GEN/orden-motor.txt") \
     ${DC_LDEXTRA:-} $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
 
 echo "== 4/4 binario de arranque (1ST_READ.BIN) + IP.BIN + imagen =="
