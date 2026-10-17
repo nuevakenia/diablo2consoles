@@ -2185,3 +2185,60 @@ EMBEBIDO (`d2common/d2util/assets.CreateTextImage`), antes de cualquier lectura 
 MPQ del romdisk estan vacios: la lectura de los datos del juego (disco u horneada) es otra tarjeta. El
 `os.Getenv` de la consola sigue siendo un stub; no se toco porque el arranque ya no lo necesita para la
 seleccion.
+
+## 36. DC-002.20: el gzip de la consola contra el asset EMBEBIDO (el tamano que se hacia pasar por cabecera)
+
+El arranque ya pasaba la seleccion de los archivos del juego y moria con `panic: assets: bmp.Decode failed:
+gzip: invalid header`. Esta tarjeta midio ese `invalid header`, lo arreglo y re-midio el arranque: el panic
+no esta mas y la frontera nueva es la RAM.
+
+**1. La causa no era la cabecera, era el TAMANO, y esta medido en las dos puntas.** El asset embebido del
+motor (`assets.CompressedDebugText`) son **2.209 bytes** (crc32 `aa973211`) que descomprimen a **98.358**
+(crc32 `5dce3e98`, un BMP de 256 x 128 x 24 bits, el atlas de texto). El `gzip` de la consola descomprimia
+de UNA sola vez, con el destino que calcula `d2c_zlib_inflate_bound` = **4 x comprimido + 64 KB = 74.372**
+bytes. Es una REGLA, no una cota: el resultado no entraba, la zlib devolvia error, el puente lo traducia a
+`-1` y el paquete a `ErrHeader` -> `gzip: invalid header`. Medido tambien del lado de la consola:
+
+    GZIP-ASSET embebido bytes= 2209 crc32= 2862035473          (0xAA973211, igual al host)
+    GZIP-ASSET viejo cota= 74372 devuelto= -1 entra_el_real= false
+
+**2. El arreglo: inflate EN STREAMING, con el destino en el buffer del que se lee.**
+`console/dc/std/csrc/zlib_dc.c` gana cuatro `z_stream` en `.bss` prestados por INDICE (no se guardan
+punteros a estado de C en el monton de Go; es la regla de los portadores `uintptr` del proyecto) con
+`d2c_zlib_stream_init` / `_step` / `_consumido` / `_fin` / `_end`, y el mismo `inflateInit2(15 + 32)` que
+decide entre zlib y gzip. El resultado del paso se lee con funciones APARTE en vez de punteros de salida: un
+puntero de salida mal pasado no se nota, un contador que no avanza si. `console/dc/std/compress/gzip`
+reescribe su `Reader.Read` para pedir bytes en el `p` del que lee, con el bucle que cubre el caso normal del
+inflate (un paso que consume todo el comprimido y escribe CERO, otro que devuelve menos de lo que entra) y
+error declarado si un paso no avanza por ningun lado (mejor que colgar el motor en un bucle). `Close()`
+devuelve el slot. El camino de una sola vez se queda para `compress/zlib`, con su limite declarado en el
+control 5 del corpus.
+
+Medido en Flycast con el destino de **512 bytes** (193 lecturas), para probar que entrega por partes y no de
+un golpe:
+
+    GZIP-ASSET nuevo bytes= 98358 crc32= 1573797528 lecturas_de_512= 193
+    GZIP-ASSET nuevo cabecera= 66 77 54 128   (BM)
+    GZIP-ASSET motor bmp.Decode OK ancho= 256 alto= 128
+
+**3. El arranque re-medido: la frontera se movio a la RAM.** Las mismas 10 marcas `MOTOR-ARRANQUE`, la
+seleccion igual de verde, el config leido por el motor, y donde antes estaba el panic del gzip ahora:
+
+    Out of memory. Requested sbrk_base 0x8cff6000, was 0x8cfde000, diff 98304
+    fatal error: gc_external_alloc: OOM
+    Memory: arena=2579164 used=2576068 free=3096
+
+El atlas de texto YA se descomprime y lo que no entra es su imagen: 98.304 bytes contiguos contra 3.096
+libres de arena. Es DC-002.21, abierta con ese numero.
+
+**4. El corpus (`scripts/console/checar-gzip-220.sh`) y su referencia del host.** Siete controles: el 0 corre
+`go run ./console/dc/gen-asset-info` (el `compress/gzip` y el `crc32` DE VERDAD de Go) y exige 2.209 /
+98.358 / `5dce3e98` / 256x128; el 1 que la consola vea los MISMOS bytes embebidos; el 2 los 98.358 bytes con
+el CRC32 del host leidos de a 512; el 3 la cabecera `BM`; el 4 el camino del MOTOR (`gzip.NewReader` +
+`bmp.Decode`) decodificando; el 5 que el camino viejo SIGA fallando (limite declarado, se pone rojo a
+proposito el dia que la regla cambie); el 6 las 6 marcas exactas. Los tres mutantes (lector de Go, contador
+del puente C, ventana de la zlib) ponen rojo el control 2. Resultado: **7/7 controles y 3/3 mutantes**.
+
+Barreras: `test-std-host.sh` verde en amd64 y 386 (13/13 excluidos), `mutar-std-host.sh` con **39/39**
+chequeos cazados y `compare-motor-dc6.sh` con **31 lineas identicas y 30 frames**. Evidencia cruda:
+`evidencia/dc-002.20-gzip-asset-embebido.txt`.

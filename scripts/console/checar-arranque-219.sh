@@ -18,11 +18,12 @@
 #  CONTROL 4 (la lectura de la config por el motor): `[App][INFO] loaded configuration file from
 #    /rd/OpenDiablo2/config.json`. Es el camino real de lectura del arranque (d2app/app.go), no un POC
 #    paralelo: lo que DC-002.18 dejo declarado como hueco.
-#  CONTROL 5 (la FRONTERA declarada): despues de la seleccion el arranque sigue y muere en
-#    `panic: assets: bmp.Decode failed: gzip: invalid header` -- el gzip de un asset EMBEBIDO, ANTES de
-#    cualquier lectura del MPQ. Eso NO es de esta tarjeta (es DC-002.20, ya abierta con este defecto
-#    medido): el control exige que el panic ESTE, para que el dia que DC-002.20 lo arregle este script se
-#    ponga ROJO y haya que mover la frontera a mano en vez de creerle a un verde viejo.
+#  CONTROL 5 (la FRONTERA declarada): despues de la seleccion, la config y el asset EMBEBIDO, el arranque
+#    muere en `fatal error: gc_external_alloc: OOM` pidiendo 98.304 bytes contiguos (la imagen del atlas de
+#    texto, ver DC-002.20/DC-002.21). Hasta DC-002.20 aca estaba el `panic: assets: bmp.Decode failed: gzip:
+#    invalid header` y este control se puso ROJO cuando DC-002.20 lo arreglo, que es para lo que estaba: la
+#    frontera se movio A MANO. Si el OOM desaparece, este control se pone ROJO otra vez y hay que venir a
+#    moverlo, no a celebrar un verde viejo.
 #  CONTROL 6 (las marcas): el numero EXACTO de marcas `MOTOR-ARRANQUE` de la corrida entera.
 #
 # MUTANTES (5): cada uno tiene que poner ROJO el control que le toca. Si queda VERDE, el hueco es del corpus.
@@ -114,7 +115,10 @@ ctrl_lectura() {
     grep -qaF 'loaded configuration file from /rd/OpenDiablo2/config.json' "$1"
 }
 ctrl_frontera() {
-    grep -qaF 'panic: assets: bmp.Decode failed: gzip: invalid header' "$1"
+    # DC-002.20 movio esta frontera: el panic del gzip del asset embebido ya no esta (el gzip de la consola
+    # descomprime en streaming), y lo que queda es el OOM del atlas de texto. Se busca el texto FIJO del
+    # error del runtime: las direcciones de sbrk cambian en cada corrida.
+    grep -qaF 'fatal error: gc_external_alloc: OOM' "$1"
 }
 ctrl_marcas() {
     [ "$(grep -ac 'MOTOR-ARRANQUE' "$1")" = "$MARCAS" ]

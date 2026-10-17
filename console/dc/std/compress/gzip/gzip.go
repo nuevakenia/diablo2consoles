@@ -13,13 +13,31 @@ import (
 	"d2std/hash"
 	"d2std/hash/crc32"
 	"d2std/io"
+	"unsafe"
 )
 
-//extern d2c_zlib_inflate
-func d2cZlibInflate(src []byte, srcLen int32, dst []byte, dstCap int32) int32
+// DC-002.20: el inflate EN STREAMING del puente de la zlib de KOS. Antes se usaba el de una sola vez
+// (`d2c_zlib_inflate`), que pide el resultado ENTERO en un destino calculado con una REGLA (4 x comprimido
+// + 64 KB). Medido con el asset EMBEBIDO del motor: comprimido 2.209 B, la regla da 74.372 B y el asset
+// descomprimido son 98.358 B, asi que la zlib devolvia error, este paquete lo traducia a `gzip: invalid
+// header` (un mensaje que mentia sobre la causa) y el motor paniqueaba al arrancar.
+//
+// Con el streaming el destino es el buffer del que lee: 512 B en el corpus, lo que pida el motor.
+//
+//extern d2c_zlib_stream_init
+func d2cZlibStreamInit() int32
 
-//extern d2c_zlib_inflate_bound
-func d2cZlibInflateBound(srcLen int32) int32
+//extern d2c_zlib_stream_step
+func d2cZlibStreamStep(slot int32, src uintptr, srcLen int32, dst uintptr, dstCap int32) int32
+
+//extern d2c_zlib_stream_consumido
+func d2cZlibStreamConsumido(slot int32) int32
+
+//extern d2c_zlib_stream_fin
+func d2cZlibStreamFin(slot int32) int32
+
+//extern d2c_zlib_stream_end
+func d2cZlibStreamEnd(slot int32) int32
 
 // Header: la cabecera de un miembro gzip. Se completa al leer (el motor la mira para saber si es texto
 // o binario, que es lo que hace gzip.Header.Text).
@@ -41,11 +59,14 @@ const (
 	ErrHeader   = errorString("gzip: invalid header")
 )
 
-// Reader: el lector de gzip.
+// Reader: el lector de gzip. Descomprime EN STREAMING: pide los bytes en el buffer que le pasan (ver el
+// comentario de los externs) en vez de materializar el resultado entero.
 type Reader struct {
 	comprimido []byte
-	crudo      []byte
-	pos        int
+	pos        int // cuantos bytes del comprimido ya consumio la zlib
+	slot       int32
+	abierto    bool
+	fin        bool
 	cerrado    bool
 	err        error
 	Header     Header
@@ -57,7 +78,7 @@ func NewReader(r io.Reader) (*Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	g := &Reader{comprimido: data}
+	g := &Reader{comprimido: data, slot: -1}
 	// la cabecera de gzip son 10 bytes fijos: 1f 8b, el metodo, las banderas, la fecha, y los dos
 	// ultimos. Se miran solo para llenar Header (si no es gzip, la zlib va a fallar igual y con mejor
 	// mensaje que inventado aca).
@@ -68,37 +89,77 @@ func NewReader(r io.Reader) (*Reader, error) {
 	return g, nil
 }
 
-func (g *Reader) descomprimir() {
-	if g.crudo != nil || g.err != nil {
-		return
-	}
-	destino := make([]byte, d2cZlibInflateBound(int32(len(g.comprimido))))
-	n := d2cZlibInflate(g.comprimido, int32(len(g.comprimido)), destino, int32(len(destino)))
-	if n < 0 {
-		g.err = ErrHeader
-		return
-	}
-	g.crudo = destino[:n]
-}
-
+// Read: los bytes descomprimidos, de a lo que entre en p.
+//
+// El bucle es por el caso normal del inflate: un paso puede CONSUMIR todo el comprimido y escribir CERO
+// bytes (la zlib esta llenando su ventana), y otro puede devolver menos de lo que entra en p. Se corta
+// cuando hubo salida, cuando la zlib dijo que el flujo termino, o cuando un paso no avanzo por NINGUN lado
+// (ese ultimo caso es un defecto del puente y se declara como error en vez de colgar el motor en un bucle).
 func (g *Reader) Read(p []byte) (int, error) {
 	if g.cerrado {
 		return 0, io.EOF
 	}
-	g.descomprimir()
-	if g.err != nil {
-		return 0, g.err
-	}
-	if g.pos >= len(g.crudo) {
+	if g.fin {
 		return 0, io.EOF
 	}
-	n := copy(p, g.crudo[g.pos:])
-	g.pos += n
-	return n, nil
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if !g.abierto {
+		g.slot = d2cZlibStreamInit()
+		if g.slot < 0 {
+			g.err = ErrHeader
+
+			return 0, g.err
+		}
+		g.abierto = true
+	}
+
+	for {
+		resto := g.comprimido[g.pos:]
+		if len(resto) == 0 {
+			// se acabo el comprimido y la zlib no dijo que termino: el flujo esta cortado
+			g.err = ErrHeader
+
+			return 0, g.err
+		}
+
+		n := d2cZlibStreamStep(g.slot, uintptr(unsafe.Pointer(&resto[0])), int32(len(resto)),
+			uintptr(unsafe.Pointer(&p[0])), int32(len(p)))
+		consumido := int(d2cZlibStreamConsumido(g.slot))
+		termino := d2cZlibStreamFin(g.slot) != 0
+
+		g.pos += consumido
+
+		if n < 0 {
+			g.err = ErrHeader
+
+			return 0, g.err
+		}
+		if termino {
+			g.fin = true
+		}
+		if n > 0 {
+			return int(n), nil
+		}
+		if g.fin {
+			return 0, io.EOF
+		}
+		if consumido == 0 {
+			// ni salida ni consumo: el puente no avanza. Mejor el error que un bucle infinito.
+			g.err = ErrHeader
+
+			return 0, g.err
+		}
+	}
 }
 
-// Close: no hay recurso que soltar.
+// Close: suelta el slot del inflate (el estado de la zlib vive en C, no en el monton de Go).
 func (g *Reader) Close() error {
+	if g.abierto {
+		d2cZlibStreamEnd(g.slot)
+		g.abierto = false
+	}
 	g.cerrado = true
 	g.comprimido = nil
 	return nil

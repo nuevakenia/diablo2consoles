@@ -1,0 +1,137 @@
+DC-002.20 — EL GZIP DE LA CONSOLA CONTRA EL ASSET EMBEBIDO DEL MOTOR (arreglo medido)
+=====================================================================================
+
+Rama DC-002. Fecha: 2026-10-17. Todo medido: el host en x86-64 con el `compress/gzip` de Go, la consola en
+Flycast con el `d2std/compress/gzip` sobre la zlib de KOS. El defecto de partida fue medido en DC-002.19
+(`evidencia/dc-002.19-seleccion-de-archivos.txt`): `panic: assets: bmp.Decode failed: gzip: invalid header`.
+
+COMANDOS
+
+    go run ./console/dc/gen-asset-info                      # la referencia del host
+    bash scripts/console/checar-gzip-220.sh /tmp/gox-00220 20   # el corpus de la consola (POC + mutantes)
+    POC=motor-arranque bash scripts/console/build-motor-arranque.sh /tmp/dcbuild/arranque-220 /tmp/gox-00220
+    bash scripts/console/run-flycast.sh /tmp/dcbuild/arranque-220/prog-emu.elf 30 /tmp/dc-run-arranque220b
+
+
+1. LA CAUSA, MEDIDA (no era la cabecera)
+----------------------------------------
+
+El asset EMBEBIDO del motor (`d2common/d2util/assets`: `CompressedDebugText`, los bytes que deja el
+`go:generate file2byteslice`):
+
+    ASSET-INFO embebido bytes=2209 sha256=5a39cdad158a6ef0336a07154c3aaaec1dbeea6d57dce783ee38f98117b6a631
+    ASSET-INFO embebido cabecera=1f 8b 08 00 00 00 00 00 02 ff ec 9d 51 72 dc 38   (es gzip: 1f 8b)
+    ASSET-INFO descomprimido bytes=98358 sha256=33e0d507837f4c01f7d4d56706de0db471d78b3350ae57441b232f4b1488e1c9
+    ASSET-INFO descomprimido cabecera=42 4d 36 80 01 00 00 00 00 00 36 00 00 00 28 00   ("BM", es BMP)
+    ASSET-INFO descomprimido crc32=5dce3e98
+    ASSET-INFO embebido crc32=aa973211
+    ASSET-INFO bmp ancho=256 alto=128 bits_por_pixel=24
+    ASSET-INFO cota_de_la_consola bytes=74372 (4*2209 + 65536) real=98358 entra=false sobra=-23986
+
+El `gzip` de la consola descomprimia de UNA SOLA VEZ, con el destino calculado por
+`d2c_zlib_inflate_bound` = `4 x comprimido + 64 KB`. Es una REGLA, no una cota: para este asset da 74.372
+bytes y el resultado son 98.358. La zlib devolvia error (el destino no alcanzaba), el puente lo traducia a
+`-1` y el paquete lo traducia a `ErrHeader` -> `gzip: invalid header`. **El mensaje mentia sobre la causa:
+era TAMANO, no cabecera.** Medido tambien del lado de la consola, con el puente de una sola vez:
+
+    GZIP-ASSET embebido bytes= 2209 crc32= 2862035473          (2862035473 = 0xAA973211, igual al host)
+    GZIP-ASSET viejo cota= 74372 devuelto= -1 entra_el_real= false
+
+
+2. EL ARREGLO: INFLATE EN STREAMING (y el destino es el buffer del que lee)
+--------------------------------------------------------------------------
+
+- `console/dc/std/csrc/zlib_dc.c`: cuatro `z_stream` en `.bss` prestados por INDICE (no se guardan punteros
+  a estado de C en el monton de Go). `d2c_zlib_stream_init` hace el mismo `inflateInit2(15 + 32)` (que
+  decide entre zlib y gzip), `d2c_zlib_stream_step` infla un pedazo en el buffer que le pasan y deja el
+  resultado del paso en dos funciones aparte (`d2c_zlib_stream_consumido`, `d2c_zlib_stream_fin`) en vez de
+  punteros de salida: un puntero de salida mal pasado no se nota, un contador que no avanza si.
+- `console/dc/std/compress/gzip/gzip.go`: el `Reader.Read` ya no materializa el resultado: pide bytes en el
+  `p` del que lee. El bucle cubre el caso normal del inflate (un paso que consume todo el comprimido y
+  escribe CERO, y otro que devuelve menos de lo que entra en `p`) y declara error si un paso no avanza por
+  ningun lado, en vez de colgar el motor en un bucle. `Close()` devuelve el slot.
+- Se dejo `d2c_zlib_inflate` (una sola vez) para el paquete `compress/zlib`, con su limite declarado en el
+  control 5 del corpus: la regla `4x + 64 KB` no es una cota y por eso hay un asset que no entra.
+
+Lo que da la consola con el arreglo (POC `console/dc/poc/gzip-asset`, en Flycast):
+
+    GZIP-ASSET nuevo bytes= 98358 crc32= 1573797528 lecturas_de_512= 193
+    GZIP-ASSET nuevo cabecera= 66 77 54 128   (BM)
+    GZIP-ASSET motor bmp.Decode OK ancho= 256 alto= 128
+
+1573797528 = 0x5DCE3E98 y 2862035473 = 0xAA973211: los MISMOS numeros del host, byte a byte por CRC32, y
+con el destino de 512 bytes (193 lecturas). El camino del MOTOR (`gzip.NewReader` + `bmp.Decode`) tambien
+decodifica, que es exactamente la linea que paniqueaba.
+
+
+3. EL ARRANQUE DEL MOTOR, RE-MEDIDO: LA FRONTERA SE MOVIO
+--------------------------------------------------------
+
+Antes (DC-002.19, `evidencia/dc-002.19-arreglo-seleccion.txt`):
+
+    [App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json
+    panic: assets: bmp.Decode failed: gzip: invalid header
+    Memory: arena=2555452 used=2512228 free=43224
+
+Despues, con el mismo romdisk, el mismo motor y el gzip en streaming:
+
+    MOTOR-ARRANQUE config del arranque: MpqPath= /rd/juego archivos en el orden= 7
+    MOTOR-ARRANQUE seleccion: Complete= true Validate.OK()= true archivos que ve= 7 faltan= 0
+    MOTOR-ARRANQUE overlay del listado: archivos= 1 bytes= 12 dirs= 2
+    MOTOR-ARRANQUE seleccion overlay: ReadDir de /rd/prueba-seleccion -> 1 entradas: uno.txt
+    MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+    [App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json
+    Out of memory. Requested sbrk_base 0x8cff6000, was 0x8cfde000, diff 98304
+    fatal error: gc_external_alloc: OOM
+    Memory: arena=2579164 used=2576068 free=3096
+
+Los mismos 10 marcas `MOTOR-ARRANQUE`, la seleccion igual de verde, **el panic del gzip YA NO ESTA** y la
+frontera nueva es la RAM: el BMP de texto decodificado pide 98.304 bytes contiguos y en la arena del motor
+quedan 3.096 libres (2.579.164 de arena, 2.576.068 usados). Es otra tarjeta, con este numero: la imagen de
+texto del motor no entra en el monton tal como esta (DC-002.21).
+
+
+4. EL CORPUS DE LA CONSOLA: 7 CONTROLES Y 3 MUTANTES
+---------------------------------------------------
+
+    bash scripts/console/checar-gzip-220.sh /tmp/gox-00220 20
+
+    == 1. control sano: con el arreglo puesto, los 7 controles
+       control 0 (el host de referencia):      VERDE
+       control 1 (los bytes embebidos):        VERDE
+       control 2 (el gzip en streaming):       VERDE
+       control 3 (la cabecera BM):             VERDE
+       control 4 (el camino del motor):        VERDE
+       control 5 (el defecto declarado):       VERDE
+       control 6 (las 6 marcas exactas):       VERDE
+       OK: 7/7 controles verdes con el codigo de ahora
+         GZIP-ASSET embebido bytes= 2209 crc32= 2862035473
+         GZIP-ASSET viejo cota= 74372 devuelto= -1 entra_el_real= false
+         GZIP-ASSET viejo la zlib devolvio error: el gzip de la consola lo traduce a invalid header
+         GZIP-ASSET nuevo bytes= 98358 crc32= 1573797528 lecturas_de_512= 193
+         GZIP-ASSET nuevo cabecera= 66 77 54 128  (host: 66 77 54 128, o sea BM)
+         GZIP-ASSET motor bmp.Decode OK ancho= 256 alto= 128
+         (lineas GZIP-ASSET de la corrida: 6)
+
+El control 0 corre `go run ./console/dc/gen-asset-info` en el host: si el host no da 2.209 / 98.358 /
+crc32 5dce3e98 / 256x128, no hay con que comparar y el corpus no arranca. Los controles 1 a 4 son la
+consola. El 5 exige que el camino VIEJO SIGA fallando (el limite declarado de la regla `4x + 64 KB`): el dia
+que alguien la cambie, ese control se pone ROJO a proposito.
+
+    == mutante 'pos-de-un-tiro'    (Go: g.pos = len(g.comprimido) en vez de += consumido)
+       control 2 ROJO, control 3 ROJO, control 4 ROJO, control 6 ROJO (4 marcas)
+       cazado   /  arbol restaurado (gzip.go)
+    == mutante 'consumido-cero'    (C: d2c_zs_consumido = 0)
+       control 2 ROJO, control 3 ROJO, control 4 ROJO, control 6 ROJO (4 marcas)
+       cazado   /  arbol restaurado (zlib_dc.c)
+    == mutante 'ventana-sin-gzip'  (C: inflateInit2(15) en vez de 15 + 32)
+       control 2 ROJO, control 3 ROJO, control 4 ROJO, control 6 ROJO (4 marcas)
+       cazado   /  arbol restaurado (zlib_dc.c)
+
+    == 3. control sano de vuelta (el arbol entero, sin mutar): 7/7 VERDE
+    == 3/3 mutantes cazados ==
+
+Los tres mutantes son el mismo defecto de los tres lados: el lector de Go (cuanto avanzo), el contador del
+puente C (cuanto consumio) y la ventana de la zlib (si reconoce la cabecera gzip). Los tres ponen rojo el
+mismo control, que es el que mide los 98.358 bytes con el CRC32 del host.
+
