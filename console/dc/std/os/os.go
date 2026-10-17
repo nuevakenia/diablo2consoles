@@ -467,3 +467,21 @@ func (f *File) ReadAt(p []byte, off int64) (n int, err error) {
 	}
 	return n, err
 }
+
+// ---------------------------------------------------------------- las banderas de OpenFile
+//
+// Las pide d2hero (d2s_lock_unix.go arma la bandera de abrir el archivo de guardado). Los valores son los
+// de Go, que a su vez son los de linux, porque el motor los puede estar combinando y comparando.
+//
+// En la consola el romdisk es de SOLO LECTURA: abrir con banderas de escritura compila y no va a poder
+// (devuelve el error de solo lectura, que ya esta declarado en este paquete).
+const (
+	O_RDONLY int = 0x0
+	O_WRONLY int = 0x1
+	O_RDWR   int = 0x2
+	O_APPEND int = 0x400
+	O_CREATE int = 0x40
+	O_EXCL   int = 0x80
+	O_SYNC   int = 0x101000
+	O_TRUNC  int = 0x200
+)

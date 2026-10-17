@@ -76,7 +76,12 @@ mutacion() { # <nombre> <archivo> <buscar> <poner> <goarch>
     # cayera por tiempo y el mutante se diera por "cazado" sin que la suite hubiera dicho nada (medido
     # en DC-002.8: dos mutantes salieron rojos por "test timed out" y no por un aserto). El control sano
     # de arriba (que corre la suite sin mutar) es el que dice si el tiempo alcanza.
-    (cd "$STD" && GOARCH="$arch_go" go test -timeout 60s ./difftest/ >"$TMP/salida" 2>&1)
+    # OJO: hay que correr TODO lo que tiene pruebas, no solo el corpus del difftest. Medido (mutantes 33
+    # y 34, los del regexp): con "./difftest/" solo, la prueba del regexp no se ejecutaba y dos mutantes
+    # reales salieron "NO CAZADOS" sin serlo -- un hueco del mutador disfrazado de hueco de la suite. Los
+    # paquetes con pruebas propias (como regexp) tienen que entrar.
+    PAQ_TEST="$(cd "$STD" && go list ./... | grep -vE "$EXCLUIDOS" | tr '\n' ' ')"
+    (cd "$STD" && GOARCH="$arch_go" go test -timeout 60s $PAQ_TEST >"$TMP/salida" 2>&1)
     # ROJO es que un test falle (--- FAIL), pero tambien lo es que el proceso se caiga: el mutante del
     # ancho del elemento de sort lee memoria con el ancho equivocado y revienta con SIGSEGV, sin llegar
     # a imprimir "--- FAIL". Las dos cosas son la suite cazando el defecto (medido: 0x3b47b99ec570).
@@ -428,14 +433,14 @@ mutacion "image: Rectangle.In con la contencion al reves" \
 
 # --- el regexp: el + deja de ser greedy (es el defecto que aparecio de verdad al escribir el motor de
 #     vuelta atras: "aaa+" devolvia "a"). Si la prueba contra el regexp de Go no lo caza, no sirve.
-chequeo "regexp: el + no es greedy (devuelve la coincidencia mas corta)" \
+mutacion "regexp: el + no es greedy (devuelve la coincidencia mas corta)" \
     "regexp/regexp.go" \
     $'\tvar salida []int\n\tif n.max < 0 || hechas < n.max {\n\t\tsalidas := r.coincide(n.sub[0], texto, pos, caps)\n\t\tfor _, p := range salidas {\n\t\t\tif p == pos {\n\t\t\t\tcontinue\n\t\t\t}\n\t\t\tsalida = append(salida, r.repetir(n, texto, p, caps, hechas+1)...)\n\t\t}\n\t}\n\tsalida = append(salida, pos)' \
     $'\tvar salida []int\n\tsalida = append(salida, pos)\n\t_ = hechas' \
     amd64
 
 # --- el regexp: la clase negada deja de negar (\D pasaria a ser \d)
-chequeo "regexp: la clase negada [^...] no niega" \
+mutacion "regexp: la clase negada [^...] no niega" \
     "regexp/regexp.go" \
     $'\tif c.negada {\n\t\treturn !esta\n\t}' \
     $'\tif c.negada {\n\t\treturn esta\n\t}' \
