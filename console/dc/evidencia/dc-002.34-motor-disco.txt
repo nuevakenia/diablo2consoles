@@ -177,4 +177,4 @@ Corrida de cierre de esta tarjeta: **8/8 controles OK, 0 fallos** (exit 0), y lo
 identicos en dos corridas completas separadas (los unicos que se mueven son los del reparto negro/licencia de
 la seccion de la pantalla, por el instante de la captura).
 Los artefactos crudos de esta corrida quedan en ~/.hermes/cache/scratch/corpus-234/ (los logs de Flycast de
-cada estado, las 80 capturas y las cuatro ISO).
+cada estado, las ~86 capturas y las cinco ISO).
