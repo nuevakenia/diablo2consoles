@@ -51,6 +51,18 @@ nota() { echo "   $*"; }
 verde() { OK=$((OK + 1)); echo "   OK: $*"; }
 rojo() { FALLOS=$((FALLOS + 1)); echo "   FALLO: $*"; }
 
+# EL ESTADO DEL ARCHIVO ANTES DE MEDIR (DC-002.29). El mutante A se aplica a `crypto.go` y ya se midio que
+# antes quedaba PEGADO cuando no se corria la parte de consola (MUTANTE_RESERVA=1): el arbol quedaba mutado
+# (sha256 c38e234f545b30a0 con el mutante contra 4a59a9cd8d99e87e sin el) y la proxima corrida daba el
+# control 1 en rojo con un diagnostico falso ("el camino por trozos se rompio"). Se dice ANTES de medir.
+# OJO: esto va DESPUES de las funciones (nota/verde/rojo) o el shell dice "nota: orden no encontrada".
+ESTADO_INICIAL="$("$DC_PYTHON" "$MUT" --estado 2>/dev/null | grep -a 'una sola reserva' | sed 's/^ *//')"
+if [ "${ESTADO_INICIAL##*: }" = "no" ]; then
+    verde "control 0b: el mutante A NO esta puesto al empezar ($ESTADO_INICIAL)"
+else
+    rojo "control 0b: el archivo ya trae el mutante A pegado ($ESTADO_INICIAL): correr $MUT --restaurar antes de medir"
+fi
+
 # ================================================================================================
 # 0. LA CARPETA QUE SE HORNEA Y EL ESTADO DE LOS PARCHES DE LOS QUE DEPENDE
 # ================================================================================================
@@ -154,9 +166,31 @@ CAPTURE=none bash "$HERE/run-flycast.sh" "$M/disc.gdi" "$SEGS" "$SAL/run-motor" 
 LM="$SAL/run-motor/flycast.log"
 
 # control 4: el motor YA NO muere en el OOM de las tablas (el de DC-002.27)
+#
+# DC-002.29: ademas del OOM, este control exige las MARCAS del motor, que desde DC-002.29 SI salen
+# (antes no podia: el binario colgaba mudo y no imprimia ni la primera marca). Y OJO con la camada:
+# desde DC-002.29 esta medido que el `.gox` de gccgo se tiene que enlazar con la camada del MISMO
+# estado del arbol. Si la camada del corpus ($GEN) no es la del arbol de trabajo, el motor NO arranca
+# (muere adentro de los `init`) y este control tiene que ponerse rojo con ese aviso, no pasar de largo:
+# para medir el motor hay que apuntar CAMADA_MOTOR a una camada coherente (p.ej. /tmp/gox-330, armada
+# con build-std-gox.sh + build-motor-all.sh).
+CAMADA_MOTOR="${CAMADA_MOTOR:-$GEN}"
+if [ "$CAMADA_MOTOR" != "$GEN" ]; then
+    nota "la camada del motor es $CAMADA_MOTOR (no la del corpus, $GEN)"
+    MKISO_JOLIET=0 DC_RUTA_DATOS=/cd/juego DC_MPQ_JUEGO=patch_d2.mpq,d2data.mpq,d2char.mpq \
+        DC_SIN_SELLOS=1 DC_DISCO_JUEGO="$SAL/juego" POC=motor-disco \
+        bash "$HERE/build-motor-arranque.sh" "$M" "$CAMADA_MOTOR" > "$M.build.log" 2>&1 || true
+    CAPTURE=none bash "$HERE/run-flycast.sh" "$M/disc.gdi" "$SEGS" "$SAL/run-motor" >/dev/null 2>&1
+    LM="$SAL/run-motor/flycast.log"
+fi
+MARCAS_MOTOR="$(grep -ac 'main.main-entra' "$LM")"
 if [ "$(grep -ac 'gc_external_alloc: OOM' "$LM")" = "0" ] &&
-   [ "$(grep -ac 'C-CONSTRUCTOR\|MOTOR-DISCO' "$LM")" -ge 1 ]; then
-    verde "control 4: el motor pasa el OOM de las tablas (la pared de ahora NO es el monton de C)"
+   [ "$(grep -ac 'C-CONSTRUCTOR\|MOTOR-DISCO' "$LM")" -ge 1 ] &&
+   [ "$MARCAS_MOTOR" -ge 1 ]; then
+    verde "control 4: el motor pasa el OOM de las tablas, ARRANCA e imprime sus marcas (main.main-entra=$MARCAS_MOTOR)"
+elif [ "$(grep -ac 'gc_external_alloc: OOM' "$LM")" = "0" ] &&
+     [ "$(grep -ac 'C-CONSTRUCTOR\|MOTOR-DISCO' "$LM")" -ge 1 ]; then
+    rojo "control 4: el motor imprime el constructor pero NO llega a main (main.main-entra=0): la camada del motor ($CAMADA_MOTOR) no es coherente con el arbol. Ver evidencia/dc-002.29 (seccion 8)"
 else
     rojo "control 4: el motor ni arranca o vuelve el OOM (ver $LM)"
 fi
@@ -240,6 +274,14 @@ if [ "${MUTANTE_RESERVA:-0}" = "1" ]; then
         rojo "el archivo NO quedo como estaba ($SHA_ANTES contra $SHA_FIN)"
 else
     nota "el mutante A en la consola no se corrio (MUTANTE_RESERVA=1 lo corre: recompila d2mpq con la reserva unica y exige que el monton de C se mueva)"
+    # OJO (DC-002.29, medido): el mutante A se aplico ARRIBA para el host y hay que LEVANTARLO. Antes
+    # quedaba pegado en `crypto.go` (el `--estado` del final decia "mutante A (una sola reserva): PUESTO")
+    # y el arbol quedaba mutado para la corrida siguiente.
+    "$DC_PYTHON" "$MUT" --restaurar > /dev/null 2>&1
+    SHA_POST_A="$(sha256sum "$CRYPTO" | awk '{print $1}')"
+    [ "$SHA_ANTES" = "$SHA_POST_A" ] &&
+        verde "mutante A levantado: el archivo quedo con el mismo sha256 ($SHA_POST_A)" ||
+        rojo "mutante A quedo PEGADO en el archivo ($SHA_ANTES contra $SHA_POST_A)"
 fi
 
 "$DC_PYTHON" "$MUT" --estado

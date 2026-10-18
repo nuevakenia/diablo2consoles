@@ -157,3 +157,126 @@ de una manera que el arranque no aguanta -- y no lo aguanta NINGUN cambio de cod
 ni su mitad. La prueba que lo confirma o lo tira: armar la camada COHERENTE del arbol de
 trabajo (stdlib + los 142) y medir con ella. Eso esta en el corpus
 (`scripts/console/checar-rearme-229.sh`).
+
+8. LA PRUEBA QUE CIERRA EL CASO: LA CAMADA COHERENTE DEL ARBOL DE TRABAJO
+--------------------------------------------------------------------------
+Se armo una camada ENTERA del arbol de trabajo (HEAD 0a9c182d) en /tmp/gox-330:
+`build-std-gox.sh` (la stdlib minima, 51 .gox) + `build-motor-all.sh` (**142 de 142** paquetes,
+206 .gox en total; los terceros --otto, ebiten-- son fuentes vendorizadas que no cambiaron y se
+copiaron de la camada de referencia: 55 .gox). Con ESA camada:
+
+  (a) el rearme de `d2mpq` con `recompilar-paquete-motor.sh` deja el `.text` IGUAL (0x399c antes y
+      despues), y el binario enlazado queda con el `.text` y el `.rodata` BYTE A BYTE iguales al de
+      la camada SIN rearmar:
+          rearmado     .text 5.001.880 B  sha256 21fc2196ce7297f1   .rodata 5.914.272 B sha256 48698cc94679f4d2
+          sin rearmar  .text 5.001.880 B  sha256 21fc2196ce7297f1   .rodata 5.914.272 B sha256 48698cc94679f4d2
+      (los 32 bytes que difiere el `prog.elf` entero --44.043.776 contra 44.043.808-- son del debug;
+      `.data` 1.760.412 B en los dos)
+  (b) y el MOTOR ARRANCA. Dos corridas de 30 s, identicas:
+          marcas=41  main.main=1  cuadros=0  arranques=2  gc_collect=11
+          ultima marca: ARQ-MARCA gc-por-umbral-bytes-usados v=480736
+          Unhandled exception: PC 0000085b, code 1
+
+O sea: con la camada del arbol, el rearme no cambia NADA del codigo y el arranque pasa los 119
+`init`, entra a `main.main` (marca `main.main-entra`) y el motor corre 11 recolecciones del GC hasta
+la PARED: 480.736 bytes usados del semiespacio de 512 KiB, y muere ANTES del primer cuadro
+(`cuadros=0`). Esa pared es la de DC-002.28 (un objeto de Go por entrada de la tabla del MPQ, que es
+lo que el codigo nuevo de d2mpq hace) y es otra tarjeta: lo que estaba roto ACA era el ARRANQUE.
+
+LA CAUSA (medida, corregida respecto de la hipotesis del cuerpo de la tarjeta): el `.gox` de gccgo no
+es autocontenido, y el enlace solo es sano con la camada del MISMO estado del arbol. MEZCLAR (el
+camino que traia la tarjeta: recompilar el `d2mpq` del arbol contra la camada de DC-002.20/DC-002.27)
+mata el arranque adentro de los `init`; con la camada COHERENTE el mismo rearme es un no-op y el motor
+arranca. No es la fragilidad de layout: E1 (seccion 2) es un rearme y arranca, y los dos medios
+cambios de DC-002.27 (seccion 3) mueren los dos. El arreglo es de procedimiento y queda en el corpus:
+la camada se rehace (`build-std-gox.sh` + `build-motor-all.sh`) cuando cambia el codigo de un paquete
+que se va a medir; el rearme corto solo vale para un paquete cuya fuente NO cambio (y ahi el `.text`
+sale identico: control 1 del corpus).
+
+9. EL CORPUS, CORRIDO DE PUNTA A PUNTA: 8/8 (y DOS DEFECTOS DEL PROPIO CORPUS, arreglados)
+--------------------------------------------------------------------------------------------
+La corrida autonoma siguiente (2026-10-18 05:2x) encontro que el corpus de arriba estaba ESCRITO pero
+NUNCA HABIA CORRIDO HASTA EL FINAL: `scripts/console/checar-rearme-229.sh` moria en el control 4
+(`exit 1`) y los controles 5, 6 y 7 no se ejecutaban nunca. Los dos defectos, medidos y arreglados:
+
+(a) CONTROL 4: la extraccion de la fuente vieja usaba `--strip-components=4`, y con 4 el `tar` **no
+    extrae NADA** (los miembros son `d2common/d2fileformats/d2mpq/<archivo>.go`: 4 componentes => el
+    archivo queda sin nombre). Medido: el directorio sale VACIO, el glob `*.go` no matchea y `gccgo`
+    corta el script entero. Se corrigio a **3** (quedan los `.go` sueltos) y ademas se filtran los
+    `_test.go` (gccgo no filtra por sufijo y piden `testing`/testify), igual que hace
+    `recompilar-paquete-motor.sh`. Ahora el control 4 compila **10 archivos** y deja
+    `d2mpq.gox` de **204.640 B** con `.text 0x36f0`: **exactamente el `.text` de la camada de referencia
+    (0x36f0)** -> el rearme con SU PROPIA fuente es un no-op, que es lo que el control tiene que mostrar.
+    Y si el `.gox` no compila, el control se marca ROJO y **no se corre** (correr la copia de la camada
+    daria un verde falso): el `exit 1` se fue.
+
+(b) CONTROL 6: comparaba las lineas `(indice, DIRECCION, simbolo)` del volcado, y las DIRECCIONES se
+    corren con el layout (el `d2mpq` nuevo agranda el binario). Daba ROJO con la lista siendo la MISMA.
+    Medido: **119 entradas identicas** en indice y simbolo, y **71 lineas** que solo difieren en la
+    direccion (la primera: `8c45992c` -> `8c459bd8`). Se corrigio a comparar `(indice, simbolo)`.
+
+**La corrida verde, con los numeros** (`SAL=…/corpus-229b COHERENTE=/tmp/gox-330
+checar-rearme-229.sh /tmp/gox-240 30`, Flycast 30 s por corrida):
+
+    == RESULTADO: 8 controles OK, 0 con fallo, 0 saltados
+    control 0  camada de referencia /tmp/gox-240: 206 .gox, 142 paquetes; d2mpq.gox 204.656 B (.text 0x36f0)
+    control 1  los 4 paquetes sin cambios conservan el .text (d2hero 116400, d2loader/mpq 1640,
+               d2netpacket 23760, d2player 489792)
+    control 2  los dos rearmes dan el mismo .gox (sha256 25f97728c10b51af)
+    control 3  la camada de referencia ARRANCA:  marcas=27 main.main=1 cuadros=1 arranques=1 gc_collect=4
+    control 4  la camada + d2mpq de su propia fuente: marcas=27 main.main=1 cuadros=1 arranques=1 gc_collect=4
+               (IDENTICO al 3: rearmar no rompe nada)
+    control 5  la camada + d2mpq del ARBOL DE TRABAJO: marcas=16 main.main=0 cuadros=0 arranques=2
+               gc_collect=0, ultima marca `main_wrapper-entra v=0`  (el defecto, vigilado)
+    control 6  la lista de los init es la MISMA: 119 entradas, mismos simbolos y mismo orden
+    control 7a sobre la camada del arbol (/tmp/gox-330) el rearme NO cambia el .text (0000399c)
+    control 7b con la camada del arbol el motor ARRANCA: marcas=41 main.main=1 cuadros=0 arranques=2
+               gc_collect=11
+
+**El mutante, sobre la camada COHERENTE** (`mutar-rearme-229.py --camada /tmp/gox-330`):
+
+    control sano (sin la linea del mutante):  .text 0x399c IDENTICO -> "la camada ES del arbol del repo"
+    con la linea del mutante:                 .text 0x39d4  != 0x399c  -> MUTANTE CAZADO (control 1 rojo)
+
+**Re-verificado en el binario de HOY** (secciones del ELF de la corrida 7, `sh-elf-objcopy` + sha256):
+`.text` **5.001.880** sha256 `21fc2196ce7297f1`, `.rodata` **5.914.272** sha256 `48698cc94679f4d2`,
+`.data` **1.760.412** -> los numeros de la seccion 8(a) se confirman con otro binario; y las marcas de la
+corrida 7 terminan en `gc-por-umbral-bytes-usados v=480736` -> `gc_collect v=11` -> `Unhandled exception:
+PC 0000085b, code 1`, como en la seccion 8(b).
+
+10. CRITERIO 3: EL CONTROL 4 DEL CORPUS DE DC-002.28, OTRA VEZ CON LAS MARCAS
+----------------------------------------------------------------------------
+`scripts/console/checar-reservas-228.sh` (el corpus de DC-002.28) se corrio con el arranque arreglado:
+`GEN=/tmp/gox-228` (la camada vieja) y **`CAMADA_MOTOR=/tmp/gox-330`** (la coherente del arbol), 75 s de
+motor. **8 controles OK, 0 con fallo**, y el control 4 ahora exige las MARCAS:
+
+    OK: control 4: el motor pasa el OOM de las tablas, ARRANCA e imprime sus marcas (main.main-entra=1)
+    MOTOR-DISCO marca 2: entrando a d2app.Create()  /  marca 3: Create() volvio, entrando a Run()
+    [App] loaded configuration file from /rd/OpenDiablo2/config.json
+    [App] display 800x600, ui scale 1
+    [File Loader] Adding source: '/cd/juego/patch_d2.mpq'
+    MOTOR-DISCO monton de C antes del motor: 1176 bytes libres
+
+Y si la camada del motor NO es la del arbol, el control se pone rojo diciendolo (y existe porque si no,
+el rojo se leeria como "el motor no arranca" en vez de "la camada no es coherente").
+
+**Un tercer defecto, tambien del corpus de DC-002.28, medido y arreglado:** su mutante A (`crypto.go`
+con la reserva unica) se aplicaba para el control del HOST y **quedaba PEGADO en el archivo** cuando no
+se corria la parte de consola (`MUTANTE_RESERVA=1`): al terminar, `--estado` decia
+`mutante A (una sola reserva): PUESTO` y `crypto.go` tenia sha256 `c38e234f545b30a0` contra el limpio
+`4a59a9cd8d99e87e`. El arbol quedaba MUTADO para la corrida siguiente (y el control 1 daria rojo con el
+diagnostico falso "el camino por trozos se rompio"). Se agrego el levantamiento del mutante al final de
+la rama sin consola + su control de sha256, y un `control 0b` al EMPEZAR que dice si el mutante ya
+estaba puesto antes de medir algo.
+
+11. EL ESTADO DE LOS CRITERIOS DE LA TARJETA (declarado, no tapado)
+--------------------------------------------------------------------
+1. "el binario del motor rearmado ARRANCA, imprime sus marcas y llega al cuadro 2": **PARCIAL y
+   declarado.** Arranca y las marcas salen (control 7b: `main.main=1`, 41 marcas, 11 recolecciones del
+   GC); **no** llega al cuadro (`cuadros=0`) porque muere en la PARED DEL SEMIESPACIO DEL GC (480.736
+   bytes usados de los 512 KiB, `PC 0000085b`), que es la de DC-002.28 (un objeto de Go por entrada de
+   la tabla del MPQ) y tiene sus palancas en las tarjetas abiertas DC-002.30 (resolucion), DC-002.31
+   (assets sueltos) y DC-002.32 (peso del binario). El defecto de ESTA tarjeta —que el rearme mataba el
+   arranque— quedo localizado, explicado y con su corpus vigilando.
+2. re-medir el arranque con las tablas por trozos: hecho (secciones 7, 9 y 10).
+3. el control 4 del corpus de DC-002.28 exigiendo las MARCAS: hecho y medido (seccion 10).

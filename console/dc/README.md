@@ -3021,9 +3021,24 @@ lista, el tamano, las rutas, el compilador), no cual es el mecanismo exacto del 
 **La hipotesis que queda viva** (y su prueba): el `.gox` de gccgo **no es autocontenido** (lleva los
 cuerpos inlineados y los numeros de tipo de sus imports, con la camada en la que se compilo), asi que
 mezclar un `.gox` de un arbol con los del otro cambia el binario de una forma que el arranque no
-aguanta — y no la aguanta **ningun** cambio de codigo de `d2mpq`, ni su mitad. La prueba es armar la
-**camada coherente** del arbol de trabajo (stdlib + los 142) y medir con ella; el corpus ya la
-contempla y el resultado se anota en la tarjeta.
+aguanta — y no la aguanta **ningun** cambio de codigo de `d2mpq`, ni su mitad.
+
+**Y la prueba, hecha: la camada COHERENTE.** Se armo la camada entera del arbol de trabajo
+(`build-std-gox.sh` + `build-motor-all.sh`: **142 de 142** paquetes, 206 `.gox`) en `/tmp/gox-330` y
+con ella:
+
+- el rearme de `d2mpq` **no cambia nada**: el binario enlazado queda con `.text` (5.001.880 B, sha256
+  `21fc2196ce7297f1`) y `.rodata` (5.914.272 B, sha256 `48698cc94679f4d2`) **byte a byte** iguales a
+  los de la camada sin rearmar (lo unico que difiere del `prog.elf` entero son 32 bytes de debug:
+  44.043.776 contra 44.043.808);
+- y el **motor arranca**: dos corridas de 30 s identicas dan `marcas=41 main.main=1 arranques=2
+  gc_collect=11`, con la ultima marca en `gc-por-umbral-bytes-usados v=480736` y la muerte en
+  `PC 0000085b`.
+
+O sea: pasa los **119** `init`, entra a `main.main` y corre **11 recolecciones del GC** hasta la
+**pared de 480.736 bytes** usados del semiespacio de 512 KiB — muere antes del primer cuadro
+(`cuadros=0`). Esa pared es la de DC-002.28 (un objeto de Go por entrada de la tabla del MPQ) y es
+otra tarjeta; lo que estaba roto aca era el **arranque**, y era **mezclar la camada**.
 
 **Corpus.** `scripts/console/checar-rearme-229.sh` (host + consola, se arma solo: saca la fuente vieja
 con `git archive`): control 1 = recompilar un paquete sin cambios conserva el `.text`; control 2 = el
@@ -3031,8 +3046,47 @@ rearme es determinista; control 3 = la camada de referencia llega al cuadro; con
 `d2mpq` de **su propia fuente** tambien llega al cuadro (el que tira abajo la hipotesis "rearmar
 rompe"); control 5 = la camada + `d2mpq` del arbol de trabajo **muere en los `init`** (el defecto,
 vigilado: si algun dia deja de morir, el corpus se pone rojo para que se revise el limite); control 6 =
-la lista de los `init` es la misma. Mutante: `scripts/console/mutar-rearme-229.py --fuente-tocada`
-rompe la coherencia de la camada y el control 1 tiene que ponerse **rojo** (es exactamente el estado
-que mata el arranque).
+la lista de los `init` es la misma; **control 7 (el ARREGLO)** = sobre la camada coherente del arbol
+(`COHERENTE=/tmp/gox-330`) el rearme no cambia el `.text` y el motor ARRANCA (`main.main=1` y las
+recolecciones del GC). Mutante: `scripts/console/mutar-rearme-229.py --fuente-tocada` rompe la
+coherencia de la camada y el control 1 tiene que ponerse **rojo** (es exactamente el estado que mata
+el arranque).
+
+**El corpus, corrido de punta a punta: 8/8 controles verdes y 1/1 mutante cazado — y TRES defectos del
+propio corpus, medidos y arreglados.** El corpus de arriba estaba escrito pero **nunca habia corrido hasta
+el final**: moria en el control 4. (1) ese control sacaba la fuente vieja con `--strip-components=4`, y con
+4 el `tar` **no extrae nada** (directorio vacio, medido) -> `gccgo` cortaba el script y los controles 5, 6 y
+7 no corrian nunca; iba con 3 y sin filtrar los `_test.go` (que gccgo no filtra y piden `testing`). Ahora
+compila **10 archivos**, deja `d2mpq.gox` de **204.640 B** con `.text 0x36f0` — **el mismo `.text` de la
+camada de referencia** — y si no compila se marca rojo **sin correr** (correr la copia daria un verde
+falso). (2) el control 6 comparaba las **direcciones** de los `init`, que se corren con el layout (el
+`d2mpq` nuevo agranda el binario): daba rojo con la lista siendo la misma — **119 entradas identicas** en
+indice y simbolo, **71 lineas** que difieren solo en la direccion (`8c45992c` -> `8c459bd8`); ahora compara
+`(indice, simbolo)`. (3) el corpus de DC-002.28 dejaba su **mutante A pegado** en `crypto.go` cuando no
+corria la parte de consola (sha256 `c38e234f545b30a0` con el mutante contra `4a59a9cd8d99e87e` limpio): el
+arbol quedaba mutado para la corrida siguiente; se agrego el levantamiento + su control de sha256, y un
+`control 0b` al empezar que dice si el mutante ya estaba puesto.
+
+Los numeros de la corrida (Flycast 30 s por corrida, `COHERENTE=/tmp/gox-330`): control 1 los 4 `.text`
+iguales; control 2 determinista (sha256 `25f97728c10b51af`); control 3 la camada de referencia ARRANCA
+(`marcas=27 main.main=1 cuadros=1 gc_collect=4`); control 4 con el `d2mpq` de su propia fuente da
+**exactamente lo mismo** (`marcas=27 main.main=1 cuadros=1 gc_collect=4`) — rearmar no rompe nada; control 5
+el rearme corto contra la camada vieja **muere adentro de los `init`** (`main.main=0 cuadros=0
+gc_collect=0`, ultima marca `main_wrapper-entra v=0`); control 6 la lista es la misma; control 7 sobre la
+camada coherente el rearme **no cambia el `.text`** (`0000399c`) y el motor **arranca**
+(`marcas=41 main.main=1 gc_collect=11`). El mutante sobre la camada coherente: control sano `.text 0x399c`
+identico (la camada **es** del arbol) y con la linea del mutante `0x39d4` -> **cazado**.
+
+**Y el control 4 del corpus de DC-002.28, otra vez con las marcas** (`CAMADA_MOTOR=/tmp/gox-330`,
+`GEN=/tmp/gox-228`, 75 s): **8 controles verdes**, con
+`main.main-entra=1` y el motor pasando `Create()`, leyendo `config.json` del romdisk (`display 800x600`) y
+empezando a cargar `/cd/juego/patch_d2.mpq` con **1.176 bytes libres** en el monton de C antes del motor.
+Si la camada del motor no es la del arbol, el control se pone **rojo diciendolo**.
+
+**El estado de los criterios, declarado:** el criterio 1 (el rearmado arranca, imprime marcas y **llega al
+cuadro 2**) queda **parcial**: arranca y las marcas salen, pero **`cuadros=0`** porque muere en la **pared
+del semiespacio del GC** (480.736 bytes usados de 512 KiB, `PC 0000085b`) — la pared de DC-002.28, con sus
+palancas en las tarjetas abiertas DC-002.30 (resolucion), DC-002.31 (assets sueltos) y DC-002.32 (peso del
+binario). Los criterios 2 y 3 quedan medidos (secciones 9 y 10 de la evidencia).
 
 Evidencia cruda: `evidencia/dc-002.29-arranque-rearmado.txt`.

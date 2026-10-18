@@ -4,21 +4,32 @@
 # QUE MIDE (host + consola). El defecto de la tarjeta era: "recompilar un paquete del motor y
 # reenlazar deja un binario que muere MUDO adentro de los `init`". Lo que este corpus exige:
 #
-#  1. HOST: recompilar un paquete cuya fuente NO cambio reproduce su `.text` BYTE A BYTE. (No el
-#     sha256 del `.gox`: el sha SIEMPRE cambia, porque los caminos del debug cambian de forma
-#     --medido--; lo que importa es el CODIGO.) Si el `.text` cambia, la camada ya no es coherente
-#     con el arbol y cualquier medicion de arriba es humo.
+#  1. HOST: recompilar un paquete cuya fuente NO cambio reproduce su `.text` BYTE A BYTE (4 paquetes de
+#     tamanos distintos). (No el sha256 del `.gox`: el sha siempre cambia, porque los caminos del debug
+#     cambian de forma --medido--; lo que importa es el CODIGO.) Si el `.text` cambia, la camada ya no
+#     es coherente con el arbol y cualquier medicion de arriba es humo.
 #  2. HOST: el compilador es determinista: dos rearmes de d2mpq dan el mismo `.gox` byte a byte.
-#  3. HOST: la lista de los `init` de `___go_init_main` es la MISMA en el binario que anda y en el
-#     que muere (119 llamadas) -> no es la lista ni el orden.
-#  4. CONSOLA (control sano): la camada de referencia, reenlazada tal cual, ARRANCA y llega al cuadro.
-#  5. CONSOLA (el control que ordena todo): la MISMA camada con d2mpq compilado de SU PROPIA fuente
-#     (la del commit con el que se armo la camada, 6e85010b) TAMBIEN ARRANCA. O sea: rearmar no rompe
-#     nada; lo que rompe es el CODIGO NUEVO contra la camada vieja.
-#  6. CONSOLA (el DEFECTO, vigilado): la camada + d2mpq de la fuente del arbol de trabajo MUERE
-#     adentro de los `init` (0 main.main, 0 cuadros, ultima marca `main_wrapper-entra`). Este es el
-#     defecto que la tarjeta vino a localizar y que NO esta arreglado: si un dia deja de morir, el
-#     corpus se pone ROJO para que se revise el limite, no para taparlo.
+#  3. CONSOLA (control sano): la camada de referencia (la de DC-002.20), reenlazada tal cual, ARRANCA y
+#     llega al cuadro.
+#  4. CONSOLA (el control que ordena todo): la MISMA camada con d2mpq compilado de SU PROPIA fuente (la
+#     del commit con el que se armo la camada, 6e85010b) TAMBIEN ARRANCA. O sea: rearmar no rompe nada.
+#  5. CONSOLA (el DEFECTO, vigilado): la camada VIEJA + d2mpq de la fuente del arbol de trabajo MUERE
+#     adentro de los `init` (0 main.main, 0 cuadros, ultima marca `main_wrapper-entra`). Es el LIMITE
+#     medido: MEZCLAR camadas mata el arranque. Si un dia deja de morir, el corpus se pone ROJO para que
+#     se revise el limite, no para taparlo.
+#  6. CONSOLA: la lista de los `init` de `___go_init_main` es la MISMA en el binario que anda y en el
+#     que muere (119 entradas, mismos simbolos y mismo orden) -> no es la lista ni el orden. Las
+#     DIRECCIONES se corren con el layout (el d2mpq nuevo agranda el binario) y no cuentan.
+#  7. CONSOLA (EL ARREGLO, DC-002.29): la camada COHERENTE del arbol de trabajo (armada con
+#     build-std-gox.sh + build-motor-all.sh; ver $COHERENTE): (a) rearmar d2mpq NO cambia su `.text` y
+#     (b) el motor ARRANCA (main.main=1). Sobre la camada del MISMO estado del arbol el rearme es un
+#     no-op y el arranque es sano.
+#
+# LA CAUSA (medida en DC-002.29): el `.gox` de gccgo NO es autocontenido (lleva los cuerpos inlineados y
+# los numeros de tipo de sus imports, con la camada con la que se compilo), asi que el enlace solo es
+# sano con la camada del MISMO estado del arbol. El arreglo es de PROCEDIMIENTO: la camada se rehace
+# cuando cambia el codigo de un paquete que se va a medir; el rearme corto solo vale para un paquete
+# cuya fuente NO cambio (y ahi el `.text` sale identico: control 1).
 #
 # MUTANTE: scripts/console/mutar-rearme-229.py --fuente-tocada rompe la coherencia de la camada
 # (compila d2mpq de una fuente con una linea de mas) y el control 1 tiene que ponerse ROJO: eso es
@@ -44,6 +55,7 @@ FUENTE_VIEJA="$SAL/src-$COMMIT_VIEJO"
 mkdir -p "$SAL"
 OK=0
 FALLOS=0
+SALTADOS=0
 verde() { OK=$((OK + 1)); echo "   OK: $*"; }
 rojo() { FALLOS=$((FALLOS + 1)); echo "   FALLO: $*"; }
 nota() { echo "   $*"; }
@@ -124,23 +136,35 @@ nota "ultima marca: $UELTIMA_"
     verde "control 3: la camada de referencia llega al cuadro ($CUADROS_ cuadros)" ||
     rojo "control 3: la camada de referencia NO llega al cuadro (main.main=$MAIN_ cuadros=$CUADROS_ arranques=$ARRANQUES_)"
 
-# la fuente del commit con el que se armo la camada (via git show, sin tocar el arbol)
+# ================================================================================================
+# 4. CONSOLA: la camada + d2mpq de SU PROPIA fuente (el control que tira la hipotesis "rearmar rompe")
+# ================================================================================================
 echo "== 4. consola: la camada + d2mpq de SU PROPIA fuente ($COMMIT_VIEJO)"
 rm -rf "$FUENTE_VIEJA"; mkdir -p "$FUENTE_VIEJA"
-( cd "$REPO" && git archive "$COMMIT_VIEJO" "$P" | tar -x -C "$FUENTE_VIEJA" --strip-components=4 ) 2>"$SAL/archivo-viejo.log"
-nota "fuentes: $(ls "$FUENTE_VIEJA"/*.go 2>/dev/null | wc -l) archivos de $COMMIT_VIEJO"
+# OJO (medido, y arreglado en DC-002.29): los miembros del archivo son
+# `d2common/d2fileformats/d2mpq/<archivo>.go` => hay que sacar TRES componentes. Con `--strip-components=4`
+# el tar no extrae NADA (directorio vacio) y el control 4 moria en el compilador. Y los `_test.go` se
+# filtran, igual que en recompilar-paquete-motor.sh: gccgo no filtra por sufijo y piden testing/testify.
+( cd "$REPO" && git archive "$COMMIT_VIEJO" "$P" | tar -x -C "$FUENTE_VIEJA" --strip-components=3 ) 2>"$SAL/archivo-viejo.log"
+SRCS_VIEJA=$(ls "$FUENTE_VIEJA"/*.go 2>/dev/null | grep -v _test.go | grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix|386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64)\.go$')
+nota "fuentes: $(echo "$SRCS_VIEJA" | grep -c .) archivos de $COMMIT_VIEJO (sin _test.go ni otras plataformas)"
 copia "$SAL/gox-ctl4"
-sh-elf-gccgo $GODC_GOFLAGS -I "$SAL/gox-ctl4" -fgo-pkgpath="$PREFIJO/$P" -c "$FUENTE_VIEJA"/*.go \
-    -o "$SAL/gox-ctl4/$PREFIJO/$P.gox" > "$SAL/gox-ctl4.log" 2>&1 ||
-    { echo "   la fuente de $COMMIT_VIEJO no compila (ver $SAL/gox-ctl4.log)"; exit 1; }
-nota "d2mpq.gox puesto: $(stat -c%s "$SAL/gox-ctl4/$PREFIJO/$P.gox") bytes (.text $(sh-elf-objdump -h "$SAL/gox-ctl4/$PREFIJO/$P.gox" | awk '$2==".text"{print "0x"$3}'))"
-corre c4-vieja "$SAL/gox-ctl4" "$SEGS"
-mide c4-vieja
-nota "marcas=$MARCA_  main.main=$MAIN_  cuadros=$CUADROS_  arranques=$ARRANQUES_  gc_collect=$GC_"
-nota "ultima marca: $UELTIMA_"
-[ "$MAIN_" -ge 1 ] && [ "$CUADROS_" -ge 1 ] &&
-    verde "control 4: rearmar con la fuente de la camada ARRANCA ($CUADROS_ cuadros) -> rearmar no rompe nada" ||
-    rojo "control 4: rearmar con la fuente de la camada NO arranca (main.main=$MAIN_ cuadros=$CUADROS_)"
+# shellcheck disable=SC2086
+if sh-elf-gccgo $GODC_GOFLAGS -I "$SAL/gox-ctl4" -fgo-pkgpath="$PREFIJO/$P" -c $SRCS_VIEJA \
+        -o "$SAL/gox-ctl4/$PREFIJO/$P.gox" > "$SAL/gox-ctl4.log" 2>&1; then
+    nota "d2mpq.gox puesto: $(stat -c%s "$SAL/gox-ctl4/$PREFIJO/$P.gox") bytes (.text $(sh-elf-objdump -h "$SAL/gox-ctl4/$PREFIJO/$P.gox" | awk '$2==".text"{print "0x"$3}'))"
+    corre c4-vieja "$SAL/gox-ctl4" "$SEGS"
+    mide c4-vieja
+    nota "marcas=$MARCA_  main.main=$MAIN_  cuadros=$CUADROS_  arranques=$ARRANQUES_  gc_collect=$GC_"
+    nota "ultima marca: $UELTIMA_"
+    [ "$MAIN_" -ge 1 ] && [ "$CUADROS_" -ge 1 ] &&
+        verde "control 4: rearmar con la fuente de la camada ARRANCA ($CUADROS_ cuadros) -> rearmar no rompe nada" ||
+        rojo "control 4: rearmar con la fuente de la camada NO arranca (main.main=$MAIN_ cuadros=$CUADROS_)"
+else
+    # sin el .gox compilado el control NO se puede correr: la camada copiada trae el d2mpq de la
+    # referencia, asi que correrla daria un VERDE falso. Se marca rojo y se sigue con el resto.
+    rojo "control 4: la fuente de $COMMIT_VIEJO no compila (ver $SAL/gox-ctl4.log) -- control 4 NO medido"
+fi
 
 # ================================================================================================
 # 5. CONSOLA: EL DEFECTO -- el codigo del arbol de trabajo contra la camada vieja
@@ -157,10 +181,15 @@ nota "ultima marca: $UELTIMA_"
 # la lista de `init` (control 6) y el defecto vigilado (control 5)
 python3 "$HERE/lista-inits-229.py" "$SAL/c3-ref/prog.elf" > "$SAL/inits-ref.txt" 2>&1
 python3 "$HERE/lista-inits-229.py" "$SAL/c5-trabajo/prog.elf" > "$SAL/inits-trabajo.txt" 2>&1
-if diff -q "$SAL/inits-ref.txt" "$SAL/inits-trabajo.txt" > /dev/null 2>&1; then
-    verde "control 6: la lista de \`init\` es la MISMA ($(head -1 "$SAL/inits-ref.txt")) en el que anda y en el que muere"
+# La comparacion es por (indice -> SIMBOLO), NO por direccion: las direcciones se CORREN con el layout
+# (el d2mpq nuevo hace el binario mas grande: medido, la primera pasa de 8c45992c a 8c459bd8) y eso no es
+# lo que este control mide. Lo que mide es que la secuencia de `init` que arma el enlazador sea la misma.
+awk '{print $1, $3}' "$SAL/inits-ref.txt" > "$SAL/inits-ref.norm.txt"
+awk '{print $1, $3}' "$SAL/inits-trabajo.txt" > "$SAL/inits-trabajo.norm.txt"
+if diff -q "$SAL/inits-ref.norm.txt" "$SAL/inits-trabajo.norm.txt" > /dev/null 2>&1; then
+    verde "control 6: la lista de \`init\` es la MISMA ($(wc -l < "$SAL/inits-ref.norm.txt") entradas, mismos simbolos y mismo orden; lo unico que cambia son las DIRECCIONES, que se corren con el layout)"
 else
-    rojo "control 6: la lista de \`init\` CAMBIA entre los dos binarios (ver $SAL/inits-*.txt)"
+    rojo "control 6: la lista de \`init\` CAMBIA entre los dos binarios (ver $SAL/inits-*.norm.txt)"
 fi
 
 if [ "$MAIN_" = 0 ] && [ "$CUADROS_" = 0 ]; then
@@ -169,8 +198,32 @@ else
     rojo "control 5: el rearme corto YA NO muere (main.main=$MAIN_ cuadros=$CUADROS_) -- el limite cambio: hay que REVISARLO, no taparlo"
 fi
 
+# ================================================================================================
+# 7. CONSOLA: EL ARREGLO -- la camada COHERENTE del arbol de trabajo
+# ================================================================================================
+echo "== 7. consola: la camada COHERENTE del arbol (${COHERENTE:-/tmp/gox-330})"
+COH="${COHERENTE:-/tmp/gox-330}"
+if [ -f "$COH/orden-motor.txt" ] && [ -f "$COH/$PREFIJO/$P.gox" ]; then
+    nota "la camada tiene $(find "$COH" -name '*.gox' | wc -l) .gox y $(wc -l < "$COH/orden-motor.txt") paquetes del motor"
+    nota "d2mpq.gox: $(stat -c%s "$COH/$PREFIJO/$P.gox") B (.text $(sh-elf-objdump -h "$COH/$PREFIJO/$P.gox" | awk '$2==".text"{print "0x"$3}'))"
+    T7A=$(sh-elf-objdump -h "$COH/$PREFIJO/$P.gox" | awk '$2==".text"{print $3}')
+    bash "$HERE/recompilar-paquete-motor.sh" "$P" "$COH" > "$SAL/rearme-coherente.log" 2>&1
+    T7B=$(sh-elf-objdump -h "$COH/$PREFIJO/$P.gox" | awk '$2==".text"{print $3}')
+    [ "$T7A" = "$T7B" ] && verde "control 7a (EL ARREGLO): sobre la camada del arbol el rearme NO cambia el .text ($T7B)" ||
+        rojo "control 7a: el rearme cambia el .text sobre la camada del arbol ($T7A -> $T7B)"
+    corre c7-coherente "$COH" "$SEGS"
+    mide c7-coherente
+    nota "marcas=$MARCA_  main.main=$MAIN_  cuadros=$CUADROS_  arranques=$ARRANQUES_  gc_collect=$GC_"
+    nota "ultima marca: $UELTIMA_"
+    [ "$MAIN_" -ge 1 ] && verde "control 7b: con la camada del arbol el motor ARRANCA (main.main=1, $GC_ recolecciones del GC)" ||
+        rojo "control 7b: con la camada del arbol el motor NO arranca (main.main=$MAIN_)"
+else
+    SALTADOS=$((SALTADOS + 1))
+    nota "SALTADO: no hay camada coherente en $COH. Se arma con: build-std-gox.sh \$COH && build-motor-all.sh \$COH \$SAL/motor"
+fi
+
 echo
-echo "== RESULTADO: $OK controles OK, $FALLOS con fallo (el 5 es el que VIGILA el defecto de la tarjeta)"
+echo "== RESULTADO: $OK controles OK, $FALLOS con fallo, $SALTADOS saltados (el 5 es el que VIGILA el defecto de la tarjeta)"
 echo "== el discriminador: rearmar es inocuo (control 4); el codigo nuevo contra la camada vieja muere (control 5)."
 echo "== evidencia: console/dc/evidencia/dc-002.29-arranque-rearmado.txt"
 [ "$FALLOS" -eq 0 ]
