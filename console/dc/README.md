@@ -2955,3 +2955,84 @@ contiguos y la de `d2data` son 2 MB); el que murió con ese OOM fue el motor (DC
 por el cuelgue de arriba.
 
 Evidencia cruda: `evidencia/dc-002.28-tablas-mpq-por-trozos.txt`.
+
+---
+
+## 46. DC-002.29: el arranque del motor rearmado — no era la fragilidad de layout, era el **codigo nuevo de `d2mpq` contra la camada vieja**
+
+DC-002.28 dejo el arranque **colgado mudo** cuando el binario se **rearma**, y lo dejo anotado como
+"fragilidad de layout": la camada de `.gox` con la que andaba el motor es de la fuente del commit
+`6e85010b` (DC-002.20, mtime 10-17 11:10), y cuando la tarjeta recompilaba `d2mpq` desde el arbol de
+trabajo y volvia a enlazar, el binario moria adentro de los `init` sin imprimir nada. Esta tarjeta
+fue a medir cual de las dos cosas es el disparador: **rearmar** o **el codigo nuevo**.
+
+La medicion es un A/B de verdad: se copia la camada de referencia (`/tmp/gox-240`, sha256 y mtime de
+`gox-00220`), se le reemplaza **solo** `d2mpq.gox`, se enlaza el POC `motor-disco` con el mismo
+`build-motor-arranque.sh` y el mismo disco, y se corren 30 s de Flycast.
+
+| corrida | `d2mpq` compilado de | `.gox` | resultado |
+|---|---|---|---|
+| E1 | `6e85010b` (la fuente de la camada) | 204.544 B (`.text` 14.020) | **ARRANCA**: `marcas=27 main.main=1 cuadros=1 arranques=1 gc_collect=4` |
+| E2 | `7ef2ff16` (DC-002.27) | 206.468 B (`.text` 14.604) | **MUERE**: `marcas=16 main.main=0 cuadros=0 gc_collect=0`, ultima marca `main_wrapper-entra` |
+| sick | HEAD (DC-002.28, lo de la tarjeta) | 207.352 B (`.text` 14.704) | igual que E2 |
+| la camada misma | — | 204.656 B (`.text` 14.064) | (es la que anda) |
+
+O sea: **rearmar no rompe nada** — E1 es un rearme (misma invocacion, mismo lugar, misma camada) y
+llega al cuadro. Lo que rompe es el **codigo nuevo**. Y la "fragilidad de layout" queda tirada por el
+suelo por partida doble: en E1 el binario tambien cambia (el `.gox` es 112 bytes mas chico y todas las
+direcciones de atras se corren) y arranca igual, y el **bisect** de DC-002.27 muestra que los dos
+archivos del cambio, **por separado**, matan el arranque:
+
+    header viejo + stream nuevo   `.gox` 204.640 B (16 bytes MENOS que la camada)  MUERE (arranques=10)
+    header nuevo + stream viejo   `.gox` 206.576 B                                MUERE (arranques=10)
+
+Y lo que queda **descartado con numeros**, no con opiniones:
+
+- **no es la lista ni el orden de los `init`**: `___go_init_main` tiene **119** llamadas y la lista
+  (indice -> destino) es **identica** en la referencia, en E1 y en E2;
+- **no es la tabla de raices del GC** que el `init` registra: la de `d2reward` (`_go..C0`) tiene en los
+  dos binarios `count=4`, las mismas formas (56/56/56/264) y todos los punteros dentro de RAM;
+- **no es una colision de nombre de tipo**: el tipo que agrega el codigo nuevo (`_type.._632_7uint8`,
+  descriptor de 48 B, `__size`=32, el `[32]byte` del buffer del `readHeader` nuevo) lo define **un solo**
+  `.gox` de los 206 de la camada;
+- **no es el compilador**: `d2mpq` recompilado dos veces da el mismo `.gox` byte a byte
+  (sha256 `25f97728c10b51af`, 207.392 B las dos);
+- **no son las rutas relativas/absolutas**: recompilando 4 paquetes cuya fuente no cambio, el sha256
+  del `.gox` **cambia** (los caminos del debug) pero el `.text` queda **identico** (`d2hero`
+  116400/116400, `d2loader/mpq` 1640/1640, `d2netpacket` 23760/23760, `d2player` 489792/489792). El
+  control 1 que heredaba esta tarjeta exigia **sha256 igual**: estaba mal escrito y queda corregido.
+
+**Donde muere, con la direccion.** Del volcado de KOS: `PC 8c0e5002, code 1, evt 0180`,
+`PR 8c01225a`, `R1 8c0e49e0`, `R15 ffffe078`. Leido contra el ELF: `PR 8c01225a` es la instruccion
+siguiente a la llamada de `___go_init_main` al `init` de **`d2reward`** (o sea: ese `init` no volvio);
+`R1 = 8c0e49e0` es `d2reward..import`, que son 16 bytes de codigo cuyo unico trabajo es
+`jsr` a **`_runtime.registerGCRoots(_go..C0)`** (`gc_heap.c:192`, cuatro lineas:
+`roots->next = gc_global_roots; gc_global_roots = roots;`); y `PC 8c0e5002` **no es una instruccion**:
+cae adentro del **charco de literales** de `d2skilldesc.sprintfD` (la palabra que esta en `8c0e5000` es
+`mov.w <pool>,r15 ! e078`, que explica el `R15 = 0xffffe078` del volcado: el CPU **entro al pool**).
+El hilo queda abierto ahi: la medicion dice **donde** muere y donde **no** esta la causa (la tabla, la
+lista, el tamano, las rutas, el compilador), no cual es el mecanismo exacto del salto.
+
+**Lo que el codigo nuevo mete en el `.gox`** (`nm -S`, viejo -> nuevo): agrega
+`_type.._632_7uint8` (48 B, debil), su `..eq`, y **20 raices del GC** (`_go..C108`..`_go..C354`); saca
+`_type.._2_6_7uint32` (40 B); `d2mpq..import` 600 -> 556 B, `MPQ.readH*` 208 -> 536 B, `Stream.lo*`
+692 -> 928 B.
+
+**La hipotesis que queda viva** (y su prueba): el `.gox` de gccgo **no es autocontenido** (lleva los
+cuerpos inlineados y los numeros de tipo de sus imports, con la camada en la que se compilo), asi que
+mezclar un `.gox` de un arbol con los del otro cambia el binario de una forma que el arranque no
+aguanta — y no la aguanta **ningun** cambio de codigo de `d2mpq`, ni su mitad. La prueba es armar la
+**camada coherente** del arbol de trabajo (stdlib + los 142) y medir con ella; el corpus ya la
+contempla y el resultado se anota en la tarjeta.
+
+**Corpus.** `scripts/console/checar-rearme-229.sh` (host + consola, se arma solo: saca la fuente vieja
+con `git archive`): control 1 = recompilar un paquete sin cambios conserva el `.text`; control 2 = el
+rearme es determinista; control 3 = la camada de referencia llega al cuadro; control 4 = la camada +
+`d2mpq` de **su propia fuente** tambien llega al cuadro (el que tira abajo la hipotesis "rearmar
+rompe"); control 5 = la camada + `d2mpq` del arbol de trabajo **muere en los `init`** (el defecto,
+vigilado: si algun dia deja de morir, el corpus se pone rojo para que se revise el limite); control 6 =
+la lista de los `init` es la misma. Mutante: `scripts/console/mutar-rearme-229.py --fuente-tocada`
+rompe la coherencia de la camada y el control 1 tiene que ponerse **rojo** (es exactamente el estado
+que mata el arranque).
+
+Evidencia cruda: `evidencia/dc-002.29-arranque-rearmado.txt`.

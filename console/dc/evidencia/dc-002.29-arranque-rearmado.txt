@@ -1,0 +1,159 @@
+DC-002.29 — EL ARRANQUE DEL MOTOR REARMADO: QUE LO MATA (medido, no deducido)
+================================================================================
+Rama DC-002, POC motor-disco, Flycast 30 s por corrida. Todo lo de abajo es de ESTA
+tarjeta: cada linea es una corrida o una comparacion de archivos, no una deduccion.
+
+ESTADO DEL TABLERO AL EMPEZAR (por si alguien relee el prompt de la noche)
+-------------------------------------------------------------------------
+Las tarjetas de la tanda DC-002 que el prompt de la corrida autonoma nombraba
+(dc-002.5b, dc-002.6, dc-002.7, dc-002.8, dc-002.9) YA ESTAN CERRADAS: el tablero `dreamcast`
+no tiene ninguna `ready`. Lo abierto eran 5 `blocked`, y las 5 lo estaban por un bloqueo
+FALSO: el worker del dispatcher murio dos veces con
+    "No usable credentials found for provider 'opencode-go'. Set OPENCODE_GO_API_KEY"
+y el cortacircuitos las paso a `blocked` (consecutive_failures=2). La de numero mas bajo
+abierta es DC-002.29 (t_5dda37eb), cuyo padre DC-002.28 esta `done`: por ahi siguio esta
+corrida.
+
+LA PREMISA DE LA TARJETA ERA OTRA (y esta medicion la corrige)
+-------------------------------------------------------------
+La tarjeta decia: "el binario del motor se cuelga MUDO cuando el binario se rearma
+(fragilidad de layout)" y traia como evidencia que una camada de .gox rearmada muere
+mientras la de DC-002.27 anda. Lo que sigue muestra que NO es "rearmar" ni el layout: es
+el CODIGO NUEVO de d2mpq contra una camada del arbol VIEJO.
+
+1. EL `.gox` DE LA CAMADA QUE ANDA ES DE LA FUENTE VIEJA (git + compilacion)
+---------------------------------------------------------------------------
+`git log -- d2common/d2fileformats/d2mpq/` solo tiene dos entradas despues de la camada:
+    7ef2ff16 10-17 21:21  DC-002.27 (los MPQ del disco se leen ENTEROS)
+    0a9c182d 10-17 22:34  DC-002.28 (las tablas del MPQ por TROZOS)
+y la camada /tmp/gox-00220 (de la que /tmp/gox-240, /tmp/gox-222, /tmp/gox-301 y
+/tmp/gox-302 son copias: mismo sha256 y mismo mtime 10-17 11:10:16) la armo el arbol de
+DC-002.20 (commit 6e85010b, 11:08). Compilando esos tres arboles con la MISMA invocacion
+(seccion `.text` del `.gox`, que es el CODIGO):
+
+    fuente 6e85010b (la de la camada)   .gox 204.544 B   .text 14.020
+    fuente 7ef2ff16 (DC-002.27)         .gox 206.468 B   .text 14.604
+    fuente HEAD     (DC-002.28)         .gox 207.352 B   .text 14.704
+    la camada misma                                        .text 14.064
+
+O sea: el `.gox` que ARRANCA corresponde a la fuente de 6e85010b. Cuando la tarjeta dice
+"d2mpq recompilado de las MISMAS fuentes (7ef2ff16) muere igual", esas NO eran las mismas
+fuentes de la camada: eran las de DC-002.27, que es justamente otro codigo.
+
+2. EL A/B (la medicion que ordena todo)
+---------------------------------------
+Las dos corridas se arman igual (copia de la camada /tmp/gox-240 + SOLO d2mpq reemplazado,
+mismo `build-motor-arranque.sh`, mismo disco, 30 s de Flycast):
+
+    E1  camada + d2mpq de 6e85010b (su propia fuente)   ARRANCA
+        marcas=27  main.main=1  cuadros=1  arranques=1  gc_collect=4
+        EBITEN-PERFIL dibujar_us 251772 convertir_us 57530 subir_us 0 pintar_us 3 cuadro_us 309305
+    E2  camada + d2mpq de 7ef2ff16                      MUERE
+        marcas=16  main.main=0  cuadros=0  arranques=1  gc_collect=0
+        ultima marca: ARQ-MARCA main_wrapper-entra v=0
+    sick camada + d2mpq de HEAD (lo de la tarjeta)      igual que E2 (0 main.main, 0 cuadros)
+
+=> El disparador es el CODIGO NUEVO de d2mpq. Rearmar (compilar con la misma invocacion,
+en el mismo lugar, con la misma camada) NO rompe nada por si solo: E1 es un rearme y llega
+al cuadro. Y la fragilidad NO es de layout: en E1 el binario tambien cambia (el `.gox` es
+112 bytes mas chico y todas las direcciones de atras se corren) y arranca igual.
+
+3. EL BISECT DE DC-002.27 (los dos archivos, por separado)
+---------------------------------------------------------
+El cambio de 7ef2ff16 en d2mpq son DOS archivos (saca `binary.Read` de la cabecera y de la
+tabla de offsets del bloque). Revirtiendo uno por vez (fuente de 7ef2ff16 + el archivo viejo):
+
+    header VIEJO + stream nuevo    `.gox` 204.640 B (16 bytes MENOS que la camada)  MUERE (arranques=10)
+    header nuevo + stream VIEJO    `.gox` 206.576 B                                MUERE (arranques=10)
+
+=> No es UN archivo/una funcion. Y no es el TAMANO: un `.gox` 16 bytes mas chico que el de
+la camada muere igual, mientras el de E1 (112 bytes mas chico) arranca.
+
+4. LO QUE QUEDA DESCARTADO, MEDIDO
+----------------------------------
+  - NO es la lista ni el orden de los `init`: `___go_init_main` tiene **119** llamadas, y la
+    lista (indice -> destino) es IDENTICA en el binario de referencia, en E1 (que anda) y en
+    E2 (que muere). Primera: `_runtime.registerTypeDescriptors`; ultima: `_d2c_aviso_init`.
+  - NO es la tabla de raices del GC que el `init` registra: la de d2reward
+    (`_go..C0`) tiene en los DOS binarios `count=4` y las mismas formas, con todos los
+    punteros dentro de RAM:
+        sick  next=0 count=4  decl=0x8cb8d8b4/7c/44 (56,56,56) + 0x8cb8d73c (264)  gcdata 0x8c5bb394/0x8c5e8a08
+        ref   next=0 count=4  decl=0x8cb8d974/3c/04 (56,56,56) + 0x8cb8d7fc (264)  gcdata 0x8c5bb518/0x8c5e8b8c
+  - NO es una colision de nombre de tipo: el tipo que agrega el codigo nuevo
+    (`_type.._632_7uint8`, descriptor de 48 B con `__size`=32 = el `[32]byte` que el
+    readHeader nuevo usa de buffer) lo define UN solo `.gox` de los 206 de la camada: ninguno
+    mas (el viejo `_type.._2_6_7uint32` tampoco colisiona).
+  - NO es el compilador: d2mpq recompilado DOS veces con la misma invocacion da el mismo
+    `.gox` byte a byte (sha256 25f97728c10b51af, 207.392 B las dos).
+  - NO son las rutas relativas/absolutas de la fuente: recompilando 4 paquetes cuya fuente no
+    cambio, el sha256 del `.gox` cambia (solo el debug: rutas) pero la seccion **`.text` es
+    identica** byte a byte. Medido (`.text` viejo/nuevo):
+        d2core/d2hero            116400/116400    (1.428.640 -> 1.428.248 B)
+        d2common/d2loader/mpq      1640/1640      (   68.028 ->    67.948 B)
+        d2networking/d2netpacket  23760/23760     (  567.204 ->   566.036 B)
+        d2game/d2player          489792/489792    (6.609.684 -> 6.607.848 B)
+    (De paso: el control 1 del corpus que dejaba esta tarjeta exigia sha256 IGUAL; eso es
+    FALSO por los caminos del debug. Lo correcto es exigir `.text` igual, y asi queda.)
+
+5. DONDE MUERE, CON LA DIRECCION EXACTA
+---------------------------------------
+Del volcado de KOS de la corrida que muere:
+
+    ARQ-MARCA main_wrapper-entra v=0
+    Unhandled exception: PC 8c0e5002, code 1, evt 0180
+     R0-R7: 8c4e1c78 8c0e49e0 00000000 0000002b 8cd3b4c0 00000000 8cdb84d0 00000399
+     R8-R15: 8c4595f4 00000000 ... 8ce90df4 ffffe078
+     SR 40000101 PR 8c01225a
+    Encountered Illegal instruction.
+
+Leido contra el mapa de simbolos del ELF:
+
+  - `PR 8c01225a` = la instruccion siguiente a la llamada de `___go_init_main` al `init` de
+    **`d2common/d2reward`**: `___go_init_main` hizo `mov.l <pool>,r1 (=8c0e49e0); jsr @r1` y ese
+    `init` NO VOLVIO. (El `init` anterior, `d2portal..import`, y el siguiente, `d2skill..import`,
+    quedan fuera: cada uno tiene su propia direccion de retorno y PR no es la suya.)
+  - `R1 = 8c0e49e0` = `d2reward..import`, que es CODIGO de 16 bytes:
+        sts.l pr,@-r15
+        mov.l <pool>,r1  ->  _runtime.registerGCRoots
+        mov.l <pool>,r4  ->  _go..C0 (la tabla de raices, 8cb8d8ec)
+        jsr @r1
+        nop
+        lds.l @r15+,pr
+        rts
+  - `PC 8c0e5002` NO es una instruccion: cae adentro del **charco de literales** de
+    `d2skilldesc.sprintfD` (la funcion ocupa 8c0e4fb0..8c0e500c y su pool empieza en 8c0e4ff8).
+    Y `R15 = 0xffffe078` es exactamente lo que escribe la palabra del pool que esta en
+    8c0e5000 (`mov.w <pool>,r15 ! e078`): o sea el CPU ENTRO al pool en 8c0e5000 y ahi encontro
+    un dato que no es instruccion.
+
+Resumen del punto de muerte: el arranque pasa `runtime_init` entero (las 11 marcas), arranca el
+planificador (`go_go-volvio-goroutines v=2`, `scheduler-entra v=2`), entra a la goroutine
+(`main_wrapper-entra v=0`), y en la secuencia de los 119 `init` de paquete MUERE el de
+`d2common/d2reward`, que es un `init` de una sola llamada: `registerGCRoots(_go..C0)`.
+`registerGCRoots` son 4 lineas en `~/dreamcast/libgodc/runtime/gc_heap.c:192`
+(`roots->next = gc_global_roots; gc_global_roots = roots;`), la tabla de entrada esta sana, y
+sin embargo el PC termina en un dato. El hilo queda abierto ahi: la medicion dice DONDE muere y
+donde NO esta la causa (la tabla, la lista, el tamano, las rutas, el compilador), no cual es el
+mecanismo exacto.
+
+6. LO QUE EL CODIGO NUEVO AGREGA EN EL `.gox` (nm -S, viejo -> nuevo)
+--------------------------------------------------------------------
+    +  _type.._632_7uint8                 48 B  V (descriptor del `[32]byte` del buffer nuevo)
+    +  _github_...1d2mpq._632_7uint8..eq        20 B  T
+    +  __632_7uint8..eq..f                       4 B  R
+    +  _go..C108 .. _go..C354                  20 raices del GC nuevas
+    -  _type.._2_6_7uint32                40 B  V (el tipo que el codigo viejo usaba)
+       d2mpq..import        600 -> 556 B
+       MPQ.readH*           208 -> 536 B
+       Stream.lo*           692 -> 928 B
+
+7. LA HIPOTESIS QUE ESTA EVIDENCIA DEJA VIVA (y su prueba)
+----------------------------------------------------------
+Lo que el A/B y el bisect dejan como explicacion es que el enlace solo es sano cuando TODOS
+los `.gox` del motor salen del MISMO estado del arbol: el `.gox` de gccgo no es autocontenido
+(lleva adentro los cuerpos inlineados y los numeros de tipo de sus imports, con la camada con
+la que se compilo), asi que MEZCLAR un `.gox` de un arbol con los del otro cambia el binario
+de una manera que el arranque no aguanta -- y no lo aguanta NINGUN cambio de codigo de d2mpq,
+ni su mitad. La prueba que lo confirma o lo tira: armar la camada COHERENTE del arbol de
+trabajo (stdlib + los 142) y medir con ella. Eso esta en el corpus
+(`scripts/console/checar-rearme-229.sh`).

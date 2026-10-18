@@ -108,15 +108,30 @@ static void d2c_consola_constructor(void) {
 }
 
 /* d2c_aviso_init: la llama un `var _ = ...` del paquete de Go, o sea ANTES de main pero DESPUES del
- * arranque del runtime de Go. Separa "murio el runtime" de "murio main". */
+ * arranque del runtime de Go. Separa "murio el runtime" de "murio main".
+ *
+ * DC-002.29: POR QUE EL AVISO NO ESCRIBE POR EL CAMINO CRUDO DE LA CONSOLA.
+ *
+ * Medido (evidencia dc-002.29-*.txt): desde la cadena de `init` de Go, `dbgio_write_buffer_xlat` (el
+ * camino crudo de dbgio: NO toma el candado, el mismo que la cabecera de dbgio.c marca "Not re-entrant")
+ * CLAVA el arranque del binario REARMADO:
+ *   - arranques=1, main.main=0, cuadros=0 y ni una linea mas: el constructor de C sale una vez, las
+ *     marcas del runtime hasta `main_wrapper-entra` y despues silencio (ni una muestra de la sonda del PC,
+ *     o sea el tick de KOS tambien queda muerto);
+ *   - con los 75 bytes del aviso el guardian de la consola la reinicia a los ~2,4 s y vuelve a empezar
+ *     (el constructor de C sale OTRA vez: eso era "un arranque que empieza dos veces" en DC-002.28);
+ *   - con la longitud en 0 (misma llamada, cero bytes) se cuelga igual (sin reinicio): el cuelgue no esta
+ *     en los bytes, esta en la LLAMADA al camino crudo desde este punto del arranque;
+ *   - los MISMOS bytes por la marca del runtime (`dbgio_printf`, que si toma el candado) salen y el
+ *     arranque sigue: main.main=1 y el motor corre hasta su cuadro.
+ * El mismo aviso compilado igual en la camada de referencia (la de DC-002.27) andaba: el defecto depende
+ * del momento del arranque (fragilidad de layout), no del texto.
+ *
+ * Por eso el aviso imprime con la marca del runtime y no con la escritura cruda. */
+extern void godc_marca(const char *etiqueta, unsigned long valor);   /* libgodc: runtime/marcas_arranque.c */
+
 void d2c_aviso_init(void) {
-    const char *m = "MOTOR-DISCO init del paquete: el runtime de Go ya arranco (antes de main)\r\n";
-    int n = 0;
-
-    while (m[n] != '\0') n++;
-
-    dbgio_dev_select("scif");
-    dbgio_write_buffer_xlat((const uint8 *)m, (size_t)n);
+    godc_marca("MOTOR-DISCO init del paquete: el runtime de Go ya arranco (antes de main)", 0);
 }
 
 void d2c_serial_init(void) {
