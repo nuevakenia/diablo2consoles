@@ -53,25 +53,45 @@ def main():
     except OSError:
         shutil.copyfile(iso, t1)
 
-    # pista 2 (audio): un sector basta, no se reproduce nada.
+    # Pista 2 (audio): un sector basta, no se reproduce nada.
     with open(t2, "wb") as f:
         f.write(b"\0" * AUDIO_SECTOR)
 
-    # pista 3 (sesion 2, datos): la que se arranca. Es el ISO tal cual (con el IP.BIN en 0).
+    # Pista 3 (sesion 2, datos): la que se arranca. Es el ISO tal cual (con el IP.BIN en 0).
     if os.path.exists(t3):
         os.remove(t3)
     try:
-        os.link(iso, t3)  # mismo contenido, sin duplicar 750 KB
+        os.link(iso, t3)  # mismo contenido, sin duplicar 512 MB
     except OSError:
         shutil.copyfile(iso, t3)
 
+    # cuantos sectores ocupa la pista 1 (el ISO): la pista 2 va justo despues
+    sectores_datos = (os.path.getsize(iso) + SECTOR - 1) // SECTOR
+
+    # DC-002.27: DONDE VIVE LA SESION DE DATOS.
+    #
+    # El .gdi tiene que llevar la pista 1 de DATOS (Flycast lo exige: "Track 1 must be a data track", medido
+    # al intentar dejar la zona de baja solo con audio). Y la pista 1 lleva el ISO entero, pero esa zona de
+    # BAJA densidad de un GD-ROM son los primeros 45.000 sectores (92 MB): el arbol de un disco con los MPQ
+    # adentro no entra ahi (el MPQ esta en el LBA 261.428). Las lecturas de mas alla del FAD 45.150 las
+    # contesta la zona de ALTA, o sea la pista 3 -- que es el mismo ISO y empieza en el LBA 45.000, igual
+    # que en un GD-ROM de verdad (por eso el arranque lee el sector de boot en el FAD 45.150 = el sector 0
+    # del ISO).
+    #
+    # Medido: sin eso, /JUEGO/PATCH_D2.MPQ se leia 41 41 85 86 ... en vez de 4d 50 51 1a (su cabecera),
+    # mientras que /1ST_READ.BIN (LBA 25) se leia bien: el defecto no era del emulador, era del driver
+    # leyendo con la base de la sesion equivocada. Lo arregla
+    # scripts/console/fix-kos-iso9660-sesion.py (la sesion de la zona de alta manda cuando trae pista de
+    # datos). GDI_BAJA=datos no cambia nada del archivo -- se deja para el mutante del corpus, que revierte
+    # el parche de KOS en vez del .gdi.
     with open(gdi, "w") as f:
         f.write("3\n")
         f.write("1 0 4 %d track01.iso 0\n" % SECTOR)
         f.write("2 450 0 %d track02.raw 0\n" % AUDIO_SECTOR)
         f.write("3 45000 4 %d track03.iso 0\n" % SECTOR)
 
-    print(f"GDI: {gdi} ({os.path.getsize(iso)} bytes de datos en la pista 3, arranca en FAD 45150)")
+    print(f"GDI: {gdi} ({os.path.getsize(iso)} bytes = {sectores_datos} sectores; el arranque lee en FAD "
+          f"45150; la sesion de datos se monta de la zona de alta)")
 
 
 if __name__ == "__main__":

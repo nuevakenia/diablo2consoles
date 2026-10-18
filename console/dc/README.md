@@ -2794,7 +2794,8 @@ binario ya carga **13.992.908 de los 16.777.216** bytes de RAM. Los datos van al
 
 **Los números del juego (medidos con `stat`, la tarjeta citaba 515 MB):** `patch_D2.mpq` **5.022.588**,
 `d2data.mpq` **267.330.019**, `d2char.mpq` **267.704.443** = **540.057.050** bytes (515,0 MB). El ISO con los
-tres adentro sale de **553.893.888** bytes (528,2 MB): entra en un CD de 700 MB y en un GD-ROM.
+tres adentro sale de **553.893.888** bytes con el árbol Joliet y de **540.428.288** bytes (263.881 sectores)
+sin él — el que anda, ver el defecto 1. Entra en un CD de 700 MB y en un GD-ROM.
 
 **Lo que se agregó (todo apagado por defecto, el camino de DC-002.19 sale byte por byte igual — el
 `config.json` del romdisk sigue dando el mismo sha256 `8305595f…`):** en `gen-config-consola`, `-ruta-consola
@@ -2820,19 +2821,52 @@ preguntar el tamaño (`fs_open` + `fs_total`), porque el driver ISO9660 sí impl
 disco siguen por el camino del `.manifiesto` (0 entradas), por eso `d2setup.Validate.Ok()` sigue en false y
 el arranque usa `Complete`.
 
-**Defecto 3 — la barrera que queda: el motor pasa la selección y sigue con su cartel en la pantalla.** La
-consola serie ya **no** dice `game files not found` ni `file not found` (0 ocurrencias) y el motor **entra a
-su loop** (`EBITEN-LOOP cuadro 0/1/2`, `cuadro_us 311843`), pero la captura (`f60s.png`) sigue mostrando el
-cuadro de error del motor (fondo rojo oscuro con su texto). O sea: el pedido que falla ahora no es el de la
-selección, es el del **cargador de assets** cuando empieza a leer el contenido de los MPQ. Ese es el tramo
-siguiente, y el corpus `checar-disco-227.sh` (5 controles + el mutante `DC_SIN_JUEGO=1`) queda escrito para
-él.
+**Defecto 3 — el `binary` de la consola no lee *structs*, y el MPQ se lee con *structs*.** La sonda de los
+cargadores del motor devolvió `d2mpq.New FALLO: failed to read reader: encoding/binary: Read no soporta ese
+tipo de dato (ver DC-002.5)`: `readHeader` hace `binary.Read(&mpq.header)` y el `binary` de la consola es la
+stdlib mínima (escalares y `[]byte`; un *struct* necesitaría reflector, que está fuera del port). Arreglo en
+`d2mpq`: la cabecera (32 bytes, sin relleno) y la tabla de posiciones del bloque se leen como bytes y se
+arman campo por campo con `binary.LittleEndian`. `go test ./d2common/d2fileformats/d2mpq/` verde
+(`TestSynthMPQ` arma MPQs de verdad, así que el camino del host queda cubierto). Después: `d2mpq.New OK`,
+`d2mpq.FromFile OK`, `mpq.NewSource OK`.
 
-**El control fuerte del horneado (sin grises):** los tres MPQ leídos **de adentro** de la ISO dan el sha256
-del archivo del PC (`patch_D2` `eb7db78b…`, `d2data` `97c452b1…`, `d2char` `29078a10…`) y la consola lee de
-verdad (suma de los dos extremos de cada archivo, 256 KiB arriba y abajo, con el `os` del motor). Y el mapa
-de FADs queda medido: el sector 0 del ISO (el IP.BIN) está en FAD **150** y el PVD (`\x01CD001`) en FAD
-**166**, justo donde el driver los busca (suma 150 por dentro, `fs_iso9660.c:280`). Velocidad del GD-ROM
-**emulado**: 4 MiB en 34.245 ms = **122 KB/s** (cota del emulador, declarada).
+**Defecto 4 — el driver montaba la sesión de la zona de BAJA densidad y leía los datos corridos 45.000
+sectores** (el que más costó: dos veces parecía «el emulador miente»). Medido con el `.gdi` de siempre
+(pista 1 = el ISO, pista 2 audio, pista 3 = el ISO en el LBA 45.000): el drive contesta GD-ROM (`disc=0x80`)
+y el mapa de FADs está bien —el sector 0 del ISO (el IP.BIN) en el FAD **150** y el PVD (`\x01CD001`) en el
+FAD **166**, justo donde el driver los busca—, y `fs_open` + `fs_total` dan **5.022.588** (el tamaño sale del
+directorio), pero `fs_read` de `/cd/JUEGO/PATCH_D2.MPQ` volvía `41 41 85 86 …` en vez de
+`4d 50 51 1a 20 00 00 00 7c a3 4c 00 00 00 03 00`, mientras que el **mismo** `fs_read` de `/1ST_READ.BIN`
+(LBA 25) daba `37 d0 02 01 …` = exacto lo que hay en el ISO en ese LBA (`mapa-extents.py`). La causa: la zona
+de **baja** densidad de un GD-ROM son los primeros 45.000 sectores (92.006.400 bytes), el árbol con los MPQ
+no entra ahí (el MPQ está en el LBA 261.428) y toda lectura más allá del FAD 45.150 la contesta la zona de
+**alta** (la pista 3, que vive en el LBA 45.000): el driver sumaba solo el 150 de siempre y leía 45.000
+sectores más allá (el LBA 216.428 del ISO, adentro de otro MPQ). Arreglo:
+`scripts/console/fix-kos-iso9660-sesion.py` (parche idempotente al KOS vendorizado, `--ver` / `--revertir`):
+la sesión de la zona alta manda cuando trae pista de datos y su base (`session_lba` = 45.000) se suma en las
+lecturas del árbol (directorios, datos por los dos caminos —DMA y caché— y readdir). Con la sesión de baja el
+resultado es byte por byte el de antes (`session_lba` = 0). Después: `fs_read(2048) -> 4d 50 51 1a` y
+`fs_read(4096)` igual (los dos caminos coinciden en 2.048 de 2.048 bytes). Medido de paso: Flycast **exige**
+que la pista 1 sea de datos («Track 1 must be a data track» → «Invalid GDI file»), así que no se puede dejar
+la zona de baja sólo con audio.
 
-Evidencia cruda: `evidencia/dc-002.27-disco-iso9660.txt`.
+**Los controles que dicen que el disco está bien (sin grises):** los tres MPQ leídos **de adentro** de la ISO
+dan el sha256 del archivo del PC (`patch_D2` `eb7db78b…`, `d2data` `97c452b1…`, `d2char` `29078a10…`) y la
+**consola lee los mismos bytes**: la suma de los primeros y los últimos 256 KiB de cada MPQ, leídos del disco
+con el `os` del motor, da lo mismo que el archivo del PC (`patch_D2` 3885502911/1899281040, `d2data`
+1306660740/1102600186, `d2char` 2160699462/2078461507). Y el motor ya **no** dice `game files not found` ni
+`file not found` (0 ocurrencias). Velocidad del GD-ROM **emulado**: 4 MiB en 34.245 ms = **122 KB/s** (cota
+del emulador, declarada). `runtime.GOOS` en la consola es `dreamcast` (no `linux`): el camino `openIgnoreCase`
+de `d2mpq`, que lista el directorio si falla el `os.Open`, no se usa allá.
+
+**La pared que queda (el tramo siguiente, medido):** el motor pasa la selección, carga las fuentes y muere al
+empezar a leer el *contenido* de los MPQ: `fatal error: gc_external_alloc: OOM`. La pantalla queda **negra** y
+en la captura de los 90 s el rojo oscuro del cuadro de error es **0,0 %** (o sea: el cartel de los MPQ ya no
+está, pero tampoco hay menú dibujado todavía). El tramo que falta es de **RAM**: la tabla de hash de
+`d2data.mpq` son **1.916.928** bytes contiguos (el número de DC-002.22) y el montón de C de la consola queda
+en **696 bytes libres** justo antes de entrar al motor. Candidato medido para el tramo siguiente: leer las
+tablas del MPQ **por trozos** (la de hash y la de bloques se descifran de a entradas de 16 bytes, sin una
+reserva única de 1,9 MB).
+
+Evidencia cruda: `evidencia/dc-002.27-disco-iso9660.txt` (incluye la corrección de la primera versión, que
+daba por bueno que la consola leía el contenido del MPQ cuando leía bien el tamaño y el contenido corrido).

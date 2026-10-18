@@ -29,10 +29,13 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"runtime"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/OpenDiablo2/OpenDiablo2/d2app"
 	"github.com/OpenDiablo2/OpenDiablo2/d2app/d2setup"
+	mpqloader "github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/mpq"
+	d2mpq "github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2config"
 )
 
@@ -201,6 +204,99 @@ func seleccionDelMotor() {
 		"Validate.OK()=", v.OK(), "archivos que ve=", len(v.LoadOrder), "faltan=", len(v.MissingCore))
 }
 
+// sondaDelCargador: el camino EXACTO del motor para leer el MPQ del disco, paso por paso.
+//
+// Por que: el motor sigue con su cartel en la pantalla y el texto dice "file not found:
+// "/cd/juego/patch_d2.mpq"" -- pero ese cartel lo arma d2app/initialization.go:85 con fmt.Errorf(..) y
+// TIRA EL ERROR DE ABAJO (no lo imprime), asi que por el serial no se puede saber que fallo. Aca se llama a
+// los mismos constructores del motor y se imprime el error de cada uno:
+//   d2app/initialization.go:82 -> asset.AddSource(srcPath, AssetSourceMPQ)
+//   d2loader/loader.go:118     -> LoaderProviders[AssetSourceMPQ](cleanPath)
+//   d2loader/mpq/source.go:17  -> d2mpq.FromFile(sourcePath)
+//   d2mpq/mpq.go:66            -> d2mpq.New (os.Open + readHeader) + readHashTable + readBlockTable
+// El primero que devuelva error es el tramo que hay que arreglar.
+func sondaDelCargador() {
+	ruta := dirJuego + "/patch_d2.mpq"
+
+	println("CARGADOR-CONSOLA runtime.GOOS=", runtime.GOOS, "(en linux d2mpq.New usa openIgnoreCase, que ante un os.Open fallido LISTA el directorio)")
+
+	f, err := os.Open(ruta)
+	if err != nil {
+		println("CARGADOR-CONSOLA os.Open", ruta, "FALLO:", err.Error())
+		return
+	}
+
+	info, errInfo := f.Stat()
+
+	if errInfo != nil {
+		println("CARGADOR-CONSOLA f.Stat FALLO:", errInfo.Error())
+	} else {
+		println("CARGADOR-CONSOLA os.Open OK; f.Stat bytes=", info.Size())
+	}
+
+	buf := make([]byte, 4096)
+	n, errRead := f.Read(buf)
+	println("CARGADOR-CONSOLA f.Read(4096) ->", n, "err:", errRead == nil)
+
+	// Los primeros bytes EN HEXA: el control de que lo que se lee del disco es el archivo y no otra cosa.
+	// (Medido 2026-10-17: la firma que salia por el serial NO era la del MPQ -- el tamano si, el contenido
+	// no -- asi que esta sonda tiene que imprimir bytes, no texto.)
+	hex := "0123456789abcdef"
+	linea := ""
+	for i := 0; i < 16 && i < n; i++ {
+		linea += string(hex[buf[i]>>4]) + string(hex[buf[i]&0x0f]) + " "
+	}
+
+	println("CARGADOR-CONSOLA primeros 16 bytes:", linea)
+
+	suma := uint32(0)
+	for i := 0; i < n; i++ {
+		suma = suma*31 + uint32(buf[i])
+	}
+
+	println("CARGADOR-CONSOLA suma de los primeros", n, "bytes:", suma)
+
+	_, errSeek := f.Seek(0, 0)
+	println("CARGADOR-CONSOLA f.Seek(0,0) err:", errSeek == nil)
+
+	f.Close()
+
+	// 1) el constructor del motor que solo lee la cabecera
+	mpqObj, err := d2mpq.New(ruta)
+	if err != nil {
+		println("CARGADOR-CONSOLA d2mpq.New FALLO:", err.Error())
+	} else {
+		println("CARGADOR-CONSOLA d2mpq.New OK")
+		mpqObj.Close()
+	}
+
+	// 2) el que ademas lee las dos tablas (el del motor de verdad)
+	mpqObj, err = d2mpq.FromFile(ruta)
+	if err != nil {
+		println("CARGADOR-CONSOLA d2mpq.FromFile FALLO:", err.Error())
+	} else {
+		println("CARGADOR-CONSOLA d2mpq.FromFile OK")
+		mpqObj.Close()
+	}
+
+	// 3) el Source del cargador de assets (lo que llama AddSource)
+	src, err := mpqloader.NewSource(ruta)
+	if err != nil {
+		println("CARGADOR-CONSOLA mpq.NewSource FALLO:", err.Error())
+	} else {
+		println("CARGADOR-CONSOLA mpq.NewSource OK")
+	}
+
+	if src != nil {
+		_, err = src.Open("data\\global\\ui\\frontend\\gameselectscreenEXP.dc6")
+		if err != nil {
+			println("CARGADOR-CONSOLA src.Open(dc6 del menu) FALLO:", err.Error())
+		} else {
+			println("CARGADOR-CONSOLA src.Open(dc6 del menu) OK")
+		}
+	}
+}
+
 func main() {
 	d2cSerialInit()
 
@@ -212,6 +308,8 @@ func main() {
 	sondaDisco()
 
 	seleccionDelMotor()
+
+	sondaDelCargador()
 
 	if err := ebiten.IniciarPantalla(640, 480); err != nil {
 		println("MOTOR-DISCO el video no arranco:", err.Error())

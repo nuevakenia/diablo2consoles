@@ -35,6 +35,47 @@ static void prueba(const char *ruta) {
     }
 }
 
+static void prueba_lectura_del_archivo(const char *ruta) {
+    static uint8_t un_sector[2048];
+    static uint8_t dos_sectores[4096];
+    int fd, i, n1, n2, distintos = 0;
+
+    errno = 0;
+    fd = fs_open(ruta, O_RDONLY);
+    printf("DISCO2-C archivo fs_open(%s) -> %d errno=%d\n", ruta, fd, errno);
+
+    if (fd < 0) {
+        return;
+    }
+
+    /* 1) UN sector en una sola llamada: es el camino de 1 sector por DMA (el mismo que usa el driver para
+     *    leer el PVD, que SI anda). El MPQ tiene que empezar con "MPQ\x1a": 4d 50 51 1a. */
+    memset(un_sector, 0, sizeof(un_sector));
+    errno = 0;
+    n1 = fs_read(fd, un_sector, 2048);
+    printf("DISCO2-C fs_read(2048) -> %d errno=%d bytes: %02x %02x %02x %02x\n", n1, errno, un_sector[0],
+           un_sector[1], un_sector[2], un_sector[3]);
+
+    /* 2) DOS sectores en una sola llamada: el driver los pide juntos (DMA multi-sector) */
+    fs_seek(fd, 0, SEEK_SET);
+    memset(dos_sectores, 0, sizeof(dos_sectores));
+    errno = 0;
+    n2 = fs_read(fd, dos_sectores, 4096);
+    printf("DISCO2-C fs_read(4096) -> %d errno=%d bytes: %02x %02x %02x %02x\n", n2, errno,
+           dos_sectores[0], dos_sectores[1], dos_sectores[2], dos_sectores[3]);
+
+    /* 3) los dos caminos tienen que traer LO MISMO en los primeros 2048 bytes */
+    for (i = 0; i < 2048; i++) {
+        if (un_sector[i] != dos_sectores[i]) {
+            distintos++;
+        }
+    }
+
+    printf("DISCO2-C los dos caminos difieren en %d de 2048 bytes\n", distintos);
+
+    fs_close(fd);
+}
+
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
@@ -53,6 +94,9 @@ int main(int argc, char **argv) {
     prueba("/cd/JUEGO/PATCH_D2.MPQ");
     prueba("/cd/1ST_READ.BIN");
     prueba("/rd/OpenDiablo2/config.json");
+
+    prueba_lectura_del_archivo("/cd/JUEGO/PATCH_D2.MPQ");
+    prueba_lectura_del_archivo("/cd/1ST_READ.BIN");
 
     if (nmmgr_lookup("/cd") == NULL) {
         printf("DISCO2-C el handler NO estaba: llamo a fs_iso9660_init() a mano\n");

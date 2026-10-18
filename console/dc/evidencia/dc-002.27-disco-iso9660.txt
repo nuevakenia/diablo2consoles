@@ -1,109 +1,139 @@
 DC-002.27 -- LOS ASSETS DEL JUEGO EN EL DISCO (/JUEGO por ISO9660, leidos en /cd)
 =================================================================================
-Corrida del 2026-10-17, rama DC-002. Todo lo de aca esta medido en este host; lo que no, se dice.
+Corrida del 2026-10-17, rama DC-002. Todo lo de aca esta medido en este host (Flycast + gccgo + KOS);
+lo que no, se dice. Este archivo CORRIGE la primera version de la evidencia, que daba por bueno que la
+consola leia el contenido del MPQ (leia el tamano bien y el CONTENIDO corrido 45.000 sectores).
 
-1. LA DECISION DE DISCO (por que el romdisk no alcanza)
---------------------------------------------------------
-El binario del motor ya carga 13.992.908 bytes de los 16.777.216 de RAM (DC-002.21), asi que los MPQ no
-pueden viajar en el romdisk: /rd se arma DENTRO del ELF. Y no hace falta que entren en RAM porque el motor
-lee el MPQ POR PARTES (Seek + ReadAt: d2common/d2fileformats/d2mpq/). Los archivos van al ISO9660 y el
-arranque los busca en /cd.
-
-Los tamanos REALES del PC (medidos con stat, la tarjeta citaba 515 MB):
+1. LOS NUMEROS DEL JUEGO Y DEL DISCO
+------------------------------------
+Del PC (medidos con stat; la tarjeta citaba 515 MB):
     patch_D2.mpq     5.022.588 bytes   =   4,8 MB
     d2data.mpq     267.330.019 bytes   = 254,9 MB
     d2char.mpq     267.704.443 bytes   = 255,3 MB
     TOTAL          540.057.050 bytes   = 515,0 MB
-El ISO que sale con los tres adentro: 553.893.888 bytes (528,2 MB). Entra en un CD de 700 MB y en un GD-ROM.
+El .iso con los tres adentro:
+    con el arbol Joliet (el de siempre): 553.893.888 bytes
+    sin Joliet (el que anda, ver defecto 1): 540.428.288 bytes = 263.881 sectores
+El motor lee el MPQ POR PARTES (Seek + ReadAt: d2common/d2fileformats/d2mpq/), asi que el disco no tiene
+que entrar en RAM: el binario ya carga 13.992.908 de los 16.777.216 bytes.
 
 2. LO QUE SE HIZO
 -----------------
-  - console/dc/gen-config-consola: dos banderas nuevas, apagadas por defecto (el camino de DC-002.19 sale
-    BYTE POR BYTE igual: el config.json del romdisk sigue dando sha256
-    8305595f55e6132f125eaf776e65f21a39d0c285d831a9d28999c048407fe959, medido antes y despues):
-        -ruta-consola /cd/juego      donde el ARRANQUE busca los datos (por defecto /rd/juego)
-        -mpq a,b,c                   los nombres del MpqLoadOrder, filtrados contra d2setup.CoreMPQs
-                                     (un nombre que el motor no conoce se RECHAZA en el build)
-    Con las dos: MpqPath=/cd/juego y MpqLoadOrder=[patch_d2.mpq d2data.mpq d2char.mpq] (config de 375
-    bytes, sha256 24eaf44bfa7afd2becf9e67f0d9f4044e5657ecd491c522de062973d6e39efdc).
-  - scripts/console/mkiso.py: `origen:ruta_interna` por archivo y las carpetas que falten se crean solas
-    (pycdlib contesta "Could not find path" si el padre no existe: medido). MKISO_JOLIET=0 arma la imagen
-    SIN el arbol Joliet (ver el defecto 3).
-  - scripts/console/mkdisco.sh: arma el ISO + el GDI de un POC ya construido con la carpeta del juego en
-    /JUEGO (los *.mpq del directorio que se le pase, en MAYUSCULAS porque el ISO9660 de nivel 3 solo acepta
-    A-Z 0-9 _). DC_SIN_JUEGO=1 es el mutante (imagen sin /JUEGO).
-  - scripts/console/leer-iso.py: lee un archivo de adentro de la ISO y dice su tamano y su sha256 (el
-    control del host de que el MPQ que viaja no es un pedazo cortado).
-  - scripts/console/build-motor-arranque.sh: tres variables de entorno nuevas, apagadas por defecto
-    (DC_RUTA_DATOS, DC_MPQ_JUEGO, DC_SIN_SELLOS y DC_DISCO_JUEGO para hornear el juego en el ISO).
-  - console/dc/poc/disco-c (C puro) y console/dc/poc/motor-disco (Go, el arranque real): las dos sondas.
-  - console/dc/std/csrc/os_dc.c: `os.Stat` con respaldo por apertura (ver el defecto 2).
+  - `gen-config-consola`: `-ruta-consola /cd/juego` y `-mpq a,b,c` (los nombres se filtran contra
+    `d2setup.CoreMPQs`). Apagadas por defecto: el config del romdisk sigue dando el mismo sha256
+    8305595f55e6132f125eaf776e65f21a39d0c285d831a9d28999c048407fe959.
+  - `mkiso.py`: `origen:ruta_interna` (carpetas que se crean solas: pycdlib contesta "Could not find path"
+    sin el padre) y `MKISO_JOLIET=0`.
+  - `mkdisco.sh`: ISO + GDI de un POC ya construido con los MPQ en /JUEGO. `DC_SIN_JUEGO=1` = el mutante.
+  - `leer-iso.py` (sha256 de un archivo de adentro del ISO), `mapa-extents.py` (la LBA de cada archivo y
+    los bytes del ISO en esa LBA y en las de al lado), `suma-mpq.py` (la misma suma que calcula la consola,
+    del lado del host), `mira-captura.py` (cuanto rojo oscuro tiene una captura: el cuadro de error).
+  - `recompilar-paquete-motor.sh`: vuelve a compilar UN paquete del motor a su .gox (la vuelta corta para
+    medir un arreglo del motor sin los minutos de build-motor-all.sh).
+  - `fix-kos-iso9660-sesion.py`: el parche al driver iso9660 de KOS (defecto 4).
+  - POC `disco-c` (C puro: el drive, el TOC, los FADs y la lectura del archivo) y POC `motor-disco` (Go: la
+    sonda del disco, `os.Stat`, `d2setup.Complete`, y los CARGADORES del motor: d2mpq.New/FromFile y
+    mpq.NewSource).
+  - `console/dc/std/csrc/os_dc.c`: `os.Stat` con respaldo por apertura (defecto 2).
+  - `d2common/d2fileformats/d2mpq/mpq_header.go` y `mpq_stream.go`: la cabecera y la tabla de offsets se
+    leen a mano (defecto 3).
 
-3. LOS TRES DEFECTOS QUE APARECIERON (medidos, en orden)
---------------------------------------------------------
-DEFECTO 1 -- el driver del iso9660 de KOS no encuentra NINGUN nombre si el ISO trae arbol Joliet.
-  Medido (POC disco-c, disco.gdi de 540.440.576 bytes):
-    nmmgr_lookup("/cd") -> 0x8c05940c     (el handler SI esta registrado)
-    fs_open("/cd/JUEGO/PATCH_D2.MPQ") -> -1 errno=2      errno 2 = ENOENT
-    fs_open("/cd/1ST_READ.BIN")       -> -1 errno=2
-  En fs.c:fs_hnd_open el ENOENT es "el handler no existe"; en iso_open es "no encontre el nombre". Y en
-  iso_open el ENOENT es de find_object_path, no de init_percd (que fallaria con ENODEV=19): el driver SI
-  monta el disco y despues no encuentra los nombres.
-  Con MKISO_JOLIET=0, MISMO POC y MISMO disco:
-    fs_open("/cd/JUEGO/PATCH_D2.MPQ") -> 3     fs_total -> 5.022.588  (el tamano exacto del PC)
-    fs_open("/cd/1ST_READ.BIN")       -> 3     fs_total -> 313.572
-  El driver compara los nombres SIN distinguir mayusculas (fncompare usa tolower, fs_iso9660.c:407): con el
-  arbol pelado, /cd/JUEGO/PATCH_D2.MPQ y /cd/juego/patch_d2.mpq abren el mismo archivo. Por eso el disco se
-  arma sin Joliet (los nombres del ISO en mayusculas y el motor pidiendo minusculas: da igual).
+3. LOS CUATRO DEFECTOS (medidos, en el orden en que aparecieron)
+----------------------------------------------------------------
+DEFECTO 1 -- con el arbol Joliet, el driver iso9660 de KOS no encuentra NINGUN nombre de /cd.
+  Medido (POC disco-c, .gdi de 540.440.576 bytes): `nmmgr_lookup("/cd") -> 0x8c05940c` (el handler esta),
+  y TODA ruta da `errno=2` (ENOENT): `/cd/JUEGO/PATCH_D2.MPQ`, `/cd/1ST_READ.BIN`, hasta `/cd`.
+  En fs.c el ENOENT es "el handler no existe" y en iso_open "no encontre el nombre": y no es el montaje,
+  porque eso devuelve ENODEV (19) -- el driver monta y despues no encuentra los nombres.
+  Con `MKISO_JOLIET=0`, el MISMO POC: `fs_open("/cd/JUEGO/PATCH_D2.MPQ") -> 3` y `fs_total -> 5.022.588`
+  (el tamano exacto del PC); `fs_open("/cd/1ST_READ.BIN") -> 3`, `fs_total -> 314.148`.
+  El driver compara sin distinguir mayusculas (fncompare usa tolower, fs_iso9660.c:407), asi que el ISO va
+  en mayusculas (lo unico que acepta el nivel 3) y el motor pide en minusculas: da igual.
 
-DEFECTO 2 -- newlib/KOS `stat()` no contesta NINGUNA ruta del disco, y el motor decide con `os.Stat`.
-  Medido (POC motor-disco, antes del respaldo): stat("/cd/JUEGO/PATCH_D2.MPQ") -> -1, ReadDir -> 0 entradas,
-  y el motor imprimia "game files not found at "/cd/juego", starting first-run setup" (porque
-  d2setup.Complete usa os.Stat). El MISMO archivo, abierto: fs_open + fs_total = 5.022.588 bytes.
-  Arreglo: `d2c_stat_tam` cae a abrir y preguntar el tamano (fs_open + fs_total) cuando stat() falla, y
-  `d2c_stat_es_dir` a abrir con O_DIR. Despues del arreglo:
+DEFECTO 2 -- `stat()` de KOS no contesta ninguna ruta del disco, y el motor decide con `os.Stat`.
+  Antes del arreglo: `stat("/cd/JUEGO/PATCH_D2.MPQ") -> -1` y el motor imprimia
+  `game files not found at "/cd/juego", starting first-run setup` (lo que mira `d2setup.Complete` es
+  `os.Stat`), aunque `fs_open` + `fs_total` del mismo archivo daban 5.022.588.
+  Arreglo: `d2c_stat_tam` cae a abrir y preguntar el tamano cuando `stat()` falla; `d2c_stat_es_dir` a
+  abrir con O_DIR. Despues:
     DISCO-CONSOLA stat /cd/juego/patch_d2.mpq bytes= 5022588 esdir= false
-    DISCO-CONSOLA stat /cd/juego/no-existe.mpq FALLO: file does not exist     (control negativo, sigue)
+    DISCO-CONSOLA stat /cd/juego/no-existe.mpq FALLO: file does not exist    (control negativo, sigue)
     MOTOR-DISCO seleccion: Complete= true ... archivos que ve= 0 faltan= 7
-  Queda declarado: el `stat` de un DIRECTORIO del disco y el ReadDir del disco (0 entradas) NO funcionan --
-  el repositorio conserva el camino del .manifiesto para ReadDir. `d2setup.Validate` (que lista el
-  directorio) sigue dando OK()=false y el arranque usa `Complete`.
+  Declarado: el `stat` de un DIRECTORIO del disco y el `ReadDir` (0 entradas: nuestro ReadDir es el del
+  .manifiesto del romdisk) NO funcionan, asi que `d2setup.Validate.Ok()` sigue en false. El arranque usa
+  `Complete`.
 
-DEFECTO 3 -- LA BARRERA QUE QUEDA: el motor pasa la seleccion y SIGUE con su cartel en la PANTALLA.
-  Medido (misma corrida, 75 s, captura con CAPTURE=auto): la consola serie NO dice "game files not found" ni
-  "file not found" (0 ocurrencias) y el motor ENTRA A SU LOOP --
-    MOTOR-DISCO seleccion: Complete= true
-    EBITEN-LOOP cuadro 0/1/2 ... EBITEN-PERFIL dibujar_us 254281 convertir_us 57559 cuadro_us 311843
-  -- pero la PANTALLA (captura f60s.png, 3.584x1.080, la ventana del emulador) sigue siendo el cuadro de
-  error del motor: fondo rojo oscuro con el texto "file not found: ...", el mismo cuadro de DC-002.26/27.
-  O sea: el pedido que falla ahora NO es el de la seleccion (que ya pasa) sino el del cargador de assets
-  cuando el motor empieza a leer el contenido de los MPQ. Ese es el tramo siguiente.
+DEFECTO 3 -- el `binary` de la consola no lee structs, y el MPQ se lee con structs.
+  Medido (POC motor-disco, sonda de los cargadores):
+    CARGADOR-CONSOLA d2mpq.New FALLO: failed to read reader: encoding/binary: Read no soporta ese tipo de
+    dato (ver DC-002.5)
+  `d2mpq.New` -> `readHeader` usa `binary.Read(&mpq.header)`; el `binary` de la consola es la stdlib minima
+  (sabe escalares y []byte) y un struct necesitaria reflector, que esta fuera del port.
+  Arreglo: la cabecera (32 bytes, sin relleno) y la tabla de offsets del bloque se leen como bytes y se
+  arman campo por campo con `binary.LittleEndian`. `go test ./d2common/d2fileformats/d2mpq/` verde
+  (TestSynthMPQ arma MPQs de verdad: el camino del host queda cubierto). Despues:
+    CARGADOR-CONSOLA d2mpq.New OK / d2mpq.FromFile OK / mpq.NewSource OK
 
-4. LOS NUMEROS DE LA LECTURA
-----------------------------
-  - Los 3 MPQ leidos DE ADENTRO de la ISO dan el sha256 del archivo del PC (leer-iso.py, 515 MB leidos):
+DEFECTO 4 -- el driver montaba la sesion de la zona de BAJA densidad y leia los datos corridos 45.000
+sectores (el que mas costo: dos veces parecia "el emulador miente").
+  Medido (con el .gdi de siempre: pista 1 = el ISO, pista 2 audio, pista 3 = el ISO en el LBA 45.000):
+    * el drive contesta GD-ROM (`disc=0x80`) y el mapa de FADs esta bien: el sector 0 del ISO (el IP.BIN,
+      "SEGA SEGAKATANA") esta en el FAD 150 y el PVD ("\x01CD001") en el FAD 166 -- justo donde el driver
+      los busca (bread_cache suma 150 por dentro, fs_iso9660.c:275);
+    * `fs_open("/cd/JUEGO/PATCH_D2.MPQ") -> 3` y `fs_total -> 5022588` (el tamano sale del directorio, OK);
+    * pero `fs_read` devolvia `41 41 85 86 ...` en vez de `4d 50 51 1a 20 00 00 00 7c a3 4c 00 00 00 03 00`
+      y la suma de los primeros 4.096 bytes daba 1.390.139.004 contra 3.218.815.363 del PC;
+    * el mismo `fs_read` de `/cd/1ST_READ.BIN` (LBA 25) daba `37 d0 02 01 ...` = EXACTO lo que hay en el
+      ISO en el LBA 25 (mapa-extents.py): o sea que el archivo chico se leia bien y el grande no.
+  La causa: la zona de BAJA densidad de un GD-ROM son los primeros 45.000 sectores (92.006.400 bytes), el
+  arbol con los MPQ no entra ahi (el MPQ esta en el LBA 261.428) y TODA lectura de mas alla del FAD 45.150
+  la contesta la zona de ALTA (la pista 3, que vive en el LBA 45.000). El driver sumaba solo el 150 de
+  siempre: leia 45.000 sectores mas alla (el LBA 216.428 del ISO, adentro de otro MPQ).
+  Arreglo (`fix-kos-iso9660-sesion.py`, parche al KOS vendorizado): la sesion de la zona de ALTA manda
+  cuando trae pista de datos, y su base (session_lba = 45.000) se suma en las lecturas del arbol
+  (directorios, datos de archivo por los dos caminos y readdir). Con la sesion de baja el resultado es
+  byte por byte el de antes (session_lba = 0). Despues (mismo POC, mismo disco):
+    DISCO2-C fs_read(2048) -> 2048 errno=16 bytes: 4d 50 51 1a
+    DISCO2-C fs_read(4096) -> 4096 errno=16 bytes: 4d 50 51 1a
+    DISCO2-C los dos caminos difieren en 0 de 2048 bytes
+  Medido de paso: Flycast EXIGE que la pista 1 sea de datos ("Track 1 must be a data track", y con eso
+  "Invalid GDI file"): no se puede dejar la zona de baja solo con audio.
+
+4. LOS CONTROLES QUE DICEN QUE EL DISCO ESTA BIEN
+-------------------------------------------------
+  * Los tres MPQ leidos DE ADENTRO de la ISO dan el sha256 del archivo del PC:
         /JUEGO/PATCH_D2.MPQ  eb7db78b91cd43359780790d3c453bebd4737702ff22beaa17626dc1e9cc82b8
         /JUEGO/D2DATA.MPQ    97c452b1c60b727cdccd62ee65f1ad1bf10749d0f9e1a03483b1a5251ede250f
         /JUEGO/D2CHAR.MPQ    29078a103d8f8baa6aa7b5ff411698c5066e227e8631271bcc3a34d4de75705a
-    (son los mismos sha256 de patch_D2.mpq, d2data.mpq y d2char.mpq en el PC)
-  - La consola LEE de verdad y el tamano coincide: la sonda suma los dos extremos de cada MPQ (256 KiB
-    arriba y 256 KiB abajo) con el `os` del motor:
-        PATCH_D2   principio leidos= 262144 de= 5022588   suma= 2951895294  ms= 2132
-                   final     desde= 4760444 leidos= 262144 suma= 3561931628 ms= 1077
-        D2DATA     principio suma= 3175827045 ms= 2130   final suma= 2145284175 ms= 2147
-        D2CHAR     principio suma= 2160699462 ms= 2130   final suma= 3213983397 ms= 2147
-  - VELOCIDAD del GD-ROM emulado: 4 MiB en 34.245 ms = 122 KB/s (~1x). Es una cota del EMULADOR (Flycast no
-    emula la velocidad real del GD-ROM): 256 KiB tardan ~2,1 s. Declarado: en la consola real seria otra.
-  - El drive y el mapa de FADs (POC disco-c, sonda de FADs): disc=0x80 (GDROM); TOC de baja: pista 1 de
-    datos en FAD 150 y pista 2 (audio) en 600, leadout 601; TOC alta: pista 3 en FAD 45150; el sector 0 del
-    ISO (el IP.BIN, "SEGA SEGAKATANA") esta en FAD 150 y el PVD ("\x01CD001") en FAD 166 -- justo donde el
-    driver los busca (el driver suma 150 por dentro: fs_iso9660.c:280).
+  * La CONSOLA lee los MISMOS bytes: la suma (suma = suma*31 + byte, 32 bits) de los primeros 256 KiB y de
+    los ultimos 256 KiB de cada MPQ, leidos con el `os` del motor, contra la del archivo del PC:
+        PATCH_D2  3885502911 / 1899281040  = PC  3885502911 / 1899281040
+        D2DATA    1306660740 / 1102600186  = PC  1306660740 / 1102600186
+        D2CHAR    2160699462 / 2078461507  = PC  2160699462 / 2078461507
+  * Los cargadores del MOTOR abren el MPQ del disco: `d2mpq.New OK`, `d2mpq.FromFile OK`,
+    `mpq.NewSource OK`, `os.Open + f.Stat -> 5022588` y `f.Read(4096)` con la cabecera del MPQ.
+  * El motor ya NO dice `game files not found` ni `file not found` (0 ocurrencias en la corrida).
+  * Velocidad del GD-ROM emulado: 4 MiB en 34.245 ms = 122 KB/s (256 KiB = ~2,13 s). Es una cota del
+    EMULADOR (no emula la velocidad real del drive): declarada, no se usa para decidir nada.
+  * `runtime.GOOS` en la consola es "dreamcast" (no "linux"): el camino `openIgnoreCase` de d2mpq (que
+    lista el directorio si falla el os.Open) NO se usa alla.
 
-5. LO QUE FALTA (tramo siguiente, declarado)
---------------------------------------------
-  a. el pedido de asset que el motor hace y que sigue sin encontrarse (el cartel de la pantalla): medirlo
-     con el instrumento de DC-002.20 (el gzip/asset embebido) y con una sonda del cargador de assets;
-  b. `os.ReadDir` de un directorio del disco (el driver ISO9660 SI sabe listar: el que no usa ese camino es
-     nuestro ReadDir, que es del .manifiesto) -- con eso `d2setup.Validate.Ok()` quedaria verde tambien;
-  c. el corpus scripts/console/checar-disco-227.sh (5 controles + el mutante DC_SIN_JUEGO=1) queda escrito y
-     commiteado, sin corrida completa: los controles que SI se midieron a mano estan en esta evidencia.
+5. LA PARED QUE QUEDA (el tramo siguiente, medido)
+--------------------------------------------------
+  El motor pasa la seleccion de archivos, carga las fuentes y muere al empezar a leer el CONTENIDO de los
+  MPQ:
+      [File Loader][INFO] Loaded /rd/OpenDiablo2 -> config.json
+      [App][INFO] loaded configuration file from /rd/OpenDiablo2/config.json
+      fatal error: gc_external_alloc: OOM
+  La pantalla queda NEGRA: en la captura de los 90 s (f90s.png) el rojo oscuro del cuadro de error del
+  motor es 0,0% (o sea: el cartel de los MPQ YA NO ESTA), pero tampoco hay menu dibujado. El tramo que
+  falta es de RAM: la tabla de hash de d2data.mpq son 1.916.928 bytes contiguos (el numero de DC-002.22) y
+  el monton de C de la consola queda en 696 bytes libres justo antes de entrar al motor.
+  Candidato medido para el tramo siguiente: leer las tablas del MPQ POR TROZOS (la tabla de hash y la de
+  bloques se pueden descifrar de a entradas de 16 bytes, sin una reserva unica de 1,9 MB).
+
+6. LO QUE QUEDA ESCRITO Y REPRODUCIBLE
+--------------------------------------
+  corpus: scripts/console/checar-disco-227.sh (7 controles + 3 mutantes: DC_SIN_JUEGO=1, MKISO_JOLIET=3 y
+  MUTANTE_KOS=1, que revierte el parche de KOS y exige que el MPQ se lea corrido: 41 41 85 86).
+  Los mutantes A y B son del repo (no tocan nada vendorizado); el C toca KOS y por eso va con bandera.

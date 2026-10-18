@@ -68,8 +68,17 @@ func (v *Stream) loadBlockOffsets() error {
 
 	v.Positions = make([]uint32, blockPositionCount)
 
-	if err := binary.Read(io.NewSectionReader(v.MPQ.file, int64(v.Block.FilePosition), 1<<32), binary.LittleEndian, &v.Positions); err != nil {
+	// DC-002.27: la tabla de offsets del bloque se lee a mano (bytes + LittleEndian), no con
+	// binary.Read sobre el slice: el `binary` de la consola no soporta `*[]uint32` (misma pared que la
+	// cabecera, ver mpq_header.go:readHeader). Un uint32 por sector, en orden.
+	crudo := make([]byte, int(blockPositionCount)*4)
+
+	if _, err := io.ReadFull(io.NewSectionReader(v.MPQ.file, int64(v.Block.FilePosition), 1<<32), crudo); err != nil {
 		return err
+	}
+
+	for i := range v.Positions {
+		v.Positions[i] = binary.LittleEndian.Uint32(crudo[i*4 : i*4+4])
 	}
 
 	// the sector data cannot lie beyond the archive
