@@ -30,31 +30,39 @@ CONTROLES (lo que dice que la imagen es la que se cree)
    el instrumento de las marcas ARQ-MARCA que se leen abajo).
 5. El arbol esta como el arreglo de DC-002.33: `fix-mpq-tablas-233.py --estado` = 7/7 como el arreglo.
 
-LOS CUATRO ESTADOS (criterio 1: antes y despues de cada palanca, por separado)
------------------------------------------------------------------------------
+LOS CINCO ESTADOS (criterio 1: antes y despues de cada palanca, cada una POR SEPARADO)
+---------------------------------------------------------------------------------------
 Dos palancas: la de DC-002.33 (las tablas del MPQ como BYTES contiguos, en el arbol) y la de DC-002.32 (la
 tabla de d2records de 1,67 MB FUERA del binario; medida con su instrumento `fix-d2records-tabla-232.py
---fuera`, que la vacia: mide el PESO y hasta donde llega el arranque, no es un motor jugable).
+--fuera`, que la vacia: mide el PESO y hasta donde llega el arranque, no es un motor jugable). Para ver el
+efecto de cada una sola hace falta la imagen con UNA y no la otra: de ahi S232SOLO (la tabla afuera con las
+tablas del MPQ todavia como objetos).
 
   estado                          palanca 233   palanca 232   1ST_READ.BIN    monton de C
   BASE    (el "antes" de las dos)     NO            NO        13.771.272 B    1.344 B libres
   S233    (solo la de 233)            SI            NO        13.773.320 B    3.392 B libres
+  S232SOLO (solo la de 232)            NO            SI        11.982.344 B      320 B libres
   S232    (las dos)                   SI            SI        11.984.360 B    2.400 B libres
   MUTANTE (sin los MPQ en la ISO)     SI            NO        13.773.320 B    3.392 B libres
 
   "monton de C" = lo que imprime el arranque ANTES de llamar al motor (`MOTOR-ARRANQUE monton de C antes del
   motor: N bytes libres`): es el hueco que le queda al monton de C cuando el binario ya ocupa lo suyo de los
-  16.777.216 bytes de la consola. La palanca de 232 baja el binario 1.788.960 B y se ve en los dos numeros.
+  16.777.216 bytes de la consola. OJO con un numero que NO se comporta como uno esperaria y queda anotado aca
+  tal como salio: el hueco de C NO crece con la imagen mas chica (S232SOLO tiene 1.788.928 B menos de imagen y
+  sin embargo le quedan 320 B contra los 1.344 B de BASE). O sea: lo que el binario deja libre se lo lleva el
+  runtime (el semiespacio/las arenas) antes de que el POC mida. Lo que manda no es ese numero solo: es el
+  binario en RAM y donde queda la proxima reserva.
 
   estado                          vueltas   ultima cosa que hizo la consola serie            muerte
   BASE                              1       Adding source: '/cd/juego/patch_d2.mpq'         Data address error (PC 0000085b)
   S233                              5       Adding source: '/cd/juego/patch_d2.mpq'         gc_external_alloc: OOM
+  S232SOLO                          1       Adding source: '/cd/juego/patch_d2.mpq'         Data address error (PC 0000085b)
   S232                              2       Loaded .../patch_d2.mpq -> .../LvlPrest.txt     MUDA (la consola reinicia)
   MUTANTE                           9       game files not found at "/cd/juego"             MUDA (la consola reinicia)
 
   (cada "vuelta" es un arranque completo: el motor muere, KOS reinicia la consola y vuelve a arrancar; por
-  eso la corrida de 25 s muestra varias. La corrida BASE se corta en la vuelta 1 porque Flycast DETIENE el
-  emulador con la excepcion del SH-4: "Flycast has stopped: Fatal: SH4 exception when blocked".)
+  eso la corrida de 25 s muestra varias. Las corridas BASE y S232SOLO se cortan en la vuelta 1 porque Flycast
+  DETIENE el emulador con la excepcion del SH-4: "Flycast has stopped: Fatal: SH4 exception when blocked".)
 
 EL NUMERO, ESTADO POR ESTADO
 ----------------------------
@@ -75,6 +83,17 @@ S233 (la de 233, "el despues" de esta tarjeta) -- el OOM limpio, con numero:
     => NO es el semiespacio del GC (le sobran 131.056 B): es el MONTON DE C, al que le quedan 39.536 B
        cuando el arranque le pide UN MEGA contiguo (1.048.576 B) al abrir el PRIMER MPQ.
        Las 5 vueltas dan el MISMO numero: no es azar, es la pared.
+
+S232SOLO (solo la de 232, con las tablas del MPQ como OBJETOS) -- NO alcanza: la pared del GC mata antes:
+    [File Loader][INFO] Adding source: '/cd/juego/patch_d2.mpq'
+    Unhandled exception: PC 0000085b, code 1, evt 00e0
+    Encountered Data address error (read)
+    Flycast has stopped: Fatal: SH4 exception when blocked   (a los 5,8 s)
+    semiespacio del GC: usado maximo 401.264 de 524.288  ->  libre 123.024
+    => el 1,79 MB que gana la tabla de d2records NO se convierte en arranque: con las tablas del MPQ como
+       objetos el que muere primero es el GC (como en BASE, misma excepcion) y el motor no pasa del primer
+       MPQ. Hace falta la de 233 para que el techo lo ponga el monton de C -- recien ahi la RAM ganada por
+       232 sirve. Las dos palancas juntas valen un MPQ; cada una sola, no.
 
 S232 (la de 233 + la de 232) -- se corre la pared un MPQ entero:
     [File Loader][INFO] Adding source: '/cd/juego/patch_d2.mpq'
@@ -110,21 +129,22 @@ corrida, y cada una clasificada por el color dominante:
   estado     capturas   "negra" (la pantalla del motor)   "arranque-sega" (licencia de la consola)   otras
   BASE          6                  4 (67%)                            2 (33%)                          0
   S233         25                 16 (64%)                            9 (36%)                          0
+  S232SOLO      5                  3 (60%)                            2 (40%)                          0
   S232         25                 17 (68%)                            8 (32%)                          0
   MUTANTE      25                  3 (12%)                           22 (88%)                          0
 
-  (la corrida BASE es mas corta porque el emulador se DETIENE con la excepcion del SH-4 a los 6 s. El reparto
-  negro/licencia NO es un numero fijo: cada ciclo del motor dura ~5 s y la captura es 1 por segundo, asi que
-  segun el instante cae mas de uno u otro -- entre corridas se midio S233 14-16 de 25 en negro, S232 17-21,
-  MUTANTE 3-10, BASE 3-4. Lo que NO varia nunca: los cuadros dibujados por el motor son 0.)
+  (las corridas BASE y S232SOLO son mas cortas porque el emulador se DETIENE con la excepcion del SH-4 a los
+  ~6 s. El reparto negro/licencia NO es un numero fijo: cada ciclo del motor dura ~5 s y la captura es 1 por
+  segundo, asi que segun el instante cae mas de uno u otro -- entre corridas se midio S233 14-23 de 25 en
+  negro, S232 16-21, MUTANTE 3-10, BASE 3-4. Lo que NO varia nunca: los cuadros dibujados por el motor son 0.)
 
   "negra" = 100,0% de los pixeles < 16 en los tres canales (dominante (0,0,0) en el 100%): la pantalla del
   motor, que muere antes de pintar nada. "arranque-sega" = 91,9% de los pixeles en un gris uniforme (dominante
   (192,192,192) en rango de 16) con 93,3% de pixeles claros: la pantalla de licencia que muestra la consola
   en cada reinicio de KOS.
 
-  CUADROS DIBUJADOS POR EL MOTOR: **0** en los cuatro estados (cero lineas EBITEN-PERFIL y cero "cuadros del
-  loop" en los cuatro logs). O sea: el motor NO llega al bucle de dibujo en ninguno. Lo que se ve en pantalla
+  CUADROS DIBUJADOS POR EL MOTOR: **0** en los cinco estados (cero lineas EBITEN-PERFIL y cero "cuadros del
+  loop" en los cinco logs). O sea: el motor NO llega al bucle de dibujo en ninguno. Lo que se ve en pantalla
   NO es su cartel ni nada del juego: es negro (su pantalla, sin pintar) o la licencia de arranque de la
   consola entre reinicio y reinicio.
 
@@ -133,8 +153,9 @@ CONCLUSION EN UNA LINEA
 Con los MPQ del disco, HEAD (DC-002.33 adentro, la palanca de DC-002.32 afuera) llega a ABRIR el primer MPQ
 y muere pidiendo 1 MiB contiguo al monton de C con 39.536 B libres (el semiespacio del GC ya NO es la pared:
 le sobran 131.056 B); aplicando la palanca de DC-002.32 (la tabla de d2records afuera, -1.788.960 B de
-imagen) el arranque pasa a leer dos MPQ y dos assets del MPQ del disco y muere MUDO justo despues. Cuadros
-dibujados: 0 en los cuatro estados.
+imagen) el arranque pasa a leer dos MPQ y dos assets del MPQ del disco y muere MUDO justo despues. Cada
+palanca SOLA no alcanza: la de 232 sin la de 233 muere igual que BASE (la pared del GC). Cuadros dibujados:
+0 en los cinco estados.
 
 LO QUE NO ENTRA (cada defecto va a SU tarjeta, con este numero)
 --------------------------------------------------------------
@@ -148,7 +169,7 @@ LO QUE NO ENTRA (cada defecto va a SU tarjeta, con este numero)
 
 REPRODUCIBILIDAD
 ----------------
-  bash scripts/console/checar-motor-disco-234.sh            # los cuatro estados, de punta a punta
+  bash scripts/console/checar-motor-disco-234.sh            # los cinco estados, de punta a punta
   (usa scripts/console/captura-ventana-234.sh para la ventana del emulador y
    scripts/console/clasifica-captura-234.py para los pixeles, y
    scripts/console/tabla-estados-234.py para la tabla de arriba)

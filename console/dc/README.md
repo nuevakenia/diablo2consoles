@@ -3723,3 +3723,110 @@ ningún archivo de `d2*`, `os`, `video` ni `audio`). La comparación consola-vs-
 DC6 y es **exacta**.
 
 Evidencia cruda: `evidencia/dc-002.35b-dc6-hash-y-captura.txt` (y la anterior, `dc-002.35-dc6-menu-disco.txt`).
+
+## 52. DC-002.34: hasta dónde llega el motor **entero** con los MPQ del disco — la palanca de DC-002.33 lo deja pidiendo **1 MiB contiguo** al montón de C (39.536 libres), la de DC-002.32 lo corre **un MPQ entero** (lee `d2data.mpq` y dos assets, y muere mudo) y **cada una sola no alcanza**: **0 cuadros** en los cinco estados
+
+La tarjeta de DC-002.33 cerró con una frase que había que cobrar: *«el arranque todavía no termina: muere
+después de `d2app.Create()`, en otra pared, el montón de C»*. Lo que hace esta tarjeta es **medir ese punto
+con el motor entero** (el POC `motor-arranque`, que llama al entry point de verdad: `d2app.Create(...)` +
+`instance.Run()`, lo único que agrega es la consola serie y el video), con los **3 MPQ del juego horneados en
+la ISO** (`/JUEGO`, el camino de DC-002.27) y **una palanca por vez**:
+
+* **BASE** — las tablas del MPQ como **objetos** de Go (el «antes» de DC-002.33) y la tabla de `d2records`
+  **adentro** del binario (el «antes» de DC-002.32);
+* **S233** — la palanca de DC-002.33 (las tablas como **bytes contiguos**), que es el árbol de HEAD;
+* **S232SOLO** — sólo la de DC-002.32 (`--fuera`), con las tablas del MPQ todavía como objetos;
+* **S232** — las dos;
+* **MUTANTE** — la misma imagen **sin** la carpeta `/JUEGO`.
+
+**1. EL NÚMERO, ESTADO POR ESTADO.** Todo con la capa `/tmp/gox-233` (control: `d2mpq.gox` recompilado de este
+árbol sale **byte a byte igual**, `cmp`), `libgodc.a` del 18-10 13:20:35 y el árbol como el arreglo de 233 (7/7):
+
+    estado                        1ST_READ.BIN   montón de C   semiespacio máx.   dónde muere
+    BASE  (sin 233, sin 232)      13.771.272 B    1.344 libres  393.240 (131.048)   Data address error (PC 0000085b)
+    S233  (solo 233)              13.773.320 B    3.392 libres  393.232 (131.056)   gc_external_alloc: OOM
+    S232SOLO (solo 232)           11.982.344 B      320 libres  401.264 (123.024)   Data address error (PC 0000085b)
+    S232  (233 + 232)             11.984.360 B    2.400 libres  409.472 (114.816)   MUDA (la consola reinicia)
+    MUTANTE (ISO sin /JUEGO)      13.773.320 B    3.392 libres  395.616 (128.672)   MUDA (la consola reinicia)
+
+La muerte de **S233** es la que da el número que faltaba, y es limpia:
+
+    [File Loader][INFO] Adding source: '/cd/juego/patch_d2.mpq'
+    Out of memory. Requested sbrk_base 0x8d04b000, was 0x8cf4b000, diff 1048576
+    fatal error: gc_external_alloc: OOM
+    Memory: arena=1970208 used=1930672 free=39536
+
+O sea: **la pared ya no es el semiespacio del GC** (le sobran **131.056 B** de 524.288) sino el **montón de C**,
+que tiene **39.536 B** cuando el arranque le pide **UN MEGA CONTIGUO**. Las **5 vueltas** de la corrida dan el
+mismo número: no es azar. (Y ojo con la lectura del «antes»: con las tablas como objetos el arranque **no**
+imprime `OOM`, se cae con una excepción —`Unhandled exception: PC 0000085b`, un PC que no es código del
+arranque— y el emulador **se detiene**; en S233 muere con el mensaje.)
+
+**2. CADA PALANCA SOLA NO ALCANZA; LAS DOS JUNTAS VALEN UN MPQ.** Con **S232SOLO** (la tabla de `d2records`
+afuera pero las tablas del MPQ como objetos) el arranque **muere igual que BASE**, con la **misma excepción** y
+sin pasar del primer MPQ: el que mata primero es el **GC** (401.264 usados). La RAM que gana la tabla de 232 no
+sirve hasta que la de 233 corre el techo al montón de C. Con **las dos** (S232) el arranque **abre los dos
+primeros MPQ del GD-ROM**, arranca el **Asset Manager** y **lee dos assets de verdad** de adentro del MPQ:
+
+    [File Loader][INFO] Adding source: '/cd/juego/patch_d2.mpq'
+    [File Loader][INFO] Adding source: '/cd/juego/d2data.mpq'
+    [Asset Manager][INFO] Language: enUS (ENG), font dir LATIN
+    [App][INFO] Initializing asset manager
+    [File Loader][INFO] Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlTypes.txt
+    [File Loader][INFO] Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlPrest.txt
+    (y ahí: 00:19:429 REIOS: Booting up — la consola reinicia sin imprimir NADA)
+
+Eso es la prueba de que **el tamaño del binario en RAM es la palanca de esta pared** (la tesis de DC-002.32,
+medida ahora sobre el arranque y no sobre una sonda). La muerte pasó a ser **muda** justo después de
+`LvlPrest.txt`: sin mensaje no se puede decir si falta RAM o si es un defecto, y por eso va a su tarjeta.
+
+Un número que **no** se comporta como uno esperaría y queda anotado tal como salió: el hueco de C **no** crece
+con la imagen más chica (S232SOLO tiene 1.788.928 B menos de imagen y le quedan **320 B** contra los 1.344 B de
+BASE). Lo que el binario deja libre se lo lleva el runtime (el semiespacio/las arenas) antes de que el POC mida.
+
+**3. LA PANTALLA (criterio 2), CON NÚMEROS.** No se usa el recorte fijo de DC-002.35 (`210,210 640x480`): en
+este host la captura de pantalla completa es **3584x1080** (dos monitores) y ahí la ventana del emulador **no
+cae**. Se captura **la ventana** por su id de X11 (`_NET_CLIENT_LIST` + `import -window`), que con
+`window:fullscreen=no` mide **682x453** (308.946 píxeles), y se clasifica cada cuadro por color dominante:
+
+    estado    capturas   "negra" (la pantalla del motor)   "arranque-sega" (licencia de la consola)
+    BASE         6              4  (67%)                          2  (33%)
+    S233        25             16  (64%)                          9  (36%)
+    S232SOLO     5              3  (60%)                          2  (40%)
+    S232        25             17  (68%)                          8  (32%)
+    MUTANTE     25              3  (12%)                         22  (88%)
+
+    «negra» = 100,0% de los píxeles con los tres canales < 16; «arranque-sega» = 91,9% en un gris uniforme.
+    El reparto se mueve entre corridas (S233 14-23 de 25, S232 16-21, MUTANTE 3-10): el ciclo del motor dura
+    ~5 s y la captura es 1 por segundo. Lo que NO se mueve: **cuadros dibujados por el motor = 0** en los
+    cinco estados (cero líneas `EBITEN-PERFIL`/`cuadros del loop`): el motor **no llega al bucle de dibujo**.
+    Lo que se ve en pantalla no es su cartel ni nada del juego: o negro (su pantalla, sin pintar) o la
+    licencia de arranque de la consola entre reinicio y reinicio.
+
+**4. EL MUTANTE (criterio 3).** La misma imagen **sin la carpeta `/JUEGO`**: 9 vueltas en 25 s y en las 9 la
+consola dice `game files not found at "/cd/juego", starting first-run setup`; en las tres corridas con juego,
+**0 veces**. El control de la ISO, además, compara el `sha256` de los tres MPQ **de adentro del ISO9660** con
+el del archivo del PC (los tres iguales) y confirma que la ISO del mutante **no** tiene `/JUEGO`.
+
+**5. LO QUE APARECIÓ EN EL CAMINO (cada uno con su tarjeta y con este número).**
+
+* **DC-002.41**: la pared es el **montón de C** (39.536 libres contra un pedido de 1.048.576). Falta medir
+  **quién** pide ese mega (la tabla de hash de `d2data.mpq` son 65.536 x 16 = **1.048.576 B** justos: el
+  arreglo de DC-002.33 la pasó al montón de C a propósito, porque supera el umbral de «objeto grande»; hay que
+  partirla).
+* **DC-002.42**: la palanca de DC-002.32 **no está en el árbol** (el instrumento la vacía). Aplicada de verdad
+  vale **un MPQ entero de arranque**… siempre que la de 233 esté abajo (arriba medido: sola, no alcanza).
+* **DC-002.43**: la muerte **muda** después de `LvlPrest.txt` (semiespacio en 409.472, sin `fatal error`, sin
+  `Out of memory`, sin excepción del SH-4 del lado del emulador).
+* **DC-002.44**: el motor **ve 0 archivos** en `/cd/juego` — `Complete= true Validate.OK()= false archivos que
+  ve= 0 faltan= 7` en las tres corridas con juego: el `Stat` por nombre anda (por eso el MPQ se abre y se lee
+  entero) y el **listado** del mismo directorio no. El `ReadDir` del overlay sí anda (`/rd/prueba-seleccion`,
+  1 entrada): el defecto está del lado del iso9660.
+
+Barreras: corpus `checar-motor-disco-234.sh` **8/8 controles OK y 0 fallos** con los **cinco estados**, los
+números de la tabla salieron idénticos en dos corridas completas separadas (los únicos que se mueven son los
+del reparto negro/licencia de la pantalla, por el instante de la captura), y la capa `/tmp/gox-233` es la de
+este árbol (control byte a byte del `d2mpq.gox`).
+
+Evidencia cruda: `evidencia/dc-002.34-motor-disco.txt` (y los logs de Flycast de los cinco estados, con las
+capturas, en `~/.hermes/cache/scratch/corpus-234/`).

@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""La tabla de los cuatro estados de DC-002.34, sacada de los logs de Flycast (sin interpretacion).
+"""La tabla de los estados de DC-002.34, sacada de los logs de Flycast (sin interpretacion).
 
-Los cuatro logs son los del corpus `scripts/console/checar-motor-disco-234.sh`: BASE (sin la palanca de
-DC-002.33 y sin la de DC-002.32), S233 (solo la de 233), S232 (las dos) y el MUTANTE (la ISO sin /JUEGO).
+Los logs son los del corpus `scripts/console/checar-motor-disco-234.sh`, en este orden:
+  BASE (sin la palanca de DC-002.33 y sin la de DC-002.32), S233 (solo la de 233), S232 (las dos),
+  S232SOLO (solo la de 232, con las tablas del MPQ como objetos) y el MUTANTE (la ISO sin /JUEGO).
 
-Uso:  tabla-estados-234.py <log_base> <log_s233> <log_s232> <log_mutante>
+Uso:  tabla-estados-234.py <log_base> <log_s233> <log_s232> <log_s232solo> <log_mutante>
+      (con 4 logs tambien anda: se saltan los estados que no se pases, en el orden de arriba)
 """
 import re
 import sys
 
 NOMBRES = [
-    "BASE  (sin 233, sin 232)",
-    "S233  (con 233, sin 232)",
-    "S232  (con 233 y 232)",
+    "BASE    (sin 233, sin 232)",
+    "S233    (solo 233)",
+    "S232    (233 y 232)",
+    "S232SOLO (solo 232, tablas como objetos)",
     "MUTANTE (ISO sin /JUEGO)",
 ]
 
@@ -57,16 +60,26 @@ def analiza(nombre, path):
     else:
         print("   muerte                      : MUDA (la consola reinicia sin mensaje)")
 
+    paradas = [l.strip() for l in ls if "Flycast has stopped" in l]
+    if paradas:
+        print("   el emulador                 : %s" % paradas[0])
+
     ult = [l.strip() for l in ls if l.strip() and "reios" not in l.lower()]
     print("   ULTIMA linea de la consola  : %s" % (ult[-1] if ult else "(vacia)"))
     print()
 
 
 def main():
-    if len(sys.argv) != 5:
+    args = sys.argv[1:]
+    if len(args) == 4:
+        # sin el estado S232SOLO: se mantiene el orden de los cinco y se saltea ese
+        args = args[:3] + [None] + [args[3]]
+    if len(args) != 5:
         print(__doc__)
         return 2
-    for nombre, path in zip(NOMBRES, sys.argv[1:]):
+    for nombre, path in zip(NOMBRES, args):
+        if path is None:
+            continue
         analiza(nombre, path)
     return 0
 

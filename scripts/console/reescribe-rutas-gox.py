@@ -13,6 +13,9 @@ import sys
 
 
 def main():
+    if len(sys.argv) != 4:
+        print("uso: reescribe-rutas-gox.py <dir_viejo> <dir_nuevo> <dir_capa>", file=sys.stderr)
+        return 2
     viejo, nuevo, capa = sys.argv[1:4]
     for nombre in ("orden.txt", "orden-motor.txt"):
         p = pathlib.Path(capa) / nombre

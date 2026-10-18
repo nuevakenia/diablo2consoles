@@ -36,6 +36,7 @@ MPQ="${MPQ:-$HOME/.wine-d2/drive_c/Games/Diablo II}"
 GEN_HEAD="${GEN_HEAD:-/tmp/gox-233}"     # la capa coherente con HEAD (control 3 la verifica)
 GOX_BASE="$SAL/gox-base"
 GOX_S232="$SAL/gox-s232"
+GOX_S232SOLO="$SAL/gox-s232solo"
 LISTA="patch_d2.mpq,d2data.mpq,d2char.mpq"
 SEGS="${2:-25}"
 REFRESCAR=0
@@ -88,9 +89,20 @@ fi
 # ================================================================================================
 # 1. LAS CUATRO IMAGENES (los tres estados y el mutante)
 # ================================================================================================
+revisa_rutas() { # $1 = capa de .gox: no puede quedar ni una ruta absoluta vieja /tmp/gox-* adentro
+    local n
+    n=$(grep -c '/tmp/gox' "$1/orden-motor.txt" 2>/dev/null || true)
+    if [ "${n:-0}" != "0" ]; then
+        echo "   FALLO: $1 conserva $n rutas /tmp/gox en orden-motor.txt (correr reescribe-rutas-gox.py)"
+        return 1
+    fi
+    return 0
+}
+
 armar() { # $1 = nombre (dir), $2 = dir de .gox, $3 = "sin-juego" para el mutante
     local dir="$SAL/$1"
     [ "$REFRESCAR" = 0 ] && [ -f "$dir/1ST_READ.BIN" ] && { nota "ya construido: $1"; return 0; }
+    revisa_rutas "$2" || exit 1
     local extra=""
     [ "${3:-}" = "sin-juego" ] && extra="DC_SIN_JUEGO=1"
     # shellcheck disable=SC2086
@@ -127,7 +139,22 @@ capa "$GOX_S232" d2core/d2records
 armar s232-con-juego "$GOX_S232"
 ( cd "$SRC" && python3 scripts/console/fix-d2records-tabla-232.py --dentro )
 
-paso "1d. MUTANTE: la misma imagen SIN la carpeta /JUEGO"
+paso "1d. S232SOLO: SOLO la palanca de DC-002.32 (la tabla afuera) y las tablas del MPQ como OBJETOS"
+# Este estado es el que pide el criterio 1 al pie de la letra: el efecto de la palanca de DC-002.32 por
+# separado, sin la de DC-002.33 debajo. Lo que se espera es que la pared del semiespacio (la de BASE) siga
+# matando antes de que la RAM ganada por la tabla llegue a servir.
+if [ "$REFRESCAR" = 1 ] || [ ! -f "$GOX_S232SOLO/orden-motor.txt" ]; then
+    rm -rf "$GOX_S232SOLO"; cp -a "$GOX_S232" "$GOX_S232SOLO"
+    python3 "$HERE/reescribe-rutas-gox.py" "$GOX_S232" "$GOX_S232SOLO" "$GOX_S232SOLO" || exit 1
+fi
+( cd "$SRC" && "$DC_PYTHON" scripts/console/fix-mpq-tablas-233.py --pristino ) || exit 1
+capa_solo() { ( cd "$SRC" && bash scripts/console/recompilar-paquete-motor.sh d2common/d2fileformats/d2mpq "$GOX_S232SOLO" ); }
+capa_solo || exit 1
+armar s232solo-con-juego "$GOX_S232SOLO"
+( cd "$SRC" && "$DC_PYTHON" scripts/console/fix-mpq-tablas-233.py --sano )
+( cd "$SRC" && python3 scripts/console/fix-d2records-tabla-232.py --dentro )
+
+paso "1e. MUTANTE: la misma imagen SIN la carpeta /JUEGO"
 armar sin-juego "$GEN_HEAD" sin-juego
 
 # ================================================================================================
@@ -170,18 +197,20 @@ corrida() { # $1 = nombre, $2 = segundos
 corrida base-con-juego
 corrida s233-con-juego
 corrida s232-con-juego
+corrida s232solo-con-juego
 corrida sin-juego
 
 # ================================================================================================
 # 4. LA TABLA (criterio 1) Y LOS CONTROLES DE LA PANTALLA Y DEL MUTANTE (criterios 2 y 3)
 # ================================================================================================
-paso "4. la tabla de los cuatro estados"
+paso "4. la tabla de los cinco estados"
 "$DC_PYTHON" "$HERE/tabla-estados-234.py" \
     "$SAL/run-base-con-juego/flycast.log" "$SAL/run-s233-con-juego/flycast.log" \
-    "$SAL/run-s232-con-juego/flycast.log" "$SAL/run-sin-juego/flycast.log" | tee "$SAL/tabla.txt"
+    "$SAL/run-s232-con-juego/flycast.log" "$SAL/run-s232solo-con-juego/flycast.log" \
+    "$SAL/run-sin-juego/flycast.log" | tee "$SAL/tabla.txt"
 
 paso "5. la pantalla, con numeros (criterio 2)"
-for e in base-con-juego s233-con-juego s232-con-juego sin-juego; do
+for e in base-con-juego s233-con-juego s232-con-juego s232solo-con-juego sin-juego; do
     n_negras=$("$DC_PYTHON" "$HERE/clasifica-captura-234.py" "$SAL/run-$e"/win-*s.png 2>/dev/null | grep -c 'negra')
     n_total=$(ls "$SAL/run-$e"/win-*s.png 2>/dev/null | wc -l)
     nota "$e: $n_total capturas, $n_negras con la pantalla del motor en negro"
