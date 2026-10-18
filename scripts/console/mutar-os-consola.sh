@@ -199,6 +199,17 @@ probar "el listado del overlay que no matchea (C)" \
     "if (l <= n + 1 || 1) {   /* MUTANTE: no matchea */" \
     "las entradas del overlay en el caso 4m"
 
+# 13. IsExist como la NEGACION de IsNotExist (DC-002.31): con err == nil -- el os.Stat de un archivo que SI
+#     esta, que es lo que mira el Exists del proveedor de sistema de archivos del motor -- eso da true donde
+#     el os.IsExist de Go da false. Lo cazan los casos 4d-bis del POC (IsExist(nil), IsExist(otro),
+#     IsExist(err de Stat de un archivo que si esta)) y, en el motor, el mutante 'exists' de
+#     scripts/console/mutar-sueltos-231.sh.
+probar "IsExist como la negacion de IsNotExist" \
+    "console/dc/std/os/os.go" \
+    "func IsExist(err error) bool { return err == ErrExist }" \
+    "func IsExist(err error) bool { return !IsNotExist(err) }" \
+    "IsExist(nil) en la consola (Go da false, la negacion da true)"
+
 echo
 echo "== restauro y verifico =="
 cp "$RESP" "$OS"

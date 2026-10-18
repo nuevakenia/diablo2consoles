@@ -14,6 +14,14 @@ DC-002.27: un archivo se puede poner en una CARPETA del ISO con la forma
 `.../d2data.mpq:/JUEGO/D2DATA.MPQ;1`). Las carpetas que falten se crean solas: pycdlib NO las
 crea y contesta `PyCdlibInvalidInput: Could not find path` cuando el directorio padre no existe
 (medido). Sin la forma con dos puntos, el comportamiento es el de antes.
+
+DC-002.31: la lista se puede pasar en un ARCHIVO, con la forma `@/ruta/de/lista.txt` (una linea
+por archivo, en las formas de arriba). Existe porque el arbol suelto del juego son 20.976 archivos
+y la lista de argumentos se pasa del tope del kernel: el build del disco moria con "La lista de
+argumentos es demasiado larga" (E2BIG medido; ver la evidencia de la tarjeta). Con la lista en un
+archivo, y medido, pycdlib ACEPTA los nombres largos del arbol suelto (nivel 3): una entrada
+`/JUEGO/DATA/GLOBAL/UI/FRONTEND/CINEMATICSELECTEXP.DC6;1` de 23 caracteres de nombre y cuatro
+niveles de carpeta queda escrita en el disco con ese nombre.
 """
 import os
 import sys
@@ -32,11 +40,25 @@ def partir(arg):
     return arg, "/%s;1" % os.path.basename(arg).upper()
 
 
+def expandir(args):
+    """Los `@archivo` se cambian por las lineas de ese archivo (una linea = un archivo, los vacios se
+    saltan). DC-002.31: sin esto la lista de 20.976 archivos del arbol suelto no entra en argv."""
+    salida = []
+    for a in args:
+        if a.startswith("@"):
+            with open(a[1:], encoding="utf-8") as fh:
+                salida.extend(l.rstrip("\n") for l in fh if l.strip())
+        else:
+            salida.append(a)
+
+    return salida
+
+
 def main():
     if len(sys.argv) < 4:
         print(__doc__)
         return 2
-    out, ipbin, files = sys.argv[1], sys.argv[2], sys.argv[3:]
+    out, ipbin, files = sys.argv[1], sys.argv[2], expandir(sys.argv[3:])
 
     iso = pycdlib.PyCdlib()
     # DC-002.27: MKISO_JOLIET=0 arma la imagen SIN el arbol Joliet (solo el ISO9660 de nivel 3 con los

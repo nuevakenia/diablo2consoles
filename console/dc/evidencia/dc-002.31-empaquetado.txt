@@ -1,0 +1,237 @@
+DC-002.31 — EL EMPAQUETADO DE LOS ASSETS SIN MPQ, Y EL TECHO DE TAMANO REAL (medido, no deducido)
+=================================================================================================
+Rama DC-002, el corpus `scripts/console/checar-sueltos-231.sh` (host + consola: el host mide el MISMO codigo
+del motor y la consola lo corre en Flycast), layer coherente de .gox `/tmp/gox-330` (142 paquetes del motor +
+74 de stdlib/terceros), 25 s de Flycast por corrida. Cada linea de abajo es una corrida o una comparacion de
+archivos. Las herramientas del host que entran al corpus: `console/dc/mpq-extraer` (MPQ -> arbol suelto),
+`console/dc/sonda-sueltos` (el proveedor de sistema de archivos del motor), `console/dc/sonda-isexit` (la
+tabla de `os.IsExist`/`os.IsNotExist` de Go), `console/dc/poc/motor-sueltos` (la consola, POR EL CAMINO DEL
+MOTOR: `d2common/d2loader.Loader`, el mismo que usa `d2core/d2asset`).
+
+LO QUE SE MIDIO, EN UNA LINEA
+-----------------------------
+(a) LOS ASSETS SUELTOS ANDAN, y el motor YA los soportaba (`loader.LoaderProviders[... AssetSourceFileSystem]`
+= `filesystem.OnAddSource`) — pero el proveedor tenia DOS defectos y la stdlib de la consola UNO. Los tres se
+vieron en ROJO antes de arreglarlos. Con los tres arreglos, el asset `data/global/ui/frontend/
+cinematicselectexp.dc6` sale del arbol suelto con **141.944 bytes** y suma **1.831.109.629**, IDENTICA a la del
+MPQ, en el host Y en la consola.
+(b) EL ARBOL SUELTO PESA **MAS** QUE LOS MPQ: **636.558.198** bytes contra **540.057.050** = x1,1787 (el MPQ
+comprime, sobre todo `d2data`: 360.353.103 contra 267.330.019 = x1,3480). Y **no entra entero en un ISO9660**:
+de las 20.976 entradas del juego, **9** quedan afuera por el NOMBRE (espacio o guion) y **7** por la
+PROFUNDIDAD (8 niveles, el tope de Ecma-119 es 8 con la raiz); entran **20.960**.
+(c) EL TECHO NO ES EL GD-ROM: Flycast **arranca y LEE** un disco de **2.130.769.632 bytes = 2.032 MB** armado
+con `.gdi` de sectores de 2352 (el tope del GD-ROM son 1,1 GB). Lo que SI rompe el montaje NO es el tamano:
+es el descriptor **JOLIET** (con el arbol Joliet por defecto el binario arranca y el disco **NO** monta: 0
+marcas contra 1 del mismo ISO sin Joliet).
+
+COMO SE REPRODUCE
+-----------------
+    bash scripts/console/checar-sueltos-231.sh <dir-de-trabajo> <layer-gox> <segundos>   # las 7 secciones:
+                                                                # 1 = MPQ->suelto, 2 = host,
+                                                                # 3 = consola, 4 = tamano,
+                                                                # 5 = el juego entero, 6 = la tabla de Go,
+                                                                # 7 = la SELECCION del motor
+    SUELTOS_SOLO="2 3" bash scripts/console/checar-sueltos-231.sh   # solo el camino del motor (host+consola)
+    SUELTOS_SOLO="6 7" bash scripts/console/checar-sueltos-231.sh   # solo el host (segundos)
+    bash scripts/console/mutar-sueltos-231.sh                    # los 2 mutantes del Source + control sano
+    bash scripts/console/mutar-os-consola.sh                     # los 13 del paquete os de la consola
+    go run ./console/dc/sonda-isexit                             # la tabla de Go que exige el corpus
+
+LOS TRES DEFECTOS, PRIMERO EN ROJO
+----------------------------------
+1. EL NOMBRE. El motor pide los assets con BARRAS INVERTIDAS (convencion de Windows: `data\global\ui\frontend\
+   cinematicselectexp.dc6`) y el Source del sistema de archivos las usaba tal cual, asi que `os.Open` no
+   encontraba nada con el arbol COMPLETO en disco. ROJO: `file not found: data\global\ui\frontend\
+   cinematicselectexp.dc6`. Arreglo (script idempotente `scripts/console/fix-d2loader-fs.py`, con la misma
+   normalizacion que el `cleanName` del Source del MPQ): `strings.ReplaceAll(subPath, "\\", "/")` +
+   `filepath.FromSlash`.
+2. EL `Exists`. El Source respondia con `os.IsExist(err)` donde `err` es el de `os.Stat`: con el archivo
+   presente ese `err` es `nil` y `os.IsExist(nil)` es FALSE. ROJO: `Source.Exists=false` con el archivo
+   presente (y `Loader.Exists=false`), o sea que el motor habria dicho "no esta" para los sueltos.
+   Arreglo: `err == nil`.
+3. LA STDLIB DE LA CONSOLA (`console/dc/std/os/os.go`). `IsExist(err)` era `!IsNotExist(err)`: con
+   `err == nil` eso da **TRUE** (nil no es `ErrNotExist`), donde el `os.IsExist` de Go da **false**. Medido
+   con el MISMO codigo compilado en los dos lados: el `Exists` del motor contestaba **true** en la consola y
+   **false** en el host. Y era la causa de un AGUJERO DE LA SUITE: el mutante del defecto 2 quedaba **VERDE**
+   en la consola (el mutante volvia a `os.IsExist(err)`, y el `os.IsExist` de la consola contestaba true con
+   `err == nil`). Arreglo: `IsExist(err) == (err == ErrExist)`, con `ErrExist` nuevo en el paquete.
+   ROJO antes: 96 bien / 3 mal en `console/dc/poc/vfs` (`IsExist(nil)`, `IsExist(otro error)`,
+   `IsExist(err de Stat de un archivo que SI esta)`); DESPUES: **99 bien / 0 mal**.
+   Y una cosa que NO era defecto, medida en Go antes de "arreglarla": el `os.IsNotExist` de Go **NO camina
+   los `Unwrap`** (un envoltorio cualquiera que envuelve a `ErrNotExist` da false: solo mira
+   `*PathError`/`*LinkError`/`*SyscallError`), asi que el de la consola compara por identidad a proposito.
+
+LOS NUMEROS
+-----------
+1) CUANTO PESA UN MPQ DESCOMPRIMIDO EN ARCHIVOS SUELTOS (`console/dc/mpq-extraer`, con `-minusculas`):
+
+       MPQ           entradas   suelto en disco        del MPQ            suelto/MPQ   errores   colisiones
+       d2char.mpq      10.009      268.026.569       267.704.443          1,0012        0          0
+       d2data.mpq      10.811      360.353.103       267.330.019          1,3480      271          0
+       patch_d2.mpq       156        8.178.526         5.022.588          1,6283        6          0
+       TOTAL           20.976      636.558.198       540.057.050          1,1787
+
+   `d2char` (los sprites) ya viene sin comprimir y suelto pesa casi lo mismo (x1,0012); `d2data` (las tablas)
+   es el que se infla (x1,3480); `patch_d2` (las pantallas del arranque) x1,6283.
+   Colisiones de nombre: **0** en los tres (dos entradas del MPQ que solo difieran en mayusculas se pisarian al
+   extraer; no hay ninguna).
+   (Los `errores` son entradas que el lector de MPQ del motor NO pudo leer; el conteo es del corpus y el
+   detalle de los motivos esta abajo, en LIMITES MEDIDOS.)
+
+2) EL PROVEEDOR DE SISTEMA DE ARCHIVOS DEL MOTOR EN EL HOST (`sonda-sueltos`, con el arbol del `patch_d2`
+   extraido: 156 archivos):
+
+       barras_invertidas_OK=true          <- el nombre del MOTOR (data\global\...) encuentra el archivo
+       barras_normales_OK=true   bytes=141944 suma=1831109629
+       source_exists=true                 <- el Source del motor
+       mpq_OK=true               bytes=141944 suma=1831109629   <- la referencia: el MISMO asset del MPQ
+       loader_addsource_OK=true
+       loader_load_OK=true       bytes=141944 suma=1831109629   <- EL CAMINO DEL MOTOR (Loader.Load)
+       loader_exists=true
+
+   Control negativo (2g): con las carpetas como las tiene la CAJA del MPQ (con mayusculas: `data/global/ui/
+   FrontEnd/`) el `Loader.Load` FALLA (`file not found: data\global\ui\frontend\cinematicselectexp.dc6`) y el
+   mismo asset del MPQ sale igual (141.944 / 1.831.109.629): el arbol suelto tiene que tener los nombres que
+   el motor pide, en minusculas.
+
+3) EL ARBOL SUELTO EN LA CONSOLA (`poc/motor-sueltos`, disco con el arbol del `patch_d2` + el MPQ, `.gdi`
+   sin Joliet). El POC NO usa una sonda a mano: usa el `Loader` del motor (el mismo que usa `d2asset`).
+
+       SUELTOS-CONSOLA arranca (DC-002.31: los assets SUELTOS en el disco)
+       SUELTOS-CONSOLA stat /cd/juego FALLO: file does not exist        <- el stat del DIRECTORIO no lo da el
+       SUELTOS-CONSOLA ReadDir /cd/juego entradas= 0                       FS ROM de KOS (limite conocido)
+       SUELTOS-CONSOLA OnAddSource OK: /cd/juego
+       SUELTOS-CONSOLA Source.Open con el nombre del MOTOR (barras invertidas) OK bytes= 141944 suma= 1831109629
+       SUELTOS-CONSOLA Source.Exists con el nombre del MOTOR= true
+       SUELTOS-CONSOLA ms del Source= 1255                             <- el primer Open, en el arranque
+       SUELTOS-CONSOLA Loader.AddSource= true
+       SUELTOS-CONSOLA Loader.Load con el nombre del MOTOR OK bytes= 141944 suma= 1831109629
+       SUELTOS-CONSOLA Loader.Exists con el nombre del MOTOR= true
+       SUELTOS-CONSOLA MPQ ReadFile OK bytes= 141944 suma= 1831109629  <- la referencia en la MISMA corrida
+
+   El mismo disco SIN el arbol suelto (3g, el mutante): el `Source.Open` y el `Loader.Load` FALLAN y el MPQ se
+   lee igual (1 linea OK). O sea que el verde de arriba lo da el arbol suelto y no otra cosa.
+
+4) EL TAMANO DE LA IMAGEN (los dos discos dummy con un archivo relleno, `.gdi` de 2352):
+
+       relleno   ISO del .gdi              la consola arranca   lee el disco   tope del GD-ROM
+       700 MB    1.275.631.616 = 1.216 MB         si (2 marcas)      si (1)         1,1 GB
+       1516 MB   2.131.269.632 = 2.032 MB         si (2 marcas)      si (1)         1,1 GB
+
+   Los dos entran y se leen: el techo del GD-ROM **no** es el techo (con GDEMU la consola lee de la tarjeta SD;
+   el limite real de FAT32 es 4 GB por archivo y aca ni se roza).
+   El mutante que SI rompe el montaje es otro: el MISMO ISO de 6,6 MB con el arbol **Joliet** que
+   `mkiso.py` arma por defecto -> el binario arranca (6 lineas) pero el disco NO monta (0 `lee_el_disco`);
+   con `MKISO_JOLIET=0` monta (1). El que rompe es el **descriptor** Joliet, no el tamano.
+
+5) EL ARBOL SUELTO DEL JUEGO ENTERO (los tres MPQ del arranque) EN UN DISCO. Los pesos por MPQ estan en (1); el
+   armado del disco choco con **dos paredes del ISO9660**, las dos con el build muriendo y la regla leida en
+   pycdlib (no deducida):
+
+       pared                       error de pycdlib                                                    afuera
+       NOMBRES (A-Z 0-9 _ .)       `ISO9660 filenames must consist of characters A-Z, 0-9, and _`        9
+       PROFUNDIDAD (7 niveles)     `Directory levels too deep (maximum is 7)`                            7
+       entran en el ISO9660                                                                            20.960
+
+   Los 9 del nombre: **7 con ESPACIO** (`IZUAL DEATH.DCC`, `SLUG MISSILE EXPLODE.DCC`, `ZOMBIE HOLE.DCC`,
+   `REDEMPTIONGHOST BIG|MEDIUM|SMALL.DCC`) y **2 con GUION** (`SUB-HAR.DT1`, `SUB-HARFLR.DT1`). Los 7 de la
+   profundidad: `DATA/GLOBAL/MONSTERS/VM/COF/VM/VM{A1,D,DTH,GH,NU,S1,WL}HTH.COF` (8 niveles).
+   Renombrarlos NO sirve (el motor los busca por su nombre: los 9 son assets que quedarian inalcanzables en un
+   ISO9660), asi que el corpus los **salta y los cuenta**.
+
+   Y faltaba un tercer tope, que no es del ISO9660: la lista de argumentos del kernel. Con 20.976 archivos en
+   `argv` el build moria con **"La lista de argumentos es demasiado larga" (E2BIG)**; ahora `mkiso.py` acepta
+   `@lista.txt` (una linea por archivo) y con eso arma el disco. Medido en la misma pasada: **pycdlib ACEPTA
+   los nombres largos** del arbol suelto (`/JUEGO/DATA/GLOBAL/UI/FRONTEND/CINEMATICSELECTEXP.DC6;1`, 23
+   caracteres de nombre y 5 niveles, queda escrito con ese nombre).
+
+   El disco de las 20.960 entradas que entran: ver el control 5a/5c de la corrida (la consola arranca, lee el
+   asset del motor con la suma del MPQ, y la ISO mide lo que dice el corpus).
+
+6) LOS DOS PREDICADOS DE ERROR DE Go, MEDIDOS (`go run ./console/dc/sonda-isexit`, exigidos por el corpus y
+   por `poc/vfs` 4d-bis):
+
+       SONDA-ISEXIT nil                  exist=false notexist=false
+       SONDA-ISEXIT ErrExist             exist=true  notexist=false
+       SONDA-ISEXIT ErrNotExist          exist=false notexist=true
+       SONDA-ISEXIT ErrPermission        exist=false notexist=false
+       SONDA-ISEXIT otro                 exist=false notexist=false
+       SONDA-ISEXIT envuelto_ErrNotExist exist=false notexist=false   <- NO camina los Unwrap
+       SONDA-ISEXIT error_de_Open        exist=false notexist=true
+       SONDA-ISEXIT nil_de_Stat          exist=false notexist=false   <- el caso del defecto 3
+
+LOS MUTANTES (lo que exige que la suite se ponga roja)
+-----------------------------------------------------
+`scripts/console/mutar-sueltos-231.sh` (arma el .gox del paquete mutado EN EL ARBOL MUTADO, que es la trampa
+de DC-002.29) caza los dos defectos del Source y despues verifica el control sano:
+
+    mutante 'nombre'  -> 8 controles en rojo: 2a (sha del arbol), 2b (Source.Open), 2e (Loader.Load),
+                         2f (Loader.Exists), 3b y 3d (la consola: el Source y el Loader del motor),
+                         3c y 3e (los dos Exists de la consola)
+    mutante 'exists'  -> 5 controles en rojo: 2a, 2d (Source.Exists), 2f, 3c y 3e
+    control sano      -> 14 OK / 0 fallos
+    resultado: 2/2 mutantes cazados
+
+`scripts/console/mutar-os-consola.sh` tiene ahora el mutante 13 (`IsExist` como la negacion de `IsNotExist`),
+que exige que `poc/vfs` se ponga rojo por los tres casos de 4d-bis (ver la corrida en el README).
+
+BARRERAS
+--------
+* `test-std-host.sh` (la prueba diferencial de la stdlib minima en amd64 y 386).
+* `mutar-std-host.sh` (los mutadores de la stdlib en el host + control sano).
+* `compare-motor-dc6.sh` (el POC del motor tiene que seguir IGUAL: 31 lineas, 30 frames).
+* `mutar-sueltos-231.sh` y `mutar-os-consola.sh` (los mutantes de esta tarjeta).
+
+LIMITES MEDIDOS (declarados, no escondidos)
+-------------------------------------------
+* El `stat` del DIRECTORIO del disco falla en la consola y su `ReadDir` da 0 entradas (el FS ROM de KOS no lo
+  sabe dar: es el limite que DC-002.27 ya tenia anotado). Abrir y leer ARCHIVOS del disco anda.
+* Nombres del disco: los archivos van en MAYUSCULAS en el ISO9660 y el motor los pide en minusculas. Anda
+  porque el driver ISO9660 de KOS compara con `tolower` (`kernel/arch/dreamcast/fs/fs_iso9660.c:411`).
+* 271 entradas de `d2data.mpq` y 6 de `patch_d2.mpq` NO se pudieron leer con el lector de MPQ del motor
+  (`-detalle-errores`): el arbol suelto del juego queda con esas entradas afuera (0,06% de d2data).
+* Un ISO9660 NO puede ser el medio de un arbol suelto con los nombres del MPQ (2 paredes arriba). Un medio con
+  nombres largos y sin tope de 7 niveles (ext2/FAT32) haria falta: NO esta medido en esta tarjeta que KOS pueda
+  montarlo (el KOS del toolchain trae `fs_iso9660`, `fs_vmu` y `fs_dcload`, y ningun `fs_ext2`: medido en el
+  arbol), asi que queda como lo primero de la tarjeta siguiente.
+* Los POC de esta tarjeta no usan el `AssetManager` del motor entero (no entra en RAM: es lo que mide
+  DC-002.32): usan su `Loader`, que es el camino que el `AssetManager` usa para abrir archivos.
+
+7) LA SELECCION DEL MOTOR (el criterio 1): MPQ-CENTRICA, y el arbol suelto NO la pasa
+--------------------------------------------------------------------------------------
+El arranque del motor decide si tiene los archivos del juego con `d2setup.Complete`/`Validate` y despues le
+pide sus fuentes al `Loader` por NOMBRE de MPQ (`d2app/initialization.go:82`). Instrumento NUEVO de esta
+tarjeta, `console/dc/sonda-seleccion` (host, con el MISMO codigo del motor), control 7 del corpus:
+
+    SONDA-SELECCION 1-solo-sueltos dir=.../sueltos-patch
+    SONDA-SELECCION 1-solo-sueltos sueltos en el dir: 156 archivos en 24 carpetas
+    SONDA-SELECCION 1-solo-sueltos Complete=false Validate.OK()=false archivos_que_ve_en_el_orden=0 faltan_core=7
+    SONDA-SELECCION 1-solo-sueltos Le faltan (core): patch_d2.mpq d2data.mpq d2char.mpq d2music.mpq d2sfx.mpq d2speech.mpq d2video.mpq
+    SONDA-SELECCION 2-solo-mpq dir=.../juego
+    SONDA-SELECCION 2-solo-mpq sueltos en el dir: 0 archivos en 1 carpetas
+    SONDA-SELECCION 2-solo-mpq Complete=false Validate.OK()=false archivos_que_ve_en_el_orden=1 faltan_core=6
+    SONDA-SELECCION 2-solo-mpq Le faltan (core): d2data.mpq d2char.mpq d2music.mpq d2sfx.mpq d2speech.mpq d2video.mpq
+    SONDA-SELECCION 2-solo-mpq Ve (en el orden): patch_d2.mpq
+    (positivo, con -orden patch_d2.mpq)
+    SONDA-SELECCION 2-solo-mpq Complete=true Validate.OK()=false archivos_que_ve_en_el_orden=1 faltan_core=6
+
+Con SOLO sueltos: `Complete=false`, 0 archivos del orden (los 156 del arbol NO se miran) y el motor se iria
+al camino de primera ejecucion (`EnsureGameFiles`: dialogos, que la consola no tiene = la pared de
+DC-002.19). Con el MPQ presente y la orden que lo pide, `Complete=true`. O sea que el empaquetado suelto
+sirve para LEER (puntos 2 y 3) y para PROCESAR los assets, pero para ARRANCAR hoy hace falta el MPQ al lado
+o cambiar la seleccion del motor. Por eso el disco del corpus lleva las dos cosas, y la consola (punto 3 y
+5) las lee.
+
+8) LA CORRIDA COMPLETA (fresca, de punta a punta, 2026-10-18)
+-----------------------------------------------------------
+    bash scripts/console/checar-sueltos-231.sh /home/dgalli/.hermes/cache/scratch/corpus-231-v2 /tmp/gox-330 25
+    == RESULTADO: 29 controles OK, 0 con fallo        (secciones 1 a 7, exit=0)
+
+Los numeros de arriba salen de ESA corrida (las secciones 6 y 7 son de host y tardan segundos; las 1-5
+arman discos y corren Flycast). Dos detalles medidos en ella, declarados: (a) el tamano exacto de la ISO de
+las 20.960 entradas es **670.253.056** bytes (8.192 mas que en la corrida de la manana: el layout del
+ISO9660 depende del orden de la lista, y el control 5c es el que dice el numero); (b) la capa de `.gox`
+`/tmp/gox-330` se REARMO entera en esta corrida (`build-motor-all.sh`: **142 de 142** paquetes del motor
+compilan para SH-4) porque el build de la barrera del motor (`build-motor-dc6.sh`) la borra al rehacer la
+stdlib: el `source.go` de la corrida es `sha256 c45a56dcb96f5364` (el mismo del arbol sano).
+

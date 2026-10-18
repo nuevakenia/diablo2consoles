@@ -64,6 +64,21 @@ func si(b bool) string {
 	return "false"
 }
 
+// errinventado: un error cualquiera, y el mismo tipo envolviendo a otro (Unwrap). Sirve para los dos
+// predicados de error de DC-002.31: el os.IsNotExist de Go NO camina los Unwrap (medido en el host), asi
+// que el de este paquete tampoco tiene que caminarlos.
+type errinventado struct{ err error }
+
+func (e errinventado) Error() string {
+	if e.err == nil {
+		return "un error cualquiera"
+	}
+
+	return "envolviendo: " + e.err.Error()
+}
+
+func (e errinventado) Unwrap() error { return e.err }
+
 // primero y segundo: las dos partes de Split (que devuelve dos valores).
 func primero(a, b string) string  { return a }
 func segundo(a, b string) string  { return b }
@@ -297,6 +312,41 @@ func main() {
 	} else {
 		check("ReadDir de algo que no esta", "error", strconv.Itoa(len(e3))+" entradas")
 	}
+
+	// 4d-bis. LOS DOS PREDICADOS DE ERROR, con la tabla de Go MEDIDA en el host (DC-002.31):
+	//
+	//   os.IsExist(nil)            = false      <- el defecto: aca IsExist era !IsNotExist(err) y con nil
+	//   os.IsNotExist(nil)         = false         daba TRUE (nil no es ErrNotExist). El `Exists` del
+	//   os.IsExist(ErrExist)       = true          proveedor de sistema de archivos del motor devolvia
+	//   os.IsNotExist(ErrExist)    = false         "existe" con el archivo ausente en la consola y false
+	//   os.IsExist(ErrNotExist)    = false         en el host: el MISMO codigo, dos respuestas.
+	//   os.IsNotExist(ErrNotExist) = true
+	//   os.IsExist(otro)           = false
+	//   os.IsNotExist(otro)        = false
+	//   os.IsNotExist(un error que envuelve a ErrNotExist con Unwrap) = false   <- MEDIDO en Go: el
+	//      os.IsNotExist de verdad solo mira *PathError/*LinkError/*SyscallError, no un envoltorio
+	//      cualquiera. Por eso este paquete compara por identidad y NO camina los Unwrap (no era un
+	//      defecto: era la misma regla).
+	//
+	// La tabla la imprime la herramienta del host `go run ./console/dc/sonda-isexit` (el corpus de
+	// DC-002.31 la exige, asi que estos valores esperados no salen de la memoria de nadie).
+	//
+	// Lo exige el mutante "IsExist inverso" de scripts/console/mutar-os-consola.sh.
+	check("IsExist(nil)", "false", si(os.IsExist(nil)))
+	check("IsNotExist(nil)", "false", si(os.IsNotExist(nil)))
+	check("IsExist(ErrExist)", "true", si(os.IsExist(os.ErrExist)))
+	check("IsNotExist(ErrExist)", "false", si(os.IsNotExist(os.ErrExist)))
+	check("IsExist(ErrNotExist)", "false", si(os.IsExist(os.ErrNotExist)))
+	check("IsNotExist(ErrNotExist)", "true", si(os.IsNotExist(os.ErrNotExist)))
+	check("IsExist(ErrSoloLectura)", "false", si(os.IsExist(os.ErrSoloLectura)))
+	check("IsExist(otro error)", "false", si(os.IsExist(errinventado{})))
+	check("IsNotExist(otro error)", "false", si(os.IsNotExist(errinventado{})))
+	check("IsNotExist(envuelto con Unwrap)", "false", si(os.IsNotExist(errinventado{err: os.ErrNotExist})))
+	// el caso del instrumento del motor: el error de os.Stat de un archivo que SI esta es nil, y con nil
+	// los dos tienen que dar false (es lo que mira el Exists del Source de sistema de archivos)
+	_, errNulo := os.Stat("/rd/hola.txt")
+	check("IsExist(err de Stat de un archivo que si esta)", "false", si(os.IsExist(errNulo)))
+	check("IsNotExist(err de Stat de un archivo que si esta)", "false", si(os.IsNotExist(errNulo)))
 
 	// 4e. path/filepath compilado para SH-4: los mismos casos que la prueba diferencial del host
 	// (difftest/dc0026b_test.go), con el resultado que da el filepath de Go.

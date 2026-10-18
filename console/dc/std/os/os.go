@@ -38,6 +38,10 @@ const (
 // ErrNotExist es el error de "no esta" (el motor lo compara con errors.Is).
 var ErrNotExist = errors.New("file does not exist")
 
+// ErrExist es el error de "ya existe" (el os.ErrExist de Go). Lo tiene el paquete porque IsExist tiene que
+// comparar contra ALGO: ver el comentario de IsExist (DC-002.31).
+var ErrExist = errors.New("file already exists")
+
 // ErrSoloLectura: escribir en el romdisk (que es de solo lectura).
 var ErrSoloLectura = errors.New("read-only file system")
 
@@ -309,12 +313,35 @@ func (f *File) Stat() (FileInfo, error) {
 }
 
 // IsNotExist: el motor lo usa para decidir si un archivo opcional falta (10 lugares).
+//
+// La comparacion es por IDENTIDAD y no camina los Unwrap a proposito: el os.IsNotExist de Go tampoco los
+// camina (solo mira *PathError/*LinkError/*SyscallError, medido en el host en DC-002.31: un error que
+// envuelve a ErrNotExist con Unwrap da false). Ojo: esa prueba en Go devuelve, ademas, FALSE para
+// os.IsNotExist(nil).
 func IsNotExist(err error) bool {
 	return err == ErrNotExist || err == ErrSoloLectura
 }
 
-// IsExist: lo inverso.
-func IsExist(err error) bool { return !IsNotExist(err) }
+// IsExist: true SOLO si el error ES el de "ya existe".
+//
+// DC-002.31: ANTES esto era `return !IsNotExist(err)`, o sea la negacion de OTRO predicado, y eso no es lo
+// mismo. Con `err == nil` -- el caso del `os.Stat` de un archivo que SI esta, que es justo lo que mira el
+// `Exists` del proveedor de sistema de archivos del motor (`d2common/d2loader/filesystem/source.go`) --
+// daba TRUE, donde el `os.IsExist` de Go da FALSE. Medido con el mismo codigo compilado en los dos lados:
+// el `Loader.Exists` del motor contestaba "esta" en la consola y "no esta" en el host.
+//
+// La tabla de Go, medida con la herramienta del host `go run ./console/dc/sonda-isexit` (el corpus de
+// DC-002.31 la exige linea por linea) y exigida caso por caso en console/dc/poc/vfs (seccion 4d-bis):
+//
+//	IsExist(nil)                 = false      IsNotExist(nil)                 = false
+//	IsExist(os.ErrExist)         = true       IsNotExist(os.ErrExist)         = false
+//	IsExist(os.ErrNotExist)      = false      IsNotExist(os.ErrNotExist)      = true
+//	IsExist(os.ErrPermission)    = false      IsNotExist(os.ErrPermission)    = false
+//	IsExist(un error cualquiera) = false      IsNotExist(un error cualquiera) = false
+//
+// Declarado (limite medido, no escondido): el paquete de la consola NO tiene los tipos *PathError ni
+// *SyscallError, asi que un error envuelto en uno de esos (que en Go si se desenvolveria) aca no existe.
+func IsExist(err error) bool { return err == ErrExist }
 
 // Las funciones de escritura del FS: en la consola el romdisk es de SOLO LECTURA y no hay ningun
 // sistema de archivos con permiso de escritura enganchado (la VMU y el GD-ROM no estan). No se
