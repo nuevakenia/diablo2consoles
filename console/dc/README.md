@@ -2870,3 +2870,88 @@ reserva única de 1,9 MB).
 
 Evidencia cruda: `evidencia/dc-002.27-disco-iso9660.txt` (incluye la corrección de la primera versión, que
 daba por bueno que la consola leía el contenido del MPQ cuando leía bien el tamaño y el contenido corrido).
+
+## 45. DC-002.28: las tablas del MPQ **por trozos** — la reserva única se fue, la pared cambió de lado, y el arranque del motor se cuelga **mudo** cuando el binario se rearma
+
+**La demanda, medida (la tarjeta la estimaba en 1.916.928 bytes).** Las dos tablas del MPQ tienen 16 bytes por
+entrada, y la cabecera dice cuántas (sonda del host `cabeceras-mpq.py`, la misma que imprime la consola):
+
+| MPQ | tabla de hash | tabla de bloques | **pedido de un tirón** (crudo + descifrado) |
+|---|---|---|---|
+| `patch_d2.mpq` | 16.384 entradas = **262.144** B | 219 = **3.504** B | 524.288 + 7.008 |
+| `d2data.mpq` | **65.536** = **1.048.576** B | 11.083 = **177.328** B | **2.097.152** + 354.656 |
+| `d2char.mpq` | 16.384 = **262.144** B | 10.010 = **160.160** B | 524.288 + 320.320 |
+
+La tarjeta sacaba sus 1.916.928 de 119.808 entradas; la cabecera dice 65.536, así que el pedido de un tirón
+son **2.097.152** bytes contiguos. Ese es el que moría: en libgodc, toda petición de más de **64 KiB**
+(`GC_LARGE_OBJECT_THRESHOLD`) se va al montón de C (`gc_alloc` → `gc_external_alloc`, `runtime/gc_heap.c`).
+
+**El arreglo: descifrar por trozos y entregarlos en el acto.** El descifrado de una tabla es una **cadena**
+(cada palabra depende del `seed` y el `seed2` que dejó la anterior), así que no se puede leer "por partes
+sueltas", pero sí se puede descifrar por trozos y darle cada trozo ya descifrado al consumidor: el estado se
+hereda. En `d2common/d2fileformats/d2mpq/`: `decryptTablePorTrozos` con **`tablaTrozoEntradas = 1.024`**
+(16 KiB crudos + 4 KiB descifrados, por debajo del umbral de 64 KiB y dentro del semiespacio de 512 KiB del
+GC), `readHashTable` llenando el mapa por trozos y `readBlockTable` con `append` de `*Block`. El camino de un
+tirón quedó como referencia (`decryptTable`) y lo usan los tests. `go test ./d2common/d2fileformats/d2mpq/`
+**verde** (0,053 s), `go vet` limpio, `FuzzArchive` 20 s sin fallos.
+
+**Lo medido en la consola (POC `motor-reservas`, el mismo disco de DC-002.27).** Los instrumentos del montón
+de C son nuevos y el número que la evidencia anterior imprimía (`mallinfo().fordblks`) **no** es "la RAM que
+queda": el arena crece por `sbrk`. Al arrancar el POC:
+
+    sbrk=0x8c3b7000 techo=0x8cff0000 arena=1211840 libre=2808 usado=1209032 bloqueMax=12814336
+
+o sea **12.814.336 bytes contiguos disponibles** (`bloqueMax`, medido pidiéndolo y devolviéndolo) con 2.808
+bytes "libres" dentro del arena. Después: `patch_d2.mpq` (hash de 262.144 B en trozos) abre **OK** y el
+montón **no se mueve** (`sbrk` y arena iguales); `d2data.mpq` llega a la cabecera y entonces:
+
+    fatal error: out of memory
+    Memory: arena=1543616 used=1541480 free=2136
+
+**La pared cambió de lado y ese es el resultado de la tarjeta:** el `gc_external_alloc: OOM` de DC-002.27 ya
+no está (el montón de C no se toca en este tramo y le quedan 12,8 MB contiguos); la pared nueva es el
+**semiespacio del GC** (512 KiB, `gc_heap.c:147`, después de `gc_collect`): lo que lo llena es un objeto de Go
+**por entrada** (los `*Hash` del mapa y los `*Block` del arreglo). Control de que no hay ninguna reserva
+grande escondida: con la traza mínima de libgodc (`fix-libgodc-alloc-traza.py --solo-grande`, que registra
+toda petición > 256 KiB y reproduce el mismo camino) la corrida imprime **cero** líneas `ALLOC-TRAZA`.
+El tramo siguiente es del lado del **motor**: guardar las tablas compactas (los bytes, no un objeto por
+entrada) o abrir cada tabla al usarla.
+
+**El arranque del motor (el POC `motor-disco`) NO se pudo medir, y no por las tablas.** Con los gox de
+DC-002.27 el motor corre hasta el **cuadro 2** (`EBITEN-PERFIL cuadro_us 311807`); con el `d2mpq` por trozos
+el mismo build muere **mudo**, dos corridas: ninguna línea del programa. Instrumentado (un constructor de C
+que abre la consola serie antes de `main` y una variable de paquete que imprime en el arranque de los `init`)
+queda localizado: el ELF **carga**, los constructores de C **corren** y la muerte está **adentro del arranque
+del runtime de Go** (entre los constructores y los `init` del paquete). Discriminadores, cada uno un
+build+corrida:
+
+| qué se enlazó | resultado |
+|---|---|
+| gox de DC-002.27 (los dos paquetes viejos) | **anda**, hasta el cuadro 2 |
+| `d2mpq` por trozos recompilado (el flujo corto) | muere mudo |
+| `d2loader/mpq` recompilado, `d2mpq` por trozos | muere mudo |
+| **`d2mpq` vuelto a HEAD** (el camino de un tirón) y recompilado con el mismo flujo | **muere mudo igual** |
+| los dos `.gox` viejos dentro del directorio nuevo | **anda** |
+
+O sea: **no es el código por trozos** (el mismo `.gox` recompilado de las fuentes de HEAD mata el arranque
+igual, con la misma firma). Es la **fragilidad de layout** que la rama ya tiene medida (DC-002.22: "el fallo
+del cuadro 0 es de LAYOUT"): el binario rearmado (13.771.784 contra 13.708.888 bytes, +62.896) cambia el
+arranque del runtime y lo deja colgado. Dato del mismo par: en la corrida que muere el constructor de C
+**corre dos veces** y en la que anda una. Queda como tarjeta hija con esta medición; para medir el motor con
+las tablas nuevas hay que resolver eso primero.
+
+**Controles y mutantes (`scripts/console/checar-reservas-228.sh`, el corpus de la tarjeta).** El host exige el
+descifrado por trozos palabra por palabra igual al de un tirón y que **ningún pedido pase de 64 KiB** —el tope
+del control está **fijo** en 64 KiB a propósito: si se atara a la constante del trozo, un trozo de 128 KiB
+pasaría el control—; la consola exige los mismos números de cabecera que el host, `mpq.NewSource OK` y la
+**ausencia** del OOM del montón de C. Los dos mutantes se cazan: **A** (la tabla entera de un tirón:
+`mutar-reservas-228.py --una-sola-reserva`) hace fallar el host ("llegó en 1 trozos, esperaba 2") y en la
+consola se caza por la **huella en el montón de C** —con la reserva única el `sbrk` se mueve al abrir el MPQ
+chico (`0x8c3b7000` → `0x8c437000`, +524.288 = las dos reservas viejas) y por el camino por trozos **no se
+mueve**—, que es un control que muerde aunque la reserva entre; **B** (el trozo de 128 KiB) hace fallar el
+host con "pidió 131056 bytes de una vez: el tope es 65536", y el corpus verifica que el archivo queda con el
+**mismo sha256** con el que empezó. Declarado: en el POC la reserva única **no** da OOM (tiene 12,8 MB
+contiguos y la de `d2data` son 2 MB); el que murió con ese OOM fue el motor (DC-002.27), que hoy no arranca
+por el cuelgue de arriba.
+
+Evidencia cruda: `evidencia/dc-002.28-tablas-mpq-por-trozos.txt`.

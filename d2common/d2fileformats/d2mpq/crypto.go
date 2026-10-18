@@ -69,41 +69,93 @@ func decryptBytes(data []byte, seed uint32) {
 
 //nolint:gomnd // Decryption magic
 func decryptTable(r io.Reader, size uint32, name string) ([]uint32, error) {
-	cryptoLookup(0) // make sure the crypto table is built
-
-	seed := hashString(name, 3)
-	seed2 := uint32(0xEEEEEEEE)
-	// a table entry is four words; a hostile header must not make this allocate gigabytes
 	if size > maxTableEntries {
 		return nil, fmt.Errorf("%s has %d entries", name, size)
 	}
 
-	size *= 4
+	tabla := make([]uint32, size*4)
+	var escritas uint32
 
-	table := make([]uint32, size)
+	err := decryptTablePorTrozos(r, size, name, func(trozo []uint32) error {
+		copy(tabla[escritas:], trozo)
+		escritas += uint32(len(trozo))
 
-	// one read for the whole table: this used to read four bytes per call, a system call
-	// for every word of a table of tens of thousands of entries, for every archive at start-up
-	raw := make([]byte, int(size)*4)
-	n, err := io.ReadFull(r, raw)
-	words := uint32(n / 4)
+		return nil
+	})
 
-	for i := uint32(0); i < words; i++ {
-		seed2 += cryptoBuffer[0x400+(seed&0xff)]
+	return tabla, err
+}
 
-		result := binary.LittleEndian.Uint32(raw[i*4:])
-		result ^= seed + seed2
+// tablaTrozoEntradas: cuantas entradas (16 bytes cada una) se leen y descifran de una vez.
+//
+// 1.024 entradas son 16 KiB de crudo + 4 KiB de palabras ya descifradas: entra de sobra en el semiespacio
+// de 512 KiB del GC de la consola y queda por debajo del umbral de 64 KiB del "objeto grande", que es el
+// que se va al monton de C (`gc_external_alloc`) y en la Dreamcast NO entra (medido en DC-002.28).
+const tablaTrozoEntradas = 1024
 
-		seed = ((^seed << 21) + 0x11111111) | (seed >> 11)
-		seed2 = result + seed2 + (seed2 << 5) + 3
-		table[i] = result
+// decryptTablePorTrozos: lee y descifra una tabla del MPQ POR TROZOS, llamando a `porTrozo` con cada trozo
+// ya descifrado (palabras de 32 bits) y sin reservar la tabla entera.
+//
+// POR QUE (DC-002.28): el descifrado de una tabla es una CADENA -- cada palabra depende del `seed` y el
+// `seed2` que dejo la anterior -- y eso no impide leerla por partes: el estado se hereda de un trozo al
+// siguiente. Lo que no se puede es reservar la tabla entera: la de hash de d2data.mpq son 65.536 entradas
+// = 1.048.576 bytes, y el camino de un solo tiron pedia DOS reservas contiguas de ese tamano (el crudo y
+// la tabla de `[]uint32`), con el monton de C de la consola en pocos bytes libres (medido: el motor muere
+// en `gc_external_alloc: OOM` al abrir ese archivo, con las tres tablas sumando ~4,6 MB de pedidos).
+//
+// Lo que NO cambia: el resultado es palabra por palabra el mismo que el de un solo tiron (lo compara el
+// corpus del host: `crypto_test.go` contra la version palabra por palabra, y `TestTablasPorTrozos` sobre
+// un MPQ de verdad armado por `synthMPQSized`).
+func decryptTablePorTrozos(r io.Reader, entries uint32, name string, porTrozo func(trozo []uint32) error) error {
+	cryptoLookup(0) // make sure the crypto table is built
+
+	// a table entry is four words; a hostile header must not make this allocate gigabytes
+	if entries > maxTableEntries {
+		return fmt.Errorf("%s has %d entries", name, entries)
 	}
 
-	if err != nil {
-		return table, err
+	seed := hashString(name, 3)
+	seed2 := uint32(0xEEEEEEEE)
+
+	crudo := make([]byte, tablaTrozoEntradas*4*4)
+	palabras := make([]uint32, tablaTrozoEntradas*4)
+
+	for restantes := entries; restantes > 0; {
+		cuantas := uint32(tablaTrozoEntradas)
+		if restantes < cuantas {
+			cuantas = restantes
+		}
+
+		leidos, err := io.ReadFull(r, crudo[:cuantas*4*4])
+		n := uint32(leidos) / 4
+
+		for i := uint32(0); i < n; i++ {
+			seed2 += cryptoBuffer[0x400+(seed&0xff)]
+
+			result := binary.LittleEndian.Uint32(crudo[i*4:])
+			result ^= seed + seed2
+
+			seed = ((^seed << 21) + 0x11111111) | (seed >> 11)
+			seed2 = result + seed2 + (seed2 << 5) + 3
+			palabras[i] = result
+		}
+
+		if n > 0 {
+			if errTrozo := porTrozo(palabras[:n]); errTrozo != nil {
+				return errTrozo
+			}
+		}
+
+		// La tabla cortada (o el archivo cortado) devuelve el error DESPUES de entregar lo que si llego,
+		// igual que el camino de un solo tiron: el llamador decide si con eso alcanza.
+		if err != nil {
+			return err
+		}
+
+		restantes -= cuantas
 	}
 
-	return table, nil
+	return nil
 }
 
 func hashFilename(key string) uint64 {

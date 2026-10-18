@@ -9,6 +9,115 @@
  *     no se usan aca.
  */
 #include <kos.h>
+#include <malloc.h>
+#include <stdint.h>
+#include <unistd.h>
+
+/* DC-002.28: por que la consola serie se abre en un CONSTRUCTOR y no solo en main.
+ *
+ * Medido en DC-002.28: el binario del motor con las tablas del MPQ por trozos (13.7 MB, el mismo que en
+ * DC-002.27 arrancaba y dibujaba) muere MUDO: ni una marca, ni un `fatal error`, ni una excepcion de KOS.
+ * El primer `println` de Go esta en el arranque de main y las marcas despues, asi que la muerte es ANTES
+ * de main: o en la carga del ELF, o en el arranque del runtime de Go (el GC, los constructores de C).
+ *
+ * Sin `dbgio_dev_select("scif")` KOS deja el handler de la consola en NULL y NO sale nada (medido desde
+ * DC-001.3): o sea que un aviso del runtime de Go (o el "Out of memory" de KOS) ANTES de que main abra la
+ * consola se pierde, y encima el que lo escribe puede quedarse colgado en el handler NULL (de ahi la
+ * muerte sin excepcion). Aca la consola se abre lo antes que se puede: en el constructor de C, con los
+ * numeros del monton de C en ese instante (si el monton no tiene con que arrancar, se ve en la linea).
+ *
+ * El constructor puede no llegar a correr (depende del arranque que use el binario): si esta linea no sale
+ * y la de `init` de Go si, lo que se aprende es eso. */
+static int d2c_a_texto(unsigned int v, char *dst, int p) {
+    char tmp[12];
+    int n = 0;
+
+    if (v == 0) {
+        dst[p++] = '0';
+
+        return p;
+    }
+
+    while (v > 0) {
+        tmp[n++] = (char)('0' + (v % 10));
+        v /= 10;
+    }
+
+    while (n > 0) {
+        dst[p++] = tmp[--n];
+    }
+
+    return p;
+}
+
+static int d2c_hex_texto(unsigned int v, char *dst, int p) {
+    const char *d = "0123456789abcdef";
+    int i;
+
+    dst[p++] = '0';
+    dst[p++] = 'x';
+
+    for (i = 7; i >= 0; i--) {
+        dst[p++] = d[(v >> (i * 4)) & 0xf];
+    }
+
+    return p;
+}
+
+__attribute__((constructor))
+static void d2c_consola_constructor(void) {
+    char l[256];
+    int p = 0;
+    const char *fijo = "C-CONSTRUCTOR (antes de main): la consola serie ya esta; sbrk=";
+    int i = 0;
+
+    while (fijo[i] != '\0') {
+        l[p++] = fijo[i++];
+    }
+
+    p = d2c_hex_texto((unsigned int)(uintptr_t)sbrk(0), l, p);
+
+    fijo = " techo=";
+    i = 0;
+    while (fijo[i] != '\0') {
+        l[p++] = fijo[i++];
+    }
+
+    p = d2c_hex_texto((unsigned int)(_arch_mem_top - THD_KERNEL_STACK_SIZE), l, p);
+
+    fijo = " arena=";
+    i = 0;
+    while (fijo[i] != '\0') {
+        l[p++] = fijo[i++];
+    }
+
+    p = d2c_a_texto((unsigned int)mallinfo().arena, l, p);
+
+    fijo = " libre=";
+    i = 0;
+    while (fijo[i] != '\0') {
+        l[p++] = fijo[i++];
+    }
+
+    p = d2c_a_texto((unsigned int)mallinfo().fordblks, l, p);
+    l[p++] = '\r';
+    l[p++] = '\n';
+
+    dbgio_dev_select("scif");
+    dbgio_write_buffer_xlat((const uint8 *)l, (size_t)p);
+}
+
+/* d2c_aviso_init: la llama un `var _ = ...` del paquete de Go, o sea ANTES de main pero DESPUES del
+ * arranque del runtime de Go. Separa "murio el runtime" de "murio main". */
+void d2c_aviso_init(void) {
+    const char *m = "MOTOR-DISCO init del paquete: el runtime de Go ya arranco (antes de main)\r\n";
+    int n = 0;
+
+    while (m[n] != '\0') n++;
+
+    dbgio_dev_select("scif");
+    dbgio_write_buffer_xlat((const uint8 *)m, (size_t)n);
+}
 
 void d2c_serial_init(void) {
     dbgio_dev_select("scif");

@@ -13,6 +13,18 @@ import (
 // zlib compressed multi-sector file and a single unit file. mutate may alter the table words before
 // they are encrypted, to build hostile archives.
 func synthMPQ(mutate func(hash, block []uint32)) []byte {
+	return synthMPQSized(8, 2, mutate)
+}
+
+// synthMPQSized is synthMPQ with the size of the two tables as parameters (DC-002.28): the tables of the
+// game are tens of thousands of entries (d2data.mpq: 65.536 de hash) and las tablas se leen POR TROZOS, asi
+// que hace falta poder armar un MPQ cuyas tablas crucen el marco del trozo (1.024 entradas) para comparar
+// el camino por trozos contra el de la tabla entera.
+func synthMPQSized(hashEntries, blockEntries uint32, mutate func(hash, block []uint32)) []byte {
+	if hashEntries < 2 || blockEntries < 2 {
+		panic("synthMPQSized: hacen falta al menos las 2 entradas de los dos archivos")
+	}
+
 	cryptoLookup(0)
 
 	const blockShift = 3 // 4 KiB sectors
@@ -69,9 +81,7 @@ func synthMPQ(mutate func(hash, block []uint32)) []byte {
 	compSize1 := uint32(body.Len()) - pos1
 
 	hashOff := uint32(body.Len())
-	hashEntries := uint32(8)
 	blockOff := hashOff + hashEntries*16
-	blockEntries := uint32(2)
 
 	hash := make([]uint32, hashEntries*4)
 	for i := range hash {
@@ -88,10 +98,11 @@ func synthMPQ(mutate func(hash, block []uint32)) []byte {
 	setHash(0, "plain.txt", 0)
 	setHash(1, "big.txt", 1)
 
-	blocks := []uint32{
+	blocks := make([]uint32, blockEntries*4)
+	copy(blocks, []uint32{
 		pos0, uint32(len(plain)), uint32(len(plain)), uint32(FileExists),
 		pos1, compSize1, uint32(len(big)), uint32(FileExists | FileCompress),
-	}
+	})
 
 	if mutate != nil {
 		mutate(hash, blocks)

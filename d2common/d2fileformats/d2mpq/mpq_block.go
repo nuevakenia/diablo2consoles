@@ -59,19 +59,20 @@ func (mpq *MPQ) readBlockTable() error {
 		return err
 	}
 
-	blockData, err := decryptTable(mpq.file, mpq.header.BlockTableEntries, "(block table)")
-	if err != nil {
-		return err
-	}
+	// DC-002.28: por trozos, igual que la tabla de hash (ver `decryptTablePorTrozos`). La de d2data.mpq
+	// son 11.083 entradas = 177.328 bytes: con el camino de un solo tiron eran dos reservas contiguas de
+	// ese tamano mas los objetos `Block` de cada entrada.
+	return decryptTablePorTrozos(mpq.file, mpq.header.BlockTableEntries, "(block table)",
+		func(trozo []uint32) error {
+			for n := 0; n+4 <= len(trozo); n += 4 {
+				mpq.blocks = append(mpq.blocks, &Block{
+					FilePosition:         trozo[n],
+					CompressedFileSize:   trozo[n+1],
+					UncompressedFileSize: trozo[n+2],
+					Flags:                FileFlag(trozo[n+3]),
+				})
+			}
 
-	for n, i := uint32(0), uint32(0); i < mpq.header.BlockTableEntries; n, i = n+4, i+1 {
-		mpq.blocks = append(mpq.blocks, &Block{
-			FilePosition:         blockData[n],
-			CompressedFileSize:   blockData[n+1],
-			UncompressedFileSize: blockData[n+2],
-			Flags:                FileFlag(blockData[n+3]),
+			return nil
 		})
-	}
-
-	return nil
 }

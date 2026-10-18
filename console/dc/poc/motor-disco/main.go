@@ -42,6 +42,20 @@ import (
 //extern d2c_serial_init
 func d2cSerialInit()
 
+//extern d2c_aviso_init
+func d2cAvisoInit()
+
+// DC-002.28: la primera marca del binario sale de aca, de una variable del paquete: los `var` de paquete se
+// evaluan ANTES de main pero DESPUES del arranque del runtime de Go. Si esta linea sale y la de main no, la
+// muerte esta en main; si no sale ninguna, esta en el arranque (o en la carga del binario).
+var _ = avisoDeArranque()
+
+func avisoDeArranque() int {
+	d2cAvisoInit()
+
+	return 0
+}
+
 //extern d2c_disco_marca
 func d2cDiscoMarca(que uint) uint
 
