@@ -168,12 +168,13 @@ func TestExplodeRealArchive(t *testing.T) {
 
 	checked := 0
 
-	for h := range m.hashes {
-		_ = h
-		break
+	// DC-002.33: la tabla de hash son BYTES contiguos y se recorre por indice (antes era un mapa).
+	if m.hashEntries() == 0 {
+		t.Fatal("el archivo no tiene tabla de hash")
 	}
 
-	for _, b := range m.blocks {
+	for i, entradas := uint32(0), m.blockEntries(); i < entradas; i++ {
+		b := m.bloqueEn(i)
 		if b.UncompressedFileSize == 0 || b.UncompressedFileSize > 1<<20 || b.HasFlag(FileEncrypted) || b.HasFlag(FileSingleUnit) {
 			continue
 		}
@@ -256,7 +257,8 @@ func BenchmarkExplode(b *testing.B) {
 
 	total := 0
 
-	for _, blk := range m.blocks {
+	for i, entradas := uint32(0), m.blockEntries(); i < entradas; i++ {
+		blk := m.bloqueEn(i)
 		if blk.UncompressedFileSize < 8192 || blk.UncompressedFileSize > 1<<20 || blk.HasFlag(FileEncrypted) ||
 			blk.HasFlag(FileSingleUnit) || !blk.HasFlag(FileCompress) {
 			continue

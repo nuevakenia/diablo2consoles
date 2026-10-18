@@ -88,15 +88,32 @@ func synthMPQSized(hashEntries, blockEntries uint32, mutate func(hash, block []u
 		hash[i] = 0xFFFFFFFF
 	}
 
-	setHash := func(slot int, name string, block uint32) {
-		hash[slot*4] = hashString(name, 1)
-		hash[slot*4+1] = hashString(name, 2)
-		hash[slot*4+2] = 0
-		hash[slot*4+3] = block
+	// DC-002.33: cada entrada va en la ranura donde el SONdeo de su nombre la deja: eso es lo que hacen los
+	// MPQ de verdad y lo que ahora usa `buscarHash`. Antes cada entrada iba en una ranura fija (0, 1, ...)
+	// porque la consulta era contra un mapa que indexaba por las dos mitades del nombre y la posicion no
+	// importaba: con una tabla de bytes la posicion ES la consulta.
+	setHash := func(name string, block uint32) {
+		slot := int(hashString(name, 0) & (hashEntries - 1))
+
+		for i := 0; i < int(hashEntries); i++ {
+			s := (slot + i) & int(hashEntries-1)
+			if hash[s*4+3] != 0xFFFFFFFF { // ranura ocupada: sigue el sondeo
+				continue
+			}
+
+			hash[s*4] = hashString(name, 1)
+			hash[s*4+1] = hashString(name, 2)
+			hash[s*4+2] = 0
+			hash[s*4+3] = block
+
+			return
+		}
+
+		panic("synthMPQSized: no queda ranura libre en la tabla de hash")
 	}
 
-	setHash(0, "plain.txt", 0)
-	setHash(1, "big.txt", 1)
+	setHash("plain.txt", 0)
+	setHash("big.txt", 1)
 
 	blocks := make([]uint32, blockEntries*4)
 	copy(blocks, []uint32{
@@ -128,7 +145,7 @@ func synthMPQSized(hashEntries, blockEntries uint32, mutate func(hash, block []u
 	return out
 }
 
-// readAll reads a bounded amount of every file of the archive.
+// readAll reads a bounded amount of every block of the archive.
 func readAll(t testing.TB, path string) {
 	m, err := FromFile(path)
 	if err != nil {
@@ -136,14 +153,12 @@ func readAll(t testing.TB, path string) {
 	}
 	defer m.Close()
 
-	for _, h := range m.hashes {
-		if h.BlockIndex >= uint32(len(m.blocks)) {
-			continue
-		}
+	// DC-002.33: la tabla de bloque son BYTES y se recorre por indice; cada consulta arma la `Block` de ese
+	// numero (antes se recorria el mapa de hash y se seguia el BlockIndex de cada ranura).
+	for bi, entradas := uint32(0), m.blockEntries(); bi < entradas; bi++ {
+		b := m.bloqueEn(bi)
 
-		b := *m.blocks[h.BlockIndex]
-
-		s, err := CreateStream(m, &b, "file")
+		s, err := CreateStream(m, b, "file")
 		if err != nil {
 			continue
 		}

@@ -3534,3 +3534,101 @@ Barreras: corpus `checar-peso-232.sh` **15/15** con **8/8** mutantes cazados, la
 `test-std-host.sh` sin cambios (esta tarjeta no toca la stdlib).
 
 Evidencia cruda: `evidencia/dc-002.32-peso.txt`.
+
+## 50. DC-002.33: las tablas del MPQ **compactas** (los bytes, no un objeto de Go por entrada) — la tabla entera da el mismo checksum en el host y en la consola, el cargador ya abre `d2data.mpq`, y la pared que mata es **otra** (el montón de C)
+
+La tarjeta sale de donde quedó DC-002.28: con el descifrado **por trozos** el `gc_external_alloc: OOM` del montón
+de C ya no estaba y la pared nueva era el **semiespacio del GC** (512 KiB), porque lo que lo llenaba era **un
+objeto de Go por entrada** (los `*Hash` del mapa y los `*Block` del arreglo): `d2data.mpq` tiene **65.536
+ranuras de hash y 11.083 de bloque** (16 bytes cada entrada), y ese conjunto vivo no entra en 512 KiB. Lo que
+hace esta tarjeta: las dos tablas de cada MPQ van **como bytes contiguos** (16 por ranura: la de hash de
+`d2data.mpq` es **UNA reserva de 1.048.576 bytes**, más grande que el umbral de "objeto grande" de libgodc, o
+sea del **montón de C**, no del semiespacio) y el que consulta lo hace **por índice**, con el sondeo del
+formato MPQ. La lectura sigue siendo **por trozos** (DC-002.28) y cada trozo se copia derecho a los bytes
+(`mpq_hash.go`, `mpq_block.go`).
+
+Todo lo de abajo está medido con una **capa coherente propia** (`/tmp/gox-233`, 142/142 paquetes) y el corpus
+`scripts/console/checar-tablas-233.sh`, que va contra los **3 MPQ del arranque** (`patch_d2`, `d2data`,
+`d2char`) horneados en la ISO (`/cd/juego`, DC-002.27). Los instrumentos son un **par host/consola** que
+imprime **los mismos seis números por archivo**: cuántas entradas tiene cada tabla, el **checksum de sus
+BYTES** (`suma = suma*31 + byte`) y la **consulta** (cuántos nombres encuentra el sondeo por índice):
+
+* host: `console/dc/sonda-tablas-mpq` (`go run ./console/dc/sonda-tablas-mpq -mpqdir <dir> -mpq ...`);
+* consola: `console/dc/poc/tablas-mpq` (+ `csrc/cshim.c`).
+
+**1. LAS TABLAS: LOS MISMOS NÚMEROS DE LOS DOS LADOS.** Con el mismo código del motor, archivo por archivo
+(control 2 del corpus = las dos tablas de los 3 MPQ; control 2b = la consulta):
+
+    archivo        entradasHash  entradasBloque  checksumHash  checksumBloque  nombres  contenidos
+    patch_d2.mpq      16.384          219         2035763179     1179232150        162        162
+    d2data.mpq        65.536       11.083         1897791535     4131808245     11.082     11.082
+    d2char.mpq        16.384       10.010         3931321293      965121384     10.009     10.009
+    ----------------------------------------------------------------------------------------------
+    TOTAL                                                                         21.253     21.253
+
+Los seis números son **idénticos** en el host y en la consola, y en el host el test
+`TestBuscarHashIgualQueElMapaViejo` (nombre por nombre del `(listfile)`, los 3 MPQ) da **21.253 nombres
+iguales y 0 distintos** contra el mapa de objetos viejo: el que consulta por índice no cambió ninguna
+respuesta.
+
+**2. EL CARGADOR DEL MOTOR YA ABRE `d2data.mpq`.** El POC de DC-002.28 (mismo código, mismo disco) **empieza**
+`d2data.mpq` — el archivo donde moría — y lo **abre con sus dos tablas**, sin una sola línea de `fatal error`
+ni `out of memory`: la reserva de 1 MB ya no pasa por el semiespacio. Con el **mutante** (un objeto de Go por
+entrada) el mismo POC **no pasa de ahí**: el pedido de la tabla de hash como objetos no entra, y muere **mudo**
+(sin el mensaje en la serie, familia de DC-002.28/29). Ese es el control 5b medido por **cuántas aperturas**
+hay: 1 con el mutante contra 3 con las tablas como bytes. Ojo con un detalle que **no** es de esta tarjeta: el
+**tercero** de ese POC es el que queda del lado del defecto del **nombre que se corrompe** (DC-002.39,
+intermitente: en una corrida salió con el nombre **vacío** —`/cd/JUEGO/`— y en la corrida del corpus llegó con
+su nombre), y no es una pared de memoria.
+
+**3. EL ARRANQUE ENTERO, ANTES Y DESPUÉS (y la lectura honesta).** Con el instrumento de DC-002.27/28
+(`motor-disco`, el motor de verdad sobre el disco con los 3 MPQ):
+
+                                          ANTES (objeto por entrada)   DESPUÉS (bytes)
+    semiespacio usado (última recolección)        409.432                  393.224
+    libre del semiespacio (de 524.288)            114.856                  131.064
+    marcas `ARQ-MARCA`                              57                       31
+    recolecciones (`gc_collect`)                    19                        6
+    `main.main-entra`                                1                        1
+    cuadros (`EBITEN-LOOP`)                          0                        0
+    donde muere                                    mudo          `fatal error: gc_external_alloc: OOM`
+                                                         `Memory: arena=2496864 used=2455304 free=41560`
+
+La pared vieja medida en DC-002.29/30 con las tablas como objetos era **480.736** usados de los 524.288. La
+lectura honesta de la tabla: **la pared del semiespacio de esta tarjeta ya no es la que mata** (ni los 393.224
+de después ni los 409.432 del mutante llegan a 480.736), pero el arranque **todavía no termina**: muere
+**después** de `d2app.Create()`, en **otra** pared — el **montón de C** (`arena=2496864`, 41.560 libres), que
+ya venía declarada desde DC-002.28 — y por eso los cuadros siguen en 0. Esa segunda pared es de DC-002.34, no
+de acá; lo que sí queda medido es que el arranque **pasa el cargador** (los 3 MPQ del disco, con `d2data.mpq`
+entre ellos) y que el semiespacio dejó de ser el que lo frenaba.
+
+**4. EL MUTANTE (criterio 3).** Con el árbol **pristino** (un objeto por entrada): el POC `tablas-mpq` **no
+compila** (los instrumentos `TableEntries`/`TableChecksum` no existen en el código viejo => el mutante llegó de
+verdad a la representación anterior, control 5a); el cargador **no pasa de las tablas de `d2data.mpq`**
+(control 5b); el motor muere **antes** de los cuadros y por el camino del **semiespacio** (mudo, sin
+`gc_external_alloc`), en **409.432** usados, contra el de las tablas como bytes que muere en el **montón de C**
+(control 5c, o sea que el sitio de la muerte no es el mismo); y el árbol vuelve con el **mismo sha256** del
+`d2mpq` (control 6).
+
+**5. LO QUE APARECIÓ EN EL CAMINO (no es de esta tarjeta, y tiene tarjeta propia).**
+
+* **DC-002.39**: en una **misma corrida**, el **nombre del tercero** del `MpqLoadOrder` se corrompe. Medido:
+  la vuelta 3 del POC sale con `FALLO: file does not exist largoNombre= -1795502946 ruta= ` (un `len`
+  **negativo**: el `string` está vivo pero su cabecera no) después de **11 recolecciones**; y en el POC
+  `motor-reservas` el tercero salió con el nombre **vacío** en una de las corridas (es **intermitente**). Es un
+  dato **vivo** que se vuelve basura (raíces del GC o el port de `encoding/json`, a decidir con un POC
+  chiquito). Por eso el corpus mide el **tercero en su propia corrida** (sección 2b, una sola vuelta) y ahí
+  `d2char.mpq` da exactamente los números del host.
+* **DC-002.40**: la consola **no puede leer un archivo comprimido del MPQ**: `ReadFile("(listfile)")` da
+  `zlib: invalid header` en los **tres** MPQ y el host los lee bien. Por eso los nombres de la **consulta**
+  viajan en un `.txt` al lado de los MPQ (`nombres_<mpq>.txt`, los escribe la sonda del host con
+  `-nombres-dir` y `mkdisco.sh` los hornea en el `/JUEGO` de la consola).
+* **Defecto del instrumento, ya arreglado**: el POC de la consola **sin importar `ebiten`** arranca y muere
+  con `Unhandled exception: PC 8c1f8a70` — un PC **6,6 KiB más allá** del `_end` de su propia imagen, antes de
+  la primera marca del runtime. `ebiten` es el que **arrastra el paquete `kos`** de libgodc: el binario que
+  anda tiene **274 símbolos `_kos.`** y el que moría, **cero**.
+
+Barreras: corpus `checar-tablas-233.sh` **14/14 controles OK y 0 fallos**, la capa **142/142** y, en el host,
+`go test ./d2common/d2fileformats/d2mpq/` verde con los 3 MPQ del juego.
+
+Evidencia cruda: `evidencia/dc-002.33-tablas-mpq.txt`.

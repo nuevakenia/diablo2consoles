@@ -20,10 +20,39 @@ var _ d2interface.Archive = &MPQ{} // Static check to confirm struct conforms to
 type MPQ struct {
 	filePath string
 	file     *os.File
-	hashes   map[uint64]*Hash
-	blocks   []*Block
-	header   Header
-	fileSize int64 // size of the archive on disk, to reject offsets and sizes beyond it
+	// DC-002.33: las dos tablas del MPQ van como BYTES contiguos (16 por entrada) y el que consulta las lee
+	// por indice, sin un objeto de Go por entrada. Antes eran `map[uint64]*Hash` + `[]*Block`: ese conjunto
+	// VIVO no entraba en el semiespacio del GC de la consola (512 KiB) con las tablas de un archivo del
+	// juego (d2data.mpq: 65.536 ranuras de hash + 11.083 de bloque) y el arranque del motor moria ahi.
+	// Cada tabla es UNA reserva del tamano de la tabla (1.048.576 y 177.328 bytes en el peor caso del
+	// juego), o sea un objeto GRANDE: libgodc la manda al monton de C, no al semiespacio.
+	hashTable  []byte
+	blockTable []byte
+	header     Header
+	fileSize   int64 // size of the archive on disk, to reject offsets and sizes beyond it
+}
+
+// TableChecksum returns the byte checksum of the two tables of the archive (hash table, block table).
+//
+// DC-002.33: como las tablas son bytes contiguos, el corpus diferencial del port compara la tabla ENTERA
+// entre el host y la consola con dos numeros (antes habia que recorrer el mapa y el arreglo de objetos, que
+// en la consola no entraban). La suma es la de los POC del port: `suma = suma*31 + byte`, sobre los bytes.
+func (mpq *MPQ) TableChecksum() (hashTable, blockTable uint32) {
+	return sumaDeBytes(mpq.hashTable), sumaDeBytes(mpq.blockTable)
+}
+
+// TableEntries returns how many slots each table has (what the port prints as "entradas").
+func (mpq *MPQ) TableEntries() (hashEntries, blockEntries uint32) {
+	return mpq.hashEntries(), mpq.blockEntries()
+}
+
+func sumaDeBytes(datos []byte) uint32 {
+	suma := uint32(0)
+	for _, b := range datos {
+		suma = suma*31 + uint32(b)
+	}
+
+	return suma
 }
 
 // PatchInfo represents patch info for the MPQ.
@@ -84,16 +113,16 @@ func FromFile(fileName string) (*MPQ, error) {
 
 // getFileBlockData gets a block table entry
 func (mpq *MPQ) getFileBlockData(fileName string) (*Block, error) {
-	fileEntry, ok := mpq.hashes[hashFilename(fileName)]
+	blockIndex, ok := mpq.buscarHash(fileName)
 	if !ok {
 		return nil, errors.New("file not found")
 	}
 
-	if fileEntry.BlockIndex >= uint32(len(mpq.blocks)) {
+	if blockIndex >= mpq.blockEntries() {
 		return nil, errors.New("invalid block index")
 	}
 
-	return mpq.blocks[fileEntry.BlockIndex], nil
+	return mpq.bloqueEn(blockIndex), nil
 }
 
 // Close closes the MPQ file
@@ -185,7 +214,7 @@ func (mpq *MPQ) Path() string {
 
 // Contains returns bool for whether the given filename exists in the mpq
 func (mpq *MPQ) Contains(filename string) bool {
-	_, ok := mpq.hashes[hashFilename(filename)]
+	_, ok := mpq.buscarHash(filename)
 	return ok
 }
 

@@ -1,0 +1,119 @@
+DC-002.33 - LAS TABLAS DEL MPQ COMPACTAS (los bytes, no un objeto de Go por entrada)
+====================================================================================
+Rama DC-002, repo ~/Proyectos/diablo2consoles. Capa coherente /tmp/gox-233 (142/142 paquetes).
+El corpus es scripts/console/checar-tablas-233.sh y sus numeros salen de ahi: 14 controles, 0 fallos
+(controles 0 a 6, con sus declarados al lado).
+Las dos mitades del par de instrumentos:
+  - HOST:    console/dc/sonda-tablas-mpq  (go run ./console/dc/sonda-tablas-mpq -mpqdir <dir> -mpq ...)
+  - CONSOLA: console/dc/poc/tablas-mpq    (+ csrc/cshim.c)
+Los dos imprimen LOS MISMOS SEIS numeros por archivo: cuantas entradas tiene cada tabla y el checksum de sus
+BYTES (suma = suma*31 + byte), mas la CONSULTA (cuantos nombres encuentra el sondeo por indice).
+Crudo: /home/dgalli/.hermes/cache/scratch/corpus-233/ (tablas-host.txt, run-tablas/flycast.log,
+run-tablas-d2char/flycast.log, run-reservas/flycast.log, run-motor/flycast.log, run-mutante-*/flycast.log).
+
+
+1. EL HOST: LA TABLA ENTERA Y LA CONSULTA NUEVA CONTRA EL MAPA VIEJO
+--------------------------------------------------------------------
+go test ./d2common/d2fileformats/d2mpq/  -> verde.
+
+TestBuscarHashIgualQueElMapaViejo (D2_GAME_DIR=<juego>, los 3 MPQ, nombre por nombre del (listfile)):
+    patch_d2.mpq: entradas_hash=16384  entradas_bloque=219    nombres=162    iguales=162    distintos=0
+    d2char.mpq:   entradas_hash=16384  entradas_bloque=10010  nombres=10009  iguales=10009  distintos=0
+    d2data.mpq:   entradas_hash=65536  entradas_bloque=11083  nombres=11082  iguales=11082  distintos=0
+    TOTAL: 21.253 nombres iguales, 0 distintos (fuera del (listfile): 0)
+
+Sonda del host (los mismos seis numeros que imprime la consola):
+    patch_d2.mpq  entradasHash=16384  entradasBloque=219    nombres=162    contenidos=162    checksumHash=2035763179  checksumBloque=1179232150
+    d2data.mpq    entradasHash=65536  entradasBloque=11083  nombres=11082  contenidos=11082  checksumHash=1897791535  checksumBloque=4131808245
+    d2char.mpq    entradasHash=16384  entradasBloque=10010  nombres=10009  contenidos=10009  checksumHash=3931321293  checksumBloque=965121384
+    TOTAL nombres=21253 contenidos=21253
+
+
+2. LA CONSOLA (POC tablas-mpq): LAS MISMAS TABLAS Y LA MISMA CONSULTA
+---------------------------------------------------------------------
+Los numeros de la consola son IDENTICOS a los del host, archivo por archivo (control 2: las dos tablas de
+los 3 MPQ; control 2b: la consulta de los 21.253 nombres).
+
+    patch_d2.mpq  entradasHash=16384  entradasBloque=219    checksumHash=2035763179  checksumBloque=1179232150   nombres=162    contenidos=162     largas=0
+    d2data.mpq    entradasHash=65536  entradasBloque=11083  checksumHash=1897791535  checksumBloque=4131808245   nombres=11082  contenidos=11082   largas=0
+    d2char.mpq    entradasHash=16384  entradasBloque=10010  checksumHash=3931321293  checksumBloque=965121384    nombres=10009  contenidos=10009   largas=0
+
+Ojo con COMO se midio: patch_d2 y d2data salen de la corrida con los 3 MPQ (seccion 2 del corpus) y d2char
+sale de SU PROPIA corrida con una sola vuelta (seccion 2b), porque en una misma corrida el nombre del tercero
+se corrompe: ver la seccion 6 (es el defecto de DC-002.39, no una pared de esta tarjeta). Con d2char solo:
+    TABLAS-MPQ 1 d2char.mpq entradasHash= 16384 entradasBloque= 10010 checksumHash= 3931321293 checksumBloque= 965121384 ms= 3606
+    TABLAS-MPQ    d2char.mpq nombres= 10009 contenidos= 10009 largas= 0 msConsulta= 10631
+
+
+3. EL CARGADOR DEL MOTOR EN LA CONSOLA (POC motor-reservas, el instrumento de DC-002.28)
+----------------------------------------------------------------------------------------
+El motor lee los MPQ del disco (/cd/JUEGO) con el MISMO codigo. Con las tablas como bytes (corrida del
+corpus, 14/14 controles):
+  - EMPIEZA d2data.mpq (el archivo donde moria) y lo ABRE CON SUS DOS TABLAS: la reserva de 1.048.576 bytes
+    (la tabla de hash de 65.536 ranuras) ya no pasa por el semiespacio;
+  - NO muere en el semiespacio en ningun momento (0 lineas de fatal error/out of memory);
+  - LLEGA al tercero: `CARGADOR-CONSOLA 3 / 3 libreAntes= 3616 /cd/JUEGO/d2char.mpq`. OJO: el nombre del
+    tercero es JUSTO el que se corrompe de vez en cuando (DC-002.39, intermitente): en una corrida anterior
+    de este mismo POC la linea salio con el nombre VACIO (`... 3 / 3 libreAntes= 800 /cd/JUEGO/` + `d2mpq.New
+    FALLO`) y en la corrida del corpus llego con su nombre. No es una pared de memoria de esta tarjeta.
+  Monton de C visto por el instrumento (las tres aperturas): arena=1472576/2701376/3123264 con libre=1064/
+  3616/2856.
+
+Con el MUTANTE (un objeto de Go por entrada, el arbol pristino) el mismo POC NO PASA de ahi:
+  - `CARGADOR-CONSOLA 2 / 3 ... /cd/JUEGO/d2data.mpq` y ninguna apertura de las tablas de ese archivo:
+    el pedido de la tabla de hash como OBJETOS no entra en el semiespacio (muere MUDO, sin el mensaje en la
+    serie: familia de DC-002.28/29; 0 marcadores OOM-throw, 0 `fatal error`).
+  => control 5b: 1 apertura con el mutante contra 3 con las tablas como bytes.
+
+
+4. EL ARRANQUE DEL MOTOR ENTERO (POC motor-disco, el instrumento de DC-002.27/28)
+----------------------------------------------------------------------------------
+                                   ANTES (objeto por entrada)   DESPUES (bytes)
+  semiespacio usado en la ultima recoleccion .... 409.432        393.224
+  libre del semiespacio (de 524.288) ........... 114.856        131.064
+  marcas ARQ-MARCA ............................. 57             31
+  recolecciones (gc_collect) ................... 19             6
+  main.main-entra .............................. 1              1
+  cuadros (EBITEN-LOOP) ........................ 0              0
+  donde muere .................................. mudo           fatal error: gc_external_alloc: OOM
+                                                                Memory: arena=2496864 used=2455304 free=41560
+La pared vieja medida en DC-002.29/30 con las tablas como objetos: 480.736 usados de los 524.288.
+
+LEIDO HONESTO: la pared del SEMIESPACIO de esta tarjeta YA NO ES LA QUE MATA (ni con 393.224 usados ni con
+los 409.432 del mutante se llega a los 480.736 de DC-002.29/30); el arranque muere DESPUES de `d2app.Create()`
+en OTRA pared, el MONTON DE C (la arena, 2.456.864 pedidos con 41.560 libres), que ya venia declarada desde
+DC-002.28. Los dos POCs llegan al mismo punto: con las tablas como bytes el arranque pasa el cargador y muere
+en el motor. Los cuadros (DC-002.34) siguen sin salir por esa segunda pared, no por el semiespacio.
+
+
+5. EL MUTANTE (criterio 3)
+--------------------------
+  - con el arbol PRISTINO (un objeto de Go por entrada) el POC tablas-mpq NO COMPILA: el instrumento nuevo
+    (`TableEntries`/`TableChecksum`) no existe en el codigo viejo, o sea que el mutante llego de verdad a la
+    representacion vieja (control 5a);
+  - el cargador muere donde moria (seccion 3): NO PASA de las tablas de d2data.mpq (control 5b);
+  - el motor con el mutante muere ANTES de los cuadros y por el camino del SEMIESPACIO (mudo, sin
+    `gc_external_alloc`), en 409.432 usados, mientras el de las tablas como bytes muere en el MONTON DE C
+    (control 5c): o sea que el sitio de la muerte NO es el mismo;
+  - el arbol vuelve con el mismo sha256 del d2mpq (control 6).
+
+
+6. LOS DEFECTOS QUE APARECIERON EN EL CAMINO (NO son de esta tarjeta: tienen tarjeta propia)
+--------------------------------------------------------------------------------------------
+  a) DC-002.39 (t_93f14abd): EN UNA MISMA CORRIDA, EL NOMBRE DEL TERCERO SE CORROMPE. Medido en el POC
+     tablas-mpq: vuelta 3 => `TABLAS-MPQ 3  FALLO: file does not exist largoNombre= -1795502946 ruta= ` (un
+     `len` negativo: el `string` vive pero su cabecera no), con 11 recolecciones antes; y en el POC
+ motor-reservas el tercero salio con el nombre VACIO en una de las corridas (en la del corpus llego con
+ su nombre: ES INTERMITENTE, depende de donde caiga el recolector). En la SEGUNDA vuelta del mismo
+ binario (el reinicio de KOS despues de que main retorna) el disco entero se ve vacio. O sea: un dato VIVO
+ de la configuracion se vuelve basura. Por eso el corpus mide el tercero en su propia corrida.
+  b) DC-002.40 (t_6a1d9f87): LA CONSOLA NO PUEDE LEER UN ARCHIVO COMPRIMIDO DEL MPQ. Medido:
+     `ReadFile("(listfile)")` => `zlib: invalid header` en los TRES MPQ (y en el host el mismo codigo los lee
+     bien: 162, 11.082 y 10.009 nombres). Por eso los nombres de la consulta viajan en un `.txt` al lado de
+     los MPQ (`nombres_<mpq>.txt`, los escribe la sonda del host con `-nombres-dir`, y `mkdisco.sh` los
+     hornea en el /JUEGO de la consola).
+  c) DEFECTO DEL INSTRUMENTO (ya arreglado, queda escrito en la cabecera del POC): sin importar `ebiten` (que
+     es el que arrastra el paquete `kos` de libgodc) el binario de la consola ARRANCA Y MUERE con
+     `Unhandled exception: PC 8c1f8a70, code 1` -- un PC 6.6 KiB mas alla del `_end` de su propia imagen y
+     antes de la primera marca del runtime. El binario que anda tiene 274 simbolos `_kos.`; el que moria,
+     CERO.

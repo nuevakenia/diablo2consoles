@@ -49,6 +49,19 @@ else
         BAKED=$((BAKED + 1))
         BYTES=$((BYTES + $(stat -c%s "$f")))
     done
+
+    # DC-002.33: ademas de los MPQ, los .txt del directorio. ES UN INSTRUMENTO, y solo hay uno: la lista de
+    # nombres de DC-002.33 (`nombres_<mpq>.txt`, la escribe `console/dc/sonda-tablas-mpq -nombres-dir`), que
+    # es por donde la CONSOLA recibe los nombres para consultarlos -- el `(listfile)` del MPQ NO se puede leer
+    # alla (medido: `zlib: invalid header`, defecto aparte). Sin esto la consulta de la consola no se puede
+    # medir: los nombres no llegan al disco.
+    for f in "$JUEGO"/*.txt; do
+        [ -f "$f" ] || continue
+        nombre="$(basename "$f" | tr '[:lower:]' '[:upper:]')"
+        ARGS+=("$f:/JUEGO/$nombre;1")
+        BAKED=$((BAKED + 1))
+        BYTES=$((BYTES + $(stat -c%s "$f")))
+    done
 fi
 
 "$DC_PYTHON" "$HERE/mkiso.py" "$ISO" "${ARGS[@]}" | sed 's/^/   /'

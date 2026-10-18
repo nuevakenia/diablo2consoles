@@ -155,31 +155,20 @@ func TestTablasPorTrozosUnMPQDeVerdad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// el mismo armado que readHashTable: una entrada por ranura (las vacias colapsan en una sola clave)
-	esperado := make(map[uint64]*Hash)
+	// DC-002.33: la tabla de hash ya no es un mapa de objetos, son BYTES: se compara ranura por ranura contra
+	// la referencia (el camino de la tabla entera), que es la misma que se compara para la de bloque.
+	if got := m.hashEntries(); got != hashEntradas {
+		t.Fatalf("la tabla de hash tiene %d ranuras, quiero %d", got, hashEntradas)
+	}
 
 	for n, i := uint32(0), uint32(0); i < hashEntradas; n, i = n+4, i+1 {
-		esperado[(uint64(quiero[n])<<32)|uint64(quiero[n+1])] = &Hash{
-			A:          quiero[n],
-			B:          quiero[n+1],
-			Locale:     uint16(quiero[n+2] >> 16),
-			Platform:   uint16(quiero[n+2] & 0xFFFF),
-			BlockIndex: quiero[n+3],
-		}
-	}
+		got := m.entradaHash(i)
 
-	if len(m.hashes) != len(esperado) {
-		t.Fatalf("el mapa tiene %d entradas, quiero %d", len(m.hashes), len(esperado))
-	}
-
-	for clave, e := range esperado {
-		got, ok := m.hashes[clave]
-		if !ok {
-			t.Fatalf("falta la clave %#x", clave)
-		}
-
-		if *got != *e {
-			t.Fatalf("la clave %#x = %+v, quiero %+v", clave, *got, *e)
+		if got.A != quiero[n] || got.B != quiero[n+1] ||
+			got.Locale != uint16(quiero[n+2]>>16) || got.Platform != uint16(quiero[n+2]&0xFFFF) ||
+			got.BlockIndex != quiero[n+3] {
+			t.Fatalf("ranura %d = %+v, quiero %d/%d/%d/%d", i, got,
+				quiero[n], quiero[n+1], quiero[n+2], quiero[n+3])
 		}
 	}
 
@@ -194,13 +183,13 @@ func TestTablasPorTrozosUnMPQDeVerdad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(m.blocks) != int(bloqueEntradas) {
-		t.Fatalf("%d bloques, quiero %d", len(m.blocks), bloqueEntradas)
+	if got := m.blockEntries(); got != bloqueEntradas {
+		t.Fatalf("la tabla de bloque tiene %d entradas, quiero %d", got, bloqueEntradas)
 	}
 
 	for i := uint32(0); i < bloqueEntradas; i++ {
 		n := i * 4
-		got := m.blocks[i]
+		got := m.bloqueEn(i)
 
 		if got.FilePosition != quieroBloques[n] || got.CompressedFileSize != quieroBloques[n+1] ||
 			got.UncompressedFileSize != quieroBloques[n+2] || uint32(got.Flags) != quieroBloques[n+3] {
