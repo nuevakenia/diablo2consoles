@@ -51,6 +51,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2app/d2setup"
@@ -141,12 +142,16 @@ func main() {
 	config := flag.String("config", "", "donde se escribe el config.json (ruta del HOST)")
 	rutaConsola := flag.String("ruta-consola", rutaDatosConsola, "donde el ARRANQUE de la consola busca los datos: /rd/juego (el romdisk, por defecto) o /cd/juego (el disco, DC-002.27)")
 	mpq := flag.String("mpq", "", "nombres del MpqLoadOrder separados por coma (por defecto: los 7 de d2setup.CoreMPQs). El orden final es el del MOTOR, no el de esta lista")
+	// DC-002.30: la RESOLUCION LOGICA del motor, que es un campo del config (`Display`). Vacio = la del
+	// motor (`d2config.DefaultConfig()`: 1512x982). OJO MEDIDO: el motor tiene PISO 800x600
+	// (`d2common/d2display.Clamp`: BaseW/BaseH), asi que un 320x240 en el config se resuelve a 800x600.
+	pantalla := flag.String("pantalla", "", "resolucion logica para el `Display` del config, WxH (por defecto: la del motor). El motor la CLAMPEA a un piso de 800x600")
 	sinSellos := flag.Bool("sin-sellos", false, "escribe la configuracion pero no crea los archivos del juego")
 	verificar := flag.Bool("verificar", false, "control del host: no escribe nada, revisa el config.json que ya esta")
 	flag.Parse()
 
 	if *datos == "" || *config == "" {
-		fmt.Fprintln(os.Stderr, "uso: gen-config-consola -datos <dir> -config <config.json> [-ruta-consola /cd/juego] [-mpq a,b,c] [-sin-sellos|-verificar]")
+		fmt.Fprintln(os.Stderr, "uso: gen-config-consola -datos <dir> -config <config.json> [-ruta-consola /cd/juego] [-mpq a,b,c] [-pantalla WxH] [-sin-sellos|-verificar]")
 		os.Exit(2)
 	}
 
@@ -156,13 +161,24 @@ func main() {
 		os.Exit(2)
 	}
 
+	pantallaPedida, hayPantalla, err := parsearPantalla(*pantalla)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "la -pantalla no cierra:", err)
+		os.Exit(2)
+	}
+
 	if *verificar {
-		os.Exit(verificarConfig(*datos, *config, *rutaConsola, orden))
+		os.Exit(verificarConfig(*datos, *config, *rutaConsola, orden, pantallaPedida, hayPantalla))
 	}
 
 	cfg := d2config.DefaultConfig()
 	cfg.MpqPath = *rutaConsola
 	cfg.MpqLoadOrder = orden
+
+	if hayPantalla {
+		cfg.Display = d2config.DisplayConfig{Width: pantallaPedida.W, Height: pantallaPedida.H}
+	}
+
 	cfg.SetPath(*config)
 
 	if err := os.MkdirAll(filepath.Dir(*config), 0750); err != nil {
@@ -208,16 +224,49 @@ func main() {
 
 	fmt.Printf("CONFIG-CONSOLA config=%s bytes=%d sha256=%s\n", rutaConfigConsola, len(datosBytes),
 		hex.EncodeToString(suma[:]))
+	fmt.Printf("CONFIG-CONSOLA display=%dx%d (lo que PIDE el config; el motor lo CLAMPEA a un piso de 800x600)\n",
+		cfg.Display.Width, cfg.Display.Height)
 	fmt.Printf("CONFIG-CONSOLA datos=%s archivos=%d de %d (vacios: el instrumento de la frontera)\n",
 		*rutaConsola, sellos, len(orden))
 	fmt.Printf("CONFIG-CONSOLA MpqLoadOrder=%d nombres: el mismo orden que crea los archivos, de %s\n",
 		len(orden), "d2setup.CoreMPQs (filtrado por -mpq)")
 }
 
+// pantalla: la resolucion logica que se pide por -pantalla, en la forma WxH.
+type pantalla struct {
+	W int
+	H int
+}
+
+// parsearPantalla: lee la -pantalla WxH. Vacio = no se pide (el config se queda con la del motor).
+// OJO (DC-002.30): esto es lo que se ESCRIBE en el config; lo que el motor RESUELVE en la consola es otra
+// cosa -- `d2common/d2display.Resolve` clampea el resultado a un piso de 800x600 (BaseW/BaseH) y ademas lo
+// limita a la pantalla del renderer. El corpus de la tarjeta compara las dos cosas.
+func parsearPantalla(v string) (pantalla, bool, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return pantalla{}, false, nil
+	}
+
+	partes := strings.SplitN(strings.ToLower(v), "x", 2)
+	if len(partes) != 2 {
+		return pantalla{}, false, fmt.Errorf("%q: se espera WxH, por ejemplo 320x240", v)
+	}
+
+	w, err1 := strconv.Atoi(strings.TrimSpace(partes[0]))
+	h, err2 := strconv.Atoi(strings.TrimSpace(partes[1]))
+
+	if err1 != nil || err2 != nil || w <= 0 || h <= 0 {
+		return pantalla{}, false, fmt.Errorf("%q: se espera WxH con enteros positivos", v)
+	}
+
+	return pantalla{W: w, H: h}, true, nil
+}
+
 // verificarConfig: EL CONTROL DEL HOST. Lee el config del romdisk con el json DE VERDAD y exige tres
 // cosas: que se parsee, que diga la ruta y el orden del arranque de la consola, y que TODOS los archivos
 // que nombra existan en el directorio de datos. Devuelve el codigo de salida (0 = OK).
-func verificarConfig(datos, config, rutaEsperada string, ordenEsperado []string) int {
+func verificarConfig(datos, config, rutaEsperada string, ordenEsperado []string, pantallaPedida pantalla, hayPantalla bool) int {
 	criollo, err := os.ReadFile(config)
 	if err != nil {
 		fmt.Println("CONFIG-CONSOLA verificacion FALLO: no pude leer", config+":", err)
@@ -251,6 +300,15 @@ func verificarConfig(datos, config, rutaEsperada string, ordenEsperado []string)
 		}
 	}
 
+	// DC-002.30: el Display del config, si se pidio por -pantalla. Este control exige que el ARCHIVO diga
+	// lo que se le pidio; lo que el MOTOR resuelve con eso (el piso de 800x600 de `d2display.Clamp`) se
+	// mide en la consola, no aca.
+	if hayPantalla && (e.Display.Width != pantallaPedida.W || e.Display.Height != pantallaPedida.H) {
+		fmt.Printf("CONFIG-CONSOLA verificacion FALLO: Display=%dx%d (se pidio %dx%d)\n",
+			e.Display.Width, e.Display.Height, pantallaPedida.W, pantallaPedida.H)
+		ok = false
+	}
+
 	// los archivos que la configuracion nombra, contados con el os DE VERDAD sobre el directorio que se
 	// hornea en el romdisk (el mismo `Complete` que el motor pregunta al arrancar)
 	presentes := 0
@@ -264,8 +322,8 @@ func verificarConfig(datos, config, rutaEsperada string, ordenEsperado []string)
 	completo := d2setup.Complete(datos, e.MpqLoadOrder)
 
 	fmt.Printf("CONFIG-CONSOLA verificacion: MpqPath=%s orden=%d archivos_en_el_directorio=%d de %d "+
-		"Complete(dir, orden)=%v bytes=%d json-de-Go=OK\n", e.MpqPath, len(e.MpqLoadOrder), presentes,
-		len(e.MpqLoadOrder), completo, len(criollo))
+		"Complete(dir, orden)=%v bytes=%d json-de-Go=OK display=%dx%d\n", e.MpqPath, len(e.MpqLoadOrder), presentes,
+		len(e.MpqLoadOrder), completo, len(criollo), e.Display.Width, e.Display.Height)
 
 	if !ok || !completo || presentes != len(e.MpqLoadOrder) {
 		fmt.Println("CONFIG-CONSOLA verificacion FALLO: la configuracion del arranque y los archivos no cierran")

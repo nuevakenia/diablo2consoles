@@ -3090,3 +3090,103 @@ palancas en las tarjetas abiertas DC-002.30 (resolucion), DC-002.31 (assets suel
 binario). Los criterios 2 y 3 quedan medidos (secciones 9 y 10 de la evidencia).
 
 Evidencia cruda: `evidencia/dc-002.29-arranque-rearmado.txt`.
+
+## 47. DC-002.30: la resolucion como palanca — es de **VRAM** (-786.432 B), no de RAM; y el motor ni la baja (el piso de 800x600)
+
+La tarjeta nacio de una hipotesis de Papu: la pantalla logica del motor es **800x600x4 = 1.920.000
+bytes** (exactamente el pedido de **1.916.928** de DC-002.21/22, `1.920.000 - 3.072` de sbrk), asi que
+bajarla a 320x240 deberia liberar **-84%** y destrabar el arranque, que hoy muere contra el semiespacio del
+GC (DC-002.28/29). El corpus (`scripts/console/checar-pantalla-230.sh`, host **y** consola, **18/18**
+controles verdes) mide tres cosas por separado y la hipotesis queda **refutada con numeros**: el campo
+`Display` del config **no puede bajar** la pantalla del motor, la pantalla **no se paga en RAM** (se paga
+en la VRAM desde DC-002.22), y aun forzando al motor a resolver 320x240 de verdad el punto de RAM **no se
+mueve ni un byte**.
+
+**1. El generador ya escribe la resolucion, y el config cambia.** `gen-config-consola -pantalla WxH`
+(`console/dc/gen-config-consola/main.go`, nuevo flag) escribe el `Display` del config.json del romdisk y el
+sha256 del archivo **cambia con ella**: `1512x982 → 24eaf44bfa7afd2b`, `800x600 → 7c893c5b134086c5`,
+`320x240 → 5588275180436273` (el `-verificar` del host acepta el Display pedido). El que **no** cambia es lo
+que el motor hace con eso:
+
+| config | pantalla del renderer | lo que el MOTOR resuelve |
+|---|---|---|
+| 1512x982 / 800x600 / 640x480 / 320x240 | 640x480 | **800x600** (las cuatro) |
+| 1512x982 / 800x600 / 640x480 / 320x240 | 320x240 | **800x600** (las cuatro) |
+
+8 de 8 combinaciones resuelven a 800x600: `d2display.Resolve` limita la config a la pantalla y despues
+pasa por `Clamp`, que **sube** a `BaseW/BaseH` (800x600). O sea que el campo `Display` del config no es una
+palanca de nada mientras el piso este puesto. (El instrumento del host usa el **mismo** codigo del motor,
+`d2display.Resolve`, no una copia.)
+
+**2. El arranque con las cuatro configs: el MISMO punto, medido con el instrumento de DC-002.27/28.** POC
+`motor-disco` (el motor entero leyendo los MPQ del disco, 3 MPQ de verdad en la ISO), Flycast 30 s por
+corrida, layer coherente `/tmp/gox-330`:
+
+    config     display resuelto   VRAM        monton de C     marcas  main.main  gc_collect  muerte
+    800x600    800x600            1.048.576   1.176 libres    41      1          11          PC 0000085b
+    640x480    800x600            1.048.576   1.176 libres    41      1          11          PC 0000085b
+    320x240    800x600            1.048.576   1.176 libres    41      1          11          PC 0000085b
+    1512x982   800x600            1.048.576   1.176 libres    41      1          11          PC 0000085b
+
+Los cuatro config.json **son distintos** (punto 1) y el punto de RAM es **el mismo**: ni el libre del monton
+de C, ni las marcas, ni las 11 recolecciones del GC, ni el PC de la muerte. La pared sigue donde la dejo
+DC-002.29 (el semiespacio del GC en 480.736 de 524.288 bytes) y la config no la corre ni un pixel. Y el
+pedido de pantalla **ya no es del monton**: en toda la corrida hay **0** lineas con `1.916.928` y **0**
+`out of memory`, y **1** `VRAM de la pantalla 1048576` (criterio 2 de la tarjeta: el numero nuevo es de
+VRAM).
+
+**3. La pantalla SI es palanca, pero de VRAM.** El shim del POC con el PVR en 320x240 (una copia del POC que
+cambia **una** linea, `IniciarPantalla(320, 240)`, y se borra al terminar) baja el cuadro de **1.048.576 a
+262.144 bytes = -786.432 (-75%)** y el punto de RAM **no se mueve** (sigue 1.176 libres, marcas=41,
+gc_collect=11, PC 0000085b). La VRAM de la consola son 8 MB con ~1 MB en uso, asi que esos 768 KiB no son
+una pared: la pared medida es el semiespacio del GC (480.736/524.288) y el monton de C (1.176 bytes libres).
+
+**4. El A/B del fondo, dentro del MISMO binario: ni forzando la pantalla abajo aparece RAM.** Con el piso de
+`Clamp` **sacado** (mutante `mutar-pantalla-230.py --sin-piso`, que solo cambia la fuente) el binario de la
+consola **seguia** resolviendo 800x600, porque el `.gox` de `d2display` esta **pre-compilado** en el layer.
+El corpus lo rearma en su **propia copia** del layer (`d2display.gox` 65508 → 65388 bytes, `.text` 7084 →
+6996) y entonces el **mismo binario** resuelve dos pantallas distintas segun la config, con la RAM
+**identica**:
+
+| config | display resuelto | monton de C | marcas | main.main | gc_collect | muerte |
+|---|---|---|---|---|---|---|
+| 800x600 | **640x400** | 1.240 libres | 41 | 1 | 11 | PC 0000085b |
+| 320x240 | **320x240** | 1.240 libres | 41 | 1 | 11 | PC 0000085b |
+
+Es el A/B que la tarjeta pedia, y ahora **cierra**: cambiar la config no cambia una linea de codigo y las
+dos pantallas llevan el mismo numero de digitos (el config.json del romdisk no cambia de tamano), asi que la
+unica diferencia entre las dos corridas es la resolucion — y la RAM no se mueve. (El 640x400 del config de
+800x600 es el motor limitando la config a la **pantalla del renderer**, 640x480 menos el marco de la
+ventana; con el piso puesto ese 800x600 se subia a 800x600 y no se veia.) Lo unico que si se mueve en ese
+A/B es el **binario**: el rearmado deja 1.240 bytes libres contra los 1.176 del layer coherente (**64
+bytes**), que es el **layout** del paquete rearmado (88 bytes de `.text`) y no la pantalla. Declarado como
+medicion, no como control.
+
+**5. El veredicto, y que NO se toca.** La resolucion **no** es una palanca de RAM: libera VRAM (-786.432
+bytes = -75% del cuadro del PVR) y ni siquiera eso es una pared hoy. La palanca de RAM sigue siendo el peso
+del binario y las tablas que lo llenan (DC-002.32). El **piso de 800x600 se queda**: la interfaz del motor
+esta disenada como una columna de 800x600 (`docs/DISPLAY.md`), y el generador ahora puede escribir cualquier
+resolucion sin que el motor deje de clampearla. Queda como instrumento (y como el control que prueba el
+piso).
+
+**6. Tres defectos del propio corpus, medidos antes de creerle un verde.** (a) El control 7 ponia el
+mutante y **no rearmaba el `.gox`**: la consola seguia resolviendo 800x600 y el control comparaba el mismo
+numero dos veces — un **verde falso**; ahora rearma el paquete en su copia y **exige** `display 320x240` en
+la consola. (b) `cp -a` **no alcanza** para copiar el layer: `orden.txt`/`orden-motor.txt` llevan rutas
+**absolutas**, asi que el enlace seguia leyendo los `.gox` de origen — el control 7 quedo **ROJO** con el
+layer copiado intacto (asi se cazo, y es la trampa que DC-002.22 §6 ya tenia anotada); ahora las rutas se
+reescriben y hay un control de que **las 74+142 entradas apunten adentro del copy**. (c) `corre` no borraba
+la corrida vieja antes del build y `mide` podia leer un `flycast.log` de **otro binario**: ahora se borra
+antes y se rechaza un log mas viejo que el build. Ademas: el corpus se corrio dos veces de punta a punta — la
+primera dejo **16 OK / 1 fallo**, y ese fallo era **expectativa mal escrita** del control 7b (esperaba
+800x600 y el motor resuelve 640x400 sin el piso); corregida la expectativa y agregado el control 7c, la
+corrida final da **18/18**. Los controles 0 a 6 dieron los mismos numeros en las dos corridas. El mutante
+(0 de 8 combinaciones resuelven a 800x600) se caza, y el script tiene un `trap` que lo **levanta en
+cualquier salida**: la corrida anterior de esta tarjeta murio por credenciales y dejo el mutante pegado en el
+arbol (`display.go` sha256 `81eaa783aae51331` contra `9c33f062f3324a4d` de HEAD), que es exactamente lo que
+el trap impide.
+
+Barreras: `test-std-host.sh` **verde** en amd64 y 386, `mutar-std-host.sh` **39/39** chequeos cazados con el
+arbol sano, `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas, 30 frames).
+
+Evidencia cruda: `evidencia/dc-002.30-resolucion.txt`.

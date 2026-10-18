@@ -75,6 +75,10 @@ if [ "${DC_SIN_ROMDISK:-0}" != "1" ]; then
             -ruta-consola "${DC_RUTA_DATOS:-/rd/juego}")
         [ -n "${DC_MPQ_JUEGO:-}" ] && ARGS_CONFIG+=(-mpq "$DC_MPQ_JUEGO")
         [ "${DC_SIN_SELLOS:-0}" = "1" ] && ARGS_CONFIG+=(-sin-sellos)
+        # DC-002.30: la RESOLUCION del config (`Display`). Vacio = la del motor (1512x982). El motor la
+        # CLAMPEA a 800x600 minimo (`d2common/d2display.Clamp`), asi que esto no baja la pantalla logica
+        # del motor: lo que mide la tarjeta es justamente eso.
+        [ -n "${DC_PANTALLA:-}" ] && ARGS_CONFIG+=(-pantalla "$DC_PANTALLA")
         if ! (cd "$REPO" && go run ./console/dc/gen-config-consola "${ARGS_CONFIG[@]}") > "$OUT/config-consola.log" 2>&1; then
             echo "   EL GENERADOR DE LA CONFIGURACION FALLO (ver $OUT/config-consola.log)" >&2
             tail -5 "$OUT/config-consola.log" >&2

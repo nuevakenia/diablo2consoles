@@ -1,0 +1,150 @@
+DC-002.30 — LA RESOLUCION DEL MOTOR: ¿PALANCA DE RAM? (medido, no deducido)
+==========================================================================
+Rama DC-002, POC console/dc/poc/motor-disco (el motor entero leyendo los MPQ del disco),
+Flycast 30 s por corrida, layer coherente de .gox /tmp/gox-330 (142 del motor + 74 de
+stdlib/terceros). Cada linea de abajo es una corrida o una comparacion de archivos.
+
+LO QUE SE MIDIO, EN UNA LINEA
+-----------------------------
+La resolucion NO es palanca de RAM. Es palanca de VRAM (-786.432 bytes = -75% del cuadro del
+PVR) y el campo `Display` del config NI SIQUIERA puede bajar la pantalla del motor: el piso de
+800x600 de `d2common/d2display.Clamp` la sube. Y aun forzando al motor a resolver 320x240 de
+verdad (el piso SACADO y el paquete REARMADO), el punto de RAM no se mueve ni un byte.
+
+COMO SE REPRODUCE
+-----------------
+    bash scripts/console/checar-pantalla-230.sh /tmp/gox-330 30
+Es host + consola: el host mide lo que resuelve el MOTOR (`d2display.Resolve`, el mismo codigo)
+y hornea configs; la consola arranca el motor con cada config y lee el instrumento de
+DC-002.27/28 (el libre del monton de C, las marcas de avance, la ultima marca, el PC de la
+excepcion, las recolecciones del GC). El resultado tiene que ser 18 controles OK y 0 fallos, y
+el mutante del piso (`scripts/console/mutar-pantalla-230.py --sin-piso`) tiene que CAZARSE (0 de
+8 combinaciones resuelven a 800x600). El script tiene un `trap` que levanta el mutante en
+CUALQUIER salida: la corrida anterior de esta tarjeta murio con el mutante pegado en el arbol.
+
+LOS NUMEROS
+-----------
+1) EL CAMPO `Display` DEL CONFIG NO BAJA LA PANTALLA (el piso de Clamp), 8 de 8:
+   config 1512x982 / 800x600 / 640x480 / 320x240, con la pantalla del renderer en 640x480 y en
+   320x240 -> TODO resuelve 800x600. Control 1 verde.
+2) EL GENERADOR ESCRIBE LA RESOLUCION (`gen-config-consola -pantalla WxH`) y el sha256 del
+   config.json del romdisk CAMBIA con ella:
+       1512x982 -> sha256 24eaf44bfa7afd2b
+        800x600 -> sha256 7c893c5b134086c5
+        320x240 -> sha256 5588275180436273
+   y el `-verificar` del host acepta el Display pedido. Controles 2 y 2b verdes.
+3) EL ARRANQUE, CON LAS CUATRO CONFIGS, MUERE EN EL MISMO LUGAR Y DEJA LA MISMA RAM:
+       800x600   display 800x600  VRAM 1048576  monton de C 1176 libres  marcas=41 main.main=1 gc_collect=11  PC 0000085b
+       640x480   display 800x600  VRAM 1048576  monton de C 1176 libres  marcas=41 main.main=1 gc_collect=11  PC 0000085b
+       320x240   display 800x600  VRAM 1048576  monton de C 1176 libres  marcas=41 main.main=1 gc_collect=11  PC 0000085b
+      1512x982   display 800x600  VRAM 1048576  monton de C 1176 libres  marcas=41 main.main=1 gc_collect=11  PC 0000085b
+   O sea: la config SI cambia (los cuatro config.json son distintos, ver 2) y el punto NO.
+   Controles 3+4, 3+4b y 4b verdes. La pared sigue siendo la de DC-002.28/29 (el semiespacio del
+   GC en 480.736 de 524.288 bytes usados) y el monton de C con 1.176 bytes libres.
+4) EL PEDIDO DE PANTALLA ES DE VRAM, NO DEL MONTON: 0 lineas con el 1.916.928 de DC-002.21/22 y
+   0 `out of memory` en la corrida; 1 linea `VRAM de la pantalla 1048576`. Control 3d verde.
+5) LA PANTALLA ES PALANCA DE VRAM: el shim del POC con el PVR en 320x240 baja el cuadro de
+   1.048.576 a 262.144 bytes (-786.432 = -75%) y el punto de RAM NO se mueve (sigue 1176).
+   Controles 5 y 5b verdes.
+6) EL A/B DE FONDO, DENTRO DEL MISMO BINARIO: con el piso de Clamp SACADO y `d2display.gox`
+   REARMADO en la copia del layer (65508 -> 65388 bytes, .text 7084 -> 6996):
+       config 800x600  -> display 640x400   (la config limitada a la pantalla del PVR 640x480
+                                             menos el marco de la ventana: 400)
+       config 320x240  -> display 320x240
+   DOS pantallas distintas en el MISMO binario, y la RAM IDENTICA en las dos (1240 bytes libres,
+   marcas=41, main.main=1, gc_collect=11, PC 0000085b). Controles 7, 7c y 7d verdes.
+   Lo unico que si cambia en ese A/B es el BINARIO: el rearmado da 1240 bytes libres contra los
+   1176 del layer coherente (64 bytes), que es el LAYOUT del paquete rearmado (88 bytes de
+   .text), no la pantalla. Declarado, no exigido (control 7e).
+== 0. la carpeta del juego y el estado del mutante ==
+   MPQ horneados: d2char.mpq d2data.mpq patch_d2.mpq 
+   OK: control 0: el piso de Clamp esta puesto (el mutante NO esta pegado)
+== 1. host: lo que resuelve el MOTOR (d2common/d2display), config x pantalla del renderer ==
+     RESOLUCION  config=1512x982  pantalla=640x480  ->  resuelto=800x600
+     RESOLUCION  config=800x600  pantalla=640x480  ->  resuelto=800x600
+     RESOLUCION  config=640x480  pantalla=640x480  ->  resuelto=800x600
+     RESOLUCION  config=320x240  pantalla=640x480  ->  resuelto=800x600
+     RESOLUCION  config=1512x982  pantalla=320x240  ->  resuelto=800x600
+     RESOLUCION  config=800x600  pantalla=320x240  ->  resuelto=800x600
+     RESOLUCION  config=640x480  pantalla=320x240  ->  resuelto=800x600
+     RESOLUCION  config=320x240  pantalla=320x240  ->  resuelto=800x600
+   OK: control 1: las 8 combinaciones (4 configs x 2 pantallas) resuelven a 800x600: el campo Display del config NO baja la pantalla del motor (el PISO de Clamp)
+== 2. host: gen-config-consola -pantalla escribe el Display (y el config cambia de sha256) ==
+   pantalla pedida 1512x982 -> config display=1512x982 sha256=24eaf44bfa7afd2b
+   pantalla pedida 800x600 -> config display=800x600 sha256=7c893c5b134086c5
+   pantalla pedida 320x240 -> config display=320x240 sha256=5588275180436273
+   OK: control 2: la resolucion SI se escribe en el config y el sha256 cambia con ella (1512x982 24eaf44bfa7afd2b / 800x600 7c893c5b134086c5 / 320x240 5588275180436273)
+   OK: control 2b: el -verificar del host acepta el Display pedido (display=320x240)
+== 3. consola: el arranque con la config en 800x600 (el instrumento de DC-002.27/28) ==
+   [c3-800x600] config:display=800x600  display_resuelto:display 800x600  VRAM de la pantalla 1048576  
+   [c3-800x600] monton de C antes del motor: 1176 bytes libres  marcas=41 main.main=1 gc_collect=11  Unhandled exception: PC 0000085b
+   [c3-800x600] ultima marca: ARQ-MARCA gc_collect v=11
+   OK: control 3d: la consola imprime el pedido de pantalla como VRAM (VRAM de la pantalla 1048576) y NO como monton de C: 0 lineas con el 1.916.928 de DC-002.21/22 y 0 OOM
+== 4. consola: lo mismo con la config en 320x240 ==
+   [c4-320x240] config:display=320x240  display_resuelto:display 800x600  VRAM de la pantalla 1048576  
+   [c4-320x240] monton de C antes del motor: 1176 bytes libres  marcas=41 main.main=1 gc_collect=11  Unhandled exception: PC 0000085b
+   [c4-320x240] ultima marca: ARQ-MARCA gc_collect v=11
+== 3b. consola: y con la resolucion del motor (sin -pantalla: 1512x982, la de siempre) ==
+   [c3b-1512x982] config:display=1512x982  display_resuelto:display 800x600  VRAM de la pantalla 1048576  
+   [c3b-1512x982] monton de C antes del motor: 1176 bytes libres  marcas=41 main.main=1 gc_collect=11  Unhandled exception: PC 0000085b
+   [c3b-1512x982] ultima marca: ARQ-MARCA gc_collect v=11
+== 3c. consola: el arranque con 640x480 (el del PLAN) ==
+   [c3c-640x480] config:display=640x480  display_resuelto:display 800x600  VRAM de la pantalla 1048576  
+   [c3c-640x480] monton de C antes del motor: 1176 bytes libres  marcas=41 main.main=1 gc_collect=11  Unhandled exception: PC 0000085b
+   [c3c-640x480] ultima marca: ARQ-MARCA gc_collect v=11
+   OK: control 3+4: el punto de RAM NO se mueve con la resolucion del config (800x600 / 640x480 / 320x240 / 1512x982 dan LO MISMO: 'display 800x600|monton de C antes del motor: 1176 bytes libres|41|1|11|ARQ-MARCA gc_collect v=11|Unhandled exception: PC 0000085b')
+   OK: control 3+4b: los cuatro configs horneados dicen lo que se les pidio (display=800x600 / display=640x480 / display=320x240 / display=1512x982): el unico que no cambia es el punto de RAM
+   OK: control 4b: el motor resuelve 800x600 CON LA CONFIG EN 320x240 (display=320x240 escrito en el romdisk -> 'display 800x600|monton de C antes del motor: 1176 bytes libres|41|1|11|ARQ-MARCA gc_collect v=11|Unhandled exception: PC 0000085b')
+== 5. consola: el shim con la pantalla del PVR en 320x240 (copia del POC, se borra al final) ==
+   la copia cambia UNA linea: 328:	if err := ebiten.IniciarPantalla(320, 240); err != nil {
+   [c5-shim320] config:display=800x600  display_resuelto:display 800x600  VRAM de la pantalla 262144  
+   [c5-shim320] monton de C antes del motor: 1176 bytes libres  marcas=41 main.main=1 gc_collect=11  Unhandled exception: PC 0000085b
+   [c5-shim320] ultima marca: ARQ-MARCA gc_collect v=11
+   OK: control 5: el cuadro del PVR SI baja con la pantalla del shim (VRAM de la pantalla 1048576 con 640x480 -> VRAM de la pantalla 262144 con 320x240): la palanca de la pantalla es de VRAM
+   OK: control 5b: el punto de RAM tampoco se mueve con la pantalla del shim (sigue 'display 800x600|monton de C antes del motor: 1176 bytes libres|41|1|11|ARQ-MARCA gc_collect v=11|Unhandled exception: PC 0000085b')
+   la copia del POC quedo borrada (/home/dgalli/Proyectos/diablo2consoles/console/dc/poc/motor-disco-p320)
+== 6. mutante: sin el piso de Clamp el 320x240 SI se resuelve (el control 1 tiene que ponerse ROJO) ==
+        mutante puesto (respaldo en /home/dgalli/.hermes/cache/scratch/dc230-mutante/display.go.sano): sha256=81eaa783aae51331
+   OK: mutante CAZADO: sin el piso solo 0 de 8 combinaciones resuelven a 800x600 (RESOLUCION  config=320x240  pantalla=640x480  ->  resuelto=320x240)
+   OK: el archivo quedo con el mismo sha256 (mutante levantado: 9c33f062f3324a4d)
+== 7. el fondo: con el piso SACADO y d2display REARMADO, ¿el motor resuelve 320x240 y gana RAM? ==
+   OK: control 7a: las 74+142 entradas del layer copiado apuntan ADENTRO del copy, asi que el enlace usa el d2display.gox REARMADO (con las rutas viejas el control 7 daba un ROJO falso... que era verdadero)
+   d2display.gox REARMADO con el piso sacado: 65508 -> 65388 bytes
+   el .text del paquete (lo que se enlaza): 7084 con piso -> 6996 sin piso
+== 7b. consola: el MISMO binario rearmado, con la config en 800x600 (la referencia del A/B) ==
+   [c7b-rearmado-800x600] config:display=800x600  display_resuelto:display 640x400  VRAM de la pantalla 1048576  
+   [c7b-rearmado-800x600] monton de C antes del motor: 1240 bytes libres  marcas=41 main.main=1 gc_collect=11  Unhandled exception: PC 0000085b
+   [c7b-rearmado-800x600] ultima marca: ARQ-MARCA gc_collect v=11
+== 7c. consola: el MISMO binario rearmado, con la config en 320x240 (el A/B de la resolucion) ==
+   [c7-sin-piso] config:display=320x240  display_resuelto:display 320x240  VRAM de la pantalla 1048576  
+   [c7-sin-piso] monton de C antes del motor: 1240 bytes libres  marcas=41 main.main=1 gc_collect=11  Unhandled exception: PC 0000085b
+   [c7-sin-piso] ultima marca: ARQ-MARCA gc_collect v=11
+   OK: control 7: con el piso SACADO y d2display.gox REARMADO la consola SI resuelve 320x240 ("display 320x240"): el mutante llego al binario y el motor puede bajar la pantalla
+   OK: control 7c: el MISMO binario resuelve DOS pantallas distintas segun la config (display 640x400 con la config en 800x600 y display 320x240 con la de 320x240): el A/B del 7d compara la resolucion y nada mas
+   OK: control 7d: con el MISMO binario, la pantalla en 320x240 da la MISMA RAM que en 800x600 (monton de C antes del motor: 1240 bytes libres|41|1|11|ARQ-MARCA gc_collect v=11|Unhandled exception: PC 0000085b): la resolucion NO es palanca de RAM ni siquiera cuando el motor la baja de verdad
+   control 7e: el binario rearmado NO tiene la misma RAM que el coherente: 'monton de C antes del motor: 1240 bytes libres|41|1|11|ARQ-MARCA gc_collect v=11|Unhandled exception: PC 0000085b' contra 'monton de C antes del motor: 1176 bytes libres|41|1|11|ARQ-MARCA gc_collect v=11|Unhandled exception: PC 0000085b' (la diferencia es del LAYOUT del paquete rearmado, no de la pantalla: el .text cambia 88 bytes)
+   OK: el layer coherente quedo intacto (d2display.gox sha256 2880f82bca39a8f1): el rearme fue en su copia
+   OK: el archivo quedo con el mismo sha256 despues del control 7 (9c33f062f3324a4d)
+   display.go sha256=9c33f062f3324a4d
+     el piso de Clamp:        puesto (sano)
+
+== RESULTADO: 18 controles OK, 0 con fallo
+== la hipotesis de la tarjeta (la resolucion como palanca de RAM) se mide en los controles 3+4 y 5b.
+== evidencia: console/dc/evidencia/dc-002.30-resolucion.txt
+
+BARRERAS (las tres del metodo, corridas al cerrar la tarjeta)
+-------------------------------------------------------------
+test-std-host.sh     == prueba diferencial con GOARCH=amd64 ==  ... y ... == con GOARCH=386 ==
+                     == los dos anchos: verde (y los 13 que hablan con KOS siguen sin compilar en el host) ==
+mutar-std-host.sh    == 39/39 chequeos cazados ==
+                     == OK: la suite caza todos los defectos conocidos y el arbol quedo sano ==
+compare-motor-dc6.sh == IGUAL: 31 lineas identicas (mismo DC6, mismo codigo del motor, x86-64 y SH-4) ==
+                        frames comparados: 30
+
+NOTA DE LAS DOS CORRIDAS: el corpus se corrio DOS veces de punta a punta. La primera
+(07:3x-07:4x) dejo 16 controles OK y 1 fallo, y el fallo era del PROPIO control 7b (esperaba
+"display 800x600" para la config de 800x600 con el piso sacado, y el motor resuelve 640x400:
+la config limitada a la pantalla del PVR 640x480 menos el marco). Se corrigio la expectativa y
+se agrego el control 7c (que las dos configs del A/B resuelvan pantallas DISTINTAS, para que el
+A/B no sea vacio). Los controles 0 a 6 dieron los MISMOS numeros en las dos corridas.
+La salida cruda de la corrida final es la de arriba.
