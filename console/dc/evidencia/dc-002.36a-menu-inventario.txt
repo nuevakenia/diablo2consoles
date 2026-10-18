@@ -1,0 +1,77 @@
+DC-002.36 (avance medido 1) -- EL INVENTARIO DEL MENU PRINCIPAL: que assets son, de que MPQ salen y
+que tamano tiene cada frame, con las posiciones del propio codigo del motor
+===============================================================================================
+Corrida autonoma del 2026-10-18 13:47-14:05. El motor ya trae el menu escrito
+(`d2game/d2gamescreen/main_menu.go`, 764 lineas): este avance NO re-escribe el menu, mide lo que ese
+codigo pide para poder dibujarlo en la consola.
+
+1) LO QUE EL MOTOR DIBUJA, CON SUS POSICIONES (leidas de sus constantes, no inventadas)
+---------------------------------------------------------------------------------------
+    fondo del menu          d2resource.GameSelectScreen    posicion (0, 0)        paleta sky
+    logo Diablo (negro)     Diablo2LogoBlackLeft           posicion (400, 120)    paleta units
+    logo Diablo (fuego)     Diablo2LogoFireLeft            posicion (400, 120)    paleta units
+    boton "SINGLE PLAYER"   ButtonTypeWide  (256x35)       posicion (264, 290)
+    boton "MULTIPLAYER"     ButtonTypeWide                 posicion (264, 330)
+    boton "PROJECT WEBSITE" ButtonTypeWide                 posicion (264, 400)
+    boton "MAP ENGINE TEST" ButtonTypeWide                 posicion (264, 440)
+    boton "CREDITS"         ButtonTypeShort (135x25)       posicion (264, 505)
+    boton "CINEMATICS"      ButtonTypeShort                posicion (401, 505)
+    boton "EXIT DIABLO"     ButtonTypeWide                 posicion (264, 535)
+    textos                  FontFormal12 / FontExocet10    copyright (400,500 y 400,525), od2 (400,580),
+                                                           version (795,-10), commit (2,2)
+    (las constantes estan en main_menu.go lineas 38-76; los tipos de boton en d2core/d2ui/button.go)
+
+2) DE QUE MPQ SALE CADA UNO (probado archivo por archivo, en orden, con bake-dc6)
+--------------------------------------------------------------------------------
+    asset              archivo del juego                                MPQ          bytes
+    fondo              data/global/ui/FrontEnd/gameselectscreenEXP.dc6   d2exp.mpq    488.892
+    logo_negro         data/global/ui/FrontEnd/D2logoBlackLeft.DC6       d2data       195.294
+    logo_fuego         data/global/ui/FrontEnd/D2logoFireLeft.DC6        d2data       409.831
+    boton_ancho        data/global/ui/FrontEnd/WideButtonBlank.dc6       d2data        19.640
+    boton_corto        data/global/ui/CharSelect/ShortButtonBlank.dc6    d2data         7.002
+    boton_medio        data/global/ui/FrontEnd/MediumButtonBlank.dc6     d2data         9.272
+    fuente_exocet      data/local/FONT/LATIN/fontexocet10.dc6            d2data        40.836
+    paleta sky         data/global/palette/sky/pal.dat                   d2data           768
+    paleta units       data/global/palette/units/pal.dat                 d2data           768
+
+    MEDIDO, y es un dato que cambia el plan: el **fondo del menu NO esta en d2data.mpq** (que es el MPQ
+    que revienta el monton de C del arranque, DC-002.41): esta en **d2exp.mpq**. Y son **9 archivos de
+    1,17 MB en total**, o sea que no hace falta llevar 267 MB de d2data al disco para ver el menu.
+
+3) LA GEOMETRIA DE CADA ASSET (medida con console/dc/verif-dc6-235, no deducida)
+--------------------------------------------------------------------------------
+    asset            bytes    crc32 del archivo   frames   lienzo compuesto   crc32 de los indices
+    fondo            488.892  2849145532            12     256x256            174788676
+    logo_negro       195.294  2615718647            30     159x122             71136314
+    logo_fuego       409.831  2985582003            30     178x165           3928878411
+    boton_ancho       19.640   820224660             4     256x35            3024943940
+    boton_corto        7.002  3184235428             2     135x25            2944236591
+    boton_medio        9.272  1028610735             2     128x35            3650984466
+    fuente_exocet     40.836  3810922681           256      17x18            2024991565
+    (la fuente es un atlas: 256 celdas de 17x18 = los glifos; el boton ancho son 4 frames = los estados
+     normal/encendido/apagado/hundido que usa d2ui.Button; los logos son 30 frames = la animacion de fuego)
+
+4) LO QUE FALTA PARA CUMPLIR LOS CRITERIOS, MEDIDO Y NO ADIVINADO
+-----------------------------------------------------------------
+ * Criterio 1 (la pantalla del menu con sus elementos contados): falta el **compositor de varios
+   sprites** en la consola. El POC de DC-002.35 sube UNA textura y pinta UN quad opaco; el menu necesita
+   **9 sprites con transparencia** (los botones y los logos tienen el indice transparente de la paleta)
+   y **posiciones distintas** por sprite, o sea varias texturas + blending del PVR. Es trabajo de C/Go
+   sobre el POC de DC-002.35, no del motor.
+ * Criterio 2 (la navegacion con el control, medida en pixeles): el boton del menu cambia de FRAME
+   (d2ui.Button: `AllowFrameChange`, frame 0..3), asi que el cambio de seleccion se mide como el frame
+   del boton en la captura — el instrumento de DC-002.35 (medir-captura-235.py) ya sirve si se le pasa
+   la referencia del boton en cada frame.
+ * Criterio 3 (el mutante sin los assets): se arma igual que DC-002.35 (DC6_INEXISTENTE) cuando exista
+   el POC del menu.
+ * El menu del MOTOR (`d2app.Create().Run()`) sigue sin poder correr: el arranque muere en el monton de
+   C (DC-002.41) / mudo despues de LvlPrest.txt (DC-002.43) / con 0 archivos en /cd/juego (DC-002.44).
+   Por eso este avance va por el camino del POC, igual que DC-002.35.
+
+5) LO QUE SE ENTREGA EN ESTE AVANCE
+-----------------------------------
+    scripts/console/extrae-menu-236.sh   prueba los MPQ en orden, saca los assets del menu a un
+                                         directorio y los mide (es el que produjo la tabla de arriba)
+    console/dc/evidencia/dc-002.36a-menu-inventario.txt   esta evidencia
+
+Repetir: bash scripts/console/extrae-menu-236.sh <salida>
