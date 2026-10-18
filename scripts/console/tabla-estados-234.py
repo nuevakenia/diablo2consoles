@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""La tabla de los cuatro estados de DC-002.34, sacada de los logs de Flycast (sin interpretacion).
+
+Los cuatro logs son los del corpus `scripts/console/checar-motor-disco-234.sh`: BASE (sin la palanca de
+DC-002.33 y sin la de DC-002.32), S233 (solo la de 233), S232 (las dos) y el MUTANTE (la ISO sin /JUEGO).
+
+Uso:  tabla-estados-234.py <log_base> <log_s233> <log_s232> <log_mutante>
+"""
+import re
+import sys
+
+NOMBRES = [
+    "BASE  (sin 233, sin 232)",
+    "S233  (con 233, sin 232)",
+    "S232  (con 233 y 232)",
+    "MUTANTE (ISO sin /JUEGO)",
+]
+
+
+def analiza(nombre, path):
+    with open(path, "rb") as fh:
+        ls = fh.read().decode("utf-8", "replace").replace("\r", "").split("\n")
+
+    print("== %s" % nombre)
+    print("   vueltas del arranque        : %d" % sum("MOTOR-ARRANQUE arranca" in l for l in ls))
+
+    m = [l for l in ls if "monton de C antes del motor" in l]
+    if m:
+        print("   monton de C antes del motor : %s" % m[0].split(":", 2)[-1].strip())
+
+    semi = [int(x.group(1)) for l in ls for x in [re.search(r"gc-por-umbral-bytes-usados v=(\d+)", l)] if x]
+    if semi:
+        print("   semiespacio usado maximo    : %d -> libre minimo %d (%d marcas)"
+              % (max(semi), 524288 - max(semi), len(semi)))
+
+    fuentes = [l.strip() for l in ls if "Adding source: '/cd/juego" in l]
+    print("   fuentes del disco abiertas  : %d" % len(fuentes))
+    for l in fuentes[:3]:
+        print("      %s" % l)
+
+    cargados = [l.strip() for l in ls if "Loaded /cd/juego" in l]
+    print("   assets leidos del MPQ       : %d" % len(cargados))
+    for l in cargados[:4]:
+        print("      %s" % l)
+
+    print("   cuadros dibujados           : %d" % sum(("EBITEN-PERFIL" in l or "cuadros del loop" in l) for l in ls))
+    print("   cartel del motor            : %d" % sum('game files not found at "/cd/juego"' in l for l in ls))
+
+    ped = [l.strip() for l in ls if "Out of memory. Requested" in l]
+    oom = [l.strip() for l in ls if l.startswith("Memory: arena=")]
+    exc = [l.strip() for l in ls if "Unhandled exception" in l or "Data address error" in l]
+    if ped:
+        print("   muerte                      : %s" % ped[0])
+        print("                                 %s" % (oom[0] if oom else "(sin Memory:)"))
+    elif exc:
+        print("   muerte                      : %s" % " / ".join(exc[:2]))
+    else:
+        print("   muerte                      : MUDA (la consola reinicia sin mensaje)")
+
+    ult = [l.strip() for l in ls if l.strip() and "reios" not in l.lower()]
+    print("   ULTIMA linea de la consola  : %s" % (ult[-1] if ult else "(vacia)"))
+    print()
+
+
+def main():
+    if len(sys.argv) != 5:
+        print(__doc__)
+        return 2
+    for nombre, path in zip(NOMBRES, sys.argv[1:]):
+        analiza(nombre, path)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

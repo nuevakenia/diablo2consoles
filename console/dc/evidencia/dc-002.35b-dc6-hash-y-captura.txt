@@ -1,0 +1,171 @@
+DC-002.35 (2a medicion) -- EL HASH YA COINCIDE y LA CAPTURA DEL MENU, MEDIDA
+================================================================================
+Corrida autonoma del 2026-10-18 13:20-13:50 sobre un CLON PROPIO del repo
+(/home/dgalli/.hermes/cache/scratch/dc35/repo, rama DC-002 con el fix #33 3fef8a6c aplicado),
+DC_ROOT propio (root2, libgodc 209.030 B copiado de ~/dreamcast a las 13:26) y GODC_GOX propio
+(gox2), para no pisar al run vecino que trabaja DC-002.34 sobre el checkout principal.
+
+QUE SE MIDIO Y POR QUE
+----------------------
+La evidencia anterior de esta tarjeta dejaba el criterio 1 en "PARCIAL, con un defecto medido":
+la consola leia el DC6 del disco con crc32=42502455 y el host el mismo asset con crc32=820453653
+(MISMO TAMANO, 488892 bytes, contenido distinto). Esta corrida vuelve a medir las dos puntas con
+el arreglo de las tablas del MPQ (#33) puesto, y mide el criterio 2 (la captura del menu) con un
+instrumento que da numeros en vez de impresiones.
+
+1) EL HASH CONTRA EL HOST: **COINCIDE EXACTO** (criterio 1, cerrado)
+---------------------------------------------------------------------
+Consola (consola serie del Flycast, corrida run-sano3, log run-sano3/flycast.log):
+
+    HITO235: MPQ-ABRIR OK /cd/JUEGO/PATCH_D2.MPQ ms= 2302
+    HITO235: DC6-LEER OK bytes= 488892 crc32= 820453653 ms= 1105
+    HITO235: DC6 primeros 16 bytes: 06 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00
+    HITO235: DC6 trozo 0 desde=  0      bytes= 65536  crc32= 1201590758
+    HITO235: DC6 trozo 1 desde=  65536  bytes= 65536  crc32= 2375366611
+    HITO235: DC6 trozo 2 desde=  131072 bytes= 65536  crc32= 2398266364
+    HITO235: DC6 trozo 3 desde=  196608 bytes= 65536  crc32= 3671128252
+    HITO235: DC6 trozo 4 desde=  262144 bytes= 65536  crc32= 2010774418
+    HITO235: DC6 trozo 5 desde=  327680 bytes= 65536  crc32= 3859150012
+    HITO235: DC6 trozo 6 desde=  393216 bytes= 65536  crc32= 1780613363
+    HITO235: DC6 trozo 7 desde=  458752 bytes= 30140  crc32= 1087561145
+    HITO235: DC6 frames= 12
+    HITO235: DC6 compuesto w= 256 h= 256 frames pegados= 12 indices= 65536 crc32= 1306731525
+    HITO235: PALETA bytes= 443175 colores= 256 crc32= 3508331570
+    HITO235: VRAM libre antes= 5789440
+    HITO235: TEXTURA OK w= 256 h= 256 pw= 256 ph= 256 bytes= 65536
+    HITO235: VRAM libre despues= 5723848
+    HITO235: escala milesima= 1875
+    HITO235: CUADROS 300 dibujados -- pantalla pintada con el asset del disco
+
+Host (console/dc/verif-dc6-235, el MISMO codigo del motor sobre el MISMO asset del MPQ,
+log build-235.log):
+
+    HOST DC6 bytes=488892 crc32=820453653
+    HOST DC6 primeros 16 bytes: 06 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00
+    HOST DC6 trozo 0 desde=0      bytes=65536 crc32=1201590758
+    HOST DC6 trozo 1 desde=65536  bytes=65536 crc32=2375366611
+    HOST DC6 trozo 2 desde=131072 bytes=65536 crc32=2398266364
+    HOST DC6 trozo 3 desde=196608 bytes=65536 crc32=3671128252
+    HOST DC6 trozo 4 desde=262144 bytes=65536 crc32=2010774418
+    HOST DC6 trozo 5 desde=327680 bytes=65536 crc32=3859150012
+    HOST DC6 trozo 6 desde=393216 bytes=65536 crc32=1780613363
+    HOST DC6 trozo 7 desde=458752 bytes=30140  crc32=1087561145
+    HOST DC6 frames=12
+    HOST DC6 compuesto w=256 h=256 frames pegados=12 indices=65536 crc32=1306731525
+    HOST PALETA bytes=443175 colores=256 crc32=3508331570
+
+    CONCLUSION MEDIDA: 8 de 8 trozos de 64 KiB iguales, los 16 primeros bytes iguales, el CRC del
+    archivo entero igual (820453653 = 820453653), los 65536 indices compuestos iguales
+    (1306731525) y la paleta igual (3508331570). El "mismo tamano, otro contenido" de la evidencia
+    anterior era el lector del MPQ viejo (antes del #33): con las tablas compactas el mismo archivo
+    sale byte a byte igual en las dos plataformas.
+
+2) LA CAPTURA DEL MENU, MEDIDA (criterio 2)
+-------------------------------------------
+Instrumento: scripts/console/medir-captura-235.py (nuevo). Que hace, y por que asi (cada regla es
+un defecto medido, no una precaucion de escritorio):
+
+  a) `spectacle -f` captura la PANTALLA COMPLETA (3584x1080: dos monitores, 2560+1024). La ventana
+     del emulador hay que ubicarla adentro. Un recorte "a ojo" (210,210 640x480) midio el ESCRITORIO:
+     color dominante 1,1,1 y 14,91% de pixeles no negros que no significaban nada.
+  b) La ventana no tiene geometria fija: Flycast la guarda en ~/.config/flycast/emu.cfg. Esa
+     geometria puede ser de OTRO run (el archivo es compartido): esta corrida la obtuvo de KWin, que
+     informa titulo y frameGeometry de la ventana viva. Con el disco copiado a `dc235.gdi` el titulo
+     es "Flycast - dc235": asi se sabe que la ventana medida es la de ESTA tarjeta.
+        KWin: Flycast - dc235 | flycast | pid=984345 | geo=1400,92,682,481
+        => area cliente = 1400,120 682x453 (28 px de barra de titulo)
+  c) El POC pinta su quad de 480x480 arriba a la izquierda de su pantalla de 640x480 y deja el resto
+     en negro puro (PvrSetBgColor 0,0,0). Con el asset ocupando el alto entero (escala 1875/1000),
+     el bloque del asset en la captura es de alto x alto pegado arriba a la izquierda de la pantalla:
+         pantalla = 604x453 centrada en el cliente (x=249..852 en la ventana de 682 de ancho)
+         bloque del asset = x=249..701  y=238..690  (453x453)
+  d) El bloque se baja a 256x256 (con promedio por celdas) y se compara con la referencia que escribe
+     el host (console/dc/verif-dc6-235 -> dc6-menu-disco-referencia.png), buscando +-6 px de
+     alineacion. El puntaje es el resultado; si el modelo de geometria estuviera mal, el puntaje cae.
+
+MEDICION (misma ventana, mismo instrumento, misma referencia):
+
+  CORRIDA SANA (build-235, disc.gdi; captura run-sano3/f10s.png)
+      pixeles del bloque que NO son fondo negro: 81047 de 205209   (39.49%)
+      color dominante (rango 16):                1,1,1 en 53698 px
+      pantalla completa en negro puro:           192565 de 273612   (70.38%)
+      contra la referencia del host:  +-4 53527 (81.68%)  +-8 59358 (90.57%)
+                                      +-16 61970 (94.56%)  error medio 6.13
+      alineacion: dx=+0 dy=+1 (x=1439 y=121), o sea el modelo de geometria pega
+
+  MUTANTE (DC6_INEXISTENTE=1: el POC pide `data\global\ui\BIGMENU\no-existe-este-asset.dc6`;
+   captura run-mutante4/f10s.png)
+      consola serie: "DC6-LEER FALLO: ... no-existe-este-asset.dc6 : file not found"
+                     "sin asset no hay textura: la pantalla queda como estaba (mutante)"
+                     "PANTALLA-VACIA (sin textura, sin quad) vram= 5789440"
+      pixeles del bloque que NO son fondo negro: 0 de 205209       (0.00%)
+      pantalla completa en negro puro:           273612 de 273612   (100.00%)
+      contra la referencia del host:  +-4 36072 (55.04%)  +-8 37313 (56.94%)
+                                      +-16 42875 (65.42%)  error medio 17.75
+
+  EL GATE (lo que tiene que pasar para decir "el menu se ve"): pixeles del asset >= 20% del bloque
+  Y coincidencia +-8 >= 80%. Sana: 39.49% y 90.57% -> PASA. Mutante: 0.00% y 56.94% (el 56% es el
+  piso de comparar negro contra una referencia que es 61% casi negra) -> NO PASA. La diferencia entre
+  las dos corridas es 81047 px contra 0 px: el mutante apaga el criterio, no lo deja verde.
+
+  CONTRASTE CONTRA EL HOST: la referencia tiene 39991 de 65536 pixeles casi negros (61,02%), o sea
+  38,98% utiles; la captura de la consola da 39,49% -> 0,51 puntos de diferencia (lo que agrega el
+  escalado bilineal 453/256 del emulador y el ARGB1555).
+
+  OTRAS MEDICIONES DEL INSTRUMENTO (para que queden escritas):
+    - run-sano/f6s.png (misma corrida, 6 s): 0,00% de pixeles del asset -> a los 6 s el POC todavia
+      no habia pintado (arranca a los ~3,5 s: 2302 ms de MPQ + 1105 ms de DC6 + composicion).
+    - run-sano/f40s.png: 99,11% de pixeles no negros y 0,98% de coincidencia -> a los 40 s habia OTRA
+      ventana tapando al emulador. Esa captura NO se usa: es la prueba de que el instrumento distingue.
+    - Corrida con `run-flycast.sh` (que mueve TODA ventana de clase "flycast" con flycast-adelante.sh):
+      con un run vecino vivo las dos ventanas terminan en el mismo lugar y la del vecino puede quedar
+      encima. Por eso esta tarjeta agrega scripts/console/run-flycast-235.sh: disco con nombre propio
+      (titulo "Flycast - dc235"), posicion pedida por `-config window:left/top`, keepAbove y geometria
+      verificada por KWin en cada captura.
+
+QUE SE ARREGLO EN LOS INSTRUMENTOS (defectos medidos, no supuestos)
+-------------------------------------------------------------------
+1. `build-dc6-menu-disco.sh` le pasaba a mkiso.py el nombre del MPQ tal como viene en la config
+   (`patch_d2.mpq`), pero en el PC el archivo es `patch_D2.mpq` (D mayuscula): el MPQ no entraba al
+   disco y el POC moria con "MPQ-ABRIR FALLO: file does not exist", que parece un defecto del MPQ.
+   Ahora el script resuelve el nombre real del archivo en el directorio del juego.
+2. La paleta vive en d2data.mpq y el DC6 en patch_d2.mpq: el segundo horneado pedia la paleta al MPQ
+   grande CON -dc6 y abortaba con "file not found" del DC6, matando el build entero. Se agrego
+   `-solo-pal` a console/dc/bake-dc6: pide solo la paleta, al MPQ que la tiene.
+3. El paso 4/5 del build llamaba a crc-dc6-235.py con el nombre del POC, que no era el de los archivos
+   horneados (pal235.*): los "numeros del host" salian de un archivo distinto del que leia la consola.
+   Ahora ese paso corre console/dc/verif-dc6-235, que ademas escribe la referencia PNG.
+4. `mkdisco-235.sh`: la paleta estaba fija en host/pal235.pal; ahora se autodetecta la primera *.pal
+   que dejo el horneador (el nombre depende del POC).
+5. `run-flycast-235.sh` (nuevo): corrida con ventana identificable y arriba (ver 2c mas arriba).
+
+ARCHIVOS DE ESTA TARJETA
+------------------------
+    console/dc/evidencia/dc-002.35b-dc6-hash-y-captura.txt   esta evidencia
+    scripts/console/medir-captura-235.py        el instrumento de la captura (numeros, no impresiones)
+    scripts/console/run-flycast-235.sh          la corrida aislada (titulo propio + keepAbove + KWin)
+    scripts/console/probar-ventana-235.sh       la sonda: titulo, pid y geometria de las ventanas Flycast
+    scripts/console/sonda-dc6-mpq-235.py        la sonda del MPQ del host (independiente del motor)
+    console/dc/bake-dc6/main.go                 -solo-pal (la paleta del MPQ que la tiene)
+    console/dc/poc/dc6-menu-disco/main.go       imprime los 16 primeros bytes y el CRC por trozo
+    console/dc/verif-dc6-235/main.go            los mismos numeros del lado del host
+    scripts/console/build-dc6-menu-disco.sh     nombre real del MPQ + paleta del MPQ grande + verif
+    scripts/console/mkdisco-235.sh              la paleta autodetectada
+
+COMO SE REPITE
+--------------
+    source scripts/console/env.sh
+    export DC_ROOT=<dir con libgodc/kos/sh-elf>  GODC_GOX=<dir propio>   # aislamiento
+    bash scripts/console/build-dc6-menu-disco.sh <salida>                 # sano
+    SALTAR_STDLIB=1 SALTAR_MOTOR=1 DC6_INEXISTENTE=1 \
+        bash scripts/console/build-dc6-menu-disco.sh <salida-mutante>     # control negativo
+    bash scripts/console/run-flycast-235.sh <salida>/disc.gdi 14 <capturas> "1400 120"
+    python3 scripts/console/medir-captura-235.py <capturas>/f10s.png \
+        <salida>/host/dc6-menu-disco-referencia.png --ventana 1400,120,682,453 --busca 6
+
+PENDIENTE / AVISO
+-----------------
+La barrera del motor (scripts/console/compare-motor-dc6.sh) NO se corrio en esta tarjeta: el diff de
+esta tarjeta no toca una sola linea del motor (`git status` -> console/dc/bake-dc6, el POC dc6-menu-disco,
+verif-dc6-235 y scripts de build/corrida; ningun archivo de d2* ni de os/video/audio). El motor queda
+como estaba; la comparacion consola-vs-host de esta tarjeta es la del POC del DC6, y es exacta.

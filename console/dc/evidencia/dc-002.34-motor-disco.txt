@@ -1,0 +1,159 @@
+DC-002.34 -- HASTA DONDE LLEGA EL MOTOR COMPLETO CON LOS ASSETS DEL DISCO (el numero, antes de cualquier dibujo)
+=============================================================================================================
+medido el dom 18 oct 2026 en este host (CachyOS, AMD RX 7900 XTX), sobre el checkout principal
+/home/dgalli/Proyectos/diablo2consoles en la rama DC-002, HEAD 3fef8a6c (DC-002.33).
+
+QUE SE CORRIO, EXACTAMENTE
+--------------------------
+El POC `console/dc/poc/motor-arranque`: el que llama al entry point de verdad del juego
+(`d2app.Create(...)` + `instance.Run()`, el mismo main.go de la raiz) y lo unico que agrega es la consola
+serie y el video por el backend de la consola. NO es una sonda parcial: es el motor entero enlazado (los 142
+paquetes del motor + la stdlib minima + terceros = 205 .gox).
+
+Los TRES MPQ del disco de verdad horneados en la ISO en /JUEGO (el camino de DC-002.27), leidos por el
+iso9660 de KOS desde /cd/juego. Nada de romdisk con archivos vacios.
+
+CONTROLES (lo que dice que la imagen es la que se cree)
+-------------------------------------------------------
+1. La ISO CON el juego trae los tres MPQ con el sha256 del archivo del PC, leidos de adentro del ISO9660:
+
+     /JUEGO/PATCH_D2.MPQ;1   bytes=5022588    sha256=eb7db78b91cd43359780790d3c453bebd4737702ff22beaa17626dc1e9cc82b8
+     /JUEGO/D2DATA.MPQ;1     bytes=267330019  sha256=97c452b1c60b727cdccd62ee65f1ad1bf10749d0f9e1a03483b1a5251ede250f
+     /JUEGO/D2CHAR.MPQ;1     bytes=267704443  sha256=29078a103d8f8baa6aa7b5ff411698c5066e227e8631271bcc3a34d4de75705a
+     (los tres iguales al sha256 de ~/.wine-d2/drive_c/Games/Diablo II/ del PC)
+
+2. La ISO del MUTANTE (sin la carpeta) NO tiene /JUEGO: `leer-iso.py` contesta "Could not find path".
+3. La capa de .gox es la de HEAD, no una vieja: `recompilar-paquete-motor.sh d2common/d2fileformats/d2mpq
+   /tmp/gox-233` deja el d2mpq.gox BYTE A BYTE igual al que ya estaba (cmp: identico, 217.448 bytes).
+4. La barrera vendorizada: ~/dreamcast/libgodc/libgodc.a del 2026-10-18 13:20:35, 209.030 bytes,
+   sha256 0e33b3089a3659fd94d5ed885fb3a1164fa00734af78f4cda66b50bb5b7a499d (con runtime/marcas_arranque.c,
+   el instrumento de las marcas ARQ-MARCA que se leen abajo).
+5. El arbol esta como el arreglo de DC-002.33: `fix-mpq-tablas-233.py --estado` = 7/7 como el arreglo.
+
+LOS CUATRO ESTADOS (criterio 1: antes y despues de cada palanca, por separado)
+-----------------------------------------------------------------------------
+Dos palancas: la de DC-002.33 (las tablas del MPQ como BYTES contiguos, en el arbol) y la de DC-002.32 (la
+tabla de d2records de 1,67 MB FUERA del binario; medida con su instrumento `fix-d2records-tabla-232.py
+--fuera`, que la vacia: mide el PESO y hasta donde llega el arranque, no es un motor jugable).
+
+  estado                          palanca 233   palanca 232   1ST_READ.BIN    monton de C
+  BASE    (el "antes" de las dos)     NO            NO        13.771.272 B    1.344 B libres
+  S233    (solo la de 233)            SI            NO        13.773.320 B    3.392 B libres
+  S232    (las dos)                   SI            SI        11.984.360 B    2.400 B libres
+  MUTANTE (sin los MPQ en la ISO)     SI            NO        13.773.320 B    3.392 B libres
+
+  "monton de C" = lo que imprime el arranque ANTES de llamar al motor (`MOTOR-ARRANQUE monton de C antes del
+  motor: N bytes libres`): es el hueco que le queda al monton de C cuando el binario ya ocupa lo suyo de los
+  16.777.216 bytes de la consola. La palanca de 232 baja el binario 1.788.960 B y se ve en los dos numeros.
+
+  estado                          vueltas   ultima cosa que hizo la consola serie            muerte
+  BASE                              1       Adding source: '/cd/juego/patch_d2.mpq'         Data address error (PC 0000085b)
+  S233                              5       Adding source: '/cd/juego/patch_d2.mpq'         gc_external_alloc: OOM
+  S232                              2       Loaded .../patch_d2.mpq -> .../LvlPrest.txt     MUDA (la consola reinicia)
+  MUTANTE                           9       game files not found at "/cd/juego"             MUDA (la consola reinicia)
+
+  (cada "vuelta" es un arranque completo: el motor muere, KOS reinicia la consola y vuelve a arrancar; por
+  eso la corrida de 25 s muestra varias. La corrida BASE se corta en la vuelta 1 porque Flycast DETIENE el
+  emulador con la excepcion del SH-4: "Flycast has stopped: Fatal: SH4 exception when blocked".)
+
+EL NUMERO, ESTADO POR ESTADO
+----------------------------
+BASE (sin 233, sin 232) -- la pared es el GC y la muerte es un salto a basura:
+    [File Loader][INFO] Adding source: '/cd/juego/patch_d2.mpq'
+    Unhandled exception: PC 0000085b, code 1, evt 00e0
+    Encountered Data address error (read) ... $KOS_ADDR2LINE ... 8c212420
+    kernel panic: unhandled IRQ/Exception / arch: aborting the system
+    semiespacio del GC: usado maximo 393.240 de 524.288  ->  libre 131.048
+    NO imprime OOM: se cae con una excepcion (PC 0000085b no es codigo del arranque).
+
+S233 (la de 233, "el despues" de esta tarjeta) -- el OOM limpio, con numero:
+    [File Loader][INFO] Adding source: '/cd/juego/patch_d2.mpq'
+    Out of memory. Requested sbrk_base 0x8d04b000, was 0x8cf4b000, diff 1048576
+    fatal error: gc_external_alloc: OOM
+    Memory: arena=1970208 used=1930672 free=39536
+    semiespacio del GC: usado maximo 393.232 de 524.288  ->  libre 131.056
+    => NO es el semiespacio del GC (le sobran 131.056 B): es el MONTON DE C, al que le quedan 39.536 B
+       cuando el arranque le pide UN MEGA contiguo (1.048.576 B) al abrir el PRIMER MPQ.
+       Las 5 vueltas dan el MISMO numero: no es azar, es la pared.
+
+S232 (la de 233 + la de 232) -- se corre la pared un MPQ entero:
+    [File Loader][INFO] Adding source: '/cd/juego/patch_d2.mpq'
+    [File Loader][INFO] Adding source: '/cd/juego/d2data.mpq'
+    [Asset Manager][ERROR] could not load file stream /data/local/use (file not found: /data/local/use)
+    [Asset Manager][INFO] Language: enUS (ENG), font dir LATIN
+    [App][INFO] Initializing asset manager
+    [File Loader][INFO] Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlTypes.txt
+    [File Loader][INFO] Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlPrest.txt
+    (y ahi: la consola reinicia sin imprimir NADA -- muerte muda)
+    semiespacio del GC: usado maximo 409.472 de 524.288  ->  libre 114.816
+    => con 1.788.960 B mas de aire el arranque abre patch_d2.mpq Y d2data.mpq del GD-ROM, inicializa el
+       Asset Manager y LEE DOS ASSETS DE VERDAD de adentro del MPQ (LvlTypes.txt y LvlPrest.txt).
+       Muere despues de LvlPrest.txt, MUDO (el defecto de la muerte sin mensaje, otra vez).
+
+MUTANTE (criterio 3: la misma imagen SIN la carpeta /JUEGO)
+----------------------------------------------------------
+9 vueltas en 25 s, y en las 9 la consola dice, textual:
+
+    game files not found at "/cd/juego", starting first-run setup
+
+O sea: sacar los MPQ de la ISO devuelve el cartel del motor. El corpus discrimina (la ISO con los MPQ no lo
+imprime ni una vez: 0 ocurrencias en las tres corridas con juego).
+
+LA PANTALLA, CON NUMEROS (criterio 2)
+-------------------------------------
+NO se usa el recorte fijo de DC-002.35 (210,210 640x480): en este host la captura de pantalla entera es de
+3584x1080 (dos monitores, uno de 1024x768 en +2560+312) y la ventana del emulador NO cae ahi -- esos numeros
+median el escritorio. Aca se captura LA VENTANA por su id de X11 (`_NET_CLIENT_LIST` + `import -window`), que
+con `window:fullscreen=no` mide **682x453** (308.946 pixeles), no 640x480. Una captura por segundo, 25 por
+corrida, y cada una clasificada por el color dominante:
+
+  estado     capturas   "negra" (la pantalla del motor)   "arranque-sega" (licencia de la consola)   otras
+  BASE          6                  4 (67%)                            2 (33%)                          0
+  S233         25                 16 (64%)                            9 (36%)                          0
+  S232         25                 17 (68%)                            8 (32%)                          0
+  MUTANTE      25                  3 (12%)                           22 (88%)                          0
+
+  (la corrida BASE es mas corta porque el emulador se DETIENE con la excepcion del SH-4 a los 6 s. El reparto
+  negro/licencia NO es un numero fijo: cada ciclo del motor dura ~5 s y la captura es 1 por segundo, asi que
+  segun el instante cae mas de uno u otro -- entre corridas se midio S233 14-16 de 25 en negro, S232 17-21,
+  MUTANTE 3-10, BASE 3-4. Lo que NO varia nunca: los cuadros dibujados por el motor son 0.)
+
+  "negra" = 100,0% de los pixeles < 16 en los tres canales (dominante (0,0,0) en el 100%): la pantalla del
+  motor, que muere antes de pintar nada. "arranque-sega" = 91,9% de los pixeles en un gris uniforme (dominante
+  (192,192,192) en rango de 16) con 93,3% de pixeles claros: la pantalla de licencia que muestra la consola
+  en cada reinicio de KOS.
+
+  CUADROS DIBUJADOS POR EL MOTOR: **0** en los cuatro estados (cero lineas EBITEN-PERFIL y cero "cuadros del
+  loop" en los cuatro logs). O sea: el motor NO llega al bucle de dibujo en ninguno. Lo que se ve en pantalla
+  NO es su cartel ni nada del juego: es negro (su pantalla, sin pintar) o la licencia de arranque de la
+  consola entre reinicio y reinicio.
+
+CONCLUSION EN UNA LINEA
+-----------------------
+Con los MPQ del disco, HEAD (DC-002.33 adentro, la palanca de DC-002.32 afuera) llega a ABRIR el primer MPQ
+y muere pidiendo 1 MiB contiguo al monton de C con 39.536 B libres (el semiespacio del GC ya NO es la pared:
+le sobran 131.056 B); aplicando la palanca de DC-002.32 (la tabla de d2records afuera, -1.788.960 B de
+imagen) el arranque pasa a leer dos MPQ y dos assets del MPQ del disco y muere MUDO justo despues. Cuadros
+dibujados: 0 en los cuatro estados.
+
+LO QUE NO ENTRA (cada defecto va a SU tarjeta, con este numero)
+--------------------------------------------------------------
+* La pared del MONTON DE C (39.536 B libres contra un pedido de 1.048.576 B)  -> tarjeta propia.
+* La palanca de DC-002.32 NO esta en el arbol: la tabla de d2records sigue adentro (1,67 MB de .data) ->
+  tarjeta propia (es la que mueve la pared un MPQ entero, medido arriba).
+* La muerte MUDA despues de LvlPrest.txt -> tarjeta propia.
+* El motor ve 0 archivos en /cd/juego: `MOTOR-ARRANQUE seleccion: Complete= true Validate.OK()= false
+  archivos que ve= 0 faltan= 7` en las tres corridas con juego (el ReadDir del directorio del ISO9660 no
+  lista; Complete, que es os.Stat por nombre, SI contesta true) -> tarjeta propia.
+
+REPRODUCIBILIDAD
+----------------
+  bash scripts/console/checar-motor-disco-234.sh            # los cuatro estados, de punta a punta
+  (usa scripts/console/captura-ventana-234.sh para la ventana del emulador y
+   scripts/console/clasifica-captura-234.py para los pixeles, y
+   scripts/console/tabla-estados-234.py para la tabla de arriba)
+Corrida de cierre de esta tarjeta: **8/8 controles OK, 0 fallos** (exit 0), y los numeros de la tabla salieron
+identicos en dos corridas completas separadas (los unicos que se mueven son los del reparto negro/licencia de
+la seccion de la pantalla, por el instante de la captura).
+Los artefactos crudos de esta corrida quedan en ~/.hermes/cache/scratch/corpus-234/ (los logs de Flycast de
+cada estado, las 80 capturas y las cuatro ISO).

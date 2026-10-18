@@ -3632,3 +3632,94 @@ Barreras: corpus `checar-tablas-233.sh` **14/14 controles OK y 0 fallos**, la ca
 `go test ./d2common/d2fileformats/d2mpq/` verde con los 3 MPQ del juego.
 
 Evidencia cruda: `evidencia/dc-002.33-tablas-mpq.txt`.
+
+## 51. DC-002.35: el primer hito visible, MEDIDO — el DC6 del menú sale **idéntico** en el host y en la consola (8/8 trozos) y la captura del emulador da el asset con **39,49%** de píxeles y **90,57%** de coincidencia
+
+La tarjeta queda de la corrida anterior con el criterio 1 en **parcial y con un defecto medido**: la consola leía
+`data\global\ui\BIGMENU\waitingroombkgd.dc6` del `patch_D2.mpq` del disco con `crc32=42502455` y el host el mismo
+asset con `crc32=820453653` — **mismo tamaño (488.892 bytes), contenido distinto**. Esta corrida vuelve a medir las
+dos puntas con el arreglo de las **tablas compactas del MPQ** (DC-002.33) puesto, y mide el criterio 2 (la captura)
+con un instrumento que da números.
+
+**1. EL HASH: COINCIDE EXACTO (criterio 1, cerrado).** El POC de la consola ahora imprime los **16 primeros bytes** y
+el **CRC-32 de cada trozo de 64 KiB**, y `console/dc/verif-dc6-235` imprime los mismos del lado del host:
+
+    trozo  desde    bytes    consola       host
+      0        0    65536    1201590758 == 1201590758
+      1    65536    65536    2375366611 == 2375366611
+      2   131072    65536    2398266364 == 2398266364
+      3   196608    65536    3671128252 == 3671128252
+      4   262144    65536    2010774418 == 2010774418
+      5   327680    65536    3859150012 == 3859150012
+      6   393216    65536    1780613363 == 1780613363
+      7   458752    30140    1087561145 == 1087561145
+    ------------------------------------------------------------------
+    archivo entero          820453653  == 820453653   (16 primeros bytes iguales)
+    65.536 índices compuestos 1306731525 == 1306731525
+    paleta PL2 (443.175 B)    3508331570 == 3508331570
+
+O sea: **8 de 8 trozos, el archivo entero, los índices compuestos y la paleta** dan lo mismo en las dos
+plataformas. El "mismo tamaño, otro contenido" de la evidencia anterior **no era el asset**: era el **lector del
+MPQ viejo** (antes de las tablas compactas). El archivo está **comprimido con IMPLODE (PKWARE)** en el MPQ —lo midió
+la sonda `sonda-dc6-mpq-235.py`, independiente del motor— y con el lector arreglado el `explode` da los mismos bytes
+en SH-4 y en amd64.
+
+**2. LA CAPTURA DEL MENÚ, CON NÚMEROS (criterio 2).** `spectacle -f` captura la **pantalla completa** (3584x1080:
+dos monitores), así que la ventana del emulador hay que **ubicarla**. Tres intentos, dos medidos en rojo:
+
+* recorte "a ojo" (210,210 640x480): midió el **escritorio** — color dominante 1,1,1 y 14,91% de píxeles no negros;
+* `spectacle` de la corrida completa a los **40 s**: 99,11% de píxeles no negros y **0,98%** de coincidencia — había
+  **otra ventana** encima (el run vecino de DC-002.34 tenía su Flycast vivo: `flycast-adelante.sh` mueve **toda**
+  ventana de clase `flycast` y las dos terminaron en el mismo lugar).
+
+El instrumento que queda (`scripts/console/medir-captura-235.py`) ubica la pantalla por la **banda de negro puro**
+que el POC deja al lado del quad, toma el bloque del asset (escala 1875/1000 => el asset ocupa el **alto entero**),
+lo baja a 256x256 y lo compara con la referencia PNG del host. La geometría se **verifica**, no se supone: la
+informa KWin para la ventana viva y esta tarjeta agrega `run-flycast-235.sh`, que corre el disco copiado a
+`dc235.gdi` (título "Flycast - dc235"), pide la posición con `-config window:left/top`, la deja `keepAbove` y
+**reafirma** posición en cada captura (medido: un script de KWin del run vecino movió mi ventana de 1400,92 a
+210,210 a los 15 s).
+
+    KWin: Flycast - dc235 | flycast | geo=1400,92,682,481  =>  cliente 1400,120 682x453
+
+Medición, misma ventana y mismo instrumento en las dos corridas:
+
+                                        SANA (asset real)      MUTANTE (DC6_INEXISTENTE)
+    píxeles del bloque que no son negro   81.047 de 205.209      0 de 205.209
+                                          (39,49%)               (0,00%)
+    pantalla completa en negro puro       192.565 de 273.612     273.612 de 273.612 (100,00%)
+                                          (70,38%)
+    coincidencia con la referencia ±4     81,68%                 55,04%
+    coincidencia con la referencia ±8     90,57%                 56,94%
+    coincidencia con la referencia ±16    94,56%                 65,42%
+    error medio por píxel                 6,13                   17,75
+
+El **gate** de la tarjeta es: píxeles del asset **≥ 20%** del bloque **y** coincidencia **±8 ≥ 80%**. La corrida
+sana pasa (39,49% y 90,57%); el mutante **no** (0,00% y 56,94% — ese 56% es el piso de comparar negro contra una
+referencia que es 61% casi negra, y se ve en el **error medio**: 17,75 contra 6,13). La diferencia entre las dos
+corridas es **81.047 píxeles contra 0**.
+
+**3. EL CONTROL CRUZADO CONTRA EL HOST.** La referencia del host tiene **39.991 de 65.536** píxeles casi negros
+(61,02%), o sea **38,98%** útiles; la captura de la consola da **39,49%** — **0,51 puntos** de diferencia, que es lo
+que agrega el escalado bilineal 453/256 del emulador y el ARGB1555. Y a los **6 s** la misma corrida da **0,00%**
+(el POC tarda ~3,5 s: 2.302 ms de MPQ + 1.105 ms del DC6 + composición), así que el instrumento también distingue
+"todavía no pintó" de "pintó".
+
+**4. LO QUE SE ARREGLÓ EN LOS INSTRUMENTOS** (cada uno es un defecto medido):
+
+* `build-dc6-menu-disco.sh` le pasaba a `mkiso.py` el nombre del MPQ de la config (`patch_d2.mpq`) pero en el PC el
+  archivo es **`patch_D2.mpq`**: el MPQ no entraba al disco y el POC moría con `MPQ-ABRIR FALLO: file does not
+  exist`, que **parece** un defecto del MPQ. Ahora resuelve el nombre real del archivo.
+* La **paleta** vive en `d2data.mpq` y el DC6 en `patch_d2.mpq`: el horneado de la paleta pedía el DC6 al MPQ grande
+  y abortaba el build. Se agregó **`-solo-pal`** a `console/dc/bake-dc6`.
+* El paso de "números del host" llamaba a `crc-dc6-235.py` con el nombre del POC, que no era el de los archivos
+  horneados (`pal235.*`): comparaba **otro archivo**. Ahora corre `console/dc/verif-dc6-235`, que además escribe la
+  referencia PNG.
+* `mkdisco-235.sh` tenía la paleta fija en `host/pal235.pal`; ahora autodetecta la `*.pal` que dejó el horneador.
+
+Barrera del motor: **no se corrió y no hace falta** — el diff de esta tarjeta no toca una línea del motor
+(`console/dc/bake-dc6`, `console/dc/poc/dc6-menu-disco`, `console/dc/verif-dc6-235` y los scripts de build/corrida;
+ningún archivo de `d2*`, `os`, `video` ni `audio`). La comparación consola-vs-host de esta tarjeta es la del POC del
+DC6 y es **exacta**.
+
+Evidencia cruda: `evidencia/dc-002.35b-dc6-hash-y-captura.txt` (y la anterior, `dc-002.35-dc6-menu-disco.txt`).

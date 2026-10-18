@@ -31,16 +31,21 @@ func main() {
 		palPath string
 		outDir  string
 		name    string
+		soloPal bool
 	)
 	flag.StringVar(&mpqPath, "mpq", "", "archivo MPQ de entrada")
 	flag.StringVar(&dc6Path, "dc6", "", "ruta del DC6 dentro del MPQ")
 	flag.StringVar(&palPath, "pal", "", "ruta del pal.dat dentro del MPQ (opcional: DC-002.9, para el color)")
 	flag.StringVar(&outDir, "out", "", "directorio de salida")
 	flag.StringVar(&name, "name", "asset", "nombre base de los archivos de salida")
+	// DC-002.35: -solo-pal saca SOLO la paleta, del MPQ que la tiene. Hace falta porque el DC6 de un
+	// hito puede vivir en un MPQ (patch_d2.mpq) y su paleta en otro (d2data.mpq): con -dc6 obligatorio,
+	// pedir la paleta del MPQ grande fallaba con "file not found" del DC6 y abortaba el build entero.
+	flag.BoolVar(&soloPal, "solo-pal", false, "extraer solo la paleta (no toca el DC6)")
 	flag.Parse()
 
-	if mpqPath == "" || dc6Path == "" || outDir == "" {
-		fatal("faltan -mpq, -dc6 y/o -out")
+	if mpqPath == "" || outDir == "" || (dc6Path == "" && !soloPal) {
+		fatal("faltan -mpq, -out y/o -dc6 (o -solo-pal)")
 	}
 
 	mpq, err := d2mpq.FromFile(mpqPath)
@@ -48,27 +53,29 @@ func main() {
 		fatal("abriendo MPQ: %v", err)
 	}
 
-	raw, err := mpq.ReadFile(dc6Path)
-	if err != nil {
-		fatal("leyendo %s del MPQ: %v", dc6Path, err)
-	}
-
 	if err := os.MkdirAll(filepath.Join(outDir, "gen"), 0o755); err != nil {
 		fatal("creando %s: %v", outDir, err)
 	}
 
-	rawPath := filepath.Join(outDir, name+".dc6")
-	if err := os.WriteFile(rawPath, raw, 0o644); err != nil {
-		fatal("escribiendo %s: %v", rawPath, err)
-	}
+	if !soloPal {
+		raw, err := mpq.ReadFile(dc6Path)
+		if err != nil {
+			fatal("leyendo %s del MPQ: %v", dc6Path, err)
+		}
 
-	goPath := filepath.Join(outDir, "gen", name+"_dc6.go")
-	if err := os.WriteFile(goPath, []byte(varGo(dc6Path, "assetDC6", raw)), 0o644); err != nil {
-		fatal("escribiendo %s: %v", goPath, err)
-	}
+		rawPath := filepath.Join(outDir, name+".dc6")
+		if err := os.WriteFile(rawPath, raw, 0o644); err != nil {
+			fatal("escribiendo %s: %v", rawPath, err)
+		}
 
-	fmt.Printf("dc6 crudo: %s (%d bytes)\n", rawPath, len(raw))
-	fmt.Printf("  -> %s (para la consola)\n", goPath)
+		goPath := filepath.Join(outDir, "gen", name+"_dc6.go")
+		if err := os.WriteFile(goPath, []byte(varGo(dc6Path, "assetDC6", raw)), 0o644); err != nil {
+			fatal("escribiendo %s: %v", goPath, err)
+		}
+
+		fmt.Printf("dc6 crudo: %s (%d bytes)\n", rawPath, len(raw))
+		fmt.Printf("  -> %s (para la consola)\n", goPath)
+	}
 
 	// --- la paleta (DC-002.9) ---
 	if palPath != "" {

@@ -1,0 +1,112 @@
+DC-002.35 -- EL PRIMER HITO VISIBLE: un DC6 real del menu, leido del MPQ DEL DISCO y pintado
+=============================================================================================
+Corrida del 2026-10-18 (corrida nocturna 12:27, en un CLON LIMPIO en HEAD 9aa06a9b + DC_ROOT propio
++ GODC_GOX propia, para no pisar al run #79 del dispatcher que trabaja DC-002.33 sobre el checkout
+principal y tenia el arbol de d2mpq a medio escribir y el libgodc recompilado a las 12:13).
+
+LO QUE QUEDO MEDIDO (consola serie, corrida run2, evidencia cruda en el log de Flycast)
+----------------------------------------------------------------------------------------
+    HITO235: MPQ-ABRIR OK /cd/JUEGO/PATCH_D2.MPQ ms= 2302
+    HITO235: DC6-LEER OK bytes= 488892 crc32= 42502455 ms= 1104
+    HITO235: DC6 frames= 12
+    HITO235: DC6 compuesto w= 256 h= 256 frames pegados= 12 indices= 65536 crc32= 110251498
+    HITO235: PALETA bytes= 443175 colores= 256 crc32= 3508331570
+    HITO235: VRAM libre antes= 5789440
+    HITO235: TEXTURA OK w= 256 h= 256 pw= 256 ph= 256 bytes= 65536
+    HITO235: VRAM libre despues= 5723848
+    HITO235: escala milesima= 1875
+    HITO235: CUADROS 300 dibujados -- pantalla pintada con el asset del disco
+    (y despues: "arch: exit return code 0" + el reinicio de KOS, que es el "SH4 exception when
+     blocked" que Flycast reporta: es POST-main, no un defecto del arranque)
+
+O sea: la cadena ENTERA corre en la consola -- MPQ del disco por ISO9660, ReadFile, decodificador del
+MOTOR (d2dc6), composicion de los 12 frames, paleta PL2 -> ARGB1555, subida de la textura paletizada
+de 8 bits por pvr_txr_load_ex y 300 cuadros de quad. La VRAM baja exactamente los 65536 bytes de la
+textura (5.789.440 -> 5.723.848).
+
+EL LADO DEL HOST, CON EL MISMO CODIGO (nuevo: console/dc/verif-dc6-235)
+-----------------------------------------------------------------------
+    HOST DC6 bytes=488892 crc32=820453653
+    HOST DC6 frames=12
+    HOST DC6 compuesto w=256 h=256 frames pegados=12 indices=65536 crc32=1306731525
+    HOST PALETA bytes=443175 colores=256 crc32=3508331570
+    HOST REFERENCIA png=.../menu235-referencia.png pixelesNoTransparentes=65536 de 65536
+
+CRITERIO 1 -- EL HASH CONTRA EL HOST: **PARCIAL, Y CON UN DEFECTO MEDIDO**
+-------------------------------------------------------------------------
+    LA PALETA COINCIDE EXACTA:  consola 3508331570  ==  host 3508331570   (mismo archivo del disco)
+    EL DC6 CRUDO **NO** COINCIDE: consola 42502455  !=  host 820453653     (MISMO TAMANO: 488892)
+    LOS INDICES COMPUESTOS **NO**: consola 110251498 !=  host 1306731525
+
+Lo primero que hay que descartar (y se descarto) es que el hash de la consola mienta: el CRC-32 de la
+stdlib minima da el MISMO numero que el CRC-32 de Go para el mismo buffer (la paleta, 512 bytes del
+ARGB1555, calculada con la misma cuenta en los dos lados). O sea: el instrumento es de fiar y **lo que
+difiere son los bytes**, no la cuenta.
+
+Y no es un buffer en cero: el frame compuesto que decodifico la consola no es 65536 bytes cero
+(el CRC-32 de 65536 ceros es 3617033963, y el de 488892 ceros es 1047536496: ninguno coincide).
+
+El sospechoso queda acotado por donde SI coinciden las dos puntas: el archivo suelto del disco
+(PAL.PL2) se lee identico, mientras que el mismo asset leido POR EL CAMINO DEL MPQ (d2mpq.FromFile +
+ReadFile, con los bloques comprimidos del MPQ) sale distinto con el mismo tamano. Eso es un defecto
+del camino de lectura del MPQ en la consola, y va a SU tarjeta (DC-002.33 es la de las tablas del
+MPQ; este hallazgo se le deja escrito ahi porque es su area).
+
+CRITERIO 2 -- LA PANTALLA CAPTURADA: **NO SE PUDO CONFIRMAR CON NUMEROS (declarado, no tapado)**
+------------------------------------------------------------------------------------------------
+Las cuatro capturas de la corrida (f3s, f6s, f40s, f60s) se midieron con
+scripts/console/cuenta-captura-235.py en el recorte de la ventana del emulador (210,210 640x480):
+    f3s    noFondo=45816  (14,91%)   dominante 1,1,1
+    f6s    noFondo=45816  (14,91%)   dominante 1,1,1
+    f40s   noFondo=110759 (36,05%)   dominante 1,1,1
+    f60s   noFondo=45809  (14,91%)   dominante 1,1,1
+Los colores dominantes (1,1,1) y (2,2,2) son el fondo OSCURO del escritorio (el editor con tema oscuro
+queda en ese rango), o sea que el recorte NO esta sobre la ventana del emulador: el numero mide el
+escritorio, no el emulador. **Por eso este criterio queda SIN medir**: no hay numero que pruebe que el
+asset se ve, y no se declara cumplido por una impresion.
+
+LO QUE FALTA (cada punto, con su medicion pendiente)
+-----------------------------------------------------
+1. Ubicar la ventana del emulador dentro de la captura (buscando el borde de 640x480 del POC, como hace
+   la skill para el POC de DC-001) y recien entonces contar los pixeles del sprite.
+2. Averiguar por que el DC6 leido por el camino del MPQ sale distinto del que lee el host -- con los
+   primeros bytes en hexa de la consola contra los del host (motor-disco ya tiene ese patron) y
+   decidiendo si el defecto esta en los bloques comprimidos o en la tabla.
+3. El MUTANTE del criterio 3 (DC6_INEXISTENTE=1 -> la pantalla queda como estaba): esta escrito en
+   scripts/console/build-dc6-menu-disco.sh pero NO se corrio.
+
+QUE NO ENTRA (y por que)
+------------------------
+* `d2data.mpq` NO se pudo usar: no trae este DC6 (bake-dc6 contesta "file not found" para
+  data\global\ui\BIGMENU\waitingroombkgd.dc6) y ademas su tabla de 65.536 entradas revienta el
+  semiespacio del GC en la consola (DC-002.28/33, en vuelo). El DC6 de este hito vive en
+  `patch_d2.mpq` (16.384 entradas), que SI se abre. `bake-list` de patch_d2 lista exactamente dos DC6
+  de BIGMENU: PlayerProfilebckg.dc6 y waitingroombkgd.dc6.
+* La paleta (data\global\palette\act1\pal.pl2) NO esta en patch_d2: se extrae del MPQ grande EN EL
+  HOST (donde si se puede abrir) y viaja al disco como archivo suelto /JUEGO/PAL.PL2. En la consola
+  se lee del disco: esa parte esta medida y coincide con el host al byte.
+
+DEFECTOS DEL INSTRUMENTO QUE APARECIERON (y quedaron arreglados en los scripts)
+-------------------------------------------------------------------------------
+1. La ISO con el arbol JOLIET de pycdlib (lo que sale por defecto): el driver iso9660 de KOS monta
+   Joliet ("fs_iso9660: disc change detected / joliet level 3 extensions detected") y despues NO
+   encuentra ninguna ruta -- el POC moria con "MPQ-ABRIR FALLO: file does not exist" con el archivo
+   presente en el disco. Se arregla con MKISO_JOLIET=0 (ISO9660 pelado), que es lo que el script hace
+   ahora por defecto. Es el mismo defecto que DC-002.27 ya tenia fichado en su corpus.
+2. El nombre del archivo en el disco es `patch_D2.mpq` (D mayuscula): d2mpq lo abre igual
+   (openIgnoreCase) pero el ISO9660 no. El script resuelve el nombre real por listado.
+3. La stdlib minima NO trae math.MaxInt32/math.MinInt32 (gccgo: "reference to undefined identifier"):
+   el POC usa sus propias constantes de 32 bits. Vale la pena agregarlos a la stdlib minima.
+4. Un puntero de Go a C en //extern: `uintptr(unsafe.Pointer(&slice[0]))` NO se puede pasar a un
+   parametro declarado `uint` (gccgo: "cannot use uintptr as uint"): hay que convertirlo con
+   `uint(...)`. Con eso el ABI de punteros Go->C del shim funciona (la textura se sube de verdad).
+
+ARCHIVOS DE ESTA TARJETA
+------------------------
+    console/dc/poc/dc6-menu-disco/main.go      el POC (lee del disco, decodifica, compone, pinta)
+    console/dc/poc/dc6-menu-disco/csrc/cshim.c el shim de C (paleta por hardware + twiddle + quad)
+    console/dc/verif-dc6-235/main.go           el lado del HOST (los mismos numeros + PNG referencia)
+    scripts/console/build-dc6-menu-disco.sh    el build (gox, ELF, ISO con /JUEGO, mutante)
+    scripts/console/mkdisco-235.sh             la ISO del disco con los archivos del juego
+    scripts/console/cuenta-captura-235.py      la cuenta de pixeles de la captura
+    scripts/console/crc-dc6-235.py             los CRC del host (por si no se corre el verif de Go)
