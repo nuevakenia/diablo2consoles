@@ -3401,3 +3401,136 @@ Barreras: `test-std-host.sh` **verde** en amd64 y 386, `mutar-std-host.sh` **39/
 arbol sano, `compare-motor-dc6.sh` **IGUAL** (31 lineas identicas, 30 frames).
 
 Evidencia cruda: `evidencia/dc-002.31-empaquetado.txt`.
+
+## 49. DC-002.32: el peso del binario en RAM — la tabla de d2records **fuera** (1.788.960 B de imagen y +1.788.928 de aire), el `.eh_frame` que **no baja por donde parece** (el hueco del linker) y el panic que **no** pierde su traza
+
+La tarjeta sale de la pregunta de Papu (2026-10-17) por un recorte de assets: esa respuesta ya estaba medida
+(el disco no es el problema, DC-002.27) y lo que quedaba era el **peso del binario**, que en la consola se
+copia ENTERO a RAM (no hay memoria virtual ni mapeo de ROM). Todo lo de abajo está medido sobre una **capa
+coherente propia armada desde HEAD `af89439b`** (copia de fuentes `/tmp/dc232-src` + capa `/tmp/gox-232p`,
+**142/142** paquetes, 4m32s) porque el repo lo estaba usando otro agente (DC-002.33). El corpus es
+`scripts/console/checar-peso-232.sh` — **15 controles, 0 fallos**, con **8 mutantes cazados** — y la
+evidencia cruda está en `evidencia/dc-002.32-peso.txt`. Los instrumentos nuevos: `console/dc/poc/sonda-peso-232`
+(el peso y el montón), `console/dc/poc/sonda-panic-232` (el panic de verdad), `fix-d2records-tabla-232.py`
+(la palanca 1, idempotente y reversible), `gen-ldscript-eh-232.py` (la palanca 2) y `armar-peso-232.sh`.
+
+**1. EL PESO, SECCIÓN POR SECCIÓN** (`sh-elf-size`, `medir-cargado.py`; base = el motor tal cual, variante =
+la tabla fuera del binario). El número del cargador es la suma de las secciones **ALLOC**, que son las únicas
+que el arranque copia; el tamaño del archivo (43,9 MB) y el `1ST_READ.BIN` no son el peso en RAM:
+
+    seccion                  base      variante      delta
+    .text                5.002.552    5.002.552          0
+    .rodata              5.918.652    5.802.604    116.048   <- las cadenas de la tabla
+    .eh_frame            1.074.504    1.074.504          0
+    .gcc_except_table       20.600       20.600          0
+    .data                1.760.444       87.548  1.672.896   <- LA TABLA (y 4 bytes de alineacion)
+    .got                        12           12          0
+    .bss                   226.748      226.748          0
+    ------------------------------------------------------------------
+    TOTAL ALLOC         14.003.628   12.214.684  1.788.944   = 83,46% -> 72,80% de la RAM
+    1ST_READ.BIN        13.777.032   11.988.072  1.788.960
+
+La tarjeta traia **13.998.980** (medido sobre el ELF de `/tmp/dcbuild/dc24b-corpus`): la diferencia
+(**4.648** bytes) es el código nuevo de DC-002.29/31. De los 16.777.216 bytes, al motor le quedan
+**2.773.588** para el montón de C, los dos semiespacios del GC (512 KB cada uno) y los ROMDISK.
+
+**2. LA TABLA, POR DOS CAMINOS QUE COINCIDEN.** El símbolo más gordo del binario es **un solo** símbolo de
+`.data`: `nm -S --size-sort` da `8cb94fc4 001986bc d _go..C3111` = **1.672.892** bytes, y la cuenta desde la
+fuente (`grep -c '^[[:space:]]*{Act:'` sobre `object_lookup_record_data.go`, 1.942.429 bytes de archivo) da
+**7.891 elementos × 212 bytes** (el `unsafe.Sizeof` medido ADENTRO de la consola por el POC, no en el host):
+**1.672.892**. Los dos caminos son el mismo número, y el corpus exige que sigan coincidiendo.
+
+**3. LA PALANCA 1 (la tabla fuera del binario), con sus TRES números y su PRECIO.** La palanca se aplica con
+`fix-d2records-tabla-232.py --fuera` (deja `var objectLookups = []ObjectLookupRecord{}`), se rearma la capa
+del paquete y se reenlaza; `--dentro` la revierte. Medido:
+
+* **la imagen plana baja 1.788.960 bytes** (13.777.032 -> 11.988.072) y el ELF cargado 1.788.944;
+* **el aire del montón de C crece 1.788.928**: el bloque contiguo más grande **antes del motor** pasa de
+  **1.428.480** a **3.217.408** bytes (`bloqueMax`, con `sbrk`/`techo`/`arena`/`usado` del instrumento de
+  DC-002.28);
+* y el hallazgo duro: **en la base la tabla ya NO ENTRA en el montón** (`la reserva de 1672892 bytes NO
+  ENTRO`, con 1.428.480 de bloque máximo) y en la variante **sí entra** (`ptr=0x8ccdd528`, arena que sube de
+  1.211.840 a 2.883.008). O sea que el binario de hoy vive más allá de lo que el montón de C puede pedir.
+
+El **precio** está medido con el mismo instrumento: devolver la tabla al montón de C cuesta
+**1.671.168** bytes (`sbrk` y `arena`, contra 1.672.892 del símbolo: los 1.724 de diferencia son la
+contabilidad del `malloc`). Conclusión honesta: la palanca **no regala RAM por sí sola**, la **mueve** del
+binario al montón; es un ahorro NETO sólo si los 7.891 registros se leen **bajo demanda** en vez de
+materializarse (eso es una decisión de `d2records`, no de esta tarjeta). Lo que sí mide esta tarjeta es que
+los 1,79 MB de imagen son **tan reales como el aire**: el `bloqueMax` del montón sube exactamente lo que baja
+la imagen (1.788.928 vs 1.788.960, con 32 bytes de alineación de diferencia).
+
+Las DOS corridas del arranque (Flycast, 30 s cada una, con las marcas y el instrumento de DC-002.27/28):
+**no se mueve el punto donde muere** — las dos llegan al loop del motor (12 líneas `EBITEN-LOOP`, mismo
+`cuadro_us` ~309.336 y las mismas 26 marcas `ARQ-MARCA`, última `gc_collect v=4`), porque **la pared del GC no
+es del tamaño del binario**: es el semiespacio (el umbral se dispara a los **471.888/471.864** bytes usados en
+las dos). Lo que cambia es el aire, y con él que la tabla entre o no entre. Las dos paredes son distintas y
+las dos hay que bajarlas (DC-002.28/29/30).
+
+**4. LA PALANCA 2 (el `.eh_frame`, 1.074.504 bytes) — EL HUECO.** Hay un detalle que cambia la palanca entera:
+**sacarlo con `objcopy -R .eh_frame` NO baja la imagen plana NI UN BYTE**. Medido: 13.777.032 con el
+`.eh_frame` y 13.777.032 sin él. La razón es el script de KOS (`utils/ldscripts/shlelf.xc`): pone el
+`.eh_frame` **en medio del mapa** (antes de `.gcc_except_table`, `.ctors`, `.dtors`, `.data` y `.got`), y
+`objcopy -O binary` escribe por **dirección**, así que el hueco se rellena para no mover lo que viene después.
+La palanca, entonces, no es "sacarlo": es **que el linker lo ponga AL FINAL** (el último PROGBITS antes del
+`__bss_start`). `gen-ldscript-eh-232.py` escribe una copia del script de KOS con las dos reglas del
+`.eh_frame` movidas ahí **sin tocar el KOS vendorizado**, y el reenlace la usa con el último `-T` (medido: el
+último manda; dos scripts se concatenan y rompen el enlace). Con eso:
+
+    script de KOS:      imagen CON .eh_frame 13.777.032   SIN 13.777.032   -> 0 bytes
+    .eh_frame AL FINAL: imagen CON .eh_frame 13.777.040   SIN 12.702.536   -> 1.074.504 bytes
+
+y el `.bss` (226.748) se corre para abajo con el `.eh_frame`, así que esos 1,07 MB son **RAM libre de verdad**
+(y no un hueco: el `.bss` NOBITS que queda delante se rellena de ceros si se lo deja detrás).
+
+**5. Y EL PANIC DE VERDAD NO PIERDE NADA.** El miedo de la tarjeta era correcto de plantear: gccgo puede
+necesitar el `.eh_frame` para desenrollar un `panic`/`recover`, y el motor SÍ usa panics. `sonda-panic-232`
+arma una pila de 4 niveles y paniquea al fondo; se corrió **tres veces**: (A) el `.elf` de siempre, (B) la
+imagen **con** `.eh_frame` por el **camino del disco** (control del camino) y (C) la imagen **sin** él. Las
+tres imprimen **lo mismo** (`evidencia/dc-002.32-peso.txt`): `panic: ...`, `goroutine 1 [running]:`,
+`Stack Trace: frame pointers not enabled!` y `Memory: arena=1212212 used=1209004 free=3208`. La razón está
+medida y no es un supuesto: **la traza de este runtime no camina el `.eh_frame`** — el mensaje lo dice
+(`frame pointers not enabled!`, el aviso que este port ya tenía fichado) —, o sea que hoy el `.eh_frame` es
+**peso muerto para el panic**. Si algún día el runtime imprime una traza de verdad, esta palanca se vuelve a
+medir (queda como límite declarado, no como verdad eterna). El camino A/B/C tiene otra lección: Flycast, con
+un `.elf`, carga por **PROGRAM HEADERS** (`core/reios/reios_elf.cpp` usa `PT_LOAD`), así que sacar la sección
+del ELF **no** cambia lo que el emulador carga: la medición de esta palanca **tiene que ir por el disco**
+(imagen plana), que es además lo que hace la consola.
+
+**6. LO QUE NO CUESTA NADA, MEDIDO.** KOS ya pasa `-Wl,--gc-sections`: medido **quitándolo** del enlace, la
+imagen crece **524.852** bytes (y el `.gcc_except_table` aporta 20.600 de esos), así que esa bandera ya está
+regalando medio mega. Y una corrección a la premisa de la tarjeta ("los 142 paquetes están todos enlazados"):
+**no lo están** — el linker sólo se lleva lo que alguien referencia. El binario del panic (que sólo necesita
+la serial y el panic) mide **340.396** bytes de imagen con la **misma** capa de 142 paquetes: el "código no
+usado" ya lo saca el linker, y por eso la palanca 5 vale lo que valga cada referencia nueva, no 142 paquetes.
+
+**LOS MUTANTES Y LA REVERSIBILIDAD (criterio 4).** `checar-peso-232.sh` corre con **--mutar=<nombre>**, que
+hace mentir UN camino de medición y exige que su control se ponga **ROJO**: `secciones-suma` (la suma de las
+secciones), `tabla-simbolo` (el símbolo del ELF contra la fuente), `palanca-imagen` (lo que baja la imagen),
+`palanca-aire` (lo que sube el montón), `palanca-precio` (lo que cuesta devolver la tabla), `eh-hueco` (el
+recorte sin mover la sección), `eh-movido` (el recorte con la sección al final) y `vuelta` (el peso viejo).
+**8 de 8 cazados** (cada uno deja el corpus en 14/15). Y la vuelta de la palanca es una medición, no una
+promesa: con `--dentro` la fuente vuelve con el **mismo sha256** (`1e29e1f8...c516`, contra la copia
+`.original`) y el motor reenlazado pesa otra vez **14.003.628**.
+
+**LIMITES MEDIDOS (declarados, no escondidos)**
+
+* La palanca 1 mueve RAM, no la regala (el precio medido de 1.671.168 en el montón): el ahorro neto depende
+  de que `d2records` lea los registros bajo demanda. Eso **no** está hecho acá.
+* La palanca 2 llega hasta el **enlace** (script propio): el script de KOS sigue siendo vendorizado y no se
+  tocó; el `Makefile`/`build-motor-arranque.sh` no lo usan por defecto (se pide con `DC_LDEXTRA`).
+* El corpus trabaja sobre una copia de fuentes cuando se le pasa `DC232_SRC` (así se hizo acá, por el otro
+  agente); por defecto trabaja sobre el repo y **deja la fuente como la encontró** (lo verifica con sha256).
+* Las corridas del arranque van **sin el disco del juego** (el POC `sonda-peso-232`, igual que el
+  `motor-arranque`): llegan al loop con las dos variantes. El arranque CON los MPQ (que es el que muere en el
+  semiespacio, DC-002.28/29) no se re-corrió acá porque su pared no es del tamaño del binario (medido: el
+  umbral del GC se dispara al mismo valor en las dos corridas).
+* El `.eh_frame` "al final" mueve el `.bss` con él: si algún día se retira la sección del enlace **sin** ese
+  script, la imagen plana **no** baja (el hueco) y el `.bss` queda relleno de ceros delante (226.748 bytes
+  pagados al pedo): el corpus vigila los dos casos.
+* Lo que no se midió: **qué** símbolos saca el `--gc-sections` (y si alguno se llama por reflexión).
+
+Barreras: corpus `checar-peso-232.sh` **15/15** con **8/8** mutantes cazados, la capa propia **142/142**, y
+`test-std-host.sh` sin cambios (esta tarjeta no toca la stdlib).
+
+Evidencia cruda: `evidencia/dc-002.32-peso.txt`.

@@ -1,0 +1,150 @@
+DC-002.32 -- EL PESO DEL BINARIO DEL MOTOR EN LA RAM DE LA CONSOLA (16.777.216 bytes)
+medido en la copia de fuentes /tmp/dc232-src (capa coherente propia /tmp/gox-232p), dom 18 oct 2026
+
+================================================================================
+1. LAS SECCIONES DEL ELF CARGADO, LA BASE Y LA VARIANTE (la tabla fuera del binario)
+================================================================================
+seccion                              base     variante        delta
+.text                             5002552      5002552            0
+.rodata                           5918652      5802604       116048
+.eh_frame                         1074504      1074504            0
+.gcc_except_table                   20600        20600            0
+.data                             1760444        87548      1672896
+.got                                   12           12            0
+.bss                               226748       226748            0
+TOTAL ALLOC (RAM)                14003628     12214684      1788944
+1ST_READ.BIN (imagen plana)      13777032     11988072      1788960
+
+de los 16.777.216 bytes: la base ocupa el 83,46% y le deja al motor
+2773588 bytes de RAM entre el monton de C, los dos semiespacios del GC y los ROMDISK
+   el monton de C es lo que mas sufre: el bloque contiguo mas grande ANTES del motor
+   bloqueMax base = 1428480
+   bloqueMax var  = 3217408
+
+================================================================================
+2. LA TABLA DE d2records: DOS CAMINOS QUE COINCIDEN
+================================================================================
+simbolo del ELF (nm -S --size-sort, el mas gordo del binario):
+   8cb94fc4 001986bc d _go..C3111
+cuenta desde la fuente (object_lookup_record_data.go, HEAD af89439b):
+   7891 elementos x 212 bytes (el sizeof medido ADENTRO de la consola) = 1672892
+el archivo de la tabla: 1942429 bytes
+
+================================================================================
+3. LAS DOS CORRIDAS DEL ARRANQUE (Flycast, instrumento de DC-002.27/28)
+================================================================================
+---- dc232-base-run (la tabla DENTRO del binario)
+   MOTOR-ARRANQUE monton de C antes del motor: 3776 bytes libres
+   MOTOR-ARRANQUE monton de C antes del motor: sbrk=0x8ce93000 techo=0x8cff0000 arena=1212832 libre=3776 usado=1209056 bloqueMax=1428480
+   PESO-232 ObjectLookupRecord mide 212 bytes (medido adentro de la consola)
+   PESO-232 la tabla del ELF pesa 1672892 bytes -> 7891 elementos
+   PESO-232 monton antes de la reserva:   sbrk=0x8ce93000 techo=0x8cff0000 arena=1212832 libre=3776 usado=1209056 bloqueMax=1428480
+   PESO-232 la reserva de la tabla NO ENTRO (no hay bloque de 1672892 bytes)
+   MOTOR-ARRANQUE marca 1: entrando a d2app.Create()
+   MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+   EBITEN-PERFIL dibujar_us 251778 convertir_us 57565 subir_us 0 pintar_us 3 cuadro_us 309346
+   marcas ARQ-MARCA: 26   cuadros del loop: 12   intentos de sbrk que no entraron: 15
+   ultima marca del arranque:    ARQ-MARCA gc_collect v=4
+---- dc232-var-run (la tabla FUERA (vacia))
+   MOTOR-ARRANQUE monton de C antes del motor: 2784 bytes libres
+   MOTOR-ARRANQUE monton de C antes del motor: sbrk=0x8ccde000 techo=0x8cff0000 arena=1211840 libre=2784 usado=1209056 bloqueMax=3217408
+   PESO-232 ObjectLookupRecord mide 212 bytes (medido adentro de la consola)
+   PESO-232 la tabla del ELF pesa 1672892 bytes -> 7891 elementos
+   PESO-232 monton antes de la reserva:   sbrk=0x8ccde000 techo=0x8cff0000 arena=1211840 libre=2784 usado=1209056 bloqueMax=3217408
+   PESO-232 reserva de 1672892 bytes: ptr=0x8ccdd528
+   PESO-232 monton con la tabla adentro:  sbrk=0x8ce76000 techo=0x8cff0000 arena=2883008 libre=1056 usado=2881952 bloqueMax=1545216
+   PESO-232 la tabla cuesta sbrk= 1671168 arena= 1671168 bytes del monton de C
+   PESO-232 monton despues de soltarla:   sbrk=0x8ccde000 techo=0x8cff0000 arena=1211840 libre=2784 usado=1209056 bloqueMax=3217408
+   MOTOR-ARRANQUE marca 1: entrando a d2app.Create()
+   MOTOR-ARRANQUE marca 2: Create() volvio, entrando a Run()
+   EBITEN-PERFIL dibujar_us 251769 convertir_us 57522 subir_us 0 pintar_us 3 cuadro_us 309294
+   marcas ARQ-MARCA: 26   cuadros del loop: 12   intentos de sbrk que no entraron: 34
+   ultima marca del arranque:    ARQ-MARCA gc_collect v=4
+
+================================================================================
+4. LA PALANCA DEL .eh_frame: EL HUECO, Y EL PANIC DE VERDAD
+================================================================================
+con el script de KOS (utils/ldscripts/shlelf.xc) -- el .eh_frame va EN MEDIO del mapa:
+   1ST_READ.BIN con el .eh_frame:    13777032
+   1ST_READ.BIN sin el .eh_frame:    13777032   <- el objcopy rellena el hueco: NO baja
+con el .eh_frame AL FINAL (scripts/console/gen-ldscript-eh-232.py + DC_LDEXTRA del reenlace):
+   1ST_READ.BIN con el .eh_frame:    13777040
+   1ST_READ.BIN sin el .eh_frame:    12702536   <- ahora SI baja: 1074504
+   .bss de la base:                  226748 (se corre con el .eh_frame: es RAM libre de verdad)
+
+el panic de verdad (sonda-panic-232: pila de 4 niveles + panic al fondo), tres corridas:
+   ---- A: .elf de siempre (Flycast carga por PT_LOAD: el .eh_frame SI esta)
+      PANIC-232 arranca (DC-002.32: la traza de un panic de verdad)
+      PANIC-232 marca 1: antes del panic
+      PANIC-232 llamando al panic desde nivel1
+      PANIC-TRAZA pc=8c010e82 tipo=8c051d00 kind=24 dato=8c051cf8
+      panic: DC-002.32: un panic de verdad
+      goroutine 1 [running]:
+      Stack Trace: frame pointers not enabled!
+      Memory: arena=1212212 used=1209004 free=3208
+   ---- B: imagen plana CON .eh_frame (control del camino del disco)
+      PANIC-232 arranca (DC-002.32: la traza de un panic de verdad)
+      PANIC-232 marca 1: antes del panic
+      PANIC-232 llamando al panic desde nivel1
+      PANIC-TRAZA pc=8c010e82 tipo=8c058e24 kind=24 dato=8c058e1c
+      panic: DC-002.32: un panic de verdad
+      goroutine 1 [running]:
+      Stack Trace: frame pointers not enabled!
+      Memory: arena=1212212 used=1209004 free=3208
+   ---- C: imagen plana SIN .eh_frame (la palanca)
+      PANIC-232 arranca (DC-002.32: la traza de un panic de verdad)
+      PANIC-232 marca 1: antes del panic
+      PANIC-232 llamando al panic desde nivel1
+      PANIC-TRAZA pc=8c010e82 tipo=8c058e24 kind=24 dato=8c058e1c
+      panic: DC-002.32: un panic de verdad
+      goroutine 1 [running]:
+      Stack Trace: frame pointers not enabled!
+      Memory: arena=1212212 used=1209004 free=3208
+
+================================================================================
+5. EL CORPUS (checar-peso-232.sh) Y SUS MUTANTES
+================================================================================
+   
+   == DC-002.32: el peso del motor en los 16.777.216 bytes de la consola
+   
+     el ELF cargado pesa 14003628 bytes = 8346 centesimas de % de la RAM
+     [OK]   secciones ALLOC suman el total cargado         14003628 = 14003628
+     .text 5002552 | .rodata 5918652 | .eh_frame 1074504 | .data 1760444 | .bss 226748
+     el simbolo mas gordo (_go..C3111) pesa 1672892 | la fuente tiene 7891 elementos | el registro mide 212
+     [OK]   la tabla por el ELF contra la fuente           1672892 = 1672892
+     [OK]   y el simbolo mas gordo es el de la tabla       1 = 1
+     la tabla: baja el .data 1672896 y el .rodata 116048; el total cargado cae 1788944
+     la imagen plana: 13777032 -> 11988072 (1788960 bytes menos)
+     el monton de C antes del motor: bloqueMax 1428480 -> 3217408 (1788928 mas)
+     [OK]   la tabla vive en el .data, no en el .rodata    1 = 1
+     [OK]   el .data baja exactamente la tabla             1672896 ~ 1672892 (dif 4, tope 16)
+     [OK]   la palanca baja la imagen lo que baja el ELF   1788960 ~ 1788944 (dif 16, tope 32)
+     [OK]   el aire del monton crece lo que baja la imagen 1788928 ~ 1788960 (dif 32, tope 32)
+     [OK]   el precio: devolver la tabla al monton cuesta su tamano 1671168 ~ 1672892 (dif 1724, tope 4096)
+     con el script de KOS: imagen 13777032 y quitando el .eh_frame 13777032
+     con el .eh_frame AL FINAL: imagen 13777040 y quitandolo 12702536
+     [OK]   el hueco: sacarlo SIN moverlo NO baja nada     0 = 0
+     [OK]   moviendolo al final, sacarlo baja su tamano    1074504 = 1074504
+     [OK]   y la traza del panic NO depende de el          1 = 1
+     [OK]   el control: la traza CON el .eh_frame por disco es la misma 1 = 1
+     sin --gc-sections la imagen crece 524852 (el .gcc_except_table mide 20600)
+     [OK]   el --gc-sections que KOS ya pasa vale imagen   524852 bytes (>= el .gcc_except_table)
+   
+   == 7. la palanca se puede poner de vuelta (criterio 4)
+     la fuente volvio a 1e29e1f88c698ba1164eb5db51ddaf4806812fa11a069cfc7b69f14a313bc516 y el original guardado es 1e29e1f88c698ba1164eb5db51ddaf4806812fa11a069cfc7b69f14a313bc516
+     [OK]   poner la tabla de vuelta devuelve la fuente identica 1e29e1f88c698ba1164eb5db51ddaf4806812fa11a069cfc7b69f14a313bc516 = 1e29e1f88c698ba1164eb5db51ddaf4806812fa11a069cfc7b69f14a313bc516
+     con la tabla de vuelta el ELF cargado pesa 14003628 (la base pesa 14003628)
+     [OK]   y el peso vuelve al de la base                 14003628 = 14003628
+   
+   == 15 de 15 verdes
+   == PESO-232: el peso y las palancas quedan medidos y con mutante
+
+   los mutantes (cada uno tiene que dar ROJO en su control):
+      mutar=secciones-suma -> 1 en rojo | == 14 de 15 verdes  (con el mutante 'secciones-suma')
+      mutar=tabla-simbolo -> 1 en rojo | == 14 de 15 verdes  (con el mutante 'tabla-simbolo')
+      mutar=palanca-imagen -> 1 en rojo | == 14 de 15 verdes  (con el mutante 'palanca-imagen')
+      mutar=palanca-aire -> 1 en rojo | == 14 de 15 verdes  (con el mutante 'palanca-aire')
+      mutar=palanca-precio -> 1 en rojo | == 14 de 15 verdes  (con el mutante 'palanca-precio')
+      mutar=eh-hueco -> 1 en rojo | == 14 de 15 verdes  (con el mutante 'eh-hueco')
+      mutar=eh-movido -> 1 en rojo | == 14 de 15 verdes  (con el mutante 'eh-movido')
+      mutar=vuelta -> 1 en rojo | == 14 de 15 verdes  (con el mutante 'vuelta')
