@@ -6,6 +6,7 @@
 //
 // El romdisk se arma con genromfs + bin2o durante el build (ver scripts/console/build-dc.sh) y queda
 // montado en /rd por KOS al arrancar (KOS_INIT_ROMDISK).
+#include <errno.h>
 #include <kos.h>
 #include <kos/fs.h>
 #include <kos/fs_romdisk.h>
@@ -487,6 +488,182 @@ int d2c_ramfs_manifiesto(char *buf, int max, const char *ruta) {
         }
         return -(100 + 10 * narch + ramfs_ndirs);
     }
+    return escritos;
+}
+
+/* ================================================================================================
+ * DC-002.45: EL LISTADO DE UN DIRECTORIO DEL DISCO POR EL `fs_readdir` DEL DRIVER (camino DIRECTO).
+ * ================================================================================================
+ *
+ * POR QUE EXISTE: DC-002.44 cerro el defecto (`/cd/juego` ve 0 -> 3 archivos) con el MANIFIESTO que hornea
+ * `mkdisco.sh` en `/JUEGO/MANIFIESTO.TXT`. Ese listado es del HORNEADOR, no del sistema de archivos: lista
+ * los `*.mpq` y `*.txt` que ese script puso, y un archivo que este en el disco pero que el horneador no
+ * conozca NO SALE. Lo que mide esta tarjeta es el camino de fondo: preguntarle al DRIVER.
+ *
+ * Y EL DRIVER SABE (medido en DC-002.44, seccion 1-BIS, con el POC de C `disco-c`): sobre una ISO SIN el
+ * arbol Joliet, `fs_open("/cd/JUEGO", O_RDONLY|O_DIR)` da un fd valido y `fs_readdir` devuelve las 6
+ * entradas con nombre, bytes y attr. Lo que faltaba era el PUENTE: `os.ReadDir` nunca lo llamaba.
+ *
+ * LA MEMORIA: el buffer es el del que llama (Go, LOCAL y de tamano fijo), igual que el manifiesto del
+ * overlay: en el arranque del motor el monton esta justo (3.136 B libres medidos en DC-002.34) y un
+ * listado no puede pedirle memoria. KOS usa su propia cache de sectores para el directorio, asi que aca
+ * no se reserva nada tampoco.
+ *
+ * EL FORMATO DE SALIDA es EL MISMO del manifiesto -- "nombre TAB bytes TAB archivo|directorio", una linea
+ * por entrada -- para que el que lo lea sea el mismo codigo de Go (`entradasDelManifiesto`). Se saltan
+ * "." y ".." (los pone `fs_readdir` de fs.c, no son entradas del usuario; el manifiesto tampoco los trae) y
+ * el `.manifiesto`/`MANIFIESTO.TXT` del propio directorio (es el indice, no una entrada del usuario).
+ *
+ * DEVUELVE: los bytes escritos, o un NEGATIVO por cada salida (el mismo instrumento que el del overlay):
+ *   -1  no entran en `max`            (mejor fallar que devolver una lista cortada)
+ *   -2  argumentos invalidos
+ *   -3  la ruta no entra en el buffer interno
+ *   -4  el driver no pudo abrir el directorio (no es un directorio, o no esta) -> el que llama decide
+ *   -5  la ruta no llego como cadena de verdad
+ *   -6  `fs_readdir` fallo a mitad del recorrido
+ */
+/* es_indice_del_directorio: los nombres que son el INDICE del directorio y no una entrada del usuario.
+ * Se comparan sin distinguir mayusculas porque el driver del ISO9660 pasa los nombres a minusculas
+ * (fs_iso9660.c:fn_postprocess) y el romdisk los deja como estan. */
+static int nombre_es_indice(const char *nombre) {
+    const char *a = ".manifiesto";
+    const char *b = "MANIFIESTO.TXT";
+    size_t i;
+
+    for (i = 0; a[i] != '\0' && nombre[i] != '\0'; i++) {
+        char c = nombre[i];
+        if (c >= 'A' && c <= 'Z') {
+            c = (char)(c - 'A' + 'a');
+        }
+        if (c != a[i]) {
+            break;
+        }
+    }
+    if (a[i] == '\0' && nombre[i] == '\0') {
+        return 1;
+    }
+
+    for (i = 0; b[i] != '\0' && nombre[i] != '\0'; i++) {
+        char c = nombre[i];
+        if (c >= 'a' && c <= 'z') {
+            c = (char)(c - 'a' + 'A');
+        }
+        if (c != b[i]) {
+            break;
+        }
+    }
+    return b[i] == '\0' && nombre[i] == '\0';
+}
+
+int d2c_iso_listar(char *buf, int max, const char *ruta) {
+    dirent_t *de;
+    int fd, escritos = 0, entradas = 0;
+    size_t n;
+    char prefijo[D2C_RAMFS_RUTA + 1];
+
+    if (ruta == 0 || buf == 0 || max <= 0) {
+        return -2;
+    }
+    if (ruta[0] != '/') {
+        return -5;
+    }
+
+    n = strlen(ruta);
+    if (n + 2 >= sizeof(prefijo)) {
+        return -3;
+    }
+    memcpy(prefijo, ruta, n);
+    if (n == 0 || prefijo[n - 1] != '/') {
+        prefijo[n] = '/';
+        n++;
+    }
+    prefijo[n] = '\0';
+
+    errno = 0;
+    fd = fs_open(ruta, O_RDONLY | O_DIR);
+    if (fd < 0) {
+        return -4;
+    }
+
+    for (;;) {
+        size_t l;
+        int tam;
+        const char *tipo;
+        char numero[12];
+        int p = 0, q;
+        char cifra[12];
+
+        errno = 0;
+        de = fs_readdir(fd);
+        if (de == NULL) {
+            /* errno == 0 es el fin normal del directorio; distinto de 0 es una falla del driver */
+            if (errno != 0) {
+                fs_close(fd);
+                return -6;
+            }
+            break;
+        }
+
+        /* "." y ".." los pone el VFS (fs.c:fs_readdir), no son entradas del usuario */
+        if (strcmp(de->name, ".") == 0 || strcmp(de->name, "..") == 0) {
+            continue;
+        }
+        /* el indice del directorio no se lista (misma regla que el manifiesto del overlay).
+         * OJO: el driver pasa los nombres a MINUSCULAS (fs_iso9660.c:fn_postprocess hace tolower), asi que
+         * "MANIFIESTO.TXT" llega como "manifiesto.txt". Se compara en minusculas las dos formas. */
+        if (nombre_es_indice(de->name)) {
+            continue;
+        }
+        if (entradas >= 64) {
+            break;      /* el tope del que llama: una lista truncada se declara, no se inventa */
+        }
+
+        l = strlen(de->name);
+        if (l == 0) {
+            continue;
+        }
+        /* el driver marca los directorios con attr = O_DIR y size = -1 (fs_iso9660.c:920) */
+        if (de->attr & O_DIR) {
+            tam = 0;
+            tipo = "directorio";
+        } else {
+            tam = de->size;
+            if (tam < 0) {
+                tam = 0;
+            }
+            tipo = "archivo";
+        }
+
+        if (tam == 0) {
+            cifra[p++] = '0';
+        }
+        while (tam > 0 && p < (int)sizeof(cifra)) {
+            cifra[p++] = (char)('0' + (tam % 10));
+            tam /= 10;
+        }
+        for (q = 0; q < p; q++) {
+            numero[q] = cifra[p - 1 - q];
+        }
+        numero[p] = '\0';
+
+        if (escritos + (int)l + (int)strlen(numero) + (int)strlen(tipo) + 3 > max) {
+            fs_close(fd);
+            return -1;
+        }
+        memcpy(buf + escritos, de->name, l);
+        escritos += (int)l;
+        buf[escritos++] = '\t';
+        for (q = 0; q < p; q++) {
+            buf[escritos++] = numero[q];
+        }
+        buf[escritos++] = '\t';
+        memcpy(buf + escritos, tipo, strlen(tipo));
+        escritos += (int)strlen(tipo);
+        buf[escritos++] = '\n';
+        entradas++;
+    }
+
+    fs_close(fd);
     return escritos;
 }
 

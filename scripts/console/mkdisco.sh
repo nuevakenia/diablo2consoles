@@ -83,6 +83,21 @@ else
     ARGS+=("$MANIF:/JUEGO/MANIFIESTO.TXT;1")
 fi
 
+# DC-002.45: LA MARCA SUELTA -- un archivo que se hornea en /JUEGO y que el MANIFIESTO.TXT NO lista.
+#
+# Es el INSTRUMENTO del control que el manifiesto no puede dar: el listado del disco salia del manifiesto
+# (o sea del HORNEADOR), asi que un archivo que este en la ISO pero que el horneador no conozca no podia
+# salir nunca. Con el listado por el `fs_readdir` del driver, SI sale. El corpus
+# (scripts/console/checar-lista-disco-245.sh) exige que salga; el mutante que fuerza el manifiesto exige
+# que NO salga. Sin este archivo el defecto no se puede ver: los 3 MPQ estan en las dos listas.
+#
+# Uso:  DC_MARCA_SUELTA=<archivo>   (se hornea como /JUEGO/MARCA_SUELTA.DAT y NO va al manifiesto)
+if [ -n "${DC_MARCA_SUELTA:-}" ]; then
+    [ -f "$DC_MARCA_SUELTA" ] || { echo "no existe la marca suelta $DC_MARCA_SUELTA" >&2; exit 1; }
+    ARGS+=("$DC_MARCA_SUELTA:/JUEGO/MARCA_SUELTA.DAT;1")
+    echo "== marca suelta: $DC_MARCA_SUELTA -> /JUEGO/MARCA_SUELTA.DAT ($(stat -c%s "$DC_MARCA_SUELTA") bytes, FUERA del manifiesto) =="
+fi
+
 # DC-002.44: SIN EL ARBOL JOLIET POR DEFECTO (MKISO_JOLIET=0). Medido (seccion 1 de la evidencia de esta
 # tarjeta, POC disco-c): con el arbol Joliet (el default de mkiso.py, nivel 3) el driver iso9660 de KOS
 # dice "joliet level 3 extensions detected" y monta, pero NINGUN ARCHIVO del arbol se abre --

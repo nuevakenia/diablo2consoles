@@ -115,6 +115,14 @@ func d2c_ramfs_tam() int
 //extern d2c_ramfs_manifiesto
 func d2c_ramfs_manifiesto(buf uintptr, max int, ruta string) int
 
+// DC-002.45: el listado de un DIRECTORIO DEL DISCO por el `fs_readdir` del DRIVER de KOS (el camino de
+// fondo). Escribe el MISMO formato del manifiesto y devuelve los bytes, o un NEGATIVO por cada salida
+// (ver os_dc.c): -1 no entra, -2 argumentos, -3 ruta larga, -4 el driver no abrio el directorio,
+// -5 la ruta no llego como cadena, -6 el driver fallo a mitad. El buffer lo pone Go (LOCAL, fijo).
+//
+//extern d2c_iso_listar
+func d2c_iso_listar(buf uintptr, max int, ruta string) int
+
 //extern d2c_escribir_consola
 func d2c_escribir_consola(buf uintptr, n int)
 
@@ -476,7 +484,12 @@ func (d dirEntryOS) Type() FileMode {
 // POC del VFS pedia e.TipoCrudo() y e.Size() (del interfaces viejo, mas ancho) y NO COMPILABA desde el
 // alias (commit 95e0ef74, DC-002.8): el corpus de os en la consola quedo muerto sin que nadie lo viera.
 
-// ReadDir lista un directorio. EN LA CONSOLA SALE DE DOS LADOS, y hay que juntarlos:
+// ReadDir lista un directorio. EN LA CONSOLA SALE DE TRES LADOS, y hay que juntarlos:
+//
+//  0. EL DISCO (el ISO9660), por el `fs_readdir` DEL DRIVER (DC-002.45). Es el camino de fondo y el
+//     primero que se prueba: `d2c_iso_listar` hace `fs_open(ruta, O_RDONLY|O_DIR)` + `fs_readdir` en un
+//     bucle, y el driver devuelve las entradas REALES del directorio con nombre, bytes y attr (medido en
+//     DC-002.44, seccion 1-BIS). Lista lo que hay en el sistema de archivos, no lo que alguien horneo.
 //
 //  1. EL ROMDISK, de un ".manifiesto" horneado por el build. Medido en Flycast (poc/sonda-i y el POC del
 //     VFS): el FS ROM de KOS NO deja abrir un directorio. fs_open("/rd") da INVALID con las tres formas de
@@ -491,8 +504,9 @@ func (d dirEntryOS) Type() FileMode {
 //     `Validate(dir).OK() = false archivos que ve = 0` sobre una carpeta con siete archivos que os.Stat
 //     SI encontraba (y el camino de la seleccion del motor pregunta justamente por el contenido).
 //
-// El ".manifiesto" no se lista a si mismo (ni el del romdisk ni el del overlay). Para /cd (el GD-ROM por
-// ISO9660) esto no aplica y hay que resolverlo cuando se llegue ahi.
+// El ".manifiesto" no se lista a si mismo (ni el del romdisk ni el del overlay), ni el MANIFIESTO.TXT del
+// disco. El MANIFIESTO.TXT de /JUEGO (DC-002.44) queda como RESPALDO del driver: si el disco no se puede
+// abrir como directorio, se usa la lista que dejo el horneador.
 func ReadDir(nombre string) ([]DirEntry, error) {
 	base := nombre
 	for len(base) > 0 && base[len(base)-1] == '/' {
@@ -525,19 +539,46 @@ func ReadDir(nombre string) ([]DirEntry, error) {
 	// (2b) EL DISCO (DC-002.44): el manifiesto del ISO9660 se llama MANIFIESTO.TXT, no ".manifiesto", porque
 	// el ISO9660 de nivel 3 solo acepta A-Z, 0-9 y _ (medido en DC-002.27: pycdlib rechaza "patch_D2.mpq").
 	// Lo escribe `scripts/console/mkdisco.sh` con lo que hornea, en el mismo formato; el iso9660 de KOS
-	// compara los nombres sin distinguir mayusculas, asi que se pide tal cual. Sin esto, /cd/juego se veia
-	// VACIO: el driver de KOS abre el directorio pero su readdir no devuelve las entradas (medido con el POC
-	// disco-c: `fs_open("/cd/JUEGO", O_DIR)` da fd valido y `fs_readdir` solo devuelve "." y "..").
+	// compara los nombres sin distinguir mayusculas, asi que se pide tal cual.
 	if err != nil {
 		datos, err = ReadFile(base + "/MANIFIESTO.TXT")
 	}
 
-	if err != nil && len(deRAM) == 0 && d2c_stat_es_dir(base) != 1 {
-		// ni manifiesto, ni entradas en la RAM, ni el directorio: para Go esto no esta
+	// (2c) EL DISCO POR EL DRIVER (DC-002.45): el camino de fondo, y el primero para /cd.
+	//
+	// Medido en DC-002.44 (seccion 1-BIS, POC disco-c): el driver de KOS SI sabe listar un directorio del
+	// ISO9660 -- `fs_open(ruta, O_RDONLY|O_DIR)` da un fd y `fs_readdir` devuelve TODAS las entradas con
+	// nombre, bytes y attr -- sobre una ISO SIN el arbol Joliet (con Joliet no abre ni los archivos). Lo que
+	// faltaba era este puente: hasta DC-002.44 el listado del disco salia del MANIFIESTO que hornea
+	// `mkdisco.sh`, o sea del HORNEADOR: un archivo que este en el disco y el horneador no conozca NO
+	// aparecia. Con esto el listado es el del SISTEMA DE ARCHIVOS, que es lo que promete os.ReadDir.
+	//
+	// ORDEN: el driver PRIMERO y el manifiesto de RESPALDO. Al reves (manifiesto primero) el defecto de
+	// esta tarjeta quedaria tapado: un disco con manifiesto viejo e incompleto daria la lista del horneador
+	// y el driver nunca se consultaria. El manifiesto queda para lo que el driver NO puede listar (el
+	// romdisk de /rd: el FS ROM de KOS no deja abrir un directorio, medido en DC-002.19) y para un disco
+	// que no se pueda abrir como directorio.
+	//
+	// El buffer es LOCAL y de tamano fijo, como el del overlay: en el arranque del motor el monton esta
+	// justo (3.136 B libres medidos en DC-002.34/DC-002.44). 1024 bytes son el presupuesto del overlay y
+	// alcanzan de sobra para un directorio del disco (los 6 de /cd/JUEGO ocupan 141).
+	var bufISO [1024]byte
+
+	deISO := []DirEntry(nil)
+	if n := d2c_iso_listar(uintptr(unsafe.Pointer(&bufISO[0])), len(bufISO), base); n >= 0 {
+		deISO = entradasDelManifiesto(bufISO[:n])
+	}
+
+	if err != nil && len(deRAM) == 0 && len(deISO) == 0 && d2c_stat_es_dir(base) != 1 {
+		// ni el driver, ni manifiesto, ni entradas en la RAM, ni el directorio: para Go esto no esta
 		return nil, ErrNotExist
 	}
 
-	salida := entradasDelManifiesto(datos)
+	salida := deISO
+	if len(salida) == 0 {
+		// el respaldo: el manifiesto del build (romdisk) o el del horneador (disco)
+		salida = entradasDelManifiesto(datos)
+	}
 
 	// El overlay TAPA al romdisk con el mismo nombre (la misma regla que os.Open y d2c_hay).
 	for _, nueva := range deRAM {

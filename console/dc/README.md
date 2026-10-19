@@ -4668,3 +4668,82 @@ POC=tablas-mpq-listfile DC_ROOT=<copia con el arreglo> bash scripts/console/chec
 ```
 
 Evidencia: `console/dc/evidencia/dc-002.39e-itab-raiz.txt`.
+
+## 65. DC-002.45: el listado de `/cd/juego` deja de ser el del **horneador** — `os.ReadDir` le pregunta al `fs_readdir` del driver y un archivo que el `MANIFIESTO.TXT` no conoce **sale igual** (78 bytes medidos)
+
+DC-002.44 cerró el síntoma con el `MANIFIESTO.TXT` que hornea `mkdisco.sh`: el motor pasó de ver **0** a ver
+**3** archivos. Pero ese listado es del **horneador**, no del sistema de archivos — la lista la escribe el
+script que arma el disco, así que un archivo que esté en la ISO y el script no conozca **no puede salir
+nunca**. Esta tarjeta lleva el listado al camino de fondo: `fs_open(ruta, O_RDONLY|O_DIR)` + `fs_readdir` en un
+bucle, que es lo que el driver del ISO9660 ya sabía hacer desde DC-002.44 (sección 1-BIS de su evidencia) y
+que el puente de `os` nunca llamaba.
+
+**El instrumento es un archivo que el horneador no conoce.** `mkdisco.sh` acepta ahora
+`DC_MARCA_SUELTA=<archivo>`: lo hornea como `/JUEGO/MARCA_SUELTA.DAT` y lo deja **fuera** del manifiesto a
+propósito. Son **78 bytes** con sha256 `67f895f06df68181…`, y el corpus exige que el listado los traiga. Sin
+ese archivo el defecto no se puede ver: los 3 MPQ están en las dos listas y los dos caminos darían lo mismo.
+
+**El orden de las fuentes es la decisión.** `os.ReadDir` prueba **(1) el driver primero** y deja el manifiesto
+de **respaldo** (el del romdisk, `/rd/.manifiesto`, y el del horneador, `MANIFIESTO.TXT`); el overlay de la
+RAM sigue encima, tapando por nombre. Al revés —manifiesto primero— el defecto quedaría **tapado**: un disco
+con manifiesto viejo o incompleto daría la lista del horneador y al driver no se le preguntaría nunca. El
+manifiesto queda para lo que el driver **no** puede listar: `/rd`, donde el FS ROM de KOS no deja abrir un
+directorio (medido en DC-002.19).
+
+Los números, medidos en Flycast (`~/.hermes/cache/scratch/c245/`):
+
+```
+POC lista-disco, disco con los 3 MPQ + la marca suelta
+  /cd/juego entradas= 4
+   [0] d2char.mpq       dir= false bytes= 267704443
+   [1] d2data.mpq       dir= false bytes= 267330019
+   [2] marca_suelta.dat dir= false bytes= 78        <- el archivo que el horneador NO conoce
+   [3] patch_d2.mpq     dir= false bytes= 5022588
+  /cd entradas= 2   -> [1] juego dir= true bytes= 0  <- el subdirectorio sale como DIRECTORIO
+  y por os.Stat los mismos bytes: 267704443 / 267330019 / 5022588  (el driver no inventa tamaños)
+
+el mismo disco, con el puente forzado al manifiesto (mutante 1)
+  /cd/juego entradas= 3                              <- la marca suelta desaparece: el defecto, en rojo
+
+motor entero (45 s), disco con marca suelta
+  seleccion: Complete= true Validate.OK()= false archivos que ve= 3 faltan= 4   <- el número de DC-002.44
+  seleccion overlay: ReadDir de /rd/prueba-seleccion -> 1 entradas: uno.txt      <- lo que ya andaba
+motor entero (45 s), disco SIN /JUEGO
+  seleccion: Complete= false Validate.OK()= false archivos que ve= 0 faltan= 7  <- el mutante, igual que antes
+```
+
+`ve= 3` no se mueve porque cuenta los nombres de la tabla `LoadOrder`, no las entradas del directorio: lo que
+cambia con esta tarjeta es **qué archivos puede ver** el listado, no cuántos de la tabla están.
+
+**La memoria, medida y no prometida.** El listado se arma en un buffer **LOCAL** de 1024 bytes (`var bufISO`),
+como el del overlay: en el arranque del motor el montón de C tiene **2.496 bytes** libres y un listado no le
+puede pedir memoria. 40 vueltas del listado dejan el montón **igual** (`cfree= 2232` y `cused= 1208572` antes y
+después). El semiespacio del GC **sí** sube (14.160 → 236.880, ~5.568 por vuelta): eso es el **resultado** — el
+`[]DirEntry` con sus cadenas — y el camino del manifiesto paga exactamente lo mismo.
+
+**Lo que salió mal en el camino y quedó cazado:** en la primera corrida el listado daba 4 entradas, pero la
+cuarta era `manifiesto.txt` — el **índice** del directorio saliendo como si fuera un archivo del juego. El
+driver del ISO9660 pasa los nombres a **minúsculas** (`fs_iso9660.c:fn_postprocess`), así que comparar contra
+`"MANIFIESTO.TXT"` no matcheaba; se compara sin distinguir mayúsculas y el mutante 3 exige que, si vuelve a
+pasar, el corpus se ponga rojo.
+
+```bash
+bash scripts/console/checar-lista-disco-245.sh    # 20 controles OK, 0 fallos
+bash scripts/console/mutar-lista-disco-245.sh     # 4 de 4 mutantes cazados
+```
+
+Los 4 mutantes, y qué caza cada uno: **1** el puente no consulta al driver (contesta `-4` y cae al
+manifiesto) → el listado baja a 3 y la marca suelta desaparece — *es el defecto de la tarjeta*; **2** el driver
+no salta `.` y `..` → 6 entradas; **3** el driver lista el `MANIFIESTO.TXT` → el índice como archivo; **4** el
+driver no trae `de->size` → los 3 MPQ con `bytes= 0`. Los mutantes corren sobre una **copia** de la capa de
+`.gox` y el script verifica con sha256 que `os.go` y `os_dc.c` quedan iguales al terminar.
+
+La barrera del motor se rearmó con la capa nueva (para no comparar contra un ELF viejo):
+`compare-motor-dc6.sh` → **31 líneas idénticas, 30 frames**, host x86-64 y SH-4.
+
+Lo que esta tarjeta **no** arregla, declarado: `/rd` sigue listándose por su `.manifiesto` (el FS ROM de KOS no
+deja abrir un directorio), el `Validate.OK()= false` del motor es el estado de DC-002.44 y depende de que el
+disco traiga el juego completo, y el listado tiene tope de 64 entradas por directorio (una lista truncada se
+avisa, no se inventa).
+
+Evidencia: `console/dc/evidencia/dc-002.45-lista-del-disco-por-el-driver.txt`.
