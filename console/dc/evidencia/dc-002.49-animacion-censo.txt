@@ -87,11 +87,29 @@ Plan cuando DC-002.38 cierre (los numeros ya estan tomados):
      separacion de las dos cosas se logra SOLO con el personaje quieto (que es lo que pide el criterio 1).
 
 =============================================================================
-4. DATO PARA DC-002.50 (medido de paso)
+4. DATO PARA DC-002.50 (medido de paso): el monstruo del acto 1 y sus animaciones
 =============================================================================
 
-Los COF del monstruo SI estan en `d2data.mpq` (`data\global\monsters\FA\COF\faa1hth.cof` = ataque 1,
-`faghhth.cof` = golpe recibido, `fanuhth.cof` = neutral, `FADTHTH.COF` = muerte), pero al leerlos con el lector
-del motor y parsearlos con `d2cof.Unmarshal` los 11 modos salen **"EOF"** (bytes cortos), mientras los de la
-amazona en `d2char.mpq` parsean perfecto. Primer dato a cazar en DC-002.50: de donde salen los COF del monstruo
-(patch_D2.mpq no los tiene: su listfile son 162 rutas) y por que este viene corto.
+Los COF del monstruo estan en `d2data.mpq` (los de los personajes en `d2char.mpq`), con la ruta
+`data\global\monsters\<token>\COF\...` y OCHO direcciones (los personajes tienen 16). Censo del fallen (FA),
+el bicho del Blood Moor, con la misma sonda (`-mpq d2data.mpq -token FA -tipo monsters`):
+
+    MODO NU  cuadrosPorDireccion=20 direcciones= 8 capas=4  fps=25.00 [animdata(FANUHTH)]  40.00 ms/cuadro  ciclo=800 ms
+    MODO WL  cuadrosPorDireccion=10 direcciones= 8 capas=4  fps=25.00 [animdata(FAWLHTH)]  40.00 ms/cuadro  ciclo=400 ms
+    MODO GH  cuadrosPorDireccion= 7 direcciones= 8 capas=4  fps=25.00 [animdata(FAGHHTH)]  40.00 ms/cuadro  ciclo=280 ms
+    MODO A1  cuadrosPorDireccion=10 direcciones= 8 capas=4  fps=25.00 [animdata(FAA1HTH)]  40.00 ms/cuadro  ciclo=400 ms
+    MODO A2  cuadrosPorDireccion=15 direcciones= 8 capas=4  fps=25.00 [animdata(FAA2HTH)]  40.00 ms/cuadro  ciclo=600 ms
+    MODO DT  cuadrosPorDireccion=20 direcciones= 8 capas=3  fps=25.00 [animdata(FADTHTH)]  40.00 ms/cuadro  ciclo=800 ms
+    MODO DD  cuadrosPorDireccion= 1 direcciones= 8 capas=3  fps=25.00 [animdata(FADDHTH)]  40.00 ms/cuadro  ciclo= 40 ms
+    TOTAL cuadros (esos modos)=664
+
+  * parado: 20 cuadros (800 ms por ciclo);
+  * recibiendo el golpe: **GH, 7 cuadros (280 ms)** -- es el numero que va a pedir el criterio 3 de DC-002.50;
+  * atacando: A1 10 cuadros (400 ms), A2 15 (600 ms);
+  * muriendo: DT 20 cuadros (800 ms) y despues DD, 1 cuadro.
+  * el golpe del PERSONAJE de referencia (amazona A1): 13 cuadros a 40 ms = 520 ms.
+
+Ojo con la sonda: en la primera pasada contra el fallen los 11 modos salieron `0 bytes` porque la ruta que armaba
+era `data\global\chars\FA\...` (personajes) en vez de `monsters\FA\...`: era el instrumento, no el MPQ. Corregido
+con `-tipo monsters`.
+

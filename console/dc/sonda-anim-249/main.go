@@ -29,6 +29,7 @@ func main() {
 	mpqPath := flag.String("mpq", filepath.Join(os.Getenv("HOME"), ".wine-d2", "drive_c", "Games", "Diablo II", "d2char.mpq"), "d2char.mpq (los personajes NO estan en d2data.mpq)")
 	token := flag.String("token", "AM", "token del personaje (AM = amazona)")
 	busca := flag.String("busca", "", "en vez del censo: lista las rutas del MPQ que contengan este texto")
+	tipo := flag.String("tipo", "chars", "carpeta del MPQ donde viven los COF: chars (personajes) o monsters")
 	flag.Parse()
 
 	m, err := d2mpq.FromFile(*mpqPath)
@@ -97,14 +98,14 @@ func main() {
 		err := error(nil)
 
 		for _, wc := range []string{"hth", "1hs", "bow", "stf", "2hs"} {
-			cofUsado = fmt.Sprintf(`data\global\chars\%s\COF\%s%s%s.COF`, *token, *token, modo, wc)
+			cofUsado = fmt.Sprintf(`data\global\%s\%s\COF\%s%s%s.COF`, *tipo, *token, *token, modo, wc)
 
-			if rawCof, err = m.ReadFile(cofUsado); err == nil {
+			if rawCof, err = m.ReadFile(cofUsado); err == nil && len(rawCof) > 0 {
 				break
 			}
 		}
 
-		if rawCof == nil {
+		if len(rawCof) == 0 {
 			fmt.Printf("MODO %-2s  sin COF (%s)\n", modo, cofUsado)
 
 			continue
@@ -112,7 +113,7 @@ func main() {
 
 		c, err := d2cof.Unmarshal(rawCof)
 		if err != nil {
-			fmt.Printf("MODO %-2s  COF ilegible: %v\n", modo, err)
+			fmt.Printf("MODO %-2s  COF ilegible (%d bytes leidos): %v\n", modo, len(rawCof), err)
 
 			continue
 		}
