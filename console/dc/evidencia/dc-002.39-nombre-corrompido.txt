@@ -131,9 +131,11 @@ La CONSULTA de los 21.253 nombres pierde entre 0 y 6 nombres por corrida (en la 
 en la vuelta en la que cae una recoleccion. Es el mismo agujero del VALOR QUE LA RECOLECCION NO PUEDE VER (un
 temporal en un registro en el momento de recolectar) pero en el camino de la CONSULTA.
 
-Por eso la **seccion 2b del corpus de DC-002.33 NO se borra todavia**: su control 2b pide los 21.253 exactos.
-Cuando el runtime vuelque TODOS los registros en el punto de recoleccion (el derrame de bancos que se probo aca
-cubria r8..r13 y no alcanzo), esa seccion sobra.
+Por eso la **seccion 2b del corpus de DC-002.33 se borro** (la corrida extra de d2char ya no hace falta: la
+seccion 2 mide el tercero en la misma pasada) y su **control 2b** -- que ahora se calcula con los numeros de la
+seccion 2 -- queda como el VIGIA de este residuo: verde cuando la consulta cierra con los 21.253, rojo cuando
+pierde alguno. El arreglo de fondo es del runtime (un punto de recoleccion que vuelque TODOS los registros; el
+derrame de bancos que se probo aca cubria r8..r13 y no alcanzo); cuando este, el control 2b queda verde estable.
 
 Mismo patron, para la proxima: `console/dc/poc/motor-reservas` (`for i, nombre := range orden`, con el tercero
 saliendo con el nombre vacio en una corrida de DC-002.33) y `d2app/d2setup/discover.go:58` (`for _, want :=

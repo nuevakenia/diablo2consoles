@@ -3992,14 +3992,16 @@ nombres por corrida (medido en la corrida del cierre: `10008` de `10009` en d2ch
 d2data => `TOTAL contenidos= 21252`; en otra corrida del mismo binario fue `21250`), siempre con los mismos
 sintomas (nombre bien formado + `segundo intento contiene= true`) y siempre en la vuelta en la que cae una
 recoleccion. Es el mismo agujero del **valor que la recoleccion no puede ver** (un temporal en un registro en
-el momento de recolectar, que en este runtime no se barre) y por eso la **seccion 2b del corpus de DC-002.33
-todavia NO se puede borrar**: su control 2b pide los 21.253 exactos. El arreglo de fondo es del runtime (un
+el momento de recolectar, que en este runtime no se barre) y por eso la **seccion 2b del corpus de DC-002.33 se
+borro** (la corrida extra del tercero ya no hace falta) y su **control 2b** -- que ahora se calcula con los
+numeros de la seccion 2 -- queda como el **vigia** de ese residuo: verde cuando la consulta cierra con los
+21.253, rojo cuando pierde alguno. El arreglo de fondo es del runtime (un
 punto de recoleccion que vuelque **todos** los registros, como el derrame de bancos que se probo para r8..r13
 y no alcanzo), no del codigo del motor. Cada POC que recorre el `MpqLoadOrder` con `range` y trabajo pesado
 adentro tiene el mismo patron (`console/dc/poc/motor-reservas`, `d2app/d2setup/discover.go`).
 
-Barreras: el corpus de DC-002.33 con la corrida de los 3 MPQ en una pasada (**el `TOTAL` sale**; la seccion 2b
-se deja por el control 2b) y `checar-cadenas-236.sh` (el arreglo de punteros interiores del runtime sigue
-aplicado).
+Barreras: el corpus de DC-002.33 con la corrida de los 3 MPQ en una pasada (**el `TOTAL` sale**, las tres vueltas
+en la misma corrida y el control 2b vigilando el residuo de la consulta) y `checar-cadenas-236.sh` (el arreglo de
+punteros interiores del runtime sigue aplicado).
 
 Evidencia cruda: `evidencia/dc-002.39-nombre-corrompido.txt`.
