@@ -5667,6 +5667,13 @@ configuración **con** bestia está al límite con los 32.032 B de TN de una dir
 pide decidir el presupuesto de memoria del arranque, o componerlo sólo cuando la bestia esté apagada. No se resuelve
 inventando un número.
 
+**Y el instrumento está medido ANTES de la feature** (`-png-dirs TN` → `pantalla-<MODO>-dNN.png` +
+`scripts/console/distinguir-dirs-249b.py`, que compara las referencias por pares dentro de la **unión de lo que cada
+una cambia** respecto del mapa solo — comparar la pantalla entera es el error que en DC-002.49 dio 68,45 % contra
+68,30 %): las 8 direcciones del control se distinguen, el **mejor** par da `00-09 = 50,60 %` y el **peor** `04-12 =
+33,71 %` (TW: 58,04 % / 37,37 %; las 16 de TN: peor 31,08 %) → **DISCRIMINA**. Una captura de la dirección N tiene
+que dar ~100 % contra su referencia y quedarse en ese orden contra las otras siete.
+
 **Lo que NO entra (declarado, no tapado):** esta sección es la **medición**, no el cierre del hito. Los criterios 1,
 2 y 4 piden **capturas de la consola** (que la flecha derecha dibuje otra caja, que la cadencia de TN siga en 128
 ms/cuadro y la de TW en 40, y el mutante del giro quieto) y no hay ninguna todavía: mientras se medía, la ventana de

@@ -228,3 +228,37 @@ O sea: la configuracion CON bestia esta hoy al limite con TN de una direccion (3
 El giro NO es un parche de plomeria: pide decidir el presupuesto de memoria del arranque (que es lo que esta
 peleando DC-002.50), o bajar el costo por direccion, o componer el giro solo cuando la bestia este apagada. Eso
 queda dicho aca y en la tarjeta; NO se resuelve inventando un numero.
+
+
+=============================================================================
+8. EL INSTRUMENTO DISCRIMINA LAS 8 DIRECCIONES (medido ANTES de tener la feature)
+=============================================================================
+
+El criterio 1 pide decir, mirando una captura, QUE direccion dibujo el personaje. Antes de exigirle eso a una
+captura hay que medir si el instrumento puede. Se comparan las REFERENCIAS del host entre si (la pantalla de 640x480
+con el cuadro 0 de cada direccion encima del mapa), y la region que se compara no se inventa: es la UNION de lo que
+cada referencia cambia respecto del mapa solo (es el error que tuvo DC-002.49 cuando comparo pantallas enteras y le
+dio 68,45 % contra 68,30 %: el mapa tapa la diferencia).
+
+Instrumento nuevo: `console/dc/verif-personaje-238 -png-dirs TN -png-ciclo DIR` escribe `pantalla-<MODO>-dNN.png`
+para las 16 direcciones (con `-png-mapa` sale la referencia sin personaje) y `scripts/console/distinguir-dirs-249b.py`
+hace las comparaciones por pares.
+
+    DISTINGUIR-DIRS-249b --modo TN   (las 8 direcciones del control)
+    DIR 00 caja=304,171 26x77 pixeles=1088     DIR 01 caja=314,174 22x73 pixeles=853
+    DIR 04 caja=304,174 25x74 pixeles=1058     DIR 07 caja=309,180 20x71 pixeles=827
+    DIR 08 caja=304,172 26x76 pixeles=1094     DIR 09 caja=307,171 24x77 pixeles=1042
+    DIR 12 caja=310,179 26x70 pixeles=1067     DIR 15 caja=304,176 23x73 pixeles=951
+    28 pares: MEJOR par 00-09 identidad=50.60 %, PEOR par 04-12 identidad=33.71 %  -> DISCRIMINA
+    (modo TW: MEJOR 58,04 % en 07-09, PEOR 37,37 % en 00-15 -> DISCRIMINA; las 16 de TN: PEOR 31,08 % en 04-06)
+
+O sea: dos direcciones distintas se parecen como mucho un 50,60 % (TN) y por lo menos un 33,71 %; una captura de
+la consola que dibuje la direccion N tiene que dar ~100 % contra la referencia N y quedarse en ese orden contra las
+otras siete. El criterio 1 es medible con este instrumento; lo que falta no es el instrumento, es la captura (la
+ventana del emulador esta tomada por DC-002.50, ver seccion 5).
+
+REPRODUCIR (solo host, sin emulador):
+
+    go build -o /tmp/verif238 ./console/dc/verif-personaje-238
+    /tmp/verif238 -png-mapa /tmp/dirs/mapa.png -png-dirs TN,TW -png-ciclo /tmp/dirs
+    python3 scripts/console/distinguir-dirs-249b.py --host /tmp/dirs --mapa /tmp/dirs/mapa.png --modo TN

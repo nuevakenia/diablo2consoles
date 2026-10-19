@@ -96,6 +96,7 @@ func main() {
 	censoDirs := flag.String("censo-dirs", "", "DC-002.49b: modos cuyo ciclo se censa en TODAS las direcciones del COF (para saber cuantas entran compuestas), separados por coma")
 	censoControl := flag.Bool("censo-control", false, "DC-002.49b: de los 8 estados del control a la direccion del COF, con las funciones del motor")
 	censoPeso := flag.String("censo-peso", "", "DC-002.49b: el pico de memoria de componer un ciclo (crudo + decodificado), por modo")
+	pngDirs := flag.String("png-dirs", "", "DC-002.49b: modos cuyas referencias POR DIRECCION se escriben como PNG (en la carpeta de -png-ciclo)")
 	flag.Parse()
 
 	ruta := *mpqPath
@@ -369,6 +370,17 @@ func main() {
 		}
 	}
 
+	// las referencias POR DIRECCION (DC-002.49b): la pantalla del host con el cuadro 0 de cada direccion del
+	// control encima. Es contra lo que se compara la captura para decir QUE direccion se dibujo (criterio 1).
+	if *pngDirs != "" {
+		for _, modo := range strings.Split(*pngDirs, ",") {
+			modo = strings.ToUpper(strings.TrimSpace(modo))
+			if modo != "" {
+				escribirPNGsDeDirecciones(mc, modo, *pngCiclo, palUni, pantallaSin, mapaX+anclaX, mapaY+anclaY)
+			}
+		}
+	}
+
 	// ============================== 7. LA DIRECCION QUE PIDE EL CONTROL (DC-002.49b) ==============================
 	//
 	// La cadena del motor, sin inventar nada: control (ejeX,ejeY) -> DireccionDelPiso (personaje.go, la inversa
@@ -391,6 +403,49 @@ func main() {
 			}
 		}
 	}
+}
+
+// escribirPNGsDeDirecciones (DC-002.49b): la pantalla del host con el CUADRO 0 de cada direccion del COF encima,
+// con el nombre `pantalla-<MODO>-d<NN>.png`. Es la referencia del criterio 1: la captura de la consola se compara
+// contra las 8 y la que gana dice QUE direccion se dibujo (el medidor recorta la caja del personaje con las mismas
+// cuentas que ya usa DC-002.49, `medir-anim-249.py`).
+func escribirPNGsDeDirecciones(mc *d2mpq.MPQ, modo, carpeta string, pal [256][3]uint8,
+	mapaBase []byte, anclaX, anclaY int) {
+	if carpeta == "" {
+		fmt.Printf("CENSO-GIRO: %s PNG-DIRS sin carpeta (pasa -png-ciclo)\n", modo)
+		return
+	}
+
+	cof, nombreCOF, _, err := cofDelModo(mc, modo)
+	if err != nil {
+		fmt.Printf("CENSO-GIRO: %s SIN-COF: %v\n", modo, err)
+		return
+	}
+
+	n := cof.FramesPerDirection
+	escritas := 0
+
+	for dir := 0; dir < cof.NumberOfDirections; dir++ {
+		capas := capasDelCiclo(mc, cof, dir, modo)
+		compuestos := componerCiclo(cof, capas, dir, n)
+
+		if len(compuestos) == 0 {
+			continue
+		}
+
+		p := compuestos[0]
+
+		pantalla := make([]byte, len(mapaBase))
+		copy(pantalla, mapaBase)
+		dibujarPersonaje(pantalla, p, pal, anclaX+p.Izq, anclaY+p.Arriba)
+
+		ruta := filepath.Join(carpeta, fmt.Sprintf("pantalla-%s-d%02d.png", modo, dir))
+		escribirPNG(ruta, pantalla, pantallaAncho, pantallaAlto)
+		escritas++
+	}
+
+	fmt.Printf("CENSO-GIRO: %s PNG-DIRS COF=%s dirs=%d escritas=%d carpeta=%s\n",
+		modo, nombreCOF, cof.NumberOfDirections, escritas, carpeta)
 }
 
 // censarPeso: cuanto pesa componer UN ciclo, capa por capa, y cual es el PICO de memoria (crudo + decodificado).
