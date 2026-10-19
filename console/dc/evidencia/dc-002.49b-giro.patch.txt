@@ -1,0 +1,214 @@
+# DC-002.49b — el cambio del GIRO, tal como se compilo para SH-4.
+#
+# NO esta aplicado al repo: este diff se hizo sobre una COPIA del POC
+# (/tmp/dc249b/poc-giro) porque `console/dc/poc/personaje-mapa/main.go` lo estaba editando la corrida de
+# DC-002.50. Se guarda aca porque /tmp se poda y el trabajo no se puede perder.
+#
+# BASE: `console/dc/poc/personaje-mapa/main.go` con sha256 565bc90ffa311acdad0a (15:33). Esa base YA NO es
+# la del repo: al aplicarlo hay que releer el archivo y volver a hacer los remiendos (son 5 chicos, ver
+# abajo). El archivo nuevo `giro.go` va tal cual a la carpeta del POC.
+#
+# LO QUE HACE (medido: ELF 8.820.448 B, 1ST_READ.BIN 1.846.792 B, compila y enlaza con gccgo 15.1 + KOS):
+#   1. `giro.go`: `direccionDelControl(ejeX,ejeY)` = la cadena del motor
+#      (DireccionDelPiso -> d2vector.DirectionTo -> d2cof.Dir64ToCof) y `direccionesDelControl()` = las 8
+#      direcciones distintas que la cruceta puede pedir (medido: [0 1 4 7 8 9 12 15]).
+#   2. `ciclo.Dir`, y `cargarCicloCon` lo llena con la direccion que compuso.
+#   3. `buscarCiclo(modo, dir)` y caida a la direccion 0 si la pedida no esta compuesta.
+#   4. En `Update`: `dirActual` desde la cruceta + la marca `HITO249B: GIRO dir=... ejes=... mutante=...`.
+#   5. En `cargarCiclos`: compone las 8 direcciones del control (TN siempre; TW cuando TW se compone) con su
+#      marca `HITO249B: DIRECCIONES` y su `MEMORIA etapa=ciclo-<MODO>` por cada una.
+#   6. `giroSordo` (GIRO_SORDO=1 por sed en el build) = EL MUTANTE del criterio 4.
+#
+# Archivo nuevo aparte de este diff: `giro.go` (esta entero en la seccion "NUEVO ARCHIVO" del final).
+#
+--- console/dc/poc/personaje-mapa/main.go	2026-10-19 15:35:43 -0300
++++ /tmp/dc249b/poc-giro/main.go	2026-10-19 15:41:50 -0300
+@@ -231,6 +231,7 @@
+ // ciclo: la animacion de UN modo (TN quieto, TW caminando), cuadro por cuadro.
+ type ciclo struct {
+ 	Modo        string
++	Dir         int           // DC-002.49b: la direccion del COF de este ciclo
+ 	MsPorCuadro int
+ 	Cuadros     []cuadro
+ 	Imagen      *ebiten.Image // la imagen del cuadro que se esta dibujando (se reemplaza al cambiar)
+@@ -314,6 +315,20 @@
+ 	// ---- el movimiento del MOTOR (d2path): la velocidad de la tabla del exe, en la direccion pedida
+ 	j.movido = false
+ 
++	// ---- LA DIRECCION (DC-002.49b): la cruceta elige QUE direccion del COF mira el personaje; la cadena es la
++	// del motor (DireccionDelPiso -> DirectionTo -> Dir64ToCof) y las 8 direcciones que puede pedir estan
++	// compuestas al arranque, asi que girar no cuesta nada en el cuadro.
++	if !giroSordo && (ejeX != 0 || ejeY != 0) {
++		d := direccionDelControl(ejeX, ejeY)
++
++		if d != dirActual {
++			dirActual = d
++
++			println("HITO249B: GIRO dir=", dirActual, "ejes=", int(ejeX), int(ejeY),
++				"cuadroDelLoop=", j.cuadros, "mutante=", giroSordo)
++		}
++	}
++
+ 	if !controlSordo && (ejeX != 0 || ejeY != 0) && paso > 0 {
+ 		dx, dy := DireccionDelPiso(ejeX, ejeY)
+ 		if caminado := j.est.Avanzar(dx, dy, paso); caminado > 0 {
+@@ -489,12 +504,12 @@
+ 		deseado = modoGolpePersonaje
+ 	}
+ 
+-	c := j.buscarCiclo(deseado)
++	c := j.buscarCiclo(deseado, dirActual)
+ 
+ 	// el modo pedido puede no estar compuesto (DC-002.50: el binario del golpe no compone TW por RAM): en ese
+ 	// caso se dibuja el quieto, que SIEMPRE esta, en vez de dejar al personaje congelado en el ultimo cuadro.
+ 	if c == nil && deseado != modoQuieto {
+-		c = j.buscarCiclo(modoQuieto)
++		c = j.buscarCiclo(modoQuieto, dirActual)
+ 	}
+ 
+ 	if c == nil || len(c.Cuadros) == 0 || c.Imagen == nil {
+@@ -532,12 +547,20 @@
+ 	j.ponerCuadro(c, f)
+ }
+ 
+-// buscarCiclo: el ciclo de un modo, si esta cargado.
+-func (j *juego) buscarCiclo(modo string) *ciclo {
++// buscarCiclo: el ciclo de un modo y una direccion, si esta cargado (DC-002.49b).
++func (j *juego) buscarCiclo(modo string, dir int) *ciclo {
+ 	for _, c := range j.ciclos {
+-		if c.Modo == modo {
++		if c.Modo == modo && c.Dir == dir {
++			return c
++		}
++	}
++
++	// la direccion pedida puede no estar compuesta (RAM): se dibuja la 0 de ese modo, que es la que dibujaba
++	// DC-002.38, en vez de dejar al personaje con el ciclo de OTRA direccion.
++	for _, c := range j.ciclos {
++		if c.Modo == modo && c.Dir == 0 {
+ 			return c
+ 		}
+ 	}
+@@ -616,7 +639,7 @@
+ 		return
+ 	}
+ 
+-	golpe := j.buscarCiclo(modoGolpePersonaje)
++	golpe := j.buscarCiclo(modoGolpePersonaje, dirActual)
+ 	if golpe == nil || len(golpe.Cuadros) == 0 {
+ 		j.golpeando = false
+ 
+@@ -1222,8 +1245,25 @@
+ 				"framesPorDir", cofModo.FramesPerDirection, "capas", cofModo.NumberOfLayers,
+ 				"dirs", cofModo.NumberOfDirections)
+ 
+-			ci := cargarCiclo(mc, cofModo, dirPersonaje, m.modo, m.ms, palUni)
+-			ciclos = append(ciclos, ci)
++			dirsCOFDelPersonaje = cofModo.NumberOfDirections
++
++			// DC-002.49b: se componen TODAS las direcciones que la cruceta puede pedir (medido: 8), no una.
++			// Con la bestia encendida se compone SOLO TN: el presupuesto de memoria de DC-002.50 esta al
++			// limite (medido: TN+TW+A1+los cuatro del bicho no entra) y las 8 de TN son 246.768 B.
++			pedidas := []int{dirPersonaje}
++
++			if m.modo == modoQuieto || !bestia {
++				pedidas = direccionesDelControl()
++			}
++
++			println("HITO249B: DIRECCIONES modo=", m.modo, "pedidas=", len(pedidas), "dirsCOF=", dirsCOFDelPersonaje)
++
++			for _, dirPedida := range pedidas {
++				ci := cargarCiclo(mc, cofModo, dirPedida, m.modo, m.ms, palUni)
++				ciclos = append(ciclos, ci)
++
++				memoria("ciclo-" + m.modo)
++			}
+ 
+ 			cofModo = nil
+ 
+@@ -1457,7 +1507,7 @@
+ 		}
+ 	}
+ 
+-	c := &ciclo{Modo: modo, MsPorCuadro: msPorCuadro, UnTiro: unTiro}
++	c := &ciclo{Modo: modo, Dir: dir, MsPorCuadro: msPorCuadro, UnTiro: unTiro}
+ 
+ 	for f := 0; f < n; f++ {
+ 		per := NuevoPersonaje(cof, dir, f)
+
+# ============================== NUEVO ARCHIVO: console/dc/poc/personaje-mapa/giro.go ==============================
+#
+# El archivo nuevo va aparte, copiado TAL CUAL del que compilo (no se transcribe a mano aca):
+#
+#     console/dc/evidencia/dc-002.49b-giro.go.txt
+#     sha256 5e2e34ad3214e739858bad4b... (66 lineas) -> destino: console/dc/poc/personaje-mapa/giro.go
+#
+# OJO: lo que sigue es una copia de LECTURA del mismo archivo (para verlo en un diff); si hay cualquier
+# diferencia, la version que vale es la del .go.txt, que es la que se copio con cp del arbol que compilo.
+
++package main
++
++// DC-002.49b: LA DIRECCION DEL MOVIMIENTO.
++//
++// El motor no inventa la direccion de una entidad: la saca de la cadena
++//   (dx,dy) en celdas -> d2vector.Vector.DirectionTo (64 direcciones) -> d2cof.Dir64ToCof (las del COF)
++// que es la MISMA que usa para pintar (`d2core/d2asset/composite.go:70`). Aca se hace exactamente eso, y se
++// midio que los 8 estados de la cruceta dan 8 direcciones distintas del COF: [0 1 4 7 8 9 12 15]
++// (verif-personaje-238 -censo-control, evidencia dc-002.49b, seccion 3).
++//
++// Costo medido de tener las 8 compuestas (host, verif-personaje-238 -censo-dirs):
++//   TN 246.768 B de indices, TW 148.720 B; el giro despues es elegir otro ciclo: 0 ms de cuadro.
++
++import (
++	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2cof"
++	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
++)
++
++// giroSordo: EL MUTANTE del criterio 4. Con esto en true la direccion se queda en la 0 (la que dibujaba
++// DC-002.38) mientras el control se sigue leyendo y el personaje se sigue moviendo: las capturas con distinta
++// tecla tienen que ser IDENTICAS. Se enciende con GIRO_SORDO=1 en el build (sed), igual que cicloSordo.
++var giroSordo = false
++
++// dirActual: la direccion del COF que el personaje esta mirando. Arranca en la del POC de DC-002.38.
++var dirActual = dirPersonaje
++
++// dirsCOFDelPersonaje: cuantas direcciones tiene el COF del heroe. Se MIDE al cargarlo (la amazona: 16); el
++// valor de aca es el que usa el control antes de que el COF este cargado.
++var dirsCOFDelPersonaje = 16
++
++// direccionDelControl: el estado de la cruceta (cada eje en -1,0,1) -> la direccion del COF, con las funciones
++// del motor. No hay tabla propia: si el motor cambia de criterio, esto lo sigue.
++func direccionDelControl(ejeX, ejeY float64) int {
++	dx, dy := DireccionDelPiso(ejeX, ejeY)
++
++	origen := d2vector.NewVector(0, 0)
++	destino := d2vector.NewVector(dx, dy)
++
++	return d2cof.Dir64ToCof(origen.DirectionTo(*destino), dirsCOFDelPersonaje)
++}
++
++// direccionesDelControl: las direcciones del COF DISTINTAS que la cruceta puede pedir (8 de los 9 estados: el
++// centro no pide ninguna). Es el conjunto que hay que tener compuesto para que el personaje gire sin pagar nada
++// en el cuadro.
++func direccionesDelControl() []int {
++	vistas := make(map[int]bool, 8)
++	dirs := make([]int, 0, 8)
++
++	for ejeX := -1; ejeX <= 1; ejeX++ {
++		for ejeY := -1; ejeY <= 1; ejeY++ {
++			if ejeX == 0 && ejeY == 0 {
++				continue
++			}
++
++			d := direccionDelControl(float64(ejeX), float64(ejeY))
++			if vistas[d] {
++				continue
++			}
++
++			vistas[d] = true
++			dirs = append(dirs, d)
++		}
++	}
++
++	return dirs
++}
