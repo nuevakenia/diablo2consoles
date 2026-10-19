@@ -282,7 +282,11 @@ func (r *RecordManager) init() error { // nolint:funlen // can't reduce
 		}
 	}
 
-	r.initObjectRecords(objectLookups)
+	// DC-002.42: ACA ESTABA `r.initObjectRecords(objectLookups)`, el volcado de los 7.891 registros en el
+	// arranque. MEDIDO (DC-002.32): eso armaba el indice `Object.Lookup` con punteros DENTRO de la tabla, o
+	// sea que la tabla entera (1.672.892 B de `.data`) tenia que estar viva desde el init del motor. Ahora el
+	// indice se llena POR REGISTRO la primera vez que el motor pide uno (lookupObject) y en la consola ese
+	// registro lo trae el archivo del disco: el arranque no toca la tabla.
 
 	return nil
 }
@@ -397,27 +401,47 @@ func (r *RecordManager) FindEquivalentTypesByItemCommonRecord(
 	return r.Item.EquivalenceByRecord[icr]
 }
 
-func (r *RecordManager) initObjectRecords(lookups []ObjectLookupRecord) {
-	// Allocating 6 to allow Acts 1-5 without requiring a -1 at every read.
-	records := make(IndexedObjects, 6)
+// Objetos: topes del indice de Object.Lookup. Los mismos numeros que usaba el volcado del arranque (6 actos
+// para no necesitar un -1 en cada lectura, 3 tipos por lo mismo y 1000 ids por fila).
+const (
+	objetosActosMax = 6
+	objetosTiposMax = 3
+	objetosIdMax    = 1000
+)
 
+// initObjectRecords deja en el indice los registros que se le pasan. El ARRANQUE ya NO lo llama (ver el
+// comentario en init): lo usa TestIndexObjects para fijar la semantica de LookupObject sin depender de la
+// tabla del juego. El camino del motor es lookupObject, que pide el registro a la FUENTE (tabla compilada en
+// el host, archivo del disco en la consola) la primera vez.
+func (r *RecordManager) initObjectRecords(lookups []ObjectLookupRecord) {
 	for i := range lookups {
 		record := &lookups[i]
-		if records[record.Act] == nil {
-			// Likewise allocating 3 so a -1 isn't necessary.
-			records[record.Act] = make([][]*ObjectLookupRecord, 3)
-		}
+		r.guardaObjectRecord(record.Act, int(record.Type), record.Id, record)
+	}
+}
 
-		if records[record.Act][record.Type] == nil {
-			// For simplicity, allocating with length 1000 then filling the values in by index.
-			// If ids in the dictionary ever surpass 1000, raise this number.
-			records[record.Act][record.Type] = make([]*ObjectLookupRecord, 1000)
-		}
-
-		records[record.Act][record.Type][record.Id] = record
+// guardaObjectRecord pone el registro en Object.Lookup[act][tipo][id], armando las filas a demanda (antes se
+// armaban todas de una: 6 x 3 x 1000 punteros mas los 7.891 registros enteros).
+func (r *RecordManager) guardaObjectRecord(act, typ, id int, record *ObjectLookupRecord) bool {
+	if act < 0 || act >= objetosActosMax || typ < 0 || typ >= objetosTiposMax || id < 0 || id >= objetosIdMax {
+		return false
 	}
 
-	r.Object.Lookup = records
+	if r.Object.Lookup == nil {
+		r.Object.Lookup = make(IndexedObjects, objetosActosMax)
+	}
+
+	if r.Object.Lookup[act] == nil {
+		r.Object.Lookup[act] = make([][]*ObjectLookupRecord, objetosTiposMax)
+	}
+
+	if r.Object.Lookup[act][typ] == nil {
+		r.Object.Lookup[act][typ] = make([]*ObjectLookupRecord, objetosIdMax)
+	}
+
+	r.Object.Lookup[act][typ][id] = record
+
+	return true
 }
 
 // FindObject is LookupObject without the fatal error: nil for a DS1 object the table has no row for.
@@ -435,20 +459,37 @@ func (r *RecordManager) LookupObject(act, typ, id int) *ObjectLookupRecord {
 	return object
 }
 
+// lookupObject: primero el indice (los registros ya pedidos), y si no esta se le pide a la fuente. En la
+// consola esa fuente es el archivo del DISCO y la lectura es POR REGISTRO: un nivel pide un punado de
+// registros y solo esos entran en RAM (los 7.891 no se piden nunca de una).
 func (r *RecordManager) lookupObject(act, typ, id int) *ObjectLookupRecord {
-	if act < 0 || typ < 0 || id < 0 || len(r.Object.Lookup) <= act {
+	if act < 0 || typ < 0 || id < 0 || act >= objetosActosMax || typ >= objetosTiposMax || id >= objetosIdMax {
 		return nil
 	}
 
-	if len(r.Object.Lookup[act]) <= typ {
+	if r.Object.Lookup != nil && r.Object.Lookup[act] != nil && r.Object.Lookup[act][typ] != nil {
+		if record := r.Object.Lookup[act][typ][id]; record != nil {
+			return record
+		}
+	}
+
+	fuente := fuenteDeObjectLookups()
+
+	base, n, hay := fuente.Grupo(act, typ)
+	if !hay || id >= n {
 		return nil
 	}
 
-	if len(r.Object.Lookup[act][typ]) <= id {
+	record := &ObjectLookupRecord{}
+	if err := fuente.Registro(base+id, record); err != nil {
+		r.Errorf("lookupObject: act %d tipo %d id %d: %s", act, typ, id, err.Error())
+
 		return nil
 	}
 
-	return r.Object.Lookup[act][typ][id]
+	r.guardaObjectRecord(record.Act, int(record.Type), record.Id, record)
+
+	return record
 }
 
 // SelectSoundByIndex selects a sound by its ID

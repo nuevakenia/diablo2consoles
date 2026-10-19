@@ -1,0 +1,587 @@
+
+== 0. la carpeta del juego, el archivo de la tabla y el host
+   MPQ: 3 en /home/dgalli/.hermes/cache/scratch/dc242-corpus/juego (540830919 bytes)
+   PACK-242 tabla compilada: 7891 registros (object_lookup_record_data.go)
+   PACK-242 archivo: /home/dgalli/.hermes/cache/scratch/dc242-corpus/juego/objectlookups.pack
+   PACK-242 bytes=773869 registros=7891 grupos=10 maxRegistro=165 crc=2553790715
+   PACK-242 verificado: bytes=773869 registros=7891 grupos=10 maxRegistro=165 crc=2553790715 crcLeida=2553790715
+   PACK-242 indice en RAM: 31644 bytes (4 x 7891) + ventana de lectura de 4096
+   OK: control 0a: el archivo de la tabla se armo y se verifico con el lector de la consola (773869 bytes, sha256 0255463368aa6513...)
+   OK: control 0b: go test ./d2core/d2records/... verde
+grep: warning: \ sobrante después de -
+grep: warning: \ sobrante después de -
+grep: warning: \ sobrante después de -
+   OK: control 0c: el formato de ida y vuelta (4 pruebas verdes: PACK-242 bytes=773869 registros=7891)
+
+== 2. la capa base, y las dos capas (FIX: la tabla fuera / MUT: la tabla adentro)
+   capa base: /tmp/gox-241 (142 paquetes del motor)
+   OK: control 2: la capa /tmp/gox-241 es la de este arbol (d2mpq.gox byte a byte igual al recompilarlo)
+   capa ya lista: /home/dgalli/.hermes/cache/scratch/dc242-corpus/gox-fix
+   capa ya lista: /home/dgalli/.hermes/cache/scratch/dc242-corpus/gox-mut
+
+== 3. las dos imagenes (con los MPQ y el archivo de la tabla en la ISO)
+   fix: 1ST_READ.BIN 12010568 bytes, ISO 552898560 bytes
+   mut: 1ST_READ.BIN 13808392 bytes, ISO 554696704 bytes
+   sin: 1ST_READ.BIN 12010568 bytes (sin el archivo de la tabla en el disco)
+
+== 4. los controles de la imagen
+   1ST_READ.BIN: FIX 12010568 / MUT 13808392 -> el mutante pesa 1797824 bytes mas
+   simbolo mas gordo FIX: 8cb8ee60 00020000 b _aligned_vertex_pool
+   simbolo mas gordo MUT: 8cb9ca2c 001986bc d _go..C3111
+   OK: control 3a: el FIX no tiene el simbolo de la tabla (1.672.892 B) en prog.elf
+   OK: control 3b: el MUTANTE si tiene el simbolo de la tabla como simbolo mas gordo
+   OK: control 3c: el mutante pesa 1797824 bytes mas en la imagen (la tabla + sus cadenas: ~1,79 MB)
+   OK: control 4: el archivo de la tabla dentro de la ISO es el del host (sha256 0255463368aa6513...)
+
+== 5. las corridas en Flycast (con reintento: el arranque de la consola es flaky)
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1647212 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/fix/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=15s
+== capturas de la ventana: 14 ==
+     10 negra (el motor no dibujo nada)
+      4 arranque-sega (gris claro uniforme)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+2
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+game files not found at "C:/Program Files (x86)/Diablo II", starting first-run setup
+ARQ-MARCA gc-por-umbral-bytes-usados v=393584
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida fix intento 1: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: 0x1800008 
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1655375 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/fix/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=16s
+== capturas de la ventana: 14 ==
+      8 arranque-sega (gris claro uniforme)
+      6 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+2
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+game files not found at "C:/Program Files (x86)/Diablo II", starting first-run setup
+ARQ-MARCA gc-por-umbral-bytes-usados v=393584
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida fix intento 2: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1671105 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/fix/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=17s
+== capturas de la ventana: 16 ==
+     11 arranque-sega (gris claro uniforme)
+      5 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+2
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+game files not found at "C:/Program Files (x86)/Diablo II", starting first-run setup
+ARQ-MARCA gc-por-umbral-bytes-usados v=393584
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida fix intento 3: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1679808 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/fix/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=16s
+== capturas de la ventana: 15 ==
+      8 arranque-sega (gris claro uniforme)
+      7 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+2
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+game files not found at "C:/Program Files (x86)/Diablo II", starting first-run setup
+ARQ-MARCA gc-por-umbral-bytes-usados v=393584
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida fix intento 4: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1690716 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/fix/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=15s
+== capturas de la ventana: 14 ==
+      9 arranque-sega (gris claro uniforme)
+      5 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+2
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+game files not found at "C:/Program Files (x86)/Diablo II", starting first-run setup
+ARQ-MARCA gc-por-umbral-bytes-usados v=393584
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida fix intento 5: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1698790 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/fix/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=13s
+== capturas de la ventana: 12 ==
+      7 negra (el motor no dibujo nada)
+      5 arranque-sega (gris claro uniforme)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+2
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+game files not found at "C:/Program Files (x86)/Diablo II", starting first-run setup
+ARQ-MARCA gc-por-umbral-bytes-usados v=393584
+ARQ-MARCA gc-por-umbral-bytes-usados v=393272
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida fix intento 6: el motor no llego a abrir 2 fuentes del disco; reintento
+   corrida fix: 3 intentos y el motor no abrio 2 fuentes del disco
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1712190 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/mut/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=20s
+== capturas de la ventana: 19 ==
+     12 negra (el motor no dibujo nada)
+      7 arranque-sega (gris claro uniforme)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+3
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+Memory: arena=1709760 used=1668192 free=41568
+ARQ-MARCA gc-por-umbral-bytes-usados v=393248
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393392
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida mut intento 1: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1721836 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/mut/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=22s
+== capturas de la ventana: 21 ==
+     12 arranque-sega (gris claro uniforme)
+      9 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+3
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+Memory: arena=1709760 used=1668192 free=41568
+ARQ-MARCA gc-por-umbral-bytes-usados v=393248
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393392
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida mut intento 2: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: 0x1800008 
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1734734 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/mut/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=19s
+== capturas de la ventana: 18 ==
+     10 negra (el motor no dibujo nada)
+      8 arranque-sega (gris claro uniforme)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+3
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+Memory: arena=1709760 used=1668192 free=41568
+ARQ-MARCA gc-por-umbral-bytes-usados v=393248
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393392
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida mut intento 3: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1752240 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/mut/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=22s
+== capturas de la ventana: 21 ==
+     13 negra (el motor no dibujo nada)
+      8 arranque-sega (gris claro uniforme)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+3
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+Memory: arena=1709760 used=1668192 free=41568
+ARQ-MARCA gc-por-umbral-bytes-usados v=393248
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393392
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida mut intento 4: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1766406 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/mut/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=24s
+== capturas de la ventana: 22 ==
+     16 arranque-sega (gris claro uniforme)
+      6 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+3
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+Memory: arena=1709760 used=1668192 free=41568
+ARQ-MARCA gc-por-umbral-bytes-usados v=393248
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393392
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida mut intento 5: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: 0x1800008 
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1780986 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/mut/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+  el emulador se detuvo en t=23s
+== capturas de la ventana: 21 ==
+     13 negra (el motor no dibujo nada)
+      8 arranque-sega (gris claro uniforme)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+3
+== el punto donde muere (ultima vuelta) ==
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+Memory: arena=1709760 used=1668192 free=41568
+ARQ-MARCA gc-por-umbral-bytes-usados v=393248
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393392
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida mut intento 6: el motor no llego a abrir 2 fuentes del disco; reintento
+   corrida mut: 3 intentos y el motor no abrio 2 fuentes del disco
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1801873 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/sin/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+== capturas de la ventana: 25 ==
+     21 arranque-sega (gris claro uniforme)
+      4 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+11
+== el punto donde muere (ultima vuelta) ==
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida sin intento 1: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1816778 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/sin/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+== capturas de la ventana: 25 ==
+     21 arranque-sega (gris claro uniforme)
+      4 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+10
+== el punto donde muere (ultima vuelta) ==
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida sin intento 2: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1840936 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/sin/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+== capturas de la ventana: 25 ==
+     20 arranque-sega (gris claro uniforme)
+      5 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+10
+== el punto donde muere (ultima vuelta) ==
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida sin intento 3: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: 0x1800008 
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1851546 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/sin/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+== capturas de la ventana: 25 ==
+     20 arranque-sega (gris claro uniforme)
+      5 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+10
+== el punto donde muere (ultima vuelta) ==
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida sin intento 4: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: ninguna
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1863820 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/sin/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+== capturas de la ventana: 25 ==
+     20 arranque-sega (gris claro uniforme)
+      5 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+9
+== el punto donde muere (ultima vuelta) ==
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida sin intento 5: el motor no llego a abrir 2 fuentes del disco; reintento
+ventanas flycast ANTES: 0x1800008 
+   ventana del emulador: la muevo a 210 210 y la dejo arriba (KWin)
+lanzado: pid=1877704 imagen=/home/dgalli/.hermes/cache/scratch/dc242-corpus/sin/disc.gdi
+ventana NUEVA: 0x1400008 (WM_CLASS(STRING) = "flycast", "flycast" _NET_WM_NAME(UTF8_STRING) = "Flycast" )
+== capturas de la ventana: 25 ==
+     21 arranque-sega (gris claro uniforme)
+      4 negra (el motor no dibujo nada)
+== vueltas del arranque en la consola serie (cada muerte del motor reinicia la consola) ==
+9
+== el punto donde muere (ultima vuelta) ==
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+[File Loader][INFO] Adding source: '/rd'
+[File Loader][INFO] Adding source: '/rd/OpenDiablo2'
+ARQ-MARCA gc-por-umbral-bytes-usados v=393224
+ARQ-MARCA gc-por-umbral-bytes-usados v=393232
+   corrida sin intento 6: el motor no llego a abrir 2 fuentes del disco; reintento
+   corrida sin: 3 intentos y el motor no abrio 2 fuentes del disco
+
+== 6. los numeros de las dos corridas
+== FIX     (la tabla FUERA: se lee del disco)
+   vueltas del arranque        : 2
+   ruta de la tabla            : /cd/juego/objectlookups.pack
+   la tabla del disco          : LOOKUPS-242 bytes= 773869 registros= 7891 grupos= 10 maxRegistro= 165
+   crc e indice                : LOOKUPS-242 crc del archivo= 2553790715 crc leido= 2553790715 indice en RAM= 31644 bytes, leidos del disco= 773869
+   monton al leer la tabla     : 376 bytes libres
+   la tabla del DS1            : 12 37 39 35 36
+   los overrides del DS1       : 0 342
+   FindObject(1,2,0)           : rogue fountain (12) FN NU HTH 12 -1
+   FindObject(1,1,0)           : gheed-ACT 1 TABLE GH NU HTH
+   monton de C antes del motor : 704 bytes libres
+   semiespacio usado maximo    : 393584 -> libre minimo 130704 (5 marcas)
+   fuentes del disco abiertas  : 0 ()
+   assets leidos del MPQ       : 0
+   cuadros dibujados           : 0
+   cartel del motor            : 0
+   muerte                      : Unhandled exception: PC 3147a940, code 1, evt 0180
+   ULTIMA linea de la consola  : 00:39:947 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked
+
+== MUTANTE (la tabla ADENTRO del binario)
+   vueltas del arranque        : 3
+   ruta de la tabla            : /cd/juego/objectlookups.pack
+   la tabla del disco          : LOOKUPS-242 bytes= 773869 registros= 7891 grupos= 10 maxRegistro= 165
+   crc e indice                : LOOKUPS-242 crc del archivo= 2553790715 crc leido= 2553790715 indice en RAM= 31644 bytes, leidos del disco= 773869
+   monton al leer la tabla     : 664 bytes libres
+   la tabla del DS1            : 12 37 39 35 36
+   los overrides del DS1       : 0 342
+   FindObject(1,2,0)           : rogue fountain (12) FN NU HTH 12 -1
+   FindObject(1,1,0)           : gheed-ACT 1 TABLE GH NU HTH
+   monton de C antes del motor : 992 bytes libres
+   semiespacio usado maximo    : 393392 -> libre minimo 130896 (9 marcas)
+   fuentes del disco abiertas  : 0 ()
+   assets leidos del MPQ       : 0
+   cuadros dibujados           : 0
+   cartel del motor            : 0
+   muerte                      : panic: growslice: cap out of range
+   ULTIMA linea de la consola  : 00:23:803 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked
+
+
+== 7. los controles de la consola (el FIX) y del mutante
+   OK: control 5: la consola abrio el archivo del disco: LOOKUPS-242 bytes= 773869 registros= 7891
+   OK: control 6: el crc del archivo del disco cierra en la consola (2553790715) y es el del host
+   OK: control 7: la tabla del DS1 sale del archivo del disco con los numeros del host (12 37 39 35 36)
+   OK: control 8: los dos overrides de la tabla del DS1 (0 y 342) salen bien
+   OK: control 9: FindObject(1,2,0) por el camino del motor trae el registro del host (rogue fountain, FN)
+   OK: control 10: FindObject(1,1,0) (una fila de tipo Character) tambien sale del archivo
+   FALLO: control 11: el arranque no llego a abrir patch_d2.mpq
+   FALLO: control 11: el arranque no llego a abrir d2data.mpq
+   FALLO: control 12: el arranque no leyo ningun asset del MPQ
+   el mutante: 0 lineas 'Adding source' (el corpus lo caza por el peso y por el simbolo)
+   el mutante tambien arma la tabla del DS1 (su d2records trae la tabla compilada)
+   OK: control 13: sin el archivo en el disco la sonda avisa (y el motor se queda sin los registros)
+   FALLO: control 14: el FIX no abre las fuentes del disco (0 fuentes, 0 assets)
+   con el archivo : 0 fuentes / 0 asset(s) -> 
+   sin el archivo: 0 fuentes / 0 asset(s) -> 
+   FALLO: control 15: los dos estados no llegan al mismo tramo (ver las dos lineas de arriba)
+
+   == /home/dgalli/.hermes/cache/scratch/dc242-corpus/run-fix/flycast.log
+     vuelta 1: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 2: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: Unhandled exception: PC 3147a940, code 1, evt 0180
+                ultima linea: 00:39:947 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked
+   
+   == /home/dgalli/.hermes/cache/scratch/dc242-corpus/run-sin/flycast.log
+     vuelta 1: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 2: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 3: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 4: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 5: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 6: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 7: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 8: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 9: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: 00:30:677 reios/reios.cpp:641 N[REIOS]: -----------------
+   
+   == /home/dgalli/.hermes/cache/scratch/dc242-corpus/run-mut/flycast.log
+     vuelta 1: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: panic: growslice: cap out of range
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 2: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: (sin muerte en la ventana)
+                ultima linea: ARQ-MARCA inits-de-paquetes-OK v=0
+     vuelta 3: 0 fuente(s) del disco [] / 0 asset(s) []
+                muere: Unhandled exception: PC 0000085b, code 1, evt 00e0
+                ultima linea: 00:23:803 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked
+   
+
+== RESULTADO: 15 controles OK, 5 con fallo ==
+EXIT=1

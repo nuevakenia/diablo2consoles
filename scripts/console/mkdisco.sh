@@ -62,10 +62,20 @@ else
         BAKED=$((BAKED + 1))
         BYTES=$((BYTES + $(stat -c%s "$f")))
     done
+    # DC-002.42: ademas de los MPQ, el archivo de la TABLA DE objectLookups que el motor lee del disco POR
+    # REGISTRO (`objectlookups.pack`, lo arma console/dc/gen-lookups-pack desde la tabla que antes viajaba
+    # dentro del binario). Va aca, al lado de los MPQ, porque es el mismo camino de datos del juego.
+    for f in "$JUEGO"/*.pack; do
+        [ -f "$f" ] || continue
+        nombre="$(basename "$f" | tr '[:lower:]' '[:upper:]')"
+        ARGS+=("$f:/JUEGO/$nombre;1")
+        BAKED=$((BAKED + 1))
+        BYTES=$((BYTES + $(stat -c%s "$f")))
+    done
 fi
 
 "$DC_PYTHON" "$HERE/mkiso.py" "$ISO" "${ARGS[@]}" | sed 's/^/   /'
 "$DC_PYTHON" "$HERE/mkgdi.py" "$DIR" | sed 's/^/   /'
 
-echo "DISCO: $BAKED MPQ en /JUEGO ($BYTES bytes) + el binario de arranque"
+echo "DISCO: $BAKED archivos en /JUEGO ($BYTES bytes) + el binario de arranque"
 echo "DISCO: $DIR/disc.iso ($(stat -c%s "$ISO") bytes) y $DIR/disc.gdi"

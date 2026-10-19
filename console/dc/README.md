@@ -4184,3 +4184,69 @@ alguien saca este arreglo de la cadena el corpus se pone rojo. El mutante se pid
 en los dos casos (no es este defecto).
 
 Evidencia cruda: `evidencia/dc-002.39b-candidato-interior.txt`.
+
+## 58. DC-002.42: la tabla de `objectLookups` **DE VERDAD** fuera del binario — viaja en el **disco** (`/JUEGO/OBJECTLOOKUPS.PACK`, 773.869 B) y el motor la lee **por registro** (el indice son 31.644 B y la ventana 4 KiB, contra 1.672.892 B de `.data`): **1.797.792 B** menos de imagen, el simbolo `_go..C3111` **desaparecido** y los 7.891 registros iguales a los del host, leidos en la consola con el crc cerrando
+
+La tarjeta pedia aplicar DE VERDAD la palanca que DC-002.32 solo midio como instrumento (vaciando la tabla,
+que deja al motor sin los 7.891 registros) y decidir con medicion DONDE vive la tabla. Ahora vive en el
+**disco** y el motor la lee **por registro** cuando la usa; y el host sigue verde.
+
+* **Los dos archivos del host NO entran al binario** (por NOMBRE, no por etiqueta): `sh-elf-gccgo` **ignora**
+  `//go:build` — medido con dos sondas en `/tmp/probe-tags` (un archivo marcado `dreamcast` y otro marcado
+  `!dreamcast` compilan los dos, exit 0). `build-motor-all.sh` y `recompilar-paquete-motor.sh` excluyen
+  `object_lookup_record_data.go` (el volcado) y `object_lookups_host.go` (el registro de la tabla como fuente
+  y el escritor del archivo). El MUTANTE de la tarjeta es `DC_TABLA_LOOKUPS=dentro`.
+* **El peso**: el `.gox` de `d2records` para SH-4 baja de **4.758.772** a **2.278.484** B (-2.480.288) y el
+  `1ST_READ.BIN` del POC `motor-arranque` (los 3 MPQ + el archivo de la tabla en la ISO) de **13.808.328** a
+  **12.010.536** B: **1.797.792 B** (1,71 MiB, el **10,7%** de los 16.777.216 B de la consola). El simbolo mas
+  gordo del mutante es `_go..C3111` (**1.672.892** = 7.891 x 212 B, `sh-elf-nm -S --size-sort prog.elf`) y en
+  el arreglo **no existe**: el mas gordo pasa a ser `_aligned_vertex_pool` (**131.072** B).
+* **El archivo**: cabecera de 32 B (`"D2OL" | version | flags | n | idxOff | recOff | nGrupos | crc |
+  maxLen`), indice `n x 4` y los registros (act u8, tipo u8, id u16, las **23** cadenas con su largo u8 y 4
+  i16). Lo arma `console/dc/gen-lookups-pack` desde `d2records.ObjectLookupsCompilados()` (MISMA tabla, sin
+  segunda copia) y lo lee `d2core/d2records/object_lookups_store.go`. El corpus comprueba que el archivo de
+  dentro del ISO9660 es el del host (`sha256 0255463368aa6513...`, via `leer-iso.py`).
+* **La consola lo lee** (POC `motor-arranque`, antes de arrancar el motor): `bytes= 773869 registros= 7891
+  grupos= 10 maxRegistro= 165`, `crc del archivo= 2553790715 crc leido= 2553790715` (**el lector verifica el
+  crc recorriendo el archivo entero al abrirlo**), `indice en RAM= 31644 bytes (4 x 7891) + ventana de 4096`.
+  Y los numeros que el MOTOR pide salen iguales a los del host: la tabla del DS1 `12 37 39 35 36` y sus dos
+  overrides `0`, `342`; `FindObject(1,2,0)` = `rogue fountain (12) FN NU HTH 12 -1` y `FindObject(1,1,0)` =
+  `gheed-ACT 1 TABLE GH NU HTH`. En RAM, en vez de 1.672.892 B (+116.048 de cadenas) vivos desde el arranque:
+  **31.644 + 4.096 = 35.740 B**. El `init` de `RecordManager` ya **no** arma `Object.Lookup` con los 7.891
+  registros (eso era, medido en DC-002.32, lo que obligaba a tener la tabla entera desde el arranque): las
+  filas se llenan a demanda (`guardaObjectRecord`) y `DS1ObjectClass` lee solo los grupos de tipo Item y solo
+  el campo `ObjectsTxtId`.
+* **El viaje de ida y vuelta** (el guardian del formato): `TestPackObjectLookups` escribe el `.PACK` desde la
+  tabla compilada, lo reabre con el LECTOR DE LA CONSOLA y compara los **7.891** registros campo por campo
+  (las 23 cadenas + Act/Type/Id + los 4 numericos). El orden de las cadenas lo fija
+  `ordenDeLosCamposDeTexto` (23 entradas): cambiar el struct o ese orden **cae** la prueba. `go test
+  ./d2core/d2records/...` verde.
+* **El arranque de la consola**: en la corrida buena, el estado de este arreglo **abre** `/cd/juego/patch_d2.mpq`
+  y `/cd/juego/d2data.mpq`, inicializa el Asset Manager y **lee su primer asset** del disco
+  (`Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlTypes.txt`), con **736 B** libres en el monton de C
+  y el semiespacio del GC en **401.328** B; el mutante (la tabla adentro) llega al mismo tramo y muere con
+  `Out of memory ... diff 7630848`; y el control negativo (la MISMA capa **sin** el archivo en el disco) llega
+  a **3** fuentes + 1 asset y muere con el OOM chico de DC-002.41 (`diff 319488`). O sea: el muro del tramo
+  siguiente esta **igual** con y sin la tabla.
+* **Dos numeros del enunciado que DC-002.41 movio** (y se reportan tal cual, no se maquillan): el mutante ya
+  **no** muere en el primer MPQ (muere pidiendo 7.630.848 B contiguos al monton de C) y el instrumento ya no
+  llega a `LvlPrest.txt`: con el arreglo de la tabla de hash de `d2data.mpq` en HEAD, los dos se corren un MPQ
+  entero. El corpus igual **caza al mutante**: por la imagen (+1.797.792 B) y por el simbolo de la tabla.
+* **La flakiness del arranque, medida y NO de esta tarjeta**: en las corridas de esta sesion los TRES estados
+  (incluido el que **no** tiene la tabla ni en el binario ni en el disco) se quedan en el primer tramo: la
+  ultima corrida completa del corpus dio **15 controles OK y 5 con fallo**, y los 5 son los del arranque (el
+  FIX y el SIN-ARCHIVO agotaron **6 intentos** cada uno sin abrir una sola fuente). El log dice `could not load
+  file stream config.json (file not found: config.json)` (con una marca `ARQ-MARCA gc_collect` justo antes) y
+  despues `game files not found at "C:/Program Files (x86)/Diablo II"` — la familia del VALOR QUE LA
+  RECOLECCION SE LLEVA (DC-002.39 y DC-002.40), aca con la cadena del camino de `config.json`; la MISMA lectura
+  hecha por el POC **antes** del motor funciona. Y una vez que la vuelta 1 falla, el motor **crea** un config
+  por defecto en `/rd/OpenDiablo2/config.json` (con los caminos de Windows) y ninguna vuelta posterior ve el
+  disco: el sintoma se auto-sostiene dentro de la sesion del emulador (por eso el corpus abre un emulador nuevo
+  en cada intento). Y no es una sospecha: DC-002.39b (commit e6a63acf, en HEAD) midio el MISMO valor ("el
+  camino del config corrompido en `ata\globa`") y lo paso a DC-002.39c ("el puntero `cfg`, un local barrido
+  conservadoramente"). El corpus no la maquilla: corre cada estado hasta 6 veces, reporta el intento y da la
+  tabla de vueltas (`scripts/console/vueltas-242.py`) con las fuentes y los assets de cada una.
+
+El corpus es `scripts/console/checar-lookups-242.sh` (estados FIX / MUTANTE / SIN-ARCHIVO, con los controles
+del peso, del simbolo, del archivo dentro del ISO y de la consola). Evidencia cruda:
+`evidencia/dc-002.42-lookups-disco.txt`.

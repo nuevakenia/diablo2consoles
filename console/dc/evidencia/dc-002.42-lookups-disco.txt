@@ -1,0 +1,159 @@
+DC-002.42: LA TABLA DE objectLookups DE VERDAD FUERA DEL BINARIO -- leida DEL DISCO, POR REGISTRO
+====================================================================================================
+
+QUE SE HIZO, EN UNA LINEA
+  La tabla que DC-002.32 midio como instrumento (vaciandola) ahora sale del binario de la consola POR DISEÑO:
+  el volcado (`d2core/d2records/object_lookup_record_data.go`, 1.672.892 B de `.data` + 116.048 de sus
+  cadenas) y su lado del host (`object_lookups_host.go`) NO se compilan para la Dreamcast; la tabla viaja en
+  el DISCO (`/JUEGO/OBJECTLOOKUPS.PACK`, 773.869 B) y el MOTOR la lee POR REGISTRO cuando la usa, sin
+  cargarla entera en RAM. La consola la abre, la recorre, su crc cierra y los numeros que el motor pide son
+  los del host (medido, ver 3).
+
+ARCHIVOS
+  d2core/d2records/object_lookups_store.go       NUEVO  la fuente de registros (el formato, `fuenteDeArchivo`,
+                                                        el lector por registro, `Grupo`, `ObjetosTxtId`)
+  d2core/d2records/object_lookups_host.go        NUEVO  el lado del HOST: registro de la tabla como fuente,
+                                                        `EscribirPack` (el escritor del archivo)
+  d2core/d2records/object_lookups_store_test.go  NUEVO  el viaje de ida y vuelta + agrupacion + DS1 + indice
+  d2core/d2records/object_lookup_record_data.go  MOD    HOST-only: solo el volcado (la tabla, intacta
+                                                        registro por registro) + su cabecera
+  d2core/d2records/record_manager.go             MOD    el `init` ya NO arma `Object.Lookup` con los 7.891
+                                                        registros: se llena POR REGISTRO (`guardaObjectRecord`)
+  d2core/d2records/object_ds1_class.go           MOD    la tabla del DS1 sale de la FUENTE, leyendo solo los
+                                                        grupos de tipo Item y solo `ObjectsTxtId`
+  console/dc/gen-lookups-pack/main.go            NUEVO  el generador del archivo (corre en el host)
+  console/dc/poc/motor-arranque/main.go          MOD    la sonda `lookupsDelDisco()` (el motor LEYENDO la
+                                                        tabla del disco en la consola, con numeros)
+  scripts/console/checar-lookups-242.sh          NUEVO  el corpus (5 controles de imagen + la consola)
+  scripts/console/tabla-lookups-242.py           NUEVO  los numeros de las corridas
+  scripts/console/vueltas-242.py                 NUEVO  una linea por vuelta del arranque
+  scripts/console/build-motor-all.sh             MOD    excluye los dos archivos del host POR NOMBRE
+  scripts/console/recompilar-paquete-motor.sh    MOD    idem; `DC_TABLA_LOOKUPS=dentro` = el MUTANTE
+  scripts/console/mkdisco.sh                     MOD    hornea tambien los `*.pack` en /JUEGO
+  scripts/console/fix-d2records-tabla-232.py     MOD    nota: el instrumento de 232 ya no mueve la consola
+
+1. POR QUE POR NOMBRE Y NO POR ETIQUETA (`//go:build`)
+   Medido con dos sondas independientes en `/tmp/probe-tags`: `sh-elf-gccgo` compila IGUAL un archivo marcado
+   `//go:build dreamcast` y uno marcado `//go:build !dreamcast` (exit 0 en los dos casos, con archivos
+   mutuamente excluyentes). gccgo NO respeta las etiquetas de build. Por eso `build-motor-all.sh` y
+   `recompilar-paquete-motor.sh` excluyen los dos archivos del host por NOMBRE, y por eso el MUTANTE de la
+   tarjeta es una variable (`DC_TABLA_LOOKUPS=dentro`) y no un tag.
+
+2. EL PESO QUE SE VA (capa de objetos y IMAGEN)
+   `.gox` del paquete d2records para SH-4:
+       la tabla ADENTRO   4.758.772 B   (el mutante, `DC_TABLA_LOOKUPS=dentro`)
+       la tabla AFUERA    2.278.484 B   (este arreglo)
+       -> 2.480.288 B menos de objeto compilado
+   1ST_READ.BIN (POC motor-arranque, los 3 MPQ + el archivo de la tabla en la ISO):
+       la tabla ADENTRO  13.808.328 B
+       la tabla AFUERA   12.010.536 B
+       -> 1.797.792 B menos de imagen (1,71 MiB; el 10,7% de un 1ST_READ de ~16,7 MB, el 10,7% de la RAM de
+          la consola: 16.777.216 B)
+   El simbolo de la tabla (`_go..C3111`, 0x1986bc = 1.672.892 B) es el MAS GORDO del binario del mutante y
+   NO existe en el de este arreglo, donde el mas gordo pasa a ser `_aligned_vertex_pool` (0x20000 = 131.072 B).
+   (El corpus lo comprueba con `sh-elf-nm -S --size-sort prog.elf` en los dos estados: controles 3a y 3b.)
+
+3. EL ARCHIVO Y LA CONSOLA LEYENDOLO (los numeros, del log de la consola)
+   El generador (host) y el lector (consola) son el MISMO contrato:
+       cabecera 32 B: `"D2OL" | version u16 | flags u16 | n u32 | idxOff u32 | recOff u32 | nGrupos u16 |
+                       _ u16 | crc u32 | maxLen u16 | _ u16`
+       indice n x 4 B, despues los registros (act u8, tipo u8, id u16, 23 cadenas con su largo u8, y 4 i16:
+       ObjectsTxtId, MonstatsTxtId, Direction, Index). cabecera + indice + registros = 773.869 B.
+   Lo que imprime la CONSOLA (Flycast, POC motor-arranque, antes de arrancar el motor):
+       LOOKUPS-242 ruta: /cd/juego/objectlookups.pack
+       LOOKUPS-242 bytes= 773869 registros= 7891 grupos= 10 maxRegistro= 165
+       LOOKUPS-242 crc del archivo= 2553790715 crc leido= 2553790715 indice en RAM= 31644 bytes,
+                     leidos del disco= 773869
+       LOOKUPS-242 DS1ObjectClass(0,0..4): 12 37 39 35 36
+       LOOKUPS-242 DS1ObjectClass overrides: 0 342
+       LOOKUPS-242 FindObject(1,2,0): rogue fountain (12) FN NU HTH 12 -1
+       LOOKUPS-242 FindObject(1,1,0): gheed-ACT 1 TABLE GH NU HTH
+   Los mismos numeros en el host (`go run` con la tabla compilada): 12 37 39 35 36, 0 y 342, y los dos
+   registros identicos. El del disco tambien es el MISMO archivo que el host armo: sha256
+   0255463368aa6513... dentro del ISO9660 y en el PC (control 4 del corpus, via `leer-iso.py`).
+   RAM: en vez de 1.672.892 B de `.data` (+116.048 de cadenas) vivos desde el arranque, la fuente se queda
+   con el INDICE (4 x 7.891 = 31.644 B) y una ventana de lectura de 4.096 B -> 35.740 B. Y el camino del
+   motor (`EnsureObject`/`FindObject`, `DS1ObjectClass`) lee SOLO lo que pide: en el arranque medido, la
+   ventana de la fuente no crece del indice + 4 KiB.
+   El crc del archivo lo verifica el lector al abrirlo (`verifica()` recorre los 773.869 B y compara): es la
+   garantia de que el archivo no llego truncado al disco.
+
+4. EL VIAJE DE IDA Y VUELTA (el guardian del formato, host)
+   `go test ./d2core/d2records/...` verde. `TestPackObjectLookups` escribe el `.PACK` desde la tabla
+   compilada, lo reabre con el LECTOR DE LA CONSOLA y compara los 7.891 registros campo por campo (las 23
+   cadenas + Act/Type/Id + los 4 numericos). El orden de las cadenas lo fija `ordenDeLosCamposDeTexto`
+   (23 entradas): si alguien cambia el struct `ObjectLookupRecord` o ese orden, la prueba se cae.
+   Ademas: `TestObjectLookupsAgrupados` (los 10 grupos acto x tipo), `TestLookupObjectDelArchivo`,
+   `TestDS1ObjectClassDelArchivo`, `TestObjectLookupIdsAreContiguous`, `TestIndexObjects`.
+   El corpus vuelve a correr esos cuatro con `-v` (control 0c: 4 PASS).
+
+5. EL ARRANQUE DE LA CONSOLA: QUE SE MIDIO Y QUE NO
+   El corpus `scripts/console/checar-lookups-242.sh` arma TRES imagenes y las corre en Flycast:
+       FIX          este arreglo (tabla fuera) con el archivo de la tabla EN EL DISCO
+       MUTANTE      la misma capa con `DC_TABLA_LOOKUPS=dentro` (la tabla adentro del binario)
+       SIN-ARCHIVO  la misma capa de FIX pero SIN el archivo en el disco (control negativo)
+   Y lo que se midio:
+     * el arranque BUENO (corrida del 2026-10-19 01:20, los mismos binarios; 25 s de captura):
+           FIX: ABRE `/cd/juego/patch_d2.mpq` y `/cd/juego/d2data.mpq`, inicializa el Asset Manager y LEE su
+                primer asset del disco (`Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlTypes.txt`),
+                con 736 B libres en el monton de C al arrancar y el semiespacio del GC en 401.328 B usados
+                (122.960 libres). Muere en el tramo SIGUIENTE (`panic: slice bounds out of range`, justo
+                despues del asset).
+           MUTANTE: la misma ronda llega a 2 fuentes y 1 asset y muere con
+                `Out of memory. Requested sbrk_base 0x8d6b2000, was 0x8cf6b000, diff 7630848`.
+           SIN-ARCHIVO: llega a 3 fuentes del disco (agrega d2char.mpq) + 1 asset y muere con el OOM chico
+                de DC-002.41 (`diff 319488`, `Memory: arena=... free=...`).
+       O sea: el muro del tramo siguiente esta IGUAL con y sin la tabla; lo que cambia es la cara del muro
+       (panic u OOM) porque con la tabla leida la fuente se queda con ~36 KB del monton de Go.
+     * el mutante del criterio 3 NO muere en el primer MPQ: muere pidiendo 7.630.848 B contiguos al monton
+       de C, o sea MUCHO mas adelante que el enunciado. Eso no es de esta tarjeta: DC-002.41 (el arreglo de
+       la tabla de hash de `d2data.mpq`, ya en HEAD) movio esa pared un MPQ entero hacia adelante. Lo mismo
+       le pasa a la expectativa "LvlPrest.txt": el numero de DC-002.34 era de ANTES de ese arreglo; con el
+       arreglo, el instrumento tambien se queda en un asset. El corpus lo dice tal cual y CAZA al mutante por
+       donde si se puede: la imagen (1.797.792 B mas) y el simbolo (`_go..C3111`).
+     * LA FLAKINESS (medida, y no es de esta tarjeta): en las corridas de esta sesion, los TRES estados
+       -- incluido el SIN-ARCHIVO, que no tiene la tabla ni en el binario ni en el disco -- se quedan en el
+       PRIMER tramo: la vueltas mueren antes de abrir el disco. La ultima corrida completa del corpus termino
+       15 controles OK y 5 con fallo, y los 5 son los del arranque (11, 11, 12, 14 y 15): el FIX y el
+       SIN-ARCHIVO agotaron sus 6 intentos cada uno sin abrir una sola fuente del disco. El sintoma en el log es
+           `[Asset Manager][ERROR] could not load file stream config.json (file not found: config.json)`
+           `[App][INFO] creating default configuration file at /rd/OpenDiablo2/config.json...`
+           `game files not found at "C:/Program Files (x86)/Diablo II", starting first-run setup`
+           `MOTOR-ARRANQUE Run() termino con error: reported to the user: no Diablo II game files were selected`
+       y `Unhandled exception: PC 3147a940 / PC 0000085b` con la vuelta siguiente. Es la familia del VALOR QUE
+       LA RECOLECCION SE LLEVA (DC-002.39: el nombre del `MpqLoadOrder`; DC-002.40: los buffers del monton
+       de Go): si el GC cae justo cuando el motor busca la cadena del camino de `config.json`, el motor se va
+       al config por defecto de Windows y no ve el disco. Se ve en el log con las marcas
+       `ARQ-MARCA gc_collect v=1` justo ANTES del `could not load file stream config.json` (la corrida del SIN
+       tiene 18 marcas `gc_collect` en 6 intentos), y la MISMA lectura de ese archivo hecha por el POC ANTES
+       del motor funciona (`JSON-CONSOLA Decode ... d2config.Configuration` con `n= 1`): lo que falla es la
+       lectura del motor, despues de que el GC cayo en el medio.
+       Y una vez que la vuelta 1 falla, el motor CREA un config por defecto en `/rd/OpenDiablo2/config.json`
+       (con los caminos de Windows) y ninguna vuelta posterior ve el disco: dentro de esa sesion del emulador
+       el sintoma se auto-sostiene. Por eso el corpus abre un emulador NUEVO en cada intento.
+       Que los TRES estados caigan igual (uno de ellos sin la tabla en ningun lado) es lo que muestra que esta
+       flakiness NO la trae la palanca de esta tarjeta, y la tarjeta que SI la tiene ya esta abierta:
+       DC-002.39b (commit e6a63acf, en HEAD) midio el mismo valor -- "el camino del config corrompido en
+       `ata\globa`" -- y lo dejo anotado para DC-002.39c ("ese es otro valor (el puntero `cfg`, un local
+       barrido conservadoramente)"). Lo de aca es la cara VISIBLE de ese mismo agujero en el arranque.
+       El corpus NO la maquilla: cada estado se corre hasta 6 veces y se reporta el intento; la tabla de
+       vueltas (`vueltas-242.py`) dice, vuelta por vuelta, cuantas fuentes del disco y cuantos assets abrio.
+
+6. LA DECISION DE DISEÑO (donde vive la tabla)
+   * NO se vacia la tabla (eso era el INSTRUMENTO de DC-002.32: mide el peso pero deja al motor sin los
+     7.891 registros). Aca los registros ESTAN, en el disco, y el motor los lee cuando los usa.
+   * NO se carga entera en RAM cuando se usa (volveria al mismo problema, solo mas tarde): la fuente lee
+     POR REGISTRO con un indice de 31.644 B y una ventana de 4 KiB.
+   * El formato es de la casa (no el MPQ): un archivo propio, con magic, version, crc y un indice ordenado
+     por (acto, tipo, id) implicito, que el lector verifica al abrir. El generador vive en el host, al lado de
+     la tabla, para que no haya DOS copias de los datos: `console/dc/gen-lookups-pack` los saca de
+     `d2records.ObjectLookupsCompilados()`.
+   * `Object.Lookup` (el indice de 6 x 3 x 1000 punteros) ya NO se arma en el `init`: sus filas se llenan a
+     demanda (`guardaObjectRecord`). El `init` que lo armaba era, medido en DC-002.32, lo que obligaba a
+     mantener viva la tabla entera desde el arranque.
+
+7. COMO REPETIRLO
+   bash scripts/console/checar-lookups-242.sh [segundos]        (SAL=... BASE_GOX=... para otra carpeta/capa)
+   La salida completa (controles verde/rojo y la tabla de las vueltas) queda en
+   `$SAL/corpus.salida.txt`, con los logs por estado en `$SAL/run-<estado>/flycast.log`.
+   El generador solo, con sus numeros:  go run ./console/dc/gen-lookups-pack -dir <carpeta_del_juego>

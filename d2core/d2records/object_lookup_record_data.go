@@ -4,6 +4,15 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 )
 
+// DC-002.42: ESTE ARCHIVO ES DEL HOST. La CONSOLA NO LO COMPILA (scripts/console/build-motor-all.sh y
+// recompilar-paquete-motor.sh lo excluyen por nombre) porque es el peso mas grande del binario: MEDIDO en
+// DC-002.32, el volcado de abajo es UN simbolo de `.data` de 1.672.892 bytes (7.891 x 212) y sus cadenas
+// otros 116.048 de `.rodata` = 1.788.960 bytes de imagen (13% de los 16 MB de la consola).
+//
+// En la consola la tabla se lee DEL DISCO por registro (d2core/d2records/object_lookups_store.go) del archivo
+// /JUEGO/OBJECTLOOKUPS.PACK, que arma `console/dc/gen-lookups-pack` DESDE ESTA MISMA TABLA: el generador y la
+// prueba de ida y vuelta viven al final de este archivo (host: no hay una segunda copia de los datos).
+//
 // https://docs.google.com/spreadsheets/d/13Wo58CNxDQlQiZm066dAWVVU4kmgKayn0zdyvmU18AM/edit#gid=330752700
 
 //nolint // This is a data dump file.

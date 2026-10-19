@@ -33,13 +33,29 @@ func DS1ObjectClass(act, id int) int {
 			}
 		}
 
-		for i := range objectLookups {
-			o := &objectLookups[i]
-			if o.Type != d2enum.ObjectTypeItem || o.Act < 1 || o.Act > ds1Acts || o.Id < 0 || o.Id >= ds1ObjectsPerAct {
+		// DC-002.42: la tabla sale de la FUENTE (host: la tabla compilada; consola: el archivo del disco) y
+		// SOLO se leen los grupos de tipo Item, y de cada registro SOLO el campo ObjectsTxtId: los 5 x 150
+		// numeros de esta tabla se arman sin dejar en RAM ni un registro entero (y sin recorrer los 7.891).
+		fuente := fuenteDeObjectLookups()
+
+		for a := 1; a <= ds1Acts; a++ {
+			base, n, hay := fuente.Grupo(a, int(d2enum.ObjectTypeItem))
+			if !hay {
 				continue
 			}
 
-			ds1ObjectTable[o.Act-1][o.Id] = o.ObjectsTxtId
+			if n > ds1ObjectsPerAct {
+				n = ds1ObjectsPerAct
+			}
+
+			for i := 0; i < n; i++ {
+				v, err := fuente.ObjetosTxtId(base + i)
+				if err != nil {
+					continue
+				}
+
+				ds1ObjectTable[a-1][i] = v
+			}
 		}
 
 		for k, v := range ds1ObjectOverrides {

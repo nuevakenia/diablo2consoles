@@ -24,7 +24,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/OpenDiablo2/OpenDiablo2/d2app"
 	"github.com/OpenDiablo2/OpenDiablo2/d2app/d2setup"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2config"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 )
 
 //extern d2c_serial_init
@@ -172,6 +174,69 @@ func seleccionDeArchivos() {
 		"entradas:", nombres)
 }
 
+// lookupsDelDisco: DC-002.42 -- LA TABLA DE objectLookups LEIDA DEL DISCO, con numeros.
+//
+// El volcado de objectLookups (1.672.892 B de `.data` + sus cadenas, el simbolo mas gordo del binario) YA NO
+// viaja adentro del 1ST_READ.BIN: viaja en el DISCO (`/JUEGO/OBJECTLOOKUPS.PACK`, lo arma
+// `console/dc/gen-lookups-pack` desde la misma tabla) y el motor lo lee POR REGISTRO cuando lo usa. Esto mide
+// las dos mitades: que el archivo se abre, se recorre y su crc cierra en la consola, y que los registros que
+// el MOTOR pide (la tabla del DS1 y dos busquedas por acto/tipo/id con el RecordManager) son los mismos.
+//
+// Corre ANTES de d2app.Create(), con el monton libre (la leccion de DC-002.17: un println que concatena no
+// imprime NADA cuando el monton no tiene donde armar la cadena; por eso todos los numeros van como argumentos
+// sueltos, sin concatenar).
+func lookupsDelDisco() {
+	println("LOOKUPS-242 ruta:", d2records.RutaDeLosLookups)
+	println("LOOKUPS-242 monton de C antes de leer la tabla:", ebiten.MemLibreDelMonton(), "bytes libres")
+
+	informe, err := d2records.AbrirLookupsDelArchivo(d2records.RutaDeLosLookups)
+	if err != nil {
+		println("LOOKUPS-242 FALLO al abrir la tabla del disco:", err.Error())
+
+		return
+	}
+
+	println("LOOKUPS-242 bytes=", informe.Bytes, "registros=", informe.Registros, "grupos=", informe.Grupos,
+		"maxRegistro=", informe.MaxRegistro)
+	println("LOOKUPS-242 crc del archivo=", informe.CrcArchivo, "crc leido=", informe.CrcLeida,
+		"indice en RAM=", informe.BytesDeIndice, "bytes, leidos del disco=", informe.BytesLeidos)
+	println("LOOKUPS-242 monton de C despues de leer la tabla:", ebiten.MemLibreDelMonton(), "bytes libres")
+
+	// EL USO DE VERDAD DEL MOTOR (1/2): la tabla del DS1 (5 x 150 numeros) se arma leyendo SOLO los grupos
+	// de tipo Item y SOLO el campo ObjectsTxtId: no queda ni un registro entero en RAM. En el host estos
+	// numeros son 12 37 39 35 36 y los dos de la tabla de overrides 0 y 342.
+	println("LOOKUPS-242 DS1ObjectClass(0,0..4):", d2records.DS1ObjectClass(0, 0), d2records.DS1ObjectClass(0, 1),
+		d2records.DS1ObjectClass(0, 2), d2records.DS1ObjectClass(0, 3), d2records.DS1ObjectClass(0, 4))
+	println("LOOKUPS-242 DS1ObjectClass overrides:", d2records.DS1ObjectClass(0, 114), d2records.DS1ObjectClass(2, 104))
+
+	// EL USO DE VERDAD DEL MOTOR (2/2): el RecordManager (que en su arranque ya NO toca la tabla: el indice
+	// de Object.Lookup se llena por registro) y dos busquedas. En el host: act 1 tipo 2 id 0 es
+	// "rogue fountain (12)" token FN mode NU class HTH y act 1 tipo 1 id 0 es "gheed-ACT 1 TABLE" token GH.
+	rm, errRM := d2records.NewRecordManager(d2util.LogLevelDefault)
+	if errRM != nil {
+		println("LOOKUPS-242 NewRecordManager FALLO:", errRM.Error())
+
+		return
+	}
+
+	uno := rm.FindObject(1, 2, 0)
+	if uno == nil {
+		println("LOOKUPS-242 FindObject(1,2,0) dio nil")
+	} else {
+		println("LOOKUPS-242 FindObject(1,2,0):", uno.Description, uno.Token, uno.Mode, uno.Class,
+			uno.ObjectsTxtId, uno.MonstatsTxtId)
+	}
+
+	dos := rm.FindObject(1, 1, 0)
+	if dos == nil {
+		println("LOOKUPS-242 FindObject(1,1,0) dio nil")
+	} else {
+		println("LOOKUPS-242 FindObject(1,1,0):", dos.Description, dos.Token, dos.Mode, dos.Class)
+	}
+
+	println("LOOKUPS-242 monton de C al final de la sonda:", ebiten.MemLibreDelMonton(), "bytes libres")
+}
+
 func main() {
 	d2cSerialInit()
 
@@ -206,6 +271,12 @@ func main() {
 	// DC-002.19: los numeros de la seleccion de los archivos del juego (el config del romdisk y el
 	// ReadDir del overlay), ANTES de arrancar el motor: es lo que esta tarjeta destraba.
 	seleccionDeArchivos()
+
+	// DC-002.42: la tabla de objectLookups, leida DEL DISCO por registro (el volcado ya no esta en el binario).
+	// El control negativo de "sin la tabla" se hace con EL DISCO (la imagen sin el archivo), no metiendo mano
+	// aca: un `os.Stat` a un archivo del disco ANTES del motor corre la recoleccion y el motor despues no
+	// encuentra `/rd/OpenDiablo2/config.json` (la familia de DC-002.39/DC-002.40), o sea cambia lo que se mide.
+	lookupsDelDisco()
 
 	d2cArranqueMarca(1)
 

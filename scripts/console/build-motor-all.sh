@@ -40,6 +40,17 @@ for CAPA in $(seq 1 20); do
         srcs=$(ls "$REPO/$p"/*.go 2>/dev/null | grep -v _test.go |
             grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
             grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$')
+        # DC-002.42: el VOLCADO de la tabla de objectLookups y su lado del host (d2core/d2records/
+        # object_lookup_record_data.go: 1.672.892 B de .data + 116.048 de sus cadenas, 1.788.960 de imagen;
+        # y object_lookups_host.go, el registro de la tabla como fuente y el escritor del .pack) NO entran al
+        # binario de la consola. El lugar de la tabla es el DISCO: viaja en /JUEGO/OBJECTLOOKUPS.PACK (la arma
+        # console/dc/gen-lookups-pack desde esa misma tabla) y el motor la lee POR REGISTRO cuando la usa
+        # (d2core/d2records/object_lookups_store.go). gccgo NO respeta //go:build -- medido: un archivo con
+        # //go:build dreamcast se compila igual -- asi que la exclusion es por NOMBRE, aca.
+        # MUTANTE (criterio 3 de la tarjeta): DC_TABLA_LOOKUPS=dentro las vuelve a meter en el binario.
+        if [ "${DC_TABLA_LOOKUPS:-fuera}" = "fuera" ]; then
+            srcs=$(echo "$srcs" | grep -vE '/(object_lookup_record_data|object_lookups_host)\.go$' || true)
+        fi
         [ -n "$srcs" ] || continue
         out="$GEN/$PREFIJO/$p.gox"
         mkdir -p "$(dirname "$out")"

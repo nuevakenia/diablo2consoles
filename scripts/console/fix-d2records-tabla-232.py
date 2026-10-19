@@ -20,6 +20,13 @@ medida en la evidencia de la tarjeta, con el numero que la decide: los bytes no 
 IDEMPOTENTE Y VERIFICABLE: deja el arbol pristino con `--dentro` (restaura el original guardado y, si no
 esta, lo saca del propio git) y reporta sha256 y tamano en cada paso.
 
+OJO DESDE DC-002.42: la tabla YA NO VIAJA EN EL BINARIO DE LA CONSOLA. El build de la consola excluye por
+nombre `object_lookup_record_data.go` y `object_lookups_host.go` (scripts/console/build-motor-all.sh) y el
+motor la lee DEL DISCO por registro (/JUEGO/OBJECTLOOKUPS.PACK). O sea que este instrumento, en la consola, ya
+no cambia nada: con la tabla vacia o llena, el .gox de d2records es el mismo. Lo que sigue midiendo es el
+peso del HOST y el punto de muerte del arranque sin los registros; la palanca de verdad (el archivo del disco)
+es DC-002.42.
+
 Uso:
   python3 scripts/console/fix-d2records-tabla-232.py --ver       (dice en que estado esta)
   python3 scripts/console/fix-d2records-tabla-232.py --fuera     (la tabla AFUERA del binario)
