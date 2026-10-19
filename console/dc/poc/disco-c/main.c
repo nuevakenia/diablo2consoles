@@ -35,6 +35,36 @@ static void prueba(const char *ruta) {
     }
 }
 
+/* DC-002.44: EL LISTADO DEL DIRECTORIO DEL DISCO, en el camino pelado de KOS (sin Go, sin el puente de os).
+ *
+ * El puente de `console/dc/std/os` lista /rd y el overlay desde un ".manifiesto" horneado, y para /cd no
+ * llama a NADIE: os.ReadDir("/cd/juego") devuelve lista vacia con error nil (por eso el Validate del motor
+ * ve 0 archivos y 7 faltantes). Este probe mide si el DRIVER sabe listar, que es la mitad de la pregunta:
+ * fs_open(ruta, O_RDONLY|O_DIR) + fs_readdir() en un bucle, con los nombres tal como los devuelve el driver
+ * (con y sin Joliet en el ISO, que es lo otro que quedo sin medir).
+ */
+static void listar(const char *ruta) {
+    dirent_t *de;
+    int fd, n = 0;
+
+    errno = 0;
+    fd = fs_open(ruta, O_RDONLY | O_DIR);
+    printf("LISTA-ISO fs_open(O_DIR)(%s) -> %d errno=%d\n", ruta, fd, errno);
+
+    if (fd < 0) {
+        return;
+    }
+
+    while ((de = fs_readdir(fd)) != NULL && n < 32) {
+        printf("LISTA-ISO [%d] nombre='%s' bytes=%d attr=%04lx\n", n, de->name, de->size,
+               (unsigned long)de->attr);
+        n++;
+    }
+
+    printf("LISTA-ISO total(%s) = %d entradas\n", ruta, n);
+    fs_close(fd);
+}
+
 static void prueba_lectura_del_archivo(const char *ruta) {
     static uint8_t un_sector[2048];
     static uint8_t dos_sectores[4096];
@@ -94,6 +124,13 @@ int main(int argc, char **argv) {
     prueba("/cd/JUEGO/PATCH_D2.MPQ");
     prueba("/cd/1ST_READ.BIN");
     prueba("/rd/OpenDiablo2/config.json");
+
+    /* DC-002.44: el listado del directorio, en el camino pelado del driver (sin Go y sin el puente de os).
+     * La comparacion de nombres del iso9660 de KOS NO distingue mayusculas (medido en DC-002.27), asi que
+     * las dos formas de la ruta tienen que listar lo mismo. */
+    listar("/cd");
+    listar("/cd/JUEGO");
+    listar("/cd/juego");
 
     prueba_lectura_del_archivo("/cd/JUEGO/PATCH_D2.MPQ");
     prueba_lectura_del_archivo("/cd/1ST_READ.BIN");

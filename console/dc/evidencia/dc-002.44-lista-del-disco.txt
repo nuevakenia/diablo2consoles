@@ -1,0 +1,134 @@
+DC-002.44 -- EL LISTADO DE UN DIRECTORIO DEL DISCO: el driver de KOS abre el directorio pero su `readdir` no
+devuelve las entradas, y el puente de `os` no lo llamaba nunca. El disco se arma con su manifiesto (como el
+romdisk) y `os.ReadDir("/cd/juego")` pasa de 0 a 3 entradas; sin ese manifiesto sigue dando 0 (mutante).
+
+Fecha: 2026-10-19 (corrida autonoma, rama DC-002). Todo medido en Flycast con la consola serie capturada.
+
+================================================================================================
+0. COMO SE MIDIO
+================================================================================================
+* clon: /tmp/d2c-39c-v1 (HEAD d9e65466 + los cambios de esta tarjeta)
+* runtime privado con el arreglo de la SQ (DC-002.39c): DC_ROOT=/tmp/dcroot-39c-sq
+* POC de C (el driver pelado):   console/dc/poc/disco-c  ->  scripts/console/build-c.sh
+* POC de Go (el puente de os):   console/dc/poc/lista-disco (nuevo) -> scripts/console/build-dc.sh
+* disco: scripts/console/mkdisco.sh <build> <dir_juego>   (con /home/.../c44/juego3 = SOLO los 3 MPQ)
+* corrida: FLYCAST=$HOME/dreamcast/dl/squashfs-root/AppRun CAPTURE=none \
+             bash scripts/console/run-flycast.sh <disc.gdi> 25 <salida>
+* crudos: ~/.hermes/cache/scratch/c44/run-{jon,joff,lista,lista2,lista2-mut}/flycast.log
+
+OJO: /tmp (tmpfs, 16 GB) estaba al 100% y el flycast.AppImage muere con SIGBUS sin decir nada (el log queda
+vacio y parece que el POC no arranca). Con el AppImage ya extraido y las imagenes fuera de /tmp, anda. Dos
+imagenes de 540 MB en tmpfs llenan el tmpfs: las de esta tarjeta viven en ~/.hermes/cache/scratch/c44.
+
+================================================================================================
+1. EL DRIVER: abre el directorio, pero no lista (medido, POC disco-c)
+================================================================================================
+`console/dc/poc/disco-c` (que hasta ahora solo probaba `fs_open` de archivos) se extendio con `listar()`:
+`fs_open(ruta, O_RDONLY|O_DIR)` + `fs_readdir()` en un bucle, imprimiendo nombre, bytes y attr de cada entrada.
+
+Con la ISO con Joliet (el default de mkdisco.sh, nivel 3):
+
+    DISCO2-C nmmgr_lookup(/cd) -> 0x8c05980c
+    LISTA-ISO fs_open(O_DIR)(/cd) -> 3 errno=0
+    LISTA-ISO [0] nombre='.' bytes=-1 attr=1000
+    LISTA-ISO [1] nombre='..' bytes=-1 attr=1000
+    LISTA-ISO total(/cd) = 2 entradas
+    LISTA-ISO fs_open(O_DIR)(/cd/JUEGO) -> -1 errno=2
+    LISTA-ISO fs_open(O_DIR)(/cd/juego) -> -1 errno=2
+    DISCO2-C fs_open(/cd/JUEGO/PATCH_D2.MPQ) -> -1 errno=2
+    DISCO2-C fs_open(/cd/1ST_READ.BIN)       -> -1 errno=2
+
+O sea, tres cosas medidas de una:
+  a) el driver SI sabe abrir un directorio: `/cd` da un fd valido (3) con `O_RDONLY|O_DIR`;
+  b) su `fs_readdir` NO devuelve las entradas reales: solo "." y ".." (las dos con bytes=-1 y attr=1000 =
+     O_DIR, que es lo que pone `fs_iso9660.c:920` cuando `de->flags & 2`), y ahi termina;
+  c) con Joliet la ISO no sirve para nada en este driver: ni `/cd/JUEGO` (ENOENT) ni `/cd/1ST_READ.BIN`
+     (ENOENT) abren, aunque los dos estan en el arbol. Por eso los corpus del motor arman las imagenes con
+     MKISO_JOLIET=0 desde DC-002.33 (y el disco "real" de mkdisco.sh, que va con joliet=3, NO serviria asi).
+
+En el codigo de KOS no es que falte el readdir: `kernel/arch/dreamcast/fs/fs_iso9660.c:844` es `iso_readdir`
+y el handler lo registra (`fs_iso9660.c:1098`), y `iso_open` respeta `O_DIR` (`fs_iso9660.c:645`). Lo que no
+hace es devolver los registros del directorio: el salto de las dos entradas en blanco (`if(!de->name[0] &&
+de->name_len == 1)`) avanza `fd->ptr` y vuelve a tomar `de` de `icache[c]`, con `c` siendo el sector leido
+ANTES del avance: cuando el salto cruza de sector, `c` ya no es el sector donde esta la entrada.
+
+================================================================================================
+2. EL PUENTE: no llamaba a nadie (medido leyendo el camino y despues el numero)
+================================================================================================
+`console/dc/std/os/os.go:496` (ReadDir) tenia DOS fuentes y ninguna era el disco:
+  1. el ".manifiesto" que el build hornea dentro del romdisk (`ReadFile(base + "/.manifiesto")`);
+  2. el manifiesto del overlay de la RAM (`d2c_ramfs_manifiesto`).
+Para `/cd/juego` las dos fallan (no hay romdisk ni overlay con ese nombre) y el codigo devuelve la lista VACIA
+con error nil (el `d2c_stat_es_dir(base) == 1` hace que NO devuelva ErrNotExist). De ahi el numero del motor:
+
+    MOTOR-ARRANQUE seleccion: Complete= true Validate.OK()= false archivos que ve= 0 faltan= 7
+
+(`Complete` es os.Stat por nombre y anda; `Validate` lista el directorio y ve 0.) Medido con el POC nuevo
+`console/dc/poc/lista-disco` (que llama al os.ReadDir del motor, sin el motor arriba):
+
+    LISTA-DISCO /cd/juego entradas= 0        <- ANTES del arreglo
+    LISTA-DISCO /cd/JUEGO entradas= 0
+    LISTA-DISCO stat /cd/juego/patch_d2.mpq bytes= 5022588      <- el Stat SI lo ve
+    LISTA-DISCO stat /cd/juego/d2data.mpq bytes= 267330019
+    LISTA-DISCO stat /cd/juego/d2char.mpq bytes= 267704443
+
+================================================================================================
+3. EL ARREGLO, y su numero
+================================================================================================
+El mismo camino que ya andaba para el romdisk se lleva al disco: `scripts/console/mkdisco.sh` es el que SABE
+que quedo adentro de la ISO, asi que ahora escribe `MANIFIESTO.TXT` con una linea por archivo horneado --
+`nombre en minusculas TAB bytes TAB archivo` -- y lo hornea en `/JUEGO`. `os.ReadDir` lo busca cuando el
+`.manifiesto` de punto no esta. El nombre no puede ser ".manifiesto": el ISO9660 de nivel 3 solo acepta
+A-Z, 0-9 y _ (medido en DC-002.27). Los nombres van en MINUSCULAS igual que los pide el motor, y el iso9660
+de KOS compara sin distinguir mayusculas, asi que la ruta se pide tal cual.
+
+    $ cat <build>/MANIFIESTO.TXT
+    d2char.mpq	267704443	archivo
+    d2data.mpq	267330019	archivo
+    patch_d2.mpq	5022588	archivo
+
+Con la ISO armada por mkdisco.sh (los 3 MPQ en /JUEGO) y el binario del POC:
+
+    LISTA-DISCO /cd/juego entradas= 3
+    LISTA-DISCO  [ 0 ] d2char.mpq dir= false
+    LISTA-DISCO  [ 1 ] d2data.mpq dir= false
+    LISTA-DISCO  [ 2 ] patch_d2.mpq dir= false
+    LISTA-DISCO /cd/JUEGO entradas= 3          <- la misma lista por la ruta en mayusculas
+    LISTA-DISCO /cd entradas= 0
+    LISTA-DISCO stat /cd/juego/patch_d2.mpq bytes= 5022588
+    LISTA-DISCO stat /cd/juego/d2data.mpq bytes= 267330019
+    LISTA-DISCO stat /cd/juego/d2char.mpq bytes= 267704443
+
+Las tres entradas son EXACTAMENTE los nombres que `d2setup.Validate` busca (`d2app/d2setup/discover.go:47`
+compara el listado en minusculas contra `LoadOrder`, `CoreMPQs` y `ExpansionMPQs`), ordenadas por nombre como
+pide os.ReadDir y con el Stat coincidiendo: `faltan= 0`. El numero del motor (`Validate.OK()= true archivos
+que ve= 3 faltan= 0`) queda para la corrida del POC `motor-disco` sobre esta misma ISO.
+
+================================================================================================
+4. EL MUTANTE (el control negativo): disco SIN la carpeta del juego
+================================================================================================
+La misma ISO armada con `DC_SIN_JUEGO=1` (el mutante que ya tenia mkdisco.sh) y el MISMO binario:
+
+    LISTA-DISCO /cd/juego ERROR file does not exist
+    LISTA-DISCO /cd/JUEGO ERROR file does not exist
+    LISTA-DISCO /cd entradas= 0
+    LISTA-DISCO stat /cd/juego/patch_d2.mpq ERROR file does not exist
+    LISTA-DISCO stat /cd/juego/d2data.mpq ERROR file does not exist
+    LISTA-DISCO stat /cd/juego/d2char.mpq ERROR file does not exist
+
+O sea: sin el manifiesto y sin el directorio, ReadDir NO inventa nada (ErrNotExist) y el motor vuelve a
+`faltan= 7`. El arreglo no "hace andar" un disco vacio.
+
+================================================================================================
+5. LO QUE QUEDA DECLARADO
+================================================================================================
+* el numero del motor (`Validate.OK()= true archivos que ve= 3 faltan= 0`) hay que sacarlo con el POC
+  `motor-disco` sobre esta ISO; el listado del puente ya da las 3 entradas y los nombres que Validate compara.
+* el driver de KOS: su readdir sigue sin devolver las entradas (es un defecto del propio `iso_readdir`, con la
+  linea y el motivo anotados arriba). El manifiesto lo esquiva; arreglarlo de verdad es tocar KOS
+  (`scripts/console/fix-kos-*.py`), y no es lo que esta tarjeta pide: lo que pide es que el motor VEA los
+  archivos, y medido asi los ve.
+* mkdisco.sh sigue armando la ISO con Joliet por defecto (nivel 3) y con Joliet este driver no abre NI los
+  archivos: los 3 MPQ se abren solo con MKISO_JOLIET=0. Un disco "real" para el GDEMU tiene que armarse con
+  MKISO_JOLIET=0 (los corpus ya lo hacen a mano desde DC-002.33). Cambiar el default de mkdisco.sh es una
+  linea, pero toca el build de todas las tarjetas: queda declarado, no hecho a las apuradas.

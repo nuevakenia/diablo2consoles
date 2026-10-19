@@ -522,6 +522,16 @@ func ReadDir(nombre string) ([]DirEntry, error) {
 	// (2) el romdisk: el ".manifiesto" que hornea el build
 	datos, err := ReadFile(base + "/.manifiesto")
 
+	// (2b) EL DISCO (DC-002.44): el manifiesto del ISO9660 se llama MANIFIESTO.TXT, no ".manifiesto", porque
+	// el ISO9660 de nivel 3 solo acepta A-Z, 0-9 y _ (medido en DC-002.27: pycdlib rechaza "patch_D2.mpq").
+	// Lo escribe `scripts/console/mkdisco.sh` con lo que hornea, en el mismo formato; el iso9660 de KOS
+	// compara los nombres sin distinguir mayusculas, asi que se pide tal cual. Sin esto, /cd/juego se veia
+	// VACIO: el driver de KOS abre el directorio pero su readdir no devuelve las entradas (medido con el POC
+	// disco-c: `fs_open("/cd/JUEGO", O_DIR)` da fd valido y `fs_readdir` solo devuelve "." y "..").
+	if err != nil {
+		datos, err = ReadFile(base + "/MANIFIESTO.TXT")
+	}
+
 	if err != nil && len(deRAM) == 0 && d2c_stat_es_dir(base) != 1 {
 		// ni manifiesto, ni entradas en la RAM, ni el directorio: para Go esto no esta
 		return nil, ErrNotExist

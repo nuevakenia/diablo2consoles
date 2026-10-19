@@ -40,12 +40,28 @@ if [ "${DC_SIN_JUEGO:-0}" = "1" ]; then
 elif [ -z "$JUEGO" ]; then
     echo "AVISO: sin <dir_juego>: la ISO va SIN los MPQ (es el mutante de la tarjeta)" >&2
 else
+    # DC-002.44: EL MANIFIESTO DEL DIRECTORIO DEL DISCO.
+    #
+    # El `os.ReadDir` de la consola NO puede listar /cd: el driver iso9660 de KOS abre el directorio
+    # (`fs_open("/cd/JUEGO", O_RDONLY|O_DIR)` da un fd valido, medido con el POC disco-c) pero su
+    # `iso_readdir` no devuelve las entradas (solo "." y ".."), y ademas el puente de `console/dc/std/os`
+    # nunca lo llamaba. Lo que SI anda, y esta medido desde DC-002.19, es el ".manifiesto" que el build
+    # hornea junto al contenido (es como lista el romdisk). El disco se arma igual: como este script es el
+    # que SABE que quedo adentro, escribe el manifiesto con lo que horneo, con los nombres en minusculas
+    # (que es como los pide el motor: `d2setup.Validate` compara el listado contra `patch_d2.mpq`...).
+    #
+    # El nombre no puede ser ".manifiesto": el ISO9660 de nivel 3 solo acepta A-Z, 0-9 y _ (medido en
+    # DC-002.27). Va como MANIFIESTO.TXT y `os.ReadDir` lo busca con ese nombre cuando el de punto no esta.
+    MANIF="$DIR/MANIFIESTO.TXT"
+    : > "$MANIF"
+
     for f in "$JUEGO"/*.mpq; do
         [ -f "$f" ] || continue
         # ojo: el nombre interno va en MAYUSCULAS (lo exige el ISO9660 de nivel 3) y con `;1` (la version de
         # ISO9660; el iso9660 de KOS la ignora al comparar, y el motor pide el nombre sin version)
         nombre="$(basename "$f" | tr '[:lower:]' '[:upper:]')"
         ARGS+=("$f:/JUEGO/$nombre;1")
+        printf '%s\t%s\tarchivo\n' "$(basename "$f" | tr '[:upper:]' '[:lower:]')" "$(stat -c%s "$f")" >> "$MANIF"
         BAKED=$((BAKED + 1))
         BYTES=$((BYTES + $(stat -c%s "$f")))
     done
@@ -59,23 +75,16 @@ else
         [ -f "$f" ] || continue
         nombre="$(basename "$f" | tr '[:lower:]' '[:upper:]')"
         ARGS+=("$f:/JUEGO/$nombre;1")
+        printf '%s\t%s\tarchivo\n' "$(basename "$f" | tr '[:upper:]' '[:lower:]')" "$(stat -c%s "$f")" >> "$MANIF"
         BAKED=$((BAKED + 1))
         BYTES=$((BYTES + $(stat -c%s "$f")))
     done
-    # DC-002.42: ademas de los MPQ, el archivo de la TABLA DE objectLookups que el motor lee del disco POR
-    # REGISTRO (`objectlookups.pack`, lo arma console/dc/gen-lookups-pack desde la tabla que antes viajaba
-    # dentro del binario). Va aca, al lado de los MPQ, porque es el mismo camino de datos del juego.
-    for f in "$JUEGO"/*.pack; do
-        [ -f "$f" ] || continue
-        nombre="$(basename "$f" | tr '[:lower:]' '[:upper:]')"
-        ARGS+=("$f:/JUEGO/$nombre;1")
-        BAKED=$((BAKED + 1))
-        BYTES=$((BYTES + $(stat -c%s "$f")))
-    done
+
+    ARGS+=("$MANIF:/JUEGO/MANIFIESTO.TXT;1")
 fi
 
 "$DC_PYTHON" "$HERE/mkiso.py" "$ISO" "${ARGS[@]}" | sed 's/^/   /'
 "$DC_PYTHON" "$HERE/mkgdi.py" "$DIR" | sed 's/^/   /'
 
-echo "DISCO: $BAKED archivos en /JUEGO ($BYTES bytes) + el binario de arranque"
+echo "DISCO: $BAKED MPQ en /JUEGO ($BYTES bytes) + el binario de arranque"
 echo "DISCO: $DIR/disc.iso ($(stat -c%s "$ISO") bytes) y $DIR/disc.gdi"
