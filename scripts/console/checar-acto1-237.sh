@@ -16,8 +16,12 @@
 #   1a/1b/1c     las dos imagenes: el ELF del FIX, el D2DATA.MPQ DENTRO del ISO (sha256 del PC) y el mutante
 #                como binario DISTINTO (sha256);
 #   2a..2h       la corrida BUENA: los numeros de la consola tienen que ser LOS DEL HOST, uno por uno;
-#   2i           la captura: pixeles pintados del bloque, color dominante, y la comparacion contra la
-#                referencia en las CUATRO orientaciones (la que gana tiene que ser la identidad);
+#   2i-0         la geometria del area cliente la midio el GESTOR DE VENTANAS (linea `GEO` de la corrida):
+#                es la unica fuente independiente del asset;
+#   2j           esa caja se valida con el quad de control magenta que el POC dibuja en coordenadas logicas
+#                conocidas (520,380 110x90): tiene que caer donde la caja dice (residuo <= 2 px);
+#   2i/2k        la captura: pixeles pintados del bloque, color dominante y medio, y la comparacion a 64x64
+#                contra la referencia en las CUATRO orientaciones (la que gana tiene que ser la identidad);
 #   3a/3b        el MUTANTE: el log dice DS1-LEER FALLO + PANTALLA-VACIA y la captura, con la MISMA geometria
 #                que la corrida buena, no tiene ni un pixel pintado.
 #
@@ -31,7 +35,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 SAL="${SAL:-$HOME/.hermes/cache/scratch/dc237-corpus}"
 GEN="${GODC_GOX:-/tmp/gox-237b}"
-SEGS="${1:-45}"
+# 75 s y no 45: MEDIDO, el POC tarda ~45 s en llegar al primer cuadro (MPQ-ABRIR ~10 s + los 8 DT1 del
+# town ~35 s) y la primera marca CUADROS 30 sale en ms=45093. Con 45 s la ultima captura es la de 40 s y
+# todavia no hay mapa: el corpus mediria una pantalla negra y diria que el POC no pinta.
+SEGS="${1:-75}"
 MPQ="${MPQ:-$HOME/.wine-d2/drive_c/Games/Diablo II}"
 
 OK=0
@@ -42,6 +49,10 @@ rojo() { FALLOS=$((FALLOS + 1)); echo "   FALLO: $*"; }
 paso() { printf '\n== %s\n' "$*"; }
 # el valor de una clave `CLAVE= valor` de un log (la ultima que aparece)
 val() { grep -a "$1=" "$2" 2>/dev/null | tail -1 | sed -n "s/.*$1= *\([^ ]*\).*/\1/p"; }
+# normaliza una linea para COMPARARLA: saca el \r de la consola serie (que escribe \r\n), junta los
+# espacios que mete el println de Go entre operandos, y unifica los separadores del host (`a,b` contra
+# `a b`). El VALOR comparado es el mismo; antes estos controles fallaban solo por el formato.
+limpiar() { tr -d '\r' | sed -e 's|\\|/|g' -e 's/,/ /g' -e 's| */ *|/|g' -e 's/  */ /g' -e 's/= /=/g' -e 's/^ *//' -e 's/ *$//'; }
 
 mkdir -p "$SAL/host" "$SAL/fix" "$SAL/mut"
 
@@ -51,7 +62,10 @@ mkdir -p "$SAL/host" "$SAL/fix" "$SAL/mut"
 paso "0. el host: el .ds1 del MPQ, la composicion y la referencia"
 if (cd "$REPO" && go run ./console/dc/verif-acto1-237 -png "$SAL/host/referencia.png") \
         > "$SAL/host/verif.txt" 2>&1; then
-    H_DS1_BYTES="$(val 'bytes' "$SAL/host/verif.txt")"
+    # OJO: el `val 'bytes'` tomaba la ULTIMA linea con "bytes=" del verificador, que es la de la PALETA
+    # (bytes=768), no la del .ds1: de ahi salia "el .ds1 del host no es el esperado (bytes=768 ...)".
+    H_DS1_BYTES="$(grep -a 'VERIF237: DS1 data' "$SAL/host/verif.txt" |
+        sed -n 's/.*bytes= *\([0-9]*\).*/\1/p' | tail -1)"
     H_DS1_CRC="$(grep -a 'VERIF237: DS1 data' "$SAL/host/verif.txt" | sed -n 's/.*crc32=\([0-9]*\).*/\1/p')"
     H_DS1_LINEA="$(grep -a 'VERIF237: DS1 version' "$SAL/host/verif.txt" | sed 's/^VERIF237: //')"
     H_VENTANA="$(grep -a 'VERIF237: VENTANA' "$SAL/host/verif.txt" | sed 's/^VERIF237: VENTANA //')"
@@ -164,7 +178,7 @@ else
 fi
 
 C_DS1_LINEA="$(grep -a 'HITO237: DS1 version' "$LOG_FIX" | sed 's/^.*HITO237: //')"
-if [ "$C_DS1_LINEA" = "$H_DS1_LINEA" ]; then
+if [ "$(echo "$C_DS1_LINEA" | limpiar)" = "$(echo "$H_DS1_LINEA" | limpiar)" ]; then
     verde "control 2b: el parseo del MOTOR en la consola: $C_DS1_LINEA (igual al host)"
 else
     rojo "control 2b: el parseo del .ds1 en la consola difiere del host ('$C_DS1_LINEA' contra '$H_DS1_LINEA')"
@@ -172,7 +186,8 @@ fi
 
 C_VENTANA="$(grep -a 'HITO237: VENTANA' "$LOG_FIX" | sed 's/^.*HITO237: VENTANA //')"
 C_PEDIDOS="$(grep -a 'HITO237: PEDIDOS' "$LOG_FIX" | sed 's/^.*HITO237: PEDIDOS //')"
-if [ "$C_VENTANA" = "$H_VENTANA" ] && [ "$C_PEDIDOS" = "$H_PEDIDOS" ]; then
+if [ "$(echo "$C_VENTANA" | limpiar)" = "$(echo "$H_VENTANA" | limpiar)" ] &&
+    [ "$(echo "$C_PEDIDOS" | limpiar)" = "$(echo "$H_PEDIDOS" | limpiar)" ]; then
     verde "control 2c: la ventana isometrica: $C_VENTANA ($C_PEDIDOS), igual al host"
 else
     rojo "control 2c: la ventana/pedidos de la consola difieren ('$C_VENTANA' '$C_PEDIDOS' contra '$H_VENTANA' '$H_PEDIDOS')"
@@ -183,7 +198,8 @@ D_DT1="$(grep -a 'VERIF237: DT1' "$SAL/host/verif.txt" | sed 's/^VERIF237: //' |
 C_DT1_LISTA="$(grep -a 'HITO237: DT1' "$LOG_FIX" | sed 's/^.*HITO237: //' |
     sed 's/ ms=.*//' | sed 's|\\\\|/|g' | sed 's|\\|/|g' | sort)"
 D_DT1_LISTA="$(echo "$D_DT1" | sed 's/ ms=.*//' | sed 's|\\\\|/|g' | sed 's|\\|/|g' | sort)"
-if [ -n "$C_DT1_LISTA" ] && [ "$C_DT1_LISTA" = "$D_DT1_LISTA" ]; then
+if [ -n "$C_DT1_LISTA" ] &&
+    [ "$(echo "$C_DT1_LISTA" | limpiar)" = "$(echo "$D_DT1_LISTA" | limpiar)" ]; then
     verde "control 2d: los $C_DT1 DT1 que el PROPIO .ds1 lista salen iguales a los del host (bytes y crc32, uno por uno)"
 else
     rojo "control 2d: los DT1 de la consola no son los del host (ver $LOG_FIX)"
@@ -191,7 +207,7 @@ else
 fi
 
 C_COMPUESTO="$(grep -a 'HITO237: COMPUESTO' "$LOG_FIX" | sed 's/^.*HITO237: COMPUESTO //')"
-if [ "$C_COMPUESTO" = "$H_COMPUESTO" ]; then
+if [ "$(echo "$C_COMPUESTO" | limpiar)" = "$(echo "$H_COMPUESTO" | limpiar)" ]; then
     verde "control 2e: la composicion en la consola: $C_COMPUESTO (igual al host)"
 else
     rojo "control 2e: la composicion de la consola difiere ('$C_COMPUESTO' contra '$H_COMPUESTO')"
@@ -215,37 +231,70 @@ fi
 
 C_TEXTURA="$(grep -a 'HITO237: TEXTURA OK' "$LOG_FIX" | sed 's/^.*HITO237: //')"
 C_CUADROS_N="$(grep -ac 'HITO237: CUADROS' "$LOG_FIX")"
-C_CUADROS_1="$(grep -a 'HITO237: CUADROS' "$LOG_FIX" | head -1 | sed 's/^.*ms= *//')"
-C_CUADROS_U="$(grep -a 'HITO237: CUADROS' "$LOG_FIX" | tail -1 | sed 's/^.*ms= *//')"
+C_CUADROS_1="$(grep -a 'HITO237: CUADROS' "$LOG_FIX" | head -1 | sed 's/^.*ms= *//; s/[^0-9].*//')"
+C_CUADROS_U="$(grep -a 'HITO237: CUADROS' "$LOG_FIX" | tail -1 | sed 's/^.*ms= *//; s/[^0-9].*//')"
+# los CUADROS de la primera y de la ultima marca: el ritmo es (cuadros_fin - cuadros_inicio) / segundos.
+# (Antes se dividia 30/d, que es el paso entre marcas, y daba 6,6 cuadros/s en vez de 59,8: medido.)
+C_CUADROS_1N="$(grep -a 'HITO237: CUADROS' "$LOG_FIX" | head -1 | sed -n 's/.*CUADROS *\([0-9]*\).*/\1/p')"
+C_CUADROS_UN="$(grep -a 'HITO237: CUADROS' "$LOG_FIX" | tail -1 | sed -n 's/.*CUADROS *\([0-9]*\).*/\1/p')"
 if [ -n "$C_TEXTURA" ] && [ "$C_CUADROS_N" -ge 2 ] && ! grep -aq 'HITO237: TEXTURA FALLO' "$LOG_FIX"; then
-    FPS="$(awk -v a="$C_CUADROS_1" -v b="$C_CUADROS_U" 'BEGIN{d=(b-a)/1000.0; if(d<=0){print "?"} else {printf "%.1f", 30.0/d}}')"
-    verde "control 2h: el lienzo subio a VRAM y se pinto: $C_TEXTURA / $C_CUADROS_N marcas de cuadros (30 cuadros cada una, ~$FPS cuadros/s)"
+    FPS="$(awk -v a="$C_CUADROS_1" -v b="$C_CUADROS_U" -v na="$C_CUADROS_1N" -v nb="$C_CUADROS_UN" \
+        'BEGIN{d=(b-a)/1000.0; if(d<=0 || nb<=na){print "?"} else {printf "%.1f", (nb-na)/d}}')"
+    verde "control 2h: el lienzo subio a VRAM y se pinto: $C_TEXTURA / $C_CUADROS_N marcas de cuadros ($C_CUADROS_1N..$C_CUADROS_UN cuadros, ~$FPS cuadros/s)"
 else
     rojo "control 2h: la textura o los cuadros no salieron ('$C_TEXTURA', marcas de CUADROS=$C_CUADROS_N)"
 fi
 
 CAP_FIX="$(ls -1 "$SAL/fix/run"/f*.png 2>/dev/null | sort -V | tail -1)"
+# La geometria del AREA CLIENTE la mide el gestor de ventanas (linea `GEO` de la corrida): es la unica
+# fuente independiente del asset. El instrumento la usa TAL CUAL y ademas la contrasta con el quad de
+# control magenta (control 2j). Antes se deducia de la banda negra y el quad magenta PARTE la banda:
+# medido, leia alto=361 donde el cliente mide 453, y con eso el mapa "no coincidia" (11,6 % a +-8).
+GEO_CLIENTE="$(grep -a '^GEO ' "$SAL/fix/run-corrida.txt" 2>/dev/null | tail -1 |
+    sed -n 's/.*cliente=\([0-9-]*,[0-9-]*,[0-9]*,[0-9]*\).*/\1/p')"
+VENTANA_ARGS=""
+if [ -n "$GEO_CLIENTE" ]; then
+    VENTANA_ARGS="--ventana $GEO_CLIENTE"
+    verde "control 2i-0: la geometria del area cliente la midio el gestor de ventanas: $GEO_CLIENTE"
+else
+    rojo "control 2i-0: la corrida no reporto la geometria del area cliente (sin linea GEO): se mediria por banda negra"
+fi
+
 if [ -n "$CAP_FIX" ]; then
-    python3 "$HERE/medir-captura-237.py" "$CAP_FIX" "$SAL/host/referencia.png" > "$SAL/fix/captura.txt" 2>&1
+    # shellcheck disable=SC2086
+    python3 "$HERE/medir-captura-237.py" "$CAP_FIX" "$SAL/host/referencia.png" $VENTANA_ARGS \
+        > "$SAL/fix/captura.txt" 2>&1
     cat "$SAL/fix/captura.txt" | sed 's/^/   /'
     NO_FONDO_PCT="$(grep -a 'MEDIDOR237 bloque' "$SAL/fix/captura.txt" | sed -n 's/.*(\([0-9.]*\)%).*/\1/p')"
     REF_PCT="$(grep -a 'MEDIDOR237 refNoFondo=' "$SAL/fix/captura.txt" | sed 's/.*refNoFondo=//')"
-    ORIENT="$(grep -a 'MEDIDOR237 MEJOR=' "$SAL/fix/captura.txt" | sed -n 's/.*MEJOR=\([a-z0-9-]*\) mas8=\([0-9.]*\)/\1 \2/p')"
-    ORIENT_NOMBRE="${ORIENT%% *}"
-    ORIENT_PCT="${ORIENT##* }"
-    # el numero FINO (128x128 -> 512 medido con reescalado) sirve para la ORIENTACION; el GRUESO (128x128)
-    # es el que dice "es el mismo mapa" sin el ruido del reescalado. Y la proporcion de pixeles pintados
-    # tiene que seguir a la de la referencia (+-3 puntos; el indice 0 es transparente en la consola y su
-    # color de paleta en la referencia).
-    GRUESO_MAS8="$(grep -a 'MEDIDOR237 grueso' "$SAL/fix/captura.txt" | sed -n 's/.*mas8=\([0-9.]*\).*/\1/p')"
-    if [ -n "$GRUESO_MAS8" ] && [ "$ORIENT_NOMBRE" = "identidad" ] &&
-        awk -v g="$GRUESO_MAS8" 'BEGIN{exit !(g >= 95.0)}' &&
-        awk -v c="$NO_FONDO_PCT" -v r="$REF_PCT" 'BEGIN{d=c-r; if(d<0)d=-d; exit !(d <= 3.0)}'; then
-        verde "control 2i: la captura es el mapa del host: gana la identidad (fino +-8 $ORIENT_PCT%) y a 128x128 coincide $GRUESO_MAS8%; pixeles pintados $NO_FONDO_PCT% contra $REF_PCT% de la referencia"
+    IDENT64="$(grep -a 'MEDIDOR237 identidad64 mas8=' "$SAL/fix/captura.txt" | sed -n 's/.*mas8=\([0-9.]*\).*/\1/p')"
+    OTRAS64="$(grep -a 'MEDIDOR237 orient64 ' "$SAL/fix/captura.txt" | sed -n 's/.*mas8=\([0-9.]*\).*/\1/p' | sort -rn | head -1)"
+    GRUESO_MAS8="$(grep -a 'MEDIDOR237 grueso ' "$SAL/fix/captura.txt" | sed -n 's/.*mas8=\([0-9.]*\).*/\1/p')"
+    QUAD_ESTADO="$(grep -a 'MEDIDOR237 quad=' "$SAL/fix/captura.txt" | sed -n 's/.*quad=\([a-z]*\).*/\1/p')"
+    QUAD_DX="$(grep -a 'MEDIDOR237 quad=' "$SAL/fix/captura.txt" | sed -n 's/.*dx=\([-+0-9.]*\).*/\1/p')"
+    QUAD_DY="$(grep -a 'MEDIDOR237 quad=' "$SAL/fix/captura.txt" | sed -n 's/.*dy=\([-+0-9.]*\).*/\1/p')"
+    DOMINANTE="$(grep -a 'MEDIDOR237 dominante=' "$SAL/fix/captura.txt" | sed 's/.*dominante=//')"
+    MEDIA="$(grep -a 'color medio del bloque' "$SAL/fix/captura.txt" | sed 's/^ *//')"
+    VENTANA_MEDIDA="$(grep -a 'MEDIDOR237 ventana=' "$SAL/fix/captura.txt" | head -1 | sed 's/.*ventana=//; s/ fuente=.*//')"
+
+    # control 2j: la caja con la que se mide esta VALIDADA por el quad de control (coordenadas logicas
+    # conocidas, dibujado sin textura por el mismo camino de dibujo).
+    if [ "$QUAD_ESTADO" = "ok" ]; then
+        verde "control 2j: el quad de control cae donde la caja dice (dx=$QUAD_DX dy=$QUAD_DY px): la geometria medida es la del asset"
     else
-        rojo "control 2i: la captura no coincide con la referencia (gana '$ORIENT_NOMBRE' $ORIENT_PCT%, 128x128 a +-8 = $GRUESO_MAS8%, pintados $NO_FONDO_PCT% contra $REF_PCT%)"
+        rojo "control 2j: el quad de control NO cae donde la caja dice (estado='$QUAD_ESTADO'): la geometria no esta validada"
     fi
-    VENTANA_MEDIDA="$(grep -a 'MEDIDOR237 ventana=' "$SAL/fix/captura.txt" | head -1 | sed 's/.*ventana=//')"
+
+    # control 2i: el mapa. El veredicto es a 64x64 y SIN buscar alineacion (la caja es la medida, no se
+    # ajusta a la medida); las otras tres orientaciones tienen que quedar MUY abajo (medido: 31-36 %).
+    if [ -n "$IDENT64" ] && awk -v i="$IDENT64" 'BEGIN{exit !(i >= 95.0)}' &&
+        [ -n "$OTRAS64" ] && awk -v i="$IDENT64" -v o="$OTRAS64" 'BEGIN{exit !(i >= 2.0*o)}' &&
+        awk -v c="$NO_FONDO_PCT" -v r="$REF_PCT" 'BEGIN{d=c-r; if(d<0)d=-d; exit !(d <= 3.0)}'; then
+        verde "control 2i: la captura ES el mapa del host: identidad $IDENT64 % a 64x64 (la mejor de las otras tres: $OTRAS64 %), a 128x128 $GRUESO_MAS8 %; pixeles pintados $NO_FONDO_PCT % contra $REF_PCT % de la referencia"
+        verde "control 2k: lo pintado en la consola: $NO_FONDO_PCT % de pixeles que no son fondo, color dominante (rango 16) $DOMINANTE, $MEDIA"
+    else
+        rojo "control 2i: la captura no coincide con la referencia (identidad $IDENT64 % a 64x64, la mejor de las otras tres $OTRAS64 %, a 128x128 $GRUESO_MAS8 %; pintados $NO_FONDO_PCT % contra $REF_PCT %)"
+    fi
 else
     rojo "control 2i: la corrida buena no dejo capturas en $SAL/fix/run"
     VENTANA_MEDIDA=""
@@ -269,8 +318,11 @@ else
 fi
 
 CAP_MUT="$(ls -1 "$SAL/mut/run"/f*.png 2>/dev/null | sort -V | tail -1)"
-if [ -n "$CAP_MUT" ] && [ -n "$VENTANA_MEDIDA" ]; then
-    python3 "$HERE/medir-captura-237.py" "$CAP_MUT" --ventana "$VENTANA_MEDIDA" \
+GEO_MUT="$(grep -a '^GEO ' "$SAL/mut/run-corrida.txt" 2>/dev/null | tail -1 |
+    sed -n 's/.*cliente=\([0-9-]*,[0-9-]*,[0-9]*,[0-9]*\).*/\1/p')"
+VENTANA_MUT="${GEO_MUT:-$VENTANA_MEDIDA}"
+if [ -n "$CAP_MUT" ] && [ -n "$VENTANA_MUT" ]; then
+    python3 "$HERE/medir-captura-237.py" "$CAP_MUT" --ventana "$VENTANA_MUT" \
         > "$SAL/mut/captura.txt" 2>&1
     cat "$SAL/mut/captura.txt" | sed 's/^/   /'
     MUT_PCT="$(grep -a 'MEDIDOR237 bloque' "$SAL/mut/captura.txt" | sed -n 's/.*(\([0-9.]*\)%).*/\1/p')"

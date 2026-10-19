@@ -4,6 +4,12 @@ Por que: `medir-captura-237.py` busca +-12 px y devolvio dx=-14 dy=+8 (el borde 
 quedo corto) con una correlacion de 0,0227: el cuadro puede estar ahi y simplemente corrido mas de 12 px.
 Aca se busca +-96 px por correlacion de Pearson sobre la luminancia, con la referencia reescalada al tamano
 del bloque, y se dice cual es el mejor desplazamiento y cuanto sube.
+
+RESULTADO (cingulo): aquel dx=-14/+8 y la correlacion 0,34 eran el INSTRUMENTO, no el POC. La banda negra
+con la que se ubicaba la ventana la PARTE el quad de control magenta: el medidor leia alto=361 donde el
+area cliente mide 453. Con la caja del gestor de ventanas (1400,120 682x453) la identidad da 98,80 % a
+64x64 y la correlacion 0,97. Esta sonda queda como diagnostico para una captura futura que vuelva a
+"no coincidir": si con la caja buena sigue sin alinear, entonces si hay algo que mirar en el POC.
 """
 import sys
 

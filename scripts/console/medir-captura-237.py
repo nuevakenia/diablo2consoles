@@ -1,23 +1,31 @@
 #!/usr/bin/env python3
-"""DC-002.37, criterio 2 -- MEDIR la captura del acto 1 en la Dreamcast: cuantos pixeles pintados hay,
-que color domina y cuanto coincide con la REFERENCIA del host (buscando la orientacion que gana).
+"""DC-002.37, criterio 2 -- MEDIR la captura del acto 1 en la Dreamcast: cuantos pixeles no son fondo,
+que color domina y si la figura es la MISMA que la referencia del host.
 
-POR QUE ASI (lo que costo cada regla, medido en DC-002.35 / DC-002.9)
----------------------------------------------------------------------
-1. `spectacle -f` (KDE/Wayland) fotografia la PANTALLA COMPLETA: la ventana del emulador hay que UBICARLA
-   adentro de la captura. Aca se ubica por la corrida de negro puro mas larga de cada fila (el POC pinta el
-   fondo en 0,0,0 exacto) y la pantalla son las filas que comparten el borde DERECHO (ese borde no se mueve;
-   el izquierdo se une al negro del asset cuando el asset es oscuro).
-2. La geometria de la ventana NO se supone: se mide (`MEDIDOR237 ventana=...`) o se pasa con `--ventana`,
-   y el corpus del mutante reusa JUSTO esa geometria (la pantalla del mutante es negra entera: ahi no hay
-   banda que detectar, y recortar a ojo seria medir el escritorio).
-3. El POC pinta su quad en (0,0) de su pantalla de 640x480 (`d2cQuad(0,0,esc)`): el lienzo es de 512 y
-   esc = min(640/512, 480/512) = 0,9375, o sea el asset ocupa EXACTAMENTE el alto de la pantalla, pegado
-   arriba a la izquierda.
-4. **Una referencia que sale del mismo lienzo no puede validar la orientacion**: la referencia del host es
-   el MISMO lienzo de indices (mismo `nivel.go`), asi que un espejado se compara espejado contra espejado y
-   da 100%. Por eso se puntua en las CUATRO orientaciones (identidad, espejada H, espejada V, rotada 180) y
-   se informa cual gana: si gana otra que la identidad, el sprite salio espejado y se ve en el numero.
+LA GEOMETRIA (lo que costo esta tarjeta)
+----------------------------------------
+El POC pinta su quad en (0,0) de una pantalla logica de 640x480 y el lienzo (512x512) se escala por
+esc = min(640/512, 480/512) = 0,9375: el asset ocupa EXACTAMENTE el alto de la pantalla logica, pegado
+arriba a la izquierda. La pantalla logica, a su vez, el emulador la mete en el AREA CLIENTE de su ventana
+manteniendo la proporcion (640x480 -> 604x453 en una ventana de 682x453, o sea 39 px de banda negra a
+cada lado). Tres cosas medidas aca:
+
+1. La geometria NO se adivina: se pasa con `--ventana L,T,W,H` (el AREA CLIENTE que reporta el gestor de
+   ventanas; la mide `run-flycast-237.sh` con KWin y la imprime como `GEO ... cliente=...`).
+2. `--ventana` se CONTRASTA con el quad de control magenta que el POC dibuja en coordenadas logicas
+   conocidas (520,380 110x90): si el quad cae donde la caja dice (residuo <= 2 px) la caja es la buena,
+   y si no, el instrumento lo avisa. El quad se dibuja sin textura: es independiente del asset.
+3. Sin `--ventana` se cae a la deteccion por banda negra (la usa el MUTANTE, que no pinta quad de
+   control). Esa deteccion se arreglo: la banda puede estar CORTADA por el propio quad de control (medido:
+   el quad magenta parte la banda y la deteccion vieja leia alto=361 donde el cliente mide 453).
+
+POR QUE EL VEREDICTO ES A 64x64 (y no a 512)
+--------------------------------------------
+La captura trae el lienzo reescalado a 453 px (y el escalado del emulador mezcla pixeles), asi que
+comparar 1:1 contra la referencia de 512 es ruido: medido, con la caja EXACTA, a 512 la identidad da
+44,7 % a +-8. A 128 da 93,5 % y a 64 da 98,8 %. Y a 128 una caja corrida 1 px cambia el numero entre
+93,5 % y 97,1 % (medido), mientras que a 64 se queda entre 95,8 % y 99,8 %: por eso el "es el mismo mapa"
+se mide a 64x64 y las otras tres orientaciones (espejada H, espejada V, rotada 180) quedan en 31-36 %.
 
 Uso:
   medir-captura-237.py <captura.png> [referencia.png] [--ventana L,T,W,H] [--busca N]
@@ -34,6 +42,10 @@ MIN_CORRIDA = 60       # una banda de la pantalla mide cientos de px; 60 descart
 REF_LADO = 512         # el lienzo del acto 1 (verif-acto1-237 -png) es de 512x512
 ANCHO_LOGICO, ALTO_LOGICO = 640, 480
 ORIENTACIONES = ("identidad", "espejada-h", "espejada-v", "rotada-180")
+# el quad de control SIN textura que dibuja el POC, en coordenadas logicas (main.go: d2cQuadSolido)
+QUAD_X, QUAD_Y, QUAD_W, QUAD_H = 520, 380, 110, 90
+TOLERANCIA_QUAD = 2.0  # px: la caja del gestor de ventanas se acepta si el quad cae a esta distancia
+LADO_VEREDICTO = 64    # la resolucion a la que se decide "es el mismo mapa" (ver arriba)
 
 
 def decodificar(png):
@@ -66,18 +78,24 @@ def banda_negra(img):
 
 
 def pantalla_por_banda(filas):
-    """Las filas de la pantalla del emulador: las que comparten el borde DERECHO de la banda."""
+    """El area cliente del emulador segun la banda negra.
+
+    OJO (medido): el quad de control magenta PARTE la banda en las filas donde cae (la banda de la derecha
+    se queda en 49 px y no llega al minimo), asi que las filas del cliente NO son contiguas. La version
+    vieja contaba filas y leia alto=361 donde el cliente mide 453; esta toma el EXTREMO (min..max) de las
+    filas que comparten el borde derecho y el borde izquierdo MENOR (el borde del cliente)."""
     if not filas:
         return None
     cuenta = {}
     for y in filas:
         der = filas[y][1]
         cuenta[der] = cuenta.get(der, 0) + 1
-    der, alto = max(cuenta.items(), key=lambda kv: kv[1])
+    der, n = max(cuenta.items(), key=lambda kv: kv[1])
     ys = sorted(y for y in filas if filas[y][1] == der)
-    izq = int(np.median([filas[y][0] for y in ys]))
-    return {"arriba": ys[0], "abajo": ys[-1], "alto": alto, "izq": izq, "der": der,
-            "seguidas": (ys[-1] - ys[0] + 1) == alto}
+    izq = min(filas[y][0] for y in ys)
+    span = ys[-1] - ys[0] + 1
+    return {"arriba": ys[0], "abajo": ys[-1], "alto": span, "izq": izq, "der": der,
+            "filas_vistas": n, "seguidas": n == span}
 
 
 def bajar(img, x0, y0, lado, destino):
@@ -101,27 +119,12 @@ def orientar(ref, cual):
     return ref[::-1, ::-1]
 
 
-def puntuar(img, ref, alto, x0, y0):
+def puntuar(img, ref, alto, x0, y0, destino=REF_LADO):
     h, w, _ = img.shape
     if x0 < 0 or y0 < 0 or x0 + alto > w or y0 + alto > h:
         return None
-    b = bajar(img, x0, y0, alto, REF_LADO)
-    dif = np.abs(b - ref).max(axis=2)
-    n = dif.size
-    return {"mas4": int((dif <= 4).sum()), "mas8": int((dif <= 8).sum()), "mas16": int((dif <= 16).sum()),
-            "n": n, "err": float(dif.mean())}
-
-
-def puntuar_grueso(img, ref, alto, x0, y0, lado_grueso=128):
-    """La comparacion a 128x128: el render de la consola escala el lienzo (512 -> 480 logicos -> el alto del
-    area cliente en la captura) y volver a subirlo a 512 mezcla pixeles. Medido en la sintetica: a 512 el
-    mismo asset derecho da 80% a +-8 y a 128 da el 99%. El numero fino sirve para la ORIENTACION (la
-    diferencia entre orientaciones es enorme) y el grueso para decir "es el mismo mapa"."""
-    h, w, _ = img.shape
-    if x0 < 0 or y0 < 0 or x0 + alto > w or y0 + alto > h:
-        return None
-    b = bajar(img, x0, y0, alto, lado_grueso)
-    r = bajar(ref, 0, 0, ref.shape[0], lado_grueso)
+    b = bajar(img, x0, y0, alto, destino)
+    r = bajar(ref, 0, 0, ref.shape[0], destino)
     dif = np.abs(b - r).max(axis=2)
     n = dif.size
     return {"mas4": int((dif <= 4).sum()), "mas8": int((dif <= 8).sum()), "mas16": int((dif <= 16).sum()),
@@ -132,6 +135,17 @@ def linea_puntaje(titulo, p):
     return ("  %s: +-4 %6d (%.2f%%)   +-8 %6d (%.2f%%)   +-16 %6d (%.2f%%)   error medio %.2f" %
             (titulo, p["mas4"], 100.0 * p["mas4"] / p["n"], p["mas8"], 100.0 * p["mas8"] / p["n"],
              p["mas16"], 100.0 * p["mas16"] / p["n"], p["err"]))
+
+
+def quad_medido(img):
+    """El bbox del quad de control magenta (0xFFFF00FF) en la captura, o None."""
+    r, g, b = (img[:, :, i].astype(np.int16) for i in range(3))
+    mag = (r >= 200) & (g <= 60) & (b >= 200)
+    if not mag.any():
+        return None
+    ys, xs = np.nonzero(mag)
+    return {"x0": int(xs.min()), "x1": int(xs.max()), "y0": int(ys.min()), "y1": int(ys.max()),
+            "px": int(mag.sum())}
 
 
 def main():
@@ -155,8 +169,9 @@ def main():
 
     if ventana:
         izq, arriba, ancho_cliente, alto = ventana
-        print("  area cliente del emulador (--ventana): x=%d..%d y=%d..%d (%dx%d)" %
+        print("  area cliente del emulador (--ventana, la de KWin): x=%d..%d y=%d..%d (%dx%d)" %
               (izq, izq + ancho_cliente - 1, arriba, arriba + alto - 1, ancho_cliente, alto))
+        fuente = "gestor-de-ventanas"
     else:
         filas = banda_negra(img)
         det = pantalla_por_banda(filas)
@@ -164,30 +179,56 @@ def main():
             print("MEDIDOR237 SIN-BANDA")
             print("  SIN BANDA NEGRA: en esta captura no hay pantalla de consola (ni asset ni fondo negro)")
             return 0
-        arriba, abajo, alto = det["arriba"], det["abajo"], det["alto"]
-        der = det["der"]
-        # Flycast deja el area cliente en la misma proporcion que la ultima corrida (682x453 con la
-        # pantalla de 640x480): de ahi sale el ancho del cliente y, centrada, la pantalla.
+        arriba, alto, der = det["arriba"], det["alto"], det["der"]
+        # El borde IZQUIERDO del cliente no siempre se ve (cuando el asset ya esta pintado, la banda negra
+        # de la izquierda se une al negro del asset y la corrida mas larga arranca adentro del asset). Asi
+        # que el ancho se toma de la VENTANA que usa este banco (682x453, la de emu.cfg) y el borde
+        # izquierdo sale del derecho: es una SUPOSICION, y por eso el corpus mide la geometria con KWin y
+        # exige el quad de control (control 2j) en vez de confiar en esta via.
         ancho_cliente = int(round(alto * 682.0 / 453.0))
         izq = der - ancho_cliente + 1
-        print("  area cliente DETECTADA por la banda negra: y=%d..%d alto=%d banda x=%d..%d "
-              "(la misma banda en %d filas, seguidas=%s)" %
-              (arriba, abajo, alto, det["izq"], der, det["alto"], det["seguidas"]))
+        print("  area cliente DETECTADA por la banda negra: y=%d..%d alto=%d x=%d..%d ancho=%d "
+              "(filas con banda=%d, contiguas=%s, ancho de la ventana 682x453 SUPUESTO)" %
+              (arriba, arriba + alto - 1, alto, izq, der, ancho_cliente,
+               det["filas_vistas"], det["seguidas"]))
+        fuente = "banda-negra"
 
+    print("MEDIDOR237 fuente=%s" % fuente)
     print("MEDIDOR237 ventana=%d,%d,%d,%d" % (izq, arriba, ancho_cliente, alto))
 
     escala = alto / float(ALTO_LOGICO)
     ancho_pantalla = int(round(ANCHO_LOGICO * escala))
     pantalla_izq = izq + (ancho_cliente - ancho_pantalla) // 2
-    print("  pantalla de la consola (640x480 escalada x%.4f): x=%d..%d y=%d..%d (%dx%d)" %
-          (escala, pantalla_izq, pantalla_izq + ancho_pantalla - 1, arriba, arriba + alto - 1,
-           ancho_pantalla, alto))
+    print("  pantalla de la consola (640x480 escalada x%.4f, centrada en el cliente): x=%d..%d y=%d..%d "
+          "(%dx%d)" % (escala, pantalla_izq, pantalla_izq + ancho_pantalla - 1, arriba, arriba + alto - 1,
+                       ancho_pantalla, alto))
 
-    # el asset mide 512 * esc en la pantalla logica, y esc = min(640/512, 480/512) = 480/512: o sea que el
-    # asset ocupa EXACTAMENTE el alto del area cliente (el mismo caso que DC-002.35, donde era 256 -> 480).
+    # el asset mide 512 * esc en la pantalla logica, y esc = min(640/512, 480/512) = 480/512: el asset
+    # ocupa EXACTAMENTE el alto del area cliente, pegado arriba-izquierda de la pantalla logica.
     lado_asset = int(round(min(ANCHO_LOGICO, ALTO_LOGICO) * escala))
-    print("  bloque del asset (%dx%d escalado = el alto entero, pegado arriba-izquierda): x=%d..%d (%dx%d)" %
+    print("  bloque del asset (%dx%d escalado = el alto entero): x=%d..%d (%dx%d)" %
           (REF_LADO, REF_LADO, pantalla_izq, pantalla_izq + lado_asset - 1, lado_asset, lado_asset))
+
+    # --- el quad de control: la caja del gestor de ventanas se contrasta con el asset que el POC dibuja en
+    # coordenadas logicas conocidas. Si el quad cae donde la caja dice, la caja es la buena.
+    q = quad_medido(img)
+    pred_x0 = pantalla_izq + QUAD_X * escala
+    pred_y0 = arriba + QUAD_Y * escala
+    if q is None:
+        print("MEDIDOR237 quad=sin (no hay quad magenta: es la pantalla del MUTANTE o no llego a pintar)")
+    else:
+        dx = q["x0"] - pred_x0
+        dy = q["y0"] - pred_y0
+        dw = (q["x1"] - q["x0"] + 1) - QUAD_W * escala
+        dh = (q["y1"] - q["y0"] + 1) - QUAD_H * escala
+        estado = "ok" if max(abs(dx), abs(dy), abs(dw), abs(dh)) <= TOLERANCIA_QUAD else "corrido"
+        print("  quad de control magenta (%d,%d %dx%d logicos): medido x=%d..%d y=%d..%d (%dx%d), "
+              "predicho x=%.1f y=%.1f (%.1fx%.1f)" %
+              (QUAD_X, QUAD_Y, QUAD_W, QUAD_H, q["x0"], q["x1"], q["y0"], q["y1"],
+               q["x1"] - q["x0"] + 1, q["y1"] - q["y0"] + 1, pred_x0, pred_y0,
+               QUAD_W * escala, QUAD_H * escala))
+        print("MEDIDOR237 quad=%s dx=%+.1f dy=%+.1f dw=%+.1f dh=%+.1f px=%d" %
+              (estado, dx, dy, dw, dh, q["px"]))
 
     bloque = img[arriba:arriba + lado_asset, pantalla_izq:pantalla_izq + lado_asset]
     no_negro = ~(bloque <= UMBRAL_NEGRO).all(axis=2)
@@ -207,6 +248,9 @@ def main():
             print("     color dominante (rango 16): %2d,%2d,%2d  pixeles=%d" % (c[0], c[1], c[2], cuenta[k]))
         c = claves[orden[0]]
         print("MEDIDOR237 dominante=%d,%d,%d pixeles=%d" % (c[0], c[1], c[2], cuenta[orden[0]]))
+        media = bloque[no_negro].astype(np.float64).mean(axis=0)
+        print("  color medio del bloque (sin fondo): R=%.1f G=%.1f B=%.1f max=%d" %
+              (media[0], media[1], media[2], int(bloque.max())))
 
     # la pantalla entera: cuanto de negro puro (para el caso del mutante, que no pinta nada)
     pantalla = img[arriba:arriba + alto, pantalla_izq:pantalla_izq + ancho_pantalla]
@@ -222,67 +266,69 @@ def main():
     ref = decodificar(ref_png)
     print("  REFERENCIA %s (%dx%d)" % (ref_png, ref.shape[1], ref.shape[0]))
 
-    # Cuanto del LIENZO de referencia no es negro: es la expectativa MEDIDA de pixeles pintados que tiene
-    # que tener la captura (el corpus compara contra este numero, no contra un umbral inventado). OJO: la
-    # referencia pinta el indice 0 con su color de paleta y en la consola el indice 0 es TRANSPARENTE (sale
-    # el fondo negro), asi que la captura puede tener unos pocos pixeles menos: por eso hay tolerancia.
+    # Cuanto del LIENZO de referencia no es negro: es la expectativa MEDIDA de pixeles pintados. OJO: la
+    # referencia pinta el indice 0 con su color de paleta y en la consola el indice 0 es TRANSPARENTE, asi
+    # que los dos numeros no tienen por que ser iguales: la diferencia medida con la caja buena es de 2,6
+    # puntos (89,0 % de la consola contra 86,4 % de la referencia) y el corpus la tolera con margen.
     ref_no_negro = int((~(ref <= UMBRAL_NEGRO).all(axis=2)).sum())
     ref_tot = ref.shape[0] * ref.shape[1]
     print("  la referencia tiene %d de %d pixeles que no son negro (%.2f%%)" %
           (ref_no_negro, ref_tot, 100.0 * ref_no_negro / ref_tot))
     print("MEDIDOR237 refNoFondo=%.2f" % (100.0 * ref_no_negro / ref_tot))
 
-    # La alineacion se busca UNA vez (con la identidad) y despues se puntua cada orientacion en ESA
-    # alineacion: asi la comparacion entre orientaciones es la misma ventana de pixeles.
+    # --- el veredicto SIN BUSCAR: la caja es la del gestor de ventanas (medida aparte), el bloque se toma
+    # tal cual y se compara a 64x64 en las cuatro orientaciones.
+    print("  == sin buscar alineacion (la caja es la medida, no se ajusta)")
+    veredicto = {}
+    for cual in ORIENTACIONES:
+        p = puntuar(img, orientar(ref, cual), lado_asset, pantalla_izq, arriba, destino=LADO_VEREDICTO)
+        if p is None:
+            continue
+        veredicto[cual] = 100.0 * p["mas8"] / p["n"]
+        print(linea_puntaje("%-11s a %dx%d" % (cual, LADO_VEREDICTO, LADO_VEREDICTO), p))
+    for cual, pct in veredicto.items():
+        if cual == "identidad":
+            print("MEDIDOR237 identidad64 mas8=%.2f" % pct)
+        else:
+            print("MEDIDOR237 orient64 %s mas8=%.2f" % (cual, pct))
+    p = puntuar(img, ref, lado_asset, pantalla_izq, arriba, destino=128)
+    if p is not None:
+        print(linea_puntaje("identidad a 128x128", p))
+        print("MEDIDOR237 grueso mas8=%.2f mas16=%.2f error=%.2f" %
+              (100.0 * p["mas8"] / p["n"], 100.0 * p["mas16"] / p["n"], p["err"]))
+    p = puntuar(img, ref, lado_asset, pantalla_izq, arriba, destino=REF_LADO)
+    if p is not None:
+        print(linea_puntaje("identidad a 512x512 (referencia, con el ruido del reescalado)", p))
+        print("MEDIDOR237 fino mas8=%.2f error=%.2f" % (100.0 * p["mas8"] / p["n"], p["err"]))
+
+    # --- ademas, la mejor alineacion buscando +-busca px a 128x128 (informativo: dice si la caja esta
+    # corrida; NO es el numero del veredicto)
     mejor = None
     for paso in (4, 1):
         rango = busca if mejor is None else paso * 2
         base_dx = 0 if mejor is None else mejor[0]
         base_dy = 0 if mejor is None else mejor[1]
-        candidatos = [(dx, dy)
-                      for dx in range(base_dx - rango, base_dx + rango + 1, paso)
-                      for dy in range(base_dy - rango, base_dy + rango + 1, paso)]
-        for dx, dy in candidatos:
-            p = puntuar(img, ref, lado_asset, pantalla_izq + dx, arriba + dy)
-            if p is None:
-                continue
-            clave = (p["mas8"], p["mas4"], -p["err"])
-            if mejor is None or clave > (mejor[2]["mas8"], mejor[2]["mas4"], -mejor[2]["err"]):
-                mejor = (dx, dy, p)
+        for dx in range(base_dx - rango, base_dx + rango + 1, paso):
+            for dy in range(base_dy - rango, base_dy + rango + 1, paso):
+                q2 = puntuar(img, ref, lado_asset, pantalla_izq + dx, arriba + dy, destino=128)
+                if q2 is None:
+                    continue
+                clave = (q2["mas8"], q2["mas4"], -q2["err"])
+                if mejor is None or clave > (mejor[2]["mas8"], mejor[2]["mas4"], -mejor[2]["err"]):
+                    mejor = (dx, dy, q2)
+    if mejor is not None:
+        print("  mejor alineacion buscando +-%d px (a 128x128): dx=%+d dy=%+d -> %.2f%% a +-8 (la caja "
+              "medida da %.2f%% sin buscar)" %
+              (busca, mejor[0], mejor[1], 100.0 * mejor[2]["mas8"] / mejor[2]["n"],
+               veredicto.get("identidad", float("nan"))))
 
-    if mejor is None:
-        return 0
-
-    dx, dy, p = mejor
-    print("  MEJOR ALINEACION (buscando +-%d px): dx=%+d dy=%+d -> x=%d y=%d" %
-          (busca, dx, dy, pantalla_izq + dx, arriba + dy))
-    print(linea_puntaje("identidad, en la mejor alineacion", p))
-
-    ganadora = "identidad"
-    mejor_pct = 100.0 * p["mas8"] / p["n"]
-    print("MEDIDOR237 orientacion=identidad mas8=%.2f mas4=%.2f error=%.2f" %
-          (mejor_pct, 100.0 * p["mas4"] / p["n"], p["err"]))
-
-    for cual in ORIENTACIONES[1:]:
-        q = puntuar(img, orientar(ref, cual), lado_asset, pantalla_izq + dx, arriba + dy)
-        if q is None:
-            continue
-        pct = 100.0 * q["mas8"] / q["n"]
-        print(linea_puntaje("%s, misma alineacion" % cual, q))
-        print("MEDIDOR237 orientacion=%s mas8=%.2f mas4=%.2f error=%.2f" %
-              (cual, pct, 100.0 * q["mas4"] / q["n"], q["err"]))
-        if pct > mejor_pct:
-            mejor_pct, ganadora = pct, cual
-
-    print("MEDIDOR237 MEJOR=%s mas8=%.2f" % (ganadora, mejor_pct))
-
-    # la comparacion a 128x128 (la que dice "es el mismo mapa", sin el ruido del reescalado)
-    gr = puntuar_grueso(img, ref, lado_asset, pantalla_izq + dx, arriba + dy)
-    if gr is not None:
-        print(linea_puntaje("a 128x128, contra la referencia", gr))
-        print("MEDIDOR237 grueso mas8=%.2f mas16=%.2f error=%.2f" %
-              (100.0 * gr["mas8"] / gr["n"], 100.0 * gr["mas16"] / gr["n"], gr["err"]))
-
+    ident = veredicto.get("identidad", 0.0)
+    otras = [v for k, v in veredicto.items() if k != "identidad"]
+    ganadora = max(veredicto.items(), key=lambda kv: kv[1])[0] if veredicto else "ninguna"
+    print("MEDIDOR237 MEJOR=%s mas8=%.2f" %
+          (ganadora, max(veredicto.values()) if veredicto else 0.0))
+    print("MEDIDOR237 orientaciones identidad=%.2f otras=%s" %
+          (ident, ",".join("%.2f" % v for v in otras)))
     return 0
 
 

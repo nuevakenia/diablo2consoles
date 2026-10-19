@@ -88,6 +88,8 @@ def medir(herramienta, png, ref_png=None, ventana=None):
             elif cuerpo.startswith("bloque"):
                 d["bloque"] = lin
                 d["noFondo"] = float(lin.split("(")[-1].split("%")[0])
+            elif cuerpo.startswith("identidad64 mas8="):
+                d["identidad64"] = float(cuerpo.split("=")[1])
             elif cuerpo.startswith("grueso mas8="):
                 resto = cuerpo[len("grueso "):]
                 partes = dict(p.split("=") for p in resto.split())
@@ -121,12 +123,14 @@ def main():
     d, salida = medir(herramienta, sano_png, ref_png)
     print("\n== CASO SANO (el asset derecho)")
     print("\n".join("   " + l for l in salida.splitlines() if l.startswith("MEDIDOR237")))
-    if d.get("mejor") == "identidad" and d.get("grueso_mas8", 0) >= 95.0:
-        print("   OK: el instrumento dice identidad y a 128x128 coincide %.2f%% a +-8 (%.2f%% a +-16)" %
-              (d["grueso_mas8"], d.get("grueso_mas16", 0.0)))
+    # El veredicto del instrumento es a 64x64 (medido: es la resolucion a la que el numero no depende de
+    # 1 px de caja; a 128 la propia sintetica baja a 84,9 % por el reescalado 512->453->128).
+    if d.get("mejor") == "identidad" and d.get("identidad64", 0) >= 95.0:
+        print("   OK: el instrumento dice identidad y a 64x64 coincide %.2f%% a +-8 (a 128x128 %.2f%%, "
+              "a +-16 %.2f%%)" % (d["identidad64"], d.get("grueso_mas8", 0.0), d.get("grueso_mas16", 0.0)))
     else:
-        print("   FALLO: el instrumento NO reconoce el asset derecho (mejor=%s, 128x128 a +-8 = %s%%)" %
-              (d.get("mejor"), d.get("grueso_mas8")))
+        print("   FALLO: el instrumento NO reconoce el asset derecho (mejor=%s, 64x64 a +-8 = %s%%)" %
+              (d.get("mejor"), d.get("identidad64")))
         fallos += 1
     if "noFondo" in d and "refNoFondo" in d and abs(d["noFondo"] - d["refNoFondo"]) <= 3.0:
         print("   OK: los pixeles pintados de la captura (%.2f%%) siguen a los de la referencia (%.2f%%)" %

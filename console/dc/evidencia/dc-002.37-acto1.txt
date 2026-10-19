@@ -1,0 +1,52 @@
+DC-002.37 -- EL ACTO 1 ARMADO Y PINTADO EN LA DREAMCAST (evidencia medida)
+=========================================================================
+Corrida: bash scripts/console/checar-acto1-237.sh  (75 s la buena, 20 s el mutante)
+Salida:  23 controles OK, 0 en rojo, exit 0   (SAL=~/.hermes/cache/scratch/dc237-corpus)
+Fecha:   2026-10-19
+
+1. EL .ds1 DEL NIVEL, LEIDO DEL MPQ DEL DISCO (/cd/JUEGO/D2DATA.MPQ, por el driver ISO9660)
+   DS1-LEER OK bytes=57652 crc32=712973328       <- MISMO crc32 y MISMO tamaño que el host
+   data\global\tiles\ACT1\TOWN\townN1.ds1         (el Rogue Encampment, el nivel 1 del acto 1)
+   version=18 act=1 w=57 h=41 objetos=41 files=8   <- igual al host (parseador del MOTOR)
+   capas con tiles NO vacios: PISO1=1982  PARED1=365  PARED2=8  SOMBRA1=2
+   los 8 DT1 que el PROPIO .ds1 lista: bytes y crc32 iguales a los del host, uno por uno
+   (treegroups 505504/720682414, stonewall 439569/3658844334, floor 1008003/231028135,
+    warp 658158/4038904381, river 316344/1771736052, objects 661515/1353167029,
+    fence 423367/2077960125, outdoors/objects 338205/3007654198)
+
+2. EL ARMADO Y LO PINTADO (misma composicion que el host: nivel.go sha256 cb463c83...)
+   VENTANA lado=512 origen=-80,512 centroCelda=28,20    PEDIDOS pisos=1982 paredes=373 total=2355
+   COMPUESTO pisos=1982/1982 paredes=373/373 sintilePiso=0 sintilePared=0 fuera=2027
+   LIENZO pixelesNoVacios=258653 de 262144 crc32=3380300152   <- EL MISMO crc32 que el host
+   PALETA (pal.dat del acto 1, 768 B) ARGB1555 crc32=3508331570 <- igual al host
+   TEXTURA OK 512x512 (262144 B en VRAM, 8 bpp paletizada + paleta ARGB1555 por hardware)
+   300 cuadros en 49608 ms, 59,8 cuadros/s (270 cuadros en 4515 ms)
+
+3. LA CAPTURA DE PANTALLA (criterio 2) -- console/dc/evidencia/dc-002.37-*
+   geometria: area cliente 1400,120 682x453 (medida por KWin) -> pantalla logica 604x453
+   el quad de control magenta (520,380 110x90 logicos) cae a dx=+0,2 dy=+0,4 px de donde
+   dice esa caja: la geometria con la que se mide esta VALIDADA (control 2j).
+   bloque del asset 453x453: 182657 de 205209 pixeles NO son fondo negro (89,01 %)
+   color dominante (rango 16): 1,1,0 (36667 px);  color medio R=34.6 G=36.2 B=22.3 max=165
+   contra la referencia del host (86,37 % de pixeles no negros, media 32.7/34.2/21.9):
+     a 64x64, identidad 98,80 % a +-8 (100 % a +-16)
+     espejada-h 36,11 %   espejada-v 31,69 %   rotada-180 35,25 %
+     a 128x128 identidad 93,46 %;  correlacion de luminancia 0,97
+   => la figura es la MISMA (misma forma, mismo lugar); el color tambien (razon 1,05).
+
+4. EL MUTANTE (criterio 3): el MISMO binario con el .ds1 apuntando a no-existe-este-nivel.ds1
+   consola: DS1-LEER FALLO: ... no-existe-este-nivel.ds1 : file not found  +  PANTALLA-VACIA
+   captura, en el MISMO bloque de 453x453: 0 de 205209 pixeles pintados (0,00 %) contra 89,01 %
+   => sin el .ds1 la pantalla NO puede cambiar.
+
+5. LO QUE ESTABA MAL Y SE MIDIO (por que antes "no coincidia")
+   El instrumento ubicaba la ventana por la banda negra mas larga de cada fila. El quad de control
+   magenta PARTE esa banda en las filas donde cae, asi que leia alto=361 donde el area cliente mide
+   453 (0,797 de la real) y con eso el bloque de pixeles salia corrido y mas chico: daba 11,64 % a
+   +-8 y "ganaba" con dx=-14 dy=+8 (el borde de la busqueda). No era el POC ni la textura.
+   Ahora la geometria la mide el gestor de ventanas (linea GEO de run-flycast-237.sh) y se valida con
+   el quad de control; el veredicto se mide a 64x64 (medido: una caja corrida 1 px mueve el numero
+   entre 93,5 % y 97,1 % a 128, y solo entre 95,8 % y 99,8 % a 64).
+   Tambien estaban rotos (y son formato, no datos): el corpus comparaba texto con \r y con los espacios
+   que mete println de Go (controles 2b/2c/2d/2e), tomaba bytes=768 de la PALETA como si fuera el .ds1
+   (control 0a) y calculaba los cuadros/s como 30/d (6,6 en vez de 59,8) (control 2h).

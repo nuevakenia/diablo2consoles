@@ -31,6 +31,7 @@ POS="${4:-1400 120}"
 FLY="${FLYCAST:-$HOME/dreamcast/dl/flycast.AppImage}"
 DISP="${DISPLAY:-:0}"
 TOKEN="dc237"
+BARRA_TITULO="${BARRA_TITULO:-28}"   # alto de la barra de titulo del marco (medido en este KWin)
 PX="${POS%% *}"; PY="${POS##* }"
 
 mkdir -p "$OUT"
@@ -59,7 +60,16 @@ function ubicar(w) {
         w.keepAbove = true;
     }
     print("DC237-CAP|" + cap + "|" + cls + "|pid=" + w.pid + "|geo=" + w.frameGeometry.x + "," +
-          w.frameGeometry.y + "," + w.frameGeometry.width + "," + w.frameGeometry.height);
+          w.frameGeometry.y + "," + w.frameGeometry.width + "," + w.frameGeometry.height + "|cli=" +
+          (function () {
+              try {
+                  var c = w.clientGeometry;
+                  if (c && c.width > 0) {
+                      return c.x + "," + c.y + "," + c.width + "," + c.height;
+                  }
+              } catch (e) { }
+              return "?";
+          })());
 }
 var pila = workspace.stackingOrder;
 for (var i = 0; i < pila.length; i++) { ubicar(pila[i]); }
@@ -92,6 +102,18 @@ for t in 3 6 10 15 25 40 60 90; do
         LIN="$(regla)"
         spectacle -b -n -f -o "$OUT/f${t}s.png" >/dev/null 2>&1
         echo "  captura ${t}s   ${LIN:-ventana: NO la encuentro}"
+        # La geometria del AREA CLIENTE, en una linea que el corpus pueda leer. `cli` la da KWin; si esta
+        # version no la expone (cli=?), se deriva del marco: la barra de titulo mide 28 px (medido, la regla
+        # pide el cliente en PY y el marco queda en PY-28).
+        CLI="$(echo "$LIN" | sed -n 's/.*cli=\([0-9-]*,[0-9-]*,[0-9]*,[0-9]*\).*/\1/p')"
+        if [ -z "$CLI" ]; then
+            GEO="$(echo "$LIN" | sed -n 's/.*geo=\([0-9-]*\),\([0-9-]*\),\([0-9]*\),\([0-9]*\).*/\1,\2,\3,\4/p')"
+            if [ -n "$GEO" ]; then
+                IFS=, read -r GX GY GW GH <<<"$GEO"
+                CLI="$GX,$(( GY + BARRA_TITULO )),$GW,$(( GH - BARRA_TITULO ))"
+            fi
+        fi
+        [ -n "$CLI" ] && echo "GEO t=${t}s cliente=$CLI"
     else
         echo "  el emulador se detuvo antes de los ${t}s"; break
     fi
