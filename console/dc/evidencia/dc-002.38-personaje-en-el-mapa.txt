@@ -1,0 +1,362 @@
+DC-002.38 (t_b7825ffa) -- EL PERSONAJE EN EL MAPA, MOVIENDOSE CON EL CONTROL DE LA DREAMCAST.
+
+El hito que pidio Papu ("ingame moviendo personajes, en el mapa"), medido: el personaje del jugador
+compuesto con el COF y los decodificadores del MOTOR, pintado ENCIMA del nivel del acto 1 (el townN1.ds1
+del MPQ del disco), y MOVIDO por el control de la Dreamcast con la velocidad de la tabla del motor
+(d2path: 9,375 subtiles/s caminando). El corpus queda 46/46 en VERDE y el mutante ROJO donde tiene que
+estar rojo.
+
+Namespace: este documento mide lo de la tarjeta DC-002.38. La seccion del README es la 72 (la 71 se la
+habia quedado DC-002.48b, los tiles corridos).
+
+=============================================================================
+1. QUE SE MIDE, Y CON QUE
+=============================================================================
+
+Dos estados, la MISMA cadena de codigo en las dos puntas:
+
+  FIX  el POC `console/dc/poc/personaje-mapa` (ELF -> ISO con los dos MPQ -> Flycast):
+       1. el NIVEL: /cd/JUEGO/D2DATA.MPQ -> townN1.ds1 -> d2ds1 -> los DT1 que el DS1 lista -> d2dt1 ->
+          el compositor `nivel.go` (el MISMO archivo que el verificador del host, sha256
+          9260af18fc084c50);
+       2. el PERSONAJE: /cd/JUEGO/D2CHAR.MPQ -> data\global\CHARS\AM\COF\amnuhth.cof -> d2cof (capas y
+          ORDEN de dibujo) -> cada capa a su .dcc/.dc6 -> d2dcc/d2dc6 -> el compuesto `personaje.go` (el
+          MISMO archivo, sha256 16061a8508d9d9e7) con el indice 0 TRANSPARENTE;
+       3. la POSICION: d2vector.Position en SUBTILES (5 por celda) que avanza con la velocidad de
+          d2path en la direccion que pide el CONTROL;
+       4. el DIBUJO: mapa y personaje ENCIMA por el camino del motor (ebiten.Image + DrawImage dentro de
+          ebiten.RunGame, o sea el loop que va a correr el juego).
+  MUT  el MISMO binario compilado con CONTROL_SORDO=1: el control se lee y se informa, pero NO se
+       engancha al movimiento. Es el mutante de la PIEZA que se prueba (el enganche control ->
+       movimiento), no del dibujado.
+
+Instrumentos (todos en el repo, todos reproducibles):
+  scripts/console/build-personaje-238.sh   el ELF, el ISO con los dos MPQ y los numeros del host
+  scripts/console/run-flycast-238.sh       la corrida: teclas por /dev/uinput + capturas atadas a la marca del POC
+  scripts/console/teclas-virtuales.py      el teclado virtual (un solo aparato para toda la secuencia)
+  scripts/console/medir-captura-238.py     identidad contra la referencia del host + pixeles del personaje
+  scripts/console/leer-pos-238.py          velocidad, proyeccion del piso y direccion por tramo
+  scripts/console/checar-personaje-238.py  el corpus (46 controles) y el mutante
+
+=============================================================================
+2. LOS NUMEROS DEL HOST (la mitad contra la que se compara todo)
+=============================================================================
+
+  VERIF238: DS1 bytes=57652 crc32=712973328  (version 18, act 1, 57x41, 41 objetos, 8 DT1)
+  VERIF238: VENTANA lado=512 origen=304,1664 centroCelda=28,20
+  VERIF238: PEDIDOS pisos=1982 paredes=330 total=2312
+  VERIF238: COMPUESTO pisos=1982/1982 paredes=330/330 sintilePiso=0 sintilePared=0 fuera=2239
+  VERIF238: LIENZO pixelesNoVacios=193538 de 262144 crc32=3507647456
+  VERIF238: LIENZO pixelesPiso=179484 pixelesPared=146567
+  VERIF238: COF bytes=1132 crc32=2708601289 capas=8 framesPorDir=8 dirs=16 speed=128
+  VERIF238: ORDEN capas=8 orden=[2 3 8 1 4 0 9 7]
+  VERIF238: CAPA HD 10931 crc32=4009831868 caja=-7,-65 15x17 pixeles=148
+  VERIF238: CAPA LA 12765 crc32=1313645261 caja=-18,-48 18x27 pixeles=172
+  VERIF238: CAPA LG 37659 crc32=2352162040 caja=-14,-37 21x51 pixeles=487
+  VERIF238: CAPA RA 10986 crc32=261487157  caja=-7,-53 13x15 pixeles=68
+  VERIF238: CAPA S1  3781 crc32=2779618826 caja=-5,-54 10x8  pixeles=39
+  VERIF238: CAPA S2  4902 crc32=3830512632 caja=-8,-51 9x9   pixeles=71
+  VERIF238: CAPA SH  SIN-GRAFICO (el MPQ no trae AMSHLITNU1ht.dc6; en la consola, igual)
+  VERIF238: CAPA TR 17401 crc32=320674826  caja=-10,-54 15x25 pixeles=244
+  VERIF238: PERSONAJE compuesto=26x79 esquina=-18,-65 capasDibujadas=7 pixelesNoVacios=896
+            crc32=1857478036
+  VERIF238: MOTOR velocidad=subtilesPorSegundo=9.3750 celdasPorSegundo=1.8750  (d2path, caminando)
+  VERIF238: POS subtiles=140.0000,100.0000 celda=28.0000,20.0000 ancla=256,256 pantalla=320,240
+  VERIF238: PANTALLA 640x480 personaje_en=302,175 personajeCaja=26x79 pixelesCambiados=896
+
+Los 7 capas dibujadas y el ORDEN [2 3 8 1 4 0 9 7] son los que pide el COF: el personaje no se arma
+"en el orden en que vienen los archivos", se arma con el orden que declara el propio COF (y el corpus lo
+compara capa por capa, bytes y crc32).
+
+=============================================================================
+3. LOS NUMEROS DE LA CONSOLA (Flycast, la misma cadena, ELF 7.673.892 B / ISO 536.492.032 B)
+=============================================================================
+
+Cada control del corpus compara la linea de la consola contra la del host, normalizada (separadores):
+
+  2a el .ds1 (bytes, crc32) ............ 57652 712973328            = host
+  2b el .ds1 (version, tam, objetos) ... version=18 w=57 h=41 objetos=41 files=8 = host
+  2c la ventana del nivel .............. lado=512 origen=304 1664 centroCelda=28 20 = host
+  2d los pedidos del nivel ............. pisos=1982 paredes=330 total=2312 = host
+  2e la composicion del nivel .......... pisos=1982/1982 paredes=330/330 sintilePiso=0 sintilePared=0
+                                         fuera=2239 = host
+  2f el lienzo (no vacios, crc32) ...... 193538 de 262144 crc32=3507647456 = host
+  2f2 el lienzo (piso y pared) ......... pixelesPiso=179484 pixelesPared=146567 = host
+  2g la paleta del acto ................ 768 B, 256 colores, crc32=3508331570 = host
+  2h el COF del heroe .................. 1132 B crc32=2708601289 capas=8 frames=8 dirs=16 speed=128 = host
+  2i cada CAPA (HD/LA/LG/RA/S1/S2/SH/TR) bytes, crc32, caja y pixeles = host, capa por capa
+  2j el compuesto del personaje ........ 26x79 esquina=-18,-65 capas=7 pixeles=896
+                                         crc32=1857478036 = host
+
+=============================================================================
+4. CRITERIO 1: EL PERSONAJE PINTADO SOBRE EL MAPA (captura y pixeles)
+=============================================================================
+
+La captura no se mira: se compara contra la pantalla del host, y el personaje se cuenta con los pixeles
+que la captura tiene DE MAS respecto del mapa solo (la referencia `-png-mapa` del host), con vecindad de
+2 px para que el reescalado del emulador no se cuente como personaje.
+
+  captura f00-parado:
+    identidad con la referencia del host a 64x60 ....... 96.65 %
+    las otras tres orientaciones (peor caso) ........... 19.30 %   (espejada-h/-v, rotada-180)
+    pixeles de personaje ............................... 704   (el host: 669)
+    centro de masa ..................................... (253.6, 214.8)  (el host: (252.4, 214.1))
+
+  controles del corpus: 2l (identidad >= 90 %) OK, 2l2 (la identidad le gana por lejos a las otras tres)
+  OK, 2m (los pixeles del personaje dan, 704 contra 669) OK.
+
+Que la identidad se compare contra las otras TRES orientaciones es lo que hace que el 96,65 % signifique
+algo: una referencia horneada del mismo lado puede validar un espejado (paso en DC-002.35); aca la
+identidad gana 96,65 contra 19,30, o sea que NO esta espejada ni rotada.
+
+=============================================================================
+5. CRITERIO 2: LA POSICION DEL MOTOR ANTES Y DESPUES DE MOVER EL CONTROL
+=============================================================================
+
+El instrumento es la tabla de DC-002.11 (los botones del control de la Dreamcast, leidos del bus maple) y
+la posicion del motor: d2vector.Position en subtiles, 5 por celda. Cada captura lleva la marca del motor
+que le toco (el `pos=` de la linea GEO: el pixel de pantalla donde el POC dibuja el ancla) y la linea POS
+del POC.
+
+  captura     botones   celda del motor            ancla de pantalla    centro medido en la captura
+  f00-parado     0      28.0000 , 20.0000          320,240              (253.6, 214.8)
+  f03-derecha  128      28.8889 , 19.9858          476,240              (411.0, 200.9)
+  f05-abajo     32      28.8889 , 20.9858          476,318              (409.4, 290.7)
+  f08-diagonal 144      29.5173 , 18.6890          546,248              (480.3, 210.7)
+  f11-quieto     0      29.5173 , 18.6890          546,248              (480.3, 210.7)
+
+  tramo DERECHA (x+)    pantalla (+157.4, -13.9)  contra motor (+156.0,  +0.0)  OK
+  tramo ABAJO   (y+)    pantalla (  -1.6, +89.8)  contra motor (  +0.0, +78.0)  OK
+  tramo ARRIBA+DERECHA  pantalla ( +70.9, -80.0)  contra motor ( +70.0, -70.0)  OK
+
+  velocidad ............ caminado 20.7281 subtiles en 2.2110 s -> 9.3750 sub/s (el motor: 9.3750; -0,00 %)
+  proyeccion del piso .. error maximo del ancla contra la proyeccion de la posicion del motor: 0 px (22 tramos)
+  total caminado ....... 20.7281 subtiles = 4.146 celdas del mapa, 24 pasos, 0 cuadros con paso 0
+  cuadros con paso acotado: 27 (cuadros que tardaron mas de 0,1 s: el paso se ACOTA, no se descarta)
+
+O sea: el control de la Dreamcast (cruceta -> flechas del teclado -> el backend de entrada del motor)
+MUEVE la posicion del motor, y la pantalla se mueve con ella. La cuenta que lo ata todo es la del camino
+del motor: `caminado/tiempo` da 9,3750 subtiles/s exactos, y el pixel con el que se dibuja el ancla es la
+proyeccion del piso ((x-y)*80-80, (x+y)*40) de la posicion en subtiles con error 0.
+
+=============================================================================
+6. CRITERIO 3: EL MUTANTE (sin tocar el control para mover, la posicion NO cambia)
+=============================================================================
+
+  CONTROL_SORDO=1 -> `var controlSordo = true` (otro binario: sha256 2b2418f6... contra dfbf8368...).
+
+Con las MISMAS teclas (las mismas tres pulsaciones, el mismo teclado virtual):
+
+  CONTROL cuadro  107 botones 128 ejes +1 +0
+  CONTROL cuadro  134 botones   0 ejes +0 +0
+  CONTROL cuadro  272 botones  32 ejes +0 +1
+  CONTROL cuadro  299 botones   0 ejes +0 +0
+  CONTROL cuadro  435 botones 144 ejes +1 -1
+  CONTROL cuadro  461 botones   0 ejes +0 +0
+
+  VELOCIDAD caminado=0.0000 subtiles  (0 pasos)
+  DESDE cuadro 1 hasta cuadro 660: pantalla (320,240) -> (320,240), celda (28.0,20.0) -> (28.0,20.0)
+  captura parado contra captura de la tecla: identidad 96.65 % contra 96.65 %, centro (253.6,214.8) contra
+  (253.6,214.8)
+
+Controles: 3a (otro binario) OK, 3a2 (el log dice que el control esta sordo) OK, 3b (caminado 0 y 0 pasos
+con las mismas teclas) OK, 3c (el control SI se leyo: 3 pulsaciones con botones != 0) OK, 3d (la pantalla
+no cambia) OK.
+
+=============================================================================
+7. LOS DEFECTOS DE INSTRUMENTO QUE APARECIERON EN ESTA TARJETA (medidos, no supuestos)
+=============================================================================
+
+Esta tarjeta se cayo TRES veces por el instrumento antes de medir el POC. Los tres quedan escritos porque
+son los que van a volver:
+
+  a) LAS CAPTURAS SE CORRIAN RESPECTO DE LAS TECLAS. Con la linea de tiempo por reloj (capturar a los 1,
+     3, 5, 8 y 11 s) cada `spectacle` + la espera a que el PNG se escriba tarda uno o dos segundos, y la
+     captura del tramo "abajo" salio DESPUES de que la diagonal ya habia movido al personaje: dos capturas
+     consecutivas identicas (0 px de pantalla) con el motor movido (+39,-37), y el criterio 2 se caia con
+     el POC perfecto. ARREGLO: la captura de cada tramo espera la marca del PROPIO POC (la pulsacion
+     "HITO238: CONTROL botones <bits>" y despues su suelta "botones 0"), y espera 1,8 s para que haya una
+     marca POS nueva (las deja cada 30 cuadros): la linea POS que se compara es la posicion FINAL del
+     tramo. Medido despues del arreglo: los tres tramos dan +157,4/-13,9, -1,6/+89,8 y +70,9/-80,0 contra
+     +156/0, 0/+78 y +70/-70 del motor.
+
+  b) LA FOTO "PARADO" SE SACABA DESPUES DE LA PRIMERA PULSACION. Al mover el lanzamiento de las teclas
+     antes de la primera captura, la foto del arranque salio con el personaje ya movido (pos=382,240 en vez
+     de 320,240): el corpus comparaba el tramo 1 contra una foto que no era la del arranque. ARREGLO: la
+     captura del personaje parado va ANTES de lanzar el teclado virtual.
+
+  c) EL PASO DE LA CELDA (esto lo arreglo DC-002.48b mientras esta tarjeta estaba en curso, y hay que
+     decirlo): el compositor avanzaba la celda 32x16 px (un SUBTILE) donde el motor avanza 80x40, asi que
+     el nivel salia a 2,5x menos escala. Con el arreglo cambian TODOS los numeros del nivel (lienzo
+     258653 -> 193538, crc32 3380300152 -> 3507647456, paredes 373 -> 330) y cambia el paso con el que se
+     dibuja el personaje: por eso esta tarjeta recompilo el POC contra el HEAD 2237ce87/08d72ab3 y volvio
+     a medir. Los numeros de arriba son los del arbol con el paso 80x40 (nivel.go sha256 9260af18fc084c50).
+     El instrumento tambien se corrigio: `leer-pos-238.py` verificaba la proyeccion con 32/16 fijos, o sea
+     que validaba el defecto (el ancla del POC seguia su propia cuenta equivocada y el error daba 0); ahora
+     usa 80/40.
+
+=============================================================================
+8. COMO SE REPITE
+=============================================================================
+
+  # el binario, el disco con los dos MPQ y los numeros del host
+  bash scripts/console/build-personaje-238.sh /tmp/dcbuild/personaje-238
+  CONTROL_SORDO=1 bash scripts/console/build-personaje-238.sh /tmp/dcbuild/personaje-238-mudo
+
+  # el corpus completo (host + corrida buena + mutante): 46 controles
+  python3 scripts/console/checar-personaje-238.py
+
+  # con lo ya compilado y corrido
+  SALTAR_BUILD=1 python3 scripts/console/checar-personaje-238.py
+
+  # una sola corrida, a mano
+  bash scripts/console/run-flycast-238.sh /tmp/dcbuild/personaje-238/disc.gdi /tmp/dc238-uno
+
+El corpus necesita el emulador LIBRE: si hay otro Flycast andando espera su turno (hasta 300 s) y, si el
+control llega a medias, REINTENTA la corrida entera (hasta 3 veces) en vez de medir a medias. En este host
+corre otro agente del tablero sobre el mismo repo: las mediciones de arriba son de una corrida que salio
+entera al primer intento, y el HEAD con el que se midio queda anotado (2237ce87 + la evidencia de
+DC-002.49, que no toca los archivos compartidos).
+
+Salida cruda del corpus (46/46): al final de este archivo.
+
+=============================================================================
+9. LO QUE NO ENTRA (declarado, no tapado)
+=============================================================================
+
+  - los MONSTRUOS, el combate y el inventario: no estan en esta tarjeta;
+  - el personaje esta en el frame 0 de la direccion 0 (parado): la ANIMACION de caminar (las 8 direcciones
+    x 8 frames del DCC cambiando con el paso) es otra tarjeta (DC-002.49 la esta censando);
+  - la colision con las paredes del nivel: el personaje camina por la ventana del mapa sin chocar. El
+    motor tiene el `d2collision`; engancharlo es de la tarjeta de movimiento del juego;
+  - el MUTANTE prueba el enganche control -> movimiento, NO el dibujado: si el personaje no se pintara,
+    las capturas lo delatarian (2l/2m) pero no el mutante.
+
+=============================================================================
+10. SALIDA CRUDA DEL CORPUS (46 controles OK, 0 FALLOS)
+=============================================================================
+
+
+== 0. EL HOST: el nivel, el COF del heroe, el compuesto del personaje y la velocidad del motor
+   VERIF238: DS1 data\global\tiles\ACT1\TOWN\townN1.ds1 bytes=57652 crc32=712973328
+   VERIF238: DS1 version=18 act=1 w=57 h=41 objetos=41 files=8
+   VERIF238: VENTANA lado=512 origen=304,1664 centroCelda=28,20
+   VERIF238: PEDIDOS pisos=1982 paredes=330 total=2312
+   VERIF238: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 bytes=505504 crc32=720682414 tiles=21
+   VERIF238: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 bytes=439569 crc32=3658844334 tiles=52
+   VERIF238: DT1 data/global/tiles/act1\town\floor.dt1 bytes=1008003 crc32=231028135 tiles=144
+   VERIF238: DT1 data/global/tiles/act1\barracks\warp.dt1 bytes=658158 crc32=4038904381 tiles=81
+   VERIF238: DT1 data/global/tiles/act1\outdoors\river.dt1 bytes=316344 crc32=1771736052 tiles=45
+   VERIF238: DT1 data/global/tiles/act1\town\objects.dt1 bytes=661515 crc32=1353167029 tiles=91
+   VERIF238: DT1 data/global/tiles/act1\town\fence.dt1 bytes=423367 crc32=2077960125 tiles=31
+   VERIF238: DT1 data/global/tiles/act1\outdoors\objects.dt1 bytes=338205 crc32=3007654198 tiles=42
+   VERIF238: COMPUESTO pisos=1982/1982 paredes=330/330 sintilePiso=0 sintilePared=0 fuera=2239
+   VERIF238: LIENZO pixelesNoVacios=193538 de 262144 crc32=3507647456
+   VERIF238: LIENZO pixelesPiso=179484 pixelesPared=146567
+   VERIF238: PALETA acto bytes=768 colores=256 crc32=3508331570
+   VERIF238: COF data\global\CHARS\AM\COF\amnuhth.cof bytes=1132 crc32=2708601289 capas=8 framesPorDir=8 dirs=16 speed=128
+   VERIF238: ORDEN capas=8 orden=[2 3 8 1 4 0 9 7]
+   VERIF238: CAPA HD bytes=10931 crc32=4009831868 caja=-7,-65 15x17 pixeles=148
+   VERIF238: CAPA LA bytes=12765 crc32=1313645261 caja=-18,-48 18x27 pixeles=172
+   VERIF238: CAPA LG bytes=37659 crc32=2352162040 caja=-14,-37 21x51 pixeles=487
+   VERIF238: CAPA RA bytes=10986 crc32=261487157 caja=-7,-53 13x15 pixeles=68
+   VERIF238: CAPA S1 bytes=3781 crc32=2779618826 caja=-5,-54 10x8 pixeles=39
+   VERIF238: CAPA S2 bytes=4902 crc32=3830512632 caja=-8,-51 9x9 pixeles=71
+   VERIF238: CAPA SH SIN-GRAFICO
+   VERIF238: CAPA TR bytes=17401 crc32=320674826 caja=-10,-54 15x25 pixeles=244
+   VERIF238: PERSONAJE compuesto=26x79 esquina=-18,-65 capasDibujadas=7 sinGrafico=0 pixelesNoVacios=896 crc32=1857478036
+   VERIF238: MOTOR velocidad=subtilesPorSegundo=9.3750 celdasPorSegundo=1.8750
+   VERIF238: POS subtiles=140.0000,100.0000 celda=28.0000,20.0000 tile=28,20 ancla=256,256 pantalla=320,240
+   VERIF238: PANTALLA 640x480 personaje_en=302,175 personajeCaja=26x79 pixelesCambiados=896
+   VERIF238: PNG-MAPA /home/dgalli/.hermes/cache/scratch/dc238-corpus/host/mapa.png
+   VERIF238: PNG /home/dgalli/.hermes/cache/scratch/dc238-corpus/host/referencia.png
+   OK: 0a: el .ds1 del nivel es el del MPQ (57652 bytes, crc32 712973328), como en DC-002.37
+   OK: 0b: el nivel compuesto: LIENZO pixelesNoVacios=193538 de 262144 crc32=3507647456
+   OK: 0c: el COF del heroe: COF data/global/CHARS/AM/COF/amnuhth.cof bytes=1132 crc32=2708601289 capas=8 framesPorDir=8 dirs=16 speed=128
+   OK: 0d: el compuesto del personaje: PERSONAJE compuesto=26 79 esquina=-18 -65 capasDibujadas=7 sinGrafico=0 pixelesNoVacios=896 crc32=1857478036
+   OK: 0e: la velocidad del motor (d2path, caminando): MOTOR velocidad=subtilesPorSegundo=9.3750 celdasPorSegundo=1.8750
+   OK: 0f: nivel.go (9260af18fc084c50) y personaje.go (16061a8508d9d9e7) son el MISMO archivo en el POC y en el host
+
+== 1. LAS IMAGENES: el ELF del POC y el disco con los DOS MPQ
+   OK: 1a: ELF 7673892 bytes, ISO 536492032 bytes (con d2data.mpq y d2char.mpq dentro)
+
+== 2. LA CORRIDA BUENA: el personaje en el mapa, moviendose con el control
+   OK: 2: la corrida salio entera al primer intento
+   OK: 2a el .ds1 (bytes, crc32): la consola da lo mismo que el host (57652 712973328)
+   OK: 2b el .ds1 (version, tamaño, objetos): la consola da lo mismo que el host (DS1 version=18 act=1 w=57 h=41 objetos=41 files=8)
+   OK: 2c la ventana del nivel: la consola da lo mismo que el host (VENTANA lado=512 origen=304 1664 centroCelda=28 20)
+   OK: 2d los pedidos del nivel: la consola da lo mismo que el host (PEDIDOS pisos=1982 paredes=330 total=2312)
+   OK: 2e la composicion del nivel: la consola da lo mismo que el host (COMPUESTO pisos=1982/1982 paredes=330/330 sintilePiso=0 sintilePared=0 fuera=2239)
+   OK: 2f el lienzo del nivel (pixeles no vacios, crc32): la consola da lo mismo que el host (LIENZO pixelesNoVacios=193538 de 262144 crc32=3507647456)
+   OK: 2f2 el lienzo del nivel (pixeles de piso y de pared): la consola da lo mismo que el host (LIENZO pixelesPiso=179484 pixelesPared=146567)
+   OK: 2g la paleta del acto: la consola da lo mismo que el host (PALETA acto bytes=768 colores=256 crc32=3508331570)
+   OK: 2h el COF del heroe: la consola da lo mismo que el host (COF data/global/CHARS/AM/COF/amnuhth.cof bytes=1132 crc32=2708601289 capas=8 framesPorDir=8 dirs=16 speed=128)
+   OK: 2h2: el orden de dibujo del COF (lo que dice el archivo): [2 3 8 1 4 0 9 7]
+   OK: 2i capa HD: bytes=10931 crc32=4009831868 caja=-7 -65 15 17 pixeles=148
+   OK: 2i capa LA: bytes=12765 crc32=1313645261 caja=-18 -48 18 27 pixeles=172
+   OK: 2i capa LG: bytes=37659 crc32=2352162040 caja=-14 -37 21 51 pixeles=487
+   OK: 2i capa RA: bytes=10986 crc32=261487157 caja=-7 -53 13 15 pixeles=68
+   OK: 2i capa S1: bytes=3781 crc32=2779618826 caja=-5 -54 10 8 pixeles=39
+   OK: 2i capa S2: bytes=4902 crc32=3830512632 caja=-8 -51 9 9 pixeles=71
+   OK: 2i capa SH: sin grafico en el MPQ (igual en el host y en la consola)
+   OK: 2i capa TR: bytes=17401 crc32=320674826 caja=-10 -54 15 25 pixeles=244
+   OK: 2j el compuesto del personaje (tamaño, esquina, pixeles, crc32): la consola da lo mismo que el host (PERSONAJE compuesto=26 79 esquina=-18 -65 capasDibujadas=7 sinGrafico=0 pixelesNoVacios=896 crc32=1857478036)
+   OK: 2k: la geometria del area cliente la midio el gestor de ventanas: 1400,120,667,442
+   OK: 2k2: la corrida le pidio el foco a la ventana del emulador
+   OK: 2k3: el POC leyo las tres pulsaciones ENTERAS del control (derecha=128, abajo=32, arriba+derecha=144), como en DC-002.11
+   [parado] identidad 96.65% (la mejor de las otras tres 19.30%), pixeles del personaje 704 contra 669 del host, centro (253.6, 214.8) contra (252.4, 214.1)
+   OK: 2l: la pantalla del personaje parado ES la del host (identidad 96.65% a 64x60)
+   OK: 2l2: y la identidad le gana por lejos a las otras tres orientaciones (96.65% contra 19.30%)
+   OK: 2m: el personaje SE VE en la captura: 704 pixeles que no son el mapa (el host: 669)
+   [f00-parado] identidad 96.65% px=704 centro=(253.6, 214.8)
+   [f03-derecha] identidad 95.63% px=491 centro=(411.0, 200.9)
+   [f05-abajo] identidad 95.52% px=691 centro=(409.4, 290.7)
+   [f08-diagonal] identidad 95.66% px=640 centro=(480.3, 210.7)
+   [f11-quieto] identidad 95.66% px=640 centro=(480.3, 210.7)
+   tramo flecha DERECHA (x+): pantalla (+157.4, -13.9) contra motor (+156.0, +0.0)
+   OK: 2n: flecha DERECHA (x+): la pantalla se movio como el motor (+157.4,-13.9 contra +156.0,+0.0 px)
+   tramo flecha ABAJO (y+): pantalla (-1.6, +89.8) contra motor (+0.0, +78.0)
+   OK: 2n: flecha ABAJO (y+): la pantalla se movio como el motor (-1.6,+89.8 contra +0.0,+78.0 px)
+   tramo diagonal ARRIBA+DERECHA (x+, y-): pantalla (+70.9, -80.0) contra motor (+70.0, -70.0)
+   OK: 2n: diagonal ARRIBA+DERECHA (x+, y-): la pantalla se movio como el motor (+70.9,-80.0 contra +70.0,-70.0 px)
+   POS leidas: 23   CONTROL leidos: 6
+   CONTROL cuadro  143 botones 128 ejes +1 +0
+   CONTROL cuadro  151 botones   0 ejes +0 +0
+   CONTROL cuadro  286 botones  32 ejes +0 +1
+   CONTROL cuadro  294 botones   0 ejes +0 +0
+   CONTROL cuadro  427 botones 144 ejes +1 -1
+   CONTROL cuadro  435 botones   0 ejes +0 +0
+   VELOCIDAD caminado=20.7281 subtiles tiempo=2.2110 s -> 9.3750 sub/s (motor 9.3750, -0.00%)
+   PROYECCION error maximo del ancla contra la proyeccion del piso: 0 px (en 22 tramos)
+   TRAMO cuadro  120-> 150  caminado=+ 6.909  pantalla (320, 240) -> (476, 240)  delta=(156, 0)  botones=128
+   TRAMO cuadro  270-> 300  caminado=+ 6.909  pantalla (476, 240) -> (476, 318)  delta=(0, 78)  botones=0
+   TRAMO cuadro  420-> 450  caminado=+ 6.909  pantalla (476, 318) -> (546, 248)  delta=(70, -70)  botones=0
+   TOTAL caminado=20.7281 subtiles (4.146 celdas) tiempo=2.2110 s pasos=24 dtCero=0 dtGrande=27
+   DESDE cuadro 1 hasta cuadro 660: pantalla (320, 240) -> (546, 248) (delta 226,8), celda (28.0, 20.0) -> (29.5173, 18.689)
+   OK: 2o: la velocidad del personaje es LA DEL MOTOR: 9.3750 subtiles/s contra 9.3750 (-0.00%)
+   OK: 2o2: el pixel con el que se dibuja el personaje es la proyeccion del piso de su posicion del motor (error maximo 0 px)
+   OK: 2o3: camino 20.7281 subtiles (4.15 celdas del mapa); cuadros con paso 0: 0, con paso acotado: 27
+   OK: 2p: sin teclas el personaje queda quieto (pantalla (544.3, 210.7) contra (544.3, 210.7) de la ultima captura con teclas)
+
+== 3. EL MUTANTE (criterio 3): el control se lee y se informa, pero NO mueve
+   OK: 3a: el MUTANTE es un binario DISTINTO (2b2418f6e43daf18 contra dfbf83684a413a3b)
+   OK: 3: la corrida del MUTANTE salio entera al primer intento
+   OK: 3a2: el log del MUTANTE dice que el control esta sordo
+   POS leidas: 23   CONTROL leidos: 6
+   CONTROL cuadro  107 botones 128 ejes +1 +0
+   CONTROL cuadro  134 botones   0 ejes +0 +0
+   CONTROL cuadro  272 botones  32 ejes +0 +1
+   CONTROL cuadro  299 botones   0 ejes +0 +0
+   CONTROL cuadro  435 botones 144 ejes +1 -1
+   CONTROL cuadro  461 botones   0 ejes +0 +0
+   VELOCIDAD caminado=0.0000 tiempo=0 (no camino: 0.0000)
+   PROYECCION error maximo del ancla contra la proyeccion del piso: 0 px (en 22 tramos)
+   TOTAL caminado=0.0000 subtiles (0.000 celdas) tiempo=0.0000 s pasos=0 dtCero=0 dtGrande=3
+   DESDE cuadro 1 hasta cuadro 660: pantalla (320, 240) -> (320, 240) (delta 0,0), celda (28.0, 20.0) -> (28.0, 20.0)
+   OK: 3b: con las MISMAS teclas, el caminado del MUTANTE queda en 0 subtiles y 0 pasos
+   OK: 3c: y el control SI se leyo en el mutante: 3 pulsaciones con botones != 0 (p.ej. CONTROL cuadro  107 botones 128 ejes +1 +0)
+   OK: 3d: la pantalla del MUTANTE no cambia entre la captura parado y la de la tecla (identidad 96.65% contra 96.65%, centro (253.6, 214.8) contra (253.6, 214.8))
+
+== VEREDICTO
+   46 controles OK, 0 FALLOS
+EXIT=0

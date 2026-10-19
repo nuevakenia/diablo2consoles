@@ -78,12 +78,92 @@ def apretar(fd, nombre, cuanto=0.25):
     time.sleep(0.15)
 
 
+def sostener(fd, nombres, segundos):
+    """Aprieta una o varias teclas A LA VEZ y las mantiene `segundos`.
+
+    POR QUE (DC-002.38): el movimiento del personaje se mide por tiempo, asi que la tecla tiene que quedar
+    apretada un rato: `apretar` la suelta a los 0,25 s y solo sirve para los menus (el flanco). Con esto se
+    puede pedir "mantene derecha 4 segundos" desde la linea de comandos, igual que una persona con el dedo
+    en la cruceta.
+    """
+    for n in nombres:
+        evento(fd, EV_KEY, TECLAS[n], 1)
+    time.sleep(segundos)
+    for n in nombres:
+        evento(fd, EV_KEY, TECLAS[n], 0)
+    time.sleep(0.15)
+
+
+def guion(fd, pasos):
+    """Sostiene varias teclas EN SECUENCIA con el MISMO aparato.
+
+    POR QUE (DC-002.38, medido): cada llamada a este script crea y destruye un teclado virtual. Llamarlo tres
+    veces seguidas (una por tecla) NO funciona: el emulador solo ve la primera. Con un solo aparato para toda
+    la secuencia, las tres teclas llegan.
+
+    LA PAUSA ENTRE TRAMOS la fija `PAUSA` (segundos, por defecto 1,0). En DC-002.38 va en 5,0 porque la
+    captura de cada tramo se saca CUANDO LA TECLA YA SE SOLTO (run-flycast-238.sh espera la marca del POC):
+    con menos pausa, la captura de un tramo se cruza con la pulsacion del siguiente y la foto deja de ser la
+    del tramo que dice.
+    """
+    pausa = float(os.environ.get("PAUSA", "1.0"))
+    for nombres, segundos in pasos:
+        print("  sostengo", "+".join(nombres), "%.2f s" % segundos)
+        sostener(fd, nombres, segundos)
+        time.sleep(pausa)
+
+
 def main():
     nombres = sys.argv[1:]
     if not nombres:
         print("uso: teclas-virtuales.py <tecla> [tecla...]")
+        print("     teclas-virtuales.py sostener <tecla[+tecla]> <segundos>")
+        print("     teclas-virtuales.py guion <tecla> <segundos> [<tecla> <segundos> ...]")
         print("teclas:", " ".join(sorted(TECLAS)))
         return 2
+
+    if nombres[0] == "guion":
+        resto = nombres[1:]
+        if len(resto) < 2 or len(resto) % 2 != 0:
+            print("uso: teclas-virtuales.py guion <tecla> <segundos> [<tecla> <segundos> ...]")
+            return 2
+        pasos = []
+        for i in range(0, len(resto), 2):
+            combinacion = resto[i].split("+")
+            for n in combinacion:
+                if n not in TECLAS:
+                    print("no conozco la tecla", n)
+                    return 2
+            pasos.append((combinacion, float(resto[i + 1])))
+        fd = abrir()
+        try:
+            print("teclado virtual creado; guion de", len(pasos), "tramos")
+            guion(fd, pasos)
+            print("listo")
+        finally:
+            fcntl.ioctl(fd, UI_DEV_DESTROY)
+            os.close(fd)
+        return 0
+
+    if nombres[0] == "sostener":
+        if len(nombres) != 3:
+            print("uso: teclas-virtuales.py sostener <tecla[+tecla]> <segundos>")
+            return 2
+        combinacion = nombres[1].split("+")
+        for n in combinacion:
+            if n not in TECLAS:
+                print("no conozco la tecla", n)
+                return 2
+        segundos = float(nombres[2])
+        fd = abrir()
+        try:
+            print("teclado virtual creado; sostengo", "+".join(combinacion), "%.2f s" % segundos)
+            sostener(fd, combinacion, segundos)
+            print("listo")
+        finally:
+            fcntl.ioctl(fd, UI_DEV_DESTROY)
+            os.close(fd)
+        return 0
 
     for n in nombres:
         if n not in TECLAS:

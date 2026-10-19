@@ -5455,3 +5455,85 @@ controles, porque había otro agente del tablero con el emulador vivo (DC-002.38
 ventana. Queda declarado, con el comando exacto, en la evidencia.
 
 Evidencia: `console/dc/evidencia/dc-002.48b-tiles-corridos.txt`.
+
+---
+
+## 72. DC-002.38: el PERSONAJE **en el mapa y movido por el control de la Dreamcast** — 46/46 en verde, con el personaje compuesto por el COF del motor y el mutante que exige que la posición NO se mueva
+
+El hito que pidió Papu («ingame moviendo personajes, en el mapa»), medido: el heroína del jugador compuesta con
+el **COF** del `d2char.mpq` y los decodificadores del motor (`d2cof`, `d2dcc`, `d2dc6`), pintada **encima** del
+nivel del acto 1 (`townN1.ds1` del `d2data.mpq`, el compositor de DC-002.37), y **movida por el control de la
+Dreamcast** con la velocidad de la tabla del motor (`d2path`: **9,3750** subtiles/s caminando). Todo dentro de
+`ebiten.RunGame`, o sea el loop que va a correr el juego.
+
+### 72.1 Los números (host y consola, el MISMO código en las dos puntas)
+
+| qué | host | consola (Flycast) |
+|---|---|---|
+| `.ds1` del acto 1 | 57.652 B, crc32 712973328 | igual |
+| ventana del nivel | 512, origen 304,1664 | igual |
+| pedidos / compuestos | 1.982 pisos + 330 paredes | igual (`0` sin tile, `0` fuera de pedido) |
+| lienzo del nivel | `pixelesNoVacios=193538` crc32 3507647456 | igual |
+| COF del héroe | 1.132 B crc32 2708601289, 8 capas, orden `[2 3 8 1 4 0 9 7]` | igual |
+| cada capa (HD/LA/LG/RA/S1/S2/SH/TR) | bytes, crc32, caja y píxeles | igual, capa por capa |
+| compuesto del personaje | 26x79, esquina −18,−65, 896 píxeles, crc32 1857478036 | igual |
+| velocidad del motor | 9,3750 subtiles/s | igual |
+
+**Criterio 1 (el personaje pintado):** la captura del personaje parado es la pantalla del host — identidad
+**96,65 %** a 64x60 contra **19,30 %** de la mejor de las otras tres orientaciones (espejada H/V, rotada 180),
+y el personaje se cuenta solo con lo que la captura tiene **de más** respecto del mapa: **704 píxeles** contra
+**669** del host, centro de masa (253,6, 214,8) contra (252,4, 214,1).
+
+**Criterio 2 (la posición del motor antes y después del control):** cada captura se ata a la marca del propio
+POC (`HITO238: POS`, la tabla del instrumento de DC-002.11):
+
+| captura | botones | celda del motor | ancla en pantalla |
+|---|---|---|---|
+| parado | 0 | 28,0000 , 20,0000 | 320,240 |
+| derecha | 128 | 28,8889 , 19,9858 | 476,240 |
+| abajo | 32 | 28,8889 , 20,9858 | 476,318 |
+| arriba+derecha | 144 | 29,5173 , 18,6890 | 546,248 |
+
+y el desplazamiento de la **pantalla** contra el del **motor**: `(+157,4, −13,9)` contra `(+156,0, 0,0)`,
+`(−1,6, +89,8)` contra `(0,0, +78,0)`, `(+70,9, −80,0)` contra `(+70,0, −70,0)`. El avance es el del motor:
+**20,7281 subtiles en 2,2110 s = 9,3750 subtiles/s (−0,00 %)** y el ancla que se usa para dibujar es la
+proyección del piso ((x−y)·80−80, (x+y)·40) con error máximo **0 px** en 22 tramos.
+
+**Criterio 3 (el mutante):** el mismo binario con `CONTROL_SORDO=1` — el control **se lee y se informa**
+(128, 32 y 144 llegan enteros) pero **no mueve**: caminado **0,0000** subtiles, **0** pasos, celda 28,20 → 28,20,
+y la captura de la tecla es la del parado (identidad 96,65 % contra 96,65 %).
+
+### 72.2 Los tres defectos de INSTRUMENTO que se cazaron (y que costaron tres corridas)
+
+1. **Las capturas se corrían respecto de las teclas.** Con la línea de tiempo por reloj, cada `spectacle` tarda
+   uno o dos segundos y la captura del tramo «abajo» salió **después** de que la diagonal ya había movido al
+   personaje: dos capturas consecutivas idénticas (0 px) con el motor movido. El POC estaba bien; el criterio se
+   caía por el instrumento. **Arreglo:** la captura de cada tramo espera la marca del POC (pulsación y suelta) y
+   1,8 s más para que haya una marca `POS` nueva.
+2. **La foto «parado» se sacaba después de la primera pulsación** (salió con el personaje en 382,240 y no en
+   320,240). **Arreglo:** va antes de lanzar el teclado virtual.
+3. **El paso de la celda.** Mientras esta tarjeta estaba en curso, DC-002.48b midió que el compositor avanzaba
+   **32x16** px (un subtile) donde el motor avanza **80x40**: el nivel salía a **2,5x** menos escala. Con ese
+   arreglo cambian todos los números del nivel y el paso con el que se dibuja al personaje, así que la tarjeta
+   **recompiló contra el HEAD** y volvió a medir. Y el verificador de la proyección (`leer-pos-238.py`) también
+   estaba mal: comprobaba con 32/16 fijos, o sea que **validaba el defecto** (el ancla seguía su propia cuenta
+   equivocada y el error daba 0); ahora usa 80/40.
+
+### 72.3 Cómo se repite
+
+```
+bash scripts/console/build-personaje-238.sh /tmp/dcbuild/personaje-238
+CONTROL_SORDO=1 bash scripts/console/build-personaje-238.sh /tmp/dcbuild/personaje-238-mudo
+python3 scripts/console/checar-personaje-238.py          # 46 controles (host + corrida buena + mutante)
+SALTAR_BUILD=1 python3 scripts/console/checar-personaje-238.py   # reusa binarios y corridas
+```
+
+El corpus espera turno si hay otro Flycast andando y **reintenta la corrida entera** si el control llega a
+medias (medido: pasa una de cada tres veces con otro agente sobre la misma ventana).
+
+**Lo que NO entra** (declarado, no tapado): monstruos, combate e inventario; la **animación** de caminar (esta
+tarjeta dibuja el frame 0 de la dirección 0 — el censo de las 8 direcciones x 8 frames es DC-002.49); la
+**colisión** con las paredes (el personaje camina por la ventana sin chocar; enganchar `d2collision` es de la
+tarjeta del movimiento del juego).
+
+Evidencia: `console/dc/evidencia/dc-002.38-personaje-en-el-mapa.txt`.
