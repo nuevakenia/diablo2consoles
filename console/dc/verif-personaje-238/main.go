@@ -90,6 +90,8 @@ func main() {
 	pos := flag.String("pos", "", "posicion del personaje en CELDAS, como x,y (por defecto: la celda del centro)")
 	pngPath := flag.String("png", "", "si se pasa, escribe la pantalla de 640x480 CON el personaje")
 	pngMapa := flag.String("png-mapa", "", "si se pasa, escribe la misma pantalla SIN el personaje")
+	cicloModos := flag.String("ciclo", "", "DC-002.49: modos cuyo CICLO completo se censa (16 cuadros de TN, 8 de TW), separados por coma")
+	pngCiclo := flag.String("png-ciclo", "", "si se pasa, escribe un PNG por cuadro del ciclo dentro de esta carpeta")
 	flag.Parse()
 
 	ruta := *mpqPath
@@ -328,6 +330,312 @@ func main() {
 	if *pngPath != "" {
 		escribirPNG(*pngPath, pantallaCon, pantallaAncho, pantallaAlto)
 		fmt.Printf("VERIF238: PNG %s\n", *pngPath)
+	}
+
+	// ============================== 5. EL CICLO DE LA ANIMACION (DC-002.49) ==============================
+	//
+	// Lo de arriba mide UN cuadro (el 0). Lo de abajo mide el CICLO ENTERO: cuantos cuadros tiene cada modo,
+	// si son dibujos DISTINTOS entre si y en cuantos pixeles cambia el compuesto entre un cuadro y el
+	// siguiente (y entre el cuadro 0 y el de la mitad del ciclo, que es la comparacion de la consola).
+	if *cicloModos != "" {
+		for _, modo := range strings.Split(*cicloModos, ",") {
+			modo = strings.ToUpper(strings.TrimSpace(modo))
+			if modo == "" {
+				continue
+			}
+
+			censarCiclo(mc, modo, dirDelPersonaje, *pngCiclo, palUni, pantallaSin, mapaX+anclaX, mapaY+anclaY)
+		}
+	}
+}
+
+// ================================================================ DC-002.49: el ciclo del personaje
+
+// capaDeCiclo: una capa del personaje con TODOS los cuadros de una direccion (no solo el 0).
+type capaDeCiclo struct {
+	tipo, izq, arriba, ancho, alto int
+	clave                          string
+	ruta                           string
+	cuadros                        [][]byte
+}
+
+// cofDelModo: el COF de un modo (amtnhth.cof, amtwhth.cof...). El arma se prueba en el mismo orden que la
+// sonda del censo (HTH primero: el personaje de la prueba va desarmado).
+func cofDelModo(mc *d2mpq.MPQ, modo string) (*d2cof.COF, string, int, error) {
+	usadas := []string{}
+
+	for _, wc := range []string{"hth", "1hs", "bow", "stf", "2hs"} {
+		nombre := `data\global\chars\AM\COF\AM` + modo + wc + `.COF`
+		usadas = append(usadas, nombre)
+
+		crudo, err := mc.ReadFile(nombre)
+		if err != nil || len(crudo) == 0 {
+			continue
+		}
+
+		cof, err := d2cof.Unmarshal(crudo)
+		if err != nil {
+			return nil, nombre, 0, err
+		}
+
+		return cof, nombre, len(crudo), nil
+	}
+
+	return nil, strings.Join(usadas, " "), 0, fmt.Errorf("no encuentro el COF del modo %s", modo)
+}
+
+// capasDelCiclo: las capas del COF con los cuadros de la direccion pedida, ya decodificados.
+func capasDelCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string) []capaDeCiclo {
+	per := NuevoPersonaje(cof, dir, 0)
+	n := cof.FramesPerDirection
+	capas := make([]capaDeCiclo, 0, len(cof.CofLayers))
+
+	for i := range cof.CofLayers {
+		for _, ext := range []string{"dcc", "dc6"} {
+			nombre := per.RutaDeLaCapaModo(i, modo, ext)
+			crudo, err := mc.ReadFile(strings.TrimPrefix(strings.ReplaceAll(nombre, "/", `\`), `\`))
+			if err != nil {
+				continue
+			}
+
+			c := capaDeCiclo{tipo: per.Tipos[i], clave: per.Claves[i], ruta: nombre}
+
+			if ext == "dcc" {
+				dd, err := d2dcc.Load(crudo)
+				if err != nil {
+					fmt.Printf("CICLO249: %s CAPA %s PARSE-FALLO: %v\n", modo, c.clave, err)
+					break
+				}
+
+				caja := dd.Directions[dir].Box
+				c.izq, c.arriba, c.ancho, c.alto = caja.Left, caja.Top, caja.Width, caja.Height
+
+				for f := 0; f < n && f < len(dd.Directions[dir].Frames); f++ {
+					c.cuadros = append(c.cuadros, dd.Directions[dir].Frames[f].PixelData)
+				}
+
+				capas = append(capas, c)
+
+				break
+			}
+
+			dc, err := d2dc6.Load(crudo)
+			if err != nil {
+				fmt.Printf("CICLO249: %s CAPA %s PARSE-FALLO: %v\n", modo, c.clave, err)
+				break
+			}
+
+			for f := 0; f < n && f < len(dc.Frames); f++ {
+				fr := dc.Frames[f]
+				if f == 0 {
+					c.izq, c.arriba, c.ancho, c.alto = int(fr.OffsetX), int(fr.OffsetY), int(fr.Width), int(fr.Height)
+				}
+
+				c.cuadros = append(c.cuadros, dc.DecodeFrame(f))
+			}
+
+			capas = append(capas, c)
+
+			break
+		}
+	}
+
+	return capas
+}
+
+// componerCiclo: un Personaje por cuadro, con el compositor COMPARTIDO (personaje.go), que es lo que hace
+// comparables el host y la consola.
+func componerCiclo(cof *d2cof.COF, capas []capaDeCiclo, dir, n int) []*Personaje {
+	compuestos := make([]*Personaje, 0, n)
+
+	for f := 0; f < n; f++ {
+		per := NuevoPersonaje(cof, dir, f)
+
+		for i := range capas {
+			c := &capas[i]
+			if f >= len(c.cuadros) {
+				break
+			}
+
+			per.Agregar(c.tipo, c.clave, c.izq, c.arriba, c.ancho, c.alto, c.cuadros[f])
+		}
+
+		per.Componer()
+		compuestos = append(compuestos, per)
+	}
+
+	return compuestos
+}
+
+// censarCiclo: el censo completo de un modo, con los numeros que pide el criterio 2 de DC-002.49.
+//
+// Ademas de los numeros escribe, uno por cuadro, (a) el compuesto del personaje solo (con alfa) y (b) la
+// PANTALLA ENTERA del host con ese cuadro encima del mapa: es la referencia contra la que se compara la
+// captura del emulador (el medidor recorta la caja del personaje en las dos y las compara pixel a pixel).
+func censarCiclo(mc *d2mpq.MPQ, modo string, dir int, carpetaPNG string, pal [256][3]uint8,
+	mapaBase []byte, anclaX, anclaY int) {
+	cof, nombreCOF, bytesCOF, err := cofDelModo(mc, modo)
+	if err != nil {
+		fmt.Printf("CICLO249: %s SIN-COF: %v\n", modo, err)
+		return
+	}
+
+	n := cof.FramesPerDirection
+
+	fmt.Printf("CICLO249: %s COF=%s bytes=%d capas=%d framesPorDir=%d dirs=%d speed=%d\n",
+		modo, nombreCOF, bytesCOF, cof.NumberOfLayers, n, cof.NumberOfDirections, cof.Speed)
+
+	capas := capasDelCiclo(mc, cof, dir, modo)
+
+	for i := range capas {
+		fmt.Printf("CICLO249: %s CAPA %s cuadros=%d caja=%d,%d %dx%d ruta=%s\n",
+			modo, capas[i].clave, len(capas[i].cuadros), capas[i].izq, capas[i].arriba,
+			capas[i].ancho, capas[i].alto, capas[i].ruta)
+	}
+
+	compuestos := componerCiclo(cof, capas, dir, n)
+
+	for f, p := range compuestos {
+		fmt.Printf("CICLO249: %s cuadro=%d caja=%dx%d esquina=%d,%d pixeles=%d crc32=%d\n",
+			modo, f, p.Ancho, p.Alto, p.Izq, p.Arriba, p.PixelesNoVacios, p.CRC32())
+
+		if carpetaPNG != "" {
+			ruta := filepath.Join(carpetaPNG, fmt.Sprintf("ciclo-%s-%02d.png", modo, f))
+			escribirPNGPersonaje(ruta, p, pal)
+
+			// la pantalla entera con este cuadro encima: la referencia de la captura
+			pantalla := make([]byte, len(mapaBase))
+			copy(pantalla, mapaBase)
+			dibujarPersonaje(pantalla, p, pal, anclaX+p.Izq, anclaY+p.Arriba)
+			escribirPNG(filepath.Join(carpetaPNG, fmt.Sprintf("pantalla-%s-%02d.png", modo, f)),
+				pantalla, pantallaAncho, pantallaAlto)
+		}
+	}
+
+	// cuadro contra cuadro: cuantos pixeles cambian (dos capturas separadas esa cantidad de cuadros tienen
+	// que diferir en pantalla en ese orden de magnitud)
+	for f := 0; f+1 < len(compuestos); f++ {
+		n, caja := difieren(compuestos[f], compuestos[f+1])
+		fmt.Printf("CICLO249: %s par=%d-%d pixelesCambiados=%d cajaDelCambio=%d,%d %dx%d\n",
+			modo, f, f+1, n, caja[0], caja[1], caja[2], caja[3])
+	}
+
+	// el cuadro 0 contra el de la MITAD del ciclo: es la comparacion que hace la consola con el personaje
+	// quieto (medio ciclo de TN = 16/2 = 8 cuadros = 1024 ms)
+	mitad := len(compuestos) / 2
+	if mitad > 0 && mitad < len(compuestos) {
+		n, caja := difieren(compuestos[0], compuestos[mitad])
+		fmt.Printf("CICLO249: %s MITAD par=%d-%d pixelesCambiados=%d cajaDelCambio=%d,%d %dx%d\n",
+			modo, 0, mitad, n, caja[0], caja[1], caja[2], caja[3])
+	}
+
+	// cuantos dibujos DISTINTOS hay de verdad: si dos cuadros del COF son el mismo dibujo, el ciclo que ve
+	// el jugador tiene menos cuadros que los que declara el archivo
+	distintos, iguales := contarDistintos(compuestos)
+	fmt.Printf("CICLO249: %s RESUMEN cuadrosCOF=%d cuadrosCompuestos=%d distintos=%d iguales=%d\n",
+		modo, n, len(compuestos), distintos, iguales)
+}
+
+// difieren: pixeles distintos entre dos compuestos (mismo tamano: si no, se compara la interseccion) y la
+// caja del cambio en coordenadas del compuesto.
+func difieren(a, b *Personaje) (int, [4]int) {
+	if a.Ancho != b.Ancho || a.Alto != b.Alto {
+		return -1, [4]int{0, 0, 0, 0}
+	}
+
+	n := 0
+	x0, y0, x1, y1 := a.Ancho, a.Alto, -1, -1
+
+	for y := 0; y < a.Alto; y++ {
+		for x := 0; x < a.Ancho; x++ {
+			i := y*a.Ancho + x
+			if a.Lienzo[i] == b.Lienzo[i] {
+				continue
+			}
+
+			n++
+
+			if x < x0 {
+				x0 = x
+			}
+
+			if y < y0 {
+				y0 = y
+			}
+
+			if x > x1 {
+				x1 = x
+			}
+
+			if y > y1 {
+				y1 = y
+			}
+		}
+	}
+
+	if n == 0 {
+		return 0, [4]int{0, 0, 0, 0}
+	}
+
+	return n, [4]int{x0, y0, x1 - x0 + 1, y1 - y0 + 1}
+}
+
+// contarDistintos: cuantos compuestos son dibujos distintos de todos los anteriores.
+func contarDistintos(compuestos []*Personaje) (int, int) {
+	distintos := 0
+
+	for i := range compuestos {
+		repetido := false
+
+		for j := 0; j < i; j++ {
+			if compuestos[i].CRC32() == compuestos[j].CRC32() && i != j {
+				if d, _ := difieren(compuestos[i], compuestos[j]); d == 0 {
+					repetido = true
+
+					break
+				}
+			}
+		}
+
+		if !repetido {
+			distintos++
+		}
+	}
+
+	return distintos, len(compuestos) - distintos
+}
+
+// escribirPNGPersonaje: el compuesto del personaje (indices) -> un PNG con alfa, del tamano de su caja.
+func escribirPNGPersonaje(ruta string, p *Personaje, pal [256][3]uint8) {
+	img := image.NewNRGBA(image.Rect(0, 0, p.Ancho, p.Alto))
+
+	for y := 0; y < p.Alto; y++ {
+		for x := 0; x < p.Ancho; x++ {
+			i := p.Lienzo[y*p.Ancho+x]
+			if i == 0 {
+				continue
+			}
+
+			c := pal[i]
+			img.SetNRGBA(x, y, color.NRGBA{R: c[0], G: c[1], B: c[2], A: 255})
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(ruta), 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, "no pude crear la carpeta del PNG:", err)
+		return
+	}
+
+	f, err := os.Create(ruta)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "no pude escribir el PNG:", err)
+		return
+	}
+
+	defer f.Close()
+
+	if err := png.Encode(f, img); err != nil {
+		fmt.Fprintln(os.Stderr, "PNG fallo:", err)
 	}
 }
 

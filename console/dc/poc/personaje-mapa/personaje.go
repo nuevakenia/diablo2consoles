@@ -129,8 +129,15 @@ func NuevoPersonaje(cof *d2cof.COF, direccion, frame int) *Personaje {
 // brazo derecho es "hth" y el resto "1ht"). Medido: con un arma fija en todas, tres capas dan "file not
 // found".
 func (p *Personaje) RutaDeLaCapa(indice int, ext string) string {
+	return p.RutaDeLaCapaModo(indice, modoDelPersonaje, ext)
+}
+
+// RutaDeLaCapaModo: lo mismo, pero con el MODO explicito (NU, TN, TW, ...). El modo va DENTRO del nombre del
+// grafico (<token><capa><valor><modo><arma>.dcc), asi que para animar (DC-002.49: TN parado, TW caminando) hay
+// que poder pedir la capa de un modo distinto del que declara la constante de arriba.
+func (p *Personaje) RutaDeLaCapaModo(indice int, modo, ext string) string {
 	return "data/global/chars/" + tokenDelPersonaje + "/" + p.Claves[indice] + "/" +
-		tokenDelPersonaje + p.Claves[indice] + valorDeLaCapa + modoDelPersonaje + p.Armas[indice] + "." + ext
+		tokenDelPersonaje + p.Claves[indice] + valorDeLaCapa + modo + p.Armas[indice] + "." + ext
 }
 
 // Agregar: el que llama decodifico una capa (con el decodificador del motor) y la pasa. Solo entran las
