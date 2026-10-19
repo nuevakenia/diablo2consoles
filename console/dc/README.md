@@ -4005,3 +4005,56 @@ en la misma corrida y el control 2b vigilando el residuo de la consulta) y `chec
 punteros interiores del runtime sigue aplicado).
 
 Evidencia cruda: `evidencia/dc-002.39-nombre-corrompido.txt`.
+
+## 55. DC-002.40: el `(listfile)` que la consola no podia leer — no era el dato ni el camino encriptado, era el puente de `compress/zlib` (el de una sola vez devolvia `rc_zlib= -5`, la zlib **sin entrada**); y lo que queda trabado (`d2data`/`d2char`) **es el monton de Go**, medido con los mismos bytes en `.bss` (**200/200** contra el fallo en la vuelta **58**)
+
+La tarjeta pedia decir **que compresion** tiene el `(listfile)` y **donde se rompe** la consola, y arreglarlo.
+Las dos respuestas, medidas con el host (`scripts/console/sonda-mpq-compr.py`, que lee el MPQ a mano y
+descomprime con la zlib de Python, a proposito **sin** codigo del motor) y con la consola
+(`console/dc/poc/compr-40` en Flycast, por el camino del motor: `d2mpq.FromFile` + `ReadFile`):
+
+* **La compresion**: los TRES `(listfile)` son `Compress | Encrypted | FixKey` (`0x80030200`), con los
+  sectores en **zlib** (primer byte `0x02`) y el **bloque encriptado** (offset con `FixKey`: los offsets
+  descifrados de `patch_d2.mpq` son `[12, 674, 1088]`). Numeros del host: `patch_d2` **5502** bytes / crc32
+  **502100774** / **162** nombres; `d2data` **466867** / **923032874** / **11082**; `d2char` **418279** /
+  **1367999602** / **10009**. En el host los tres se leen y `go test ./d2common/d2fileformats/d2mpq/` esta
+  verde: el MPQ no era el problema.
+* **Donde se rompia**: en el **puente**, no en el dato. Los 662 bytes del sector 0 llegaban al monton de la
+  consola **enteros** (crc32 **3898719478**, el del host) y el crudo del disco tambien (**2166895218**). Lo
+  que fallaba era el puente **de una sola vez** que usaba `d2std/compress/zlib`: `d2c_zlib_inflate` devuelve
+  **-1** con `rc_zlib= -5` = `Z_BUF_ERROR`, o sea la zlib **sin entrada** (`avail_in` llegaba 0: el slice de
+  Go en la firma corria los argumentos). Tampoco era tamano: la cota era **68180** bytes para 4096 de salida.
+  El puente en **streaming** (buffers como `uintptr` y el resultado del paso por funciones aparte: la
+  convencion que el proyecto pago cara en DC-002.19/2.20), con los MISMOS bytes, da **4096 / crc32
+  2274402335**, los del host.
+* **El arreglo**: `compress/zlib` de la consola pasa al puente en streaming (el slot del inflate se suelta
+  apenas termina el flujo, no solo en `Close`, para no quedarse sin los 4 slots si un camino se olvida de
+  cerrar). Con eso **el motor** lee el `(listfile)` de `patch_d2.mpq`: `bytes= 5502 nombres= 162
+  crc32= 502100774` (ms 2198), y el mismo paquete leyendo **de a 512 bytes** (9 pasos: el unico control del
+  avance de `z.pos` entre pasos) tambien da **4096 / crc32 2274402335**. El control sano de la tarjeta (el DC6
+  con implode, que nunca estuvo encriptado) sigue **igual**: **141944** bytes, suma **1831109629**.
+
+**Lo que queda trabado, y NO es la zlib** (`d2data.mpq` y `d2char.mpq`: 11082 y 10009 nombres). Con los mismos
+662 bytes y el mismo puente, **200 vueltas con los buffers en el monton de Go** (como los tiene el motor:
+`bytes.Reader` + `bytes.Buffer`) fallan en la **vuelta 58** con `rc_zlib= -3` (`Z_DATA_ERROR`, no `-4` de
+memoria) y con el crc32 de la entrada **intacto**; las mismas 200 vueltas **con los buffers en `.bss`** dan
+**200/200**. O sea: lo que se pisa son los buffers del monton de Go. Y ese monton son dos
+`memalign(32, 512 KB)` **pedidos al monton de C** (`libgodc/runtime/gc_heap.c:39-40`: en el log del arranque,
+`gc_init-semiespacio0/1` caen DENTRO del arena), que queda con **~1 KB** libre al arrancar y **~34 KB** cuando
+falla, con la zlib pidiendo 32 KB de ventana + ~7 KB de estado por flujo; despues de que el motor lee el
+`(listfile)` el monton de C ya crecio a **1.961.088** B de arena con **10264** libres. La lectura de `d2data`
+ademas **muere muda** y la consola se rearma (39 arranques en 120 s en una de las corridas). La causa de fondo
+—el agujero del **valor que la recoleccion no puede ver** de la seccion 54, o el copiado del recolector encima
+de un bloque de C— **no queda medida**: es lo primero que hay que medir en DC-002.41 (`t_d2725794`), que es de
+donde cuelga el ultimo tramo de esta tarjeta. El corpus lo deja a la vista en su **control 11**, que se pone
+ROJO el dia que el monton se arregle (para que nadie se olvide de mudarlo).
+
+Barreras: corpus `checar-compr-240.sh` **13/13** controles con el control sano y **2/2** mutantes cazados
+(`avail-in-cero` en el C — `avail_in = 0`, literalmente el defecto medido, que voltea todo lo que descomprima
+— y `pos-de-un-tiro` en el Go, al que lo caza el **control 5b**: `M4b` es el mismo paquete con un lector de a
+512 bytes, porque el camino del motor pide de a 4096 y descomprime todo en UN paso, y sin ese control el
+mutante quedaba verde; medido, y por eso existe), `bash scripts/console/test-std-host.sh` verde en los dos
+anchos (13 de 13 de los que hablan con KOS siguen sin compilar en el host) y
+`go test ./d2common/d2fileformats/d2mpq/` verde.
+
+Evidencia cruda: `evidencia/dc-002.40-mpq-comprimido.txt`.

@@ -20,6 +20,16 @@ int d2c_zlib_inflate_bound(int src_len) {
     return src_len * 4 + 65536;
 }
 
+/* DC-002.40: el ULTIMO codigo de retorno de la zlib (`inflate`/`inflateInit2`), para poder decir POR QUE
+ * fallo en vez de suponerlo. Los codigos no son lo mismo: Z_DATA_ERROR (-3) = los datos no son un flujo
+ * zlib valido; Z_MEM_ERROR (-4) = no hubo memoria para la ventana de 32 KB; Z_STREAM_ERROR (-2) = el
+ * estado se corrompio. Una medicion que solo dice "devolvio -1" no distingue un defecto de datos de uno
+ * de memoria, y la diferencia decide si el arreglo va en el puente o en el monton. */
+static int d2c_ultimo_rc = 0;
+
+int d2c_zlib_ultimo_rc(void) { return d2c_ultimo_rc; }
+const char *d2c_zlib_version(void) { return zlibVersion(); }
+
 int d2c_zlib_inflate(const unsigned char *src, int src_len,
                      unsigned char *dst, int dst_cap) {
     z_stream zs;
@@ -28,6 +38,7 @@ int d2c_zlib_inflate(const unsigned char *src, int src_len,
     /* 15 + 32: ventana de 32 KB y que la zlib decida entre cabecera zlib o gzip. Es lo que hace el
      * zlib.NewReader de Go, y al MPQ le llegan las dos formas segun el bloque. */
     if (inflateInit2(&zs, 15 + 32) != Z_OK) {
+        d2c_ultimo_rc = -100;   /* DC-002.40: no fue ni un dato ni un paso: fallo el init (memoria/version) */
         return -1;
     }
 
@@ -37,6 +48,7 @@ int d2c_zlib_inflate(const unsigned char *src, int src_len,
     zs.avail_out = (uInt)dst_cap;
 
     int rc = inflate(&zs, Z_FINISH);
+    d2c_ultimo_rc = rc;
 
     if (rc != Z_STREAM_END) {
         inflateEnd(&zs);
@@ -81,7 +93,10 @@ int d2c_zlib_stream_init(void) {
     for (i = 0; i < D2C_ZLIB_SLOTS; i++) {
         if (!d2c_zs_libre[i]) continue;
         memset(&d2c_zs[i], 0, sizeof(z_stream));
-        if (inflateInit2(&d2c_zs[i], 15 + 32) != Z_OK) return -1;
+        if (inflateInit2(&d2c_zs[i], 15 + 32) != Z_OK) {
+            d2c_ultimo_rc = -100;   /* el init: memoria o version, no los datos */
+            return -1;
+        }
         d2c_zs_libre[i] = 0;
         d2c_zs_fin[i] = 0;
         d2c_zs_consumido[i] = 0;
@@ -104,6 +119,7 @@ int d2c_zlib_stream_step(int slot, const unsigned char *src, int src_len,
     d2c_zs[slot].avail_out = (uInt)dst_cap;
 
     rc = inflate(&d2c_zs[slot], Z_NO_FLUSH);
+    d2c_ultimo_rc = rc;
 
     escrito = dst_cap - (int)d2c_zs[slot].avail_out;
     d2c_zs_consumido[slot] = src_len - (int)d2c_zs[slot].avail_in;

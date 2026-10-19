@@ -1,0 +1,147 @@
+DC-002.40 - POR QUE LA CONSOLA NO LEIA UN ARCHIVO COMPRIMIDO DE UN MPQ (el puente de la zlib)
+==============================================================================================
+Rama DC-002, repo ~/Proyectos/diablo2consoles. Capa coherente /tmp/gox-240 (142 paquetes del motor + 63 de
+stdlib/terceros, la MISMA de DC-002.33/2.39).
+El corpus es scripts/console/checar-compr-240.sh: 12 controles y 2 mutantes.
+Los dos instrumentos:
+  - HOST:    scripts/console/sonda-mpq-compr.py, que lee el MPQ A MANO (tablas descifradas, offsets,
+             sectores) y descomprime con la zlib de Python. A proposito NO usa el motor: si el host y la
+             consola discrepan, la discrepancia es de la consola.
+  - CONSOLA: console/dc/poc/compr-40 (+ csrc/pantalla.c), que corre en Flycast sobre un disco con los MPQ
+             de verdad y llama al MOTOR por `d2mpq.FromFile` + `ReadFile`: el camino que fallaba.
+Crudo: /home/dgalli/.hermes/cache/scratch/corpus-240/ (gen/sonda.txt, gen/host-*.txt, sano/flycast.log,
+mut-avail-in-cero/, mut-pos-de-un-tiro/, vuelta/).
+
+
+1. EL DATO: EL `(listfile)` ES zlib + ENCRIPTADO, Y EN EL HOST SE LEE
+---------------------------------------------------------------------
+Sonda del host sobre los 3 MPQ (los mismos numeros contra los que se compara la consola):
+
+    patch_d2.mpq: (listfile) FilePosition=4755852  comprimido=1088  descomprimido=5502  hashIdx=10329 blockIdx=218
+        Flags=0x80030200 (Compress | Encrypted | FixKey | Exists)
+        offsets DESCIFRADOS=[12, 674, 1088] (clave=0x2D77895E)
+        sector 0: guardado=662 esperado=4096  primer byte=0x02 -> comprimido: zlib
+        DESCOMPRIMIDO (zlib de Python): 5502 bytes de 5502, 0 fallos, 0 sectores crudos, 162 nombres, crc32=502100774
+    d2data.mpq:  Flags=0x80030200  sector 0 guardado=660/4096 -> zlib
+        DESCOMPRIMIDO: 466867 bytes, 0 fallos, 0 sectores crudos, 11082 nombres, crc32=923032874
+    d2char.mpq:  Flags=0x80030200  sector 0 guardado=427/4096 -> zlib
+        DESCOMPRIMIDO: 418279 bytes, 0 fallos, 0 sectores crudos, 10009 nombres, crc32=1367999602
+
+Tres archivos, los tres `Compress | Encrypted | FixKey`, los tres con los sectores en zlib, los tres se leen
+enteros en el host. La consola no podia con NINGUNO: el defecto no era el MPQ.
+
+
+2. LO QUE LA CONSOLA DECIA, Y LO QUE PASABA DE VERDAD
+-----------------------------------------------------
+Sin el arreglo, el camino del motor en la consola (`FromFile` + `ReadFile("(listfile)")`) contestaba
+`zlib: invalid header` en los tres MPQ. Ese mensaje es del `d2std/compress/zlib` de la consola y MIENTE sobre
+la causa (ya pasó en DC-002.20: el `ErrHeader` era TAMANO). Medido con el POC, en la MISMA corrida y con el
+estado del monton que el motor tenia:
+
+    COMPR-40 M1 sector del host bytes= 662 crc32= 3898719478 (host: 662 3898719478 ) primer byte= 2 intentos= 1
+    COMPR-40 M2 puente de una sola vez FALLO (devolvio -1 ) cota= 68180 ms= 0 rc_zlib= -5
+    COMPR-40 M3 puente en streaming bytes= 4096 crc32= 2274402335 lecturas_de_ 512 = 8 (host: 4096 2274402335 )
+    COMPR-40 M4 compress/zlib FALLO al leer: zlib: invalid header        <-- el camino del defecto
+    COMPR-40 M5 crudo del disco bytes= 662 crc32= 2166895218             <-- el sector ENCRIPTADO como esta en el disco
+    COMPR-40 M6 patch_d2.mpq (listfile) FALLO: zlib: invalid header
+    COMPR-40 M6 d2data.mpq (listfile) FALLO: zlib: invalid header
+    COMPR-40 M6 d2char.mpq (listfile) FALLO: zlib: invalid header
+
+(Las lineas M4/M6 son las de la corrida sin el arreglo; M1/M2/M3/M5 dan lo mismo con y sin el, que es
+justamente el punto: el dato y el puente en streaming nunca fueron el problema.)
+
+Los tres numeros que lo cierran:
+ - M1: los bytes BUENOS llegan enteros al monton de la consola (662 / crc32 3898719478: los del host).
+ - M5: los bytes CRUDOS del disco coinciden con el host en CRC32 (2166895218). O sea: la lectura del disco y
+   el camino encriptado del motor NO son el problema.
+ - M2: el puente de la zlib devuelve -1 con `rc_zlib= -5`. -5 es Z_BUF_ERROR: la zlib NO VIO ENTRADA
+   (`avail_in` llego 0). La cota era 68180 bytes para 4096 de salida: no es tamano, es el ABI del puente.
+   El slice de Go en la firma (`d2c_zlib_inflate(src []byte, srcLen int32, ...)`) corria los argumentos.
+   Por eso M4/M6 fallaban con "invalid header" sobre datos validos: el unico puente que ese paquete usaba
+   era el que no recibia los datos.
+ - M3: el puente EN STREAMING (buffers como uintptr, resultado del paso por funciones aparte: la convencion
+   que el proyecto ya pago cara en DC-002.19/2.20) da EXACTAMENTE los del host: 4096 / crc32 2274402335.
+
+
+3. EL ARREGLO Y LO QUE AHORA SI LEE
+-----------------------------------
+`console/dc/std/compress/zlib/zlib.go` pasa al puente EN STREAMING, igual que `d2std/compress/gzip` desde
+DC-002.20 (el slot se suelta apenas termina el flujo, no solo en `Close`, para no quedarse sin los 4 slots
+si un camino se olvida de cerrar). Con ese arreglo, la misma corrida, el mismo disco y el mismo monton:
+
+    COMPR-40 M4 compress/zlib bytes= 4096 crc32= 2274402335 (host: 4096 2274402335 )     <-- el arreglo
+    COMPR-40 M4b compress/zlib de a 512 bytes= 4096 crc32= 2274402335 pasos= 9 (host: 4096 2274402335 )
+    COMPR-40 M6 patch_d2.mpq (listfile) bytes= 5502 nombres= 162 crc32= 502100774 ms= 2198
+    COMPR-40 M7 control bytes= 141944 suma= 1831109629
+
+O sea: el `(listfile)` de patch_d2.mpq lo lee el MOTOR entero: 5502 bytes, 162 nombres y
+crc32 502100774, los tres numeros del host. Y el control sano de la tarjeta (el DC6 con implode, que nunca
+estuvo encriptado) sigue igual: 141944 bytes, suma 1831109629 -> el disco y el motor no cambiaron. El `M2`
+sigue devolviendo -1 a proposito: es el limite conocido del puente viejo y el corpus lo exige (control 3).
+
+M4b (el paquete con un lector de a 512 bytes, 9 pasos) existe por una razon medida: el camino del motor pide
+bloques de 4096 (el `io.ReadAll` de la consola usa un buffer de 4096 y su `bytes.Buffer.ReadFrom` tambien),
+asi que un bloque de 4096 que da 4096 de salida se descomprime EN UN SOLO PASO y el avance de `z.pos` entre
+pasos no se prueba por ahi. Sin M4b, el mutante `pos-de-un-tiro` quedaba VERDE (medido); con M4b, cae.
+
+
+4. LO QUE QUEDA: d2data.mpq Y d2char.mpq NO SE PUEDEN LEER TODAVIA, Y NO ES LA zlib
+-----------------------------------------------------------------------------------
+Medido: con el arreglo puesto, el motor sigue fallando con el MISMO mensaje en los dos MPQ grandones (114 y
+104 sectores) y la corrida se REARMA (39 arranques en 120 s: la lectura muere y la consola se reinicia).
+Los dos bloques del POC que lo miden:
+
+    COMPR-40 M8 vuelta 58 ReadFrom fallo: zlib: invalid header rc_zlib= -3 arena= 1317792 libre= 33448
+    COMPR-40 M8 200 vueltas del camino del motor, fallos= 1
+    COMPR-40 M10 200 vueltas con los buffers en C: vueltas_ok= 200 fallas= 0 arena= 1317792 libre= 33448
+
+M8 y M10 hacen lo MISMO (los mismos 662 bytes, el mismo puente en streaming, 200 vueltas) y la unica
+diferencia es DONDE VIVEN LOS BUFFERS: en M8 en el monton de Go (como en el motor: `bytes.Reader` +
+`bytes.Buffer`) y en M10 en .bss (`csrc/pantalla.c`). Con los buffers de Go falla en la vuelta 58
+(`rc_zlib= -3`, Z_DATA_ERROR, NO -4 de memoria) y con los de C da 200/200.
+Y los bytes de entrada siguen intactos cuando falla: el crc32 que se imprime en cada vuelta es el del host
+(3898719478).
+
+El mapa de los dos montones, medido en la misma corrida:
+
+    COMPR-40 MAPA bss= 2350470568 sbrk= 2351898624 arena= 1209984 heap_go= 2350787272 libre_c= 952
+
+y en el arranque el runtime dice donde dejo sus semiespacios (`ARQ-MARCA gc_init-semiespacio0/1`:
+2350768160 y 2351292480), o sea DENTRO del arena: el monton de Go son dos `memalign(32, 512 KB)` PEDIDOS AL
+MONTON DE C (libgodc/runtime/gc_heap.c:39-40). El de C queda con ~1 KB libre al arrancar y ~34 KB cuando
+falla, con la zlib pidiendo 32 KB de ventana + ~7 KB de estado por flujo.
+Alcance de lo medido: M10 aisla que lo que se pisa son los buffers del monton de Go; NO queda medido cual de
+los dos lados escribe encima del otro. Los candidatos, con lo que el proyecto ya tiene medido al lado:
+ (a) el agujero del "valor que la recoleccion no puede ver" de DC-002.39 (seccion 54 del README: un temporal
+     en un registro que este runtime no barre) -- mis vueltas fallan justo cuando cae una recoleccion;
+ (b) el copiado del recolector escribiendo encima de un bloque que le pidio el C (o al reves: una ventana de
+     inflate de 32 KB entregada encima de un semiespacio).
+Es lo primero que hay que medir en DC-002.41 (la PARED del MONTON DE C, t_d2725794). En esta camada la lectura
+de d2data ADEMAS muere muda (sin la linea del FALLO) y la consola se rearma: por eso el bloque M7 del POC
+(el control sano del DC6) va ANTES del motor, si no no se mide (se midio 10/12 con M7 al final).
+
+
+5. LOS MUTANTES (cada uno tiene que poner ROJO el control que le toca)
+---------------------------------------------------------------------
+Corrida: `bash scripts/console/checar-compr-240.sh /tmp/gox-240 "<dir de Diablo II>" 60 todo` ->
+**13/13 controles** con el control sano, **2/2 mutantes cazados** y el control sano de vuelta en verde.
+
+  'avail-in-cero'  (C, csrc/zlib_dc.c)  `d2c_zs[slot].avail_in = (uInt)src_len;` -> `= 0;`. Es,
+                   literalmente, el defecto medido del puente viejo (la zlib sin entrada). CAZADO: caen los
+                   controles 4 (M3), 5 (M4), 7 (M6), 9 (M8) y 10 (M10) -- todo lo que descomprima.
+  'pos-de-un-tiro' (Go, compress/zlib)  `z.pos += consumido` -> `z.pos = len(z.comprimido)`. El lector se
+                   come el comprimido en el primer paso y el segundo paso se queda sin entrada. CAZADO: cae
+                   el control 5b (M4b). OJO: el control 5 (M4) NO lo caza, porque M4 pide de a 4096 y
+                   descomprime todo en un paso; por eso M4b existe.
+
+Un mutante que NO sirve, y queda anotado para que nadie lo repita: `int32(len(p))` -> `int32(1)` (pedirle UN
+byte de destino a la zlib por paso). Quedo VERDE y no es un hueco de la suite: es un mutante INVALIDO, porque
+el lector aguanta ese caso (devuelve de a un byte, el que llama vuelve a pedir, y los 4096 bytes salen bien y
+en orden). Un mutante que no cambia el resultado no prueba nada: lo que se saca en limpio es que el unico
+control del avance de `z.pos` es M4b.
+
+Los mutantes se aplican con match unico, se recompila el paquete y el POC, se mide en la consola y se
+restaura verificando el sha256. El corpus no termina en verde si alguno queda verde: un mutante que no caza
+es un hueco de la suite, no un exito. (Medido en carne propia: una corrida del corpus se corto a mitad de un
+mutante y dejo `zlib.go` mutado en el arbol; por eso el modo `[sano|mut1|mut2|vuelta]` del corpus permite
+correr una sola parte y el que mira el log tiene que verificar que la ultima linea diga "arbol restaurado".)
