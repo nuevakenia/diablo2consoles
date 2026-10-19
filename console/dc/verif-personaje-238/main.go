@@ -95,6 +95,7 @@ func main() {
 	pngCiclo := flag.String("png-ciclo", "", "si se pasa, escribe un PNG por cuadro del ciclo dentro de esta carpeta")
 	censoDirs := flag.String("censo-dirs", "", "DC-002.49b: modos cuyo ciclo se censa en TODAS las direcciones del COF (para saber cuantas entran compuestas), separados por coma")
 	censoControl := flag.Bool("censo-control", false, "DC-002.49b: de los 8 estados del control a la direccion del COF, con las funciones del motor")
+	censoPeso := flag.String("censo-peso", "", "DC-002.49b: el pico de memoria de componer un ciclo (crudo + decodificado), por modo")
 	flag.Parse()
 
 	ruta := *mpqPath
@@ -377,6 +378,56 @@ func main() {
 	if *censoControl {
 		censarControlDelGiro(mc)
 	}
+
+	// ============================== 8. EL PICO DE MEMORIA AL COMPONER UN CICLO (DC-002.49b) ==============================
+	//
+	// Componer un ciclo NO cuesta solo el ciclo: `cargarCiclo` lee el .dcc de la capa ENTERO (las 16 direcciones) y
+	// se queda con UNA direccion. El pico es el archivo crudo + el decodificado + lo que ya estaba compuesto.
+	if *censoPeso != "" {
+		for _, modo := range strings.Split(*censoPeso, ",") {
+			modo = strings.ToUpper(strings.TrimSpace(modo))
+			if modo != "" {
+				censarPeso(mc, modo)
+			}
+		}
+	}
+}
+
+// censarPeso: cuanto pesa componer UN ciclo, capa por capa, y cual es el PICO de memoria (crudo + decodificado).
+func censarPeso(mc *d2mpq.MPQ, modo string) {
+	cof, nombreCOF, _, err := cofDelModo(mc, modo)
+	if err != nil {
+		fmt.Printf("CENSO-PESO: %s SIN-COF: %v\n", modo, err)
+		return
+	}
+
+	capas := capasDelCiclo(mc, cof, 0, modo)
+
+	sumaCrudos, maxCrudo, sumaDecodificada := 0, 0, 0
+
+	fmt.Printf("CENSO-PESO: %s COF=%s capas=%d\n", modo, nombreCOF, len(capas))
+
+	for i := range capas {
+		c := &capas[i]
+
+		decodificada := 0
+		for _, cu := range c.cuadros {
+			decodificada += len(cu)
+		}
+
+		sumaCrudos += c.bytesCrudos
+		sumaDecodificada += decodificada
+
+		if c.bytesCrudos > maxCrudo {
+			maxCrudo = c.bytesCrudos
+		}
+
+		fmt.Printf("CENSO-PESO: %s capa=%s crudo=%d decodificada(1 dir)=%d cuadros=%d ruta=%s\n",
+			modo, c.clave, c.bytesCrudos, decodificada, len(c.cuadros), c.ruta)
+	}
+
+	fmt.Printf("CENSO-PESO: %s TOTAL sumaCrudos=%d maxCrudo=%d decodificada(1 dir)=%d picoComponer1dir=%d\n",
+		modo, sumaCrudos, maxCrudo, sumaDecodificada, maxCrudo+sumaDecodificada)
 }
 
 // censarControlDelGiro: de los 8 estados del control (4 cardinales + 4 diagonales) a la direccion del COF, con
@@ -495,6 +546,7 @@ type capaDeCiclo struct {
 	tipo, izq, arriba, ancho, alto int
 	clave                          string
 	ruta                           string
+	bytesCrudos                    int // DC-002.49b: el tamano del .dcc/.dc6 crudo (el pico de memoria al componer)
 	cuadros                        [][]byte
 }
 
@@ -537,7 +589,7 @@ func capasDelCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string) []capaDe
 				continue
 			}
 
-			c := capaDeCiclo{tipo: per.Tipos[i], clave: per.Claves[i], ruta: nombre}
+			c := capaDeCiclo{tipo: per.Tipos[i], clave: per.Claves[i], ruta: nombre, bytesCrudos: len(crudo)}
 
 			if ext == "dcc" {
 				dd, err := d2dcc.Load(crudo)

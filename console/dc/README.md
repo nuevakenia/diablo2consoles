@@ -5654,6 +5654,19 @@ marcha— cuesta **0** de montón permanente y **3.237 ms** en el cuadro del gir
 173.250 ms de `Load` con las 16); la salida (3) —bajar el ciclo a la mitad— **no hace falta**: el problema que la
 tarjeta suponía no existe.
 
+**El pico al componer también está medido** (`-censo-peso TN,TW,A1`), porque `cargarCiclo` lee el `.dcc` de la capa
+**entero** (16 direcciones) y se queda con una: TN `maxCrudo=63.718` + `decodificada(1 dir)=43.728` =
+**pico 107.446 B**; TW `41.867 + 24.992` = **66.859 B**; A1 `75.132 + 122.239` = **197.371 B**. Con eso, tener las
+8 direcciones del control compuestas cuesta **246.768 B** (TN) y **148.720 B** (TW) permanentes, con un pico de
+**~459.206 B** al componer las dos seguidas.
+
+**Y ahí aparece el choque, que no es de esta tarjeta pero la condiciona:** el build que DC-002.50 está armando deja
+escrito en `cargarCiclos` que con la bestia encendida **no entra ni TW con UNA dirección** ("con TN + TW + A1 + los
+cuatro del bicho el montón de la consola no alcanza y el POC se queda sin memoria al empezar TW"). O sea que la
+configuración **con** bestia está al límite con los 32.032 B de TN de una dirección y no admite 386 KB más: el giro
+pide decidir el presupuesto de memoria del arranque, o componerlo sólo cuando la bestia esté apagada. No se resuelve
+inventando un número.
+
 **Lo que NO entra (declarado, no tapado):** esta sección es la **medición**, no el cierre del hito. Los criterios 1,
 2 y 4 piden **capturas de la consola** (que la flecha derecha dibuje otra caja, que la cadencia de TN siga en 128
 ms/cuadro y la de TW en 40, y el mutante del giro quieto) y no hay ninguna todavía: mientras se medía, la ventana de

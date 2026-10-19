@@ -174,3 +174,57 @@ REPRODUCIR TODO LO DE ESTE ARCHIVO (solo el host, no necesita emulador):
     cd ~/Proyectos/diablo2consoles
     go run ./console/dc/verif-personaje-238 -censo-dirs TN,TW,A1 | grep CENSO-DIRS
     go run ./console/dc/verif-personaje-238 -censo-control   | grep CENSO-GIRO
+
+
+=============================================================================
+6. POR QUE LA SALIDA (2) "COMPONER EN LA MARCHA" NO ES GRATIS (medido, ajeno a esta tarjeta)
+=============================================================================
+
+La salida (2) pide decodificar los cuadros de la direccion nueva DURANTE el juego. Eso necesita el MPQ abierto, y
+el POC lo CIERRA al final del arranque (`HITO250: MPQ-CERRADOS ...`): reabrirlo no es gratis, esta medido en la
+misma corrida del POC:
+
+    HITO238: MPQ-ABRIR OK /cd/JUEGO/D2DATA.MPQ ms= 10146
+
+o sea 10.146 ms (10,1 s) por reabrir, contra 3.237 ms de decodificar una direccion. Con las 16 direcciones de TN
+y de TW compuestas de una vez (773.080 B de indices) el giro sale gratis y no hay que reabrir nada; con (2) hay que
+o quedarse con el MPQ abierto (mas memoria, justo lo que falta) o pagar 10,1 s una vez. Es un argumento mas para
+la salida (1), y no estaba escrito en la tarjeta.
+
+
+=============================================================================
+7. EL PICO DE MEMORIA AL COMPONER UN CICLO (medido; y por que el giro choca con DC-002.50)
+=============================================================================
+
+Componer un ciclo no cuesta solo el ciclo: `cargarCiclo` lee el **.dcc de la capa ENTERO** (las 16 direcciones) y
+se queda con **una**. El pico de componer UNA direccion es el archivo crudo mas grande mas el decodificado de todo
+el ciclo (medido capa por capa con `-censo-peso TN,TW,A1`):
+
+    CENSO-PESO: TN capas=7 sumaCrudos=188602 maxCrudo=63718 decodificada(1 dir)=43728 picoComponer1dir=107446
+        LG crudo=63718 decodificada(1 dir)=12784 | TR crudo=35479 | LA crudo=26439 | RA crudo=23556
+        HD crudo=22754 | S2 crudo=9400 | S1 crudo=7256
+    CENSO-PESO: TW capas=7 sumaCrudos=106380 maxCrudo=41867 decodificada(1 dir)=24992 picoComponer1dir=66859
+        LG crudo=41867 decodificada(1 dir)=11600 | TR crudo=18467 | LA crudo=13303 | RA crudo=11999
+        HD crudo=11519 | S2 crudo=5190 | S1 crudo=4035
+    CENSO-PESO: A1 capas=7 sumaCrudos=179806 maxCrudo=75132 decodificada(1 dir)=122239 picoComponer1dir=197371
+        LG crudo=75132 decodificada(1 dir)=21476 | TR crudo=31355 | LA crudo=21912 | HD crudo=18642
+        RA crudo=18641 | S2 crudo=8096 | S1 crudo=6028
+
+Con eso, el costo de tener las 8 direcciones del control compuestas es:
+
+    TN  8 dirs: 246.768 B permanentes, pico al componer la ultima ~ 246.768 + 63.718 = 310.486 B
+    TW  8 dirs: 148.720 B permanentes, pico al componer la ultima ~ 148.720 + 41.867 = 190.587 B
+    TN+TW seguidas: pico ~ 246.768 + 148.720 + 63.718 = 459.206 B
+
+**El choque, medido y no supuesto:** el build que DC-002.50 esta armando en este momento deja escrito en
+`cargarCiclos` (main.go, comentario de `modosDelHeroe`) que con la bestia encendida **no entra ni TW con UNA
+direccion**:
+
+    "Con la bestia encendida son DOS y no tres (TN quieto y A1 ataque): medido, con TN + TW + A1 + los cuatro del
+     bicho el monton de la consola no alcanza y el POC se queda sin memoria al empezar TW (TN y el DT ya estaban
+     compuestos y no entro uno mas)."
+
+O sea: la configuracion CON bestia esta hoy al limite con TN de una direccion (32.032 B) y no admite 386 KB mas.
+El giro NO es un parche de plomeria: pide decidir el presupuesto de memoria del arranque (que es lo que esta
+peleando DC-002.50), o bajar el costo por direccion, o componer el giro solo cuando la bestia este apagada. Eso
+queda dicho aca y en la tarjeta; NO se resuelve inventando un numero.
