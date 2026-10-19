@@ -81,7 +81,7 @@ type Nivel struct {
 	PisosSinTile, ParedesSinTile int
 	FueraDeVentana               int
 	PixelesDelPiso               int
-	PixelesDePared                int
+	PixelesDePared               int
 
 	// CENSAR (DC-002.48): el instrumento que ve los "tiles corridos". Con Censar en true, `pegar` lleva la
 	// cuenta de CUANTOS tiles pintan cada pixel del lienzo (Cobertura: 1 = el piso encaja borde con borde,
@@ -181,7 +181,9 @@ func NuevoNivel(d *d2ds1.DS1, ancho, alto, centroX, centroY int) *Nivel {
 //
 // POR QUE NO UN MAPA CON CLAVE ARRAY (medido en la consola, no supuesto): con
 // `map[[3]int32][]int32` el binario de SH-4 se cae en el PRIMER archivo que compone, con
-//   Unhandled exception: PC 8c0c432a, code 1, evt 0180 / Encountered Illegal instruction
+//
+//	Unhandled exception: PC 8c0c432a, code 1, evt 0180 / Encountered Illegal instruction
+//
 // y el PC cae DENTRO de `_main._63_7int32_7..hash..f`, que `sh-elf-nm` marca como DATO (R, .rodata):
 // el runtime salta a un pedazo de .rodata y ejecuta dato. La traza del retorno (PR=8c046bda) resuelve a
 // `runtime.mapassign`. Los mapas con clave ESCALAR andan (DC-002.5 los midio en la consola); el que no

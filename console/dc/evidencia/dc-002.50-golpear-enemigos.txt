@@ -1,0 +1,123 @@
+DC-002.50 GOLPEAR ENEMIGOS -- LO MEDIDO, LO QUE FALTA Y POR QUE
+================================================================
+
+ESTADO: LA TARJETA NO SE CIERRA. Los cuatro criterios piden la pelea EN PANTALLA y la consola no
+arranca el video cuando el bicho y el heroe estan compuestos en el mismo binario. Lo que si quedo
+medido esta abajo, con los numeros y con el archivo donde sale cada uno.
+
+Todo esto corre en el host (amd64, los lectores del MOTOR, sin emulador) y en la consola por el cable
+serie. No hay un solo numero elegido: la vida, el daño, los cuadros y los ritmos salen de las tablas y
+los COF del MPQ del disco.
+
+1. DE DONDE SALE LA VIDA DEL BICHO (sin emulador, lectores del motor)
+--------------------------------------------------------------------
+Clase: Returned (token SK, las criptas del Acto 1). Se eligio despues de medir las tres candidatas:
+
+  clase     token  nivel  MinHP  MaxHP  factor de MonLvl  vida que sale
+  Fallen    FA       7      1      3          7             1   (MulDiv100(7,1)=0 -> piso 1)
+  Brute     YE       5     18     29         15             2..4  (no entra en RAM: DT 176x124)
+  Returned  SK       6     13     19         17             2..3  <- la elegida
+  Dummy     DU       -      -      -          -             no sirve (es el muñeco de prueba)
+  RogueScout RG      -      -      -          -             mas grande que el Returned
+
+Camino: monstats.txt (d2data.mpq, 238.019 B, crc32 3970117673) + MonLvl.txt (PATCH_D2.MPQ,
+data\global\excel\MonLvl.txt) -> MinHP/MaxHP por la columna del nivel (renglon = nivel-1, el off-by-one
+de MonLvl.Scale frente a d2core/d2monsters/vitals.go:95-124) -> MulDiv100 -> tirada del dado del motor
+-> piso 1 HP.
+
+  consola: "HITO250: MONSTATS bytes= 238019 crc32= 3970117673"
+           "HITO250: VIDA clase= Returned nivel= 6 min= 2 max= 3 HP= 3 AC= 30 A1= 2 .. 5 semilla= 3"
+  host:    console/dc/verif-monstruo-250 (mismos tres .go compartidos, sha256 iguales)
+
+La semilla es determinista: 0x250, y el dado de los golpes es uint32(semilla) ^ 0x6865726f. Con la
+misma semilla sale la misma secuencia de golpes (es lo que hace reproducible el criterio 2).
+
+2. LOS CUADROS Y LOS RITMOS (censo del animdata.d2 y del COF, host)
+-------------------------------------------------------------------
+Returned, direccion 0, capa HTH:
+
+  modo  que es        cuadros  cuadros/s  ms/cuadro  ciclo     caja del compuesto
+  NU    parado          8       12,50       80        640 ms    25x67
+  GH    golpeado         4       17,97       56        224 ms    --
+  DT    muriendo        19       20,31       49        931 ms    hasta 68x86
+  DD    cadaver          1       14,84       67         67 ms    68x43
+
+  DT: 19 cuadros, 19 DISTINTOS (ninguno repetido), cajas que van de 38x79 a 48x20 y pixeles de 1144 a
+      125 (el bicho se desarma). Verificador del host: "VERIF250: DISTINTOS modo=DT cuadros=19
+      distintos=19 repetidos=0".
+  heroe A1 (AM, amnuhth.cof del d2char.mpq): 13 cuadros a 25,00 cuadros/s = 40 ms/cuadro, ciclo 520 ms,
+      el daño cae en el cuadro 7 (regla currentFrame/frameCount >= 0,5 de d2mapentity/monster.go
+      checkEvents).
+
+El daño del heroe a mano limpia es 1..2 (monstruo.go, VERIFIED contra el motor) y la vida del Returned
+es 2..3: con la semilla 0x250 la secuencia es 3 -> 2 -> 1 -> 0 (tres golpes y el cadaver).
+
+3. LO QUE LA CONSOLA COMPONE HOY (medido en la Dreamcast, Flycast + serie)
+--------------------------------------------------------------------------
+El binario de la 250 (scripts/console/build-monstruo-250.sh) lee los tres MPQ del disco (D2DATA, D2CHAR,
+PATCH_D2), compone el nivel (512x512), el personaje (TN quieto) y -- despues del video -- los ciclos del
+bicho y el A1 del heroe. Todo eso ENTRA y se mide:
+
+  "HITO250: MEMORIA etapa= nivel libre= 800472"
+  "HITO250: MEMORIA etapa= ciclos-del-personaje libre= 139432"   (solo TN antes del video)
+  "HITO250: BESTIA lista modos= 3 estado= NU celda= 29 21 ms= 4982 mutante= false"  (cuando va antes)
+  "HITO250: MPQ-CERRADOS vram_libre= 0"
+
+4. EL PROBLEMA (el unico, y esta medido): EL VIDEO NO ARRANCA CON LOS CICLOS COMPUESTOS
+----------------------------------------------------------------------------------------
+`IniciarPantalla` -> d2c_pvr_pantalla_init -> pvr_init_defaults y ahi se termina el arranque:
+
+  a) con el monton de C en 70.168..70.976 B libres:
+     "pvr: enabling vertical scaling for non-VGA" y de ahi no vuelve (cuelgue silencioso).
+  b) con el monton en 139.432 B libres (el mismo valor con el que el POC de DC-002.49 arranca):
+     "Unhandled exception: PC 8c42de98, code 1, evt 0180 ... Encountered Illegal instruction
+      kernel panic: unhandled IRQ/Exception" -> "arch: aborting the system".
+  c) pintando el mapa con SetRGBA en vez de ReplacePixels (intento de ahorrar 1 MB):
+     "*** ASSERTION FAILURE *** Assertion "__builtin_popcount(src->txr.width) == 1 && src->txr.width
+      <= 1024" failed at pvr_prim.c:69 in `pvr_poly_compile': Invalid texture U size"
+
+El mismo binario con bestia=0 (o sea el POC de DC-002.49, sin bicho) SI arranca y dibuja cuadros:
+  "HITO238: dibujando (mapa 512 x 512 en 64 -16 ; personaje 26 x 79 )" + "EBITEN-LOOP cuadro 2 listo"
+O sea: lo que rompe el arranque del video es tener el bicho (y/o el A1) compuestos en el binario.
+
+5. LOS OCHO INTENTOS, CON EL NUMERO DE CADA UNO (para no repetirlos)
+-------------------------------------------------------------------
+ 1. DT compuesto (377 KB) -> "fatal error: out of memory" al empezar el ciclo del heroe (188 KB libres).
+ 2. DT fuera y solo NU/GH/DD -> entra; el video se cuelga con 70 KB libres.
+ 3. TW (caminar) fuera con bestia=1 -> entra; el video igual.
+ 4. GC_SEMISPACE_SIZE_KB 4096 -> la arena llega a 13,7 MB y ya no entra el RGBA del mapa (1 MB).
+ 5. GC_SEMISPACE_SIZE_KB 2048 -> entran los siete ciclos y el video se cuelga igual.
+ 6. Devolver a mano el RGBA del mapa y el lienzo del nivel (d2cFreeExternal) -> el video se cae (y con
+    bestia=0 tambien: no era el bicho). Se sacaron.
+ 7. Devolver a mano la tabla de monstats (238 KB) -> "Encountered Illegal instruction" en
+    pvr_init_defaults. Se saco.
+ 8. Ventana del nivel 512 -> 480 (para ganarle RAM al video) -> el monton queda igual (~71 KB): el
+    monton de Go crece y ocupa lo que se libera. Se volvio a 512.
+
+OJO CON EL TOOLCHAIN: ~/dreamcast/libgodc quedo como estaba (GC_SEMISPACE_SIZE_KB = 1024, el valor que
+deja scripts/console/fix-libgodc-semiespacio-245.py) y se rehizo con ese script, no a mano.
+
+OJO CON EL EMULADOR: el Flycast de esta maquina se cae con "Error del bus" (core dump) en el hilo del PVR
+con la GPU (Mesa/RADV) -- le pasa tambien al POC de DC-002.49 tal cual esta en git. Las corridas de esta
+tarjeta se hicieron con LIBGL_ALWAYS_SOFTWARE=1, que es estable.
+
+6. QUE HACE FALTA PARA CERRARLA (la decision que queda abierta)
+---------------------------------------------------------------
+El arranque del video no tolera que el binario tenga, al mismo tiempo, los tres ciclos del bicho y el A1
+del heroe compuestos. Caminos posibles, todos medibles:
+  a) bajar el bicho a UN ciclo (NU) y componer GH/DD en el primer golpe (composicion perezosa);
+  b) componer los ciclos con una ventana de 3-4 cuadros en vez de la animacion entera;
+  c) recortar la RAM del NIVEL (los 8 DT1 son 4,35 MB de monton de C) para dejarle 1 MB libre al video;
+  d) subir la particion de datos del binario (DC-002.45 media el techo en ~3,2 MB).
+
+Ninguna de las cuatro se probo: cada una es una corrida de ~8 minutos y esta tarjeta ya lleva ocho.
+
+ARCHIVOS
+--------
+  console/dc/poc/personaje-mapa/main.go        el POC con el bicho (interruptores bestia / golpeSordo)
+  console/dc/poc/personaje-mapa/monstruo.go    vida, combate, ruta COF del bicho (compartido con el host)
+  console/dc/poc/personaje-mapa/nivel.go       el compositor del nivel (compartido)
+  console/dc/poc/personaje-mapa/personaje.go   el compositor del personaje (compartido)
+  console/dc/verif-monstruo-250/               el verificador del host (vida, secuencia, cuadros, PNG)
+  console/dc/sonda-monstruo-250/main.go        la sonda del censo (clases, vida, animaciones)
+  scripts/console/build-monstruo-250.sh        build del POC + los tres MPQ + el censo del host

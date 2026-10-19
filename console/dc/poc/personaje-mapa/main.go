@@ -4,27 +4,27 @@
 //
 // LA CADENA QUE SE MIDE (la misma que usa el juego, con los decodificadores y el compositor del MOTOR):
 //
-//	1. el NIVEL: el .ds1 del acto 1 del MPQ del disco -> d2ds1 (el parseador del motor) -> los DT1 que el
-//	   propio DS1 lista -> d2dt1 -> el compositor `nivel.go` (el MISMO archivo que el verificador del host);
-//	2. el PERSONAJE: el COF del heroe (data\global\CHARS\AM\COF\amnuhth.cof, del d2char.mpq) -> las capas y
-//	   su ORDEN DE DIBUJO -> cada capa a su .dcc (o .dc6) -> d2dcc/d2dc6 (los decodificadores del motor) ->
-//	   el compuesto `personaje.go` (el MISMO archivo que el verificador del host);
-//	3. la POSICION: d2vector.Position (subtiles, 5 por celda) que avanza con la velocidad del motor
-//	   (d2path: 9,375 subtiles por segundo caminando) en la direccion que pide el CONTROL de la Dreamcast;
-//	4. el DIBUJO: el mapa y el personaje ENCIMA, por el camino del motor (ebiten.Image + DrawImage), que es
-//	   el loop que va a correr el juego (ebiten.RunGame).
+//  1. el NIVEL: el .ds1 del acto 1 del MPQ del disco -> d2ds1 (el parseador del motor) -> los DT1 que el
+//     propio DS1 lista -> d2dt1 -> el compositor `nivel.go` (el MISMO archivo que el verificador del host);
+//  2. el PERSONAJE: el COF del heroe (data\global\CHARS\AM\COF\amnuhth.cof, del d2char.mpq) -> las capas y
+//     su ORDEN DE DIBUJO -> cada capa a su .dcc (o .dc6) -> d2dcc/d2dc6 (los decodificadores del motor) ->
+//     el compuesto `personaje.go` (el MISMO archivo que el verificador del host);
+//  3. la POSICION: d2vector.Position (subtiles, 5 por celda) que avanza con la velocidad del motor
+//     (d2path: 9,375 subtiles por segundo caminando) en la direccion que pide el CONTROL de la Dreamcast;
+//  4. el DIBUJO: el mapa y el personaje ENCIMA, por el camino del motor (ebiten.Image + DrawImage), que es
+//     el loop que va a correr el juego (ebiten.RunGame).
 //
 // LOS NUMEROS (la consola serie es la unica salida; son los mismos que imprime
 // `console/dc/verif-personaje-238`, uno por uno):
 //
-//	- el .ds1 y los DT1 (bytes y CRC-32) y la composicion del nivel (pedidos/compuestos/sin tile/fuera,
-//	  pixeles no vacios y CRC-32 del lienzo);
-//	- el COF (bytes, CRC-32, capas, frames, direcciones) y cada capa del personaje (bytes, CRC-32, caja,
-//	  pixeles no vacios);
-//	- el compuesto del personaje (tamano, esquina, capas dibujadas, pixeles no vacios, CRC-32);
-//	- la velocidad del motor y la POSICION cuadro a cuadro: subtiles, celda, tile y el pixel del ancla en la
-//	  ventana y en la pantalla;
-//	- la tabla del CONTROL (los bits del control de la Dreamcast, como en DC-002.11), cada vez que cambia.
+//   - el .ds1 y los DT1 (bytes y CRC-32) y la composicion del nivel (pedidos/compuestos/sin tile/fuera,
+//     pixeles no vacios y CRC-32 del lienzo);
+//   - el COF (bytes, CRC-32, capas, frames, direcciones) y cada capa del personaje (bytes, CRC-32, caja,
+//     pixeles no vacios);
+//   - el compuesto del personaje (tamano, esquina, capas dibujadas, pixeles no vacios, CRC-32);
+//   - la velocidad del motor y la POSICION cuadro a cuadro: subtiles, celda, tile y el pixel del ancla en la
+//     ventana y en la pantalla;
+//   - la tabla del CONTROL (los bits del control de la Dreamcast, como en DC-002.11), cada vez que cambia.
 //
 // MUTANTE (criterio 3): con CONTROL_SORDO=true (lo pone el script, recompilando) el control SE LEE y SE
 // INFORMA, pero NO se engancha al movimiento: con las mismas teclas apretadas, la posicion del motor no
@@ -38,13 +38,13 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2cof"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dc6"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 //extern d2c_serial_init
@@ -56,6 +56,9 @@ func d2cMs() uint
 //extern d2c_vram_libre
 func d2cVramLibre() uint
 
+//extern d2c_heap_libre
+func d2cHeapLibre() uint
+
 //extern d2c_free_external
 func d2cFreeExternal(p uintptr)
 
@@ -66,19 +69,29 @@ const (
 	rutaMPQ      = "/cd/JUEGO/D2DATA.MPQ"
 	rutaMPQChars = "/cd/JUEGO/D2CHAR.MPQ"
 
+	// DC-002.50: el TERCER MPQ, el del parche. MonLvl.txt (la tabla del nivel de los monstruos, de donde sale
+	// la vida) NO esta en d2data.mpq ni en d2exp.mpq: medido con la sonda del host, vive en patch_D2.mpq.
+	rutaMPQPatch = "/cd/JUEGO/PATCH_D2.MPQ"
+
+	// Las dos tablas del excel que hacen falta para la vida del bicho (monstruo.go).
+	excelMonstats = "data\\global\\excel\\monstats.txt"
+	excelMonLvl   = "data\\global\\excel\\MonLvl.txt"
+
 	// EL PRIMER NIVEL DEL ACTO 1 (el Rogue Encampment): el mismo .ds1 de DC-002.37.
 	nivelEnMPQ = "data\\global\\tiles\\ACT1\\TOWN\\townN1.ds1"
 
 	// La paleta del ACTO (mapa) y la de las UNIDADES (personajes): 768 bytes cada una, B,G,R.
-	palEnMPQ      = "data/global/palette/ACT1/pal.dat"
+	palEnMPQ       = "data/global/palette/ACT1/pal.dat"
 	palUnidadesMPQ = "data/global/palette/Units/pal.dat"
 
 	// El COF del personaje: la amazona parada y desarmada (AM + NU + HTH).
 	cofEnMPQ = "data\\global\\CHARS\\AM\\COF\\amnuhth.cof"
 
 	// La ventana isometrica y la celda que queda en el centro (las mismas de DC-002.37, para que los
-	// numeros del nivel sean comparables).
-	ladoVentana     = 512
+	// numeros del nivel sean comparables). OJO (DC-002.50, medido): se probo bajarla a 480 para ganarle RAM al
+	// video y NO sirve -- el monton de C queda igual (~71 KB) porque el monton de Go crece y ocupa lo que se
+	// libera. Se deja en 512, la misma de DC-002.37/238/249.
+	ladoVentana      = 512
 	centroX, centroY = 28, 20
 
 	// La pantalla logica del POC y donde se pega la ventana del nivel (centrada: (640-512)/2, (480-512)/2).
@@ -100,6 +113,37 @@ const (
 	modoCaminando = "TW"
 	msQuieto      = 128
 	msCaminando   = 40
+
+	// ============================== LA BESTIA (DC-002.50) ==============================
+	//
+	// EL BICHO: el Returned del acto 1 (las criptas), su carpeta del MPQ es SK y su clase de monstats es
+	// "Returned". Se eligio MIDIENDO (ver monstruo.go): el fallen del Blood Moor nace con 1 HP con las tablas
+	// del motor (muere del primer golpe, no llega a jugar la animacion de "recibiendo") y el Brute no entra en
+	// la RAM de la consola (su animacion de morir son 393 KB y la arena se queda sin memoria).
+	//
+	// EL RITMO: los ms/cuadro NO son iguales para los cuatro modos y no salen del COF, salen del animdata.d2.
+	// Medidos con la sonda del host (console/dc/sonda-monstruo-250):
+	//     NU 8 cuadros a 12,50 cuadros/s = 80 ms/cuadro (ciclo 640 ms)
+	//     GH 4 cuadros a 17,97 cuadros/s = 56 ms/cuadro (ciclo 224 ms)
+	//     DT 19 cuadros a 20,31 cuadros/s = 49 ms/cuadro (ciclo 931 ms)
+	//     DD 1 cuadro a 14,84 cuadros/s = 67 ms/cuadro
+	// No se carga el animdata en la consola (son 411 KB y 2.556 registros con mapa: no entra): se usan las
+	// constantes medidas, igual que msQuieto y msCaminando en DC-002.49.
+	celdaBestiaX = centroX + 1
+	celdaBestiaY = centroY + 1
+
+	// la direccion del bicho que se dibuja (el COF trae 8; la 0 es la que mira al sur-oeste, la misma que el
+	// host usa para sus numeros de referencia).
+	dirBestia = 0
+
+	msBestiaQuieto   = 80 // NU (medido)
+	msBestiaGolpeada = 56 // GH (medido)
+	msBestiaMuriendo = 49 // DT (medido)
+	msBestiaMuerta   = 67 // DD (medido)
+
+	// el ataque del heroe: AMA1HTH, 13 cuadros a 25,00 cuadros/s = 40 ms/cuadro (ciclo 520 ms), medido con la
+	// sonda del host. El cuadro del golpe es la mitad: 7 de 13.
+	msGolpeHeroe = 40
 
 	// cuadrosAMedir: cada cuantos cuadros se deja la marca de la POSICION en la consola serie (30 cuadros
 	// son medio segundo a 60, o tres segundos a 10: el ritmo real lo dice el ms de la marca).
@@ -124,6 +168,15 @@ var animar = false
 // cicloSordo: EL MUTANTE del criterio 3 de DC-002.49. El cuadro se queda en 0: el personaje QUIETO se dibuja
 // siempre igual, asi que dos capturas separadas en el tiempo tienen que dar 0 pixeles de diferencia.
 var cicloSordo = false
+
+// bestia: ENCIENDE el monstruo y el golpe (DC-002.50). Arranca APAGADO a proposito: con esto apagado el
+// binario es el de DC-002.49 (el personaje animado y nada mas), que es lo que compara su corpus. El script
+// `scripts/console/build-monstruo-250.sh` lo enciende con un sed y recompila, igual que `animar`.
+var bestia = false
+
+// golpeSordo: EL MUTANTE del criterio 4. El boton de golpe se LEE y se INFORMA (la marca del boton sale
+// igual), pero NO arranca el ataque: con las mismas pulsaciones, la vida del bicho no puede cambiar.
+var golpeSordo = false
 
 // umbralGrande: a partir de que tamaño el recolector de libgodc manda la asignacion al monton de C (64 KB,
 // ver DC-002.37): esas no las recupera el recolector.
@@ -155,6 +208,14 @@ type juego struct {
 	msUltimoCambio      int64    // ms del ultimo cambio de cuadro (para la evidencia)
 	cambios             int      // cuantos cambios de cuadro se dibujaron
 	palUnidades         [256][3]uint8
+
+	// ---- la bestia y el golpe (DC-002.50)
+	mon             *monstruo // el bicho: su vida, sus ciclos y su caja en pantalla
+	golpeando       bool      // el heroe esta en medio del ataque (ciclo A1)
+	golpeDado       bool      // el dano de ESTE ataque ya se aplico (cae a la mitad de la animacion)
+	msGolpe         int64     // cuando empezo el ataque
+	botonGolpeAntes bool      // el flanco del boton (una pulsacion = un ataque)
+	ataques         int       // cuantos ataques empezo el heroe
 }
 
 // rect: una caja de la pantalla (x0,y0) .. (x1,y1) sin incluir el borde derecho/inferior.
@@ -162,11 +223,11 @@ type rect struct{ x0, y0, x1, y1 int }
 
 // cuadro: un cuadro del ciclo del personaje, ya compuesto (indices de 8 bits, el 0 transparente).
 type cuadro struct {
-	Ancho, Alto      int
-	Izq, Arriba      int
-	Pixeles          []byte
-	PixelesNoVacios  int
-	CRC              uint32
+	Ancho, Alto     int
+	Izq, Arriba     int
+	Pixeles         []byte
+	PixelesNoVacios int
+	CRC             uint32
 }
 
 // ciclo: la animacion de UN modo (TN quieto, TW caminando), cuadro por cuadro.
@@ -176,6 +237,24 @@ type ciclo struct {
 	Cuadros     []cuadro
 	Imagen      *ebiten.Image // la imagen del cuadro que se esta dibujando (se reemplaza al cambiar)
 	RGBA        []byte        // el buffer de esa imagen, reusado cuadro a cuadro (no se asigna por cuadro)
+	UnTiro      bool          // DC-002.50: el modo NO da vueltas (GH, DT): al terminarlo, el modo cambia
+}
+
+// monstruo: el bicho en el mapa y su combate. Los ciclos son los cuatro modos del COF que se dibujan (NU
+// parado, GH golpeado, DT muriendo, DD muerto) y la vida sale de monstruo.go (las tablas del motor).
+type monstruo struct {
+	Vida    *Vida
+	Combate *Combate
+	Ciclos  []*ciclo
+	Ciclo   *ciclo
+	Estado  string // el modo que se esta dibujando (NU, GH, DT, DD)
+	Cuadro  int    // el cuadro del ciclo que esta puesto
+	Pintado int    // el cuadro que quedo en pantalla
+	MsModo  int64  // cuando empezo el modo
+	Cambios int    // cuantos cuadros se dibujaron (para la evidencia)
+
+	Caja    rect // la caja del bicho en la pantalla
+	HayCaja bool
 }
 
 // capaCiclo: una capa del COF con TODOS los cuadros de la direccion (para componer el ciclo entero).
@@ -245,6 +324,11 @@ func (j *juego) Update() error {
 	}
 
 	// ---- LA ANIMACION (DC-002.49): el cuadro del ciclo que toca, por el reloj de la consola
+	if animar && bestia && j.mon != nil {
+		j.combate()        // el boton del golpe, el dano y el modo del bicho
+		j.animarMonstruo() // el cuadro del bicho, por el reloj
+	}
+
 	if animar {
 		j.animar()
 	}
@@ -316,11 +400,13 @@ func (j *juego) Draw(pantalla *ebiten.Image) {
 	pantalla.DrawImage(j.personaje, &op2)
 }
 
-// dibujarAnimado: el mapa entero la primera vez y, cuadro a cuadro, solo la caja del personaje.
+// dibujarAnimado: el mapa entero la primera vez y, cuadro a cuadro, solo las cajas del bicho y del personaje.
 func (j *juego) dibujarAnimado(pantalla *ebiten.Image) {
 	if j.ciclo == nil || j.ciclo.Imagen == nil || len(j.ciclo.Cuadros) == 0 {
 		return
 	}
+
+	hayBestia := j.mon != nil && j.mon.Ciclo != nil
 
 	if !j.pintado {
 		var op ebiten.DrawImageOptions
@@ -331,7 +417,8 @@ func (j *juego) dibujarAnimado(pantalla *ebiten.Image) {
 	}
 
 	// si no cambio ni el cuadro ni la posicion, la pantalla ya esta bien: no se repinta
-	if j.hayCaja && j.cuadroPintado == j.cuadroDibujado && !j.movido {
+	if j.hayCaja && j.cuadroPintado == j.cuadroDibujado && !j.movido &&
+		(!hayBestia || (j.mon.HayCaja && j.mon.Pintado == j.mon.Cuadro)) {
 		return
 	}
 
@@ -341,9 +428,18 @@ func (j *juego) dibujarAnimado(pantalla *ebiten.Image) {
 	ax, ay := PixelDeLaCelda(cx, cy, origenX, origenY)
 	px, py := mapaX+ax+cu.Izq, mapaY+ay+cu.Arriba
 
-	// la caja del cuadro anterior vuelve a ser mapa (es lo que tapaba al personaje)
+	// las cajas que tapaban al bicho y al personaje vuelven a ser mapa (es lo que tapaban)
 	if j.hayCaja {
 		j.devolverAlMapa(pantalla, j.caja)
+	}
+
+	if hayBestia && j.mon.HayCaja {
+		j.devolverAlMapa(pantalla, j.mon.Caja)
+	}
+
+	// el bicho primero (queda DETRAS del personaje) y el personaje encima
+	if hayBestia {
+		j.dibujarBestia(pantalla)
 	}
 
 	var op ebiten.DrawImageOptions
@@ -389,7 +485,19 @@ func (j *juego) animar() {
 		deseado = modoCaminando
 	}
 
+	// DC-002.50: mientras dura el golpe, el personaje dibuja el ciclo del ATAQUE (A1, 13 cuadros a 40 ms).
+	if j.golpeando {
+		deseado = modoGolpePersonaje
+	}
+
 	c := j.buscarCiclo(deseado)
+
+	// el modo pedido puede no estar compuesto (DC-002.50: el binario del golpe no compone TW por RAM): en ese
+	// caso se dibuja el quieto, que SIEMPRE esta, en vez de dejar al personaje congelado en el ultimo cuadro.
+	if c == nil && deseado != modoQuieto {
+		c = j.buscarCiclo(modoQuieto)
+	}
+
 	if c == nil || len(c.Cuadros) == 0 || c.Imagen == nil {
 		return
 	}
@@ -466,6 +574,209 @@ func (j *juego) ponerCuadro(c *ciclo, f int) {
 // origenX/origenY: donde cayo la ventana del nivel (los imprime el compositor).
 var origenX, origenY int
 
+// ============================== EL GOLPE Y EL BICHO (DC-002.50) ==============================
+
+// combate: el boton del golpe, el dano y el modo del bicho.
+//
+// EL BOTON ES EL Y DEL CONTROL DE LA DREAMCAST (control.go: contY -> KeyY). Se pregunta el FLANCO: una
+// pulsacion es un ataque; dejando el boton apretado no se encadenan golpes, igual que en el juego.
+//
+// EL DANO CAE A LA MITAD DE LA ANIMACION DEL HEROE (CuadroDelGolpe): es la regla del motor
+// (d2mapentity/monster.go, checkEvents: currentFrame/frameCount >= 0,5).
+func (j *juego) combate() {
+	ahora := int64(d2cMs())
+	apretado := ebiten.IsKeyPressed(ebiten.KeyY)
+
+	// la marca del control CRUDO: los bits del maple tal cual (CONT_Y = 32). Es el instrumento para saber que
+	// boton del control esta apretado y para probar el mapeo del emulador sin adivinar.
+	if j.cuadros%cuadrosAMedir == 0 {
+		println("HITO250: CONTROL botones=", int(ebiten.BotonesParaLaEvidencia()), "yApretada=", apretado,
+			"golpeando=", j.golpeando, "vida=", j.mon.Vida.HP, "cuadroDelLoop=", j.cuadros)
+	}
+
+	if apretado && !j.botonGolpeAntes {
+		println("HITO250: BOTON boton=Y botones=", int(ebiten.BotonesParaLaEvidencia()), "golpeSordo=", golpeSordo,
+			"vida=", j.mon.Vida.HP, "muerto=", j.mon.Combate.Muerto, "cuadroDelLoop=", j.cuadros)
+
+		if !golpeSordo && !j.golpeando && !j.mon.Combate.Muerto {
+			j.golpeando = true
+			j.golpeDado = false
+			j.msGolpe = ahora
+			j.ataques++
+
+			println("HITO250: GOLPE-EMPIEZA ataque=", j.ataques, "vidaAntes=", j.mon.Vida.HP,
+				"cuadroDelLoop=", j.cuadros)
+		}
+	}
+
+	j.botonGolpeAntes = apretado
+
+	if !j.golpeando {
+		return
+	}
+
+	golpe := j.buscarCiclo(modoGolpePersonaje)
+	if golpe == nil || len(golpe.Cuadros) == 0 {
+		j.golpeando = false
+
+		return
+	}
+
+	f := int((ahora - j.msGolpe) / int64(golpe.MsPorCuadro))
+
+	// el dano, una sola vez por ataque
+	if !j.golpeDado && f >= CuadroDelGolpe(len(golpe.Cuadros)) {
+		j.golpeDado = true
+
+		dano, antes, despues, muerto := j.mon.Combate.GolpeDelHeroe()
+
+		println("HITO250: GOLPE ataque=", j.ataques, "cuadroDelHeroe=", f, "de", len(golpe.Cuadros),
+			"dano=", dano, "vidaAntes=", antes, "vidaDespues=", despues, "muerto=", muerto,
+			"danoAcumulado=", j.mon.Combate.Dano, "cuadroDelLoop=", j.cuadros)
+
+		if muerto {
+			// EL BICHO MUERE: pasa al cadaver (DD). El DT no esta compuesto en este binario (ver el comentario
+			// de los modos del bicho en main): la vida queda en 0 y el dibujo pasa al cadaver.
+			j.cambiarModoBestia(modoBestiaMuerta, ahora)
+
+			println("HITO250: MUERTE vida=", j.mon.Vida.HP, "golpes=", j.mon.Combate.Golpes,
+				"dano=", j.mon.Combate.Dano, "modo=", j.mon.Estado, "cuadroDelLoop=", j.cuadros)
+		} else {
+			j.cambiarModoBestia(modoBestiaGolpeada, ahora)
+		}
+	}
+
+	// el ataque termina cuando la animacion del heroe dio la vuelta
+	if f >= len(golpe.Cuadros) {
+		j.golpeando = false
+
+		println("HITO250: GOLPE-FIN ataque=", j.ataques, "vida=", j.mon.Vida.HP, "cuadroDelLoop=", j.cuadros)
+	}
+}
+
+// animarMonstruo: el cuadro del bicho por el RELOJ de la consola y los cambios de modo que hace el motor.
+//
+// La regla de los modos es la de `d2mapentity/monster.go` (checkEvents): GH y DT son de UN SOLO TIRO -- cuando
+// la animacion se jugo entera, GH vuelve a NU y DT pasa a DD (el cadaver, que se queda). NU y DD dan vueltas.
+func (j *juego) animarMonstruo() {
+	m := j.mon
+	if m.Ciclo == nil || len(m.Ciclo.Cuadros) == 0 {
+		return
+	}
+
+	// a lo sumo dos transiciones en un cuadro (GH -> NU, DT -> DD), para no quedarse dando vueltas
+	for i := 0; i < 3; i++ {
+		ahora := int64(d2cMs())
+		ms := ahora - m.MsModo
+		if ms < 0 {
+			ms = 0
+		}
+
+		f := int(ms / int64(m.Ciclo.MsPorCuadro))
+
+		if !m.Ciclo.UnTiro {
+			f %= len(m.Ciclo.Cuadros)
+		} else if f >= len(m.Ciclo.Cuadros) {
+			// el modo de un tiro se termino: cual sigue (checkEvents del motor)
+			switch m.Estado {
+			case modoBestiaGolpeada:
+				j.cambiarModoBestia(modoBestiaQuieto, ahora)
+			case modoBestiaMuriendo:
+				j.cambiarModoBestia(modoBestiaMuerta, ahora)
+
+				println("HITO250: MUERTE vida=", m.Vida.HP, "golpes=", m.Combate.Golpes, "dano=", m.Combate.Dano,
+					"modo=", m.Estado, "cuadroDelLoop=", j.cuadros)
+			default:
+				return
+			}
+
+			continue
+		}
+
+		if f == m.Cuadro && m.Pintado == f {
+			return
+		}
+
+		m.Cuadro = f
+		j.ponerCuadroBestia(m.Ciclo, f)
+
+		return
+	}
+}
+
+// cambiarModoBestia: el bicho cambia de animacion (NU <-> GH, DT, DD) y el reloj del modo arranca de cero.
+func (j *juego) cambiarModoBestia(modo string, ahora int64) {
+	for _, c := range j.mon.Ciclos {
+		if c.Modo != modo {
+			continue
+		}
+
+		j.mon.Ciclo = c
+		j.mon.Estado = modo
+		j.mon.MsModo = ahora
+		j.mon.Cuadro = 0
+		j.mon.Pintado = -1 // fuerza el repintado en el primer cuadro del modo
+
+		println("HITO250: MODO-BESTIA modo=", modo, "cuadros=", len(c.Cuadros), "msPorCuadro=", c.MsPorCuadro,
+			"cicloMs=", len(c.Cuadros)*c.MsPorCuadro, "cuadroDelLoop=", j.cuadros)
+
+		return
+	}
+
+	println("HITO250: MODO-BESTIA SIN-CICLO modo=", modo)
+}
+
+// ponerCuadroBestia: el cuadro del bicho a su imagen (indices -> RGBA, el 0 transparente) y la marca con los
+// numeros que el corpus compara contra el host (modo, cuadro, caja, pixeles y crc32 del compuesto).
+func (j *juego) ponerCuadroBestia(c *ciclo, f int) {
+	cu := &c.Cuadros[f]
+
+	for i := 0; i < cu.Ancho*cu.Alto; i++ {
+		idx := cu.Pixeles[i]
+
+		if idx == 0 {
+			c.RGBA[i*4+0], c.RGBA[i*4+1], c.RGBA[i*4+2], c.RGBA[i*4+3] = 0, 0, 0, 0
+
+			continue
+		}
+
+		c.RGBA[i*4+0], c.RGBA[i*4+1], c.RGBA[i*4+2], c.RGBA[i*4+3] =
+			j.palUnidades[idx][0], j.palUnidades[idx][1], j.palUnidades[idx][2], 255
+	}
+
+	c.Imagen.ReplacePixels(c.RGBA)
+
+	j.mon.Cambios++
+
+	println("HITO250: ANIM-BESTIA modo=", c.Modo, "cuadro=", f, "de", len(c.Cuadros),
+		"caja=", cu.Ancho, cu.Alto, "esquina=", cu.Izq, cu.Arriba,
+		"pixeles=", cu.PixelesNoVacios, "crc32=", cu.CRC,
+		"msDelModo=", int64(d2cMs())-j.mon.MsModo, "cambios=", j.mon.Cambios,
+		"vida=", j.mon.Vida.HP, "cuadroDelLoop=", j.cuadros)
+}
+
+// dibujarBestia: el bicho en la pantalla. La posicion sale de la MISMA proyeccion del piso que el personaje
+// (PixelDeLaCelda) con la celda donde esta parado, y la esquina del cuadro la da el COF.
+func (j *juego) dibujarBestia(pantalla *ebiten.Image) {
+	m := j.mon
+	if m.Ciclo == nil || m.Ciclo.Imagen == nil || len(m.Ciclo.Cuadros) == 0 {
+		return
+	}
+
+	cu := &m.Ciclo.Cuadros[m.Cuadro]
+
+	ax, ay := PixelDeLaCelda(float64(celdaBestiaX), float64(celdaBestiaY), origenX, origenY)
+	px, py := mapaX+ax+cu.Izq, mapaY+ay+cu.Arriba
+
+	var op ebiten.DrawImageOptions
+	op.GeoM.Translate(float64(px), float64(py))
+	pantalla.DrawImage(m.Ciclo.Imagen, &op)
+
+	m.Caja = rect{px, py, px + cu.Ancho, py + cu.Alto}
+	m.HayCaja = true
+	m.Pintado = m.Cuadro
+}
+
 func main() {
 	d2cSerialInit()
 
@@ -485,7 +796,9 @@ func main() {
 		return
 	}
 
-	defer mpq.Close()
+	// OJO (DC-002.50): NO hay `defer mpq.Close()`. El MPQ se cierra EXPLICITAMENTE cuando ya no hace falta
+	// (despues del bicho), porque en la consola la RAM es una sola y el indice del d2data tiene que volver
+	// antes de componer los ciclos del personaje. Cerrarlo dos veces seria un error del disco.
 
 	println("HITO238: MPQ-ABRIR OK", rutaMPQ, "ms=", int64(d2cMs())-t0)
 
@@ -547,6 +860,8 @@ func main() {
 
 	n.Cerrar()
 
+	memoria("nivel")
+
 	println("HITO238: COMPUESTO pisos=", n.PisosCompuestos, "/", n.PisosPedidos,
 		"paredes=", n.ParedesCompuestas, "/", n.ParedesPedidas,
 		"sintilePiso=", n.PisosSinTile, "sintilePared=", n.ParedesSinTile, "fuera=", n.FueraDeVentana)
@@ -569,21 +884,37 @@ func main() {
 	mapa := ebiten.NewImage(n.Ancho, n.Alto)
 	rgba := make([]byte, n.Ancho*n.Alto*4)
 
+	// OJO (DC-002.50, medido): se probo pintar el mapa DIRECTO en la imagen con SetRGBA (para no tener el
+	// temporal de 1 MB) y con eso el POC de DC-002.49 -- bestia=0, que no toca nada del bicho -- se cae en el
+	// PVR con `Assertion "__builtin_popcount(src->txr.width) == 1" failed ... Invalid texture U size`. Con
+	// ReplacePixels no. Asi que el mapa se pinta como en DC-002.38/DC-002.49.
 	for i, idx := range n.Canvas {
 		r, g, b := ColorDelIndice(palActo, idx)
 		rgba[i*4+0], rgba[i*4+1], rgba[i*4+2], rgba[i*4+3] = r, g, b, 255
 	}
 
 	mapa.ReplacePixels(rgba)
-	rgba = nil
 
-	// el lienzo de indices ya no hace falta: se suelta para que el recolector tenga lugar para el personaje
+	// EL BUFFER RGBA SON 1 MB (512x512x4) Y EL LIENZO DEL NIVEL 262 KB (512x512): por tamano el runtime los manda
+	// al monton de C, y de ahi no los recupera nadie. Ya no se usan (los pixeles estan subidos a la textura con
+	// ReplacePixels y el lienzo no se toca mas), asi que se devuelven A MANO. MEDIDO EN DC-002.50: sin esto, con
+	// los tres ciclos del bicho compuestos, al monton de C le quedaban 72.696 B y el POC se REINICIABA en
+	// `IIniciarPantalla` -- justo despues de "pvr: enabling vertical scaling" --; con la devolucion quedan 1,33 MB
+	// y el video arranca. (En DC-002.45 ya se habia medido que el techo del monton de C son ~3,2 MB.)
+	// OJO (DC-002.50, medido): aca se probaron devoluciones A MANO con d2cFreeExternal para bajar la presion de
+	// RAM antes del video, y las dos -- el buffer RGBA y el lienzo del nivel -- dejan el POC sin arrancar el
+	// video (la consola se reinicia en IniciarPantalla, y con bestia=0 tambien: no era el bicho). Se sueltan con
+	// el recolector, como en DC-002.38, y la RAM se gana no pidiendola (ver el mapa, que ya no arma el temporal).
 	n.Canvas = nil
 	n.Scratch = nil
 
 	runtime.GC()
 
 	println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre=", int64(d2cVramLibre()))
+
+	// OJO (DC-002.50, medido): aca se probo arrancar el video ANTES de componer los ciclos, para que el PVR
+	// encontrara el monton libre. NO sirve: la consola se queda en "pvr: enabling vertical scaling" (con 800.216 B
+	// libres), asi que el video arranca al final, como en DC-002.38/DC-002.49.
 
 	// ============================== 3. el personaje ==============================
 	tCoF := int64(d2cMs())
@@ -594,7 +925,7 @@ func main() {
 		return
 	}
 
-	defer mc.Close()
+	// lo mismo que el d2data: se cierra EXPLICITAMENTE cuando los tres ciclos del heroe ya estan compuestos.
 
 	println("HITO238: MPQ-CHARS-ABRIR OK", rutaMPQChars, "ms=", int64(d2cMs())-tCoF)
 
@@ -722,7 +1053,76 @@ func main() {
 
 	println("HITO238: PERSONAJE-IMAGEN bytes=", per.Ancho*per.Alto*4, "vram_libre=", int64(d2cVramLibre()))
 
-	// ============================== 3b. LOS CICLOS DE LA ANIMACION (DC-002.49) ==============================
+	// ============================== 3b. LA BESTIA Y EL GOLPE (DC-002.50) ==============================
+	//
+	// Con `bestia` encendido se suma al mapa el bicho del acto 1 y el golpe a mano limpia. NINGUN numero de
+	// los que se usan aca es elegido: la vida sale de las tablas del MPQ por el camino de siembra del motor y
+	// el dano del dado del motor (monstruo.go, el archivo que comparten la consola y el verificador del host).
+	var mon *monstruo
+
+	// la vida y el combate se calculan en 3b y los usa 3d (que arma el bicho con sus ciclos, ya con el video
+	// andando): por eso viven aca afuera
+	var vida *Vida
+
+	var combate *Combate
+
+	var tBestia int64
+
+	if bestia {
+		if !animar {
+			println("HITO250: LA BESTIA NECESITA animar=true (el golpe dibuja los ciclos)")
+
+			return
+		}
+
+		tBestia = int64(d2cMs())
+
+		monstats, err := mpq.ReadFile(excelMonstats)
+		if err != nil {
+			println("HITO250: MONSTATS FALLO:", err.Error())
+
+			return
+		}
+
+		monlvl := leerDeMPQ(rutaMPQPatch, excelMonLvl)
+		if monlvl == nil {
+			println("HITO250: MONLVL FALLO:", excelMonLvl)
+
+			return
+		}
+
+		vida, err = VidaDelBicho(monstats, monlvl, claseBestia, semillaCombate)
+		if err != nil {
+			println("HITO250: VIDA FALLO:", err.Error())
+
+			return
+		}
+
+		println("HITO250: MONSTATS bytes=", len(monstats), "crc32=", crc32.ChecksumIEEE(monstats))
+		println("HITO250: MONLVL bytes=", len(monlvl), "crc32=", crc32.ChecksumIEEE(monlvl))
+		println("HITO250: VIDA clase=", vida.Clase, "nivel=", vida.Nivel, "min=", vida.Min, "max=", vida.Max,
+			"HP=", vida.HP, "AC=", vida.AC, "A1=", vida.DanoMin, "..", vida.DanoMax, "semilla=", semillaCombate)
+
+		// OJO (DC-002.50, medido): aca estaba la devolucion a mano de la tabla de monstats (238 KB) con
+		// d2cFreeExternal, copiando lo que hacen los DT1 del nivel en DC-002.37. NO VA: con esa devolucion el
+		// POC se cae con "Unhandled exception ... Encountered Illegal instruction" adentro de
+		// `pvr_init_defaults`, y sin ella no (el mismo binario con bestia=0, que no toca esta tabla, arranca).
+		// Las dos tablas las suelta el recolector.
+		monstats, monlvl = nil, nil
+
+		runtime.GC()
+
+		combate = NuevoCombate(vida, semillaCombate)
+
+		// los CUATRO modos del bicho que se dibujan: parado (da vueltas), golpeado y muriendo (de un tiro),
+		// muerto (el cadaver, se queda).
+		// LOS CICLOS DEL BICHO NO SE COMPONEN ACA (DC-002.50, medido): son ~420 KB del monton de C y si se
+		// componen antes de `IniciarPantalla` al PVR no le queda con que arrancar (medido: 70.976 B libres y la
+		// consola se queda en "pvr: enabling vertical scaling"). Se componen en 3d, con el video ya andando.
+		_ = combate
+	}
+
+	// ============================== 3c. LOS CICLOS DE LA ANIMACION (DC-002.49) ==============================
 	//
 	// Con `animar` encendido se componen los DOS ciclos del pueblo: TN (parado, 16 cuadros) y TW (caminando,
 	// 8 cuadros), cada uno con su COF y sus graficos del d2char.mpq, cuadro por cuadro, con el compositor
@@ -732,10 +1132,23 @@ func main() {
 	if animar {
 		tCiclos := int64(d2cMs())
 
-		for _, m := range []struct {
+		// LOS MODOS DEL HEROE QUE SE COMPONEN. Con la bestia encendida son DOS y no tres (TN quieto y A1
+		// ataque): medido, con TN + TW + A1 + los cuatro del bicho el monton de la consola no alcanza y el POC
+		// se queda sin memoria al empezar TW (TN y el DT ya estaban compuestos y no entro uno mas). El caminar
+		// NO se rompe: la posicion la sigue moviendo el motor, lo unico que se dibuja es TN.
+		modosDelHeroe := []struct {
 			modo string
 			ms   int
-		}{{modoQuieto, msQuieto}, {modoCaminando, msCaminando}} {
+		}{{modoQuieto, msQuieto}}
+
+		if !bestia {
+			modosDelHeroe = append(modosDelHeroe, struct {
+				modo string
+				ms   int
+			}{modoCaminando, msCaminando})
+		}
+
+		for _, m := range modosDelHeroe {
 			cofModo, nombreCOF, bytesCOF, ok := cofDelModo(mc, m.modo)
 			if !ok {
 				println("HITO249: SIN COF PARA EL MODO", m.modo)
@@ -754,10 +1167,19 @@ func main() {
 			runtime.GC()
 		}
 
+		// EL CICLO DEL GOLPE (A1) NO SE COMPONE ACA: va en 3d, con el video ya andando (medido: es el que deja el
+		// monton de C en 70 KB y con eso `IniciarPantalla` no arranca).
+
 		println("HITO249: CICLOS cargados", len(ciclos), "ms", int64(d2cMs())-tCiclos, "mutante", cicloSordo)
+
+		memoria("ciclos-del-personaje")
 	}
 
+	// el d2char.mpq SIGUE ABIERTO: el ciclo del golpe (A1) se compone en 3d, con el video ya andando.
+
 	// ============================== 4. el personaje y el control ==============================
+	println("HITO250: MPQ-CERRADOS vram_libre=", int64(d2cVramLibre()))
+
 	est := NuevoEstado(float64(centroX), float64(centroY), false)
 
 	println("HITO238: MOTOR velocidad=subtilesPorSegundo=", est.Velocidad,
@@ -785,9 +1207,121 @@ func main() {
 		j.cuadroPintado = -1
 	}
 
+	// DC-002.50: el bicho entra al juego
+	if bestia && mon != nil {
+		j.mon = mon
+	}
+
 	if err := ebiten.IniciarPantalla(ancho, alto); err != nil {
 		println("HITO238: no pude arrancar el video:", err.Error())
 	}
+
+	// ============================== 3d. LOS CICLOS DEL BICHO, CON EL VIDEO YA ANDANDO (DC-002.50) ==========
+	//
+	// POR QUE ACA Y NO EN 3b (medido en la consola): componer los tres modos del bicho son ~420 KB del monton de
+	// C (las capas decodificadas y los cuadros compuestos) y con eso hecho `IniciarPantalla` ya no arranca: el
+	// POC se queda en "pvr: enabling vertical scaling" con 70.976 B libres y no vuelve. Con el video ya andando
+	// los ciclos se componen igual que cualquier textura en runtime (los pixeles viven en el monton; la textura
+	// en la VRAM). El d2data.mpq se cierra DESPUES de componerlos, porque las capas salen de ahi.
+	cargarBestia := func() {
+		ciclosBestia := make([]*ciclo, 0, 4)
+
+		for _, m := range []struct {
+			modo   string
+			ms     int
+			unTiro bool
+		}{
+			// LOS TRES MODOS QUE ENTRAN EN LA CONSOLA: parado (da vueltas), golpeado (de un tiro) y cadaver.
+			// El DT (muriendo, 8 capas de 19 cuadros = 377 KB de monton) NO se compone aca: con el monton de Go
+			// de 1 MB del toolchain no entra junto con los otros tres y los dos del heroe (medido: "fatal error:
+			// out of memory"). Se censo con el verificador del host, que no tiene ese limite, y la consola pasa
+			// del GH al cadaver.
+			{modoBestiaQuieto, msBestiaQuieto, false},
+			{modoBestiaGolpeada, msBestiaGolpeada, true},
+			{modoBestiaMuerta, msBestiaMuerta, false},
+		} {
+			runtime.GC()
+
+			crudoCOF, err := mpq.ReadFile(RutaCOFBestia(m.modo, "HTH"))
+			if err != nil || len(crudoCOF) == 0 {
+				println("HITO250: SIN COF PARA EL MODO DEL BICHO", m.modo)
+
+				continue
+			}
+
+			cofBestia, err := d2cof.Unmarshal(crudoCOF)
+			if err != nil {
+				println("HITO250: COF DEL BICHO", m.modo, "PARSE-FALLO:", err.Error())
+
+				continue
+			}
+
+			println("HITO250: COF DEL BICHO", m.modo, "bytes=", len(crudoCOF), "crc32=", crc32.ChecksumIEEE(crudoCOF),
+				"capas=", cofBestia.NumberOfLayers, "framesPorDir=", cofBestia.FramesPerDirection,
+				"dirs=", cofBestia.NumberOfDirections)
+
+			ciclosBestia = append(ciclosBestia, cargarCicloCon(mpq, cofBestia, dirBestia, m.modo, m.ms,
+				palUni, rutaDeLaCapaDelBicho, "HITO250", m.unTiro))
+
+			cofBestia = nil
+			crudoCOF = nil
+
+			memoria("modo-" + m.modo)
+
+			runtime.GC()
+		}
+
+		mon = &monstruo{Vida: vida, Combate: combate, Ciclos: ciclosBestia, Pintado: -1}
+
+		for _, c := range ciclosBestia {
+			if c.Modo == modoBestiaQuieto {
+				mon.Ciclo = c
+				mon.Estado = modoBestiaQuieto
+			}
+		}
+
+		mon.MsModo = int64(d2cMs())
+
+		println("HITO250: BESTIA lista modos=", len(ciclosBestia), "estado=", mon.Estado,
+			"celda=", celdaBestiaX, celdaBestiaY, "ms=", int64(d2cMs())-tBestia, "mutante=", golpeSordo)
+
+		// EL D2DATA.MPQ YA NO HACE FALTA: el mapa, la vida y los cuatro modos del bicho estan en RAM. Se
+		// cierra ACA, antes de los ciclos del personaje, porque su indice (la tabla de bloques y la de hash de
+		// los ~40.000 archivos) es el objeto mas grande que queda vivo y es lo que le deja la RAM a los ciclos
+		// del d2char (medido: cerrarlo despues no alcanzaba y el POC se quedaba sin memoria).
+		mpq.Close()
+
+		memoria("d2data-cerrado")
+	}
+
+	// EL CICLO DEL GOLPE DEL HEROE (A1): 13 cuadros a 40 ms. Se compone DESPUES del video por la misma razon que
+	// los del bicho: es el ultimo que pide RAM y con el PVR ya andando se compone sin pelearse con el arranque.
+	if bestia {
+		if cofA1, nombreA1, bytesA1, ok := cofDelModo(mc, modoGolpePersonaje); ok {
+			println("HITO250: COF DEL GOLPE", nombreA1, "bytes=", bytesA1,
+				"framesPorDir=", cofA1.FramesPerDirection, "dirs=", cofA1.NumberOfDirections)
+
+			ciclos = append(ciclos, cargarCiclo(mc, cofA1, dirPersonaje, modoGolpePersonaje, msGolpeHeroe, palUni))
+
+			cofA1 = nil
+
+			runtime.GC()
+			memoria("ciclo-del-golpe")
+		} else {
+			println("HITO250: SIN COF PARA EL GOLPE", modoGolpePersonaje)
+		}
+
+		cargarBestia()
+
+		// los ciclos y el bicho se cargaron DESPUES de armar el juego: se le pasan ahora (el corte de la lista
+		// de ciclos es una copia, asi que hay que volver a asignarla)
+		j.ciclos = ciclos
+		j.mon = mon
+	}
+
+	mc.Close()
+
+	memoria("d2char-cerrado")
 
 	println("HITO238: dibujando (mapa", n.Ancho, "x", n.Alto, "en", mapaX, mapaY, "; personaje", per.Ancho, "x", per.Alto, ")")
 
@@ -809,6 +1343,40 @@ func noCero(pix []byte) int {
 }
 
 // ============================== EL CICLO DEL PERSONAJE (DC-002.49) ==============================
+
+// rutaDeLaCapaDelBicho: el adaptador para cargarCicloCon (las capas del bicho van por el esquema de los
+// monstruos, no por el de los personajes).
+func rutaDeLaCapaDelBicho(p *Personaje, i int, modo, ext string) string {
+	return p.RutaDeLaCapaBestia(i, modo, ext)
+}
+
+// memoria: cuanta RAM queda libre (bytes) al empezar una etapa. En la consola es UN solo monton y el numero
+// es el mismo que imprime el runtime cuando se queda sin memoria: es el instrumento de "esto entra o no
+// entra" (DC-002.50: el Brute no entraba por 150 KB).
+func memoria(etapa string) {
+	println("HITO250: MEMORIA etapa=", etapa, "libre=", int64(d2cHeapLibre()))
+}
+
+// leerDeMPQ: lee UN archivo de un MPQ que solo se usa para eso (el patch_D2.mpq: se abre, se lee la tabla y se
+// cierra, para no dejar 8 MB de indice en la RAM de la consola).
+func leerDeMPQ(rutaMPQ, nombre string) []byte {
+	m, err := d2mpq.FromFile(rutaMPQ)
+	if err != nil {
+		println("HITO250: MPQ-ABRIR FALLO:", rutaMPQ, err.Error())
+
+		return nil
+	}
+	defer m.Close()
+
+	crudo, err := m.ReadFile(nombre)
+	if err != nil {
+		println("HITO250: MPQ-LEER FALLO:", nombre, err.Error())
+
+		return nil
+	}
+
+	return crudo
+}
 
 // cofDelModo: el COF de un modo (AMTNHTH para parado, AMTWHTH para caminando), con el MISMO criterio que la
 // sonda del censo: se prueba el arma HTH primero (el personaje de la prueba va desarmado).
@@ -843,6 +1411,14 @@ func cofDelModo(mc *d2mpq.MPQ, modo string) (*d2cof.COF, string, int, bool) {
 // se copian los cuadros de ESTA direccion y el DCC se suelta.
 func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadro int,
 	pal [256][3]uint8) *ciclo {
+	return cargarCicloCon(mc, cof, dir, modo, msPorCuadro, pal, nil, "HITO249", false)
+}
+
+// cargarCicloCon: el MISMO compositor para cualquier COF. `rutas` dice donde esta el grafico de cada capa
+// (nil = el esquema del personaje) y `hito` es el prefijo de las marcas de la consola serie; `unTiro` marca
+// los modos que NO dan vueltas (GH y DT del bicho, DC-002.50).
+func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadro int,
+	pal [256][3]uint8, rutas func(*Personaje, int, string, string) string, hito string, unTiro bool) *ciclo {
 	n := cof.FramesPerDirection
 	per0 := NuevoPersonaje(cof, dir, 0)
 	capas := make([]capaCiclo, 0, len(cof.CofLayers))
@@ -853,6 +1429,9 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 
 		for _, ext := range []string{"dcc", "dc6"} {
 			nombre := per0.RutaDeLaCapaModo(i, modo, ext)
+			if rutas != nil {
+				nombre = rutas(per0, i, modo, ext)
+			}
 
 			crudo, err := LeerDelMPQ(mc, nombre)
 			if err != nil {
@@ -864,7 +1443,7 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 			if ext == "dcc" {
 				dd, err := d2dcc.LoadDirection(crudo, dir)
 				if err != nil {
-					println("HITO249: CAPA", c.clave, "DEL MODO", modo, "PARSE-FALLO:", err.Error())
+					println(hito+": CAPA", c.clave, "DEL MODO", modo, "PARSE-FALLO:", err.Error())
 					break
 				}
 
@@ -886,7 +1465,7 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 
 			dc, err := d2dc6.Load(crudo)
 			if err != nil {
-				println("HITO249: CAPA", c.clave, "DEL MODO", modo, "PARSE-FALLO:", err.Error())
+				println(hito+": CAPA", c.clave, "DEL MODO", modo, "PARSE-FALLO:", err.Error())
 				break
 			}
 
@@ -910,7 +1489,11 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 		}
 
 		if encontrada {
-			println("HITO249: CAPA DEL CICLO", modo, per0.Claves[i], "cuadros", len(capas[len(capas)-1].cuadros),
+			if hito != "HITO249" {
+				println(hito+": MEMORIA-CAPA modo=", modo, "capa=", per0.Claves[i], "libre=", int64(d2cHeapLibre()))
+			}
+
+			println(hito+": CAPA DEL CICLO", modo, per0.Claves[i], "cuadros", len(capas[len(capas)-1].cuadros),
 				"caja", capas[len(capas)-1].ancho, capas[len(capas)-1].alto, "ms", int64(d2cMs())-tCapa)
 
 			// EL RECOLECTOR DESPUES DE CADA CAPA (esto es de DC-002.38 y no es adorno): d2dcc.Load decodifica
@@ -922,7 +1505,7 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 		}
 	}
 
-	c := &ciclo{Modo: modo, MsPorCuadro: msPorCuadro}
+	c := &ciclo{Modo: modo, MsPorCuadro: msPorCuadro, UnTiro: unTiro}
 
 	for f := 0; f < n; f++ {
 		per := NuevoPersonaje(cof, dir, f)
@@ -944,7 +1527,7 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 		}
 		c.Cuadros = append(c.Cuadros, cu)
 
-		println("HITO249: CUADRO DEL CICLO", modo, f, "de", n, "caja", cu.Ancho, cu.Alto,
+		println(hito+": CUADRO DEL CICLO", modo, f, "de", n, "caja", cu.Ancho, cu.Alto,
 			"esquina", cu.Izq, cu.Arriba, "pixeles", cu.PixelesNoVacios, "crc32", cu.CRC)
 	}
 
@@ -952,8 +1535,12 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 	capas = nil
 	runtime.GC()
 
+	if hito != "HITO249" {
+		println(hito+": MEMORIA-COMPUESTO modo=", modo, "libre=", int64(d2cHeapLibre()))
+	}
+
 	if len(c.Cuadros) == 0 || c.Cuadros[0].Ancho == 0 {
-		println("HITO249: EL CICLO", modo, "SALIO VACIO")
+		println(hito+": EL CICLO", modo, "SALIO VACIO")
 
 		return c
 	}

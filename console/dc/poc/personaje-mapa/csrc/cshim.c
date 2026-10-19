@@ -16,6 +16,7 @@
 #include <kos.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <malloc.h>
 
 static pvr_ptr_t tex = NULL;
 static pvr_poly_hdr_t hdr;
@@ -44,6 +45,18 @@ unsigned int d2c_ms(void) {
 /* d2c_vram_libre: la VRAM que queda, igual que la mide el POC del motor. */
 unsigned int d2c_vram_libre(void) {
     return (unsigned int)pvr_mem_available();
+}
+
+/* d2c_heap_libre: el monton que queda (bytes libres), el MISMO numero que imprime el runtime cuando se queda
+ * sin memoria ("Memory: arena=%d used=%d free=%d" en libgodc/runtime/defer_dreamcast.c). En la Dreamcast la
+ * RAM es un solo monton: el heap de Go se pide de aca con memalign, y las asignaciones GRANDES del runtime van
+ * a parar aca y no las recupera nadie (ver d2c_free_external mas abajo). O sea que este numero es el que dice
+ * si un POC entra o no, y sin el se mide a ciegas (medido en DC-002.50: se paso de "entra" a "no entra" por
+ * 150 KB). */
+unsigned int d2c_heap_libre(void) {
+    struct mallinfo mi = mallinfo();
+
+    return (unsigned int)mi.fordblks;
 }
 
 /* d2c_tex_init: sube los indices de 8 bits y la paleta ARGB1555 que le pasa el Go.
