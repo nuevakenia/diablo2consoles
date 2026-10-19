@@ -262,3 +262,49 @@ REPRODUCIR (solo host, sin emulador):
     go build -o /tmp/verif238 ./console/dc/verif-personaje-238
     /tmp/verif238 -png-mapa /tmp/dirs/mapa.png -png-dirs TN,TW -png-ciclo /tmp/dirs
     python3 scripts/console/distinguir-dirs-249b.py --host /tmp/dirs --mapa /tmp/dirs/mapa.png --modo TN
+
+
+=============================================================================
+9. EL CAMBIO ESCRITO Y COMPILADO PARA SH-4 (sobre una COPIA; NO aplicado al repo)
+=============================================================================
+
+El codigo del giro esta escrito y COMPILA Y ENLAZA con el toolchain de la consola, pero **no se aplico a
+`console/dc/poc/personaje-mapa/main.go`** porque ese archivo lo esta editando la corrida de DC-002.50 (ver seccion
+5). Se hizo sobre una copia del POC, con un arbol .gox PROPIO (`/tmp/dc249b/gox`) para no pisar el compartido:
+
+    cp -r console/dc/poc/personaje-mapa /tmp/dc249b/poc-giro
+    GODC_GOX=/tmp/dc249b/gox bash scripts/console/build-std-gox.sh  /tmp/dc249b/gox
+    PAQUETES="... d2fileformats/d2txt d2math/d2rand d2monstats d2monster" \
+      GODC_GOX=/tmp/dc249b/gox bash scripts/console/build-motor-gox.sh /tmp/dc249b/gox
+    GODC_GOX=/tmp/dc249b/gox bash scripts/console/build-dc.sh /tmp/dc249b/poc-giro /tmp/dc249b/build-giro
+
+Resultado (medido):
+
+    == 1/4 compilando Go        OK
+    == 2/4 enlazando ELF        OK
+    ELF: /tmp/dc249b/build-giro/prog.elf  8820448 bytes
+    1ST_READ.BIN                          1846792 bytes
+
+QUE HACE EL CAMBIO (archivo nuevo `giro.go` + 5 remiendos chicos en `main.go`; diff de 145 lineas en
+`/tmp/dc249b/giro.patch`, base = main.go con sha256 565bc90f... del 15:33, que ya NO es el actual porque la otra
+corrida sigue editando):
+
+  * `direccionDelControl(ejeX, ejeY)`: la cadena del motor (DireccionDelPiso -> DirectionTo -> Dir64ToCof);
+  * `direccionesDelControl()`: las 8 direcciones distintas que la cruceta puede pedir, calculadas, no escritas a
+    mano (medido: `[0 1 4 7 8 9 12 15]`);
+  * `dirActual` y el `HITO249B: GIRO dir=<N> ejes=<x> <y> cuadroDelLoop=<n> mutante=<bool>` en el Update;
+  * `ciclo.Dir` y `buscarCiclo(modo, dir)` con caida a la direccion 0 si la pedida no esta compuesta (asi el
+    personaje nunca dibuja la direccion de OTRO estado);
+  * el arranque compone las 8 direcciones de TN (y de TW cuando TW se compone), cada una con su marca
+    `HITO249B: DIRECCIONES modo=<M> pedidas=<n> dirsCOF=<n>` y su `MEMORIA etapa=ciclo-<M> libre=<n>`;
+  * `giroSordo` (GIRO_SORDO=1 por sed en el build) = EL MUTANTE del criterio 4.
+
+LO QUE FALTA PARA CERRAR (no es codigo, es la consola):
+
+  1. que el emulador quede libre y el arranque tenga presupuesto para las 8 direcciones (medido: 246.768 B de TN;
+     hoy el POC con bestia no llega ni a componer TW de una direccion);
+  2. correr con la tecla a la derecha y con la tecla arriba y capturar: la identidad contra `pantalla-TN-dNN.png`
+     tiene que dar ~100 % contra la direccion del `HITO249B: GIRO` y quedar <= 50,60 % contra las otras siete;
+  3. la cadencia (`HITO249: ANIM`, mediana 128 ms/cuadro en TN y 40 en TW) no se puede mover, y el corpus de
+     DC-002.49 (11/11) no se puede romper;
+  4. el mutante GIRO_SORDO=1 tiene que dar capturas IDENTICAS con la flecha a la derecha y con la flecha arriba.

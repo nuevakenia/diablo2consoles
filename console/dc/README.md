@@ -5674,6 +5674,13 @@ una cambia** respecto del mapa solo — comparar la pantalla entera es el error 
 33,71 %` (TW: 58,04 % / 37,37 %; las 16 de TN: peor 31,08 %) → **DISCRIMINA**. Una captura de la dirección N tiene
 que dar ~100 % contra su referencia y quedarse en ese orden contra las otras siete.
 
+**El código del giro está escrito y compila para SH-4** (archivo nuevo `giro.go` con la cadena del motor y el
+conjunto de 8 direcciones calculado, `ciclo.Dir`, `buscarCiclo(modo, dir)` con caída a la dirección 0, las marcas
+`HITO249B: GIRO`/`HITO249B: DIRECCIONES` y el mutante `giroSordo`): `ELF: prog.elf 8820448 bytes`, `1ST_READ.BIN
+1846792 bytes`. Se hizo **sobre una copia** con un `.gox` propio (`/tmp/dc249b/gox`), no sobre el repo, porque
+`main.go` lo está editando la otra corrida; el diff es `/tmp/dc249b/giro.patch` (145 líneas, base main.go
+`565bc90f…`).
+
 **Lo que NO entra (declarado, no tapado):** esta sección es la **medición**, no el cierre del hito. Los criterios 1,
 2 y 4 piden **capturas de la consola** (que la flecha derecha dibuje otra caja, que la cadencia de TN siga en 128
 ms/cuadro y la de TW en 40, y el mutante del giro quieto) y no hay ninguna todavía: mientras se medía, la ventana de
