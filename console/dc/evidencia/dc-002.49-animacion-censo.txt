@@ -96,6 +96,13 @@ Para las dos capturas de la MISMA corrida (que es la unica comparacion valida, p
 en cada corrida: 87,58 % de diferencia entre corridas) `d2app/autoshot.go` ahora acepta una lista:
 `OD2_AUTOSHOT='/tmp/a.png;/tmp/b.png' OD2_AUTOSHOT_SECONDS='12,13'`.
 
+LA BARRERA DEL MOTOR SIGUE IGUAL con el instrumento adentro:
+
+    bash scripts/console/build-motor-all.sh /tmp/gox-248 /tmp/motorall-249
+    == RESULTADO: 142 de 142 paquetes del motor compilan para SH-4 ==
+    == bloqueados: 0 (el motor compila COMPLETO) ==        (11 capas, 333 s)
+
+
 
 Criterio 1: la animacion DISTINGUIDA del desplazamiento -- con el personaje QUIETO y el ciclo corriendo, la caja
 del personaje tiene que cambiar de dibujo, con su numero. Pide el POC de DC-002.38 y Flycast: una sola ventana.
