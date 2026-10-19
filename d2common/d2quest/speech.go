@@ -118,6 +118,15 @@ func loadMessages() {
 		panic(fmt.Sprintf("d2quest: bad embedded messages.csv: %v", err))
 	}
 
+	// DC-002.48: aca habia `for _, r := range rows[1:]` a secas. Con el embed apagado (ver el parche de
+	// port de arriba) `messagesCSV` es VACIO en este arbol, `csv.ReadAll` devuelve 0 filas y `rows[1:]`
+	// paniquea con "slice bounds out of range [1:0]": medido en el HOST al entrar al juego, la partida no
+	// arranca (el panic sale de advanceQuests -> newA1Prologue -> speechTables). Sin filas no hay tablas de
+	// dialogo: se declara y se sigue, que es el limite que el port ya tenia escrito.
+	if len(rows) == 0 {
+		return
+	}
+
 	for _, r := range rows[1:] {
 		prefix, _, _ := strings.Cut(r[0], " ")
 

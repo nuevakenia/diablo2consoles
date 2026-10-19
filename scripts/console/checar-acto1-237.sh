@@ -83,14 +83,22 @@ if (cd "$REPO" && go run ./console/dc/verif-acto1-237 -png "$SAL/host/referencia
         rojo "control 0a: el .ds1 del host no es el esperado (bytes=$H_DS1_BYTES crc32=$H_DS1_CRC, ver $SAL/host/verif.txt)"
     fi
 
+    # DC-002.48: las paredes pedidas bajan de 373 a 330 porque el compositor ahora pide lo mismo que el motor
+    # (`!Hidden() && Prop1 != 0 && !Type.Special()`): 43 paredes de este nivel son ocultas o especiales y el
+    # motor NO las dibuja (medido con console/dc/sonda-geom-248). No pintaban nada en esta ventana (fuera=2239),
+    # asi que el lienzo no cambia; lo que cambia es que el compositor ya no pide tiles que el motor saltea.
     case "$H_COMPUESTO" in
-    *"pisos=1982/1982"*"paredes=373/373"*"sintilePiso=0"*"sintilePared=0"*)
+    *"pisos=1982/1982"*"paredes=330/330"*"sintilePiso=0"*"sintilePared=0"*)
         verde "control 0b: la composicion del host: $H_PEDIDOS -> $H_COMPUESTO ($H_PIXELES)" ;;
     *)
         rojo "control 0b: la composicion del host no es la documentada ($H_PEDIDOS -> $H_COMPUESTO)" ;;
     esac
 
-    if [ -n "$H_LIENZO_CRC" ] && [ "$H_LIENZO_NV" = "258653" ]; then
+    # DC-002.48: aca pedia 258653 pixeles no vacios, que era el lienzo del DEFECTO (paso de celda 32x16: el
+    # nivel entero a 2,5x menos escala y cada losa de piso pintada 5 veces encima de las vecinas, 98,67% del
+    # lienzo pisado). Con el paso del motor (80x40) el lienzo da 193538 y la cobertura es 1 tile por pixel:
+    # el numero viejo era el sintoma, no la referencia.
+    if [ -n "$H_LIENZO_CRC" ] && [ "$H_LIENZO_NV" = "193538" ]; then
         verde "control 0c: el lienzo del host: $H_LIENZO y paleta crc32=$H_PALETA_CRC"
     else
         rojo "control 0c: el lienzo del host cambio (pixelesNoVacios=$H_LIENZO_NV crc32=$H_LIENZO_CRC)"

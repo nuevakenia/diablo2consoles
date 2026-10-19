@@ -5307,3 +5307,151 @@ sincroniza el árbol al vuelo y una copia congelada es la única forma de que lo
 
 Evidencia: `console/dc/evidencia/dc-002.48-dato-vivo-bajo-el-techo.txt`.
 
+
+## 71. DC-002.48b (LOS TILES CORRIDOS): el compositor avanzaba la celda **32x16** (un subtile) donde el motor avanza **80x40** — cada losa de piso se pintaba **5 veces** encima de las vecinas y el nivel entero salía a **2,5x** menos escala; el corpus de DC-002.37 estaba **pinneado al defecto** (`pixelesNoVacios = 258653`)
+
+> Numeración: esta tarjeta es la t_5a7a32a8. La sección 70 ya se había quedado con el número DC-002.48 (t_b444b9dd, el
+> dato vivo del arranque), así que esta va como **DC-002.48b** para no tener dos tarjetas con el mismo número.
+
+El jugador miró la ventana del emulador y dijo «habían algunos tiles corridos». La tarjeta anterior (DC-002.37) había cerrado
+diciendo que la geometría estaba bien, con el CRC del lienzo **igual en la consola y en el host**. Las dos cosas eran
+ciertas al mismo tiempo, y eso es el defecto: **el instrumento no veía lo que el ojo ve**.
+
+### 71.1 La causa: 32x16 es el SUBTILE, no la celda
+
+`nivel.go` (el compositor, copiado en cuatro lugares) avanzaba la celda así:
+
+```go
+ladoCeldaX = 32 // tileWidth del viewport: la x avanza 32 px por celda
+ladoCeldaY = 16 // tileHeight del viewport: la y avanza 16 px por celda
+```
+
+con un comentario que citaba `d2core/d2map/d2maprenderer/viewport.go`. **Ese archivo no dice eso.** Dice `tileWidth = 80` y
+`tileHeight = 40`, y `renderer.go` declara `orthoTileWidth = subtilesPerTile(5) × orthoSubTileWidth(16) = 80` y
+`orthoTileHeight = 5 × 8 = 40`. **32x16 es el tamaño de UN SUBTILE**; la celda son cinco. El paso del motor es **2,5 veces**
+más grande.
+
+Lo que el paso chico hace, medido: el tile de piso del DT1 mide **160x128** y su **diamante visible 160x79**
+(`sonda-geom-248/diamante`: `pixelesNoCero=6400 caja=(0,0)-(159,78)`). Un diamante de 160 px de ancho encaja borde con borde
+con su vecino cuando el vecino está a **medio diamante: 80 en x y 40 en y**. A 32x16 cada losa se pinta encima de cuatro
+vecinas: eso es lo que el ojo ve como «tiles corridos», y las paredes (cuyo `YAdjust = minY + 80` **no** se escala) quedan
+además flotando fuera de su celda.
+
+### 71.2 Por qué el instrumento de la 37 no lo veía (la lección)
+
+El verificador del host y el POC de la consola usaban **el mismo archivo** (`nivel.go`, el mismo sha256: eso se verificaba y
+estaba bien). Comparar el CRC del lienzo de la consola contra el CRC del lienzo del host es comparar **el compositor consigo
+mismo**: da igual siempre, tenga el paso bien o mal. Un instrumento que se valida contra sí mismo no mide nada, y encima
+**fija** el error: el control 0c del corpus exigía `pixelesNoVacios = 258653`, que es exactamente el lienzo de 32x16 (medido
+con el mutante). El corpus no solo no cazaba el defecto: lo pedía.
+
+Lo que hay que repetir: **la referencia tiene que salir de otro lado que el código bajo prueba**. Acá salió del motor —
+llamando a sus funciones en el host y corriéndolo de verdad— y de una propiedad del dato que no depende de nadie (el tamaño
+del diamante del DT1).
+
+### 71.2b La hipótesis con la que arrancó la tarjeta, medida y refutada
+
+La tarjeta decía: «el POC está bien (el CRC coincide con el host); lo que el jugador vio es **la ventana del motor**, que es
+otro camino, y el defecto está ahí». **Medido: no.** El camino del motor usa `WorldToOrtho` y da **80x40** (llamado, no
+copiado), y su propio cuadro en el host sale **continuo, sin costuras** (`OD2_AUTOGAME`, 800x600, `floors=229`). El 32x16
+estaba en **el compositor que la ventana de Flycast estaba mostrando**: el POC del acto 1 (37) y el del personaje (38) sacan
+su bloque de nivel de `nivel.go`. O sea: el jugador vio el POC, no el motor, y el «POC está bien» era el instrumento
+comparándose consigo mismo. La regla que queda: cuando el ojo y el instrumento no coinciden, **primero se mide de dónde sale
+cada píxel de la ventana** (qué archivo lo compuso); recién después se opina sobre quién miente.
+
+### 71.3 Lo medido (todo en el host, con el código del motor)
+
+El paso del **motor**, medido **llamando** a `d2maprenderer.NewViewport` + `WorldToOrtho` (no copiando una constante):
+
+```
+GEOM248: MOTOR pasoCelda=80x40 px (WorldToOrtho(1,0)-WorldToOrtho(0,0), d2maprenderer)
+GEOM248: MOTOR ventana=512x512 celdasVisibles=81 rango=(0,0)-(9,9) areaPorCelda=3236.3 px2
+```
+
+El **cuadro del motor** en el host, con el mismo `.ds1` que compone el POC (`gen-config-host-248` + el motor con
+`OD2_AUTOGAME`/`OD2_AUTOSHOT`): `real town: Act1/Town/TownN1.ds1 (file index 0), preset 57x41`,
+`TILESTATS level=1 exact=true cells=2337 nofloor=0 floors=2337 walls=394`, `DRAWSTATS level=1 floors=229 ...` y la captura de
+800x600 (`679.205 B`). Para llegar ahí hubo que arreglar un defecto del **host** que nadie había visto: con el `go:embed` de
+`d2quest/data/messages.csv` apagado por el port, `messagesCSV` es vacío y `for _, r := range rows[1:]` paniquea con
+`slice bounds out of range [1:0]` al entrar al juego (`advanceQuests → newA1Prologue → speechTables`): **la partida no
+arrancaba en el host**. Queda la guarda `len(rows) == 0` y el límite declarado (el texto de los NPC sigue sin cargar).
+
+### 71.4 La medición nueva: la cobertura (cuántos tiles pintan cada píxel)
+
+`nivel.go` gana un censo **opt-in** (`Censar`): cuántos tiles de **piso** pintan cada píxel del lienzo. Con el paso correcto
+el piso encaja borde con borde y cada píxel lo pinta **un** tile; con el paso chico, hasta **nueve**. En la consola va
+apagado (la cobertura cuesta un `uint16` por píxel: 512 KB en un lienzo de 512x512, y el POC no lo necesita).
+
+Ventana de 512x512 centrada en la celda (28,20), el mismo caso de la 37:
+
+```
+                               DEFECTO (32x16, mutante)     ARREGLO (80x40)
+paso del compositor                    32x16                      80x40
+paso del MOTOR (llamado)               80x40                      80x40
+cobertura maxima                       9                          1
+pixeles con 2+ tiles                   233.091 de 262.144         0 de 262.144
+%                                      88,92%                     0,00%
+caja de los pixeles pisados            (0,0)-(511,511)            (ninguna)
+pisos que caen en la ventana           249                        46
+pisos por celda visible del motor      3,074                      0,568
+pixelesNoVacios del lienzo             258.653 (98,67%)           193.538 (73,83%)
+pixelesPiso acumulados                 1.173.833                  179.484   (6,54x)
+pixelesPared acumulados                791.720                    146.567   (5,40x)
+crc32 del lienzo                       3380300152                 3507647456
+veredicto del instrumento              TILES-CORRIDOS             ENCAJA
+```
+
+En 1024x1024 (para que el ojo vea el campamento): cobertura máxima **9 → 1**, píxeles pisados **922.648 (87,99 %) → 0**,
+pisos en la ventana **914 → 141**, `pixelesNoVacios` **1.026.955 → 798.598**, crc32 **2813558295 → 3326817646**. Con el paso
+del motor se reconocen la tienda, la carreta y las empalizadas **alineadas**; con 32x16 el suelo sale repisado y las vallas no
+cierran ninguna estructura (es lo que el jugador describió).
+
+### 71.5 Las otras dos diferencias con el motor que aparecieron midiendo
+
+1. **El compositor pedía tiles que el motor NO dibuja**: `renderPass1`/`generateFloorCache` piden `!Hidden() && Prop1 != 0`
+   y `generateWallCache` agrega `!Type.Special()`. El compositor pedía solo `Style/Seq`. Medido en este nivel: **43 paredes
+   ocultas y 3 especiales**. Ahora pide lo mismo que el motor (373 → **330** paredes pedidas); el lienzo no cambia porque esas
+   43 no pintaban nada en esta ventana (`fuera` 2282 → **2239**), pero la regla ya es la del motor.
+2. **Las 355 celdas sin piso del preset** (1982 de 2337): no son un defecto del compositor. El motor arma el pueblo
+   estampando **35 salas** encima del preset (`cells=2337 nofloor=0 floors=2337`), y el POC compone **una** sala: los huecos
+   negros son del alcance del POC. A 32x16 los tapaba la superposición, que es peor: **los huecos también los escondía**.
+
+### 71.6 El mutante
+
+`scripts/console/mutar-geom-248.py` deja las **cuatro** copias de `nivel.go` en `32x16` (`--defecto`) o `80x40`
+(`--arreglo`), y dice si quedaron iguales entre sí:
+
+```
+--defecto  ->  las 4 copias ladoCeldaX=32 ladoCeldaY=16 sha256=c47adc1084a30487  (iguales entre si: SI)
+checkout   ->  las 4 copias ladoCeldaX=80 ladoCeldaY=40 sha256=9260af18fc084c50  (iguales entre si: SI)
+```
+
+y el mismo instrumento sobre los dos árboles: **TILES-CORRIDOS** (cobertura 9, 88,92 % pisado) contra **ENCAJA** (cobertura 1,
+0 %). El corpus de la 37 se actualizó en el mismo commit: control 0c `258653 → 193538` y control 0b `373 → 330` paredes.
+
+### 71.7 Los instrumentos que quedan
+
+* `console/dc/verif-acto1-237` — ahora imprime el informe `GEOM248` (paso del motor **llamado**, paso del compositor,
+  cobertura, caja de los píxeles pisados, densidad). Es el instrumento del 37 **arreglado**.
+* `console/dc/sonda-geom-248` (+ `/diamante` y `/celdas`) — el tamaño real de los tiles y de las celdas, el diamante, lo que
+  el motor saltea y las celdas que declara visibles su `TileRange`.
+* `console/dc/gen-config-host-248` — el `config.json` del motor en el host (escrito por el escritor del motor) para poder
+  correrlo con `OD2_AUTOGAME`/`OD2_AUTOSHOT`/`OD2_DRAWSTATS` y tener una referencia que **no** es el POC.
+
+### 71.8 Cómo se repite
+
+```
+go run ./console/dc/verif-acto1-237 -png /tmp/lienzo.png            # ENCAJA o TILES-CORRIDOS
+go run ./console/dc/verif-acto1-237 -ventana 1024 -png /tmp/l.png
+go run ./console/dc/sonda-geom-248 ; go run ./console/dc/sonda-geom-248/diamante ; go run ./console/dc/sonda-geom-248/celdas
+
+GODC_GOX=<gox> SALTAR_STDLIB=1 SALTAR_MOTOR=1 bash scripts/console/build-acto1-237.sh /tmp/dcbuild248
+bash scripts/console/checar-acto1-237.sh 40       # 23 controles (host + consola + captura + mutante)
+```
+
+La consola compila y enlaza con el compositor arreglado (`prog.elf` **7.502.836 B**, ISO **268.703.744 B**, GDI), y el mismo
+script imprime el informe del host. Lo que esta corrida **no** pudo hacer: la captura de Flycast y el corpus completo de 23
+controles, porque había otro agente del tablero con el emulador vivo (DC-002.38) y la regla es un agente a la vez sobre la
+ventana. Queda declarado, con el comando exacto, en la evidencia.
+
+Evidencia: `console/dc/evidencia/dc-002.48b-tiles-corridos.txt`.

@@ -120,6 +120,10 @@ func main() {
 
 	n := NuevoNivel(d, *ventana, *ventana, cx, cy)
 
+	// DC-002.48: el censo de la cobertura (cuantos tiles pintan cada pixel). Es lo que ve los "tiles
+	// corridos" que el CRC de la 37 no podia ver, porque las dos puntas componian con este mismo archivo.
+	n.Censar = true
+
 	fmt.Printf("VERIF237: VENTANA lado=%d origen=%d,%d centroCelda=%d,%d\n",
 		n.Ancho, n.OrigenX, n.OrigenY, cx, cy)
 	fmt.Printf("VERIF237: PEDIDOS pisos=%d paredes=%d total=%d\n",
@@ -162,6 +166,9 @@ func main() {
 		n.PixelesNoVacios(), n.Ancho*n.Alto,
 		float64(n.PixelesNoVacios())*100/float64(n.Ancho*n.Alto), n.CRC32())
 	fmt.Printf("VERIF237: LIENZO pixelesPiso=%d pixelesPared=%d\n", n.PixelesDelPiso, n.PixelesDePared)
+
+	// DC-002.48: el informe de la GEOMETRIA (paso del motor contra paso del compositor, cobertura, densidad)
+	informeGeometria(n, d.Width(), d.Height())
 
 	// --- 4. la paleta del acto ---
 	pb, err := LeerDelMPQ(m, *palName)

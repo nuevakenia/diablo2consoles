@@ -1,0 +1,189 @@
+DC-002.48b (t_5a7a32a8) -- LOS TILES CORRIDOS: el instrumento de DC-002.37 dijo "la geometria esta bien" y el ojo del
+jugador dijo "hay tiles corridos". El ojo tenia razon.
+(La seccion 70 del README ya se habia quedado con el numero DC-002.48 -- t_b444b9dd, el dato vivo del arranque --, por eso
+esta tarjeta va como 48b.)
+
+=============================================================================
+1. EL DEFECTO, EN UNA LINEA
+=============================================================================
+
+`console/dc/*/nivel.go` avanzaba la celda isometrica 32 px en x y 16 px en y, con el comentario
+
+    ladoCeldaX = 32 // tileWidth del viewport: la x avanza 32 px por celda
+    ladoCeldaY = 16 // tileHeight del viewport: la y avanza 16 px por celda
+
+citando a `d2core/d2map/d2maprenderer/viewport.go`. Ese archivo NO dice eso: dice
+
+    tileWidth  = 80
+    tileHeight = 40
+
+y el renderer declara `orthoTileWidth = subtilesPerTile(5) * orthoSubTileWidth(16) = 80` y
+`orthoTileHeight = 5 * 8 = 40` (renderer.go). 32x16 es el tamaño de UN SUBTILE, no el de la celda: el
+paso de la celda es 2,5 veces mas grande. Con 32x16 cada losa de piso (160x128 en el DT1, diamante
+visible 160x79) se pinta ENCIMA de las vecinas y el nivel entero sale a 2,5x menos escala que el motor.
+
+POR QUE EL INSTRUMENTO DE LA 37 NO LO VEIA (esto es la leccion): el verificador del host y el POC de la
+consola usaban EL MISMO ARCHIVO (`nivel.go`, el mismo sha256). Comparar el CRC del lienzo de la consola
+contra el CRC del lienzo del host es comparar el compositor CONSIGO MISMO: da igual siempre, tenga el
+paso bien o mal. Un instrumento que se valida contra si mismo no mide nada.
+
+=============================================================================
+2. LO MEDIDO (todo en el HOST, con el codigo del motor; nada deducido)
+=============================================================================
+
+2.1 El paso del MOTOR, medido LLAMANDO al motor (`d2maprenderer.NewViewport` + `WorldToOrtho`):
+
+    GEOM248: MOTOR pasoCelda=80x40 px (WorldToOrtho(1,0)-WorldToOrtho(0,0), d2maprenderer)
+
+2.2 El diamante del tile de PISO, medido decodificando el DT1 con el decodificador del motor
+    (`console/dc/sonda-geom-248/diamante`, townN1.ds1 -> los 8 DT1 que el DS1 lista):
+
+    PISO   style=0 seq=55 type=0 DT1=160x128 bloquesY=0..64 offY=0
+           pixelesNoCero=6400 caja=(0,0)-(159,78)  diamante=160x79
+           fila del medio (y=39): x=0..159 (ancho 160)
+
+    Un diamante de 160 px de ancho encaja borde con borde con el vecino cuando el vecino esta a MEDIO
+    diamante: 80 en x y 40 en y. Eso es exactamente el paso del motor.
+
+2.3 Las celdas del DS1 y lo que el motor saltea (`console/dc/sonda-geom-248/celdas`):
+
+    DS1 data\global\tiles\ACT1\TOWN\townN1.ds1 w=57 h=41 celdas=2337
+    CAPA piso 0: registros=1982 dibujables=1982 Hidden=0 Prop1==0 0
+    CELDAS con algun registro de piso=1982 de 2337 (sin ninguno=355)
+    CELDAS cuyo piso NO se puede dibujar (Hidden o Prop1==0)=0
+    NO-DIBUJADOS por el motor: Prop1==0 0, Hidden 43, Type.Special() 3 (de 2337 celdas)
+
+    Las 355 celdas sin piso NO son un defecto del compositor: son celdas del PRESET (el motor arma el
+    pueblo estampando 35 salas encima; su TILESTATS da cells=2337 nofloor=0 floors=2337 walls=394 para el
+    pueblo entero). Lo que SI era un defecto: el compositor pedia 43 paredes ocultas y 3 especiales que el
+    motor NO dibuja (`renderPass1`/`generateWallCache` piden `!Hidden() && Prop1 != 0` y `!Type.Special()`).
+    Ahora pide lo mismo que el motor: 373 -> 330 paredes pedidas, y el lienzo no cambia (`fuera` 2282 ->
+    2239: esas 43 no pintaban nada en esta ventana).
+
+2.4 EL CUADRO DEL MOTOR, en el host (`console/dc/gen-config-host-248` + el motor con OD2_AUTOGAME):
+
+    [Map Generator] real town: Act1/Town/TownN1.ds1 (file index 0), preset 57x41 tiles, level rectangle 56x40
+    [Map Generator] TILESTATS level=1 exact=true cells=2337 nofloor=0 floors=2337 walls=394
+    [Game Screen]  DRAWSTATS level=1 floors=229 walls=0 upperwalls=53 shadows=1 ...
+    AUTOSHOT saved /tmp/ref248b.png (679205 bytes)   (800x600, el cuadro que ve el jugador)
+
+    El mismo .ds1 que compone el POC, pintado por el motor: 229 pisos en una pasada de 800x600.
+    (Para llegar ahi hubo que arreglar un defecto del HOST que nadie habia visto: con el embed de
+    `d2common/d2quest/data/messages.csv` apagado por el port, `messagesCSV` es vacio y
+    `for _, r := range rows[1:]` paniquea con "slice bounds out of range [1:0]" al entrar al juego:
+    `advanceQuests -> newA1Prologue -> speechTables`. La partida NO arrancaba en el host. Arreglado con la
+    guarda `len(rows) == 0` y el limite declarado.)
+
+=============================================================================
+3. LA MEDICION NUEVA (la que SI ve los tiles corridos)
+=============================================================================
+
+El censo de la cobertura: cuantos tiles de PISO pintan cada pixel del lienzo (`nivel.go`, campo
+`Censar`; en la consola va apagado). Con el paso correcto el piso encaja borde con borde y cada pixel lo
+pinta UN tile; con el paso chico, hasta NUEVE.
+
+Ventana de 512x512 centrada en la celda (28,20), el mismo caso de DC-002.37:
+
+                                   DEFECTO (32x16, mutante)     ARREGLO (80x40)
+    paso del compositor                    32x16                      80x40
+    paso del MOTOR (llamado)               80x40                      80x40
+    cobertura maxima                       9                          1
+    pixeles con 2+ tiles                   233.091 de 262.144         0 de 262.144
+    %                                      88,92%                     0,00%
+    caja de los pixeles pisados            (0,0)-(511,511)            (ninguna)
+    pisos que caen en la ventana           249                        46
+    pisos por celda visible del motor      3,074                      0,568
+    pixelesNoVacios del lienzo             258.653 (98,67%)           193.538 (73,83%)
+    pixelesPiso acumulados                 1.173.833                  179.484   (6,54x)
+    pixelesPared acumulados                791.720                    146.567   (5,40x)
+    crc32 del lienzo                       3380300152                 3507647456
+    veredicto del instrumento              TILES-CORRIDOS             ENCAJA
+
+Ventana de 1024x1024 (la misma pareja, para que el ojo vea el campamento):
+
+                                   DEFECTO (32x16)             ARREGLO (80x40)
+    cobertura maxima                       9                          1
+    pixeles con 2+ tiles                   922.648 (87,99%)           0 (0,00%)
+    pisos que caen en la ventana           914                        141
+    pixelesNoVacios                        1.026.955 (97,94%)         798.598 (76,16%)
+    crc32 del lienzo                       2813558295                 3326817646
+
+EL NUMERO QUE CIERRA EL CASO: **el corpus de DC-002.37 estaba PINNEADO AL DEFECTO**. Su control 0c exigia
+`pixelesNoVacios = 258653`, que es exactamente el lienzo de 32x16 (medido con el mutante). O sea que la
+suite no solo no veia el defecto: lo exigia.
+
+=============================================================================
+4. EL MUTANTE (el que exige que el corpus se ponga ROJO)
+=============================================================================
+
+`scripts/console/mutar-geom-248.py` deja las CUATRO copias de `nivel.go` en 32x16 o en 80x40 y dice si
+quedaron iguales entre si (el proyecto compara su sha256):
+
+    python3 scripts/console/mutar-geom-248.py /tmp/dc248-mut --defecto
+      console/dc/poc/personaje-mapa/nivel.go   ladoCeldaX=32 ladoCeldaY=16 sha256=c47adc1084a30487
+      console/dc/poc/acto1-disco/nivel.go      ladoCeldaX=32 ladoCeldaY=16 sha256=c47adc1084a30487
+      console/dc/verif-acto1-237/nivel.go      ladoCeldaX=32 ladoCeldaY=16 sha256=c47adc1084a30487
+      console/dc/verif-personaje-238/nivel.go  ladoCeldaX=32 ladoCeldaY=16 sha256=c47adc1084a30487
+      copias iguales entre si: SI (4 de 4)
+
+En el arbol del checkout (arreglo), las cuatro dan `ladoCeldaX=80 ladoCeldaY=40`,
+sha256=9260af18fc084c50 las cuatro.
+
+    .../verif-acto1-237 en el arbol del mutante  -> VEREDICTO TILES-CORRIDOS (cobertura 9, 88,92% pisado)
+    .../verif-acto1-237 en el checkout           -> VEREDICTO ENCAJA (cobertura 1, 0% pisado)
+
+El corpus de la 37 (`checar-acto1-237.sh`) se actualizo en el mismo commit: el control 0c ahora exige
+193538 (el lienzo del paso del motor) y el 0b las 330 paredes (las 43 que el motor saltea ya no se piden).
+
+=============================================================================
+5. LA CONSOLA
+=============================================================================
+
+    GODC_GOX=/tmp/gox-248 SALTAR_STDLIB=1 SALTAR_MOTOR=1 bash scripts/console/build-acto1-237.sh /tmp/dcbuild248-acto1c
+      ELF:  /tmp/dcbuild248-acto1c/prog.elf   (7502836 bytes)
+      ISO:  /tmp/dcbuild248-acto1c/disc.iso  (268703744 bytes)
+      GDI:  /tmp/dcbuild248-acto1c/disc.gdi
+
+El POC del acto 1 COMPILA y ENLAZA para SH-4 con el compositor arreglado, y el mismo script imprime el
+informe de geometria del host (ENCAJA). Lo que NO se pudo hacer en esta corrida: correr Flycast para la
+captura de la consola, porque habia otro agente del tablero (DC-002.38, run 141) con el emulador vivo y
+la regla del proyecto es un agente a la vez sobre la ventana. Comando exacto para cerrarlo:
+
+    bash scripts/console/checar-acto1-237.sh 40      # 23 controles: host + consola + captura + mutante
+
+=============================================================================
+6. LO QUE ESTA TARJETA DEJA DICHO (limites, no tapados)
+=============================================================================
+
+1. El compositor sigue siendo un archivo COPIADO en cuatro lugares (poc/personaje-mapa, poc/acto1-disco,
+   verif-acto1-237, verif-personaje-238). El script del mutante verifica que las cuatro sean iguales, pero
+   la copia sigue siendo a mano. Unificarlo en un paquete es otra tarjeta (y en la consola exige un .gox).
+2. El lienzo de una sola sala muestra los 355 huecos del preset (el motor los tapa estampando las 35 salas
+   del pueblo). El POC compone UNA sala: los huecos son del alcance del POC, no del paso de la celda.
+3. La animacion del personaje es DC-002.49 y el golpe a los monstruos DC-002.50: no entran aca.
+4. El host del motor no arrancaba por el panic de `d2quest` (arriba). Arreglado, pero la conversacion de
+   los NPC sigue sin texto en la consola: es el limite que DC-002.8 ya habia declarado.
+
+=============================================================================
+7. COMO SE REPITE
+=============================================================================
+
+    # el instrumento (host; imprime el paso del motor, la cobertura y la densidad, y escribe el PNG)
+    go run ./console/dc/verif-acto1-237 -png /tmp/lienzo.png
+    go run ./console/dc/verif-acto1-237 -ventana 1024 -png /tmp/lienzo1024.png
+
+    # las sondas de la geometria del archivo
+    go run ./console/dc/sonda-geom-248
+    go run ./console/dc/sonda-geom-248/diamante
+    go run ./console/dc/sonda-geom-248/celdas
+
+    # el cuadro del MOTOR en el host (la referencia que no es el POC)
+    go run ./console/dc/gen-config-host-248 -dir "$HOME/.wine-d2/drive_c/Games/Diablo II"
+    go build -o /tmp/od2host . && \
+      DISPLAY=:0 OD2_AUTOGAME=/tmp/nada.od2 OD2_AUTOCAST_CLASS=amazon OD2_AUTOSHOT=/tmp/ref.png \
+      OD2_AUTOSHOT_SECONDS=12 OD2_AUTOEXIT=1 OD2_DRAWSTATS=1 /tmp/od2host
+
+    # el mutante
+    rsync -a --exclude .git ~/Proyectos/diablo2consoles/ /tmp/dc248-mut/
+    python3 scripts/console/mutar-geom-248.py /tmp/dc248-mut --defecto
+    cd /tmp/dc248-mut && go run ./console/dc/verif-acto1-237    # -> TILES-CORRIDOS

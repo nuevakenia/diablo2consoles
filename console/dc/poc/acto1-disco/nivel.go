@@ -35,8 +35,20 @@ import (
 )
 
 const (
-	ladoCeldaX      = 32 // tileWidth del viewport: la x avanza 32 px por celda
-	ladoCeldaY      = 16 // tileHeight del viewport: la y avanza 16 px por celda
+	// DC-002.48: aca iba 32 y 16, con un comentario que citaba a `viewport.go` ("WorldToOrtho usa tileWidth=32 y
+	// tileHeight=16"). Es FALSO: el viewport del motor declara `tileWidth = 80` y `tileHeight = 40`
+	// (d2core/d2map/d2maprenderer/viewport.go, usados por WorldToOrtho), y el renderer declara
+	// `orthoTileWidth = subtilesPerTile(5) * orthoSubTileWidth(16) = 80` y
+	// `orthoTileHeight = 5 * 8 = 40` (renderer.go). 32x16 es el tamaño de UN SUBTILE
+	// (orthoSubTileWidth/Height), no el de la celda.
+	//
+	// Lo que eso costaba, medido: el tile de PISO del DT1 mide 160x128 y su diamante visible 160x79 (medido
+	// con `console/dc/sonda-geom-248/diamante`), o sea que los diamantes encajan borde con borde cuando la
+	// celda vecina esta a MEDIO diamante: 80 en x y 40 en y. Con 32x16 cada losa de piso se pinta 5 veces
+	// encima de las vecinas (sobre-escritura 5, medido) y el nivel entero sale a 2,5x menos escala que el
+	// motor: eso es lo que el ojo ve como "tiles corridos".
+	ladoCeldaX      = 80 // orthoTileWidth del renderer: la x avanza 80 px por celda
+	ladoCeldaY      = 40 // orthoTileHeight del renderer: la y avanza 40 px por celda
 	anchoSuperficie = 160
 	altoSuperficie  = 80
 	offsetIso       = 80
@@ -70,6 +82,20 @@ type Nivel struct {
 	FueraDeVentana               int
 	PixelesDelPiso               int
 	PixelesDePared                int
+
+	// CENSAR (DC-002.48): el instrumento que ve los "tiles corridos". Con Censar en true, `pegar` lleva la
+	// cuenta de CUANTOS tiles pintan cada pixel del lienzo (Cobertura: 1 = el piso encaja borde con borde,
+	// 2..5 = los tiles se pisan) y de cuantos pedidos caen DENTRO de la ventana (PisosEnVentana /
+	// ParedesEnVentana), que es lo que se compara contra las celdas que el MOTOR considera visibles.
+	// En la consola va APAGADO: la cobertura cuesta un uint16 por pixel del lienzo (512x512 = 512 KB), y el
+	// POC no lo necesita; lo prende el verificador del host.
+	Censar                           bool
+	Cobertura                        []uint16
+	PisosEnVentana, ParedesEnVentana int
+	PixelesSobre                     int // pixeles pintados por 2 o mas tiles
+	CajaSobreX0, CajaSobreY0         int // la caja de esos pixeles (x0,y0)-(x1,y1)
+	CajaSobreX1, CajaSobreY1         int
+	MaxCobertura                     uint16
 }
 
 // NuevoNivel: arma la ventana (centrada en la celda pedida) y los pedidos de TODAS las capas del DS1.
@@ -102,6 +128,14 @@ func NuevoNivel(d *d2ds1.DS1, ancho, alto, centroX, centroY int) *Nivel {
 					continue
 				}
 
+				// DC-002.48: el MOTOR no dibuja un tile oculto ni uno con Prop1==0 (`renderPass1` y
+				// `generateFloorCache` piden `!Hidden() && Prop1 != 0`). Aca se pedia solo Style/Seq, asi que el
+				// compositor pintaba 43 tiles ocultos de este nivel que el motor saltea (medido con
+				// `console/dc/sonda-geom-248`). Se pide lo mismo que el motor.
+				if t.Hidden() || t.Prop1 == 0 {
+					continue
+				}
+
 				n.Pedidos = append(n.Pedidos, Pedido{
 					CeldaX: x, CeldaY: y, Estilo: int32(t.Style), Secuencia: int32(t.Sequence),
 					Tipo: int32(d2enum.TileFloor), Azar: int(t.RandomIndex), Faltan: int(t.RandomIndex),
@@ -121,6 +155,13 @@ func NuevoNivel(d *d2ds1.DS1, ancho, alto, centroX, centroY int) *Nivel {
 			for x := 0; x < l.Width(); x++ {
 				t := l.Tile(x, y)
 				if t == nil || (t.Style == 0 && t.Sequence == 0) {
+					continue
+				}
+
+				// DC-002.48: las mismas dos condiciones que el motor MAS `!Type.Special()` (los tiles
+				// especiales son marcadores de warp/entrada: el motor no les arma cache ni los dibuja). Medido:
+				// 3 paredes especiales en este nivel que el compositor pintaba igual.
+				if t.Hidden() || t.Prop1 == 0 || d2enum.TileType(t.Type).Special() {
 					continue
 				}
 
@@ -212,10 +253,20 @@ func (n *Nivel) Alimentar(tiles []d2dt1.Tile) {
 
 		if p.Pared {
 			n.ParedesCompuestas++
-			n.PixelesDePared += n.componerPared(p, t)
+			pintados := n.componerPared(p, t)
+			n.PixelesDePared += pintados
+
+			if pintados > 0 {
+				n.ParedesEnVentana++
+			}
 		} else {
 			n.PisosCompuestos++
-			n.PixelesDelPiso += n.componerPiso(p, t)
+			pintados := n.componerPiso(p, t)
+			n.PixelesDelPiso += pintados
+
+			if pintados > 0 {
+				n.PisosEnVentana++
+			}
 		}
 	}
 }
@@ -293,6 +344,16 @@ func (n *Nivel) pegar(p *Pedido, t *d2dt1.Tile, ancho, alto, offsetY, yAjuste in
 		return 0
 	}
 
+	// la cobertura se pide UNA vez y solo si el que llama la quiere (el POC de la consola no). Se censa el
+	// PISO y nada mas: la losa de piso es la que tiene que encajar borde con borde (su diamante mide 160x79).
+	// Las paredes son sprites ALTOS (hasta 480 px) y se pisan entre si por diseño, asi que su cobertura no
+	// dice nada de la geometria; lo que se mide de ellas es cuantas caen en la ventana.
+	if n.Censar && n.Cobertura == nil {
+		n.Cobertura = make([]uint16, n.Ancho*n.Alto)
+		n.CajaSobreX0, n.CajaSobreY0 = n.Ancho, n.Alto
+		n.CajaSobreX1, n.CajaSobreY1 = -1, -1
+	}
+
 	necesario := ancho * alto
 	for i := 0; i < necesario; i++ {
 		n.Scratch[i] = 0
@@ -326,6 +387,35 @@ func (n *Nivel) pegar(p *Pedido, t *d2dt1.Tile, ancho, alto, offsetY, yAjuste in
 
 			n.Canvas[base+cx] = v
 			entraron++
+
+			if n.Cobertura != nil && !p.Pared {
+				pos := base + cx
+
+				n.Cobertura[pos]++
+				if c := n.Cobertura[pos]; c > n.MaxCobertura {
+					n.MaxCobertura = c
+				}
+
+				if n.Cobertura[pos] == 2 { // el pixel pasa a estar pisado
+					n.PixelesSobre++
+
+					if cx < n.CajaSobreX0 {
+						n.CajaSobreX0 = cx
+					}
+
+					if cy < n.CajaSobreY0 {
+						n.CajaSobreY0 = cy
+					}
+
+					if cx > n.CajaSobreX1 {
+						n.CajaSobreX1 = cx
+					}
+
+					if cy > n.CajaSobreY1 {
+						n.CajaSobreY1 = cy
+					}
+				}
+			}
 		}
 	}
 
@@ -334,6 +424,18 @@ func (n *Nivel) pegar(p *Pedido, t *d2dt1.Tile, ancho, alto, offsetY, yAjuste in
 	}
 
 	return entraron
+}
+
+// CoberturaHistograma: cuantos pixeles del lienzo pintan EXACTAMENTE k tiles (k de 1 a MaxCobertura).
+func (n *Nivel) CoberturaHistograma() map[uint16]int {
+	h := map[uint16]int{}
+	for _, c := range n.Cobertura {
+		if c > 0 {
+			h[c]++
+		}
+	}
+
+	return h
 }
 
 // PixelesNoVacios: cuantos pixeles del lienzo NO son el indice 0 (el instrumento del criterio 2).
