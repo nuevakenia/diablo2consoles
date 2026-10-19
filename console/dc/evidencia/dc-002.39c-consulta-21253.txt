@@ -1,0 +1,157 @@
+DC-002.39c, SEGUNDA PARTE -- LA CONSULTA DE LOS 21.253 CIERRA: el que se llevaba la corrida puesta NO era
+la consulta sino el `ReadFile("(listfile)")` del tercer MPQ (salta a una DIRECCION BASURA: `PC 656a626f`,
+`PR` -> `bytes.Buffer.ReadFrom`), y con la lectura fuera el MISMO binario y el MISMO disco dan
+`TOTAL nombres= 21253 contenidos= 21253` (3 de 3 vueltas). El mutante de la Store Queue (`>>26`, el estado
+del vendor vivo) queda CAZADO: 162 de 21.253.
+
+Fecha: 2026-10-19 (corrida autonoma, rama DC-002, HEAD f98aa8ec; el otro agente del repo commiteo 4cd7b2df
+en medio de esta medicion)
+
+================================================================================================
+0. COMO SE MIDIO (todo privado: hay OTRO agente vivo sobre el repo, regla "un agente, una carpeta")
+================================================================================================
+* clon en HEAD:  /home/dgalli/.hermes/cache/scratch/c39c/repo   (git clone + checkout DC-002)
+* runtime A (el BUENO): la copia privada de DC-002.39c, con el arreglo de la Store Queue (`>>24`) y el
+  candidato interior de DC-002.39b puestos:
+      /tmp/godc-39c-sq      libgodc.a 224666 B sha256 fa2208fbfb9fbd3c     DC_ROOT=/tmp/dcroot-39c-sq
+* runtime B (EL MUTANTE, `>>26` = el estado del vendor vivo):
+      cp -a /tmp/godc-39c-sq /tmp/godc-39c-mut
+      python3 scripts/console/mutar-libgodc-sq.py --build /tmp/godc-39c-mut
+      /tmp/godc-39c-mut     libgodc.a 224666 B sha256 428e632f0b3e7ac9     DC_ROOT=/tmp/dcroot-39c-mut
+  (es UN cambio de una palabra: `(dst_addr >> 24) & 0x1C` -> `>> 26`. El `dcache_inval_range` del arreglo se
+   deja puesto a proposito: asi el mutante aisla SOLO la formula del QACR.)
+* disco: los 3 MPQ del juego en /JUEGO (`MKISO_JOLIET=0`), POC `tablas-mpq`, gox `/tmp/gox-head`
+* EL VENDOR (`~/dreamcast/libgodc`) **NO SE TOCO**: sigue en `>>26`, o sea el defecto DC-002.24 sigue VIVO
+  ahi y todos los numeros que salgan del vendor estan medidos encima de el. Eso es DC-002.39d.
+* crudos: ~/.hermes/cache/scratch/c39c/{base,sonda1,sonda2,v39c,mut39c,banco39c}/
+
+================================================================================================
+1. EL ROJO DE PARTIDA (el numero que traia la tarjeta), reproducido con el runtime bueno
+================================================================================================
+    DC_ROOT=/tmp/dcroot-39c-sq POC=tablas-mpq bash scripts/console/checar-consulta-233.sh 1 150 <sal> <gox>
+
+    FALLO: vuelta 1: la consulta da 11244 de 21253
+           ( patch_d2.mpq:162/162  d2data.mpq:11082/11082  d2char.mpq:/10009 )
+    RESULTADO: 0 de 1 vueltas con los 21253 nombres (totales: 11244)
+
+Los dos primeros MPQ ya daban BIEN con el arreglo de la SQ (ese era el resultado de la primera parte de la
+tarjeta): el que falta es `d2char.mpq`, y no por la consulta. En el log, el ultimo verso del POC es
+
+    TABLAS-MPQ 3 d2char.mpq entradasHash= 16384 entradasBloque= 10010 checksumHash= 3931321293
+                            checksumBloque= 965121384 ms= 3519
+
+y de ahi NO sale ninguna linea mas de la consulta: entre esas tablas y la linea del `(listfile)` la corrida
+se reinicia (`REIOS: Booting up`, 3 veces en 150 s, con el monton de C volviendo con 3352 B libres).
+
+================================================================================================
+2. DONDE SE VA LA CORRIDA: LA SONDA DE PASO (el monton de C y el reloj en cada tramo)
+================================================================================================
+Se le puso al POC una sonda de paso (una linea por tramo + una cada 500 nombres) y el `ReadFile` del
+`(listfile)` con una palanca. La corrida murio DENTRO del `(listfile)` de `d2data.mpq`, y la consola lo dijo:
+
+    TABLAS-MPQ-SONDA listfile-d2data.mpq-antes libreC= 3488 ms= 12579
+    Unhandled exception: PC 656a626f, code 1, evt 00e0
+     R0-R7: 00000000 656a626f 8c3b29a8 00000000 8c2bc320 8c2bc348 00001000 00001000
+     SR 40000101 PR 8c0159aa
+    Encountered Data address error (read)
+    kernel panic: unhandled IRQ/Exception
+
+    $ sh-elf-addr2line -f -C -i -e prog.elf 8c0159aa
+    bytes.Buffer.ReadFrom
+    /tmp/gox-head/src/bytes/bytes.go:186
+
+DOS DATOS que valen: (a) el PC al que salto es 0x656a626f, que leido byte a byte es TEXTO (`"obje"`, un
+pedazo de las rutas del `(listfile)`): el salto se fue a un pedazo de DATO, no a codigo -- el mismo genero
+de defecto que DC-002.23/DC-002.24 (un puntero/descriptor vivo que queda con basura); (b) el que estaba
+corriendo es `bytes.Buffer.ReadFrom`, que es el que usa el camino de lectura del MPQ (y el puente de
+`compress/zlib` que DC-002.40 mide).
+
+OJO: con la sonda puesta el fallo aparece ANTES (en `d2data.mpq`, ms= 12579) que sin ella (en `d2char.mpq`,
+ms= 3519 de su vuelta): la sonda crea basura en el monton de Go y el defecto se adelanta. Por eso el numero
+de la tarjeta se mide SIN la sonda (abajo).
+
+================================================================================================
+3. LA CONTRA-PRUEBA: el MISMO binario con el `(listfile)` fuera -> 21253 de 21253
+================================================================================================
+Un solo cambio (la palanca `leerListfile = false`), mismo disco, mismo gox, mismo runtime:
+
+    TABLAS-MPQ-SONDA consulta-d2char.mpq-arranca libreC= 3120 ms= 24530
+    TABLAS-MPQ-SONDA consulta-d2char.mpq n= 500 ... n= 10000     (20 marcas, el monton de C en 2792 B
+                                                                  libres TODO el tramo: no es RAM)
+    TABLAS-MPQ-SONDA consulta-d2char.mpq-termino libreC= 3120 ms= 32213
+    TABLAS-MPQ-TOTAL archivos= 3 nombres= 21253 contenidos= 21253 libreFinal= 3448 ebitenLibre= 3448
+
+y la corrida NO muere: en los 150 s hace 3 pasadas de los 3 MPQ. El monton de C no se mueve durante la
+consulta de `d2char` (2792 B libres antes y despues): la consulta no es la pared.
+
+DECISION DE INSTRUMENTO (y no es esconder nada): este POC mide LA CONSULTA; el `(listfile)` de
+`patch_d2.mpq` lo mide su propio corpus (`scripts/console/checar-compr-240.sh`, control 7, contra el crc32
+del host) y el defecto del `(listfile)` del tercer MPQ queda MEDIDO aca y abierto como tarjeta propia. El
+POC imprime `(listfile) NO SE LEE (DC-002.39c: dispara un salto a basura)` en cada vuelta, para que el
+recorte se vea en el log y no se confunda con una lectura que si funciono.
+
+================================================================================================
+4. EL NUMERO DE LA TARJETA: 3 de 3 vueltas con los 21.253
+================================================================================================
+    DC_ROOT=/tmp/dcroot-39c-sq GODC_GOX=/tmp/gox-head POC=tablas-mpq \
+      bash scripts/console/checar-consulta-233.sh 3 120 <sal> /tmp/gox-head
+
+    OK: vuelta 1: la consulta encuentra 21253 de 21253 (patch_d2.mpq:162/162 d2data.mpq:11082/11082 d2char.mpq:10009/10009)
+    OK: vuelta 2: la consulta encuentra 21253 de 21253 (patch_d2.mpq:162/162 d2data.mpq:11082/11082 d2char.mpq:10009/10009)
+    OK: vuelta 3: la consulta encuentra 21253 de 21253 (patch_d2.mpq:162/162 d2data.mpq:11082/11082 d2char.mpq:10009/10009)
+    RESULTADO: 3 de 3 vueltas con los 21253 nombres (totales: 21253 21253 21253)
+
+(Las tablas y los checksums de los 3 MPQ son los del host: `d2char.mpq` 16384 / 10010 / 3931321293 /
+965121384 y `d2data.mpq` 65536 / 11083 / 1897791535 / 4131808245: los mismos que la evidencia de la primera
+parte de la tarjeta.)
+
+================================================================================================
+5. EL MUTANTE: la formula vieja de la Store Queue (`>>26`) deja la consulta en 162 de 21.253
+================================================================================================
+    DC_ROOT=/tmp/dcroot-39c-mut GODC_GOX=/tmp/gox-head POC=tablas-mpq \
+      bash scripts/console/checar-consulta-233.sh 1 120 <sal> /tmp/gox-head
+
+    FALLO: vuelta 1: la consulta da 162 de 21253
+           ( patch_d2.mpq:162/162  d2data.mpq:/11082  d2char.mpq:/10009 )
+    RESULTADO: 0 de 1 vueltas con los 21253 nombres (totales: 162)
+
+Es exactamente el numero de la primera parte de la tarjeta (162, `d2data.mpq` 0 de 11082) y el mutante es
+UN cambio de una palabra en la copia privada; el instrumento vive en el repo:
+
+    scripts/console/mutar-libgodc-sq.py [--estado] [--build] <copia privada del runtime>
+
+CONCLUSION DEL MUTANTE: la suite CAZA la regresion, y el arreglo que la tarjeta midio (el barrido del GC
+que se cortaba en una cabecera en cero, causa: los QACR con `>>26`) es el que hace la diferencia.
+
+================================================================================================
+6. LO QUE NO SE ROMPE (control 1d: el otro defecto del mismo barrido, DC-002.39b)
+================================================================================================
+    DC_ROOT=/tmp/dcroot-39c-sq GODC_GOX=/tmp/gox-head bash scripts/console/build-dc.sh console/dc/poc/banco-vivo <sal>
+    FLYCAST=~/dreamcast/dl/squashfs-root/AppRun CAPTURE=none bash scripts/console/run-flycast.sh <sal>/prog.elf 40 <out>
+
+    BANCO-VIVO-TOTAL rondas= 40 comparaciones= 2560 fallos= 0 suma= 15974400 ms= 21083 libreC= 1624
+
+Es el MISMO numero que dejo la primera parte de la tarjeta (0 de 2560, suma 15974400, 21082 ms): el arreglo
+de la Store Queue no rompe el arreglo del candidato interior de DC-002.39b.
+
+================================================================================================
+7. LO QUE QUEDA ABIERTO (declarado, no escondido)
+================================================================================================
+1. EL DEFECTO DEL `(listfile)` DEL TERCER MPQ (nuevo, medido aca): el `ReadFile("(listfile)")` del tercer
+   MPQ mata la corrida -- salto a una direccion basura (PC 0x656a626f = texto, `PR` en
+   `bytes.Buffer.ReadFrom`) que sin la sonda se ve como `REIOS: Booting up` (la consola se reinicia SIN un
+   solo caracter). Con `patch_d2.mpq` (5502 B) y `d2data.mpq` (466867 B) la MISMA llamada funciona. Hay que
+   medirlo como defecto propio (tarjeta nueva) y con su mutante: el mutante natural es volver a leer el
+   `(listfile)` (`leerListfile = true`), que deja el corpus en 11244 de 21253.
+2. LA CADENA DE `fix-libgodc-*.py` NO SE RE-APLICA ENTERA: hoy el vendor vivo esta en `>>26` (el defecto
+   DC-002.24 VIVO). Es la tarjeta DC-002.39d; mientras siga asi, ningun numero sacado del vendor es limpio.
+3. EL VENDOR NO SE TOCO en esta corrida: hay otro agente trabajando el mismo repo (dos workers del kanban
+   vivos: pids 2616790 y 2647907) y la regla es un agente, una carpeta.
+4. `checar-cadenas-236.sh` (controles 1d/2d del corpus de cadenas) NO SE CORRIO: su seccion del mutante
+   (`fix-libgodc-interior.py --quitar --build`, sin argumento de LIB) muta el VENDOR COMPARTIDO por defecto,
+   y con otro agente vivo eso le cambia los numeros a la mitad de su corrida. Su control 1d (el
+   `banco-vivo`) SI se midio arriba, con la copia privada.
+5. LA BARRA DEL SEMIESPACIO sigue siendo el freno del ARRANQUE DEL MOTOR (no de este POC): el commit
+   4cd7b2df de DC-002.43 mide que la lectura completa de `LvlPrest.txt` (134937 B) no entra en el
+   semiespacio (132104 libres) y que el monton de C no se mueve. Este POC, en cambio, corre con el
+   semiespacio holgado y NO muere: los dos defectos son distintos.

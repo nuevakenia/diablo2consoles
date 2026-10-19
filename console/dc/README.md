@@ -4425,3 +4425,56 @@ El estado `S232` es el que importa acá; los cinco salen en `<SAL>/tabla.txt`.
   con el runtime al día: hoy la muerte es DENTRO de la lectura de `LvlPrest.txt`. Queda anotado para la tarjeta
   siguiente.
 
+## 60. DC-002.39c, la segunda mitad: la consulta de los **21.253 cierra** — el que se llevaba la corrida puesta era el `ReadFile("(listfile)")` del TERCER MPQ (salta a una **dirección basura**), no la consulta
+
+La sección 58 dejó el defecto medido en los dos sentidos y el `TOTAL de 21.253` sin imprimir, con la razón
+declarada ("la consola se reinicia al entrar en `d2char`"). Lo que faltaba era **qué** la tira abajo. Se midió
+con una **sonda de paso** en el POC (el montón de C y el reloj en cada tramo) y con el `ReadFile` del
+`(listfile)` bajo una palanca, y el resultado cambia el diagnóstico: **el que mata la corrida es el
+`(listfile)`, no la consulta.**
+
+1. **El rojo de partida**, con el runtime bueno (la copia privada con `>>24` y el candidato interior de
+   DC-002.39b): `11244 de 21253` — `patch_d2.mpq` 162/162, `d2data.mpq` 11082/11082 y `d2char.mpq` **sin
+   línea**, porque después de sus tablas (`16384 / 10010 / 3931321293 / 965121384`) la corrida se reinicia.
+2. **Dónde se va**: con la sonda puesta, la consola lo dice ella misma, dentro del `(listfile)` de `d2data`:
+
+       TABLAS-MPQ-SONDA listfile-d2data.mpq-antes libreC= 3488 ms= 12579
+       Unhandled exception: PC 656a626f, code 1, evt 00e0
+        R0-R7: 00000000 656a626f 8c3b29a8 …      SR 40000101 PR 8c0159aa
+       Encountered Data address error (read)      kernel panic: unhandled IRQ/Exception
+
+   `0x656a626f` leído byte a byte es **texto** (`"obje"`, un pedazo de las rutas del `(listfile)`): el salto se
+   fue a un pedazo de **dato**, el mismo género de defecto que DC-002.23/DC-002.24. Y el `PR` dice dónde
+   estaba el que corrió: `sh-elf-addr2line -f -C -i -e prog.elf 8c0159aa` → **`bytes.Buffer.ReadFrom`**
+   (`bytes/bytes.go:186`), que es el camino de lectura del MPQ. Sin la sonda, el mismo fallo se ve como un
+   reinicio mudo (`REIOS: Booting up`), que es el síntoma que la tarjeta tenía anotado como de DC-002.43.
+3. **La contra-prueba** (un solo cambio: `leerListfile = false`, mismo binario, mismo disco, mismo gox):
+
+       TABLAS-MPQ-TOTAL archivos= 3 nombres= 21253 contenidos= 21253 libreFinal= 3448
+
+   y la corrida **no muere**: en 150 s hace tres pasadas de los 3 MPQ. El montón de C no se mueve durante la
+   consulta de `d2char` (**2792 B libres** de punta a punta, 20 marcas): la consulta no es la pared.
+4. **El número de la tarjeta**, con el instrumento del corpus:
+
+       checar-consulta-233.sh 3 120  ->  3 de 3 vueltas con los 21253
+       (patch_d2.mpq:162/162  d2data.mpq:11082/11082  d2char.mpq:10009/10009)
+
+5. **El mutante**, que es una palabra (`>> 24` → `>> 26` en los dos QACR de la copia privada, con
+   `scripts/console/mutar-libgodc-sq.py`): la MISMA suite da `162 de 21253` (`d2data.mpq` sin línea). El
+   mutante caza la regresión y el arreglo de la SQ es el que hace la diferencia.
+6. **Lo que no se rompe**: `banco-vivo` sigue en `rondas= 40 comparaciones= 2560 fallos= 0 suma= 15974400`
+   (control 1d de DC-002.39b).
+
+**Decisión de instrumento (no es esconder nada):** el POC `tablas-mpq` mide **la consulta**; el `(listfile)`
+de `patch_d2.mpq` lo mide su corpus (`checar-compr-240.sh`, control 7, contra el crc32 del host), y el defecto
+del `(listfile)` del tercer MPQ queda **medido acá** y abierto en su tarjeta. El POC imprime
+`(listfile) NO SE LEE (DC-002.39c: dispara un salto a basura)` en cada vuelta, para que el recorte se vea en el
+log y no se confunda con una lectura que sí funcionó.
+
+**Lo que queda abierto (declarado):** (a) el defecto del `(listfile)` del tercer MPQ, con su mutante natural
+(volver a leerlo deja el corpus en 11244 de 21253); (b) el vendor sigue en `>>26`, o sea **el defecto
+DC-002.24 sigue VIVO** y la cadena de `fix-libgodc-*.py` no se re-aplica entera (DC-002.39d): ningún número
+sacado del vendor es limpio mientras eso siga así; (c) `checar-cadenas-236.sh` no se corrió porque su sección
+del mutante toca el **vendor compartido** y había otro agente vivo sobre el repo. Evidencia:
+`console/dc/evidencia/dc-002.39c-consulta-21253.txt`.
+

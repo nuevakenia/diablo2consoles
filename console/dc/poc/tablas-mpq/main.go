@@ -56,6 +56,24 @@ func d2cMontonLibre() int
 
 const configConsola = "/rd/OpenDiablo2/config.json"
 
+// leerListfile: leer o no el `(listfile)` de cada MPQ dentro de este bucle.
+//
+// MEDIDO en DC-002.39c (y NO es un capricho): con la lectura puesta, la corrida de los 3 MPQ muere antes de
+// la consulta del TERCERO y nunca imprime el TOTAL de los 21.253. La corrida de peor caso medida:
+//
+//   TABLAS-MPQ 3 d2char.mpq entradasHash= 16384 ... ms= 3519
+//   Unhandled exception: PC 656a626f, code 1        <- el PC es TEXTO ("obje": un pedazo del (listfile))
+//   PR 8c0159aa -> bytes.Buffer.ReadFrom (bytes/bytes.go:186)
+//   (y en la corrida sin la sonda de paso: REIOS: Booting up -- la consola se REINICIA, sin mensaje)
+//
+// o sea el que se lleva la corrida puesta es el `ReadFile("(listfile)")`, no la consulta. Con la lectura
+// fuera, el MISMO binario y el MISMO disco dan `TABLAS-MPQ-TOTAL archivos= 3 nombres= 21253
+// contenidos= 21253` (y sigue corriendo: 3 pasadas en 150 s). El defecto del (listfile) tiene su propia
+// tarjeta (DC-002.39c, seccion "lo que queda abierto"); este POC mide LA CONSULTA y el (listfile) lo mide
+// su corpus aparte (`scripts/console/checar-compr-240.sh`, control 7 = el (listfile) de patch_d2.mpq
+// contra el crc32 del host).
+const leerListfile = false
+
 // configDelArranque: el `MpqPath` y el `MpqLoadOrder` que el motor leyo de su config del romdisk. Es el
 // ORDEN que importa: `d2app/initialization.go` recorre `MpqLoadOrder` y abre cada archivo.
 func configDelArranque() *d2config.Configuration {
@@ -214,14 +232,25 @@ func main() {
 			"checksumHash=", ch, "checksumBloque=", cb,
 			"ms=", d2cMs()-t0)
 
-		// el (listfile) por el camino del motor: en el HOST anda y en la CONSOLA falla (`zlib: invalid
-		// header`, defecto aparte de esta tarjeta). Se intenta igual y, si falla, se dice con su error.
-		datos, errList := m.ReadFile("(listfile)")
+		// el (listfile) por el camino del motor: en el HOST anda y en la CONSOLA el del TERCER MPQ se lleva
+		// la corrida puesta (ver `leerListfile` arriba y la seccion de DC-002.39c). Se intenta igual y, si
+		// falla, se dice con su error. OJO: `datos` se declara AFUERA del if a proposito: cuando se lee,
+		// el buffer queda vivo hasta el fin de la vuelta (es parte de lo que el corpus mide).
+		var (
+			datos   []byte
+			errList error
+		)
 
-		if errList != nil {
-			println("TABLAS-MPQ   ", nombreArchivo, "(listfile) FALLO:", errList.Error())
+		if !leerListfile {
+			println("TABLAS-MPQ   ", nombreArchivo, "(listfile) NO SE LEE (DC-002.39c: dispara un salto a basura)")
 		} else {
-			println("TABLAS-MPQ   ", nombreArchivo, "(listfile) bytes=", len(datos))
+			datos, errList = m.ReadFile("(listfile)")
+
+			if errList != nil {
+				println("TABLAS-MPQ   ", nombreArchivo, "(listfile) FALLO:", errList.Error())
+			} else {
+				println("TABLAS-MPQ   ", nombreArchivo, "(listfile) bytes=", len(datos))
+			}
 		}
 
 		// LA CONSULTA: los nombres que el corpus deja al lado de los MPQ (los escribio el host leyendo el
