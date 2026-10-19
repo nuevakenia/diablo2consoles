@@ -287,7 +287,9 @@ Resultado (medido):
 
 QUE HACE EL CAMBIO (archivo nuevo `giro.go` + 5 remiendos chicos en `main.go`; diff de 145 lineas en
 `/tmp/dc249b/giro.patch`, base = main.go con sha256 565bc90f... del 15:33, que ya NO es el actual porque la otra
-corrida sigue editando):
+corrida sigue editando). Los dos artefactos quedan EN EL REPO (no en /tmp, que se poda):
+`console/dc/evidencia/dc-002.49b-giro.patch.txt` y `console/dc/evidencia/dc-002.49b-giro.go.txt` (sha256
+5e2e34ad3214e739858bad4b, 66 lineas, copiado con `cp` del arbol que compilo).
 
   * `direccionDelControl(ejeX, ejeY)`: la cadena del motor (DireccionDelPiso -> DirectionTo -> Dir64ToCof);
   * `direccionesDelControl()`: las 8 direcciones distintas que la cruceta puede pedir, calculadas, no escritas a
