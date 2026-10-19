@@ -30,6 +30,9 @@ SEGS="${2:-75}"
 SAL="${3:-/home/dgalli/.hermes/cache/scratch/consulta-233}"
 GEN="${4:-${GODC_GOX:-/tmp/gox-233}}"
 MPQ="${5:-$HOME/.wine-d2/drive_c/Games/Diablo II}"
+# POC: `tablas-mpq` (el de la consulta) o `tablas-mpq-viva` (el mismo bucle con la vigia del runtime, para
+# ver DENTRO de una recoleccion; su vigia vive en el runtime, no en su csrc/: ver DC-002.39c)
+POC="${POC:-tablas-mpq}"
 MPQ_LISTA="patch_d2.mpq,d2data.mpq,d2char.mpq"
 MPQ_ARCHIVOS="patch_d2.mpq d2data.mpq d2char.mpq"
 REPO="${REPO:-$(cd "$HERE/../.." && pwd)}"
@@ -65,9 +68,9 @@ nota "los 3 MPQ: $(ls "$SAL/juego" | tr '\n' ' ')"
     > "$SAL/tablas-host.txt" 2>&1
 nota "nombres para la consola: $(cat "$SAL"/juego/nombres_*.txt 2>/dev/null | wc -l) lineas"
 
-echo "== 1. el POC tablas-mpq (el que hace la consulta), armado contra $LIBGODC"
+echo "== 1. el POC $POC (el que hace la consulta), armado contra $LIBGODC"
 MKISO_JOLIET=0 DC_RUTA_DATOS=/cd/juego DC_MPQ_JUEGO="$MPQ_LISTA" DC_SIN_SELLOS=1 DC_DISCO_JUEGO="$SAL/juego" \
-    POC=tablas-mpq bash "$HERE/build-motor-arranque.sh" "$SAL/tablas" "$GEN" > "$SAL/tablas.build.log" 2>&1
+    POC="$POC" bash "$HERE/build-motor-arranque.sh" "$SAL/tablas" "$GEN" > "$SAL/tablas.build.log" 2>&1
 if [ ! -e "$SAL/tablas/disc.gdi" ]; then
     rojo "el POC tablas-mpq NO se armo (ver $SAL/tablas.build.log)"
     tail -6 "$SAL/tablas.build.log" | sed 's/^/     /'
