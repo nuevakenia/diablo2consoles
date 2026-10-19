@@ -169,6 +169,35 @@ RESUMEN DEL NUMERO (lo que la tarjeta pedia medir):
    SIN el arreglo de la SQ): hoy el vendor vivo esta en `>>26`. Mientras eso siga asi, el defecto DC-002.24
    esta VIVO y todos los numeros que se saquen del vendor se miden encima de el. No se toco el vendor en
    esta corrida porque hay otro agente trabajando el mismo repo (regla: un agente, una carpeta).
-3. Falta la barrera de la tarjeta: `checar-cadenas-236.sh` (controles 1d/2d) y `banco-vivo` sobre el
-   runtime con la SQ arreglada, y el mutante que exige que la suite se ponga ROJA (el mutante natural es
-   volver a `>> 26`, que es el estado del vendor hoy).
+3. Falta el mutante de la tarjeta que exige que la suite se ponga ROJA (el mutante natural es volver a
+   `>> 26`, que es el estado del vendor hoy) y el corpus `checar-cadenas-236.sh` completo (controles 1d/2d
+   con su mutante): lo de abajo es el control sano de 1d medido aparte.
+
+================================================================================================
+6. LO QUE SE MIDIO DESPUES (mismo runtime B, la SQ arreglada)
+================================================================================================
+a) `banco-vivo` (el POC chiquito de DC-002.39b, el control 1d del corpus) -- NO lo rompe el arreglo de la SQ:
+
+      BANCO-VIVO-TOTAL rondas= 40 comparaciones= 2560 fallos= 0 suma= 15974400 ms= 21082 libreC= 1624
+
+   (fallos= 0 en las 8 marcas de cada 5 rondas, de la 5 a la 40). Es el numero que DC-002.39b
+   dejo como control (0 de 2560, suma 15974400): se sostiene con la SQ arreglada.
+   armado:  DC_ROOT=/tmp/dcroot-39c-sq GODC_GOX=/tmp/gox-head \
+              bash scripts/console/build-dc.sh console/dc/poc/banco-vivo <salida>
+   corrida: FLYCAST=~/dreamcast/dl/squashfs-root/AppRun CAPTURE=none \
+              bash scripts/console/run-flycast.sh <salida>/disc.gdi 40 <out>
+
+b) Con 150 s (en vez de 75) y la SQ arreglada la corrida del POC grande LLEGA MAS LEJOS, y el avance se ve
+   en dos numeros que antes salian en ROJO:
+
+      TABLAS-MPQ-VIVA 3 d2char.mpq entradasHash= 16384 entradasBloque= 10010 \
+                        checksumHash= 3931321293 checksumBloque= 965121384 ms= 3517
+          (las MISMAS tablas que el host: 16384 / 10010 / 3931321293 / 965121384)
+      TABLAS-MPQ-VIVA   d2data.mpq (listfile) bytes= 466867
+          (con `>> 26` la MISMA linea salia "FALLO: zlib: invalid header": el camino del zlib tambien
+           depende de las copias del GC)
+
+   y despues de eso la consola SE REINICIA (REIOS: Booting up a los 02:04,940, con el monton de C en 728 B
+   libres al volver a arrancar), asi que el TOTAL de los 21.253 sigue sin imprimirse: es la pared de RAM /
+   reinicio de DC-002.43, no la consulta.
+
