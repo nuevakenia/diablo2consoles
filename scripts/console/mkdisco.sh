@@ -83,7 +83,14 @@ else
     ARGS+=("$MANIF:/JUEGO/MANIFIESTO.TXT;1")
 fi
 
-"$DC_PYTHON" "$HERE/mkiso.py" "$ISO" "${ARGS[@]}" | sed 's/^/   /'
+# DC-002.44: SIN EL ARBOL JOLIET POR DEFECTO (MKISO_JOLIET=0). Medido (seccion 1 de la evidencia de esta
+# tarjeta, POC disco-c): con el arbol Joliet (el default de mkiso.py, nivel 3) el driver iso9660 de KOS
+# dice "joliet level 3 extensions detected" y monta, pero NINGUN ARCHIVO del arbol se abre --
+# `/cd/JUEGO/PATCH_D2.MPQ` y `/cd/1ST_READ.BIN` dan ENOENT -- asi que un disco "real" armado por aca no
+# servia para leer el juego (el listado andaba igual, por el manifiesto). El arbol Joliet se sigue pudiendo
+# pedir con MKISO_JOLIET=3 (lo hace scripts/console/checar-disco-227.sh, que mide ese defecto a proposito).
+# Los otros armadores de disco (mkdisco-235.sh, mkdisco-236.sh) ya venian con 0 desde DC-002.35.
+MKISO_JOLIET="${MKISO_JOLIET:-0}" "$DC_PYTHON" "$HERE/mkiso.py" "$ISO" "${ARGS[@]}" | sed 's/^/   /'
 "$DC_PYTHON" "$HERE/mkgdi.py" "$DIR" | sed 's/^/   /'
 
 echo "DISCO: $BAKED MPQ en /JUEGO ($BYTES bytes) + el binario de arranque"
