@@ -1,0 +1,97 @@
+DC-002.49 (t_c3da226a) -- LA ANIMACION DEL PERSONAJE: censo medido, causa localizada. Tarjeta ABIERTA.
+
+Esta nota NO cierra la tarjeta: deja medido lo que no necesita el emulador (el ciclo del personaje y su
+velocidad, leidos del MPQ con los lectores del motor) y la causa en el POC, medida leyendolo. Lo que falta para
+cerrar -- correr el ciclo en la consola con el personaje QUIETO y contar los cuadros que se ven -- pide el POC de
+DC-002.38 y Flycast, y DC-002.38 seguia VIVO sobre el mismo repo al medir esto (regla del tablero: un agente a la
+vez sobre la ventana).
+
+=============================================================================
+1. EL CICLO DEL PERSONAJE, MEDIDO (console/dc/sonda-anim-249)
+=============================================================================
+
+Fuente: los COF del personaje desde `d2char.mpq` (los personajes NO estan en d2data.mpq: el listfile de
+d2data.mpq no tiene una sola ruta `chars\...`) y la velocidad desde `data\global\animdata.d2` (que si esta en
+d2data.mpq). Las dos fuentes coinciden en el FPS de cada modo, asi que el numero no depende de una sola.
+
+    go run ./console/dc/sonda-anim-249                       # amazona (AM), sin arma (hth)
+
+    ANIMDATA: 2556 animaciones en total
+    MODO TN  cuadrosPorDireccion=16 direcciones=16 capas=8  fps=7.81 [animdata(AMTNHTH)]  128.00 ms/cuadro  ciclo=2048 ms
+    MODO TW  cuadrosPorDireccion= 8 direcciones=16 capas=8  fps=25.00 [animdata(AMTWHTH)]   40.00 ms/cuadro  ciclo= 320 ms
+    MODO NU  cuadrosPorDireccion= 8 direcciones=16 capas=8  fps=12.50 [animdata(AMNUHTH)]   80.00 ms/cuadro  ciclo= 640 ms
+    MODO WL  cuadrosPorDireccion= 8 direcciones=16 capas=8  fps=25.00 [animdata(AMWLHTH)]   40.00 ms/cuadro  ciclo= 320 ms
+    MODO RN  cuadrosPorDireccion= 8 direcciones=16 capas=8  fps=25.00 [animdata(AMRNHTH)]   40.00 ms/cuadro  ciclo= 320 ms
+    MODO GH  cuadrosPorDireccion= 6 direcciones=16 capas=8  fps=25.00 [animdata(AMGHHTH)]   40.00 ms/cuadro  ciclo= 240 ms
+    MODO A1  cuadrosPorDireccion=13 direcciones=16 capas=8  fps=25.00 [animdata(AMA1HTH)]   40.00 ms/cuadro  ciclo= 520 ms
+    MODO A2  cuadrosPorDireccion=13 direcciones=16 capas=8  fps=25.00 [animdata(AMA2HTH)]   40.00 ms/cuadro  ciclo= 520 ms
+    MODO SC  cuadrosPorDireccion=20 direcciones=16 capas=8  fps=25.00 [animdata(AMSCHTH)]   40.00 ms/cuadro  ciclo= 800 ms
+    MODO DT  cuadrosPorDireccion=23 direcciones=16 capas=1  fps=25.00 [animdata(AMDTHTH)]   40.00 ms/cuadro  ciclo= 920 ms
+    MODO DD  cuadrosPorDireccion= 1 direcciones=16 capas=1  fps=25.00 [animdata(AMDDHTH)]   40.00 ms/cuadro  ciclo=  40 ms
+
+    TOTAL cuadros sumando esos modos (por direccion x direcciones)=1984 ; modos con UN solo cuadro=1
+
+LOS DOS NUMEROS QUE PIDE EL CRITERIO 2:
+
+  * el ciclo que el jugador ve PARADO en el pueblo es **TN: 16 cuadros**, 8 capas, **128 ms por cuadro**
+    (7,81 cuadros/s), o sea un ciclo de **2048 ms**;
+  * caminando en el pueblo, **TW: 8 cuadros**, **40 ms por cuadro** (25 cuadros/s), ciclo de **320 ms**.
+
+O sea: el motor TIENE la animacion (el jugador parado tiene 16 dibujos distintos, no uno). Si la consola muestra
+un personaje tieso, no es que falte el dato: es que el POC pinta siempre el mismo cuadro.
+
+=============================================================================
+2. LA CAUSA EN EL POC, MEDIDA (leyendo el POC de DC-002.38, sin tocarlo)
+=============================================================================
+
+`console/dc/poc/personaje-mapa/main.go`:
+
+    linea  90:  framePersonaje = 0
+
+y el unico uso del cuadro es al armar el compuesto:
+
+    linea 389:  per := NuevoPersonaje(cof, dirPersonaje, framePersonaje)
+    linea 415:  pix := dd.Directions[dirPersonaje].Frames[framePersonaje].PixelData
+
+`framePersonaje` es una **constante**: no hay ninguna variable que avance el cuadro ni reloj que lo module, asi
+que el compuesto es siempre el cuadro 0 de la direccion. El COF tiene 16 cuadros en TN; el POC usa UNO.
+
+Segundo defecto, del mismo tipo: el modo es `NU` (neutral del campo) y **no cambia con el movimiento**. En el
+pueblo el motor usa **TN** parado y **TW** caminando (los dos medidos arriba), y `NU` tiene 8 cuadros a 12,5
+cuadros/s: aunque se avanzara el cuadro, con el modo fijo nunca aparece el ciclo de caminar.
+
+=============================================================================
+3. LO QUE FALTA PARA CERRAR (y por que no se hizo hoy)
+=============================================================================
+
+Criterio 1: la animacion DISTINGUIDA del desplazamiento -- con el personaje QUIETO y el ciclo corriendo, la caja
+del personaje tiene que cambiar de dibujo, con su numero. Pide el POC de DC-002.38 y Flycast: una sola ventana.
+Al medir esto, DC-002.38 (t_b7825ffa) seguia `running` con el emulador vivo.
+
+Criterio 2: los dos numeros ya estan arriba (16 de TN y 8 de TW contra los 1984 del censo); falta cuantos se ven
+de verdad en la consola.
+
+Criterio 3: el mutante -- sin avanzar el ciclo, dos capturas del personaje quieto IDENTICAS (0 pixeles). Hoy ese
+mutante ya esta puesto por accidente: es el POC que hay (`framePersonaje = 0`). La medicion del criterio 1 tiene
+que dar 0 pixeles contra SI MISMA en el POC de hoy y > 0 con el ciclo andando.
+
+Plan cuando DC-002.38 cierre (los numeros ya estan tomados):
+
+  1. `framePersonaje` pasa de constante a variable: cuadro = (ms del cuadro / msPorCuadro) % cuadros, con
+     msPorCuadro = 1000/animdata (TN 128 ms, TW 40 ms) y el modo elegido por estado (TN quieto / TW caminando).
+  2. dos capturas con el personaje QUIETO separadas medio ciclo (TN: 1024 ms) -> pixeles distintos > 0, y la
+     caja del cambio dentro de la caja del personaje (no del mapa).
+  3. dos capturas con el personaje QUIETO en el mismo punto del ciclo -> 0 pixeles distintos (el mutante del
+     criterio 3, al reves).
+  4. las mismas dos capturas con el personaje MOVIENDOSE -> pixeles distintos tambien, y ahi se ve que la
+     separacion de las dos cosas se logra SOLO con el personaje quieto (que es lo que pide el criterio 1).
+
+=============================================================================
+4. DATO PARA DC-002.50 (medido de paso)
+=============================================================================
+
+Los COF del monstruo SI estan en `d2data.mpq` (`data\global\monsters\FA\COF\faa1hth.cof` = ataque 1,
+`faghhth.cof` = golpe recibido, `fanuhth.cof` = neutral, `FADTHTH.COF` = muerte), pero al leerlos con el lector
+del motor y parsearlos con `d2cof.Unmarshal` los 11 modos salen **"EOF"** (bytes cortos), mientras los de la
+amazona en `d2char.mpq` parsean perfecto. Primer dato a cazar en DC-002.50: de donde salen los COF del monstruo
+(patch_D2.mpq no los tiene: su listfile son 162 rutas) y por que este viene corto.
