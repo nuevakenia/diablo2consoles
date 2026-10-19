@@ -4250,3 +4250,56 @@ que deja al motor sin los 7.891 registros) y decidir con medicion DONDE vive la 
 El corpus es `scripts/console/checar-lookups-242.sh` (estados FIX / MUTANTE / SIN-ARCHIVO, con los controles
 del peso, del simbolo, del archivo dentro del ISO y de la consola). Evidencia cruda:
 `evidencia/dc-002.42-lookups-disco.txt`.
+
+## 58. DC-002.39c: el barrido del GC se **CORTA en una cabecera en CERO** y deja 63.024 B sin barrer — el arreglo de los nombres queda en el from-space, y la cabecera en cero la deja la **copia por Store Queue** con la fórmula vieja (`>>26`)
+
+Lo que DC-002.39b dejó anotado como "queda viejo el puntero `cfg`" se midió y **no era eso**: el `cfg` local no
+queda viejo (el GC lo actualiza a la dirección nueva del objeto), y el JSON tampoco (el testigo de literales,
+que vive en `.rodata`, no se rompe nunca). Lo que se rompe es **la memoria a la que `cfg` apunta**.
+
+El eslabón, medido con el POC `tablas-mpq-viva` (el de DC-002.39, que **hoy ya enlaza**: le faltaba su
+`d2c_fallo`, que vivía en el `gc_copy.c` de la copia privada; se portó a `vigia_fallo.c` y se le sumaron tres
+ganchos privados al `gc_copy.c` — `vigia_imprime` al entrar y al salir de cada recolección, `vigia_obj` al
+barrer el objeto del tipo de la config y `vigia_barrido`/`vigia_corte` con el resultado del barrido de Cheney):
+
+1. en la **recolección 1** (fase 17, dentro del cuerpo de `d2data.mpq`) el **barrido de Cheney se corta**:
+   `objetos= 47 cursor= 8c3278e0 alloc= 8c336f10 corto= 1 queda-sin-barrer= 63024`, y la cabecera que lo corta
+   está **en cero** (`corte_datos= 0`, con 136 palabras en cero seguidas); las 4 palabras de antes son texto
+   (`lite` / `dhth` / `.dcc` / `\r\nda`), o sea el cursor cayó en el **medio** de un objeto medio copiado;
+2. la copia del objeto de la **config** (`hdr MUDADO 8c2a5890 -> 8c335398`) cae **dentro** de ese tramo sin
+   barrer: su campo `[]string` no se sigue (`OBJN ... barridos= 0`), el arreglo de los 3 nombres **no se
+   copia** y queda en el from-space;
+3. la recolección 2 usa ese espacio como destino y **lo pisa**: `cfg` fase 17 gc 2 lee `6f4d5c6c 6574736e …`
+   ("l\Monste…"), `largos= 1702130542,1381260368,1414089810` y el nombre sale `LITDTHTH.D`;
+4. el número: `d2data.mpq **nombres= 0** contenidos= 0` de 11.082 (el mismo 162 de 21.253 de DC-002.39b).
+
+La cabecera en cero la deja **la copia por Store Queue con la fórmula vieja**: `~/dreamcast/libgodc` tenía
+`*QACR0/1 = (dst_addr >> 26) & 0x1C`, que para el montón (`0x8C……`) da área 0 → las escrituras van a la BIOS y
+se descartan, o sea **el defecto DC-002.24 estaba VIVO en el vendor**. El script que corrió último en la cadena
+fue el de DC-002.39b y **no re-aplica** el de la SQ: la cadena de `fix-libgodc-*.py` no se sostiene sola
+(tarjeta DC-002.39d).
+
+La **contra-prueba**, con el mismo POC, el mismo disco y el mismo gox (lo único distinto es lo que aplica
+`fix-libgodc-sq.py`, `>> 24` + la invalidación de caché del destino):
+
+| | con `>>26` (el vendor vivo) | con `>>24` (la SQ arreglada) |
+|---|---|---|
+| barrido de la recolección 1 | 47 objetos, `corto=1`, **63.024 B sin barrer** | 138 objetos, `corto=0`, `queda-sin-barrer=0` |
+| `patch_d2.mpq` | 162 de 162 (2.421 ms) | 162 de 162 (2.421 ms) |
+| `d2data.mpq` | **0 de 11.082** (10.815 ms) | **11.082 de 11.082**, `largas= 0` (21.122 ms) |
+| `(listfile)` de `d2data` | `FALLO: zlib: invalid header` | `bytes= 466867` |
+| tablas de `d2char.mpq` | no llega | `16384 / 10010 / 3931321293 / 965121384` (las del host) |
+| `banco-vivo` (control 1d) | — | 40 rondas, 2.560 comparaciones, **fallos= 0**, suma 15.974.400 |
+
+Los mismos números en dos corridas independientes (y repetidos dentro de cada corrida tras el reinicio de la
+consola). El **TOTAL de 21.253 sigue sin imprimirse** porque con los 3 MPQ la consola **se reinicia** al entrar
+en `d2char` (el síntoma de DC-002.43, no de la consulta).
+
+**El método, para que no se repita:** medir siempre sobre una copia privada del runtime (`cp -a` + los
+`fix-libgodc-*.py` con la ruta como argumento) y **comprobar en qué estado está el vendor antes de creer
+cualquier número**: `grep -n 'dst_addr >> 2' ~/dreamcast/libgodc/runtime/gc_copy.c` tiene que decir `>> 24`.
+
+**Ambiente (costó dos corridas):** el `flycast.AppImage` muere con **SIGBUS** si `/tmp` (tmpfs, 16 GB) está
+casi lleno; el log no trae una sola línea de la consola y parece un fallo del POC. Con el AppImage ya extraído
+(`FLYCAST=$HOME/dreamcast/dl/squashfs-root/AppRun`) anda. Evidencia:
+`console/dc/evidencia/dc-002.39c-barrido-cortado.txt`.
