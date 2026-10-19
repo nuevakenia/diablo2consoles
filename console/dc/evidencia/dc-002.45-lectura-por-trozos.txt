@@ -1,0 +1,112 @@
+DC-002.45 -- LA TABLA SE CONSUME POR TROZOS, NO ENTERA EN MEMORIA
+=================================================================
+Evidencia medida en la consola (Flycast, consola serie) y en el host, 19-oct-2026, rama DC-002.
+Corpus: scripts/console/checar-trozos-245.sh 50   ->  12 controles OK, 0 con fallo (exit 0).
+Host:   go test ./d2common/d2fileformats/d2txt/... ./d2core/d2asset/... ./d2common/d2loader/...  -> ok
+        (cd console/dc/std && go test ./difftest/ -run 'DC00245|LvlPrest|PorTrozos')               -> ok
+
+== 0. DE QUE SE TRATA =
+DC-002.43 midio que el arranque moria ADENTRO de la lectura completa (`ioutil.ReadAll`) de
+`data/global/excel/LvlPrest.txt`: 134937 B de archivo contra 132104 B libres en el semiespacio del GC
+(392184/524288 usados al entrar). El arreglo de esta tarjeta es que la tabla NO se materialice: el
+`csv.Reader` la consume del stream del asset (el MPQ ya entrega por sector de 4096).
+
+== 1. EL ARREGLO (que cambio) =
+* d2core/d2asset/asset_manager.go  `LoadDataDictionary`: `LoadFile` (ReadAll) + `LoadDataDictionary(bytes)`
+  -> `LoadAsset` (el stream tal cual) + `d2txt.LoadDataDictionaryReader(stream)`.
+* d2core/d2asset/asset_manager.go  `LoadRecords`: las dos marcas de la LECTURA (`lee-entra`/`lee-volvio`)
+  envuelven el CONSUMO de la tabla, que es donde el stream se lee de verdad.
+* d2common/d2fileformats/d2txt/data_dictionary.go: `LoadDataDictionaryReader(io.Reader)`.
+  `LoadDataDictionary([]byte)` queda como envoltorio (mismos bytes, mismo comportamiento).
+* El mutante (el estado de antes) y el arreglo salen del MISMO texto reversible:
+  scripts/console/fix-tablas-trozos-245.py --sano | --pristino | --estado.
+
+== 2. HOST: la tabla REAL (134937 B) leida por trozos =
+  (console/dc/std/difftest/dc00245_test.go, con la tabla sacada del MPQ por el d2mpq del arbol,
+   sin usar el codigo del motor: tablas/LvlPrest.txt = 134937 B)
+
+  filas = 1093        pedidos al lector = 34        pedido mayor = 4096 B
+  las 1093 filas son IGUALES a las de `encoding/csv` de Go: mismos campos, mismo largo de fila, mismo final.
+  la tabla entera (bytes) y la tabla por trozos dan las mismas 1093 filas.
+
+  O sea: el consumidor le pide al lector 4096 B por vuelta -- NUNCA el archivo entero.
+
+== 3. CONSOLA: la lectura de LvlPrest.txt (capa del arbol de hoy, 50 s de captura) =
+
+  SANO (la tabla por trozos)
+  --------------------------------------------------------------------------------------------------
+  ARQ-CARGA entra   /data/global/excel/LvlPrest.txt  cfree=39944 cused=2343960 gsemi=368376/524288 gc=6
+  ARQ-CARGA volvio  /data/global/excel/LvlPrest.txt  cfree=39944 cused=2343960 gsemi=374032/524288 gc=6
+  ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=39944 cused=2343960 gsemi=372568/524288 gc=7
+  ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=39416 cused=2668072 gsemi=376320/524288 gc=1121
+  ARQ-CARGA entra   /data/global/excel/LvlWarp.txt   cfree=39416 cused=2668072 gsemi=376584/524288 gc=1121
+  ARQ-CARGA lee-volvio /data/global/excel/LvlWarp.txt cfree=39416 cused=2668072 gsemi=371992/524288 gc=1122
+
+  la marca de la lectura CRECE 3752 B (376320 - 372568) con un archivo de 134937 B: la tabla no se
+  materializa. Y el motor SIGUE: pide la tabla siguiente (LvlWarp.txt) y la termina de leer.
+  15 marcas de carga, 3 assets del MPQ, ninguna muerte en la ventana.
+
+  MUTANTE (el ReadAll puesto: fix-tablas-trozos-245.py --pristino)
+  --------------------------------------------------------------------------------------------------
+  ARQ-CARGA entra   /data/global/excel/LvlPrest.txt  cfree=39912 cused=2343960 gsemi=342720/524288 gc=7
+  ARQ-CARGA volvio  /data/global/excel/LvlPrest.txt  cfree=39912 cused=2343960 gsemi=348376/524288 gc=7
+  ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=39912 cused=2343960 gsemi=348376/524288 gc=7
+  ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=39232 cused=3176128 gsemi=381248/524288 gc=47
+  ...y muere DESPUES, ya lejos de la lectura:
+  fatal error: gc_external_alloc: OOM
+  Memory: arena=4374528 used=4332408 free=42120
+
+  Entra a la lectura con 175912 B libres (524288 - 348376) para un archivo de 134937 B: LE SOBRAN 40975 B.
+  NO muere adentro de la lectura. El `ReadAll` entra hoy, y el mutante avanza MAS que el arreglo en la
+  misma ventana (5 tablas del MPQ contra 3, 24 marcas contra 15). Lo que lo mata no es la lectura: es el
+  monton de C (`arena=4374528 used=4332408`, 42120 B libres) al pedir un itab (`gc_external_alloc`).
+
+== 4. EL NUMERO QUE DECIDE LA TARJETA SIGUIENTE: el DATO VIVO =
+  (marca `gc-vivo` de scripts/console/instrumentar-vivo-245.py: bytes que sobreviven a la copia)
+
+  sano:     dato vivo maximo 514832 B de 524288  ->  98.1 %   quedan  9456 B
+  mutante:  dato vivo maximo 515536 B de 524288  ->  98.3 %   quedan  8752 B
+
+  Ya no es el archivo (134937 B) el que llena el semiespacio: son las filas parseadas que el RecordManager
+  se queda. Con el dato vivo al 98 %, cada recoleccion copia ~500 KB y el arranque se arrastra: entre
+  `lee-entra` y `lee-volvio` de LvlPrest.txt el arreglo hace 1114 recolecciones (gc 7 -> 1121).
+
+  Del otro lado del semiespacio: el monton de C tiene 42120 B libres de 4374528 (99 % usado). O sea que
+  la otra salida de la tarjeta ("subir el semiespacio") NO es gratis NI es posible hoy: no hay de donde.
+
+== 5. EL CORPUS DE DC-002.34 NO SE MUEVE (criterio 2) =
+  GEN_HEAD=<capa del arbol de hoy> bash scripts/console/checar-motor-disco-234.sh 25
+  -> 9 controles OK, 0 con fallo (exit 0)
+
+  los cinco estados, medidos con la capa del arreglo:
+    BASE      1 vuelta, 1 fuente, 0 assets, semiespacio max 424048 (libre min 100240)
+    S233      1 vuelta, 3 fuentes, 2 assets (LvlTypes, LvlPrest), 10 marcas, semiespacio max 491200
+    S232      1 vuelta, 3 fuentes, 2 assets (LvlTypes, LvlPrest), 10 marcas, semiespacio max 491200
+    S232SOLO  1 vuelta, 1 fuente,  0 assets, semiespacio max 424048
+    sin-juego el cartel del motor vuelve (2 veces)
+  S233 y S232 siguen pidiendo los dos assets y su ultima marca sigue siendo `lee-entra .../LvlPrest.txt`:
+  con 25 s de captura la tabla nueva (por trozos) todavia se esta consumiendo. NO es una regresion (las
+  marcas son las mismas de DC-002.43); con 50 s la lectura termina y el motor pasa a LvlWarp.txt (seccion 3).
+
+== 6. LO QUE ESTA TARJETA **NO** DEJA ARREGLADO (y el numero que lo dice) =
+  1. el criterio 3 de la tarjeta ("el mutante tiene que volver a morir en la lectura") NO se cumple, y no
+     se cumple porque el defecto de DC-002.43 ya no alcanza a matar: con el runtime de hoy entran 175912 B
+     donde el archivo pide 134937 B. El control se reformulo: lo que se mide es la PROPIEDAD (la marca de
+     la lectura no crece en el tamano del archivo: 3752 B) y el margen del mutante se informa con numeros.
+  2. el camino por trozos CUESTA: 1114 recolecciones entre lee-entra y lee-volvio de una sola tabla, y
+     avanza menos por segundo que el ReadAll (3 tablas contra 5 en 50 s) porque el dato vivo esta al 98 %
+     del semiespacio. Sin bajar el dato vivo (o sin mas semiespacio, que hoy no hay) el arreglo no paga.
+  3. el monton de C esta al 99 % (42120 B libres de 4374528): ahi muere el mutante (`gc_external_alloc:
+     OOM`), o sea que el techo de la consola hoy son DOS montones llenos, no uno.
+
+== 7. COMO SE REPITE =
+  bash scripts/console/checar-trozos-245.sh --refrescar 50      # 12 controles, arma capas e imagenes
+  bash scripts/console/checar-trozos-245.sh 50                  # reusa capas/imagenes, reusa corridas
+  GEN_HEAD=<capa> bash scripts/console/checar-motor-disco-234.sh 25
+  (cd console/dc/std && go test ./difftest/ -run 'DC00245|LvlPrest|PorTrozos' -v)
+  go test ./d2common/d2fileformats/d2txt/... ./d2core/d2asset/... ./d2common/d2loader/...
+
+  OJO 1: con 25 s el `lee-volvio` de LvlPrest.txt NO alcanza a salir (la tabla por trozos hace ~1114
+         recolecciones): medir con 50 s.
+  OJO 2: el runtime tiene que traer el arreglo de los itabs (control 0e). Sin el, el camino por trozos
+         salta a basura DENTRO de un gc_collect (PC 6c000000) y la corrida no mide la lectura.

@@ -4807,3 +4807,83 @@ Ojo con lo que esta tarjeta **no** arregló: el defecto del itab ya estaba arreg
 que se hizo fue medirlo, nombrarlo y dejar el corpus con los controles que lo cazan.
 
 Evidencia: `console/dc/evidencia/dc-002.46-corpus-16.txt`.
+
+## 67. DC-002.45: la tabla se **consume por trozos** (34 pedidos de 4.096 B por `LvlPrest.txt`) — la lectura deja de ser la pared, y **el que llena el semiespacio es el DATO VIVO: 514.832 de 524.288 (98,1 %)**
+
+DC-002.43 dejó medido que el arranque moría **adentro** de la lectura completa (`ioutil.ReadAll` de
+`LoadFile`) de `data/global/excel/LvlPrest.txt`: **134.937 B** de archivo contra **132.104 B** libres en el
+semiespacio del GC al entrar (`gsemi=392184/524288`). Lo que se hizo acá es que la tabla **no se materialice**:
+el `csv.Reader` la consume del stream del asset (el MPQ ya entrega por **sector de 4.096**), y las filas que
+quedan vivas son las parseadas, no el archivo.
+
+**Lo que cambió** (`d2core/d2asset/asset_manager.go`, `d2common/d2fileformats/d2txt/data_dictionary.go`):
+
+```
+LoadDataDictionary:  antes  LoadFile(path)  (ReadAll del asset entero) + LoadDataDictionary(bytes)
+                     ahora  LoadAsset(path) (el stream tal cual)      + LoadDataDictionaryReader(stream)
+LoadRecords:         las marcas lee-entra/lee-volvio envuelven el CONSUMO de la tabla, que es donde se lee
+```
+
+Las dos versiones (arreglo y mutante) salen del **mismo texto reversible**:
+`scripts/console/fix-tablas-trozos-245.py --sano | --pristino | --estado`.
+
+**Host, con la tabla REAL** (`console/dc/std/difftest/dc00245_test.go`, 134.937 B sacados del MPQ por el
+`d2mpq` del árbol): **1.093 filas**, el lector recibe **34 pedidos**, el mayor de **4.096 B**, y las 1.093
+filas son idénticas a las de `encoding/csv` de Go (campos, largos y final). La tabla entera y por trozos dan
+lo mismo: el arreglo no cambia lo que sale.
+
+**Consola (Flycast, 50 s, capa del árbol de hoy)** — la marca de la lectura del arreglo **crece 3.752 B**
+(372.568 → 376.320) con un archivo de 134.937 B, y el motor **sigue**:
+
+```
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt  gsemi=372568/524288 gc=7
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt gsemi=376320/524288 gc=1121
+ARQ-CARGA entra     /data/global/excel/LvlWarp.txt   gsemi=376584/524288 gc=1121
+ARQ-CARGA lee-volvio /data/global/excel/LvlWarp.txt  gsemi=371992/524288 gc=1122
+```
+
+15 marcas de carga, 3 assets del MPQ, ninguna muerte en la ventana. `scripts/console/checar-trozos-245.sh 50`
+→ **12 controles OK, 0 con fallo**. (Con 25 s el `lee-volvio` **no alcanza a salir**: la tabla por trozos hace
+~1.114 recolecciones, ver abajo. Medir con 50 s.)
+
+**El número que decide la tarjeta siguiente** (marca `gc-vivo` de `instrumentar-vivo-245.py`, lo que sobrevive
+a la copia): **514.832 B de 524.288 = 98,1 %**, quedan **9.456 B**. Ya no es el archivo el que llena el
+semiespacio: son las filas parseadas que el `RecordManager` se queda. Con el dato vivo al 98 %, cada
+recolección copia ~500 KB y el arranque se arrastra: **1.114 recolecciones** entre `lee-entra` y `lee-volvio`
+de una sola tabla.
+
+**La otra salida de la tarjeta quedó cerrada por medición**: "subir el semiespacio" no es gratis ni posible
+hoy — del otro lado está el **montón de C con 42.120 B libres de 4.374.528** (99 % usado). El mutante muere
+justo ahí, ya lejos de la lectura:
+
+```
+fatal error: gc_external_alloc: OOM
+Memory: arena=4374528 used=4332408 free=42120
+```
+
+**El criterio 3 de la tarjeta cambió de forma, y lo cambia un número**: el mutante con el `ReadAll` puesto
+**entra** a la lectura (175.912 B libres para 134.937 B: le sobran **40.975 B**) y **no** muere adentro —
+avanza **más** que el arreglo en la misma ventana (5 tablas contra 3, 24 marcas contra 15). Un control que se
+pone rojo porque el defecto ya no alcanza a matar no habla del arreglo, así que el corpus mide la **propiedad**
+(la marca de la lectura no crece en el tamaño del archivo) y **informa el margen** del mutante con números.
+
+**El corpus de DC-002.34 no se mueve** (`GEN_HEAD=<capa de hoy> bash scripts/console/checar-motor-disco-234.sh 25`
+→ **9/9**): los cinco estados dan lo mismo que en DC-002.43 — `S233`/`S232` siguen con **10 marcas**, **2
+assets** y la última marca `lee-entra .../LvlPrest.txt` (con 25 s la tabla por trozos todavía se está
+consumiendo; con 50 s termina y pasa a `LvlWarp.txt`).
+
+**Controles nuevos del corpus** (`checar-trozos-245.sh`, 12 en verde): `0e` el runtime pide los itabs al
+montón de C (sin eso el camino por trozos salta a basura dentro de un `gc_collect`, PC `6c000000`);
+`0f` `orden-motor.txt` sin repetidos (medido: **171 líneas, 29 repetidas, 142 únicas** → el linker muere con
+`multiple definition of ...`); `2`/`2b` la capa del mutante **no** es el mismo binario (`d2asset.gox`
+1.099.948 B contra 1.101.628 B) y la copia estaba en `pristino` al compilarla; `7` la marca de la lectura del
+arreglo no crece en el tamaño del archivo. El control `2` anterior miraba `LoadDataDictionaryReader` en
+`d2txt.gox`: esa función existe en **los dos** árboles (el que se muta es el **llamador**) y daba `4 y 4`, que
+se lee como "el mutante no se recompiló" cuando sí.
+
+**Lo que esta tarjeta NO deja arreglado**: el arranque no avanza más que antes (3 tablas contra 5 del mutante
+en 50 s) porque el dato vivo está al 98 % del semiespacio; el montón de C está al 99 %; y la cadena del
+runtime ahora incluye el paso 5 (`fix-libgodc-itab-245.py`, el itab fuera del montón movible) para que un
+runtime rearmado desde cero no pierda el arreglo.
+
+Evidencia: `console/dc/evidencia/dc-002.45-lectura-por-trozos.txt`.

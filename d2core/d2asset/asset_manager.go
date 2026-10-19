@@ -430,22 +430,30 @@ func (am *AssetManager) LoadPaletteTransform(path string) (*d2pl2.PL2, error) {
 	return pl2, nil
 }
 
-// LoadDataDictionary loads a txt data file
+// LoadDataDictionary loads a txt data file.
+//
+// DC-002.45 -- LA TABLA SE CONSUME POR TROZOS, NO ENTERA EN MEMORIA. Antes esto era
+// `LoadFile(path)` (el `ioutil.ReadAll` del asset completo) + `d2txt.LoadDataDictionary(bytes)`: el archivo
+// ENTERO tenia que entrar en el semiespacio del GC de la consola ANTES de parsear la primera fila, y el
+// arranque moria adentro de esa lectura (`LvlPrest.txt`: 134.937 B contra 132.104 libres al entrar;
+// DC-002.43). El `csv.Reader` de la tabla NO necesita los bytes: los pide por trozos a medida que avanza, y
+// el stream del MPQ ya entrega por SECTOR (4 KB). Se le pasa el stream del asset tal cual. Lo que queda vivo
+// son las filas ya parseadas, no el archivo: el techo de memoria no cambia y sirve para cualquier tabla
+// grande (MonStats.txt son 432.634 B, Skills.txt 173.535).
+//
+// OJO: el `DataDictionary` lee del stream MIENTRAS se lo recorre, asi que la tabla se tiene que consumir
+// antes de olvidar el stream. El que la consume lo hace en el acto: `LoadRecords` la entrega a los loaders
+// del RecordManager y vuelve. El comentario de mas abajo sobre el cacheo sigue valiendo (no se cachea el
+// DataDictionary: no se puede recorrer dos veces, ni con un stream ni con los bytes de antes).
 func (am *AssetManager) LoadDataDictionary(path string) (*d2txt.DataDictionary, error) {
-	// we purposefully do not cache data dictionaries because we are already
-	// caching the file data. The underlying csv.Reader does not implement io.Seeker,
-	// so after it has been iterated through, we cannot iterate through it again.
-	//
-	// The easy way around this is to not cache d2txt.DataDictionary objects, and just create
-	// a new instance from cached file data if/when we ever need to reload the data dict
-	data, err := am.LoadFile(path)
+	stream, err := am.LoadAsset(path)
 	if err != nil {
 		return nil, err
 	}
 
 	am.Debugf(fmtLoadDict, path)
 
-	return d2txt.LoadDataDictionary(data), nil
+	return d2txt.LoadDataDictionaryReader(stream), nil
 }
 
 // LoadRecords will load the records for the given path into the record manager.
@@ -456,7 +464,17 @@ func (am *AssetManager) LoadRecords(path string) error {
 		return err
 	}
 
+	// DC-002.45: las dos marcas de la LECTURA envuelven EL CONSUMO del asset, que es donde el stream se lee
+	// de verdad (los loaders del RecordManager recorren la tabla entera aca adentro). Con la tabla entera en
+	// memoria (`ReadAll`) las dos marcas quedaban adentro de `LoadFile`; el significado es el MISMO -- la
+	// ultima marca de la corrida sigue diciendo que asset estaba leyendo el motor cuando se murio -- pero
+	// ahora la marca mira al consumidor, que es donde puede morir una tabla que se lee por trozos.
+	d2loader.Marca(path, d2loader.MarcaLeeEntra)
+
 	err = am.Records.Load(path, dict)
+
+	d2loader.Marca(path, d2loader.MarcaLeeVolvio)
+
 	if err != nil {
 		return err
 	}

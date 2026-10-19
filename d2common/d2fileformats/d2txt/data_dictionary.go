@@ -84,8 +84,26 @@ func (d *DataDictionary) col(field string) int {
 
 // LoadDataDictionary loads the contents of a spreadsheet style txt file
 func LoadDataDictionary(buf []byte) *DataDictionary {
-	cr := csv.NewReader(bytes.NewReader(buf))
-	cr.Comma = '\t'
+	return LoadDataDictionaryReader(bytes.NewReader(buf))
+}
+
+// LoadDataDictionaryReader loads a spreadsheet style txt file FROM A STREAM (DC-002.45).
+//
+// POR QUE EXISTE: `LoadDataDictionary` obliga a tener el archivo ENTERO en memoria (`[]byte`) ANTES de
+// empezar a leer la primera fila, y eso es justo lo que no entra en el semiespacio del GC de la consola
+// (DC-002.43: `LvlPrest.txt` son 134.937 B y al entrar quedaban 132.104 libres -- el arranque moria adentro
+// de `ioutil.ReadAll`). La tabla NO necesita esos bytes: el `csv.Reader` los pide POR TROZOS a medida que
+// `Next()` avanza (su `bufio` pide 4 KB por vuelta) y el stream del MPQ los entrega por SECTOR (ya lee por
+// sectores: `LvlPrest.txt` son 33 sectores de 4.096). Con esto la tabla se consume ENTERA sin materializar
+// el archivo: lo vivo son las filas ya parseadas, no el archivo.
+//
+// OJO, LA VIDA DEL LECTOR ES LA VIDA DE LA TABLA: el `DataDictionary` lee de `r` a medida que se lo
+// recorre, asi que el `io.Reader` tiene que seguir abierto hasta el ultimo `Next()`. Los campos de cada
+// fila son cadenas PROPIAS (el `csv.Reader` las copia en `readRecord`), o sea que las filas ya leidas no
+// dependen del buffer del lector y sobreviven a la tabla.
+func LoadDataDictionaryReader(r io.Reader) *DataDictionary {
+	cr := csv.NewReader(r)
+	cr.Comma = '	'
 	cr.ReuseRecord = true
 	cr.FieldsPerRecord = -1 // real game tables have ragged rows
 	cr.LazyQuotes = true

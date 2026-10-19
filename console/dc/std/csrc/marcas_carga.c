@@ -26,6 +26,11 @@
  * cuelga en la linea siguiente, la marca tiene que estar YA afuera. dbgio_printf escribe con el dispositivo
  * de consola de KOS (scif) y usa un buffer ESTATICO (kos/kernel/debug/dbgio.c: `printf_buf`), o sea que no
  * reserva memoria: la marca no puede mover los numeros que esta midiendo.
+ *
+ * DC-002.45: `lee-entra`/`lee-volvio` son las marcas de LA LECTURA DEL ASSET, y hay dos caminos que las
+ * usan (el mismo par para los dos, ver d2common/d2loader/marca_carga.go): la lectura COMPLETA
+ * (`LoadFile` -> `ioutil.ReadAll`, el asset entero a memoria) y la lectura POR TROZOS (las tablas del
+ * RecordManager, que consumen el stream del MPQ por SECTOR: las marca `LoadRecords`).
  */
 #include <kos.h>
 #include <malloc.h>
@@ -42,8 +47,8 @@ static const char *etiqueta_de(int punto)
     case 0: return "instrumento"; /* la marca de control que imprime el paquete al arrancar */
     case 1: return "entra";       /* entrando a Loader.Load */
     case 2: return "volvio";      /* Loader.Load devolvio el archivo abierto */
-    case 3: return "lee-entra";   /* entrando a la lectura completa del stream */
-    case 4: return "lee-volvio";  /* la lectura completa devolvio los bytes */
+    case 3: return "lee-entra";   /* entrando a la LECTURA del asset (ReadAll, o el consumo por trozos) */
+    case 4: return "lee-volvio";  /* la lectura del asset termino */
     default: return "?";
     }
 }

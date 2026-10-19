@@ -24,11 +24,13 @@
 #     2. fix-libgodc-candidato.py <LIB>        reset + punteros interiores + candidato + marcas ARQ-MARCA
 #     3. fix-libgodc-sq.py <LIB> --sin-pristino  LA STORE QUEUE (el paso que faltaba: sin resetear)
 #     4. fix-libgodc-itab.py <LIB>             el CACHE DE ITABS como raiz del GC (DC-002.39e)
-#     5. (con --build) el `libgodc.a` al dia
+#     5. fix-libgodc-itab-245.py <LIB>         el ITAB FUERA DEL MONTON MOVIBLE (DC-002.45): se pide al monton
+#                                              de C, asi el cache de `.bss` no guarda punteros que el GC mueve
+#     6. (con --build) el `libgodc.a` al dia
 #
-#   El paso 4 va ULTIMO a proposito, por la misma razon que la SQ: `fix-libgodc-itab.py` resetea
-#   `interface_dreamcast.c` y despues reaplica el ABI, asi que deja su archivo en el estado final y no se
-#   lleva nada de los anteriores (tocan `gc_copy.c`, otro archivo). Medido: la cadena desde el vendor sucio
+#   El paso 4 va antes del 5 a proposito (los dos tocan `get_itab`, y el 5 tiene que quedar el ultimo), y los
+#   dos van DESPUES de la SQ por la misma razon: `fix-libgodc-itab.py` resetea `interface_dreamcast.c` y despues
+#   reaplica el ABI, asi que deja su archivo en el estado final. Medido: la cadena desde el vendor sucio
 #   termina siempre en el mismo sha.
 #
 # USO
@@ -73,11 +75,21 @@ veredicto() { # $1 = archivo
     [ "$(grep -c 'PUNTEROS INTERIORES' "$f")" -ge 1 ] || { echo "   FALTAN los punteros interiores (DC-002.36)"; fallos=$((fallos + 1)); }
     [ "$(grep -c 'DC-002.39b' "$f")" -ge 1 ] || { echo "   FALTA el candidato del barrido (DC-002.39b)"; fallos=$((fallos + 1)); }
     [ "$(grep -c 'ARQ-MARCA (DC-002.29)' "$f")" -ge 1 ] || { echo "   FALTAN las marcas del arranque (DC-002.29)"; fallos=$((fallos + 1)); }
-    # DC-002.39e: el cache de itabs como raiz del GC. Vive en OTRO archivo (interface_dreamcast.c), asi que
-    # se comprueba aparte y no por el sha de gc_copy.c.
+    # DC-002.39e / DC-002.45: el cache de itabs NO puede guardar punteros del monton movible. Hay DOS formas
+    # de lograrlo y las dos son validas: registrar el cache como raiz del GC (DC-002.39e) o pedir el itab al
+    # monton de C con `gc_external_alloc` (DC-002.45, el estado de hoy: si el itab no se mueve, no hay nada
+    # que registrar). Vive en OTRO archivo (interface_dreamcast.c), asi que se comprueba aparte del sha.
     local itab="$LIB/runtime/interface_dreamcast.c"
-    [ "$(grep -c 'd2c_itab_registrar_raices' "$itab" 2>/dev/null)" -ge 2 ] || {
-        echo "   FALTA el cache de itabs como raiz del GC (DC-002.39e)"; fallos=$((fallos + 1)); }
+    local raices externo
+    raices="$(grep -c 'd2c_itab_registrar_raices' "$itab" 2>/dev/null || true)"
+    externo="$(grep -c 'gc_external_alloc(total_size)' "$itab" 2>/dev/null || true)"
+    if [ "${raices:-0}" -ge 2 ]; then
+        :
+    elif [ "${externo:-0}" -ge 1 ]; then
+        :
+    else
+        echo "   FALTA el arreglo de los itabs (DC-002.39e: el cache como raiz, o DC-002.45: el itab fuera del monton movible)"; fallos=$((fallos + 1))
+    fi
     local kb
     kb="$(grep -a '^#define GC_SEMISPACE_SIZE_KB' "$LIB/runtime/godc_config.h" 2>/dev/null | head -1 | grep -oE '[0-9]+$')"
     [ "${kb:-0}" = "$KB" ] || { echo "   el semiespacio esta en ${kb:-?} KiB y se pidio $KB"; fallos=$((fallos + 1)); }
@@ -115,13 +127,22 @@ python3 "$HERE/fix-libgodc-sq.py" "$LIB" --sin-pristino > /tmp/dc-cadena-sq.log 
 dato "    despues de la SQ (el estado completo)"
 grep -n 'dst_addr >> 2' "$C" | head -2 | sed 's/^/        /'
 
-echo "   4/5 fix-libgodc-itab.py  (el CACHE DE ITABS como raiz del GC: DC-002.39e)"
+echo "   4/6 fix-libgodc-itab.py  (el CACHE DE ITABS como raiz del GC: DC-002.39e)"
 python3 "$HERE/fix-libgodc-itab.py" "$LIB" > /tmp/dc-cadena-itab.log 2>&1 || {
     echo "   FALLO: ver /tmp/dc-cadena-itab.log" >&2; tail -5 /tmp/dc-cadena-itab.log >&2; exit 1; }
 echo "        interface_dreamcast.c: sha $(sha256sum "$LIB/runtime/interface_dreamcast.c" | cut -c1-16), $(grep -c 'd2c_itab_registrar_raices' "$LIB/runtime/interface_dreamcast.c") marcas del arreglo"
 
+# DC-002.45: el itab FUERA del monton movible. Va DESPUES del paso 4 porque `fix-libgodc-itab.py` reescribe el
+# mismo get_itab (y `fix-libgodc-iface.py`, dentro del paso 1, resetea interface_dreamcast.c). El porque esta en
+# la cabecera de fix-libgodc-itab-245.py; el numero que lo pide esta en DC-002.43 (el camino por trozos hace una
+# recoleccion cada 4 KB de tabla y el cache de `.bss` quedaba apuntando a la mitad vieja del semiespacio).
+echo "   5/6 fix-libgodc-itab-245.py  (el itab al monton de C, fuera del monton movible: DC-002.45)"
+python3 "$HERE/fix-libgodc-itab-245.py" "$LIB" > /tmp/dc-cadena-itab245.log 2>&1 || {
+    echo "   FALLO: ver /tmp/dc-cadena-itab245.log" >&2; tail -5 /tmp/dc-cadena-itab245.log >&2; exit 1; }
+echo "        interface_dreamcast.c: $(grep -c 'gc_external_alloc(total_size)' "$LIB/runtime/interface_dreamcast.c") itabs pedidos al monton de C"
+
 if [ "$BUILD" = "1" ]; then
-    echo "   5/5 el libgodc.a al dia"
+    echo "   6/6 el libgodc.a al dia"
     rm -f "$LIB"/runtime/*.o "$LIB"/*.a
     make -C "$LIB" -s all > /tmp/dc-cadena-make.log 2>&1 || {
         echo "   FALLO: ver /tmp/dc-cadena-make.log" >&2; tail -5 /tmp/dc-cadena-make.log >&2; exit 1; }
