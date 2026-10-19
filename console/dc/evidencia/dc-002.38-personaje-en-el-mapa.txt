@@ -360,3 +360,15 @@ Salida cruda del corpus (46/46): al final de este archivo.
 == VEREDICTO
    46 controles OK, 0 FALLOS
 EXIT=0
+
+=============================================================================
+11. LAS TRES CAPTURAS (recortadas al area cliente del emulador, 667x442)
+=============================================================================
+
+  dc-002.38-consola-parado.png     md5 e38958d90b92a9301084271599838ac6   el arranque (botones 0)
+  dc-002.38-consola-diagonal.png   md5 bcd886a2891ba93296f64c4b33ff7a6f   despues de arriba+derecha (144)
+  dc-002.38-mutante-derecha.png    md5 e38958d90b92a9301084271599838ac6   el MUTANTE despues de derecha (128)
+
+Las dos primeras son distintas: el personaje se movio. La tercera es BYTE A BYTE la misma que la del
+arranque del MUTANTE: con el control sordo, la pulsacion de la flecha derecha no cambia ni un pixel (es lo
+que exige el criterio 3, y es el mismo md5, no una semejanza).
