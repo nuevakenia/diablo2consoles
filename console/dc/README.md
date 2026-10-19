@@ -4058,3 +4058,69 @@ anchos (13 de 13 de los que hablan con KOS siguen sin compilar en el host) y
 `go test ./d2common/d2fileformats/d2mpq/` verde.
 
 Evidencia cruda: `evidencia/dc-002.40-mpq-comprimido.txt`.
+
+## 56. DC-002.41: el mega contiguo del monton de C era la **tabla de hash de `d2data.mpq`** (1.048.576 B pedidos de una sola vez con 671.744 de credito) — el arreglo guarda solo las ranuras **OCUPADAS** (la reserva baja a **185.776 B** y el ahorro en las tres tablas es **1.219.200 B**), y con eso el arranque abre las **TRES** fuentes del disco
+
+La tarjeta pedia decir **quien** pide los 1 MiB contiguos del monton de C y **bajar esa pared**. El
+instrumento (`scripts/console/sonda-alloc-241.py`, enganchado a las reservas grandes de
+`libgodc/runtime/gc_heap.c` y `gc_runtime.c`) imprime por cada reserva >= `--umbral` el sitio, el tamano, el
+**pc** del Go que la pide, el **credito de `sbrk`** (`_arch_mem_top - THD_KERNEL_STACK_SIZE - sbrk_base`) y
+el estado del monton. Con `--umbral 16384`, la corrida de la pared dice:
+
+    107  ALLOC-241 makeslice size=262144  pc=8c1af410 credito=933888 arena=1711168 used=1668192
+    113  [File Loader][INFO] Adding source: '/cd/juego/patch_d2.mpq'
+    114  ALLOC-241 makeslice size=1048576 pc=8c1af410 credito=671744 arena=1973312 used=1930672 free=42640
+    116  Out of memory. Requested sbrk_base 0x8d04c000, was 0x8cf4c000, diff 1048576
+
+`pc=8c1af410` resuelto sobre `prog.elf` da **`MPQ.readHashTable` (`d2common/d2fileformats/d2mpq/mpq_hash.go:102`)**,
+y el MISMO pc pidio 262.144 bytes siete lineas antes: era la tabla de `patch_d2.mpq` (16.384 ranuras x 16,
+que si entra). El mega es la tabla de **`d2data.mpq`** (65.536 x 16 = 1.048.576 exactos), la primera reserva
+grande de la SEGUNDA fuente: la corrida muere antes de que salga su linea `Adding source`.
+
+**El arreglo.** La tabla del formato es casi toda **vacia** (en `d2data.mpq` hay 11.083 entradas de bloque: a
+lo sumo 11.083 ranuras ocupadas, el **17%** de las 65.536) y las vacias son `0xFFFFFFFF` en las cuatro
+palabras: guardarlas cuesta 871.248 B que no hacen falta. Ahora la tabla de hash se guarda como **un bit por
+ranura** + las entradas **ocupadas** (16 B cada una, en orden de ranura) + un acumulado **por bloque de 512
+ranuras** para convertir numero de ranura en indice compacto. La consulta sigue siendo EL MISMO sondeo del
+formato MPQ de DC-002.33 y el checksum de la tabla sigue siendo el de los bytes de la tabla **logica**
+(ranura por ranura), que es lo que lo mantiene sirviendo de barrera. Ademas el arreglo se **reserva de una
+vez** con la cota de entradas de bloque del header: la primera version crecia con `append` y esa cadena dejo
+**905.400 B** de monton de C para un arreglo final de 185.441 (medido), o sea se comia lo que habia ganado.
+
+| archivo | ranuras | ocupadas | reserva antes | reserva ahora |
+| --- | --- | --- | --- | --- |
+| `patch_D2.mpq` | 16.384 | 216 | 262.144 | **5.616** |
+| `d2data.mpq` | 65.536 | 11.083 | 1.048.576 | **185.776** |
+| `d2char.mpq` | 16.384 | 10.010 | 262.144 | **162.272** |
+
+**El resultado, medido en la consola.** Con el arreglo el arranque **no pide ningun mega** (ninguna reserva
+de 1.048.576 en toda la corrida), abre **las tres** fuentes del disco (`patch_d2.mpq`, `d2data.mpq` — lo que
+pedia el criterio 2, **sin** la palanca de DC-002.32 — y ademas `d2char.mpq`, que ninguna corrida habia
+alcanzado), inicializa el Asset Manager y lee su primer asset del MPQ. La pared de esta tarjeta queda atras:
+el monton de C llega al final con decenas de miles de bytes libres y **258.048** de credito de `sbrk`. Lo que
+viene despues ya no es memoria: `panic: index out of range` al cargar el asset **siguiente** — el tramo que
+DC-002.43 tiene que diagnosticar (es donde S232 moria MUDA, sin mensaje).
+
+**Barreras.** `TestBuscarHashIgualQueElMapaViejo` compara el sondeo nuevo contra el mapa de objetos de antes
+con la tabla **cruda** del archivo como referencia: **21.253 nombres, 0 distintos, 0 fuera del (listfile)** en
+los tres MPQ (o sea que cubre TODAS las ranuras ocupadas, no una muestra); los dos checksums de cada tabla son
+los mismos numeros de DC-002.33/DC-002.39 (`checksumHash` 2035763179 / 1897791535 / 3931321293); el corpus de
+DC-002.34 vuelve a correr los cuatro estados **8 controles OK, 0 fallos** (y su fila S233 pasa de "OOM pidiendo
+1 MiB con 39.536 libres, 1 fuente" a "las tres fuentes abiertas, 1 asset leido, sin OOM"); y el corpus de
+DC-002.40 queda **13/13** con el control 7 (el motor leyendo el `(listfile)` comprimido de `patch_d2.mpq`, con
+el crc32 del host) intacto — de paso, `d2data.mpq` ahora **abre** su tabla (`FromFile` OK) y su `(listfile)`
+arranca a streamear 65.536 B antes de morir en el defecto que esa tarjeta ya declaro (el monton de Go), asi que
+su control 11 **no** hay que mudarlo. El SANO de `fix-mpq-tablas-233.py` se actualizo al texto nuevo (es el
+script que declara cual es el estado sano del arbol: si no, el control 0 del corpus se ponia rojo), y
+`checar-motor-disco-234.sh` lleva un arreglo de una linea: el mutante sin `/JUEGO` se pasa con `env` (la
+asignacion expandida no es asignacion para bash: el build del mutante moria con "orden no encontrada" y no se
+habia visto porque en DC-002.34 la imagen del mutante ya estaba construida).
+
+**Lo que queda anotado.** (a) El arranque se lleva **458.752 B** en CUATRO reservas antes de tocar un MPQ
+(2 x 98.304 de `image/bmp.decodeConfig`, 131.072 de `image.NewRGBA` y 131.072 de `ebiten/v2.NewImage`): es la
+palanca que le queda a la pared del monton de C, y vive en el camino de la pantalla de arranque, no en el MPQ.
+(b) El estado S232 (la palanca de 232, que **vacia** la tabla de d2records: es un instrumento de peso, no un
+motor jugable) es el que mas memoria viva pide (4.356.112 B) y con el arreglo muere con un OOM chico
+(diff 323.584): es el estado que DC-002.42 tiene que aplicar de verdad.
+
+Evidencia cruda: `evidencia/dc-002.41-monton-de-c.txt`.

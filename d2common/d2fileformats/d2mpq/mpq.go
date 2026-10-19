@@ -24,12 +24,19 @@ type MPQ struct {
 	// por indice, sin un objeto de Go por entrada. Antes eran `map[uint64]*Hash` + `[]*Block`: ese conjunto
 	// VIVO no entraba en el semiespacio del GC de la consola (512 KiB) con las tablas de un archivo del
 	// juego (d2data.mpq: 65.536 ranuras de hash + 11.083 de bloque) y el arranque del motor moria ahi.
-	// Cada tabla es UNA reserva del tamano de la tabla (1.048.576 y 177.328 bytes en el peor caso del
-	// juego), o sea un objeto GRANDE: libgodc la manda al monton de C, no al semiespacio.
-	hashTable  []byte
-	blockTable []byte
-	header     Header
-	fileSize   int64 // size of the archive on disk, to reject offsets and sizes beyond it
+	//
+	// DC-002.41: de la tabla de HASH solo se guardan las ranuras OCUPADAS (un bit por ranura + las entradas
+	// compactas + los rangos por bloque; ver `mpq_hash.go`). La reserva de la tabla entera de d2data.mpq
+	// (1.048.576 bytes contiguos) es la que NO entraba en el monton de C del arranque con los tres MPQ del
+	// disco: el arranque moria en `gc_external_alloc: OOM` pidiendola con 671.744 bytes de credito de `sbrk`.
+	// La tabla de BLOQUE sigue como bytes contiguos: sus entradas son densas (no hay ranuras que sacar).
+	hashRanuras  uint32   // cuantas ranuras tiene la tabla de hash
+	hashOcupadas []byte   // 1 bit por ranura: 1 = tiene entrada
+	hashEntradas []byte   // las entradas OCUPADAS, 16 bytes cada una, en orden de ranura
+	hashRangos   []uint16 // por bloque de `ranurasPorRango` ranuras: ocupadas ANTES del bloque
+	blockTable   []byte
+	header       Header
+	fileSize     int64 // size of the archive on disk, to reject offsets and sizes beyond it
 }
 
 // TableChecksum returns the byte checksum of the two tables of the archive (hash table, block table).
@@ -37,8 +44,13 @@ type MPQ struct {
 // DC-002.33: como las tablas son bytes contiguos, el corpus diferencial del port compara la tabla ENTERA
 // entre el host y la consola con dos numeros (antes habia que recorrer el mapa y el arreglo de objetos, que
 // en la consola no entraban). La suma es la de los POC del port: `suma = suma*31 + byte`, sobre los bytes.
+//
+// DC-002.41: la tabla de hash ya no guarda las ranuras vacias, asi que su suma se arma ranura por ranura
+// desde la representacion compacta (`sumaDeTablaHash`). El NUMERO es el mismo de siempre -- los bytes que
+// suma son los de la tabla logica, con las vacias incluidas -- que es lo que hace que este checksum siga
+// sirviendo de barrera entre el host y la consola.
 func (mpq *MPQ) TableChecksum() (hashTable, blockTable uint32) {
-	return sumaDeBytes(mpq.hashTable), sumaDeBytes(mpq.blockTable)
+	return mpq.sumaDeTablaHash(), sumaDeBytes(mpq.blockTable)
 }
 
 // TableEntries returns how many slots each table has (what the port prints as "entradas").

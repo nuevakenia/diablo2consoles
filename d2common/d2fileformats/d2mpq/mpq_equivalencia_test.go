@@ -1,7 +1,7 @@
 package d2mpq
 
 import (
-	"encoding/binary"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,15 +12,15 @@ import (
 // las DOS mitades del nombre pegadas (`hashString(nombre, 1) << 32 | hashString(nombre, 2)`), y el ultimo
 // que escribe gana. Es el camino que la tarjeta reemplaza por los BYTES + el sondeo, asi que sirve de
 // referencia: `buscarHash` tiene que encontrar lo mismo.
-func mapaViejo(tabla []byte) map[uint64]uint32 {
+//
+// DC-002.41: recibe las palabras de la tabla CRUDA (las que salen del archivo, ranuras vacias incluidas),
+// NO la representacion que guarda el paquete: con las ranuras vacias fuera del arreglo, una referencia
+// armada con `entradaHash` no seria independiente (un error del arreglo saldria igual en las dos puntas).
+func mapaViejo(palabras []uint32) map[uint64]uint32 {
 	viejo := make(map[uint64]uint32)
 
-	for i := 0; i+bytesPorEntrada <= len(tabla); i += bytesPorEntrada {
-		a := binary.LittleEndian.Uint32(tabla[i:])
-		b := binary.LittleEndian.Uint32(tabla[i+4:])
-		idx := binary.LittleEndian.Uint32(tabla[i+12:])
-
-		viejo[uint64(a)<<32|uint64(b)] = idx
+	for i := 0; i+4 <= len(palabras); i += 4 {
+		viejo[uint64(palabras[i])<<32|uint64(palabras[i+1])] = palabras[i+3]
 	}
 
 	return viejo
@@ -60,7 +60,20 @@ func TestBuscarHashIgualQueElMapaViejo(t *testing.T) {
 			t.Fatalf("%s: (listfile): %v", archivo, err)
 		}
 
-		viejo := mapaViejo(m.hashTable)
+		// DC-002.41: la referencia sale de la tabla CRUDA del archivo, descifrada palabra por palabra por el
+		// camino de siempre (`naiveDecryptTable`): el sondeo se compara contra los bytes que estan en el
+		// disco, no contra otra vuelta de la representacion nueva.
+		cruda := make([]byte, int(m.hashEntries())*bytesPorEntrada)
+		if _, errR := m.file.ReadAt(cruda, int64(m.header.HashTableOffset)); errR != nil {
+			t.Fatalf("%s: no pude leer la tabla de hash cruda: %v", archivo, errR)
+		}
+
+		palabras, errR := naiveDecryptTable(bytes.NewReader(cruda), m.hashEntries(), "(hash table)")
+		if errR != nil {
+			t.Fatalf("%s: %v", archivo, errR)
+		}
+
+		viejo := mapaViejo(palabras)
 
 		nombres, iguales, distintos, fuera := 0, 0, 0, 0
 
@@ -93,8 +106,13 @@ func TestBuscarHashIgualQueElMapaViejo(t *testing.T) {
 
 		hashSum, blockSum := m.TableChecksum()
 
-		t.Logf("%s: entradas_hash=%d entradas_bloque=%d nombres=%d iguales=%d distintos=%d fuera_del_listfile=%d checksum_hash=%d checksum_bloque=%d",
-			archivo, m.hashEntries(), m.blockEntries(), nombres, iguales, distintos, fuera, hashSum, blockSum)
+		// DC-002.41: lo que la tabla de hash ocupa AHORA en RAM (las ranuras ocupadas + 1 bit por ranura +
+		// los rangos) contra lo que ocupaba con la tabla entera. Es el numero de la tarjeta.
+		reserva := cap(m.hashEntradas) + len(m.hashOcupadas) + 2*len(m.hashRangos)
+
+		t.Logf("%s: entradas_hash=%d entradas_bloque=%d nombres=%d iguales=%d distintos=%d fuera_del_listfile=%d checksum_hash=%d checksum_bloque=%d ranuras_ocupadas=%d reserva_hash=%d reserva_tabla_entera=%d",
+			archivo, m.hashEntries(), m.blockEntries(), nombres, iguales, distintos, fuera, hashSum, blockSum,
+			len(m.hashEntradas)/bytesPorEntrada, reserva, int(m.hashEntries())*bytesPorEntrada)
 
 		m.Close()
 

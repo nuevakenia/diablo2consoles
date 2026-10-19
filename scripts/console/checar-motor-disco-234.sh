@@ -103,11 +103,15 @@ armar() { # $1 = nombre (dir), $2 = dir de .gox, $3 = "sin-juego" para el mutant
     local dir="$SAL/$1"
     [ "$REFRESCAR" = 0 ] && [ -f "$dir/1ST_READ.BIN" ] && { nota "ya construido: $1"; return 0; }
     revisa_rutas "$2" || exit 1
-    local extra=""
-    [ "${3:-}" = "sin-juego" ] && extra="DC_SIN_JUEGO=1"
-    # shellcheck disable=SC2086
+    local -a extra=()
+    [ "${3:-}" = "sin-juego" ] && extra=(env DC_SIN_JUEGO=1)
+    # DC-002.41: el mutante se pasa con `env`, NO como palabra expandida. Con `extra="DC_SIN_JUEGO=1"` y
+    # `... $extra bash ...` (o el arreglo expandido entre comillas) bash NO reconoce la asignacion -- una
+    # palabra que sale de una expansion no es una asignacion -- e intenta ejecutar el comando
+    # `DC_SIN_JUEGO=1`: el build del mutante muere con "orden no encontrada". No se habia visto porque en
+    # DC-002.34 la imagen del mutante ya estaba construida en $SAL y `armar` la reusaba; con un $SAL nuevo se cae.
     ( cd "$SRC" && MKISO_JOLIET=0 DC_RUTA_DATOS=/cd/juego DC_MPQ_JUEGO="$LISTA" DC_SIN_SELLOS=1 \
-        DC_DISCO_JUEGO="$SAL/juego" POC=motor-arranque $extra \
+        DC_DISCO_JUEGO="$SAL/juego" POC=motor-arranque "${extra[@]}" \
         bash scripts/console/build-motor-arranque.sh "$dir" "$2" ) > "$dir.build.log" 2>&1 ||
         { echo "   NO COMPILA/ARMA $1 (ver $1.build.log)"; exit 1; }
     nota "$1: 1ST_READ.BIN $(stat -c%s "$dir/1ST_READ.BIN") bytes, ISO $(stat -c%s "$dir/disc.iso") bytes"
