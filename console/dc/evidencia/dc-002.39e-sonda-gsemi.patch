@@ -1,0 +1,139 @@
+diff --git a/console/dc/poc/tablas-mpq/csrc/cshim.c b/console/dc/poc/tablas-mpq/csrc/cshim.c
+index 50fe07b0..fcdde3ef 100644
+--- a/console/dc/poc/tablas-mpq/csrc/cshim.c
++++ b/console/dc/poc/tablas-mpq/csrc/cshim.c
+@@ -16,6 +16,7 @@
+  */
+ #include <kos.h>
+ #include <malloc.h>
++#include <stdint.h>
+ 
+ void d2c_serial_init(void) {
+     dbgio_dev_select("scif");
+@@ -35,3 +36,32 @@ unsigned int d2c_ms(void) {
+ int d2c_monton_libre(void) {
+     return mallinfo().fordblks;
+ }
++
++/* DC-002.39e: el SEMIESPACIO del GC de Go -- el mismo `gsemi= usado/tope` de las marcas ARQ-CARGA (que lo
++ * sacan de `gc_stats()` de runtime/gc_heap.c). Es la otra memoria: la que la evidencia de DC-002.43 mide
++ * llenandose con la lectura COMPLETA de un asset. Aca se usa para ver con cuanta memoria entra el
++ * `ReadFile("(listfile)")` que se lleva la corrida puesta. */
++void gc_stats(size_t *used, size_t *total, uint32_t *collections);
++
++static void d2c_gc(size_t *u, size_t *t, uint32_t *c) {
++    *u = 0; *t = 0; *c = 0;
++    gc_stats(u, t, c);
++}
++
++int d2c_semi_usado(void) {
++    size_t u, t; uint32_t c;
++    d2c_gc(&u, &t, &c);
++    return (int)u;
++}
++
++int d2c_semi_tope(void) {
++    size_t u, t; uint32_t c;
++    d2c_gc(&u, &t, &c);
++    return (int)t;
++}
++
++int d2c_gc_cuenta(void) {
++    size_t u, t; uint32_t c;
++    d2c_gc(&u, &t, &c);
++    return (int)c;
++}
+diff --git a/console/dc/poc/tablas-mpq/main.go b/console/dc/poc/tablas-mpq/main.go
+index d0357ad9..fea03232 100644
+--- a/console/dc/poc/tablas-mpq/main.go
++++ b/console/dc/poc/tablas-mpq/main.go
+@@ -56,6 +56,43 @@ func d2cMontonLibre() int
+ 
+ const configConsola = "/rd/OpenDiablo2/config.json"
+ 
++// sondaSaltearListfile: la palanca del EXPERIMENTO de DC-002.39e (null = leer el (listfile) de verdad).
++const sondaSaltearListfile = false
++
++// DC-002.39e: los numeros del semiespacio del GC de Go (lo mismo que el `gsemi=` de las marcas ARQ-CARGA).
++//
++//extern d2c_semi_usado
++func d2cSemiUsado() int
++
++//extern d2c_semi_tope
++func d2cSemiTope() int
++
++//extern d2c_gc_cuenta
++func d2cGcCuenta() int
++
++func sonda(paso string) {
++	println("TABLAS-MPQ-SONDA", paso, "libreC=", d2cMontonLibre(), "gsemi=", d2cSemiUsado(), "/", d2cSemiTope(),
++		"gc=", d2cGcCuenta(), "ms=", d2cMs())
++}
++
++// leerListfile: leer o no el `(listfile)` de cada MPQ dentro de este bucle.
++//
++// MEDIDO en DC-002.39c (y NO es un capricho): con la lectura puesta, la corrida de los 3 MPQ muere antes de
++// la consulta del TERCERO y nunca imprime el TOTAL de los 21.253. La corrida de peor caso medida:
++//
++//   TABLAS-MPQ 3 d2char.mpq entradasHash= 16384 ... ms= 3519
++//   Unhandled exception: PC 656a626f, code 1        <- el PC es TEXTO ("obje": un pedazo del (listfile))
++//   PR 8c0159aa -> bytes.Buffer.ReadFrom (bytes/bytes.go:186)
++//   (y en la corrida sin la sonda de paso: REIOS: Booting up -- la consola se REINICIA, sin mensaje)
++//
++// o sea el que se lleva la corrida puesta es el `ReadFile("(listfile)")`, no la consulta. Con la lectura
++// fuera, el MISMO binario y el MISMO disco dan `TABLAS-MPQ-TOTAL archivos= 3 nombres= 21253
++// contenidos= 21253` (y sigue corriendo: 3 pasadas en 150 s). El defecto del (listfile) tiene su propia
++// tarjeta (DC-002.39c, seccion "lo que queda abierto"); este POC mide LA CONSULTA y el (listfile) lo mide
++// su corpus aparte (`scripts/console/checar-compr-240.sh`, control 7 = el (listfile) de patch_d2.mpq
++// contra el crc32 del host).
++const leerListfile = true
++
+ // configDelArranque: el `MpqPath` y el `MpqLoadOrder` que el motor leyo de su config del romdisk. Es el
+ // ORDEN que importa: `d2app/initialization.go` recorre `MpqLoadOrder` y abre cada archivo.
+ func configDelArranque() *d2config.Configuration {
+@@ -184,6 +221,8 @@ func main() {
+ 		ruta := cfg.MpqPath + "/" + nombreArchivo
+ 		t0 := d2cMs()
+ 
++		sonda("vuelta-" + nombreArchivo)
++
+ 		m, err := d2mpq.FromFile(ruta)
+ 		if err != nil {
+ 			println("TABLAS-MPQ", i+1, nombreArchivo, "FALLO:", err.Error(), "largoNombre=", len(nombreArchivo),
+@@ -214,14 +253,29 @@ func main() {
+ 			"checksumHash=", ch, "checksumBloque=", cb,
+ 			"ms=", d2cMs()-t0)
+ 
+-		// el (listfile) por el camino del motor: en el HOST anda y en la CONSOLA falla (`zlib: invalid
+-		// header`, defecto aparte de esta tarjeta). Se intenta igual y, si falla, se dice con su error.
+-		datos, errList := m.ReadFile("(listfile)")
+-
+-		if errList != nil {
+-			println("TABLAS-MPQ   ", nombreArchivo, "(listfile) FALLO:", errList.Error())
++		// el (listfile) por el camino del motor: en el HOST anda y en la CONSOLA el del TERCER MPQ se lleva
++		// la corrida puesta (ver `leerListfile` arriba y la seccion de DC-002.39c). Se intenta igual y, si
++		// falla, se dice con su error. OJO: `datos` se declara AFUERA del if a proposito: cuando se lee,
++		// el buffer queda vivo hasta el fin de la vuelta (es parte de lo que el corpus mide).
++		var (
++			datos   []byte
++			errList error
++		)
++
++		if !leerListfile {
++			println("TABLAS-MPQ   ", nombreArchivo, "(listfile) NO SE LEE (DC-002.39c: dispara un salto a basura)")
+ 		} else {
+-			println("TABLAS-MPQ   ", nombreArchivo, "(listfile) bytes=", len(datos))
++			sonda("listfile-" + nombreArchivo + "-antes")
++
++			datos, errList = m.ReadFile("(listfile)")
++
++			sonda("listfile-" + nombreArchivo + "-despues")
++
++			if errList != nil {
++				println("TABLAS-MPQ   ", nombreArchivo, "(listfile) FALLO:", errList.Error())
++			} else {
++				println("TABLAS-MPQ   ", nombreArchivo, "(listfile) bytes=", len(datos))
++			}
+ 		}
+ 
+ 		// LA CONSULTA: los nombres que el corpus deja al lado de los MPQ (los escribio el host leyendo el

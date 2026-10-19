@@ -1,0 +1,78 @@
+DC-002.39e -- PUNTA DE ARRANQUE MEDIDA: el `ReadFile("(listfile)")` que mata la corrida NO se queda sin
+memoria (el semiespacio del GC va en el 43%) y salta a un pedazo de DATO (PC 656a626f = "obje" en ASCII):
+es un puntero vivo que queda corrupto, del mismo genero que DC-002.24/DC-002.36.
+
+Fecha: 2026-10-19 (corrida autonoma DC-002.39c/39d, rama DC-002, HEAD 322b5914)
+
+================================================================================================
+1. EL INSTRUMENTO (nuevo): el SEMIESPACIO DEL GC en la sonda de paso
+================================================================================================
+El POC `tablas-mpq` ya tenia el monton de C (`d2c_monton_libre` = `mallinfo().fordblks`). Le faltaba la OTRA
+memoria: el semiespacio del GC de Go, que es el que la evidencia de DC-002.43 ve llenarse con la lectura
+COMPLETA de un asset. Se saca de `gc_stats()` de `runtime/gc_heap.c` (el mismo dato del `gsemi= usado/tope`
+de las marcas ARQ-CARGA):
+
+    /* en console/dc/poc/tablas-mpq/csrc/cshim.c */
+    void gc_stats(size_t *used, size_t *total, uint32_t *collections);
+    int d2c_semi_usado(void);   int d2c_semi_tope(void);   int d2c_gc_cuenta(void);
+
+y la sonda de paso imprime `libreC / gsemi / gc / ms` en cada tramo (el patch completo, listo para aplicar:
+`console/dc/evidencia/dc-002.39e-sonda-gsemi.patch`). El POC se armo con esa sonda y con el `(listfile)` PUESTO
+(`leerListfile = true`), contra la copia privada del runtime con la cadena completa (`>>24`) y el disco de los
+3 MPQ en `/cd/juego`.
+
+================================================================================================
+2. LO MEDIDO (40 s de consola serie; la corrida muere antes)
+================================================================================================
+    TABLAS-MPQ-SONDA vuelta-patch_d2.mpq            libreC= 2392   gsemi= 12784 / 524288   gc= 0   ms= 0
+    TABLAS-MPQ-SONDA listfile-patch_d2.mpq-antes    libreC= 2064   gsemi= 87880 / 524288   gc= 0   ms= 2333
+    TABLAS-MPQ-SONDA listfile-patch_d2.mpq-despues  libreC= 10256  gsemi= 119112 / 524288  gc= 0   ms= 2347
+    TABLAS-MPQ-SONDA vuelta-d2data.mpq              libreC= 10584  gsemi= 152216 / 524288  gc= 0   ms= 2447
+    TABLAS-MPQ-SONDA listfile-d2data.mpq-antes      libreC= 3744   gsemi= 226504 / 524288  gc= 0   ms= 12563
+    Unhandled exception: PC 656a626f, code 1, evt 00e0
+     R0-R7: 00000000 656a626f 8c3b2930 00000000 8c2bc220 8c2bc248 00001000 00001000
+     SR 40000101 PR 8c015886
+    kernel panic: unhandled IRQ/Exception
+
+TRES COSAS QUE ESTO DICE (y ninguna es "se quedo sin memoria"):
+
+1. **NO es el semiespacio del GC**: al entrar al `(listfile)` de `d2data.mpq` va en **226.504 de 524.288
+   (43,2%)**, o sea quedaban **297.784 B** libres. En el `(listfile)` de `patch_d2.mpq` la cuenta sube
+   87.880 -> 119.112 y termina bien. Con `gc= 0` (ni una recoleccion hasta ahi): el que se cae no es el
+   recolector corriendo por presion de memoria.
+2. **El salto es a un pedazo de DATO**: `PC 656a626f` leido byte a byte es `0x6f 0x62 0x6a 0x65` = **"obje"** en
+   ASCII (texto de las rutas del propio `(listfile)`). El `PR` cambia de corrida en corrida
+   (`8c0159aa` / `8c015886`) pero cae en la MISMA zona: `sh-elf-addr2line -f -C -i -e prog.elf <PR>` da
+   **`bytes.Buffer.ReadFrom`** (`bytes/bytes.go:186`). O sea: un puntero que el camino de lectura usa quedo
+   apuntando al CONTENIDO de un texto (dato), no a codigo: el mismo genero de defecto que DC-002.24 (el campo
+   del App que amanece con basura de otro objeto) y DC-002.36 (las cadenas que apuntan al medio de un buffer).
+3. **Donde muere depende del momento de la recoleccion**: con esta sonda (que crea basura en el monton de Go)
+   muere en el `(listfile)` de `d2data.mpq`; sin la sonda, el MISMO binario pasa ese tramo y muere despues de
+   las tablas de `d2char.mpq`. Es la firma de un defecto de TIMING/LAYOUT (un puntero que queda viejo cuando la
+   recoleccion cae en cierto punto), no de una cantidad de memoria.
+
+================================================================================================
+3. POR DONDE SEGUIR (la hipotesis a medir, en orden)
+================================================================================================
+a) El camino del `ReadFile` del `(listfile)` pasa por el puente de `compress/zlib` de la consola (el que
+   DC-002.40 arreglo para que devolviera los bytes): el `bytes.Buffer` que crece con `ReadFrom` y el buffer de
+   destino del zlib son los sospechosos naturales. Medirlo con una sonda DENTRO de ese camino (marcas antes y
+   despues de cada `Read`/`Write` del zlib, con el puntero del buffer) dice si el que queda viejo es el
+   `Buffer` o el `zlib`.
+b) Comparar la MISMA lectura en el host (que no falla) contra la consola, con el mismo archivo y el mismo
+   largo (466.867 B de `d2data.mpq`).
+c) El mutante de esta tarjeta existe y es barato: volver a leer el `(listfile)` en el POC de la consulta deja
+   el corpus en 11244 de 21253 (medido en DC-002.39c), asi que cualquier arreglo de esto se puede verificar
+   con `checar-consulta-233.sh 3 120` (3 de 3 vueltas con 21253) + este mismo corpus.
+
+================================================================================================
+4. LO QUE ESTA PUNTA DE ARRANQUE NO ES
+================================================================================================
+* NO es el defecto del barrido cortado (DC-002.39c: ya arreglado, el vendor esta en `988e80fc` verificado) ni
+  la cadena de `fix-libgodc-*.py` (DC-002.39d: cerrada).
+* NO es OOM del semiespacio (43%) ni del monton de C (el numero que importa lo da la sonda: 3.744 B libres de
+  `mallinfo`, pero el `malloc` de KOS crece por `sbrk` y en esta corrida no hay ninguna linea de
+  `Out of memory` ni de `fatal error: out of memory`).
+* El defecto del ARRANQUE DEL MOTOR (DC-002.43/DC-002.45) es OTRO: ahi la lectura completa de `LvlPrest.txt`
+  (134.937 B) SI se queda sin semiespacio (132.104 libres al entrar, `fatal error: out of memory`). Aca el
+  semiespacio va por la mitad: son dos defectos distintos, y conviene no mezclarlos.
