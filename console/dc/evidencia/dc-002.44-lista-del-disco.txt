@@ -120,6 +120,18 @@ O sea: sin el manifiesto y sin el directorio, ReadDir NO inventa nada (ErrNotExi
 `faltan= 7`. El arreglo no "hace andar" un disco vacio.
 
 ================================================================================================
+4-bis. EL NUMERO DEL MOTOR, medido (POC motor-disco sobre la misma ISO de 3 MPQ)
+================================================================================================
+    MOTOR-DISCO config del arranque: MpqPath= /cd/juego orden= 7
+    MOTOR-DISCO seleccion: Complete= false Validate.OK()= false archivos que ve= 3 faltan= 4
+
+`archivos que ve= 3` es el numero de esta tarjeta: antes de la corrida del puente daba 0. `faltan= 4` NO es
+el listado: el `MpqLoadOrder` del arranque pide 7 archivos y esta ISO lleva los 3 que hay en esta maquina
+(patch_d2, d2data, d2char); los otros 4 (la expansion) no existen aca, asi que `Validate.OK()` no puede dar
+true con este disco. Lo que se midio es que el LISTADO entrega los 3 que estan: el defecto de "ve 0" esta
+cerrado, y el `faltan= 0` de la tarjeta necesita los 7 MPQ del juego en el disco.
+
+================================================================================================
 5. LO QUE QUEDA DECLARADO
 ================================================================================================
 * el numero del motor (`Validate.OK()= true archivos que ve= 3 faltan= 0`) hay que sacarlo con el POC
