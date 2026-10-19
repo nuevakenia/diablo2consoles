@@ -28,6 +28,13 @@
 #   este arreglo, y el corpus tiene que ponerse ROJO en A y en B (y C tiene que seguir verde). Despues se
 #   vuelve a aplicar y la ultima corrida es el CONTROL SANO.
 #
+#   DC-002.39b (controles 1d y 2d): el MISMO barrido conservador tenia OTRO agujero del mismo tema -- el
+#   portero `gc_is_valid_object_start` rechazaba los punteros INTERIORES que solo viven en la PILA (el
+#   valor del bucle de la consulta del corpus de DC-002.33), asi que el candidato nunca llegaba al
+#   resolutor. El POC `banco-vivo` (30 s) es el instrumento de ese agujero y entra aca: con la cadena
+#   puesta tiene que dar `fallos= 0` de 2560 y con el mutante `fallos > 0`, siempre con la MISMA suma de
+#   largos (15974400: se pierde la direccion, no el dato).
+#
 # Uso:  bash scripts/console/checar-cadenas-236.sh [segundos_consola]
 #   SAL (variable): /home/dgalli/.hermes/cache/scratch/corpus-cadenas-236
 set -uo pipefail
@@ -64,6 +71,27 @@ correr() { # $1 = nombre de la corrida
 veredicto() { # $1 = log, $2 = caso (A|B|C)
     tr -d '\r' < "$1" | grep -a "SONDA-CADENAS: $2 " | tail -1 |
         sed -n "s/.*SONDA-CADENAS: $2 \([A-Z]*\).*/\1/p"
+}
+
+# DC-002.39b: la corrida del POC `banco-vivo`, que es el instrumento del OTRO defecto del mismo barrido:
+# un valor vivo que SOLO esta en la pila (el valor del bucle), con el cuerpo reservando adentro. La sonda
+# de arriba no lo ve porque sus cadenas viven en CAMPOS de objetos (camino preciso del GC).
+correr_banco() { # $1 = nombre de la corrida
+    local d="$SAL/$1"
+    rm -rf "$d"
+    mkdir -p "$d"
+    bash "$HERE/build-dc.sh" "$REPO/console/dc/poc/banco-vivo" "$d/build" > "$d/build.log" 2>&1 || return 1
+    CAPTURE=none bash "$HERE/run-flycast.sh" "$d/build/prog.elf" 30 "$d" >/dev/null 2>&1
+    return 0
+}
+
+# los dos numeros del POC: `fallos` y `suma` (la suma de los largos: tiene que ser la MISMA con y sin el
+# arreglo, 15974400, porque el defecto pierde la DIRECCION, no el dato)
+banco_fallos() { # $1 = log
+    tr -d '\r' < "$1" | grep -a 'BANCO-VIVO-TOTAL' | tail -1 | sed -n 's/.*fallos= *\([0-9]*\).*/\1/p'
+}
+banco_suma() { # $1 = log
+    tr -d '\r' < "$1" | grep -a 'BANCO-VIVO-TOTAL' | tail -1 | sed -n 's/.*suma= *\([0-9]*\).*/\1/p'
 }
 
 huella() { # $1 = log, $2 = etiqueta (ANTES|DESPUES)
@@ -117,6 +145,23 @@ if correr sano; then
     else
         rojo "control 1c: la corrida murio por 'GC to-space overflow' (el instrumento mide otra cosa)"
     fi
+
+    # DC-002.39b: el valor del bucle (SOLO en la pila) con el cuerpo reservando = la consulta del corpus
+    # de DC-002.33 (el residuo de 0..6 nombres por corrida)
+    if correr_banco sano-banco; then
+        LB="$SAL/sano-banco/flycast.log"
+        nota "el POC banco-vivo (el valor del bucle), tal cual:"
+        tr -d '\r' < "$LB" | grep -a 'BANCO-VIVO-TOTAL' | sed 's/^/     /'
+        FB="$(banco_fallos "$LB")"
+        SB="$(banco_suma "$LB")"
+        if [ "${FB:-x}" = "0" ] && [ "${SB:-x}" = "15974400" ]; then
+            verde "control 1d: banco-vivo da fallos= 0 de 2560 con suma= $SB (el valor del bucle ya no queda viejo)"
+        else
+            rojo "control 1d: banco-vivo da fallos= ${FB:-sin numero} y suma= ${SB:-sin numero} (esperado 0 y 15974400): ver $LB"
+        fi
+    else
+        rojo "el POC banco-vivo NO COMPILA/ARMA con el arreglo puesto (ver $SAL/sano-banco/build.log)"
+    fi
 else
     rojo "la sonda NO COMPILA/ARMA con el arreglo puesto (ver $SAL/sano/build.log)"
 fi
@@ -152,6 +197,24 @@ if correr mutante; then
         verde "control 2c: con el mutante el caso C (control sano de la sonda) SIGUE verde: el que se cae es el defecto, no el instrumento"
     else
         rojo "control 2c: con el mutante el caso C sale '${V:-sin veredicto}': el instrumento no es confiable"
+    fi
+
+    # DC-002.39b: el POC del valor del bucle. OJO: el mutante de `interior` hace `git checkout` de
+    # gc_copy.c, asi que tambien se lleva el arreglo del candidato (que va encima): este estado es el que
+    # medi 184 fallos de 2560 antes de aplicar el arreglo.
+    if correr_banco mutante-banco; then
+        LMB="$SAL/mutante-banco/flycast.log"
+        nota "el POC banco-vivo con el mutante, tal cual:"
+        tr -d '\r' < "$LMB" | grep -a 'BANCO-VIVO-TOTAL' | sed 's/^/     /'
+        FB="$(banco_fallos "$LMB")"
+        SB="$(banco_suma "$LMB")"
+        if [ "${FB:-0}" -gt 0 ] && [ "${SB:-x}" = "15974400" ]; then
+            verde "control 2d: con el mutante banco-vivo da fallos= $FB de 2560 y la MISMA suma= $SB: el POC caza el defecto (se pierde la direccion, no el dato)"
+        else
+            rojo "control 2d: con el mutante banco-vivo da fallos= ${FB:-sin numero} y suma= ${SB:-sin numero} (tenia que dar fallos > 0 y suma 15974400): ver $LMB"
+        fi
+    else
+        rojo "el POC banco-vivo no se pudo armar en el mutante (ver $SAL/mutante-banco/build.log)"
     fi
 else
     rojo "la sonda NO COMPILA/ARMA con el mutante (ver $SAL/mutante/build.log)"
@@ -189,6 +252,7 @@ echo "== RESUMEN: las cadenas interiores (A y B) y el control sano (C)"
 echo "   con el arreglo:  A=$(veredicto "$SAL/sano/flycast.log" A) B=$(veredicto "$SAL/sano/flycast.log" B) C=$(veredicto "$SAL/sano/flycast.log" C)   (huella $(huella "$SAL/sano/flycast.log" ANTES))"
 echo "   con el mutante:  A=$(veredicto "$SAL/mutante/flycast.log" A) B=$(veredicto "$SAL/mutante/flycast.log" B) C=$(veredicto "$SAL/mutante/flycast.log" C)   ($(huella "$SAL/mutante/flycast.log" ANTES) -> $(huella "$SAL/mutante/flycast.log" DESPUES))"
 echo "   y al final:      A=$(veredicto "$SAL/sano2/flycast.log" A) B=$(veredicto "$SAL/sano2/flycast.log" B) C=$(veredicto "$SAL/sano2/flycast.log" C)   (huella $(huella "$SAL/sano2/flycast.log" ANTES))"
+echo "   banco-vivo:      con el arreglo fallos= $(banco_fallos "$SAL/sano-banco/flycast.log") y con el mutante fallos= $(banco_fallos "$SAL/mutante-banco/flycast.log") de 2560, y la misma suma= $(banco_suma "$SAL/sano-banco/flycast.log")")
 echo "   la sonda:        $FUENTE/main.go"
 echo "   el arreglo:      $FIX"
 echo "   logs:            $SAL/sano/flycast.log  $SAL/mutante/flycast.log  $SAL/sano2/flycast.log"

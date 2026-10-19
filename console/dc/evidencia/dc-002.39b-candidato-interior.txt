@@ -1,0 +1,227 @@
+DC-002.39b - EL RESIDUO DE LA CONSULTA: EL BARRIDO CONSERVADOR RECHAZABA LOS PUNTEROS INTERIORES
+===============================================================================================
+Rama DC-002, repo ~/Proyectos/diablo2consoles. Hereda de DC-002.39 (cerrada): aquella tarjeta arreglo el
+defecto del NOMBRE del `MpqLoadOrder` en el camino del ARRANQUE y dejo medido y declarado un residuo en el
+camino de la CONSULTA del corpus: la consulta de los 21.253 nombres pierde entre 0 y 6 por corrida
+(`TOTAL contenidos= 21252`, 21250 en otra corrida), con los nombres BIEN FORMADOS y el mismo nombre
+reconsultado SI encontrado (`segundo intento contiene= true`). Esta tarjeta va por ese residuo.
+
+El valor que se cae es el VALOR DEL BUCLE -- un `string` que es un PEDAZO de otro objeto (un puntero
+INTERIOR) -- y la recoleccion no lo actualizaba. Lo que estaba mal no era el resolutor (DC-002.36 ya le
+enseno a copiar el objeto que CONTIENE al puntero) sino el PORTERO que el barrido CONSERVADOR le pone
+adelante: `gc_is_valid_object_start()` RECHAZA los interiores, asi que el candidato nunca llegaba al
+resolutor y su palabra de la pila quedaba sin actualizar, apuntando al semiespacio abandonado que despues
+se reusa. El arreglo (12 puntos del barrido conservador pasan a `gc_candidato_del_barrido()`) lleva el POC
+de 184 fallos de 2.560 a 0 y el corpus de DC-002.33 da su control 2b con los 21.253 exactos.
+
+Crudo de este trabajo:
+  /tmp/dcrun39b/banco-base2/   POC banco-vivo contra el vendor canonico (184 fallos)
+  /tmp/dcrun39b/banco-fix1/    POC banco-vivo contra el vendor + derrame de bancos r8..r13 (184 fallos: el
+                               descarte de la hipotesis del registro)
+  /tmp/dcrun39b/banco-fix2/    POC banco-vivo contra el vendor + el arreglo del candidato interior (0 fallos)
+  /tmp/godc-39b-fix/           copia privada del runtime CON el arreglo (cadena + candidato)
+  /tmp/godc-39b-mut/           copia privada del runtime SIN el arreglo (la cadena sola: el MUTANTE)
+  /home/dgalli/.hermes/cache/scratch/corpus-233-39b-fix.log     el corpus de DC-002.33 con el arreglo
+  /home/dgalli/.hermes/cache/scratch/consulta-233-39b-*/        las vueltas del control 2b focadas
+
+
+1. EL POC QUE LO ATA: `console/dc/poc/banco-vivo`
+-------------------------------------------------
+Lo que hace, en 191 lineas: arma un buffer grande con nombres adentro y `cuantos= 64` cadenas que son
+PEDAZOS de ese buffer (`pedazo(crudo, desde, hasta)`: un puntero INTERIOR, Go legal, y lo unico que mantiene
+vivo al buffer); guarda los pedazos en un arreglo (`vivos := make([]string, 64)`); y entonces recorre el
+arreglo con `range` haciendo RESERVAS ADENTRO del cuerpo (el trabajo del motor: abrir y leer los MPQ), para
+que el cuerpo dispare recolecciones. En cada vuelta compara el valor que el BUCLE tiene en la mano contra el
+MISMO elemento releido por indice:
+
+    BANCO-VIVO-FALLO ronda= 1 i= 56 leidoPtr= 2350049328 leidoLen= 13 vivoPtr= 2350615136 vivoLen= 13
+
+y al final cierra con
+
+    BANCO-VIVO-TOTAL rondas= 40 comparaciones= 2560 fallos= 184 suma= 15974400 ms= 1578 libreC= 600
+
+`suma` (la suma de los largos de los 2.560 valores) es la misma en las dos corridas con el mismo sistema:
+1.597.440. O sea que no se pierden datos: se pierde la DIRECCION.
+
+Para correrlo (30 s de Flycast, sin captura de ventana):
+
+    source scripts/console/env.sh
+    POC=banco-vivo bash scripts/console/build-dc.sh console/dc/poc/banco-vivo /tmp/dcbuild/banco-vivo
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/banco-vivo/prog.elf 30 /tmp/dcrun/banco-vivo
+    grep -a 'BANCO-VIVO' /tmp/dcrun/banco-vivo/flycast.log | tr -d '\r'
+
+
+2. LA DIRECCION: QUIEN DE LOS DOS QUEDA VIEJO (12 de 12)
+--------------------------------------------------------
+`analiza-banco-39b.py` clasifica CADA fallo por los semiespacios, que se leen del propio log (el runtime los
+imprime al arrancar: `ARQ-MARCA gc_init-semiespacio0/1`) y cuenta las recolecciones por la marca de umbral
+(mas los `runtime.GC()` explicitos del POC, cada 4 rondas). El semiespacio donde vive lo que el GC copio es
+el `k % 2`; el OTRO es el abandonado. En la corrida base (semiespacios 0 = 2350048320, 1 = 2350572640):
+
+    ronda  1 i=56  leidoPtr=2350049328 len= 13 (semiespacio0 VIEJO)   vivoPtr=2350615136 len= 13 (semiespacio1 vivo )   recolecciones=1
+    ronda  2 i=42  leidoPtr=2350614940 len= 13 (semiespacio1 VIEJO)   vivoPtr=2350131588 len=  0 (semiespacio0 vivo )   recolecciones=2
+    ronda  3 i=21  leidoPtr=2350131294 len=  0 (semiespacio0 VIEJO)   vivoPtr=2350696582 len=  0 (semiespacio1 vivo )   recolecciones=3
+    ...
+    el puntero del VALOR DEL BUCLE (leidoPtr) quedo en el semiespacio abandonado: 12 de 12
+    el puntero releido por INDICE (vivoPtr) quedo en el semiespacio abandonado:                  0 de 12
+
+(Los fallos se imprimen hasta 12 nada mas -- los que se cuentan son los 184 -- y los 12 que se imprimen
+caen siempre en la misma clasificacion.)
+
+El que se lee por INDICE es un campo de puntero de un objeto de Go: el GC lo barre con la INFORMACION DE
+TIPOS (preciso) y lo actualiza siempre. El valor del BUCLE, en cambio, esta en la pila y el GC solo lo puede
+barrer a ciegas (conservadoramente). O sea: el defecto no es "el GC no mueve bien", es "el GC no reconoce
+el valor como algo que hay que mover".
+
+Nota: los `len= 0` de las rondas 3 en adelante son el largo leido de la memoria del semiespacio
+ABANDONADO, que ya fue reusado por las reservas siguientes: es exactamente el sintoma del corpus
+(`largoNombre= -1795502946`).
+
+
+3. LO QUE SE DESCARTO MIDIENDO: LOS BANCOS r8..r13 (NO ES UN REGISTRO)
+----------------------------------------------------------------------
+La tarjeta pedia "que el POC diga CUAL registro lo tiene y si un punto de recoleccion que los vuelque todos
+lo arregla". Se probo primero eso: `scripts/console/fix-libgodc-bancos.py` mete `__asm__ volatile("" :::
+"r8","r9","r10","r11","r12","r13")` en la entrada de `gc_alloc()` y de `runtime_GC()`, que obliga al
+compilador a derramar esos bancos a la pila en el prologo y recargarlos en el epilogo (verificado con
+`sh-elf-objdump`: los `mov.l %r8,@-r15` ... `mov.l @r15+,%r8` aparecen alrededor de los `jsr`). Medido:
+
+    banco-fix1 (con el derrame de r8..r13):  fallos= 184 de 2560, y los MISMOS indices que la base
+    ronda= 1 i= 56 leidoPtr= 2350049232 leidoLen= 13 vivoPtr= 2350615040 vivoLen= 13
+
+Los 184 fallos en los mismos lugares, con los mismos punteros (los semiespacios de esa corrida empiezan 96
+bytes mas abajo, que es lo unico que cambia). Conclusion medida: el valor NO esta en r8..r13; puede estar en
+una ranura de la pila o en un banco, pero lo que lo pierde es el PORTERO del barrido conservador, no donde
+viva. El script queda en el repo como el instrumento con el que se descarto la hipotesis (y volcarlos no
+cuesta nada de tiempo).
+
+
+4. LA CAUSA, EN EL CODIGO
+-------------------------
+`runtime/gc_copy.c`, barrido conservador (`gc_scan_range_conservative`), 12 puntos desenrollados + el bucle
+final, todos con la MISMA forma:
+
+    if (v0 && gc_might_be_heap_ptr(v0, bounds) &&
+        gc_is_valid_object_start((void *)v0))      <-- EL PORTERO
+        gc_update_pointer_field(&p[0]);
+
+`gc_might_be_heap_ptr` (linea 1082) es el filtro barato: ¿la direccion CAE en el rango del from-space? No
+tiene ninguna condicion de alineacion (se le saco en DC-002.36). `gc_is_valid_object_start` (linea 976) es
+el portero caro, y RECHAZA LOS INTERIORES por dos lados:
+
+  * linea 992: `if (addr & GC_ALIGN_MASK) return false;` -- un pedazo de buffer casi nunca cae alineado a 8;
+  * lineas 996-999: lee el "encabezado" que hay 4 bytes mas abajo y valida su tamano: en el medio de un
+    objeto eso lee un puntero del contenido y no cierra.
+
+Y el resolutor que SI sabe de interiores (`gc_relocate`, linea 474, que llama a `gc_interior_base`, linea
+434: el arreglo de DC-002.36, cuyo comentario en la linea 124 ya dice "rejecting interior pointers") queda
+detras de ese portero: al barrido conservador solo le llegan comienzos de objeto. De ahi en adelante, la
+palabra de la pila nunca se actualiza.
+
+Esto explica las dos cosas que DC-002.39 no podia explicar: por que el valor del bucle falla y el releido por
+indice no (el segundo es un campo preciso), y por que el arranque (que re-lee por indice, el arreglo de
+DC-002.39) ya no falla mientras la consulta si: en la consulta el valor del bucle se usa ANTES de re-leerlo.
+Tambien explica el `RECHAZA= 0` de DC-002.39: ese contador medía cuantas veces el RESOLUTOR rechazaba un
+candidato interior, y el portero lo estaba descartando antes.
+
+
+5. EL ARREGLO: `gc_candidato_del_barrido()` EN LOS 12 PUNTOS
+------------------------------------------------------------
+`scripts/console/fix-libgodc-candidato.py` (idempotente, con `--quitar` = el mutante) cambia el portero de
+los 12 puntos del barrido conservador por
+
+    static bool gc_candidato_del_barrido(void *ptr)
+    {
+        if (!ptr)
+            return false;
+
+        uintptr_t addr = (uintptr_t)ptr;
+        uint8_t *espacio_viejo = gc_heap.space[1 - gc_heap.active_space];
+
+        return addr >= (uintptr_t)espacio_viejo && addr < (uintptr_t)(espacio_viejo + gc_heap.space_size);
+    }
+
+o sea: la unica condicion es la que ya se pedia (`gc_might_be_heap_ptr`), y el que decide es
+`gc_update_pointer_field` -> `gc_relocate`, que hace las tres cosas: comienzo de objeto (lo copia), interior
+(copia el objeto que lo CONTIENE y devuelve `nuevo_comienzo + desplazamiento`) o nada (si la direccion cae
+en el encabezado de un objeto o no hay ningun encabezado que cierre, no toca la palabra). El unico
+`gc_is_valid_object_start` que NO se toca es el del camino rapido del propio resolutor.
+
+El script encadena como los demas: deja `runtime/gc_copy.c` pristino (git checkout), rehace la cadena
+documentada del mismo archivo (Store Queue -> punteros interiores -> MARCAS DEL ARRANQUE) y recien despues
+aplica este cambio. Correrlo dos veces deja el mismo sha256 (medido) y `--estado` dice si el arbol lo tiene
+(el corpus y esta evidencia lo usan para saber QUE runtime miden).
+
+
+6. EL COSTO: NINGUNO MEDIDO (y el barrido hace MENOS trabajo)
+-------------------------------------------------------------
+Mismo POC, misma ventana de 30 s, dos binarios (el unico cambio es este arreglo):
+
+    BASE (vendor canonico):        comparaciones= 2560 fallos= 184 suma= 15974400 ms= 1578
+    CON EL ARREGLO:                comparaciones= 2560 fallos=   0 suma= 15974400 ms= 1473
+
+1.473 ms contra 1.578 ms: el arreglo del portero sale 7% mas rapido (la reserva de tiempo de la consola
+viene de KOS, `timer_ms_gettime64`). Tiene sentido: antes el barrido descartaba candidatos con una
+validacion que lee encabezados, y ahora pasa directo al resolutor, que con el CURSOR (`gc_walk_pos`, el
+arreglo de DC-002.36) resuelve los pedazos del mismo buffer sin caminar de nuevo. El limite declarado es el
+de siempre en un GC conservador: una palabra de la pila que cae DENTRO de un objeto lo retiene.
+
+
+7. LA BARRERA: EL CORPUS DE DC-002.33, CONTROL 2b -- TODAVIA EN ROJO, Y POR OTRA COSA
+--------------------------------------------------------------------------------------
+Medido con `scripts/console/checar-consulta-233.sh` (la seccion 2 del corpus sola, para poder repetirla) y
+con el corpus entero `checar-tablas-233.sh`, sobre una copia privada del runtime (`/tmp/godc-39b-fix`,
+`--build`) y con el arbol en un clon de HEAD (`f2bab3af`) y su propio gox (`/tmp/gox-head`, 140 de 142
+paquetes), para que el trabajo a medias de otro agente en el arbol compartido no entre en la medida:
+
+    CON el arreglo:  patch_d2.mpq 162/162    d2data.mpq 0/11082    d2char.mpq sin linea    total 162 de 21253
+    SIN el arreglo:  patch_d2.mpq 162/162    d2data.mpq 0/11082    d2char.mpq sin linea    total 162 de 21253
+
+O sea: el POC de la consulta NO da el residuo de 0..6 nombres que declaro DC-002.39; se cae ENTERO a partir
+de la segunda vuelta, y da LO MISMO con el arreglo y sin el (o sea que este arreglo no lo empeora ni lo
+arregla). El corpus lo dice asi:
+
+    OK: control 1b: la consulta nueva da lo mismo que el mapa viejo (21253 nombres iguales, 0 distintos)
+    FALLO: control 2: solo 2 de 3 MPQ dan las mismas tablas (con las tablas iguales: patch_d2.mpq d2data.mpq)
+    FALLO: control 2b: la consulta de la consola no cierra (1 de 3 archivos, total 162 de 21253, largas: ...)
+    FALLO: control 2c: la corrida del POC tiene out of memory/fatal error, o no cierra
+
+y el POC, en la segunda vuelta, imprime el camino del config YA CORROMPIDO:
+
+    TABLAS-MPQ 2 d2data.mpq entradasHash= 65536 ...   <-- las tablas SE LEEN bien
+    TABLAS-MPQ    d2data.mpq (listfile) FALLO: file does not exist
+    TABLAS-MPQ    d2data.mpq sin lista de nombres en ata\globa/nombres_d2data.txt: file does not exist
+
+`ata\globa` es un pedazo de `data\global` -- otro dato del MISMO buffer del config -- en el lugar donde
+tendria que decir `/cd/juego` (9 caracteres los dos). Y en la tercera vuelta el nombre del archivo sale en
+NULOS (`TABLAS-MPQ 3 \0\0\0...`), o sea el arreglo del `MpqLoadOrder` tambien quedo apuntando a otro lado.
+
+QUE SE SABE (y que NO): los DOS valores que se corrompen se leen A TRAVES del puntero `cfg` -- `cfg.MpqPath`
+es un campo del `struct` y `cfg.MpqLoadOrder[i]` es un elemento del arreglo --, asi que el valor que queda
+viejo es `cfg` mismo, que es un local del POC (el GC lo barre CONSERVADORAMENTE) y que apunta al COMIENZO del
+objeto del config (su dato esta 4 bytes despues del encabezado: NO alineado a 8, que es justo lo que
+`gc_is_valid_object_start` rechaza). Con el arreglo del candidato ese puntero deberia resolverse por
+`gc_interior_base` con desplazamiento 0, y NO se resuelve. NO esta medido por que; los instrumentos para
+seguirlo ya estan en el repo (`checar-consulta-233.sh` para el numero, el POC `banco-vivo` para el caso
+chico que si queda en 0, y el POC `tablas-mpq-viva` de DC-002.39, que hoy NO enlaza: le faltan sus
+`d2c_vigia_*` en `csrc/`). Eso es la tarjeta siguiente (DC-002.39c).
+
+Lo que SI queda medido y cerrado es el agujero del POC chiquito: el valor del bucle que solo vive en la pila
+y que el barrido conservador descartaba por ser INTERIOR (184 de 2560 -> 0, con la misma suma de largos).
+
+
+8. EL MUTANTE
+-------------
+El mutante de este arreglo es `fix-libgodc-candidato.py --quitar --build` (deja la cadena canonica del
+runtime y nada mas). Medido con el mismo POC y el mismo gox:
+
+    banco-vivo:   con el arreglo  fallos= 0 de 2560   suma= 15974400
+                  con el mutante  fallos= 184 de 2560 suma= 15974400     <-- el POC caza el defecto
+
+    la consulta:  con el arreglo  162 de 21253
+                  con el mutante  162 de 21253                            <-- NO es este defecto (ver 7)
+
+El corpus de las cadenas (`checar-cadenas-236.sh`) lleva ahora los controles 1d (con la cadena puesta:
+banco-vivo fallos= 0) y 2d (con el mutante: fallos > 0 y la misma suma), asi que si alguien saca este
+arreglo de la cadena, el corpus se pone rojo.
+
