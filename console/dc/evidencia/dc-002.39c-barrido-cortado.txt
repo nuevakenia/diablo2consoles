@@ -1,0 +1,174 @@
+DC-002.39c -- EL BARRIDO DEL GC SE CORTA EN UNA CABECERA EN CERO: el arreglo de los nombres queda en el
+FROM-space, la recoleccion siguiente lo pisa y los 11.082 nombres de `d2data.mpq` se pierden.
+Y la cabecera en cero la deja la COPIA POR STORE QUEUE con la formula vieja (`>>26`): el arreglo
+DC-002.24 NO estaba aplicado en el arbol vendorizado, y con el aplicado la consulta pasa de 0 a 11.082.
+
+Fecha: 2026-10-19 (corrida autonoma, rama DC-002, HEAD d9e65466)
+
+================================================================================================
+0. COMO SE MIDIO (todo privado: el arbol compartido tiene el WIP de DC-002.42)
+================================================================================================
+* clon en HEAD:            /tmp/d2c-39c-v1                    (git clone + checkout d9e65466, arbol limpio)
+* runtime A ("como el vendor vivo", >>26): /tmp/godc-39c-vigia   DC_ROOT=/tmp/dcroot-39c-vigia
+* runtime B (con el arreglo de la SQ, >>24): /tmp/godc-39c-sq    DC_ROOT=/tmp/dcroot-39c-sq
+      cp -a /tmp/godc-39c-vigia /tmp/godc-39c-sq
+      python3 scripts/console/fix-libgodc-sq.py --build --sin-pristino /tmp/godc-39c-sq
+      # (es el UNICO cambio entre A y B: `*QACR0/1 = (dst_addr >> 26)` -> `>> 24` + la invalidacion de
+      #  cache del destino. El resto del runtime es identico.)
+* POC: console/dc/poc/tablas-mpq-viva, armado con
+      DC_ROOT=<runtime> POC=tablas-mpq-viva MKISO_JOLIET=0 DC_RUTA_DATOS=/cd/juego \
+        DC_MPQ_JUEGO="patch_d2.mpq,d2data.mpq,d2char.mpq" DC_SIN_SELLOS=1 \
+        DC_DISCO_JUEGO=<dir con los 3 MPQ> \
+        bash scripts/console/build-motor-arranque.sh <salida> /tmp/gox-head
+* corrida:  FLYCAST=$HOME/dreamcast/dl/squashfs-root/AppRun CAPTURE=none \
+              bash scripts/console/run-flycast.sh <disc.gdi> 75 <salida>
+* crudos:   ~/.hermes/cache/scratch/c39c/{viva2,viva3,viva4,viva5,viva6,viva7}.txt y
+            run-viva-{2,3,4,5,6,7}/flycast.log, rep-1/flycast.log
+
+OJO (ambiente, medido y costoso): el `flycast.AppImage` muere con SIGBUS si /tmp (tmpfs, 16 GB al 93%) esta
+casi lleno -- el primer intento de esta tarjeta murio asi a los ~2 s ("Error del bus", core de 56,7 MB,
+coredumpctl 02:22 pid 1435045) y NO era el POC (el log no tenia una sola linea de la consola). Con el
+AppImage YA extraido (`~/dreamcast/dl/squashfs-root/AppRun`) las 7 corridas siguientes anduvieron. El otro
+agente del repo se cayo por lo mismo (coredumpctl 02:02 pid 1146908, tambien flycast, tambien SIGBUS).
+
+================================================================================================
+1. LO QUE FALTABA: el POC de la vigia NO ENLAZABA (paso 1 de la tarjeta) -- ARREGLADO
+================================================================================================
+`tablas-mpq-viva` pedia `d2c_fallo`, que vivia en el `gc_copy.c` de la copia privada de DC-002.39 (no en
+`vigia_viva.c`). Se porto el instrumento a la copia privada, en su propio archivo:
+      /tmp/godc-39c-vigia/runtime/vigia_fallo.c   (busca el par {valor,largo} en los 16 MB y dice de que
+                                                   direccion salio)
+y se le pusieron tres ganchos mas al `gc_copy.c` privado (ninguno toca el vendor):
+      vigia_imprime()   al entrar y al salir de cada recoleccion (estado del arreglo y de la cabecera)
+      vigia_obj(...)    al barrer un objeto del TIPO de la config (tamano, bandera y `__ptrdata`)
+      vigia_barrido(...) y vigia_corte(...)  el resultado del barrido de Cheney: cuantos objetos, hasta
+                                             donde llego el cursor y que cabecera lo corto
+Enlaza y corre: 2 builds limpios seguidos (`rc=0`), sin warnings (`-Wall -Wextra -Werror`).
+
+================================================================================================
+2. LA MEDICION CON EL RUNTIME A (el vendor vivo: `>>26`) -- ROJO
+================================================================================================
+POC `tablas-mpq-viva`, 75 s, disc.gdi con los 3 MPQ del disco en /cd/juego (corridas viva-4 y viva-5,
+mismos numeros; viva-2 sin el instrumento del barrido, mismos 162/0).
+
+  fase 0, 10, 14 (antes de la 1ra recoleccion): los 3 nombres SANOS
+      ARQ-VIGIA cfg fase=0 gc=0 8c2a6b78 c 8c2a6bf8 a 8c2a6c80 a      <- {ptr,len} de los 3 nombres
+      ARQ-VIGIA lit fase=0 gc=0 8c1305fc c 8c13060c a 8c130618 a      <- el testigo (literales) NUNCA se rompe
+      ARQ-VIGIA hdr fase=0 gc=0 SIN-MUDAR dir=8c2a5890 (objeto=19000070 type=8c2084e4)
+
+  RECOLECCION 1 (fase 17, dentro del cuerpo de `d2data.mpq`): EL BARRIDO SE CORTA
+      ARQ-VIGIA BARRIDO fase=17 gc=1 desde=8c3243c0 hasta=8c3a43c0 objetos=47 cursor=8c3278e0 \
+                             alloc=8c336f10 corto=1 corte_datos=0 queda-sin-barrer=63024
+      ARQ-VIGIA CORTE         fase=17 gc=1 dir=8c3278e0 antes=6474696c 68746864 6363642e 61640a0d \
+                                              despues=0 0 0 0
+      ARQ-VIGIA CORTE-ceros   fase=17 gc=1 dir=8c3278e0 ceros-seguidos=136 (bytes=544)
+
+      o sea: el cursor del barrido queda en 0x8C3278E0 con la cabecera (size_and_flags) en CERO
+      (`corte_datos=0`), y de ese punto hacia arriba quedan **63.024 B del espacio NUEVO sin barrer**
+      (`alloc=8c336f10` contra `cursor=8c3278e0`). Las 4 palabras ANTES del corte son texto
+      ("lite"/"dhth"/".dcc"/"\r\nda"): el cursor cayo en el MEDIO de un objeto que quedo a medio copiar.
+
+      La copia del objeto de la CONFIG cae dentro de ese tramo sin barrer:
+      `ARQ-VIGIA hdr fase=17 gc=1 MUDADO 8c2a5890 -> 8c335398` (8c335398 esta entre el cursor y alloc).
+      El objeto se COPIA (su cabecera y su contenido salen bien: `hdr-nuevo 8c2a6c98 3 4 8c2a6d68 9`) pero
+      NUNCA SE BARRE: el contador del instrumento queda en `ARQ-VIGIA OBJN fase=17 gc=1 barridos=0`
+      (en la recoleccion 2, en cambio, `OBJ ... ptrdata=60` y `barridos=1`).
+      Consecuencia: el campo `[]string MpqLoadOrder` no se sigue -> el ARREGLO de los 3 nombres no se copia
+      -> sigue en el from-space, que en la recoleccion siguiente pasa a ser el DESTINO y se pisa.
+
+  RECOLECCION 2 (misma fase 17): el arreglo ya es memoria de otro objeto
+      ARQ-VIGIA cfg fase=17 gc=2 6f4d5c6c 6574736e 4d5c7372 52545c50 54504d5c 54494c52  <- "l\Monste..."
+      ARQ-VIGIA hdr fase=17 gc=2 largos=1702130542,1381260368,1414089810        <- los 3 largos, basura
+      TABLAS-MPQ-VIVA-VUELTA 2 leidoPtr= 2351589832 leidoLen= 10 vivoPtr= 1414548828 vivoLen= 1414089810
+      TABLAS-MPQ-VIVA 3 LITDTHTH.D FALLO: file does not exist largoNombre= 10 ruta= ata\globa/LITDTHTH.D
+
+  EL NUMERO (el mismo que traia DC-002.39b, la consulta del corpus):
+      TABLAS-MPQ-VIVA 1 patch_d2.mpq entradasHash= 16384 entradasBloque= 219 checksumHash= 2035763179 \
+                                      checksumBloque= 1179232150 ms= 2310
+      TABLAS-MPQ-VIVA   patch_d2.mpq nombres= 162 contenidos= 162 largas= 0 msConsulta= 2428
+      TABLAS-MPQ-VIVA 2 d2data.mpq  entradasHash= 65536 entradasBloque= 11083 checksumHash= 1897791535 \
+                                      checksumBloque= 4131808245 ms= 10099
+      TABLAS-MPQ-VIVA   d2data.mpq nombres= 0 contenidos= 0 largas= 0 msConsulta= 10815      <- ROJO
+      (d2char.mpq: la corrida no llega al TOTAL)
+
+  El resto del diagnostico de la tarjeta queda DESCARTADO midiendo:
+      - `banco-vivo` y el hipotesis del registro (r8..r13): el vigia los volco en cada recoleccion
+        (`ARQ-VIGIA BANCOS ... r8=0 r9=0 ... r14=0`, el derrame no esta en este runtime) y no son el valor.
+      - el hipotesis del TOPE DEL STACK (64 KiB, `GC_STACK_SCAN_MAX`): el instrumento que ya traia la copia
+        (`gc_scan_stack-PASA-EL-TOPE`) no aparece ni una vez en las 7 corridas de esta tarjeta.
+      - el JSON y el decodificador: el testigo de LITERALES (`lit`, en .rodata) nunca se rompe, y el valor
+        de la config esta sano hasta la recoleccion 1 inclusive.
+      - `cfg` (el local del POC) NO queda viejo: el GC lo actualiza bien (`cfg= 2351648680` = la direccion
+        NUEVA del objeto, la misma a la que el vigia siguio el reenvio). Lo que queda mal es la memoria a la
+        que `cfg` apunta, porque el ARREGLO de adentro nunca se copio.
+
+================================================================================================
+3. LA CAUSA DE LA CABECERA EN CERO: LA COPIA POR STORE QUEUE (`>>26`), el defecto DC-002.24
+================================================================================================
+`~/dreamcast/libgodc/runtime/gc_copy.c` (el vendor VIVO, medido hoy a las 02:45) tiene la formula VIEJA:
+
+      32:    *QACR0 = (dst_addr >> 26) & 0x1C;
+      33:    *QACR1 = (dst_addr >> 26) & 0x1C;
+
+`scripts/console/fix-libgodc-sq.py` (el arreglo de DC-002.24, con su comentario medido: la formula del KOS
+es `(dest >> 24) & 0x1C`, y con `>> 26` el area sale SIEMPRE 0 para el monton 0x8C......, asi que las
+escrituras van a la BIOS y se DESCARTAN) NO estaba aplicado en el arbol vendorizado. El script que corrio
+ULTIMO en la cadena del vendor fue el de DC-002.39b (`fix-libgodc-candidato.py`, 01:04) y ese NO re-aplica
+el de la SQ: el vendor quedo en `>>26`. (Es el hueco de idempotencia que ya habia dejado anotado la seccion
+41 del README: la cadena de `fix-libgodc-*.py` no se re-aplica entera.)
+
+Mecanismo medido, eslabon por eslabon:
+  1. una copia del GC que va por Store Queue NO escribe en el destino (area 0 -> BIOS): el destino queda con
+     la memoria VIEJA de esa direccion del semiespacio;
+  2. por eso, en el espacio NUEVO aparece un tramo con una cabecera en CERO en el medio de un objeto
+     medio copiado (`CORTE ... antes= <texto> despues= 0 0 0 0`);
+  3. el barrido de Cheney de `gc_collect` corta en la PRIMERA cabecera invalida
+     (`if (obj_size < GC_HEADER_SIZE || ...) break;`) y lo que sigue NO SE BARRE;
+  4. la copia del objeto de la config cae en ese tramo -> su campo `[]string` no se sigue -> el arreglo de
+     los 3 nombres queda en el from-space;
+  5. la recoleccion siguiente usa ese from-space como destino y lo pisa: los nombres pasan a ser basura y
+     `d2data.mpq` da 0 de 11.082.
+
+================================================================================================
+4. LA CONTRA-PRUEBA: EL MISMO POC CON EL ARREGLO DE LA SQ (runtime B) -- VERDE
+================================================================================================
+Mismo disco, mismo POC, mismo gox: lo unico distinto es `>> 24` en los dos QACR (y la invalidacion de
+cache del destino que trae el mismo script). Corridas independientes: viva-7 (disc de tablas6) y rep-1;
+cada corrida ademas se REINICIO a mitad de camino y repitio los mismos numeros (4 pasadas iguales).
+
+      ARQ-VIGIA BARRIDO fase=17 gc=1 desde=8c3243e0 hasta=8c3a43e0 objetos=138 cursor=8c33c278 \
+                             alloc=8c33c278 corto=0 corte_datos=0 queda-sin-barrer=0
+      ARQ-VIGIA BARRIDO fase=17 gc=2 ... objetos=137 cursor=8c2bb418 alloc=8c2bb418 corto=0 \
+                             queda-sin-barrer=0
+      ARQ-VIGIA BARRIDO fase=41 gc=6 .. gc=16  (la vuelta de d2data): todos corto=0 queda-sin-barrer=0
+      ARQ-VIGIA BARRIDO fase=21 gc=17..gc=20 (la vuelta de d2char): todos corto=0 queda-sin-barrer=0
+      TABLAS-MPQ-VIVA OBJ fase=17 gc=1 dir=8c3356d8 size_flags=19000070 size=112 noscan=0 \
+                             type=8c208828 ptrdata=60     <- el objeto de la config SI se barre
+
+      TABLAS-MPQ-VIVA   patch_d2.mpq nombres= 162 contenidos= 162 largas= 0 msConsulta= 2421
+      TABLAS-MPQ-VIVA   d2data.mpq  nombres= 11082 contenidos= 11082 largas= 0 msConsulta= 21122  <- VERDE
+
+RESUMEN DEL NUMERO (lo que la tarjeta pedia medir):
+
+    d2data.mpq   runtime A (`>>26`, el vendor vivo):  nombres= 0      contenidos= 0      de 11082
+    d2data.mpq   runtime B (`>>24`, la SQ arreglada): nombres= 11082  contenidos= 11082  de 11082
+                                                     (largas= 0, 21122 ms en la consola)
+
+    El barrido del GC pasa de 47 objetos con 63.024 B sin barrer y corte en una cabecera en cero
+    (`corto=1 corte_datos=0`) a 137-138 objetos con `queda-sin-barrer=0` y `corto=0` en las 20
+    recolecciones de la corrida.
+
+================================================================================================
+5. LO QUE QUEDA ABIERTO (declarado, no escondido)
+================================================================================================
+1. El TOTAL de los 21.253 no se imprime: la corrida se REINICIA al entrar en `d2char.mpq` (fase 21, tras
+   la recoleccion 20), antes de la linea `TABLAS-MPQ-VIVA-TOTAL`. Es el mismo sintoma que la tarjeta
+   DC-002.43 ("la consola reinicia sin un solo caracter") y no es de esta tarjeta: con los 3 MPQ y 25 s
+   pasa igual. Con 75 s el POC alcanza a hacer DOS pasadas completas de patch+d2data antes del reinicio.
+2. La cadena de `fix-libgodc-*.py` NO se re-aplica entera (correr `fix-libgodc-candidato.py` deja el arbol
+   SIN el arreglo de la SQ): hoy el vendor vivo esta en `>>26`. Mientras eso siga asi, el defecto DC-002.24
+   esta VIVO y todos los numeros que se saquen del vendor se miden encima de el. No se toco el vendor en
+   esta corrida porque hay otro agente trabajando el mismo repo (regla: un agente, una carpeta).
+3. Falta la barrera de la tarjeta: `checar-cadenas-236.sh` (controles 1d/2d) y `banco-vivo` sobre el
+   runtime con la SQ arreglada, y el mutante que exige que la suite se ponga ROJA (el mutante natural es
+   volver a `>> 26`, que es el estado del vendor hoy).
