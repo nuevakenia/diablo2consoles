@@ -1,0 +1,186 @@
+DC-002.36 - EL MENU PRINCIPAL DEL JUEGO EN LA DREAMCAST: LOS NOMBRES DE LAS TEXTURAS SOBREVIVEN AL GC
+=====================================================================================================
+Todo lo de abajo esta medido en este host (CachyOS, Flycast del AppImage, la consola serie por el SCIF) y
+en el host de verdad (el compositor del menu con el CODIGO DEL MOTOR). Lo que no esta medido no se afirma.
+
+0. QUE ERA EL DEFECTO Y DE DONDE SALIAN LOS NUMEROS
+---------------------------------------------------
+El POC del menu lee el plan del menu (`PLAN.TXT`) y de ahi saca los NOMBRES de las texturas con
+`strings.Fields(string(datos))`: cada nombre es una CADENA QUE APUNTA AL MEDIO DE UN OBJETO MAS GRANDE (el
+buffer del plan). El recolector de basura de la consola tenia dos huecos con esos punteros INTERIORES:
+
+  (a) el barrido conservador de la pila / de las cajas del heap descartaba las direcciones que caian
+      ADENTRO de un objeto (`gc_is_valid_object_start` pedia un principio de objeto EXACTO), asi que el
+      buffer del plan se recolectaba con cadenas vivas apuntandole: el nombre quedaba con basura;
+  (b) al copiar (`gc_copy_object`) un objeto del from-space al to-space no habia resolutor para el caso
+      "puntero al medio".
+
+Sintoma medido, POC del menu ANTES del arreglo (los ids 2..10 con el nombre en basura):
+
+  MENU236: TEXTURA id= 0 FONDO tipo= fondo tam= 800 x 600 ... crc32= 1622281050
+  MENU236: TEXTURA id= 1 LOGO_NEGRO_IZQ tipo= logo tam= 159 x 122 ... crc32= 71136314
+  MENU236: TEXTURA id= 2 <basura> tipo= <basura> ...
+  MENU236: TEXTURA FALLO id= 3 <basura> file does not exist          (lo mismo los ids 4..10)
+  MENU236: LIENZOS listos ms= 7714 faltan= 8                          (3 de 11 texturas)
+
+ARGUMENTO (no deduccion): la sonda `console/dc/poc/sonda-cadenas` mide los tres casos por separado --
+A: una cadena que es un pedazo de una reserva grande (el `strings.Fields` del plan y del decodificador de
+json); B: una cadena guardada en un campo de una caja del heap (el campo `nombre` de cada `textura`);
+C: un CONTROL SANO con copias propias (si C se cae, el que esta mal es el instrumento, no el runtime).
+La sonda NO depende del POC del menu y no dibuja nada (solo consola serie y el reloj de KOS).
+
+1. LA SONDA, EN ROJO Y DESPUES EN VERDE (la huella CRC-32 de cada caso, ANTES y DESPUES de 5 recolecciones)
+-----------------------------------------------------------------------------------------------------------
+ANTES del arreglo (`/tmp/dc-run-sonda-antes3`, 25 s):
+
+  caso A: huella 2992558440 ANTES -> 2644168089 DESPUES     ROJO (perdio el contenido)
+  caso B: huella 2992558440 ANTES -> 2644168089 DESPUES     ROJO (perdio el contenido)
+  caso C: huella 2992558440 ANTES -> 2992558440 DESPUES     VERDE (el control sano sobrevive)
+
+DESPUES del arreglo (`/tmp/dc-run-sonda-despues`, 25 s):
+
+  caso A: 2992558440 == 2992558440    VERDE
+  caso B: 2992558440 == 2992558440    VERDE
+  caso C: 2992558440 == 2992558440    VERDE
+
+Las 5 recolecciones son deterministas (`runtime.GC()`, que el paquete `runtime` de la consola expone como
+`//extern d2c_gc`), no por llenar el semiespacio de basura: con `tamBuffer` = 1200, `recolecciones` = 5,
+`tamSobra` = 2048 y sin "GC to-space overflow" en la corrida. (Con `tamBuffer` = 20000 el instrumento medía
+otra cosa: 567 recolecciones y `GC to-space overflow` a 487.960 B del semiespacio de 512 KiB.)
+
+2. EL CORPUS Y SU MUTANTE (una suite verde no prueba nada)
+----------------------------------------------------------
+`bash scripts/console/checar-cadenas-236.sh 25`    -> 15 controles OK, 0 con fallo. Entre ellos:
+
+  OK: control 1: caso A OK (2992558440 == 2992558440, 9 caso(s))
+  OK: control 1: caso B OK (2992558440 == 2992558440, 9 caso(s))
+  OK: control 1: caso C OK (2992558440 == 2992558440, 9 caso(s))
+  OK: control 2: el arbol quedo con el arreglo QUITADO (el mutante es de verdad)
+  OK: control 2b: con el mutante el caso A sale ROJO (2992558440 -> 2644168089): la suite lo caza
+  OK: control 2b: con el mutante el caso B sale ROJO (2992558440 -> 2644168089): la suite lo caza
+  OK: control 2c: con el mutante el caso C (control sano de la sonda) SIGUE verde: el que se cae es el
+      defecto, no el instrumento
+  OK: control 3: el runtime quedo con el arreglo puesto otra vez
+
+El mutante es `python3 scripts/console/fix-libgodc-interior.py --quitar --build` (deja la cadena
+documentada del runtime y sin el resolutor de punteros interiores) y al final el corpus vuelve a dejar el
+arbol como estaba.
+
+3. EL BUG DEL GOX QUE APARECIO EN EL CAMINO (medido)
+----------------------------------------------------
+Al enlazar los POC: `multiple definition of golang_0org_1x_1image_1bmp.Decode` (y 11 mas). Causa:
+`~/dreamcast/gox/orden.txt` tenia 87 lineas = 75 de la stdlib + 12 `.gox` de terceros DUPLICADOS: el build
+los escribia en `$GODC_GOX` y los anotaba en la orden del arbol compartido, asi que se acumulaban en cada
+corrida. Arreglado en `scripts/console/build-std-gox.sh` (los terceros van a `$GEN`, el mismo arbol que la
+stdlib): la orden quedo en 63 lineas, 0 duplicados, y el arbol con 65 `.gox` (51 stdlib + 12 terceros + 2
+del motor) todos con la MISMA fecha (21:14): la camada coherente de DC-002.29.
+
+4. EL MENU EN PANTALLA (lo que la tarjeta pedia: dibujado y navegable, con numeros)
+-----------------------------------------------------------------------------------
+`bash scripts/console/checar-menu-236.sh 45`  (corre el ELF en Flycast con la ventana identificada por
+KWin, capturas con `spectacle` y las teclas por el teclado virtual de /dev/uinput)
+
+  texturas subidas a la VRAM: 10 de 11   (bytes= 1196032, vram_libre= 4593064)
+  LIENZOS listos ms= 941 faltan= 1
+  MENU236: CUADROS 60 dibujados= 281              <- el menu esta en pantalla, 281 quads por cuadro
+  MENU236: FOCO inicial= -1
+
+  criterio 1 (captura de los 10 s, foco -1): pixeles que NO son el fondo = 49542 de 307200 (16.13%)
+     colores dominantes: 0,0,0 255249 (83.09%) | 80,80,80 4877 (1.59%) | 64,64,64 4676 (1.52%) |
+                         96,96,96 2380 (0.77%)
+     contra la referencia del host (640x480, con el codigo del motor):
+         +-4   96903 (31.61%)   +-8  117806 (38.43%)   +-16  149892 (48.89%)   error medio 35.41
+     (la coincidencia es PARCIAL porque la referencia del host incluye el fondo y la corrida va sin el:
+     ver el punto 6.)
+
+  criterio 2 (la navegacion, 'abajo' por el teclado virtual antes de las capturas de 15 s y 25 s):
+     consola serie: 42 marcas de FOCO en la corrida; el POC mueve la seleccion con cada borde del pad
+     capturas f10s vs f15s: 6059 de 307200 pixeles CAMBIAN (1.97%)
+        la caja donde cambian: x=211..428 y=352..380 (218x29)
+     capturas f15s vs f25s: 11921 de 307200 pixeles CAMBIAN (3.88%)
+        la caja donde cambian: x=211..428 y=320..380 (218x61)
+        en el lienzo logico del motor (800x600): x=263..535 y=400..475
+     <- es la region de los botones: la seleccion se movio y el cuadro del boton cambio en pantalla.
+     (La tecla de /dev/uinput aprieta Y suelta, asi que el POC ve dos bordes por tecla; el runner
+     comprueba en la consola serie que el FOCO se movio y reintenta la tecla hasta 3 veces: sin esa
+     comprobacion una corrida "verde" puede estar midiendo una navegacion que no paso.)
+
+  criterio 3 (el MUTANTE: sin `PLAN.TXT` no hay plan):
+     MENU236: AVISO no encontre PLAN.TXT ni en /rd/ ni en /cd/MENU/ ni en /cd/
+     MENU236: PLAN FALLO: file does not exist
+     texturas subidas: ninguna (el POC se va antes de subir nada)   |   quads dibujados: 0
+     la pantalla queda como estaba: 0 de 307200 pixeles que no sean el fondo del PVR (negro), contra los
+     49542 del menu con el plan.
+
+  PARA QUE LA TECLA LLEGUE: el teclado virtual del host manda las teclas a la ventana ACTIVA, no a la de
+  arriba. Con la ventana solo "keepAbove" la consola serie se quedaba en `FOCO inicial= -1` y las dos
+  capturas salian identicas (0 pixeles de diferencia, medido). La regla de KWin del runner ahora tambien
+  hace `workspace.activeWindow = w` y con eso la navegacion se mide.
+
+  PARA QUE EL MENU ENTRE EN LA RAM: se decodifica, se sube a la VRAM y se SUELTA el lienzo de cada textura
+  antes de la siguiente (`t.idx = nil`). Antes se armaban los 11 lienzos y se subian despues: con los ~2,3
+  MB de lienzos + los ~1,4 MB de los DC6 crudos vivos a la vez, el arena de C de KOS quedaba lleno
+  (`Memory: arena=4148384 used=4144792 free=3592`) y el POC moria con `panic: index out of range` al cargar
+  la 9na textura (FUENTE_FORMAL10).
+
+5. EL FONDO: EL DEFECTO QUE QUEDA DECLARADO (no escondido)
+----------------------------------------------------------
+Con los 11 assets el POC MUERE al subir la textura 0 (el FONDO) a la VRAM. La medicion que lo ubica:
+
+  recien leido el plan:   MENU236: PLAN-LEIDO id= 0 w= 800 h= 600 pw= 1024 ph= 1024 banco= 0     <- LIMPIO
+  al salir de armarDC6:   MENU236: TEXTURA id= 0 FONDO tipo= fondo tam= 800 x 600
+                          pot= 1024 x -2147482624 banco= -1942452840  crc32= 1622281050           <- BASURA
+
+`ph` y `banco` quedan con valores con pinta de puntero (0x80000C00 y una direccion de la RAM del host de
+emulacion) MIENTRAS los otros 10 elementos salen perfectos (todos los crc32 son estables entre corridas).
+O sea: algo escribe fuera de su buffer al DECODIFICAR los frames del fondo, y lo que pisa es el struct de la
+textura 0. Se le puso un TOPE EXPLICITO al pegado de la grilla del fondo (contando los pixeles que no
+entran) y NO se dispara: el pegado no es el culpable, el que se sale es el decodificador del DC6
+(`d2dc6.DecodeFrame`) con los frames del fondo. Es el mismo sintoma de fondo de la tarjeta DC-002.39 (la
+consola corrompe un dato vivo): se declara aca y se sigue por esa otra tarjeta.
+
+Por eso la corrida "el menu se ve" va SIN el fondo (`SIN_ASSET=FONDO.DC6`): los otros 10 elementos (4
+logos, 4 fuentes, 2 botones) se cargan, se suben y se dibujan. La captura queda para verla en
+`$SAL/menuseve/f10s.png` (SAL por defecto: ~/.hermes/cache/scratch/corpus-menu-236).
+
+6. EL DISCO: LOS DOS DEFECTOS DE ARRANQUE MEDIDOS (y la salida)
+---------------------------------------------------------------
+Al principio de la tarjeta el POC leia sus assets DEL DISCO. Medido, con el MISMO `1ST_READ.BIN`
+(sha256 c48f24624e8fa48705077c3d) y el mismo IP.BIN:
+
+  a) el ISO con los 20 archivos adentro de la CARPETA `/MENU` NO ARRANCA: la corrida no imprime NINGUNA
+     marca del arranque (ni el constructor de C de libgodc, 'ARQ-MARCA ctor-kos_startup v=0', que sale
+     antes de main) y la pantalla queda negra. El MISMO binario con los 20 archivos en la RAIZ del ISO
+     arranca (2 marcas del constructor y el POC corre).
+  b) el bisect del contenido: con UN solo archivo chico en la carpeta (PAL_SKY.PAL, 768 B) ya no arranca,
+     con nombres cortos 8.3 tampoco, con PLAN.TXT (10 sectores) tampoco: es la CARPETA, no los nombres ni
+     el tamano. Sin carpetas arranca.
+  c) el cruce, que ubica de que lado esta la diferencia: el disco de DC-002.35 (carpeta /JUEGO) arranca con
+     SU binario pero NO con el del menu; y el binario del menu con la carpeta /JUEGO tampoco arranca. O
+     sea: no es el nombre de la carpeta ni el ISO solo -- depende del BINARIO. Y el arreglo "sin carpetas"
+     tampoco es estable: el mismo ISO de raiz arranco con el binario de antes y NO arranco con el binario
+     de 352 bytes mas grande (medido). El arranque depende de una combinacion (layout del ISO x layout del
+     binario) que NO esta medida: queda declarado, no resuelto.
+
+SALIDA (`romdisk`): los assets VIAJAN ADENTRO DEL ELF. `build-dc.sh` empaqueta `<poc>/romdisk` con genromfs
++ bin2o cuando ese directorio existe y libgodc lo monta en `/rd` (`runtime/romdisk_init.c`, simulacion
+debiles: no hace falta tocar el csrc del POC). El POC busca sus assets en `/rd/`, despues en `/cd/MENU/` y
+despues en `/cd/`, y se queda con el primero donde lea el `PLAN.TXT` -- con el romdisk el disco sale de la
+ecuacion y el menu se mide igual.
+
+7. LA CAMADA DE `.gox` Y EL RUNTIME QUE SE MIDIO
+------------------------------------------------
+  stdlib: 51 `.gox` + 12 de terceros + 2 del motor = 65 archivos, orden.txt de 63 lineas (los del motor
+          van aparte), todo recompilado en la misma corrida.
+  libgodc: con la cadena documentada (ABI, iface, semiespacios) + `fix-libgodc-interior.py` aplicado
+          (imprime el sha256 del `gc_copy.c` pristino y lo deja con el resolutor de punteros interiores).
+  compare-motor-dc6.sh: la barrera del motor sigue IGUAL (ver la seccion del README).
+
+8. COMO SE REPRODUCE
+--------------------
+  source scripts/console/env.sh
+  bash scripts/console/checar-cadenas-236.sh 25        # la sonda, el corpus y el mutante del GC (15 OK)
+  SALTAR_HOST=1 bash scripts/console/build-menu-236.sh # el ELF del menu (con el romdisk adentro)
+  bash scripts/console/checar-menu-236.sh 45           # la pantalla, la navegacion y el mutante
+  los instrumentos: scripts/console/medir-menu-236.py (pixeles y navegacion) y
+                    scripts/console/checar-cadenas-236.sh (la sonda del GC)

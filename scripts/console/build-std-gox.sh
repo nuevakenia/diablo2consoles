@@ -72,12 +72,15 @@ echo "stdlib minima compilada para SH-4 en $GEN"
 # ============================================================================
 compilar_tercero() {
     local pkgpath="$1" fuente="$2"
-    # El destino SALE DE GODC_GOX, igual que la stdlib de arriba. Antes estaba fijo en $DC_ROOT/gox y eso
-    # rompia medir con un gox aparte: la stdlib se compilaba en el gox propio pero los paquetes de
-    # terceros se iban al compartido, asi que el gox propio quedaba a medias y el motor acusaba
-    # "import file ... not found" por paquetes que si estaban compilados (medido: 99 de 142 en vez de 127).
-    # Con GODC_GOX puesto, los dos agentes pueden medir sin pisarse la gox del otro.
-    local GOX_TERCEROS="${GODC_GOX:-$DC_ROOT/gox}"
+    # El destino SALE DEL MISMO DIRECTORIO QUE LA STDLIB (GEN): los terceros son parte del MISMO arbol de
+    # .gox y su lista de enlace (`orden.txt`) es UNA. Antes decia GODC_GOX y eso hacia que el arbol de
+    # terceros fuera OTRO que el de la stdlib cuando el script se llamaba con un dir explicito
+    # (`build-std-gox.sh /tmp/gox-x`): el `rm -rf "$GEN"` borraba la stdlib de ese dir pero las 12 lineas
+    # de los terceros se AGREGABAN a la orden.txt del arbol COMPARTIDO en cada corrida. Medido en DC-002.36:
+    # ~/dreamcast/gox/orden.txt quedo con 87 lineas = 75 de la stdlib + 12 repetidas (una por cada tercero),
+    # y el enlace de CUALQUIER POC moria con "multiple definition of ..." porque el mismo .gox entraba dos
+    # veces a la linea de enlace (`english: multiple definition of golang_0org_1x_1image_1bmp.Decode`).
+    local GOX_TERCEROS="$GEN"
     local salida="$GOX_TERCEROS/${pkgpath}.gox"
     mkdir -p "$(dirname "$salida")"
 

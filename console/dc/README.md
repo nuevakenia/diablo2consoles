@@ -3830,3 +3830,107 @@ este árbol (control byte a byte del `d2mpq.gox`).
 
 Evidencia cruda: `evidencia/dc-002.34-motor-disco.txt` (y los logs de Flycast de los cinco estados, con las
 capturas, en `~/.hermes/cache/scratch/corpus-234/`).
+
+## 53. DC-002.36: el MENU PRINCIPAL **dibujado y navegable** en la Dreamcast — los nombres de las texturas ya no se caen con el recolector (la cadena que apunta al **MEDIO** de otro objeto), el disco que **no arranca** con carpeta y el romdisk que lo saca de la ecuación
+
+La tarjeta pedía el menú principal del juego en pantalla y navegable. Lo que la bloqueaba no era el menú: era el
+**recolector de basura de la consola con los punteros interiores** — las cadenas que son un **pedazo** de un objeto
+más grande (el `strings.Fields(string(datos))` del plan del menú, o el `strings.Split` del decodificador de json).
+Medido, el POC del menú cargaba **3 de 11** texturas: los ids 0 y 1 salían con su `crc32` y desde el id 2 los
+**nombres** salían `<basura>` y el POC pedía archivos que no existen (`faltan= 8`). Los nombres son los que se caen,
+y los nombres son cadenas que apuntan al medio del buffer del plan.
+
+**El arreglo**, con la sonda como instrumento (`console/dc/poc/sonda-cadenas`, tres casos y un **control sano**):
+
+* **A**: una cadena que es un pedazo de una reserva grande (el `strings.Fields` del plan) — huella crc32 antes y
+  después de las recolecciones: **2992558440 → 2644168089** sin el arreglo (ROJO) y **2992558440 == 2992558440** con el
+  arreglo (VERDE).
+* **B**: una cadena guardada en un campo de una caja del heap (el campo `nombre` de cada `textura`) — lo mismo:
+  **ROJO → VERDE**.
+* **C**: el control sano de la sonda — **VERDE siempre** (si C se cae, el que está mal es el instrumento).
+
+Las recolecciones son **deterministas** (`runtime.GC()`, que el paquete `runtime` de la consola expone como
+`//extern d2c_gc`): `tamBuffer= 1200`, `recolecciones= 5`, `tamSobra= 2048` y **sin** `GC to-space overflow`. (Con
+`tamBuffer= 20000` el instrumento medía otra cosa: 567 recolecciones y el desborde del semiespacio de 512 KiB a
+487.960 B.) En `~/dreamcast/libgodc/runtime/gc_copy.c` el arreglo tiene dos partes: el barrido conservador ya no
+descarta las direcciones que caen adentro de un objeto (`gc_is_valid_object_start` pedía principio exacto) y el
+copiado resuelve el puntero al medio moviéndolo con su objeto. Se aplica con
+`python3 scripts/console/fix-libgodc-interior.py --build` (idempotente, deja pristino el vendor y encadena
+`fix-libgodc-sq.py`).
+
+**La suite y su mutante** (`bash scripts/console/checar-cadenas-236.sh 25`): **15 controles OK, 0 con fallo**.
+El mutante es `fix-libgodc-interior.py --quitar --build` y con él **A y B salen ROJOS** (2992558440 → 2644168089) y
+**C sigue verde**: la suite caza el defecto y no se cae por el instrumento. Al final el corpus deja el árbol como
+estaba.
+
+**El menú, en pantalla y con números** (`bash scripts/console/checar-menu-236.sh 45`):
+
+* **10 de 11** texturas subidas a la VRAM (`bytes= 1196032`, `vram_libre= 4593064`), `faltan= 1` y
+  **281 quads por cuadro** dibujados: el menú está en pantalla.
+* criterio 1 (captura a los 10 s, foco -1): **49.542 de 307.200** píxeles que **no** son el fondo (16,13%); los
+  dominantes son los grises de las fuentes y los botones (80,80,80 / 64,64,64 / 96,96,96). Contra la referencia que
+  arma el **host con el código del motor**: ±4 **31,61%**, ±8 **38,43%**, ±16 **48,89%**, error medio **35,41** — la
+  coincidencia es parcial porque la referencia incluye el **fondo** y la corrida va sin él.
+* criterio 2 (navegación): con `abajo` por el **teclado virtual de `/dev/uinput`** antes de las capturas de 15 s y
+  25 s (42 marcas de FOCO en la corrida), las capturas **f10s vs f15s cambian 6.059 de 307.200 píxeles (1,97%)** en
+  la caja `x=211..428 y=352..380 (218x29)` y **f15s vs f25s cambian 11.921 de 307.200 píxeles (3,88%)** en
+  `x=211..428 y=320..380 (218x61)` = `x=263..535 y=400..475` en el lienzo lógico del motor: es la región de los
+  botones. La selección se mueve y **se ve**.
+* criterio 3 (el mutante, sin `PLAN.TXT`): `PLAN FALLO: file does not exist`, **0 texturas, 0 quads** y la pantalla
+  **queda como estaba**: 0 de 307.200 píxeles que no sean el fondo del PVR (negro), contra los 49.542 del menú con
+  el plan.
+
+**Para que la tecla llegue** hay que ACTIVAR la ventana: el teclado virtual manda a la ventana activa, no a la de
+arriba. Con la ventana sólo `keepAbove` la consola serie se quedaba en `FOCO inicial= -1` y las dos capturas salían
+idénticas (**0 píxeles** de diferencia). La regla de KWin del runner ahora hace `workspace.activeWindow = w`, informa
+cuál quedó activa y el runner **insiste** hasta 5 veces antes de cada tecla (medido: con un run vecino vivo la
+activación no siempre prende al primer intento).
+
+**Para que las 11 texturas entren en la RAM** el POC decodifica, sube a la VRAM y **suelta el lienzo** de cada
+textura antes de la siguiente (`t.idx = nil`). Antes armaba los 11 lienzos y los subía después: con los ~2,3 MB de
+lienzos más los ~1,4 MB de los DC6 crudos vivos a la vez, el arena de C de KOS quedaba lleno
+(`Memory: arena=4148384 used=4144792 free=3592`) y el POC moría con `panic: index out of range` al cargar la 9.ª
+textura (`FUENTE_FORMAL10`).
+
+**El defecto que queda declarado: el FONDO.** Con los 11 assets el POC **muere al subir la textura 0** a la VRAM. La
+medición lo ubica: recién leído el plan la textura 0 está **limpia** (`PLAN-LEIDO id= 0 w= 800 h= 600 pw= 1024
+ph= 1024 banco= 0`) y al salir de `armarDC6` sale con `ph= -2147482624` y `banco= -1942452840` (valores con pinta de
+puntero) mientras los otros 10 elementos salen perfectos y con `crc32` estable entre corridas: **algo escribe fuera
+de su buffer al decodificar los frames del fondo** y lo que pisa es el struct de la textura 0. Al pegado de la grilla
+del fondo se le puso un **tope explícito** que cuenta los píxeles que no entran y **no se dispara**: el que se sale es
+el decodificador del DC6 (`d2dc6.DecodeFrame`). Es el mismo síntoma de fondo de **DC-002.39** (la consola corrompe un
+dato vivo): se declara acá y sigue por esa tarjeta. La corrida «el menú se ve» va sin el fondo
+(`SIN_ASSET=FONDO.DC6`) y por eso trae los otros 10.
+
+**El disco no arranca con carpeta (y el romdisk lo saca de la ecuación).** Con el mismo `1ST_READ.BIN`
+(sha256 `c48f24624e8fa48705077c3d`) y el mismo IP.BIN:
+
+* el ISO con los 20 archivos adentro de la carpeta `/MENU` **no arranca**: la corrida no imprime **ninguna** marca del
+  arranque (ni el constructor de C de libgodc, `ARQ-MARCA ctor-kos_startup v=0`, que sale antes de `main`) y la
+  pantalla queda negra; el mismo binario con los 20 archivos en la **raíz** del ISO arranca.
+* el bisect del contenido: con **un** archivo chico en la carpeta (`PAL_SKY.PAL`, 768 B) ya no arranca, con nombres
+  cortos 8.3 tampoco, con `PLAN.TXT` (10 sectores) tampoco → es la **carpeta**, no los nombres ni el tamaño.
+* el **cruce**: el disco de DC-002.35 (carpeta `/JUEGO`) arranca con **su** binario pero **no** con el del menú, y el
+  binario del menú con `/JUEGO` tampoco → no es el nombre de la carpeta ni el ISO solo: depende del **binario**. Y el
+  arreglo «sin carpetas» tampoco es estable: el mismo ISO de raíz arrancó con el binario de antes y **no** con el
+  binario de 352 bytes más grande. El arranque depende de una combinación (layout del ISO × layout del binario) que
+  **no** está medida: queda declarado, no resuelto.
+
+La salida medida es el **romdisk**: `build-dc.sh` empaqueta `<poc>/romdisk` con `genromfs` + `bin2o` cuando ese
+directorio existe y `~/dreamcast/libgodc/runtime/romdisk_init.c` lo monta en `/rd` (símbolos débiles: no hay que
+tocar el `csrc` del POC). El POC busca sus assets en `/rd/`, después en `/cd/MENU/` y después en `/cd/`, y se queda
+con el primero donde lea el `PLAN.TXT`. Con eso el menú se mide igual y el disco sale de la ecuación.
+
+**De paso, el bug del `.gox`** que rompía el enlace de los POC: `multiple definition of
+golang_0org_1x_1image_1bmp.Decode` (y 11 más). La causa era `~/dreamcast/gox/orden.txt` con **87 líneas** = 75 de la
+stdlib más **12 `.gox` de terceros duplicados**: se escribían en otro árbol y se anotaban en la orden compartida, así
+que se acumulaban en cada corrida. En `build-std-gox.sh` los terceros van a `$GEN` (el mismo árbol que la stdlib): la
+orden quedó en **63 líneas, 0 duplicados** y el árbol con **65 `.gox`** (51 stdlib + 12 terceros + 2 del motor) todos
+de la misma corrida = la camada coherente de DC-002.29.
+
+Barreras: corpus `checar-cadenas-236.sh` **15/15 controles OK** con el mutante cazado (A y B rojos, C verde),
+`checar-menu-236.sh` con los tres criterios medidos (**49.542** píxeles de elementos, **6.059** y **11.921** píxeles de
+cambio al navegar, **0** quads y **0** píxeles con el mutante) y la barrera del motor (`compare-motor-dc6.sh`) igual.
+
+Evidencia cruda: `evidencia/dc-002.36-menu-consola.txt` (con las capturas en
+`~/.hermes/cache/scratch/corpus-menu-236/menuseve/`).
