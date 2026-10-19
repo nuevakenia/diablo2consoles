@@ -1,0 +1,152 @@
+DC-002.39e — EL CACHE DE ITABS DEL RUNTIME GUARDA PUNTEROS DEL MONTON DE GO EN `.bss` DE C, Y EL
+RECOLECTOR NO BARRE `.bss`: el `ReadFile("(listfile)")` del TERCER MPQ salta a un pedazo de DATO
+(`PC 656a626f` = "obje", `PR` en `bytes.Buffer.ReadFrom`) y la consulta queda en 11244 de 21253
+========================================================================================================
+Fecha: 2026-10-19.  Rama DC-002.  Todo lo de aca esta MEDIDO en la consola (Flycast) o en el host.
+Instrumento: `scripts/console/checar-itab-39e.sh` (arbol a /home/dgalli/.hermes/cache/scratch/itab-39e-final2,
+crudos en .../sano/ y .../fix/).  POC: `console/dc/poc/itab-raiz` (nuevo, de esta tarjeta).
+Runtime: copia privada armada con la cadena oficial (DC-002.39d) + el paso 4 de esta tarjeta.
+
+RESUMEN EN UNA LINEA
+`get_itab` (runtime/interface_dreamcast.c) guarda los `Itab *` de las conversiones ENTRE INTERFACES en un
+array de `.bss` de C (`itab_cache.itabs[32]`).  El recolector copiativo de la consola no barre `.bss`, asi que
+cuando el itab se COPIA al otro semiespacio la ranura queda apuntando al viejo; el puntero viejo se reubica
+como INTERIOR en la recoleccion siguiente y la tabla de metodos termina siendo la de OTRO objeto -> la llamada
+al metodo salta a un pedazo de DATO.  Arreglo: registrar las 32 ranuras con `gc_add_root`.
+
+
+1. EL DEFECTO, COMO TAL: EN QUE SE VA
+-------------------------------------
+El sintoma de la tarjeta (DC-002.39c) es `PC 656a626f` — texto `"obje"` leido como direccion — con el `PR` en
+`bytes.Buffer.ReadFrom` (`bytes/bytes.go:186`), que hace `r.Read(bloque)`: UNA LLAMADA DE METODO POR INTERFAZ,
+o sea un salto por un ITAB.  La sospecha es el cache del runtime, y hay que medirla, no creerla.  Se mide con
+un POC que arma la MISMA figura que el motor:
+
+    porCache(entra saludador) otro    // conversion entre DOS interfaces -> runtime -> get_itab -> cache
+    porEstatico(u *uno) otro          // CONTROL: conversion concreto->interfaz, itab ESTATICO de .rodata
+
+y una vuelta con basura retenida + recolecciones forzadas (`runtime.GC()` cada 4 vueltas).  Tres lecturas:
+V1 la variable de interfaz de la PILA (control), V2 la interfaz que sale del CACHE y queda VIVA en un slice a
+traves de la recoleccion, V4 el control de V2 con itab estatico.
+
+CONTROL PREVIO (que el camino dinamico SE EJERCE, no es una hipotesis de escritorio):
+    ITAB-RAIZ semiespacio= 2350051168 .. 2350575456 itabLlamadas= 40 itabArmados= 10
+    ITAB-RAIZ ... itabEnSemi= true  (el itab cae ADENTRO del semiespacio activo: el GC lo PUEDE mover)
+O sea: la conversion entre interfaces SI pasa por `get_itab` (40 llamadas en 40 vueltas) y los itabs SI viven
+en el monton de Go (10 armados, `runtime_malloc`), no en `.rodata`.  Con la llamada INMEDIATA (sin
+recoleccion en el medio) todo da bien: 120/120 llamadas, 0 malas.  El defecto necesita el paso siguiente.
+
+MEDIDO (v2: el `Append` guarda la interfaz del cache VIVA y se llama despues de la recoleccion)
+
+    mutante (dcroot-mut, libgodc.a 210728 B sha256 d89f2752e07f36a5, `fix-libgodc-itab.py --sin-raices`)
+    bash scripts/console/checar-itab-39e.sh
+        ITAB-RAIZ arranca ... montonC= 1848 gc= 0 ebitenLibre= 1848
+        ITAB-RAIZ semiespacio= 2350051168 .. 2350575456 itabLlamadas= 0 itabArmados= 0 itabUltimo= 0
+        ITAB-RAIZ armados a= 1007 b= 2009 gc= 0                <- imprime esto y NADA MAS
+        (la consola se REINICIA: 70 arranques en 25 s, 0 lineas de TOTAL)
+
+    70 arranques  x  3 lineas de progreso (v=1..3) = 210 lineas de progreso y CERO TOTAL: la corrida muere en
+    la VUELTA 4 -- despues de la primera recoleccion forzada.  No imprime excepcion: REINICIO MUDO, la misma
+    firma que el defecto del motor en DC-002.43.
+
+De las 4 vueltas, las 3 primeras van bien: lo que la mata es la recoleccion.  Ese es el dato que separa "el
+cache devuelve una tabla rota" (seria malo desde la vuelta 1) de "el cache devuelve una tabla que se rompe
+DESPUES, cuando el recolector copia el itab".
+
+
+2. EL ARREGLO: LAS RANURAS DEL CACHE COMO RAICES DEL GC
+-------------------------------------------------------
+`scripts/console/fix-libgodc-itab.py` (nuevo; la cadena lo corre como paso 4, asi que el `.a` de un arbol
+armado con `fix-libgodc-cadena.sh` ya lo trae):
+
+    void gc_add_root(void **root_ptr);
+    static int d2c_itab_raices_puestas = 0;
+    static void d2c_itab_registrar_raices(void) {
+        if (d2c_itab_raices_puestas) return;
+        for (int i = 0; i < MAX_CACHED_ITABS; i++) gc_add_root((void **)&itab_cache.itabs[i]);
+        d2c_itab_raices_puestas = 1;
+    }
+    // y al final de get_itab, despues de guardar en el cache: d2c_itab_registrar_raices();
+
+Se registran las 32 de una vez (no la que se acaba de guardar) porque `gc_add_root` no se puede llamar por
+cada itab: la tabla de raices del runtime tiene tope 256 y el cache son 32 ranuras.  Con las ranuras
+registradas, el recolector las barre como una variable de Go mas y las ACTUALIZA al copiar el itab.
+
+MEDIDO (arreglo: dcroot-fix, libgodc.a 210932 B sha256 58e6567d424051a7)
+
+    ITAB-RAIZ semiespacio= 2350051168 .. 2350575456 itabLlamadas= 0 itabArmados= 0 itabUltimo= 0
+    ITAB-RAIZ armados a= 1007 b= 2009 gc= 0
+    ITAB-RAIZ v= 1 llamadas= 3 correcto= 2 malo= 0 v2bien= 1 v2mal= 0 vivos= 1 v4bien= 1 v4mal= 0
+    ...
+    ITAB-RAIZ-TOTAL vueltas= 40 llamadas= 120 correcto= 80 malo= 0
+        v2bien= 820 v2mal= 0 vivos= 40 v4bien= 820 v4mal= 0 estaticos= 40
+        gc= 32 suma= 531800 ms= 226 libreC= 2016 ebitenLibre= 2016
+
+    arranques= 1   TOTAL impreso= 1   itabArmados= 1
+
+Los cuatro numeros que importan:
+  * `v2mal= 0` con `v2bien= 820`: 820 llamadas por el camino del CACHE despues de las recolecciones, todas
+    correctas.  Sin el arreglo esta corrida no llega ni a la cuarta vuelta.
+  * `itabArmados= 1` contra **10** del defecto (y 40 llamadas al cache en ambos casos): con las ranuras
+    registradas el cache ACIERTA y el itab se reserva una sola vez; sin ellas el cache FALLA despues de cada
+    recoleccion y vuelve a reservar.  Es el mismo defecto mirado desde el otro lado, y es un numero que se ve
+    sin instrumentar nada: 1 vs 10.
+  * `v4bien= 820 v4mal= 0`: el CONTROL (interfaz con itab estatico de `.rodata`, la misma figura de "viva en
+    un slice") sobrevive igual con y sin el arreglo.  O sea lo que rompe no es "una interfaz viva en un slice"
+    -- que es el patron del motor en `bytes.Buffer.ReadFrom` -- es EL ITAB DEL CACHE.
+  * `gc= 32` recolecciones y ninguna linea `ITAB-RAIZ-MALO-*`.
+
+
+3. EL CORPUS DEL MOTOR: LA CONSULTA DE LOS 21.253 CON LA LECTURA PUESTA
+-----------------------------------------------------------------------
+POC `console/dc/poc/tablas-mpq-listfile` (nuevo: el MISMO `tablas-mpq` de DC-002.33 con `leerListfile = true`,
+que es lo que estaba apagado; el resto del archivo es identico).  Arbol LIMPIO de HEAD (719d7b82) para que no
+se mezcle el trabajo en curso de otra tarjeta.  `scripts/console/checar-consulta-233.sh 1 75`, gox del motor de
+140 paquetes:
+
+    ARREGLO (dcroot-fix):   OK: vuelta 1: la consulta encuentra 21253 de 21253
+                                ( patch_d2.mpq:162/162  d2data.mpq:11082/11082  d2char.mpq:10009/10009)
+                            RESULTADO: 1 de 1 vueltas con los 21253 nombres (totales: 21253)
+
+    MUTANTE (dcroot-mut):   FALLO: vuelta 1: la consulta da 11244 de 21253
+                                ( patch_d2.mpq:162/162  d2data.mpq:11082/11082  d2char.mpq:/10009)
+                            RESULTADO: 0 de 1 vueltas con los 21253 nombres (totales: 11244)
+
+162 + 11082 + 10009 = 21253.  El que se cae es el TERCER MPQ (`d2char.mpq`), exactamente como decia la
+tarjeta: el mutante ni siquiera llega a contar los nombres de ese MPQ.  Un solo cambio entre las dos corridas
+(las raices del cache: sha del `.a` 58e6567d424051a7 contra d89f2752e07f36a5) y el corpus pasa de 11244 a
+21253.
+
+Criterio 4 de la tarjeta (repeticion, `checar-consulta-233.sh 3 120` con la lectura puesta, mismo arbol y
+mismo gox que la corrida de arriba):
+
+    OK: vuelta 1: la consulta encuentra 21253 de 21253 ( patch_d2.mpq:162/162 d2data.mpq:11082/11082 d2char.mpq:10009/10009)
+    OK: vuelta 2: la consulta encuentra 21253 de 21253 ( patch_d2.mpq:162/162 d2data.mpq:11082/11082 d2char.mpq:10009/10009)
+    OK: vuelta 3: la consulta encuentra 21253 de 21253 ( patch_d2.mpq:162/162 d2data.mpq:11082/11082 d2char.mpq:10009/10009)
+    RESULTADO: 3 de 3 vueltas con los 21253 nombres (totales: 21253 21253 21253)
+
+O sea: NO es un cierre por suerte de una vuelta -- las tres dan el mismo numero, con el mismo binario.
+
+
+4. EL MUTANTE, Y QUE PASA SI NO ESTA
+------------------------------------
+El mutante de este arreglo es BORRAR el `gc_add_root` y dejar lo demas igual: es el modo
+`fix-libgodc-itab.py --sin-raices`, que tambien deja la observabilidad puesta (los contadores) para que el POC
+pueda medir en los dos estados.  Los dos arboles salen de la MISMA cadena oficial; lo unico que cambia es el
+paso 4.  Resultado: ROJO (70 reinicios, 0 TOTAL) contra VERDE (1 arranque, 21253).  Si el mutante quedara
+verde, el hueco seria de la suite: por eso `checar-itab-39e.sh` exige los DOS resultados para salir 0.
+
+Un mutante que NO sirve de nada (y por eso no se usa): sacar los contadores de la sonda deja el POC sin
+símbolos y no compila.  Los contadores NO son el arreglo; el arreglo es el `gc_add_root`.
+
+
+5. LO QUE ESTA TARJETA NO MIDE (declarado, para que no se lea de mas)
+---------------------------------------------------------------------
+* NO se toca el vendor (`~/dreamcast/libgodc`, sigue en la formula vieja `>>26` de DC-002.24): todo lo de aca
+  es sobre copias privadas.  El vendor no se arregla hasta que la cadena se corra sobre el a proposito.
+* NO se corre `checar-compr-240.sh` entero en esta tarjeta (son ~4 min de Flycast + 4 compilaciones del motor
+  y su control 7 es de otra tarjeta): lo que si esta medido es que el arreglo no cambia el comportamiento con
+  la lectura APAGADA -- es el mismo camino, solo cambia si el cache quedo con una direccion vieja.
+* NO se corre la consola real (GDEMU): eso es DC-001.2d y lo hace Daniel.
+* El `itab_cache` sigue siendo de 32 entradas SIN desalojo (si un programa usa mas de 32 conversiones distintas
+  no caben) -- es un tema aparte, no el defecto de aca, y no se toca.

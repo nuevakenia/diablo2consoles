@@ -4583,3 +4583,88 @@ criterios). Evidencia: `console/dc/evidencia/dc-002.44-lista-del-disco.txt`.
 del driver —que medido funciona—, y eso va como tarjeta aparte: el manifiesto es del **horneador** (lista los
 `*.mpq` y `*.txt` que ese script hornea), no del sistema de archivos de la consola.
 
+
+---
+
+## 63. DC-002.39e: el cache de itabs guarda punteros del monton de Go en `.bss` de C y el recolector **no barre `.bss`** — por eso el `ReadFile("(listfile)")` del tercer MPQ saltaba a un pedazo de DATO, y la consulta queda en **21.253** con la lectura puesta
+
+`get_itab` (`runtime/interface_dreamcast.c`) arma los `Itab *` de las conversiones **entre interfaces** en el
+montón de Go y los guarda en `static struct { Itab *itabs[32]; int count; } itab_cache`, un array en **`.bss`
+de C**. El recolector de la consola es copiativo y sus raíces son **solo** `gc_root_table`, las listas de
+gccgo y las pilas (`gc_scan_roots` de `gc_copy.c`, con el comentario explícito *"not conservative .data/.bss
+scan"*). Un puntero guardado en `.bss` es **invisible**: cuando el recolector **copia** el itab al otro
+semiespacio la ranura sigue apuntando al viejo, y en la recolección siguiente ese puntero se reubica como
+**interior** (DC-002.36) — la tabla de métodos termina siendo la de **otro** objeto y la llamada al método
+salta a un pedazo de **dato**. Eso es exactamente `PC 656a626f` (`"obje"` leído como dirección) con el `PR` en
+`bytes.Buffer.ReadFrom`.
+
+### el defecto, como tal (POC nuevo `console/dc/poc/itab-raiz`)
+
+El POC arma la **misma figura** que el motor: `porCache(entra saludador) otro` es una conversión entre **dos**
+interfaces (no se puede resolver en compilación: va al runtime y al cache), `porEstatico(u *uno) otro` es el
+**control** (conversión concreto→interfaz, itab **estático** en `.rodata`). Las interfaces que salen del cache
+quedan **vivas** en un slice a través de las recolecciones, y se vuelven a llamar después.
+
+Primero se mide que el camino se **ejerce** (si no, la hipótesis no vale nada): `itabLlamadas= 40`,
+`itabArmados= 10`, `itabEnSemi= true` — o sea el itab cae **adentro** del semiespacio activo, el recolector lo
+**puede** mover. Con la llamada **inmediata** (sin recolección en el medio) todo da bien: **120/120**.
+
+Con la figura V2 (viva a través de la recolección), medido con `bash scripts/console/checar-itab-39e.sh`:
+
+| runtime | `libgodc.a` | arranques | TOTAL | resultado |
+|---|---|---|---|---|
+| **mutante** (`fix-libgodc-itab.py --sin-raices`) | 210728 B `d89f2752e07f36a5` | **70** | **0** | reinicio mudo en la **vuelta 4** |
+| **arreglo** (paso 4 de `fix-libgodc-cadena.sh`) | 210932 B `58e6567d424051a7` | **1** | **1** | 40 vueltas, `v2mal= 0` |
+
+El mutante imprime `ITAB-RAIZ armados a= 1007 b= 2009 gc= 0` y **nada más**: 70 arranques × 3 líneas de
+progreso (`v=1..3`) = 210 líneas y **cero** TOTAL. Muere en la vuelta 4, después de la primera recolección
+forzada: las 3 primeras van bien. Ese es el dato que separa *"el cache devuelve una tabla rota"* (sería malo
+desde la vuelta 1) de *"el cache devuelve una tabla que se rompe **después**, cuando el recolector copia el
+itab"*.
+
+Con el arreglo, los cuatro números que importan:
+
+* `v2mal= 0` con `v2bien= 820` — 820 llamadas por el camino del cache **después** de las recolecciones, todas
+  correctas (`gc= 32` recolecciones, ninguna línea `ITAB-RAIZ-MALO-*`);
+* `itabArmados= 1` contra **10** del defecto, con las **mismas** 120 llamadas: con las ranuras registradas el
+  cache **acierta**; sin ellas **falla** después de cada recolección y vuelve a reservar;
+* `v4bien= 820 v4mal= 0` — el **control** con itab estático sobrevive igual con y sin arreglo, así que lo que
+  rompe **no** es "una interfaz viva en un slice" (el patrón del motor en `ReadFrom`), es **el itab del cache**.
+
+### el arreglo (paso 4 de la cadena)
+
+`scripts/console/fix-libgodc-itab.py`: registra las **32 ranuras** del cache con `gc_add_root` una sola vez, al
+guardar el primer itab. Con eso el recolector las barre como una variable de Go más y las **actualiza** al
+copiar el itab. Se registran las 32 de una vez (no la que se acaba de guardar) porque `gc_add_root` no se puede
+llamar por cada itab: la tabla de raíces del runtime tiene tope **256** y el cache son 32 ranuras. El paso va
+**último** en `fix-libgodc-cadena.sh` por la misma razón que la Store Queue (DC-002.39d): el script resetea
+`interface_dreamcast.c` y después reaplica el ABI, así que deja su archivo en el estado final sin llevarse nada
+de los pasos anteriores (que tocan `gc_copy.c`). La cadena lo **verifica** (`--verificar` exige el marcador
+`d2c_itab_registrar_raices`).
+
+### el corpus del motor: los 21.253 **con** la lectura puesta
+
+POC nuevo `console/dc/poc/tablas-mpq-listfile` (el mismo `tablas-mpq` de DC-002.33 con `leerListfile = true`,
+que es lo que estaba apagado), sobre un **árbol limpio de HEAD** (`719d7b82`) para que no se mezcle el trabajo
+en curso de otra tarjeta. `bash scripts/console/checar-consulta-233.sh 1 75` con el gox del motor (140
+paquetes), un solo cambio entre las dos corridas:
+
+```
+ARREGLO   21253 de 21253   ( patch_d2.mpq:162/162  d2data.mpq:11082/11082  d2char.mpq:10009/10009)
+MUTANTE   11244 de 21253   ( patch_d2.mpq:162/162  d2data.mpq:11082/11082  d2char.mpq:/10009)
+```
+
+`162 + 11082 + 10009 = 21253`. El que se cae es el **tercer** MPQ (`d2char.mpq`), exactamente como decía la
+tarjeta: el mutante ni siquiera llega a contar los nombres de ese MPQ. Y con el arreglo se cumple el criterio 4
+de la tarjeta (`checar-consulta-233.sh 3 120`, mismo árbol y mismo gox): **3 de 3 vueltas con los 21253**
+(`totales: 21253 21253 21253`) — no es un cierre por suerte de una vuelta.
+
+### cómo se repite
+
+```
+source scripts/console/env.sh
+bash scripts/console/checar-itab-39e.sh --preparar           # arma los dos árboles y mide los dos estados
+POC=tablas-mpq-listfile DC_ROOT=<copia con el arreglo> bash scripts/console/checar-consulta-233.sh 3 120
+```
+
+Evidencia: `console/dc/evidencia/dc-002.39e-itab-raiz.txt`.

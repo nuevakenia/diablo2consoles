@@ -23,7 +23,13 @@
 #     1. fix-libgodc-gc.py <KB> <LIB>          pristino + ABI + interfaces + la Store Queue
 #     2. fix-libgodc-candidato.py <LIB>        reset + punteros interiores + candidato + marcas ARQ-MARCA
 #     3. fix-libgodc-sq.py <LIB> --sin-pristino  LA STORE QUEUE (el paso que faltaba: sin resetear)
-#     4. (con --build) el `libgodc.a` al dia
+#     4. fix-libgodc-itab.py <LIB>             el CACHE DE ITABS como raiz del GC (DC-002.39e)
+#     5. (con --build) el `libgodc.a` al dia
+#
+#   El paso 4 va ULTIMO a proposito, por la misma razon que la SQ: `fix-libgodc-itab.py` resetea
+#   `interface_dreamcast.c` y despues reaplica el ABI, asi que deja su archivo en el estado final y no se
+#   lleva nada de los anteriores (tocan `gc_copy.c`, otro archivo). Medido: la cadena desde el vendor sucio
+#   termina siempre en el mismo sha.
 #
 # USO
 #   bash scripts/console/fix-libgodc-cadena.sh [LIB] [--kb 512] [--build] [--verificar]
@@ -67,6 +73,11 @@ veredicto() { # $1 = archivo
     [ "$(grep -c 'PUNTEROS INTERIORES' "$f")" -ge 1 ] || { echo "   FALTAN los punteros interiores (DC-002.36)"; fallos=$((fallos + 1)); }
     [ "$(grep -c 'DC-002.39b' "$f")" -ge 1 ] || { echo "   FALTA el candidato del barrido (DC-002.39b)"; fallos=$((fallos + 1)); }
     [ "$(grep -c 'ARQ-MARCA (DC-002.29)' "$f")" -ge 1 ] || { echo "   FALTAN las marcas del arranque (DC-002.29)"; fallos=$((fallos + 1)); }
+    # DC-002.39e: el cache de itabs como raiz del GC. Vive en OTRO archivo (interface_dreamcast.c), asi que
+    # se comprueba aparte y no por el sha de gc_copy.c.
+    local itab="$LIB/runtime/interface_dreamcast.c"
+    [ "$(grep -c 'd2c_itab_registrar_raices' "$itab" 2>/dev/null)" -ge 2 ] || {
+        echo "   FALTA el cache de itabs como raiz del GC (DC-002.39e)"; fallos=$((fallos + 1)); }
     local kb
     kb="$(grep -a '^#define GC_SEMISPACE_SIZE_KB' "$LIB/runtime/godc_config.h" 2>/dev/null | head -1 | grep -oE '[0-9]+$')"
     [ "${kb:-0}" = "$KB" ] || { echo "   el semiespacio esta en ${kb:-?} KiB y se pidio $KB"; fallos=$((fallos + 1)); }
@@ -104,8 +115,13 @@ python3 "$HERE/fix-libgodc-sq.py" "$LIB" --sin-pristino > /tmp/dc-cadena-sq.log 
 dato "    despues de la SQ (el estado completo)"
 grep -n 'dst_addr >> 2' "$C" | head -2 | sed 's/^/        /'
 
+echo "   4/5 fix-libgodc-itab.py  (el CACHE DE ITABS como raiz del GC: DC-002.39e)"
+python3 "$HERE/fix-libgodc-itab.py" "$LIB" > /tmp/dc-cadena-itab.log 2>&1 || {
+    echo "   FALLO: ver /tmp/dc-cadena-itab.log" >&2; tail -5 /tmp/dc-cadena-itab.log >&2; exit 1; }
+echo "        interface_dreamcast.c: sha $(sha256sum "$LIB/runtime/interface_dreamcast.c" | cut -c1-16), $(grep -c 'd2c_itab_registrar_raices' "$LIB/runtime/interface_dreamcast.c") marcas del arreglo"
+
 if [ "$BUILD" = "1" ]; then
-    echo "   4/4 el libgodc.a al dia"
+    echo "   5/5 el libgodc.a al dia"
     rm -f "$LIB"/runtime/*.o "$LIB"/*.a
     make -C "$LIB" -s all > /tmp/dc-cadena-make.log 2>&1 || {
         echo "   FALLO: ver /tmp/dc-cadena-make.log" >&2; tail -5 /tmp/dc-cadena-make.log >&2; exit 1; }
