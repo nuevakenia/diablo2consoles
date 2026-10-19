@@ -1,0 +1,77 @@
+DC-002.42 (cierre medido): EL CORPUS DE LA TABLA EN EL DISCO QUEDA 21/21 CON EL RUNTIME REENLAZADO
+=================================================================================================
+
+QUE SE MIDIO, EN UNA LINEA
+  El criterio 2 (el arranque abre los MPQ del disco y LEE un asset) estaba en rojo y pasa a verde: el
+  freno NO era la palanca de esta tarjeta, era el `libgodc.a` SIN REENLAZAR (el arreglo de la copia del GC
+  por Store Queue de DC-002.39c vivia en el arbol y no en la biblioteca). Al re-medir aparecio ADEMAS un
+  defecto de esta tarjeta: el horneador del disco habia perdido el bucle que hornea el archivo de la tabla
+  (la reescritura de `mkdisco.sh` de DC-002.44 se lo llevo puesto), asi que la consola no podia abrirla.
+  Reparado, con su mutante. Resultado: 21 controles OK, 0 con fallo.
+
+1. EL RUNTIME (el freno real del criterio 2)
+  antes (08:41, el `.a` con el que se midio la entrega de esta tarjeta):
+      libgodc.a  210054 B  sha256 13683f0479edbce39897865bd66aebbbe0a033dd34534e8c98e5bd8d18c64539
+      `fix-libgodc-sq.py --estado` -> "falta rm -f runtime/*.o *.a && make"
+  reenlazado (la cadena documentada + la copia del GC por Store Queue):
+      python3 scripts/console/fix-libgodc-sq.py /home/dgalli/dreamcast/libgodc --build --semispace 1024
+      runtime/gc_copy.c: sha256 daf54657ec72fc56   (es el archivo del arreglo de DC-002.39c)
+      bash scripts/console/fix-libgodc-cadena.sh --verificar --kb 1024
+          -> OK: la cadena esta completa (sha daf54657ec72fc56, 51101 B)
+      runtime/godc_config.h: GC_SEMISPACE_SIZE_KB = 1024
+  el `.a` que quedo en la biblioteca: 210984 B, sha256 fb835e5ce77f9e9827fa4d4ae6ae2e77bb43b47095d84305d12bf24745e5b0e8
+
+2. LA CORRIDA EN ROJO (el defecto del horneador, medido ANTES de tocarlo)
+  `bash scripts/console/checar-lookups-242.sh 25` con el `.a` ya reenlazado y SIN el bucle de los `.pack`:
+      == RESULTADO: 13 controles OK, 7 con fallo ==
+      rojos: 4, 5, 6, 7, 8, 9, 10
+      verdes: 11 (x2), 12, 13, 14, 15   <- o sea: el arranque y su lectura de assets YA andaban
+  lo que decia la consola (run-fix/flycast.log):
+      LOOKUPS-242 ruta: /cd/juego/objectlookups.pack
+      LOOKUPS-242 FALLO al abrir la tabla del disco: objectLookups: no pude abrir /cd/juego/objectlookups.pack: file does not exist
+  el manifiesto que quedo en el disco (fix/MANIFIESTO.TXT) listaba 3 archivos y ninguno era el `.pack`:
+      d2char.mpq 267704443 archivo / d2data.mpq 267330019 archivo / patch_d2.mpq 5022588 archivo
+  causa, en el codigo: `mkdisco.sh` hornea `$JUEGO/*.mpq` y `$JUEGO/*.txt`; el bucle de `*.pack` que agrego
+  esta tarjeta en el commit 3a381c5e no sobrevivio a la reescritura del horneador de DC-002.44 (el
+  MANIFIESTO.TXT). No se noto porque el horneador NO se queja de lo que no hornea: el disco se armaba igual.
+
+3. EL ARREGLO (y su mutante)
+  scripts/console/mkdisco.sh
+      vuelve el bucle de `*.pack` (lo hornea en /JUEGO y lo anota en el MANIFIESTO.TXT, como los MPQ)
+      MUTANTE del camino: DC_SIN_PACK=1 -> NO lo hornea (ni en la ISO ni en el manifiesto)
+  scripts/console/checar-lookups-242.sh
+      control 4b: arma una ISO MINIMA (el `.pack` y nada mas: 773.869 B, sin los 540 MB de los MPQ) y exige
+      que con el bucle el archivo salga con el sha del host y con DC_SIN_PACK=1 NO este.
+
+4. LA CORRIDA VERDE
+  `bash scripts/console/checar-lookups-242.sh 25`   (salida cruda: /tmp/dc242-corpus-final.txt)
+      == RESULTADO: 21 controles OK, 0 con fallo ==
+  los numeros de la tarjeta, otra vez a la vista:
+      PACK-242 bytes=773869 registros=7891 grupos=10 maxRegistro=165 crc=2553790715
+      PACK-242 indice en RAM: 31644 bytes (4 x 7891) + ventana de lectura de 4096
+      control 4:  el archivo de la tabla dentro de la ISO es el del host (sha256 0255463368aa6513...)
+      control 4b: el horneador SACA el .pack (0255463368aa6513...) y el MUTANTE DC_SIN_PACK=1 lo deja afuera
+      control 5:  la consola abrio el archivo del disco: LOOKUPS-242 bytes= 773869 registros= 7891
+      control 6:  el crc del archivo del disco cierra en la consola (2553790715) y es el del host
+      control 7:  la tabla del DS1 sale del archivo del disco con los numeros del host (12 37 39 35 36)
+      control 8:  los dos overrides de la tabla del DS1 (0 y 342) salen bien
+      control 9:  FindObject(1,2,0) por el camino del motor trae el registro del host (rogue fountain, FN)
+      control 10: FindObject(1,1,0) (una fila de tipo Character) tambien sale del archivo
+      control 11: el arranque ABRE patch_d2.mpq del disco (criterio 2)
+      control 11: el arranque ABRE d2data.mpq del disco (criterio 2)
+      control 12: el arranque LEE 2 asset(s) del MPQ del disco
+      control 13: sin el archivo en el disco la sonda avisa (y el motor se queda sin los registros)
+      control 14: el FIX abre 3 fuentes del disco y lee 2 asset(s) (criterio 2)
+      control 15: el arranque llega al MISMO tramo con y sin el archivo (las fuentes del disco y su primer asset)
+  el peso (no se movio: es el de la entrega): 1ST_READ.BIN FIX 12010632 / MUT 13808424 -> el mutante pesa
+  1797792 B mas; simbolo mas gordo FIX `_aligned_vertex_pool` (00020000), MUT `_go..C3111` (001986bc).
+
+5. LO QUE SIGUE ABIERTO Y NO ES DE ESTA TARJETA (declarado, no maquillado)
+  * el arranque SIGUE muriendo mudo despues de leer los assets (DC-002.43) y el monton de C se queda sin
+    aire: medido hoy, "Memory: arena=4372096 used=4333072 free=39024" con
+    "Out of memory. Requested sbrk_base 0x8cff0000, was 0x8cfdb000, diff 86016".
+  * el arranque es FLAKY (el control 11 reintenta hasta 5 veces): es el agujero de DC-002.39c/45, no la
+    palanca de esta tarjeta; el corpus lo dice con los reintentos a la vista.
+  * el mutante (la tabla adentro del binario) ya no muere en el primer MPQ: esa pared la movio DC-002.41.
+    El corpus lo sigue cazando por la IMAGEN (1797792 B) y por el SIMBOLO, que es lo que el control 3a/3b/3c
+    mide.

@@ -80,6 +80,33 @@ else
         BYTES=$((BYTES + $(stat -c%s "$f")))
     done
 
+    # DC-002.42 (reparado): ADEMAS DE LOS MPQ Y LOS .txt, LOS `.pack` -- el archivo de la TABLA de
+    # objectLookups que el motor lee del disco POR REGISTRO (`objectlookups.pack`, lo arma
+    # `console/dc/gen-lookups-pack`). Es el mismo camino de datos del juego, asi que va al lado de los MPQ.
+    #
+    # POR QUE VUELVE A ESTAR: este bucle lo agrego DC-002.42 y la reescritura del horneador de DC-002.44
+    # (el MANIFIESTO.TXT) lo dejo afuera sin que nadie lo notara, porque el horneador no se queja de lo que
+    # no hornea: el disco se armaba igual, solo que SIN el archivo. Medido (corrida del corpus
+    # `checar-lookups-242.sh` con el .a de hoy, 09:0x): la consola contestaba
+    #     LOOKUPS-242 FALLO al abrir la tabla del disco: no pude abrir /cd/juego/objectlookups.pack
+    # y los controles 4 a 10 caian en rojo MIENTRAS los del arranque (11/12/14/15) daban verde: eso es lo
+    # que delata que el que falta es el archivo del disco y no la palanca del binario.
+    for f in "$JUEGO"/*.pack; do
+        [ -f "$f" ] || continue
+        if [ "${DC_SIN_PACK:-0}" = "1" ]; then
+            # EL MUTANTE de este camino (DC-002.42): el horneador NO hornea el .pack. Es lo que pasaba de
+            # verdad cuando la reescritura de DC-002.44 se lo llevo puesto: el disco se armaba igual y la
+            # consola contestaba "no pude abrir /cd/juego/objectlookups.pack". El corpus lo caza.
+            echo "== MUTANTE DC_SIN_PACK=1: NO horneo $(basename "$f") (queda fuera de la ISO y del manifiesto) =="
+            continue
+        fi
+        nombre="$(basename "$f" | tr '[:lower:]' '[:upper:]')"
+        ARGS+=("$f:/JUEGO/$nombre;1")
+        printf '%s\t%s\tarchivo\n' "$(basename "$f" | tr '[:upper:]' '[:lower:]')" "$(stat -c%s "$f")" >> "$MANIF"
+        BAKED=$((BAKED + 1))
+        BYTES=$((BYTES + $(stat -c%s "$f")))
+    done
+
     ARGS+=("$MANIF:/JUEGO/MANIFIESTO.TXT;1")
 fi
 

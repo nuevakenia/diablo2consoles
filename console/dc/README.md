@@ -4887,3 +4887,174 @@ runtime ahora incluye el paso 5 (`fix-libgodc-itab-245.py`, el itab fuera del mo
 runtime rearmado desde cero no pierda el arreglo.
 
 Evidencia: `console/dc/evidencia/dc-002.45-lectura-por-trozos.txt`.
+
+## 68. DC-002.47: el arranque **no** se quedaba en 3 tablas por memoria — `d2std/bufio` tiraba el último trozo: cuando el stream del MPQ devuelve **bytes y `io.EOF` en la misma llamada**, una tabla que entra en un solo pedido se leía **VACÍA** (`LvlWarp.txt`, 3.935 B contra 4.096); arreglado el lector el arranque **pide la 6ª tabla**, y el `.eh_frame` **fuera del mapa** corre el fin del `.bss` **1.076.448 B** para abajo
+
+DC-002.45 dejó el corpus en verde y el diagnóstico escrito: «el que llena el semiespacio es el dato vivo
+(98,1 %)». Y el arranque seguía pidiendo **3 tablas**. Lo que faltaba medir era **dónde** se quedaba el cuarto
+pedido, y la respuesta no estaba en la memoria: estaba en **dos líneas de `ReadBytes`**.
+
+**El defecto** (`console/dc/std/bufio/bufio.go`). `ReadBytes` acumulaba los trozos y, cuando `rellenar`
+devolvía error, hacía `return salida, err` — **tirando los bytes que `rellenar` acababa de dejar en el buffer**.
+El stream del MPQ entrega los bytes del último pedido **junto con el fin** (todo lo que entra en un pedido
+viene con `io.EOF` pegado), así que el caso no es exótico: le pasa a **cualquier** tabla que entre en un solo
+pedido y a cualquier tabla en su último trozo.
+
+```
+LvlWarp.txt  3.935 B  <  buffer 4.096 B  ->  0 filas  ->  el arranque no pide la tabla siguiente
+```
+
+El arreglo es la guarda que usa el `ReadSlice` de Go: el fin se entrega cuando **el buffer quedó vacío**
+(`if b.Buffered() == 0 && b.err != nil { return salida, b.err }`) y `rellenar` sólo se llama si no hay error
+pendiente. Reversible: `python3 scripts/console/mutar-bufio-247.py --sano | --mutante | --estado`.
+
+**El instrumento tenía el mismo tipo de defecto, y por eso daba verde.** `d2std/io.EOF` es un valor **propio**
+(`errors.New("EOF")`), distinto del `io.EOF` del host, y el csv de la consola compara por **identidad**. Las
+pruebas de DC-002.45 le inyectaban a la consola el EOF **de Go**: ninguna rama de fin se disparaba (medido con
+una traza temporal: `readLine bytes=5 err=SI` con el EOF de Go, `err=no` con el de la consola) y la prueba
+medía otra cosa. Ahora cada lado lee con **su** EOF (`fin error` en los lectores de prueba) y los finales se
+comparan por el **texto** del error (`esEOF`). Las dos pruebas de DC-002.45 siguen verdes con el instrumento
+arreglado:
+
+```
+filas=1093  pedidos=34  pedido mayor=4096 B  (la tabla son 134937 B)
+filas iguales por los dos caminos: 1093
+```
+
+**El mutante lo caza la difftest, no el relato** (`go test ./difftest/ -run DC00247`, el mutante es el lector
+de antes):
+
+```
+arreglo  3.935 B entra entero     Go=270 registros  d2std=270 registros
+arreglo  11 KB, no entra entero   Go=780 registros  d2std=780 registros
+arreglo  3.935 B sin salto final  Go=270 registros  d2std=270 registros
+arreglo  una fila sin salto final Go=1   registro   d2std=1   registro
+MUTANTE 3.935 B entra entero      Go=270 registros  d2std=0   registros      <- FAIL
+MUTANTE 11 KB, no entra entero    Go=780 registros  d2std=781 registros      <- FAIL
+```
+
+**Lo que cambió en el arranque** (Flycast, 50 s, misma capa, lo único distinto es el lector):
+
+```
+                          assets del MPQ pedidos   tablas LEÍDAS                    dónde queda
+lector VIEJO                     3                LvlTypes, LvlPrest, LvlWarp      (la pared de DC-002.45)
+lector ARREGLADO                 5                + objtype, + Objects             pide la 6ª (weapons)
+```
+
+Y el mutante del lector, con la partición **nueva** puesta (para que no quede duda de que la pared de las 3
+tablas no era memoria): **3 tablas**, el semiespacio al **36,2 %** (668.472 B de 1.048.576 B **sin usar**) y
+**3 recolecciones** en toda la ventana.
+
+**La partición de memoria, medida en cuatro binarios del mismo árbol** (`scripts/console/checar-techo-247.sh`):
+
+```
+fin del .bss   1ST_READ.BIN   semiespacio  lector   assets       dato vivo máx        gc_collect  final
+0x8CBBBF5C     12.011.848 B   512 KB       arreglo  5            515.344 / 524.288    1.258       pide Objects
+                                                                  (98,3 %: 8.944 B)               (en curso)
+0x8CBBBF5C     12.011.848 B   1024 KB      arreglo  6            981.592 / 1.048.576  1.087       pide weapons
+                                                                  (93,6 %)                        (en curso)
+0x8CAB527C     10.935.400 B   1024 KB      arreglo  11 (2 vidas) 828.808 / 1.048.576    517       panic: index
+                                                                  (79,0 %)                        out of range
+0x8CAB527C     10.935.400 B   1024 KB      VIEJO    3            380.104 / 1.048.576      3       (se queda en 3)
+                                                                  (36,2 %)
+```
+
+**Las dos palancas.**
+
+* **El semiespacio** lo fija el `godc_config.h` del runtime **vendorizado** (`GC_SEMISPACE_SIZE_KB`, hoy
+  **1024 KB por lado**): `python3 scripts/console/fix-libgodc-semiespacio-245.py --kb 1024` (y `--estado` para
+  leerlo — el corpus lo lee de ahí, **no está escrito a mano** en ninguna parte). El script **rehace
+  `libgodc.a`**: el Makefile del vendor es `%.o: %.c` **sin** dependencias de cabeceras y tocar el header no
+  recompila nada (DC-002.45). Nunca sube a ciegas: si falta `sh-elf-gcc` en el `PATH` **aborta antes** de
+  borrar los `.o`, porque el modo de fallar era quedarse sin biblioteca y con un `make` roto.
+* **El `.eh_frame` fuera del mapa** (`scripts/console/gen-ldscript-eh-247.py`, `DC_EH_FINAL=1`): saca las dos
+  reglas del script de enlace de KOS y las manda al `/DISCARD/` — **sin tocar el KOS vendorizado** (el script
+  se lee de `$KOS_BASE` y el nuevo se deja en el directorio de build). El `.eh_frame` pasa de **1.076.440 B** a
+  **4 B** y todo lo que venía detrás se corre para abajo: el fin del `.bss` baja **1.076.448 B**
+  (2.360.887.648 → 2.359.811.200) y la imagen plana baja lo mismo (**12.011.848 → 10.935.400**). El montón de
+  C **empieza en el fin del `.bss`**, así que gana exactamente ese techo.
+* Los dos semiespacios salen del **montón de C** (`memalign(32, 1 MB)` en `gc_heap.c`), de modo que **subirlos
+  cuesta techo del montón**: por eso las dos palancas son compañeras y no alternativas.
+
+**El techo del montón de C, medido por el lado del que se choca**: en el corpus de DC-002.45 el mutante del
+`ReadAll` muere con `Out of memory. Requested sbrk_base 0x8d00a000, was 0x8cfe1000, diff 167936` seguido de
+`fatal error: gc_external_alloc: OOM` (arena=5.422.432 used=5.380.984 **free=41.448**): el que no entra es el
+**montón**, no el semiespacio. Los `gc_external_alloc` (los itabs que desde DC-002.45 no viven en el montón
+movible) son parte de eso.
+
+**Los corpus** (`scripts/console/checar-trozos-245.sh 50` → **12 controles OK, 0 con fallo**, exit 0;
+`checar-techo-247.sh 50` → **9/9**; `checar-motor-disco-234.sh 25` → **9/9**). El corpus de DC-002.45 ahora
+**recompila del snapshot del árbol** los paquetes de la stdlib que esta tarjeta tocó (`STD_PACKS=bufio`): la
+capa de partida traía los `.gox` de la stdlib de otro día y la corrida medía el árbol de ayer **sin que nada
+lo dijera** — el mismo modo de fallar que el corpus ya castiga del lado del motor.
+
+**Lo que esta tarjeta NO cierra, con el número**: con el semiespacio de 1 MB y el `.eh_frame` fuera del mapa
+la corrida 1 muere con `panic: index out of range` después de **517** recolecciones y con el dato vivo en
+**787.176 B (75,1 %)**, o sea con **261.400 B de semiespacio libres**: **no es memoria**, es una pared nueva,
+más allá de las 5 tablas. La corrida sin la palanca del `.eh_frame` pasó por el mismo tramo (**1.087**
+recolecciones) sin morir, y el arranque **no termina**: llega a la 6ª tabla (`weapons.txt`) y ahí se cortan los
+50 s. Cuántas tablas pide el arranque completo no lo dice esta tarjeta.
+
+**Cómo se repite**:
+
+```
+bash scripts/console/checar-trozos-245.sh 50        # 12 controles (el corpus de DC-002.45, actualizado)
+bash scripts/console/checar-techo-247.sh 50         # los de esta tarjeta: la partición, el lector y el mutante
+bash scripts/console/checar-motor-disco-234.sh 25   # 9/9 (el corpus del motor)
+python3 scripts/console/mutar-bufio-247.py --estado # sano | mutante del lector
+```
+
+Evidencia: `console/dc/evidencia/dc-002.47-techo-del-arranque.txt`.
+
+## 69. DC-002.42 (cierre medido): el corpus de la tabla en el disco queda **21/21** — el rojo del criterio 2 era el **runtime sin reenlazar**, y al re-medir apareció que el horneador había **perdido el bucle del `.pack`**
+
+La entrega de DC-002.42 (la tabla de `objectLookups` fuera del binario, leída del disco **por registro**) quedó
+en `review` con el criterio 2 parcial y 5 controles en rojo. Re-medido hoy, el criterio 2 **sí** cierra, y en el
+camino apareció un defecto propio que el corpus no estaba cazando.
+
+**1. El freno del criterio 2 no era la palanca: era el `.a`.** `fix-libgodc-sq.py --estado` lo decía en su paso
+1/2: el arreglo de la copia del GC por Store Queue (DC-002.39c) estaba en el árbol (`gc_copy.c`, sha256
+`daf54657ec72fc56`) y **no** en la biblioteca (`libgodc.a` 210.054 B, sha256 `13683f04…`, 08:41). Reenlazado con
+`fix-libgodc-sq.py /home/dgalli/dreamcast/libgodc --build --semispace 1024`, el arranque pasa de morir antes de
+los assets a **abrir `patch_d2.mpq` y `d2data.mpq` del disco y leer 2 assets** (controles 11/12/14/15, criterio 2).
+
+**2. El defecto que apareció al re-medir.** Con el runtime sano, los controles 4 a 10 cayeron en rojo **y los del
+arranque quedaron verdes** (13 OK / 7 fallo): la consola contestaba
+
+```
+LOOKUPS-242 FALLO al abrir la tabla del disco: objectLookups: no pude abrir /cd/juego/objectlookups.pack: file does not exist
+```
+
+y el `MANIFIESTO.TXT` del disco listaba **3** archivos (los tres MPQ) y ninguno era el `.pack`. Causa en el
+código: `mkdisco.sh` hornea `$JUEGO/*.mpq` y `$JUEGO/*.txt`, y el bucle de `*.pack` que agregó esta tarjeta
+(commit `3a381c5e`) **no sobrevivió** a la reescritura del horneador de DC-002.44. No se notó porque el horneador
+no se queja de lo que no hornea: el disco se armaba igual, sólo que sin el archivo. Es la misma lección que la
+sección 66: un instrumento compartido que se reescribe se lleva puestos los caminos de las otras tarjetas.
+
+**3. El arreglo, con su mutante.** Vuelve el bucle de `*.pack` en `mkdisco.sh` (lo hornea en `/JUEGO` y lo anota
+en el manifiesto, como los MPQ) y se agrega el mutante del camino, `DC_SIN_PACK=1` (no lo hornea). El corpus
+`checar-lookups-242.sh` gana el **control 4b**: arma una ISO mínima (el `.pack` y nada más, 773.869 B, sin los
+540 MB de MPQ) y exige que con el bucle salga con el sha del host y con el mutante **no** esté.
+
+**4. Medido.** `bash scripts/console/checar-lookups-242.sh 25` → **21 controles OK, 0 con fallo**. Los números de
+la tarjeta siguen ahí: `PACK-242 bytes= 773869 registros= 7891 grupos= 10 maxRegistro= 165 crc= 2553790715`, índice
+en RAM **31.644 B** (4 × 7.891) + ventana de 4 KiB, `LOOKUPS-242 bytes= 773869 registros= 7891` en la consola con
+el crc cerrando, la tabla del DS1 con los números del host (`12 37 39 35 36`) y los overrides `0`/`342`, y
+`FindObject(1,2,0)` = `rogue fountain` por el camino del motor. El peso no se movió: `1ST_READ.BIN` 12.010.632 B
+contra 13.808.424 B del mutante (**1.797.792 B**, el símbolo `_go..C3111` desaparecido).
+
+**Lo que sigue abierto y no es de esta tarjeta**: el arranque muere mudo después de leer los assets (DC-002.43)
+con el montón de C sin aire (`arena=4372096 used=4333072 free=39024`, `diff 86016`), el arranque es flaky (el
+control 11 reintenta), y el mutante ya no muere en el primer MPQ porque esa pared la movió DC-002.41 — el corpus
+lo caza por la imagen y por el símbolo.
+
+**Cómo se repite**:
+
+```
+python3 scripts/console/fix-libgodc-sq.py /home/dgalli/dreamcast/libgodc --build --semispace 1024
+bash scripts/console/fix-libgodc-cadena.sh --verificar --kb 1024     # OK: la cadena esta completa
+bash scripts/console/checar-lookups-242.sh 25                       # 21 controles OK, 0 con fallo
+DC_SIN_PACK=1 bash scripts/console/mkdisco.sh <dir_build> <dir_juego>  # el mutante del horneador
+```
+
+Evidencia: `console/dc/evidencia/dc-002.42-corpus-verificado.txt`.

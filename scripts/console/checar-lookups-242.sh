@@ -188,6 +188,30 @@ else
     rojo "control 4: el archivo dentro de la ISO ($pack_iso) no es el del host ($PACK_SHA)"
 fi
 
+# control 4b (EL MUTANTE DEL HORNEADOR, DC-002.42): el `.pack` viaja al disco SOLO mientras el bucle nuevo
+# de mkdisco.sh lo hornee. Se arma una ISO MINIMA (el .pack y nada mas: 773.869 B, sin los 540 MB de los
+# MPQ) porque lo que se mide es el horneado, no el juego. Es el mutante que dejo en rojo a este corpus
+# cuando la reescritura del horneador de DC-002.44 se llevo puesto el bucle (medido: controles 4 a 10 rojos
+# y 11/12/14/15 verdes, o sea el archivo del disco faltaba y la palanca del binario estaba bien).
+mini="$SAL/mini-pack"
+mkdir -p "$mini/poc" "$mini/juego"
+ln -f "$SAL/fix/IP.BIN" "$mini/poc/IP.BIN" 2>/dev/null || cp -f "$SAL/fix/IP.BIN" "$mini/poc/IP.BIN"
+ln -f "$SAL/fix/1ST_READ.BIN" "$mini/poc/1ST_READ.BIN" 2>/dev/null || cp -f "$SAL/fix/1ST_READ.BIN" "$mini/poc/1ST_READ.BIN"
+cp -f "$PACK" "$mini/juego/objectlookups.pack"
+pack_mini=""
+if bash "$HERE/mkdisco.sh" "$mini/poc" "$mini/juego" > "$mini/sano.log" 2>&1; then
+    pack_mini="$("$DC_PYTHON" "$HERE/leer-iso.py" "$mini/poc/disc.iso" "/JUEGO/OBJECTLOOKUPS.PACK;1" 2>&1 | grep -o 'sha256=[0-9a-f]*' | cut -d= -f2)"
+fi
+pack_mini_mut=""
+if DC_SIN_PACK=1 bash "$HERE/mkdisco.sh" "$mini/poc" "$mini/juego" > "$mini/mut.log" 2>&1; then
+    pack_mini_mut="$("$DC_PYTHON" "$HERE/leer-iso.py" "$mini/poc/disc.iso" "/JUEGO/OBJECTLOOKUPS.PACK;1" 2>&1 | grep -o 'sha256=[0-9a-f]*' | cut -d= -f2)"
+fi
+if [ "$pack_mini" = "$PACK_SHA" ] && [ -z "$pack_mini_mut" ]; then
+    verde "control 4b: el horneador SACA el .pack al disco (sha256 ${PACK_SHA:0:16}...) y el MUTANTE DC_SIN_PACK=1 lo deja afuera (no esta en la ISO)"
+else
+    rojo "control 4b: el horneador no discrimina (sano='$pack_mini' mutante='$pack_mini_mut')"
+fi
+
 # ================================================================================================
 # 4. LAS DOS CORRIDAS (consola serie)
 # ================================================================================================
