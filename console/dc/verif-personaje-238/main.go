@@ -56,6 +56,9 @@ const (
 	frameDelPersonaje           = 0
 )
 
+// crcDirs (DC-002.49b): si se pasa -crc-dirs, el censo imprime la tabla de crc32 por direccion y cuadro.
+var crcDirs bool
+
 func autodetectarD2() string {
 	if d := os.Getenv("D2_DIR"); d != "" {
 		return d
@@ -97,7 +100,10 @@ func main() {
 	censoControl := flag.Bool("censo-control", false, "DC-002.49b: de los 8 estados del control a la direccion del COF, con las funciones del motor")
 	censoPeso := flag.String("censo-peso", "", "DC-002.49b: el pico de memoria de componer un ciclo (crudo + decodificado), por modo")
 	pngDirs := flag.String("png-dirs", "", "DC-002.49b: modos cuyas referencias POR DIRECCION se escriben como PNG (en la carpeta de -png-ciclo)")
+	crcDirsFlag := flag.Bool("crc-dirs", false, "DC-002.49b: imprime la tabla de crc32 por direccion y cuadro (CRC249B), para leer la direccion desde el log")
 	flag.Parse()
+
+	crcDirs = *crcDirsFlag
 
 	ruta := *mpqPath
 
@@ -578,6 +584,16 @@ func censarDirecciones(mc *d2mpq.MPQ, modo string) {
 			"conRGBA=%d conRGBAeImagen=%d crc32Cuadro0=%d\n",
 			modo, dir, p0.Ancho, p0.Alto, p0.Izq, p0.Arriba, len(compuestos), p0.PixelesNoVacios,
 			indices, indices+rgba, indices+rgba+imagen, p0.CRC32())
+
+		// DC-002.49b: la tabla de crc32 por CUADRO y direccion. Sirve para saber QUE direccion se dibujo
+		// mirando SOLO el log del POC (`HITO249: ANIM ... crc32=`), sin captura: es un canal independiente
+		// del de los pixeles, y con el se cruzan las dos mediciones.
+		if crcDirs {
+			for f, p := range compuestos {
+				fmt.Printf("CRC249B: %s dir=%02d cuadro=%02d caja=%dx%d esquina=%d,%d pixeles=%d crc32=%d\n",
+					modo, dir, f, p.Ancho, p.Alto, p.Izq, p.Arriba, p.PixelesNoVacios, p.CRC32())
+			}
+		}
 
 		fmt.Printf("CENSO-DIRS: %s ACUM dirs=%d indices=%d conRGBA=%d conRGBAeImagen=%d\n",
 			modo, dir+1, acumIndices, acumIndices+acumRGBA, acumTotal)

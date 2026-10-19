@@ -310,3 +310,25 @@ LO QUE FALTA PARA CERRAR (no es codigo, es la consola):
   3. la cadencia (`HITO249: ANIM`, mediana 128 ms/cuadro en TN y 40 en TW) no se puede mover, y el corpus de
      DC-002.49 (11/11) no se puede romper;
   4. el mutante GIRO_SORDO=1 tiene que dar capturas IDENTICAS con la flecha a la derecha y con la flecha arriba.
+
+
+=============================================================================
+10. EL CANAL DEL LOG: cada (direccion, cuadro) tiene su crc32 y son 256 DISTINTOS
+=============================================================================
+
+El POC ya imprime, por cada cuadro que dibuja, `HITO249: ANIM modo=TN cuadro=<f> caja=<WxH> esquina=.. pixeles=..
+crc32=<n>`. Si el crc32 del compuesto identifica de forma UNIVOCA (modo, direccion, cuadro), entonces el log solo
+alcanza para medir el criterio 1 sin depender de la captura.
+
+Medido con el censo nuevo `-crc-dirs` (16 direcciones x 16 cuadros de TN = 256 lineas `CRC249B`):
+
+    CRC249B: TN dir=12 cuadro=00 caja=27x71 esquina=-10,-62 pixeles=1109 crc32=1131618781
+    CRC249B: TN dir=12 cuadro=01 caja=27x71 esquina=-10,-62 pixeles=1109 crc32=1078768867
+    CRC249B: TN dir=12 cuadro=02 caja=27x71 esquina=-10,-62 pixeles=1096 crc32=500856330
+    ...
+    crc32 distintos = 256 de 256   (0 colisiones)
+    cajas distintas = 14
+
+O sea: con el `crc32` de una linea `ANIM` se sabe EXACTAMENTE que direccion y que cuadro se dibujo, sin ambiguedad.
+Eso da un segundo canal, independiente del de los pixeles (seccion 8), para el criterio 1: los dos tienen que
+coincidir. La caja sola NO alcanza (14 cajas para 16 direcciones: hay pares que comparten tamano), el crc32 si.

@@ -5674,6 +5674,11 @@ una cambia** respecto del mapa solo — comparar la pantalla entera es el error 
 33,71 %` (TW: 58,04 % / 37,37 %; las 16 de TN: peor 31,08 %) → **DISCRIMINA**. Una captura de la dirección N tiene
 que dar ~100 % contra su referencia y quedarse en ese orden contra las otras siete.
 
+**Y hay un segundo canal, el del LOG** (`-crc-dirs`): el POC ya imprime el `crc32` del compuesto en cada `HITO249:
+ANIM`, y los 256 compuestos de TN (16 direcciones × 16 cuadros) tienen **256 crc32 distintos, 0 colisiones** (las
+cajas, en cambio, son sólo 14 distintas: la caja sola no alcanza para decir la dirección). Con eso, el `crc32` de
+una línea `ANIM` dice exactamente qué dirección y qué cuadro se dibujó, y se cruza con el canal de los píxeles.
+
 **El código del giro está escrito y compila para SH-4** (archivo nuevo `giro.go` con la cadena del motor y el
 conjunto de 8 direcciones calculado, `ciclo.Dir`, `buscarCiclo(modo, dir)` con caída a la dirección 0, las marcas
 `HITO249B: GIRO`/`HITO249B: DIRECCIONES` y el mutante `giroSordo`): `ELF: prog.elf 8820448 bytes`, `1ST_READ.BIN
