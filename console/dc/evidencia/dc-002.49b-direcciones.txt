@@ -1,0 +1,176 @@
+DC-002.49b (t_f18b01ca) -- LA DIRECCION DEL MOVIMIENTO: cuanto ocupa de verdad girar el personaje.
+ESTADO: medicion del HOST hecha y cerrada; la mitad de la CONSOLA queda declarada como bloqueo (ver seccion 5).
+NO es una tarjeta cerrada: los criterios 1, 2 y 4 piden capturas de la consola y aca no hay ninguna todavia.
+
+POR QUE ESTE ARCHIVO EXISTE: la tarjeta nace de una ESTIMA escrita en la evidencia de DC-002.49 ("16 x el ciclo
+de TN son ~2 MB de cuadros contra un ELF de 7,7 MB", seccion 9 de dc-002.49-animacion-censo.txt). Esa estima
+NUNCA se midio, y es la que decide la salida de la tarjeta. Aca se mide, y da OTRO numero: 4,3 veces menos.
+
+LO QUE QUEDA MEDIDO, CON LOS NUMEROS EXACTOS:
+
+  * el COF de la amazona parada (AMTNhth.COF, 2164 bytes) declara 16 direcciones y 16 cuadros por direccion; TW
+    (AMTWhth.COF, 1132 bytes) 16 direcciones y 8 cuadros; A1 (AMA1hth.COF, 1777 bytes) 16 y 13;
+  * las 16 direcciones de TN compuestas pesan 475.120 bytes de indices (8 bits por pixel y cuadro) + 118.780 de
+    un unico buffer RGBA por ciclo: 593.900 bytes; con la imagen, 712.680. NO son ~2 MB: son 0,45 MB de indices;
+  * las 16 de TW: 297.960 indices / 446.940 con RGBA. Las 16 de A1: 1.005.147 indices / 1.314.423 con RGBA;
+  * el CONTROL no puede pedir 16 direcciones: pide 8. La cadena del motor (DireccionDelPiso -> DirectionTo ->
+    Dir64ToCof) sobre los 8 estados de la cruceta da EXACTAMENTE las direcciones {0,1,4,7,8,9,12,15};
+  * esas 8 direcciones son 246.768 bytes de indices en TN + 148.720 en TW = 395.488 bytes (386 KB) de indices,
+    ~0,5 MB con los buffers RGBA e imagenes;
+  * la caja del compuesto CAMBIA por direccion (medido, es lo que pide el criterio 1): TN dir 0 = 26x77, dir 1 =
+    26x73, dir 4 = 28x75, dir 7 = 21x74, dir 8 = 27x76, dir 9 = 24x77, dir 12 = 27x71, dir 15 = 27x76; y las 16
+    cajas de TN son 14 tamanos distintos, las de TW 15 (dos pares comparten tamano);
+  * el cuadro 0 de cada direccion es DISTINTO en las 16 (crc32 distinto en las 16: no hay dos direcciones que
+    se dibujen igual, o sea que si el personaje no gira, se nota);
+
+
+=============================================================================
+1. EL INSTRUMENTO (nuevo, en el host; no toca la consola)
+=============================================================================
+
+Dos censos nuevos en `console/dc/verif-personaje-238`, que es la mitad de HOST del hito del personaje (comparte
+`nivel.go` y `personaje.go` con el POC de la consola, y el build verifica el sha256 de los dos):
+
+    cd ~/Proyectos/diablo2consoles
+    go run ./console/dc/verif-personaje-238 -censo-dirs TN,TW,A1     # el ciclo, por TODAS las direcciones
+    go run ./console/dc/verif-personaje-238 -censo-control           # del control a la direccion del COF
+
+`-censo-dirs` compone el ciclo entero de cada direccion con el MISMO compositor que la consola (`Componer` de
+`personaje.go`) y suma lo que la consola tiene que guardar. `-censo-control` NO inventa la direccion: usa la
+cadena del motor, tal cual:
+
+    control (ejeX,ejeY)  ->  DireccionDelPiso (personaje.go; inversa de la proyeccion isometrica)
+                         ->  d2vector.Vector.DirectionTo   (d2common/d2math/d2vector/position.go:94, 64 vias)
+                         ->  d2cof.Dir64ToCof(dir, cof.NumberOfDirections)  (d2common/d2fileformats/d2cof/
+                                                                             cof_dir_lookup.go:14, tabla de 16)
+
+Es la MISMA cadena que usa el motor para pintar cualquier entidad (`d2core/d2asset/composite.go:70`:
+`direction := d2cof.Dir64ToCof(c.direction, c.mode.cof.NumberOfDirections)`), asi que la direccion que se
+componga en la consola no es una convencion del POC: es la del motor.
+
+
+=============================================================================
+2. EL CICLO, POR DIRECCION (host, medido)
+=============================================================================
+
+    CENSO-DIRS: TN COF=data\global\chars\AM\COF\AMTNhth.COF bytesCOF=2164 capas=8 framesPorDir=16 dirsCOF=16 speed=80
+    CENSO-DIRS: TN dir=00 caja=26x77 izq=-16 arriba=-69 cuadros=16 pixeles0=1131 indices=32032 conRGBA=40040
+    CENSO-DIRS: TN dir=01 caja=26x73 izq=-10 arriba=-66 cuadros=16 pixeles0=886  indices=30368 conRGBA=37960
+    CENSO-DIRS: TN dir=02 caja=26x72 izq=-10 arriba=-62 cuadros=16 pixeles0=1081 indices=29952 conRGBA=37440
+    CENSO-DIRS: TN dir=03 caja=25x76 izq=-16 arriba=-66 cuadros=16 pixeles0=881  indices=30400 conRGBA=38000
+    CENSO-DIRS: TN dir=04 caja=28x75 izq=-18 arriba=-67 cuadros=16 pixeles0=1122 indices=33600 conRGBA=42000
+    CENSO-DIRS: TN dir=05 caja=21x75 izq=-9  arriba=-68 cuadros=16 pixeles0=889  indices=25200 conRGBA=31500
+    CENSO-DIRS: TN dir=06 caja=28x69 izq=-10 arriba=-62 cuadros=16 pixeles0=1068 indices=30912 conRGBA=38640
+    CENSO-DIRS: TN dir=07 caja=21x74 izq=-12 arriba=-63 cuadros=16 pixeles0=870  indices=24864 conRGBA=31080
+    CENSO-DIRS: TN dir=08 caja=27x76 izq=-17 arriba=-68 cuadros=16 pixeles0=1158 indices=32832 conRGBA=41040
+    CENSO-DIRS: TN dir=09 caja=24x77 izq=-13 arriba=-69 cuadros=16 pixeles0=1074 indices=29568 conRGBA=36960
+    CENSO-DIRS: TN dir=10 caja=22x74 izq=-8  arriba=-67 cuadros=16 pixeles0=817  indices=26048 conRGBA=32560
+    CENSO-DIRS: TN dir=11 caja=27x71 izq=-10 arriba=-64 cuadros=16 pixeles0=988  indices=30672 conRGBA=38340
+    CENSO-DIRS: TN dir=12 caja=27x71 izq=-10 arriba=-62 cuadros=16 pixeles0=1109 indices=30672 conRGBA=38340
+    CENSO-DIRS: TN dir=13 caja=24x74 izq=-11 arriba=-63 cuadros=16 pixeles0=1018 indices=28416 conRGBA=35520
+    CENSO-DIRS: TN dir=14 caja=22x76 izq=-14 arriba=-65 cuadros=16 pixeles0=812  indices=26752 conRGBA=33440
+    CENSO-DIRS: TN dir=15 caja=27x76 izq=-17 arriba=-67 cuadros=16 pixeles0=1010 indices=32832 conRGBA=41040
+    CENSO-DIRS: TN TOTAL dirs=16 indices=475120 conRGBA=593900 conRGBAeImagen=712680
+        cajas=[21x74 x1, 21x75 x1, 22x74 x1, 22x76 x1, 24x74 x1, 24x77 x1, 25x76 x1, 26x72 x1, 26x73 x1,
+               26x77 x1, 27x71 x2, 27x76 x2, 28x69 x1, 28x75 x1]
+
+(Acumulados de TN, los que dan el costo de tener N direcciones: dirs=1 32032, 2 62400, 3 92352, 4 122752,
+ 5 156352, 6 181552, 7 212464, 8 237328, 9 270160, 10 299728, 11 325776, 12 356448, 13 387120, 14 415536,
+ 15 442288, 16 475120 bytes de indices.)
+
+    CENSO-DIRS: TW COF=data\global\chars\AM\COF\AMTWhth.COF bytesCOF=1132 capas=8 framesPorDir=8 dirsCOF=16 speed=0
+    CENSO-DIRS: TW TOTAL dirs=16 indices=297960 conRGBA=446940 conRGBAeImagen=595920
+        cajas=[27x74 x1, 27x82 x1, 28x74 x1, 28x82 x1, 29x74 x1, 29x81 x1, 30x74 x1, 31x73 x1, 31x79 x1,
+               31x80 x1, 32x73 x1, 33x73 x1, 33x76 x1, 33x77 x1, 34x73 x2]
+
+    CENSO-DIRS: A1 COF=data\global\chars\AM\COF\AMA1hth.COF bytesCOF=1777 capas=8 framesPorDir=13 dirsCOF=16 speed=0
+    CENSO-DIRS: A1 TOTAL dirs=16 indices=1005147 conRGBA=1314423 conRGBAeImagen=1623699
+        cajas=[44x73 x1, 45x73 x1, 45x89 x1, 50x90 x1, 51x71 x1, 53x84 x1, 59x72 x1, 63x88 x1, 64x69 x1,
+               70x77 x1, 75x69 x1, 75x71 x1, 77x83 x1, 79x73 x1, 81x72 x1, 81x76 x1]
+
+Los acumulados, que son el numero que importa (lo que cuesta tener N direcciones compuestas a la vez):
+
+    CENSO-DIRS: TN ACUM dirs=8  indices=237328 conRGBA=296660
+    CENSO-DIRS: TN ACUM dirs=16 indices=475120 conRGBA=593900
+    CENSO-DIRS: TW ACUM dirs=8  indices=148704 conRGBA=223056
+    CENSO-DIRS: TW ACUM dirs=16 indices=297960 conRGBA=446940
+    CENSO-DIRS: A1 ACUM dirs=8  indices=504439 conRGBA=659651
+    CENSO-DIRS: A1 ACUM dirs=16 indices=1005147 conRGBA=1314423
+
+O sea: la estima de la tarjeta ("~2 MB por las 16 de TN") esta MAL por 4,3x. Las 16 de TN son 475.120 bytes de
+indices, y las 16 de TN + las 16 de TW juntas son 773.080 bytes de indices (755 KB), no 4 MB.
+
+
+=============================================================================
+3. LA DIRECCION QUE PIDE EL CONTROL (host, medido con las funciones del motor)
+=============================================================================
+
+    CENSO-GIRO: COF=data\global\chars\AM\COF\AMTNhth.COF dirsCOF=16
+    CENSO-GIRO: control=(-1,-1) piso=(-0.9487,-0.3162) dir64=27 cof=07
+    CENSO-GIRO: control=(-1,0)  piso=(-0.7071,+0.7071) dir64=16 cof=04
+    CENSO-GIRO: control=(-1,1)  piso=(+0.3162,+0.9487) dir64=04 cof=01
+    CENSO-GIRO: control=(0,-1)  piso=(-0.7071,-0.7071) dir64=31 cof=08
+    CENSO-GIRO: control=(0,1)   piso=(+0.7071,+0.7071) dir64=00 cof=00
+    CENSO-GIRO: control=(1,-1)  piso=(-0.3162,-0.9487) dir64=36 cof=09
+    CENSO-GIRO: control=(1,0)   piso=(+0.7071,-0.7071) dir64=47 cof=12
+    CENSO-GIRO: control=(1,1)   piso=(+0.9487,+0.3162) dir64=60 cof=15
+    CENSO-GIRO: TOTAL controles=8 direccionesCOF=8 lista=[0 1 4 7 8 9 12 15]
+
+Lo que esto dice, y es la decision de la tarjeta:
+
+  * con la cruceta se pueden pedir 8 direcciones, NO 16: las 16 del COF existen en el archivo pero el control
+    (8 estados) solo alcanza 8, y son {0,1,4,7,8,9,12,15} (las cuatro cardinales y las cuatro diagonales);
+  * por lo tanto componer las 8 que el control puede pedir cuesta, en indices: TN 246.768 bytes (los dirs
+    0,1,4,7,8,9,12,15: 32032+30368+33600+24864+32832+29568+30672+32832) y TW 148.720, o sea 395.488 bytes
+    (386 KB) por los dos ciclos;
+  * girar con las 8 compuestas al arranque NO cuesta nada en el cuadro: el cambio de direccion es elegir otro
+    ciclo (`cargarCiclo` ya recibe `dir` y `LoadDirection` ya decodifica una sola direccion);
+  * si en cambio se compone la direccion EN LA MARCHA, el peor caso es el ya medido en DC-002.49: 3.237 ms por
+    ciclo de direccion (contra 173.250 ms de `Load` con las 16), o sea un tiron de 3,2 ms en ese cuadro: se
+    puede, pero se nota, y no hace falta.
+
+
+=============================================================================
+4. LA BARRERA DE MEMORIA, MEDIDA EN LA CONSOLA (dato de una corrida ajena)
+=============================================================================
+
+El numero que falta para cerrar la decision es cuanto monton libre hay en la consola en el momento de componer
+los ciclos. La corrida de DC-002.50 que estaba andando mientras se escribia esto (mismo POC, `/tmp/dc250-run`)
+lo imprime:
+
+    HITO250: MEMORIA etapa= nivel libre= 800408
+
+y despues muere:
+
+    fatal error: gc_external_alloc: OOM
+
+Es decir: con el nivel cargado quedan 800.408 bytes libres, y el POC de DC-002.50 (que ademas carga los ciclos
+del bicho) ya no alcanza. Las 8 direcciones de TN+TW son 395.488 bytes de indices: entran en esos 800 KB SOLO si
+los ciclos del bicho y el resto del arranque no se los comen, y hoy se los comen. Esto NO es una conclusion de
+esta tarjeta: es el estado medido del arranque en el momento de la medicion, y por eso el criterio 1 de aca no se
+puede medir hasta que DC-002.50 cierre su presupuesto de memoria.
+
+Lo que si queda claro con los numeros de arriba: la salida (1) de la tarjeta ("componer SOLO las direcciones que
+el control puede pedir") cuesta 386 KB, la (2) ("componer en la marcha") cuesta 0 de monton permanente y 3.237 ms
+en el cuadro del giro, y la (3) ("bajar el ciclo a la mitad") NO hace falta: el problema que la tarjeta suponia
+(2 MB) no existe.
+
+
+=============================================================================
+5. LO QUE QUEDA DECLARADO (bloqueo, no medido)
+=============================================================================
+
+  * los criterios 1, 2 y 4 de la tarjeta piden CAPTURAS de la consola (que el personaje dibuje otra direccion
+    con la flecha, que la cadencia de TN siga en 128 ms y la de TW en 40, y el mutante del giro quieto). No hay
+    ninguna en este archivo porque la ventana de Flycast estaba tomada por la corrida de DC-002.50 y su arbol
+    de trabajo esta sin commitear: correr el emulador encima le rompe la captura y editar `main.go` le rompe el
+    build. Se declara en la tarjeta, no se disimula.
+  * el codigo del giro (que `dirPersonaje` deje de ser 0 y que el estado elija la direccion con la cadena de la
+    seccion 3) NO se escribio todavia: vive en `console/dc/poc/personaje-mapa/main.go`, que en este momento esta
+    siendo editado por otra corrida sobre el mismo repo.
+
+REPRODUCIR TODO LO DE ESTE ARCHIVO (solo el host, no necesita emulador):
+
+    cd ~/Proyectos/diablo2consoles
+    go run ./console/dc/verif-personaje-238 -censo-dirs TN,TW,A1 | grep CENSO-DIRS
+    go run ./console/dc/verif-personaje-238 -censo-control   | grep CENSO-GIRO

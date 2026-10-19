@@ -5601,8 +5601,65 @@ python3 scripts/console/checar-anim-249.py --host /tmp/dcbuild/anim249/host \
 personaje camina a ~300 px/s y en 3 s se va de la ventana del mapa: a la segunda captura está fuera de cuadro y
 en la primera el instrumento no distingue — 68,45 % contra 68,30 %); la **dirección del movimiento** (el ciclo se
 compone para una sola dirección, `dirPersonaje = 0`: caminar al este no gira al personaje — las 16 direcciones no
-entran en el montón y recargar el ciclo al girar cuesta 3,2 s, así que pide su propia vuelta); el **cierre sucio**
-del emulador (SIGBUS al `kill`, después de las capturas: la misma corrida con `ESPERA_FINAL=45` vive 70 s y muere
-sólo al cierre); monstruos, combate y colisión.
+entran en el montón y recargar el ciclo al girar cuesta 3.237 ms por dirección —no 3,2 s, que era un error de
+esta sección—, así que pide su propia vuelta); el **cierre sucio** del emulador (SIGBUS al `kill`, después de las
+capturas: la misma corrida con `ESPERA_FINAL=45` vive 70 s y muere sólo al cierre); monstruos, combate y colisión.
 
 Evidencia: `console/dc/evidencia/dc-002.49-animacion-censo.txt`.
+
+---
+
+## 74. DC-002.49b (medición): **la premisa de la tarjeta estaba mal por 4,3x** — las 16 direcciones de TN son **475.120 B**, no ~2 MB, y el control **sólo puede pedir 8** (`{0,1,4,7,8,9,12,15}`)
+
+La tarjeta de la dirección del movimiento nació de una **estima** escrita en la sección 73 ("las 16 direcciones no
+entran en el montón"), no de una medición. Antes de elegir salida se midió, y la estima no se sostiene.
+
+**El instrumento (host, dos censos nuevos en `console/dc/verif-personaje-238`):**
+
+```bash
+cd ~/Proyectos/diablo2consoles
+go run ./console/dc/verif-personaje-238 -censo-dirs TN,TW,A1   # el ciclo entero, por TODAS las direcciones
+go run ./console/dc/verif-personaje-238 -censo-control         # de la cruceta a la dirección del COF
+```
+
+`-censo-dirs` compone cada dirección con el **mismo compositor** que la consola (`Componer` de `personaje.go`, el
+archivo que el build verifica por sha256 contra el POC) y suma **lo que la consola tiene que guardar**: un índice de
+8 bits por píxel y cuadro, más **un** buffer RGBA y **una** imagen por ciclo (no por cuadro: `cargarCiclo` hace
+`c.RGBA = make(...)` y `ebiten.NewImage(...)` una vez, con la caja del cuadro 0).
+
+**Lo medido (números exactos):**
+
+| ciclo | cuadros/dir | las 16 direcciones: índices | + RGBA | + imagen | las **8** que pide el control |
+|---|---|---|---|---|---|
+| TN (quieto, pueblo) | 16 | **475.120** | 593.900 | 712.680 | 246.768 |
+| TW (caminando) | 8 | **297.960** | 446.940 | 595.920 | 148.720 |
+| A1 (golpe) | 13 | **1.005.147** | 1.314.423 | 1.623.699 | 504.439 |
+
+- la estima de la sección 73 decía "~2 MB las 16 de TN": son **475.120 B** (4,3x menos). Las 16 de TN **y** las 16
+  de TW juntas son **773.080 B** (755 KB), no 4 MB;
+- el COF declara 16 direcciones (`AMTNhth.COF` 2.164 B, `AMTWhth.COF` 1.132 B, `AMA1hth.COF` 1.777 B), pero la
+  **cruceta no las alcanza**: la cadena del motor —`DireccionDelPiso` → `d2vector.Vector.DirectionTo`
+  (`d2math/d2vector/position.go:94`, 64 vías) → `d2cof.Dir64ToCof` (`d2fileformats/d2cof/cof_dir_lookup.go:14`),
+  la **misma** que usa el motor en `d2core/d2asset/composite.go:70`— da, para los 8 estados del control, exactamente
+  **ocho** direcciones: `[0 1 4 7 8 9 12 15]`;
+- la caja del compuesto **cambia por dirección**, que es lo que hace medible el giro: TN dir 0 = `26x77`, dir 1 =
+  `26x73`, dir 4 = `28x75`, dir 7 = `21x74`, dir 8 = `27x76`, dir 9 = `24x77`, dir 12 = `27x71`, dir 15 = `27x76`
+  (14 tamaños distintos entre las 16 de TN, 15 entre las 16 de TW);
+- el cuadro 0 de cada dirección es **distinto** en las 16 (crc32 distinto): si el personaje no gira, se nota.
+
+**La decisión que sale de esos números:** la salida (1) de la tarjeta —componer **sólo** las direcciones que el
+control puede pedir— cuesta **395.488 B** de índices (TN 246.768 + TW 148.720) y deja el giro en **0 ms** de cuadro
+(es elegir otro ciclo ya compuesto, y `cargarCiclo`/`LoadDirection` ya reciben `dir`); la salida (2) —componer en la
+marcha— cuesta **0** de montón permanente y **3.237 ms** en el cuadro del giro (el número de DC-002.49, contra
+173.250 ms de `Load` con las 16); la salida (3) —bajar el ciclo a la mitad— **no hace falta**: el problema que la
+tarjeta suponía no existe.
+
+**Lo que NO entra (declarado, no tapado):** esta sección es la **medición**, no el cierre del hito. Los criterios 1,
+2 y 4 piden **capturas de la consola** (que la flecha derecha dibuje otra caja, que la cadencia de TN siga en 128
+ms/cuadro y la de TW en 40, y el mutante del giro quieto) y no hay ninguna todavía: mientras se medía, la ventana de
+Flycast y `console/dc/poc/personaje-mapa/main.go` estaban tomados por la corrida de **DC-002.50** (que además muere
+con `fatal error: gc_external_alloc: OOM` después de `HITO250: MEMORIA etapa= nivel libre= 800408`), así que correr
+el emulador encima o editar ese archivo le rompe la corrida y el build. El estado queda escrito en la tarjeta
+(`t_f18b01ca`), no disimulado.
+
+Evidencia: `console/dc/evidencia/dc-002.49b-direcciones.txt`.

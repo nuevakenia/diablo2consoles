@@ -30,6 +30,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2cof"
@@ -92,6 +93,8 @@ func main() {
 	pngMapa := flag.String("png-mapa", "", "si se pasa, escribe la misma pantalla SIN el personaje")
 	cicloModos := flag.String("ciclo", "", "DC-002.49: modos cuyo CICLO completo se censa (16 cuadros de TN, 8 de TW), separados por coma")
 	pngCiclo := flag.String("png-ciclo", "", "si se pasa, escribe un PNG por cuadro del ciclo dentro de esta carpeta")
+	censoDirs := flag.String("censo-dirs", "", "DC-002.49b: modos cuyo ciclo se censa en TODAS las direcciones del COF (para saber cuantas entran compuestas), separados por coma")
+	censoControl := flag.Bool("censo-control", false, "DC-002.49b: de los 8 estados del control a la direccion del COF, con las funciones del motor")
 	flag.Parse()
 
 	ruta := *mpqPath
@@ -347,7 +350,143 @@ func main() {
 			censarCiclo(mc, modo, dirDelPersonaje, *pngCiclo, palUni, pantallaSin, mapaX+anclaX, mapaY+anclaY)
 		}
 	}
+
+	// ============================== 6. TODAS LAS DIRECCIONES (DC-002.49b) ==============================
+	//
+	// Cuantas direcciones ENTRAN compuestas a la vez en la consola: para cada direccion del COF se compone el
+	// ciclo entero con el MISMO compositor y se suman los bytes que la consola tiene que guardar (un indice de
+	// 8 bits por pixel y cuadro). Ese numero, contra el monton libre medido en la consola, decide la salida de
+	// la tarjeta (componer solo algunas / componer en la marcha / bajar el ciclo).
+	if *censoDirs != "" {
+		for _, modo := range strings.Split(*censoDirs, ",") {
+			modo = strings.ToUpper(strings.TrimSpace(modo))
+			if modo == "" {
+				continue
+			}
+
+			censarDirecciones(mc, modo)
+		}
+	}
+
+	// ============================== 7. LA DIRECCION QUE PIDE EL CONTROL (DC-002.49b) ==============================
+	//
+	// La cadena del motor, sin inventar nada: control (ejeX,ejeY) -> DireccionDelPiso (personaje.go, la inversa
+	// de la proyeccion) -> d2vector.Vector.DirectionTo (el motor la lleva a 64 direcciones) -> d2cof.Dir64ToCof
+	// (el motor la lleva a las direcciones del COF: 16 en la amazona). El numero que decide cuantas direcciones
+	// hay que componer es cuantas DISTINTAS salen de los 9 estados del control.
+	if *censoControl {
+		censarControlDelGiro(mc)
+	}
 }
+
+// censarControlDelGiro: de los 8 estados del control (4 cardinales + 4 diagonales) a la direccion del COF, con
+// las funciones del MOTOR. Imprime la cadena entera y el conjunto de direcciones distintas que el control puede
+// pedir: ese es el numero de ciclos que hay que tener compuestos para que el personaje gire.
+func censarControlDelGiro(mc *d2mpq.MPQ) {
+	cof, nombreCOF, _, err := cofDelModo(mc, "TN")
+	if err != nil {
+		fmt.Printf("CENSO-GIRO: SIN-COF: %v\n", err)
+		return
+	}
+
+	fmt.Printf("CENSO-GIRO: COF=%s dirsCOF=%d\n", nombreCOF, cof.NumberOfDirections)
+
+	distintas := make(map[int]bool)
+	orden := make([]int, 0, 8)
+
+	for _, ejeX := range []float64{-1, 0, 1} {
+		for _, ejeY := range []float64{-1, 0, 1} {
+			if ejeX == 0 && ejeY == 0 {
+				continue
+			}
+
+			dx, dy := DireccionDelPiso(ejeX, ejeY)
+			origen := d2vector.NewVector(0, 0)
+			destino := d2vector.NewVector(dx, dy)
+			d64 := origen.DirectionTo(*destino)
+			cofDir := d2cof.Dir64ToCof(d64, cof.NumberOfDirections)
+
+			if !distintas[cofDir] {
+				distintas[cofDir] = true
+				orden = append(orden, cofDir)
+			}
+
+			fmt.Printf("CENSO-GIRO: control=(%.0f,%.0f) piso=(%+.4f,%+.4f) dir64=%02d cof=%02d\n",
+				ejeX, ejeY, dx, dy, d64, cofDir)
+		}
+	}
+
+	sort.Ints(orden)
+	fmt.Printf("CENSO-GIRO: TOTAL controles=8 direccionesCOF=%d lista=%v\n", len(orden), orden)
+}
+
+// censarDirecciones (DC-002.49b): el censo del ciclo por TODAS las direcciones del COF.
+//
+// Por direccion imprime la caja del compuesto, sus cuadros y los bytes que ocupa, y va acumulando: el numero
+// que importa es el ACUMULADO contra el monton libre de la consola, no el total suelto.
+func censarDirecciones(mc *d2mpq.MPQ, modo string) {
+	cof, nombreCOF, bytesCOF, err := cofDelModo(mc, modo)
+	if err != nil {
+		fmt.Printf("CENSO-DIRS: %s SIN-COF: %v\n", modo, err)
+		return
+	}
+
+	n := cof.FramesPerDirection
+	dirs := len(cof.Priority)
+	if cof.NumberOfDirections < dirs {
+		dirs = cof.NumberOfDirections
+	}
+
+	fmt.Printf("CENSO-DIRS: %s COF=%s bytesCOF=%d capas=%d framesPorDir=%d dirsCOF=%d dirsDelPriority=%d speed=%d\n",
+		modo, nombreCOF, bytesCOF, cof.NumberOfLayers, n, cof.NumberOfDirections, len(cof.Priority), cof.Speed)
+
+	var acumIndices, acumRGBA, acumImagen, acumTotal int
+	cajas := make(map[string]int)
+
+	for dir := 0; dir < dirs; dir++ {
+		capas := capasDelCiclo(mc, cof, dir, modo)
+		compuestos := componerCiclo(cof, capas, dir, n)
+
+		if len(compuestos) == 0 {
+			fmt.Printf("CENSO-DIRS: %s dir=%02d SIN-CUADROS (capas=%d)\n", modo, dir, len(capas))
+			continue
+		}
+
+		indices, rgba, imagen := 0, 0, 0
+		for _, p := range compuestos {
+			indices += p.Ancho * p.Alto
+		}
+
+		// la consola guarda UN buffer RGBA y UNA imagen por CICLO (no por cuadro): se cuentan con la caja del
+		// cuadro 0, que es la que usa `cargarCiclo` para `c.RGBA = make(...)` y `ebiten.NewImage(...)`.
+		p0 := compuestos[0]
+		rgba = p0.Ancho * p0.Alto * 4
+		imagen = p0.Ancho * p0.Alto * 4
+		acumIndices += indices
+		acumRGBA += rgba
+		acumImagen += imagen
+		acumTotal += indices + rgba + imagen
+		cajas[fmt.Sprintf("%dx%d", p0.Ancho, p0.Alto)]++
+
+		fmt.Printf("CENSO-DIRS: %s dir=%02d caja=%dx%d izq=%d arriba=%d cuadros=%d pixeles0=%d indices=%d "+
+			"conRGBA=%d conRGBAeImagen=%d crc32Cuadro0=%d\n",
+			modo, dir, p0.Ancho, p0.Alto, p0.Izq, p0.Arriba, len(compuestos), p0.PixelesNoVacios,
+			indices, indices+rgba, indices+rgba+imagen, p0.CRC32())
+
+		fmt.Printf("CENSO-DIRS: %s ACUM dirs=%d indices=%d conRGBA=%d conRGBAeImagen=%d\n",
+			modo, dir+1, acumIndices, acumIndices+acumRGBA, acumTotal)
+	}
+
+	cajasOrden := make([]string, 0, len(cajas))
+	for c := range cajas {
+		cajasOrden = append(cajasOrden, fmt.Sprintf("%s x%d", c, cajas[c]))
+	}
+	sort.Strings(cajasOrden)
+
+	fmt.Printf("CENSO-DIRS: %s TOTAL dirs=%d indices=%d conRGBA=%d conRGBAeImagen=%d cajas=[%s]\n",
+		modo, dirs, acumIndices, acumIndices+acumRGBA, acumTotal, strings.Join(cajasOrden, ", "))
+}
+
 
 // ================================================================ DC-002.49: el ciclo del personaje
 
