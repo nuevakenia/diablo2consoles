@@ -75,7 +75,17 @@ Capitalization in the file name matters.
 func (a *App) initConfig(config *d2config.Configuration) error {
 	a.config = config
 
-	for _, mpqName := range a.config.MpqLoadOrder {
+	// DC-002.39: se recorre por INDICE y el nombre se RELEE del arreglo vivo en cada vuelta, en vez de
+	// `for _, mpqName := range a.config.MpqLoadOrder`. Medido en la consola: con el `range`, la vuelta 3
+	// leia el nombre con el puntero correcto y el LARGO de otro lado (49, -1795502946 o 0 segun la corrida)
+	// apenas `AddSource` disparaba una recoleccion del GC; el arreglo vivo del `MpqLoadOrder` tenia los
+	// largos correctos y el par {puntero, largo} leido no existe en los 16 MB de RAM, o sea el largo venia
+	// de un registro y no de memoria. El decodificador JSON y el GC quedan descartados como causa: entrega
+	// los 3 nombres y mantiene la cabecera y el arreglo. Releyendo por indice el nombre sale bien.
+	// Evidencia: console/dc/evidencia/dc-002.39-nombre-corrompido.txt.
+	for i := 0; i < len(a.config.MpqLoadOrder); i++ {
+		mpqName := a.config.MpqLoadOrder[i]
+
 		cleanDir := filepath.Clean(a.config.MpqPath)
 		srcPath := filepath.Join(cleanDir, mpqName)
 

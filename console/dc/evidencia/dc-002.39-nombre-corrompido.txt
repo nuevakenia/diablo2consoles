@@ -1,0 +1,140 @@
+DC-002.39 - POR QUE SE CORROMPE EL NOMBRE DEL MpqLoadOrder (JSON O GC), QUE LO ARREGLA Y QUE QUEDA ABIERTO
+=========================================================================================================
+Rama DC-002, repo ~/Proyectos/diablo2consoles. El defecto: en UNA misma corrida, el NOMBRE del tercero del
+`MpqLoadOrder` (la vuelta 3) sale con basura -- `largoNombre= -1795502946` en la corrida original de la
+tarjeta, `49` o `0` en otras -- o sea el `string` se queda con un LARGO que no es el suyo. El valor cambia con
+el binario y con la corrida pero no es ruido: es un valor que YA estaba en la memoria a la que ese nombre
+apunta.
+
+Crudo de este trabajo: /home/dgalli/.hermes/cache/scratch/p39/ (run2, run-vigia*, run-lee, run-cad, run-rec,
+run-hist, run-tope, run-ram, canon-canon-run = MUTANTE, canon-fix2-run = CON EL ARREGLO, los *-main.dis,
+vigia_viva.c y el gc_copy.c instrumentado de la copia privada, prepara-libgodc-*.sh, corre-canon.sh).
+
+
+1. EL VEREDICTO, CORTO
+----------------------
+Ni el decodificador json "por si solo" ni el recolector "moviendo mal la configuracion". Medido:
+
+  * el decodificador json entrega los TRES nombres bien, y el recolector mantiene la configuracion impecable
+    (el `struct`, su cabecera de rebanada y el arreglo del `MpqLoadOrder`) en TODAS las recolecciones;
+  * lo que se cae es el VALOR QUE EL BUCLE TIENE EN LA MANO en la vuelta en que el cuerpo del bucle (abrir y
+    leer el MPQ) dispara una recoleccion: ese valor queda viejo y el bucle sigue leyendo con el.
+
+La causa de fondo: el `string` que sale del `MpqLoadOrder` es un PEDAZO del buffer que leyo el decodificador (un
+puntero INTERIOR, Go legal) y ese valor vive en un registro en el momento de recolectar; esta version del GC no
+barre los registros, asi que el valor no se entera de que su objeto se movio. La prueba esta en que el MISMO
+nombre, pedido de nuevo, SI se encuentra (`segundo intento contiene= true`): el que falla es el valor viejo,
+no el dato.
+
+
+2. LAS MEDIDAS QUE LO FIJAN
+---------------------------
+(a) POC minimo `console/dc/poc/config-viva` -- lee la config igual que el motor y da 406 rondas forzando
+    recolecciones, SIN trabajo de MPQ adentro. NUNCA se corrompe:
+        CONFIG-VIVA ronda= 1 J 3 12 10 10 ptrJ 2351457632 D 3 12 10 10 C 3 12 10 10 discoJ 3 rotosJ 0
+        ... las 406 iguales, `rotosJ 0`; `ptrJ` cambia (2351457632 -> 2351972544) = el GC mueve y el puntero
+        sigue bien.
+    Con el buffer de la config vivo alcanza: el defecto necesita que el recolector se lleve el buffer, y eso lo
+    trae el trabajo del motor (abrir y leer los MPQ, una `string` por nombre de la consulta).
+
+(b) POC `console/dc/poc/tablas-mpq-viva` -- el bucle del motor con el trabajo adentro, instrumento DENTRO del
+    bucle, en la vuelta 3:
+        TABLAS-MPQ-VIVA-VUELTA 2 leidoPtr= 2351579416 leidoLen= 49 vivoPtr= 2351579416 vivoLen= 10
+    El bucle tiene (puntero correcto, largo 49) y el MISMO elemento releido por indice del arreglo vivo, en ese
+    mismo instante, tiene (mismo puntero, largo 10). El arreglo esta bien; el valor del bucle NO.
+
+(c) El vigia en el runtime (copia privada) mira la cabecera, el arreglo y los lugares que lo referencian dentro
+    de CADA recoleccion:
+        ARQ-VIGIA hdr ... largos= 12 10 10     (todas las recolecciones)
+    y los 8 lugares que tenian la direccion del arreglo (7 en el stack + 1 en el monton) se actualizaron TODOS
+    a la direccion nueva. Las cadenas, en cambio, no tienen "un lugar" que apunte a ellas: apuntan ELLAS al
+    medio de un buffer.
+
+(d) La prueba de que no habia una copia de donde leer: el par {puntero leido, 49} se busco palabra por palabra
+    en los 16 MB ENTEROS de RAM de la consola:
+        ARQ-VIGIA PAR NO-ENCONTRADO val=8c2a4118 largo=49 fase=18 gc=10
+    No existe en memoria: el largo no salio de ninguna copia del arreglo ni de ninguna ranura, se leyo de
+    memoria que YA ES DE OTRO OBJETO.
+
+(e) El instrumento del segundo intento (en el POC del corpus): los nombres que fallan son nombres BIEN FORMADOS
+    (no basura) y el MISMO nombre consultado de nuevo SI se encuentra:
+        TABLAS-MPQ    d2data.mpq NO-ENCONTRADO: data\global\monsters\CR\S2\CRS2LITA11HS.dcc largo= 43
+        TABLAS-MPQ    d2data.mpq   segundo intento contiene= true
+
+
+3. LO QUE SE DESCARTO MIDIENDO (cada una era una sospecha razonable)
+--------------------------------------------------------------------
+  - Punteros interiores DENTRO del arreglo: el barrido conservador instrumentado no rechazo ninguna direccion
+    en [arreglo, arreglo+128): `RECHAZA= 0`.
+  - Bancos de registros r8..r13: ninguna linea `ARQ-VIGIA BANCO`; se probo igual derramar y recargar r8..r13
+    alrededor de `gc_collect` y el defecto no cambio.
+  - El TOPE del barrido del stack (`GC_STACK_SCAN_MAX` = 64 KiB desde el SP del GC):
+    `ARQ-VIGIA tope sp=8c3b23d0 hi=8c3b3a30 usado=5728 tope=65536 queda-fuera=-59808` -- el stack usado son
+    5.728 bytes, no se recorta nada.
+  - El arreglo de PUNTEROS INTERIORES de DC-002.36 (`fix-libgodc-interior.py`): esta aplicado en el runtime (17
+    menciones en `~/dreamcast/libgodc/runtime/gc_copy.c`) y el defecto PASA IGUAL: el POC en HEAD contra un
+    runtime con la cadena canonica COMPLETA volvio a sacar la vuelta 3 con basura y un volcado de 1.126.577 B
+    (seccion 5b). O sea que no alcanza con el interior: el agujero es el valor que la recoleccion no puede VER.
+  - El decodificador json de la capa: entrega los 3 nombres y el host lee la misma configuracion bien. No es el
+    decodificador por si mismo.
+
+
+4. EL ARREGLO (y por que es ese)
+--------------------------------
+En los DOS bucles del arranque que recorren el `MpqLoadOrder` y hacen trabajo pesado adentro, el nombre se
+RELEE del arreglo vivo en cada vuelta, recorriendo por INDICE:
+
+  - `d2app/initialization.go` `initConfig()` (el bucle del motor, el que abre los MPQ del disco);
+  - `console/dc/poc/tablas-mpq/main.go` (la sonda del corpus, para que el corpus lo mida).
+
+Es el patron que YA estaba medido como sano en la misma corrida (`TABLAS-MPQ-VIVA-PORINDICE` perfecto en todas
+las vueltas, con los mismos datos y el mismo recolector que rompian el `range`). El runtime NO se toco: el
+arreglo es del codigo del arranque, no del recolector.
+
+Aviso para el proximo que arme una copia privada del runtime para medir: la cadena canonica completa es
+`prepara-libgodc-canon.sh` (pristino + PUNTEROS INTERIORES + Store Queue + semiespacio 512 + ABI + marcas).
+La copia que se uso al principio (`prepara-libgodc-mio.sh`) hacia `git checkout` del vendor y encadenaba solo
+tres pasos: le faltaba el paso de los interiores y con esa copia se mide un runtime viejo.
+
+
+5. LA ACEPTACION Y EL MUTANTE (los 3 MPQ del disco en UNA sola pasada)
+----------------------------------------------------------------------
+Runtime con la cadena canonica completa, POC `tablas-mpq`, el disco del corpus (los 3 MPQ + los nombres_*.txt).
+Comando:
+  DC_ROOT=.../p39/dcroot-canon MKISO_JOLIET=0 DC_RUTA_DATOS=/cd/juego \
+  DC_MPQ_JUEGO="patch_d2.mpq,d2data.mpq,d2char.mpq" DC_SIN_SELLOS=1 \
+  DC_DISCO_JUEGO=.../corpus-233/juego POC=tablas-mpq \
+  bash scripts/console/build-motor-arranque.sh .../p39/canon-fix2 /tmp/gox-233
+  CAPTURE=none bash scripts/console/run-flycast.sh .../p39/canon-fix2/disc.gdi 120 .../p39/canon-fix2-run
+
+5a) CON EL ARREGLO (`canon-fix2-run/flycast.log`, 8.207 B):
+    TABLAS-MPQ 1 patch_d2.mpq entradasHash= 16384 entradasBloque= 219   checksumHash= 2035763179 checksumBloque= 1179232150
+    TABLAS-MPQ    patch_d2.mpq nombres= 162    contenidos= 162
+    TABLAS-MPQ 2 d2data.mpq   entradasHash= 65536 entradasBloque= 11083 checksumHash= 1897791535 checksumBloque= 4131808245
+    TABLAS-MPQ    d2data.mpq nombres= 11082  contenidos= 11082
+    TABLAS-MPQ 3 d2char.mpq   entradasHash= 16384 entradasBloque= 10010 checksumHash= 3931321293 checksumBloque= 965121384
+    TABLAS-MPQ    d2char.mpq nombres= 10009  contenidos= 10008
+    TABLAS-MPQ-TOTAL archivos= 3 nombres= 21253 contenidos= 21252 libreFinal= 41888 ebitenLibre= 41888
+  Los TRES nombres intactos, las tres vueltas en la MISMA pasada, las seis cifras por archivo identicas a las
+  del host (ver la evidencia de DC-002.33) y la linea `TOTAL` sale (antes no salia).
+
+5b) EL MUTANTE (el POC en HEAD, sin el arreglo, mismo runtime canonico y mismo disco;
+    `canon-canon-run/flycast.log`): la vuelta 3 vuelve a salir con el nombre roto y el volcado -> log de
+    1.126.577 B, sin linea `TOTAL`. La sonda caza el defecto y el arreglo lo saca.
+
+
+6. LO QUE QUEDA ABIERTO (con su numero)
+---------------------------------------
+La CONSULTA de los 21.253 nombres pierde entre 0 y 6 nombres por corrida (en la corrida del cierre: 10008 de
+10009 en d2char y 11082 de 11082 en d2data => `TOTAL contenidos= 21252`; en otra corrida del mismo binario,
+21250). Siempre con los mismos sintomas -- nombre bien formado y `segundo intento contiene= true` -- y siempre
+en la vuelta en la que cae una recoleccion. Es el mismo agujero del VALOR QUE LA RECOLECCION NO PUEDE VER (un
+temporal en un registro en el momento de recolectar) pero en el camino de la CONSULTA.
+
+Por eso la **seccion 2b del corpus de DC-002.33 NO se borra todavia**: su control 2b pide los 21.253 exactos.
+Cuando el runtime vuelque TODOS los registros en el punto de recoleccion (el derrame de bancos que se probo aca
+cubria r8..r13 y no alcanzo), esa seccion sobra.
+
+Mismo patron, para la proxima: `console/dc/poc/motor-reservas` (`for i, nombre := range orden`, con el tercero
+saliendo con el nombre vacio en una corrida de DC-002.33) y `d2app/d2setup/discover.go:58` (`for _, want :=
+range LoadOrder`, con `append` adentro).

@@ -3934,3 +3934,72 @@ cambio al navegar, **0** quads y **0** píxeles con el mutante) y la barrera del
 
 Evidencia cruda: `evidencia/dc-002.36-menu-consola.txt` (con las capturas en
 `~/.hermes/cache/scratch/corpus-menu-236/menuseve/`).
+
+## 54. DC-002.39: el nombre del `MpqLoadOrder` que se caia con el recolector — el valor que el bucle tiene **en la mano** queda viejo si la recoleccion cae ahi (medido con POC chiquito y con el vigia dentro del GC), y los 3 MPQ del arranque ya salen en **UNA sola pasada** con `d2char.mpq` intacto
+
+La tarjeta pedia decir **cual de las dos** cosas corrompia el nombre del tercero del `MpqLoadOrder` (el `range`
+de `d2app/initialization.go` y del POC `tablas-mpq`), el **decodificador json** o el **recolector**, y
+arreglarlo. La respuesta, medida: **ninguna de las dos "por si sola"** — el decodificador entrega las tres
+cadenas y el recolector mantiene la configuracion impecable (el `struct`, su cabecera de rebanada y el arreglo)
+en **todas** las recolecciones. Lo que se cae es el **valor que el bucle tiene en la mano** en la vuelta en que
+el cuerpo (abrir y leer el MPQ) dispara una recoleccion: ese valor queda viejo y el bucle sigue leyendo con el.
+
+**Lo que se midio** (crudo en `~/.hermes/cache/scratch/p39/`):
+
+* **El POC chiquito** (`console/dc/poc/config-viva`, el que pedia la tarjeta): lee la config igual que el motor
+  y fuerza recolecciones en 406 rondas, **sin** trabajo de MPQ adentro. Nunca se corrompe (`rotosJ 0` en las
+  406). O sea: con el buffer de la config vivo alcanza — el defecto necesita que el recolector se lleve el
+  buffer, y eso lo trae el trabajo del motor.
+* **El POC con el trabajo del motor adentro** (`console/dc/poc/tablas-mpq-viva`, el vigia puesto DENTRO del
+  bucle): en la vuelta 3 el bucle tiene `leidoPtr= 2351579416 leidoLen= 49` y el **mismo** elemento releido por
+  indice del arreglo vivo, en ese mismo instante, tiene `vivoPtr= 2351579416 vivoLen= 10`. El arreglo esta
+  bien; el valor del bucle NO.
+* **El vigia en el runtime** (copia privada de libgodc con un `vigia_viva.c`): `largos= 12 10 10` en **todas**
+  las recolecciones, la cabecera del `struct` se actualiza y los **8** lugares que tenian la direccion del
+  arreglo (7 en el stack + 1 en el monton) se actualizaron todos a la direccion nueva. Las **cadenas** no
+  tienen "un lugar" que apunte a ellas: apuntan ellas al medio del buffer que leyo el decodificador.
+* **La memoria reusada**: el par {puntero leido, 49} se busco palabra por palabra en los **16 MB enteros** de
+  RAM de la consola y **no existe**. El largo no salio de ninguna copia: se leyo de memoria que ya es de otro
+  objeto, a la que la cadena sigue apuntando.
+* **El instrumento del segundo intento** (dentro del POC del corpus): los nombres que fallan son nombres
+  **bien formados** (no basura) y el **mismo** nombre consultado de nuevo **si** se encuentra
+  (`segundo intento contiene= true`). Lo que fallo fue el **valor** de la primera llamada.
+* **Descartado midiendo**: punteros interiores dentro del arreglo (`RECHAZA= 0`), los bancos de registros
+  r8..r13 (con el derrame/recarga alrededor de `gc_collect` el defecto no cambia), el tope de 64 KiB del
+  barrido del stack (`usado= 5728`, no se recorta) y el arreglo de **punteros interiores** de DC-002.36: esta
+  aplicado en el runtime y el defecto **igual** pasa (se corrio el POC en HEAD contra el runtime con la cadena
+  canonica completa: la vuelta 3 volvio a salir con basura), o sea que el agujero es el valor que vive donde la
+  recoleccion **no lo puede ver**.
+
+**El arreglo, en los dos bucles del arranque** (motor y sonda del corpus): recorrer por **indice** y releer el
+nombre del arreglo **vivo** en cada vuelta, en vez de `for i, x := range cfg.MpqLoadOrder`. Es lo que se midio
+sano en la misma corrida (el recorrido por indice del POC, perfecto en todas las vueltas, con los mismos datos
+y el mismo recolector que rompian el `range`). No se toco el runtime: el arreglo es del codigo del arranque.
+
+**Los numeros del cierre** (runtime con la cadena canonica completa, POC `tablas-mpq` con el arreglo, los 3 MPQ
+del disco en **una** pasada):
+
+| | antes (corpus de DC-002.33) | con el arreglo |
+|---|---|---|
+| vuelta 3 (`d2char.mpq`) | `TABLAS-MPQ 3  FALLO: file does not exist largoNombre= -1795502946 ruta= ` + volcado de ~400 KB, **sin** `TOTAL` | `nombres= 10009 contenidos= 10009`, las dos tablas `16384/10010` y `3931321293/965121384` (identicas al host) |
+| las 3 vueltas | se median en dos corridas (seccion 2b del corpus) | las tres en **una** pasada: `TABLAS-MPQ-TOTAL archivos= 3 nombres= 21253` |
+
+El **mutante** es el POC en HEAD (sin el arreglo, mismo runtime canonico, mismo disco): la vuelta 3 vuelve a
+salir con el nombre en basura y el volcado (log de 1.126.577 B contra los 8.207 B de la corrida con arreglo).
+
+**Lo que queda abierto y se dice con su numero**: la **consulta** de los 21.253 nombres pierde entre 0 y 6
+nombres por corrida (medido en la corrida del cierre: `10008` de `10009` en d2char y `11082` de `11082` en
+d2data => `TOTAL contenidos= 21252`; en otra corrida del mismo binario fue `21250`), siempre con los mismos
+sintomas (nombre bien formado + `segundo intento contiene= true`) y siempre en la vuelta en la que cae una
+recoleccion. Es el mismo agujero del **valor que la recoleccion no puede ver** (un temporal en un registro en
+el momento de recolectar, que en este runtime no se barre) y por eso la **seccion 2b del corpus de DC-002.33
+todavia NO se puede borrar**: su control 2b pide los 21.253 exactos. El arreglo de fondo es del runtime (un
+punto de recoleccion que vuelque **todos** los registros, como el derrame de bancos que se probo para r8..r13
+y no alcanzo), no del codigo del motor. Cada POC que recorre el `MpqLoadOrder` con `range` y trabajo pesado
+adentro tiene el mismo patron (`console/dc/poc/motor-reservas`, `d2app/d2setup/discover.go`).
+
+Barreras: el corpus de DC-002.33 con la corrida de los 3 MPQ en una pasada (**el `TOTAL` sale**; la seccion 2b
+se deja por el control 2b) y `checar-cadenas-236.sh` (el arreglo de punteros interiores del runtime sigue
+aplicado).
+
+Evidencia cruda: `evidencia/dc-002.39-nombre-corrompido.txt`.

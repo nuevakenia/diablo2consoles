@@ -242,23 +242,12 @@ else
     tail -5 "$T.build.log" | sed 's/^/     /'
 fi
 
-# EL TERCERO, EN SU PROPIA CORRIDA. No es un capricho del corpus: en una misma corrida el nombre del tercero
-# se corrompe (ver la nota del defecto en console/dc/poc/tablas-mpq/main.go y el `largoNombre=` del log), asi
-# que la unica forma de medir d2char.mpq en la consola es darle una corrida con una sola vuelta.
-echo "== 2b. la consola: el TERCERO (d2char.mpq) en su propia corrida, una sola vuelta"
-TD="$SAL/tablas-d2char"
-if armar tablas-mpq "$TD" d2char.mpq; then
-    corrida_motor "$TD" "$SAL/run-tablas-d2char" "$SEGS_RES"
-    LTD="$SAL/run-tablas-d2char/flycast.log"
-
-    nota "la consola (POC tablas-mpq), d2char.mpq solo:"
-    grep -a 'TABLAS-MPQ' "$LTD" | tr -d '\r' | sed 's/^/     /'
-
-    medir_tablas "$LTD" d2char.mpq
-    medir_consulta "$LTD" d2char.mpq
-else
-    rojo "el POC tablas-mpq (d2char solo) NO COMPILA/ARMA (ver $TD.build.log)"
-fi
+# DC-002.39: aca estaba la seccion 2b (el TERCERO, d2char.mpq, en su PROPIA corrida con una sola vuelta). Se
+# borro: era el rodeo por el defecto del nombre del tercero, y la seccion 2 de arriba ya mide d2char.mpq en la
+# MISMA pasada de los 3 MPQ (DC-002.39 cerrada: la vuelta 3 sale con su nombre y sus dos tablas; evidencia
+# dc-002.39-nombre-corrompido.txt). El control 2b (la consulta de los 21.253 nombres) sigue midiendose, pero con
+# los numeros de la seccion 2 -- o sea que ahora vigila el residuo que DC-002.39 dejo abierto y declarado: la
+# consulta pierde entre 0 y 6 nombres por corrida (seccion 6 de la evidencia).
 
 CUANTAS_TABLAS="$(echo $TABLAS_OK | tr ' ' '\n' | grep -c .)"
 if [ "$CUANTAS_TABLAS" = "3" ]; then
@@ -274,18 +263,19 @@ else
     rojo "control 2b: la consulta de la consola no cierra ($CUANTAS_CONSULTA de 3 archivos, total $CONSULTA_TOTAL de 21253, largas:$LARGAS)"
 fi
 
-if [ "$(cat "$SAL/run-tablas/flycast.log" "$LTD" 2>/dev/null | grep -ac 'fatal error')" = "0" ] &&
-   [ "$(cat "$SAL/run-tablas/flycast.log" "$LTD" 2>/dev/null | grep -ac 'out of memory')" = "0" ] &&
-   [ "$(grep -ac 'TABLAS-MPQ-TOTAL' "$LTD" 2>/dev/null)" -ge 1 ]; then
-    verde "control 2c: las dos corridas del POC sin out of memory ni fatal error (la del tercero cierra con TOTAL)"
+if [ "$(cat "$SAL/run-tablas/flycast.log" 2>/dev/null | grep -ac 'fatal error')" = "0" ] &&
+   [ "$(cat "$SAL/run-tablas/flycast.log" 2>/dev/null | grep -ac 'out of memory')" = "0" ] &&
+   [ "$(grep -ac 'TABLAS-MPQ-TOTAL' "$LT" 2>/dev/null)" -ge 1 ]; then
+    verde "control 2c: la corrida del POC (los 3 MPQ en UNA pasada) sin out of memory ni fatal error, y cierra con TOTAL"
 else
-    rojo "control 2c: alguna corrida del POC tiene out of memory/fatal error, o la del tercero no cierra (ver $LT y $LTD)"
+    rojo "control 2c: la corrida del POC tiene out of memory/fatal error, o no cierra (ver $LT)"
 fi
 
-# DECLARADO: la corrida de los 3 MPQ puede perder su linea TOTAL (o la impresion entera) por el defecto del
-# nombre que se corrompe (DC-002.39). No es un fallo de esta tarjeta, pero se dice con su numero.
+# DC-002.39 (CERRADA): la corrida de los 3 MPQ YA imprime su linea TOTAL (antes la perdia: el nombre del
+# tercero se corrompia y la impresion se llevaba la salida serie puesta). Se deja el aviso para que, si vuelve
+# a faltar, salte a la vista que es ese defecto.
 if [ "$(grep -ac 'TABLAS-MPQ-TOTAL' "$SAL/run-tablas/flycast.log" 2>/dev/null)" = "0" ]; then
-    nota "declarado (DC-002.39): la corrida de los 3 MPQ NO imprime TOTAL -- el nombre del tercero se corrompe y la impresion se lleva la salida puesta; las dos primeras se miden igual"
+    nota "DC-002.39: la corrida de los 3 MPQ NO imprime TOTAL -- el nombre del tercero se corrompe y la impresion se lleva la salida puesta; las dos primeras se miden igual"
 else
     nota "la corrida de los 3 MPQ cierra con TOTAL: $(grep -a 'TABLAS-MPQ-TOTAL' "$SAL/run-tablas/flycast.log" | tr -d '\r' | tail -1 | sed 's/^ *//')"
 fi

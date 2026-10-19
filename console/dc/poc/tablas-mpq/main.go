@@ -170,7 +170,17 @@ func main() {
 
 	archivos, nombres, contenidos := 0, 0, 0
 
-	for i, nombreArchivo := range cfg.MpqLoadOrder {
+	// DC-002.39: se recorre por INDICE y el nombre se RELEE del arreglo vivo en cada vuelta, en vez de
+	// `for i, nombreArchivo := range cfg.MpqLoadOrder`. Medido en la consola, en la vuelta 3 (d2char.mpq,
+	// la que dejaba el nombre con el largo en basura): con el `range` el bucle se queda con el valor de la
+	// CADENA (un pedazo del buffer que leyo el decodificador) y ese valor puede quedar viejo cuando el
+	// cuerpo (abrir y leer el MPQ) dispara una recoleccion: el arreglo vivo del `MpqLoadOrder` tiene los
+	// largos correctos en todo momento y un mismo nombre consultado DE NUEVO si se encuentra
+	// (`segundo intento contiene= true`), o sea el que falla es el valor que el bucle tenia en la mano.
+	// Releyendo por indice el nombre sale bien en las tres vueltas.
+	// Evidencia: console/dc/evidencia/dc-002.39-nombre-corrompido.txt.
+	for i := 0; i < len(cfg.MpqLoadOrder); i++ {
+		nombreArchivo := cfg.MpqLoadOrder[i]
 		ruta := cfg.MpqPath + "/" + nombreArchivo
 		t0 := d2cMs()
 
