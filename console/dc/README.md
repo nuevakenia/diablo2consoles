@@ -5537,3 +5537,70 @@ tarjeta dibuja el frame 0 de la dirección 0 — el censo de las 8 direcciones x
 tarjeta del movimiento del juego).
 
 Evidencia: `console/dc/evidencia/dc-002.38-personaje-en-el-mapa.txt`.
+
+## 73. DC-002.49: el personaje **ANIMA** en la consola — el ciclo lo elige el estado y el cuadro el reloj; corpus **11/11**, y `d2dcc.LoadDirection` baja la carga del ciclo de **173.250 ms a 3.237 ms**
+
+DC-002.38 dejaba al personaje **tieso**: `framePersonaje` era la constante `0` y el modo `NU` (neutral del campo,
+8 cuadros a 12,5 cuadros/s) en vez de `TN` (parado, 16 cuadros a 128,00 ms) o `TW` (caminando, 8 a 40,00 ms). El
+dueño del proyecto lo dijo mirando la ventana: «se movía sin animación». Era el POC, no el motor.
+
+### 73.1 Qué se hizo
+
+| pieza | qué cambió |
+|---|---|
+| `console/dc/poc/personaje-mapa/main.go` | el cuadro sale del **reloj de la consola**: `(msDelModo / msPorCuadro) % cuadros`; el ciclo se **compone entero al cargar** (`cargarCiclo`), el modo lo elige el **estado** (quieto `TN` / caminando `TW`); `dibujarAnimado` restaura la **caja del personaje** (26x77 = 2.002 px) y pega el cuadro, sin repintar el mapa (repintar 512x512 costaba ~0,17 s y un cuadro de TN dura 128 ms) |
+| `console/dc/poc/personaje-mapa/personaje.go` | `RutaDeLaCapaModo(indice, modo, ext)`: el modo va **dentro del nombre** del DCC (`<token><capa><valor><modo><arma>.dcc`); `RutaDeLaCapa` delega ahí |
+| `d2common/d2fileformats/d2dcc/dcc.go` | **`LoadDirection(fileData, direction)`**: decodifica **una** dirección y deja las otras en `nil`; `Load` no cambia (misma cabecera, mismas 16) |
+| `console/dc/verif-personaje-238/main.go` | `-ciclo TN,TW` + `-png-ciclo DIR`: censa el ciclo **entero** en el host y escribe, por cuadro, el personaje aislado **y la pantalla completa** con el personaje encima |
+| `scripts/console/build-anim-249.sh` | build de la tarjeta: prende `animar` y/o `cicloSordo` **por `sed` sobre su copia** (en el árbol los dos quedan `false`, el binario del repo sigue siendo el instrumento estático de DC-002.38) |
+| `scripts/console/run-flycast-249.sh` | corrida con ventana identificable, capturas separadas en el tiempo **sin mandar teclas** (o con `TECLAS=1` para caminar), `GEO`/`ANIM`/`POS` de cada captura y `ESPERA_FINAL` antes del cierre |
+| `scripts/console/medir-anim-249.py` | mide la **caja del personaje** de cada captura contra los cuadros del host, en la resolución de la captura, y los pares contra pares |
+| `scripts/console/checar-anim-249.py` | el corpus: 9 controles (host, mitad del ciclo, ciclos cargados, cuadros dibujados, cadencia, criterio 1, criterio 2, mutante, mutante-fijo) |
+
+### 73.2 Los tres criterios, con números
+
+* **Criterio 1 (animación ≠ desplazamiento).** 8 capturas con el personaje **quieto** (ancla 320,240 en las ocho,
+  ni una marca `CONTROL` en el log), separadas 1,6 s: **28 pares, entre 14 y 467 px cambiados dentro de la caja**
+  (promedio 273 de 5.112) y **7 dibujos distintos en 8 capturas**. Si el personaje no se mueve y la pantalla del
+  POC no se repinta sin movimiento, lo que cambia es el **dibujo**.
+* **Criterio 2 (cuántos hay / cuántos se ven).** Del MPQ: **TN 16** cuadros (2.048 ms de ciclo) y **TW 8** (320
+  ms), y el host compone **16 y 8 dibujos distintos** (`distintos=16 iguales=0`; del cuadro 0 al de la mitad
+  cambian **1.115** px en TN y **1.237** en TW). En la consola el log marca **los 16 de TN (0..15)** y **los 8 de
+  TW (0..7)**; la cadencia medida es **127 ms/cuadro en TN** (el animdata dice 128,00) y **51 ms en TW** (dice
+  40,00: el bucle tarda ~50 ms por vuelta mientras camina — declarado).
+* **Criterio 3 (el mutante).** `CICLO_SORDO=1` (cuadro fijo en 0): las **5 capturas con el personaje quieto son
+  idénticas byte a byte** (mismo md5) y la medición da **0 px en los 10 pares**; y el log confirma que el mutante
+  **no dibujó otro cuadro** (si no, el 0 no probaría nada).
+
+### 73.3 El hallazgo de rendimiento (y por qué tocó el motor)
+
+`d2dcc.Load` decodifica **siempre las 16 direcciones**; el POC usa **una**. En la Dreamcast eso no era solo
+trabajo de más: era **basura** de más, y el recolector de libgodc (DC-002.37) se atraganta con ella. Medido en la
+consola, capa por capa del ciclo de TN:
+
+```
+con d2dcc.Load          ciclo TN completo 173.250 ms   (LG 42.608 ms)
+con d2dcc.LoadDirection ciclo TN completo   3.237 ms   (LG    544 ms)   53x
+```
+
+La barrera del motor sigue **142 de 142** con el cambio adentro. `Load` no cambió de comportamiento: los tests de
+`d2dcc` pasan.
+
+### 73.4 Cómo se repite
+
+```
+SALTAR_STDLIB=1 SALTAR_MOTOR=1 bash scripts/console/build-anim-249.sh /tmp/dcbuild/anim249
+CICLO_SORDO=1 SALTAR_STDLIB=1 SALTAR_MOTOR=1 bash scripts/console/build-anim-249.sh /tmp/dcbuild/anim249-mudo
+CAPTURAS=8 INTERVALO=1.6 bash scripts/console/run-flycast-249.sh /tmp/dcbuild/anim249/disc.gdi /tmp/dc249-run 1400 120
+CAPTURAS=5 INTERVALO=1.4 bash scripts/console/run-flycast-249.sh /tmp/dcbuild/anim249-mudo/disc.gdi /tmp/dc249-mudo 1400 120
+python3 scripts/console/checar-anim-249.py --host /tmp/dcbuild/anim249/host \
+  --run-normal /tmp/dc249-run --run-mutante /tmp/dc249-mudo --ventana 1400,120,667,442
+```
+
+**Lo que NO entra** (declarado, no tapado): la animación de **TW medida en píxeles** sobre la captura (el
+personaje camina a ~300 px/s y en 3 s se va de la ventana del mapa: a la segunda captura está fuera de cuadro y
+en la primera el instrumento no distingue — 68,45 % contra 68,30 %); el **cierre sucio** del emulador (SIGBUS al
+`kill`, después de las capturas: la misma corrida con `ESPERA_FINAL=45` vive 70 s y muere sólo al cierre);
+monstruos, combate y colisión.
+
+Evidencia: `console/dc/evidencia/dc-002.49-animacion-censo.txt`.

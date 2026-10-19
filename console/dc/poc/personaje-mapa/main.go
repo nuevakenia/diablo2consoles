@@ -862,7 +862,7 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 			c := capaCiclo{tipo: per0.Tipos[i], clave: per0.Claves[i]}
 
 			if ext == "dcc" {
-				dd, err := d2dcc.Load(crudo)
+				dd, err := d2dcc.LoadDirection(crudo, dir)
 				if err != nil {
 					println("HITO249: CAPA", c.clave, "DEL MODO", modo, "PARSE-FALLO:", err.Error())
 					break
@@ -912,6 +912,13 @@ func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadr
 		if encontrada {
 			println("HITO249: CAPA DEL CICLO", modo, per0.Claves[i], "cuadros", len(capas[len(capas)-1].cuadros),
 				"caja", capas[len(capas)-1].ancho, capas[len(capas)-1].alto, "ms", int64(d2cMs())-tCapa)
+
+			// EL RECOLECTOR DESPUES DE CADA CAPA (esto es de DC-002.38 y no es adorno): d2dcc.Load decodifica
+			// las 16 DIRECCIONES de la capa, y de ahi solo se guardan los cuadros de una. Los otros 240
+			// cuadros son basura; si no se recoge entre capa y capa, el recolector de libgodc se pone a
+			// correr sobre un monton lleno de basura y la carga se vuelve 40 veces mas lenta (medido en esta
+			// tarjeta: LG sin recoleccion 42.608 ms contra 652 ms con ella).
+			runtime.GC()
 		}
 	}
 

@@ -32,7 +32,7 @@ TOKEN="dc249"
 BARRA_TITULO="${BARRA_TITULO:-28}"
 PX="${POS%% *}"; PY="${POS##* }"
 PYTHON="${DC_PYTHON:-python3}"
-ESPERA_ARRANQUE="${ESPERA_ARRANQUE:-120}"
+ESPERA_ARRANQUE="${ESPERA_ARRANQUE:-240}"
 CAPTURAS="${CAPTURAS:-8}"
 INTERVALO="${INTERVALO:-1.6}"
 
@@ -258,7 +258,7 @@ if [ "${TECLAS:-0}" = "1" ]; then
     vivo && capturar "f95-quieto-otra-vez"
 fi
 
-sleep 1
+sleep "${ESPERA_FINAL:-1}"
 kill -TERM -"$PID" 2>/dev/null || kill -TERM "$PID" 2>/dev/null
 pkill -f "$PATRON" 2>/dev/null
 sleep 1

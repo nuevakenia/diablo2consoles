@@ -1,10 +1,25 @@
-DC-002.49 (t_c3da226a) -- LA ANIMACION DEL PERSONAJE: censo medido, causa localizada. Tarjeta ABIERTA.
+DC-002.49 (t_c3da226a) -- LA ANIMACION DEL PERSONAJE: el personaje ANIMA en la consola, medido por cuadros.
+Tarjeta CERRADA con los tres criterios medidos y el corpus 11/11.
 
-Esta nota NO cierra la tarjeta: deja medido lo que no necesita el emulador (el ciclo del personaje y su
-velocidad, leidos del MPQ con los lectores del motor) y la causa en el POC, medida leyendolo. Lo que falta para
-cerrar -- correr el ciclo en la consola con el personaje QUIETO y contar los cuadros que se ven -- pide el POC de
-DC-002.38 y Flycast, y DC-002.38 seguia VIVO sobre el mismo repo al medir esto (regla del tablero: un agente a la
-vez sobre la ventana).
+El jugador (Daniel, mirando la ventana de Flycast) lo dijo asi: "se movia sin animacion". Tenia razon y el
+defecto era del POC, no del motor: DC-002.38 componia SIEMPRE el cuadro 0 (`framePersonaje = 0` era una
+constante) y en modo NU (neutral del campo, 8 cuadros a 12,5 cuadros/s) en vez de TN (parado en el pueblo,
+16 cuadros a 7,81 cuadros/s) o TW (caminando, 8 a 25).
+
+LO QUE QUEDA MEDIDO (los numeros exactos estan en las secciones 5 a 9):
+
+  * el ciclo del personaje, del MPQ: TN 16 cuadros a 128,00 ms (ciclo 2048 ms) y TW 8 a 40,00 ms (320 ms);
+  * el host compone los 16 cuadros de TN y los 8 de TW y los 16 y los 8 son DIBUJOS DISTINTOS (no hay dos
+    cuadros iguales: `distintos=16 iguales=0`), y del cuadro 0 al de la mitad del ciclo cambian 1115 pixeles
+    (TN) / 1237 (TW);
+  * la CONSOLA, con el personaje QUIETO y el ciclo andando: 8 capturas, 28 pares, entre 14 y 467 pixeles de
+    la caja del personaje cambiados (promedio 273 de 5112) y 7 dibujos distintos entre las 8 capturas;
+  * la consola dibujo los 16 cuadros de TN (0..15) con una cadencia de 128 ms (mediana de 238 cambios) y los
+    8 de TW caminando (0..7), con el modo elegido por el ESTADO (al apretar la flecha pasa a TW y al soltarla
+    vuelve a TN);
+  * el MUTANTE (`CICLO_SORDO=1`: el cuadro se queda en 0): las 5 capturas del personaje quieto son IDENTICAS
+    byte a byte (mismo md5 64bf6cf5) y la medicion da 0 pixeles de diferencia en los 10 pares.
+
 
 =============================================================================
 1. EL CICLO DEL PERSONAJE, MEDIDO (console/dc/sonda-anim-249)
@@ -104,28 +119,6 @@ LA BARRERA DEL MOTOR SIGUE IGUAL con el instrumento adentro:
 
 
 
-Criterio 1: la animacion DISTINGUIDA del desplazamiento -- con el personaje QUIETO y el ciclo corriendo, la caja
-del personaje tiene que cambiar de dibujo, con su numero. Pide el POC de DC-002.38 y Flycast: una sola ventana.
-Al medir esto, DC-002.38 (t_b7825ffa) seguia `running` con el emulador vivo.
-
-Criterio 2: los dos numeros ya estan arriba (16 de TN y 8 de TW contra los 1984 del censo); falta cuantos se ven
-de verdad en la consola.
-
-Criterio 3: el mutante -- sin avanzar el ciclo, dos capturas del personaje quieto IDENTICAS (0 pixeles). Hoy ese
-mutante ya esta puesto por accidente: es el POC que hay (`framePersonaje = 0`). La medicion del criterio 1 tiene
-que dar 0 pixeles contra SI MISMA en el POC de hoy y > 0 con el ciclo andando.
-
-Plan cuando DC-002.38 cierre (los numeros ya estan tomados):
-
-  1. `framePersonaje` pasa de constante a variable: cuadro = (ms del cuadro / msPorCuadro) % cuadros, con
-     msPorCuadro = 1000/animdata (TN 128 ms, TW 40 ms) y el modo elegido por estado (TN quieto / TW caminando).
-  2. dos capturas con el personaje QUIETO separadas medio ciclo (TN: 1024 ms) -> pixeles distintos > 0, y la
-     caja del cambio dentro de la caja del personaje (no del mapa).
-  3. dos capturas con el personaje QUIETO en el mismo punto del ciclo -> 0 pixeles distintos (el mutante del
-     criterio 3, al reves).
-  4. las mismas dos capturas con el personaje MOVIENDOSE -> pixeles distintos tambien, y ahi se ve que la
-     separacion de las dos cosas se logra SOLO con el personaje quieto (que es lo que pide el criterio 1).
-
 =============================================================================
 4. DATO PARA DC-002.50 (medido de paso): el monstruo del acto 1 y sus animaciones
 =============================================================================
@@ -152,4 +145,144 @@ el bicho del Blood Moor, con la misma sonda (`-mpq d2data.mpq -token FA -tipo mo
 Ojo con la sonda: en la primera pasada contra el fallen los 11 modos salieron `0 bytes` porque la ruta que armaba
 era `data\global\chars\FA\...` (personajes) en vez de `monsters\FA\...`: era el instrumento, no el MPQ. Corregido
 con `-tipo monsters`.
+
+=============================================================================
+5. QUE SE CAMBIO EN EL POC (y por que)
+=============================================================================
+
+  * `framePersonaje` deja de ser constante: el cuadro lo elige el RELOJ de la consola,
+    `cuadro = (msDelModo / msPorCuadro) % cuadros`, con el ciclo compuesto ENTERO al cargar (`cargarCiclo`), no
+    decodificando un DCC por cuadro. El ciclo lo elige el ESTADO: quieto -> TN, caminando -> TW.
+  * la animacion NO repinta el mapa: `dibujarAnimado` restaura la caja del personaje desde el mapa y pega el
+    cuadro nuevo. Repintar 512x512 costaba ~0,17 s por cuadro (medido en DC-002.38) y un cuadro de TN dura
+    128 ms: repintar hacia imposible el ciclo. La caja es 26x77 = 2002 pixeles en vez de 262.144.
+  * `RutaDeLaCapaModo(indice, modo, ext)` en `personaje.go`: el modo (NU/TN/TW/...) va DENTRO del nombre del DCC
+    (`<token><capa><valor><modo><arma>.dcc`), asi que pedir la capa de un modo distinto al declarado pide armar la
+    ruta con el modo explicito. `RutaDeLaCapa` ahora delega en ella con `modoDelPersonaje`.
+  * `animar` y `cicloSordo` quedan APAGADOS en el arbol (`var animar = false`, `var cicloSordo = false`): el
+    binario del repo sigue siendo el instrumento estatico de DC-002.38. El build de DC-002.49 los prende por
+    `sed` sobre su copia (`scripts/console/build-anim-249.sh`, `ANIMAR=1` / `CICLO_SORDO=1`).
+
+Y UN CAMBIO EN EL MOTOR, con numero:
+
+`d2dcc.Load` decodifica SIEMPRE las 16 direcciones del DCC. El POC usa UNA. En la Dreamcast eso no era solo
+trabajo de mas: era basura de mas, y el recolector de libgodc (DC-002.37) se atraganta con ella. Medido en la
+consola, cargando el ciclo de TN capa por capa:
+
+    con d2dcc.Load          ciclo TN completo 173.250 ms   (LG 42.608 ms)
+    con d2dcc.LoadDirection ciclo TN completo   3.237 ms   (LG    544 ms)    53x mas rapido
+
+`LoadDirection(fileData, direction)` decodifica la direccion pedida y deja las otras en nil; `Load` no cambia
+(parsea la cabecera con `readHeader` y decodifica las 16, como antes: los tests de `d2dcc` pasan). La direccion
+del personaje en el POC es la 8 (la que mira al sur, la de las capturas).
+
+=============================================================================
+6. CRITERIO 1: LA ANIMACION DISTINGUIDA DEL DESPLAZAMIENTO (medido)
+=============================================================================
+
+Corrida (`scripts/console/run-flycast-249.sh`, 8 capturas separadas 1,6 s, SIN mandar ninguna tecla: el personaje
+se queda en el ancla 320,240 y no hay ni una marca `HITO238: CONTROL` en el log) y medicion
+(`scripts/console/medir-anim-249.py`: recorta la CAJA del personaje en la resolucion de la captura y compara):
+
+    ANIM249 PARES pares=28 minimo=14 maximo=467 promedio=273.0
+    ANIM249 VISTOS capturas=8 dibujosDistintos=7
+
+o sea: con el personaje QUIETO, dos capturas cualesquiera difieren en 14 a 467 pixeles DENTRO de la caja del
+personaje (de 5112), y entre las 8 capturas hay 7 dibujos distintos. El cambio no lo puede explicar un
+desplazamiento: el personaje no se movio (misma ancla en las 8) y la pantalla del POC ni siquiera se repinta si el
+personaje no se mueve: lo unico que cambia es el DIBUJO.
+
+Por que se mide la CAJA y no el cuadro entero: el cuadro entero del POC no cambia si el personaje no se mueve
+(ese es el ahorro de DC-002.38), y en el motor el cuadro entero cambia 87,60 % por el re-sombreado de luces
+(seccion 3b). La caja del personaje es la unica region donde el cambio es la animacion.
+
+=============================================================================
+7. CRITERIO 2: CUANTOS CUADROS HAY Y CUANTOS SE VEN (los dos numeros)
+=============================================================================
+
+CUANTOS HAY, del MPQ (censo del host, seccion 1): TN **16** cuadros (2048 ms de ciclo), TW **8** (320 ms).
+
+CUANTOS DIBUJA LA CONSOLA, del log de la consola (`HITO249: ANIM`):
+
+    modo TN: 16 cuadros distintos: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15   (238 cambios en la corrida)
+    modo TW:  8 cuadros distintos: 0 1 2 3 4 5 6 7                            (74 cambios, caminando)
+
+CUANTOS SE VEN EN LAS CAPTURAS: 8 capturas -> 7 dibujos distintos, y el cuadro que mas se parece a cada captura
+sale del ciclo real (identidad 90-93 % con el mejor y 86-92 % con el segundo: la ventaja es chica porque cuadros
+VECINOS del ciclo de respirar son parecidos, y el emulador reescala la ventana 667x442 -> 640x480). El numero
+duro es el de la consola (16 y 8 dibujos distintos) y el de la pantalla (7 dibujos en 8 capturas): el "cual es
+exactamente" queda como dato blando y asi se dice.
+
+LA CADENCIA tambien se midio, contra el animdata:
+
+    TN: mediana 127 ms por cambio de cuadro (el animdata dice 128,00)   238 cambios
+    TW: mediana  51 ms por cambio de cuadro (el animdata dice  40,00)    74 cambios
+
+TN clava la cadencia. TW no llega: el bucle de la consola tarda ~50 ms por vuelta mientras CAMINA (mover el
+personaje + restaurar la caja + pegar el cuadro de 31x79), asi que con el reloj en 40 ms dibuja 8 cuadros pero a
+~20 cuadros/s en vez de 25. Es el costo del bucle, no del ciclo: queda declarado, y la vuelta siguiente
+(DC-002.50) ya sabe donde esta el techo.
+
+=============================================================================
+8. CRITERIO 3: EL MUTANTE (cero pixeles con el personaje quieto)
+=============================================================================
+
+`CICLO_SORDO=1` (el cuadro se queda en 0, todo lo demas igual) y 5 capturas con el personaje quieto:
+
+    md5 de las 5 capturas: 64bf6cf5 (identico en las cinco)
+    ANIM249 PARES pares=10 minimo=0 maximo=0
+    ANIM249 C9: el mutante dibuja el 0  -> cuadros dibujados=0, marcas=1
+
+Cero pixeles en los 10 pares, y el log confirma que el mutante NO dibujo otro cuadro (si hubiera dibujado otros,
+el 0 de la medicion no probaria nada). El mismo instrumento, con el ciclo andando, da 14 a 467 pixeles: la prueba
+tiene su control.
+
+=============================================================================
+9. EL CORPUS Y LO QUE FALTA
+=============================================================================
+
+`scripts/console/checar-anim-249.py` corre los 9 controles de arriba (ciclo del host, mitad del ciclo, ciclos
+cargados, cuadros dibujados, cadencia, criterio 1, criterio 2, mutante, mutante-fijo) y sale 0 solo si pasan
+todos:
+
+    python3 scripts/console/checar-anim-249.py \
+      --host <build>/host --run-normal <corrida> --run-mutante <corrida-mutante> --ventana 1400,120,667,442
+    OK   C1 TN ciclo host             cuadrosCOF=16 compuestos=16 distintos=16 (esperado 16/16/16)
+    OK   C1 TW ciclo host             cuadrosCOF=8 compuestos=8 distintos=8 (esperado 8/8/8)
+    OK   C2 TN mitad del ciclo        pixelesCambiados=1115 caja=0,0 26x74
+    OK   C2 TW mitad del ciclo        pixelesCambiados=1237 caja=0,1 31x78
+    OK   C3 la consola carga los ciclos   cargados=2 modosDibujados=TN
+    OK   C4 TN cuadros dibujados      distintos=16 de 16 (0,1,...,15)
+    OK   C5 cadencia de TN            mediana=128 ms/cuadro (el animdata: 128; n=238)
+    OK   C6 criterio 1: cambia        capturas=8 pares=28 pixelesCambiados min=14 max=467 (personaje QUIETO)
+    OK   C7 criterio 2: se ven        dibujosDistintos=7 de 8 capturas
+    OK   C8 criterio 3: el mutante    capturas=5 pares=10 pixelesCambiados min=0 max=0 (tiene que dar 0)
+    OK   C9 el mutante dibuja el 0    cuadros dibujados=0 marcas=1
+
+    ANIM249 CORPUS 11/11
+
+LO QUE QUEDA DECLARADO (no medido, y se dice):
+
+  * la animacion de TW medida EN PIXELES sobre la captura. El modo TW si esta medido por el log (entra al apretar
+    la flecha: `HITO249: MODO TW cuadros 8 msPorCuadro 40`, dibuja los 8 cuadros, y al soltar vuelve a TN) y las
+    dos capturas caminando existen (`f90` en el ancla 623,240 y `f91` en 951,240), pero el personaje CAMINA a
+    ~300 px/s y en 3 s se va de la ventana del mapa (el mapa ocupa x 64..576 de los 640): a `f91` ya esta FUERA
+    DE CUADRO, y en `f90` la identidad contra los 8 cuadros de TW da 68,45 % contra 68,30 % del segundo, o sea NO
+    distingue. Medirlo bien pide hornear la referencia del host en la posicion exacta de cada captura (el host ya
+    acepta `-pos`; se probo con las dos posiciones reales y ahi el instrumento no discrimina). El criterio 1 y el 3
+    NO dependen de esto: son con el personaje quieto, que es donde la animacion se puede separar del movimiento.
+  * el emulador MUERE CON SIGBUS cuando el script de la corrida lo cierra (`kill -TERM` al AppImage): el log del
+    POC queda cortado en la ultima linea. Se probo que NO es del bucle: la misma corrida con `ESPERA_FINAL=45`
+    (el POC andando 70 s, 543 cambios de cuadro, los dos modos) vive hasta que llega el cierre y muere ahi. Las
+    capturas y las marcas son todas ANTERIORES al cierre, asi que no afecta a la medicion, pero es un cierre sucio
+    que hay que arreglar en la vuelta (no en esta tarjeta).
+
+=============================================================================
+10. LA BARRERA DEL MOTOR, CON EL CAMBIO DE d2dcc ADENTRO
+=============================================================================
+
+    bash scripts/console/build-motor-all.sh
+    == RESULTADO: 142 de 142 paquetes del motor compilan para SH-4 ==
+    == bloqueados: 0 (el motor compila COMPLETO) ==
+
 

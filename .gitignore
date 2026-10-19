@@ -13,5 +13,6 @@
 tags
 heap.out
 heap.pdf
+__pycache__/
 .DS_Store
 /dist/

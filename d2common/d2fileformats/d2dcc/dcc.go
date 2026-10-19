@@ -28,6 +28,49 @@ func Load(fileData []byte) (dcc *DCC, err error) {
 	// the bit reader and the cell decoder panic on truncated or corrupt data
 	defer d2datautils.RecoverError("dcc", &err)
 
+	result, err := readHeader(fileData)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Directions = make([]*DCCDirection, result.NumberOfDirections)
+
+	for i := 0; i < result.NumberOfDirections; i++ {
+		result.Directions[i] = result.decodeDirection(i)
+	}
+
+	return result, nil
+}
+
+// LoadDirection decodes ONE direction of a DCC file and leaves the rest decoded as nil (DC-002.49).
+//
+// PARA QUE: los graficos de los personajes traen 16 direcciones (8 los monstruos) y quien anima un
+// personaje en UNA direccion necesita 1 de 16. Load() decodifica las 16 SIEMPRE: en la Dreamcast eso es
+// 16 veces el trabajo y 16 veces la basura (medido en DC-002.49: la capa LG del cuerpo de la amazona,
+// 63.718 B de archivo, son 202.352 B de pixeles decodificados, de los que se usan 12.784), y el
+// recolector de libgodc se atraganta con esa basura: la capa LG del cuerpo de la amazona tardaba 42.608 ms
+// con Load() (medido en la consola, DC-002.49). La direccion pedida es la UNICA que queda decodificada.
+func LoadDirection(fileData []byte, direction int) (dcc *DCC, err error) {
+	defer d2datautils.RecoverError("dcc", &err)
+
+	result, err := readHeader(fileData)
+	if err != nil {
+		return nil, err
+	}
+
+	if direction < 0 || direction >= result.NumberOfDirections {
+		return nil, fmt.Errorf("dcc: direction %d out of range (the file has %d)",
+			direction, result.NumberOfDirections)
+	}
+
+	result.Directions = make([]*DCCDirection, result.NumberOfDirections)
+	result.Directions[direction] = result.decodeDirection(direction)
+
+	return result, nil
+}
+
+// readHeader: la cabecera y la tabla de offsets de las direcciones, sin decodificar ninguna.
+func readHeader(fileData []byte) (*DCC, error) {
 	result := &DCC{
 		fileData: fileData,
 	}
@@ -50,8 +93,6 @@ func Load(fileData []byte) (dcc *DCC, err error) {
 			result.NumberOfDirections, result.FramesPerDirection)
 	}
 
-	result.Directions = make([]*DCCDirection, result.NumberOfDirections)
-
 	if bm.GetInt32() != 1 {
 		return nil, errors.New("this value isn't 1. It has to be 1")
 	}
@@ -62,7 +103,6 @@ func Load(fileData []byte) (dcc *DCC, err error) {
 
 	for i := 0; i < result.NumberOfDirections; i++ {
 		result.directionOffsets[i] = int(bm.GetInt32())
-		result.Directions[i] = result.decodeDirection(i)
 	}
 
 	return result, nil
