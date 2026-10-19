@@ -21,13 +21,16 @@ PREFIJO="github.com/OpenDiablo2/OpenDiablo2"
 cd "$REPO"
 
 # los mismos filtros que build-motor-all.sh: sin _test.go, sin los sufijos de otras plataformas
-# (gccgo no los filtra solo y los intenta compilar) y sin el lado del HOST de la tabla de objectLookups
+# (gccgo no los filtra solo y los intenta compilar), sin el lado del HOST de la tabla de objectLookups
 # (el volcado y su escritor/registro), que en la consola NO van en el binario: la tabla viaja en el disco
-# (/JUEGO/OBJECTLOOKUPS.PACK) y se lee por registro (DC-002.42).
+# (/JUEGO/OBJECTLOOKUPS.PACK) y se lee por registro (DC-002.42), y sin `marca_carga_host.go` (DC-002.43: las
+# marcas de carga; el lado de la consola es `marca_carga_godc.go`, que gccgo compila siempre porque NO
+# respeta los build tags -- medido).
 # DC_TABLA_LOOKUPS=dentro los vuelve a meter: es el mutante de la tarjeta.
 SRCS=$(ls "$PAQ"/*.go | grep -v _test.go |
     grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
-    grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$')
+    grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$' |
+    grep -vE '/(marca_carga_host)\.go$')
 
 if [ "${DC_TABLA_LOOKUPS:-fuera}" = "fuera" ]; then
     SRCS=$(echo "$SRCS" | grep -vE '/(object_lookup_record_data|object_lookups_host)\.go$' || true)

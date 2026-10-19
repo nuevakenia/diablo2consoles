@@ -1,0 +1,197 @@
+DC-002.43 -- LAS MARCAS DE CARGA: DENTRO DE QUE LLAMADA SE MUERE EL ARRANQUE, Y CON CUANTA MEMORIA
+===============================================================================================
+medido el lunes 19 oct 2026 en este host (CachyOS, AMD RX 7900 XTX), sobre el checkout principal
+/home/dgalli/Proyectos/diablo2consoles en la rama DC-002 (HEAD 3b1108eb), con el runtime vendorizado
+~/dreamcast/libgodc REARMADO (ver el hallazgo 0: el `.a` que habia era viejo) y la capa de .gox
+gox-i2/gox-head (el arbol de HEAD, con y sin el instrumento).
+
+QUE SE CORRIO, EXACTAMENTE
+--------------------------
+El POC `console/dc/poc/motor-arranque` (el motor ENTERO: `d2app.Create(...)` + `instance.Run()`), con los
+TRES MPQ del disco en /JUEGO y -- desde DC-002.42 -- la tabla de objectLookups tambien en el disco
+(/JUEGO/OBJECTLOOKUPS.PACK, 773869 B, la arma `go run ./console/dc/gen-lookups-pack -dir <carpeta>`).
+Flycast con la consola serie capturada, 25 s por corrida (los 20 s de las corridas sueltas NO alcanzan para
+que la consola alcance a vaciar su ultimo mensaje: con 25 s el MISMO binario imprime `fatal error: out of
+memory` donde con 20 s parecia mudo).
+
+Los cinco estados del corpus de DC-002.34 (`scripts/console/checar-motor-disco-234.sh`), corridos DOS veces
+sobre el MISMO arbol y el MISMO runtime: una con el instrumento y otra sin el (la capa `gox-head`), que es
+lo que prueba que el instrumento no mueve los numeros (criterio 2).
+
+HALLAZGO 0 -- LO PRIMERO QUE HAY QUE ARREGLAR PARA PODER MEDIR: `libgodc.a` ESTABA VIEJO
+--------------------------------------------------------------------------------------------
+`libgodc.a` es un archivo del arbol VENDORIZADO que se arma aparte (`make -C ~/dreamcast/libgodc`), y las
+fuentes del runtime cambian en los scripts idempotentes (`fix-libgodc-*.py`). Medido:
+
+    fs. del archivo                              mtime
+    ~/dreamcast/libgodc/libgodc.a                19 oct 01:40
+    ~/dreamcast/libgodc/runtime/gc_copy.c        19 oct 02:54   (el arreglo de la Store Queue de DC-002.39c)
+    ~/dreamcast/libgodc/runtime/gc_copy.o        19 oct 01:40   (viejo tambien)
+
+Con ese `.a` el arranque del motor, con los TRES MPQ del disco, NO llega ni a abrir un MPQ: lee su config
+(`Loaded /rd/OpenDiablo2 -> config.json`), entra en la pantalla de error del motor y muere DIBUJANDOLA:
+
+    game files not found at "C:/Program Files (x86)/Diablo II", starting first-run setup
+    Run() termino con error: reported to the user: no Diablo II game files were selected
+    ... (en la vuelta que si lee el config):
+    Unhandled exception: PC 3147a940, code 1, evt 0180
+    SR 40000100 PR 8c448dac
+    Encountered Illegal instruction.
+
+`PR 8c448dac` resuelto con `sh-elf-addr2line` sobre `prog.elf`:
+`github...d2app.App.updateInitError .../d2app/app.go:718 (discriminator 2)` -- o sea que el PC cayo en el
+texto de la pantalla de error del motor (el mismo sintoma de la familia DC-002.29: el PC termina adentro de
+un dato). CERO lineas `Adding source: '/cd/juego/...`: el corpus habria medido ESA muerte y no la suya.
+
+Rearmando el `.a` (`make -C ~/dreamcast/libgodc`) y reenlazando EL MISMO arbol:
+
+    libgodc.a  210002 B  sha256 54bd85eb3ce768bb...
+    el MISMO binario (1ST_READ.BIN 12010600 B) llega a los TRES MPQ y lee dos assets (LvlTypes, LvlPrest)
+
+=> la causa no era el motor ni el disco: era el runtime del binario. Por eso el corpus de esta tarjeta
+trae un CONTROL NUEVO (control 0b de `checar-motor-disco-234.sh`) que se pone ROJO cuando hay algun
+`runtime/*.c` mas nuevo que `libgodc.a`, con el arreglo escrito en el mensaje. Sin ese control, el sintoma
+("no llega a los MPQ") se lee como un defecto del motor.
+
+HALLAZGO 1 -- EL INSTRUMENTO: LA ULTIMA MARCA DICE EN QUE LLAMADA SE MUERE Y CON CUANTA MEMORIA
+----------------------------------------------------------------------------------------------
+Las lineas `[File Loader] Loaded ...` salen DESPUES de que la carga salio bien: no dicen nada del pedido
+que estaba en curso cuando el motor murio. Lo que se agrego (DC-002.43):
+
+  * `d2common/d2loader/marca_carga.go`    las constantes y el porque. Sin `//go:build`: lo compilan los dos lados.
+  * `d2common/d2loader/marca_carga_host.go`   (tag `!dreamcast`): `Marca()` NO HACE NADA en el host.
+  * `d2common/d2loader/marca_carga_godc.go`   (tag `dreamcast`): `Marca()` llama al C de la consola. gccgo NO
+    respeta los build tags (medido en DC-002.42), asi que el build de la consola saca el archivo del HOST POR
+    NOMBRE -- la misma regla que ya usa `object_lookups_host.go` -- en `build-motor-all.sh` y
+    `recompilar-paquete-motor.sh` (si esa exclusion se pierde, gccgo NO falla callado: el paquete no compila
+    con dos `Marca`).
+  * `console/dc/std/csrc/marcas_carga.c`  el que imprime. Va en el C de la STDLIB, que enlazan TODOS los
+    binarios de la consola: ningun POC tuvo que cambiar.
+
+LOS DOS PUNTOS QUE SE MARCAN (d2loader es el unico camino por el que el Asset Manager pide un archivo):
+
+    Loader.Load      ENTRAR (antes de tocar ninguna fuente) y VOLVER (con el stream abierto)
+    LoadFile         ENTRAR y VOLVER de la lectura completa (`ioutil.ReadAll`, el que se lleva el archivo
+                     entero a la memoria)
+
+y cada marca lleva la memoria de ESE instante: `cfree`/`cused` (el monton de C, los MISMOS dos numeros que
+el runtime imprime en su linea `Memory: arena= used= free=`, sacados de `mallinfo()`), `gsemi` (el
+semiespacio del GC de Go, usado/tope, de `gc_stats()`) y `gc` (cuantas recolecciones van). Ademas, el
+paquete imprime UNA marca de control al arrancar (`ARQ-CARGA instrumento instrumento-de-carga-puesto ...`):
+si esa linea no esta, la corrida NO trae el instrumento y no sirve para leer la muerte.
+
+LA CORRIDA (estado S232 del corpus, 25 s, la consola serie literal):
+
+    ARQ-CARGA entra /data/local/use cfree=40136 cused=2344184 gsemi=370232/524288 gc=8
+    ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=40136 cused=2344184 gsemi=385072/524288 gc=8
+    [File Loader][INFO] Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlTypes.txt
+    ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=40136 cused=2344184 gsemi=390512/524288 gc=8
+    ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=40136 cused=2344184 gsemi=390512/524288 gc=8
+    ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=40136 cused=2344184 gsemi=397672/524288 gc=9
+    ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=40136 cused=2344184 gsemi=392792/524288 gc=13
+    [File Loader][INFO] Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlPrest.txt
+    ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=40136 cused=2344184 gsemi=392184/524288 gc=16
+    ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=40136 cused=2344184 gsemi=392184/524288 gc=16
+    ARQ-MARCA gc-por-umbral-bytes-usados v=396312        <-- de aca para abajo, DENTRO de la lectura
+    ARQ-MARCA gc_collect v=17
+    ...
+    ARQ-MARCA gc-por-umbral-bytes-usados v=521024
+    fatal error: out of memory
+    Memory: arena=2384320 used=2344184 free=40136
+
+**LA ULTIMA MARCA** es `lee-entra /data/global/excel/LvlPrest.txt` con el monton de C en 40.136 libres
+(2.344.184 usados) y el semiespacio en **392.184 de 524.288 (132.104 libres)**, 16 recolecciones. Es el
+numero que no existia: hoy se sabe que la muerte es ADENTRO de la lectura completa del SEGUNDO asset (el
+`ioutil.ReadAll` de `LoadFile`), no en abrir el MPQ y no en el parseo.
+
+Y el numero que la cierra (host, del propio archivo, `sonda-mpq-compr.py` sin usar el codigo del motor):
+
+    patch_d2.mpq  data\global\excel\LvlPrest.txt  hashIdx=7534 blockIdx=15
+      CompressedFileSize=22259  UncompressedFileSize=134937   Flags=0x80000100 (Implode)
+      33 sectores de 4096: el camino del motor es por SECTORES + Implode
+
+=> la lectura entera de LvlPrest.txt son **134.937 B** y en el semiespacio quedaban **132.104**: el archivo
+NO ENTRA. La lectura crece a saltos (4K, 8K, ... 256K) y el arranque se muere cuando el semiespacio llega a
+521.024 de 524.288. La pared NO es el monton de C: mientras todo eso pasa, `cfree`/`cused` NO SE MUEVEN
+(40.136 / 2.344.184, los mismos desde el primer asset hasta la muerte).
+
+RESPUESTA A LA PREGUNTA DE LA TARJETA (RAM contra defecto): **es RAM, y es el SEMIESPACIO DEL GC DE GO** --
+no el monton de C -- y el que la llena es la lectura COMPLETA de un asset de 134.937 B. Lo que queda para la
+tarjeta siguiente es la decision (leer por trozos / por sectores en vez de `ReadAll`, o subir el semiespacio),
+y se puede tomar con estos numeros SIN otra corrida a ciegas.
+
+LO QUE EL INSTRUMENTO NO CAMBIA (criterio 2)
+--------------------------------------------
+El corpus de DC-002.34 corrido de punta a punta TRES veces sobre el MISMO arbol y el MISMO runtime: dos con el
+instrumento (`corpus-ins` y `corpus-ins2`) y una SIN el (`corpus-plain`, la capa `gox-head`, la misma que no
+tiene ni una marca), 25 s por corrida. Las tres:
+
+    == RESULTADO: 9 controles OK, 0 con fallo ==     (los 8 de siempre + el control 0b nuevo)
+
+LOS CINCO ESTADOS, UNO AL LADO DEL OTRO (tabla del corpus; `$SAL/tabla.txt` de cada corrida):
+
+  estado    | instrumentado (ins/ins2)                       | sin instrumento (plain)
+  ----------|------------------------------------------------|------------------------------------------
+  BASE      | 1 vuelta, muda, 0 assets, 1 fuente, max 410760 | 1 vuelta, muda, 0 assets, 1 fuente, 424192
+  S233      | 1 vuelta, `fatal error: out of memory`, 2 assets, 3 fuentes, 521024 | 1 vuelta, `GC to-space overflow`, 2 assets, 3 fuentes, 509624
+  S232      | 1 vuelta, mensaje, 2 assets, 3 fuentes, 521024 | 1 vuelta, muda, 2 assets, 3 fuentes, 487656
+  S232SOLO  | 1 vuelta, muda, 0 assets, 1 fuente, 410760     | 1 vuelta, muda, 0 assets, 1 fuente, 424192
+  MUTANTE   | 2 vueltas, el cartel, 0 fuentes                | 2 vueltas, el cartel, 0 fuentes
+
+Lo que NO cambia: los cinco estados son los mismos cinco (vueltas, fuentes del disco, assets leidos, cartel y
+familia de muerte), y el instrumento NO mueve la muerte: la corrida SIN el instrumento llega al mismo punto y
+hasta nombra la pared con sus propias palabras (`fatal error: GC to-space overflow - your live data doesn't fit
+in the heap.`).
+
+Lo que SI se mueve, y por que NO es el instrumento: el maximo del semiespacio. Medido con la MISMA imagen sin
+instrumento y dos corridas de 25 s: **487.656** y **408.088** (80 KB, 19% de diferencia) -- o sea que ese
+numero no es comparable corrida a corrida, y las diferencias instrumentado/sin (10 a 33 KB) caen adentro de esa
+dispersion. Los DOS corpus instrumentados, en cambio, dieron los cinco numeros IDENTICOS entre si
+(410760/521024/521024/410760/401080): con el instrumento la muerte queda clavada en la pared o en la tormenta de
+recolecciones, y por eso se repite.
+
+
+DOS COSAS QUE LA TABLA CAMBIA RESPECTO DE DC-002.34, y que NO son del instrumento (son del runtime
+rearmado y de DC-002.42):
+
+  * `BASE` y `S232SOLO` (las tablas del MPQ como OBJETOS de Go) siguen muriendo MUDOS, pero ahora se ve
+    DONDE: la ultima marca de carga es `volvio config.json` -- o sea que mueren ANTES de pedir el primer
+    asset -- y la ultima linea de la consola es `gc_collect` con **835** (BASE) y **828** (S232SOLO)
+    recolecciones: no es una muerte cualquiera, es una tormenta de recolecciones (el objeto de Go por
+    entrada de la tabla, DC-002.33/DC-002.41).
+  * `S233` y `S232` (las palancas) NO son mudos: con el runtime al dia la consola alcanza a imprimir
+    `fatal error: out of memory` + `Memory: arena=2384320 used=2344184 free=40136`, y la marca dice que
+    estaba adentro de la lectura de LvlPrest.txt.
+  * `S232` y `S233` dan HOY el MISMO 1ST_READ.BIN (12011560 B) y los MISMOS numeros: la palanca de
+    DC-002.32 (la tabla de d2records afuera) ya no cambia el tamano de la imagen, porque desde DC-002.42 la
+    tabla vive en el DISCO. La palanca sigue cambiando el DATO (la tabla vacia), no el peso.
+
+COMO SE REPITE
+--------------
+    # 0) el runtime TIENE que estar al dia (si no, el arranque ni llega a los MPQ)
+    make -C ~/dreamcast/libgodc -j8               # (lo vigila el control 0b del corpus)
+    cd ~/Proyectos/diablo2consoles
+
+    # 1) el instrumento, en la consola (una corrida suelta, 25 s: 20 s no alcanzan para el ultimo mensaje)
+    python3 scripts/console/reescribe-rutas-gox.py ... # (ver el corpus: la capa se copia y se le reescriben las rutas)
+    bash scripts/console/recompilar-paquete-motor.sh d2common/d2loader <capa>
+    bash scripts/console/recompilar-paquete-motor.sh d2core/d2asset   <capa>
+    MKISO_JOLIET=0 DC_RUTA_DATOS=/cd/juego DC_MPQ_JUEGO="patch_d2.mpq,d2data.mpq,d2char.mpq" \
+        DC_SIN_SELLOS=1 DC_DISCO_JUEGO=<carpeta con los MPQ + objectlookups.pack> POC=motor-arranque \
+        bash scripts/console/build-motor-arranque.sh /tmp/dc243 <capa>
+    bash scripts/console/captura-ventana-234.sh /tmp/dc243/disc.gdi 25 /tmp/run-dc243
+    tr -d '\r' < /tmp/run-dc243/flycast.log | grep -a "ARQ-CARGA" | tail
+
+    # 2) el corpus (los cinco estados, con su control 0b y la tabla)
+    SAL=... SRC=... GEN_HEAD=<capa> bash scripts/console/checar-motor-disco-234.sh --medir 25
+
+LO QUE ESTA TARJETA **NO** MIDE (declarado)
+-------------------------------------------
+* NO arregla la muerte: la deja dicha. El arreglo (leer por trozos / subir el semiespacio) es la tarjeta
+  siguiente y los numeros de arriba son los que la deciden.
+* NO mide donde muere el motor DESPUES de pasar LvlPrest.txt: la corrida muere ahi.
+* NO cambia el `ReadAll` de `LoadFile`: la marca lo señala, no lo toca.
+* La lectura de DC-002.41 (`panic: index out of range` justo despues de `LvlTypes.txt`, con el monton de C con
+  libres) NO se reprodujo hoy con el runtime al dia: hoy la muerte es ADENTRO de la lectura completa de
+  `LvlPrest.txt` (el segundo asset) y el mensaje es `fatal error: out of memory`. Queda anotado para la tarjeta
+  siguiente: los dos sintomas son de la misma familia (la pared del semiespacio) pero el punto cambio.

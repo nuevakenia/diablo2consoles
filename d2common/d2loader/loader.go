@@ -76,6 +76,10 @@ func (l *Loader) SetCharset(charset *string) {
 func (l *Loader) Load(subPath string) (io.ReadSeeker, error) {
 	subPath = filepath.Clean(subPath)
 
+	// DC-002.43: la marca de ENTRAR va antes de tocar ninguna fuente: si la carga se muere adentro, esta es
+	// la ultima linea que queda y nombra el pedido. Los bytes de la ruta no se copian (ver marca_carga.go).
+	Marca(subPath, MarcaEntra)
+
 	if l.language != nil {
 		charset := l.charset
 		language := l.language
@@ -97,6 +101,10 @@ func (l *Loader) Load(subPath string) (io.ReadSeeker, error) {
 
 		srcBase, _ := filepath.Abs(source.Path())
 		l.Info(fmt.Sprintf("Loaded %s -> %s", srcBase, subPath))
+
+		// DC-002.43: la carga VOLVIO. Si despues de esta marca no hay ninguna otra, el motor no murio en el
+		// MPQ: murio en lo que vino despues (el parseo del archivo, por ejemplo).
+		Marca(subPath, MarcaVolvio)
 
 		return loadedAsset, nil
 	}

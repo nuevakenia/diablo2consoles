@@ -119,10 +119,17 @@ func (am *AssetManager) LoadFile(filePath string) ([]byte, error) { // I DO NOT 
 		return nil, err
 	}
 
+	// DC-002.43: las dos marcas de la LECTURA COMPLETA. `LoadFile` es el que se lleva el archivo entero a la
+	// memoria: aca es donde una lectura grande puede morir por memoria, y sin marca la muerte no decia si
+	// habia sido el MPQ o este `ReadAll`.
+	d2loader.Marca(filePath, d2loader.MarcaLeeEntra)
+
 	data, err := ioutil.ReadAll(fileAsset)
 	if err != nil {
 		return nil, err
 	}
+
+	d2loader.Marca(filePath, d2loader.MarcaLeeVolvio)
 
 	return data, err
 }

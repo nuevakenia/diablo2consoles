@@ -48,6 +48,9 @@ for CAPA in $(seq 1 20); do
         # (d2core/d2records/object_lookups_store.go). gccgo NO respeta //go:build -- medido: un archivo con
         # //go:build dreamcast se compila igual -- asi que la exclusion es por NOMBRE, aca.
         # MUTANTE (criterio 3 de la tarjeta): DC_TABLA_LOOKUPS=dentro las vuelve a meter en el binario.
+        # DC-002.43: `marca_carga_host.go` es el otro par mutuamente excluyente del motor (las marcas de
+        # carga: `marca_carga_godc.go` es el de la consola). Se saca por NOMBRE por lo mismo.
+        srcs=$(echo "$srcs" | grep -vE '/(marca_carga_host)\.go$' || true)
         if [ "${DC_TABLA_LOOKUPS:-fuera}" = "fuera" ]; then
             srcs=$(echo "$srcs" | grep -vE '/(object_lookup_record_data|object_lookups_host)\.go$' || true)
         fi

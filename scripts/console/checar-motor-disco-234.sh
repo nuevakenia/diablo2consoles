@@ -62,6 +62,36 @@ for n in patch_d2.mpq d2data.mpq d2char.mpq; do
 done
 nota "MPQ horneados: $(ls "$SAL/juego" | tr '\n' ' ') ($(du -sb "$SAL/juego" | cut -f1) bytes)"
 
+# DC-002.43: ADEMAS de los MPQ, el archivo de la tabla de objectLookups que el motor lee DEL DISCO por
+# registro (DC-002.42, /JUEGO/OBJECTLOOKUPS.PACK). Sin el, el arranque del motor NO pasa de leer su config:
+# cae en la pantalla de error del motor y muere dibujandola -- medido en DC-002.43: `game files not found at
+# "C:/Program Files (x86)/Diablo II"` + `Unhandled exception ... d2app.App.updateInitError (app.go:718)` y
+# CERO lineas de `Adding source: '/cd/juego/...` (o sea: el corpus mediria otra muerte, no la suya). Lo arma
+# el generador del host (el mismo que uso DC-002.42): es la tabla compilada del binario, no un dato nuevo.
+if [ ! -f "$SAL/juego/objectlookups.pack" ]; then
+    if (cd "$REPO" && go run ./console/dc/gen-lookups-pack -dir "$SAL/juego") > "$SAL/gen-lookups-pack.log" 2>&1; then
+        nota "tabla de objectLookups horneada: $(stat -c%s "$SAL/juego/objectlookups.pack") bytes"
+    else
+        echo "no pude armar objectlookups.pack (ver $SAL/gen-lookups-pack.log)"; exit 1
+    fi
+else
+    nota "tabla de objectLookups horneada: $(stat -c%s "$SAL/juego/objectlookups.pack") bytes (ya estaba)"
+fi
+
+# DC-002.43: CONTROL DE LA HERRAMIENTA. `libgodc.a` es un archivo del arbol VENDORIZADO que se arma aparte
+# (`make -C ~/dreamcast/libgodc`): si las fuentes del runtime son mas nuevas que el `.a`, el binario que se
+# mide NO es el de las fuentes. Medido en esta tarjeta: con un `.a` de 01:40 y `runtime/gc_copy.c` de las
+# 02:54 (el arreglo de la Store Queue de DC-002.39c) el arranque NO llegaba ni a los MPQ (moria dibujando la
+# pantalla de error) y los cinco estados se median contra otra muerte. Con el `.a` rearmado, el MISMO binario
+# llega a LvlPrest.txt. Sin este control, eso se lee como "el motor no avanza" y no como "el runtime esta
+# viejo": los dos son un rojo que habla de otra cosa.
+VIEJO="$(find "$LIBGODC/runtime" -name '*.c' -newer "$LIBGODC/libgodc.a" -print -quit 2>/dev/null)"
+if [ -n "$VIEJO" ]; then
+    rojo "control 0b: libgodc.a esta VIEJO ($(basename "$VIEJO") es mas nuevo): corre 'make -C $LIBGODC' y volve a medir"
+else
+    verde "control 0b: libgodc.a ($(stat -c%s "$LIBGODC/libgodc.a") bytes, sha256 $(sha256sum "$LIBGODC/libgodc.a" | cut -c1-16)) es mas nuevo que sus fuentes"
+fi
+
 if [ "$(cd "$REPO" && "$DC_PYTHON" scripts/console/fix-mpq-tablas-233.py --estado | tail -1 | grep -c '7/7 como el arreglo')" = "1" ]; then
     verde "control 0: el arbol del checkout esta como el arreglo de DC-002.33 (7/7)"
 else

@@ -101,5 +101,5 @@ echo "== vueltas del arranque en la consola serie (cada muerte del motor reinici
 tr -d '\r' < "$OUT/flycast.log" | grep -ac 'MOTOR-ARRANQUE arranca' || true
 echo "== el punto donde muere (ultima vuelta) =="
 tr -d '\r' < "$OUT/flycast.log" |
-    grep -a 'Adding source\|Out of memory\|fatal error\|Memory:\|EBITEN-PERFIL\|cuadros del loop\|gc-por-umbral\|game files not found' |
+    grep -a 'ARQ-CARGA\|Adding source\|Out of memory\|fatal error\|Memory:\|EBITEN-PERFIL\|cuadros del loop\|gc-por-umbral\|game files not found' |
     tail -14

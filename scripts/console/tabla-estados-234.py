@@ -46,15 +46,36 @@ def analiza(nombre, path):
     for l in cargados[:4]:
         print("      %s" % l)
 
+    # DC-002.43: LAS MARCAS DE CARGA (el instrumento de la muerte muda). La ultima dice la llamada exacta en
+    # la que estaba el motor cuando murio, con la memoria de ese instante. Si no hay ninguna, la corrida NO
+    # trae el instrumento (y entonces no se puede leer donde murio, no es que no haya cargado nada).
+    marcas = [l.strip() for l in ls if "ARQ-CARGA" in l]
+    if marcas:
+        print("   marcas de carga             : %d" % len(marcas))
+        print("      ultima : %s" % marcas[-1])
+        # ojo: NO hay marca de control que se imprima sola (el `init` del paquete no entra en la cadena de
+        # arranque de la consola: ver marca_carga_godc.go). El control es HABER marcas o no haberlas.
+        print("      primera: %s" % marcas[0])
+    else:
+        print("   marcas de carga             : 0 -- corrida SIN el instrumento de DC-002.43")
+
     print("   cuadros dibujados           : %d" % sum(("EBITEN-PERFIL" in l or "cuadros del loop" in l) for l in ls))
     print("   cartel del motor            : %d" % sum('game files not found at "/cd/juego"' in l for l in ls))
 
     ped = [l.strip() for l in ls if "Out of memory. Requested" in l]
     oom = [l.strip() for l in ls if l.startswith("Memory: arena=")]
     exc = [l.strip() for l in ls if "Unhandled exception" in l or "Data address error" in l]
+    # DC-002.43: el `panic:` de Go TAMBIEN es una muerte con mensaje (DC-002.41 lo dejo anotado: el
+    # clasificador lo rotulaba MUDA aunque la linea estaba en el log). Y el `fatal error:` tambien.
+    pan = [l.strip() for l in ls if l.startswith("panic:")]
+    fat = [l.strip() for l in ls if l.startswith("fatal error:")]
     if ped:
         print("   muerte                      : %s" % ped[0])
         print("                                 %s" % (oom[0] if oom else "(sin Memory:)"))
+    elif pan or fat:
+        print("   muerte                      : %s" % (pan[0] if pan else fat[0]))
+        if oom:
+            print("                                 %s" % oom[0])
     elif exc:
         print("   muerte                      : %s" % " / ".join(exc[:2]))
     else:
