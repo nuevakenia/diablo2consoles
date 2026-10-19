@@ -34,11 +34,6 @@ func objectDetailsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 			SizeX: d.Number("SizeX"),
 			SizeY: d.Number("SizeY"),
 
-			NTgtFX: d.Number("nTgtFX"),
-			NTgtFY: d.Number("nTgtFY"),
-			NTgtBX: d.Number("nTgtBX"),
-			NTgtBY: d.Number("nTgtBY"),
-
 			FrameCount: [8]int{
 				d.Number("FrameCnt0"),
 				d.Number("FrameCnt1"),
@@ -79,26 +74,6 @@ func objectDetailsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 				d.Number("Lit6"),
 				d.Number("Lit7"),
 			},
-			BlocksLight: [8]bool{
-				d.Number("BlocksLight0") == 1,
-				d.Number("BlocksLight1") == 1,
-				d.Number("BlocksLight2") == 1,
-				d.Number("BlocksLight3") == 1,
-				d.Number("BlocksLight4") == 1,
-				d.Number("BlocksLight5") == 1,
-				d.Number("BlocksLight6") == 1,
-				d.Number("BlocksLight7") == 1,
-			},
-			HasCollision: [8]bool{
-				d.Number("HasCollision0") == 1,
-				d.Number("HasCollision1") == 1,
-				d.Number("HasCollision2") == 1,
-				d.Number("HasCollision3") == 1,
-				d.Number("HasCollision4") == 1,
-				d.Number("HasCollision5") == 1,
-				d.Number("HasCollision6") == 1,
-				d.Number("HasCollision7") == 1,
-			},
 			IsAttackable: d.Number("IsAttackable0") == 1,
 			StartFrame: [8]int{
 				d.Number("Start0"),
@@ -111,11 +86,7 @@ func objectDetailsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 				d.Number("Start7"),
 			},
 
-			EnvEffect:       d.Number("EnvEffect") == 1,
-			IsDoor:          d.Number("IsDoor") == 1,
-			BlockVisibility: d.Number("BlocksVis") == 1,
-			Orientation:     d.Number("Orientation"),
-			Trans:           d.Number("Trans"),
+			IsDoor: d.Number("IsDoor") == 1,
 
 			OrderFlag: [8]int{
 				d.Number("OrderFlag0"),
@@ -127,7 +98,6 @@ func objectDetailsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 				d.Number("OrderFlag6"),
 				d.Number("OrderFlag7"),
 			},
-			PreOperate: d.Number("PreOperate") == 1,
 			HasAnimationMode: [8]bool{
 				d.Number("Mode0") == 1,
 				d.Number("Mode1") == 1,
@@ -143,41 +113,10 @@ func objectDetailsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 			YOffset: d.Number("Xoffset"),
 			Draw:    d.Number("Draw") == 1,
 
-			LightRed:   uint8(d.Number("Red")),
-			LightGreen: uint8(d.Number("Green")),
-			LightBlue:  uint8(d.Number("Blue")),
+			SubClass: d.Number("SubClass"),
 
-			SelHD: d.Number("HD") == 1,
-			SelTR: d.Number("TR") == 1,
-			SelLG: d.Number("LG") == 1,
-			SelRA: d.Number("RA") == 1,
-			SelLA: d.Number("LA") == 1,
-			SelRH: d.Number("RH") == 1,
-			SelLH: d.Number("LH") == 1,
-			SelSH: d.Number("SH") == 1,
-			SelS: [8]bool{
-				d.Number("S1") == 1,
-				d.Number("S2") == 1,
-				d.Number("S3") == 1,
-				d.Number("S4") == 1,
-				d.Number("S5") == 1,
-				d.Number("S6") == 1,
-				d.Number("S7") == 1,
-				d.Number("S8") == 1,
-			},
-
-			TotalPieces: d.Number("TotalPieces"),
-			SubClass:    d.Number("SubClass"),
-
-			XSpace: d.Number("Xspace"),
-			YSpace: d.Number("Yspace"),
-
-			NameOffset: d.Number("NameOffset"),
-
-			MonsterOk:      uint8(d.Number("MonsterOK")) == 1,
-			OperateRange:   d.Number("OperateRange"),
-			ShrineFunction: d.Number("ShrineFunction"),
-			Restore:        uint8(d.Number("Restore")) == 1,
+			OperateRange: d.Number("OperateRange"),
+			Restore:      uint8(d.Number("Restore")) == 1,
 
 			Parm: [8]int{
 				d.Number("Parm0"),
@@ -189,15 +128,12 @@ func objectDetailsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 				d.Number("Parm6"),
 				d.Number("Parm7"),
 			},
-			Act:            d.Number("Act"),
-			Lockable:       uint8(d.Number("Lockable")) == 1,
-			Gore:           uint8(d.Number("Gore")) == 1,
-			Sync:           uint8(d.Number("Sync")) == 1,
-			Flicker:        uint8(d.Number("Flicker")) == 1,
-			Damage:         d.Number("Damage"),
-			Beta:           uint8(d.Number("Beta")) == 1,
-			Overlay:        uint8(d.Number("Overlay")) == 1,
-			CollisionSubst: uint8(d.Number("CollisionSubst")) == 1,
+			Act:      d.Number("Act"),
+			Lockable: uint8(d.Number("Lockable")) == 1,
+			Sync:     uint8(d.Number("Sync")) == 1,
+			Flicker:  uint8(d.Number("Flicker")) == 1,
+			Damage:   d.Number("Damage"),
+			Overlay:  uint8(d.Number("Overlay")) == 1,
 
 			Left:   d.Number("Left"),
 			Top:    d.Number("Top"),
@@ -207,12 +143,8 @@ func objectDetailsLoader(r *RecordManager, d *d2txt.DataDictionary) error {
 			OperateFn:  d.Number("OperateFn"),
 			PopulateFn: d.Number("PopulateFn"),
 			InitFn:     d.Number("InitFn"),
-			ClientFn:   d.Number("ClientFn"),
 
 			RestoreVirgins: uint8(d.Number("RestoreVirgins")) == 1,
-			BlockMissile:   uint8(d.Number("BlockMissile")) == 1,
-			DrawUnder:      uint8(d.Number("DrawUnder")) == 1,
-			OpenWarp:       uint8(d.Number("OpenWarp")) == 1,
 
 			AutoMap: d.Number("AutoMap"),
 		}

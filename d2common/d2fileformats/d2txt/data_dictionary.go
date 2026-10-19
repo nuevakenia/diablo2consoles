@@ -158,7 +158,23 @@ func (d *DataDictionary) String(field string) string {
 		return ""
 	}
 
-	return d.record[i]
+	// DC-002.48: el valor se COPIA fuera del buffer del csv. Los campos del csv son subslices del buffer
+	// interno del lector, asi que una tabla que guarda UNA sola cadena se lleva vivo el texto entero del
+	// archivo (medido en el host con Objects.txt: 211.970 B de texto y 573 records de 768 B = 440.064;
+	// el delta vivo de la tabla eran 654.424 B).
+	return copiar(d.record[i])
+}
+
+// copiar devuelve una cadena con su PROPIO respaldo (el equivalente de strings.Clone, que este Go no trae).
+func copiar(s string) string {
+	if s == "" {
+		return ""
+	}
+
+	b := make([]byte, len(s))
+	copy(b, s)
+
+	return string(b)
 }
 
 // Number gets a number for the given column

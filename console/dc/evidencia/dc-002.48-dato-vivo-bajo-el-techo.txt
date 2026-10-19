@@ -1,0 +1,189 @@
+DC-002.48 — EL DATO VIVO DEL ARRANQUE BAJA DE 1.037.032 A 788.488 BYTES (98,8 % -> 75,1 % DEL SEMIESPACIO)
+CON EL ARRANQUE LLEGANDO AL MISMO TRAMO, Y EL MUTANTE LO DEVUELVE A 1.037.032
+
+Medido en: CachyOS, Flycast, POC `motor-arranque` con los tres MPQ del disco
+(`patch_d2.mpq,d2data.mpq,d2char.mpq`), 142 de 142 paquetes del motor compilados de la copia de fuentes,
+semiespacio de 1024 KB por lado (`GC_SEMISPACE_SIZE_KB=1024`, `DC_EH_FINAL=1`), 50 s por corrida, consola
+serie capturada. Fecha de las corridas: 2026-10-19, 11:29-12:40. El arbol que se mide es una COPIA CONGELADA
+del checkout (`rsync` a un directorio de trabajo), porque hay otro agente del tablero trabajando el mismo repo
+(DC-002.38) y el corpus sincroniza el arbol al vuelo.
+
+
+1. DE DONDE SALEN LOS BYTES (medido en el HOST, instrumento `console/dc/peso-arranque-248`)
+
+El runtime de la consola no tiene un contador de "vivo por tabla", asi que primero se mide en el host con el
+MISMO camino del motor (lector de MPQ -> `d2txt.LoadDataDictionary` -> loader de `d2records`), corrido DOS
+veces con el mismo binario del instrumento: sobre `HEAD` y sobre el arbol con las palancas.
+
+  tabla             archivo B    vivo HEAD B   vivo palancas B      delta
+  LvlTypes.txt         10.719          79.904            90.872     +10.968
+  LvlPrest.txt        134.937         371.760           332.952     -38.808
+  LvlWarp.txt           3.935          14.920            14.952         +32
+  objtype.txt           7.003          26.184            27.776      +1.592
+  Objects.txt         211.970         654.536           408.976    -245.560
+  (6a) weapons.txt    118.029         984.104         1.042.288     +58.184
+
+  acumulado de las 5 tablas que el arranque SI completa:  1.147.304  ->  875.528   =  -271.776 B (-23,7 %)
+  sizeof ObjectDetailRecord:                                   768 B  ->     632 B
+  campos del struct:                                            77     ->      41   (36 de ellos muertos)
+
+Las dos cosas que el arranque se queda de mas, medidas y no deducidas:
+
+  a) `Objects.txt` son 573 records: 573 x 768 B = 440.064 B, pero el delta vivo de esa tabla era 654.536 B:
+     los 214.472 B que sobran son el TEXTO de la tabla (211.970 B), retenido porque los campos que guarda cada
+     record (`Name`, `Description`, `token`) son SUBSLICES del buffer interno del `csv.Reader` y una sola
+     subslice viva se lleva el buffer entero.
+  b) `ObjectDetailRecord` tiene 77 campos y **36 no tienen una sola lectura** en los 142 paquetes del motor
+     (barrido de `.Campo` en todo el arbol, fuera del loader y del archivo del struct): 12 `int` de las
+     columnas de targeting/orientacion/piezas, 3 arreglos `[8]bool` y 21 `bool` mas, y los 3 bytes de color de
+     la luz. Son 136 B por fila que el GC copia en cada recoleccion.
+
+
+2. LAS DOS PALANCAS
+
+  Palanca 1 — `ObjectDetailRecord` no guarda los 36 campos que nadie lee
+  (`scripts/console/campos-muertos-248.py --podar`, y `--estado` dice hoy "campos del struct hoy: 41; de la
+  lista de muertos quedan 0"): el record pasa de 768 a 632 B en el host y la tabla de Objects de 654.536 a
+  408.976 B vivos con el mismo instrumento. La lista de campos esta en el script y se puede volver a medir: si
+  algun dia el motor lee uno, el barrido lo devuelve a la lista de vivos.
+
+  Palanca 2 — `d2txt.DataDictionary.String` COPIA el valor fuera del buffer del csv (el `strings.Clone` que
+  este Go no trae, escrito a mano). Medido a favor y en contra: la copia CUESTA en las tablas con muchas
+  cadenas chicas (LvlTypes 79.904 -> 90.872 B, +10.968; LvlWarp +32; objtype +1.592) y PAGA en las que guardan
+  pocas cadenas sobre archivos grandes (Objects -245.560 B, LvlPrest -38.808 B). El neto de las 5 tablas es
+  -271.776 B en el host.
+
+  Las dos palancas no cambian lo que el motor ve: los 142 de 142 paquetes compilan (control 0c del corpus) y el
+  arranque pide exactamente los mismos assets.
+
+
+3. LOS NUMEROS DE LA CONSOLA (50 s por corrida)
+
+  mismo instrumento (`gc-vivo` = lo que sobrevive a una copia), misma particion (1024 KB por lado), mismo
+  arranque; lo unico que cambia es el arbol:
+
+                                      HEAD (mutante)        DC-002.48 (palancas)
+  dato VIVO maximo (gc-vivo)               1.037.032 B           788.488 B      -> -248.544 B (-24,0 %)
+  del semiespacio                                 98,8 %              75,1 %
+  libre del semiespacio en el maximo             11.544 B           260.088 B      -> x22,5
+  marcas gc-vivo en la ventana                     264                 770       (las recolecciones NO bajaron)
+  assets del MPQ pedidos                              6                   6
+  lecturas de tabla terminadas                        5                   5
+  ultima tabla pedida                        weapons.txt        weapons.txt
+  muerte                                     MUDA (corte)        MUDA (corte)
+
+  El arranque llega AL MISMO TRAMO (entra a leer `weapons.txt`, la 6a tabla) con 248.544 B menos de dato
+  vivo: es el criterio 1 de la tarjeta ("baja con numeros medidos y el arranque llega igual o mas lejos").
+
+  Corrida de contraste independiente, el corpus de DC-002.47 con la misma capa (`checar-techo-247.sh 50`):
+  sano (palancas) **788.616 B de 1.048.576 (75,2 %), gc_collect maximo 804, 6 assets**; mutante del lector
+  536.808 B (51,1 %), gc 7, 3 assets; particion vieja 434.848 de 524.288 (82,9 %), gc 1408, 2 assets. O sea:
+  dos corridas distintas del mismo arbol dan 788.488 y 788.616 B (128 B de diferencia, la ventana de 50 s).
+
+  Los tramos intermedios, marca por marca (`ARQ-CARGA lee-volvio`, el `gsemi` del momento), corrida propia:
+
+  tabla leida         HEAD        DC-002.48
+  LvlTypes.txt       408.312         459.808     <- la palanca 2 CUESTA 51.496 B aca
+  LvlPrest.txt       668.976         507.952
+  LvlWarp.txt        705.552         581.528
+  objtype.txt        429.296         717.672     <- el gsemi depende de donde caiga la recoleccion
+  Objects.txt        832.144         716.792
+  maximo del recorrido 1.037.032      788.488
+
+  OJO con leer los tramos como una escalera: `gsemi` es el semiespacio USADO en ese instante, asi que una
+  recoleccion antes o despues lo mueve decenas de KB (el contador `gc=` de la marca lo delata: 270 en el
+  `lee-volvio` de Objects de HEAD contra 24 en el de esta tarjeta). El numero que no depende de eso es el
+  MAXIMO de `gc-vivo` (lo que sobrevive a una copia).
+
+
+4. EL MUTANTE (el que exige que la suite se ponga ROJA)
+
+`scripts/console/mutar-vivo-248.py --pristino <dir>` devuelve los TRES archivos al estado de `HEAD` en un
+arbol de trabajo aparte. Verificado con `cmp` en esta corrida: los 3 son DISTINTOS del checkout e IGUALES a
+`git show HEAD:<archivo>`. Ese arbol pasa por el MISMO corpus:
+
+  control `checar-vivo-248.sh` (techo declarado 950.000 B)   arbol con las palancas   arbol pristino
+  dato vivo maximo                                                    788.488 B     1.037.032 B
+  del semiespacio                                                        75,1 %          98,8 %
+  resultado del control                                         4 OK / 0 fallo   3 OK / 1 FALLO (control 2)
+  exit                                                                       0                1
+
+  y el corpus del arbol pristino da 12/12 (el mismo motor de DC-002.47: 10 assets / 9 lecturas SUMADAS de dos
+  pasadas del arranque — es flaky, defecto conocido de otra tarjeta — con el `gc-vivo` maximo en 1.037.032).
+
+El mutante reproduce el numero de DC-002.47 y el control 2 se pone ROJO: sin el, una corrida con el dato vivo
+otra vez en el 98,8 % se lee igual que una que lo bajo (75,1 % y 98,8 % son los dos "verde" si el numero no es
+un control).
+
+
+5. LOS CORPUS
+
+  * `bash scripts/console/checar-trozos-245.sh 50` -> **12 controles OK, 0 con fallo** (exit 0) sobre la copia
+    congelada: la capa base compilo **142 de 142**, el sano llega a **6 assets / 5 lecturas** con dato vivo
+    maximo **788.488 B**, y el mutante del LECTOR (el `ReadAll` de DC-002.47) sigue muriendo donde tiene que
+    morir: **5 assets / 4 lecturas** y **574.088 B**.
+  * `bash scripts/console/checar-vivo-248.sh <dir>` -> **4 controles OK, 0 con fallo** con las palancas,
+    **3 OK / 1 FALLO** con el arbol pristino.
+  * `bash scripts/console/checar-techo-247.sh 50` (BASE = la capa de esta tarjeta) -> **11 controles OK**:
+    sano 788.616 B (75,2 %), gc_collect maximo 804, 6 assets; mutante del lector 536.808 B (51,1 %), gc 7, 3
+    assets; particion vieja 434.848 de 524.288 (82,9 %), gc 1.408, 2 assets; al MISMO tramo (lee-volvio de
+    LvlTypes.txt) la particion nueva usa 459.808 de 1.048.576 (43,8 %) contra 402.752 de 524.288 (76,8 %).
+  * `bash scripts/console/checar-motor-disco-234.sh 25` -> **9 controles OK, 0 con fallo** con
+    `GEN_HEAD=gox-248head-b` (la capa "de hoy" armada como se explica en 7.b): los 5 estados quedan igual que
+    en DC-002.43, el mutante sin `/JUEGO` deja el cartel del motor **2 veces** y con los MPQ **0**, y
+    `S233`/`S232` leen **3 assets** del MPQ.
+
+
+6. EL LIMITE, DECLARADO (no tapado)
+
+El arranque sigue muriendo mas alla de las 5 tablas en `fatal error: gc_external_alloc: OOM Memory:
+arena=5.424.000 used=5.381.312 free=42.688` (el monton de C, `sbrk 0x8d00a000` contra `0x8cfe1000`). Bajar el
+dato vivo NO mueve ese techo: son dos montones distintos. Y el arranque es flaky (una corrida del pristino
+hizo DOS pasadas: 10 assets / 9 lecturas sumadas). Las dos cosas son de otras tarjetas.
+
+
+7. LOS DEFECTOS DE INSTRUMENTO QUE APARECIERON EN ESTA TARJETA
+
+  a) `checar-trozos-245.sh` rehacia la capa base solo si `$SAL/motor-all.log` EXISTIA. Una corrida MATADA a
+     mitad deja ese log en 0 bytes, asi que la corrida siguiente se salta la recompilacion, hereda el
+     `orden-motor.txt` de la capa de PARTIDA (111 de 142 paquetes, SIN `d2records`) y el enlace muere con los
+     ~1.500 simbolos de `d2records` indefinidos: se lee como "el arbol no compila" cuando el que no compilo
+     nunca fue invocado (medido hoy: log de 0 bytes, `link` con `ObjectDetailRecord..p`,
+     `LevelPresetRecord..d` y `RecordManager.FindObject` indefinidos). ARREGLADO: la condicion exige la linea
+     `compilados:` en el log.
+  b) `checar-motor-disco-234.sh` toma su capa de partida de `/tmp/gox-233`, que es de ANTES de DC-002.42: no
+     trae `d2records.RutaDeLosLookups` (el POC del arranque no compila: "reference to undefined identifier") y
+     su `d2mpq.gox` no coincide con un recompilado de hoy porque lleva rutas embebidas de otro dia (control 3
+     en rojo). Se corre con `GEN_HEAD=<capa armada en este arbol>`, que es lo que el propio comentario del
+     script pide ("la capa coherente con HEAD").
+  c) `mutar-vivo-248.py --pristino` necesita un arbol con `.git`: la copia congelada se hace con `rsync
+     --exclude .git`, asi que el script se corre DESDE EL CHECKOUT apuntando a la copia (si no, `git show
+     HEAD:` falla y deja los 3 archivos a medio escribir).
+
+
+8. COMO SE REPITE
+
+```
+# el instrumento del host (peso vivo por tabla, en el host)
+go run ./console/dc/peso-arranque-248 -mpq "/home/dgalli/.wine-d2/drive_c/Games/Diablo II" -n 6
+
+# la suite de la consola (12 controles) y el control del dato vivo (4 controles)
+SRC=$S/trozos-248c-src SAL=$S/trozos-248c bash scripts/console/checar-trozos-245.sh 50
+bash scripts/console/checar-vivo-248.sh $S/trozos-248c
+
+# el mutante: los 3 archivos al estado de HEAD en un arbol aparte y el mismo corpus + el control
+rsync -a --exclude .git ~/Proyectos/diablo2consoles/ $S/repo-248c-pristino/
+python3 ~/Proyectos/diablo2consoles/scripts/console/mutar-vivo-248.py --pristino $S/repo-248c-pristino
+cd $S/repo-248c-pristino && SRC=$S/trozos-248c-pristino-src SAL=$S/trozos-248c-pristino \
+  bash scripts/console/checar-trozos-245.sh 50
+bash scripts/console/checar-vivo-248.sh $S/trozos-248c-pristino     # -> ROJO (control 2)
+
+# las otras dos barreras
+BASE=$S/trozos-248c SAL=$S/techo-248c bash scripts/console/checar-techo-247.sh 50
+GEN_HEAD=$S/gox-248head SRC=$S/dc234-src-248d SAL=$S/corpus-234-248d bash scripts/console/checar-motor-disco-234.sh 25
+```
+
+NOTA DE AISLAMIENTO: las corridas de esta tarjeta se hicieron sobre copias (`trozos-248c`,
+`repo-248c-pristino`), no sobre el checkout, porque habia otro agente del tablero trabajando el mismo repo
+(DC-002.38): el corpus sincroniza el arbol al vuelo y una copia congelada es la unica forma de que lo medido
+sea lo que se dice.

@@ -256,7 +256,13 @@ if [ ! -d "$PARTIDA" ]; then
     rojo "no existe la capa de partida $PARTIDA (una capa del arbol de HOY: solo se usa por su stdlib)"
     echo; echo "== RESULTADO: $OK controles OK, $FALLOS con fallo =="; exit 1
 fi
-if [ "$REFRESCAR" = 1 ] || [ ! -f "$GEN_BASE/orden-motor.txt" ] || [ ! -f "$SAL/motor-all.log" ]; then
+# DC-002.48: LA CAPA BASE SE REHACE TAMBIEN CUANDO EL LOG NO DICE CUANTOS COMPILO. Antes bastaba con que
+# `motor-all.log` EXISTIERA, y una corrida matada a mitad deja el archivo en 0 bytes: la corrida siguiente
+# se salta la recompilacion, hereda el `orden-motor.txt` de la capa de PARTIDA (111 de 142 paquetes, sin
+# d2records) y el enlace muere con TODOS los simbolos de d2records indefinidos -- que se lee como "el arbol
+# no compila" cuando el que no compilo nunca fue invocado (medido el 2026-10-19: el log tenia 0 bytes).
+if [ "$REFRESCAR" = 1 ] || [ ! -f "$GEN_BASE/orden-motor.txt" ] || \
+   ! grep -q '^compilados:' "$SAL/motor-all.log" 2>/dev/null; then
     if [ -d "$GEN_BASE" ]; then mv "$GEN_BASE" "$GEN_BASE.vieja.$(date +%s)"; fi
     cp -a "$PARTIDA" "$GEN_BASE"
     python3 "$HERE/reescribe-rutas-gox.py" "$PARTIDA" "$GEN_BASE" "$GEN_BASE" > /dev/null || exit 1
