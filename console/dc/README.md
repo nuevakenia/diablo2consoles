@@ -4478,3 +4478,48 @@ sacado del vendor es limpio mientras eso siga así; (c) `checar-cadenas-236.sh` 
 del mutante toca el **vendor compartido** y había otro agente vivo sobre el repo. Evidencia:
 `console/dc/evidencia/dc-002.39c-consulta-21253.txt`.
 
+## 61. DC-002.39d: la cadena del runtime **paso por paso** — el que corre último manda, el paso que se llevaba la Store Queue queda identificado, y el vendor de hoy **ya está completo** (verificado por sha256)
+
+La tarjeta nació de una medición: a las 02:45 `~/dreamcast/libgodc/runtime/gc_copy.c` estaba en `>>26` (la
+fórmula vieja del QACR: el defecto DC-002.24 **vivo**) aunque `fix-libgodc-sq.py` existe y promete
+idempotencia. Lo que faltaba era **quién pisa a quién**. Medido sobre una copia privada, con el sha256, los
+bytes y el estado de la Store Queue después de cada paso:
+
+| paso | sha256(16) | bytes | SQ |
+|---|---|---|---|
+| pristino (`git show HEAD`, una lectura: la regla del proyecto) | `130de736` | 43749 | `>>26` |
+| `fix-libgodc-gc.py 512` (pristino + ABI + interfaces) | `379271ee` | 44509 | `>>24` |
+| `fix-libgodc-candidato.py` (modo normal: reset + interiores + candidato + marcas) | `fec6ef13` | 50074 | **`>>26`** |
+| `fix-libgodc-sq.py --sin-pristino` (solo la Store Queue) | `988e80fc` | 50834 | `>>24` |
+
+O sea: **el último que corre es el que manda**, y el candidato en su modo normal (el que promete
+idempotencia) hace `git checkout` de `gc_copy.c` y **se lleva la Store Queue**. Es exactamente el estado en el
+que DC-002.39c encontró el vendor (había corrido el candidato a las 01:04) y sobre el que midió el barrido
+cortado.
+
+**El vendor de HOY ya está completo** (alguien corrió la cadena entera: DC-002.43 rearmó el `.a` a las 02:54):
+`gc_copy.c` `988e80fca09df879`, 50.834 B, con los interiores (DC-002.36), el candidato (DC-002.39b), las
+marcas ARQ-MARCA (DC-002.29) y `>> 24` en los dos QACR; `libgodc.a` 210.002 B `54bd85eb3ce768bb`, más nuevo
+que todos los `runtime/*.c` (control 0b verde). Y no es casualidad: es **el mismo sha256** que produce la
+cadena ordenada.
+
+**El arreglo:** un solo punto de entrada, `scripts/console/fix-libgodc-cadena.sh`, que corre la cadena entera
+en el orden que importa y **con la Store Queue al final** (después del último script que resetea
+`gc_copy.c`), desde cualquier estado de partida, más `--build` (el `.a` al día) y `--verificar` (el control
+que se le puede correr a cualquier árbol sin modificarlo):
+
+    desde el PRISTINO   130de736  ->  punto de entrada  ->  988e80fc   (50834 B)
+    desde el SUCIO      fec6ef13  ->  punto de entrada  ->  988e80fc   (50834 B)
+    --verificar: completo -> 0 · el del candidato -> 1 ("FALTA la Store Queue (>>24)") · mutado -> 1 · vendor -> 0
+
+**El mutante** (`>> 24` → `>> 26`, una palabra, `mutar-libgodc-sq.py`) deja la suite en `162 de 21253`
+(contra `3 de 3 vueltas con 21253` del arreglado): cazado. Y **el número con el VENDOR** (el criterio de
+cerrar con el árbol bueno): `checar-consulta-233.sh 3 100` con `DC_ROOT=$HOME/dreamcast` da **3 de 3 vueltas
+con los 21.253** (`patch_d2.mpq` 162/162, `d2data.mpq` 11082/11082, `d2char.mpq` 10009/10009).
+
+**Lo que queda abierto (declarado):** la regla **no está forzada en el código** — los `fix-libgodc-*.py`
+sueltos siguen pudiendo resetear el árbol y dejar el estado a medias; lo que hay es el punto de entrada y
+`--verificar` (que sirve de control 0 de cualquier corpus). Y `checar-idempotencia-vendor.sh` sigue midiendo y
+mutando el **vendor compartido**: no se corrió con otro agente midiendo. Evidencia:
+`console/dc/evidencia/dc-002.39d-cadena.txt`.
+

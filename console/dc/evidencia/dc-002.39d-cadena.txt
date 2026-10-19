@@ -1,0 +1,120 @@
+DC-002.39d -- LA CADENA DEL RUNTIME VENDORIZADO, MEDIDA PASO POR PASO Y ATADA A UN SOLO PUNTO DE ENTRADA.
+El vendor de HOY ya esta en el estado completo (sha256 `988e80fc`, verificado), el paso que se llevaba la
+Store Queue queda identificado con su sha256, y el punto de entrada deja el MISMO estado desde CUALQUIER
+estado de partida (pristino o a medio aplicar).
+
+Fecha: 2026-10-19 (corrida autonoma, rama DC-002, HEAD b502c62d + el WIP de DC-002.44 de otro agente)
+
+================================================================================================
+0. COMO SE MIDIO (copia privada: el vendor es COMPARTIDO y hay otro agente midiendo)
+================================================================================================
+* copia privada del vendor:  cp -a ~/dreamcast/libgodc /tmp/godc-39d        (24 MB, con su .git)
+* el arbol pristino NO se saca con `git checkout` (regla del proyecto) sino con una LECTURA:
+      git -C <LIB> show HEAD:runtime/gc_copy.c > <LIB>/runtime/gc_copy.c
+* la huella de cada paso: sha256 + bytes de `runtime/gc_copy.c` + cuantas `dst_addr >> 24` y `>> 26` tiene
+  (el estado de la Store Queue: `>>24` = la formula del KOS, `>>26` = el defecto DC-002.24)
+* el instrumento nuevo: `scripts/console/fix-libgodc-cadena.sh` (el punto de entrada unico, ver 3)
+* el mutante: `scripts/console/mutar-libgodc-sq.py` (`>>24` -> `>>26`, UNA palabra)
+
+================================================================================================
+1. LA CADENA, PASO POR PASO (el defecto medido)
+================================================================================================
+Sobre la copia privada, en el orden en que se corre hoy:
+
+    paso                                                        sha256(16)  bytes   SQ
+    pristino (git show HEAD)                                     130de736   43749   >>26
+    fix-libgodc-gc.py 512   (pristino + ABI + interfaces)        379271ee   44509   >>24
+    fix-libgodc-candidato.py (reset + interiores + candidato + marcas)
+                                                                 fec6ef13   50074   >>26   <- REVIERTE la SQ
+    fix-libgodc-sq.py --sin-pristino (solo la Store Queue)       988e80fc   50834   >>24   <- estado completo
+
+LECTURA: **el ultimo que corre es el que manda**. `fix-libgodc-candidato.py`, en su modo NORMAL (el que
+promete idempotencia), hace `git checkout` de `gc_copy.c` para partir del pristino y re-aplica lo suyo
+(interiores + candidato + marcas) -- y con ese checkout **se lleva la Store Queue**: el archivo sale con
+`>>26` y 50074 bytes. Es exactamente el estado en el que DC-002.39c encontro el vendor a las 02:45 (el
+01:04 habia corrido ese script) y sobre el que midio el barrido cortado.
+
+    $ grep -n 'dst_addr >> 2' <LIB>/runtime/gc_copy.c     (despues del candidato en su modo normal)
+    32:    *QACR0 = (dst_addr >> 26) & 0x1C;
+    33:    *QACR1 = (dst_addr >> 26) & 0x1C;
+
+================================================================================================
+2. EL VENDOR DE HOY: YA ESTA EN EL ESTADO COMPLETO (verificado, sin tocar nada)
+================================================================================================
+    ~/dreamcast/libgodc/runtime/gc_copy.c   988e80fca09df879   50834 B
+        PUNTEROS INTERIORES (DC-002.36) = 1    candidato (DC-002.39b) = 2    ARQ-MARCA (DC-002.29) = 4
+        dst_addr >> 24 = 2                     dst_addr >> 26 = 0
+    ~/dreamcast/libgodc/libgodc.a           210002 B  sha256 54bd85eb3ce768bb
+        (03:09:52, mas nuevo que TODOS los runtime/*.c: el control 0b del corpus esta verde)
+
+O sea: entre la medicion de DC-002.39c (02:45, `>>26`) y esta corrida, alguien corrio la cadena entera
+(el propio DC-002.43 rearmo el `.a` a las 02:54) y el arbol quedo bien. **El estado de `gc_copy.c` del
+vendor es IDENTICO (mismo sha256) al que produce la cadena ordenada de esta tarjeta**: no es casualidad, es
+el mismo conjunto de arreglos.
+
+================================================================================================
+3. EL ARREGLO: UN SOLO PUNTO DE ENTRADA (scripts/console/fix-libgodc-cadena.sh)
+================================================================================================
+Corre la cadena ENTERA en el orden que importa, **con la Store Queue al final** (despues del ultimo script
+que resetea `gc_copy.c`), desde cualquier estado de partida, y verifica el resultado:
+
+    1. fix-libgodc-gc.py <KB> <LIB>            pristino + ABI + interfaces + la Store Queue
+    2. fix-libgodc-candidato.py <LIB>          (modo normal) interiores + candidato + marcas
+    3. fix-libgodc-sq.py <LIB> --sin-pristino  LA STORE QUEUE  <- el paso que la cadena no tenia
+    4. --build                                 limpia los .o/.a y rehace libgodc.a
+       --verificar                             exige el estado completo (sale != 0 si falta algo)
+
+MEDIDO, desde dos estados de partida distintos (el sha256 final es el MISMO):
+
+    desde el PRISTINO     130de736  ->  punto de entrada  ->  988e80fc  (50834 B)
+    desde el SUCIO         fec6ef13 ->  punto de entrada  ->  988e80fc  (50834 B)
+    (el "sucio" es el que deja `fix-libgodc-candidato.py` en su modo normal, con la SQ revertida)
+
+y el control en los dos sentidos:
+
+    bash scripts/console/fix-libgodc-cadena.sh <LIB> --kb 512 --verificar
+        completo (988e80fc)                    ->  OK          (devolvio 0)
+        el que deja el candidato (fec6ef13)     ->  ROJO: FALTA la Store Queue (>>24)
+                                                        el arbol tiene la formula VIEJA (>>26): el defecto DC-002.24
+                                                    (devolvio 1)
+        mutado (7aa6b02b)                       ->  ROJO (mismos dos renglones)         (devolvio 1)
+        el VENDOR de hoy                        ->  OK          (devolvio 0)
+
+================================================================================================
+4. EL MUTANTE (el control negativo que la tarjeta pedia)
+================================================================================================
+El mutante natural es el estado en el que el vendor ESTABA: `>> 24` -> `>> 26`, una palabra, aplicada por
+`scripts/console/mutar-libgodc-sq.py`. Con la copia mutada (libgodc.a sha256 `428e632f0b3e7ac9` contra
+`fa2208fbfb9fbd3c` del arreglado) la suite de la consulta da:
+
+    checar-consulta-233.sh 1 120          ->  FALLO: la consulta da 162 de 21253
+    RESULTADO: 0 de 1 vueltas con los 21253 nombres (totales: 162)
+
+contra `3 de 3 vueltas con 21253` del arreglado (evidencia `dc-002.39c-consulta-21253.txt`). El mutante es
+CAZADO por la suite.
+
+================================================================================================
+5. EL NUMERO CON EL VENDOR (el criterio "cerrar con el vendor en el estado bueno")
+================================================================================================
+Con `DC_ROOT=$HOME/dreamcast` (el vendor, ya verificado: `--verificar` OK) y el mismo disco de los 3 MPQ:
+
+    checar-consulta-233.sh 3 100
+    OK: vuelta 1: la consulta encuentra 21253 de 21253 (patch_d2.mpq:162/162 d2data.mpq:11082/11082 d2char.mpq:10009/10009)
+    OK: vuelta 2: la consulta encuentra 21253 de 21253 (idem)
+    OK: vuelta 3: la consulta encuentra 21253 de 21253 (idem)
+    RESULTADO: 3 de 3 vueltas con los 21253 nombres (totales: 21253 21253 21253)
+
+    (el "quien" que imprime el corpus: libgodc.a 210002 B sha256 54bd85eb3ce768bb sobre gc_copy.c 988e80fc)
+
+================================================================================================
+6. LO QUE QUEDA ABIERTO (declarado, no escondido)
+================================================================================================
+1. **La regla no esta forzada en el codigo**: los `fix-libgodc-*.py` sueltos siguen existiendo y cada uno
+   puede resetear el arbol, asi que un agente que corra UNO SOLO (como paso a las 01:04) puede volver a
+   dejar el estado a medias. Lo que hay ahora es el punto de entrada + `--verificar` (que se puede correr
+   como control 0 de cualquier corpus, sobre cualquier arbol, sin modificarlo). Forzar cada script a
+   re-aplicar TODO lo anterior es un cambio mas grande y no se hizo.
+2. `scripts/console/checar-idempotencia-vendor.sh` sigue midiendo y MUTANDO el VENDOR compartido (su reset
+   pristino escribe en `$LIBGODC`): con otro agente midiendo no se corrio. Es el candidato natural a
+   cambiar para que use una copia privada y/o el punto de entrada.
+3. El defecto del `(listfile)` del tercer MPQ sigue abierto en DC-002.39e (no es de esta tarjeta).
