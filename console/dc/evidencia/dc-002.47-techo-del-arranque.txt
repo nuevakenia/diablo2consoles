@@ -201,3 +201,10 @@ LO QUE SIGUE ABIERTO (el numero, no el relato): con el lector arreglado el arran
 las 5 tablas en `fatal error: gc_external_alloc: OOM` -- el que no entra es el MONTON de C (`arena=5.422.432
 used=5.380.984 free=41.448`), no el semiespacio -- y el PANIC SIGUIENTE del punto 6 (index out of range con
 261.400 B de semiespacio libres) sigue siendo otra pared, tarjeta aparte.
+
+LOS CORPUS VECINOS, RE-MEDIDOS HOY CON ESTE ARBOL Y ESTA PARTICION:
+  bash scripts/console/checar-trozos-245.sh 50        -> 12 controles OK, 0 con fallo (salida cruda /tmp/dc245-vecino.txt)
+      sano:    dato vivo maximo 1.037.096 B de 1.048.576 (98,9 %), quedan 11.480 B
+      mutante: dato vivo maximo   566.088 B de 1.048.576 (53,9 %), quedan 482.488 B
+  bash scripts/console/checar-motor-disco-234.sh 25   -> 9 controles OK, 0 con fallo (salida cruda /tmp/dc234-vecino.txt)
+      control 6: sin los MPQ en la ISO vuelve el cartel (2 veces) y con ellos no aparece (0)
