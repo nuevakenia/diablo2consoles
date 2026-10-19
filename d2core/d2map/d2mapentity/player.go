@@ -208,6 +208,9 @@ func (p *Player) Advance(tickTime float64) {
 		fmt.Printf("failed to advance composite animation of player: %s, err: %v\n", p.ID(), err)
 	}
 
+	// DC-002.49: el estado de la animacion en el host (apagado salvo OD2_ANIMSTATS=1)
+	p.instrumentarAnimacion(tickTime)
+
 	if p.deathPhase == deathPhaseDying && p.composite.GetPlayedCount() >= 1 {
 		p.deathPhase = deathPhaseDead
 		p.setDeathMode(d2enum.PlayerAnimationModeDead)

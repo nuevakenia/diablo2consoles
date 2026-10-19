@@ -61,8 +61,41 @@ pueblo el motor usa **TN** parado y **TW** caminando (los dos medidos arriba), y
 cuadros/s: aunque se avanzara el cuadro, con el modo fijo nunca aparece el ciclo de caminar.
 
 =============================================================================
-3. LO QUE FALTA PARA CERRAR (y por que no se hizo hoy)
+3b. LA REFERENCIA DEL HOST: el motor AVANZANDO el cuadro (medido, no deducido)
 =============================================================================
+
+Nuevo instrumento (apagado salvo que se pida): `OD2_ANIMSTATS=1` imprime una linea por segundo de tiempo de
+juego con el estado REAL que el motor esta dibujando (`d2core/d2map/d2mapentity/animstats.go`, enganchado en
+`Player.Advance`). Corrida de 20 s con la amazona en el pueblo (`OD2_AUTOGAME`):
+
+    ANIMSTATS t= 1s modo=TW cuadro=7 de 8 direccion=21 vueltas=0
+    ...
+    ANIMSTATS t=13s modo=TW cuadro=7 de 8 direccion=8  vueltas=34
+    ANIMSTATS t=14s modo=TN cuadro=4 de 16 direccion=56 vueltas=0
+    ANIMSTATS t=15s modo=TN cuadro=12 de 16 direccion=56 vueltas=0
+    ANIMSTATS t=16s modo=TN cuadro=4 de 16 direccion=56 vueltas=1
+    ANIMSTATS t=17s modo=TN cuadro=12 de 16 direccion=56 vueltas=1
+    ANIMSTATS t=18s modo=TN cuadro=3 de 16 direccion=56 vueltas=2
+    ANIMSTATS t=19s modo=TN cuadro=11 de 16 direccion=56 vueltas=2
+
+DOS COSAS QUE ESTO PRUEBA, y las dos son numeros:
+
+  * CAMINANDO (TW): el contador de vueltas sube 3 por segundo (3,6,9,12,16,19,22,25,28,31,34 sobre 13 s =
+    2,6 vueltas/s) y el ciclo son 8 cuadros: 8 x 40 ms = **320 ms** por vuelta. Coincide con el censo del COF y
+    del animdata (25 cuadros/s).
+  * PARADO (TN, desde t=14 s: la direccion queda fija en 56 y el modo pasa a TN): el cuadro salta 4 -> 12 -> 4 ->
+    12 -> 3 -> 11 y las vueltas suben 1 cada DOS segundos: 16 cuadros x 128 ms = **2048 ms** por ciclo. O sea el
+    personaje QUIETO del motor NO esta tieso: cambia de dibujo 7,8 veces por segundo.
+
+Esa es la referencia que la consola tiene que igualar. Y la medicion de la consola NO puede ser "diferenciar dos
+capturas del cuadro entero": medido tambien, el cuadro del motor cambia **420.485 de 480.000 pixeles (87,60 %)**
+entre dos instantes con el personaje quieto, porque re-sombrea la pantalla con las luces cada cuadro (con umbral
+40 sigue cambiando el 49,03 %). Lo que hay que mirar es el CUADRO que se pide dibujar, no los pixeles del cuadro.
+
+Para las dos capturas de la MISMA corrida (que es la unica comparacion valida, porque el pueblo se arma distinto
+en cada corrida: 87,58 % de diferencia entre corridas) `d2app/autoshot.go` ahora acepta una lista:
+`OD2_AUTOSHOT='/tmp/a.png;/tmp/b.png' OD2_AUTOSHOT_SECONDS='12,13'`.
+
 
 Criterio 1: la animacion DISTINGUIDA del desplazamiento -- con el personaje QUIETO y el ciclo corriendo, la caja
 del personaje tiene que cambiar de dibujo, con su numero. Pide el POC de DC-002.38 y Flycast: una sola ventana.
