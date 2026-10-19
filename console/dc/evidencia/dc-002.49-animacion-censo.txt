@@ -215,7 +215,7 @@ exactamente" queda como dato blando y asi se dice.
 
 LA CADENCIA tambien se midio, contra el animdata:
 
-    TN: mediana 127 ms por cambio de cuadro (el animdata dice 128,00)   238 cambios
+    TN: mediana 127-128 ms por cambio de cuadro (el animdata dice 128,00)   238 cambios
     TW: mediana  51 ms por cambio de cuadro (el animdata dice  40,00)    74 cambios
 
 TN clava la cadencia. TW no llega: el bucle de la consola tarda ~50 ms por vuelta mientras CAMINA (mover el
@@ -271,6 +271,11 @@ LO QUE QUEDA DECLARADO (no medido, y se dice):
     distingue. Medirlo bien pide hornear la referencia del host en la posicion exacta de cada captura (el host ya
     acepta `-pos`; se probo con las dos posiciones reales y ahi el instrumento no discrimina). El criterio 1 y el 3
     NO dependen de esto: son con el personaje quieto, que es donde la animacion se puede separar del movimiento.
+  * la DIRECCION del movimiento. El ciclo se compone para UNA direccion (`dirPersonaje = 0`, la misma que dibuja
+    DC-002.38) y el estado si cambia (quieto/caminando), pero caminar hacia el este no gira al personaje. Las 16
+    direcciones no entran en el monton de la consola compuestas a la vez (16 x el ciclo de TN son ~2 MB de
+    cuadros contra un ELF de 7,7 MB) y recargar el ciclo al girar cuesta 3,2 s: pide su propia vuelta (tarjeta
+    aparte), no un parche aca.
   * el emulador MUERE CON SIGBUS cuando el script de la corrida lo cierra (`kill -TERM` al AppImage): el log del
     POC queda cortado en la ultima linea. Se probo que NO es del bucle: la misma corrida con `ESPERA_FINAL=45`
     (el POC andando 70 s, 543 cambios de cuadro, los dos modos) vive hasta que llega el cierre y muere ahi. Las

@@ -5566,7 +5566,7 @@ dueño del proyecto lo dijo mirando la ventana: «se movía sin animación». Er
 * **Criterio 2 (cuántos hay / cuántos se ven).** Del MPQ: **TN 16** cuadros (2.048 ms de ciclo) y **TW 8** (320
   ms), y el host compone **16 y 8 dibujos distintos** (`distintos=16 iguales=0`; del cuadro 0 al de la mitad
   cambian **1.115** px en TN y **1.237** en TW). En la consola el log marca **los 16 de TN (0..15)** y **los 8 de
-  TW (0..7)**; la cadencia medida es **127 ms/cuadro en TN** (el animdata dice 128,00) y **51 ms en TW** (dice
+  TW (0..7)**; la cadencia medida es **127-128 ms/cuadro en TN** (el animdata dice 128,00) y **51 ms en TW** (dice
   40,00: el bucle tarda ~50 ms por vuelta mientras camina — declarado).
 * **Criterio 3 (el mutante).** `CICLO_SORDO=1` (cuadro fijo en 0): las **5 capturas con el personaje quieto son
   idénticas byte a byte** (mismo md5) y la medición da **0 px en los 10 pares**; y el log confirma que el mutante
@@ -5599,8 +5599,10 @@ python3 scripts/console/checar-anim-249.py --host /tmp/dcbuild/anim249/host \
 
 **Lo que NO entra** (declarado, no tapado): la animación de **TW medida en píxeles** sobre la captura (el
 personaje camina a ~300 px/s y en 3 s se va de la ventana del mapa: a la segunda captura está fuera de cuadro y
-en la primera el instrumento no distingue — 68,45 % contra 68,30 %); el **cierre sucio** del emulador (SIGBUS al
-`kill`, después de las capturas: la misma corrida con `ESPERA_FINAL=45` vive 70 s y muere sólo al cierre);
-monstruos, combate y colisión.
+en la primera el instrumento no distingue — 68,45 % contra 68,30 %); la **dirección del movimiento** (el ciclo se
+compone para una sola dirección, `dirPersonaje = 0`: caminar al este no gira al personaje — las 16 direcciones no
+entran en el montón y recargar el ciclo al girar cuesta 3,2 s, así que pide su propia vuelta); el **cierre sucio**
+del emulador (SIGBUS al `kill`, después de las capturas: la misma corrida con `ESPERA_FINAL=45` vive 70 s y muere
+sólo al cierre); monstruos, combate y colisión.
 
 Evidencia: `console/dc/evidencia/dc-002.49-animacion-censo.txt`.
