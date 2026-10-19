@@ -120,9 +120,18 @@ func (b *Reader) ReadByte() (byte, error) {
 }
 
 // ReadBytes lee hasta el separador (incluido). El separador lo elige el que llama.
+//
+// DC-002.47 -- EL ULTIMO TROZO NO SE PIERDE: si el lector de abajo devuelve BYTES Y ERROR EN LA MISMA
+// LLAMADA (que es lo que hace el stream del MPQ: el ultimo pedido entrega lo que queda y `io.EOF`
+// juntos), esos bytes se devuelven igual, con el error, en la misma llamada (como el `ReadSlice` de Go).
+// La version anterior hacia `if err := b.rellenar(); err != nil { return salida, err }` y tiraba lo que
+// `rellenar` acababa de meter en el buffer: una tabla que entraba en un solo pedido se leia VACIA
+// (medido: LvlWarp.txt, 3.935 B contra el buffer de 4.096, daba 0 filas y el arranque moria en la 3a
+// tabla; `console/dc/std/difftest/dc00247_test.go` es la prueba que lo caza).
 func (b *Reader) ReadBytes(delim byte) ([]byte, error) {
 	var salida []byte
 	for {
+		// el error se entrega cuando ya no queda nada en el buffer: con los bytes adentro, no
 		if b.Buffered() == 0 && b.err != nil {
 			return salida, b.err
 		}
@@ -141,8 +150,10 @@ func (b *Reader) ReadBytes(delim byte) ([]byte, error) {
 		}
 		salida = append(salida, trozo...)
 		b.r = b.w
-		if err := b.rellenar(); err != nil {
-			return salida, err
+		// SOLO se pide mas si el lector no fallo todavia: `rellenar` deja el error en b.err y los bytes
+		// (si los hubo) en el buffer, y la vuelta de arriba los devuelve con el error.
+		if b.err == nil {
+			b.rellenar()
 		}
 	}
 }

@@ -4933,19 +4933,37 @@ MUTANTE 3.935 B entra entero      Go=270 registros  d2std=0   registros      <- 
 MUTANTE 11 KB, no entra entero    Go=780 registros  d2std=781 registros      <- FAIL
 ```
 
-**Lo que cambió en el arranque** (Flycast, 50 s, misma capa, lo único distinto es el lector):
+**Lo que cambió en el arranque** (Flycast, 50 s por corrida, mismas capas, lo único que cambia es el lector;
+`bash scripts/console/checar-techo-247.sh 50` → **11 controles OK, 0 con fallo**):
 
 ```
-                          assets del MPQ pedidos   tablas LEÍDAS                    dónde queda
-lector VIEJO                     3                LvlTypes, LvlPrest, LvlWarp      (la pared de DC-002.45)
-lector ARREGLADO                 5                + objtype, + Objects             pide la 6ª (weapons)
+                       assets del MPQ pedidos   tablas LEÍDAS                     dato vivo máx        gc
+lector VIEJO (mutante)         3                LvlTypes, LvlPrest, LvlWarp      406.992 (38,8 %)      3
+lector ARREGLADO (sano)        6                + Objects, + objtype           1.037.096 (98,9 %)   911
+                                                 (y pide la 7ª: weapons.txt)
 ```
 
-Y el mutante del lector, con la partición **nueva** puesta (para que no quede duda de que la pared de las 3
-tablas no era memoria): **3 tablas**, el semiespacio al **36,2 %** (668.472 B de 1.048.576 B **sin usar**) y
-**3 recolecciones** en toda la ventana.
+El mutante del lector — el MISMO binario con el `ReadBytes` de antes y la MISMA partición — vuelve a quedarse
+en las 3 tablas de DC-002.45, con el semiespacio al **38,8 %** y **3 recolecciones** en toda la ventana: la
+pared de las 3 tablas no era memoria, era el último trozo que se tiraba.
 
-**La partición de memoria, medida en cuatro binarios del mismo árbol** (`scripts/console/checar-techo-247.sh`):
+**La partición, medida con las dos particiones y el MISMO lector** (`checar-techo-247.sh`, el control 8
+compara **al mismo tramo**):
+
+```
+partición                          assets   al terminar LvlTypes.txt (mismo tramo)   gc_collect
+1024 KB por lado, .eh_frame fuera     6     408.312 de 1.048.576  (38,9 %)              911
+ 512 KB por lado, .eh_frame adentro   2     389.560 de   524.288  (74,3 %)              726
+```
+
+Al MISMO trabajo hecho (LvlTypes.txt terminada) la partición nueva usa **38,9 %** del semiespacio contra
+**74,3 %** de la vieja: eso es lo que corre la pared. En el máximo del recorrido los dos números quedan
+parecidos (**98,9 %** contra **97,9 %**) porque **el motor llena el semiespacio que le den** — el sano llega a
+6 assets y la vieja se queda en 2. Comparar máximos fue el primer control de esta tarjeta y daba ROJO con el
+arranque yendo tres veces más lejos; el control que sirve compara el mismo tramo.
+
+**Los cuatro binarios de la exploración** (mismo árbol, 50 s cada uno; se corrieron para ELEGIR la partición,
+y de ahí salió que el `.eh_frame` fuera del mapa se queda):
 
 ```
 fin del .bss   1ST_READ.BIN   semiespacio  lector   assets       dato vivo máx        gc_collect  final
@@ -4958,6 +4976,9 @@ fin del .bss   1ST_READ.BIN   semiespacio  lector   assets       dato vivo máx 
 0x8CAB527C     10.935.400 B   1024 KB      VIEJO    3            380.104 / 1.048.576      3       (se queda en 3)
                                                                   (36,2 %)
 ```
+
+El panic de la tercera fila (517 recolecciones) **no se reprodujo** en las corridas del corpus, que pasaron de
+911 y 929 recolecciones sin morir: queda como una observación a vigilar, no como una pared medida.
 
 **Las dos palancas.**
 
@@ -4983,17 +5004,33 @@ fin del .bss   1ST_READ.BIN   semiespacio  lector   assets       dato vivo máx 
 movible) son parte de eso.
 
 **Los corpus** (`scripts/console/checar-trozos-245.sh 50` → **12 controles OK, 0 con fallo**, exit 0;
-`checar-techo-247.sh 50` → **9/9**; `checar-motor-disco-234.sh 25` → **9/9**). El corpus de DC-002.45 ahora
-**recompila del snapshot del árbol** los paquetes de la stdlib que esta tarjeta tocó (`STD_PACKS=bufio`): la
-capa de partida traía los `.gox` de la stdlib de otro día y la corrida medía el árbol de ayer **sin que nada
-lo dijera** — el mismo modo de fallar que el corpus ya castiga del lado del motor.
+`checar-techo-247.sh 50` → **11 controles OK, 0 con fallo**; `checar-motor-disco-234.sh 25` → **9/9**). El
+corpus de DC-002.45 ahora **recompila del snapshot del árbol** los paquetes de la stdlib que esta tarjeta tocó
+(`STD_PACKS=bufio`): la capa de partida traía los `.gox` de la stdlib de otro día y la corrida medía el árbol
+de ayer **sin que nada lo dijera** — el mismo modo de fallar que el corpus ya castiga del lado del motor.
 
-**Lo que esta tarjeta NO cierra, con el número**: con el semiespacio de 1 MB y el `.eh_frame` fuera del mapa
-la corrida 1 muere con `panic: index out of range` después de **517** recolecciones y con el dato vivo en
-**787.176 B (75,1 %)**, o sea con **261.400 B de semiespacio libres**: **no es memoria**, es una pared nueva,
-más allá de las 5 tablas. La corrida sin la palanca del `.eh_frame` pasó por el mismo tramo (**1.087**
-recolecciones) sin morir, y el arranque **no termina**: llega a la 6ª tabla (`weapons.txt`) y ahí se cortan los
-50 s. Cuántas tablas pide el arranque completo no lo dice esta tarjeta.
+Los números del sano en el corpus de DC-002.45, con la partición nueva: **6 assets** del MPQ, **5 tablas
+leídas** (la última pedida es `weapons.txt`), dato vivo máximo **1.037.096 B de 1.048.576 (98,9 %)** y **929**
+recolecciones; el mutante del `ReadAll` completa 4 lecturas y 5 assets con el dato vivo en 566.088 B (53,9 %).
+Tres cosas del instrumento que el corpus ahora exige, porque las tres se midieron rotas en esta tarjeta:
+
+* `checar-trozos-245.sh 50` **son 50 segundos**: el parseo viejo dejaba 25 (`SEGS="${2:-25}"` y los segundos en
+  `$1`) y las corridas se cortaban a los 25 s sin que nada lo dijera (los `win-025s.png` de todas las corridas).
+* el control 0e exige **la marca `gc-vivo` en `gc_copy.c`**: la cadena del runtime resetea el archivo y se
+  lleva el instrumento, con lo que la corrida sigue pero los números no existen (medido: el sano corrió sin
+  una sola marca y el corpus solo podía dejar una nota).
+* el corpus **fija la partición que mide** (`SEMI_KB=1024`): el runtime vendorizado es uno solo y lo comparten
+  todas las tarjetas; entre dos corridas otra tarjeta lo dejó en el semiespacio viejo y los controles de la
+  lectura se pusieron rojos **sin que el arreglo hubiera cambiado** (marcas `gsemi=373472/524288` contra un
+  techo de 1.048.576 leído al empezar).
+
+**Lo que esta tarjeta NO cierra, con el número**: el arranque **no termina** — llega a la 6ª tabla
+(`weapons.txt`) y ahí se cortan los 50 s — y con la partición de 1 MB el dato vivo vuelve a tocar el techo
+(**1.037.096 de 1.048.576 = 98,9 %**): el motor llena el semiespacio que le den, así que la tarjeta siguiente
+es la misma pregunta un piso más arriba (bajar el dato vivo o mover la partición otra vez, ahora con el montón
+de C medido). El `panic: index out of range` que apareció en una corrida de la exploración (517 recolecciones,
+dato vivo 787.176 B, 261.400 B libres) **no se reprodujo** en las corridas del corpus (911 y 929 recolecciones,
+sin muerte) y queda como observación a vigilar, no como pared medida.
 
 **Cómo se repite**:
 
@@ -5005,6 +5042,31 @@ python3 scripts/console/mutar-bufio-247.py --estado # sano | mutante del lector
 ```
 
 Evidencia: `console/dc/evidencia/dc-002.47-techo-del-arranque.txt`.
+
+### DC-002.47, cierre medido (2026-10-19 09:4x): el corpus queda **11/11** y el **control 8 estaba mal**
+
+El defecto de raíz ya está arriba; lo que faltaba era la corrida con el instrumento sano. `bash
+scripts/console/checar-techo-247.sh 50` → **11 controles OK, 0 con fallo (exit 0)**.
+
+**El control 8 mezclaba tramos y por eso daba rojo con la partición buena.** Comparaba el MÁXIMO del dato vivo
+del recorrido: **98,9 %** (sano, semiespacio 1.048.576 B) contra **97,9 %** (partición vieja, 524.288 B), o sea
+"la partición nueva no baja la ocupación" — y el que se muere antes (2 assets) no alcanza a llenarse. Al
+**mismo tramo** (`lee-volvio` de la primera tabla del MPQ) la partición nueva usa **408.312 B de 1.048.576
+(38,9 %)** y la vieja **389.560 B de 524.288 (74,3 %)**, con **2 contra 11** recolecciones en ese punto. El
+control ahora mide eso; los máximos quedan como nota. Lección: una comparación entre corridas que recorren
+distancias distintas no discrimina, por más números que tenga.
+
+**Los tres estados, 50 s cada uno**: sano (**lector arreglado + partición nueva**) = **6 assets / 5 tablas**
+(LvlTypes, LvlPrest, LvlWarp, Objects, objtype), dato vivo máx **1.037.096 de 1.048.576 (98,9 %)**, `gc_collect`
+máx **905**; mutante (**lector viejo**) = **3 assets**, **406.992 (38,8 %)**, gc máx **4**; partición vieja
+(**`.eh_frame` dentro del mapa**, 512 KB) = **2 assets**, **513.448 (97,9 %)**, gc máx **726**.
+
+**Declarado, no tapado**: el arranque sigue muriendo más allá de las 5 tablas en `fatal error:
+gc_external_alloc: OOM` (el que no entra es el **montón de C**: `arena=5.422.432 used=5.380.984 free=41.448`),
+y el arranque es **flaky** (en una corrida intermedia el lado del mutante no llegó ni al primer MPQ: 0 assets,
+mismo binario que en la anterior daba 3 — es el agujero de DC-002.39c/243, no esta palanca).
+
+Evidencia: `console/dc/evidencia/dc-002.47-techo-del-arranque.txt` (sección 8).
 
 ## 69. DC-002.42 (cierre medido): el corpus de la tabla en el disco queda **21/21** — el rojo del criterio 2 era el **runtime sin reenlazar**, y al re-medir apareció que el horneador había **perdido el bucle del `.pack`**
 

@@ -54,11 +54,39 @@ GOX_MUT="$SAL/gox-mut"
 LISTA="patch_d2.mpq,d2data.mpq,d2char.mpq"
 SEGS="${2:-25}"
 REFRESCAR=0
-[ "${1:-}" = "--refrescar" ] && REFRESCAR=1
+case "${1:-}" in
+    --refrescar) REFRESCAR=1 ;;
+    # DC-002.47: el uso documentado es `checar-trozos-245.sh 50` (los segundos primero, como en los demas
+    # corpus). Antes eso dejaba SEGS=25 -- el valor por defecto del segundo argumento -- y las corridas se
+    # cortaban a los 25 s sin que nada lo dijera (medido: los `win-025s.png` de todas las corridas). Un numero
+    # suelto en $1 son los segundos.
+    ""|*[!0-9]*) ;;
+    *) SEGS="$1" ;;
+esac
 
 LIBGODC="${LIBGODC:-$HOME/dreamcast/libgodc}"
 PACKS="d2common/d2fileformats/d2txt d2common/d2loader d2core/d2asset"
+# DC-002.47: EL TECHO NO ES UNA CONSTANTE, ES UNA VOLUNTAD. El tamano del semiespacio del GC lo fija
+# `godc_config.h` del runtime vendorizado y esta tarjeta lo movio (la voluntad se deja con
+# `fix-libgodc-semiespacio-245.py --kb N`, que ademas rehace libgodc.a). Si el techo queda escrito a mano en
+# los controles, una corrida con otro semiespacio mide contra un numero que no es el suyo: los controles
+# tienen que leer el techo de donde vive. Se lee de la misma voluntad.
+#
+# Y LA VOLUNTAD LA FIJA EL CORPUS, NO EL ENTORNO DE TURNO (medido, 2026-10-19): el runtime vendorizado es UNO
+# SOLO y lo comparten todas las tarjetas del tablero, asi que entre dos corridas de este corpus alguien puede
+# dejarlo en el semiespacio viejo: la corrida entonces mide OTRA particion y los controles de la lectura se
+# ponen rojos sin que el arreglo haya cambiado (medido: el semiespacio en 512 KB mientras el corpus leia el
+# techo al empezar, marcas `gsemi=373472/524288` contra `TECHO=1048576`). El corpus DECLARA la particion que
+# mide y la deja puesta antes de armar nada. Es la misma regla que con la capa de partida: el binario que se
+# mide tiene que salir del arbol y de la particion que dice el corpus.
+SEMI_KB="${SEMI_KB:-1024}"
+"$DC_PYTHON" "$HERE/fix-libgodc-semiespacio-245.py" "$LIBGODC" --kb "$SEMI_KB" | sed 's/^/   /'
+TECHO="$("$DC_PYTHON" "$HERE/fix-libgodc-semiespacio-245.py" "$LIBGODC" --estado 2>/dev/null |
+    grep -m1 'cada semiespacio' | sed 's/.*cada semiespacio: *\([0-9]*\) B.*/\1/')"
+[ -n "${TECHO:-}" ] || TECHO=$((SEMI_KB * 1024))
 LECTURA="data/global/excel/LvlPrest.txt"
+# DC-002.47: los paquetes de la stdlib minima que se recompilan del arbol en cada capa (ver `capa()`).
+STD_PACKS="${STD_PACKS:-bufio}"
 
 OK=0
 FALLOS=0
@@ -78,7 +106,7 @@ VIEJO="$(find "$LIBGODC/runtime" -name '*.c' -newer "$LIBGODC/libgodc.a" -print 
 if [ -n "$VIEJO" ]; then
     rojo "control 0: libgodc.a esta VIEJO ($(basename "$VIEJO") es mas nuevo): corre 'make -C $LIBGODC' y volve a medir"
 else
-    verde "control 0: libgodc.a ($(stat -c%s "$LIBGODC/libgodc.a") bytes) es mas nuevo que sus fuentes"
+    verde "control 0: libgodc.a ($(stat -c%s "$LIBGODC/libgodc.a") bytes) es mas nuevo que sus fuentes; el corpus deja el semiespacio en $SEMI_KB KB y lo lee de godc_config.h ($TECHO B)"
 fi
 
 if [ "$(cd "$REPO" && "$DC_PYTHON" scripts/console/fix-mpq-tablas-233.py --estado | tail -1 | grep -c '7/7 como el arreglo')" = "1" ]; then
@@ -91,9 +119,21 @@ fi
 # no mide la lectura: el camino por trozos hace una recoleccion cada 4 KB de tabla, el cache de itabs de
 # `.bss` queda apuntando a la mitad vieja del semiespacio y la CPU salta a basura (PC 6c000000) DENTRO de un
 # gc_collect. Medido en esta tarjeta; el porque esta en scripts/console/fix-libgodc-itab-245.py.
+#
+# Y DC-002.47: el control tambien exige EL INSTRUMENTO DEL DATO VIVO. La cadena del runtime
+# (`fix-libgodc-cadena.sh`) RESETEA `gc_copy.c` y se lleva la marca `gc-vivo` (que es el numero que decide
+# esta tarjeta): sin ella la corrida sigue, pero los numeros no existen y el corpus solo puede dejar una
+# nota -- un corpus que no puede medir su numero no puede decir que esta verde. Medido el 2026-10-19: el
+# instrumento se habia caido con un rearme del vendor y el sano corrio sin una sola marca `gc-vivo`.
 ESTADO_ITAB="$("$DC_PYTHON" "$HERE/fix-libgodc-itab-245.py" "$LIBGODC" --estado 2>/dev/null | tail -1)"
+INSTRUMENTO="$(grep -cF 'godc_marca("gc-vivo"' "$LIBGODC/runtime/gc_copy.c" 2>/dev/null || true)"
 case "$ESTADO_ITAB" in
-    *"arreglado"*) verde "control 0e: el runtime pide los itabs al monton de C (fuera del monton movible)" ;;
+    *"arreglado"*)
+        if [ "${INSTRUMENTO:-0}" -ge 1 ]; then
+            verde "control 0e: el runtime pide los itabs al monton de C (fuera del monton movible) y trae el instrumento del dato vivo (gc_copy.c)"
+        else
+            rojo "control 0e: el runtime trae el itab arreglado pero le FALTA la marca 'gc-vivo' en gc_copy.c: los numeros de la corrida no existen. Correr: python3 $HERE/instrumentar-vivo-245.py $LIBGODC && make -C $LIBGODC"
+        fi ;;
     *) rojo "control 0e: el runtime NO trae el arreglo de itabs ($ESTADO_ITAB): correr fix-libgodc-itab-245.py $LIBGODC y make" ;;
 esac
 
@@ -158,6 +198,16 @@ capa() { # $1 = destino, $2 = dir de donde copiar (vacio = $GEN_BASE)
     python3 "$HERE/reescribe-rutas-gox.py" "${2:-$GEN_BASE}" "$1" "$1" > /dev/null || exit 1
     revisa_rutas "$1" || exit 1
     nota "capa copiada de ${2:-$GEN_BASE}: $1"
+    # DC-002.47: LA STDLIB MINIMA TAMBIEN ES DEL ARBOL DE HOY. La capa de partida trae los .gox de la stdlib
+    # compilados en un arbol de otro dia, y esta tarjeta CAMBIO un paquete de la stdlib (el lector por trozos
+    # de `d2std/bufio`). Sin este paso la capa lleva el lector VIEJO y la corrida mide el arbol de ayer sin
+    # que nada lo diga -- el mismo error que el comentario de arriba. Se recompilan de la COPIA de fuentes
+    # (el snapshot que este corpus acaba de sacar), NO del checkout vivo: otro agente del tablero puede estar
+    # editando el checkout a mitad de la corrida y las dos capas tienen que salir del MISMO arbol.
+    for p in $STD_PACKS; do
+        sha="$(bash "$SRC/scripts/console/compilar-paquete-std.sh" "$p" "$1" | tail -1)"
+        nota "   stdlib del arbol: $sha"
+    done
 }
 
 compila() { # $1 = capa, $2 = paquete (en la COPIA de fuentes)
@@ -170,8 +220,13 @@ armar() { # $1 = nombre (dir), $2 = dir de .gox
         nota "ya construido: $1"; return 0
     fi
     revisa_rutas "$2" || exit 1
+    # DC-002.47: la PARTICION de memoria es parte del entorno del corpus, no un detalle de cada corrida: el
+    # semiespacio lo fija `godc_config.h` del vendor (`fix-libgodc-semiespacio-245.py --kb`) y el `.eh_frame`
+    # fuera del mapa lo agrega esta palanca del enlace (`DC_EH_FINAL=1`, medido: el fin del `.bss` baja
+    # 1.076.448 B y el monton de C gana ese techo). Se declara aca para que el corpus sea reproducible: el
+    # binario que se mide es el de la particion que la tarjeta dejo, no el que salga del entorno de turno.
     ( cd "$SRC" && MKISO_JOLIET=0 DC_RUTA_DATOS=/cd/juego DC_MPQ_JUEGO="$LISTA" DC_SIN_SELLOS=1 \
-        DC_DISCO_JUEGO="$SAL/juego" POC=motor-arranque \
+        DC_DISCO_JUEGO="$SAL/juego" POC=motor-arranque DC_EH_FINAL="${DC_EH_FINAL:-1}" \
         bash scripts/console/build-motor-arranque.sh "$dir" "$2" ) > "$dir.build.log" 2>&1 ||
         { echo "   NO COMPILA/ARMA $1 (ver $1.build.log)"; exit 1; }
     nota "$1: 1ST_READ.BIN $(stat -c%s "$dir/1ST_READ.BIN") bytes, ISO $(stat -c%s "$dir/disc.iso") bytes"
@@ -308,10 +363,10 @@ LEE_VOLVIO_LINEA=$(log_de "$SAL/run-sano" | grep -an "ARQ-CARGA lee-volvio .*$LE
 GSEMI_VOLVIO=""
 [ -n "${LEE_VOLVIO_LINEA:-}" ] && GSEMI_VOLVIO=$(log_de "$SAL/run-sano" | sed -n "${LEE_VOLVIO_LINEA}p" | sed 's/.*gsemi=\([0-9]*\)\/.*/\1/')
 if [ -n "${LEE_VOLVIO_LINEA:-}" ] && [ -n "${LEE_ENTRA:-}" ] && [ "$LEE_VOLVIO_LINEA" -gt "$LEE_ENTRA" ]; then
-    if [ -n "${GSEMI_VOLVIO:-}" ] && [ "$GSEMI_VOLVIO" -lt 524288 ]; then
-        verde "control 3: lee-volvio de LvlPrest.txt esta (linea $LEE_VOLVIO_LINEA, despues del lee-entra de la $LEE_ENTRA) con gsemi=$GSEMI_VOLVIO < 524288"
+    if [ -n "${GSEMI_VOLVIO:-}" ] && [ "$GSEMI_VOLVIO" -lt "$TECHO" ]; then
+        verde "control 3: lee-volvio de LvlPrest.txt esta (linea $LEE_VOLVIO_LINEA, despues del lee-entra de la $LEE_ENTRA) con gsemi=$GSEMI_VOLVIO < $TECHO ($((TECHO - GSEMI_VOLVIO)) B debajo del techo)"
     else
-        rojo "control 3: el lee-volvio de LvlPrest.txt esta pero con gsemi=${GSEMI_VOLVIO:-?} (queria < 524288)"
+        rojo "control 3: el lee-volvio de LvlPrest.txt esta pero con gsemi=${GSEMI_VOLVIO:-?} (queria < $TECHO; el techo lo fija godc_config.h)"
     fi
 else
     rojo "control 3: NO hay lee-volvio de LvlPrest.txt en la corrida del arreglo (lee-entra=$LEE_ENTRA lee-volvio=${LEE_VOLVIO_LINEA:-ninguno})"
@@ -355,17 +410,28 @@ S_GS_VOLVIO="$(printf '%s' "$S_VOLVIO" | sed 's/.*gsemi=\([0-9]*\).*/\1/')"
 M_FREE_ENTRA=""
 if [ -n "$M_ENTRA" ]; then
     M_GS_ENTRA="$(printf '%s' "$M_ENTRA" | sed 's/.*gsemi=\([0-9]*\).*/\1/')"
-    [ -n "$M_GS_ENTRA" ] && M_FREE_ENTRA=$((524288 - M_GS_ENTRA))
+    [ -n "$M_GS_ENTRA" ] && M_FREE_ENTRA=$((TECHO - M_GS_ENTRA))
 fi
+# DC-002.47: LA PROPIEDAD SE MIDE DONDE HAY CONTADOR, Y EL PROXY DE LA CONSOLA DEJO DE VALER.
+# El control de DC-002.45 era un proxy: "la marca `gsemi` de la lectura no crece el semiespacio en el tamano
+# del archivo". Ese proxy pasaba POR CASUALIDAD: en la ventana de UNA tabla caia una recoleccion entera (la
+# marca de gc pasaba de 7 a 1122 con 512 KB) y el delta salia NEGATIVO. Con la particion de 1 MB las
+# recolecciones de la ventana son 2-3 y el delta es lo que crecen las FILAS PARSEADAS -- medido: 219.944 B,
+# mas que los 134.937 B del archivo, que no se materializan. Un control que depende de donde caiga una
+# recoleccion no dice nada del arreglo, asi que el proxy baja a nota y la propiedad se mide con el CONTADOR
+# del lector, que es lo unico que distingue "por trozos" de "de un tiron": la difftest del host lee la tabla
+# REAL por trozos y dice cuantas veces le pidio bytes y cual fue el pedido mayor (el sector del MPQ, 4.096 B).
+# Con el lector viejo la tabla no sale (0 filas): esa es la difftest de DC-002.47.
 if [ -n "$S_GS_VOLVIO" ] && [ -n "$S_GS_ENTRA" ]; then
-    DELTA=$((S_GS_VOLVIO - S_GS_ENTRA))
-    if [ "$DELTA" -lt 32768 ]; then
-        verde "control 7: la marca de la lectura del arreglo crece $DELTA B (el archivo son $LECTURA_BYTES B): la tabla NO se materializa"
-    else
-        rojo "control 7: la marca de la lectura del arreglo crece $DELTA B, del orden del archivo ($LECTURA_BYTES B): la tabla se esta materializando"
-    fi
+    nota "la marca de la lectura del arreglo crece $((S_GS_VOLVIO - S_GS_ENTRA)) B con un archivo de $LECTURA_BYTES B (lo que crecen las FILAS; con 1 MB por lado hay 2-3 recolecciones en la ventana y no 1.121)"
+fi
+PEDIDOS_LINE="$((cd "$SRC/console/dc/std" && go test ./difftest/ -run TablaRealLvlPrestPorTrozos -v) 2>&1 | grep -a 'pedidos=' | tail -1)"
+PEDIDOS="$(printf '%s' "$PEDIDOS_LINE" | sed 's/.*pedidos=\([0-9]*\).*/\1/')"
+MAYOR="$(printf '%s' "$PEDIDOS_LINE" | sed 's/.*pedido mayor=\([0-9]*\) B.*/\1/')"
+if [ -n "${PEDIDOS_LINE:-}" ] && [ "${PEDIDOS:-0}" -ge 30 ] && [ "${MAYOR:-99999}" -le 4096 ]; then
+    verde "control 7: la tabla se lleva POR TROZOS -- la difftest del host le pidio al lector $PEDIDOS veces y el pedido mayor fue de $MAYOR B ($LECTURA_BYTES B de archivo): no se la pide de un tiron"
 else
-    rojo "control 7: no estan las dos marcas de la lectura del arreglo (lee-entra='$S_ENTRA' lee-volvio='$S_VOLVIO')"
+    rojo "control 7: la difftest del host no dice que la lectura sea por trozos ('$PEDIDOS_LINE')"
 fi
 if [ -n "$M_FREE_ENTRA" ]; then
     MARGEN=$((M_FREE_ENTRA - LECTURA_BYTES))
@@ -395,8 +461,8 @@ for e in sano mutante; do
     MUERTE=$(log_de "$SAL/run-$e" | grep -aE '^fatal error|^panic:|^Memory: arena=' | head -2 | tr '\n' ' ')
     MAXV=$(log_de "$SAL/run-$e" | grep -ao 'gc-vivo v=[0-9]*' | sed 's/.*v=//' | sort -n | tail -1)
     echo "   -- $e: marcas=$MARKS lecturas-terminadas=$TROZOS assets-de-MPQ=$TABLAS"
-    echo "      semiespacio: max en las marcas=${MAXS:-?} max del runtime=${MAXU:-?} de 524288"
-    echo "      dato VIVO maximo (gc-vivo, lo que sobrevive a una copia): ${MAXV:-?} de 524288"
+    echo "      semiespacio: max en las marcas=${MAXS:-?} max del runtime=${MAXU:-?} de $TECHO"
+    echo "      dato VIVO maximo (gc-vivo, lo que sobrevive a una copia): ${MAXV:-?} de $TECHO"
     echo "      ultima marca: $(log_de "$SAL/run-$e" | grep -a 'ARQ-CARGA' | tail -1 | cut -c1-100)"
     echo "      muerte: ${MUERTE:-MUDA}"
 done
@@ -408,8 +474,8 @@ paso "11. el dato VIVO: cuanto queda del semiespacio despues de la recoleccion (
 for e in sano mutante; do
     V=$(log_de "$SAL/run-$e" | grep -ao 'gc-vivo v=[0-9]*' | sed 's/.*v=//' | sort -n | tail -1)
     if [ -n "${V:-}" ]; then
-        P=$((V * 1000 / 524288))
-        nota "$e: dato vivo maximo $V B de 524288 ($((P / 10)).$((P % 10)) %), quedan $((524288 - V)) B"
+        P=$((V * 1000 / TECHO))
+        nota "$e: dato vivo maximo $V B de $TECHO ($((P / 10)).$((P % 10)) %), quedan $((TECHO - V)) B"
     else
         nota "$e: sin marcas gc-vivo (el runtime no trae instrumentar-vivo-245.py; no es un fallo del arreglo)"
     fi

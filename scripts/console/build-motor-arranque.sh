@@ -138,13 +138,49 @@ N_REPETIDOS="$((N_STD - $(wc -l < "$ORDEN_STD")))"
 # DC-002.14: DC_LDEXTRA existe para medir el RECORTE del binario (-Wl,--gc-sections, que necesita los .gox
 # compilados con -ffunction-sections -fdata-sections) sin duplicar este script. Vacio por defecto: el
 # binario de siempre (el que mide la tarjeta DC-002.13) sale con la MISMA linea de enlace que antes.
+#
+# DC-002.47 -- DC_EH_FINAL=1: EL `.eh_frame` AL FINAL DEL MAPA Y FUERA DE LA IMAGEN PLANA. Es la palanca que
+# le da AIRE AL MONTON DE C, y es la unica que queda cuando lo que no entra es el monton (DC-002.21/32/47).
+#
+# POR QUE (medido en DC-002.32, re-medido en DC-002.47): el `.eh_frame` del motor son 1.076.512 bytes de
+# tablas de desenrollado, y en el mapa de KOS caen EN MEDIO (antes de `.data`), asi que sacarlas con
+# `objcopy -R .eh_frame` NO baja la imagen plana: queda un hueco que se rellena para conservar las
+# direcciones de lo que viene despues. Lo que hace esta palanca es lo otro: generar un script de linker con
+# el `.eh_frame` AL FINAL (`gen-ldscript-eh-247.py`) y enlazar con el. Con eso lo que sigue al `.eh_frame`
+# es solo el `.bss` (NOBITS: no ocupa bytes en la imagen), sacarlo baja la imagen EXACTAMENTE su tamano, el
+# fin del `.bss` se corre para abajo con ella y el monton de C (que empieza justo arriba del fin del `.bss`)
+# GANA esos bytes de techo. Y no cuesta traza: el panic de la consola usa el frame pointer de KOS
+# (`arch_stk_trace`), no el `.eh_frame` (medido: la traza sale identica sin el, DC-002.32).
+DC_EH_SCRIPT=""
+if [ "${DC_EH_FINAL:-0}" = "1" ]; then
+    DC_EH_SCRIPT="$OUT/ld-eh-final.xc"
+    "$DC_PYTHON" "$HERE/gen-ldscript-eh-247.py" "$DC_EH_SCRIPT" | sed 's/^/   /'
+    # OJO, MEDIDO: el script de KOS se REEMPLAZA en KOS_LDFLAGS, no se agrega otro `-T` al lado. Con los
+    # dos `-T` el linker acumula las dos descripciones de secciones y muere con
+    #   ld: section .rodata LMA [8c010000,8c010007] overlaps section .text LMA [8c010000,8c4d7df7]
+    # (medido en DC-002.47 con DC_LDEXTRA="-Wl,-T,<copia>"). Reemplazando, el mapa es UNO solo: el de la copia.
+    KOS_LDFLAGS="${KOS_LDFLAGS//-T$KOS_BASE\/utils\/ldscripts\/shlelf.xc/-T$DC_EH_SCRIPT}"
+    export KOS_LDFLAGS
+    case "$KOS_LDFLAGS" in
+        *"$DC_EH_SCRIPT"*) echo "   DC-002.47: el script de linker de KOS se cambio por $DC_EH_SCRIPT" ;;
+        *) echo "   DC-002.47: NO pude cambiar el script de linker (KOS_LDFLAGS no traia -T$KOS_BASE/utils/ldscripts/shlelf.xc)" >&2; exit 1 ;;
+    esac
+fi
 # shellcheck disable=SC2046,SC2086
 kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $EXTRA_OBJS $STD_C_OBJS $ROMDISK_OBJ \
     $(tr '\n' ' ' < "$ORDEN_STD") $(tr '\n' ' ' < "$GEN/orden-motor.txt") \
     ${DC_LDEXTRA:-} $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
 
 echo "== 5/5 binario de arranque (1ST_READ.BIN) + IP.BIN + imagen =="
-sh-elf-objcopy -R .stack -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"
+# DC-002.47: con la palanca puesta, el `.eh_frame` (que quedo AL FINAL del mapa) sale de la imagen plana.
+# Sin la palanca, la linea de siempre (byte por byte la de DC-002.13).
+DC_EH_OBJCOPY=""
+if [ "${DC_EH_FINAL:-0}" = "1" ]; then
+    DC_EH_OBJCOPY="-R .eh_frame"
+    echo "   DC-002.47: palanca del .eh_frame puesta (al final del mapa y fuera de la imagen plana)"
+fi
+# shellcheck disable=SC2086
+sh-elf-objcopy -R .stack $DC_EH_OBJCOPY -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"
 "$DC_MAKEIP" -f "$OUT/IP.BIN" >/dev/null
 "$DC_PYTHON" "$HERE/mkiso.py" "$OUT/disc.iso" "$OUT/IP.BIN" "$OUT/1ST_READ.BIN"
 "$DC_PYTHON" "$HERE/mkgdi.py" "$OUT"
