@@ -4747,3 +4747,63 @@ disco traiga el juego completo, y el listado tiene tope de 64 entradas por direc
 avisa, no se inventa).
 
 Evidencia: `console/dc/evidencia/dc-002.45-lista-del-disco-por-el-driver.txt`.
+
+## 66. DC-002.46: el corpus de DC-002.40 **vuelve a 16/16** — los cuatro rojos (M6/M7/M8/M10) eran el **runtime vendorizado**, no el corpus, y ahora el corpus trae los tres controles que lo dicen
+
+La tarjeta reportaba `bash scripts/console/checar-compr-240.sh <capa limpia de HEAD>` en **9/13** con los
+cuatro controles del MOTOR en rojo, y el log imprimiendo M1..M5 y **rearmándose** (M6/M7/M8/M10 nunca salen).
+Ya estaba descartado el instrumento, la capa y el `OBJECTLOOKUPS.PACK`. Lo que quedaba por mirar era lo que el
+corpus **no** medía: el runtime vendorizado, que es un `.a` que se arma **aparte** (`make -C ~/dreamcast/libgodc`)
+y no viene del repo.
+
+Los 9/13 se midieron con un `libgodc.a` de las **03:09**. Entre esa corrida y esta el runtime cambió dos veces:
+`runtime/interface_dreamcast.c` (05:50, el arreglo de DC-002.39e: el itab sale del montón **movible** y se pide
+al montón de C con `gc_external_alloc`) y `runtime/gc_copy.c` + `libgodc.a` rearmado (06:03). Con el `.a` de
+**hoy**, la capa del árbol de HEAD limpio (`/tmp/gox-246`, 205 `.gox`) y el mismo disco, el corpus da:
+
+```
+control 0  (el host, patch_d2):          VERDE      control 7  (M6 el MOTOR, 162 nombres):   VERDE
+control 0b (libgodc.a no esta viejo):    VERDE      control 8  (M7 el control sano DC6):     VERDE
+control 0c (el itab FUERA del monton):   VERDE      control 9  (M8 200/200 sin fallos):      VERDE
+control 0d (la capa es la de este arbol):VERDE      control 10 (M10 aislado con buffers C):  VERDE
+control 1  (el host, los otros dos):     VERDE      control 11 (M6 d2data Y d2char al host): VERDE
+control 2  (M1 los 662 bytes):           VERDE
+control 3  (M2 el defecto declarado):    VERDE      mutante 'avail-in-cero'  -> cae el 5   -> CAZADO
+control 4  (M3 el puente streaming):     VERDE      mutante 'pos-de-un-tiro' -> cae el 5b  -> CAZADO
+control 5  (M4 compress/zlib ARREGLADO): VERDE      vuelta sano                          -> 16/16
+control 5b (M4b el paquete de a 512):    VERDE                                  == 2 verdes, 0 fallos ==
+control 6  (M5 el crudo del disco):      VERDE
+```
+
+Los números del motor, los tres MPQ por el camino del motor (`d2mpq.FromFile` + `ReadFile`): patch_d2
+**5502 / 162 nombres / crc32 502100774**, d2data **466867 / 11082 / 923032874**, d2char **418279 / 10009 /
+1367999602** — los tres del host. `M8` 200 vueltas con `fallos= 0` y `M10` 200/200.
+
+**La prueba en contra** (para que el verde no sea de palabra): `scripts/console/mutar-runtime-itab-246.sh`
+copia el árbol de Dreamcast a un `DC_ROOT` propio y cambia **una línea** del runtime vendorizado —
+`gc_external_alloc(total_size)` por `gc_alloc(total_size, NULL)`, o sea el itab de vuelta en el montón
+**movible** — y rearma el `.a` **en ese árbol** (sin rearmarlo el corpus enlaza el runtime sano y el mutante
+es invisible). Con eso, mismo árbol de fuentes, misma capa, mismo disco: **9/16**, con `0c`, `7`, `8`, `9`,
+`10` y `11` en ROJO y el log rearmándose 33 veces sin llegar a M6. Es el síntoma exacto que reportaba la
+tarjeta, y ahora tiene nombre y apellido en la primera línea de la salida.
+
+Lo que se mudó en el corpus (13 → **16** controles):
+
+* **0b (nuevo)** — `libgodc.a` no está viejo: ninguna fuente del runtime es más nueva que el `.a`. Ya existía
+  en el corpus de DC-002.34; acá faltaba, y es justo la herramienta con la que se estaba midiendo.
+* **0c (nuevo)** — el `get_itab` pide el itab al montón de C. Es un control de **fuente**: dice el nombre del
+  defecto (DC-002.39e) en vez de dejar que el síntoma se lea como "el motor no avanza".
+* **0d (nuevo)** — la capa de `.gox` es la de **este** árbol: cada paquete de `orden-motor.txt` tiene que
+  estar y ningún `.go` suyo puede ser más nuevo que su `.gox`. El corpus tomaba por **defecto** la capa
+  `/tmp/gox-240` (la de la época de DC-002.40) y nada avisaba: medir el motor de hoy con la capa de ayer da
+  números que no son de hoy. Medido: `/tmp/gox-246` contra HEAD → 0 paquetes con problema; `/tmp/gox-240`
+  contra HEAD → 6 (d2mpq, d2records, d2loader, d2asset, d2app y uno más).
+* **9 (mudado)** — M8 pedía `fallos>0` con `rc_zlib= -3` (el defecto del montón de Go de DC-002.40, arreglado
+  en DC-002.41). Ahora pide `fallos= 0`: es el defecto que **ya no queda**, y si vuelve, se pone ROJO.
+* **11 (mudado)** — pedía lo contrario de lo que pasa: "d2data/d2char NO llegan a los números del host" era el
+  bloqueo declarado. Desde DC-002.39e **sí** llegan, así que ahora el control pide que los dos lleguen.
+
+Ojo con lo que esta tarjeta **no** arregló: el defecto del itab ya estaba arreglado en el vendor (05:50). Lo
+que se hizo fue medirlo, nombrarlo y dejar el corpus con los controles que lo cazan.
+
+Evidencia: `console/dc/evidencia/dc-002.46-corpus-16.txt`.

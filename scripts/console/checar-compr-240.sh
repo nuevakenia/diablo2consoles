@@ -14,6 +14,22 @@
 # del host). El arreglo es que `d2std/compress/zlib` pase al puente EN STREAMING (el mismo del gzip).
 #
 # CONTROLES
+#  0b RUNTIME   `libgodc.a` NO esta viejo: ninguna fuente del runtime es mas nueva que el `.a`. Es el
+#              archivo VENDORIZADO que se arma aparte (`make -C ~/dreamcast/libgodc`), y si quedo atras el
+#              binario que se mide NO es el de las fuentes (medido en DC-002.43: un `.a` de 01:40 con
+#              `gc_copy.c` de las 02:54 y el arranque ni abria un MPQ). Sin este control, un rojo del motor
+#              se lee como "el motor no avanza" cuando lo que pasa es que el runtime es otro.
+#  0c RUNTIME   el `get_itab` del runtime pide el itab al monton de C (`gc_external_alloc`), NO al monton
+#              movible de Go. Es el arreglo de DC-002.39e y es LO QUE ESTA TARJETA VIENE A CAZAR: con el
+#              itab en el monton movible, `itab_cache` (que vive en `.bss`, y el GC NO barre `.bss`) queda
+#              apuntando a la mitad vieja del semiespacio y el (listfile) del tercer MPQ salta a un pedazo
+#              de DATO. Medido: con ese defecto puesto el corpus da 9/16 (M6/M7/M8/M10 no imprimen).
+#  0d CAPA      la capa de `.gox` que se mide es la de ESTE arbol: cada paquete de `orden-motor.txt` esta, y
+#              ningun `.go` suyo es mas nuevo que su `.gox`. POR QUE: el corpus tomaba por DEFECTO la capa
+#              `/tmp/gox-240` (la de la epoca de DC-002.40) y medir el motor de hoy con la capa de ayer da
+#              numeros que no son de hoy, sin que nada lo diga. Medido: `/tmp/gox-246` contra HEAD = 0
+#              paquetes con problema; `/tmp/gox-240` contra HEAD = 6 (d2mpq, d2records, d2loader, d2asset,
+#              d2app y uno mas).
 #  0 HOST      la sonda sobre patch_d2.mpq: Flags=0x80030200, sector 0 guardado=662 crc32=3898719478,
 #              inflado=4096 crc32=2274402335, (listfile) 5502 bytes crc32=502100774 con 162 nombres.
 #  1 HOST      la referencia de los OTROS DOS: d2data 466867 crc32=923032874 (11082 nombres) y d2char
@@ -31,15 +47,19 @@
 #              crc32=502100774. Es el criterio 2 de la tarjeta, cumplido con los numeros del host.
 #  8 CONSOLA M7  el control sano de la tarjeta: el DC6 con implode (SIN encriptar) sigue igual
 #              (141944 bytes, suma 1831109629). Si esto cambia, el disco o el motor cambiaron.
-#  9 CONSOLA M8  el defecto que QUEDA, medido: 200 vueltas del MISMO camino con los buffers en el monton
-#              de Go y falla (rc_zlib=-3, Z_DATA_ERROR) con el dato de entrada intacto. No es la zlib: es
-#              el monton (ver 10).
+#  9 CONSOLA M8  el defecto que QUEDABA (DC-002.41), hoy ARREGLADO: 200 vueltas del MISMO camino con los
+#              buffers en el monton de Go y CERO fallos (`fallos= 0`). Antes de DC-002.41 esto daba fallos>0
+#              con rc_zlib=-3 (Z_DATA_ERROR) y el dato de entrada intacto; el control 10 aisla el defecto.
+#              MUDADO EN DC-002.46: el control pedia `fallos>0` y el defecto esta arreglado, asi que ahora
+#              pide `fallos= 0` -- es el defecto que YA NO QUEDA, y el dia que vuelva, este control se pone
+#              ROJO (que es lo que tiene que hacer).
 # 10 CONSOLA M10 los mismos 662 bytes y el mismo puente, pero con los buffers en .bss: 200/200 vueltas
 #              OK. Aisla el defecto 9: lo que se pisa es el monton de Go, no falta memoria en el de C.
-# 11 CONSOLA M6  d2data.mpq y d2char.mpq NO llegan a los numeros del host (ni 466867 ni 418279 bytes): en
-#              esta camada la lectura de d2data ademas muere MUDA (sin la linea del FALLO) y la consola se
-#              rearma. Es el BLOQUEO DECLARADO de la tarjeta: sin arreglar el monton (DC-002.41) no se llega
-#              a los 11082/10009 nombres. Cuando eso se arregle, este control se pone ROJO y hay que mudarlo.
+# 11 CONSOLA M6  d2data.mpq y d2char.mpq llegan a los numeros del HOST (466867 con 11082 nombres y 418279
+#              con 10009, crc32 los del host). Antes de DC-002.39e este control pedia lo CONTRARIO (que NO
+#              llegaran: era el bloqueo declarado de la tarjeta) y la lectura de d2data moria MUDA. MUDADO
+#              EN DC-002.46: el bloqueo esta arreglado, asi que ahora el control pide que los DOS lleguen.
+#              Es el control que caza al itab en el monton movible (junto con 0c).
 #
 # MUTANTES (2), cada uno tiene que poner ROJO el control que le toca:
 #  'avail-in-cero'  (C, csrc/zlib_dc.c)  `d2c_zs[slot].avail_in = (uInt)src_len;` -> `= 0;`: es,
@@ -167,23 +187,77 @@ ctrl_m4b() { # el paquete con un lector de a 512: el UNICO control del avance de
 ctrl_m5() { grep -qaF "COMPR-40 M5 crudo del disco bytes= $S0_BYTES crc32= $RAW_CRC" "$1"; }
 ctrl_m6() { grep -qaF "COMPR-40 M6 patch_d2.mpq (listfile) bytes= $LF_BYTES nombres= $LF_NOMBRES crc32= $LF_CRC" "$1"; }
 ctrl_m7() { grep -qaF 'COMPR-40 M7 control bytes= 141944 suma= 1831109629' "$1"; }
-ctrl_m8() { # el defecto que QUEDA: 200 vueltas y falla (con rc -3), con el dato de entrada intacto
+ctrl_m8() { # el defecto que QUEDABA (DC-002.41), hoy arreglado: 200 vueltas y CERO fallos
     local f
     f="$(tr -d '\r' < "$1" | grep -ao 'M8 200 vueltas del camino del motor, fallos= [0-9]*' | head -1 | awk '{print $NF}')"
-    [ -n "$f" ] && [ "$f" -gt 0 ] && grep -qaF 'rc_zlib= -3' "$1"
+    [ -n "$f" ] && [ "$f" -eq 0 ]
 }
 ctrl_m10() { grep -qaF 'COMPR-40 M10 200 vueltas con los buffers en C: vueltas_ok= 200 fallas= 0' "$1"; }
-ctrl_bloqueo() { # d2data/d2char NO llegan a los numeros del host: o fallan con el error, o la corrida muere
-    # ahi mismo (medido: en esta camada la lectura de d2data muere MUDA, sin la linea del FALLO, y la consola
-    # se rearma). El control es el mismo en los dos casos: NO se llega al (listfile) de esos dos.
-    ! grep -qaF 'COMPR-40 M6 d2data.mpq (listfile) bytes=' "$1" &&
-        ! grep -qaF 'COMPR-40 M6 d2char.mpq (listfile) bytes=' "$1"
+ctrl_m11() { # DC-002.46 (antes ctrl_bloqueo): d2data y d2char LLEGAN a los numeros del host.
+    # Antes de DC-002.39e este control pedia lo contrario (que NO llegaran). El bloqueo esta arreglado, asi
+    # que ahora el control es el bueno: los DOS tienen que dar el bytes/nombres/crc32 del host.
+    grep -qaF 'COMPR-40 M6 d2data.mpq (listfile) bytes= 466867 nombres= 11082 crc32= 923032874' "$1" &&
+        grep -qaF 'COMPR-40 M6 d2char.mpq (listfile) bytes= 418279 nombres= 10009 crc32= 1367999602' "$1"
 }
 
-controles() { # $1 = log; imprime los doce y devuelve cuantos dan bien (en la ultima linea)
+# DC-002.46: LOS DOS CONTROLES DEL RUNTIME (el arbol vendorizado, que se arma aparte con `make`).
+# Son los que faltaban: los cuatro rojos de esta tarjeta eran el MOTOR muriendo por el runtime, y el corpus
+# no tenia con que decirlo. `libgodc.a` viejo y el itab en el monton movible son los dos un rojo que, sin
+# control, se lee como "el motor no avanza".
+ctrl_libgodc() { # 0b: ninguna fuente del runtime es mas nueva que el .a
+    [ -z "$(find "$LIBGODC/runtime" -name '*.c' -newer "$LIBGODC/libgodc.a" -print -quit 2>/dev/null)" ]
+}
+ctrl_itab() { # 0c: get_itab pide el itab al monton de C (el arreglo de DC-002.39e), no al de Go
+    grep -qaF 'gc_external_alloc(total_size)' "$LIBGODC/runtime/interface_dreamcast.c" &&
+        ! grep -qaF 'itab = (Itab *)gc_alloc' "$LIBGODC/runtime/interface_dreamcast.c"
+}
+ctrl_capa() { # 0d: la capa de .gox es la de ESTE arbol (cada .gox no mas viejo que sus fuentes)
+    # POR QUE: el corpus tomo durante toda su vida la capa `/tmp/gox-240` por DEFECTO, que es la de la epoca de
+    # DC-002.40. Medir el motor de hoy con la capa de ayer no dice nada de hoy: el binario que se corre es OTRO
+    # y los numeros que salen no son los del arbol, sin que nada lo diga. Se verifica paquete por paquete: cada
+    # .gox que la capa declara en orden-motor.txt TIENE que estar, y ningun .go de ese paquete puede ser mas
+    # nuevo (mismo criterio que 0b con el `libgodc.a`). El resultado se calcula UNA vez por corrida: es caro
+    # (142 find) y la capa no cambia en el medio.
+    if [ -n "${CAPA_0D:-}" ]; then return "$CAPA_0D"; fi
+    CAPA_0D=0
+    if ! ctrl_capa_revisa; then CAPA_0D=1; fi
+    return "$CAPA_0D"
+}
+
+ctrl_capa_revisa() {
+    local lista="$GEN/orden-motor.txt" gox rel dest paq src nuevo
+    [ -f "$lista" ] || { echo "   no hay $lista: la capa no declara sus paquetes" >&2; return 1; }
+    while read -r gox; do
+        [ -n "$gox" ] || continue
+        rel="${gox#*/OpenDiablo2/OpenDiablo2/}"
+        [ "$rel" != "$gox" ] || continue
+        dest="$GEN/github.com/OpenDiablo2/OpenDiablo2/$rel"
+        paq="${rel%.gox}"
+        src="$REPO/$paq"
+        if [ ! -f "$dest" ]; then
+            echo "   capa incompleta: falta $rel (lo declara $lista)" >&2
+            return 1
+        fi
+        [ -d "$src" ] || continue
+        nuevo="$(find "$src" -maxdepth 1 -name '*.go' -newer "$dest" -print -quit 2>/dev/null)"
+        if [ -n "$nuevo" ]; then
+            echo "   capa VIEJA: $nuevo es mas nuevo que $rel (recompilar con build-motor-all.sh)" >&2
+            return 1
+        fi
+    done < "$lista"
+    return 0
+}
+
+controles() { # $1 = log; imprime los dieciseis y devuelve cuantos dan bien (en la ultima linea)
     local log="$1" bien=0
     if ctrl_host;     then echo "   control 0  (el host, patch_d2):          VERDE"; bien=$((bien + 1));
     else echo "   control 0  (el host, patch_d2):          ROJO"; fi
+    if ctrl_libgodc;  then echo "   control 0b (libgodc.a no esta viejo):    VERDE"; bien=$((bien + 1));
+    else echo "   control 0b (libgodc.a no esta viejo):    ROJO"; fi
+    if ctrl_itab;     then echo "   control 0c (el itab FUERA del monton):   VERDE"; bien=$((bien + 1));
+    else echo "   control 0c (el itab FUERA del monton):   ROJO"; fi
+    if ctrl_capa;     then echo "   control 0d (la capa es la de este arbol): VERDE"; bien=$((bien + 1));
+    else echo "   control 0d (la capa es la de este arbol): ROJO"; fi
     if ctrl_host3;    then echo "   control 1  (el host, los otros dos):     VERDE"; bien=$((bien + 1));
     else echo "   control 1  (el host, los otros dos):     ROJO"; fi
     if ctrl_m1 "$log"; then echo "   control 2  (M1 los 662 bytes):           VERDE"; bien=$((bien + 1));
@@ -202,12 +276,12 @@ controles() { # $1 = log; imprime los doce y devuelve cuantos dan bien (en la ul
     else echo "   control 7  (M6 el MOTOR, 162 nombres):   ROJO"; fi
     if ctrl_m7 "$log"; then echo "   control 8  (M7 el control sano DC6):     VERDE"; bien=$((bien + 1));
     else echo "   control 8  (M7 el control sano DC6):     ROJO"; fi
-    if ctrl_m8 "$log"; then echo "   control 9  (M8 el defecto que QUEDA):    VERDE"; bien=$((bien + 1));
-    else echo "   control 9  (M8 el defecto que QUEDA):    ROJO"; fi
+    if ctrl_m8 "$log"; then echo "   control 9  (M8 200/200 sin fallos):      VERDE"; bien=$((bien + 1));
+    else echo "   control 9  (M8 200/200 sin fallos):      ROJO"; fi
     if ctrl_m10 "$log"; then echo "   control 10 (M10 aislado con buffers C):  VERDE"; bien=$((bien + 1));
     else echo "   control 10 (M10 aislado con buffers C):  ROJO"; fi
-    if ctrl_bloqueo "$log"; then echo "   control 11 (el bloqueo declarado d2data): VERDE"; bien=$((bien + 1));
-    else echo "   control 11 (el bloqueo declarado d2data): ROJO"; fi
+    if ctrl_m11 "$log"; then echo "   control 11 (M6 d2data Y d2char al host): VERDE"; bien=$((bien + 1));
+    else echo "   control 11 (M6 d2data Y d2char al host): ROJO"; fi
     echo "$bien"
 }
 
@@ -264,7 +338,7 @@ probar_mutante() { # <nombre> <archivo> <buscar> <poner> <control que tiene que 
         return
     fi
     if compilar && correr "$run"; then
-        controles "$run/flycast.log" | sed -n '1,13p'
+        controles "$run/flycast.log" | sed -n '1,16p'
         if "$tiene_que_caer" "$run/flycast.log"; then
             echo "   NO LO CAZO: el control que tenia que caer sigue VERDE con el mutante puesto" >&2
             rojo "mutante $nombre: NO cazado"
@@ -289,17 +363,17 @@ nota "sonda del host: $(grep -ac 'DESCOMPRIMIDO' "$SAL/gen/sonda.txt") archivo(s
 # ---------------------------------------------------------------- 2. control sano
 if [ "$MODO" = todo ] || [ "$MODO" = sano ]; then
 echo
-echo "== 2. control sano: con el arreglo puesto, los 12 controles"
+echo "== 2. control sano: con el arreglo puesto, los 16 controles"
 compilar || exit 1
 correr "$SAL/sano" || exit 1
 BIEN="$(controles "$SAL/sano/flycast.log" | sed -n '$p')"
-controles "$SAL/sano/flycast.log" | sed -n '1,13p'
-if [ "$BIEN" -ne 13 ]; then
-    echo "   EL CONTROL SANO NO DA ($BIEN/13): no se sigue, primero hay que ver por que" >&2
+controles "$SAL/sano/flycast.log" | sed -n '1,16p'
+if [ "$BIEN" -ne 16 ]; then
+    echo "   EL CONTROL SANO NO DA ($BIEN/16): no se sigue, primero hay que ver por que" >&2
     mostrar "$SAL/sano/flycast.log" >&2
     exit 1
 fi
-echo "   OK: 13/13 controles verdes con el codigo de ahora"
+echo "   OK: 16/16 controles verdes con el codigo de ahora"
 mostrar "$SAL/sano/flycast.log"
 fi
 
@@ -328,8 +402,8 @@ echo
 echo "== 4. control sano de vuelta (el arbol entero, sin mutar)"
 if compilar && correr "$SAL/vuelta"; then
     BIEN="$(controles "$SAL/vuelta/flycast.log" | sed -n '$p')"
-    controles "$SAL/vuelta/flycast.log" | sed -n '1,13p'
-    [ "$BIEN" -eq 13 ] || { echo "   NO VOLVIERON LOS 13 CONTROLES ($BIEN/13)" >&2; exit 1; }
+    controles "$SAL/vuelta/flycast.log" | sed -n '1,16p'
+    [ "$BIEN" -eq 16 ] || { echo "   NO VOLVIERON LOS 16 CONTROLES ($BIEN/16)" >&2; exit 1; }
     echo "   control sano VERDE"
 else
     echo "   NO VOLVIO EL CONTROL SANO" >&2

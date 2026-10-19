@@ -1,0 +1,152 @@
+DC-002.46 — EL CORPUS DE DC-002.40 VUELVE A VERDE (16/16), Y LOS 4 ROJOS ERAN EL RUNTIME VENDORIZADO
+
+QUE DECIA LA TARJETA
+====================
+"Medido durante DC-002.43, con el arbol de HEAD y SIN nada de esa tarjeta puesto:
+
+    bash scripts/console/checar-compr-240.sh <capa limpia de HEAD>        -> exit 1, 9/13
+
+Los cuatro rojos son justo los que usan el MOTOR: control 7 (M6 el MOTOR, 162 nombres), control 8 (M7 el
+control sano DC6), control 9 (M8 el defecto que QUEDA), control 10 (M10 aislado con buffers C). La corrida
+imprime M1..M5 y despues vuelve a arrancar: M6/M7/M8/M10 no salen nunca."
+
+EL DIAGNOSTICO: NO ERA EL CORPUS, ERA EL RUNTIME VENDORIZADO QUE SE ESTABA MIDIENDO
+==================================================================================
+Los 9/13 de DC-002.43 se midieron con un `libgodc.a` de las 03:09 y un arbol de HEAD de las 03:53. Entre esa
+corrida y esta, el runtime vendorizado (`~/dreamcast/libgodc`, que se arma aparte con `make`, NO con el repo)
+cambio dos veces:
+
+  * 05:50  `runtime/interface_dreamcast.c` -- el arreglo de DC-002.39e: el itab sale del monton MOVIBLE de Go
+           y se pide al monton de C (`gc_external_alloc`).
+  * 06:03  `runtime/gc_copy.c` + `libgodc.a` rearmado.
+
+Con el `.a` de HOY (06:03) el corpus NO da 9/13: da 16/16, y M6/M7/M8/M10 imprimen los tres MPQ enteros. O sea
+que los cuatro rojos eran el MOTOR muriendo por el runtime viejo (el defecto del itab en `.bss` de DC-002.39e:
+la corrida se rearma 33 veces y nunca llega a M6), no un defecto del POC ni del corpus.
+
+LO MEDIDO (capa de .gox del arbol de HEAD LIMPIO + el libgodc de hoy)
+=====================================================================
+Arbol: `/home/dgalli/.hermes/cache/scratch/t_9a720def/src-head` (copia de HEAD 9bf96019 con los cuatro
+archivos que DC-002.45 tiene sin commitear devueltos a HEAD), capa `/tmp/gox-246` (63 stdlib + 142 motor =
+205 .gox), libgodc.a 210054 B del 06:03.
+
+    bash scripts/console/checar-compr-240.sh /tmp/gox-246 "" 90 todo   ->  exit 0
+
+    == 2. control sano: con el arreglo puesto, los 16 controles
+       control 0  (el host, patch_d2):          VERDE
+       control 0b (libgodc.a no esta viejo):    VERDE
+       control 0c (el itab FUERA del monton):   VERDE
+       control 0d (la capa es la de este arbol): VERDE
+       control 1  (el host, los otros dos):     VERDE
+       control 2  (M1 los 662 bytes):           VERDE
+       control 3  (M2 el defecto declarado):    VERDE
+       control 4  (M3 el puente streaming):     VERDE
+       control 5  (M4 compress/zlib ARREGLADO): VERDE
+       control 5b (M4b el paquete de a 512):    VERDE
+       control 6  (M5 el crudo del disco):      VERDE
+       control 7  (M6 el MOTOR, 162 nombres):   VERDE
+       control 8  (M7 el control sano DC6):     VERDE
+       control 9  (M8 200/200 sin fallos):      VERDE
+       control 10 (M10 aislado con buffers C):  VERDE
+       control 11 (M6 d2data Y d2char al host): VERDE
+       OK: 16/16 controles verdes con el codigo de ahora
+
+    == mutante 'avail-in-cero'   -> control 5 ROJO   -> cazado   (arbol restaurado)
+    == mutante 'pos-de-un-tiro'  -> control 5b ROJO  -> cazado   (arbol restaurado)
+    == 4. control sano de vuelta -> 16/16 -> control sano VERDE
+    == 2 verdes, 0 fallos ==   (exit 0)
+
+Los numeros del MOTOR en esa corrida (los tres MPQ, por el camino del motor):
+
+    COMPR-40 M6 patch_d2.mpq (listfile) bytes= 5502   nombres= 162    crc32= 502100774    ms= 2208
+    COMPR-40 M6 d2data.mpq   (listfile) bytes= 466867 nombres= 11082  crc32= 923032874    ms= 10682
+    COMPR-40 M6 d2char.mpq   (listfile) bytes= 418279 nombres= 10009  crc32= 1367999602   ms= 3956
+    COMPR-40 M7 control bytes= 141944 suma= 1831109629 (host: 141944 1831109629)
+    COMPR-40 M8 200 vueltas del camino del motor, fallos= 0 monton libre= 42424
+    COMPR-40 M10 200 vueltas con los buffers en C: vueltas_ok= 200 fallas= 0 arena= 1319680 libre= 42424
+    COMPR-40 fin
+
+LA PRUEBA EN CONTRA (el defecto REAL puesto a mano, no supuesto)
+================================================================
+`bash scripts/console/mutar-runtime-itab-246.sh /tmp/dcroot-mut-itab` copia el arbol de Dreamcast a un DC_ROOT
+propio y cambia UNA linea del runtime vendorizado:
+
+    -    Itab *itab = (Itab *)gc_external_alloc(total_size);            <- el arreglo de DC-002.39e
+    +    Itab *itab = (Itab *)gc_alloc(total_size, NULL);               <- MUTANTE: el itab en el monton MOVIBLE
+
+y rearma `libgodc.a` EN ESE ARBOL (210018 B; sin rearmarlo el corpus enlaza el runtime sano y el mutante es
+invisible). Mismo arbol de fuentes, misma capa de .gox, mismo disco:
+
+    control 0c (el itab FUERA del monton):   ROJO     <- el control NUEVO lo nombra
+    control 7  (M6 el MOTOR, 162 nombres):   ROJO
+    control 8  (M7 el control sano DC6):     ROJO
+    control 9  (M8 200/200 sin fallos):      ROJO
+    control 10 (M10 aislado con buffers C):  ROJO
+    control 11 (M6 d2data Y d2char al host): ROJO
+    EL CONTROL SANO NO DA (9/16): no se sigue, primero hay que ver por que
+
+9/16, exactamente el 9/13 que reporto la tarjeta (los tres controles de mas son los nuevos). Y en el log se ve
+el sintoma que describia la tarjeta: `COMPR-40 arranca` sale 33 veces, M1..M5 se imprimen y despues la consola
+se rearma, sin llegar nunca a M6. O sea: el corpus quedo con el control que caza al que lo rompio.
+
+LO QUE SE MUDO EN EL CORPUS (y por que)
+=======================================
+1. control 0b (NUEVO) -- `libgodc.a` no esta viejo. Ninguna fuente del runtime es mas nueva que el `.a`. Es
+   la herramienta: si quedo atras, el binario que se mide no es el de las fuentes (medido en DC-002.43: un
+   `.a` de 01:40 con `gc_copy.c` de las 02:54 y el arranque ni abria un MPQ). Ya existia en el corpus de
+   DC-002.34; faltaba aca.
+
+2. control 0c (NUEVO) -- el `get_itab` del runtime pide el itab al monton de C (`gc_external_alloc`), no al
+   monton movible de Go. Es el arreglo de DC-002.39e y es LO QUE ESTA TARJETA VINO A CAZAR. Es un control de
+   FUENTE (lee `runtime/interface_dreamcast.c`), a proposito: dice el nombre del defecto en la primera linea
+   de la corrida en vez de dejar que el sintoma (la consola rearmandose) se lea como "el motor no avanza".
+
+3. control 0d (NUEVO) -- la capa de `.gox` es la de ESTE arbol: cada paquete que la capa declara en
+   `orden-motor.txt` tiene que estar, y ningun `.go` de ese paquete puede ser mas nuevo que su `.gox` (mismo
+   criterio que 0b con el `.a`). POR QUE: el corpus tomaba por DEFECTO la capa `/tmp/gox-240`, que es la de la
+   epoca de DC-002.40 — medir el motor de hoy con la capa de ayer da numeros que no son de hoy y nada lo decia.
+   Medido: `/tmp/gox-246` contra HEAD da 0 paquetes con problema; `/tmp/gox-240` contra HEAD da 6 (d2mpq,
+   d2records, d2loader, d2asset, d2app y uno mas).
+
+4. control 9 (MUDADO) -- M8 pedia `fallos>0` con `rc_zlib= -3` (el defecto del monton de Go de DC-002.40).
+   Ese defecto esta arreglado desde DC-002.41: la corrida da `fallos= 0`. Ahora el control pide `fallos= 0`:
+   es el defecto que YA NO QUEDA, y el dia que vuelva se pone ROJO.
+
+5. control 11 (MUDADO) -- pedia lo CONTRARIO de lo que pasa hoy: "d2data/d2char NO llegan a los numeros del
+   host" era el BLOQUEO DECLARADO de DC-002.40. Desde DC-002.39e los dos llegan (466867/11082 y 418279/10009,
+   crc32 los del host). Ahora el control pide que los DOS lleguen: es el control que, junto con 0c, caza al
+   itab en el monton movible.
+
+El corpus pasa de 13 a 16 controles; los umbrales (`-ne 13`, `-eq 13`, `sed -n '1,13p'`) suben a 16.
+
+COMO SE REPITE
+==============
+    # la capa de .gox del arbol de HEAD limpio (205 .gox) -- ~6 min
+    rsync -a --exclude .git /home/dgalli/Proyectos/diablo2consoles/ /tmp/src-head/
+    cd /tmp/src-head && git --git-dir=/home/dgalli/Proyectos/diablo2consoles/.git \
+        --work-tree=$PWD checkout -- console/dc/std/csrc/marcas_carga.c \
+        d2common/d2fileformats/d2txt/data_dictionary.go d2common/d2loader/marca_carga.go \
+        d2core/d2asset/asset_manager.go                       # (lo que DC-002.45 tiene sin commitear)
+    bash scripts/console/build-std-gox.sh  /tmp/gox-246
+    bash scripts/console/build-motor-all.sh /tmp/gox-246
+
+    # el corpus entero: sano + los 2 mutantes + la vuelta (16/16, exit 0)
+    cd /tmp/src-head
+    REPO=$PWD SAL=/home/dgalli/.hermes/cache/scratch/corpus-246c \
+        bash scripts/console/checar-compr-240.sh /tmp/gox-246 "" 90 todo
+
+    # la prueba en contra: el itab al monton movible tiene que dar 9/16 con 0c en ROJO
+    bash scripts/console/mutar-runtime-itab-246.sh /tmp/dcroot-mut-itab
+    DC_ROOT=/tmp/dcroot-mut-itab LIBGODC=/tmp/dcroot-mut-itab/libgodc REPO=$PWD SAL=/tmp/corpus-246-mut \
+        bash scripts/console/checar-compr-240.sh /tmp/gox-246 "" 90 sano
+
+La corrida se hizo sobre una copia del arbol con lo de DC-002.45 devuelto a HEAD a proposito: el criterio de
+la tarjeta es "el corpus de DC-002.40 vuelve a 13/13", no "el corpus con el trabajo en curso de otra tarjeta
+encima".
+
+LO QUE ESTA TARJETA **NO** ARREGLO (para que nadie lo lea como verde de mas)
+===========================================================================
+El defecto del itab NO se arreglo aca: ya estaba arreglado en el arbol vendorizado (05:50, DC-002.39e). Lo que
+esta tarjeta hizo fue (a) medir que los 4 rojos eran eso y no el corpus, y (b) dejar el corpus con los tres
+controles que lo dicen (0b la herramienta, 0c el defecto, 0d la capa) y mudar los dos controles que pedian el
+estado viejo (9 y 11). El corpus de DC-002.40 queda 16/16.
