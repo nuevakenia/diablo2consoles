@@ -121,3 +121,64 @@ ARCHIVOS
   console/dc/verif-monstruo-250/               el verificador del host (vida, secuencia, cuadros, PNG)
   console/dc/sonda-monstruo-250/main.go        la sonda del censo (clases, vida, animaciones)
   scripts/console/build-monstruo-250.sh        build del POC + los tres MPQ + el censo del host
+
+==============================================================================================================
+SECCION 12 -- 2026-10-24: SE CAE LA PREMISA DEL "MURO DE RAM" (y se encuentra el culpable de verdad)
+==============================================================================================================
+
+Durante ocho intentos esta tarjeta se freno culpando al monton: "el bicho no entra en la RAM". Medido hoy,
+la premisa era FALSA y el sintoma estaba mal leido: la consola no se quedaba sin memoria, se REINICIABA
+dentro de la inicializacion del video.
+
+12.1 EL CONTROL QUE FALTABA: el build de la rama con `BESTIA=0` TAMBIEN se cae
+  `/tmp/dcbuild/dc250-c0` (BESTIA=0, o sea el binario de DC-002.49 compilado desde el main.go de la rama):
+  `dibujando=0`, arranques=1, muere imprimiendo `pvr: enabling vertical scaling for non-VGA`.
+  O sea: la regresion NO la metia el bicho. El "bestia=0 arranca" en el que se apoyaban los intentos previos
+  era falso, y con esa premisa rota el resto del razonamiento no valia.
+
+12.2 EL AMBIENTE Y LA BASE DE DC-002.49 ESTAN SANOS
+  `bbf3769a` (DC-002.49) extraido a /tmp/poc249 y compilado con el toolchain de HOY:
+  `/tmp/dcbuild/dc249-hoy` -> `HITO238: dibujando` a los 54 s, `HITO249: CICLO TN cuadro 6/16`.
+  Contra pruebas de layout, todas dibujando:
+    /tmp/dcbuild/dc249-medido   + instrumentacion de heap              -> dibuja, 137.920 B libres
+    /tmp/dcbuild/dc249-bss2     + 14.336 B de .bss (escritura real)    -> dibuja
+    /tmp/dcbuild/dc249-shift2   + 13.376 B de .bss, DMA Buffer ac209fe0 (el MISMO pie que el build que falla)
+                                                                       -> dibuja
+    /tmp/dcbuild/dc249-text     + 13.376 B de .text, 1ST_READ 1.853.448 (mas grande que el que falla)
+                                                                       -> dibuja
+  Conclusion medida: NO es la RAM, NO es el tamano del binario, NO es donde arranca el monton de C.
+
+12.3 EL CULPABLE: UNA REBANADA DE STRUCT ANONIMO (defecto de codegen de gccgo en SH-4)
+  La lista de modos del heroe se armaba asi:
+      modosDelHeroe := []struct{ modo string; ms int }{{modoQuieto, msQuieto}}
+      if !bestia { modosDelHeroe = append(modosDelHeroe, struct{ modo string; ms int }{...}) }
+  Cambiando SOLO eso por un literal con tipo CON NOMBRE y recorte (`modosDelHeroe[:1]`), el mismo binario
+  ARRANCA: `/tmp/dcbuild/poc-v3` -> `dibujando=1`, arranques=1, y pasan todas las marcas del PVR
+  (`HITO250: PVR despues-de-pvr_init_defaults`, `textura-de-pantalla OK`, `relleno OK`, `contexto OK`).
+  El defecto no lo dispara el bicho: lo dispara la MISMA operacion sobre una rebanada de struct anonimo, y el
+  sintoma es una excepcion del SH4 saltando a una direccion del monton (PC 8c42dea0, PR 8c42dea0), o un
+  reinicio limpio adentro de `pvr_init_defaults`/`pvr_mem_malloc`.
+
+12.4 LO QUE QUEDA ABIERTO (y por que NO es "RAM" tampoco)
+  Con `BESTIA=1` el arranque sigue cayendo, pero el punto de muerte SE MUEVE con cada cambio de codigo:
+    /tmp/dcbuild/bestia-ok   (append arreglado, bestia=1)  -> excepcion en pvr_init_defaults
+    /tmp/dcbuild/v4-bestia   (idem, sin recortar TW)       -> excepcion en pvr_init_defaults
+    /tmp/dcbuild/v6-bestia   (tipo con nombre, bestia=1)   -> excepcion en pvr_init_defaults
+    /tmp/dcbuild/v7-unCiclo  (bestia=0, un solo ciclo)     -> pasa pvr_init, muere en pvr_mem_malloc
+    /tmp/dcbuild/v8-video    (video al principio)          -> muere en pvr_init_defaults a los 0,1 s
+    /tmp/dcbuild/split-bestia / split-base (main recortado a funciones) -> se cae TAMBIEN bestia=0
+  O sea: el binario que arma el bicho es fragil al layout (misma clase de sintoma que DC-002.29, pero por otra
+  causa: ahi era mezclar camadas .gox; aca las camadas se rearman de punta a punta en cada build).
+  El refactor que sacaba el bicho de `main()` a `armarBestia` empeoro las cosas (rompio la base), asi que se
+  REVIRTIO: el repo queda en el estado /tmp/poc-v3, que es el que dibuja.
+
+12.5 EL DATO DURO QUE ORDENA EL TRABAJO QUE VIENE
+  El monton de Go de estos binarios es UN SEMIESPACIO DE 1 MB
+  (`#define GC_SEMISPACE_SIZE_KB 1024` en `~/dreamcast/libgodc/runtime/godc_config.h`; el log del arranque lo
+  confirma: semiespacio0 2351033216, semiespacio1 2352081824).
+  Y el bicho necesita, medido con el verificador del host: ~420 KB los tres modos de la bestia + ~140 KB cada
+  modo del heroe + el A1. El propio codigo ya se habia comido el DT (377 KB) por esto, y el intento previo con
+  los cuatro modos murio con "fatal error: out of memory".
+  Por eso la decision que sigue NO es de codigo: o se sube el semiespacio (cambio del toolchain, que toca los
+  invariantes de DC-002.28/214/221 y hay que re-medir), o se cambia el diseño del bicho para que entre en 1 MB
+  (componer el modo que se muestra y no los tres a la vez).

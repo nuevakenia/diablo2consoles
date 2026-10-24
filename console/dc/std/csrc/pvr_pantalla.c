@@ -20,6 +20,7 @@
  * 480/512), no por 1. Si se pintara con 1, el cuadro saldria estirado y con basura en el borde.
  */
 #include <kos.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -169,14 +170,23 @@ int d2c_pvr_pantalla_init(int w, int h) {
      *
      * DC-002.22: se llama UNA sola vez (ver `pvr_listo`). */
     if (!pvr_listo) {
+        /* DC-002.50 (instrumento de 2026-10-24): el POC se reinicia DENTRO de pvr_init_defaults y el ultimo
+         * mensaje que deja KOS es "pvr: enabling vertical scaling for non-VGA". Estas dos marcas dicen si el
+         * que se cae es el arranque del PVR o lo que viene despues (vblank_handler_add + las IRQ del ASIC). */
+        printf("HITO250: PVR antes-de-pvr_init_defaults\n");
         pvr_init_defaults();
+        printf("HITO250: PVR despues-de-pvr_init_defaults\n");
         pvr_listo = 1;
     }
 
     pant_tex = pvr_mem_malloc((size_t)PANT_PW * (size_t)PANT_PH * 2);
     if (pant_tex == NULL) {
+        printf("HITO250: PVR SIN-VRAM\n");
+
         return -2;
     }
+
+    printf("HITO250: PVR textura-de-pantalla OK\n");
 
     /* DC-002.17: ACA HABIA UN `calloc(PANT_PW * PANT_PH, 2)` = 1.048.576 bytes (1 MiB exactos) del
      * monton, y era el `codigo -3` que dejaba al motor sin video. Medido en el arranque del motor:
@@ -206,6 +216,8 @@ int d2c_pvr_pantalla_init(int w, int h) {
         }
     }
 
+    printf("HITO250: PVR relleno OK\n");
+
     /* contexto: lista OPACA (la pantalla tapa todo, no hay nada atras) y sin filtro (pixel exacto: con
      * filtro se ve borroso y en una pantalla de 640x480 se nota) */
     pvr_poly_cxt_t cxt;
@@ -213,6 +225,8 @@ int d2c_pvr_pantalla_init(int w, int h) {
                      PVR_TXRFMT_RGB565 | PVR_TXRFMT_TWIDDLED,
                      PANT_PW, PANT_PH, pant_tex, PVR_FILTER_NONE);
     pvr_poly_compile(&pant_hdr, &cxt);
+
+    printf("HITO250: PVR contexto OK\n");
 
     return 0;
 }

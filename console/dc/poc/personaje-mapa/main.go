@@ -895,20 +895,28 @@ func main() {
 
 	mapa.ReplacePixels(rgba)
 
+	// EL RGBA DE 1 MB SE SUELTA ACA, Y ESTA LINEA ES LA QUE ARREGLA EL ARRANQUE (medido 2026-10-24).
+	// gccgo NO hace analisis de vivos fino: un local del tamano de un MB sigue ocupando el monton de C hasta el
+	// final de la funcion si no se pone en nil a mano. DC-002.49 (bbf3769a) la tenia y el video arrancaba;
+	// DC-002.50 (68ad6e88) la borro al reescribir este bloque, y con eso el POC -- INCLUSO con bestia=0, el que
+	// no toca nada del bicho -- se reinicia dentro de `IniciarPantalla`, justo despues de "pvr: enabling vertical
+	// scaling". Se pago cara: ocho intentos culpando a la RAM del bicho (la bestia usa MENOS RAM que el camino
+	// base: 141.128 B libres contra 142.024). El control que lo cazo fue compilar el main.go de bbf3769a con el
+	// toolchain de hoy: ese dibuja, el de la rama no.
+	rgba = nil
+
 	// EL BUFFER RGBA SON 1 MB (512x512x4) Y EL LIENZO DEL NIVEL 262 KB (512x512): por tamano el runtime los manda
-	// al monton de C, y de ahi no los recupera nadie. Ya no se usan (los pixeles estan subidos a la textura con
-	// ReplacePixels y el lienzo no se toca mas), asi que se devuelven A MANO. MEDIDO EN DC-002.50: sin esto, con
-	// los tres ciclos del bicho compuestos, al monton de C le quedaban 72.696 B y el POC se REINICIABA en
-	// `IIniciarPantalla` -- justo despues de "pvr: enabling vertical scaling" --; con la devolucion quedan 1,33 MB
-	// y el video arranca. (En DC-002.45 ya se habia medido que el techo del monton de C son ~3,2 MB.)
-	// OJO (DC-002.50, medido): aca se probaron devoluciones A MANO con d2cFreeExternal para bajar la presion de
-	// RAM antes del video, y las dos -- el buffer RGBA y el lienzo del nivel -- dejan el POC sin arrancar el
-	// video (la consola se reinicia en IniciarPantalla, y con bestia=0 tambien: no era el bicho). Se sueltan con
-	// el recolector, como en DC-002.38, y la RAM se gana no pidiendola (ver el mapa, que ya no arma el temporal).
+	// al monton de C, y de ahi no los recupera nadie. Los pixeles ya estan subidos a la textura con ReplacePixels
+	// y el lienzo no se toca mas.
+	// OJO (DC-002.50, medido): devolverlos A MANO con d2cFreeExternal deja el POC sin arrancar el video (la
+	// consola se reinicia en IniciarPantalla, y con bestia=0 tambien: no era el bicho). Se sueltan con el
+	// recolector, como en DC-002.38.
 	n.Canvas = nil
 	n.Scratch = nil
 
 	runtime.GC()
+
+	memoria("mapa-en-imagen")
 
 	println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre=", int64(d2cVramLibre()))
 
@@ -1058,68 +1066,28 @@ func main() {
 	// Con `bestia` encendido se suma al mapa el bicho del acto 1 y el golpe a mano limpia. NINGUN numero de
 	// los que se usan aca es elegido: la vida sale de las tablas del MPQ por el camino de siembra del motor y
 	// el dano del dado del motor (monstruo.go, el archivo que comparten la consola y el verificador del host).
+	//
+	// ACA NO SE LEE NADA (DC-002.50, el 9no camino): la vida del bicho pide leer monstats.txt (238.019 B) del
+	// d2data.mpq y parsearla, y ESA lectura -- y nada mas -- era lo que quedaba de distinto contra el POC de
+	// DC-002.49 al llegar a `IniciarPantalla`. Con esa lectura hecha el monton de C queda en 70.168..70.976 B
+	// libres y el PVR se cuelga en "pvr: enabling vertical scaling"; el mismo binario sin ella arranca y
+	// dibuja. El monton de Go no devuelve lo que crecio (medido: liberar 1 MB del nivel no le deja plata al
+	// video, el monton se la queda), asi que la unica forma de que el arranque quede IDENTICO al que ya anda
+	// es no tocar la RAM antes del video: todo lo del bicho se prepara en 3d, con el video ya andando.
 	var mon *monstruo
 
-	// la vida y el combate se calculan en 3b y los usa 3d (que arma el bicho con sus ciclos, ya con el video
-	// andando): por eso viven aca afuera
+	// la vida y el combate se calculan en 3d (con el video andando) y los usa el mismo bloque para armar el
+	// bicho con sus ciclos: por eso viven aca afuera
 	var vida *Vida
 
 	var combate *Combate
 
 	var tBestia int64
 
-	if bestia {
-		if !animar {
-			println("HITO250: LA BESTIA NECESITA animar=true (el golpe dibuja los ciclos)")
+	if bestia && !animar {
+		println("HITO250: LA BESTIA NECESITA animar=true (el golpe dibuja los ciclos)")
 
-			return
-		}
-
-		tBestia = int64(d2cMs())
-
-		monstats, err := mpq.ReadFile(excelMonstats)
-		if err != nil {
-			println("HITO250: MONSTATS FALLO:", err.Error())
-
-			return
-		}
-
-		monlvl := leerDeMPQ(rutaMPQPatch, excelMonLvl)
-		if monlvl == nil {
-			println("HITO250: MONLVL FALLO:", excelMonLvl)
-
-			return
-		}
-
-		vida, err = VidaDelBicho(monstats, monlvl, claseBestia, semillaCombate)
-		if err != nil {
-			println("HITO250: VIDA FALLO:", err.Error())
-
-			return
-		}
-
-		println("HITO250: MONSTATS bytes=", len(monstats), "crc32=", crc32.ChecksumIEEE(monstats))
-		println("HITO250: MONLVL bytes=", len(monlvl), "crc32=", crc32.ChecksumIEEE(monlvl))
-		println("HITO250: VIDA clase=", vida.Clase, "nivel=", vida.Nivel, "min=", vida.Min, "max=", vida.Max,
-			"HP=", vida.HP, "AC=", vida.AC, "A1=", vida.DanoMin, "..", vida.DanoMax, "semilla=", semillaCombate)
-
-		// OJO (DC-002.50, medido): aca estaba la devolucion a mano de la tabla de monstats (238 KB) con
-		// d2cFreeExternal, copiando lo que hacen los DT1 del nivel en DC-002.37. NO VA: con esa devolucion el
-		// POC se cae con "Unhandled exception ... Encountered Illegal instruction" adentro de
-		// `pvr_init_defaults`, y sin ella no (el mismo binario con bestia=0, que no toca esta tabla, arranca).
-		// Las dos tablas las suelta el recolector.
-		monstats, monlvl = nil, nil
-
-		runtime.GC()
-
-		combate = NuevoCombate(vida, semillaCombate)
-
-		// los CUATRO modos del bicho que se dibujan: parado (da vueltas), golpeado y muriendo (de un tiro),
-		// muerto (el cadaver, se queda).
-		// LOS CICLOS DEL BICHO NO SE COMPONEN ACA (DC-002.50, medido): son ~420 KB del monton de C y si se
-		// componen antes de `IniciarPantalla` al PVR no le queda con que arrancar (medido: 70.976 B libres y la
-		// consola se queda en "pvr: enabling vertical scaling"). Se componen en 3d, con el video ya andando.
-		_ = combate
+		return
 	}
 
 	// ============================== 3c. LOS CICLOS DE LA ANIMACION (DC-002.49) ==============================
@@ -1139,13 +1107,14 @@ func main() {
 		modosDelHeroe := []struct {
 			modo string
 			ms   int
-		}{{modoQuieto, msQuieto}}
+		}{{modoQuieto, msQuieto}, {modoCaminando, msCaminando}}
 
-		if !bestia {
-			modosDelHeroe = append(modosDelHeroe, struct {
-				modo string
-				ms   int
-			}{modoCaminando, msCaminando})
+		// DC-002.50: con la bestia encendida NO se compone TW (la RAM de la consola no alcanza para TN + A1 +
+		// los tres modos del bicho). Se recorta el literal en vez de armarlo con append: el append de un struct
+		// anonimo es el unico codigo nuevo que quedaba en el camino previo al video (ver el comentario de
+		// 3b-bis), y se saca de la duda.
+		if bestia {
+			modosDelHeroe = modosDelHeroe[:1]
 		}
 
 		for _, m := range modosDelHeroe {
@@ -1207,10 +1176,7 @@ func main() {
 		j.cuadroPintado = -1
 	}
 
-	// DC-002.50: el bicho entra al juego
-	if bestia && mon != nil {
-		j.mon = mon
-	}
+	// DC-002.50: el bicho entra al juego DESPUES del video (ver 3b-bis): aca todavia no existe.
 
 	if err := ebiten.IniciarPantalla(ancho, alto); err != nil {
 		println("HITO238: no pude arrancar el video:", err.Error())
@@ -1294,29 +1260,85 @@ func main() {
 		memoria("d2data-cerrado")
 	}
 
-	// EL CICLO DEL GOLPE DEL HEROE (A1): 13 cuadros a 40 ms. Se compone DESPUES del video por la misma razon que
-	// los del bicho: es el ultimo que pide RAM y con el PVR ya andando se compone sin pelearse con el arranque.
+	// ============================== 3b-bis. LA VIDA DEL BICHO, CON EL VIDEO YA ANDANDO (DC-002.50) ==========
+	//
+	// La vida y el combate se calculan ACA y no antes del video: leer monstats.txt (238.019 B) y parsearlo es
+	// la unica diferencia que tenia el arranque con la del POC de DC-002.49, y es lo que dejaba al PVR con
+	// 70 KB (se cuelga en "pvr: enabling vertical scaling"). El monton de Go no devuelve lo que crece, asi
+	// que la lectura se hace con el video andando, igual que los ciclos.
 	if bestia {
-		if cofA1, nombreA1, bytesA1, ok := cofDelModo(mc, modoGolpePersonaje); ok {
-			println("HITO250: COF DEL GOLPE", nombreA1, "bytes=", bytesA1,
-				"framesPorDir=", cofA1.FramesPerDirection, "dirs=", cofA1.NumberOfDirections)
+		tBestia = int64(d2cMs())
 
-			ciclos = append(ciclos, cargarCiclo(mc, cofA1, dirPersonaje, modoGolpePersonaje, msGolpeHeroe, palUni))
+		prepararVida := func() bool {
+			monstats, err := mpq.ReadFile(excelMonstats)
+			if err != nil {
+				println("HITO250: MONSTATS FALLO:", err.Error())
 
-			cofA1 = nil
+				return false
+			}
+
+			monlvl := leerDeMPQ(rutaMPQPatch, excelMonLvl)
+			if monlvl == nil {
+				println("HITO250: MONLVL FALLO:", excelMonLvl)
+
+				return false
+			}
+
+			v, err := VidaDelBicho(monstats, monlvl, claseBestia, semillaCombate)
+			if err != nil {
+				println("HITO250: VIDA FALLO:", err.Error())
+
+				return false
+			}
+
+			vida = v
+
+			println("HITO250: MONSTATS bytes=", len(monstats), "crc32=", crc32.ChecksumIEEE(monstats))
+			println("HITO250: MONLVL bytes=", len(monlvl), "crc32=", crc32.ChecksumIEEE(monlvl))
+			println("HITO250: VIDA clase=", vida.Clase, "nivel=", vida.Nivel, "min=", vida.Min, "max=", vida.Max,
+				"HP=", vida.HP, "AC=", vida.AC, "A1=", vida.DanoMin, "..", vida.DanoMax, "semilla=", semillaCombate)
+
+			// OJO (DC-002.50, medido): aca estaba la devolucion a mano de la tabla de monstats (238 KB) con
+			// d2cFreeExternal, copiando lo que hacen los DT1 del nivel en DC-002.37. NO VA: con esa devolucion
+			// el POC se cae con "Unhandled exception ... Encountered Illegal instruction" adentro de
+			// `pvr_init_defaults`. Las dos tablas las suelta el recolector.
+			monstats, monlvl = nil, nil
 
 			runtime.GC()
-			memoria("ciclo-del-golpe")
-		} else {
-			println("HITO250: SIN COF PARA EL GOLPE", modoGolpePersonaje)
+
+			combate = NuevoCombate(vida, semillaCombate)
+
+			return true
 		}
 
-		cargarBestia()
+		if !prepararVida() {
+			println("HITO250: SIN VIDA DEL BICHO, EL BICHO NO ENTRA (el mapa y el personaje siguen)")
+		} else {
+			// EL ORDEN ES POR RAM, no por gusto: `cargarBestia` compone los tres modos del bicho y CIERRA el
+			// d2data.mpq (su indice de ~40.000 archivos es el objeto mas grande que queda vivo); recien despues
+			// se compone el A1 del heroe, que sale del d2char.mpq y asi encuentra esa RAM libre.
+			cargarBestia()
 
-		// los ciclos y el bicho se cargaron DESPUES de armar el juego: se le pasan ahora (el corte de la lista
-		// de ciclos es una copia, asi que hay que volver a asignarla)
-		j.ciclos = ciclos
-		j.mon = mon
+			// EL CICLO DEL GOLPE DEL HEROE (A1): 13 cuadros a 40 ms.
+			if cofA1, nombreA1, bytesA1, ok := cofDelModo(mc, modoGolpePersonaje); ok {
+				println("HITO250: COF DEL GOLPE", nombreA1, "bytes=", bytesA1,
+					"framesPorDir=", cofA1.FramesPerDirection, "dirs=", cofA1.NumberOfDirections)
+
+				ciclos = append(ciclos, cargarCiclo(mc, cofA1, dirPersonaje, modoGolpePersonaje, msGolpeHeroe, palUni))
+
+				cofA1 = nil
+
+				runtime.GC()
+				memoria("ciclo-del-golpe")
+			} else {
+				println("HITO250: SIN COF PARA EL GOLPE", modoGolpePersonaje)
+			}
+
+			// los ciclos y el bicho se cargaron DESPUES de armar el juego: se le pasan ahora (el corte de la
+			// lista de ciclos es una copia, asi que hay que volver a asignarla)
+			j.ciclos = ciclos
+			j.mon = mon
+		}
 	}
 
 	mc.Close()

@@ -38,6 +38,9 @@ TECLAS = {
     "z": 44, "x": 45, "c": 46, "v": 47,
     "a": 30, "s": 31, "d": 32, "f": 33,
     "q": 16, "w": 17, "e": 18, "r": 19,
+    # DC-002.50: el boton Y del control es el de GOLPEAR, y para mandarlo hace falta la tecla Y del teclado
+    # (el emulador la mapea al boton). KEY_Y = 21 en linux/input-event-codes.h.
+    "y": 21,
     "enter_kp": 96,   # KEY_KPENTER
 }
 
