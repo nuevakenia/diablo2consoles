@@ -53,12 +53,16 @@ else
     echo "   stdlib SALTEADA (SALTAR_STDLIB=1)"
 fi
 
-# los paquetes del motor que entran al binario: los de DC-002.37 mas los tres del personaje
+# los paquetes del motor que entran al binario: los de DC-002.37 mas los tres del personaje, mas los CUATRO
+# del monstruo. OJO (2026-10-24): `monstruo.go` vive en el POC desde DC-002.50 y `main.go` lo importa siempre
+# (con `bestia=false` tambien), asi que sin estos cuatro paquetes este script NO COMPILA y el corpus de
+# DC-002.49 se queda sin la pareja build/build-mudo que pide. Se agregan aca en vez de tocar el POC.
 PAQUETES249="d2common/d2enum d2common/d2math d2common/d2geom d2common/d2math/d2vector d2common/d2path \
 d2networking/d2client/d2clientconnectiontype d2common/d2interface d2common/d2datautils \
 d2common/d2data/d2compression d2common/d2fileformats/d2ds1 d2common/d2fileformats/d2dt1 \
 d2common/d2fileformats/d2mpq d2common/d2fileformats/d2cof d2common/d2fileformats/d2dcc \
-d2common/d2fileformats/d2dc6"
+d2common/d2fileformats/d2dc6 d2common/d2fileformats/d2txt d2common/d2monstats \
+d2common/d2math/d2rand d2common/d2monster"
 
 if [ "${SALTAR_MOTOR:-0}" != "1" ]; then
     PAQUETES="$PAQUETES249" bash "$HERE/build-motor-gox.sh" "$GEN" > "$OUT/motor.log" 2>&1 || {
