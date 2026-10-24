@@ -153,7 +153,11 @@ POS = colgado).
   ver:    tr -d '\r' < /tmp/dcbuild/s257-bestia/corrida/flycast.log | grep -a "SONDA253\|ARQ-PILA253\|ARQ-UBC253"
           python3 scripts/console/resolver-pc.py /tmp/dcbuild/s257-bestia/prog.elf <pc> <pr>
 
-Los builds de esta tarjeta quedaron en /tmp/dcbuild/s253*..s257*, y los logs en <build>/corrida/.
+Los intermedios (s253*..s256*, chk253*) se borraron porque /tmp es tmpfs de 16 GB y cada build deja una
+ISO de 540 MB: quedan /tmp/dcbuild/s257-bestia (con instrumento) y /tmp/dcbuild/verif253-base y
+verif253-bestia (arbol limpio, los de la verificacion final), con sus logs en <build>/corrida/. Los
+numeros de todos los demas builds estan transcritos arriba; para repetir uno, se recompila con el
+comando de la seccion 7.
 
 
 8. ARCHIVOS
