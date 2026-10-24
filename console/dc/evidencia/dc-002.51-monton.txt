@@ -1,0 +1,202 @@
+==============================================================================================================
+DC-002.51 -- EL MONTON DE LA CONSOLA: cuanto hay, cuanto pide cada feature, y que se puede decidir con numeros
+==============================================================================================================
+Fecha: 2026-10-24 (corrida autonoma de Hermes). Rama DC-002, HEAD d7004417.
+
+Este documento NO decide: mide. La decision A/B es de Daniel (linea 2 del PLAN de la tarjeta) y sigue abierta.
+Lo que si hace es tirar abajo una parte de la premisa con la que se abrio la tarjeta, porque esa parte, medida,
+es falsa: **el bicho no muere por monton**. El giro si necesita presupuesto. Los dos, con numeros, abajo.
+
+==============================================================================================================
+SECCION 1 -- EL SEMIESPACIO, MEDIDO EN EL ARRANQUE DE HOY
+==============================================================================================================
+
+  ~/dreamcast/libgodc/runtime/godc_config.h:7   #define GC_SEMISPACE_SIZE_KB 1024
+
+  El arranque lo imprime (marca nueva del instrumento, `ARQ-MARCA`), en las DOS corridas de hoy:
+
+    ARQ-MARCA gc_init-semiespacio0 v=2351033216     (= 0x8C200000)
+    ARQ-MARCA gc_init-semiespacio1 v=2352081824     (= 0x8C300000, +1.048.576 B)
+
+  O sea: el monton de Go del binario son DOS regiones de 1 MB (2 MB del monton de C), y el espacio util de
+  una generacion es UN semiespacio = 1.048.576 B. No es una estima: son las dos direcciones que pide el
+  runtime al arrancar, y coinciden con lo que dice el `#define`.
+
+  El otro numero que hace falta para hablar de "cuanto queda" es el conjunto VIVO del monton de Go, que el
+  mismo instrumento imprime en cada recoleccion (`gc-vivo`):
+
+    gc-vivo  max = 723.328 B      (de 1.048.576 -> el 69,0 % del semiespacio)
+    umbral   max = 822.152 B      (78,4 %, cuando el runtime decide recolectar)
+
+  723.328 B de 1.048.576 dejan ~325 KB de semiespacio para lo que se sume despues del arranque. Ese es el
+  presupuesto real, y es el numero contra el que hay que comparar cada feature (no contra los ~142 KB del
+  monton de C, que es otra cosa y se mide aparte).
+
+==============================================================================================================
+SECCION 2 -- LAS DOS CORRIDAS DE HOY (misma maquina, mismo emulador, mismo toolchain)
+==============================================================================================================
+
+  Fuente: `console/dc/poc/personaje-mapa/main.go` de HEAD d7004417
+  (sha256 b342d92b73b53969df5454c71e7bad5fb23e788adc81e3d26adea67594345404, copiado a /tmp antes de compilar:
+  los .go de los builds 251-base y 251-bestia NO traen el tipo `modoDelHeroe` que se esta escribiendo hoy en
+  el arbol -- ver seccion 7, "provenance"). Los tres .go compartidos con el verificador del host tienen el
+  mismo sha256 en las dos puntas (los imprime el build, `host/sha256.txt`).
+
+  Build (los dos, `SALTAR_STDLIB=1 SALTAR_MOTOR=1`, gox reusados de ~/dreamcast/gox; 4,7 s el de base):
+
+    BESTIA=0  /tmp/dcbuild/251-base     ELF 8.832.908 B  1ST_READ.BIN 1.851.528 B
+                                        sha256 ELF 1a501ca10c2027f674c30268561064cdef2670b7c2d6b8e766fc96e5cd519e0b
+    BESTIA=1  /tmp/dcbuild/251-bestia   ELF 8.834.532 B  1ST_READ.BIN 1.852.552 B
+                                        sha256 ELF 92e1d5c5a751ba08f71ad57125fd77b4757a1093a65ac64a1a563f87bb47aa08
+
+    diferencia: +1.624 B de ELF (+1.024 B de 1ST_READ). O sea el bicho entero son 1,6 KB de codigo.
+
+  Corrida: `scripts/console/run-flycast-249.sh <disc.gdi> <salida>` con LIBGL_ALWAYS_SOFTWARE=1
+  (el Flycast de esta maquina tira SIGBUS en el hilo del PVR con la GPU; con software es estable; se
+  confirmo hoy: un intento del build con bicho murio con `dumped core ... SIGBUS` y se repitio limpio).
+
+==============================================================================================================
+SECCION 3 -- EL MONTON EN EL PUNTO DE COMPOSICION, ANTES Y DESPUES (criterio 4 de la tarjeta)
+==============================================================================================================
+
+  Las marcas son del propio POC (`memoria(etapa)` -> `HITO250: MEMORIA etapa=<x> libre=<N>`), y `libre` es el
+  monton de C que queda:
+
+    etapa                     BESTIA=0 (dibuja)      BESTIA=1 (se cae)
+    ------------------------  ----------------------  ----------------------
+    nivel                             800.376 B               799.352 B
+    mapa-en-imagen                    800.360 B               799.336 B
+    ciclos-del-personaje              142.056 B               141.032 B   <-- EL PUNTO DE COMPOSICION
+    d2char-cerrado                    142.160 B                     --     (no llega)
+    PVR antes-de-pvr_init_defaults        OK                      OK
+    PVR despues-de-pvr_init_defaults      OK               *** NO SALE ***
+
+  Lectura: el build con bicho llega al video con 141.032 B libres despues de componer UN ciclo del heroe
+  (TN), y el build base llega con 142.056 B despues de componer DOS (TN + TW). Es decir: el bicho, en ese
+  punto, cuesta ~1 KB NETO (compone un ciclo menos de los que pesa la bestia... y aun asi queda mas apretado).
+
+  Y el otro numero, la cadencia y el dibujo del camino base, que es el criterio 1 de la tarjeta:
+
+    HITO249: CICLO TN cuadros 16 msPorCuadro 128 cicloMs 2048 imagen 26 77
+    HITO249: CICLO TW cuadros 8  msPorCuadro 40  cicloMs 320  imagen 31 79
+    HITO249: CICLOS cargados 2 ms 3237
+    HITO249: MODO TN cuadros 16 msPorCuadro 128 cicloMs 2048 cuadroDelLoop 1
+    modo TN: 16 cuadros distintos: 0..15    cambios de cuadro dibujados: 63
+    capturas: f1 cuadro 1/16, f2 8/16, f3 9/16, f4 15/16  (md5 distintos los cuatro)
+
+  Los mismos numeros de DC-002.49 (128 ms/cuadro TN, 40 TW, 16 cuadros distintos): el camino base queda
+  INTACTO. Y el build con bicho compone 1 ciclo en 1.996 ms (vs 3.237 ms los dos del base), como se espera.
+
+==============================================================================================================
+SECCION 4 -- POR QUE CON ESTO EL BICHO YA NO SE PUEDE CULPAR AL MONTON
+==============================================================================================================
+
+  Lo que hace el build con bicho, textual de la consola serie (/tmp/dcbuild/251-bestia/corrida/flycast.log):
+
+    HITO250: PVR antes-de-pvr_init_defaults
+    arch: aborting the system
+    vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+    arch: aborting the system
+    00:53:730 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked
+
+  Tres cosas, cada una suficiente:
+
+  (a) NO HAY NEGATIVA DEL ASIGNADOR. Un monton lleno en este port tiene una firma que ya se vio dos veces y
+      es OTRA: `fatal error: out of memory` (el intento con el DT, evidencia de DC-002.50 seccion 5.1) y
+      `fatal error: gc_external_alloc: OOM` (DC-002.49b, comentario de la tarjeta). Aca no hay ninguna de las
+      dos: hay una EXCEPCION del SH-4 (`arch: aborting the system`) dentro de `pvr_init_defaults`, antes de
+      que el PVR pida un solo byte.
+  (b) HAY MONTA. El build base llega al mismo punto con 142.056 B libres y DIBUJA; el del bicho llega con
+      141.032 B y no arranca. La diferencia entre dibujar y no dibujar son 1.024 B de monton de C. Ningun
+      `#define` de semiespacio arregla una diferencia de 1 KB.
+  (c) SUBIR EL SEMIESPACIO YA SE PROBO, DOS VECES, EN DC-002.50 (intentos 4 y 5 de la seccion 5 de su
+      evidencia): `GC_SEMISPACE_SIZE_KB 4096` -> la arena llega a 13,7 MB y ya no entra el RGBA del mapa;
+      `GC_SEMISPACE_SIZE_KB 2048` -> entran los siete ciclos y el video se cuelga igual. Esas dos corridas
+      fueron con el defecto de codegen presente, asi que no prueban nada sobre el codegen -- pero si prueban
+      que **mas semiespacio no arranca este video**.
+
+  O sea: el camino A (subir el semiespacio) NO es un camino para el bicho. El bicho tiene otra enfermedad
+  (codegen/layout del camino con `bestia=true`; DC-002.50 seccion 12 y DC-002.52, que la vigila).
+
+==============================================================================================================
+SECCION 5 -- EL PRESUPUESTO REAL DE LAS DOS FEATURES (contra el semiespacio, no contra el monton de C)
+==============================================================================================================
+
+  Semiespacio: 1.048.576 B. Vivo despues del arranque: 723.328 B. **Quedan ~325 KB.**
+
+  GIRO (DC-002.49b, medido con el verificador del host: -censo-dirs / -censo-control / -censo-peso):
+    * las 8 direcciones que el control puede pedir, permanentes: TN 246.768 B + TW 148.720 B = 395.488 B
+      -> NO entran: pide 395 KB donde hay ~325 KB. Faltan ~70 KB, y no hay forma de acomodarlos.
+    * componiendo UNA direccion a la vez (guardando el .dcc crudo y liberando la anterior), el pico es
+      maxCrudo + decodificada: TN 63.718 + 43.728 = 107.446 B; TW 66.859 B
+      -> entra, con ~218 KB de margen. Decodificar una direccion cuesta 3.237 ms (medido en DC-002.49).
+
+  BICHO (DC-002.50, medido con el verificador del host, evidencia seccion 12.5):
+    * los tres modos compuestos a la vez: ~420 KB -> NO entran (420 KB contra ~325 KB).
+    * un modo a la vez: ~140 KB -> entra, con ~185 KB de margen.
+    * el A1 del heroe: pico 197.371 B (75.132 crudo + 122.239 decodificado).
+
+  Conclusion de presupuesto: **B (componer bajo demanda) sirve para las dos features con el semiespacio como
+  esta; A (2048) tambien les daria lugar, pero no arregla el arranque del bicho y ademas obliga a re-medir los
+  invariantes de DC-002.28 / DC-002.214 / DC-002.221, que leen ese numero.**
+
+==============================================================================================================
+SECCION 6 -- LOS DOS CAMINOS, CON SU COSTO (para que la decision sea de numeros y no de gusto)
+==============================================================================================================
+
+  A) `GC_SEMISPACE_SIZE_KB 2048` (~/dreamcast/libgodc/runtime/godc_config.h) + rearmar libgodc:
+     * a favor: es un `#define`; da 2 MB de semiespacio (entran las 8 direcciones y los tres modos del bicho).
+     * en contra: toca el TOOLCHAIN COMPARTIDO (todos los binarios del port), y los invariantes de
+       DC-002.28 / DC-002.214 / DC-002.221 leen ese numero -> hay que re-medir tres corpus.
+     * en contra, medido: ya se probo 2048 y 4096 en DC-002.50 y el video no arranco; y el arranque del
+       bicho no es un problema de asignador (seccion 4).
+  B) componer BAJO DEMANDA (guardar el .dcc CRUDO de cada modo y componer solo la direccion/modo que se
+     dibuja, liberando el anterior):
+     * a favor: NO toca el toolchain, no toca ningun invariante de otra tarjeta, y deja las dos features
+       dentro del semiespacio de 1 MB (seccion 5). Sirve igual para el bicho (un modo) y para el giro (una
+       direccion), y es exactamente el instrumento que DC-002.49b ya midio (3.237 ms por direccion).
+     * en contra: es codigo nuevo en el POC y en `personaje.go` (que es archivo compartido con el verificador
+       del host: los dos tienen que quedar con el mismo sha256, lo exige el build).
+
+  Recomendacion del que mide: **B**, en los dos frentes, y por una razon que no es de gusto: es la unica de
+  las dos que deja el semiespacio en 1 MB (o sea, no re-abre DC-002.28/214/221) y la unica compatible con las
+  dos features a la vez. A queda como palanca de emergencia si B no alcanza en la consola (los margenes de
+  la seccion 5 son de 218 KB y 185 KB, no de 5 KB: hay aire).
+
+  Lo que NINGUNO de los dos caminos arregla, y hay que decirlo junto: **el arranque del bicho**
+  (`arch: aborting the system` dentro de `pvr_init_defaults`). Eso es DC-002.50 (codegen/layout), y DC-002.52
+  es el control que evita que vuelva.
+
+==============================================================================================================
+SECCION 7 -- COMO SE REPITE (exacto)
+==============================================================================================================
+
+  # 1. los dos builds, 5 s cada uno con los gox ya compilados
+  cd ~/Proyectos/diablo2consoles
+  SALTAR_STDLIB=1 SALTAR_MOTOR=1 BESTIA=0 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/251-base
+  SALTAR_STDLIB=1 SALTAR_MOTOR=1 BESTIA=1 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/251-bestia
+
+  # 2. las dos corridas (una ventana de Flycast a la vez; software para no comerse el SIGBUS)
+  LIBGL_ALWAYS_SOFTWARE=1 CAPTURAS=4 INTERVALO=1.0 \
+      bash scripts/console/run-flycast-249.sh /tmp/dcbuild/251-base/disc.gdi   /tmp/dcbuild/251-base/corrida
+  LIBGL_ALWAYS_SOFTWARE=1 ESPERA_ARRANQUE=75 \
+      bash scripts/console/run-flycast-249.sh /tmp/dcbuild/251-bestia/disc.gdi /tmp/dcbuild/251-bestia/corrida
+
+  # 3. los numeros que importan
+  grep -a "HITO250: MEMORIA\|HITO249: CICLOS\|HITO250: PVR\|HITO238: dibujando\|arch: aborting" \
+      /tmp/dcbuild/251-*/corrida/flycast.log
+  grep -a "ARQ-MARCA" /tmp/dcbuild/251-base/corrida/flycast.log | grep -E "semiespacio|gc-vivo"
+
+  # 4. la cadencia del camino base (criterio 1), con las capturas
+  grep -a "HITO249: MODO\|cuadros distintos\|cambios de cuadro" /tmp/dcbuild/251-base/corrida/flycast.log
+
+PROVENANCE (importante para el que lea esto manana): las dos corridas se compilaron desde la copia del POC en
+/tmp/dcbuild/251-*/poc, que salio de HEAD d7004417 ANTES de que otro actor empezara a editar
+`console/dc/poc/personaje-mapa/main.go` en el arbol (14:57, es el trabajo de DC-002.52: `modoDelHeroe` con
+nombre y `scripts/console/checar-codegen-252.py`). O sea: los numeros de arriba son del arbol commiteado, que
+es el que dibuja con bestia=0. Si se repiten desde el arbol de trabajo con el fix de DC-002.52 puesto, el
+build es otro binario y hay que volver a correr las dos.
+
+OJO CON EL EMULADOR (se pago hoy otra vez): Flycast aca tira `SIGBUS` (core dump) en el hilo del PVR con la
+GPU. Todas las corridas validas de esta tarjeta son con LIBGL_ALWAYS_SOFTWARE=1. Un intento del build con
+bicho murio con `Process ... (flycast) dumped core` y NO es un dato del port: se repite.
