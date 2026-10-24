@@ -777,6 +777,15 @@ func (j *juego) dibujarBestia(pantalla *ebiten.Image) {
 	m.Pintado = m.Cuadro
 }
 
+// modoDelHeroe: un modo de la animacion del heroe con su ritmo. TIENE NOMBRE A PROPOSITO (medido el
+// 2026-10-24): con un struct ANONIMO, gccgo para SH-4 miscompila las operaciones sobre la rebanada (el
+// `append` y el recorte tumbaban el arranque del PVR con una excepcion del SH4). Lo vigila
+// `scripts/console/checar-codegen-252.py`.
+type modoDelHeroe struct {
+	modo string
+	ms   int
+}
+
 func main() {
 	d2cSerialInit()
 
@@ -1104,17 +1113,18 @@ func main() {
 		// ataque): medido, con TN + TW + A1 + los cuatro del bicho el monton de la consola no alcanza y el POC
 		// se queda sin memoria al empezar TW (TN y el DT ya estaban compuestos y no entro uno mas). El caminar
 		// NO se rompe: la posicion la sigue moviendo el motor, lo unico que se dibuja es TN.
-		modosDelHeroe := []struct {
-			modo string
-			ms   int
-		}{{modoQuieto, msQuieto}, {modoCaminando, msCaminando}}
+		// DEFECTO DE CODEGEN, MEDIDO EL 2026-10-24 (evidencia de DC-002.50, seccion 12): con una rebanada de
+		// struct ANONIMO, gccgo para SH-4 miscompila el `append` y el recorte, y la consola se REINICIA dentro
+		// de `pvr_init_defaults`/`pvr_mem_malloc` como si le faltara RAM -- ocho intentos de esta tarjeta se
+		// fueron en esa hipotesis. Por eso el tipo tiene NOMBRE (`modoDelHeroe`) y la lista se arma con un
+		// literal por rama, sin append ni recorte. Lo vigila `scripts/console/checar-codegen-252.py`.
+		var modosDelHeroe []modoDelHeroe
 
-		// DC-002.50: con la bestia encendida NO se compone TW (la RAM de la consola no alcanza para TN + A1 +
-		// los tres modos del bicho). Se recorta el literal en vez de armarlo con append: el append de un struct
-		// anonimo es el unico codigo nuevo que quedaba en el camino previo al video (ver el comentario de
-		// 3b-bis), y se saca de la duda.
 		if bestia {
-			modosDelHeroe = modosDelHeroe[:1]
+			// con la bestia encendida NO se compone TW: TN + A1 + los tres modos del bicho no entran juntos
+			modosDelHeroe = []modoDelHeroe{{modoQuieto, msQuieto}}
+		} else {
+			modosDelHeroe = []modoDelHeroe{{modoQuieto, msQuieto}, {modoCaminando, msCaminando}}
 		}
 
 		for _, m := range modosDelHeroe {

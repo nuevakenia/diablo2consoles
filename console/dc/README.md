@@ -5695,3 +5695,53 @@ el emulador encima o editar ese archivo le rompe la corrida y el build. El estad
 (`t_f18b01ca`), no disimulado.
 
 Evidencia: `console/dc/evidencia/dc-002.49b-direcciones.txt`.
+
+## 75. DC-002.52: la REGLA de codegen como control — **ninguna rebanada de struct anónimo** (`append` ni recorte), con el mutador que la vigila
+
+**Lo medido el 2026-10-24** (evidencia `evidencia/dc-002.50-golpear-enemigos.txt`, sección 12). La tarjeta del
+golpe (DC-002.50) llevaba **ocho intentos** culpando al montón de la consola. La causa no era la RAM:
+
+* el build de la rama con `BESTIA=0` (sin una sola línea del bicho) **también** se reiniciaba dentro de
+  `IniciarPantalla` → la regresión nunca la metió el bicho;
+* el binario de DC-002.49 compilado con el toolchain de hoy **dibuja** (`TN cuadro 6/16`, 54 s) y **sigue
+  dibujando** con **+14.336 B de `.bss`**, con **+13.376 B de `.text`** (`1ST_READ.BIN` más grande que el que
+  falla) y con el **DMA Buffer en la misma dirección** que el build que falla → ni RAM, ni tamaño, ni dónde
+  arranca el montón de C;
+* el culpable es una operación sobre una **rebanada de struct ANÓNIMO**:
+
+```go
+// ASI NO (medido: la consola se reinicia dentro de pvr_init_defaults, con el camino bestia=0)
+modos := []struct{ modo string; ms int }{{modoQuieto, msQuieto}}
+modos = append(modos, struct{ modo string; ms int }{modoCaminando, msCaminando})
+```
+
+```go
+// ASI SI: el tipo con nombre y el literal por rama
+type modoDelHeroe struct{ modo string; ms int }
+var modos []modoDelHeroe
+if bestia { modos = []modoDelHeroe{{modoQuieto, msQuieto}} } else { modos = []modoDelHeroe{...} }
+```
+
+Con el tipo con nombre el mismo binario **arranca** (`dibujando=1`, `arranques=1`) y pasan todas las marcas del
+PVR. El síntoma es de los peores: una **excepción del SH4** saltando a una dirección del montón
+(`PC 8c42dea0`), o un reinicio limpio, indistinguibles de "me quedé sin memoria". El recorte `modos[:1]` sobre
+la rebanada anónima se comporta igual de mal (variante `/tmp/poc-v7`: pasa el init del PVR y muere después).
+
+**La regla, entonces** (y ahora con control, no con memoria):
+
+```bash
+python3 scripts/console/checar-codegen-252.py        # verde: 0 violaciones sobre 154 .go
+bash    scripts/console/mutar-codegen-252.sh         # 1 control verde + 2/2 mutantes cazados
+```
+
+Persigue dos formas concretas: `append` de un struct anónimo y **recorte/asignación de elemento** sobre una
+variable declarada `[]struct{...}`. **No** prohíbe el literal `[]struct{...}{...}` recorrido con `range` y sólo
+leído: eso está en el árbol desde DC-002.38 y no rompe nada (por ejemplo el bucle de los modos del bicho).
+
+**Lo que queda abierto con `BESTIA=1`** y su causa común con DC-002.49b: el montón de Go es **un semiespacio de
+1 MB** (`GC_SEMISPACE_SIZE_KB 1024`) y las dos features piden más de lo que hay. Está en la tarjeta **DC-002.51**
+(decidir semiespacio de 2 MB vs componer bajo demanda con el `.dcc` crudo en RAM).
+
+**Ojo con el entorno**: `/tmp` de esta máquina es un `tmpfs` de 16 GB y cada build deja una ISO de **540 MB**.
+Se llenó a mitad de la sesión y el emulador empezó a morir con `Failed to locate bootfile` en GDI incompletos —
+un "fallo del código" que era del disco. Limpiar los builds viejos antes de creerle a una corrida rara.
