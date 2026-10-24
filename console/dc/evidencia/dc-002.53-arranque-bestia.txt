@@ -1,0 +1,207 @@
+DC-002.53 ARRANQUE DEL VIDEO CON BESTIA=1 -- LO MEDIDO Y LO QUE FALTA
+=====================================================================
+
+ESTADO: LA TARJETA NO SE CIERRA. La causa raiz NO esta confirmada y por lo tanto NO hay arreglo: lo que
+hay es el sintoma medido con instrumentos que no tocan el layout, cuatro hipotesis descartadas con su
+numero, y el siguiente paso concreto para encontrar al culpable. Cualquier "arreglo" propuesto antes de
+cerrar esto seria una tirada de dados -- y ademas, medido: cualquier cambio de codigo MUEVE el punto de
+muerte (ver seccion 3), asi que un arreglo que "funciona" puede ser solo un layout distinto.
+
+Recordatorio del instrumento: el POC bestia=1 y el bestia=0 son el MISMO codigo Go. Las 18 marcas
+ARQ-MARCA del arranque del runtime son identicas salvo las direcciones del semiespacio, y el diff
+instruccion por instruccion de _pvr_init / _pvr_init_defaults entre los dos ELF no muestra diferencias
+de logica. Lo unico que cambia son los bytes y las direcciones.
+
+
+1. EL SINTOMA, MEDIDO
+---------------------
+bestia=0 llega a dibujar. bestia=1 no llega nunca al bucle de cuadros: muere (o se cuelga) adentro del
+arranque de video de KOS, o sea adentro de `pvr_init`.
+
+Que deja el que anda (corrida de 90 s, CAPTURE=none):
+
+  HITO238: POS cuadro 60 ms 67967 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256
+  HITO249: ANIM modo TN cuadro 13 de 16 caja 26 77 ... cuadroDelLoop 62 mutante false
+  avisos YUV del emulador: 0
+
+Que deja el que muere: la ultima marca propia es `HITO250: PVR antes-de-pvr_init_defaults` y despues o
+bien una excepcion del SH-4, o bien silencio. Nunca aparece un `HITO238: POS cuadro`. Textual del
+emulador en la corrida de verificacion final (arbol limpio, sin instrumento):
+
+  base    (BESTIA=0, 1ST_READ.BIN 1.851.848 B): 5 marcas "HITO238: POS cuadro", 0 excepciones -> DIBUJA
+  bestia  (BESTIA=1, 1ST_READ.BIN 1.852.904 B): 0 marcas, "Unhandled exception: PC 8c42e020, code 1,
+          evt 0180" -> instruccion ilegal, y el PC otra vez cae en la PILA (0x8c42e020), igual que en
+          todas las demas corridas de esta tarjeta.
+
+
+
+2. EL INSTRUMENTO (y por que no puede vivir en el kernel)
+---------------------------------------------------------
+Tres sondas propias del POC, ninguna toca libkallisti.a:
+
+  SONDA253          etapa 1..6: sp, sbrk(0), heap libre (mallinfo), vid_mode, cable_type, w, h, flags,
+                    _arch_mem_top.   -> "SONDA253 etapa=..."
+  SONDA-PILA253     handler global de IRQ/excepcion (irq_set_global_handler): SPC/SSR/EXPEVT reales,
+                    contexto de KOS, registros, 128 palabras de pila y las que caen en .text, mas un
+                    volcado del codigo en RAM alrededor del PC.   -> "ARQ-PILA253..."
+  SONDA-UBC253      User Break Controller del SH-4: corta en las escrituras a la pila y, desde esta
+                    corrida, tambien por VALOR de dato (BDR/BDMR).   -> "ARQ-UBC253..."
+
+Medido: si el volcado de excepcion se instala DENTRO de irq.c de KOS, el instrumento agrega ~1 KB al
+kernel y el sintoma DESAPARECE (el binario anda). Por eso vive en el POC. Esto no es una comodidad: es
+la prueba de que el defecto depende del layout.
+
+El UBC solo enmascara desde 10 bits (ventana de 1 KB), asi que se instala sobre el KB que contiene la
+pila en el momento de inicializar el video, y se le suma la comparacion por dato con mascara 0xFF sobre
+ese mismo KB (acepta cualquier valor `base..base+0xFF`, que es donde caen los punteros a esta pila).
+
+
+3. LO MEDIDO, BUILD POR BUILD (90 s, CAPTURE=none, todas BESTIA=1)
+------------------------------------------------------------------
+  build         que se cambio respecto del anterior                  donde muere
+  ------------  ---------------------------------------------------  -------------------------------
+  s253d/e       ninguna (instrumento de pila)                          PC = 0x8c42e5xx (PILA), PR = pila
+  s253f         + sonda UBC sobre el KB de la pila                    PC = 0x8c0e50c4, PR = 0x8c0d24fa
+  s254a         libgodc reconstruido (interruptor copia SQ = 1)        PC = PR = 0x8c42e808 (params+8)
+  s254b         MISMO binario, interruptor copia SQ = 0                PC = PR = 0x8c42e808  (IDENTICO)
+  s254c         params de _pvr_init_defaults movido a .rodata          PC = 0x8c0e5000, PR = 0x8c0d2506
+  s255-full     build COMPLETO (sin SALTAR_STDLIB/SALTAR_MOTOR)        PC = 0x8c0e50c4, PR = 0x8c0d24fa
+  s256          + volcado del codigo en RAM en el handler              NO hay excepcion: se cuelga
+  s257          + UBC por valor de dato                                PC = 0x8c0e5002, PR = 0x8c0d2532
+
+Las tres conclusiones que salen de la tabla:
+
+  a) el punto de muerte SE MUEVE con cualquier cambio de codigo, incluso con cambios que no se ejecutan
+     (el volcado de .text de s256 solo corre si hay excepcion, y sin embargo s256 no muere: se cuelga).
+     Eso descarta "un bug de una funcion del video" y apunta a memoria pisada: la victima depende del
+     layout.
+  b) 1ST_READ.BIN de s253f y de s255-full pesan exactamente lo mismo (1.854.856 B) y mueren en la MISMA
+     direccion: el build incremental / el cache de .gox no tiene nada que ver.
+  c) los PR de los builds de la tabla son todos _pvr_init+0x86..0xbe: el que muere es SIEMPRE un callee
+     de `pvr_init`, y el PC de la excepcion cae en DATOS (pila) o en el cluster .text de pvr_dma /
+     pvr_sq (0x8c0e4fxx..0x8c0e50c4), nunca en codigo que corresponda a lo que estaba llamando.
+     La excepcion es siempre la misma: EXPEVT=0x180 (instruccion ilegal), event 0x180, sr=0x40000000
+     (o 0x40000001 con T=1). El CPU dice "ejecute algo que no es una instruccion".
+
+
+4. LA GEOMETRIA DEL FRAME QUE MUERE (s254a/s254b, corrida de 90 s)
+-------------------------------------------------------------------
+Valores del volcado ARQ-PILA253: pc=pr=0x8c42e808, sp=0x8c42e7e4, r11=0x8c42e800.
+
+  params = 0x8c42e800 = r11 = el struct pvr_init_params_t que _pvr_init_defaults arma EN SU PILA, y
+  ademas es el fin de la trama de _pvr_init (E = params, o sea el sp con el que se llamo a _pvr_init).
+
+  _pvr_init         7 push (r8..r13, pr) -> ocupa 0x8c42e7e4..0x8c42e7fc
+                    su PR guardado esta en 0x8c42e7e4 = 0x8c0d27d8 -> _pvr_init_defaults+40  (correcto)
+  el callee         E = 0x8c42e7e4, guarda r8 en 0x8c42e7e0 y pr en 0x8c42e7dc
+  el slot 0x8c42e7dc  = 0x8c42e808  <- PISADO: deberia tener la direccion de vuelta a _pvr_init
+  epilogo            lds.l @r15+,pr  desde 0x7dc -> PR = 0x8c42e808
+                     mov.l @r15+,r8  desde 0x7e0 -> r8 = 0x8c208564 (coincide con el r8 vivo del contexto)
+                     rts -> salta a 0x8c42e808 con r15 = 0x8c42e7e4 (coincide con el sp del contexto)
+
+Es decir: la geometria cierra exactamente, y el valor que se llevo puesto la direccion de retorno es
+`params + 8`, un puntero a la MISMA pila, 8 bytes adentro del struct de parametros. Ese valor aparecio
+en CUATRO builds distintas (s253d/e, s254a, s254b, y con otra forma en s253f/s255). No es basura
+aleatoria: es un puntero derivado de `params`.
+
+
+5. LO QUE YA SE DESCARTÓ, CON SU MEDIDA
+---------------------------------------
+  a) La copia del recolector por Store Queue (gc_sq_copy de libgodc). Se agrego un interruptor volatile
+     -- mismo tamano de codigo, un solo byte de .data distinto -- y se corrieron las dos versiones:
+     con copia por SQ y con memcpy el binario muere en la MISMA direccion (PC=PR=0x8c42e808). Descartada.
+     (El interruptor se saco despues; libgodc quedo como estaba.)
+  b) El cache de .gox / el build incremental. Build completo sin SALTAR_STDLIB ni SALTAR_MOTOR: mismo
+     tamano de imagen y mismo punto de muerte. Descartada.
+  c) Que `params` este en la pila. Se movio a .rodata (`static const` en pvr_init_defaults de KOS): el
+     punto de muerte cambia (PC pasa a .text, el valor pisado ya no es un puntero a la pila) pero NO se
+     arregla. Descartada como causa (el struct en la pila solo decide QUIEN es la victima).
+  d) Que el culpable sea una escritura de 32 bits de un puntero a la pila en ese KB. El UBC con
+     comparacion por valor de dato (mascara 0xFF sobre el KB de la pila) NO corto NI UNA VEZ y el POC
+     murio igual (PC=0x8c0e5002). Descartada tal cual, o el UBC no ve esa escritura (ver seccion 6).
+  e) El GDB de Flycast: este build del emulador no expone el stub (`Debug.GDBEnabled` y variantes no
+     abren el puerto 3269). Sin eso no hay depurador remoto; queda la instrumentacion propia.
+  f) Que el binario que anda y el que muere difieran en codigo: 18 marcas ARQ-MARCA identicas salvo el
+     semiespacio, y diff de _pvr_init/_pvr_init_defaults sin diferencias de logica.
+
+
+6. LO QUE FALTA (el siguiente paso, concreto)
+---------------------------------------------
+Falta el QUIEN: que instruccion escribe el puntero en el slot de la direccion de retorno. El instrumento
+esta listo pero todavia no mira donde hay que mirar, por una razon medida: la corrupcion puede ocurrir
+ANTES de que se instale el UBC (se instala en la etapa 6, justo antes del video) y en ese caso la
+escritura ya paso cuando el breakpoint existe. Los dos caminos, en orden de costo:
+
+  1. Instalar el UBC desde la etapa 1 (arranque), con comparacion por valor de dato, sobre el KB de la
+     pila. Cuesta ~1 corrida y no toca el layout (la sonda ya esta en el binario). Si corta, el PC del
+     corte es el culpable y se puede resolver con scripts/console/resolver-pc.py.
+  2. Si no corta, la escritura no es un store de 32 bits del CPU a ese KB: quedan (i) una escritura por
+     DMA, (ii) un store de 8/16 bits partido, (iii) el UBC configurado con la mascara al reves (la
+     mascara es de EXCLUSION: 1 = no comparo; con 0xFF se aceptan los 256 primeros bytes del KB) y
+     (iv) que el valor se escriba donde NO esta el UBC (otra ventana de 1 KB).
+
+Control automatico del sintoma (para que no vuelva sin que nos enteremos): scripts/console/checar-
+arranque-253.sh compila bestia=1, corre 90 s y clasifica ANDA / MUERE-EXCEPCION / COLGADO leyendo las
+marcas (HITO238: POS cuadro = dibuja; ARQ-PILA253-REAL = excepcion; PVR antes-de-pvr_init_defaults sin
+POS = colgado).
+
+
+7. COMO SE REPRODUCE
+--------------------
+  build:  BESTIA=1 SALTAR_STDLIB=1 SALTAR_MOTOR=1 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/s257-bestia
+  run:    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/s257-bestia/disc.gdi 90 /tmp/dcbuild/s257-bestia/corrida
+  ver:    tr -d '\r' < /tmp/dcbuild/s257-bestia/corrida/flycast.log | grep -a "SONDA253\|ARQ-PILA253\|ARQ-UBC253"
+          python3 scripts/console/resolver-pc.py /tmp/dcbuild/s257-bestia/prog.elf <pc> <pr>
+
+Los builds de esta tarjeta quedaron en /tmp/dcbuild/s253*..s257*, y los logs en <build>/corrida/.
+
+
+8. ARCHIVOS
+-----------
+  instrumento      console/dc/poc/personaje-mapa/csrc/cshim.c   (SONDA253, SONDA-PILA253, SONDA-UBC253)
+                   console/dc/poc/personaje-mapa/main.go         (etapas 1..6, instalacion de sondas)
+  control          scripts/console/checar-arranque-253.sh
+  comparadores     comparar-arranque-253.py   (marcas ARQ-MARCA entre dos corridas)
+                   diff-funcion-253.py        (una funcion entre dos ELF, direcciones enmascaradas)
+                   scripts/console/resolver-pc.py (direccion -> simbolo+linea)
+
+KOS y libgodc quedaron RESTAURADOS: irq.c sin instrumento (respaldo irq.c.orig-dc253) y
+pvr_init_shutdown.c con `params` en la pila otra vez (respaldo .orig-dc253).
+
+
+9. DOS HALLAZGOS NUEVOS QUE CAMBIAN EL PLANTEO DE LA TARJETA
+--------------------------------------------------------------
+9.a EL STACK DE LA GOROUTINA PRINCIPAL SE SOLAPA CON EL SEMIESPACIO 1 (medido).
+
+  gc_init-semiespacio0 = 0x8c21f8c0   -> ocupa hasta 0x8c31f8c0   (1 MB)
+  gc_init-semiespacio1 = 0x8c31f8e0   -> ocupa hasta 0x8c41f8e0   (1 MB)
+  pila de la goroutine principal: tope 0x8c42e800 (sp en la etapa 6), GOROUTINE_STACK_SIZE = 64 KB
+                                   -> base 0x8c41e800
+  solapamiento: 0x8c41e800..0x8c41f8e0 = 4.320 bytes (los PRIMEROS 4 KB de la pila caen adentro del
+  semiespacio 1).
+
+  Por que importa: `gc_update_pointer_field()` (libgodc/runtime/gc_copy.c) razona asi en un comentario
+  -- "This check will correctly skip: ... Stack pointers (on the stack, above heap)". En este layout el
+  monton de malloc (sbrk = 0x8ca76000) esta ARRIBA de la pila y el semiespacio 1 esta DEBAJO: la
+  suposicion del comentario no se cumple. Con GC en el semiespacio 1, la region [from_lo, from_hi) del
+  barrido conservador pisa los primeros 4 KB de la pila, y el barrido del to-space los lee como si
+  fueran objetos. No esta probado que ESTE sea el corruptor de la seccion 4, pero es un defecto real,
+  medido con las direcciones del arranque, y explica la clase de sintoma (memoria de pila pisada por el
+  recolector con el layout como arbitro).
+
+9.b BESTIA=1 NO ES EL CASO ESPECIAL: es el caso con el layout desafortunado (medido).
+
+  Con el instrumento actual (SONDA253 + SONDA-PILA253 + SONDA-UBC253) las DOS variantes mueren:
+
+    BESTIA=1  1ST_READ.BIN 1.854.952 B  -> MUERE-EXCEPCION  pc=0x8c0e5002 pr=0x8c0d2532
+    BESTIA=0  1ST_READ.BIN 1.853.896 B  -> MUERE-EXCEPCION  pc=pr=0x8c42e770 (pila)
+
+  (medido con scripts/console/checar-arranque-253.sh, corridas de 90 s). Sin instrumento, bestia=0
+  llega a dibujar y bestia=1 muere. O sea: el defecto esta en los DOS binarios y el layout decide quien
+  se lleva el golpe. Por eso "arreglar bestia=1" no es el objetivo correcto: el objetivo es encontrar la
+  escritura que pisa la pila, y el control automatico tiene que correr las DOS variantes.
+
+  Corolario practico: un cambio que haga que bestia=1 dibuje NO es prueba de arreglo mientras no se
+  explique; ya paso en esta sesion (build s256: el mismo codigo, 152 bytes mas de codigo en el handler,
+  y el POC deja de morir por excepcion y se CUELGA adentro del video).
+

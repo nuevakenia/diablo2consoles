@@ -1,0 +1,310 @@
+diff --git a/console/dc/poc/personaje-mapa/csrc/cshim.c b/console/dc/poc/personaje-mapa/csrc/cshim.c
+index 49c7c689..12dfb894 100644
+--- a/console/dc/poc/personaje-mapa/csrc/cshim.c
++++ b/console/dc/poc/personaje-mapa/csrc/cshim.c
+@@ -17,6 +17,221 @@
+ #include <stdio.h>
+ #include <stdint.h>
+ #include <malloc.h>
++#include <unistd.h>
++#include <dc/video.h>
++#include <arch/irq.h>
++
++extern unsigned long _arch_mem_top;   /* tope de la RAM (0x8d000000 con 16 MB), de <arch/arch.h> */
++
++/* SONDA-PILA253 (DC-002.53): VOLCADO DE LA PILA EN LA EXCEPCION, DESDE AFUERA DEL KERNEL.
++ *
++ * POR QUE ASI Y NO EN EL KERNEL: el sintoma depende del LAYOUT del binario (basto con ~1 KB de codigo
++ * mas en el kernel para que el mismo POC dejara de caerse), asi que el instrumento NO puede vivir en
++ * libkallisti: se instala desde el POC como handler global de IRQ/Excepcion de KOS, que recibe el
++ * contexto del fault (irq_context_t) y por lo tanto el SP, el PC y el PR REALES.
++ *
++ * QUE BUSCA: el POC se cae adentro de pvr_init con el PC adentro de la pila (una direccion de retorno
++ * pisada). Con el volcado de 64 palabras desde SP se ve QUE se escribio encima del frame: si son
++ * direcciones de la propia pila, punteros del monton o codigo, y cual es el ultimo return vivo (la
++ * cadena de llamadas se resuelve con scripts/console/resolver-pc.py).
++ */
++static void sonda_pila_253(irq_t evt, irq_context_t *ctx, void *data) {
++    static int veces = 0;
++    uint32_t sp, spc, ssr, expevt;
++    int i;
++
++    (void)data;
++
++    /* solo las EXCEPCIONES del SH-4 (las interrupciones son INTEVT >= 0x2a0 y no interesan aca) */
++    if((unsigned)evt > 0x1ff) {
++        return;
++    }
++
++    if(veces++ > 2) {
++        return;
++    }
++
++    sp = ctx->r[15];
++
++    /* La verdad de la excepcion: SPC/SSR son registros del CPU y EXPEVT dice el evento REAL (el campo
++     * evt que llega por parametro viene del despacho de KOS; si no coinciden, el contexto esta stale). */
++    asm volatile("stc spc, %0" : "=r"(spc));
++    asm volatile("stc ssr, %0" : "=r"(ssr));
++    expevt = *(volatile uint32_t *)0xff000024;
++
++    printf("ARQ-PILA253-REAL spc=%08lx ssr=%08lx expevt=%08lx | ctx evt=%03x pc=%08lx pr=%08lx\n",
++           (unsigned long)spc, (unsigned long)ssr, (unsigned long)expevt,
++           (unsigned)evt, (unsigned long)ctx->pc, (unsigned long)ctx->pr);
++
++    printf("ARQ-PILA253 evt=%03x pc=%08lx pr=%08lx sp=%08lx sr=%08lx\n",
++           (unsigned)evt, (unsigned long)ctx->pc, (unsigned long)ctx->pr, (unsigned long)sp,
++           (unsigned long)ctx->sr);
++    printf("ARQ-PILA253 r0-r7 %08lx %08lx %08lx %08lx %08lx %08lx %08lx %08lx\n",
++           (unsigned long)ctx->r[0], (unsigned long)ctx->r[1], (unsigned long)ctx->r[2],
++           (unsigned long)ctx->r[3], (unsigned long)ctx->r[4], (unsigned long)ctx->r[5],
++           (unsigned long)ctx->r[6], (unsigned long)ctx->r[7]);
++    printf("ARQ-PILA253 r8-r15 %08lx %08lx %08lx %08lx %08lx %08lx %08lx %08lx\n",
++           (unsigned long)ctx->r[8], (unsigned long)ctx->r[9], (unsigned long)ctx->r[10],
++           (unsigned long)ctx->r[11], (unsigned long)ctx->r[12], (unsigned long)ctx->r[13],
++           (unsigned long)ctx->r[14], (unsigned long)sp);
++
++    if(sp < 0x8c000000 || sp > (_arch_mem_top - 256)) {
++        printf("ARQ-PILA253 sp fuera de RAM: no se vuelca\n");
++
++        return;
++    }
++
++    /* DC-002.53: EL CODIGO EN RAM, AL LADO DEL PC. Si el ELF dice una cosa y la RAM dice otra, el ladron
++     * escribio encima de .text: eso explicaria que el mismo POC salte a DATOS y que el punto de muerte se
++     * mueva con el layout. Se imprime de pc-0x10 a pc+0x30. */
++    {
++        uint32_t base_txt = (ctx->pc & ~3u) - 0x10u;
++        int k;
++
++        for(k = 0; k < 4; k++) {
++            uint32_t *p = (uint32_t *)(base_txt + k * 16);
++
++            printf("ARQ-PILA253-TEXT %08lx: %08lx %08lx %08lx %08lx\n",
++                   (unsigned long)(base_txt + k * 16), (unsigned long)p[0], (unsigned long)p[1],
++                   (unsigned long)p[2], (unsigned long)p[3]);
++        }
++    }
++    {
++        uint32_t base = sp - 0x80;
++
++        for(i = 0; i < 128; i += 8) {
++            uint32_t *p = (uint32_t *)(base + i * 4);
++
++            printf("ARQ-PILA253 %+04x: %08lx %08lx %08lx %08lx %08lx %08lx %08lx %08lx\n",
++                   (int)(base + i * 4 - sp), (unsigned long)p[0], (unsigned long)p[1],
++                   (unsigned long)p[2], (unsigned long)p[3], (unsigned long)p[4],
++                   (unsigned long)p[5], (unsigned long)p[6], (unsigned long)p[7]);
++        }
++    }
++
++    printf("ARQ-PILA253-CODIGO (palabras de la pila que caen en .text)\n");
++
++    for(i = -32; i < 128; i++) {
++        uint32_t v = *(uint32_t *)(sp + i * 4);
++
++        if(v >= 0x8c010000 && v < 0x8c106000) {
++            printf("ARQ-PILA253   %+04x: %08lx\n", (int)(i * 4), (unsigned long)v);
++        }
++    }
++}
++
++/* d2c_instalar_sonda_pila_253: la llama el Go al arrancar (etapa 0). */
++void d2c_instalar_sonda_pila_253(void) {
++    irq_set_global_handler(sonda_pila_253, NULL);
++}
++
++/* SONDA-UBC253 (DC-002.53): QUIEN ESCRIBE LA DIRECCION DE RETORNO.
++ *
++ * El volcado de pila ya mostro el QUE: un slot de la pila del video queda con un puntero a la pila
++ * (params+8) y la funcion retorna ahi. Falta el QUIEN. El UBC del SH-4 corta cuando alguien ESCRIBE
++ * en un rango de direcciones y entrega el contexto del corte, asi que da el PC exacto del store.
++ *
++ * El UBC solo permite enmascarar 10 bits como minimo (rango de 1 KB), asi que se instala sobre el KB
++ * que contiene la pila actual: las tramas del video se arman por debajo de este punto.
++ */
++#include <dc/ubc.h>
++#include <string.h>
++
++static ubc_breakpoint_t bp_253;
++
++static bool ubc_sonda_253(const ubc_breakpoint_t *bp, const irq_context_t *ctx, void *data) {
++    static int veces = 0;
++
++    (void)bp;
++    (void)data;
++
++    if(veces > 20) {
++        return true;   /* true = sacar el breakpoint */
++    }
++
++    veces++;
++
++    printf("ARQ-UBC253 pc=%08lx pr=%08lx sp=%08lx r14=%08lx r12=%08lx r11=%08lx r4=%08lx r1=%08lx\n",
++           (unsigned long)ctx->pc, (unsigned long)ctx->pr, (unsigned long)ctx->r[15],
++           (unsigned long)ctx->r[14], (unsigned long)ctx->r[12], (unsigned long)ctx->r[11],
++           (unsigned long)ctx->r[4], (unsigned long)ctx->r[1]);
++
++    return false;   /* false = dejarlo armado */
++}
++
++/* d2c_instalar_ubc_253: se llama justo antes de inicializar el video. */
++void d2c_instalar_ubc_253(void) {
++    uint32_t sp, base;
++    bool ok;
++
++    asm volatile("mov r15, %0" : "=r"(sp));
++
++    base = sp & ~0x3ffu;
++
++    memset(&bp_253, 0, sizeof(bp_253));
++    bp_253.address = (void *)base;
++    bp_253.address_mask = ubc_address_mask_10;
++    bp_253.access = ubc_access_operand;
++    bp_253.operand.rw = ubc_rw_write;
++    bp_253.operand.size = ubc_size_32bit;
++
++    /* DC-002.53: ADEMAS del rango, el VALOR. Medido en cuatro builds: lo que se escribe en el slot de la
++     * direccion de retorno vale siempre `params+8`, o sea un puntero a la MISMA pila, dentro de este KB.
++     * Con la comparacion por dato (BDR/BDMR del SH-4) el corte salta solo cuando alguien escribe un
++     * puntero a esta pila en este KB: los empujones normales de la pila escriben otras cosas y no
++     * disparan. La mascara es de EXCLUSION (1 = no comparo), asi que con 0xFF acepto los 256 primeros
++     * bytes del KB, que es donde caen los punteros de estas tramas. */
++    bp_253.operand.data.enabled = true;
++    bp_253.operand.data.value = base;
++    bp_253.operand.data.mask = 0x000000ffu;
++
++    ubc_init();
++    ok = ubc_add_breakpoint(&bp_253, ubc_sonda_253, NULL);
++
++    printf("ARQ-UBC253 instalado base=%08lx (1 KB) sp=%08lx ok=%d\n",
++           (unsigned long)base, (unsigned long)sp, (int)ok);
++}
++
++/* SONDA253 (DC-002.53): EL MAPA DE MEMORIA DEL ARRANQUE Y EL ESTADO DEL VIDEO, POR ETAPA.
++ *
++ * POR QUE EXISTE: los dos binarios del POC (bestia=0 y bestia=1) son IDENTICOS en las 18 marcas
++ * ARQ-MARCA del arranque del runtime salvo las direcciones del semiespacio, y sin embargo el de
++ * bestia=1 muere adentro de `pvr_init_defaults`. La ultima linea de KOS que deja es el aviso del
++ * escalado vertical, que se elige con `vid_mode->cable_type`: el que anda imprime "enabling ...
++ * non-VGA" (cable != 0) y el que muere "disabling ... for VGA" (cable == 0, o sea CT_VGA). Eso es lo
++ * primero que hay que medir: si `currmode` (la copia privada de KOS, en .bss) ya viene con el campo en
++ * cero ANTES del video, el ladron escribio mucho antes; y si viene bien, el dano ocurre adentro de
++ * pvr_init. Sin este numero, cualquier "arreglo" es una tirada de dados.
++ *
++ * Imprime una linea por etapa, con el formato estable:
++ *   SONDA253 etapa=<n> sp=<sp> sbrk=<brk> heap_libre=<fordblks> vid_mode=<ptr> cable=<n> w=<n> h=<n>
++ *            flags=<...> fin_bss=<_end> memtop=<_arch_mem_top>
++ */
++extern unsigned long _arch_mem_top;
++/* OJO (medido): en este enlace `_end`/`__bss_start` del ldscript de KOS NO quedan definidos (el enlace
++ * del POC falla con "undefined reference"), asi que el fin del .bss se lee ESTATICO del ELF
++ * (sh-elf-nm prog.elf | grep _end) y aca se imprime lo que cambia en runtime: sbrk, el tope y el sp. */
++
++void d2c_sonda_arranque(int etapa) {
++    unsigned long sp;
++    int cable = -9, w = -9, h = -9;
++    unsigned long flags = 0, vmp = (unsigned long)vid_mode;
++    struct mallinfo mi = mallinfo();
++
++    __asm__ volatile ("mov r15, %0" : "=r"(sp));
++
++    if (vid_mode != NULL) {
++        cable = (int)vid_mode->cable_type;
++        w = (int)vid_mode->width;
++        h = (int)vid_mode->height;
++        flags = (unsigned long)vid_mode->flags;
++    }
++
++    printf("SONDA253 etapa=%d sp=%08lx sbrk=%08lx heap_libre=%lu vid_mode=%08lx cable=%d w=%d h=%d"
++           " flags=%08lx memtop=%08lx\n",
++           etapa, sp, (unsigned long)sbrk(0), (unsigned long)mi.fordblks, vmp, cable, w, h,
++           flags, (unsigned long)_arch_mem_top);
++}
+ 
+ static pvr_ptr_t tex = NULL;
+ static pvr_poly_hdr_t hdr;
+diff --git a/console/dc/poc/personaje-mapa/main.go b/console/dc/poc/personaje-mapa/main.go
+index a3f638c4..1fbc0991 100644
+--- a/console/dc/poc/personaje-mapa/main.go
++++ b/console/dc/poc/personaje-mapa/main.go
+@@ -62,6 +62,15 @@ func d2cHeapLibre() uint
+ //extern d2c_free_external
+ func d2cFreeExternal(p uintptr)
+ 
++//extern d2c_sonda_arranque
++func d2cSondaArranque(etapa int)
++
++//extern d2c_instalar_sonda_pila_253
++func d2cInstalarSondaPila()
++
++//extern d2c_instalar_ubc_253
++func d2cInstalarUbc()
++
+ const (
+ 	// El disco: los DOS MPQ del juego que hacen falta, por ISO9660. El mapa y las paletas estan en
+ 	// d2data.mpq; los graficos de los personajes, en d2char.mpq (medido: en d2data.mpq la carpeta chars
+@@ -789,6 +798,14 @@ type modoDelHeroe struct {
+ func main() {
+ 	d2cSerialInit()
+ 
++	// SONDA-PILA253: el handler global de excepciones que vuelca la pila y los registros del fault.
++	// Se instala lo antes posible: lo que se mide es el arranque del video.
++	d2cInstalarSondaPila()
++
++	// SONDA253: la foto del mapa de memoria y del estado del video en CADA etapa del arranque. La 1
++	// es la referencia (antes de tocar nada); la 6, el ultimo punto del Go antes de pvr_init_defaults.
++	d2cSondaArranque(1)
++
+ 	println("HITO238: arranca (DC-002.38, el personaje en el mapa moviendose con el control de la Dreamcast)")
+ 	println("HITO238: runtime", runtime.GOOS, runtime.GOARCH)
+ 
+@@ -811,6 +828,8 @@ func main() {
+ 
+ 	println("HITO238: MPQ-ABRIR OK", rutaMPQ, "ms=", int64(d2cMs())-t0)
+ 
++	d2cSondaArranque(2)
++
+ 	t1 := int64(d2cMs())
+ 
+ 	raw, err := mpq.ReadFile(nivelEnMPQ)
+@@ -1188,6 +1207,14 @@ func main() {
+ 
+ 	// DC-002.50: el bicho entra al juego DESPUES del video (ver 3b-bis): aca todavia no existe.
+ 
++	// SONDA253: el ULTIMO punto del Go antes del arranque del video. Si aca el cable todavia es el de
++	// KOS (3, compuesto) y el aviso de pvr_init sale "for VGA", el que lo puso en 0 fue pvr_init.
++	d2cSondaArranque(6)
++
++	// SONDA-UBC253: a partir de aca, el UBC corta en cada escritura al KB de pila donde el video arma
++	// sus tramas, para ver el PC exacto del store que pisa la direccion de retorno.
++	d2cInstalarUbc()
++
+ 	if err := ebiten.IniciarPantalla(ancho, alto); err != nil {
+ 		println("HITO238: no pude arrancar el video:", err.Error())
+ 	}
+@@ -1387,6 +1414,24 @@ func rutaDeLaCapaDelBicho(p *Personaje, i int, modo, ext string) string {
+ // entra" (DC-002.50: el Brute no entraba por 150 KB).
+ func memoria(etapa string) {
+ 	println("HITO250: MEMORIA etapa=", etapa, "libre=", int64(d2cHeapLibre()))
++
++	// SONDA253: junto con el numero de monton libre, la foto del mapa de memoria y del video.
++	d2cSondaArranque(codigoDeEtapa253(etapa))
++}
++
++// codigoDeEtapa253: el numero con el que la sonda SONDA253 marca cada etapa del arranque (el 90 es
++// "otra etapa", para no confundirla con las que se comparan entre binarios).
++func codigoDeEtapa253(etapa string) int {
++	switch etapa {
++	case "nivel":
++		return 3
++	case "mapa-en-imagen":
++		return 4
++	case "ciclos-del-personaje":
++		return 5
++	}
++
++	return 90
+ }
+ 
+ // leerDeMPQ: lee UN archivo de un MPQ que solo se usa para eso (el patch_D2.mpq: se abre, se lee la tabla y se
