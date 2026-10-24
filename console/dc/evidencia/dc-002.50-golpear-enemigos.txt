@@ -182,3 +182,29 @@ dentro de la inicializacion del video.
   Por eso la decision que sigue NO es de codigo: o se sube el semiespacio (cambio del toolchain, que toca los
   invariantes de DC-002.28/214/221 y hay que re-medir), o se cambia el diseño del bicho para que entre en 1 MB
   (componer el modo que se muestra y no los tres a la vez).
+
+--------------------------------------------------------------------------------------------------------------
+12.6 -- CIERRE DE LA JORNADA (2026-10-24): la paradoja y el proximo paso
+--------------------------------------------------------------------------------------------------------------
+
+* /tmp LLENO durante buena parte de la sesion (tmpfs de 16 GB, 30 builds de 540 MB cada uno). Un GDI a medias
+  muere con `Failed to locate bootfile`, que se lee igual que un defecto del codigo. Limpio: 14 GB libres.
+  Anotado como trampa en README seccion 75 y en la skill de cross-compilacion.
+* Con /tmp limpio, BESTIA=1 sigue cayendo y NO es el disco: excepcion del SH4 con el PC en una direccion del
+  monton (8c42e020, 8c42dfc8, 8c42dfec en tres builds distintos), adentro de `pvr_init_defaults`.
+* LA PARADOJA (la pista central): el build con bestia=0 compone TN+TW (MÁS monton) y ARRANCA; el build con
+  bestia=1 falla TAMBIEN componiendo TN+TW (/tmp/poc-beast2: `MEMORIA etapa= ciclos-del-personaje libre=
+  140680`, PC 8c42dfec). O sea: no es cuanta memoria se usa, es como queda armado el binario.
+* El arreglo "de manual" NO alcanza: /tmp/poc-split2 saca TODO el bicho de `main()` a `cargarElBicho()`
+  (palUni por puntero) y con bestia=1 cae con la misma firma (PC 8c42dfc8). La hipotesis del frame de main()
+  queda DESCARTADA.
+* El arranque del runtime comparado marca por marca (ARQ-MARCA, 18 marcas no-GC): IDENTICO en los dos
+  binarios, salvo las direcciones del semiespacio (+1.056 B en el que falla, o sea el binario es mas grande).
+  La divergencia esta DENTRO de main(), en el arranque del video, que las marcas del runtime no cubren.
+* gccgo pliega `var bestia = false` como constante: con `true` deja compilado todo el codigo del bicho y el
+  layout se corre decenas de KB. Es la unica diferencia entre los dos binarios, y es de la MISMA clase de
+  fragilidad que el titulo de DC-002.29 (ahi: camadas .gox mezcladas).
+
+Proximo paso: tarjeta DC-002.53 (t_e95967c5) -- instrumentar `pvr_init_defaults` y el mapa de memoria del
+proceso en los dos binarios, localizar el primer punto de divergencia y arreglar ahi. Sin eso, cada "arreglo"
+del bicho es una tirada de dados: se cambia una linea y el sintoma se mueve.
