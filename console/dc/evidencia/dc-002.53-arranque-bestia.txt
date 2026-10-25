@@ -332,3 +332,26 @@ componga el nivel: eso parte el camino del POC en dos.
   * libgodc queda con una medicion (no un arreglo): `gc_solapa_semiespacio()` + la marca en `stack_alloc`
     que dice la base de la pila y si solapa. Se puede dejar o sacar; no cambia el resultado.
   * KOS quedo restaurado a su fuente original (`pvr_init_shutdown.c.orig-dc253-hoy`).
+
+10.i  EL MUTANTE QUE CIERRA LA DISCUSION: ES EL BINARIO, NO LA LOGICA
+
+Se compilo BESTIA=1 pero con `modosDelHeroe` forzado a los DOS ciclos de BESTIA=0 (TN + TW), o sea
+haciendo exactamente el mismo trabajo previo al video que el build que anda:
+
+    /tmp/dcbuild/mutante-b1 -> "HITO249: CICLOS cargados 2", "MEMORIA ... libre= 140680",
+                               "HITO250: PVR antes-de-pvr_init_defaults",
+                               "Unhandled exception: PC 8c42dfec, code 1, evt 0180"
+                               dibujando = 0
+
+Falla igual. Y el detalle que lo confirma: con DOS ciclos compuestos, BESTIA=0 deja 141.736 B libres de
+monton de C y el mismo trabajo en el binario de BESTIA=1 deja 140.680 B. El mismo trabajo, distinto
+resultado, segun el binario.
+
+CONCLUSION: no es la logica del bicho ni el trabajo previo al video. Es la FORMA DEL BINARIO (donde caen el
+monton de C, los semiespacios del GC y las pilas), que es exactamente lo que la firma del crash dice desde
+el principio: un marco de pila leido corrido.
+
+Lo que sigue, entonces, no es "probar otra bandera" sino encontrar la escritura que pisa el marco. Las dos
+herramientas que quedan para eso son el UBC del SH-4 (KOS lo expone en <dc/ubc.h>: se puede cortar en la
+ESCRITURA a la direccion exacta y leer el PC del que escribe) y la escalera de repro-253 creciendo hacia el
+POC (abrir el d2data.mpq, leer el DS1, componer el nivel).
