@@ -209,3 +209,126 @@ pvr_init_shutdown.c con `params` en la pila otra vez (respaldo .orig-dc253).
   explique; ya paso en esta sesion (build s256: el mismo codigo, 152 bytes mas de codigo en el handler,
   y el POC deja de morir por excepcion y se CUELGA adentro del video).
 
+================================================================================
+10. SEGUNDA VUELTA (2026-10-25): EL SOLAPE ERA UN ARTEFACTO, Y EL CULPABLE ES OTRO
+================================================================================
+
+10.a  EL SOLAPE PILA/SEMIESPACIO *NO EXISTE* (corrige la seccion 9.a)
+
+La seccion 9.a afirmaba que el stack de la goroutine principal arrancaba 4.320 B
+adentro del semiespacio 1. Ese numero salio de mezclar direcciones de DOS builds
+distintos (el semiespacio de uno y el stack de otro). Medido dentro del MISMO build,
+con una marca nueva en `stack_alloc` que imprime la base de la pila y el resultado del
+control `gc_solapa_semiespacio()`:
+
+    build                     semiespacio1        pila (base)         solape
+    /tmp/dcbuild/base-b0      2352083360          2353133264          0
+    /tmp/dcbuild/base-b1      2352084416          2353134320          0
+
+El semiespacio 1 termina en 2353131936 y la pila empieza en 2353133264: queda 1.328 B
+ARRIBA, sin solape. El control queda en el codigo (libgodc/runtime/gc_heap.c,
+`gc_solapa_semiespacio`) y `stack_alloc` lo consulta e informa en cada arranque, asi
+que la pregunta no se vuelve a contestar de memoria.
+
+Se revirtio el cambio de "arena propia en .bss" que se habia hecho para esquivar ese
+solape inexistente: no arreglaba nada y movia el layout (rompia BESTIA=0).
+
+10.b  CONTROL LIMPIO: LA BASE ANDA
+
+Con KOS y libgodc pristinos (sin ningun instrumento agregado por esta tarjeta):
+
+    BESTIA=0 -> dibujando=1, arranques=1, animacion TN corriendo (cuadros 12, 15, 1 con
+                crc32 distintos), ~13 s por ciclo de 16 cuadros.
+
+    BESTIA=1 -> dibujando=0, arranques=1, ultimo mensaje "pvr: disabling vertical
+                scaling for VGA" (o sea, muere DENTRO de pvr_init_defaults).
+
+Esta es la linea base de la que hay que partir: la base SANA y el bicho ROTO, con el
+toolchain y las librerias tal como estan.
+
+10.c  DESCARTADO CON MEDICION (no repetir)
+
+  * RAM del bicho . . . . . . . ya descartado en la seccion 12 de la evidencia de
+                               DC-002.50 (mas libre y aun asi falla).
+  * GC / punteros . . . . . .  `gc_update_pointer_field()` solo toca direcciones
+                               DENTRO de [from_lo, from_hi); la pila no cae ahi.
+  * IRQ . . . . . . . . . . .  con `irq_disable()` en TODO pvr_init la consola muere
+                               igual, en el mismo punto.
+  * ABI del binario . . . . .  barrido completo con `checar-registros-253.py`: 0
+                               funciones que usen o restituyan r8-r13/fr12-fr15 sin
+                               guardarlos.
+  * dbglog roto . . . . . . .  su prologo guarda r8, r9, r10 y el epilogo los
+                               restituye (desarmado, 0x8c0c2b24..0x8c0c2cfc).
+  * KOS y Flycast . . . . . .  un programa de KOS PELADO que solo hace
+                               `pvr_init_defaults()`, `pvr_mem_malloc(64 KB)` y 60
+                               escenas vacias arranca y sale limpio
+                               (/tmp/prueba-pvr, "arch: shutting down kernel").
+  * Go + libgodc + shim . . .  un Go MINIMO sobre libgodc que solo enciende el PVR y
+                               pinta 60 cuadros anda perfecto
+                               (/tmp/poc-minimo -> "MINIMO: 60 pintadas OK").
+
+10.d  LA FIRMA REAL DEL FALLO
+
+Desarmando el crash (build con marcas dentro de pvr_init):
+
+    PC 8c20b8c2  -> adentro del AREA DE PILAS (no es codigo)
+    PR 8c0d2200  -> justo despues de un `jsr @r8`
+    R8 8c20b8c0  -> tenia que ser &_dbglog y era una direccion de pila
+    R11 00000000 -> tenia que ser &_pvr_state
+
+o sea: se ejecuta la pila como si fuera codigo y varios registros callee-saved vuelven
+con valores de OTRAS funciones (r8 = &vid_mode era lo ultimo que dejaba `vid_empty()`).
+Eso es un marco leido corrido, no un error de logica. Y el punto de muerte se corre con
+cada cambio de codigo: agregar UN `dbglog` adentro de pvr_init alcanza para que BESTIA=0
+tambien falle. El desenlace depende del ESTADO DEL MONTON en el momento del arranque del
+PVR, no del bicho.
+
+10.e  EL ARREGLO QUE SE PRUEBA: EL VIDEO PRIMERO
+
+Con BESTIA=1 se compone UN ciclo del heroe (TN) y con BESTIA=0 se componen DOS (TN+TW):
+distinto churn del monton antes de llegar al video. Por eso el PVR se enciende ahora
+como lo PRIMERO de `main()`, antes de abrir los MPQ y antes de componer el nivel:
+
+    if err := ebiten.IniciarPantalla(ancho, alto); err != nil { ... }
+
+Es lo que hace un juego de Dreamcast normal (primero la pantalla, despues los datos) y
+hace que `pvr_init_defaults()` corra con el monton en el estado de arranque, que es
+justo el estado donde el repro minimo anda.
+
+10.f  LA ESCALERA DE REPRODUCCION (lo que de verdad acoto el problema)
+
+Tres programas chiquitos, cada uno se compila y corre en Flycast en ~3 minutos
+(scripts/console/repro-253/, se corren con `correr.sh [kos|minimo|churn|todos]`):
+
+    eslabon   que hace                                                              resultado
+    kos       KOS pelado: pvr_init_defaults + 64 KB de VRAM + 60 escenas            PASA (sale limpio)
+    minimo    Go sobre libgodc que llama al MISMO shim del POC y pinta 60 cuadros    PASA
+    churn     como minimo, pero antes 1 MB + 40 temporales de 96 KB + 2 GC           PASA
+
+Los tres pasan. O sea: KOS sano, Flycast sano, libgodc sano, el shim sano, y el estado del monton de Go
+(1 MB vivo + basura + GCs) NO alcanza para romperlo.
+
+10.g  LO QUE QUEDA COMO SOSPECHOSO, ORDENADO
+
+  1. Algo que el POC hace ANTES de encender el video. Con BESTIA=1 se compone un solo ciclo del heroe (TN) y
+     con BESTIA=0 se componen dos (TN+TW); el resto del camino previo es comun. Pero BESTIA=1 (que hace
+     MENOS) es el que falla, asi que no es "cuanta RAM se uso".
+  2. La forma del BINARIO del POC (2,2 MB contra 445 KB de los eslabones): la lenta de vinculacion de paquetes
+     cambia donde arranca el monton de C y donde caen los semiespacios del GC. Los experimentos V4..V8 de la
+     jornada anterior (mismo binario, bandera distinta) ya habian mostrado que el disparador viaja con el
+     CODIGO, no con la bandera.
+  3. `pvr_mem_malloc` / `pvr_mem_available` ANTES de `pvr_init_defaults`: el POC imprime `MAPA-IMAGEN ...
+     vram_libre= 0` antes del video, o sea llama a `pvr_mem_available()` con el PVR sin inicializar. Vale
+     revisar si la imagen del mapa (512x512, 1 MB de RGBA) pide VRAM antes del init; eso dejaria al allocator
+     del PVR con estado sucio justo antes de pvr_init_defaults.
+
+El siguiente eslabon de la escalera (el que hay que construir) es uno que abra el d2data.mpq, lea el DS1 y
+componga el nivel: eso parte el camino del POC en dos.
+
+10.h  ESTADO AL CERRAR ESTA VUELTA
+
+  * La base quedo VERIFICADA: con KOS y libgodc pristinos, BESTIA=0 dibuja (ver 10.b y la corrida final).
+  * El repo no tiene cambios de codigo por esta vuelta: solo la evidencia y la escalera nueva.
+  * libgodc queda con una medicion (no un arreglo): `gc_solapa_semiespacio()` + la marca en `stack_alloc`
+    que dice la base de la pila y si solapa. Se puede dejar o sacar; no cambia el resultado.
+  * KOS quedo restaurado a su fuente original (`pvr_init_shutdown.c.orig-dc253-hoy`).
