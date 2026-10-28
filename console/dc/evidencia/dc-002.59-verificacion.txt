@@ -1,0 +1,236 @@
+DC-002.59 -- VERIFICACION INDEPENDIENTE DE LA NOCHE DEL 2026-10-27 (56 / 57 / 58, una por una)
+Tarjeta: t_c0353428 (worker de verificacion: el que juzga no es el juzgado). NO arregla nada: mide y declara.
+Arbol juzgado: rama DC-002, commit 5388ce84 (DC-002.58), `git status` limpio, /tmp con 11 GB libres.
+Host: CachyOS, Flycast 2.7 (AppImage), sin KVM. Todo lo de abajo se corrio EL 2026-10-27 despues de las
+23:46 (o sea: sobre el arbol acumulado, no sobre un build viejo).
+
+
+1. TABLA DE VEREDICTOS
+======================
+
+  tarjeta        que prometio                                  evidencia que encontre                veredicto
+  ------------   -------------------------------------------   -----------------------------------   ------------------
+  DC-002.56      medir si las tres lecturas de VRAM pre-init   la medicion y TODOS los numeros       VERDE en la
+  t_f71fb8ee     causan la muerte con bestia=1, y limpiarlas   reproducen hoy (ver 3.1)              medicion /
+                                                                                                      2 criterios del
+                                                                                                      encargo ABIERTOS
+                                                                                                      (limpieza no
+                                                                                                      aterrizada, ya en
+                                                                                                      t_f04f3ab9)
+  DC-002.57      que el UBC del SH-4 corta (o probar con       sonda y control reproducen hoy,       VERDE
+  t_51b1ecc8     numeros que no corta)                         0 cortes en 3 condiciones (ver 3.2)
+  DC-002.58      que el eslabon `nivel` de repro-253 abre el   hashes, log y pixeles reproducen      VERDE (con 1
+  t_cdc4836f     MPQ, compone el nivel y PINTA                 hoy; PINTA corroborrado a ojo         observacion
+                                                                                                      sobre el
+                                                                                                      instrumento)
+
+  Aparte, la barrera del host y el `go build ./...` del arbol completo (seccion 2): el primero VERDE, el
+  segundo ROJO por una razon ESTRUCTURAL Y PRE-EXISTENTE que no viene de la noche (seccion 2.1).
+
+
+2. LA BARRERA, RE-CORRIDA HOY SOBRE EL ARBOL COMO ESTA
+======================================================
+
+2.1 `go build ./...` y `go vet ./...` del arbol COMPLETO -> ROJO (pre-existente, no de la noche)
+
+  $ cd ~/Proyectos/diablo2consoles && go build ./...
+  console/dc/engine/ebiten/v2/ebiten.go:25:2: package kos is not in std (/usr/lib/go/src/kos)
+  rc_build=1
+  $ go vet ./...
+  console/dc/engine/ebiten/v2/ebiten.go:25:2: package kos is not in std (/usr/lib/go/src/kos)
+  rc_vet=1
+
+  POR QUE NO ES CULPA DE LA NOCHE (dos pruebas):
+  a) el archivo que falla no se toco: `git log -1 -- console/dc/engine/ebiten/v2/ebiten.go` ->
+     ee0a5398 2026-10-17 14:41:46 DC-002.22 (diez dias antes de la noche);
+  b) las tres tarjetas de la noche no cambiaron nada bajo `console/dc/engine/`: los archivos que tocan son
+     console/dc/poc/personaje-mapa/main.go, .../csrc/cshim.c, console/dc/sonda-ubc-257/main.c, las
+     evidencias y los scripts (git diff --name-only 7adb9717..5388ce84).
+  c) `import "kos"` no es un paquete de Go de host: lo resuelve gccgo con `-I$LIBGODC/kos` (kos.gox), que es
+     el camino de la consola (scripts/console/env.sh:6-7,31). Con el toolchain de host ese paquete no existe
+     ni puede existir.
+
+2.2 La barrera del MOTOR en el host (lo que si se puede medir aca) -> VERDE
+
+  $ mapfile -t PKGS < <(go list ./... | grep -v "/console/")     # 147 paquetes
+  $ go build "${PKGS[@]}"   -> rc=0, sin salida
+  $ go vet   "${PKGS[@]}"   -> rc=0, sin salida
+
+2.3 Los controles del area, corridos hoy (crudo, sin editar)
+
+  a) checar-vram-preinit-253.sh (DC-002.56) sobre el arbol:   ROJO, 7 problemas, rc=1
+     == control VRAM pre-init (DC-002.56) sobre .../personaje-mapa
+        OK:   la marca del encendido del video esta en main.go:1205 ('ebiten.IniciarPantalla(')
+        ROJO: d2cVramLibre() en main.go:942, ANTES del encendido del video (linea 1205)
+        ROJO: d2cVramLibre() en main.go:1083, ANTES del encendido del video (linea 1205)
+        ROJO: d2cVramLibre() en main.go:1174, ANTES del encendido del video (linea 1205)
+        ROJO: solo 0 de 3 marcas previas al video dicen 'vram_libre= sin-init'
+        OK:   csrc/: una sola lectura de pvr_mem_available() (la de d2c_vram_libre en cshim.c)
+     == ROJO: 7 problema(s) de lectura pre-init      rc=1
+     (Esto NO es un fallo del control: es la deuda DECLARADA por DC-002.56 -- la limpieza no se aterrizo
+      porque mover 64 B de 1ST_READ.BIN tumba BESTIA=0. La deuda tiene tarjeta: t_f04f3ab9, hoy `ready`.)
+
+  b) mutar-vram-preinit-253.sh (el mutador de ese control): MUTADOR OK, 2/2 cazados, rc=0
+     == resumen: verdes=2 rojos=2 fallos=0
+     [1/4] copia con la limpieza aplicada: VERDE
+     [2/4] mutante de fuente (MAPA-IMAGEN pre-video): cazado
+     [3/4] mutante de log (vram_libre= 0 pre-video): cazado
+     [4/4] log sano (las tres marcas dicen sin-init): VERDE
+     => el control de DC-002.56 no es un verde de adorno: caza los dos defectos que promete cazar.
+
+  c) checar-arranque-253.sh, BESTIA=1, SEGUNDOS=300  -> MUERE-EXCEPCION, rc=1
+     -- 1ST_READ.BIN: 1852904 B
+     -- marcas: cuadros=0 video=1 excepciones=0 cortes-del-UBC=0
+     -- ojo: 1 'Unhandled exception' en el log (sonda ARQ-PILA253-REAL: 0)
+     == estado: MUERE-EXCEPCION
+     Unhandled exception: PC 8c42e020, code 1, evt 0180
+     (en el log, inmediatamente despues de `HITO250: PVR antes-de-pvr_init_defaults`, y con las tres marcas
+      pre-video imprimiendo `vram_libre= 0`: la lectura pre-init sigue en el arbol y sigue valiendo 0.)
+
+  d) checar-arranque-253.sh, BESTIA=0, SEGUNDOS=300  -> ANDA, rc=0
+     -- 1ST_READ.BIN: 1851848 B
+     -- marcas: cuadros=32 video=1 excepciones=0 cortes-del-UBC=0
+     == estado: ANDA
+     HITO238: POS cuadro 1 ms 52382 ... pantalla 320 240
+
+  e) sonda del UBC compilada HOY del arbol (console/dc/sonda-ubc-257) -> NO-CORTA
+     UBC-AUTOPRUEBA: REGISTROS BARA esc=8c123400 lee=8c123400 BDRB esc=deadbeef lee=deadbeef BRCR esc=00008000 lee=00000000
+     UBC-AUTOPRUEBA: DATO armado=1 dir=8c05d040 (canal de operandos, solo escritura)
+     UBC-AUTOPRUEBA: DATO despues cortes=0 valor=12345678
+     UBC-AUTOPRUEBA: INSTR armado=1 dir=8c010228
+     UBC-AUTOPRUEBA: INSTR despues cortes=0 vigilado=12345679
+     UBC-AUTOPRUEBA: RANGO armado=1 base=8c05cc00 tope=8c05cfff arreglo=8c05cf40
+     UBC-AUTOPRUEBA: RANGO despues cortes=0 valor=a5a5a5a5
+     UBC-AUTOPRUEBA: FIN dato=0 instr=0 rango=0 fuera=0
+     UBC-AUTOPRUEBA: VEREDICTO NO-CORTA
+
+  f) checar-ubc-253.sh (control de DC-002.57, completo: sonda + POC instrumentado) -> NO-CORTA, rc=1
+     sonda: identica a (e) -> VEREDICTO NO-CORTA
+     1ST_READ.BIN: 1854760 B
+     UBC: RANGO sp=8c42ea40 pila64k=8c420000..8c42ffff armado_64k=1 bloque4k=8c42e000..8c42efff armado_4k=1
+     escrituras-en-el-rango=0 excepciones=1 cuadros=0 animaciones-del-bicho=0
+     VEREDICTO NO-CORTA ...
+
+  g) pixeles-258.py sobre la captura cruda de DC-002.58 -> PINTA, rc=0
+     PIXELES: area de video 320x240 en (1400,120) de una captura de 3584x1080
+     PIXELES: no negros=41816 de 76800 (54.4%), umbral=20% y piso 5000
+     VEREDICTO: PINTA (el area de video del emulador tiene 41816 pixeles pintados)
+
+  h) MEDIDO Y ANOTADO (pitfall nuevo, para la proxima): la ventana del clasificador.
+     Con SEGUNDOS=90 (el default del script) la corrida BESTIA=1 sobre este arbol da COLGADO y NO llega al
+     video: el log se corta en `HITO238: PEDIDOS pisos= 1982 paredes= 330 total= 2312` (el emulador solo
+     habia avanzado 23,6 s de reloj invitado en 90 s de reloj de pared). Con SEGUNDOS=300 aparece la
+     excepcion y la clasificacion correcta (c arriba). El POC de hoy tarda ~52 s de invitado hasta el primer
+     cuadro (POS cuadro 1 ms 52382): 90 s de ventana ya no alcanzan.
+
+
+3. LA EVIDENCIA DE LAS TRES TARJETAS, UNA POR UNA
+=================================================
+
+3.1 DC-002.56 (t_f71fb8ee) -- "el PVR apagado: las tres lecturas de VRAM pre-init"
+    Commit citado: cfdb9a48 -> EXISTE (`git show --stat cfdb9a48`: evidencia + main.go + cshim.c + los dos
+    scripts). Artefacto citado: console/dc/evidencia/dc-002.56-vram-preinit.txt -> EXISTE (14.375 B).
+    Los numeros del cierre, buscados en ese archivo (8 apariciones de las cifras clave):
+      - "1.851.848 B ANDA cuadros=9"           -> lineas 75, 76, 126, 130 del archivo
+      - "1.851.784 B ... COLGADO"              -> lineas 57, 78, 128
+      - "MUERE-EXCEPCION PC 8c42e020"          -> lineas 126, 130
+    Reproduccion INDEPENDIENTE de la medicion (una rerun de verdad, no la lectura del archivo):
+      - BESTIA=1 -> 1.852.904 B, MUERE-EXCEPCION, `PC 8c42e020, code 1, evt 0180`  (coincide exacto)
+      - BESTIA=0 -> 1.851.848 B, ANDA (32 cuadros con ventana de 300 s; la evidencia dice 9 con su ventana:
+        el numero de cuadros depende de la ventana, la CLASIFICACION es la misma)
+    La medicion de KOS, verificada en la fuente y no en el resumen:
+      $ ~/dreamcast/kos/kernel/arch/dreamcast/hardware/pvr/pvr_mem.c
+        size_t pvr_mem_available(void) {          <- linea 176
+            if(!pvr_mem_base)
+                return 0;                         <- linea 178
+        ...
+        static size_t pvr_mem_available_int(void) { struct mallinfo mi = pvr_int_mallinfo(); ... }
+      => con el PVR apagado la funcion corta en el guard y NO camina nada; el allocator que usa es el del
+         pool del PVR (mallinfo), no existe `pvr_state.ram_free_list` en este KOS. La cita
+         "pvr_mem.c:176" apunta a la linea de la FIRMA; el guard esta en 177-178: la sustancia es exacta.
+    VEREDICTO: VERDE en lo que midio (el veredicto "la lectura pre-init NO era la causa" queda probado, y
+    sus numeros reproducen hoy).
+    ABIERTO, y hay que decirlo: el encargo de la tarjeta era tambien DEJAR LAS TRES LECTURAS EN `sin-init`
+    (criterios 1 y 4: control VERDE sobre el arbol arreglado + dos corridas clasificadas del arbol arreglado).
+    Eso NO se hizo y esta declarado en la propia evidencia (linea 154: "Estado HOY en el arbol del repo
+    (deuda declarada...)"), con su razon medida: mover 1ST_READ.BIN 64 B tumba el control BESTIA=0. La deuda
+    tiene tarjeta: t_f04f3ab9 (`ready`). No es un verde mentiroso; es un verde con deuda escrita.
+
+3.2 DC-002.57 (t_51b1ecc8) -- "el UBC del SH-4"
+    Commit citado: 4d20fdfd -> EXISTE (evidencia 235 lineas + parche + sonda + control). Artefactos citados:
+    dc-002.57-ubc.txt (14.764 B), dc-002.57-instrumento.patch (11.840 B), sonda-ubc-257/main.c,
+    checar-ubc-253.sh -> EXISTEN todos.
+    Numeros del cierre en el archivo: `1.854.760 B` (lineas 114, 123, 155), `PC 8c2086a8` (128),
+    las cinco lineas de la autoprueba (57-64), `VEREDICTO NO-CORTA` (65, 152, 160).
+    Reproduccion INDEPENDIENTE:
+      - la sonda suelta, recompilada del arbol de hoy, imprime EXACTAMENTE las mismas 10 lineas que el
+        cierre cita (registros que retienen lo escrito, cortes=0 en dato, instruccion y rango, NO-CORTA);
+      - el control completo da NO-CORTA con rc=1, 1.854.760 B y 0 escrituras en 66 KB de pila vigilados;
+      - el POC instrumentado murio hoy con `PC 8c2086a8` -- el MISMO PC que la evidencia anota en 4.c/4.e.
+    Sobre "el instrumento cura el sintoma" (el hallazgo mas fuerte): la evidencia lo atribuye a la PRIMERA
+    forma del parche (dos canales de 4 KB: 6 cuadros y 179/183 animaciones del bicho, seccion 4.b), y con la
+    forma final (64 KB + 4 KB) el binario MUERE (4.c) con el mismo tamano y otro contenido. La rerun de hoy
+    cae del lado de 4.c. No hay contradiccion: el hallazgo es "el layout de ESTE binario es el arbitro", y
+    hoy lo volvio a ser.
+    VEREDICTO: VERDE.
+
+3.3 DC-002.58 (t_cdc4836f) -- "la escalera repro-253 llega al nivel"
+    Commit citado: 5388ce84 -> EXISTE. Artefactos: dc-002.58-escalon-nivel.txt (61 lineas) y
+    dc-002.58-escalon-nivel.png -> EXISTEN.
+    Hashes citados vs medidos hoy (`sha256sum` sobre /tmp/repro253-nivel, que sigue vivo):
+      prog.elf      ca43127ff249e2ac1e10ffa40773d835...  = prefijo citado  OK
+      1ST_READ.BIN  470b669507ff2483f0027d2689e4a444...  = prefijo citado  OK
+      disc.iso      0f0119acd8ebf346e33a927e51052712...  = prefijo citado  OK
+      nivel.go del eslabon == nivel.go del POC: `cmp` -> IDENTICOS (la promesa "copiado tal cual")
+      PNG commiteado: sha256 53121d68... == /tmp/repro253-nivel/corrida/nivel-258-recorte-x2.png
+      (o sea: la imagen del repo es el recorte x2, no el recorte 1:1 que nombra el texto; es la misma area.)
+    El log crudo /tmp/repro253-nivel/corrida/flycast.log trae, identicas a las transcritas:
+      HITO258: MPQ-ABRIR OK /cd/JUEGO/D2DATA.MPQ ms= 10144
+      HITO258: DS1 version= 18 act= 1 w= 57 h= 41 objetos= 41 files= 8
+      HITO258: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+      HITO258: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456
+      HITO258: PANTALLA pixelesNoVacios= 177657 de 307200
+      HITO258: MAPA-IMAGEN bytes= 1228800 vram_libre= 0
+      HITO250: PVR antes-de-pvr_init_defaults ... PVR-INIT OK ms= 48 ... CUADRO n= 60 de 60 dibujando=1
+    El veredicto PINTA, reproducido sobre la captura CRUDA y no sobre el resumen:
+      pixeles-258.py nivel-258.png 1400,120,320,240  ->  no negros=41816 de 76800 (54.4%)  PINTA
+    Y corroborado a ojo (la vision del worker, al zoom de 1:1 sobre esa region): es el mapa isometrico del
+    acto 1 -- terreno, empalizadas de troncos, carro, y el vacio negro alrededor. NO es el escritorio.
+    OBSERVACION sobre el instrumento (no es rojo, pero hay que saberlo): el contador de pixeles NO
+    discrimina contra el escritorio -- la misma captura con la region (0,0,320,240) da 76800/76800 (100%,
+    tambien "PINTA"). Lo que sostiene el veredicto es (a) la geometria sale del gestor de ventanas
+    (`flycast-adelante.sh geo` -> clientGeometry) y (b) el recorte se ve a ojo. Falta un control negativo
+    honesto: la misma region en una corrida que NO pinte. Ademas el log de la corrida no guarda la linea
+    FLYCAST-GEO, asi que la procedencia de las coordenadas no queda archivada.
+    VEREDICTO: VERDE.
+
+
+4. LO QUE NO REPRODUJO / LO QUE QUEDA ABIERTO (sin adornos)
+===========================================================
+
+1. `go build ./...` del arbol completo: ROJO. Causa estructural y anterior a la noche (`import "kos"` de la
+   capa de consola, resuelto solo por gccgo con -I$LIBGODC/kos). La barrera del host (147 paquetes) da VERDE
+   en build y vet. NO se declara verde el arbol completo: se declara lo que pasa.
+2. Los criterios 1 y 4 de DC-002.56 (limpieza aterrizada + control verde sobre el arbol) NO se cumplieron.
+   Esta declarado en su evidencia y la deuda vive en t_f04f3ab9 (`ready`). Hoy `checar-vram-preinit-253.sh`
+   sigue ROJO 7/7 sobre el arbol: es la foto fiel de esa deuda, no un defecto del control (su mutador caza
+   2/2).
+3. Cabo suelto del tablero: t_6c8e2c34 es un DUPLICADO de t_f04f3ab9 (misma limpieza, dos tarjetas `ready`).
+   Lo creo el worker de DC-002.56 sin workspace. PEDIDO: archivar t_6c8e2c34.
+4. El padre de la feature, t_e95967c5 (DC-002.53), esta en `triage` (no en la cola): sus lineas del PLAN no
+   se pueden marcar mientras este ahi. PEDIDO: sacarlo de triage y pegarle las tres lineas (estan en el
+   comentario que este worker dejo en el padre).
+5. Ninguna tarjeta se reabre: no hay rojo de evidencia. Las tres prometieron algo medible y las tres lo
+   cumplieron con artefacto que existe y numero que reproduce hoy.
+
+
+5. VEREDICTO GLOBAL
+===================
+
+  3/3 verdes en lo que las tarjetas prometieron medir, con evidencia que existe, numeros que reproducen y
+  commits que existen. Se re-corrio de punta a punta: build/vet del host, el control de la VRAM (rojo y
+  explicado por la deuda), su mutador (2/2), el clasificador del arranque en las DOS variantes (1.852.904 B
+  muere con PC 8c42e020 / 1.851.848 B dibuja), la sonda del UBC recompilada (NO-CORTA) y su control completo
+  (NO-CORTA, rc=1), y el veredicto PINTA sobre la captura cruda (41816/76800).
+  Dos cabos sueltos de operacion del tablero (duplicado t_6c8e2c34; padre en triage) y una deuda tecnica ya
+  tarjetada (t_f04f3ab9). Ninguna tarjeta se cierra en verde por un resumen: se cierra por lo medido aca.
