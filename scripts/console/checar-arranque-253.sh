@@ -50,15 +50,26 @@ cuenta() { tr -d '\r' < "$LOG" | grep -ac "$1"; }
 
 CUADROS=$(cuenta "HITO238: POS cuadro")
 EXCEPCIONES=$(cuenta "ARQ-PILA253-REAL")
+EXCEPCIONES_LOG=$(cuenta "Unhandled exception")
 VIDEO=$(cuenta "HITO250: PVR antes-de-pvr_init_defaults")
 UBC=$(cuenta "ARQ-UBC253 pc")
 
 echo "-- 1ST_READ.BIN: $TAM B"
 echo "-- marcas: cuadros=$CUADROS video=$VIDEO excepciones=$EXCEPCIONES cortes-del-UBC=$UBC"
 
+# DC-002.56: la excepcion del SH-4 tambien se cuenta por el log de Flycast. La sonda ARQ-PILA253-REAL es de
+# DC-002.53 y no siempre esta compilada en el binario; sin esta segunda cuenta la corrida se clasificaba
+# COLGADO aunque el log dijera "Unhandled exception: PC ... code 1, evt 0180" (medido el 2026-10-27 con las
+# corridas de esta tarjeta: BESTIA=1 moria con excepcion y el script la daba por colgada).
+if [ "$EXCEPCIONES_LOG" -gt 0 ]; then
+    EXCEPCIONES=$((EXCEPCIONES + EXCEPCIONES_LOG))
+    echo "-- ojo: $EXCEPCIONES_LOG 'Unhandled exception' en el log (sonda ARQ-PILA253-REAL: $((EXCEPCIONES - EXCEPCIONES_LOG)))"
+fi
+
 if [ "$EXCEPCIONES" -gt 0 ]; then
     echo "== estado: MUERE-EXCEPCION"
     tr -d '\r' < "$LOG" | grep -a -m1 -A 3 "ARQ-PILA253-REAL" | head -4
+    tr -d '\r' < "$LOG" | grep -a -m1 "Unhandled exception" | head -1
     echo "   (resolver el pc/pr con: python3 scripts/console/resolver-pc.py $SALIDA/prog.elf <pc> <pr>)"
     exit 1
 fi

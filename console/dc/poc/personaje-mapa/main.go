@@ -927,13 +927,19 @@ func main() {
 
 	memoria("mapa-en-imagen")
 
-	// DC-002.56: ACA HABIA `int64(d2cVramLibre())`. Se saco porque corre con el PVR APAGADO: la marca del
-	// encendido es "HITO250: PVR antes-de-pvr_init_defaults", que esta mas abajo (en d2c_pvr_pantalla_init).
-	// Medido en KOS (kernel/arch/dreamcast/hardware/pvr/pvr_mem.c:176): pvr_mem_available() devuelve 0 si el
-	// estatico `pvr_mem_base` es NULL, y eso es todo lo que hace -- no camina pvr_state ni el allocator (esa
-	// version de la API, con pvr_state.ram_free_list, ya no existe en este KOS). O sea que el numero de aca
-	// SIEMPRE era 0 y no ensuciaba nada, pero medir con un 0 fijo no informa: dice "sin-init".
-	println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre= sin-init")
+	// DC-002.56: esta lectura (y las dos de mas abajo, PERSONAJE-IMAGEN y MPQ-CERRADOS) corre con el PVR
+	// APAGADO: la marca del encendido es "HITO250: PVR antes-de-pvr_init_defaults", mucho mas abajo.
+	// MEDIDO (console/dc/evidencia/dc-002.56-vram-preinit.txt):
+	//  * pvr_mem_available() (KOS kernel/arch/dreamcast/hardware/pvr/pvr_mem.c:176) arranca con
+	//    `if(!pvr_mem_base) return 0;` sobre un estatico en .bss, asi que con el PVR apagado devuelve 0 SIN
+	//    tocar el allocator ni pvr_state (en este KOS el allocator de VRAM es un dlmalloc propio y
+	//    `pvr_state.ram_free_list` ya no existe). O sea que el 0 de aca no ensucia nada: no era la causa.
+	//  * el "arreglo de limpieza" (imprimir "vram_libre= sin-init" y sacar la llamada) se PROBO y NO se puede
+	//    aplicar todavia: mueve 1ST_READ.BIN 64 bytes y con eso BESTIA=0 (el control que dibuja) deja de
+	//    dibujar. El umbral esta medido: una edicion de 1 byte que NO cambia el tamano del binario dibuja,
+	//    64 bytes menos se cuelga. Es la fragilidad de layout de DC-002.53, no esta lectura.
+	//  * la barrera para cuando eso se arregle ya existe: scripts/console/checar-vram-preinit-253.sh.
+	println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre=", int64(d2cVramLibre()))
 
 	// OJO (DC-002.50, medido): aca se probo arrancar el video ANTES de componer los ciclos, para que el PVR
 	// encontrara el monton libre. NO sirve: la consola se queda en "pvr: enabling vertical scaling" (con 800.216 B
@@ -1074,9 +1080,7 @@ func main() {
 		personaje.ReplacePixels(crgba)
 	}
 
-	// DC-002.56: aca tambien habia `int64(d2cVramLibre())`, con el PVR todavia apagado. Ver la nota larga en
-	// MAPA-IMAGEN: la lectura devolvia 0 (pvr_mem_base NULL) y no tocaba el allocator; ahora lo dice.
-	println("HITO238: PERSONAJE-IMAGEN bytes=", per.Ancho*per.Alto*4, "vram_libre= sin-init")
+	println("HITO238: PERSONAJE-IMAGEN bytes=", per.Ancho*per.Alto*4, "vram_libre=", int64(d2cVramLibre()))
 
 	// ============================== 3b. LA BESTIA Y EL GOLPE (DC-002.50) ==============================
 	//
@@ -1165,10 +1169,9 @@ func main() {
 	// el d2char.mpq SIGUE ABIERTO: el ciclo del golpe (A1) se compone en 3d, con el video ya andando.
 
 	// ============================== 4. el personaje y el control ==============================
-	// DC-002.56: tercera y ultima lectura pre-video que se saca (las tres son las de esta tarjeta). Con el PVR
-	// apagado el numero no informa nada; el valor de verdad se imprime UNA vez, ya con el video andando
-	// ("HITO250: VRAM-POSTINIT"), que es el unico momento en que el allocator del PVR existe.
-	println("HITO250: MPQ-CERRADOS vram_libre= sin-init")
+	// DC-002.56: tercera lectura pre-video (las tres son las de esta tarjeta). Ver la nota larga de
+	// MAPA-IMAGEN: con el PVR apagado el numero es 0 y no toca el allocator; sacarla hoy rompe el control.
+	println("HITO250: MPQ-CERRADOS vram_libre=", int64(d2cVramLibre()))
 
 	est := NuevoEstado(float64(centroX), float64(centroY), false)
 
@@ -1202,12 +1205,6 @@ func main() {
 	if err := ebiten.IniciarPantalla(ancho, alto); err != nil {
 		println("HITO238: no pude arrancar el video:", err.Error())
 	}
-
-	// DC-002.56: LA UNICA lectura de VRAM del POC, y corre con el PVR ENCENDIDO (IniciarPantalla ya llamo a
-	// pvr_init_defaults y ya subio la textura de la pantalla). Es el contraste que pide la tarjeta: antes del
-	// encendido el numero era 0 porque el allocator todavia no existe, no porque no hubiera VRAM. Con esto
-	// `d2cVramLibre` sigue vivo y medido, pero nunca antes de la marca del video.
-	println("HITO250: VRAM-POSTINIT vram_libre=", int64(d2cVramLibre()))
 
 	// ============================== 3d. LOS CICLOS DEL BICHO, CON EL VIDEO YA ANDANDO (DC-002.50) ==========
 	//

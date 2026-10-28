@@ -87,8 +87,10 @@ while IFS= read -r n; do
 done <<< "$PRE_INIT"
 if [ "$CUENTA_MARCA" -lt 3 ]; then
     malo "esperaba TRES marcas previas al video (MAPA-IMAGEN / PERSONAJE-IMAGEN / MPQ-CERRADOS) y encontre $CUENTA_MARCA"
-else
+elif [ "$CUENTA_INIT" -eq "$CUENTA_MARCA" ]; then
     bien "las $CUENTA_INIT de $CUENTA_MARCA marcas previas al video dicen 'vram_libre= sin-init'"
+else
+    malo "solo $CUENTA_INIT de $CUENTA_MARCA marcas previas al video dicen 'vram_libre= sin-init'"
 fi
 
 # ---- A.4 en csrc/ hay UNA sola aparicion de pvr_mem_available( : la de d2c_vram_libre
@@ -137,40 +139,44 @@ if [ -n "$LOG" ]; then
         malo "me pasaron un log que no existe: $LOG"
     else
         SALIDA=$(awk '
+            BEGIN { marcas = 0; ok = 0; n = 0; video = 0 }
             /HITO250: PVR antes-de-pvr_init_defaults/ { video = 1 }
             !video && /(MAPA-IMAGEN|PERSONAJE-IMAGEN|MPQ-CERRADOS)/ {
                 marcas++
-                if (/vram_libre= sin-init/) { bien++ } else { malas[++n] = $0 }
+                if (/vram_libre= sin-init/) { ok++ } else { malas[++n] = $0 }
             }
             END {
-                if (marcas == 0) { print "sin-marcas"; exit }
+                if (marcas == 0) { print "SIN-MARCAS"; exit }
                 for (i = 1; i <= n; i++) print "MALA " malas[i]
-                print "CUENTA " bien " " marcas
+                print "CUENTA " ok " " marcas
             }' < <(tr -d '\r' < "$LOG"))
         case "$SALIDA" in
-            sin-marcas)
+            SIN-MARCAS)
                 malo "en el log no hay ninguna marca previa al video (MAPA-IMAGEN / PERSONAJE-IMAGEN / MPQ-CERRADOS)"
                 ;;
             *)
                 while IFS= read -r l; do
                     case "$l" in
-                        MALA*) malo "log: marca previa al video con vram_libre NUMERICO: ${l#MALA }" ;;
+                        MALA*)
+                            malo "log: marca previa al video con vram_libre NUMERICO: ${l#MALA }" ;;
                         CUENTA*)
-                            set -- $l
-                            if [ "$2" -eq "$3" ]; then
-                                bien "log: las $2 de $3 marcas previas al video dicen 'vram_libre= sin-init'"
+                            # OJO: la cuenta se lee con `read` y no con `set --` (medido: con `set --` y una
+                            # cuenta incompleta el `$3` queda sin asignar y el script muere por `set -u`).
+                            read -r _ hecho total <<< "$l"
+                            if [ "${hecho:-x}" = "${total:-y}" ]; then
+                                bien "log: las $hecho de $total marcas previas al video dicen 'vram_libre= sin-init'"
                             else
-                                malo "log: $(( $3 - $2 )) de $3 marcas previas al video NO dicen 'sin-init'"
+                                malo "log: $hecho de $total marcas previas al video dicen 'sin-init' (el resto, numero)"
                             fi
                             ;;
                     esac
                 done <<< "$SALIDA"
                 ;;
         esac
-        if tr -d '\r' < "$LOG" | grep -q 'HITO250: VRAM-POSTINIT vram_libre='; then
-            bien "log: hay lectura post-init ($(tr -d '\r' < "$LOG" | grep -m1 'VRAM-POSTINIT' | sed 's/^ *//'))"
+        if tr -d '\r' < "$LOG" | grep -q 'HITO250: PVR despues-de-pvr_init_defaults'; then
+            bien "log: el video arranco ($(tr -d '\r' < "$LOG" | grep -m1 'HITO250: PVR despues-de-pvr_init_defaults' | sed 's/^ *//'))"
         else
-            echo "   aviso: el log no trae 'HITO250: VRAM-POSTINIT' (puede que la corrida no llegara al video)"
+            echo "   aviso: el log no trae 'HITO250: PVR despues-de-pvr_init_defaults' (la corrida no llego al video)"
         fi
     fi
 else

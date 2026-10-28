@@ -1,0 +1,223 @@
+DC-002.56 -- EL PVR APAGADO: las tres lecturas de VRAM del camino previo al video
+==================================================================================
+Fecha: 2026-10-27.  Rama DC-002.  Host: CachyOS, Flycast 2.7 (AppImage), sin KVM.
+Todo lo de abajo esta medido en este host, con los scripts de `scripts/console/`.
+
+VEREDICTO, PRIMERO
+------------------
+"La lectura pre-init era la causa" -> **NO**. Con dos pruebas duras:
+
+  1. Con el PVR apagado `pvr_mem_available()` devuelve 0 y NO toca nada: corta con `if(!pvr_mem_base)
+     return 0;` sobre un estatico en .bss, antes de mirar el allocator o `pvr_state`. El sospechoso que
+     quedo listado en dc-002.53 (10.g.3), "eso dejaria al allocator del PVR con estado sucio justo antes
+     de pvr_init_defaults", no ocurre: la funcion ni siquiera llega al allocator.
+  2. Sacando las tres lecturas del camino previo al video NO se arregla nada: BESTIA=1 sigue muriendo. Y
+     ademas el cambio mueve el layout del binario y TUMBA a BESTIA=0 (el control que dibuja). Medido con
+     el mismo arbol y los mismos scripts: 4 corridas clasificadas + 1 control de 1 byte.
+
+1) LA MEDICION DEL SOSPECHOSO (antes de tocar codigo)
+----------------------------------------------------
+Header de KOS: `~/dreamcast/kos/kernel/arch/dreamcast/include/dc/pvr/pvr_mem.h`
+  `size_t pvr_mem_available(void);`  -- "Return the number of bytes available still in the PVR RAM pool."
+
+Implementacion: `~/dreamcast/kos/kernel/arch/dreamcast/hardware/pvr/pvr_mem.c:169-182`
+
+    static size_t pvr_mem_available_int(void) {
+        struct mallinfo mi = pvr_int_mallinfo();
+        return mi.arena - mi.uordblks;
+    }
+    size_t pvr_mem_available(void) {
+        if(!pvr_mem_base)                 <-- ACÁ CORTA
+            return 0;
+        return pvr_mem_available_int() + (PVR_RAM_INT_TOP - (size_t)pvr_mem_base);
+    }
+
+  * `pvr_mem_base` es un `static pvr_ptr_t` de ese archivo (linea 57) -> .bss, cero al arrancar; solo lo
+    llenan `pvr_init`/`pvr_mem_reset`. Con el PVR apagado la funcion retorna 0 en la primera linea.
+  * `pvr_mem_available_int()` (la que mira el allocator) NO se ejecuta en ese caso.
+  * En este KOS el allocator de VRAM es un dlmalloc propio (`pvr_mem_core.c`, "a dlmalloc-derived malloc
+    for use with the PVR memory pool"). La version vieja de la API que la tarjeta sospechaba, con
+    `pvr_state.ram_free_list`, NO EXISTE en este arbol:
+        grep -rn "ram_free_list" ~/dreamcast/kos/kernel/arch/dreamcast/{hardware,include}/
+        (sin resultados)
+  * El numero de la consola lo confirma: `HITO238: MAPA-IMAGEN ... vram_libre= 0` es exactamente el 0 del
+    early-return, no un allocator con estado raro.
+  * Contraste con el PVR ENCENDIDO, ya medido en este repo (dc-002.36-menu-consola.txt:83):
+        "texturas subidas a la VRAM: 10 de 11   (bytes= 1196032, vram_libre= 4593064)"
+
+Conclusion de la medicion: la lectura pre-init es un 0 constante y sin efectos. No ensucia el allocator,
+no escribe en `pvr_state` y no puede ser la causa de la excepcion dentro de `pvr_init_defaults`.
+
+2) LA LIMPIEZA: se probo, se midio, y NO se puede aplicar todavia
+------------------------------------------------------------------
+Se aplico la limpieza completa (las tres marcas imprimen `vram_libre= sin-init` y se agrego una lectura
+viva despues del video, `HITO250: VRAM-POSTINIT`). Compila. Y con eso:
+
+    BESTIA=0 (el control que dibuja)  -> COLGADO   (1ST_READ.BIN 1.851.880 B)
+    sin el VRAM-POSTINIT              -> COLGADO   (1ST_READ.BIN 1.851.784 B)
+    BESTIA=1                          -> COLGADO   (1ST_READ.BIN 1.852.840 B)
+
+El punto donde se cuelga BESTIA=0 con el cambio (log, tr -d '\r'):
+
+    HITO250: PVR antes-de-pvr_init_defaults
+    pvr: enabling vertical scaling for non-VGA
+    HITO250: PVR despues-de-pvr_init_defaults        <-- pvr_init_defaults TERMINO
+    (nada mas en 120 s: no llega ni a "PVR textura-de-pantalla OK", o sea se cuelga en el pvr_mem_malloc
+     de d2c_pvr_pantalla_init, ya con el PVR encendido)
+
+Y con BESTIA=1 el mismo arbol muere ADENTRO de `pvr_init_defaults`, sin excepcion impresa y sin la linea
+"pvr:" de KOS.
+
+3) EL UMBRAL: menos de 64 bytes (esto es lo que cierra la discusion)
+--------------------------------------------------------------------
+Mismo arbol, misma bandera (BESTIA=0), 4 binarios distintos en 1ST_READ.BIN:
+
+    1.851.848 B  arbol del commit 7adb9717 (antes de esta tarjeta)      -> ANDA    (cuadros=9)
+    1.851.848 B  ese mismo arbol + UNA edicion de 1 byte en una cadena  -> ANDA    (cuadros=9)
+                 (`"HITO238: hay control en el puerto 0"` -> `... puerto 0."`: el binario NO cambia de tamano)
+    1.851.784 B  con la limpieza (sin VRAM-POSTINIT)                    -> COLGADO (cuadros=0)
+    1.851.880 B  con la limpieza + VRAM-POSTINIT                        -> COLGADO (cuadros=0)
+
+O sea: el disparador no es "cuanto trabajo hace el POC antes del video" (los dos que dibujan y los dos que
+se cuelgan hacen EXACTAMENTE el mismo trabajo), es donde caen las cosas en el binario. El escalon medido
+es de 64 bytes, que es justo el paso con que se mueve 1ST_READ.BIN. Es la firma de DC-002.53 ("es la forma
+del binario, no la logica del bicho"), ahora con el numero: 64 bytes deciden entre dibujar y colgarse.
+
+Por eso la limpieza NO se aterrizo en el POC: dejaria el control (BESTIA=0) roto. El arbol queda con las
+tres lecturas como estaban, y con la nota de por que (main.go ~930 y ~1171, cshim.c d2c_vram_libre).
+
+4) LAS CORRIDAS (comandos y clasificacion)
+------------------------------------------
+Clasificador: `scripts/console/checar-arranque-253.sh` (ANDA / MUERE-EXCEPCION / COLGADO).
+
+  # el arbol del commit anterior a esta tarjeta (POC extraido con git archive 7adb9717 ...)
+  POC_DIR=/tmp/poc-anterior-XXXX/personaje-mapa BESTIA=0 SEGUNDOS=120 \
+      bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/vram56-pre-b0
+  -- 1ST_READ.BIN: 1851848 B
+  -- marcas: cuadros=9 video=1 excepciones=0 cortes-del-UBC=0
+  == estado: ANDA
+  HITO238: POS cuadro 1 ms 52382 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ...
+
+  POC_DIR=/tmp/poc-anterior-XXXX/personaje-mapa BESTIA=1 SEGUNDOS=120 \
+      bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/vram56-pre-b1
+  -- 1ST_READ.BIN: 1852904 B
+  -- marcas: cuadros=0 video=1 excepciones=0 cortes-del-UBC=0
+  -- ojo: 1 'Unhandled exception' en el log (sonda ARQ-PILA253-REAL: 0)
+  == estado: MUERE-EXCEPCION
+  Unhandled exception: PC 8c42e020, code 1, evt 0180
+  (el log trae, antes: "pvr: disabling vertical scaling for VGA" -> muere ADENTRO de pvr_init_defaults)
+
+  # el arbol de esta tarjeta, tal como queda (sin la limpieza)
+  BESTIA=0 SEGUNDOS=120 bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/vram56-final-b0
+  -- 1ST_READ.BIN: 1851848 B
+  -- marcas: cuadros=9 video=1 excepciones=0 cortes-del-UBC=0
+  == estado: ANDA
+
+  BESTIA=1 SEGUNDOS=120 bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/vram56-final-b1
+  -- 1ST_READ.BIN: 1852904 B
+  -- marcas: cuadros=0 video=1 excepciones=0 cortes-del-UBC=0
+  -- ojo: 1 'Unhandled exception' en el log (sonda ARQ-PILA253-REAL: 0)
+  == estado: MUERE-EXCEPCION   Unhandled exception: PC 8c42e020, code 1, evt 0180
+
+Resumen de las cuatro (+ el control de 1 byte y la limpieza, que quedan como contraprueba):
+
+  build                    1ST_READ.BIN   BESTIA=0          BESTIA=1
+  ----------------------   -------------  ----------------  -----------------------------
+  7adb9717 (antes)          1.851.848 B    ANDA (9 cuadros)  MUERE-EXCEPCION PC 8c42e020
+  + 1 byte (mismo tamano)   1.851.848 B    ANDA (9 cuadros)  (no se corrio)
+  con la limpieza           1.851.784 B    COLGADO           COLGADO (dentro de pvr_init)
+  con limpieza+POSTINIT     1.851.880 B    COLGADO           COLGADO
+  esta tarjeta (sin ella)   1.851.848 B    ANDA (9 cuadros)  MUERE-EXCEPCION PC 8c42e020
+
+`dibujando=` (la marca `HITO238: dibujando`, que se imprime justo antes del loop de cuadros):
+   bestia=0 (esta tarjeta): dibujando=1      bestia=1: dibujando=0
+
+CAPTURAS (spectacle, 120 s de corrida, cada 3/6/10/15/25/40/60/90/120 s):
+   /tmp/shot56-b0/f*.png   (bestia=0: hay "HITO238: dibujando" y 9 cuadros en el log)
+   /tmp/shot56-b1/f*.png   (bestia=1: no hay dibujando)
+   OJO, medido hoy: en las capturas la VENTANA DE FLYCAST SALE NEGRA (la superficie del emulador no entra
+   en la foto de pantalla completa en este KDE/Wayland; el escritorio si sale). O sea que las capturas de
+   esta corrida NO sirven como prueba visual: la prueba de que dibuja es el log (cuadros=9, POS cuadro con
+   subtiles/celda/ancla, y la marca `HITO238: dibujando`).
+
+5) EL CONTROL Y SU MUTADOR
+--------------------------
+`scripts/console/checar-vram-preinit-253.sh` -- dos caras, las dos medibles:
+
+  A) LA FUENTE (siempre): ninguna llamada a `d2cVramLibre(` en una linea ANTERIOR a `ebiten.IniciarPantalla(`
+     (los comentarios se borran antes de mirar: una nota que nombra la funcion no es una llamada), las tres
+     marcas previas al video tienen que imprimir `vram_libre= sin-init`, y en `csrc/` tiene que haber UNA
+     sola aparicion de `pvr_mem_available(` (la de `d2c_vram_libre`; los comentarios de C tambien se borran).
+  B) EL LOG (si se le pasa un flycast.log): ninguna marca previa a `HITO250: PVR antes-de-pvr_init_defaults`
+     puede traer un `vram_libre=` NUMERICO.
+
+Estado HOY en el arbol del repo (deuda declarada, la limpieza esta bloqueada por el layout):
+
+    $ bash scripts/console/checar-vram-preinit-253.sh
+    == control VRAM pre-init (DC-002.56) sobre .../console/dc/poc/personaje-mapa
+       OK:   la marca del encendido del video esta en main.go:1205 ('ebiten.IniciarPantalla(')
+       ROJO: d2cVramLibre() en main.go:942, ANTES del encendido del video (linea 1205): ...
+       ROJO: d2cVramLibre() en main.go:1083, ANTES del encendido del video (linea 1205): ...
+       ROJO: d2cVramLibre() en main.go:1174, ANTES del encendido del video (linea 1205): ...
+       ROJO: la marca previa al video main.go:942 no imprime 'vram_libre= sin-init': ...
+       ROJO: la marca previa al video main.go:1083 no imprime 'vram_libre= sin-init': ...
+       ROJO: la marca previa al video main.go:1174 no imprime 'vram_libre= sin-init': ...
+       ROJO: solo 0 de 3 marcas previas al video dicen 'vram_libre= sin-init'
+       OK:   csrc/: una sola lectura de pvr_mem_available() (la de d2c_vram_libre en cshim.c)
+    == ROJO: 7 problema(s) de lectura pre-init    (rc=1)
+
+    $ bash scripts/console/checar-vram-preinit-253.sh /tmp/dcbuild/vram56-final-b0/corrida/flycast.log
+    ... (los 7 de arriba) ...
+       ROJO: log: marca previa al video con vram_libre NUMERICO: HITO238: MAPA-IMAGEN bytes= 1048576 vram_libre= 0
+       ROJO: log: marca previa al video con vram_libre NUMERICO: HITO238: PERSONAJE-IMAGEN bytes= 8216 vram_libre= 0
+       ROJO: log: marca previa al video con vram_libre NUMERICO: HITO250: MPQ-CERRADOS vram_libre= 0
+       ROJO: log: 0 de 3 marcas previas al video dicen 'sin-init' (el resto, numero)
+       OK:   log: el video arranco (HITO250: PVR despues-de-pvr_init_defaults)
+    == ROJO: 11 problema(s) de lectura pre-init   (rc=1)
+
+Y sobre la COPIA con la limpieza aplicada (lo que dara verde cuando el layout este arreglado) el control da
+VERDE. Eso lo mide el mutador, que arma esa copia solo:
+
+    $ bash scripts/console/mutar-vram-preinit-253.sh
+    == copia de trabajo: /tmp/.../poc-limpio (3 marcas sin-init)
+    == arbol del repo: ROJO -- deuda declarada de DC-002.56 (3 lecturas pre-video); no cuenta como fallo
+      [1/4] copia con la limpieza aplicada: VERDE
+      [2/4] el mutante de fuente quedo puesto
+      [2/4] mutante de fuente (MAPA-IMAGEN pre-video): cazado  (ROJO: d2cVramLibre() en main.go:942, ANTES del encendido del video (linea 1205): ...)
+      [3/4] mutante de log (vram_libre= 0 pre-video): cazado  (ROJO: log: marca previa al video con vram_libre NUMERICO: HITO238: MAPA-IMAGEN bytes= 1048576 vram_libre= 0)
+      [4/4] log sano (las tres marcas dicen sin-init): VERDE
+    == resumen: verdes=2 rojos=2 fallos=0
+    == MUTADOR OK: el control caza 2/2 defectos y no da rojo sobre la copia sana   (rc=0)
+
+Dos bugs del propio control que el mutador cazo (y quedan arreglados, con su nota en el codigo):
+  * la limpieza tiene DOS formas de texto en `main.go` (en MAPA-IMAGEN y PERSONAJE-IMAGEN el literal
+    `"vram_libre="` va aparte; en MPQ-CERRADOS va pegado a la etiqueta): con una sola regla quedaba una de
+    las tres sin limpiar;
+  * la cuenta del log se moria por `set -u` cuando la cuenta venia incompleta (`set --` + `$3`): se lee con
+    `read`.
+
+6) INSTRUMENTO: el clasificador contaba mal la excepcion
+--------------------------------------------------------
+`checar-arranque-253.sh` solo contaba la sonda `ARQ-PILA253-REAL` (de DC-002.53). En este arbol la sonda no
+esta compilada, asi que BESTIA=1 —que muere con `Unhandled exception: PC 8c42e020, code 1, evt 0180`— salia
+clasificada COLGADO. Ahora cuenta tambien los `Unhandled exception` del log de Flycast y los imprime:
+
+    -- ojo: 1 'Unhandled exception' en el log (sonda ARQ-PILA253-REAL: 0)
+    == estado: MUERE-EXCEPCION
+    Unhandled exception: PC 8c42e020, code 1, evt 0180
+
+(Nota: `resolver-pc.py` necesita el toolchain en el PATH; sin `env.sh` muere con `FileNotFoundError:
+sh-elf-nm`. Con el entorno cargado resuelve el PC de la muerte a DATOS, no a codigo:
+    $ . scripts/console/env.sh && python3 scripts/console/resolver-pc.py /tmp/dcbuild/vram56-final-b1/prog.elf 8c42e020
+    0x8c42e020  _end                                     +0x1028  ?
+o sea el mismo sintoma de DC-002.53: el PC se va a la region de datos.)
+
+7) QUE QUEDA PARA LA TARJETA DE LA LIMPIEZA
+-------------------------------------------
+La limpieza (las tres marcas a `sin-init` + la barrera verde) esta ESCRITA y PROBADA, pero no puede
+aterrizar mientras 64 bytes de binario decidan entre dibujar y colgarse. La tarjeta que la aplique tiene que:
+  1. partir del arbol con DC-002.53 cerrado (o con el control `checar-arranque-253.sh` en ANDA para
+     BESTIA=0 con el binario NUEVO, no con el viejo);
+  2. aplicar los dos `sed` del mutador (o el equivalente a mano) y compilar;
+  3. exigir `checar-vram-preinit-253.sh` VERDE sobre el arbol y `checar-arranque-253.sh` ANDA con BESTIA=0;
+  4. si BESTIA=0 se cuelga, NO tocar el layout para "que entre": es la senal de que DC-002.53 sigue abierto.
