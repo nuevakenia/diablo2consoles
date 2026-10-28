@@ -47,10 +47,10 @@ index e112588..a261954 100644
          interpr/sh4_interpreter.cpp
 diff --git a/core/hw/sh4/dc_watchpoint.cpp b/core/hw/sh4/dc_watchpoint.cpp
 new file mode 100644
-index 0000000..36ecce8
+index 0000000..5d1b5bc
 --- /dev/null
 +++ b/core/hw/sh4/dc_watchpoint.cpp
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,292 @@
 +/*
 +	DC-002.60 -- watchpoint de escritura del SH-4 (instrumento LOCAL, fuera del upstream).
 +	Ver core/hw/sh4/dc_watchpoint.h para el contrato y las variables de entorno.
@@ -178,6 +178,8 @@ index 0000000..36ecce8
 +	}
 +}
 +
++static void dumpCalls(const char *motivo);
++
 +static void dumpRing(const char *motivo)
 +{
 +	if (sRing == nullptr || sRingCount == 0)
@@ -224,9 +226,52 @@ index 0000000..36ecce8
 +
 +	if (sRing != nullptr)
 +		dumpRing("excepcion");
++	dumpCalls("excepcion");
 +}
 +
 +static unsigned sBranchDumps = 0;
++
++// anillo chico de llamadas: se vuelca en la excepcion para ver la CADENA de sps antes del salto malo
++struct CallEntry
++{
++	u32 ip;
++	u32 target;
++	u32 sp;
++	u32 pr;
++};
++static CallEntry sCalls[512];
++static unsigned sCallPos = 0;
++static unsigned long long sCallCount = 0;
++
++void call(u32 ip, u32 target, u32 sp, u32 pr)
++{
++	if (!sInitDone || !gArmed)
++		return;
++	if (sp < 0x8c42c000 || sp >= 0x8c42e900)	// solo cuando la pila esta en la zona del marco
++		return;
++	sCalls[sCallPos] = CallEntry { ip, target, sp, pr };
++	sCallPos = (sCallPos + 1) % 512;
++	sCallCount++;
++}
++
++static void dumpCalls(const char *motivo)
++{
++	const unsigned n = sCallCount < 512 ? (unsigned)sCallCount : 512;
++	if (n == 0)
++	{
++		emit("WP-CADENA-VACIA motivo=%s\n", motivo);
++		return;
++	}
++	emit("WP-CADENA motivo=%s n=%u total=%llu\n", motivo, n, sCallCount);
++	for (unsigned i = 0; i < n; i++)
++	{
++		const unsigned idx = (sCallPos + 512 - n + i) % 512;
++		const CallEntry& c = sCalls[idx];
++		emit("WP-LLAMADA ip=%08x destino=%08x sp=%08x pr=%08x k=%u\n", c.ip, c.target, c.sp, c.pr, i + 1);
++	}
++	sCallPos = 0;
++	sCallCount = 0;
++}
 +
 +void branch(u32 ip, u32 target, u32 sp, u32 pr, const char *tipo)
 +{
@@ -300,10 +345,10 @@ index 0000000..36ecce8
 +}
 diff --git a/core/hw/sh4/dc_watchpoint.h b/core/hw/sh4/dc_watchpoint.h
 new file mode 100644
-index 0000000..777c045
+index 0000000..ac13f13
 --- /dev/null
 +++ b/core/hw/sh4/dc_watchpoint.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,64 @@
 +/*
 +	DC-002.60 -- watchpoint de escritura del SH-4 (instrumento LOCAL, fuera del upstream).
 +
@@ -364,9 +409,12 @@ index 0000000..777c045
 +// Aviso de salto a direccion que no es codigo (rts/jmp): pc de la instruccion, destino, sp y pr.
 +void branch(u32 ip, u32 target, u32 sp, u32 pr, const char *tipo);
 +
++// Registra un `jsr @Rn` cuya pila cae en la zona del marco vigilado (cadena de llamadas).
++void call(u32 ip, u32 target, u32 sp, u32 pr);
++
 +}
 diff --git a/core/hw/sh4/interpr/sh4_opcodes.cpp b/core/hw/sh4/interpr/sh4_opcodes.cpp
-index 26df085..4e5e6e7 100644
+index 26df085..e130fdc 100644
 --- a/core/hw/sh4/interpr/sh4_opcodes.cpp
 +++ b/core/hw/sh4/interpr/sh4_opcodes.cpp
 @@ -10,6 +10,7 @@
@@ -385,6 +433,14 @@ index 26df085..4e5e6e7 100644
  	executeDelaySlot(); //WARN : pr can change here
  	ctx->pc = newpc;
  	debugger::subroutineReturn();
+@@ -949,6 +951,7 @@ sh4op(i0100_nnnn_0000_1011)
+ 
+ 	u32 newpr = ctx->pc + 2;   //return after delayslot
+ 	u32 newpc = ctx->r[n];
++	dcwp::call(ctx->pc - 2, newpc, ctx->r[15], newpr);	// DC-002.60
+ 	executeDelaySlot(); //r[n]/pr can change here
+ 
+ 	ctx->pr = newpr;
 diff --git a/core/hw/sh4/sh4_interrupts.cpp b/core/hw/sh4/sh4_interrupts.cpp
 index 49a3be4..28bce43 100644
 --- a/core/hw/sh4/sh4_interrupts.cpp

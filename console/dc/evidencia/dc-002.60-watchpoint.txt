@@ -20,7 +20,7 @@ tarjeta siguiente, con estos numeros como punto de partida.
 ----------------------
   fuente del emulador   ~/Proyectos/flycast-2.7   (git v2.7 shallow + submodulos, 848 MB, rama `dc-wp`)
   binario               ~/Proyectos/flycast-2.7/build/flycast   (31.136.256 B, cmake Release + ninja -j8)
-  parche                console/dc/evidencia/dc-002.60-flycast.patch   (428 lineas, 7 archivos)
+  parche                console/dc/evidencia/dc-002.60-flycast.patch   (484 lineas, 7 archivos)
   no se toco            ~/dreamcast/dl/flycast.AppImage (los scripts siguen usandolo por defecto)
                         ~/dreamcast/libgodc, el POC, KOS
 
@@ -155,9 +155,32 @@ tarjeta siguiente, con estos numeros como punto de partida.
   c) El binario instrumentado NO reemplaza al AppImage: se invoca por ruta explicita
      (FLYCAST=~/Proyectos/flycast-2.7/build/flycast). Los scripts `run-flycast*.sh` quedan como estaban.
 
+6.b  LA CADENA DE LLAMADAS (agregado en la misma corrida: anillo de 512 `jsr @Rn` con sp en la zona)
+     En la ultima vuelta del instrumento se agrego `WP-LLAMADA` (cada `jsr @Rn` cuyo sp cae en
+     [0x8c42c000,0x8c42e900), anillo de 512, volcado en la excepcion). Resultado de la corrida 13:
+       WP-CADENA motivo=excepcion n=512 total=5437631
+       ...
+       WP-LLAMADA ip=8c0d215a destino=8c0e4658 sp=8c42e000 pr=8c0d215e k=432
+       ...
+       WP-LLAMADA ip=8c0d2298 destino=8c0d0330 sp=8c42dfe0 pr=8c0d229c k=510
+       WP-LLAMADA ip=8c0d229e destino=8c0e4b1c sp=8c42dfe0 pr=8c0d22a2 k=511
+       WP-LLAMADA ip=8c0d22a6 destino=8c0d2940 sp=8c42dfec pr=8c0d22aa k=512
+     Las dos ultimas son el cuerpo de `_pvr_init` llamando a `_pvr_dma_init` (0x8c0e4b1c) y a
+     `_pvr_mem_reset` (0x8c0d2940) con sp=0x8c42dfe0 (dip de 12 bytes por argumentos en pila) y
+     0x8c42dfec (fondo de marco) respectivamente: eso es NORMAL.
+     La que importa es k=432: **ip=0x8c0d215a es `_pvr_init` mismo** (`jsr @r1` a `_pvr_allocate_buffers`,
+     la direccion se carga en 0x8c0d2158) y lo llama con **sp=0x8c42e000**, o sea 0x14 bytes ARRIBA del
+     fondo de su propio marco (0x8c42dfec, seccion 4.e). Con ese sp, el primer push de r11 del callee
+     (0x8c0e4660) cae en 0x8c42dff0 = el slot donde `_pvr_init` guardo SU PR. Ahi esta el solape:
+     no es un puntero loco, es el llamador pasando un sp que ya esta dentro de su propio marco.
+     Lo que sigue abierto (y es la pregunta exacta de la proxima tarjeta): POR QUE el sp de `_pvr_init`
+     esta en 0x8c42e000 en ese punto (su cuerpo deberia tenerlo en 0x8c42dfec). Candidatos, todos medibles
+     con este mismo instrumento: reentrada de `_pvr_init` (dos activaciones anidadas), un `add`/`pop` de mas
+     en el camino previo (0x8c0d20e8 `add #-4,r15` y su pareja), o un cambio de pila (goroutine) en medio.
+
 7. ARTEFACTOS
 -------------
-  console/dc/evidencia/dc-002.60-flycast.patch        el parche del emulador (7 archivos, 428 lineas)
+  console/dc/evidencia/dc-002.60-flycast.patch        el parche del emulador (7 archivos, 484 lineas)
   console/dc/evidencia/dc-002.60-watchpoint.txt       este archivo
   /tmp/dcbuild/wp60-bestia/{disc.gdi,1ST_READ.BIN}    bicho (1.852.904 B)
   /tmp/dcbuild/wp60-base/{disc.gdi,1ST_READ.BIN}      control (1.851.848 B)
