@@ -1,0 +1,136 @@
+DC-002.57 -- APLICAR LA LIMPIEZA DE LA VRAM PRE-INIT: la barrera de layout sigue CERRADA
+=========================================================================================
+Fecha: 2026-10-28 00:06-00:14 (America/Santiago).  Rama DC-002.  Host: CachyOS, Flycast 2.7 (AppImage), sin KVM.
+Arbol de partida: 4e26f02d (arbol limpio, `main.go` del POC sin tocar desde cfdb9a48).
+Tarjeta: t_f04f3ab9.  Todo lo de abajo esta medido hoy con los scripts de `scripts/console/`.
+
+VEREDICTO, PRIMERO
+------------------
+La barrera de partida **PASA** (el control que dibuja anda con el binario de hoy), pero la limpieza
+**NO aterriza**: aplicada, BESTIA=0 se cuelga. El escalon medido por DC-002.56 se reproduce EXACTO en el
+arbol de hoy (mismos 64 bytes, mismo punto de cuelgue), o sea que **DC-002.53 sigue abierto** y este
+cambio no se puede dejar puesto. Arbol revertido, deuda re-declarada, tarjeta devuelta a DC-002.53.
+
+  build (BESTIA=0)                       1ST_READ.BIN   estado
+  ------------------------------------   -------------  ------------------------------------------
+  arbol de hoy, tal como esta            1.851.848 B    ANDA (cuadros=9)          <- barrera: PASA
+  arbol de hoy + la limpieza (2 sed)     1.851.784 B    COLGADO (cuadros=0)       <- 64 B menos
+
+1) LA BARRERA DE PARTIDA (con el binario de HOY, compilado en esta corrida)
+---------------------------------------------------------------------------
+  $ BESTIA=0 SEGUNDOS=120 bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/limpieza57-b0-base
+  == build bestia=0 -> /tmp/dcbuild/limpieza57-b0-base
+  == corrida 120 s
+  -- 1ST_READ.BIN: 1851848 B
+  -- marcas: cuadros=9 video=1 excepciones=0 cortes-del-UBC=0
+  == estado: ANDA      (rc=0)
+  HITO238: POS cuadro 1 ms 52382 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256
+                        pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 1
+
+  Nota: 1.851.848 B es el MISMO tamano que midio DC-002.56 para el arbol sano; `main.go` no ha cambiado
+  desde cfdb9a48 (los commits 4d20fdfd / 5388ce84 / 4e26f02d no lo tocan), asi que la barrera se cumple
+  por la misma razon que ayer: el binario sigue siendo el que dibuja.
+
+2) LA LIMPIEZA APLICADA (las dos formas de texto, tal cual las tiene el mutador)
+--------------------------------------------------------------------------------
+  Reglas usadas (las mismas de `scripts/console/mutar-vram-preinit-253.sh`, seccion "la copia con la
+  limpieza aplicada"; se aplicaron a mano con la herramienta de edicion, no con `sed -i` en el arbol):
+
+    MAPA-IMAGEN / PERSONAJE-IMAGEN:  "vram_libre=", int64(d2cVramLibre())   ->  "vram_libre= sin-init"
+    MPQ-CERRADOS (pegado a la etiqueta): vram_libre=", int64(d2cVramLibre()) ->  vram_libre= sin-init"
+
+  Quedaron las TRES marcas sin la llamada:
+
+    main.go:942   println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre= sin-init")
+    main.go:1083  println("HITO238: PERSONAJE-IMAGEN bytes=", per.Ancho*per.Alto*4, "vram_libre= sin-init")
+    main.go:1174  println("HITO250: MPQ-CERRADOS vram_libre= sin-init")
+
+  Y el control de fuente da VERDE (o sea: el criterio 1 de la tarjeta SI se cumple sobre el arbol con la
+  limpieza puesta; lo que falla es el binario):
+
+    $ bash scripts/console/checar-vram-preinit-253.sh
+    == control VRAM pre-init (DC-002.56) sobre .../console/dc/poc/personaje-mapa
+       OK:   la marca del encendido del video esta en main.go:1205 ('ebiten.IniciarPantalla(')
+       OK:   ninguna llamada a d2cVramLibre() en main.go (solo la declaracion extern)
+       OK:   las 3 de 3 marcas previas al video dicen 'vram_libre= sin-init'
+       OK:   csrc/: una sola lectura de pvr_mem_available() (la de d2c_vram_libre en cshim.c)
+    == VERDE: ninguna lectura del allocator del PVR antes de encender el video      (rc=0)
+
+3) LAS DOS CORRIDAS CON LA LIMPIEZA (clasificacion, sin inventar veredicto)
+---------------------------------------------------------------------------
+  $ BESTIA=0 SEGUNDOS=120 bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/limpieza57-b0
+  -- 1ST_READ.BIN: 1851784 B
+  -- marcas: cuadros=0 video=1 excepciones=0 cortes-del-UBC=0
+  == estado: COLGADO (empezo el video y no llego al primer cuadro)      (rc=2)
+
+  Ultimas marcas del log (`tr -d '\r' < .../limpieza57-b0/corrida/flycast.log`):
+
+    HITO250: MEMORIA etapa= ciclos-del-personaje libre= 141800
+    HITO250: MPQ-CERRADOS vram_libre= sin-init
+    HITO238: MOTOR velocidad=subtilesPorSegundo= 9.375 celdasPorSegundo= 1.875
+    HITO238: POS-INICIAL subtiles= 140 100 celda= 28 20 ancla= 256 256 pantalla= 320 240
+    HITO238: hay control en el puerto 0
+    HITO250: PVR antes-de-pvr_init_defaults
+    pvr: enabling vertical scaling for non-VGA
+    HITO250: PVR despues-de-pvr_init_defaults     <-- pvr_init_defaults TERMINO
+    (nada mas en 120 s: se cuelga en el pvr_mem_malloc de d2c_pvr_pantalla_init, ya con el PVR encendido)
+
+  $ BESTIA=1 SEGUNDOS=120 bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/limpieza57-b1
+  -- 1ST_READ.BIN: 1852840 B
+  -- marcas: cuadros=0 video=1 excepciones=0 cortes-del-UBC=0
+  == estado: COLGADO (empezo el video y no llego al primer cuadro)      (rc=2)
+
+  Ultimas marcas del log (.../limpieza57-b1/corrida/flycast.log):
+
+    HITO249: CICLO TN cuadros 16 msPorCuadro 128 cicloMs 2048 imagen 26 77
+    HITO249: CICLOS cargados 1 ms 1995 mutante false
+    HITO250: MEMORIA etapa= ciclos-del-personaje libre= 140744
+    HITO250: MPQ-CERRADOS vram_libre= sin-init
+    HITO238: MOTOR velocidad=subtilesPorSegundo= 9.375 celdasPorSegundo= 1.875
+    HITO238: POS-INICIAL subtiles= 140 100 celda= 28 20 ancla= 256 256 pantalla= 320 240
+    HITO238: hay control en el puerto 0
+    HITO250: PVR antes-de-pvr_init_defaults       <-- aqui se queda: ni entra al pvr_init
+
+  O sea: BESTIA=1 **no** mejora con la limpieza (sigue sin arrancar), y BESTIA=0 **empeora** (pasa de
+  dibujar a colgarse). Los dos numeros son los mismos de DC-002.56 (1.851.784 B y 1.852.840 B): el arbol
+  se movio de commit pero `main.go` no, asi que la limpieza pesa los mismos 64 bytes.
+
+4) LA DEUDA, RE-DECLARADA: arbol revertido
+------------------------------------------
+  `git checkout -- console/dc/poc/personaje-mapa/main.go` (solo ese archivo; no se toco
+  `~/dreamcast/libgodc`, que tiene fixes sin commitear). Arbol limpio.
+
+  $ bash scripts/console/checar-vram-preinit-253.sh ; echo rc=$?
+  ...
+  == ROJO: 7 problema(s) de lectura pre-init        (rc=1)   <- la deuda de DC-002.56, otra vez declarada
+
+  $ bash scripts/console/mutar-vram-preinit-253.sh ; echo rc=$?
+  == arbol del repo: ROJO -- deuda declarada de DC-002.56 (3 lecturas pre-video); no cuenta como fallo
+    [1/4] copia con la limpieza aplicada: VERDE
+    [2/4] mutante de fuente (MAPA-IMAGEN pre-video): cazado
+    [3/4] mutante de log (vram_libre= 0 pre-video): cazado
+    [4/4] log sano (las tres marcas dicen sin-init): VERDE
+  == resumen: verdes=2 rojos=2 fallos=0
+  == MUTADOR OK: el control caza 2/2 defectos y no da rojo sobre la copia sana        (rc=0)
+
+5) POR QUE NO SE DEJA PUESTO (y que haria falta)
+-----------------------------------------------
+ * El sintoma no es de esta limpieza: es la fragilidad de layout de DC-002.53 (el PC de la excepcion cae
+   en DATOS, el marco de pila de `pvr_init_defaults` aparece pisado). La limpieza solo mueve el binario
+   64 bytes y con eso cambia quien se lleva el defecto.
+ * NO se rellena ni se hace padding para "que entre": esta tarjeta lo prohibe y ademas taparia el defecto
+   real. Con BESTIA=0 colgado, DC-002.53 sigue abierto.
+ * Para que esta tarjeta se pueda cerrar hace falta: DC-002.53 con la escritura culpable identificada y
+   arreglada (o el layout estabilizado), y despues re-correr los tres comandos de arriba. La limpieza en
+   si ya esta PROBADA: control de fuente VERDE y mutador 2/2 sobre una copia (DC-002.56 y hoy).
+
+CRITERIOS DE ACEPTACION DE LA TARJETA
+-------------------------------------
+  1. `checar-vram-preinit-253.sh` VERDE sobre el arbol  -> SI con la limpieza puesta, pero NO se puede
+     dejar puesta (el arbol queda ROJO 7/7, como estaba): NO CUMPLIDO.
+  2. BESTIA=0 ANDA con el binario NUEVO                 -> NO: COLGADO (1.851.784 B).
+  3. BESTIA=1 clasificado con su log en la evidencia    -> SI: COLGADO (1.852.840 B), log arriba.
+  4. mutador 2/2 cazados                                -> SI: verdes=2 rojos=2 fallos=0.
+
+CONCLUSION: la precondicion "cuando el layout lo permita" NO se cumple. Tarjeta devuelta a DC-002.53
+(t_e95967c5) como dependencia; no se cierra.
