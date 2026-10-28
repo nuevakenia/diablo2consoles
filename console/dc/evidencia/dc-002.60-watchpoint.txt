@@ -1,0 +1,169 @@
+DC-002.60 -- FLYCAST DESDE FUENTE CON WATCHPOINT DE ESCRITURA DEL SH-4
+=====================================================================
+Fecha: 2026-10-28. Rama: DC-002 (checkout principal, sin worktrees). Commits locales, sin push.
+Tarjeta: t_727f2966 (paraguas DC-002.53, t_e95967c5).
+
+VEREDICTO (una linea)
+----------------------
+El watchpoint instrumentado en el EMULADOR FUNCIONA y encontro las escrituras con su PC: la escritura que
+deja la direccion de retorno de `_pvr_init` apuntando a la PILA (0x8c42e020) es el push de r11 del PROLOGO
+de sus callees (`_pvr_allocate_buffers+0x8` en 0x8c0e4660 y `_sq_set32+0x8` en 0x8c0d85a8), ejecutados
+con sp=0x8c42dff4: el marco del callee EMPIEZA 4 bytes arriba del slot donde `_pvr_init` guardo su PR
+(0x8c42dff0), o sea marco pisado por solape de marcos, no basura aleatoria. El salto final medido:
+`rts ip=8c0d22ba destino=8c42e020` (epilogo de `_pvr_init`), y de ahi "Unhandled exception: PC 8c42e020,
+evt 0180" -> el handler de KOS tambien muere -> "Fatal: SH4 exception when blocked".
+El control con bestia=0, con el MISMO instrumento armado, dibuja (5 marcas POS cuadro) y tiene CERO saltos a
+datos. Lo que NO queda cerrado (y se declara): quien pasa sp=0x8c42dff4/0x8c42e000 a esos callees; eso es la
+tarjeta siguiente, con estos numeros como punto de partida.
+
+1. LO QUE SE CONSTRUYO
+----------------------
+  fuente del emulador   ~/Proyectos/flycast-2.7   (git v2.7 shallow + submodulos, 848 MB, rama `dc-wp`)
+  binario               ~/Proyectos/flycast-2.7/build/flycast   (31.136.256 B, cmake Release + ninja -j8)
+  parche                console/dc/evidencia/dc-002.60-flycast.patch   (428 lineas, 7 archivos)
+  no se toco            ~/dreamcast/dl/flycast.AppImage (los scripts siguen usandolo por defecto)
+                        ~/dreamcast/libgodc, el POC, KOS
+
+  Comandos (reproducibles):
+    bash ~/.hermes/cache/scratch/clona-flycast.sh                      # clon v2.7 + submodulos fuera del repo
+    cd ~/Proyectos/flycast-2.7 && git switch -c dc-wp
+    git apply < console/dc/evidencia/dc-002.60-flycast.patch            # (o aplicar desde cero: el parche va aparte)
+    cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Release -DUSE_DX9=OFF -DUSE_DX11=OFF \
+          -DUSE_VULKAN=OFF -DUSE_BREAKPAD=OFF -DUSE_DISCORD=OFF -DUSE_LUA=OFF -DUSE_LIBAO=OFF \
+          -DUSE_PULSEAUDIO=OFF -DUSE_OPENMP=ON
+    ninja -C build -j8                                                 # 918 pasos, ~9 min en este host
+
+  Builds del POC (arbol limpio, sin tocar 1ST_READ):
+    BESTIA=1 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/wp60-bestia   -> 1ST_READ 1.852.904 B
+    BESTIA=0 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/wp60-base     -> 1ST_READ 1.851.848 B
+  Los dos tamanos son IDENTICOS a los de la evidencia de DC-002.53/DC-002.56 (1.852.904 / 1.851.848), o sea
+  el arbol de hoy es el mismo que el de las tarjetas anteriores: lo medido aca aplica a ese binario.
+
+2. EL INSTRUMENTO (que hace y donde vive)
+-----------------------------------------
+  core/hw/sh4/dc_watchpoint.{h,cpp}    NUEVO. Gancho de store + volcado de excepcion + aviso de salto.
+  core/hw/mem/addrspace.cpp            writet<T>() llama al gancho antes de escribir (unico camino de store
+                                       del CPU en modo no-MMU: interprete, DMA, store queue).
+  core/hw/sh4/sh4_mem.cpp              SetMemoryHandlers() arma el instrumento una sola vez (idempotente).
+  core/hw/sh4/sh4_interrupts.cpp       Do_Exception() vuelca contexto SH-4 + marco de pila.
+  core/hw/sh4/interpr/sh4_opcodes.cpp  `rts` avisa cuando el destino no es codigo.
+  core/hw/sh4/CMakeLists.txt           suma el archivo nuevo.
+
+  Entorno (no hay que recompilar por corrida):
+    DC_WP_BASE / DC_WP_TOP     rango de DIRECCIONES vigilado (0x8c... como las ve el programa)
+    DC_WP_VAL_BASE/DC_WP_VAL_TOP  filtro por VALOR escrito (para cazar "quien escribe un puntero a X")
+    DC_WP_FILE                 archivo de salida (default /tmp/dc-wp.log)
+    DC_WP_MAX / DC_WP_ECHO     tope de lineas / cuantas tambien a stdout
+    DC_WP_RING                 anillo en memoria: no escribe nada y vuelca los ULTIMOS n stores al
+                               levantar la excepcion (asi el tope no se come justo lo que importa)
+
+  DOS PITFALLS MEDIDOS EN ESTA TARJETA (los dos cuestan una corrida entera si no se saben):
+  a) Con el RECOMPILADOR el watchpoint es CIEGO: en x64 los stores a RAM van por un handler generado
+     (`ram_base + (addr & 0x1FFFFFFF)`, rec_x64.cpp genMemHandlers) que no pasa por addrspace. Con rango
+     armado el instrumento FUERZA el interprete y lo dice en `WP-INIT dynarec estaba ON -> APAGADO`.
+     Costo de eso: la corrida pasa de ~60 s a ~90 s hasta el mismo punto. Vale la pena: los PCs son exactos.
+  b) `SetMemoryHandlers()` se llama VARIAS veces por corrida; si el instrumento reabre el archivo en cada
+     llamada, lo TRUNCA y se pierden las escrituras ya registradas. Paso en la primera corrida y dio un
+     falso "0 escrituras" (ver 4.a). Ahora se arma una sola vez (a=append).
+
+3. CRITERIO 1 -- EL EMULADOR DE FUENTE SE COMPORTA COMO EL APPIMAGE (VERDE)
+--------------------------------------------------------------------------
+  Corrida: CAPTURE=none FLYCAST=~/Proyectos/flycast-2.7/build/flycast \
+           bash scripts/console/run-flycast.sh /tmp/dcbuild/wp60-base/disc.gdi 150 /tmp/dcbuild/wp60-base/corrida-fuente
+  Sin watchpoint armado (DC_WP_BASE=0 DC_WP_TOP=0) -> `WP-INIT vigilado=no` y el emulador corre con su
+  recompilador, igual que el AppImage. Resultado del log:
+    13 lineas "HITO238: POS cuadro" (ms 52382 ... 146691), HITO238: POS-INICIAL, hay control en el puerto 0
+  O sea: Flycast 2.7 compilado aca DIBUJA el POC bestia=0 igual que el AppImage. Criterio 1: PASA.
+
+4. LO MEDIDO CON EL WATCHPOINT, EN ORDEN
+----------------------------------------
+  4.a  FALSO CERO (se declara porque costo una corrida). Primera corrida con rango [0x8c400000,0x8c430000):
+       archivo con 0 escrituras. NO era que no hubiera escrituras: el archivo se truncaba en cada
+       SetMemoryHandlers. Arreglado (init idempotente, append) y con la prueba de vida `WP-DIAG writet<4>
+       primer store visto dir=8c0000b0 dynarec=0` el mismo rango dio escrituras.
+
+  4.b  LA ZONA ALTA DE LA PILA ES UN ARENA CALIENTE (por eso hay que acotar, no barrer).
+       Rango [0x8c42c000,0x8c42e800) (10 KB), corrida de 150 s: 96.240.529 escrituras vigiladas.
+       Rango de 2 KB [0x8c42e000,0x8c42e900): topes de 200.000 lineas agotados en 0x8c42e020/024/028
+       (pc=8c04fbba, pares puntero/largo) y en 0x8c42e0a4. Conclusion practica: barrer la pila no sirve,
+       hay que ir con la geometria del marco (seccion 5).
+
+  4.c  bestia=1 MUERE IGUAL que con el AppImage, con la MISMA firma (esto es lo que habilita todo lo demas).
+       Con el instrumento armado (interprete), 01:30 de reloj, el log del POC trae:
+         HITO250: PVR antes-de-pvr_init_defaults
+         Unhandled exception: PC 8c42e020, code 1, evt 0180
+         01:30:744 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked
+       El volcado del emulador en la excepcion:
+         WP-EXC n=1 evt=180 epc=8c42e020 pc=8c42e022 sp=8c42e00c pr=8c42e020 fp=8c42e020 ssr=40000000 bl=0
+       (el "exception when blocked" es la SEGUNDA excepcion, ya dentro del handler de KOS: bl=1 en n=3)
+
+  4.d  EL SALTO QUE SE VA A LA PILA (una sola linea, no hay mas en toda la corrida):
+       WP-SALTO rts ip=8c0d22ba destino=8c42e020 sp=8c42e008 pr=8c42e020 r14=8c42e020
+       Desarmando 0x8c0d22b8..bc en prog.elf: el `rts` esta en `_pvr_init+0x1e2`, precedido por
+         lds.l @r15+,pr   (0x8c0d22ae)  -> carga PR desde 0x8c42dff0
+         mov.l @r15+,r13/r12/r11/r10/r9 (0x8c0d22b0..b8)
+       O sea: el PR que se lleva puesto el `rts` se LEE de 0x8c42dff0 y ahi habia 0x8c42e020 (la pila).
+
+  4.e  GEOMETRIA DEL MARCO (por que la victima es ese slot, con numeros del binario de hoy):
+       `_pvr_init` = 0x8c0d20d8. Prologo: 6 pushes (r8..r13) + `sts.l pr,@-r15` + `add #-4,r15` = 0x20 bytes.
+       Con sp de entrada E = 0x8c42e00c (el mismo que aparece en el volcado de la excepcion):
+         cuerpo                sp = 0x8c42dfec
+         PR guardado           sp = 0x8c42dff0    <- el slot que se pisa
+         retorno al llamador   0x8c42e00c = 8c088544 (intacto en el volcado)
+       Epilogo 0x8c0d22ac..ba: `add #4,r15`, `lds.l @r15+,pr` (de 0x8c42dff0), 5 pops, `rts`.
+
+  4.f  LOS ESCRITORES DEL SLOT (esto es lo que la tarjeta pedia: la escritura, con su PC)
+       Busqueda con filtro por VALOR (dir = toda la RAM, valor en [0x8c42d000,0x8c42e800)) y anillo de
+       200.000 entradas; total de stores con ese perfil en la corrida: 1.450.784. En el anillo quedan los
+       ultimos 200.000 (los del final, que son los que importan). Escrituras a 0x8c42dff0 con valor
+       0x8c42e020: DOS, y las dos son un push de r11 en el prologo de un callee:
+         WP: pc=8c0e4660 dir=8c42dff0 val=8c42e020 r15=8c42dff4   -> `mov.l r11,@-r15` en _pvr_allocate_buffers+0x8
+         WP: pc=8c0d85a8 dir=8c42dff0 val=8c42e020 r15=8c42dff4   -> `mov.l r11,@-r15` en _sq_set32+0x8
+       (0x8c0d2158 es donde `_pvr_init` carga la direccion de `_pvr_allocate_buffers`; el `jsr @r1` esta en
+       0x8c0d215a.)
+       Lectura: el push es LEGITIMO para el callee (es su propio `@-r15`), pero su sp=0x8c42dff4 lo hace
+       caer justo 4 bytes arriba del slot donde `_pvr_init` tenia guardado su PR. El valor 0x8c42e020 es un
+       puntero a un arreglo de pila del llamador (r11), no basura: por eso el sintoma es deterministico y
+       depende del layout, como ya habia medido DC-002.53.
+       Escrituras del MISMO valor a otros destinos (contexto, del anillo): 0x8c42df8c x51 (pc=8c0f8a30),
+       0x8c42df18 x49 (pc=8c0fbbd8), 0x8c42df34 x49 (pc=8c0fbb3a), 0x8c42df50 x33 (pc=8c0fbbd4),
+       0x8c42dc58 x8 (pc=8c08e19e), y al MONTON 0x8c0c3ef4/0x8c0c3ddc/0x8c0c3fe0 (pc=8c0f3892, 8c0f5802,
+       8c0f895e). O sea el puntero a ese arreglo viaja a varios lados; el que mata es el de 0x8c42dff0.
+
+5. CRITERIO 3 -- EL CONTROL CON bestia=0 (HECHO Y COMPARADO)
+----------------------------------------------------------
+  Mismo instrumento, mismos filtros (dir=toda la RAM, valor en [0x8c42e020,0x8c42e024)), 150 s:
+    bestia=0 (1.851.848 B): DIBUJA -> 5 lineas "HITO238: POS cuadro" (ms 88536, 102154, ...),
+                            WP-SALTO = 0, WP-EXC = 0, 758 stores del valor 0x8c42e020.
+    bestia=1 (1.852.904 B): MUERE   -> 0 POS cuadro, WP-SALTO = 1 (la de 4.d), WP-EXC = 3.
+  Lo que el control dice, con honestidad: en el build que anda TAMBIEN se escribe 0x8c42e020 (131 veces, en
+  destinos como 0x8c42dff0/0x8c42dfdc/0x8c42dfe8/0x8c42e040). Por eso el valor NO es la firma del bicho:
+  lo que cambia con el layout es SI ese slot es el PR guardado de `_pvr_init`. En el build que anda la misma
+  escritura cae en memoria que no es un marco vivo, y el programa sigue. Es exactamente lo que DC-002.53
+  habia concluido ("el layout decide quien se lleva el golpe"), ahora medido escritura por escritura.
+  El control que SI discrimina el sintoma es el del salto: 1 salto a datos en el bicho vs 0 en la base.
+
+6. LO QUE QUEDA ABIERTO (para la tarjeta siguiente, no se arregla aca)
+---------------------------------------------------------------------
+  a) QUIEN pasa sp=0x8c42dff4 (o 0x8c42e000 al entrar) a `_pvr_allocate_buffers` / `_sq_set32` cuando
+     `_pvr_init` ya tenia su marco montado con cuerpo en 0x8c42dfec. Los numeros para cazarlo estan todos
+     arriba; el instrumento ya permite hacerlo con el mismo parche (basta un `WP-CADENA` que registre
+     `jsr`/`bsr` con el sp del llamador, o leer `pr` del ultimo push).
+  b) El defecto es de SOLAPE de marcos (callee escribe en el marco del llamador), no de un puntero loco: el
+     siguiente paso natural es revisar la generacion de codigo / el ABI de la cadena que llama al video
+     (KOS `pvr_init` desde el runtime de Go), y el orden "video primero" que ya se probo en DC-002.53.
+  c) El binario instrumentado NO reemplaza al AppImage: se invoca por ruta explicita
+     (FLYCAST=~/Proyectos/flycast-2.7/build/flycast). Los scripts `run-flycast*.sh` quedan como estaban.
+
+7. ARTEFACTOS
+-------------
+  console/dc/evidencia/dc-002.60-flycast.patch        el parche del emulador (7 archivos, 428 lineas)
+  console/dc/evidencia/dc-002.60-watchpoint.txt       este archivo
+  /tmp/dcbuild/wp60-bestia/{disc.gdi,1ST_READ.BIN}    bicho (1.852.904 B)
+  /tmp/dcbuild/wp60-base/{disc.gdi,1ST_READ.BIN}      control (1.851.848 B)
+  /tmp/dcbuild/wp60-bestia/corrida-wp12/              log del emulador con el salto a la pila
+  /tmp/dcbuild/wp60-bestia/wp12.log                   anillo volcado (200.000 stores + WP-SALTO + WP-EXC)
+  /tmp/dcbuild/wp60-base/corrida-wp-ctrl/             log del control (dibuja)
+  /tmp/dcbuild/wp60-base/wp-ctrl.log                  758 stores del valor 0x8c42e020 en el control
+  /tmp/dcbuild/wp60-base/corrida-fuente/              criterio 1: emulador de fuente dibujando
+  (los /tmp son tmpfs: si se limpian, se rehacen con los comandos de la seccion 1)

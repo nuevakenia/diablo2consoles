@@ -1,0 +1,428 @@
+diff --git a/core/hw/mem/addrspace.cpp b/core/hw/mem/addrspace.cpp
+index c08cb8e..a7bc99b 100644
+--- a/core/hw/mem/addrspace.cpp
++++ b/core/hw/mem/addrspace.cpp
+@@ -4,6 +4,8 @@
+ #include "hw/pvr/elan.h"
+ #include "hw/sh4/dyna/blockmanager.h"
+ #include "hw/sh4/sh4_mem.h"
++#include "hw/sh4/dc_watchpoint.h"	// DC-002.60: watchpoint de escritura (instrumento local)
++#include "cfg/option.h"
+ #include "oslib/oslib.h"
+ #include "oslib/virtmem.h"
+ #include <cassert>
+@@ -150,6 +152,20 @@ void DYNACALL writet(u32 addr, T data)
+ {
+ 	constexpr u32 sz = sizeof(T);
+ 
++	// DC-002.60: watchpoint de escritura (no hace nada si DC_WP_BASE/TOP no estan armados)
++	if (dcwp::hit(addr, (u64)data))
++		dcwp::record(addr, (u64)data, sz);
++	{
++		// prueba de vida del gancho: con rango armado se informa el primer store de cada tamano
++		static bool _visto = false;
++		if (!_visto && dcwp::gArmed)
++		{
++			_visto = true;
++			printf("WP-DIAG writet<%u> primer store visto dir=%08x dynarec=%d\n", sz, addr, (int)(bool)config::DynarecEnabled);
++			fflush(stdout);
++		}
++	}
++
+ 	u32 page = addr>>24;
+ 	uintptr_t iirf = (uintptr_t)memInfo_ptr[page];
+ 	void *ptr = (void *)(iirf & ~HANDLER_MAX);
+diff --git a/core/hw/sh4/CMakeLists.txt b/core/hw/sh4/CMakeLists.txt
+index e112588..a261954 100644
+--- a/core/hw/sh4/CMakeLists.txt
++++ b/core/hw/sh4/CMakeLists.txt
+@@ -12,6 +12,8 @@ target_sources(${PROJECT_NAME} PRIVATE
+         dyna/ssa.cpp
+         dyna/ssa.h
+         dyna/ssa_regalloc.h
++        dc_watchpoint.cpp
++        dc_watchpoint.h
+         fsca-table.h
+         interpr/sh4_fpu.cpp
+         interpr/sh4_interpreter.cpp
+diff --git a/core/hw/sh4/dc_watchpoint.cpp b/core/hw/sh4/dc_watchpoint.cpp
+new file mode 100644
+index 0000000..36ecce8
+--- /dev/null
++++ b/core/hw/sh4/dc_watchpoint.cpp
+@@ -0,0 +1,247 @@
++/*
++	DC-002.60 -- watchpoint de escritura del SH-4 (instrumento LOCAL, fuera del upstream).
++	Ver core/hw/sh4/dc_watchpoint.h para el contrato y las variables de entorno.
++*/
++#include "dc_watchpoint.h"
++#include "sh4_if.h"
++#include "hw/mem/addrspace.h"
++#include "cfg/option.h"
++
++#include <cstdarg>
++#include <cstdio>
++#include <cstdlib>
++
++namespace dcwp
++{
++
++u32 gBase = 0;
++u32 gTop = 0;
++u32 gValBase = 0;
++u32 gValTop = 0;
++bool gArmed = false;
++
++struct Entry
++{
++	u32 ip;
++	u32 addr;
++	u32 val;
++	u32 r15;
++	u8 size;
++};
++
++static FILE *sFile = nullptr;
++static unsigned long long sHits = 0;
++static unsigned long long sMaxHits = 200000;
++static unsigned long long sEcho = 200;
++static bool sInitDone = false;
++
++// Anillo en memoria: guarda los ULTIMOS n stores y los vuelca al levantar la excepcion.
++// Sin esto el tope de lineas se comia justo las escrituras que importan (las de los
++// ultimos milisegundos antes del salto a la basura).
++static Entry *sRing = nullptr;
++static unsigned sRingSize = 0;
++static unsigned sRingPos = 0;
++static unsigned long long sRingCount = 0;
++
++static u32 envU32(const char *name, u32 def)
++{
++	const char *v = getenv(name);
++	if (v == nullptr || *v == '\0')
++		return def;
++	return (u32)strtoul(v, nullptr, 0);	// acepta 0x...
++}
++
++static void emit(const char *fmt, ...)
++{
++	va_list ap;
++	va_start(ap, fmt);
++	vprintf(fmt, ap);
++	va_end(ap);
++	fflush(stdout);
++	if (sFile != nullptr)
++	{
++		va_start(ap, fmt);
++		vfprintf(sFile, fmt, ap);
++		va_end(ap);
++	}
++}
++
++void init()
++{
++	// OJO: SetMemoryHandlers() se llama varias veces (arranque, resets, mmu). Se arma UNA vez:
++	// reabrir el archivo en cada llamada lo truncaba y se perdian las escrituras ya registradas.
++	if (!sInitDone)
++	{
++		sInitDone = true;
++		gBase = envU32("DC_WP_BASE", 0);
++		gTop = envU32("DC_WP_TOP", 0);
++		sMaxHits = envU32("DC_WP_MAX", 200000);
++		sEcho = envU32("DC_WP_ECHO", 200);
++		sRingSize = envU32("DC_WP_RING", 0);	// 0 = sin anillo (se escribe todo al archivo)
++		gValBase = envU32("DC_WP_VAL_BASE", 0);
++		gValTop = envU32("DC_WP_VAL_TOP", 0);
++		const char *path = getenv("DC_WP_FILE");
++		if (path == nullptr || *path == '\0')
++			path = "/tmp/dc-wp.log";
++
++		gArmed = gTop > gBase;
++
++		if (!gArmed)
++		{
++			printf("WP-INIT vigilado=no (DC_WP_BASE=%08x DC_WP_TOP=%08x)\n", gBase, gTop);
++			fflush(stdout);
++		}
++		else
++		{
++			sFile = fopen(path, "a");
++			if (sFile != nullptr)
++			{
++				setvbuf(sFile, nullptr, _IOLBF, 64 * 1024);
++				fprintf(sFile, "WP-INIT base=%08x top=%08x bytes=%u\n", gBase, gTop, gTop - gBase);
++			}
++			printf("WP-INIT vigilado=si base=%08x top=%08x bytes=%u valor=%08x..%08x anillo=%u archivo=%s%s\n",
++					gBase, gTop, gTop - gBase, gValBase, gValTop, sRingSize, path, sFile == nullptr ? " (NO SE PUDO ABRIR)" : "");
++			fflush(stdout);
++			if (sRingSize != 0)
++			{
++				if (sRingSize > 1000000)
++					sRingSize = 1000000;
++				sRing = new Entry[sRingSize];
++			}
++		}
++	}
++
++	if (!gArmed)
++		return;
++
++	// Los stores a RAM del recompilador (x64: handler "Fast" con ram_base + addr&0x1FFFFFFF)
++	// NO pasan por addrspace::writet, asi que con dynarec el watchpoint es ciego.
++	// Con rango armado se corre el interprete para que TODAS las escrituras del CPU se vean.
++	if (config::DynarecEnabled)
++	{
++		config::DynarecEnabled.set(false);
++		printf("WP-INIT dynarec estaba ON -> APAGADO para esta corrida (stores de RAM del recompilador no se verian)\n");
++		fflush(stdout);
++	}
++}
++
++static void dumpRing(const char *motivo)
++{
++	if (sRing == nullptr || sRingCount == 0)
++	{
++		emit("WP-RING-VACIO motivo=%s hits=%llu\n", motivo, sHits);
++		return;
++	}
++	const unsigned n = sRingCount < sRingSize ? (unsigned)sRingCount : sRingSize;
++	emit("WP-RING motivo=%s n=%u total_hits=%llu base=%08x top=%08x\n", motivo, n, sHits, gBase, gTop);
++	for (unsigned i = 0; i < n; i++)	// del mas viejo al mas nuevo
++	{
++		const unsigned idx = (sRingPos + sRingSize - n + i) % sRingSize;
++		const Entry& e = sRing[idx];
++		emit("WP: pc=%08x dir=%08x val=%08x sz=%u r15=%08x k=%u\n", e.ip, e.addr, e.val, e.size, e.r15, i + 1);
++	}
++	sRingPos = 0;
++	sRingCount = 0;
++}
++
++void exception(u32 epc, u32 evt)
++{
++	if (!sInitDone || !gArmed)
++		return;
++	static int nDumps = 0;
++	if (nDumps >= 8)
++		return;
++	nDumps++;
++
++	const u32 sp = Sh4cntx.r[15];
++	const u32 pr = Sh4cntx.pr;
++	const u32 fp = Sh4cntx.r[14];
++
++	emit("WP-EXC n=%d evt=%03x epc=%08x pc=%08x sp=%08x pr=%08x fp=%08x ssr=%08x spc=%08x bl=%d hits=%llu\n",
++			nDumps, evt, epc, Sh4cntx.pc, sp, pr, fp, Sh4cntx.ssr, Sh4cntx.spc, (int)Sh4cntx.sr.BL, sHits);
++
++	// marco en memoria: 16 palabras hacia abajo y 16 hacia arriba de sp
++	for (int i = -16; i < 16; i += 4)
++	{
++		const u32 a = sp + i * 4;
++		emit("WP-EXC-PILA %08x: %08x %08x %08x %08x\n", a,
++				addrspace::read32(a), addrspace::read32(a + 4),
++				addrspace::read32(a + 8), addrspace::read32(a + 12));
++	}
++
++	if (sRing != nullptr)
++		dumpRing("excepcion");
++}
++
++static unsigned sBranchDumps = 0;
++
++void branch(u32 ip, u32 target, u32 sp, u32 pr, const char *tipo)
++{
++	// avisa cuando el salto se va fuera del segmento de codigo del ELF:
++	// .text+.init+.fini+.rodata+.eh_frame = 0x8c010000..0x8c1cfb8c (readelf -l), mas KOS debajo.
++	// Arriba de 0x8c1c0000 solo hay .data/.bss/monton/pila: ahi no hay codigo.
++	if (!sInitDone || !gArmed || target < 0x8c1c0000 || target >= 0x8d000000)
++		return;
++	if (sBranchDumps >= 200)
++		return;
++	sBranchDumps++;
++	emit("WP-SALTO %s ip=%08x destino=%08x sp=%08x pr=%08x r14=%08x\n",
++			tipo, ip, target, sp, pr, Sh4cntx.r[14]);
++}
++
++void record(u32 addr, u64 val, unsigned size)
++{
++	if (!sInitDone)
++		init();
++
++	const u32 ip = Sh4cntx.pc - 2;	// el interprete deja pc en la instruccion siguiente
++	const u32 r15 = Sh4cntx.r[15];
++	const u32 pr = Sh4cntx.pr;
++
++	sHits++;
++
++	if (sRing != nullptr)
++	{
++		Entry& e = sRing[sRingPos];
++		e.ip = ip;
++		e.addr = addr;
++		e.val = (u32)val;
++		e.r15 = r15;
++		e.size = (u8)size;
++		sRingPos = (sRingPos + 1) % sRingSize;
++		sRingCount++;
++		return;
++	}
++
++	if (sHits > sMaxHits)
++	{
++		if (sHits == sMaxHits + 1)
++		{
++			emit("WP-TOPE: %llu escrituras vigiladas, se deja de escribir (subir DC_WP_MAX o usar DC_WP_RING)\n", sHits - 1);
++			if (sFile != nullptr)
++				fflush(sFile);
++		}
++		return;
++	}
++
++	const bool echo = sHits <= sEcho;
++	if (sFile != nullptr || echo)
++	{
++		char line[192];
++		if (size == 8)
++			snprintf(line, sizeof(line), "WP: pc=%08x dir=%08x val=%08x%08x sz=%u r15=%08x pr=%08x n=%llu",
++					ip, addr, (u32)(val >> 32), (u32)val, size, r15, pr, sHits);
++		else
++			snprintf(line, sizeof(line), "WP: pc=%08x dir=%08x val=%08x sz=%u r15=%08x pr=%08x n=%llu",
++					ip, addr, (u32)val, size, r15, pr, sHits);
++		if (sFile != nullptr)
++			fprintf(sFile, "%s\n", line);
++		if (echo)
++		{
++			printf("%s\n", line);
++			fflush(stdout);
++		}
++	}
++}
++
++}
+diff --git a/core/hw/sh4/dc_watchpoint.h b/core/hw/sh4/dc_watchpoint.h
+new file mode 100644
+index 0000000..777c045
+--- /dev/null
++++ b/core/hw/sh4/dc_watchpoint.h
+@@ -0,0 +1,61 @@
++/*
++	DC-002.60 -- watchpoint de escritura del SH-4 (instrumento LOCAL, fuera del upstream).
++
++	No es parte de Flycast: es un parche de medicion del proyecto diablo2consoles.
++	Se arma leyendo el entorno:
++
++	  DC_WP_BASE=0x8c41e800  DC_WP_TOP=0x8c42e800     rango de DIRECCIONES vigilado
++	  DC_WP_VAL_BASE / DC_WP_VAL_TOP                  (opcional) filtro por VALOR escrito
++	  DC_WP_FILE=/tmp/dc-wp.log                       (opcional; default /tmp/dc-wp.log)
++	  DC_WP_MAX=200000                                (opcional; tope de lineas al archivo)
++	  DC_WP_ECHO=200                                  (opcional; cuantas lineas tambien a stdout)
++	  DC_WP_RING=60000                                (opcional) anillo en memoria: no escribe
++	                                                  nada hasta la excepcion y ahi vuelca los
++	                                                  ultimos n stores (asi el tope no se come
++	                                                  justo las escrituras que importan)
++
++	El gancho vive en el camino de store del INTERPRETE (core/hw/mem/addrspace.cpp,
++	writet<T>), que en modo no-MMU es el unico camino de escritura del CPU. Por eso
++	cuando hay rango armado se apaga el recompilador (sus stores a RAM van por un
++	camino directo y no se verian): se informa en WP-INIT.
++*/
++#pragma once
++
++#include "types.h"
++
++namespace dcwp
++{
++
++// rango vigilado, en direcciones SH-4 (tal como las ve el programa: 0x8C...)
++extern u32 gBase;
++extern u32 gTop;
++extern u32 gValBase;
++extern u32 gValTop;
++extern bool gArmed;
++
++// chequeo barato: cuando no hay rango armado son dos comparaciones
++static inline bool hit(u32 addr, u64 val)
++{
++	if (!gArmed || addr < gBase || addr >= gTop)
++		return false;
++	if (gValTop > gValBase)
++	{
++		const u32 v = (u32)val;
++		return v >= gValBase && v < gValTop;
++	}
++	return true;
++}
++
++// Lee el entorno y (si hay rango) fuerza el interprete. Se llama desde SetMemoryHandlers().
++void init();
++
++// Registra una escritura vigilada: direccion, valor, tamano + PC/r15/pr del escritor.
++void record(u32 addr, u64 val, unsigned size);
++
++// Volcado del contexto del SH-4 cuando se levanta una excepcion (para ubicar el marco por corrida).
++void exception(u32 epc, u32 evt);
++
++// Aviso de salto a direccion que no es codigo (rts/jmp): pc de la instruccion, destino, sp y pr.
++void branch(u32 ip, u32 target, u32 sp, u32 pr, const char *tipo);
++
++}
+diff --git a/core/hw/sh4/interpr/sh4_opcodes.cpp b/core/hw/sh4/interpr/sh4_opcodes.cpp
+index 26df085..4e5e6e7 100644
+--- a/core/hw/sh4/interpr/sh4_opcodes.cpp
++++ b/core/hw/sh4/interpr/sh4_opcodes.cpp
+@@ -10,6 +10,7 @@
+ #include "hw/sh4/sh4_interrupts.h"
+ #include "debug/gdb_server.h"
+ #include "hw/sh4/dyna/decoder.h"
++#include "hw/sh4/dc_watchpoint.h"	// DC-002.60: watchpoint/branch (instrumento local)
+ #include "emulator.h"
+ 
+ #ifdef STRICT_MODE
+@@ -841,6 +842,7 @@ sh4op(i0000_0000_0010_1011)
+ sh4op(i0000_0000_0000_1011)
+ {
+ 	u32 newpc = ctx->pr;
++	dcwp::branch(ctx->pc - 2, newpc, ctx->r[15], ctx->pr, "rts");	// DC-002.60
+ 	executeDelaySlot(); //WARN : pr can change here
+ 	ctx->pc = newpc;
+ 	debugger::subroutineReturn();
+diff --git a/core/hw/sh4/sh4_interrupts.cpp b/core/hw/sh4/sh4_interrupts.cpp
+index 49a3be4..28bce43 100644
+--- a/core/hw/sh4/sh4_interrupts.cpp
++++ b/core/hw/sh4/sh4_interrupts.cpp
+@@ -15,6 +15,7 @@
+ #include "sh4_mmr.h"
+ #include "oslib/oslib.h"
+ #include "debug/gdb_server.h"
++#include "dc_watchpoint.h"	// DC-002.60: watchpoint/volcado de excepcion (instrumento local)
+ #include "serialize.h"
+ #include <cassert>
+ 
+@@ -198,6 +199,7 @@ static void Do_Interrupt(Sh4ExceptionCode intEvn)
+ 
+ void Do_Exception(u32 epc, Sh4ExceptionCode expEvn)
+ {
++	dcwp::exception(epc, (u32)expEvn);	// DC-002.60: contexto del SH-4 al levantar la excepcion
+ 	assert((expEvn >= Sh4Ex_TlbMissRead && expEvn <= Sh4Ex_SlotIllegalInstr)
+ 			|| expEvn == Sh4Ex_FpuDisabled || expEvn == Sh4Ex_SlotFpuDisabled || expEvn == Sh4Ex_UserBreak);
+ 	if (Sh4cntx.sr.BL != 0)
+diff --git a/core/hw/sh4/sh4_mem.cpp b/core/hw/sh4/sh4_mem.cpp
+index 196cdf5..fa08a06 100644
+--- a/core/hw/sh4/sh4_mem.cpp
++++ b/core/hw/sh4/sh4_mem.cpp
+@@ -11,6 +11,7 @@
+ #include "hw/pvr/pvr_mem.h"
+ #include "hw/mem/addrspace.h"
+ #include "hw/sh4/modules/mmu.h"
++#include "dc_watchpoint.h"	// DC-002.60: watchpoint de escritura (instrumento local)
+ #include "cfg/option.h"
+ 
+ #ifdef STRICT_MODE
+@@ -292,6 +293,8 @@ u8* GetMemPtr(u32 addr, u32 size)
+ 
+ void SetMemoryHandlers()
+ {
++	// DC-002.60: se lee el entorno del watchpoint y, si hay rango armado, se fuerza el interprete.
++	dcwp::init();
+ #ifdef STRICT_MODE
+ 	static bool interpreterRunning;
+ 
