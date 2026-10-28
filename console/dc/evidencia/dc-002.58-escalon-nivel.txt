@@ -1,0 +1,61 @@
+DC-002.58 -- LA ESCALERA repro-253 LLEGA AL NIVEL: mpq + DS1 compuestos en un eslabon
+Medido el 2026-10-27 en este host (CachyOS, Flycast 2.7, sin KVM).
+
+COMANDO:  bash scripts/console/repro-253/correr.sh nivel
+LOG:      /tmp/repro253-nivel/corrida/flycast.log
+CAPTURA:  /tmp/repro253-nivel/corrida/nivel-258.png  (pantalla entera, 3584x1080)
+RECORTE:  /tmp/repro253-nivel/corrida/nivel-258-recorte.png  (area de video del emulador)
+
+== BINARIO DEL ESLABON
+   prog.elf                              7939760 B  sha256=ca43127ff249e2ac1e10ffa40773d835
+   1ST_READ.BIN                          1320200 B  sha256=470b669507ff2483f0027d2689e4a444
+   disc.iso                            268703744 B  sha256=0f0119acd8ebf346e33a927e51052712
+   nivel.go del eslabon == nivel.go del POC: SI
+   scripts/console/repro-253/go-nivel/main.go     sha256=adf085e7c27c8cf00c2b795ea3b43655
+   scripts/console/repro-253/go-nivel/csrc/shim.c sha256=64678e5411c744f9e00f312b18737ade
+   scripts/console/repro-253/correr.sh            sha256=92ca741fd38a929f35bbf2d6d252158a
+   scripts/console/repro-253/pixeles-258.py       sha256=3c4996654714ae3848b0a04c73c8f095
+
+== LAS CINCO MARCAS DEL POC (prefijo HITO258), UNA POR UNA
+   HITO258: MPQ-ABRIR OK /cd/JUEGO/D2DATA.MPQ ms= 10144
+   HITO258: DS1-LEER OK bytes= 57652 crc32= 712973328 ms= 52
+   HITO258: DS1 version= 18 act= 1 w= 57 h= 41 objetos= 41 files= 8
+   HITO258: MEMORIA etapa= nivel libre= 799608
+   HITO258: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+   HITO258: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456
+   HITO258: LIENZO pixelesPiso= 179484 pixelesPared= 146567
+   HITO258: PALETA acto bytes= 768 colores=256 crc32= 3508331570 ms= 27
+   HITO258: MEMORIA etapa= mpq-cerrado libre= 799936
+   HITO258: PANTALLA pixelesNoVacios= 177657 de 307200
+   HITO258: MAPA-IMAGEN bytes= 1228800 vram_libre= 0
+   HITO258: MEMORIA etapa= mapa-en-imagen libre= 799928
+
+== EL VIDEO (lo que el eslabon hace AL FINAL, despues del nivel)
+   HITO250: PVR antes-de-pvr_init_defaults
+   HITO250: PVR despues-de-pvr_init_defaults
+   HITO250: PVR textura-de-pantalla OK
+   HITO250: PVR relleno OK
+   HITO250: PVR contexto OK
+   HITO258: PVR-INIT OK ms= 48
+   HITO258: PVR-SUBIR r= 0 ms= 87
+   HITO258: CUADRO n= 1 de 60 dibujando=1 ms= 43250
+   HITO258: CUADRO n= 60 de 60 dibujando=1 ms= 44207
+   latidos (un cuadro pintado cada 60): 4, el ultimo dice: HITO258: LATIDO cuadros= 241 dibujando=1 ms= 47234
+
+== EL VEREDICTO DE 'PINTA' (sobre la captura, medida del area de video del emulador)
+   PIXELES: area de video 320x240 en (1400,120) de una captura de 3584x1080
+   PIXELES: no negros=41816 de 76800 (54.4%), umbral=20% y piso 5000
+   VEREDICTO: PINTA (el area de video del emulador tiene 41816 pixeles pintados)
+
+== COMPARACION CONTRA EL POC DEL DISCO (los mismos numeros, byte a byte de texto)
+   DS1:        eslabon act=1 w=57 h=41 objetos=41 files=8      | POC act=1 w=57 h=41 objetos=41
+   COMPUESTO:  eslabon pisos=1982/1982 paredes=330/330         | POC pisos=1982/1982 paredes=330/330
+   LIENZO:     eslabon pixelesNoVacios=193538 de 262144        | POC pixelesNoVacios=193538 de 262144
+
+== LECTURA
+   El trabajo previo al video NO es lo que rompe el arranque del POC: con un binario de 1.320.200 B de
+   1ST_READ.BIN (contra los 1.854.760 B del POC con BESTIA=1, medidos en DC-002.57) el mismo camino (abrir el
+   d2data.mpq por ISO9660, leer el DS1, cargar los 8 DT1 de a uno devolviendo los grandes al monton de C,
+   componer el nivel y pintarlo con el PVR) llega al cuadro 60 y sigue pintando. Lo que queda en pie es el
+   TAMANO/FORMA del binario del POC y lo que el POC hace ADEMAS del nivel (personaje, bicho, control), que es
+   exactamente lo que la 10.i sospechaba.

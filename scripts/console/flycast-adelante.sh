@@ -59,6 +59,46 @@ sacar() {
     qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$NOMBRE" >/dev/null 2>&1
 }
 
+# geo (DC-002.58): donde quedo la ventana del emulador, AHORA. La geometria la sabe el gestor de ventanas y no
+# hay que adivinarla mirando la captura: la imprime un script de KWin por la consola del journal, igual que el
+# gancho de run-flycast-249.sh (medido: el `print()` de un script de KWin cae en `journalctl --user`).
+#
+# Sale:  FLYCAST-GEO|cli=x,y,w,h|geo=x,y,w,h     (cli = el area de video; geo = la ventana con su barra)
+#        nada, si no encuentra la ventana.
+geo() {
+    local js="${TMPDIR:-/tmp}/kwin-flycast-geo.js"
+    local nombre="flycast-geo-d2"
+    cat > "$js" <<'JSFIN'
+var pila = workspace.stackingOrder;
+for (var i = 0; i < pila.length; i++) {
+    var w = pila[i], cls = "";
+    try { cls = (w.resourceClass || "").toString().toLowerCase(); } catch (e) { continue; }
+    if (cls.indexOf("flycast") < 0) { continue; }
+    var g = w.frameGeometry, cli = "?";
+    try {
+        var c = w.clientGeometry;
+        if (c && c.width > 0) { cli = c.x + "," + c.y + "," + c.width + "," + c.height; }
+    } catch (e) { cli = "?"; }
+    print("FLYCAST-GEO|cli=" + cli + "|geo=" + g.x + "," + g.y + "," + g.width + "," + g.height);
+}
+JSFIN
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$nombre" >/dev/null 2>&1
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$js" "$nombre" >/dev/null 2>&1
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1
+    sleep 1
+    journalctl --user --since "-8 s" 2>/dev/null | grep -a 'FLYCAST-GEO|' | tr -d '\r' | tail -1 |
+        sed 's/.*FLYCAST-GEO|/FLYCAST-GEO|/'
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$nombre" >/dev/null 2>&1
+}
+
+if [ "$ACCION" = "geo" ]; then
+    if ! command -v qdbus6 >/dev/null 2>&1; then
+        exit 0
+    fi
+    geo
+    exit 0
+fi
+
 if ! command -v qdbus6 >/dev/null 2>&1; then
     exit 0
 fi
