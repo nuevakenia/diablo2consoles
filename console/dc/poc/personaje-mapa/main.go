@@ -927,7 +927,13 @@ func main() {
 
 	memoria("mapa-en-imagen")
 
-	println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre=", int64(d2cVramLibre()))
+	// DC-002.56: ACA HABIA `int64(d2cVramLibre())`. Se saco porque corre con el PVR APAGADO: la marca del
+	// encendido es "HITO250: PVR antes-de-pvr_init_defaults", que esta mas abajo (en d2c_pvr_pantalla_init).
+	// Medido en KOS (kernel/arch/dreamcast/hardware/pvr/pvr_mem.c:176): pvr_mem_available() devuelve 0 si el
+	// estatico `pvr_mem_base` es NULL, y eso es todo lo que hace -- no camina pvr_state ni el allocator (esa
+	// version de la API, con pvr_state.ram_free_list, ya no existe en este KOS). O sea que el numero de aca
+	// SIEMPRE era 0 y no ensuciaba nada, pero medir con un 0 fijo no informa: dice "sin-init".
+	println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre= sin-init")
 
 	// OJO (DC-002.50, medido): aca se probo arrancar el video ANTES de componer los ciclos, para que el PVR
 	// encontrara el monton libre. NO sirve: la consola se queda en "pvr: enabling vertical scaling" (con 800.216 B
@@ -1068,7 +1074,9 @@ func main() {
 		personaje.ReplacePixels(crgba)
 	}
 
-	println("HITO238: PERSONAJE-IMAGEN bytes=", per.Ancho*per.Alto*4, "vram_libre=", int64(d2cVramLibre()))
+	// DC-002.56: aca tambien habia `int64(d2cVramLibre())`, con el PVR todavia apagado. Ver la nota larga en
+	// MAPA-IMAGEN: la lectura devolvia 0 (pvr_mem_base NULL) y no tocaba el allocator; ahora lo dice.
+	println("HITO238: PERSONAJE-IMAGEN bytes=", per.Ancho*per.Alto*4, "vram_libre= sin-init")
 
 	// ============================== 3b. LA BESTIA Y EL GOLPE (DC-002.50) ==============================
 	//
@@ -1157,7 +1165,10 @@ func main() {
 	// el d2char.mpq SIGUE ABIERTO: el ciclo del golpe (A1) se compone en 3d, con el video ya andando.
 
 	// ============================== 4. el personaje y el control ==============================
-	println("HITO250: MPQ-CERRADOS vram_libre=", int64(d2cVramLibre()))
+	// DC-002.56: tercera y ultima lectura pre-video que se saca (las tres son las de esta tarjeta). Con el PVR
+	// apagado el numero no informa nada; el valor de verdad se imprime UNA vez, ya con el video andando
+	// ("HITO250: VRAM-POSTINIT"), que es el unico momento en que el allocator del PVR existe.
+	println("HITO250: MPQ-CERRADOS vram_libre= sin-init")
 
 	est := NuevoEstado(float64(centroX), float64(centroY), false)
 
@@ -1191,6 +1202,12 @@ func main() {
 	if err := ebiten.IniciarPantalla(ancho, alto); err != nil {
 		println("HITO238: no pude arrancar el video:", err.Error())
 	}
+
+	// DC-002.56: LA UNICA lectura de VRAM del POC, y corre con el PVR ENCENDIDO (IniciarPantalla ya llamo a
+	// pvr_init_defaults y ya subio la textura de la pantalla). Es el contraste que pide la tarjeta: antes del
+	// encendido el numero era 0 porque el allocator todavia no existe, no porque no hubiera VRAM. Con esto
+	// `d2cVramLibre` sigue vivo y medido, pero nunca antes de la marca del video.
+	println("HITO250: VRAM-POSTINIT vram_libre=", int64(d2cVramLibre()))
 
 	// ============================== 3d. LOS CICLOS DEL BICHO, CON EL VIDEO YA ANDANDO (DC-002.50) ==========
 	//

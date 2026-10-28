@@ -42,7 +42,17 @@ unsigned int d2c_ms(void) {
     return (unsigned int)(timer_ms_gettime64() & 0xffffffffu);
 }
 
-/* d2c_vram_libre: la VRAM que queda, igual que la mide el POC del motor. */
+/* d2c_vram_libre: la VRAM que queda, igual que la mide el POC del motor.
+ *
+ * DC-002.56 (medido): SOLO TIENE SENTIDO CON EL PVR ENCENDIDO. `pvr_mem_available()` (KOS
+ * kernel/arch/dreamcast/hardware/pvr/pvr_mem.c:176) arranca con `if(!pvr_mem_base) return 0;` y
+ * `pvr_mem_base` es un estatico en .bss que pone en cero el arranque y solo llena `pvr_init`/
+ * `pvr_mem_reset`. Con el PVR apagado devuelve 0 sin tocar el allocator ni pvr_state (en este KOS
+ * el allocator de VRAM es un dlmalloc propio y `pvr_state.ram_free_list` ya no existe). O sea:
+ * leerlo antes del encendido no ensucia nada, pero el 0 no informa nada tampoco. Las marcas del
+ * camino previo al video dicen "vram_libre= sin-init" y la unica lectura viva es
+ * "HITO250: VRAM-POSTINIT", despues de `pvr_init_defaults`.
+ */
 unsigned int d2c_vram_libre(void) {
     return (unsigned int)pvr_mem_available();
 }
