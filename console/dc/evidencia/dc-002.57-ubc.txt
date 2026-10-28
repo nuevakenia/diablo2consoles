@@ -1,0 +1,235 @@
+DC-002.57 -- EL UBC DEL SH-4: LA CAZA DE LA ESCRITURA QUE PISA EL MARCO DE PILA
+=================================================================================
+
+Tarjeta:  t_51b1ecc8   (feature DC-002.53, t_e95967c5)
+Rama:     DC-002
+Fecha:    2026-10-27
+Instrumento:  console/dc/evidencia/dc-002.57-instrumento.patch  (NO se queda en el arbol)
+Sonda suelta: console/dc/sonda-ubc-257/main.c
+Control:      scripts/console/checar-ubc-253.sh
+
+VEREDICTO EN UNA LINEA
+----------------------
+NO CORTA. El SH-4 que emula este Flycast (2.7, el AppImage de ~/dreamcast/dl) GUARDA los registros del
+UBC pero NO EVALUA NINGUNA CONDICION DE CORTE: con el canal de operandos armado sobre una variable
+conocida -- escritura, cualquier tamano -- y disparandolo desde el propio programa, hay 0 cortes. Con el
+rango de la pila armado (64 KB + 4 KB, calculado del SP del build) el binario que muere no dejo ni una
+escritura. O sea: por este camino NO se puede ver el PC del escritor en este emulador; la caza tiene que
+seguir por otro lado (seccion 5).
+
+Y un hallazgo que hay que anotar aparte: EL INSTRUMENTO CURA EL SINTOMA. La sonda agrega 1.856 B a
+1ST_READ.BIN y con eso el binario con el bicho DIBUJA (179 cuadros, el bicho animando), cuando el mismo
+arbol sin sonda muere en `pvr_init_defaults`. Es la fragilidad de layout de DC-002.53, medida otra vez y
+desde otro angulo. Un cambio de 40 bytes en la sonda hace que la MISMA sonda vuelva a morir.
+
+
+1. LA API DEL UBC EN ESTE KOS (leida, no supuesta)
+--------------------------------------------------
+Archivos leidos: $KOS_BASE/kernel/arch/dreamcast/include/dc/ubc.h  (KOS 2.2.1, autor Falco Girgis, 2024)
+                 $KOS_BASE/kernel/arch/dreamcast/hardware/ubc.c
+
+  * Dos canales (A y B). Condiciones: direccion con mascara opcional de 10/12/16/20 bits
+    (`ubc_address_mask_t`), ciclo de bus (instruccion u operando), R/W, tamano (byte..quadword) y -- solo
+    en el canal B -- comparacion por VALOR de 32 bits con mascara de 32 bits (BDRB/BDMRB).
+  * `ubc_add_breakpoint(bp, callback, user_data)` devuelve `true` si reservo canal. El callback corre en
+    contexto de EXCEPCION, devuelve `true` para sacar el breakpoint y `false` para dejarlo armado.
+  * KOS engancha los dos eventos de user break en `ubc_init()` (kernel/arch/dreamcast/kernel/init.c:165):
+    `irq_set_handler(EXC_USER_BREAK_PRE, ...)` y `EXC_USER_BREAK_POST` (0x1e0 los dos, uno REEXEC y el
+    otro POST). Con `break_before = false` (default) el corte es DESPUES de la instruccion, asi que
+    devolver `false` no re-ejecuta el store: no hay bucle.
+  * Un corte de OPERANDOS no entrega la direccion accedida en ningun registro: solo SPC/SSR y el contexto.
+    La sonda decodifica la instruccion del store en SPC (y en SPC-2, por si el corte es POST) para
+    derivar la direccion de los registros del contexto; cubre mov.l/mov.w/mov.b con @Rn, @-Rn y @(disp,Rn).
+
+
+2. LA AUTOPRUEBA FUERA DEL POC: EL CANAL NO CORTA NADA (medido)
+--------------------------------------------------------------
+Programa aparte, C puro, 3 condiciones armadas y disparadas desde el mismo programa. Se corre como ELF
+directo (Flycast lo arranca sin disco: ~20 s, no hacen falta ISO ni MPU).
+
+  bash scripts/console/build-c.sh console/dc/sonda-ubc-257 /tmp/dcbuild/ubc57-auto
+  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/ubc57-auto/prog.elf 20 /tmp/shot57-auto
+  tr -d '\r' < /tmp/shot57-auto/flycast.log | grep -a "^UBC-AUTOPRUEBA"
+
+Log crudo:
+
+  UBC-AUTOPRUEBA: arranca (ELF propio, sin disco)
+  UBC-AUTOPRUEBA: REGISTROS BARA esc=8c123400 lee=8c123400 BDRB esc=deadbeef lee=deadbeef BRCR esc=00008000 lee=00000000
+  UBC-AUTOPRUEBA: DATO armado=1 dir=8c05d040 (canal de operandos, solo escritura)
+  UBC-AUTOPRUEBA: DATO despues cortes=0 valor=12345678
+  UBC-AUTOPRUEBA: INSTR armado=1 dir=8c010228
+  UBC-AUTOPRUEBA: INSTR despues cortes=0 vigilado=12345679
+  UBC-AUTOPRUEBA: RANGO armado=1 base=8c05cc00 tope=8c05cfff arreglo=8c05cf40
+  UBC-AUTOPRUEBA: RANGO despues cortes=0 valor=a5a5a5a5
+  UBC-AUTOPRUEBA: FIN dato=0 instr=0 rango=0 fuera=0
+  UBC-AUTOPRUEBA: VEREDICTO NO-CORTA
+
+Lectura, linea por linea:
+
+  * `REGISTROS BARA ... lee=8c123400` y `BDRB ... lee=deadbeef`: el emulador SI tiene el registro de
+    direccion y el de dato; lo escrito se lee igual. (BRCR no retiene 0x8000 porque CMFA es un bit de
+    ESTADO, write-1-clear: no es evidencia de nada y no se usa.)
+  * `DATO armado=1` + `cortes=0`: la condicion era una escritura de 32 bits a una direccion EXACTA y
+    conocida, con el canal reservado (KOS dijo que si), y el store ocurrio (`valor=12345678` se escribio)
+    sin que el CPU levantase el user break.
+  * `INSTR armado=1` + `cortes=0`: ni siquiera el canal de INSTRUCCION sobre una funcion corta.
+  * `RANGO armado=1` + `cortes=0`: la condicion de la sonda del POC (mascara de 10 bits sobre el KB del
+    arreglo), escribiendo ADENTRO del KB.
+
+Conclusion de esta seccion: es el EMULADOR, no la sonda. Cualquier "no corto" medido en el POC tiene que
+leerse con este numero al lado, y por eso la sonda del POC trae su PROPIA autoprueba adentro.
+
+
+3. LA SONDA EN EL POC: QUE SE ARMA Y CON QUE RANGO
+--------------------------------------------------
+`console/dc/evidencia/dc-002.57-instrumento.patch` agrega `csrc/sonda-ubc-257.c` y dos llamadas en
+`main.go`: una justo ANTES de `ebiten.IniciarPantalla` (o sea antes de `pvr_init_defaults`) y un resumen
+despues. El rango NO esta tecleado: sale del SP real del build en el momento del armado.
+
+  canal A: operandos | solo escritura | cualquier tamano | mascara de 16 bits  -> los 64 KB que contienen el SP
+  canal B: operandos | solo escritura | cualquier tamano | mascara de 12 bits  -> el bloque de 4 KB del SP
+
+Los dos canales, porque el punto de muerte SE MUEVE con el layout: con la pila entera de la goroutine
+vigilada, un "no corto" no se puede explicar por haber mirado el KB equivocado.
+
+El manejador imprime una linea por PC nuevo (dedupe: los empujones de cada prologo son cientos y taparian
+el que importa), con `pc` (SPC), `dir` (decodificada del store), `valor` (los 4 bytes que quedaron en esa
+direccion), el rango, el contexto (pc/pr/sp) y el opcode; y se saca solo a los 400 cortes para no frenar
+la corrida. Este texto lo pide la tarjeta: `UBC: escritura pc=0x... dir=0x...`.
+
+
+4. LAS CORRIDAS (7 en total, con los numeros)
+---------------------------------------------
+Todas BESTIA=1, `CAPTURE=none`, 110-130 s (el POC tarda ~60 s en llegar al video). Builds en /tmp.
+
+4.a CONTROL SIN SONDA -- el sintoma esta ahi:
+    build: /tmp/dcbuild/ubc57base   1ST_READ.BIN = 1.852.904 B
+    log:
+      HITO250: PVR antes-de-pvr_init_defaults
+      Unhandled exception: PC 8c42e020, code 1, evt 0180
+      Flycast has stopped: Fatal: SH4 exception when blocked
+    cuadros = 0
+
+4.b INSTRUMENTADO, PRIMERA FORMA del parche (dos canales de 4 KB) -- DIBUJA, 2 corridas:
+    build: /tmp/dcbuild/ubc57a   1ST_READ.BIN = 1.854.760 B
+      UBC: SONDA sp=8c42ea40 (el rango se calcula de aca, no esta escrito a mano)
+      UBC: AUTOPRUEBA armado=1 dir=8c1d4ec0 cortes=0 veredicto=NO-CORTA
+      UBC: RANGO sp=8c42ea40 lo=8c42e000..8c42efff armado_lo=1 hi=8c42f000..8c42ffff armado_hi=1 ...
+      UBC: RESUMEN cortes=0 pcs_distintos=0 autoprueba=0
+    cuadros = 6,  animaciones del bicho = 179 (corrida 1) y 183 (corrida 2), vida=3
+    => la sonda se armo, no corto nada, y el binario NO murio.
+
+4.c INSTRUMENTADO, FORMA FINAL del parche (64 KB + 4 KB) -- MUERE, 4 corridas (2 propias + 2 del control):
+    build: /tmp/dcbuild/ubc57b   1ST_READ.BIN = 1.854.760 B  (mismo tamano que 4.b, otro contenido)
+      HITO257: UBC antes-de-pvr_init_defaults
+      UBC: SONDA sp=8c42ea40 (el rango se calcula de aca, no esta escrito a mano)
+      UBC: AUTOPRUEBA armado=1 dir=8c1d4ec0 cortes=0 veredicto=NO-CORTA
+      UBC: RANGO sp=8c42ea40 pila64k=8c420000..8c42ffff armado_64k=1 bloque4k=8c42e000..8c42efff armado_4k=1 condicion=escritura/tamano-cualquiera
+      Unhandled exception: PC 8c2086a8, code 1, evt 0180
+    escrituras en el rango = 0 ;  cuadros = 0
+    => el binario MUERE con la sonda armada y los 66 KB de pila vigilados: ni una escritura vista.
+
+4.d INSTRUMENTADO + 1 KB de relleno de layout -- MUERE (el relleno es del experimento, no del parche):
+    build: /tmp/dcbuild/ubc57q1024  1ST_READ.BIN = 1.855.848 B
+      UBC: RELLENO dir=8c1d03e8
+      UBC: SONDA sp=8c42ee80 ...
+      UBC: AUTOPRUEBA armado=1 dir=8c1d5300 cortes=0 veredicto=NO-CORTA
+      UBC: RANGO sp=8c42ee80 lo=8c42e000..8c42efff armado_lo=1 hi=8c42f000..8c42ffff armado_hi=1 ...
+      Unhandled exception: PC 8c208ae8, code 1, evt 0180
+    escrituras en el rango = 0
+
+4.e EL CONTROL AUTOMATICO (el que queda en el repo), 2 corridas completas del script:
+    bash scripts/console/checar-ubc-253.sh /tmp/dcbuild/chequeo-ubc257
+    (salida pegada, resumida)
+
+    == 0/2 la sonda SUELTA del UBC (canal de dato, canal de instruccion, canal de rango)
+       UBC-AUTOPRUEBA: DATO armado=1 dir=8c05d040 (canal de operandos, solo escritura)
+       UBC-AUTOPRUEBA: DATO despues cortes=0 valor=12345678
+       UBC-AUTOPRUEBA: INSTR armado=1 dir=8c010228
+       UBC-AUTOPRUEBA: INSTR despues cortes=0 vigilado=12345679
+       UBC-AUTOPRUEBA: RANGO armado=1 base=8c05cc00 tope=8c05cfff arreglo=8c05cf40
+       UBC-AUTOPRUEBA: RANGO despues cortes=0 valor=a5a5a5a5
+       UBC-AUTOPRUEBA: VEREDICTO NO-CORTA
+
+    == 1/2 el POC INSTRUMENTADO (bestia=1) sobre una copia del arbol
+       1ST_READ.BIN: 1854760 B
+       UBC: RANGO sp=8c42ea40 pila64k=8c420000..8c42ffff armado_64k=1 bloque4k=8c42e000..8c42efff armado_4k=1 condicion=escritura/tamano-cualquiera
+       UBC: AUTOPRUEBA armado=1 dir=8c1d4ec0 cortes=0 veredicto=NO-CORTA
+       escrituras-en-el-rango=0 excepciones=1 cuadros=0 animaciones-del-bicho=0
+
+    VEREDICTO NO-CORTA: ...
+    (codigo de salida del script: 1 = NO-CORTA, medido; 0 seria CORTA)
+
+Numeros que cierran la cuenta: 0 cortes en 3 condiciones de la autoprueba suelta, 0 cortes en la
+autoprueba del POC, 0 escrituras sobre 66 KB de pila vigilados en 4 corridas que murieron, y 7 corridas
+del POC en total. Accesos vigilados que el UBC reporto: NINGUNO, ni uno.
+
+
+5. QUE SE APRENDE, Y QUE QUEDA
+------------------------------
+1. El UBC es un camino CIEGO en este emulador. El intento de DC-002.53 (comparacion por valor) no fallo
+   por la mascara ni por el valor: en Flycast no hay evaluacion de condiciones, punto. Un "no corto" con
+   el UBC no dice nada del programa -- dice del emulador. Cualquier tarjeta futura que pretenda cazar
+   escrituras con el UBC sobre Flycast tiene que empezar por la autoprueba de la seccion 2.
+2. Consecuencia dura para la estrategia: la escritura que pisa el marco NO se puede ver con el UBC en
+   emulador. Quedan dos caminos, los dos fuera de esta tarjeta:
+     a) hardware real con un UBC de verdad (la tarjeta dice que Papu no prueba hardware salvo pedido); o
+     b) Flycast compilado desde fuente con el stub de GDB/el UBC implementado (el AppImage no abre el
+        3269: ya medido en DC-002.53), y ahi si: canal B con mascara sobre el KB de la pila.
+3. El sintoma es layout y el instrumento lo mueve: +1.856 B de sonda y el binario dibuja 179 cuadros;
+   la MISMA sonda con 40 bytes menos de ELF (1ST_READ del mismo tamano, otro contenido) vuelve a morir
+   (4.c). Esto refuerza la conclusion de DC-002.53 10.i
+   ("es la forma del binario") y le da una consecuencia practica: cualquier instrumento que se agregue
+   para mirar este defecto CAMBIA el objeto que mira. Por eso el instrumento se guarda como parche.
+4. El rango vigilado quedo calculado en runtime y pegado al build: sp=8c42ea40 -> 64 KB 8c420000..8c42ffff
+   y bloque de 4 KB 8c42e000..8c42efff. Coincide con la pila de la goroutine principal de ESE binario
+   (DC-002.53 seccion 4 midio el marco que muere en 0x8c42e7dc..0x8c42e800 con el tope en 0x8c42e800).
+
+
+6. COMO SE REPRODUCE (comandos exactos)
+---------------------------------------
+  cd ~/Proyectos/diablo2consoles
+
+  # A) la autoprueba suelta del canal (20 s, ELF directo, sin disco)
+  bash scripts/console/build-c.sh console/dc/sonda-ubc-257 /tmp/dcbuild/ubc57-auto
+  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/ubc57-auto/prog.elf 20 /tmp/shot57-auto
+  tr -d '\r' < /tmp/shot57-auto/flycast.log | grep -a "^UBC-AUTOPRUEBA"
+
+  # B) el control que clasifica (autoprueba + POC instrumentado): ~3 min
+  bash scripts/console/checar-ubc-253.sh /tmp/dcbuild/chequeo-ubc257 ; echo "rc=$?"
+  #   rc=0 CORTA | rc=1 NO-CORTA | rc=3 sin datos
+
+  # C) a mano, el POC instrumentado con el parche (arbol intacto: se aplica a una copia)
+  bash scripts/console/checar-ubc-253.sh     # hace exactamente esto, no hay otro camino mas corto
+
+  # D) el control SIN sonda, para ver el sintoma (2 min + build)
+  SALTAR_STDLIB=1 SALTAR_MOTOR=1 BESTIA=1 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/ubc57base
+  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/ubc57base/disc.gdi 110 /tmp/dcbuild/ubc57base/corrida
+  tr -d '\r' < /tmp/dcbuild/ubc57base/corrida/flycast.log | grep -a "PVR antes\|Unhandled"
+
+
+7. ARCHIVOS
+-----------
+  console/dc/evidencia/dc-002.57-instrumento.patch   el instrumento (NO se aplica en el arbol)
+  console/dc/sonda-ubc-257/main.c                    la autoprueba del canal (programa aparte, C puro)
+  scripts/console/checar-ubc-253.sh                  el control: CORTA / NO-CORTA / SIN-DATOS
+  console/dc/evidencia/dc-002.57-ubc.txt             este archivo
+  (referencia) console/dc/evidencia/dc-002.53-arranque-bestia.txt   el sintoma y su geometria
+
+  El parche se aplica con `patch -p5` dentro de la carpeta del POC (o `-p1` desde la raiz del repo);
+  toca 2 archivos: `csrc/sonda-ubc-257.c` (nuevo) y `main.go` (dos llamadas).
+
+
+8. PITFALLS QUE COSTARON TIEMPO (para el que siga)
+--------------------------------------------------
+* `run-flycast.sh` acepta un ELF directo: no hace falta ISO ni disco para las pruebas de canal (20 s en
+  vez de 2 min). Es el ciclo rapido y no estaba usado para esto.
+* Un relleno de layout (`unsigned char relleno[N]`) SIN REFERENCIAS lo tira `--gc-sections`: los tres
+  builds del primer experimento dieron el MISMO sha256 de 1ST_READ.BIN y parecia que el relleno no hacia
+  nada. Hay que darle una funcion y llamarla.
+* En sesion sin usuario, `rm -rf /tmp/dcbuild/<dir>` se bloquea como "delete in root path": usar un
+  directorio nuevo (el nombre del experimento en el path) en vez de borrar el viejo.
+* El POC tarda ~60 s en llegar al video (MPQ + nivel + personaje + ciclos): con menos de 110 s de corrida
+  la sonda no llega a armarse y el log no dice nada.
+* La consola serie del POC sale por `Debug:SerialConsoleEnabled=true` (lo pone run-flycast.sh) y las
+  lineas llegan con \r: `tr -d '\r'` antes de grep, siempre.

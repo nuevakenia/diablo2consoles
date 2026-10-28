@@ -1,0 +1,300 @@
+diff --git a/console/dc/poc/personaje-mapa/csrc/sonda-ubc-257.c b/console/dc/poc/personaje-mapa/csrc/sonda-ubc-257.c
+new file mode 100644
+index 00000000..0c01d7bc
+--- /dev/null
++++ b/console/dc/poc/personaje-mapa/csrc/sonda-ubc-257.c
+@@ -0,0 +1,255 @@
++/* DC-002.57 -- SONDA DEL UBC DEL SH-4 SOBRE EL RANGO DEL MARCO DE PILA DEL ARRANQUE DEL VIDEO.
++ *
++ * QUE BUSCA: la ESCRITURA que pisa el marco de `_pvr_init`/`_pvr_init_defaults` en el binario con el
++ * bicho (bestia=1). La geometria medida en DC-002.53 es que el slot de la direccion de retorno del
++ * callee de `_pvr_init` queda con `params + 8` (un puntero a la MISMA pila) y el `rts` salta ahi:
++ * `Unhandled exception: PC 8c42e020, code 1, evt 0180` (instruccion ilegal ejecutando datos).
++ *
++ * POR QUE UNA SONDA DE RANGO Y NO DE VALOR: el intento anterior (DC-002.53) uso el canal B con
++ * comparacion por VALOR (BDR/BDMR, mascara 0xFF) y no corto nunca. Aca se quiere cualquier ESCRITURA
++ * dentro del rango, sin mirar el valor, en los DOS canales del UBC:
++ *
++ *      canal X: operandos | solo escritura | cualquier tamano | mascara de 12 bits (4 KB)
++ *
++ * y el rango NO se teclea: sale del SP real de este binario en el momento de armar la sonda (lo que
++ * cambia con cada build, que es justo el problema de DC-002.53).
++ *
++ * LA AUTOPRUEBA (lo primero que hace): arma la misma condicion sobre una variable de .bss conocida,
++ * la escribe y cuenta los cortes. Si la autoprueba NO corta, el canal no existe en este emulador y
++ * cualquier ausencia de cortes sobre la pila no significa nada. Medido con `sonda-ubc-257` (programa
++ * aparte, sin Go): el Flycast 2.7 guarda los registros del UBC (BARA/BDRB retienen lo escrito) pero
++ * NO evalua ninguna condicion de corte -- 0 cortes en dato, en instruccion y en rango.
++ *
++ * El instrumento NO se queda en el arbol: perturba el layout, que es el arbitro del sintoma. Se guarda
++ * como parche en console/dc/evidencia/dc-002.57-instrumento.patch.
++ */
++#include <kos.h>
++#include <dc/ubc.h>
++#include <arch/irq.h>
++#include <stdint.h>
++#include <stdbool.h>
++#include <string.h>
++
++#define MAX_PCS     64   /* cuantos PC distinctos se informan */
++#define MAX_CORTES  400  /* tope de cortes atendidos antes de sacar la sonda */
++
++static ubc_breakpoint_t bp_auto, bp_lo, bp_hi;
++
++/* la variable de la autoprueba: .bss, direccion conocida en runtime */
++static volatile unsigned int auto_vigilado;
++
++/* estado del manejador (volatile: corre en contexto de excepcion) */
++static volatile int en_manejador;
++static volatile int auto_cortes;
++static volatile unsigned long cortes_total;
++static volatile int n_pcs;
++static volatile unsigned long pcs_vistos[MAX_PCS];
++static volatile int n_orden;
++static volatile unsigned long pcs_orden[8];
++
++static unsigned long leer_spc(void) {
++    unsigned long v;
++
++    __asm__ volatile("stc spc, %0" : "=r"(v));
++
++    return v;
++}
++
++/* dir_del_store: la direccion que escribe la instruccion que disparo el corte.
++ *
++ * El SH-4 NO entrega la direccion vigilada en ningun registro para un corte de operandos (solo
++ * SPC/SSR y el contexto), asi que se decodifica la instruccion. Se cubren los stores del compilador
++ * de verdad (los que empujan la pila y los que copian con desplazamiento); si no es ninguna de esas,
++ * devuelve 0xFFFFFFFF y se informa el opcode para resolverlo a mano con objdump.
++ *
++ * OJO: con el corte configurado DESPUES de la instruccion (break_before = false, que es lo que hace
++ * KOS por defecto), SPC puede apuntar a la instruccion siguiente; por eso se prueba SPC y SPC-2.
++ */
++static unsigned long dir_del_store(unsigned long spc, const irq_context_t *ctx) {
++    unsigned long cand[2];
++    int i;
++
++    cand[0] = spc;
++    cand[1] = spc - 2;
++
++    for(i = 0; i < 2; i++) {
++        unsigned short op = *(volatile unsigned short *)cand[i];
++        int n = (op >> 8) & 0xf;
++
++        /* mov.l Rm,@Rn (0x2nm2) y mov.l Rm,@-Rn (0x2nm6): la pila */
++        if((op & 0xf00f) == 0x2002)
++            return ctx->r[n];
++
++        if((op & 0xf00f) == 0x2006)
++            return ctx->r[n] - 4;
++
++        /* mov.w/mov.b Rm,@Rn y @-Rn */
++        if((op & 0xf00f) == 0x2001 || (op & 0xf00f) == 0x2000)
++            return ctx->r[n];
++
++        if((op & 0xf00f) == 0x2005)
++            return ctx->r[n] - 2;
++
++        if((op & 0xf00f) == 0x2004)
++            return ctx->r[n] - 1;
++
++        /* mov.l Rm,@(disp,Rn) (0x1nmd): 4*disp con signo de 4 bits */
++        if((op & 0xf000) == 0x1000) {
++            int d = op & 0xf;
++            if(d & 8)
++                d -= 16;
++
++            return ctx->r[n] + (unsigned long)(4 * d);
++        }
++    }
++
++    return 0xfffffffful;
++}
++
++/* volcado de la instruccion y el valor vigilado, sin inventar: si el dir no es de RAM, no se lee. */
++static void informar(unsigned long spc, unsigned long dir, const ubc_breakpoint_t *bp,
++                     const irq_context_t *ctx, int orden) {
++    unsigned long valor = 0;
++    int dir_valida = (dir >= 0x8c000000ul && dir < 0x8d000000ul);
++
++    if(dir_valida)
++        valor = *(volatile unsigned long *)(dir & ~3ul);
++
++    printf("UBC: escritura pc=%08lx srr0=%08lx dir=%08lx valor=%08lx rango=%08lx..%08lx"
++           " ctxpc=%08lx pr=%08lx sp=%08lx iw=%04x orden=%d\n",
++           spc, spc, dir, valor,
++           (unsigned long)(uintptr_t)bp->address, (unsigned long)(uintptr_t)bp->address + 0xffful,
++           (unsigned long)ctx->pc, (unsigned long)ctx->pr, (unsigned long)ctx->r[15],
++           (unsigned)*(volatile unsigned short *)spc, orden);
++}
++
++static bool cb_auto(const ubc_breakpoint_t *bp, const irq_context_t *ctx, void *ud) {
++    (void)bp;
++    (void)ctx;
++    (void)ud;
++
++    if(en_manejador)
++        return false;
++
++    en_manejador = 1;
++    auto_cortes++;
++    en_manejador = 0;
++
++    return true; /* true = sacar el breakpoint: la autoprueba es de UN tiro, sin bucle */
++}
++
++static bool cb_rango(const ubc_breakpoint_t *bp, const irq_context_t *ctx, void *ud) {
++    unsigned long spc, dir;
++    int i, nuevo, orden;
++
++    (void)ud;
++
++    if(en_manejador)
++        return false;
++
++    en_manejador = 1;
++
++    spc = leer_spc();
++    dir = dir_del_store(spc, ctx);
++
++    cortes_total++;
++
++    orden = (n_orden < 8) ? ++n_orden : 0;
++
++    if(orden)
++        pcs_orden[orden - 1] = spc;
++
++    nuevo = 1;
++
++    for(i = 0; i < n_pcs; i++) {
++        if(pcs_vistos[i] == spc) {
++            nuevo = 0;
++
++            break;
++        }
++    }
++
++    /* solo se informa el PRIMER corte de cada PC: los empujones de la pila de cada prologo son
++     * cientos y taparian el que importa. */
++    if(nuevo && n_pcs < MAX_PCS) {
++        pcs_vistos[n_pcs++] = spc;
++        informar(spc, dir, bp, ctx, orden);
++    }
++
++    en_manejador = 0;
++
++    if(cortes_total > MAX_CORTES)
++        return true; /* sacar la sonda: no puede frenar la corrida */
++
++    return false;
++}
++
++/* d2c_sonda_ubc_257: se llama UNA vez, justo antes de `ebiten.IniciarPantalla` (o sea antes de
++ * `pvr_init_defaults`), con el SP de ESE momento: el rango es el de este binario, no uno tecleado. */
++void d2c_sonda_ubc_257(void) {
++    unsigned long sp, base_lo, base_hi;
++    bool ok_auto, ok_lo, ok_hi;
++
++    __asm__ volatile("mov r15, %0" : "=r"(sp));
++
++    printf("UBC: SONDA sp=%08lx (el rango se calcula de aca, no esta escrito a mano)\n", sp);
++
++    /* ---- 1. LA AUTOPRUEBA: el canal corta al menos una vez en ESTE binario y ESTE emulador? ---- */
++    memset(&bp_auto, 0, sizeof(bp_auto));
++    bp_auto.address = (void *)&auto_vigilado;
++    bp_auto.access = ubc_access_operand;
++    bp_auto.operand.rw = ubc_rw_write;
++    bp_auto.operand.size = ubc_size_any;
++
++    ok_auto = ubc_add_breakpoint(&bp_auto, cb_auto, NULL);
++    auto_vigilado = 0x12345678u;
++
++    printf("UBC: AUTOPRUEBA armado=%d dir=%08lx cortes=%d veredicto=%s\n",
++           (int)ok_auto, (unsigned long)(uintptr_t)&auto_vigilado, auto_cortes,
++           auto_cortes ? "CORTA" : "NO-CORTA");
++
++    ubc_remove_breakpoint(&bp_auto);
++
++    /* ---- 2. EL RANGO: dos condiciones anidadas sobre la pila de ESTE binario ----
++     * El marco que muere (DC-002.53 seccion 4) cae pegado al tope de la pila de la goroutine principal.
++     * Como el punto de muerte se MUEVE con el layout, no alcanza con el KB del SP: se vigilan dos
++     * rangos anidados, los dos calculados del SP de este armado:
++     *   canal A: mascara de 16 bits -> los 64 KB que contienen el SP (la pila entera de la goroutine)
++     *   canal B: mascara de 12 bits -> los 4 KB del SP (el bloque donde caen las tramas del video)
++     * Asi el "no corto" no se puede explicar por haber vigilado el KB equivocado. */
++    base_lo = sp & ~0xfffful;   /* 64 KB: la ventana de la pila */
++    base_hi = sp & ~0xffful;    /* 4 KB: el bloque del SP */
++
++    memset(&bp_lo, 0, sizeof(bp_lo));
++    bp_lo.address = (void *)base_lo;
++    bp_lo.address_mask = ubc_address_mask_16;
++    bp_lo.access = ubc_access_operand;
++    bp_lo.operand.rw = ubc_rw_write;
++    bp_lo.operand.size = ubc_size_any;
++
++    memset(&bp_hi, 0, sizeof(bp_hi));
++    bp_hi.address = (void *)base_hi;
++    bp_hi.address_mask = ubc_address_mask_12;
++    bp_hi.access = ubc_access_operand;
++    bp_hi.operand.rw = ubc_rw_write;
++    bp_hi.operand.size = ubc_size_any;
++
++    ok_lo = ubc_add_breakpoint(&bp_lo, cb_rango, NULL);
++    ok_hi = ubc_add_breakpoint(&bp_hi, cb_rango, NULL);
++
++    printf("UBC: RANGO sp=%08lx pila64k=%08lx..%08lx armado_64k=%d bloque4k=%08lx..%08lx armado_4k=%d"
++           " condicion=escritura/tamano-cualquiera\n",
++           sp, base_lo, base_lo + 0xfffful, (int)ok_lo,
++           base_hi, base_hi + 0xffful, (int)ok_hi);
++}
++
++/* d2c_resumen_ubc_257: el marcador de cierre, por si el video llega a arrancar. */
++void d2c_resumen_ubc_257(void) {
++    int i;
++
++    printf("UBC: RESUMEN cortes=%lu pcs_distintos=%d autoprueba=%d\n",
++           cortes_total, n_pcs, auto_cortes);
++
++    for(i = 0; i < 8 && i < n_orden; i++)
++        printf("UBC: ORDEN %d pc=%08lx\n", i + 1, pcs_orden[i]);
++}
+diff --git a/console/dc/poc/personaje-mapa/main.go b/console/dc/poc/personaje-mapa/main.go
+index 9bbbedb9..fd12ba1a 100644
+--- a/console/dc/poc/personaje-mapa/main.go
++++ b/console/dc/poc/personaje-mapa/main.go
+@@ -62,6 +62,14 @@ func d2cHeapLibre() uint
+ //extern d2c_free_external
+ func d2cFreeExternal(p uintptr)
+ 
++// DC-002.57: la sonda del UBC del SH-4 (csrc/sonda-ubc-257.c). Se arma justo antes del video, con el
++// rango del marco de pila calculado en runtime de ESTE binario.
++//extern d2c_sonda_ubc_257
++func d2cSondaUbc257()
++
++//extern d2c_resumen_ubc_257
++func d2cResumenUbc257()
++
+ const (
+ 	// El disco: los DOS MPQ del juego que hacen falta, por ISO9660. El mapa y las paletas estan en
+ 	// d2data.mpq; los graficos de los personajes, en d2char.mpq (medido: en d2data.mpq la carpeta chars
+@@ -1202,10 +1210,19 @@ func main() {
+ 
+ 	// DC-002.50: el bicho entra al juego DESPUES del video (ver 3b-bis): aca todavia no existe.
+ 
++	// ============================== LA SONDA DEL UBC (DC-002.57) ==============================
++	// Justo antes de `pvr_init_defaults`, que es donde muere el binario con el bicho: se vigila el
++	// rango del marco de pila calculado con el SP de ESTE binario (ver csrc/sonda-ubc-257.c). Si el
++	// UBC no corta, el log lo dice en la autoprueba y no hay que creerle al silencio del rango.
++	println("HITO257: UBC antes-de-pvr_init_defaults")
++	d2cSondaUbc257()
++
+ 	if err := ebiten.IniciarPantalla(ancho, alto); err != nil {
+ 		println("HITO238: no pude arrancar el video:", err.Error())
+ 	}
+ 
++	d2cResumenUbc257()
++
+ 	// ============================== 3d. LOS CICLOS DEL BICHO, CON EL VIDEO YA ANDANDO (DC-002.50) ==========
+ 	//
+ 	// POR QUE ACA Y NO EN 3b (medido en la consola): componer los tres modos del bicho son ~420 KB del monton de
