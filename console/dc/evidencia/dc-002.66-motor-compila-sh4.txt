@@ -1,0 +1,88 @@
+DC-002.66 (Fase A) - EL MOTOR COMPILA PARA SH-4: 139 de 139 paquetes
+=====================================================================
+
+Fecha: 2026-10-29. Rama DC-002. Origen: informe-continuidad.md, Fase A.
+
+LA PREGUNTA
+-----------
+Antes de invertir semanas en el backend de render (Fase B) hay que saber una cosa barata y decisiva:
+la logica del juego del motor de OpenDiablo2 compila para el SH-4 de la Dreamcast, o no?
+
+No es una pregunta retorica. El motor son 66.961 lineas de juego con reflection, interfaces, goroutines y
+mapas; gccgo 15.1 para sh-elf no es el compilador de Go de escritorio. Si esto no compilaba, el pivote del
+informe no era viable y habia que replantear todo ANTES de tocar el render.
+
+METODO
+------
+`scripts/console/compilar-motor-gox.sh`: compila cada paquete del motor a `.gox` (el formato de importacion
+de gccgo) con punto fijo -- se intenta cada paquete, los que fallan solo por faltarles el `.gox` de otro
+paquete interno se reintentan en la vuelta siguiente, y se para cuando una vuelta no agrega nada.
+Los `_test.go` no entran.
+
+    bash scripts/console/compilar-motor-gox.sh /tmp/motor-gox
+    PAQUETES_OVERRIDE="./d2networking/... ./d2game/..." bash scripts/console/compilar-motor-gox.sh
+
+RESULTADO
+---------
+    paquetes del motor: 139
+    vuelta 1: +139 compilados (total 139), quedan 0
+    VERDES (compilan a .gox para sh-elf): 139 de 139
+    .gox escritos en /tmp/motor-gox (66M)
+
+Entran, entre otros:
+
+    d2game/d2gamescreen      6.787.916 B    los 144 archivos del juego (actos, quests, NPC, UI, combate)
+    d2game/d2player          6.611.428 B
+    d2networking/d2client      930.736 B
+    d2core/d2ui                            paneles, botones, texto, skill tree
+    d2core/d2map/d2maprenderer
+    d2core/d2render/ebiten                 (ver el aviso de abajo)
+    d2common/d2act3, d2quest, d2monster, d2level, d2hero, d2skills ...
+
+LOS TRES BLOQUEOS QUE HABIA, Y COMO SE CAYERON
+----------------------------------------------
+1. `d2common/d2loader` no compilaba: "redefinition of 'Marca'". Tiene DOS variantes de las marcas de
+   carga, `marca_carga_godc.go` (`//go:build dreamcast`) y `marca_carga_host.go` (`//go:build !dreamcast`),
+   y se estaban compilando las dos. Esa redefinicion cortaba `d2asset`, y sin `d2asset` se cae la mitad
+   del arbol (`d2mapentity`, `d2hero`, `d2records`, `d2gamescreen`...). El compilador hay que decirle que
+   filtre: ahora el script excluye `_host.go`, `_windows.go`, `_darwin.go`, `_js.go` y cualquier archivo
+   con `//go:build !dreamcast`.
+
+   Dato que vale la pena: esas dos variantes las escribimos NOSOTROS en DC-002.43 (commit 4cd7b2df, el
+   instrumento de las marcas de carga). O sea el arbol ya estaba preparado para compilar en Dreamcast y
+   nadie habia vuelto a intentarlo en serio desde entonces.
+
+2. `./d2data/...` no existe como directorio. Un patron invalido hace que `go list` no devuelva NADA
+   (falla entero, no parcial), y el script decia "0 paquetes". Se saco del default.
+
+3. `d2gamescreen` importa `d2networking/d2client` y `d2netpacket`, que no estaban en los patrones. Se
+   agrego `./d2networking/...`.
+
+AVISO IMPORTANTE: POR QUE COMPILA `d2render/ebiten`
+---------------------------------------------------
+En `~/dreamcast/gox/github.com/hajimehoshi/ebiten/` hay un **stub de ebiten ya compilado**: `v2.gox`,
+`v2/ebitenutil.gox`, `v2/audio.gox`, `v2/inpututil.gox`, `v2/audio/wav.gox`. Gracias a ese stub el paquete
+`d2render/ebiten` compila. **No hay fuentes `.go` de ese stub en el disco**: hay que averiguar de donde
+salio y que cubre antes de confiar en el.
+
+Consecuencia: este resultado NO dice que el render funcione. Dice que **la firma del paquete cuadra**, nada
+mas. El backend PVR real (Fase B) sigue completamente pendiente.
+
+LO QUE ESTE RESULTADO NO DICE (y no hay que leerlo de mas)
+----------------------------------------------------------
+- Compilar no es enlazar: no hay todavia un binario de Dreamcast que una estos 139 `.gox` con KOS y libgodc.
+- Compilar no es correr: en 16 MB de RAM, un motor que en el host pide cientos de MB puede morir cargando
+  el primer asset (ya paso en DC-002.43: `fatal error: out of memory` en el semiespacio del GC leyendo
+  `LvlPrest.txt`).
+- El render no esta.
+
+Lo que SI dice, y es lo que se queria saber: **no hay ningun paquete del motor que gccgo no pueda
+compilar**. El lenguaje, las interfaces, la reflection y las goroutines del juego pasan. El pivote del
+informe-continuidad es viable; lo que queda es backend y memoria, no lenguaje.
+
+SIGUIENTE (Fase B, ya con esto en la mano)
+------------------------------------------
+1. Averiguar el origen y la cobertura del stub de ebiten.
+2. Enlazar un binario minimo de consola que llame UNA funcion del motor compilado (aunque no dibuje nada):
+   probar que los `.gox` de 66 MB se pueden enlazar con KOS/libgodc sin explotar.
+3. Recien despues, la interfaz de render y el backend PVR.
