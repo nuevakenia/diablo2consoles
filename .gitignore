@@ -16,3 +16,6 @@ heap.pdf
 __pycache__/
 .DS_Store
 /dist/
+
+# DC-002.49b: respaldo que deja scripts/console/aplicar-giro-249b.py antes de aplicar el giro
+**/main.go.pre-giro

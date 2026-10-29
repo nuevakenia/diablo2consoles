@@ -240,6 +240,7 @@ type cuadro struct {
 // ciclo: la animacion de UN modo (TN quieto, TW caminando), cuadro por cuadro.
 type ciclo struct {
 	Modo        string
+	Dir         int // DC-002.49b: la direccion del COF de este ciclo (el COF del heroe tiene 16).
 	MsPorCuadro int
 	Cuadros     []cuadro
 	Imagen      *ebiten.Image // la imagen del cuadro que se esta dibujando (se reemplaza al cambiar)
@@ -322,6 +323,20 @@ func (j *juego) Update() error {
 
 	// ---- el movimiento del MOTOR (d2path): la velocidad de la tabla del exe, en la direccion pedida
 	j.movido = false
+
+	// ---- LA DIRECCION (DC-002.49b): la cruceta elige QUE direccion del COF mira el personaje; la cadena es
+	// la del motor (DireccionDelPiso -> DirectionTo -> Dir64ToCof) y las 8 direcciones que puede pedir estan
+	// compuestas al arranque, asi que girar no cuesta nada en el cuadro.
+	if !giroSordo && (ejeX != 0 || ejeY != 0) {
+		d := direccionDelControl(ejeX, ejeY)
+
+		if d != dirActual {
+			dirActual = d
+
+			println("HITO249B: GIRO dir", dirActual, "ejes", int(ejeX), int(ejeY),
+				"cuadroDelLoop", j.cuadros, "mutante", giroSordo)
+		}
+	}
 
 	if !controlSordo && (ejeX != 0 || ejeY != 0) && paso > 0 {
 		dx, dy := DireccionDelPiso(ejeX, ejeY)
@@ -497,12 +512,12 @@ func (j *juego) animar() {
 		deseado = modoGolpePersonaje
 	}
 
-	c := j.buscarCiclo(deseado)
+	c := j.buscarCiclo(deseado, dirActual)
 
 	// el modo pedido puede no estar compuesto (DC-002.50: el binario del golpe no compone TW por RAM): en ese
 	// caso se dibuja el quieto, que SIEMPRE esta, en vez de dejar al personaje congelado en el ultimo cuadro.
 	if c == nil && deseado != modoQuieto {
-		c = j.buscarCiclo(modoQuieto)
+		c = j.buscarCiclo(modoQuieto, dirActual)
 	}
 
 	if c == nil || len(c.Cuadros) == 0 || c.Imagen == nil {
@@ -538,10 +553,18 @@ func (j *juego) animar() {
 	j.ponerCuadro(c, f)
 }
 
-// buscarCiclo: el ciclo de un modo, si esta cargado.
-func (j *juego) buscarCiclo(modo string) *ciclo {
+// buscarCiclo: el ciclo de un modo y una direccion, si esta cargado (DC-002.49b).
+func (j *juego) buscarCiclo(modo string, dir int) *ciclo {
 	for _, c := range j.ciclos {
-		if c.Modo == modo {
+		if c.Modo == modo && c.Dir == dir {
+			return c
+		}
+	}
+
+	// la direccion pedida puede no estar compuesta (RAM): se dibuja la 0 de ese modo, que es la que dibujaba
+	// DC-002.38, en vez de dejar al personaje con el ciclo de OTRA direccion.
+	for _, c := range j.ciclos {
+		if c.Modo == modo && c.Dir == 0 {
 			return c
 		}
 	}
@@ -628,7 +651,7 @@ func (j *juego) combate() {
 		return
 	}
 
-	golpe := j.buscarCiclo(modoGolpePersonaje)
+	golpe := j.buscarCiclo(modoGolpePersonaje, dirActual)
 	if golpe == nil || len(golpe.Cuadros) == 0 {
 		j.golpeando = false
 
@@ -1163,8 +1186,30 @@ func main() {
 				"framesPorDir", cofModo.FramesPerDirection, "capas", cofModo.NumberOfLayers,
 				"dirs", cofModo.NumberOfDirections)
 
-			ci := cargarCiclo(mc, cofModo, dirPersonaje, m.modo, m.ms, palUni)
-			ciclos = append(ciclos, ci)
+			dirsCOFDelPersonaje = cofModo.NumberOfDirections
+
+			// DC-002.49b: se componen TODAS las direcciones que la cruceta puede pedir (medido: 8), no una:
+			// el giro despues es elegir otro ciclo, 0 ms de cuadro. Con BESTIA=0 entran las 8 de TN
+			// (246.768 B de indices) y las 8 de TW (148.720 B): DC-002.51 dejo el monton en 4 MB (2 MB por
+			// semiespacio) y con los 1 MB de antes las de TW morian con "fatal error: out of memory" al
+			// tercer ciclo. Con la bestia encendida el presupuesto de RAM es del bicho (DC-002.50) y el
+			// heroe se queda con la direccion 0, que es lo que esa tarjeta midio.
+			pedidas := []int{dirPersonaje}
+
+			if !bestia {
+				pedidas = direccionesDelControl()
+			}
+
+			println("HITO249B: DIRECCIONES modo", m.modo, "pedidas", len(pedidas),
+				"dirsCOF", dirsCOFDelPersonaje)
+
+			for _, dirPedida := range pedidas {
+				ciclos = append(ciclos, cargarCiclo(mc, cofModo, dirPedida, m.modo, m.ms, palUni))
+
+				println("HITO249B: DIR modo", m.modo, "dir", dirPedida)
+
+				memoria("ciclo-" + m.modo)
+			}
 
 			cofModo = nil
 
@@ -1174,7 +1219,23 @@ func main() {
 		// EL CICLO DEL GOLPE (A1) NO SE COMPONE ACA: va en 3d, con el video ya andando (medido: es el que deja el
 		// monton de C en 70 KB y con eso `IniciarPantalla` no arranca).
 
-		println("HITO249: CICLOS cargados", len(ciclos), "ms", int64(d2cMs())-tCiclos, "mutante", cicloSordo)
+		// DC-002.49b: la marca lleva los DOS numeros. `cargados` sigue siendo el de los MODOS -- el corpus de
+		// DC-002.49 (control C3) exige 2 -- y `ciclos` es lo que hay en la lista: con el giro cada modo trae
+		// las 8 direcciones que el control puede pedir, o sea 16 ciclos.
+		modosCargados := 0
+
+		for _, m := range modosDelHeroe {
+			for _, c := range ciclos {
+				if c.Modo == m.modo {
+					modosCargados++
+
+					break
+				}
+			}
+		}
+
+		println("HITO249: CICLOS cargados", modosCargados, "modos", len(ciclos), "ciclos",
+			"ms", int64(d2cMs())-tCiclos, "mutante", cicloSordo)
 
 		memoria("ciclos-del-personaje")
 	}
@@ -1565,7 +1626,7 @@ func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCu
 		}
 	}
 
-	c := &ciclo{Modo: modo, MsPorCuadro: msPorCuadro, UnTiro: unTiro}
+	c := &ciclo{Modo: modo, Dir: dir, MsPorCuadro: msPorCuadro, UnTiro: unTiro}
 
 	for f := 0; f < n; f++ {
 		per := NuevoPersonaje(cof, dir, f)

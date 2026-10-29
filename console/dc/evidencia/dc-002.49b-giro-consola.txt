@@ -1,0 +1,273 @@
+================================================================================
+DC-002.49b -- LA DIRECCION DEL MOVIMIENTO: el personaje GIRA al caminar
+Medido en la consola (Flycast 2.7 AppImage + SH-4 gccgo) el 2026-10-29
+Host: CachyOS, pantalla 3584x1080, ventana del emulador 320x240 en 1400,120
+Rama DC-002. Base: 5a2702b7 (DC-002.50 cerrada)
+================================================================================
+
+RESUMEN
+El giro ATERRIZO: la cruceta elige la direccion del COF y el personaje dibuja ESA
+direccion, en el quieto (TN) y en la caminata (TW), sin tocar la cadencia de
+ninguno de los dos ciclos y sin romper el corpus de DC-002.49 (11/11).
+La pieza que faltaba desde DC-002.49 era solo el presupuesto de RAM: DC-002.51
+dejo el monton en 4 MB (dos semiespacios de 2.097.184 B, medido hoy en el
+arranque) y con eso entran las 8 direcciones de TN (246.768 B) y las 8 de TW
+(148.720 B) compuestas al arranque.
+
+--------------------------------------------------------------------------------
+1. QUE SE APLICO (codigo)
+--------------------------------------------------------------------------------
+`scripts/console/aplicar-giro-249b.py` sobre el POC del repo: 9 ediciones + un
+archivo nuevo, todas por anclaje de texto (no por numero de linea), idempotente y
+con vuelta atras (`--revertir` contra `main.go.pre-giro`).
+
+  1. `type ciclo struct` gana `Dir` (la direccion del COF de ese ciclo)
+  2. `cargarCicloCon` guarda `Dir: dir` (el `dir` ya lo recibia)
+  3. `animar()` pide el ciclo por `dirActual` (y la caida al quieto tambien)
+  4. `buscarCiclo(modo, dir)` con caida a la direccion 0 del modo
+  5. `combate()`: el ciclo del golpe (A1) tambien por `dirActual`
+  6. `Update()`: la cruceta -> `dirActual` con la cadena del MOTOR
+     (`DireccionDelPiso` -> `d2vector.Vector.DirectionTo` -> `d2cof.Dir64ToCof`)
+     y la marca `HITO249B: GIRO` (una linea por CAMBIO de direccion)
+  7. `cargarCiclos`: compone las 8 direcciones que el control puede pedir
+     (`[0 1 4 7 8 9 12 15]`) en TN y en TW cuando BESTIA=0; con la bestia el
+     presupuesto es del bicho (DC-002.50) y el heroe se queda en la direccion 0.
+     Marcas nuevas: `HITO249B: DIRECCIONES modo <M> pedidas <N> dirsCOF <16>` y
+     una `HITO249B: DIR modo <M> dir <D>` por ciclo compuesto.
+  8. `HITO249: CICLOS cargados <MODOS> modos <CICLOS> ciclos`: la marca vieja
+     imprimia `len(ciclos)` en el campo de los MODOS; con el giro son 16 ciclos y
+     el control C3 del corpus de DC-002.49 (que exige 2 modos) se caia. Ahora dice
+     los dos numeros y `cargados` sigue significando MODOS.
+  9. `giro.go` (nuevo): `dirActual`, `direccionDelControl`, `direccionesDelControl`
+     y el mutante `giroSordo`.
+
+LOS TRES BINARIOS (los tres medidos en Flycast, una ventana a la vez):
+
+  build            prog.elf   1ST_READ.BIN   sha256(prog.elf) primeros 16
+  normal         8.836.724      1.853.608    780920868c7f20d8
+  mutante giro   8.836.244      1.853.288    adf3bd2c8bbf042d   (giroSordo=true)
+  mutante ciclo  8.836.640      1.853.576    1e9199e166347197   (cicloSordo=true, corpus 249)
+
+  GDI normal: /tmp/dcbuild/giro-normal/disc.gdi (536.942.592 B, 262.179 sectores)
+
+--------------------------------------------------------------------------------
+2. CRITERIO 1 -- QUE DIRECCION SE DIBUJA Y CON QUE CAJA
+--------------------------------------------------------------------------------
+2.1 EL GIRO LLEGA AL DIBUJO (canal del LOG, cruzado con la tabla del host)
+
+  `go run ./console/dc/verif-personaje-238 -censo-dirs TN,TW -crc-dirs`
+  -> 384 compuestos (8 dirs x 16 cuadros de TN + 8 dirs x 8 de TW), 384 crc32
+     DISTINTOS: 0 colisiones, o sea el crc32 de una linea ANIM dice sin
+     ambiguedad que (modo, direccion, cuadro) se dibujo.
+  `scripts/console/checar-giro-249b.py --run <corrida-normal> --tabla ...`
+  -> VERDE, todo OK:
+       TN: pedidas=8 compuestas=8 [0,1,4,7,8,9,12,15] dirsCOF=16
+       TW: pedidas=8 compuestas=8 [0,1,4,7,8,9,12,15] dirsCOF=16
+       348 marcas ANIM, 0 crc32 desconocidos
+       4 GIRO (la cruceta giro 4 veces) con 4 direcciones distintas [0,4,8,12]
+       "el primer cuadro dibujado despues del GIRO es de esa direccion: 4/4"
+
+  Los 4 giros de la corrida normal, tal cual los imprimio la consola:
+    HITO249B: GIRO dir 12 ejes 1 0  cuadroDelLoop 110
+    HITO249B: GIRO dir 8  ejes 0 -1 cuadroDelLoop 155
+    HITO249B: GIRO dir 4  ejes -1 0 cuadroDelLoop 201
+    HITO249B: GIRO dir 0  ejes 0 1  cuadroDelLoop 246
+
+2.2 LAS CAJAS: cada direccion dibuja la caja del COF que le toca
+
+  La caja NO es la misma para todas las direcciones: es lo que hace medible el
+  giro. Lo que dibujo la consola (lineas `HITO249: ANIM ... caja A B`) contra lo
+  que el compositor del host calcula para esa misma direccion:
+
+    dir    caja que dibujo la consola    caja del host (censo)
+     0            26x77                        26x77
+     1            26x73                        26x73
+     4            28x75                        28x75
+     7            21x74                        21x74
+     8            27x76                        27x76
+     9            24x77                        24x77
+    12            27x71                        27x71
+    15            27x76                        27x76
+
+  Y en la corrida con el guion lento (`GUION="derecha 1.0 arriba 1.0 izquierda
+  1.0 abajo 1.0" PAUSA=4.0`), `scripts/console/direccion-por-captura.py` cruza
+  cada CAPTURA con el log y con la tabla del host:
+
+    captura   modo cuadro caja   dir  celda    veredicto
+    c00       TN   2      26x77  00   28,20    caja del POC == la del host
+    c02       TN   8      27x71  12   29,18    caja del POC == la del host
+    c03       TN   7      27x76  08   28,17    caja del POC == la del host
+    c04       TN   14     27x76  08   27,17    caja del POC == la del host
+    c05       TN   14     28x75  04   26,18    caja del POC == la del host
+    c06       TW   6      31x79  00   26,18    caja del POC == la del host
+    c07..c12  TN   3..0   26x77  00   28,19    caja del POC == la del host
+
+  O sea: en la MISMA corrida y con el personaje QUIETO se dibujaron 4 cajas
+  distintas (26x77, 27x71, 27x76, 28x75), cada una exactamente la del host para
+  su direccion.
+
+2.3 EL CANAL DE PIXELES: MEDIDO Y CON SU LIMITE DECLARADO
+
+  `scripts/console/clasificar-captura-249b.py` (compara la captura contra las
+  referencias por direccion del host, compuestas en el mismo ancla):
+   * con el ancla correcta DISCRIMINA: c00-quieto (celda 28,20) -> mejor=dir 00
+     identidad 92,97 % segundo dir 09 88,75 % (margen 4,22 pts);
+   * para las capturas con el personaje YA girado NO discrimina: c02 (log: dir
+     12) da mejor=dir 07 con 74,38 % y margen 0,78 pts; c05 (log: dir 04) da
+     mejor=dir 07 con 71,41 %.
+  CAUSA MEDIDA, no una excusa: el `-pos` del verificador del host NO reproduce
+  donde el POC pinta al personaje. Con `-pos 26,18` el host pone el sprite en
+  y=11..91 de la pantalla logica; el POC, con el personaje en la celda 26,18,
+  lo pinta en y=171..251 (el POC dibuja el nivel en una ventana fija en 64,-16
+  y el host lo centra por `-centro`). Al no coincidir el ancla, la identidad se
+  cae a ~70 % para TODAS las direcciones y el margen se vuelve ruido.
+  Ademas la ventana de este host es 320x240 para una pantalla logica de 640x480:
+  el sprite de 26x77 se reduce a 13x38 y se pierde detalle.
+  CONSECUENCIA: la direccion queda establecida por dos canales que cruzan el POC
+  contra el compositor del host (crc32 del buffer que se manda a pantalla, 384
+  compuestos sin colisiones, y la caja de cada cuadro), y el canal de pixeles
+  sobre capturas queda como instrumento PENDIENTE (tarjeta aparte).
+
+--------------------------------------------------------------------------------
+3. CRITERIO 2 -- EL GIRO NO TOCA LA CADENCIA
+--------------------------------------------------------------------------------
+`scripts/console/medir-cadencia-249b.py <corrida>` (deltas de `msDelModo` entre
+cuadros consecutivos de la misma direccion, sin contar reinicios):
+
+  corrida normal (guion rapido)      corrida normal (guion lento)
+  TN declarado 128  mediana 128      TN declarado 128  mediana 128,0
+  TW declarado  40  mediana  54      TW declarado  40  mediana  55,0
+  VERDE                             VERDE
+
+  El 40 de TW es el del animdata (`HITO249: MODO TW cuadros 8 msPorCuadro 40`) y
+  la mediana observada queda pegada al TECHO DEL BUCLE: mientras camina, la
+  consola tarda ~50 ms por vuelta y no puede dibujar mas rapido que eso. No es un
+  defecto nuevo: DC-002.49 ya habia medido 51 ms de mediana para TW y lo dejo
+  escrito en su evidencia. Lo que importa aca es que el giro NO movio ningun
+  reloj: los dos modos siguen declarando 128 y 40, y TN sigue clavando 128 justo
+  en los tramos con giro.
+
+--------------------------------------------------------------------------------
+4. CRITERIO 3 -- EL CORPUS DE DC-002.49 NO SE ROMPIO: 11/11
+--------------------------------------------------------------------------------
+  bash scripts/console/checar-anim-249-corrida.sh \
+       /tmp/dcbuild/giro-normal /tmp/dcbuild/giro-mudo \
+       /tmp/dc249b-run/anim-n7 /tmp/dc249b-run/anim-m7 /tmp/dc249b-run/corpus-249.txt
+
+  OK   C1 TN ciclo host             cuadrosCOF=16 compuestos=16 distintos=16
+  OK   C1 TW ciclo host             cuadrosCOF=8 compuestos=8 distintos=8
+  OK   C2 TN mitad del ciclo        pixelesCambiados=1115 caja=0,0 26x74
+  OK   C2 TW mitad del ciclo        pixelesCambiados=1237 caja=0,1 31x78
+  OK   C3 la consola carga los ciclos   cargados=2 modosDibujados=TN
+  OK   C4 TN cuadros dibujados      distintos=16 de 16 (0..15)
+  OK   C5 cadencia de TN            mediana=128 ms/cuadro (el animdata: 128; n=292)
+  OK   C6 criterio 1: cambia        capturas=8 pares=28 pixelesCambiados min=16 max=127
+  OK   C7 criterio 2: se ven        dibujosDistintos=8 de 8 capturas
+  OK   C8 criterio 3: el mutante    capturas=8 pares=28 pixelesCambiados min=0 max=0
+  OK   C9 el mutante dibuja el 0    cuadros dibujados=0 marcas=1
+  ANIM249 CORPUS 11/11
+
+  DOS INSTRUMENTOS DEL CORPUS HUBO QUE ARREGLAR, y los dos estaban midiendo de
+  menos por la forma de la corrida, no por la animacion:
+
+  (a) LA VENTANA DEL EMULADOR. `checar-anim-249-corrida.sh` sacaba el area
+      cliente de `flycast.log`; `run-flycast-249.sh` la imprimia solo a su stdout
+      y el corpus caia al valor por defecto 1400,120,667,442. En este host la
+      ventana mide 320x240, asi que el recorte agarraba una region que no era la
+      del juego. Ahora `run-flycast-249.sh` deja las lineas GEO en
+      `<corrida>/geo.txt` (igual que el de 249b) y el corpus busca ahi primero.
+  (b) LA HUELLA DE LA CAPTURA. El script descartaba la captura cuando su md5
+      repetia el de la anterior. Medido: la pantalla entera incluye el reloj de
+      la barra, asi que el md5 cambia aunque el cuadro del juego sea el mismo, y
+      el control C6 (que exige que TODOS los pares cambien) se caia con pares
+      identicos pixel a pixel (f5 y f8, mismo md5 distinto, misma caja). Se
+      agrego `scripts/console/huella-zona.py` (md5 del AREA CLIENTE, con
+      autoprueba 3/3) y la captura se repite si la zona repite una anterior.
+      Con el mutante de ciclo quieto el reintento se agota y la captura se acepta
+      igual: ahi repetir ES el resultado que se mide (medido: las 8 capturas del
+      mutante dan la MISMA huella 65fe0502 con md5 del PNG distinto).
+
+--------------------------------------------------------------------------------
+5. CRITERIO 4 -- EL MUTANTE (giroSordo=true)
+--------------------------------------------------------------------------------
+  Mismo guion de cruceta, mismo disco, un solo cambio: `var giroSordo = true`.
+
+  `checar-giro-249b.py --run <corrida-sorda> --tabla ... --mutante` -> VERDE:
+     log: 353 marcas ANIM, 0 GIRO
+     mutante: no hay lineas GIRO (0)
+     mutante: TODO decodifica a la direccion 0 (son [0])
+     TN: 1 direccion dibujada [0]; TW: 1 direccion dibujada [0]
+
+  Y en las capturas (`direccion-por-captura.py` sobre la corrida sorda): las 12
+  capturas dan dir 00 con caja 26x77 (TN) / 31x79 (TW dir 0), todas iguales a la
+  del host para la direccion 0. O sea: con el giro quieto el dibujo se queda en
+  la direccion que dibujaba DC-002.38 y nada mas se mueve.
+
+  Comparacion de las dos corridas con el mismo guion:
+     normal: 4 direcciones dibujadas [0,4,8,12], 4 cajas distintas
+     sordo:  1 direccion dibujada  [0],         1 caja
+
+--------------------------------------------------------------------------------
+6. MEMORIA (por que ahora entra y antes no)
+--------------------------------------------------------------------------------
+  ARQ-MARCA gc_init-semiespacio0 v=2351035296
+  ARQ-MARCA gc_init-semiespacio1 v=2353132480   -> separacion 2.097.184 B (2 MB)
+  HITO250: MEMORIA etapa= nivel                 libre= 802.392 B
+  HITO250: MEMORIA etapa= ciclo-TN (x8)         libre= 72.384 .. 76.000 B
+  HITO250: MEMORIA etapa= ciclo-TW (x8)         libre= 75.656 B
+  HITO249: CICLOS cargados 2 modos 16 ciclos ms 25.753
+
+  Las 16 composiciones (8 dirs x 2 modos) tardan 25,7 s de reloj de la consola en
+  total, o sea ~1,6 s por direccion; el giro despues es elegir otro puntero de
+  ciclo y no cuesta cuadro (medido: 0 cambios de msPorCuadro, ver criterio 2).
+
+--------------------------------------------------------------------------------
+7. COMO REPETIRLO
+--------------------------------------------------------------------------------
+  # 1. codigo
+  python3 scripts/console/aplicar-giro-249b.py --verificar      # GIRO APLICADO
+  # 2. los tres discos
+  bash scripts/console/build-anim-249.sh /tmp/dcbuild/giro-normal
+  CICLO_SORDO=1 SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
+       bash scripts/console/build-anim-249.sh /tmp/dcbuild/giro-mudo
+  SORDO=/tmp/poc-giro-sordo && cp -r console/dc/poc/personaje-mapa "$SORDO" && \
+    python3 scripts/console/aplicar-giro-249b.py --poc "$SORDO" --mutante && \
+    POC_DIR="$SORDO" SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
+       bash scripts/console/build-anim-249.sh /tmp/dcbuild/giro-sordo
+  # 3. la tabla del host
+  go run ./console/dc/verif-personaje-238 -censo-dirs TN,TW -crc-dirs \
+      > /tmp/dcbuild/giro-normal/host/crc249b.txt
+  # 4. la corrida del giro (una ventana de Flycast a la vez)
+  LIBGL_ALWAYS_SOFTWARE=1 TECLAS=1 \
+      bash scripts/console/run-flycast-249b.sh /tmp/dcbuild/giro-normal/disc.gdi /tmp/dc249b-run/pixeles
+  LIBGL_ALWAYS_SOFTWARE=1 TECLAS=1 \
+      bash scripts/console/run-flycast-249b.sh /tmp/dcbuild/giro-sordo/disc.gdi  /tmp/dc249b-run/final-sordo
+  # 5. los dos canales
+  python3 scripts/console/checar-giro-249b.py --run /tmp/dc249b-run/pixeles --tabla /tmp/dcbuild/giro-normal/host/crc249b.txt
+  python3 scripts/console/checar-giro-249b.py --run /tmp/dc249b-run/final-sordo --tabla /tmp/dcbuild/giro-normal/host/crc249b.txt --mutante
+  python3 scripts/console/direccion-por-captura.py /tmp/dc249b-run/pixeles /tmp/dcbuild/giro-normal/host/crc249b.txt
+  python3 scripts/console/medir-cadencia-249b.py /tmp/dc249b-run/pixeles
+  # 6. el corpus de DC-002.49
+  LIBGL_ALWAYS_SOFTWARE=1 TECLAS=0 bash scripts/console/run-flycast-249.sh /tmp/dcbuild/giro-normal/disc.gdi /tmp/dc249b-run/anim-n7
+  LIBGL_ALWAYS_SOFTWARE=1 TECLAS=0 bash scripts/console/run-flycast-249.sh /tmp/dcbuild/giro-mudo/disc.gdi  /tmp/dc249b-run/anim-m7
+  bash scripts/console/checar-anim-249-corrida.sh /tmp/dcbuild/giro-normal /tmp/dcbuild/giro-mudo \
+       /tmp/dc249b-run/anim-n7 /tmp/dc249b-run/anim-m7 /tmp/dc249b-run/corpus-249.txt
+
+  NOTA DEL HOST (por que `LIBGL_ALWAYS_SOFTWARE=1`): el emulador de esta maquina
+  tira SIGBUS con la GPU (medido en DC-002.51 y DC-002.50); con el rasterizador
+  por software dibuja igual y es con lo que se midio todo lo de arriba.
+
+--------------------------------------------------------------------------------
+8. LO QUE QUEDA PENDIENTE (declarado, no escondido)
+--------------------------------------------------------------------------------
+ * El canal de PIXELES sobre capturas para las direcciones giradas (2.3): falta
+   que el verificador del host pinte el personaje donde lo pinta el POC (o que el
+   POC dibuje en la ventana centrada del host). Tarjeta aparte.
+ * Con BESTIA=1 el heroe sigue con UNA direccion (la 0): el presupuesto de RAM de
+   esa configuracion es del bicho (DC-002.50). Medir si las 8 entran con la bestia
+   encendida es trabajo de la tarjeta del bicho.
+ * Las direcciones diagonales no se ejercitaron en la consola: la cruceta del
+   guion presiona un eje por vez. El conjunto [0 1 4 7 8 9 12 15] esta compuesto
+   y en la tabla del host, pero dibujado se vieron 4 (0,4,8,12). Un guion con dos
+   ejes a la vez lo cierra.
+================================================================================

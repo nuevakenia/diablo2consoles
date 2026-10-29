@@ -171,6 +171,20 @@ fi
 sleep 1
 
 ultimo_md5=""
+
+# DC-002.49b: los md5 de TODAS las capturas ya tomadas en esta corrida. La captura se acepta solo si NO
+# repite ninguna anterior: la animacion del personaje quieto tiene 16 cuadros y el plan de captura puede caer
+# dos veces en el mismo (medido en este host: con INTERVALO=1.6 los pares f1/f6 y f2/f7 salian IDENTICOS y el
+# control C6 del corpus --que exige que TODOS los pares cambien-- se caia por el plan, no por la animacion).
+# Con el mutante de ciclo quieto el reintento se agota y la captura se acepta igual: ahi repetir es el
+# resultado que se mide.
+md5s_vistos=" "
+
+# DC-002.49b: la huella se calcula sobre el AREA CLIENTE del emulador (scripts/console/huella-zona.py), no
+# sobre la pantalla entera: el md5 del PNG completo cambia por el reloj de la barra aunque el cuadro del juego
+# sea el mismo (medido: f5 y f8 con md5 distinto y caja identica pixel a pixel). Sin esto el corpus de
+# DC-002.49 se cae en C6 --que exige que TODOS los pares de capturas cambien-- por el plan de captura.
+huellas_vistas=" "
 esperar_quieto() {
     local f="$1" a=-1 b=-1 i=0
     while [ "$i" -lt 15 ]; do
@@ -199,16 +213,23 @@ capturar() {
         fi
     fi
 
-    for intento in 1 2 3; do
+    for intento in 1 2 3 4 5 6; do
         spectacle -b -n -f -o "$OUT/$nombre.png" >/dev/null 2>&1
         esperar_quieto "$OUT/$nombre.png"
         md5="$(md5sum "$OUT/$nombre.png" 2>/dev/null | cut -d' ' -f1)"
-        if [ -z "$ultimo_md5" ] || [ "$md5" != "$ultimo_md5" ]; then
-            break
+        if [ -n "$cli" ] && [ -f "$HERE/huella-zona.py" ]; then
+            huella="$("$PYTHON" "$HERE/huella-zona.py" "$OUT/$nombre.png" "$cli" 2>/dev/null)"
         fi
-        echo "  captura $nombre SIN-CAMBIO (md5 igual al anterior), reintento $intento"
+        [ -n "${huella:-}" ] || huella="$md5"
+        case "$huellas_vistas" in
+            *" $huella "*) ;;   # la zona del emulador repite una captura anterior: se vuelve a sacar
+            *) break ;;
+        esac
+        echo "  captura $nombre SIN-CAMBIO (la zona del emulador repite una anterior), reintento $intento"
         sleep 0.7
     done
+    huellas_vistas="$huellas_vistas$huella "
+    md5s_vistos="$md5s_vistos$md5 "
     ultimo_md5="$md5"
 
     # las dos marcas del POC que enmarcan la captura: la ultima de cada tipo
@@ -217,8 +238,11 @@ capturar() {
     pos="$(grep -a 'HITO238: POS cuadro' "$OUT/flycast.log" 2>/dev/null | tr -d '\r' | tail -1 |
         sed -n 's/.* pantalla \([0-9-]*\) \([0-9-]*\) caminado.*/ancla=\1,\2/p')"
 
-    echo "  captura $nombre.png  md5=${md5:0:8} ${anim:-anim=?} ${pos:-pos=?}"
-    [ -n "$cli" ] && echo "GEO captura=$nombre cliente=$cli ${anim:-} ${pos:-} ms=$(date +%s%3N)"
+    echo "  captura $nombre.png md5=${md5:0:8} huella=${huella:0:8} ${anim:-anim=?} ${pos:-pos=?}"
+    # DC-002.49b: la linea GEO se guarda TAMBIEN en geo.txt. El area cliente del emulador no la puede adivinar
+    # el corpus (medido: la pantalla de este host es 3584x1080 y la ventana mide 320x240), asi que el dato
+    # tiene que viajar con la corrida en vez de quedar solo en la salida del script.
+    [ -n "$cli" ] && echo "GEO captura=$nombre cliente=$cli ${anim:-} ${pos:-} ms=$(date +%s%3N)" | tee -a "$OUT/geo.txt"
 }
 
 # ---- 2. las capturas CON EL PERSONAJE QUIETO (el criterio 1 y el 3 se miden asi)

@@ -11,7 +11,7 @@
 # anclaje por su texto, exige que aparezca EXACTAMENTE UNA VEZ, y no escribe nada si alguno no cuadra:
 # o aplica el giro entero, o no toca el archivo.
 #
-# QUE HACE (7 ediciones + un archivo nuevo)
+# QUE HACE (8 ediciones + un archivo nuevo)
 #   1. `type ciclo struct`: el campo `Dir` (la direccion del COF de ese ciclo).
 #   2. `cargarCicloCon`: `Dir: dir` al construir el ciclo (el `dir` ya lo recibia: solo no se guardaba).
 #   3. `animar()`: pide el ciclo con `dirActual` (y la caida al quieto tambien).
@@ -21,7 +21,7 @@
 #      en `dirActual`, con la marca `HITO249B: GIRO` (una linea por CAMBIO de direccion).
 #   7. `cargarCiclos`: compone las direcciones que el control puede pedir (medido: 8, `[0 1 4 7 9 8 12 15]`)
 #      en vez de una sola, con la marca `HITO249B: DIRECCIONES` y la memoria despues de cada una.
-#   8. `giro.go`: el archivo con la cadena del motor y el conjunto de 8 direcciones, copiado de
+#   9. `giro.go`: el archivo con la cadena del motor y el conjunto de 8 direcciones, copiado de
 #      `scripts/console/giro-249b.go.txt` (el mismo que se compilo con sha256 5e2e34ad...).
 #
 # Uso:
@@ -43,7 +43,7 @@ POC_DEF = REPO / "console/dc/poc/personaje-mapa"
 PLANTILLA_GIRO = Path(__file__).resolve().parent / "giro-249b.go.txt"
 
 # -----------------------------------------------------------------------------------------------------------
-# Las 7 ediciones: (nombre, buscar, poner, marca de "ya aplicado")
+# Las 8 ediciones: (nombre, buscar, poner, marca de "ya aplicado")
 # `buscar` y `poner` van con TABULADORES explicitos (\t) porque el archivo es Go y gofmt usa tabs.
 # -----------------------------------------------------------------------------------------------------------
 
@@ -127,15 +127,15 @@ E7_BUSCAR = ("\t\t\tci := cargarCiclo(mc, cofModo, dirPersonaje, m.modo, m.ms, p
 E7_PONER = (
     "\t\t\tdirsCOFDelPersonaje = cofModo.NumberOfDirections\n"
     "\n"
-    "\t\t\t// DC-002.49b: se componen TODAS las direcciones que la cruceta puede pedir (medido: 8), no una.\n"
-    "\t\t\t// MEDIDO EN LA CONSOLA (2026-10-19 17:38): las 8 de TN entran -- quedan 72.368 B de monton despues\n"
-    "\t\t\t// de componerlas (arranca con 799.096) -- y las 8 de TW NO: moria con \"fatal error: out of memory\"\n"
-    "\t\t\t// en la TERCERA direccion, con 72.368 B libres contra un pico de 66.859 B por ciclo y ~37 KB\n"
-    "\t\t\t// permanentes por direccion. Por eso el giro de las 8 va SOLO en el modo quieto (TN), que es el que\n"
-    "\t\t\t// se dibuja con el personaje parado; TW sigue con la direccion 0.\n"
+    "\t\t\t// DC-002.49b: se componen TODAS las direcciones que la cruceta puede pedir (medido: 8), no una:\n"
+    "\t\t\t// el giro despues es elegir otro ciclo, 0 ms de cuadro. Con BESTIA=0 entran las 8 de TN\n"
+    "\t\t\t// (246.768 B de indices) y las 8 de TW (148.720 B): DC-002.51 dejo el monton en 4 MB (2 MB por\n"
+    "\t\t\t// semiespacio) y con los 1 MB de antes las de TW morian con \"fatal error: out of memory\" al\n"
+    "\t\t\t// tercer ciclo. Con la bestia encendida el presupuesto de RAM es del bicho (DC-002.50) y el\n"
+    "\t\t\t// heroe se queda con la direccion 0, que es lo que esa tarjeta midio.\n"
     "\t\t\tpedidas := []int{dirPersonaje}\n"
     "\n"
-    "\t\t\tif m.modo == modoQuieto {\n"
+    "\t\t\tif !bestia {\n"
     "\t\t\t\tpedidas = direccionesDelControl()\n"
     "\t\t\t}\n"
     "\n"
@@ -152,6 +152,32 @@ E7_PONER = (
 )
 E7_MARCA = 'HITO249B: DIRECCIONES modo'
 
+# E8: la marca de los ciclos cargados dice los DOS numeros. `cargados` sigue siendo el de los MODOS (el control
+# C3 del corpus de DC-002.49 exige 2) y se agrega cuantos CICLOS hay en la lista, que con el giro son 16 (8
+# direcciones x 2 modos). La marca vieja imprimia len(ciclos) en el campo de los modos: aplicada, C3 se caia.
+E8_BUSCAR = ("\t\tprintln(\"HITO249: CICLOS cargados\", len(ciclos), \"ms\", int64(d2cMs())-tCiclos, "
+             "\"mutante\", cicloSordo)\n")
+E8_PONER = (
+    "\t\t// DC-002.49b: la marca lleva los DOS numeros. `cargados` sigue siendo el de los MODOS -- el corpus de\n"
+    "\t\t// DC-002.49 (control C3) exige 2 -- y `ciclos` es lo que hay en la lista: con el giro cada modo trae\n"
+    "\t\t// las 8 direcciones que el control puede pedir, o sea 16 ciclos.\n"
+    "\t\tmodosCargados := 0\n"
+    "\n"
+    "\t\tfor _, m := range modosDelHeroe {\n"
+    "\t\t\tfor _, c := range ciclos {\n"
+    "\t\t\t\tif c.Modo == m.modo {\n"
+    "\t\t\t\t\tmodosCargados++\n"
+    "\n"
+    "\t\t\t\t\tbreak\n"
+    "\t\t\t\t}\n"
+    "\t\t\t}\n"
+    "\t\t}\n"
+    "\n"
+    "\t\tprintln(\"HITO249: CICLOS cargados\", modosCargados, \"modos\", len(ciclos), \"ciclos\",\n"
+    "\t\t\t\"ms\", int64(d2cMs())-tCiclos, \"mutante\", cicloSordo)\n"
+)
+E8_MARCA = "DC-002.49b: la marca lleva los DOS numeros"
+
 EDICIONES = [
     ("1 struct ciclo.Dir", E1_BUSCAR, E1_PONER, E1_MARCA),
     ("2 cargarCicloCon: Dir: dir", E2_BUSCAR, E2_PONER, E2_MARCA),
@@ -161,6 +187,7 @@ EDICIONES = [
     ("5 combate: el golpe por dirActual", E5_BUSCAR, E5_PONER, E5_MARCA),
     ("6 Update: la cruceta -> dirActual", E6_BUSCAR, E6_PONER, E6_MARCA),
     ("7 cargarCiclos: las 8 direcciones", E7_BUSCAR, E7_PONER, E7_MARCA),
+    ("8 CICLOS cargados: modos y ciclos", E8_BUSCAR, E8_PONER, E8_MARCA),
 ]
 
 MUTANTE_OFF = "var giroSordo = false"
@@ -215,7 +242,7 @@ def main():
         if faltan or not tiene_giro:
             print(f"GIRO NO APLICADO: faltan {faltan}" if faltan else "GIRO NO APLICADO: falta giro.go")
             return 1
-        print("GIRO APLICADO (8/8 ediciones + giro.go)")
+        print(f"GIRO APLICADO ({len(EDICIONES)}/{len(EDICIONES)} ediciones + giro.go)")
         return 0
 
     # ---- revertir

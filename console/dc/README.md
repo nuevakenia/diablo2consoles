@@ -5745,3 +5745,65 @@ leído: eso está en el árbol desde DC-002.38 y no rompe nada (por ejemplo el b
 **Ojo con el entorno**: `/tmp` de esta máquina es un `tmpfs` de 16 GB y cada build deja una ISO de **540 MB**.
 Se llenó a mitad de la sesión y el emulador empezó a morir con `Failed to locate bootfile` en GDI incompletos —
 un "fallo del código" que era del disco. Limpiar los builds viejos antes de creerle a una corrida rara.
+
+---
+
+## 76. DC-002.49b (cierre): el personaje **GIRA** al caminar — 16 ciclos compuestos (8 direcciones × TN/TW), la cadencia intacta y el corpus de DC-002.49 en **11/11**
+
+El diagnóstico de la sección 74 era correcto y le faltaba una pieza de otra tarjeta: el montón. **DC-002.51 lo
+dejó en 4 MB** (dos semiespacios de 2.097.184 B, medidos en el arranque de esta corrida) y con eso entran las
+**8 direcciones que el control puede pedir** (`[0 1 4 7 8 9 12 15]`) compuestas al arranque, **en TN y en TW**:
+
+| modo | ciclos compuestos | índices permanentes | cajas que se dibujan |
+|---|---|---|---|
+| TN (quieto, 16 cuadros a 128 ms) | 8 | 246.768 B | 26x77, 26x73, 28x75, 21x74, 27x76, 24x77, 27x71, 27x76 |
+| TW (caminando, 8 cuadros a 40 ms) | 8 | 148.720 B | 31x79 y las otras siete del caminar |
+
+Componer los 16 tarda **25,7 s de reloj de consola** (~1,6 s por dirección, `d2dcc.LoadDirection`), y después
+**girar no cuesta cuadro**: es elegir otro puntero de ciclo.
+
+### 76.1 Cómo entra el código al POC (y por qué no es un `.patch`)
+
+`scripts/console/aplicar-giro-249b.py` hace **9 ediciones + `giro.go`**, todas por **anclaje de texto**: exige
+que cada anclaje aparezca exactamente una vez y **no escribe nada** si alguno no cuadra. Es idempotente
+(`--verificar`) y tiene vuelta atrás (`--revertir` contra `main.go.pre-giro`). Se escribió así porque el parche
+original nació viejo sobre un `main.go` que otra tarjeta estaba reescribiendo.
+
+La dirección no se inventa: es la cadena del motor, la misma que usa para pintar
+(`DireccionDelPiso` → `d2vector.Vector.DirectionTo` → `d2cof.Dir64ToCof`).
+
+### 76.2 Los cuatro criterios, medidos en la consola
+
+1. **La dirección llega al dibujo.** 384 compuestos del host (8 dirs × 16 de TN + 8 × 8 de TW) dan **384 crc32
+   distintos, 0 colisiones**, así que el `crc32` de cada línea `HITO249: ANIM` dice qué `(modo, dirección,
+   cuadro)` se dibujó. La corrida normal: **4 giros** (`dir 12, 8, 4, 0`) y **4/4** veces el cuadro siguiente es
+   de la dirección girada, con **la caja del COF de esa dirección** (26x77 / 27x71 / 27x76 / 28x75, cada una
+   igual a la del host). `scripts/console/direccion-por-captura.py` cruza captura ↔ log ↔ tabla del host.
+2. **La cadencia no cae.** `medir-cadencia-249b.py`: TN declara 128 y mide **128**; TW declara **40** (animdata)
+   y mide 54–55 porque **el bucle de la consola es el techo** mientras camina (DC-002.49 ya había medido 51 y lo
+   dejó escrito). Ningún reloj se movió.
+3. **El corpus de DC-002.49 sigue 11/11** (`checar-anim-249-corrida.sh`), con **dos defectos de instrumento
+   arreglados**: la ventana del emulador viajaba sólo al `stdout` del script de corrida (y en este host la
+   ventana es **320x240**, no el 667x442 por defecto, así que el recorte no era el del juego) y el descarte de
+   capturas comparaba el **md5 de la pantalla entera**, que cambia con el reloj de la barra: dos capturas con la
+   caja idéntica pixel a pixel pasaban como distintas y el control C6 se caía. Ahora hay
+   `scripts/console/huella-zona.py` (md5 del **área cliente**, con autoprueba 3/3) y `geo.txt` por corrida.
+4. **El mutante `giroSordo`.** Mismo guion, mismo disco: **0 líneas GIRO**, todo decodifica a la **dirección 0**
+   y las 12 capturas dan **una sola caja**. La comparación con la corrida normal (4 direcciones, 4 cajas) es el
+   control.
+
+### 76.3 Lo que quedó declarado abierto
+
+- **El canal de píxeles sobre capturas** para las direcciones giradas: `clasificar-captura-249b.py` discrimina
+  con el ancla correcta (dir 0: 92,97 % vs 88,75 % del segundo) pero **no** con el personaje ya girado, y la
+  causa está medida: el `-pos` del verificador del host **no pinta al personaje donde lo pinta el POC** (con
+  `-pos 26,18` el host lo pone en y=11..91; el POC, en y=171..251), y a 0,5× (ventana 320x240) el sprite de
+  26x77 queda en 13x38. Tarjeta aparte.
+- **Con `BESTIA=1`** el héroe sigue con una sola dirección: el presupuesto de RAM de esa configuración es del
+  bicho (DC-002.50). Las 8 del caminar sólo se componen con `BESTIA=0`.
+- Las **diagonales** están compuestas y en la tabla del host, pero no se ejercitaron en la consola: el guion
+  presiona un eje por vez. Un guion con dos ejes a la vez lo cierra.
+
+Evidencia completa: `console/dc/evidencia/dc-002.49b-giro-consola.txt` (8 secciones, con los comandos para
+repetir todo).
+

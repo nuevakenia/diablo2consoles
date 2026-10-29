@@ -27,7 +27,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REPO="$(cd "$HERE/../.." && pwd)"
 POC="personaje-mapa"
-SRC="$REPO/console/dc/poc/$POC"
+# DC-002.49b: POC_DIR permite compilar una COPIA del POC (por ejemplo con giroSordo=true para el mutante del
+# giro) sin tocar el arbol. Sin POC_DIR se compila el POC del repo. La verificacion de los archivos
+# compartidos con el host se hace igual (son los mismos en la copia).
+SRC="${POC_DIR:-$REPO/console/dc/poc/$POC}"
 OUT="${1:-${DC249_OUT:-/tmp/dcbuild/personaje-mapa-anim249}}"
 GEN="${GODC_GOX:-$DC_ROOT/gox}"
 
