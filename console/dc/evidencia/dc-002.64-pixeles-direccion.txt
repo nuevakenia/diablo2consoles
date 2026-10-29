@@ -1,0 +1,229 @@
+================================================================================
+DC-002.64 -- EL CANAL DE LOS PIXELES: la captura dice la MISMA direccion que el log
+Medido en la consola (Flycast 2.7 AppImage + SH-4 gccgo) el 2026-10-29
+Host: CachyOS, pantalla 3584x1080, ventana del emulador 640x480 en 1400,120 (1:1)
+Rama DC-002. Build del POC /tmp/dcbuild/giro264. Guion lento: derecha/arriba/
+izquierda/abajo (1,0 s de tecla, 4,0 s de pausa), 10 capturas + la del quieto
+================================================================================
+
+RESUMEN
+El tercer canal cierra: mirando SOLO los pixeles de la captura, cada captura del
+guion lento se clasifica a la direccion que dice el log con margen >= 4 pts. El
+corpus de esta corrida queda 10/11 (10 de 11 con veredicto, y las 10 aciertan la
+direccion), margenes de 7,00 a 19,58 pts (mediana 10,18). La que falta (c04) NO
+dictamina y esta declarada abajo con su causa medida: cayo en el cambio de tramo
+del guion, donde la imagen es un cuadro de transicion que el host no compone.
+
+Y el criterio 1 de la tarjeta, el que era el problema: la captura del quieto da
+identidad 99,32 % con su direccion (00), segundo 88,93 % y margen 10,39 pts.
+
+No se toco nada del corpus de DC-002.49 (11/11, verificado hoy despues de los
+cambios) ni la tabla CRC249B (384 lineas, byte a byte identica: `diff` vacio).
+
+--------------------------------------------------------------------------------
+1. LA CAUSA DEL -pos, RESUELTA POR MEDICION (no por cuenta)
+--------------------------------------------------------------------------------
+La tarjeta tenia la causa medida: con `-pos 26,18` el host pintaba al personaje
+en y=11..91 de la pantalla logica, y el POC, con el personaje en la misma celda,
+en y=171..251. La diferencia no es un offset misterioso: el `-pos` del verificador
+se pinta DENTRO de la ventana que fija `-centro`, y la ventana del POC no es la
+del default del verificador.
+
+La ventana del POC, medida en su codigo y confirmada por el verificador:
+
+  * lado 512 centrada en la celda 28,20;
+  * pegada en (640-512)/2, (480-512)/2 = 64,-16 de la pantalla logica;
+  * origen del nivel (28-20)*80-80-256 = 304 y (28+20)*40-256 = 1664;
+  * el verificador lo imprime en su linea de siempre:
+    `VERIF238: VENTANA lado=512 origen=304,1664 centroCelda=28,20`.
+
+Con `-centro 28,20` las referencias del host caen donde cae la captura del POC.
+El instrumento no le cree a la cuenta: mide. Por cada captura despeja la celda
+del personaje a partir de SUS pixeles (los que no son el mapa del host) y la
+compara con la celda del testigo del log; en las 10 capturas verdes el desvio va
+de 0,03 a 0,24 celda (tabla del punto 4). Y antes de clasificar se verifica la
+linea `VENTANA`: si el centro no es 28,20, ABORTA en vez de clasificar con las
+referencias mal ubicadas (esa verificacion es la que convierte un error de
+instrumento en un error visible).
+
+La otra mitad del criterio 1 es la CELDA CON DECIMALES. El POC camina en
+sub-tiles (`HITO238: POS ... celda 29.3152 18.6848`) y el ancla depende de la
+celda asi: x = (dx-dy)*80 y y = (dx+dy)*40. Truncar 29.3152,18.6848 a 29,18
+mueve el ancla 0,37 celda en (dx-dy) y 1,00 celda en (dx+dy), o sea ~30 px en x y
+~40 px en y: el personaje se sale de su caja y TODAS las direcciones caen a
+70-74 % con margen de ruido. Medido: con la celda truncada, la captura c02 daba
+`mejor=dir 07 74,38 %` con el log diciendo dir 12.
+
+--------------------------------------------------------------------------------
+2. EL INSTRUMENTO (que se agrego, y donde)
+--------------------------------------------------------------------------------
+* `console/dc/verif-personaje-238/main.go` -- `escribirPNGsDeDirecciones` escribe
+  ahora el CICLO ENTERO de cada direccion (`pantalla-<MODO>-d<NN>-c<MM>.png`)
+  ademas del cuadro 0 con el nombre viejo. La marca CENSO-GIRO dice `cuadros=`.
+* `scripts/console/clasificar-captura-249b.py` -- region = union de lo que cada
+  referencia CAMBIA respecto del mapa solo (el personaje y nada mas); identidad
+  de una direccion = la mejor de su ciclo entero; margen mejor-segundo; tolerancia
+  40 por canal (el reescalado del emulador, DC-002.49).
+* `scripts/console/direccion-por-captura.py` -- por captura: modo, cuadro, caja,
+  crc32, direccion de la tabla del host, celda EXACTA y cual testigo la sostiene
+  (`HITO238: POS` o `HITO238: CONTROL`); tolera el crc32 truncado de `geo.txt`
+  (se leia `5718` de un `57183000`: se acepta por prefijo y se busca con el crc
+  completo del log).
+* `scripts/console/run-flycast-249b.sh` -- `VENTANA=640x480` (default 320x240,
+  el de este host) y la pasa a Flycast como `window:width/height`.
+* `scripts/console/canal-pixeles-249b.py` (NUEVO) -- el pipeline completo:
+  log -> celda exacta -> referencias del host en el ancla del POC -> verificacion
+  de VENTANA -> clasificacion por margen -> celda de los pixeles. Sale 0 si todas
+  las capturas evaluables son verdes; escribe el corpus igual si alguna es roja.
+
+--------------------------------------------------------------------------------
+3. LAS CINCO LECCIONES (todas medidas, ninguna elegida)
+--------------------------------------------------------------------------------
+1) LA CELDA VA CON DECIMALES. Ver el punto 1: truncarla cuesta ~30 px en x y
+   ~40 px en y y el margen se vuelve ruido.
+2) SE COMPARA CONTRA EL CICLO ENTERO, no contra el cuadro 0. La captura cae en un
+   cuadro cualquiera: contra el cuadro 0, las capturas de los cuadros 3, 7, 10 y
+   14 bajaban a ~81 % contra SU PROPIA direccion y el margen a 0,8-3,9 pts;
+   contra el ciclo entero la misma captura da 92-99 % y el margen queda en 4-22.
+3) LA CAPTURA VA 1:1 (ventana 640x480). Con 320x240 el sprite de 26x77 se reduce
+   a 13x38 y el detalle que separa direcciones finas (00/08/09) se borra. Mismo
+   instrumento, misma corrida del guion, una sola variable:
+     * 320x240 -> 13 filas, 5 verdes, margen 0,10..10,00 (mediana 3,61);
+     * 640x480 -> 11 filas, 10 verdes, margen 2,13..19,58 (mediana 10,18).
+   (las dos corridas son las de /tmp/dc249b-run/pixeles y /tmp/dc264-run/pixeles)
+4) LA REGION ES LA UNION DE LO QUE CAMBIA. La pantalla entera da ~68 % de
+   identidad entre dos cuadros cualesquiera y esconde todo; la caja entera
+   incluye piso que nadie cambia. Se compara lo que cada referencia cambia
+   respecto del MAPA SOLO. Ademas el emulador dibuja pixeles que el host no
+   (franja de texto arriba): se miden como la INTERSECCION de las mascaras de
+   TODAS las capturas de la corrida (lo que no es el mapa en todas no es el
+   personaje, porque el personaje se mueve) y se restan. En esta corrida esa
+   franja son 2.444 px.
+5) EL MODO Y EL CUADRO DEL LOG NO SON LOS DE LA IMAGEN. La marca `HITO249: ANIM`
+   se lee DESPUES del recorte (medido en geo.txt: 3,06 s entre capturas con
+   1,5 s de espera del guion), asi que la imagen es ~1,5 s mas vieja: caminando
+   son celdas y cuadros de diferencia. Por eso el instrumento deja libres el
+   MODO (TN/TW) y el CUADRO -- lo unico que pregunta es la DIRECCION -- y si los
+   pixeles dicen que el personaje no esta donde dice el testigo, vuelve a armar
+   las referencias en la celda de los pixeles y se queda con el ancla que da MAS
+   margen. El mapa del host no depende del ancla (la ventana del nivel esta fija
+   en 28,20), asi que rearmar es barato y no arrastra la respuesta.
+
+--------------------------------------------------------------------------------
+4. EL CORPUS DE LA CORRIDA A 1:1
+--------------------------------------------------------------------------------
+Comando (una sola linea, sale 0 si todo verde):
+
+  python3 scripts/console/canal-pixeles-249b.py --run /tmp/dc264-run/pixeles \
+      --tabla /tmp/dc264/crc249b-tntw.txt --refs /tmp/dc264-refs-1a
+
+Veredicto por captura. Verde = dir_pixel == dir_log Y margen >= 4 pts Y |celda
+de los pixeles - celda del testigo| <= 0,30 celda.
+
+SIN-DATOS c05            la captura no cayo sobre una marca ANIM
+VERDE c00-quieto     TN   c09  dir_log=00 dir_pixel=00 (modo TN cuadro 05)  identidad=99.32% segundo=09:88.93% margen=10.39  celda_testigo=28,20 (POS)  celda_pixeles=28.09,20.06 desvio=0.09 ancla=28,20 caja_medida=21x71 pixeles=679 recorte=39x82
+VERDE c01            TN   c02  dir_log=12 dir_pixel=12 (modo TW cuadro 06)  identidad=88.62% segundo=00:81.61% margen= 7.00  celda_testigo=29.2927,18.7073 (CONTROL)  celda_pixeles=29.09,18.93 desvio=0.22 ancla=29.0938,18.9312 caja_medida=21x57 pixeles=533 recorte=39x82
+VERDE c02            TN   c11  dir_log=12 dir_pixel=12 (modo TN cuadro 07)  identidad=99.07% segundo=01:79.49% margen=19.58  celda_testigo=29.2927,18.7073 (POS)  celda_pixeles=29.50,18.88 desvio=0.21 ancla=29.2927,18.7073 caja_medida=23x44 pixeles=489 recorte=39x82
+VERDE c03            TN   c12  dir_log=08 dir_pixel=08 (modo TN cuadro 08)  identidad=99.75% segundo=00:87.46% margen=12.29  celda_testigo=27.9642,17.3788 (POS)  celda_pixeles=28.14,17.56 desvio=0.18 ancla=27.9642,17.3788 caja_medida=23x61 pixeles=604 recorte=39x82
+ROJO c04            TW   c03  dir_log=04 dir_pixel=09 (modo TW cuadro 02)  identidad=78.33% segundo=00:76.20% margen= 2.13  celda_testigo=27.9151,17.4279 (CONTROL)  celda_pixeles=27.71,18.04 desvio=0.61 ancla=27.7125,18.0375 caja_medida=20x60 pixeles=518 recorte=39x82
+VERDE c06            TN   c09  dir_log=00 dir_pixel=00 (modo TN cuadro 05)  identidad=99.32% segundo=09:89.21% margen=10.11  celda_testigo=27.9244,19.9854 (POS)  celda_pixeles=28.02,20.02 desvio=0.10 ancla=27.9244,19.9854 caja_medida=19x71 pixeles=610 recorte=39x82
+VERDE c07            TN   c03  dir_log=00 dir_pixel=00 (modo TN cuadro 15)  identidad=99.36% segundo=08:89.46% margen= 9.89  celda_testigo=27.9244,19.9854 (POS)  celda_pixeles=28.00,20.00 desvio=0.08 ancla=27.9244,19.9854 caja_medida=21x73 pixeles=700 recorte=39x82
+VERDE c08            TN   c13  dir_log=00 dir_pixel=00 (modo TN cuadro 09)  identidad=99.29% segundo=09:89.11% margen=10.18  celda_testigo=27.9244,19.9854 (POS)  celda_pixeles=28.17,20.18 desvio=0.24 ancla=27.9244,19.9854 caja_medida=19x59 pixeles=523 recorte=39x82
+VERDE c09            TN   c06  dir_log=00 dir_pixel=00 (modo TN cuadro 02)  identidad=99.43% segundo=08:89.31% margen=10.12  celda_testigo=27.9244,19.9854 (POS)  celda_pixeles=28.00,20.00 desvio=0.08 ancla=27.9244,19.9854 caja_medida=21x73 pixeles=685 recorte=39x82
+VERDE c10            TN   c00  dir_log=00 dir_pixel=00 (modo TN cuadro 12)  identidad=99.89% segundo=09:88.21% margen=11.68  celda_testigo=27.9244,19.9854 (POS)  celda_pixeles=27.96,19.97 desvio=0.03 ancla=27.9244,19.9854 caja_medida=21x76 pixeles=741 recorte=39x82
+VERDE c99-final      TN   c10  dir_log=00 dir_pixel=00 (modo TN cuadro 06)  identidad=100.00% segundo=09:88.86% margen=11.14  celda_testigo=27.9244,19.9854 (POS)  celda_pixeles=28.16,20.17 desvio=0.23 ancla=27.9244,19.9854 caja_medida=19x60 pixeles=543 recorte=39x82
+
+CANAL-PIXELES 249B 10/11
+
+Como se lee una linea: `dir_log` es la direccion que dice el canal del compositor
+(el crc32 del buffer contra la tabla CRC249B); `dir_pixel` es la que gana por
+pixeles; `modo`/`cuadro` son los de la imagen (libres, punto 3.5); `desvio` es
+cuanta distancia hay entre la celda que dicen los pixeles y la que dice el
+testigo del log; `ancla` es la celda con la que se armaron las referencias que
+ganaron (el testigo, o la de los pixeles cuando esa dio mas margen).
+
+OJO con `caja_medida`: NO es la caja del COF (26x77, 27x71...), es la caja de los
+pixeles que DIFIEREN del mapa, o sea el cuerpo del sprite sin el contorno que
+coincide con el fondo. Sirve para ubicar al personaje, no para compararlo con la
+tabla de cajas (que es lo que hace el canal 2 de DC-002.49b).
+
+--------------------------------------------------------------------------------
+5. LA UNICA QUE NO DICTAMINA: c04 (y por que)
+--------------------------------------------------------------------------------
+c04 es la captura que cayo en el CAMBIO de tramo (el guion pasa de "arriba" a
+"izquierda"). Lo medido:
+
+  * la identidad de la mejor direccion es 78,33 % cuando las capturas en reposo
+    dan 99,0-100,00 %: NINGUNA de las 384 referencias (16 direcciones x TN/TW,
+    todas con todos sus cuadros) se parece a esa imagen;
+  * el margen no llega a 4 pts en ninguno de los tres anclas probados: 2,13 con
+    el testigo, 2,35 con la celda que despeja la caja de las dos candidatas
+    (dir 04 y dir 08), 0,29 en TN con el testigo;
+  * la caja de los pixeles del personaje (24x76 contando las componentes que se
+    tocan) no es NINGUNA de las 29 cajas distintas de la tabla de 384 cuadros:
+    las mas cercanas son 24x77 y 25x76, ninguna es 24x76;
+  * el log, 1,5 s mas nuevo, ya dice dir 04 caminando, y el tramo anterior era
+    dir 08: la imagen es de la transicion.
+
+Conclusion: el canal de pixeles no inventa un veredicto. La captura no dice una
+direccion porque la imagen es un cuadro de transicion que el host no compone (el
+POC compone los 8 ciclos estables, no los cuadros de cambio de direccion). No es
+un fallo del clasificador: es un limite del objeto medido, y el corpus lo declara
+en vez de esconderlo.
+
+--------------------------------------------------------------------------------
+6. LO QUE NO SE TOCO (criterio 4, verificado hoy)
+--------------------------------------------------------------------------------
+* TABLA CRC249B: se regenero despues de todos los cambios
+
+    go run ./console/dc/verif-personaje-238 -censo-dirs TN,TW -crc-dirs \
+        > /tmp/dc264-crc-verif.txt
+    diff /tmp/dc264-crc-verif.txt /tmp/dc264/crc249b-tntw.txt   # vacio
+
+  384 lineas `CRC249B`, identicas byte a byte: el cambio de main.go solo agrega
+  PNGs, no toca el compositor ni el censo.
+* CORPUS DE DC-002.49: 11/11, con
+
+    bash scripts/console/checar-anim-249-corrida.sh /tmp/dc264/build49 \
+        /tmp/dc264/build49 /tmp/dc249b-run/anim-n7 /tmp/dc249b-run/anim-m7 \
+        /tmp/dc264-corpus-249-verif.txt
+
+  (C1..C9 en verde, `ANIM249 CORPUS 11/11`, la cadencia de TN en 128 ms/cuadro y
+  el mutante con 0 pixeles cambiados)
+
+--------------------------------------------------------------------------------
+7. COMO REPETIRLO
+--------------------------------------------------------------------------------
+1) tabla del host (una vez por build del POC)
+
+   cd ~/Proyectos/diablo2consoles
+   go run ./console/dc/verif-personaje-238 -censo-dirs TN,TW -crc-dirs \
+       > /tmp/dc264/crc249b-tntw.txt
+
+2) build del POC y corrida a 1:1 (la ventana es la mitad del resultado, punto 3.3)
+
+   SALTAR_STDLIB=1 SALTAR_MOTOR=1 bash scripts/console/build-anim-249.sh /tmp/dcbuild/giro264
+   LIBGL_ALWAYS_SOFTWARE=1 TECLAS=1 VENTANA=640x480 \
+   GUION="derecha 1.0 arriba 1.0 izquierda 1.0 abajo 1.0" PAUSA=4.0 \
+   CAPTURAS=10 INTERVALO=1.5 \
+   bash scripts/console/run-flycast-249b.sh /tmp/dcbuild/giro264/disc.gdi /tmp/dc264-run/pixeles
+
+3) el canal de pixeles
+
+   python3 scripts/console/canal-pixeles-249b.py --run /tmp/dc264-run/pixeles \
+       --tabla /tmp/dc264/crc249b-tntw.txt --refs /tmp/dc264-refs-1a
+
+   (--ver deja el ranking de las 8 direcciones por captura; --margen y
+   --celda-tolerancia mueven los umbrales; las referencias se reusan por celda)
+
+4) una captura sola, a mano (util para depurar)
+
+   go run ./console/dc/verif-personaje-238 -centro 28,20 -pos 29.2927,18.7073 \
+       -censo-dirs TN -png-dirs TN -png-ciclo /tmp/refs/TN-29.2927_18.7073 \
+       -png-mapa /tmp/refs/TN-29.2927_18.7073/mapa.png
+   python3 scripts/console/clasificar-captura-249b.py \
+       --host /tmp/refs/TN-29.2927_18.7073 --mapa /tmp/refs/TN-29.2927_18.7073/mapa.png \
+       --modo TN --ventana 1400,120,640,480 /tmp/dc264-run/pixeles/c02.png
+
+El `-centro 28,20` es el del POC (punto 1): sin el, el `-pos` cae en otra ventana
+y todo el canal miente con numeros plausibles.

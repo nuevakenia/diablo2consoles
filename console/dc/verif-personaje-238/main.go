@@ -411,10 +411,15 @@ func main() {
 	}
 }
 
-// escribirPNGsDeDirecciones (DC-002.49b): la pantalla del host con el CUADRO 0 de cada direccion del COF encima,
-// con el nombre `pantalla-<MODO>-d<NN>.png`. Es la referencia del criterio 1: la captura de la consola se compara
-// contra las 8 y la que gana dice QUE direccion se dibujo (el medidor recorta la caja del personaje con las mismas
-// cuentas que ya usa DC-002.49, `medir-anim-249.py`).
+// escribirPNGsDeDirecciones (DC-002.49b, DC-002.64): la pantalla del host con el CUADRO de cada direccion del
+// COF encima. Desde DC-002.64 se escribe el CICLO ENTERO de cada direccion (un PNG por cuadro, con el nombre
+// `pantalla-<MODO>-d<NN>-c<MM>.png`) y ademas el cuadro 0 con el nombre viejo `pantalla-<MODO>-d<NN>.png`.
+//
+// POR QUE EL CICLO ENTERO (medido en DC-002.64): la captura es de un cuadro cualquiera de la animacion y el
+// cuadro 0 solo se parece a las capturas quietas del arranque. Comparando contra el cuadro 0, las capturas del
+// ciclo (cuadro 3, 7, 10, 14) bajaban a ~81 % de identidad contra SU PROPIA direccion y el margen contra el
+// segundo se caia a 0,8-3,9 pts; contra el cuadro que de verdad se dibujo, la misma captura da 92-95 % y el
+// margen queda en 4-8 pts. Con el ciclo entero el clasificador no tiene que saber que cuadro se dibujo.
 func escribirPNGsDeDirecciones(mc *d2mpq.MPQ, modo, carpeta string, pal [256][3]uint8,
 	mapaBase []byte, anclaX, anclaY int) {
 	if carpeta == "" {
@@ -429,7 +434,7 @@ func escribirPNGsDeDirecciones(mc *d2mpq.MPQ, modo, carpeta string, pal [256][3]
 	}
 
 	n := cof.FramesPerDirection
-	escritas := 0
+	escritas, dirsEscritas := 0, 0
 
 	for dir := 0; dir < cof.NumberOfDirections; dir++ {
 		capas := capasDelCiclo(mc, cof, dir, modo)
@@ -439,19 +444,28 @@ func escribirPNGsDeDirecciones(mc *d2mpq.MPQ, modo, carpeta string, pal [256][3]
 			continue
 		}
 
-		p := compuestos[0]
+		dirsEscritas++
 
-		pantalla := make([]byte, len(mapaBase))
-		copy(pantalla, mapaBase)
-		dibujarPersonaje(pantalla, p, pal, anclaX+p.Izq, anclaY+p.Arriba)
+		for cuadro, p := range compuestos {
+			pantalla := make([]byte, len(mapaBase))
+			copy(pantalla, mapaBase)
+			dibujarPersonaje(pantalla, p, pal, anclaX+p.Izq, anclaY+p.Arriba)
 
-		ruta := filepath.Join(carpeta, fmt.Sprintf("pantalla-%s-d%02d.png", modo, dir))
-		escribirPNG(ruta, pantalla, pantallaAncho, pantallaAlto)
-		escritas++
+			escribirPNG(filepath.Join(carpeta, fmt.Sprintf("pantalla-%s-d%02d-c%02d.png", modo, dir, cuadro)),
+				pantalla, pantallaAncho, pantallaAlto)
+			escritas++
+
+			// el nombre viejo (cuadro 0) se sigue escribiendo: es la referencia que usaba la 1a version del
+			// clasificador y no cambia nada para quien la lea.
+			if cuadro == 0 {
+				escribirPNG(filepath.Join(carpeta, fmt.Sprintf("pantalla-%s-d%02d.png", modo, dir)),
+					pantalla, pantallaAncho, pantallaAlto)
+			}
+		}
 	}
 
-	fmt.Printf("CENSO-GIRO: %s PNG-DIRS COF=%s dirs=%d escritas=%d carpeta=%s\n",
-		modo, nombreCOF, cof.NumberOfDirections, escritas, carpeta)
+	fmt.Printf("CENSO-GIRO: %s PNG-DIRS COF=%s dirs=%d dirsEscritas=%d cuadros=%d carpeta=%s\n",
+		modo, nombreCOF, cof.NumberOfDirections, dirsEscritas, escritas, carpeta)
 }
 
 // censarPeso: cuanto pesa componer UN ciclo, capa por capa, y cual es el PICO de memoria (crudo + decodificado).

@@ -5798,7 +5798,7 @@ La dirección no se inventa: es la cadena del motor, la misma que usa para pinta
   con el ancla correcta (dir 0: 92,97 % vs 88,75 % del segundo) pero **no** con el personaje ya girado, y la
   causa está medida: el `-pos` del verificador del host **no pinta al personaje donde lo pinta el POC** (con
   `-pos 26,18` el host lo pone en y=11..91; el POC, en y=171..251), y a 0,5× (ventana 320x240) el sprite de
-  26x77 queda en 13x38. Tarjeta aparte.
+  26x77 queda en 13x38. Tarjeta aparte. → **cerrado en DC-002.64** (sección 77).
 - **Con `BESTIA=1`** el héroe sigue con una sola dirección: el presupuesto de RAM de esa configuración es del
   bicho (DC-002.50). Las 8 del caminar sólo se componen con `BESTIA=0`.
 - Las **diagonales** están compuestas y en la tabla del host, pero no se ejercitaron en la consola: el guion
@@ -5806,4 +5806,69 @@ La dirección no se inventa: es la cadena del motor, la misma que usa para pinta
 
 Evidencia completa: `console/dc/evidencia/dc-002.49b-giro-consola.txt` (8 secciones, con los comandos para
 repetir todo).
+
+## 77. DC-002.64: el **canal de los píxeles** cierra el giro — mirando SÓLO la captura, 10 de 11 capturas del guion clasifican a la dirección del log con **margen ≥ 7 pts**, y la que falta está declarada con su causa medida
+
+El tercer canal cruza el POC contra el compositor por **crc32 y caja** (DC-002.49b). El que faltaba mira la
+**captura del emulador** y pregunta, sólo con píxeles, qué dirección se dibujó. Cierra:
+
+- **criterio 1** (las referencias del host caen donde cae la captura): la captura del quieto da identidad
+  **99,32 %** con su dirección (00), segundo 88,93 %, **margen 10,39 pts**;
+- **criterio 2** (cada captura clasifica a la dirección del log con margen ≥ 4): **10/11**, márgenes de
+  **7,00 a 19,58 pts** (mediana 10,18) — c00-quieto, c01 (dir 12), c02 (12), c03 (8), c06, c07, c08, c09, c10
+  y c99-final (0);
+- la que falta, **c04**, no dictamina: cayó en el cambio de tramo del guion y su imagen es un cuadro de
+  transición que el host no compone (identidad 78,33 % contra las 384 referencias, margen < 2,5 pts en los tres
+  anclas probados, y su caja de 24x76 no es ninguna de las 29 cajas de la tabla). No se inventa veredicto;
+- **criterio 4** (no tocar DC-002.49): la tabla `CRC249B` regenerada es **idéntica byte a byte** (384 líneas) y
+  el corpus de DC-002.49 sigue **11/11** después de los cambios.
+
+### 77.1 La causa del `-pos`, resuelta por medición
+
+El `-pos` del verificador se pinta **dentro de la ventana que fija `-centro`**, y la ventana del POC no es la
+del default: es de **512** centrada en la celda **28,20**, pegada en **64,-16** de la pantalla lógica, con el
+origen del nivel en **304,1664** (lo que imprime `VERIF238: VENTANA`). Con `-centro 28,20 -pos <celda exacta>`
+las referencias caen donde cae la captura. Y no se le cree a la cuenta: por cada captura el instrumento
+despeja **la celda del personaje a partir de sus píxeles** y la compara con la del testigo del log — en las 10
+verdes el desvío va de **0,03 a 0,24 celda**. Si la línea `VENTANA` no dice `centroCelda=28,20`, el
+instrumento **aborta** en vez de clasificar con las referencias mal ubicadas.
+
+La otra mitad es la **celda con decimales**: el POC camina en sub-tiles (`celda 29.3152 18.6848`) y el ancla se
+mueve `(dx-dy)*80` en x y `(dx+dy)*40` en y; truncar a `29,18` son ~30 px en x y ~40 px en y, y todas las
+direcciones caen a 70-74 % con margen de ruido.
+
+### 77.2 Las cuatro cosas que hubo que arreglar en el instrumento (y su número)
+
+1. **El ciclo entero, no el cuadro 0**: la captura cae en un cuadro cualquiera. Contra el cuadro 0, las
+   capturas de los cuadros 3/7/10/14 daban ~81 % contra *su propia* dirección y margen 0,8-3,9 pts; con el
+   ciclo entero, 92-99 % y margen 4-22 pts. `escribirPNGsDeDirecciones` escribe ahora
+   `pantalla-<MODO>-d<NN>-c<MM>.png` para todos los cuadros (y sigue escribiendo el cuadro 0 con el nombre
+   viejo).
+2. **La captura a 1:1 (ventana 640x480)**: a 320x240 el sprite de 26x77 queda en 13x38 y el detalle que separa
+   las direcciones finas se borra. Mismo instrumento y mismo guion, una sola variable: 320x240 → **5/13 verdes**
+   con margen mediano **3,61**; 640x480 → **10/11 verdes** con margen mediano **10,18**. `run-flycast-249b.sh`
+   gana `VENTANA=` y se la pasa a Flycast.
+3. **La región es la unión de lo que cambia**: la pantalla entera da ~68 % entre dos cuadros cualesquiera y
+   esconde todo; se compara la unión de lo que cada referencia cambia respecto del **mapa solo**. Los píxeles
+   que el emulador dibuja y el host no (la franja de texto de arriba, 2.444 px en esta corrida) se miden como
+   la **intersección de las máscaras de todas las capturas** —el personaje se mueve, la franja no— y se restan.
+4. **El modo y el cuadro del log no son los de la imagen**: `HITO249: ANIM` se lee *después* del recorte
+   (medido en `geo.txt`: 3,06 s entre capturas con 1,5 s de espera), así que la imagen es ~1,5 s más vieja.
+   El instrumento deja libres modo (TN/TW) y cuadro, pregunta **sólo la dirección**, y si los píxeles dicen que
+   el personaje no está donde dice el testigo rearma las referencias en la celda de los píxeles (el mapa del
+   host no depende del ancla: la ventana está fija en 28,20).
+
+### 77.3 Cómo se corre
+
+```
+python3 scripts/console/canal-pixeles-249b.py --run /tmp/dc264-run/pixeles \
+    --tabla /tmp/dc264/crc249b-tntw.txt --refs /tmp/dc264-refs-1a
+```
+
+Sale 0 si todas las capturas evaluables son verdes y escribe el corpus en `<run>/canal-pixeles.txt`; con
+`--ver` deja el ranking de las 8 direcciones por captura. El resto de los comandos (tabla del host, build,
+corrida a 1:1) está en la evidencia.
+
+Evidencia completa: `console/dc/evidencia/dc-002.64-pixeles-direccion.txt` (7 secciones, con el corpus, la
+comparación de ventanas y los comandos para repetir todo).
 

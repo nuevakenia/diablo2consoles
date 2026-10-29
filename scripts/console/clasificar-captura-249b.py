@@ -19,9 +19,15 @@ LA REGLA QUE HACE QUE ESTO NO SE ENGANE A SI MISMO
 La captura se tiene que parecer a SU direccion MUCHO mas que a la segunda: se informa el margen
 (mejor - segundo). Si el margen es chico, el numero no dice nada y el corpus lo tiene que declarar.
 
-Las referencias tienen que estar compuestas EN EL MISMO ANCLA que la captura: el personaje se mueve al
-caminar, y una referencia centrada no se parece a un personaje corrido 20 px. Las arma el que llama con
-`verif-personaje-238 -pos <celda> -censo-dirs TN -png-dirs TN` (medido: el censo tarda 0,43 s en el host).
+EL ANCLA (DC-002.64, medido): las referencias tienen que estar compuestas EN EL MISMO ANCLA que la captura, y
+el ancla del POC es `-centro 28,20` (la ventana de 512 del nivel, pegada en 64,-16 de la pantalla logica: o
+sea origen 304,1664) con `-pos <celda>` EXACTA del personaje. Eso lo arma `canal-pixeles-249b.py`, que ademas
+verifica la linea VENTANA del host antes de creerle a las referencias.
+
+OJO (DC-002.64): la version anterior de este comentario culpaba al `-pos` del host de no pintar donde pinta el
+POC. Medido: era falso — con `-centro 28,20` y la celda exacta el host pinta EXACTAMENTE donde el POC (misma
+cuenta: `PixelDeLaCelda(celda, origen) + (mapaX,mapaY)`). Lo que fallaba era quien armaba la referencia: le
+pasaba la celda RECORTADA a entero (medio subtile = 80 px de error). Ver `direccion-por-captura.py`.
 
 Uso:
   clasificar-captura-249b.py --host REFS --mapa REFS/mapa.png --modo TN --ventana L,T,W,H captura.png ...
@@ -49,17 +55,103 @@ ANIM = cargar("medidor249", "medir-anim-249.py")
 
 
 def region_de_las_referencias(refs, mapa, tolerancia):
-    """La union de lo que CADA direccion pinta encima del mapa solo (en pixeles logicos 640x480)."""
+    """La union de lo que CADA direccion (y CADA cuadro de su ciclo) pinta encima del mapa solo, en pixeles
+    logicos 640x480."""
     x0 = y0 = 10 ** 9
     x1 = y1 = -1
-    for d, img in refs.items():
-        cambio = (np.abs(img.astype(np.int16) - mapa.astype(np.int16)).max(axis=2) > tolerancia)
-        ys, xs = np.where(cambio)
-        if len(xs) == 0:
-            raise SystemExit(f"VACIA dir={d:02d}: no cambia ningun pixel respecto del mapa")
-        x0, y0 = min(x0, int(xs.min())), min(y0, int(ys.min()))
-        x1, y1 = max(x1, int(xs.max()) + 1), max(y1, int(ys.max()) + 1)
+    for d, imagenes in refs.items():
+        for img in imagenes:
+            cambio = (np.abs(img.astype(np.int16) - mapa.astype(np.int16)).max(axis=2) > tolerancia)
+            ys, xs = np.where(cambio)
+            if len(xs) == 0:
+                raise SystemExit(f"VACIA dir={d:02d}: no cambia ningun pixel respecto del mapa")
+            x0, y0 = min(x0, int(xs.min())), min(y0, int(ys.min()))
+            x1, y1 = max(x1, int(xs.max()) + 1), max(y1, int(ys.max()) + 1)
     return x0, y0, x1, y1
+
+
+def imagenes_de_la_direccion(host, modo, d):
+    """Los PNG de una direccion: el CICLO ENTERO si esta (`-cNN`), o el cuadro 0 solo si es de antes (DC-002.64)."""
+    prefijo = "pantalla-%s-d%02d" % (modo, d)
+    ciclo = sorted(n for n in os.listdir(host) if n.startswith(prefijo + "-c") and n.endswith(".png"))
+    if ciclo:
+        return [os.path.join(host, n) for n in ciclo]
+    suelto = os.path.join(host, prefijo + ".png")
+    return [suelto] if os.path.exists(suelto) else []
+
+
+def cargar_referencias(host, modo, dirs):
+    """{dir: [imagenes del ciclo]} y cuantos cuadros trae cada direccion."""
+    refs, ruta = {}, {}
+    faltan = []
+    for d in dirs:
+        rutas = imagenes_de_la_direccion(host, modo, d)
+        if not rutas:
+            faltan.append("pantalla-%s-d%02d*.png" % (modo, d))
+            continue
+        refs[d] = [MED.decodificar(r) for r in rutas]
+        ruta[d] = rutas
+    if faltan:
+        raise SystemExit("FALTAN las referencias: " + ", ".join(faltan))
+    return refs, ruta
+
+
+def clasificar(host, mapa, modo, ventana, capturas, dirs=None, tolerancia=40):
+    """Una fila por captura: el ranking de identidad contra cada direccion, el mejor, el segundo y el margen.
+
+    La identidad de una DIRECCION es la mejor de su ciclo entero (DC-002.64): la captura cayo en un cuadro
+    cualquiera de la animacion, y comparar solo contra el cuadro 0 castigaba a todas las direcciones por igual
+    (medido: 81 % en vez de 93 % para la direccion correcta).
+
+    Devuelve (region, filas). Cada fila es un dict con: captura, recorte, ranking (lista de (ident, dir)),
+    mejor, segundo, margen, y el cuadro que gano por direccion; o `falla` con el motivo.
+    """
+    dirs = dirs or DIRS_DEL_CONTROL
+    mapa_img = MED.decodificar(mapa)
+    refs, rutas = cargar_referencias(host, modo, dirs)
+    region = region_de_las_referencias(refs, mapa_img, 8)
+    cuadros = {d: len(refs[d]) for d in dirs}
+
+    filas = []
+    for ruta in capturas:
+        fila = {"captura": os.path.basename(ruta), "region": region, "cuadros": cuadros}
+        img = MED.decodificar(ruta)
+        recorte = ANIM.recorte_en_la_captura(img, ventana, region)
+        if recorte is None:
+            fila["falla"] = "la region del personaje no cae dentro de la captura"
+            filas.append(fila)
+            continue
+
+        alto_d, ancho_d = recorte.shape[0], recorte.shape[1]
+        ranking, ganador = [], {}
+        for d in dirs:
+            mejor_d = None
+            for k, ref in enumerate(refs[d]):
+                ref_crop = ANIM.recorte_de_la_referencia(ref, region, (ancho_d, alto_d))
+                if ref_crop is None:
+                    continue
+                ident = ANIM.identidad(recorte, ref_crop)
+                if mejor_d is None or ident > mejor_d[0]:
+                    mejor_d = (ident, k)
+            if mejor_d is None:
+                continue
+            ranking.append((mejor_d[0], d))
+            ganador[d] = mejor_d
+        if not ranking:
+            fila["falla"] = "ninguna referencia entra en el recorte"
+            filas.append(fila)
+            continue
+
+        ranking.sort(reverse=True)
+        fila["recorte"] = (ancho_d, alto_d)
+        fila["ranking"] = ranking
+        fila["ganador"] = ganador
+        fila["mejor"] = ranking[0]
+        fila["segundo"] = ranking[1] if len(ranking) > 1 else (0.0, -1)
+        fila["margen"] = fila["mejor"][0] - fila["segundo"][0]
+        fila["cuadro_del_mejor"] = ganador[ranking[0][1]][1]
+        filas.append(fila)
+    return region, filas
 
 
 def main():
@@ -80,40 +172,21 @@ def main():
         if len(ventana) != 4:
             raise SystemExit("--ventana tiene que ser L,T,W,H")
 
-    mapa = MED.decodificar(args.mapa)
     dirs = [int(x) for x in args.dirs.split(",")]
-    refs = {}
-    for d in dirs:
-        ruta = os.path.join(args.host, "pantalla-%s-d%02d.png" % (args.modo, d))
-        if not os.path.exists(ruta):
-            raise SystemExit("FALTA " + ruta)
-        refs[d] = MED.decodificar(ruta)
-
-    region = region_de_las_referencias(refs, mapa, 8)
+    region, filas = clasificar(args.host, args.mapa, args.modo, ventana, args.capturas, dirs, args.tolerancia)
     print("region del personaje (union de las %d direcciones, pixeles logicos): %d,%d -> %d,%d  (%dx%d)"
           % (len(dirs), region[0], region[1], region[2], region[3], region[2] - region[0], region[3] - region[1]))
 
-    for ruta in args.capturas:
-        img = MED.decodificar(ruta)
-        recorte = ANIM.recorte_en_la_captura(img, ventana, region)
-        if recorte is None:
-            print("%-28s FALLA: la region del personaje no cae dentro de la captura" % os.path.basename(ruta))
+    for f in filas:
+        if f.get("falla"):
+            print("%-28s FALLA: %s" % (f["captura"], f["falla"]))
             continue
-
-        alto_d, ancho_d = recorte.shape[0], recorte.shape[1]
-        filas = []
-        for d in dirs:
-            ref_crop = ANIM.recorte_de_la_referencia(refs[d], region, (ancho_d, alto_d))
-            if ref_crop is None:
-                continue
-            filas.append((ANIM.identidad(recorte, ref_crop), d))
-
-        filas.sort(reverse=True)
-        mejor, segundo = filas[0], filas[1] if len(filas) > 1 else (0.0, -1)
-        margen = mejor[0] - segundo[0]
-        print("%-28s mejor=dir %02d  identidad=%.2f %%  segundo=dir %02d (%.2f %%)  margen=%.2f pts  recorte=%dx%d"
-              % (os.path.basename(ruta), mejor[1], mejor[0], segundo[1], segundo[0], margen, ancho_d, alto_d))
-        print("    ranking: " + "  ".join("%02d:%.2f" % (d, i) for i, d in filas))
+        mejor, segundo = f["mejor"], f["segundo"]
+        print("%-28s mejor=dir %02d (cuadro %02d)  identidad=%.2f %%  segundo=dir %02d (%.2f %%)  margen=%.2f pts  "
+              "recorte=%dx%d"
+              % (f["captura"], mejor[1], f["cuadro_del_mejor"], mejor[0], segundo[1], segundo[0], f["margen"],
+                 f["recorte"][0], f["recorte"][1]))
+        print("    ranking: " + "  ".join("%02d:%.2f" % (d, i) for i, d in f["ranking"]))
 
     return 0
 

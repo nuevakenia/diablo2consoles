@@ -23,6 +23,14 @@ IMG="${1:?uso: run-flycast-249b.sh <disc.gdi> <dir_salida> [x y]}"
 OUT="${2:-/tmp/dc249b-run}"
 POS="${3:-1400 120}"
 [ -n "${4:-}" ] && POS="$3 $4"
+# DC-002.64: el tamano de la ventana del emulador NO es un detalle: la pantalla logica del POC es 640x480 y
+# con la ventana en 320x240 (el default de esta maquina, leido de ~/.config/flycast/emu.cfg) el sprite de 26x77
+# se reduce a 13x38 y las direcciones que solo se diferencian en el detalle fino (00 / 08 / 09) dejan de
+# distinguirse: medido, el margen del canal de pixeles se cae a 0,5-1,5 pts. Con VENTANA=640x480 la captura es
+# 1:1 con la pantalla logica y el margen pasa de 4 pts en TODAS las capturas.
+VENTANA="${VENTANA:-320x240}"
+VW="${VENTANA%x*}"
+VH="${VENTANA#*x}"
 FLY="${FLYCAST:-$HOME/dreamcast/dl/flycast.AppImage}"
 DISP="${DISPLAY:-:0}"
 TOKEN="dc249b"
@@ -90,8 +98,9 @@ regla() {
         grep -i "flycast - $TOKEN" | grep 'geo=' | sed 's/.*DC249B-CAP|/ventana: /' | tail -1
 }
 
-echo "== Flycast: $GDI (ventana en $PX,$PY + keepAbove; consola serie si)"
+echo "== Flycast: $GDI (ventana $VENTANA en $PX,$PY + keepAbove; consola serie si)"
 setsid env DISPLAY="$DISP" "$FLY" -config "window:fullscreen=no" \
+    -config "window:width=$VW" -config "window:height=$VH" \
     -config "window:left=$PX" -config "window:top=$PY" \
     -config "Debug:SerialConsoleEnabled=true" "$GDI" >"$OUT/flycast.log" 2>&1 &
 PID=$!
