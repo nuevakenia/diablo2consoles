@@ -54,6 +54,25 @@ def main():
         shutil.copyfile(iso, t1)
 
     # Pista 2 (audio): un sector basta, no se reproduce nada.
+    #
+    # DC-002.61: DONDE VA ESTA PISTA IMPORTA. El arranque vive en el sector 25 del ISO (FAD 175 =
+    # 150 + 25) y el ejecutable ocupa los FAD 175..175+N. Si el sector de audio cae dentro de ese
+    # rango, el emulador le contesta ese FAD a la pista de audio (readSector recorre las pistas de
+    # atras para adelante y el audio gana) y devuelve 2048 B de ceros de un sector de 2352: queda un
+    # agujero de un sector en medio del .text, en RAM. Medido con el FAD 600 (LBA 450, el valor
+    # viejo): borraba el offset 0xD4800 del binario, que caia dentro de _pvr_allocate_buffers; el
+    # flujo se iba a la zona vacia, no ejecutaba el epilogo, la pila quedaba 0x20 abajo y el rts
+    # saltaba a 0x8c42e020. Como el agujero esta siempre en el mismo offset pero el codigo que lo
+    # habita cambia con cada compilacion, el sintoma se movia con el tamano del binario.
+    # Por eso el audio va bien lejos del ejecutable y antes de la zona de alta.
+    AUDIO_LBA = 30000
+    binario = os.path.join(d, "1ST_READ.BIN")
+    if os.path.isfile(binario):
+        sectores_bin = (os.path.getsize(binario) + SECTOR - 1) // SECTOR
+        fin_bin_fad = 150 + 25 + sectores_bin
+        if 150 + AUDIO_LBA <= fin_bin_fad:
+            sys.exit(f"el audio en LBA {AUDIO_LBA} (FAD {150 + AUDIO_LBA}) cae dentro del ejecutable "
+                     f"(termina en FAD {fin_bin_fad}): correrlo mas arriba")
     with open(t2, "wb") as f:
         f.write(b"\0" * AUDIO_SECTOR)
 
@@ -87,7 +106,7 @@ def main():
     with open(gdi, "w") as f:
         f.write("3\n")
         f.write("1 0 4 %d track01.iso 0\n" % SECTOR)
-        f.write("2 450 0 %d track02.raw 0\n" % AUDIO_SECTOR)
+        f.write("2 %d 0 %d track02.raw 0\n" % (AUDIO_LBA, AUDIO_SECTOR))
         f.write("3 45000 4 %d track03.iso 0\n" % SECTOR)
 
     print(f"GDI: {gdi} ({os.path.getsize(iso)} bytes = {sectores_datos} sectores; el arranque lee en FAD "

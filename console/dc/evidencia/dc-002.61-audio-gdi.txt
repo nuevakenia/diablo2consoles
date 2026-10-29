@@ -1,0 +1,119 @@
+DC-002.61 - EL AUDIO DEL GDI SE COMIA UN SECTOR DEL EJECUTABLE
+==============================================================
+
+Fecha: 2026-10-29.  Rama DC-002.  Cierra el bloqueo de DC-002.53 / 56 / 57 / 58 / 60 / 63.
+
+RESUMEN EN UNA LINEA
+--------------------
+El .gdi que genera scripts/console/mkgdi.py ponia la pista de AUDIO en LBA 450 (FAD 600). El
+ejecutable ocupa los FAD 175..1078, asi que ese unico sector de audio caia DENTRO del binario:
+al cargarlo, el FAD 600 se lo contestaba la pista de audio y el sector 425 del ejecutable
+(offset 0xD4800) quedaba en 2048 bytes de ceros, en RAM. El flujo de _pvr_allocate_buffers se
+iba a esa zona vacia, no ejecutaba su epilogo, la pila quedaba 0x20 abajo y el rts de
+_pvr_init saltaba a 0x8c42e020 (la pila). No era el bicho, no era Go, no era el PVR: era el
+.gdi.
+
+SINTOMA (con el GDI viejo)
+--------------------------
+Corrida bestia=1, ~1,5 s: "Unhandled exception: PC 8c42e020, code 1, evt 0180".
+El PC cae en datos. Dependencia brutal del tamano del binario, en escalones de 64 B:
+1ST_READ de 1.851.848 B dibujaba; 1.851.784 B se colgaba. De ahi el "Heisenbug" de DC-002.53.
+
+CADENA MEDIDA (instrumento en Flycast 2.7, parche en console/dc/instrumentos/)
+-----------------------------------------------------------------------------
+1) Traza de r15 instruccion por instruccion dentro de _pvr_init (0x8c0d20d8..0x8c0d22d0):
+   n=1    pc=8c0d20d8 op=2f86 r15=8c42e020 pr=8c0d2430   <- entrada, llamador en 8c0d242c
+   n=10   pc=8c0d20ea             r15=8c42e000            <- fondo del marco tras el prologo
+   n=50   pc=8c0d215a op=410b     r15=8c42e000            <- jsr @r1 a _pvr_allocate_buffers
+   n=51   pc=8c0d215e             r15=8c42dfe0            <- VOLVIO con la pila 0x20 abajo
+   n=182  pc=8c0d22a2             r15=8c42dfec
+   n=187  pc=8c0d22ae op=4f26     r15=8c42dff0            <- lds.l @r15+,pr
+   n=188  pc=8c0d22b0             r15=8c42dff4 pr=8c42e020 <- el PR leido es un puntero de pila
+   n=193  pc=8c0d22ba op=000b     r15=8c42e008 pr=8c42e020 <- rts -> 8c42e020
+   El jsr sale con sp=0x8c42e000 y vuelve con sp=0x8c42dfe0: el callee deja 0x20 sin restaurar.
+
+2) Traza del callee _pvr_allocate_buffers (0x8c0e4658..0x8c0e4878): 113 instrucciones.
+   n=102  pc=8c0e4728 op=a09b (bra 8c0e4862)
+   n=103  pc=8c0e4862 op=0000  <- ahi NO hay codigo: ceros.
+   n=104..113 pc=8c0e4864..8c0e4876, todos op=0000, r15=8c42dfd4.
+   El flujo NUNCA pasa por el epilogo (0x8c0e4832 add #12,r15 / 0x8c0e4834 lds.l @r15+,pr /
+   0x8c0e4842 rts): por eso el sp no se restaura y por eso el PR de _pvr_init queda pisado.
+
+3) El binario en disco SI tiene el bra: 1ST_READ.BIN y el 1ST_READ.BIN extraido del ISO con
+   pycdlib (sha256 identico) llevan "6e af" (opcode 0xaf6e) en el offset 0xD4862.
+
+4) Barrido de la RAM de 0x8c010000 a 0x8c1c5000, sector por sector (874): UN solo sector vacio,
+   0x8c0e4800..0x8c0e5000 = 2048 B exactos.
+
+5) Watchpoint de escritura sobre 0x8c0e4800..0x8c0e5000: CERO escrituras, por los cuatro caminos:
+   - addrspace::writet (DC-002.60)
+   - WriteMemHook, el store del interprete (WriteCachedMem -> ocache), que en DC-002.60 era
+     CIEGO: con dynarec apagado WriteMem32 apunta a WriteCachedMem y no a addrspace::writet.
+   - WriteMemBlock_nommu_dma / _ptr / _sq (DMA del G2, GD-ROM, AICA, store queue).
+   Nadie lo escribe: el sector no se borra, NUNCA SE CARGA.
+
+6) Prueba de carga en reios.cpp, justo despues de bootFile->read(dest, size, offset):
+   "bytes_no_cero=0 de 2048" en el offset 0xD4800 (con el GDI viejo).
+
+7) IsoFs::File::read del arranque: startFad=175, 904 sectores, got=904 (no hubo miss).
+   Dos sectores salieron vacios:
+     sector_archivo=359 fad=534  -> lo contesto el track 0 (data, start=150 end=264781)
+     sector_archivo=425 fad=600  -> lo contesto el track 1 (start=600 end=600, CTRL=0 AUDIO)
+   El sector 359 es relleno de ceros legitimo del binario. El 425 no.
+
+CAUSA
+-----
+GDI viejo (mkgdi.py):
+    3
+    1 0 4 2048 track01.iso 0
+    2 450 0 2352 track02.raw 0
+    3 45000 4 2048 track03.iso 0
+En un .gdi el segundo campo es LBA y FAD = LBA + 150. El audio queda en FAD 600.
+El ejecutable arranca en el FAD 175 (sector 25 del ISO + 150) y con 1,85 MB ocupa hasta el
+FAD ~1078. Los FAD 450..1078 los contesta la pista de audio, que tiene un solo sector de 2352 B
+de ceros; readSector recorre las pistas de atras para adelante y el audio gana. El FAD 600 cae
+en el sector 425 del ejecutable, o sea el offset 0xD4800, y ese offset es SIEMPRE el mismo
+mientras el binario empieza en el sector 25 del ISO. Por eso el agujero no cambia de lugar al
+cambiar el tamano, pero el codigo que lo habita SI cambia: con un binario cae dentro de
+_pvr_allocate_buffers (y mata el arranque) y con otro cae en una zona que no se ejecuta.
+Eso era "el mutante que cierra la discusion": la forma del binario, no la logica del bicho.
+
+ARREGLO
+-------
+scripts/console/mkgdi.py: AUDIO_LBA = 30000 (FAD 30150), lejos del ejecutable y antes de la
+zona de alta, mas una guarda que aborta si el FAD del audio cae dentro del rango del
+1ST_READ.BIN. Es un cambio de tres lineas en el generador; no toca el POC, ni KOS, ni libgodc.
+
+MEDICIONES DESPUES DEL ARREGLO
+------------------------------
+- Carga: "bytes_no_cero=1869 de 2048" en el offset 0xD4800. El FAD 600 lo contesta el track 0.
+- bestia=1, 170 s: CERO excepciones, cuadroDelLoop=1362, y el bicho dibujado y animando:
+    HITO250: ANIM-BESTIA modo= NU cuadro= 7 de 8 caja= 25 67 pixeles= 621 crc32= 4082661727
+             vida= 3 cambios= 1039 cuadroDelLoop= 1359
+    HITO249: ANIM modo TN cuadro 12 de 16 caja 26 77 pixeles 1112 crc32 3935684366
+  Antes el techo era 179 cuadros y solo con el instrumento dentro del POC (que curaba el
+  sintoma agregando 1.856 B, justo los que corrian el codigo fuera del offset 0xD4800).
+- Control bestia=0, 60 s: 128 cuadros, personaje animando, cero excepciones.
+- Escalera repro-253 completa: kos, minimo, churn y nivel verdes; 60/60 cuadros;
+  COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330; LIENZO 193538 de 262144 pixeles.
+
+REPRODUCIR
+----------
+    BESTIA=1 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/x
+    python3 scripts/console/mkgdi.py /tmp/dcbuild/x          # ahora pone el audio en LBA 30000
+    CAPTURE=none FLYCAST=$HOME/Proyectos/flycast-2.7/build/flycast \
+      bash scripts/console/run-flycast.sh /tmp/dcbuild/x/disc.gdi 170 /tmp/dcbuild/x/corrida
+    grep -a "HITO250\|exception" /tmp/dcbuild/x/corrida/flycast.log
+
+El emulador instrumentado se rearma con:
+    cd ~/Proyectos/flycast-2.7 && git apply /ruta/console/dc/instrumentos/flycast-dc-002.61.patch
+    cmake --build build -j8
+Variables: DC_WP_BASE/TOP/FILE (watchpoint de escritura), DC_WP_RING, DC_WP_TRAZA_BASE/TOP/FILE
+(traza de r15 por rango de PC), DC_WP_TEXTO (compara datos vs instrucciones) y DC61_DIAG=1
+(avisa que pista contesta un FAD y los sectores que faltan).
+
+CORRECCION A DC-002.60
+----------------------
+El watchpoint de DC-002.60 era ciego al store del interprete (WriteMem32 -> WriteCachedMem ->
+ocache, sin pasar por addrspace::writet). Su "0 escrituras en 66 KB de pila" no probaba nada.
+La cadena de llamadas que encontro (WP-LLAMADA) si era valida y es la que abrio este camino.

@@ -1,0 +1,776 @@
+diff --git a/core/hw/mem/addrspace.cpp b/core/hw/mem/addrspace.cpp
+index c08cb8e..a7bc99b 100644
+--- a/core/hw/mem/addrspace.cpp
++++ b/core/hw/mem/addrspace.cpp
+@@ -4,6 +4,8 @@
+ #include "hw/pvr/elan.h"
+ #include "hw/sh4/dyna/blockmanager.h"
+ #include "hw/sh4/sh4_mem.h"
++#include "hw/sh4/dc_watchpoint.h"	// DC-002.60: watchpoint de escritura (instrumento local)
++#include "cfg/option.h"
+ #include "oslib/oslib.h"
+ #include "oslib/virtmem.h"
+ #include <cassert>
+@@ -150,6 +152,20 @@ void DYNACALL writet(u32 addr, T data)
+ {
+ 	constexpr u32 sz = sizeof(T);
+ 
++	// DC-002.60: watchpoint de escritura (no hace nada si DC_WP_BASE/TOP no estan armados)
++	if (dcwp::hit(addr, (u64)data))
++		dcwp::record(addr, (u64)data, sz);
++	{
++		// prueba de vida del gancho: con rango armado se informa el primer store de cada tamano
++		static bool _visto = false;
++		if (!_visto && dcwp::gArmed)
++		{
++			_visto = true;
++			printf("WP-DIAG writet<%u> primer store visto dir=%08x dynarec=%d\n", sz, addr, (int)(bool)config::DynarecEnabled);
++			fflush(stdout);
++		}
++	}
++
+ 	u32 page = addr>>24;
+ 	uintptr_t iirf = (uintptr_t)memInfo_ptr[page];
+ 	void *ptr = (void *)(iirf & ~HANDLER_MAX);
+diff --git a/core/hw/sh4/CMakeLists.txt b/core/hw/sh4/CMakeLists.txt
+index e112588..a261954 100644
+--- a/core/hw/sh4/CMakeLists.txt
++++ b/core/hw/sh4/CMakeLists.txt
+@@ -12,6 +12,8 @@ target_sources(${PROJECT_NAME} PRIVATE
+         dyna/ssa.cpp
+         dyna/ssa.h
+         dyna/ssa_regalloc.h
++        dc_watchpoint.cpp
++        dc_watchpoint.h
+         fsca-table.h
+         interpr/sh4_fpu.cpp
+         interpr/sh4_interpreter.cpp
+diff --git a/core/hw/sh4/dc_watchpoint.cpp b/core/hw/sh4/dc_watchpoint.cpp
+new file mode 100644
+index 0000000..76a6a2e
+--- /dev/null
++++ b/core/hw/sh4/dc_watchpoint.cpp
+@@ -0,0 +1,468 @@
++/*
++	DC-002.60 -- watchpoint de escritura del SH-4 (instrumento LOCAL, fuera del upstream).
++	Ver core/hw/sh4/dc_watchpoint.h para el contrato y las variables de entorno.
++*/
++#include "dc_watchpoint.h"
++#include "sh4_if.h"
++#include "hw/mem/addrspace.h"
++#include "hw/sh4/sh4_mem.h"	// DC-002.61: IReadMem16 para comparar datos vs instrucciones
++#include "hw/sh4/sh4_cache.h"	// DC-002.61: WriteCachedMem, el store del interprete
++#include "cfg/option.h"
++
++#include <cstdarg>
++#include <cstdio>
++#include <cstdlib>
++
++namespace dcwp
++{
++
++u32 gBase = 0;
++u32 gTop = 0;
++u32 gValBase = 0;
++u32 gValTop = 0;
++bool gArmed = false;
++
++// DC-002.61: traza de instrucciones dentro de un rango de PC.
++static u32 sTrazaBase = 0;
++static u32 sTrazaTop = 0;
++static bool sTrazaOn = false;
++static FILE *sTrazaFile = nullptr;
++static unsigned long long sTrazaN = 0;
++static unsigned long long sTrazaMax = 200000;
++
++struct Entry
++{
++	u32 ip;
++	u32 addr;
++	u32 val;
++	u32 r15;
++	u8 size;
++};
++
++static FILE *sFile = nullptr;
++static unsigned long long sHits = 0;
++static unsigned long long sMaxHits = 200000;
++static unsigned long long sEcho = 200;
++static bool sInitDone = false;
++
++// DC-002.63: ENTRADAS a una funcion concreta (destino exacto de un `bsr`/`jsr`), con el sp y el pr
++// del llamador. Sirve para contar activaciones (¿reentrada?) sin depender del rango de stores ni de
++// que el sp caiga en una zona: se registra TODA entrada, con su numero de orden.
++static u32 sEntrada1 = 0;
++static u32 sEntrada2 = 0;
++static unsigned long long sEntradaN = 0;
++static unsigned long long sEntradaMax = 200;
++static bool sEntradaArmada = false;
++
++// Anillo en memoria: guarda los ULTIMOS n stores y los vuelca al levantar la excepcion.
++// Sin esto el tope de lineas se comia justo las escrituras que importan (las de los
++// ultimos milisegundos antes del salto a la basura).
++static Entry *sRing = nullptr;
++static unsigned sRingSize = 0;
++static unsigned sRingPos = 0;
++static unsigned long long sRingCount = 0;
++
++static u32 envU32(const char *name, u32 def)
++{
++	const char *v = getenv(name);
++	if (v == nullptr || *v == '\0')
++		return def;
++	return (u32)strtoul(v, nullptr, 0);	// acepta 0x...
++}
++
++static void emit(const char *fmt, ...)
++{
++	va_list ap;
++	va_start(ap, fmt);
++	vprintf(fmt, ap);
++	va_end(ap);
++	fflush(stdout);
++	if (sFile != nullptr)
++	{
++		va_start(ap, fmt);
++		vfprintf(sFile, fmt, ap);
++		va_end(ap);
++	}
++}
++
++void init()
++{
++	// OJO: SetMemoryHandlers() se llama varias veces (arranque, resets, mmu). Se arma UNA vez:
++	// reabrir el archivo en cada llamada lo truncaba y se perdian las escrituras ya registradas.
++	if (!sInitDone)
++	{
++		sInitDone = true;
++		gBase = envU32("DC_WP_BASE", 0);
++		gTop = envU32("DC_WP_TOP", 0);
++		sMaxHits = envU32("DC_WP_MAX", 200000);
++		sEcho = envU32("DC_WP_ECHO", 200);
++		sRingSize = envU32("DC_WP_RING", 0);	// 0 = sin anillo (se escribe todo al archivo)
++		gValBase = envU32("DC_WP_VAL_BASE", 0);
++		gValTop = envU32("DC_WP_VAL_TOP", 0);
++
++		// DC-002.61: traza por rango de PC (independiente del rango de stores)
++		sTrazaBase = envU32("DC_WP_TRAZA_BASE", 0);
++		sTrazaTop = envU32("DC_WP_TRAZA_TOP", 0);
++		sTrazaMax = envU32("DC_WP_TRAZA_MAX", 200000);
++		sTrazaOn = sTrazaTop > sTrazaBase;
++		if (sTrazaOn)
++		{
++			const char *tp = getenv("DC_WP_TRAZA_FILE");
++			if (tp == nullptr || *tp == '\0')
++				tp = "/tmp/dc-traza.log";
++			sTrazaFile = fopen(tp, "w");
++			printf("WP-TRAZA armada pc=%08x..%08x archivo=%s%s\n", sTrazaBase, sTrazaTop, tp,
++					sTrazaFile == nullptr ? " (NO SE PUDO ABRIR)" : "");
++			fflush(stdout);
++		}
++		// DC-002.63: entrada(s) vigiladas (destino de bsr/jsr). No necesita rango de stores.
++		sEntrada1 = envU32("DC_WP_ENTRADA", 0);
++		sEntrada2 = envU32("DC_WP_ENTRADA2", 0);
++		sEntradaMax = envU32("DC_WP_ENTRADA_MAX", 200);
++		sEntradaArmada = sEntrada1 != 0 || sEntrada2 != 0;
++		if (sEntradaArmada)
++		{
++			printf("WP-ENTRADA-INIT entrada=%08x entrada2=%08x tope=%llu\n", sEntrada1, sEntrada2, sEntradaMax);
++			fflush(stdout);
++		}
++
++		const char *path = getenv("DC_WP_FILE");
++		if (path == nullptr || *path == '\0')
++			path = "/tmp/dc-wp.log";
++
++		gArmed = gTop > gBase;
++
++		if (!gArmed && !sEntradaArmada)
++		{
++			printf("WP-INIT vigilado=no (DC_WP_BASE=%08x DC_WP_TOP=%08x)\n", gBase, gTop);
++			fflush(stdout);
++		}
++		else
++		{
++			sFile = fopen(path, "a");
++			if (sFile != nullptr)
++			{
++				setvbuf(sFile, nullptr, _IOLBF, 64 * 1024);
++				if (gArmed)
++					fprintf(sFile, "WP-INIT base=%08x top=%08x bytes=%u\n", gBase, gTop, gTop - gBase);
++				if (sEntradaArmada)
++					fprintf(sFile, "WP-ENTRADA-INIT entrada=%08x entrada2=%08x\n", sEntrada1, sEntrada2);
++			}
++			printf("WP-INIT vigilado=%s base=%08x top=%08x bytes=%u valor=%08x..%08x anillo=%u archivo=%s%s\n",
++					gArmed ? "si" : "no", gBase, gTop, gArmed ? gTop - gBase : 0, gValBase, gValTop,
++					gArmed ? sRingSize : 0, path, sFile == nullptr ? " (NO SE PUDO ABRIR)" : "");
++			fflush(stdout);
++			if (gArmed && sRingSize != 0)
++			{
++				if (sRingSize > 1000000)
++					sRingSize = 1000000;
++				sRing = new Entry[sRingSize];
++			}
++		}
++	}
++
++	if (!gArmed && !sEntradaArmada)
++		return;
++
++	// Los stores a RAM del recompilador (x64: handler "Fast" con ram_base + addr&0x1FFFFFFF)
++	// NO pasan por addrspace::writet, asi que con dynarec el watchpoint es ciego.
++	// Con rango armado se corre el interprete para que TODAS las escrituras del CPU se vean.
++	if (config::DynarecEnabled)
++	{
++		config::DynarecEnabled.set(false);
++		printf("WP-INIT dynarec estaba ON -> APAGADO para esta corrida (stores de RAM del recompilador no se verian)\n");
++		fflush(stdout);
++	}
++}
++
++static void dumpCalls(const char *motivo);
++
++static void dumpRing(const char *motivo)
++{
++	if (sRing == nullptr || sRingCount == 0)
++	{
++		emit("WP-RING-VACIO motivo=%s hits=%llu\n", motivo, sHits);
++		return;
++	}
++	const unsigned n = sRingCount < sRingSize ? (unsigned)sRingCount : sRingSize;
++	emit("WP-RING motivo=%s n=%u total_hits=%llu base=%08x top=%08x\n", motivo, n, sHits, gBase, gTop);
++	for (unsigned i = 0; i < n; i++)	// del mas viejo al mas nuevo
++	{
++		const unsigned idx = (sRingPos + sRingSize - n + i) % sRingSize;
++		const Entry& e = sRing[idx];
++		emit("WP: pc=%08x dir=%08x val=%08x sz=%u r15=%08x k=%u\n", e.ip, e.addr, e.val, e.size, e.r15, i + 1);
++	}
++	sRingPos = 0;
++	sRingCount = 0;
++}
++
++void exception(u32 epc, u32 evt)
++{
++	if (!sInitDone || !gArmed)
++		return;
++	static int nDumps = 0;
++	if (nDumps >= 8)
++		return;
++	nDumps++;
++
++	const u32 sp = Sh4cntx.r[15];
++	const u32 pr = Sh4cntx.pr;
++	const u32 fp = Sh4cntx.r[14];
++
++	emit("WP-EXC n=%d evt=%03x epc=%08x pc=%08x sp=%08x pr=%08x fp=%08x ssr=%08x spc=%08x bl=%d hits=%llu\n",
++			nDumps, evt, epc, Sh4cntx.pc, sp, pr, fp, Sh4cntx.ssr, Sh4cntx.spc, (int)Sh4cntx.sr.BL, sHits);
++
++	// marco en memoria: 16 palabras hacia abajo y 16 hacia arriba de sp
++	for (int i = -16; i < 16; i += 4)
++	{
++		const u32 a = sp + i * 4;
++		emit("WP-EXC-PILA %08x: %08x %08x %08x %08x\n", a,
++				addrspace::read32(a), addrspace::read32(a + 4),
++				addrspace::read32(a + 8), addrspace::read32(a + 12));
++	}
++
++	// DC-002.61: que hay en la zona de .text que el flujo ejecuto como ceros.
++	// Se compara la memoria de DATOS (addrspace) con la de INSTRUCCIONES (IReadMem16):
++	// si discrepan, no es un store: es el camino de lectura/cache.
++	const u32 txt = envU32("DC_WP_TEXTO", 0);
++	if (txt != 0)
++	{
++		emit("WP-TEXTO-DATOS %08x: %08x %08x %08x %08x\n", txt,
++				addrspace::read32(txt), addrspace::read32(txt + 4),
++				addrspace::read32(txt + 8), addrspace::read32(txt + 12));
++		emit("WP-TEXTO-INST  %08x: %08x %08x %08x %08x\n", txt,
++				(u32)IReadMem16(txt), (u32)IReadMem16(txt + 4),
++				(u32)IReadMem16(txt + 8), (u32)IReadMem16(txt + 12));
++	}
++
++	// DC-002.61: mapa de lo CARGADO. Se recorre .text/.rodata cada 64 KB desde 0x8c010000 y se
++	// imprime la primera palabra: un 00000000 sostenido = zona que el binario no lleno.
++	{
++		static bool sMapaHecho = false;
++		if (!sMapaHecho)
++		{
++			sMapaHecho = true;
++			emit("WP-SECTORES barrido de 8c010000 a 8c1c5000\n");
++			{
++				u32 ini = 0;
++				bool dentro = false;
++				u32 total = 0;
++				for (u32 a = 0x8c010000; a < 0x8c1c5000; a += 0x800)
++				{
++					bool cero = true;
++					for (u32 o = 0; o < 0x800; o += 4)
++						if (addrspace::read32(a + o) != 0) { cero = false; break; }
++					if (cero)
++					{
++						total++;
++						if (!dentro) { dentro = true; ini = a; }
++					}
++					else if (dentro)
++					{
++						dentro = false;
++						emit("WP-CEROS %08x..%08x sectores=%u\n", ini, a, (a - ini) / 0x800);
++					}
++				}
++				if (dentro)
++					emit("WP-CEROS %08x..%08x sectores=%u\n", ini, (u32)0x8c1c5000, (0x8c1c5000 - ini) / 0x800);
++				emit("WP-CEROS-TOTAL sectores_vacios=%u (de %u)\n", total, (0x8c1c5000 - 0x8c010000) / 0x800);
++			}
++			emit("WP-MAPA-FIN\n");
++		}
++	}
++
++	if (sRing != nullptr)
++		dumpRing("excepcion");
++	dumpCalls("excepcion");
++}
++
++static unsigned sBranchDumps = 0;
++
++// anillo chico de llamadas: se vuelca en la excepcion para ver la CADENA de sps antes del salto malo
++struct CallEntry
++{
++	u32 ip;
++	u32 target;
++	u32 sp;
++	u32 pr;
++};
++static CallEntry sCalls[512];
++static unsigned sCallPos = 0;
++static unsigned long long sCallCount = 0;
++
++void call(u32 ip, u32 target, u32 sp, u32 pr)
++{
++	if (!sInitDone)
++		init();
++
++	// DC-002.63: entrada vigilada por DESTINO exacto. Se registra siempre (sin filtro de sp ni de
++	// rango): es lo que cuenta activaciones y da el sp con que se entra a la funcion.
++	if (sEntradaArmada && (target == sEntrada1 || target == sEntrada2))
++	{
++		sEntradaN++;
++		if (sEntradaN <= sEntradaMax)
++			emit("WP-ENTRADA destino=%08x ip=%08x sp=%08x pr=%08x n=%llu\n", target, ip, sp, pr, sEntradaN);
++		else if (sEntradaN == sEntradaMax + 1)
++			emit("WP-ENTRADA-TOPE: ya van %llu entradas a %08x, no se escriben mas (subir DC_WP_ENTRADA_MAX)\n",
++					sEntradaN - 1, target);
++	}
++
++	if (!gArmed)
++		return;
++	if (sp < 0x8c42c000 || sp >= 0x8c42e900)	// solo cuando la pila esta en la zona del marco
++		return;
++	sCalls[sCallPos] = CallEntry { ip, target, sp, pr };
++	sCallPos = (sCallPos + 1) % 512;
++	sCallCount++;
++}
++
++static void dumpCalls(const char *motivo)
++{
++	const unsigned n = sCallCount < 512 ? (unsigned)sCallCount : 512;
++	if (n == 0)
++	{
++		emit("WP-CADENA-VACIA motivo=%s\n", motivo);
++		return;
++	}
++	emit("WP-CADENA motivo=%s n=%u total=%llu\n", motivo, n, sCallCount);
++	for (unsigned i = 0; i < n; i++)
++	{
++		const unsigned idx = (sCallPos + 512 - n + i) % 512;
++		const CallEntry& c = sCalls[idx];
++		emit("WP-LLAMADA ip=%08x destino=%08x sp=%08x pr=%08x k=%u\n", c.ip, c.target, c.sp, c.pr, i + 1);
++	}
++	sCallPos = 0;
++	sCallCount = 0;
++}
++
++void branch(u32 ip, u32 target, u32 sp, u32 pr, const char *tipo)
++{
++	// avisa cuando el salto se va fuera del segmento de codigo del ELF:
++	// .text+.init+.fini+.rodata+.eh_frame = 0x8c010000..0x8c1cfb8c (readelf -l), mas KOS debajo.
++	// Arriba de 0x8c1c0000 solo hay .data/.bss/monton/pila: ahi no hay codigo.
++	if (!sInitDone || !gArmed || target < 0x8c1c0000 || target >= 0x8d000000)
++		return;
++	if (sBranchDumps >= 200)
++		return;
++	sBranchDumps++;
++	emit("WP-SALTO %s ip=%08x destino=%08x sp=%08x pr=%08x r14=%08x\n",
++			tipo, ip, target, sp, pr, Sh4cntx.r[14]);
++}
++
++void record(u32 addr, u64 val, unsigned size)
++{
++	if (!sInitDone)
++		init();
++
++	const u32 ip = Sh4cntx.pc - 2;	// el interprete deja pc en la instruccion siguiente
++	const u32 r15 = Sh4cntx.r[15];
++	const u32 pr = Sh4cntx.pr;
++
++	sHits++;
++
++	if (sRing != nullptr)
++	{
++		Entry& e = sRing[sRingPos];
++		e.ip = ip;
++		e.addr = addr;
++		e.val = (u32)val;
++		e.r15 = r15;
++		e.size = (u8)size;
++		sRingPos = (sRingPos + 1) % sRingSize;
++		sRingCount++;
++		return;
++	}
++
++	if (sHits > sMaxHits)
++	{
++		if (sHits == sMaxHits + 1)
++		{
++			emit("WP-TOPE: %llu escrituras vigiladas, se deja de escribir (subir DC_WP_MAX o usar DC_WP_RING)\n", sHits - 1);
++			if (sFile != nullptr)
++				fflush(sFile);
++		}
++		return;
++	}
++
++	const bool echo = sHits <= sEcho;
++	if (sFile != nullptr || echo)
++	{
++		char line[192];
++		if (size == 8)
++			snprintf(line, sizeof(line), "WP: pc=%08x dir=%08x val=%08x%08x sz=%u r15=%08x pr=%08x n=%llu",
++					ip, addr, (u32)(val >> 32), (u32)val, size, r15, pr, sHits);
++		else
++			snprintf(line, sizeof(line), "WP: pc=%08x dir=%08x val=%08x sz=%u r15=%08x pr=%08x n=%llu",
++					ip, addr, (u32)val, size, r15, pr, sHits);
++		if (sFile != nullptr)
++			fprintf(sFile, "%s\n", line);
++		if (echo)
++		{
++			printf("%s\n", line);
++			fflush(stdout);
++		}
++	}
++}
++
++void bloque(const char *tipo, u32 dst, u32 size)
++{
++	if (!gArmed || size == 0)
++		return;
++	if (dst + size <= gBase || dst >= gTop)
++		return;
++	emit("WP-BLOQUE %s dst=%08x size=%u (rango armado %08x..%08x)\n", tipo, dst, size, gBase, gTop);
++}
++
++void wpStore(u32 addr, u64 data, u32 sz)
++{
++	if (!gArmed)
++		return;
++	{
++		// prueba de vida: con rango armado se informa el primer store del interprete
++		static bool _visto = false;
++		if (!_visto)
++		{
++			_visto = true;
++			printf("WP-DIAG store-interprete visto dir=%08x sz=%u\n", addr, sz);
++			fflush(stdout);
++		}
++	}
++	if (hit(addr, data))
++		record(addr, data, sz);
++}
++
++template<class T>
++void WriteMemHook(u32 address, T data)
++{
++	wpStore(address, (u64)data, (u32)sizeof(T));
++	WriteCachedMem<T>(address, data);
++}
++template void WriteMemHook<u8>(u32, u8);
++template void WriteMemHook<u16>(u32, u16);
++template void WriteMemHook<u32>(u32, u32);
++template void WriteMemHook<u64>(u32, u64);
++
++void traza(u32 pc, u32 op, u32 r15, u32 pr)
++{
++	if (!sTrazaOn)
++		return;
++	if (pc < sTrazaBase || pc >= sTrazaTop)
++		return;
++	if (sTrazaN >= sTrazaMax)
++		return;
++	sTrazaN++;
++	char line[128];
++	snprintf(line, sizeof(line), "T pc=%08x op=%04x r15=%08x pr=%08x n=%llu\n", pc, (unsigned)op, r15, pr, sTrazaN);
++	if (sTrazaFile != nullptr)
++	{
++		fputs(line, sTrazaFile);
++		fflush(sTrazaFile);	// la corrida MUERE por excepcion: sin flush se pierde justo el final
++	}
++	if (sTrazaN <= 40)
++	{
++		fputs(line, stdout);
++		fflush(stdout);
++	}
++}
++
++}
+diff --git a/core/hw/sh4/dc_watchpoint.h b/core/hw/sh4/dc_watchpoint.h
+new file mode 100644
+index 0000000..5afd7eb
+--- /dev/null
++++ b/core/hw/sh4/dc_watchpoint.h
+@@ -0,0 +1,80 @@
++/*
++	DC-002.60 -- watchpoint de escritura del SH-4 (instrumento LOCAL, fuera del upstream).
++
++	No es parte de Flycast: es un parche de medicion del proyecto diablo2consoles.
++	Se arma leyendo el entorno:
++
++	  DC_WP_BASE=0x8c41e800  DC_WP_TOP=0x8c42e800     rango de DIRECCIONES vigilado
++	  DC_WP_VAL_BASE / DC_WP_VAL_TOP                  (opcional) filtro por VALOR escrito
++	  DC_WP_FILE=/tmp/dc-wp.log                       (opcional; default /tmp/dc-wp.log)
++	  DC_WP_MAX=200000                                (opcional; tope de lineas al archivo)
++	  DC_WP_ECHO=200                                  (opcional; cuantas lineas tambien a stdout)
++	  DC_WP_RING=60000                                (opcional) anillo en memoria: no escribe
++	                                                  nada hasta la excepcion y ahi vuelca los
++	                                                  ultimos n stores (asi el tope no se come
++	                                                  justo las escrituras que importan)
++
++	El gancho vive en el camino de store del INTERPRETE (core/hw/mem/addrspace.cpp,
++	writet<T>), que en modo no-MMU es el unico camino de escritura del CPU. Por eso
++	cuando hay rango armado se apaga el recompilador (sus stores a RAM van por un
++	camino directo y no se verian): se informa en WP-INIT.
++*/
++#pragma once
++
++#include "types.h"
++
++namespace dcwp
++{
++
++// rango vigilado, en direcciones SH-4 (tal como las ve el programa: 0x8C...)
++extern u32 gBase;
++extern u32 gTop;
++extern u32 gValBase;
++extern u32 gValTop;
++extern bool gArmed;
++
++// chequeo barato: cuando no hay rango armado son dos comparaciones
++static inline bool hit(u32 addr, u64 val)
++{
++	if (!gArmed || addr < gBase || addr >= gTop)
++		return false;
++	if (gValTop > gValBase)
++	{
++		const u32 v = (u32)val;
++		return v >= gValBase && v < gValTop;
++	}
++	return true;
++}
++
++// Lee el entorno y (si hay rango) fuerza el interprete. Se llama desde SetMemoryHandlers().
++void init();
++
++// Registra una escritura vigilada: direccion, valor, tamano + PC/r15/pr del escritor.
++void record(u32 addr, u64 val, unsigned size);
++
++// Volcado del contexto del SH-4 cuando se levanta una excepcion (para ubicar el marco por corrida).
++void exception(u32 epc, u32 evt);
++
++// Aviso de salto a direccion que no es codigo (rts/jmp): pc de la instruccion, destino, sp y pr.
++void branch(u32 ip, u32 target, u32 sp, u32 pr, const char *tipo);
++
++// DC-002.61: escritura en BLOQUE (DMA de CD/G2, store queue). No pasa por writet ni por
++// WriteMemHook: se vigila aparte para saber si un bloque cae sobre el rango armado.
++void bloque(const char *tipo, u32 dst, u32 size);
++
++// DC-002.61: store del INTERPRETE. El camino rapido (WriteCachedMem -> ocache) no pasa por
++// addrspace::writet, asi que el watchpoint de DC-002.60 era ciego a el. Se engancha aqui.
++void wpStore(u32 addr, u64 data, u32 sz);
++
++template<class T>
++void WriteMemHook(u32 address, T data);
++
++// Registra una `jsr @Rn` cuya pila cae en la zona del marco vigilado (cadena de llamadas).
++void call(u32 ip, u32 target, u32 sp, u32 pr);
++
++// DC-002.61: TRAZA de una instruccion dentro de un rango de PC (para ver como evoluciona r15
++// dentro de una funcion). Se arma con DC_WP_TRAZA_BASE/DC_WP_TRAZA_TOP; sin ellas es una
++// comparacion de un bool por instruccion. Escribe pc, opcode, r15 y pr.
++void traza(u32 pc, u32 op, u32 r15, u32 pr);
++
++}
+diff --git a/core/hw/sh4/interpr/sh4_interpreter.cpp b/core/hw/sh4/interpr/sh4_interpreter.cpp
+index 54a2b02..119170f 100644
+--- a/core/hw/sh4/interpr/sh4_interpreter.cpp
++++ b/core/hw/sh4/interpr/sh4_interpreter.cpp
+@@ -13,6 +13,7 @@
+ #include "../sh4_cache.h"
+ #include "debug/gdb_server.h"
+ #include "../sh4_cycles.h"
++#include "hw/sh4/dc_watchpoint.h"	// DC-002.61: traza de instrucciones (instrumento local)
+ 
+ Sh4ICache icache;
+ Sh4OCache ocache;
+@@ -50,6 +51,7 @@ void Sh4Interpreter::Run()
+ 				do
+ 				{
+ 					u32 op = ReadNexOp();
++					dcwp::traza(ctx->pc - 2, op, ctx->r[15], ctx->pr);	// DC-002.61
+ 
+ 					ExecuteOpcode(op);
+ 				} while (ctx->cycle_counter > 0);
+diff --git a/core/hw/sh4/interpr/sh4_opcodes.cpp b/core/hw/sh4/interpr/sh4_opcodes.cpp
+index 26df085..46e2e69 100644
+--- a/core/hw/sh4/interpr/sh4_opcodes.cpp
++++ b/core/hw/sh4/interpr/sh4_opcodes.cpp
+@@ -10,6 +10,7 @@
+ #include "hw/sh4/sh4_interrupts.h"
+ #include "debug/gdb_server.h"
+ #include "hw/sh4/dyna/decoder.h"
++#include "hw/sh4/dc_watchpoint.h"	// DC-002.60: watchpoint/branch (instrumento local)
+ #include "emulator.h"
+ 
+ #ifdef STRICT_MODE
+@@ -841,6 +842,7 @@ sh4op(i0000_0000_0010_1011)
+ sh4op(i0000_0000_0000_1011)
+ {
+ 	u32 newpc = ctx->pr;
++	dcwp::branch(ctx->pc - 2, newpc, ctx->r[15], ctx->pr, "rts");	// DC-002.60
+ 	executeDelaySlot(); //WARN : pr can change here
+ 	ctx->pc = newpc;
+ 	debugger::subroutineReturn();
+@@ -916,6 +918,7 @@ sh4op(i1011_iiii_iiii_iiii)
+ {
+ 	u32 newpr = ctx->pc + 2; //return after delayslot
+ 	u32 newpc = branch_target_s12(ctx, op);
++	dcwp::call(ctx->pc - 2, newpc, ctx->r[15], newpr);	// DC-002.61: bsr tambien entra en la cadena
+ 	executeDelaySlot();
+ 
+ 	ctx->pr = newpr;
+@@ -949,6 +952,7 @@ sh4op(i0100_nnnn_0000_1011)
+ 
+ 	u32 newpr = ctx->pc + 2;   //return after delayslot
+ 	u32 newpc = ctx->r[n];
++	dcwp::call(ctx->pc - 2, newpc, ctx->r[15], newpr);	// DC-002.60
+ 	executeDelaySlot(); //r[n]/pr can change here
+ 
+ 	ctx->pr = newpr;
+diff --git a/core/hw/sh4/sh4_interrupts.cpp b/core/hw/sh4/sh4_interrupts.cpp
+index 49a3be4..28bce43 100644
+--- a/core/hw/sh4/sh4_interrupts.cpp
++++ b/core/hw/sh4/sh4_interrupts.cpp
+@@ -15,6 +15,7 @@
+ #include "sh4_mmr.h"
+ #include "oslib/oslib.h"
+ #include "debug/gdb_server.h"
++#include "dc_watchpoint.h"	// DC-002.60: watchpoint/volcado de excepcion (instrumento local)
+ #include "serialize.h"
+ #include <cassert>
+ 
+@@ -198,6 +199,7 @@ static void Do_Interrupt(Sh4ExceptionCode intEvn)
+ 
+ void Do_Exception(u32 epc, Sh4ExceptionCode expEvn)
+ {
++	dcwp::exception(epc, (u32)expEvn);	// DC-002.60: contexto del SH-4 al levantar la excepcion
+ 	assert((expEvn >= Sh4Ex_TlbMissRead && expEvn <= Sh4Ex_SlotIllegalInstr)
+ 			|| expEvn == Sh4Ex_FpuDisabled || expEvn == Sh4Ex_SlotFpuDisabled || expEvn == Sh4Ex_UserBreak);
+ 	if (Sh4cntx.sr.BL != 0)
+diff --git a/core/hw/sh4/sh4_mem.cpp b/core/hw/sh4/sh4_mem.cpp
+index 196cdf5..41b5095 100644
+--- a/core/hw/sh4/sh4_mem.cpp
++++ b/core/hw/sh4/sh4_mem.cpp
+@@ -11,6 +11,7 @@
+ #include "hw/pvr/pvr_mem.h"
+ #include "hw/mem/addrspace.h"
+ #include "hw/sh4/modules/mmu.h"
++#include "dc_watchpoint.h"	// DC-002.60: watchpoint de escritura (instrumento local)
+ #include "cfg/option.h"
+ 
+ #ifdef STRICT_MODE
+@@ -203,6 +204,7 @@ void mem_Term()
+ 
+ void WriteMemBlock_nommu_dma(u32 dst, u32 src, u32 size)
+ {
++	dcwp::bloque("dma", dst, size);	// DC-002.61
+ 	bool dst_ismem, src_ismem;
+ 	void* dst_ptr = addrspace::writeConst(dst, dst_ismem, 4);
+ 	void* src_ptr = addrspace::readConst(src, src_ismem, 4);
+@@ -225,6 +227,7 @@ void WriteMemBlock_nommu_dma(u32 dst, u32 src, u32 size)
+ 
+ void WriteMemBlock_nommu_ptr(u32 dst, const u32 *src, u32 size)
+ {
++	dcwp::bloque("ptr", dst, size);	// DC-002.61: por aca entra el GD-ROM (gdromv3)
+ 	bool dst_ismem;
+ 
+ 	void* dst_ptr = addrspace::writeConst(dst, dst_ismem, 4);
+@@ -259,6 +262,7 @@ void WriteMemBlock_nommu_ptr(u32 dst, const u32 *src, u32 size)
+ 
+ void WriteMemBlock_nommu_sq(u32 dst, const SQBuffer *src)
+ {
++	dcwp::bloque("sq", dst, 32);	// DC-002.61
+ 	// destination address is 32-byte aligned
+ 	SQBuffer *pdst = (SQBuffer *)GetMemPtr(dst, sizeof(SQBuffer));
+ 	if (pdst != nullptr)
+@@ -292,6 +296,8 @@ u8* GetMemPtr(u32 addr, u32 size)
+ 
+ void SetMemoryHandlers()
+ {
++	// DC-002.60: se lee el entorno del watchpoint y, si hay rango armado, se fuerza el interprete.
++	dcwp::init();
+ #ifdef STRICT_MODE
+ 	static bool interpreterRunning;
+ 
+@@ -311,10 +317,12 @@ void SetMemoryHandlers()
+ 		ReadMem32 = &ReadCachedMem<u32>;
+ 		ReadMem64 = &ReadCachedMem<u64>;
+ 
+-		WriteMem8 = &WriteCachedMem<u8>;
+-		WriteMem16 = &WriteCachedMem<u16>;
+-		WriteMem32 = &WriteCachedMem<u32>;
+-		WriteMem64 = &WriteCachedMem<u64>;
++		// DC-002.61: el camino del INTERPRETE no pasa por addrspace::writet (lo que volvia
++		// ciego al watchpoint de DC-002.60). Se engancha el store aqui mismo.
++		WriteMem8 = &dcwp::WriteMemHook<u8>;
++		WriteMem16 = &dcwp::WriteMemHook<u16>;
++		WriteMem32 = &dcwp::WriteMemHook<u32>;
++		WriteMem64 = &dcwp::WriteMemHook<u64>;
+ 
+ 		return;
+ 	}
+diff --git a/core/imgread/common.cpp b/core/imgread/common.cpp
+index 193c9ef..0c96256 100644
+--- a/core/imgread/common.cpp
++++ b/core/imgread/common.cpp
+@@ -277,7 +277,15 @@ bool Disc::readSector(u32 FAD, u8 *dst, SectorFormat *sector_type, u8 *subcode,
+ 	{
+ 		*subcode_type = SUBFMT_NONE;
+ 		if (tracks[i].Read(FAD, dst, sector_type, subcode, subcode_type))
++		{
++			if (getenv("DC61_DIAG") != nullptr && FAD == 600)	// DC-002.61: que pista contesta el FAD
++			{
++				printf("DC61-TRACK fad=%u idx=%zu start=%u end=%u ctrl=%u fmt=%d\n", FAD, i,
++						tracks[i].StartFAD, tracks[i].EndFAD, tracks[i].CTRL, (int)*sector_type);
++				fflush(stdout);
++			}
+ 			return true;
++		}
+ 	}
+ 
+ 	return false;
+@@ -302,6 +310,10 @@ u32 Disc::ReadSectors(u32 FAD, u32 count, u8* dst, u32 fmt, bool stopOnMiss, Loa
+ 			return i;
+ 		if (!readSector(FAD, temp, &secfmt, q_subchannel, &subfmt))
+ 		{
++			if (getenv("DC61_DIAG") != nullptr)	// DC-002.61
++			{
++				printf("DC61-SECTOR-MISS fad=%u\n", FAD); fflush(stdout);
++			}
+ 			WARN_LOG(GDROM, "Sector Read miss FAD: %d", FAD);
+ 			memset(temp, 0, sizeof(temp));
+ 			secfmt = SECFMT_2352;
