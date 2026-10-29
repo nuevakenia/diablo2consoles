@@ -4,12 +4,12 @@
 # Un control que solo da verde no prueba nada: este script mete los DOS defectos que el control tiene que cazar
 # y exige que se ponga ROJO con cada uno. Nunca toca el arbol del repo.
 #
-# OJO CON EL ESTADO DEL ARBOL (medido el 2026-10-27): la limpieza que este control vigila ("vram_libre= sin-init"
-# en las tres marcas previas al video) NO pudo aterrizar en el POC todavia, porque mover 1ST_READ.BIN 64 bytes
-# tumba BESTIA=0 (ver console/dc/evidencia/dc-002.56-vram-preinit.txt). Por eso el mutador NO usa el arbol del
-# repo como referencia sana: arma una COPIA con la limpieza aplicada (la misma transformacion que hara la tarjeta
-# de la limpieza cuando el layout este arreglado) y trabaja sobre ella. Asi sirve hoy y no depende de que la
-# deuda este paga.
+# OJO CON EL ESTADO DEL ARBOL: la limpieza que este control vigila ("vram_libre= sin-init" en las tres marcas
+# previas al video) YA ATERRIZO en el POC (DC-002.57), una vez que DC-002.61 encontro que el que tumbaba
+# BESTIA=0 no era el layout del binario sino la pista de audio del .gdi. El mutador igual NO usa el arbol del
+# repo como referencia sana: arma una COPIA con la limpieza aplicada (la misma transformacion que aplico
+# DC-002.57 a mano, las dos formas de texto) y trabaja sobre ella. Asi el mutador no depende de que nadie
+# vuelva a tocar esas tres lineas: si el POC cambia, la copia se arma igual y el paso [1/4] lo delata.
 #
 #   [1/4] copia con la limpieza aplicada                      -> VERDE
 #   [2/4] mutante de FUENTE: la lectura devuelta en MAPA-IMAGEN -> ROJO (cazado)
@@ -70,11 +70,11 @@ if [ "$quedan" -ne 3 ]; then
     exit 1
 fi
 
-# el arbol del repo, informativo: hoy esta ROJO porque la limpieza esta bloqueada por el layout
+# el arbol del repo, informativo: desde DC-002.57 deberia estar VERDE (la limpieza ya aterrizo)
 if bash "$CONTROL" > "$TMP/repo.txt" 2>&1; then
     echo "== arbol del repo: VERDE (la limpieza ya aterrizo)"
 else
-    echo "== arbol del repo: ROJO -- deuda declarada de DC-002.56 ($(grep -c 'ANTES del encendido' "$TMP/repo.txt") lecturas pre-video); no cuenta como fallo del mutador"
+    echo "== arbol del repo: ROJO -- alguien devolvio una lectura pre-video ($(grep -c 'ANTES del encendido' "$TMP/repo.txt") lecturas); no cuenta como fallo del mutador"
 fi
 
 # ---- [1/4] la copia limpia tiene que dar verde

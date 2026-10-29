@@ -1,0 +1,121 @@
+DC-002.57 - LA LIMPIEZA DE LAS TRES LECTURAS DE VRAM ATERRIZA (el layout ya no es el arbitro)
+=============================================================================================
+
+Fecha: 2026-10-29.  Rama DC-002.  Arbol: console/dc/poc/personaje-mapa/main.go + el control de DC-002.56.
+Cierra la deuda que DC-002.56 dejo declarada y desbloquea el criterio de DC-002.53 sobre estas marcas.
+
+RESUMEN EN UNA LINEA
+--------------------
+Con el .gdi arreglado (DC-002.61: el audio ya no cae dentro del .text), la limpieza aterriza y las dos
+variantes dibujan: BESTIA=0 con 1.851.784 B (el MISMO tamano que en DC-002.56 y DC-002.57 se COLGABA) da
+ANDA con 51 cuadros, y BESTIA=1 da ANDA con 34 cuadros y la bestia animando. El layout dejo de decidir.
+
+QUE SE APLICO (las dos formas de texto, igual que las reglas del mutador)
+-------------------------------------------------------------------------
+`console/dc/poc/personaje-mapa/main.go`, las tres marcas previas al video:
+
+  942  HITO238: MAPA-IMAGEN   ... "vram_libre=", int64(d2cVramLibre())  ->  "vram_libre= sin-init"
+ 1083  HITO238: PERSONAJE-IMAGEN ... idem                                ->  "vram_libre= sin-init"
+ 1174  HITO250: MPQ-CERRADOS vram_libre=, int64(d2cVramLibre())         ->  vram_libre= sin-init
+
+Son las DOS formas que documenta `scripts/console/mutar-vram-preinit-253.sh` (en MAPA-IMAGEN y
+PERSONAJE-IMAGEN el literal va aparte; en MPQ-CERRADOS va PEGADO a la etiqueta). Aplicadas a mano con
+`patch`, no con sed: el resultado es el mismo que produce el mutador sobre su copia (lo verifica el paso
+[1/4], que sigue dando VERDE).
+
+Tambien se reescribieron los comentarios de las tres marcas: decian que la limpieza "NO se puede aplicar
+todavia" y por que (64 bytes de 1ST_READ.BIN tumbaban BESTIA=0). Eso era falso como causa: el sintoma lo
+ponia el .gdi (DC-002.61), no el layout. Un comentario que miente es deuda igual que el codigo.
+
+Ninguna otra linea del POC cambio. `d2cVramLibre()` queda SOLO declarada (linea 57) porque el shim
+`d2c_vram_libre` de `csrc/cshim.c` sigue existiendo y el control exige UNA sola lectura de
+`pvr_mem_available()` ahi. `~/dreamcast/libgodc` NO se toco.
+
+BARRERA DE PARTIDA (paso 1 de la tarjeta)
+-----------------------------------------
+Con el arbol como estaba (sin la limpieza), para no comparar contra un binario de ayer:
+
+    BESTIA=0 SEGUNDOS=120 bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/dc257-barrera-b0
+      -- 1ST_READ.BIN: 1851848 B
+      -- marcas: cuadros=51 video=1 excepciones=0 cortes-del-UBC=0
+      == estado: ANDA                                                     (rc=0)
+
+LAS TRES CORRIDAS DE LA TARJETA (GDI con el audio en LBA 30000, guarda de mkgdi.py activa)
+-----------------------------------------------------------------------------------------
+    corrida                                   1ST_READ.BIN   estado   cuadros  exc.
+    barrera   BESTIA=0, sin la limpieza        1.851.848 B    ANDA        51     0
+    paso 2-3  BESTIA=0, CON la limpieza        1.851.784 B    ANDA        51     0
+    paso 2-3  BESTIA=1, CON la limpieza        1.852.648 B    ANDA        34     0
+
+El dato que cierra la discusion: 1.851.784 B es EXACTAMENTE el tamano con el que DC-002.56 y la primera
+pasada de DC-002.57 (commit fde6b4b3) se COLGABAN en el `pvr_mem_malloc` de `d2c_pvr_pantalla_init`. Con el
+GDI arreglado, esos mismos bytes dibujan. La fragilidad nunca fue del layout del binario: era el sector 425
+del ejecutable que se perdia por la pista de audio en FAD 600 (DC-002.61).
+
+Marcas del log de BESTIA=0 (el control que dibuja):
+    HITO238: MAPA-IMAGEN bytes= 1048576 vram_libre= sin-init
+    HITO238: PERSONAJE-IMAGEN bytes= 8216 vram_libre= sin-init
+    HITO250: MPQ-CERRADOS vram_libre= sin-init
+    HITO250: PVR antes-de-pvr_init_defaults
+    HITO250: PVR despues-de-pvr_init_defaults
+    HITO238: dibujando (mapa 512 x 512 en 64 -16 ; personaje 26 x 79 )
+    HITO249: ANIM modo TN cuadro 6 de 16 ... cambios 519 cuadroDelLoop 1521 mutante false
+
+Marcas del log de BESTIA=1 (la bestia anda, sin excepciones):
+    HITO250: ANIM-BESTIA modo= NU cuadro= 7 de 8 caja= 25 67 pixeles= 621 crc32= 4082661727 vida= 3
+             cambios= 756 cuadroDelLoop= 990
+    ("Unhandled exception" en el log: 0; sonda ARQ-PILA253-REAL: 0)
+
+CRITERIOS DE ACEPTACION
+-----------------------
+1. `bash scripts/console/checar-vram-preinit-253.sh` VERDE sobre el arbol.          CUMPLIDO
+     OK: ninguna llamada a d2cVramLibre() en main.go (solo la declaracion extern)
+     OK: las 3 de 3 marcas previas al video dicen 'vram_libre= sin-init'
+     OK: csrc/: una sola lectura de pvr_mem_available() (la de d2c_vram_libre en cshim.c)
+     y con los DOS logs de las corridas de arriba (parte B del control): VERDE tambien,
+     "log: las 3 de 3 marcas previas al video dicen 'vram_libre= sin-init'" + "log: el video arranco".
+2. `BESTIA=0` = ANDA (cuadros>0) con el binario NUEVO y `dibujando=1` en su log.     CUMPLIDO
+     cuadros=51, rc=0, y en el log la marca de dibujo ("HITO238: dibujando (mapa 512 x 512 ...)").
+3. `BESTIA=1` clasificado con su log.                                               CUMPLIDO -> ANDA
+     cuadros=34, cero excepciones, ANIM-BESTIA animando cuadro 0..7 de 8.
+4. `bash scripts/console/mutar-vram-preinit-253.sh` sigue en 2/2 cazados.           CUMPLIDO
+     verdes=2 rojos=2 fallos=0 / MUTADOR OK: el control caza 2/2 defectos y no da rojo sobre la copia sana
+     (y ahora ademas imprime "== arbol del repo: VERDE (la limpieza ya aterrizo)").
+
+DEFECTO ENCONTRADO Y ARREGLADO EN EL CONTROL DE DC-002.56
+---------------------------------------------------------
+`checar-vram-preinit-253.sh` decia "aviso: el log no trae HITO250: PVR despues-de-pvr_init_defaults (la
+corrida no llego al video)" sobre el log de BESTIA=1, con la marca en la linea 188 del archivo. No era el
+log: es la forma `tr -d '\r' < "$LOG" | grep -q ...` bajo `set -o pipefail`. `grep -q` corta en el primer
+match, `tr` muere con SIGPIPE y el pipeline sale 141, que es "no encontrado" para el `if`. Medido:
+
+    ( set -uo pipefail; tr -d '\r' < flycast.log | grep -q 'HITO250: PVR despues-de-pvr_init_defaults' )
+    rc=141     (el patron SI esta; con `grep -c` sobre el mismo archivo: 1)
+
+Es un veredicto de moneda al aire que depende del tamano del log (con el de BESTIA=0 salia bien, con el de
+BESTIA=1 no). Arreglado contando con `grep -c` (lee el archivo entero, no corta) y decidiendo sobre el
+numero. Despues del arreglo los dos logs dicen "el video arranco".
+
+COMO SE REPRODUCE
+-----------------
+    cd ~/Proyectos/diablo2consoles
+    bash scripts/console/checar-vram-preinit-253.sh ; echo rc=$?
+    BESTIA=0 SEGUNDOS=120 bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/dc257-limpieza-b0
+    BESTIA=1 SEGUNDOS=120 bash scripts/console/checar-arranque-253.sh /tmp/dcbuild/dc257-limpieza-b1
+    bash scripts/console/checar-vram-preinit-253.sh /tmp/dcbuild/dc257-limpieza-b0/corrida/flycast.log
+    bash scripts/console/checar-vram-preinit-253.sh /tmp/dcbuild/dc257-limpieza-b1/corrida/flycast.log
+    bash scripts/console/mutar-vram-preinit-253.sh
+
+LOGS DE ESTA MEDICION (en /tmp/dcbuild, no se versionan)
+--------------------------------------------------------
+    dc257-barrera-b0/  1ST_READ.BIN 1851848 B  sha256 fba66f5f7a188d7a21ff4841b13fcf4fe010e35b0bdd9fb61468d235fee17ef9
+    dc257-limpieza-b0/ 1ST_READ.BIN 1851784 B  sha256 778b898ec4dfb4eb1ad96f24a2494602fce1b9de6011271df3325e85188a0cce
+    dc257-limpieza-b1/ 1ST_READ.BIN 1852648 B  sha256 97171558f316820c1a7c23c8fcd2156a0327d98703c4e3610a9ddb7fd5939388
+    disc.gdi de las dos corridas con la limpieza: "2 30000 0 2352 track02.raw 0" (audio fuera del .text)
+
+QUE NO SE HIZO (a proposito)
+----------------------------
+- No se toco `~/dreamcast/libgodc` (conserva sus fixes sin commitear).
+- No se puso relleno ni padding para "hacer entrar" el binario: no hizo falta, y la tarjeta lo prohibe.
+- No se toco `d2cVramLibre()` ni el shim: la funcion queda declarada y sin llamadas, que es lo que el
+  control espera ("solo la declaracion extern").

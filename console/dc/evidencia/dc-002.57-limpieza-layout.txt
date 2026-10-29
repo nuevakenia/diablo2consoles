@@ -4,6 +4,12 @@ Fecha: 2026-10-28 00:06-00:14 (America/Santiago).  Rama DC-002.  Host: CachyOS, 
 Arbol de partida: 4e26f02d (arbol limpio, `main.go` del POC sin tocar desde cfdb9a48).
 Tarjeta: t_f04f3ab9.  Todo lo de abajo esta medido hoy con los scripts de `scripts/console/`.
 
+OJO -- ESTE INFORME QUEDO SUPERADO EL 2026-10-29. Su conclusion ("el layout del binario decide, la limpieza no
+se puede dejar puesta") era correcta sobre lo que se midio, pero la causa NO era el layout: era el .gdi, que
+ponia la pista de audio en FAD 600, dentro del .text (DC-002.61, ver dc-002.61-audio-gdi.txt). Con el GDI
+arreglado la limpieza aterriza y el MISMO tamano de 1.851.784 B que aca se colgaba ahora dibuja:
+dc-002.57-limpieza-aterriza.txt.
+
 VEREDICTO, PRIMERO
 ------------------
 La barrera de partida **PASA** (el control que dibuja anda con el binario de hoy), pero la limpieza

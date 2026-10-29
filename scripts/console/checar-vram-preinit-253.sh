@@ -173,7 +173,12 @@ if [ -n "$LOG" ]; then
                 done <<< "$SALIDA"
                 ;;
         esac
-        if tr -d '\r' < "$LOG" | grep -q 'HITO250: PVR despues-de-pvr_init_defaults'; then
+        # OJO (medido en DC-002.57): con `set -o pipefail` la forma `tr ... | grep -q` MIENTE, porque grep -q
+        # corta en el primer match, tr muere con SIGPIPE y el pipeline sale 141 aunque el patron ESTE. Sobre el
+        # log de BESTIA=1 decia "el log no trae PVR despues-de-pvr_init_defaults" con la marca en la linea 188.
+        # Se cuenta con grep -c (lee todo el archivo, no corta) y se decide sobre el numero.
+        N_DESPUES=$(tr -d '\r' < "$LOG" | grep -c 'HITO250: PVR despues-de-pvr_init_defaults' || true)
+        if [ "${N_DESPUES:-0}" -gt 0 ]; then
             bien "log: el video arranco ($(tr -d '\r' < "$LOG" | grep -m1 'HITO250: PVR despues-de-pvr_init_defaults' | sed 's/^ *//'))"
         else
             echo "   aviso: el log no trae 'HITO250: PVR despues-de-pvr_init_defaults' (la corrida no llego al video)"

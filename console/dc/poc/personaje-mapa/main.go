@@ -927,19 +927,19 @@ func main() {
 
 	memoria("mapa-en-imagen")
 
-	// DC-002.56: esta lectura (y las dos de mas abajo, PERSONAJE-IMAGEN y MPQ-CERRADOS) corre con el PVR
-	// APAGADO: la marca del encendido es "HITO250: PVR antes-de-pvr_init_defaults", mucho mas abajo.
-	// MEDIDO (console/dc/evidencia/dc-002.56-vram-preinit.txt):
-	//  * pvr_mem_available() (KOS kernel/arch/dreamcast/hardware/pvr/pvr_mem.c:176) arranca con
-	//    `if(!pvr_mem_base) return 0;` sobre un estatico en .bss, asi que con el PVR apagado devuelve 0 SIN
-	//    tocar el allocator ni pvr_state (en este KOS el allocator de VRAM es un dlmalloc propio y
-	//    `pvr_state.ram_free_list` ya no existe). O sea que el 0 de aca no ensucia nada: no era la causa.
-	//  * el "arreglo de limpieza" (imprimir "vram_libre= sin-init" y sacar la llamada) se PROBO y NO se puede
-	//    aplicar todavia: mueve 1ST_READ.BIN 64 bytes y con eso BESTIA=0 (el control que dibuja) deja de
-	//    dibujar. El umbral esta medido: una edicion de 1 byte que NO cambia el tamano del binario dibuja,
-	//    64 bytes menos se cuelga. Es la fragilidad de layout de DC-002.53, no esta lectura.
-	//  * la barrera para cuando eso se arregle ya existe: scripts/console/checar-vram-preinit-253.sh.
-	println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre=", int64(d2cVramLibre()))
+	// DC-002.56 / DC-002.57: esta marca (y las dos de mas abajo, PERSONAJE-IMAGEN y MPQ-CERRADOS) corre con el
+	// PVR APAGADO: la marca del encendido es "HITO250: PVR antes-de-pvr_init_defaults", mucho mas abajo. Por eso
+	// imprime `vram_libre= sin-init` y NO llama al allocator: con el PVR apagado el numero era siempre 0 y un
+	// instrumento que imprime un 0 fijo no informa.
+	// MEDIDO (console/dc/evidencia/dc-002.56-vram-preinit.txt): pvr_mem_available() (KOS
+	// kernel/arch/dreamcast/hardware/pvr/pvr_mem.c:176) corta con `if(!pvr_mem_base) return 0;`, asi que el 0 no
+	// ensuciaba nada: no era la causa del bicho de DC-002.53.
+	// La limpieza se PROBO en DC-002.56 y no se pudo aplicar: movia 1ST_READ.BIN 64 bytes y BESTIA=0 dejaba de
+	// dibujar. Ese sintoma NO era del layout: era el .gdi, que ponia la pista de audio en FAD 600, dentro del
+	// .text, y dejaba un sector en ceros (DC-002.61, console/dc/evidencia/dc-002.61-audio-gdi.txt). Con el GDI
+	// arreglado (mkgdi.py, audio en LBA 30000) aterriza en DC-002.57, con BESTIA=0 ANDA en las dos variantes.
+	// El control que la vigila es scripts/console/checar-vram-preinit-253.sh.
+	println("HITO238: MAPA-IMAGEN bytes=", n.Ancho*n.Alto*4, "vram_libre= sin-init")
 
 	// OJO (DC-002.50, medido): aca se probo arrancar el video ANTES de componer los ciclos, para que el PVR
 	// encontrara el monton libre. NO sirve: la consola se queda en "pvr: enabling vertical scaling" (con 800.216 B
@@ -1080,7 +1080,7 @@ func main() {
 		personaje.ReplacePixels(crgba)
 	}
 
-	println("HITO238: PERSONAJE-IMAGEN bytes=", per.Ancho*per.Alto*4, "vram_libre=", int64(d2cVramLibre()))
+	println("HITO238: PERSONAJE-IMAGEN bytes=", per.Ancho*per.Alto*4, "vram_libre= sin-init")
 
 	// ============================== 3b. LA BESTIA Y EL GOLPE (DC-002.50) ==============================
 	//
@@ -1169,9 +1169,10 @@ func main() {
 	// el d2char.mpq SIGUE ABIERTO: el ciclo del golpe (A1) se compone en 3d, con el video ya andando.
 
 	// ============================== 4. el personaje y el control ==============================
-	// DC-002.56: tercera lectura pre-video (las tres son las de esta tarjeta). Ver la nota larga de
-	// MAPA-IMAGEN: con el PVR apagado el numero es 0 y no toca el allocator; sacarla hoy rompe el control.
-	println("HITO250: MPQ-CERRADOS vram_libre=", int64(d2cVramLibre()))
+	// DC-002.56 / DC-002.57: tercera marca pre-video (las tres son las de esta tarjeta). Igual que MAPA-IMAGEN:
+	// con el PVR apagado no se le pregunta nada al allocator y se imprime `sin-init`. Ver la nota larga de
+	// MAPA-IMAGEN (y DC-002.61: la fragilidad que impedia aplicarlo era el .gdi, no el layout).
+	println("HITO250: MPQ-CERRADOS vram_libre= sin-init")
 
 	est := NuevoEstado(float64(centroX), float64(centroY), false)
 
