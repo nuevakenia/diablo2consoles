@@ -1,0 +1,208 @@
+DC-002.61 - LOS ITEMS DEL SUELO EN LA CONSOLA (medido en Flycast)
+==============================================================
+
+Fecha: 2026-10-29.  Rama DC-002.  Cierra el hito que sigue a DC-002.50: los 41 registros de
+objetos del `townN1.ds1` se dibujan en su celda isometrica con el grafico que sale del MPQ, el
+boton de accion (A) recoge el que esta en la celda de al lado y el inventario de 4 casillas se ve
+en un panel (tecla I / boton X).
+
+QUE ENTRA
+---------
+  console/dc/poc/personaje-mapa/objetos.go   los items del suelo, el inventario, el panel y la recogida
+  console/dc/poc/personaje-mapa/fuente.go    la letra de 5x7 del panel (dibujada a mano, sin DC6)
+  console/dc/poc/personaje-mapa/main.go      el suelo se arma con el DS1, los graficos se cargan despues
+                                             de `IniciarPantalla`, y el loop llama a `j.items()`
+  scripts/console/build-items-261.sh         el build de esta tarjeta (una COPIA del POC con los interruptores)
+  scripts/console/captura-ventana-261.sh     la captura de la VENTANA del emulador (no del escritorio)
+  scripts/console/checar-items-261.py        el verificador: lee el log y da el veredicto
+
+QUE NO ENTRA
+------------
+  - Nada de equipo: los items se recogen y se cuentan, pero no hay arma/armadura que se ponga encima.
+  - Nada de scrollear: la ventana del nivel es fija (512x512), asi que de los 41 objetos del pueblo
+    solo los que caen en esa ventana se ven (ver "EL GRAFICO SOLO PARA LO QUE SE VE").
+  - Nada de sonido, ni de arrastrar items, ni de tirarlos al suelo.
+
+DE DONDE SALEN LOS ITEMS (y por que solo los `Type 2`)
+------------------------------------------------------
+El DS1 del pueblo (`data\global\tiles\ACT1\TOWN\townN1.ds1`, crc32 `2a7f1c10`) trae 41 registros:
+26 son OBJETOS (`Type 2`, se buscan en `objects.txt` por su `Id`) y 15 son APARICIONES de
+monstruo/NPC (`Type 1`, no tienen fila en `objects.txt`: en `d2drlg/drlgoutdoor/subobjects_test.go`
+los `Type 1` son "a monster: never"). Los dos tipos se dibujan; lo que cambia es que los `Type 2`
+traen su capa COF/DCC del MPQ y los `Type 1` van con el marcador de una celda.
+
+Las 41 posiciones, tal cual las imprime la consola (`ITEM suelo idx= ...`, `X`/`Y` del DS1 en
+subtiles y la celda = `X/5`, `Y/5`):
+
+     idx tipo  id  sub      celda     token nombre
+       0    2  110 (144, 51) (28,10)   n5    not used        <- el token no tiene COF en el MPQ (marcador)
+       1    2    1 (185, 20) (37,4)    C5    Casket
+       2    2    1 (163, 81) (32,16)   C5    Casket
+       3    2   52 (114,  9) (22,1)    U3    Urn
+       4    2    2 (137, 52) (27,10)   SF    Shrine
+       5    2    1 (101, 80) (20,16)   C5    Casket
+       6    2    1 (202,104) (40,20)   C5    Casket
+       7    1    0 ( 95, 87) (19,17)   --    aparicion
+       8    2   33 (120, 52) (24,10)   A1    Dummy
+       9    2    1 (158,  2) (31,0)    C5    Casket
+      10    2    1 (171, 19) (34,3)    C5    Casket
+      11    1    2 (192, 16) (38,3)    --    aparicion
+      12    1   13 (212, 13) (42,2)    --    aparicion
+      13    2    4 (100, 41) (20,8)    U1    LargeUrn
+      14    2    1 (159,101) (31,20)   C5    Casket          <- EN LA VENTANA
+      15    2    1 (198, 11) (39,2)    C5    Casket
+      16    1    8 ( 94, 27) (18,5)    --    aparicion
+      17    2    1 (102, 21) (20,4)    C5    Casket
+      18    2    1 ( 88, 34) (17,6)    C5    Casket
+      19    2    1 ( 96, 53) (19,10)   C5    Casket
+      20    2    1 ( 90, 95) (18,19)   C5    Casket
+      21    2    1 (121, 83) (24,16)   C5    Casket
+      22    1   13 (169,100) (33,20)   --    aparicion       <- el tercero que se recoge (fuera de la ventana)
+      23    2    3 (183, 62) (36,12)   C6    Casket
+      24    2    1 (196, 66) (39,13)   C5    Casket
+      25    1    4 (158, 23) (31,4)    --    aparicion
+      26    1    4 (177, 42) (35,8)    --    aparicion
+      27    2    1 (116, 44) (23,8)    C5    Casket
+      28    1    4 (177, 72) (35,14)   --    aparicion
+      29    2    1 (201, 46) (40,9)    C5    Casket
+      30    2    1 (142, 19) (28,3)    C5    Casket
+      31    1    3 ( 82, 62) (16,12)   --    aparicion
+      32    1    3 (138, 98) (27,19)   --    aparicion       <- EN LA VENTANA (marcador)
+      33    1    3 (208, 57) (41,11)   --    aparicion
+      34    1    3 (177, 11) (35,2)    --    aparicion
+      35    1    4 (127, 20) (25,4)    --    aparicion
+      36    2    1 (161, 30) (32,6)    C5    Casket
+      37    2  102 (126, 39) (25,7)    FB    Dummy
+      38    2    1 (135, 30) (27,6)    C5    Casket
+      39    1    7 (126, 45) (25,9)    --    aparicion
+      40    1    5 (153, 46) (30,9)    --    aparicion
+
+El grafico de un objeto NO es un DC6 suelto: es un COF con sus capas DCC bajo `data\global\objects\`
+(por eso la ruta se arma con los tokens `may`, `capa`, `min`, `arma`, igual que hace el motor en
+`d2common/d2fileformats/d2cof`). Medido para el cofre que se ve:
+
+    ITEM GRAFICO token= C5 fuente=DCC bytes= 13320 crc32= 636238938 dirs= 1 cuadros= 7
+                 caja= 115 97 esquina= -55 -65 pixeles= 6560 crc= 435493804
+
+EL GRAFICO SOLO PARA LO QUE SE VE (la memoria manda)
+----------------------------------------------------
+El primer intento de esta tarjeta decodifico los 12 tokens del pueblo de una vez y se cayo:
+
+    ITEM GRAFICO token= n5 ... cuadros= 8 ...
+    ITEM GRAFICO token= C5 ... cuadros= 7 ...
+    ITEM GRAFICO token= U3 ... cuadros= 9 ...
+    ITEM GRAFICO token= SF ... cuadros= 21 ...
+    Out of memory. Requested sbrk_base 0x8d070000, was 0x8cd2d000, diff 3420160
+    fatal error: gc_external_alloc: OOM          (el monton de la consola: arena 11,6 MB)
+
+`d2dcc.Load` decodifica TODOS los cuadros del DCC y el santuario solo son 21 cuadros de 76x134
+(~214 KB de RGBA, y el monton tiene ~140 KB libres a esa altura del arranque: los ciclos del
+personaje y el mapa ya se comieron el resto). Asi que la regla quedo medida, no elegida: **se
+decodifica el grafico solo de los items que pueden caer en la pantalla** (`posiblementeEnPantalla`,
+con margen de un cuadro grande). La ventana del nivel son 12 celdas de ancho y el pueblo 57x41
+celdas, asi que en la ventana caen DOS items: el cofre de (31,20) y la aparicion de (27,19). Los
+otros 38 existen igual -- tienen su celda del DS1 y se pueden recoger caminando hasta ellos --, solo
+que no se dibujan porque estan fuera del cuadro. En la corrida eso se informa:
+
+    ITEM grafico-pedidos= 3 de 41
+    ITEM cargados= 41 tokens= 1 conGrafico= 1 marcador= 2 enPantalla= 2 sinGrafico= 38 ms= 541
+
+CORRIDA A -- items=1 itemsAuto=1 panelAuto=1 medirPantalla=1 (170 s de emulacion)
+---------------------------------------------------------------------------------
+    ITEM suelo= 41 objetos= 26 apariciones= 15
+    ITEM OBJECTS.TXT bytes= 152030 crc32= 292748583
+    ITEM OBJECTS.TXT filas= 8 de 8 ids del suelo       (solo se guardan las filas que el suelo pide)
+    ITEM grafico-pedidos= 3 de 41
+    ITEM GRAFICO token= C5 fuente=DCC bytes= 13320 ... pixeles= 6560 crc= 435493804
+    ITEM cargados= 41 tokens= 1 conGrafico= 1 marcador= 2 enPantalla= 2 sinGrafico= 38 ms= 541
+    ITEM recogido=SPAWN3  celda=27,19 suelo=40 inventario=1/4 radio=1 cuadroDelLoop=3
+    ITEM recogido=Casket  celda=31,20 suelo=39 inventario=2/4 radio=1 cuadroDelLoop=16
+    ITEM recogido=SPAWN13 celda=33,20 suelo=38 inventario=3/4 radio=1 cuadroDelLoop=38
+    ITEM PANEL abierto= true inventario= 3 / 4 suelo= 38 cuadroDelLoop= 44
+    ITEM PANTALLA cuadro= 60 pixelesNoVacios= 182629 de 307200 huella= 3826564331 suelo= 38 inventario= 3
+    ITEM PANTALLA cuadro= 240 pixelesNoVacios= 182631 de 307200 huella= 1609481550 suelo= 38 inventario= 3
+
+  El panel se abrio y cerro 37 veces, y el inventario NUNCA bajo (valores vistos 0, 1 y 3: solo
+  sube cuando se recoge). Cero excepciones del SH-4.
+
+CORRIDA B (items quietos) y CORRIDA C (el BASELINE sin items) -- los pixeles del criterio 2
+--------------------------------------------------------------------------------------------
+Las dos con el personaje quieto en (28,20) y el mismo instrumento (`medirPantalla`), para comparar
+el MISMO cuadro del loop. La cuenta se hace DENTRO de la consola (pixeles no negros de la pantalla
+de 640x480), que es la misma cuenta que se le hace a la captura pero sin depender de que la ventana
+del emulador este adelante:
+
+    con items : cuadro  60 -> 177170 pixelesNoVacios   huella= 3078799571
+                cuadro 240 -> 177079 pixelesNoVacios   huella= 2366063349
+    baseline  : cuadro  60 -> 172174 pixelesNoVacios   huella= 2731880225
+                cuadro 240 -> 172095 pixelesNoVacios   huella=  866959215
+
+    diferencia: +4996 pixeles (cuadro 60) y +4984 (cuadro 240)  ->  los items se pintan de verdad
+
+Y sobre las CAPTURAS de la ventana del emulador (450x398, la misma ventana en las dos corridas):
+`dc-002.61-suelo.png` 54374 pixeles no negros contra `dc-002.61-baseline.png` 53083 -> +1291.
+
+  Capturas de esta tarjeta (en `console/dc/evidencia/`):
+    dc-002.61-suelo.png     el cofre (C5) abajo a la derecha del personaje y el rombo del marcador
+                            de la aparicion arriba a la izquierda, los dos sobre el piso isometrico
+    dc-002.61-panel.png     el panel: INVENTARIO 3/4 SUELO 38, con las casillas SPAWN3, CASKET,
+                            SPAWN13 y la cuarta vacia
+    dc-002.61-baseline.png  el mismo cuadro con `ITEMS=0` (el binario de DC-002.50): sin items
+
+EL MUTANTE -- items=1 itemsAuto=1 itemsSordo=1 (140 s)
+------------------------------------------------------
+El mismo binario con la recogida muerta a proposito: el boton se lee y se informa, pero no recoge.
+
+    ITEM BOTON boton=A celda= 28 20 cerca= 32 suelo= 41 inventario= 0 / 4 itemsSordo= true cuadroDelLoop= 5
+    ... 150 pulsaciones con un item EN RANGO (`cerca= 32`) a lo largo de la corrida ...
+    ITEM BOTON boton=A celda= 28 20 cerca= 32 suelo= 41 inventario= 0 / 4 itemsSordo= true cuadroDelLoop= 918
+
+    pulsaciones: 150      ITEM recogido: 0      suelo: 41 (no baja)      inventario: 0/4
+
+  Es la prueba de que lo que cambia el resultado es la RECOGIDA y no el instrumento: las mismas
+  pulsaciones, el mismo caminar, el mismo radio.
+
+MEMORIA Y PESO (criterio 4)
+---------------------------
+    ELF con items ................ 8.884.200 bytes  (tope 16 MB: sigue a menos de la mitad)
+    ELF baseline (sin items) ..... 8.881.652 bytes  ->  los items suman 2.548 bytes de codigo
+    heap libre antes de los items  138.088   (etapa `items-antes`)
+    heap libre despues ............ 140.208   (etapa `items`; sube porque se suelta objects.txt)
+    heap al cerrar d2char: 70.296 con items  contra  69.552 en el baseline (DC-002.50)
+
+  O sea: la capa de items NO se come el margen del arranque (lo deja 744 bytes mejor que el
+  baseline), siempre que solo se decodifique lo que se ve.
+
+QUE SE PROBO (comandos, en este host)
+-------------------------------------
+    # el build de esta tarjeta (una COPIA del POC; el arbol no se toca)
+    SALTAR_STDLIB=1 SALTAR_MOTOR=1 GODC_GOX=~/dreamcast/gox \
+        bash scripts/console/build-items-261.sh /tmp/dcbuild/finalA
+
+    # la corrida, con las capturas de la ventana del emulador
+    (bash scripts/console/captura-ventana-261.sh /tmp/dcbuild/capA/w 95 115 140 160 &)
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/finalA/disc.gdi 170 /tmp/dcbuild/capA
+
+    # el veredicto (lee el log serie de la consola)
+    python3 scripts/console/checar-items-261.py /tmp/dcbuild/capA/flycast.log
+    python3 scripts/console/checar-items-261.py /tmp/dcbuild/capB/flycast.log base:/tmp/dcbuild/capC/flycast.log
+
+    VEREDICTO: VERDE (todo lo que la tarjeta pide esta en el log)   <- las dos veces
+
+  `ITEMS=0` da el baseline, `ITEMS_AUTO=1` el instrumento de la cruceta y del boton, `PANEL_AUTO=1`
+  el del panel, `ITEMS_SORDO=1` el mutante y `MEDIR=1` la cuenta de pixeles.
+
+TRAMPAS MEDIDAS (para el que venga)
+-----------------------------------
+  1. `spectacle -f` (pantalla completa) NO sirve en esta maquina: el emulador queda debajo de otras
+     ventanas y la captura sale con el editor, cero pixeles del POC. Hay que ACTIVAR la ventana del
+     emulador (`kdotool windowactivate`) y capturarla sola (`spectacle -a`): eso hace
+     `captura-ventana-261.sh`.
+  2. `d2dcc.Load` decodifica el DCC ENTERO (todos los cuadros, no el que se dibuja): con el monton de
+     la consola a ~140 KB libres, 12 tokens no entran y el arranque se cae con `OOM`.
+  3. El heap de la consola esta al limite a esta altura del arranque (los ciclos del personaje se
+     llevan ~660 KB): lo que se cargue de mas ANTES de `IniciarPantalla` deja al PVR sin sus ~70 KB
+     de monton de C y cuelga en `pvr: enabling vertical scaling`. Los items se cargan DESPUES del
+     video y ANTES de cerrar `d2data.mpq`.
+  4. La fuente del juego (`font16.dc6` + la tabla `.tbl`) son ~200 KB mas en ese mismo momento
+     fragil: el panel usa una letra de 5x7 propia (`fuente.go`), que ademas no depende del idioma.

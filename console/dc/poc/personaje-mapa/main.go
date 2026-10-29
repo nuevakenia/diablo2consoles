@@ -223,6 +223,14 @@ type juego struct {
 	msGolpe         int64     // cuando empezo el ataque
 	botonGolpeAntes bool      // el flanco del boton (una pulsacion = un ataque)
 	ataques         int       // cuantos ataques empezo el heroe
+
+	// ---- los items del suelo y el inventario (DC-002.61)
+	itemsSuelo       []itemDelSuelo // los 41 registros de objetos del DS1, con su grafico y si se recogieron
+	inv              inventario     // las cuatro casillas
+	panelAbierto     bool           // el panel del inventario (tecla I / boton X)
+	botonAccionAntes bool           // el flanco del boton de accion (A)
+	botonPanelAntes  bool           // el flanco del panel
+	itemsPillados    int            // cuantos recogio el instrumento (itemsAuto)
 }
 
 // rect: una caja de la pantalla (x0,y0) .. (x1,y1) sin incluir el borde derecho/inferior.
@@ -321,6 +329,13 @@ func (j *juego) Update() error {
 		ejeY++
 	}
 
+	// ---- DC-002.61: EL INSTRUMENTO DE LOS ITEMS. El emulador corre sin teclado, asi que la cruceta no se
+	// aprieta nunca: con itemsAuto el POC simula los MISMOS ejes que daria el control (los calcula con
+	// DireccionDelPiso, la misma funcion del camino real) y el resto del movimiento no cambia una linea.
+	if items && itemsAuto {
+		ejeX, ejeY = j.ejeDelAuto()
+	}
+
 	// ---- el movimiento del MOTOR (d2path): la velocidad de la tabla del exe, en la direccion pedida
 	j.movido = false
 
@@ -353,6 +368,12 @@ func (j *juego) Update() error {
 
 	if animar {
 		j.animar()
+	}
+
+	// ---- DC-002.61: el boton de accion, el panel y la recogida (despues de moverse: se recoge desde la celda
+	// donde el personaje quedo en ESTE cuadro)
+	if items {
+		j.items(ahora)
 	}
 
 	// ---- la tabla del control (el instrumento de DC-002.11): se informa CUANDO CAMBIA, no cada cuadro
@@ -403,6 +424,12 @@ func (j *juego) marca() {
 func (j *juego) Draw(pantalla *ebiten.Image) {
 	if animar {
 		j.dibujarAnimado(pantalla)
+
+		// DC-002.61: el instrumento de los pixeles (criterio 2), DESPUES de dibujar
+		if medirPantalla {
+			j.medirLaPantalla(pantalla)
+		}
+
 		return
 	}
 
@@ -430,16 +457,29 @@ func (j *juego) dibujarAnimado(pantalla *ebiten.Image) {
 
 	hayBestia := j.mon != nil && j.mon.Ciclo != nil
 
+	// DC-002.61: con el panel del inventario abierto el cuadro se repinta ENTERO (el panel tapa el mapa y las
+	// cajas del personaje lo borrarian). Es un cuadro lento (~0,17 s) y solo pasa con el panel abierto.
+	hayPanel := items && j.panelAbierto
+	if hayPanel {
+		j.pintado = false
+	}
+
 	if !j.pintado {
 		var op ebiten.DrawImageOptions
 		op.GeoM.Translate(mapaX, mapaY)
 		pantalla.DrawImage(j.mapa, &op)
 
+		// los items del suelo van ENCIMA del mapa y DEBAJO del bicho y del personaje
+		if items {
+			j.dibujarItems(pantalla)
+		}
+
 		j.pintado = true
 	}
 
-	// si no cambio ni el cuadro ni la posicion, la pantalla ya esta bien: no se repinta
-	if j.hayCaja && j.cuadroPintado == j.cuadroDibujado && !j.movido &&
+	// si no cambio ni el cuadro ni la posicion, la pantalla ya esta bien: no se repinta (con el panel abierto
+	// NO vale: el panel se repinta cuadro a cuadro)
+	if !hayPanel && j.hayCaja && j.cuadroPintado == j.cuadroDibujado && !j.movido &&
 		(!hayBestia || (j.mon.HayCaja && j.mon.Pintado == j.mon.Cuadro)) {
 		return
 	}
@@ -450,13 +490,15 @@ func (j *juego) dibujarAnimado(pantalla *ebiten.Image) {
 	ax, ay := PixelDeLaCelda(cx, cy, origenX, origenY)
 	px, py := mapaX+ax+cu.Izq, mapaY+ay+cu.Arriba
 
-	// las cajas que tapaban al bicho y al personaje vuelven a ser mapa (es lo que tapaban)
+	// las cajas que tapaban al bicho y al personaje vuelven a ser mapa (es lo que tapaban). Con items, ademas
+	// se vuelven a pintar los items que caian dentro de esas cajas: si no, el personaje al pasar por encima
+	// los borra.
 	if j.hayCaja {
-		j.devolverAlMapa(pantalla, j.caja)
+		j.restaurarCajaConItems(pantalla, j.caja)
 	}
 
 	if hayBestia && j.mon.HayCaja {
-		j.devolverAlMapa(pantalla, j.mon.Caja)
+		j.restaurarCajaConItems(pantalla, j.mon.Caja)
 	}
 
 	// el bicho primero (queda DETRAS del personaje) y el personaje encima
@@ -471,6 +513,11 @@ func (j *juego) dibujarAnimado(pantalla *ebiten.Image) {
 	j.caja = rect{px, py, px + cu.Ancho, py + cu.Alto}
 	j.hayCaja = true
 	j.cuadroPintado = j.cuadroDibujado
+
+	// DC-002.61: el panel del inventario va ULTIMO: encima del mapa, del bicho y del personaje
+	if hayPanel {
+		j.dibujarPanel(pantalla)
+	}
 }
 
 // devolverAlMapa: escribe en la pantalla los pixeles del MAPA que hay debajo de una caja de la pantalla.
@@ -872,6 +919,19 @@ func main() {
 	println("HITO238: VENTANA lado=", n.Ancho, "origen=", n.OrigenX, n.OrigenY, "centroCelda=", centroX, centroY)
 	println("HITO238: PEDIDOS pisos=", n.PisosPedidos, "paredes=", n.ParedesPedidas, "total=", len(n.Pedidos))
 
+	// ============================== 1b. LOS ITEMS DEL SUELO (DC-002.61) ==============================
+	// Los registros de OBJETOS del DS1 se toman ACA, antes del video, pero SOLO se cuentan y se informan: los
+	// 41 structs son ~3 KB. Los graficos (objects.txt y las capas DCC) se cargan DESPUES de `IniciarPantalla`,
+	// ver la nota larga de objetos.go.
+	var suelo []itemDelSuelo
+
+	if items {
+		suelo = nuevoSuelo(d.Objects)
+		informarSuelo(suelo)
+	} else {
+		println("ITEM apagado (items=false): el binario no tiene items en el suelo")
+	}
+
 	// los DT1, DE A UNO (el town pide 4,35 MB de DT1: tenerlos todos vivos no entra en la consola)
 	for _, f := range d.Files {
 		nombre := RutaDelDT1(f)
@@ -1267,6 +1327,10 @@ func main() {
 
 	j := &juego{mapa: mapa, personaje: personaje, per: per, est: est, msAnterior: int64(d2cMs())}
 
+	if items {
+		j.itemsSuelo = suelo
+	}
+
 	if animar {
 		j.ciclos = ciclos
 		j.palUnidades = palUni
@@ -1279,6 +1343,15 @@ func main() {
 
 	if err := ebiten.IniciarPantalla(ancho, alto); err != nil {
 		println("HITO238: no pude arrancar el video:", err.Error())
+	}
+
+	// ============================== 3c. LOS GRAFICOS DE LOS ITEMS, CON EL VIDEO YA ANDANDO ==============
+	// objects.txt (~60 KB) y las 12 capas DCC de los objetos: se cargan ACA y no antes, por lo mismo que la
+	// vida del bicho y los ciclos (DC-002.50): lo que crece antes de `IniciarPantalla` deja al PVR sin sus
+	// ~70 KB de monton de C y lo cuelga en "pvr: enabling vertical scaling". Y tiene que ser ANTES de que se
+	// cierre el d2data.mpq (adentro de `cargarBestia`), porque de ahi salen los dos.
+	if items {
+		j.cargarItems(mpq)
 	}
 
 	// ============================== 3d. LOS CICLOS DEL BICHO, CON EL VIDEO YA ANDANDO (DC-002.50) ==========
