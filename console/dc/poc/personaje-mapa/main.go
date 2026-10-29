@@ -178,6 +178,13 @@ var bestia = false
 // igual), pero NO arranca el ataque: con las mismas pulsaciones, la vida del bicho no puede cambiar.
 var golpeSordo = false
 
+// golpeAuto: INSTRUMENTO de medicion (DC-002.50). El emulador corre sin ventana y sin teclado, asi que
+// el boton Y nunca se aprieta y la cadena golpe -> dano -> vida no se puede medir. Con esto encendido
+// el POC simula el FLANCO del boton (80 ms apretado cada 1,6 s) y todo lo demas del camino es el real:
+// el mismo combate(), el mismo ciclo A1, la misma regla del dano a la mitad. NO toca el dano ni la vida.
+// Se enciende con GOLPEAUTO=1 en build-monstruo-250.sh. Para el mutante se combina con golpeSordo=1.
+var golpeAuto = false
+
 // umbralGrande: a partir de que tamaño el recolector de libgodc manda la asignacion al monton de C (64 KB,
 // ver DC-002.37): esas no las recupera el recolector.
 const umbralGrande = 64 * 1024
@@ -586,6 +593,12 @@ var origenX, origenY int
 func (j *juego) combate() {
 	ahora := int64(d2cMs())
 	apretado := ebiten.IsKeyPressed(ebiten.KeyY)
+
+	// DC-002.50: el instrumento. Sin teclado (el emulador corre sin ventana) el boton no se aprieta
+	// nunca, asi que se simula el flanco: 80 ms apretado cada 1,6 s. El resto del camino es el real.
+	if golpeAuto {
+		apretado = apretado || (ahora%1600) < 80
+	}
 
 	// la marca del control CRUDO: los bits del maple tal cual (CONT_Y = 32). Es el instrumento para saber que
 	// boton del control esta apretado y para probar el mapeo del emulador sin adivinar.

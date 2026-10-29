@@ -102,6 +102,13 @@ if [ "${GOLPE_SORDO:-0}" = "1" ]; then
     echo "   MUTANTE: golpeSordo=true (el boton se lee, la vida no cambia)"
 fi
 
+if [ "${GOLPEAUTO:-0}" = "1" ]; then
+    sed -i 's|^var golpeAuto = false$|var golpeAuto = true|' "$TMPPOC/main.go"
+    grep -q '^var golpeAuto = true$' "$TMPPOC/main.go" || {
+        echo "   FALLO: no pude encender el instrumento (no encontre 'var golpeAuto = false')"; exit 1; }
+    echo "   GOLPEAUTO=ON: el flanco del boton Y se simula (80 ms cada 1,6 s) para poder medir sin teclado"
+fi
+
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$TMPPOC" "$OUT"
 
 echo

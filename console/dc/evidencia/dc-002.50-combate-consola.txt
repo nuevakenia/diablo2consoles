@@ -1,0 +1,71 @@
+DC-002.50 - GOLPEAR ENEMIGOS EN LA CONSOLA (medido en Flycast)
+==============================================================
+
+Fecha: 2026-10-29.  Rama DC-002.  Cierra el hito que Papu pidio para el "breaking news": el
+personaje animado en el acto 1, el monstruo en el mapa, el golpe con su animacion, el dano y la
+vida bajando hasta la muerte.
+
+POR QUE ESTABA BLOQUEADA Y POR QUE YA NO
+----------------------------------------
+El codigo del combate estaba escrito y medido en el host desde el 2026-10-24, pero la consola no
+arrancaba el video cuando el bicho y el A1 del heroe iban en el mismo binario: `pvr_init_defaults`
+colgaba con el PC en la pila. Eso NO era el bicho ni la memoria -- era el .gdi, que ponia la pista
+de audio en FAD 600 y borraba el sector 425 del ejecutable (DC-002.61, commit d8da3aeb). Con el
+audio en LBA 30000 el mismo binario arranca, dibuja y pelea.
+
+EL INSTRUMENTO QUE FALTABA
+--------------------------
+`var golpeAuto` (main.go): el emulador corre sin ventana y sin teclado, asi que el boton Y no se
+aprieta nunca y la cadena golpe->dano->vida no se podia medir. Con `GOLPEAUTO=1` el POC simula el
+FLANCO del boton (80 ms apretado cada 1,6 s); el resto del camino es el real: el mismo `combate()`,
+el mismo ciclo A1 del heroe y la misma regla del dano a la mitad de la animacion. No toca el dano ni
+la vida.
+
+CORRIDA 1 -- bestia=1 GOLPEAUTO=1 (130 s de emulacion)
+-----------------------------------------------------
+    HITO250: COF DEL GOLPE ...AMA1hth.COF bytes= 1777 framesPorDir= 13 dirs= 16
+    HITO250: BOTON boton=Y golpeSordo= false vida= 3 cuadroDelLoop= 2
+    HITO250: GOLPE-EMPIEZA ataque= 1 vidaAntes= 3
+    HITO250: GOLPE ataque= 1 cuadroDelHeroe= 8 de 13 dano= 1 vidaAntes= 3 vidaDespues= 2 muerto= false danoAcumulado= 1
+    HITO250: GOLPE-FIN ataque= 1 vida= 2
+    HITO250: GOLPE ataque= 2 cuadroDelHeroe= 8 de 13 dano= 1 vidaAntes= 2 vidaDespues= 1 danoAcumulado= 2
+    HITO250: GOLPE ataque= 3 cuadroDelHeroe= 8 de 13 dano= 1 vidaAntes= 1 vidaDespues= 0 muerto= true danoAcumulado= 3
+    HITO250: MUERTE vida= 0 golpes= 3 dano= 3 modo= DD cuadroDelLoop= 52
+    HITO250: ANIM-BESTIA modo= DD cuadro= 0 de 1 caja= 68 43 esquina= -28 -25 pixeles= 741 crc32= 2643148389 vida= 0
+
+  Cero excepciones del SH-4 en toda la corrida.
+
+CORRIDA 2 -- EL MUTANTE: bestia=1 GOLPEAUTO=1 GOLPE_SORDO=1 (100 s)
+-------------------------------------------------------------------
+    HITO250: BOTON boton=Y golpeSordo= true vida= 3 cuadroDelLoop= 2
+    HITO250: BOTON boton=Y golpeSordo= true vida= 3 cuadroDelLoop= 27
+    ... (diez pulsaciones informadas, la vida se queda en 3 todo el tiempo)
+    HITO250: ANIM-BESTIA modo= NU cuadro= 0 de 8 caja= 25 67 pixeles= 621 vida= 3 cuadroDelLoop= 495
+
+  Ninguna marca GOLPE-EMPIEZA ni MUERTE. Las mismas pulsaciones, la vida no se mueve: el dano lo
+  aplica el golpe, no el reloj ni el dibujo.
+
+LOS CUATRO CRITERIOS
+--------------------
+1. El monstruo pintado en el mapa: ANIM-BESTIA con caja 25x67, esquina -17/-56, 621-622 pixeles y
+   crc32 distinto por cuadro (NU gira 0..7 de 8).
+2. El golpe medido por el MOTOR: vida 3 -> 2 -> 1 -> 0, dano 1 por golpe, danoAcumulado 3.
+3. La animacion: el heroe dibuja A1 en el cuadro 8 de 13 justo cuando cae el dano (la regla del
+   motor: currentFrame/frameCount >= 0,5), y el bicho pasa a GH al recibir y a DD al morir.
+4. El mutante: con golpeSordo=1, mismas pulsaciones y la vida no cambia (3 durante 495 cuadros).
+
+REPRODUCIR
+----------
+    BESTIA=1 GOLPEAUTO=1 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/golpe
+    CAPTURE=none FLYCAST=$HOME/Proyectos/flycast-2.7/build/flycast \
+      bash scripts/console/run-flycast.sh /tmp/dcbuild/golpe/disc.gdi 130 /tmp/dcbuild/golpe/corrida
+    grep -a "HITO250: BOTON\|HITO250: GOLPE\|HITO250: MUERTE" /tmp/dcbuild/golpe/corrida/flycast.log
+
+    # el mutante
+    BESTIA=1 GOLPEAUTO=1 GOLPE_SORDO=1 bash scripts/console/build-monstruo-250.sh /tmp/dcbuild/golpe-mudo
+    # ... misma corrida; la vida tiene que quedarse en 3
+
+LO QUE NO ENTRA (como decia la tarjeta)
+---------------------------------------
+Inventario, habilidades por arbol y loot. El DT (muriendo) no esta compuesto en este binario: la
+muerte pasa directo a DD (cadaver), que es lo que se ve en la marca MUERTE con modo=DD.
