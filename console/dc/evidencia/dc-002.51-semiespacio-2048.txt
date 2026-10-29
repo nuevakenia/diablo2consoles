@@ -1,0 +1,65 @@
+DC-002.51 - EL SEMIESPACIO DEL GC A 2 MB (OPCION A)
+===================================================
+
+Fecha: 2026-10-29.  Rama DC-002.  Opcion elegida: A.  Commit de la evidencia: ver git log.
+
+POR QUE A Y NO B
+----------------
+Daniel pidio A "si es mejor en cuanto a escalabilidad, mantenibilidad y principios de programacion,
+aunque demore mas tiempo". Lo es:
+
+ * Escalabilidad: el monton pasa de 2 MB a 4 MB (dos semiespacios de 2 MB). Cualquier feature futura
+   entra sin tocar su codigo; no hay que rediseñar nada cuando el consumo crezca.
+ * Mantenibilidad: A es UN #define. B (componer bajo demanda) agrega un subsistema nuevo -- cache de
+   .dcc crudos, liberar el modo anterior, recomponer a 3,2 ms por direccion -- para ahorrar ~290 KB
+   por feature. Mas codigo propio que mantener y mas formas de fallar.
+ * Principios: el problema es de CAPACIDAD de la plataforma, no de algoritmo. Subir el limite es la
+   solucion de plataforma; componer bajo demanda es una optimizacion prematura que paga complejidad
+   permanente por un ahorro chico.
+
+Y un detalle que decide: 2048 es el valor que libgodc trae de fabrica (Makefile/KOS del upstream).
+El 1024 que habia era un parche LOCAL sin commitear, puesto como workaround del Heisenbug de
+DC-002.53 (cambiar el layout de la memoria movia el codigo que caia sobre el agujero del .gdi). Con
+la causa raiz resuelta (DC-002.61), el parche sobra: A es volver al default, no inventar uno nuevo.
+
+QUE SE HIZO
+-----------
+    cd ~/dreamcast/libgodc
+    git checkout runtime/godc_config.h        # GC_SEMISPACE_SIZE_KB 1024 -> 2048 (el default)
+    rm -f runtime/*.o libgodc.a libgodcbegin.a
+    make -j8 && make install                  # KOS_BASE=~/dreamcast/kos, sin sudo
+    grep GC_SEMISPACE_SIZE_KB ~/dreamcast/kos/include/godc/godc_config.h   # 2048
+
+MEDICIONES
+----------
+1) Semiespacios en el arranque (marcas ARQ-MARCA del runtime):
+     antes  (1024): semiespacio0 2351034592  semiespacio1 2352083200   -> separacion 1.048.608 B
+     ahora  (2048): semiespacio0 2351034592  semiespacio1 2353131776   -> separacion 2.097.184 B
+   O sea 2 MB por semiespacio, 4 MB de monton.
+
+2) bestia=1, 90 s, GDI con el audio en LBA 30000:
+   CERO excepciones, cuadroDelLoop=504, bicho dibujado y animando:
+     HITO250: ANIM-BESTIA modo= NU cuadro= 1 de 8 caja= 25 67 pixeles= 621 vida= 3 cambios= 383
+     HITO249: ANIM modo TN cuadro 0 de 16 caja 26 77 pixeles 1131
+
+3) Control bestia=0, 60 s: CERO excepciones, cuadroDelLoop=140, personaje animando, 35 gc_collect.
+
+4) Escalera repro-253 completa (kos, minimo, churn, nivel): 60/60 cuadros, todo verde.
+
+5) Con 1 MB el bicho ya entraba (344-375 KB vivos, umbral de GC ~790 KB): A no era necesaria para
+   el bicho de hoy. Se elige igual por lo de arriba -- margen para el giro (495 KB de las 8
+   direcciones) y para lo que venga, sin volver a tocar este numero.
+
+CORPUS DE 214 / 221
+-------------------
+`checar-gc-221.sh` NO es ejecutable hoy: rearma libgodc con 512 KB y despues intenta enlazar el POC
+`motor-arranque` con /tmp/gox-0028, que ya no existe -> "NO ENLAZA" (log en
+/tmp/dcbuild/gc221-kb512.build.log). Queda declarado el numero nuevo (2048) y la escalera re-medida
+sobre el POC vigente (los cuatro puntos de arriba). OJO: ese corpus deja libgodc en 512 e instalado;
+hay que volver a 2048 despues de correrlo (lo hace scripts/console/checar-semiespacio-251.sh).
+
+CONTROL AUTOMATICO
+------------------
+    bash scripts/console/checar-semiespacio-251.sh
+Verifica el #define en el repo de libgodc y en el KOS instalado, y si le pasas un log de corrida,
+que la separacion entre semiespacio0 y semiespacio1 sea la esperada (2 MB).
