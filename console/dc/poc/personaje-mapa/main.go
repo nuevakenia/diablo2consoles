@@ -681,6 +681,19 @@ func (j *juego) combate() {
 		println("HITO250: BOTON boton=Y botones=", int(ebiten.BotonesParaLaEvidencia()), "golpeSordo=", golpeSordo,
 			"vida=", j.mon.Vida.HP, "muerto=", j.mon.Combate.Muerto, "cuadroDelLoop=", j.cuadros)
 
+		// DC-002.62: EL GOLPE SUENA ACA, EN EL FLANCO DEL BOTON Y (la tarjeta lo pide literal: "el efecto
+		// de golpe en el boton Y"). Dos guardas, las dos con causa medida:
+		//   - `!j.golpeando`: el POC rechaza el ataque en medio de otro (un flanco = un golpe), asi que no
+		//     hay golpe que suene; una pulsacion a mitad del A1 no suena, igual que en el juego.
+		//   - `!golpeSordo`: ese mutante de DC-002.50 significa "el boton se lee y NO hay golpe". Aca no
+		//     hay golpe, asi que tampoco hay sonido.
+		// El bicho MUERTO si suena: en el juego de PC el golpe suena contra el aire o contra el cadaver,
+		// y el Returned de este POC muere a los 3 golpes (DC-002.50 medido: HP=3). Sin esto el contador
+		// se quedaria en 3 y no habria 10 golpes que medir (criterio 3 de la tarjeta).
+		if !golpeSordo && !j.golpeando {
+			sonar(idSonidoGolpe)
+		}
+
 		if !golpeSordo && !j.golpeando && !j.mon.Combate.Muerto {
 			j.golpeando = true
 			j.golpeDado = false
@@ -1518,6 +1531,11 @@ func main() {
 	memoria("d2char-cerrado")
 
 	println("HITO238: dibujando (mapa", n.Ancho, "x", n.Alto, "en", mapaX, mapaY, "; personaje", per.Ancho, "x", per.Alto, ")")
+
+	// ============================== 5. EL SONIDO (DC-002.62) ==============================
+	// El AICA se enciende ACA, con el video ya andando y los MPQ cerrados: snd_init carga el programa
+	// del AICA y arranca su monton, y los dos PCM se copian a la RAM del AICA (no a la del POC).
+	iniciarSonido()
 
 	if err := ebiten.RunGame(j); err != nil {
 		println("HITO238: el loop termino con error:", err.Error())

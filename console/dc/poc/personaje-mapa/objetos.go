@@ -890,6 +890,10 @@ func (j *juego) recoger() {
 	j.inv.Agregar(it.Nombre)
 	j.itemsPillados++
 
+	// DC-002.62: RECOGER SUENA. Aca, cuando el item ya paso al inventario, y no antes: si el inventario
+	// esta lleno o no hay nada cerca (los dos caminos que salen mas arriba con `return`) no suena nada.
+	sonar(idSonidoRecoger)
+
 	// el mapa se repinta el proximo cuadro: el item ya no esta en el suelo
 	j.pintado = false
 

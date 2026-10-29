@@ -1,0 +1,202 @@
+DC-002.62 - EL PRIMER SONIDO DEL POC: EL GOLPE Y EL RECOGER POR EL AICA
+======================================================================
+
+Fecha: 2026-10-29.  Rama DC-002.  Emulador: Flycast 2.7 (AppImage).  Toolchain: KOS 2.2.1 + gccgo 15.1.
+Cierra el hito que sigue a DC-002.61: el POC deja de ser mudo. Un efecto al golpear (boton Y, el golpe
+de DC-002.50) y otro al recoger un item del suelo (la recogida de DC-002.61), los dos por el AICA.
+
+RESUMEN EN UNA LINEA
+--------------------
+snd_init OK con 64 canales, dos PCM de 4.000 y 4.864 B a 22.050 Hz cargados en la RAM del AICA (8.864 B
+de los 1,9 MB que quedan libres), 40 reproducciones en una corrida de 135 s (37 golpes + 3 recogidas) con
+CERO errores, el registro de estado del AICA pasa de todo ceros a cmd=1 base=200608 largo=2432 freq=22050
+vol=200 pan=128 pos=54, el emulador no imprime un solo aviso del AICA, y el monton principal del POC paga
+152 B por el sonido entero.
+
+QUE SE AGREGO (cuatro archivos y tres lineas de enganche)
+---------------------------------------------------------
+1. console/dc/poc/personaje-mapa/sonido.go      NUEVO. El interruptor `sonido`, el mutante
+                                                `sonidoSordo`, la carga de los dos PCM, el disparo
+                                                (`sonar`), el contador y el volcado del registro.
+2. console/dc/poc/personaje-mapa/csrc/cshim.c   + 5 funciones: d2c_snd_init, d2c_snd_canales_libres,
+                                                d2c_snd_mem_libre, d2c_snd_cargar, d2c_snd_play y
+                                                d2c_snd_dump. El binding de Go de libgodc NO expone
+                                                nada del sonido de KOS, asi que la cara C va en el shim
+                                                que ya existia (no se toco libgodc).
+3. scripts/console/gen-pcm-262.py               NUEVO. Genera los dos PCM (deterministico: mismo crc32
+                                                en cualquier host) y escribe gen/sonidos_gen.go.
+4. scripts/console/build-sonido-262.sh          NUEVO. El build de la tarjeta: copia el POC, enciende los
+                                                interruptores con sed, genera los PCM y le pasa POC_DIR a
+                                                build-monstruo-250.sh (el de la casa: ISO con los tres
+                                                MPQ y la verificacion de los tres .go compartidos).
+5. console/dc/poc/personaje-mapa/main.go        +3 lineas de enganche: el disparo en el flanco del boton
+                                                Y (combate) y `iniciarSonido()` antes de RunGame.
+6. console/dc/poc/personaje-mapa/objetos.go     +1 linea: el disparo dentro de `recoger()`, cuando el
+                                                item ya paso al inventario.
+
+COMO SE PRUEBA (comandos, copiables)
+------------------------------------
+    cd ~/Proyectos/diablo2consoles
+
+    # 1) el binario de la tarjeta (sonido + items + los dos instrumentos de entrada)
+    SALTAR_STDLIB=1 SALTAR_MOTOR=1 GODC_GOX=$HOME/dreamcast/gox ITEMS_AUTO=1 \
+        bash scripts/console/build-sonido-262.sh /tmp/dcbuild/s262-final
+
+    # 2) la corrida (la ISO lleva los tres MPQ: ~60 s hasta POS-INICIAL, de ahi el loop)
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/s262-final/disc.gdi 135 \
+        /tmp/dcbuild/run262-final
+
+    # 3) el veredicto, a mano (los cinco numeros que importan)
+    grep -a "SND"     /tmp/dcbuild/run262-final/flycast.log | head -8
+    echo -n "plays=";    grep -ac "SND play"  /tmp/dcbuild/run262-final/flycast.log
+    echo -n "golpes=";   grep -ac "SND play id=1" /tmp/dcbuild/run262-final/flycast.log
+    echo -n "recoger=";  grep -ac "SND play id=2" /tmp/dcbuild/run262-final/flycast.log
+    echo -n "errores>0="; grep -ac "errores=[1-9]" /tmp/dcbuild/run262-final/flycast.log
+    echo -n "avisos-aica="; grep -acE "Overrun|Invalid src address|Invalid dst address|Unaligned DSP" \
+        /tmp/dcbuild/run262-final/flycast.log
+
+    # 4) la cadena de DC-002.61 sigue verde con el sonido encendido
+    python3 scripts/console/checar-items-261.py /tmp/dcbuild/run262-final/flycast.log
+
+LOS CINCO CRITERIOS DE LA TARJETA
+---------------------------------
+1. snd_init OK y canales disponibles.
+   SND init snd_init=0 canalesLibres=64 aicaLibre=1900544
+   - `snd_init=0` es el codigo de KOS (snd_iface.c:37; devuelve 0 siempre que pudo cargar el driver).
+   - `canalesLibres=64` NO es la constante de la tabla: el shim los PIDE de a uno con
+     `snd_sfx_chn_alloc()` hasta que dice que no, y los devuelve (csrc/cshim.c:d2c_snd_canales_libres).
+     Es el numero de canales que el AICA puede prestar en ese instante.
+   - `aicaLibre=1900544` = 1,81 MB de los 2 MB del SPU, medido con `snd_mem_available()`.
+
+2. Los dos PCM cargados con tamano y tasa, sin errores.
+   SND pcm id=1 nombre=GOLPE   bytes=4000 muestras=2000 tasa=22050 bits=16 canales=1 hnd=2356682080
+   SND pcm id=2 nombre=RECOGER bytes=4864 muestras=2432 tasa=22050 bits=16 canales=1 hnd=2356682120
+   SND aica libreAntes=1900544 libreDespues=1891680 usado=8864
+   - `usado=8864` = 4.000 + 4.864 exactos: el monton del AICA bajo justo lo que pesan los dos efectos.
+     El handle no es un numero inventado: en el volcado del registro (criterio 4) aparece el `base=200608`
+     del segundo efecto, que es 0x030000 (AICA_RAM_START) + 4.000 -> el primero quedo en 196.608 y el
+     segundo detras, sin solaparse.
+   - Los dos son multiplos de 16 muestras (32 B): los samples viajan por `spu_memload_sq`
+     (spu.c:65), que copia por store queues.
+   - Generador: GOLPE 4.000 B crc32=0xb03fb3db pico=28494 · RECOGER 4.864 B crc32=0xbc46bb82 pico=21548.
+
+3. Tras 10 golpes, total=10 y cero errores.
+   Corrida con los golpes SOLO (ITEMS=0, para que nada mas mueva el contador):
+   SND play id=1 canal=8  total=5  errores=0
+   SND play id=1 canal=10 total=6  errores=0
+   SND play id=1 canal=12 total=7  errores=0
+   SND play id=1 canal=14 total=8  errores=0
+   SND play id=1 canal=16 total=9  errores=0
+   SND play id=1 canal=18 total=10 errores=0      <- EL DECIMO GOLPE: total=10, errores=0
+   SND play id=1 canal=20 total=11 errores=0
+   ...
+   SND play id=1 canal=38 total=20 errores=0      (la corrida de 110 s alcanzo 20 golpes)
+   En la corrida completa (135 s, items encendidos): 40 plays = 37 golpes + 3 recogidas, errores>0 = 0.
+   Los golpes siguen sonando despues de que el bicho muere (HP=3, DC-002.50): a partir del cuarto no hay
+   `GOLPE-EMPIEZA` pero si `SND play`, porque el sonido es del SWING del boton Y y no del dano (ver
+   "LO QUE HAY QUE SABER").
+
+4. El registro de AICA avanza y el emulador no reporta underrun/desborde.
+   Antes de sonar (canal 0, 64 B leidos del area AICA_MEM_CHANNELS, que es de SOLO LECTURA desde el SH-4
+   y la escribe el programa del AICA):
+     SND aica etiqueta=antes-del-primer-play canal=0 cmd=0 base=0 type=0 largo=0 loop=0 freq=0 vol=0
+     pan=0 pos=0
+   Despues del primer play:
+     SND aica etiqueta=despues-del-primer-play canal=0 cmd=1 base=200608 type=0 largo=2432 loop=0
+     freq=22050 vol=200 pan=128 pos=54
+   Los cinco numeros coinciden con lo que se le pidio a KOS, uno por uno: `largo=2432` son las muestras
+   del efecto RECOGER, `freq=22050` es la tasa que se declaro, `vol=200` y `pan=128` son los del POC, y
+   `pos=54` es la muestra por la que iba el chip en el momento del volcado. Antes del play el registro
+   estaba en CERO: el chip no habia recibido nada. Esto SI se pudo medir en Flycast (la duda del cuerpo
+   de la tarjeta quedo descartada): el volcado sale por `spu_memread` (G2), que el emulador implementa.
+   Avisos del AICA en el log de Flycast: 0. La busqueda es sobre los mensajes que el propio emulador tiene
+   para el AICA: "Overrun address" (desborde de la DMA del AICA), "Invalid src/dst address",
+   "Unaligned DSP register" (core/hw/aica/aica_if.cpp:300-382, aica_mem.cpp:46,134). En las cuatro
+   corridas de esta tarjeta salieron 0.
+
+5. El binario sigue por debajo de 16 MB y el monton se reporta antes/despues.
+   ELF        8.903.684 B (8,5 MiB)  1ST_READ.BIN 1.894.088 B  ISO 542.007.296 B
+   Base DC-002.61 (mismo build sin sonido): ELF 8.887.984 B, 1ST_READ.BIN 1.881.128 B
+     -> el sonido cuesta +15.700 B de ELF y +12.960 B del binario de arranque (8.864 son los PCM).
+   Monton principal (el instrumento `memoria` de DC-002.50):
+     HITO250: MEMORIA etapa= antes-del-sonido libre= 72376
+     HITO250: MEMORIA etapa= sonido-listo     libre= 72224
+     -> 152 B. El sonido entero le cuesta 152 bytes al POC por la razon correcta: los samples viven en la
+        RAM del AICA, no en la de la consola (lo confirma el `usado=8864` del criterio 2).
+
+LO QUE PRUEBA QUE EL VERDE ES VERDE (mutantes y baseline)
+---------------------------------------------------------
+a) MUTANTE `sonidoSordo=1` (los dos momentos se alcanzan, el AICA no recibe el play):
+   SND listo volumen=200 pan=128 sordo=true
+   SND sordo id=2 total=0 (el momento se alcanzo, el AICA no recibe el play)
+   SND sordo id=1 total=0 (...)
+   ... 22 momentos y CERO `SND play` (medido: grep -c "SND play" = 0). Y no sale el volcado
+   "despues-del-primer-play" porque nunca hubo play: el contador NO cuenta llamadas, cuenta
+   reproducciones que el AICA acepto.
+
+b) BASELINE `build-items-261.sh` (el binario de DC-002.61, sin una linea de audio):
+   una sola marca de sonido, `SND apagado (sonido=false): el POC no inicializa el AICA`, y 0 plays.
+   O sea: sin el interruptor, el POC no toca el AICA ni una vez.
+
+c) LA CADENA DE DC-002.61 SIGUE VERDE con el sonido encendido:
+   `python3 scripts/console/checar-items-261.py` sobre la corrida completa -> 18 OK (41 objetos del DS1,
+   3 items recogidos con nombre y celda, ninguna excepcion). El unico FALLA es el panel, y no es una
+   regresion: esta corrida no lleva el instrumento del panel (PANEL_AUTO/MEDIR apagados).
+
+d) LA PANTALLA SIGUE DIBUJANDO (captura de la VENTANA del emulador, a los 92 y 120 s):
+   30,3 % de los pixeles del cuadro NO son negros (54.303 de 179.100), y el log llega a
+   `HITO238: POS cuadro 513` con los 16 cuadros del ciclo TN del personaje compuestos (crc32 distinto en
+   cada uno). El sonido no le saco nada al PVR.
+
+LO QUE HAY QUE SABER (decisiones y cosas declaradas)
+----------------------------------------------------
+- EL GOLPE SUENA EN EL FLANCO DEL BOTON Y, no en "el dano". La tarjeta lo pide asi ("el efecto de golpe
+  en el boton Y"). Tiene dos guardas, las dos con causa medida: `!j.golpeando` (el POC rechaza un ataque
+  en medio de otro: una pulsacion a mitad del A1 no suena) y `!golpeSordo` (ese mutante de DC-002.50
+  significa "no hay golpe", asi que no hay sonido). El bicho MUERTO si suena: en el juego de PC el swing
+  suena contra el aire o el cadaver, y el Returned de este POC muere a los 3 golpes (HP=3 medido en
+  DC-002.50). Sin eso el contador se quedaba en 3 y no habia 10 golpes que medir (fue lo que paso en la
+  primera corrida, con el disparo atado al ataque aceptado: 4 plays en 120 s).
+- LOS PCM LOS GENERA EL BUILD y no salen del juego: los sonidos de Diablo II viven en `d2sfx.mpq` y ese
+  MPQ NO viaja en la ISO del POC (la ISO lleva D2DATA, D2CHAR y PATCH_D2, ver build-monstruo-250.sh paso
+  3/6). El generador es deterministico: el mismo `.go`, el mismo crc32 y el mismo pico en cualquier host.
+- EL EFECTO DE RECOGER esta VIVO, no "listo para cuando existan los items": los items existen desde
+  DC-002.61 y el disparo va dentro de `recoger()`, despues de que el item paso al inventario. Los tres
+  plays id=2 de la corrida caen exactamente sobre los tres `ITEM recogido=` (SPAWN3, Casket, SPAWN13).
+- NO ENTRA (y no se hizo): musica, streaming, sonido 3D/posicional, mezcla, y nada de volumen por
+  distancia. El volumen y el pan son dos constantes (200 y 128, el centro).
+- NO SE TOCO: ~/dreamcast/libgodc, el AppImage de Flycast, el semiespacio (2048 KB), los invariantes de
+  layout ni los tres .go compartidos con el verificador del host (el build lo comprueba con `cmp` antes
+  de compilar: nivel.go, personaje.go y monstruo.go, los tres identicos).
+
+PITFALLS MEDIDOS EN ESTA TARJETA
+--------------------------------
+1. `AICA_CHANNEL()` NO EXISTE para el compilador del proyecto: ese macro vive en
+   kernel/arch/dreamcast/sound/arm/aica_cmd_iface.h, que KOS no instala en $KOS_BASE/include (ahi solo
+   entran aica_comm.h, sfxmgr.h, sound.h y stream.h). El primer build murio con
+   "implicit declaration of function 'AICA_CHANNEL'". Los dos numeros (0x020000 y 64 B por canal) van
+   escritos en cshim.c con su fuente.
+2. `kos.h` NO incluye los headers de sonido (en include/kos.h estan COMENTADOS, lineas 111-112): hay que
+   incluirlos a mano en el shim.
+3. EL GENERADOR DE PCM EMITIA `var pcmGolpe = []byte{...}` ADENTRO DE `func init()`: eso declara una
+   variable LOCAL que se queda sin usar y la del paquete queda en nil (el POC no suena y el log dice
+   "sin-PCM"). Va como ASIGNACION. Se caza con un `gofmt -l` (un archivo bien formado no sale en la
+   lista) antes de creerle al build.
+4. EL ROTADOR DE BUILDS (`scripts/console/limpiar-builds.sh`, DC-002.64) BORRA LOS BUILDS VIEJOS cada 15
+   minutos: el directorio de la corrida buena (s262c, 13:51) desaparecio mientras se armaban los
+   mutantes. Los logs de las corridas se copiaron fuera de /tmp/dcbuild antes de seguir, y el binario de
+   la evidencia se re-armo en ~/.hermes/cache/scratch/dc262/final. Moraleja: lo que va a la evidencia no
+   se deja en el directorio de builds.
+5. El binario NO es reproducible byte a byte entre directorios de build distintos (mismo arbol, mismo
+   toolchain: ELF 8.903.376 B desde /tmp/dcbuild/s262c y 8.903.684 B desde
+   ~/.hermes/cache/scratch/dc262/final). La diferencia son ~300 B de rutas/longitudes, no codigo: lo que
+   se compara en la evidencia son los numeros del log y los hashes de los PCM, no el sha256 del ELF.
+
+BITACORA
+--------
+- intente: disparar el sonido donde se ACEPTA el ataque (dentro del `if !j.mon.Combate.Muerto`).
+- medi: corrida de 130 s -> 4 plays (3 golpes + 1 recogida) y el bicho ya muerto: no habia 10 golpes.
+- descarte: esa atadura porque el criterio 3 pide 10 golpes y el Returned muere a los 3; el disparo paso
+  al flanco del boton Y, que es lo que pide el cuerpo de la tarjeta.
+- corri: 4 builds (tarjeta, solo-golpes, mutante sordo, baseline DC-002.61) y 4 corridas de 110-150 s
+  (~8 min de emulador en total). El primer build rompio por AICA_CHANNEL (pitfall 1).

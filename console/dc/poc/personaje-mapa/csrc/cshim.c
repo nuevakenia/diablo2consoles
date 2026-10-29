@@ -14,6 +14,10 @@
  *      (PVR_CMD_VERTEX_EOL) va en el CUARTO, no en el tercero.
  */
 #include <kos.h>
+#include <dc/sound/sound.h>
+#include <dc/sound/sfxmgr.h>
+#include <dc/sound/aica_comm.h>
+#include <dc/spu.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <malloc.h>
@@ -184,4 +188,82 @@ void d2c_quad(float x, float y, float s) {
     v.u = u0;   v.v = v1;   v.x = x;                v.y = y + alto * s;     pvr_prim(&v, sizeof(v));
     v.flags = PVR_CMD_VERTEX_EOL;
     v.u = u1;   v.v = v1;   v.x = x + ancho * s;    v.y = y + alto * s;     pvr_prim(&v, sizeof(v));
+}
+
+/* ============================ DC-002.62: EL SONIDO POR EL AICA ============================
+ *
+ * Por que en C: el binding de Go de libgodc no expone NADA del sonido de KOS (ni snd_init, ni el
+ * sfxmgr). Las cinco funciones de abajo son la cara C del camino de KOS, tal cual (no hay logica
+ * propia: cada una llama a la de KOS y devuelve su resultado).
+ *
+ * EL CAMINO: snd_init() carga el programa del AICA y arranca su monton de RAM
+ * (AICA_RAM_START = 0x030000 de los 2 MB del SPU; snd_iface.c:37). snd_sfx_load_raw_buf() copia los
+ * samples a la RAM del AICA (fuera de la RAM principal: por eso dos efectos no le quitan monton al
+ * POC) y snd_sfx_play() le pide un canal al AICA (64 canales, snd_sfxmgr.c:find_free_channel).
+ *
+ * MEDIDO en el codigo de KOS (no supuesto): el DCC/PCM de 16 bits mono se guarda con la longitud en
+ * MUESTRAS (effect->len = (len/2)/canales, snd_sfxmgr.c:661), o sea que el `len` que se le pasa es en
+ * BYTES, y los samples viajan con spu_memload_sq, que copia por store queues (necesita longitud
+ * multiplo de 4; por eso el generador de PCM emite cantidades de 16 muestras).
+ */
+
+/* d2c_snd_init: enciende el AICA. Devuelve lo mismo que snd_init (0 = bien). */
+int d2c_snd_init(void) {
+    return snd_init();
+}
+
+/* d2c_snd_mem_libre: cuanto queda del monton del AICA (bytes). Es el instrumento de "el efecto
+ * entro o no entro", hermano de d2c_heap_libre (que mide la RAM principal). */
+unsigned int d2c_snd_mem_libre(void) {
+    return (unsigned int)snd_mem_available();
+}
+
+/* d2c_snd_canales_libres: los canales que el sfxmgr puede prestar AHORA.
+ * No se informa el 64 de la tabla: se PIDE de a uno y se devuelven, asi el numero es el que queda de
+ * verdad (si algo ya tomo un canal, se ve en el numero). */
+int d2c_snd_canales_libres(void) {
+    int tomados[64];
+    int n = 0;
+
+    while(n < 64) {
+        int chn = snd_sfx_chn_alloc();
+        if(chn < 0)
+            break;
+        tomados[n++] = chn;
+    }
+
+    for(int i = 0; i < n; i++)
+        snd_sfx_chn_free(tomados[i]);
+
+    return n;
+}
+
+/* d2c_snd_cargar: sube un bloque PCM crudo a la RAM del AICA y devuelve el handle (0 = fallo). */
+unsigned int d2c_snd_cargar(unsigned int buf, int len, int tasa, int bits, int canales) {
+    return (unsigned int)snd_sfx_load_raw_buf((char *)(uintptr_t)buf, (size_t)len,
+        (uint32_t)tasa, (uint16_t)bits, (uint16_t)canales);
+}
+
+/* d2c_snd_play: dispara un efecto y devuelve el canal que le toco (-1 = no hay canal / error). */
+int d2c_snd_play(unsigned int hnd, int vol, int pan) {
+    return snd_sfx_play((sfxhnd_t)hnd, vol, pan);
+}
+
+/* d2c_snd_dump: volca el registro de estado de un canal del AICA (64 B: cmd, base, type, length,
+ * loop, loopstart, loopend, freq, vol, pan, pos...) en `dst`. Es la prueba de que el registro AVANZA:
+ * la zona AICA_MEM_CHANNELS la escribe el programa del AICA y es de SOLO LECTURA desde el SH-4
+ * (aica_cmd_iface.h:29), asi que leerla es leer lo que el chip tiene cargado, no una copia nuestra.
+ *
+ * OJO: el offset NO se toma de AICA_CHANNEL() porque ese macro vive en
+ * kernel/arch/dreamcast/sound/arm/aica_cmd_iface.h, que KOS NO instala en $KOS_BASE/include (medido:
+ * ahi solo entran aica_comm.h, sfxmgr.h, sound.h y stream.h). Los dos numeros van aca, con su fuente:
+ * AICA_MEM_CHANNELS = 0x020000 y 64 B por canal (16 dwords, aica_comm.h:aica_channel_t). */
+#define D2C_AICA_MEM_CHANNELS 0x020000
+#define D2C_AICA_CANAL(n)     (D2C_AICA_MEM_CHANNELS + (n) * 64)
+
+void d2c_snd_dump(unsigned int dst, int canal) {
+    if(dst == 0 || canal < 0 || canal > 63)
+        return;
+
+    spu_memread((void *)(uintptr_t)dst, D2C_AICA_CANAL(canal), sizeof(aica_channel_t));
 }

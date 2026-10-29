@@ -1,0 +1,82 @@
+DC-002.62 - LAS LINEAS CRUDAS DEL SONIDO (recortadas de los logs de Flycast)
+======================================================================
+
+Todo lo que sigue son lineas TAL CUAL del log del emulador (la consola serie del POC). Cada bloque
+dice de que corrida sale. Se recorta a las marcas del sonido, la posicion y las recogidas: el log
+completo de la corrida buena tiene ~1.500 lineas y se reproduce con los comandos de
+dc-002.62-sonido.txt.
+
+== A) LA CORRIDA DE LA TARJETA (build-sonido-262.sh, 135 s, items + itemsAuto + golpeAuto)
+HITO238: POS-INICIAL subtiles= 140 100 celda= 28 20 ancla= 256 256 pantalla= 320 240
+HITO250: MEMORIA etapa= antes-del-sonido libre= 72376
+SND init snd_init=0 canalesLibres=64 aicaLibre=1900544
+SND pcm id=1 nombre=GOLPE bytes=4000 muestras=2000 tasa=22050 bits=16 canales=1 hnd=2356682080
+SND pcm id=2 nombre=RECOGER bytes=4864 muestras=2432 tasa=22050 bits=16 canales=1 hnd=2356682120
+SND aica libreAntes=1900544 libreDespues=1891680 usado=8864
+SND aica etiqueta=antes-del-primer-play canal=0 cmd=0 base=0 type=0 largo=0 loop=0 freq=0 vol=0 pan=0 pos=0
+HITO250: MEMORIA etapa= sonido-listo libre= 72224
+SND listo volumen=200 pan=128 sordo=false
+SND play id=2 canal=0 total=1 errores=0
+SND aica etiqueta=despues-del-primer-play canal=0 cmd=1 base=200608 type=0 largo=2432 loop=0 freq=22050 vol=200 pan=128 pos=54
+ITEM recogido=SPAWN3 celda=27,19 suelo=40 inventario=1/4 radio=1 cuadroDelLoop=5
+SND play id=1 canal=2 total=2 errores=0
+HITO250: GOLPE-EMPIEZA ataque= 1 vidaAntes= 3 cuadroDelLoop= 9
+SND play id=2 canal=4 total=3 errores=0
+ITEM recogido=Casket celda=31,20 suelo=39 inventario=2/4 radio=1 cuadroDelLoop=25
+SND play id=1 canal=6 total=4 errores=0
+HITO250: GOLPE-EMPIEZA ataque= 2 vidaAntes= 2 cuadroDelLoop= 30
+SND play id=2 canal=8 total=5 errores=0
+ITEM recogido=SPAWN13 celda=33,20 suelo=38 inventario=3/4 radio=1 cuadroDelLoop=46
+SND play id=1 canal=10 total=6 errores=0
+HITO250: GOLPE-EMPIEZA ataque= 3 vidaAntes= 1 cuadroDelLoop= 51
+SND play id=1 canal=12 total=7 errores=0
+SND play id=1 canal=14 total=8 errores=0
+SND play id=1 canal=16 total=9 errores=0
+SND play id=1 canal=18 total=10 errores=0
+SND play id=1 canal=20 total=11 errores=0
+SND play id=1 canal=22 total=12 errores=0
+SND play id=1 canal=24 total=13 errores=0
+SND play id=1 canal=26 total=14 errores=0
+SND play id=1 canal=28 total=15 errores=0
+SND play id=1 canal=30 total=16 errores=0
+SND play id=1 canal=32 total=17 errores=0
+SND play id=1 canal=34 total=18 errores=0
+SND play id=1 canal=36 total=19 errores=0
+SND play id=1 canal=38 total=20 errores=0
+SND play id=1 canal=40 total=21 errores=0
+SND play id=1 canal=42 total=22 errores=0
+SND play id=1 canal=44 total=23 errores=0
+SND play id=1 canal=46 total=24 errores=0
+
+   (la corrida completa: 62 plays en total)
+
+== B) LOS GOLPES SOLOS (ITEMS=0): el decimo golpe deja total=10
+SND play id=1 canal=0 total=1 errores=0
+SND play id=1 canal=2 total=2 errores=0
+SND play id=1 canal=4 total=3 errores=0
+SND play id=1 canal=6 total=4 errores=0
+SND play id=1 canal=8 total=5 errores=0
+SND play id=1 canal=10 total=6 errores=0
+SND play id=1 canal=12 total=7 errores=0
+SND play id=1 canal=14 total=8 errores=0
+SND play id=1 canal=16 total=9 errores=0
+SND play id=1 canal=18 total=10 errores=0
+SND play id=1 canal=20 total=11 errores=0
+SND play id=1 canal=22 total=12 errores=0
+
+== C) EL MUTANTE sonidoSordo=1: los momentos se alcanzan, el AICA no recibe un play
+SND init snd_init=0 canalesLibres=64 aicaLibre=1900544
+SND pcm id=1 nombre=GOLPE bytes=4000 muestras=2000 tasa=22050 bits=16 canales=1 hnd=2356681632
+SND pcm id=2 nombre=RECOGER bytes=4864 muestras=2432 tasa=22050 bits=16 canales=1 hnd=2356681672
+SND aica libreAntes=1900544 libreDespues=1891680 usado=8864
+SND aica etiqueta=antes-del-primer-play canal=0 cmd=0 base=0 type=0 largo=0 loop=0 freq=0 vol=0 pan=0 pos=0
+SND listo volumen=200 pan=128 sordo=true
+SND sordo id=2 total=0 (el momento se alcanzo, el AICA no recibe el play)
+SND sordo id=1 total=0 (el momento se alcanzo, el AICA no recibe el play)
+SND sordo id=2 total=0 (el momento se alcanzo, el AICA no recibe el play)
+SND sordo id=1 total=0 (el momento se alcanzo, el AICA no recibe el play)
+   (totales del mutante: momentos=22 plays=0)
+
+== D) EL BASELINE de DC-002.61 (sin una linea de audio)
+SND apagado (sonido=false): el POC no inicializa el AICA
+   (plays del baseline: 0)
