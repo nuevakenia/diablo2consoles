@@ -1,0 +1,169 @@
+DC-002.67 (Fase B) - EL MOTOR ENLAZADO EN UN BINARIO DE DREAMCAST
+===============================================================
+
+Fecha: 2026-10-29. Rama DC-002. Antes: DC-002.66 (139 de 139 paquetes compilan a .gox).
+
+LA PREGUNTA
+-----------
+DC-002.66 probo que el motor COMPILA para sh-elf. Compilar no es enlazar. Antes de escribir una linea de
+backend de render hay que saber si esos .gox se pueden unir con KOS + libgodc en un 1ST_READ.BIN que arranque
+en Flycast, y cuanto ocupa. Tres pasos: (1) que es y que cubre el stub de ebiten, (2) el binario minimo con un
+paquete del motor, (3) d2ui + d2gamescreen referenciados.
+
+ARBOL DE PARTIDA (el que dejo DC-002.66)
+----------------------------------------
+    /tmp/gox-std: 205 .gox, 70.381.928 B (67,12 MiB)
+      orden.txt        63 objetos  = stdlib minima (51) + terceros reescritos (12)
+      orden-motor.txt 139 objetos  = los paquetes del motor, d2gamescreen incluido
+    El .gox es un ELF reubicable de SH-4 CON DWARF: la mayor parte de esos 67 MB es informacion de depuracion,
+    no codigo (medido abajo).
+
+PASO 1 - DE DONDE SALIO EL EBITEN DE LA CONSOLA Y QUE CUBRE
+-----------------------------------------------------------
+Origen (no habia que adivinar: esta en el repo y en su historia)
+    console/dc/engine/ebiten/            10 archivos, 96.720 B de fuente
+      v2/ebiten.go   32.133 B   v2/dibujo.go   13.145 B   v2/pvr.go      10.239 B   v2/control.go 8.636 B
+      v2/entrada.go   8.814 B   v2/cuadro.go    3.366 B
+      v2/ebitenutil    3.983 B  v2/inpututil    3.459 B   v2/audio       5.829 B   v2/audio/wav 7.116 B
+    Nace en el commit 9b874efd (2026-10-16, DC-002.8), no en un vendor de terceros: lo escribio el proyecto
+    para la consola. No es Ebitengine: es un esqueleto del MISMO ABI, calcado midiendo la version real que el
+    motor declara en go.mod (github.com/hajimehoshi/ebiten/v2 v2.0.2, en el module cache del host).
+    Los .gox salen de ahi: scripts/console/build-std-gox.sh compila console/dc/engine/ebiten/v2 con
+    -fgo-pkgpath=github.com/hajimehoshi/ebiten/v2 (y lo mismo con ebitenutil, inpututil, audio y audio/wav).
+
+Que cubre (medido con AST, no a ojo)
+    superficie exportada de nivel superior:
+      ebiten v2.0.2 REAL ................ 241 simbolos
+      stub de la consola ................ 215 simbolos (154 compartidos + 61 propios de la consola)
+      que le FALTAN al stub .............. 87 (33 GamepadButton0..31+Max, 10 CompositeMode*, 4 Address*,
+                                            3 Touch*, 3 CursorMode*, KeyMax, GeoMDim, ColorMDim,
+                                            DefaultTPS/MaxTPS/CurrentTPS, DeviceScaleFactor, IsFocused,
+                                            las de ventana (Is/SetWindow*, Minimize/Maximize/Restore),
+                                            shaders (NewShader, Shader, DrawRect/TrianglesShaderOptions),
+                                            Event/Member, RunGameWithoutMainLoop, TouchIDs/Position)
+      lo que el MOTOR usa ............... 149 simbolos distintos, 0 faltantes (por eso los 139 paquetes
+                                            compilan: el stub cubre el 100 % de lo que el juego toca)
+    61 simbolos que SOLO tiene el stub: el pegamento de la consola (IniciarPantalla, PantallaIniciada,
+    HayControl, LeerControl, PonerTecla, HuellaDePantalla, CentroDeMasaDePantalla, CerrarCuadro...).
+
+Funciones vacias o algo real (cuerpos contados con AST sobre v2/)
+    funciones 138 (44 metodos):  111 REALES (80 %)   13 extern a C   11 VACIAS   3 devuelven cero
+      vacias: SetFullscreen, SetVsyncEnabled, SetWindowTitle, SetWindowResizingMode, SetScreenSize, SetTPS,
+              SetMaxTPS, SetWindowSize, SetWindowResizable, SetRunnableOnUnfocused, SetWindowIcon
+              (gestion de ventana: en la consola no existe, es lo que la tarjeta de render puede ignorar)
+      los 13 extern van a C: console/dc/std/csrc/pvr_pantalla.c (463 lineas), que ya convierte RGBA->RGB565,
+      sube a la VRAM del PVR y pinta la textura en 640x480 -- el camino que usa el POC motor-pvr (DC-002.10)
+    Lo "real" no es un cascaron: v2/dibujo.go dibuja de verdad, con la INVERSA de la matriz de geometria por
+    pixel (y explica por que al reves deja huecos al agrandar); audio (19 funcs) y ebitenutil/inpututil (17)
+    son todos reales; el unico "cero" del audio es wav.Close.
+    Conclusion del paso 1: el stub cubre el ABI que el motor usa, la mitad "de ventana" esta vacia a proposito,
+    y el dibujado existe pero es un rasterizador por software + una subida de pantalla completa al PVR. Lo que
+    NO hay es el backend de sprites/tiles del motor: eso es lo que faltaba y sigue faltando.
+
+PASO 2 - EL BINARIO MINIMO CON UN PAQUETE DEL MOTOR
+---------------------------------------------------
+    POC: console/dc/poc/enlace-267 (main.go sin //go:build, corre igual en el host y en la consola)
+    paquetes del motor enlazados: el cierre de d2common/d2act3 segun `go list -deps` = 4
+      d2common/d2act3 33.060 B | d2quest 1.084.096 B | d2level 334.052 B | d2fileformats/d2s 614.352 B
+      suma motor 2.065.560 B  +  stdlib/terceros 3.654.436 B  =  5.719.996 B de .gox al enlazador
+    resultado del enlace y del build (build-enlace-267.sh):
+      main.o            24.728 B
+      prog.elf       7.532.148 B  (de los cuales 5.239.159 B son .debug)
+      .text            815.088 B   .rodata 452.136 B   .data+.bss 206.904 B
+      1ST_READ.BIN   1.374.728 B   disc.iso 1.437.696 B   disc.gdi 85 B
+    Corrida en Flycast: arranca, imprime 14 lineas por la consola serie y NO tira una sola excepcion.
+    Las 14 lineas son IDENTICAS a las del host (`go run ./console/dc/poc/enlace-267`), verificado con diff.
+        ENLACE267: INICIO d2act3 sobre el motor enlazado
+        ENLACE267: objetos= 7
+        ENLACE267: objeto-405= Khalim's Heart chest item= qhr nivel= 93 hay= true
+        ENLACE267: orb-con-will= true orb-con-flail= false
+        ENLACE267: consejo= 3 primero= Ismail Vilehand
+        ENLACE267: es-consejo-minusculas= true es-consejo-otro= false
+        ENLACE267: kill-clase-seguidor= 0 kill-clase-jefe= 345
+        ENLACE267: flail-sin-tenerlo= qf1 true
+        ENLACE267: flail-ya-tiene=  false
+        ENLACE267: hellgate-con-mephisto-muerto= true sin-mephisto= false
+        ENLACE267: escaleras-sin-palanca-hay-error= true
+        ENLACE267: escaleras-sin-palanca-error= warp: the stairs to the Lower Kurast Sewers 2 are hidden until the lever is pulled
+        ENLACE267: escaleras-con-palanca-hay-error= false
+        ENLACE267: FIN
+    (Las dos lineas de RAM que salen despues del FIN son del shim de la consola, ver "RAM".)
+
+PASO 3 - SUBIR LA APUESTA: d2ui + d2gamescreen REFERENCIADOS
+-----------------------------------------------------------
+    Se toma la direccion de d2ui.NewUIManager y d2gamescreen.CreateGame (sin instanciar nada) y se enlaza el
+    cierre completo que pide `go list -deps ./d2core/d2ui ./d2game/d2gamescreen`: 125 paquetes (89 % del
+    motor), incluidos d2records (la tabla de lookups), d2mapengine, d2maprenderer, d2render/ebiten, d2ui,
+    d2gamescreen, d2hero, d2player y toda la red.
+
+      .gox del motor   125 paquetes   63.622.020 B
+      stdlib+terceros                   3.654.436 B
+      suma al enlazador                67.276.456 B   (64,2 MiB de .gox, el arbol entero)
+      main.o                              110.516 B
+      prog.elf                         40.657.228 B   (.debug 11.335.200 B)
+      .text 4.886.296 B  .rodata 5.638.632 B  .data+.bss 312.568 B  -> 10.837.496 B de codigo+datos
+      1ST_READ.BIN                     11.664.488 B   (11,12 MiB, de 16 MB de RAM)
+      disc.iso 11.726.848 B   disc.gdi 85 B
+    ENLACE: los 67 MB de .gox enlazan sin una sola referencia indefinida. El enlazador se queda con todo:
+    no hay --gc-sections (KOS_LDFLAGS vacio y gccgo mete todo el .text de cada paquete).
+    ARRANCA en Flycast: las MISMAS 14 lineas, identicas al host (diff vacio), corrida de 60 s, 0 excepciones.
+
+CUANTO CRECIO
+-------------
+                          paso 2          paso 3          factor
+    .gox al enlazador     5.719.996 B    67.276.456 B     x11,8
+    codigo+datos          1.474.128 B    10.837.496 B      x7,35
+    1ST_READ.BIN          1.374.728 B    11.664.488 B      x8,49   (+10.289.760 B)
+    (1ST_READ.BIN del paso 2 sin el bucle final ni el shim de RAM, o sea solo motor+stdlib: 1.035.724 B,
+     .text 583.724 B -- los 339.004 B de diferencia son las dependencias del paquete kos.)
+
+RAM (lo que de verdad decide, medido en la consola)
+--------------------------------------------------
+    En los dos pasos el monton de KOS tiene un arena de ~4,36 MB (ahi viven los dos semiespacios de GC de
+    libgodc, 2 MB cada uno, que se llevan casi todo) y de libre quedan 1.400 B / 3.512 B. Ese numero NO dice
+    la RAM libre: dice que el arena esta lleno. La RAM se mide al reves, pidiendole al monton el bloque que el
+    motor va a necesitar:
+
+    bloque pedido        paso 2 (1,37 MB)     paso 3 (11,66 MB)
+    4 MB                 4.194.304 OK         0  FALLA
+    1 MB                 1.048.576 OK         0  FALLA
+    1.228.800 B (la pantalla 640x480 RGBA del motor)  1.228.800 OK    0  FALLA
+    256 KB               262.144 OK           262.144 OK
+
+    O sea: el paso 3 arranca y ejecuta el motor, pero NO puede reservar ni 1 MB. La pantalla que el motor pide
+    (1,2 MB) no entra. Enlazar los 125 paquetes deja la consola sin RAM para dibujar: sirve como prueba de
+    enlace, NO como binario de juego.
+
+LO QUE ESTO CAMBIA PARA LA FASE B (render)
+------------------------------------------
+1. El enlace esta resuelto: no hay simbolos faltantes ni problemas de ABI. El bloqueo no era el enlazador.
+2. El enemigo es el TAMANO. 11,12 MiB de 16 MB con el motor entero: no queda RAM para la pantalla ni para las
+   texturas de ningun tamano util. El siguiente paso NO es "escribir el backend", es RECORTAR el binario:
+   - los .gox traen DWARF (11,3 MB de los 40,6 del ELF): no va al BIN, pero compilar con -g0 achica los
+     objetos y el tiempo de enlace;
+   - gccgo mete el .text de cada paquete entero: hace falta -ffunction-sections al compilar los .gox y
+     -Wl,--gc-sections al enlazar para que el linker tire lo que no se usa (medido: hoy no se tira nada);
+   - y las 33 GamepadButton/stubs de ventana vacios son ruido: no hay nada que ganar ahi.
+3. El stub de ebiten ya tiene rasterizador por software + subida de pantalla completa al PVR (C, 463 lineas):
+   el que escriba el backend de sprites/tiles arranca de ahi, no de cero.
+
+COMO SE REPRODUCE
+-----------------
+    bash scripts/console/build-enlace-267.sh /tmp/dcbuild/enlace267-p2          # paso 2
+    PASO3=1 bash scripts/console/build-enlace-267.sh /tmp/dcbuild/enlace267-p3  # paso 3
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/enlace267-p2/disc.gdi 25 /tmp/dcbuild/c2
+    go run ./console/dc/poc/enlace-267                                          # la referencia del host
+
+PITFALLS MEDIDOS EN ESTA TARJETA
+--------------------------------
+- `cp -rs` sobre un arbol de enlaces que ya existe dice "son el mismo fichero" y mezcla el arbol: el script
+  arma el arbol de enlace desde cero en cada corrida.
+- `stat -c%s` sobre un enlace simbolico mide EL ENLACE (69 B por un .gox de 1 MB). Hubo que usar stat -L.
+- gccgo NO respeta //go:build: serial_dc.go lleva //go:build dreamcast y gccgo lo compila igual; `go run` en el
+  host lo salta. Asi el mismo main.go sirve para las dos puntas.
+- Cuando main retorna, libgodc llama a arch_exit de KOS y Flycast (sin BIOS) reporta
+  "Fatal: SH4 exception when blocked" ~0,5 s despues de imprimir: parece un crash del enlace y no lo es. El POC
+  se queda en un bucle (kos.ThdSleep) y la corrida termina por el script.
+- La etiqueta __arch_mem_top de KOS (startup.S) NO resuelve al enlazar desde C: "undefined reference to
+  __arch_mem_top". Por eso la RAM se mide pidiendo bloques con malloc, no leyendo el techo.
+- El ELF no es el tamano que importa: 40,6 MB de prog.elf son 11,66 MB de BIN. Lo que va a RAM es el BIN.
