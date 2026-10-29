@@ -117,3 +117,16 @@ CORRECCION A DC-002.60
 El watchpoint de DC-002.60 era ciego al store del interprete (WriteMem32 -> WriteCachedMem ->
 ocache, sin pasar por addrspace::writet). Su "0 escrituras en 66 KB de pila" no probaba nada.
 La cadena de llamadas que encontro (WP-LLAMADA) si era valida y es la que abrio este camino.
+
+MATRIZ FINAL (2026-10-29, con todo junto: GDI arreglado + semiespacio 2 MB + limpieza de VRAM aplicada)
+------------------------------------------------------------------------------------------------------
+Estado del arbol: commit 07b6ca31 (la limpieza de las tres lecturas de VRAM aterrizo; la barrera
+checar-vram-preinit-253.sh da VERDE, re-corrida por fuera del worker).
+
+  build                cuadros   bicho                     personaje            excepciones
+  fin-b0 (BESTIA=0)      798     -                         TN cuadro 3/16          0
+  fin-b1 (BESTIA=1)      500     ANIM-BESTIA cuadro 0/8    TN cuadro 15/16         0
+                                 pixeles=618 vida=3
+
+Semiespacio1 en las dos: 2353131584 (2 MB). El mismo build de 1.851.784 B que en DC-002.53 se colgaba
+ahora dibuja: la fragilidad de layout era el agujero de un sector del .gdi, no el tamano del binario.
