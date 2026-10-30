@@ -1,0 +1,252 @@
+DC-002.73 -- VERIFICACION INDEPENDIENTE DE LA TANDA .68 / .69 / .70
+=====================================================================
+Tarjeta: t_1dba2549 (feat:fase-b, prioridad 76)
+Fecha de la corrida: 2026-10-30 00:48..01:45 (America/Santiago)
+Rama: DC-002, checkout unico /home/dgalli/Proyectos/diablo2consoles, HEAD 63b0c0af
+Arbol: LIMPIO antes y despues (`git status --short` vacio): esta tarjeta no arregla NADA, solo mide.
+
+Los numeros de abajo son de HOY, medidos en esta corrida. No se copiaron de los resumenes de los
+workers (el resumen es un auto-reporte). Cada linea trae el comando al lado.
+
+Arbol de .gox propio para no pisar nada de los otros workers:
+    GODC_GOX=/tmp/verif273/gox  (stdlib 63 objetos + 143 paquetes del motor)
+
+
+1. LAS BARRERAS, HOY
+---------------------
+1.1 Motor completo a SH-4   ->  143 de 143, 0 bloqueados
+    source scripts/console/env.sh
+    GODC_GOX=/tmp/verif273/gox bash scripts/console/build-std-gox.sh /tmp/verif273/gox
+    GODC_GOX=/tmp/verif273/gox bash scripts/console/build-motor-all.sh /tmp/verif273/gox /tmp/verif273/motor
+    (12 capas; log /tmp/verif273/motor-all.log, ultima linea "== bloqueados: 0 ==")
+    OJO CON EL NUMERO: la evidencia de DC-002.68 dice 142 y hoy son 143. El paquete que sobra es
+    d2core/d2render/pvr, que lo agrego DC-002.69; el criterio (que compilen TODOS) se cumple igual.
+    Confirmado en /tmp/verif273/gox/orden-motor.txt: 143 lineas, con .../d2core/d2render/pvr.gox.
+
+1.2 Host, go build ./...   ->  rc=1, UNA sola linea, la MISMA de antes de la tanda
+    go build ./... > /tmp/verif273/host-build.log 2>&1 ; echo $?     ->  1
+    console/dc/engine/ebiten/v2/ebiten.go:25:2: package kos is not in std (/usr/lib/go/src/kos)
+    (pre-existente: ya estaba anotado en dc-002.69-pvr-surface.txt:115 y dc-002.70-renderer-pvr.txt:164)
+    El MOTOR compila verde:
+    go build ./d2core/... ./d2common/... ./d2game/... ./d2app/... ./d2networking/... ./d2script/... ./d2thread/...
+    ->  rc=0, sin salida.
+
+1.3 Enlace del paso 3 (el binario grande de DC-002.68)  ->  EL MISMO BIN, BYTE A BYTE
+    PASO3=1 BASE_GOX=/tmp/verif273/gox bash scripts/console/build-enlace-267.sh /tmp/verif273/enlace268
+    prog.elf        32.221.036 B      .text      4.597.272    .rodata   5.636.236
+    1ST_READ.BIN    10.337.608 B      data+bss     305.528    .eh_frame         4   <- la palanca del .68 anda
+    _end = 0x8ca2191c  ->  techo del monton = 0x8D000000 - _end = 6.153.956 B (sh-elf-nm sobre prog.elf)
+    Contrastado con la evidencia (.68): BIN 10.337.608 (identico), .text 4.597.272 (identico),
+    .rodata 5.636.236 (identico), data+bss 305.528 (identico), .eh_frame 4 (identico), techo
+    6.153.956 (identico). prog.elf 32.221.036 vs 32.218.540 (2.496 B) y los .gox del motor
+    59.526.712 vs 59.525.804 (908 B): diferencia de la stdlib recompilada hoy, sin efecto en el BIN.
+
+1.4 Binarios de las pruebas de humo
+    build-pvr-surface.sh  (.69): pvr.gox 319.180 B | prog.elf 6.331.924 | 1ST_READ.BIN 1.004.552
+                                 (evidencia .69: 242.072 / 6.640.576 / 1.026.120 -> ver 4.b)
+    build-estado-b-270.sh (.70): pvr.gox 319.180 B | prog.elf 6.919.780 | 1ST_READ.BIN 1.280.296
+                                 (evidencia .70: 316.840 / 7.454.900 / 1.330.312 -> ver 4.b)
+
+
+2. LO QUE DIJO LA CONSOLA EN FLYCAST (corrida real, Flycast 2.7, sin BIOS)
+--------------------------------------------------------------------------
+2.1 DC-002.68 -- la escalera del monton (POC enlace-267, paso 3), corrida de 25 s
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/verif273/enlace268/disc.gdi 25 /tmp/verif273/c268
+    grep -a ENLACE267 /tmp/verif273/c268/flycast.log
+      RAM arena= 4355808 libre-en-arena= 1496
+      malloc  262144 OK        malloc 1572864 OK
+      malloc 1048576 OK        malloc 1835008 FALLA
+      malloc 1228800 OK  <- la pantalla del motor
+      malloc 1966080 / 2097152 / 3145728 / 4194304 -> FALLA
+    IDENTICO a la evidencia de .68, escalon por escalon.
+
+2.2 DC-002.68 -- las 14 lineas del motor, contra el host: DIFF VACIO
+    go run ./console/dc/poc/enlace-267 > /tmp/verif273/host267.txt        (14 lineas)
+    grep -a ENLACE267 .../c268/flycast.log | head -14  (sin el \r)        (14 lineas)
+    diff /tmp/verif273/host267.txt /tmp/verif273/consola267-limpio.txt  ->  sin diferencias
+
+2.3 DC-002.69 -- la prueba de humo del backend PVR, corrida de 15 s
+    CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/verif273/pvr-surface/disc.gdi 15 /tmp/verif273/c269
+      PVRSMOKE: sprites dibujados= 73 (8 tiles iso + 64 diamantes + 1 heroe)
+      PVRSMOKE: pixeles no-vacios= 21584 de 307200 crc32= -2001956231
+      PVRSMOKE: cuadro 0 / 120 / 240 / 360 pintado, crc32= -2001956231
+    Los cuatro numeros son LOS MISMOS de la evidencia (.69). La captura, medida con el script del repo:
+    python3 scripts/console/checar-pvr-surface.py /tmp/verif273/c269/f15s.png --consola 21584
+      pantalla del POC en (1400,120) 640x480 | pintados 21996 vs 21584 de la consola (1,91 %)
+      verdes del sprite por HARDWARE 2575 | verdes del rombo por SOFTWARE 265 | RESULTADO: OK
+    (2575 y 265 son los mismos numeros de la evidencia: se re-midio el cuadro, no se creyo el informe)
+
+2.4 DC-002.70 -- el estado B (el mapa y el personaje por d2interface.Surface/Renderer), 150 s
+    CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/verif273/estado270/disc.gdi 150 /tmp/verif273/c270
+      COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330       (igual)
+      LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456    (igual)
+      PALETA crc32= 3508331570 | COF crc32= 2708601289              (iguales)
+      PERSONAJE 26x79 esquina= -18 -65 capas 7/8 pixelesNoVacios= 896 crc32= 1857478036  (igual)
+      POS-INICIAL celda= 28 20 ancla= 256 256 pantalla= 302 175      (igual)
+      CUADRO pixelesNoVacios= 178248 de 307200 crc32= 1321968744 lienzoEnVram= 1228800 montonLibre= 1352
+    Todos los crc32 coinciden con la evidencia. Unica diferencia: montonLibre 1352 vs 488 en la
+    evidencia (el binario de hoy es 50.016 B mas chico; ver 4.b).
+
+2.5 DC-002.70 -- la comparacion de pixeles contra el POC de referencia
+    python3 scripts/console/comparar-estado-b-270.py /tmp/verif273/c270/f120s.png /tmp/dcbuild/cpoc270b/f120s.png
+      estado B -> pantalla en (1400,120,474) | POC -> (1400,120) [acuerdo 25.600 pixeles]
+      filas 474 | pixeles 303.360 | IDENTICOS 299.679 (98,79 %) | cuantizacion 570 (0,19 %) | CONTENIDO 3.111
+      caja de los de contenido: x 0..639  y 0..25
+    Numeros IDENTICOS a la evidencia (.70), incluida la caja de las 26 filas y la explicacion
+    (el POC de referencia no limpia su pantalla: personaje-mapa/main.go:442; el estado B si:
+    estado-b/main.go:337).
+    SALVEDAD HONESTA: el lado "POC" de esta comparacion es la captura que dejo el worker de .70
+    (/tmp/dcbuild/cpoc270b/f120s.png). Su log de consola tiene los MISMOS crc32 de LIENZO y PERSONAJE
+    que mi corrida del estado B, o sea las dos puntas se cruzaron; pero no se re-genero esa captura
+    (ver 4.a: el comando de la evidencia para construir ese POC no corre tal como esta escrito).
+
+2.6 DC-002.68 -- la NO-REGRESION: el POC del juego con los flags nuevos (build-monstruo-250.sh)
+    bash scripts/console/build-monstruo-250.sh /tmp/verif273/monstruo   -> rc=0, imprime
+      `bestia=1 golpeSordo=0`
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/verif273/monstruo/disc.gdi 90 /tmp/verif273/cmonstruo
+      rc=0 | 380 lineas HITO250 ANIM-BESTIA animando (pixeles por cuadro 615/616/621/622, el ciclo de 8)
+      | grep -ciE "Fatal|SH4 exception|Blocked" sobre el log -> 0 (cero excepciones del SH-4)
+    O sea: `-g0 -ffunction-sections -fdata-sections` + `--gc-sections` + `.eh_frame` fuera, que
+    quedaron puestos para TODOS los POC (DC_SIN_GC=1 / DC_SIN_EH=1 los apagan), no rompen el POC
+    del juego. Es lo que el comentario de .68 pedia comprobar y se comprobo hoy.
+
+
+3. ESTADO DE CADA CRITERIO DE LAS TRES TARJETAS
+-----------------------------------------------
+3.1 DC-002.68 (Fase B.1: recortar el binario para que entre la pantalla)
+  [CUMPLIDO]    1ST_READ.BIN baja de 11.664.488 a 10.337.608 B (-11,4 %): 1.3, medido hoy.
+  [CUMPLIDO]    malloc(1.228.800) -- la pantalla del motor -- OK en Flycast: 2.1.
+  [CUMPLIDO]    el .eh_frame fuera del mapa (la palanca del techo): .eh_frame = 4 B en el ELF de hoy, 1.3.
+  [CUMPLIDO]    el recorte no cambia comportamiento: las 14 lineas del motor, diff vacio contra el host, 2.2;
+                0 excepciones del SH-4 en la corrida de 25 s.
+  [CUMPLIDO]    el POC del juego (build-monstruo-250.sh) sigue igual con los flags nuevos:
+                build imprime `bestia=1 golpeSordo=0` y la corrida de 90 s no tira excepcion: 2.6.
+  [NO CUMPLIDO, POR DISEÑO] malloc(4.194.304) NO entra: pide 8,39 MB de techo y hay 6,15 MB.
+                Esta declarado en la propia evidencia (.68:75 y .68:109-131) y en docs/PLAN.md:42-44.
+                No es un defecto del trabajo: es la distancia que queda (2,24 MB de imagen).
+  [NO RE-MEDIDO] el reparto por objeto del mapa del enlazador (.68:85-107, "que ocupa el binario") no se
+                re-hizo hoy: exige un DC_LDMAP=<archivo> y el parser del mapa. El BIN de hoy es byte a
+                byte el de la evidencia, asi que el reparto no puede haber cambiado; pero no se re-midio.
+
+3.2 DC-002.69 (d2render/pvr: Surface sobre el PVR)
+  [CUMPLIDO]    Surface entero: `d2common/d2interface/surface.go` declara 21 metodos
+                (grep -cE '^\s+[A-Z][A-Za-z]*\(' d2common/d2interface/surface.go -> 21) y el backend
+                los implementa, con la asercion de compilacion en d2core/d2render/pvr/surface.go:51
+                (`var _ d2interface.Surface = (*Surface)(nil)`): si el contrato cambia, no compila.
+  [CUMPLIDO]    sprites paletizados y tiles con la geometria del POC: 73 sprites y crc32 estable en
+                360 cuadros, y los DOS caminos separados en la captura (2575 verdes de hardware,
+                265 del rombo por software): 2.3.
+  [CUMPLIDO]    RenderSection / ReplacePixels / Screenshot existen y se ejercitan donde toca:
+                surface.go:260 / :275 / :282; la prueba de humo usa RenderSection
+                (console/dc/poc/pvr-surface/main.go:122) y SubirSpritePVR (:152).
+                ReplacePixels/Screenshot no los llama el humo: su prueba es la asercion de contrato.
+  [CUMPLIDO]    go build ./... no empeora: la misma y unica linea `kos` de antes (1.2); el motor rc=0.
+  [CUMPLIDO]    lo que no se pudo queda declarado y no tapado (.69:109-122): PushFilter NEAREST, fuente
+                3x5, ShadedSurface/ShadedGridSurface fuera, un banco de paleta por cuadro.
+
+3.3 DC-002.70 (el Renderer PVR y el mapa del motor dibujado por la interfaz)
+  [CUMPLIDO]    los 15 metodos de `d2interface.Renderer` implementados
+                (grep -cE '^\s+[A-Z][A-Za-z]*\(' d2common/d2interface/renderer.go -> 15;
+                grep -nE '^func \(r \*Renderer\)' d2core/d2render/pvr/renderer.go -> 15 del contrato
+                + medirFPS/Surface/Cuadros/PantallaEnVram, que no son del contrato).
+  [CUMPLIDO]    el MISMO mapa y el MISMO personaje, por la interfaz: LIENZO crc32 3507647456 y PERSONAJE
+                crc32 1857478036 son los del POC de referencia y los del verificador del host: 2.4.
+  [CUMPLIDO]    el lienzo del cuadro vive en VRAM: `lienzoEnVram= 1228800` y montonLibre 1352 con el
+                nivel y el personaje cargados: 2.4.
+  [CUMPLIDO]    la comparacion de pixeles: 98,79 % identicos, 0,19 % de cuantizacion <= 8, el 1,03 %
+                restante en las bandas que la referencia no limpia: 2.5.
+  [CUMPLIDO]    go build ./... con el mismo unico paquete rojo pre-existente (1.2).
+  [NO VERIFICABLE HOY] el "+-8 por canal y 0 pixeles fuera contra la referencia EXACTA del host"
+                (.70:136-140) no se re-midio: pide generar el PNG del verificador del host
+                (`go run ./console/dc/verif-personaje-238 -png ...`) y una captura nueva del emulador.
+                La comparacion que si se re-midio (2.5) es la que da 98,79 %.
+
+
+4. LO QUE NO CUMPLE O NO SE PUEDE VERIFICAR (con archivo:linea y el comando que lo demuestra)
+----------------------------------------------------------------------------------------------
+a) EL COMANDO DE REPRODUCCION DEL POC DE REFERENCIA (.70) NO CORRE TAL COMO ESTA ESCRITO.
+   console/dc/evidencia/dc-002.70-renderer-pvr.txt:156-157:
+       GODC_GOX=/tmp/dcbuild/estado270/gox-enlace SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
+         bash scripts/console/build-personaje-238.sh /tmp/dcbuild/poc270
+   Ese arbol de enlace tiene SOLO el cierre del estado B (16 paquetes del motor), y el POC de
+   referencia importa mas: el enlace muere con simbolos indefinidos.
+   Comando que lo demuestra (medido hoy, rc!=0):
+       GODC_GOX=/tmp/verif273/estado270/gox-enlace SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
+         bash scripts/console/build-personaje-238.sh /tmp/verif273/poc270
+       -> undefined reference to `...d2monstats.Class..p', `...d2monster.Mode.String',
+          `...d2txt..types', `...d2rand.Seed..p'  (collect2: error: ld returned 1 exit status)
+   La forma que SI anda: sin SALTAR_MOTOR (asi build-motor-gox.sh agrega a orden.txt el cierre de los
+   15 paquetes de personaje-mapa, scripts/console/build-personaje-238.sh:54-66), o apuntando GODC_GOX
+   al arbol del motor completo. Se anota; NO se arregla aca (esa linea es evidencia de una tarjeta
+   cerrada y tocarla es de otra tarjeta: ver 5.a).
+   Consecuencia en el veredicto: el 98,79 % de 2.5 se apoya en la captura de referencia del worker.
+
+b) LOS TAMAÑOS DE .69 Y .70 NO REPRODUCEN AL BYTE (el comportamiento SI):
+       .69  1ST_READ.BIN 1.026.120 (evidencia) vs 1.004.552 (hoy)  |  pvr.gox 242.072 vs 319.180
+       .70  1ST_READ.BIN 1.330.312 (evidencia) vs 1.280.296 (hoy)  |  pvr.gox 316.840 vs 319.180
+   El pvr.gox de .69 (242.072) es el del commit eb2bffb0, SIN renderer.go: hoy el paquete tiene el
+   renderer de .70, y por eso 319.180. Para el BIN del .70 la diferencia (50.016 B) es del arbol de
+   stdlib con que se enlazo (cada worker uso su /tmp/gox-*): la evidencia no dice con cual midio.
+   Comando: `stat -c%s /tmp/verif273/estado270/1ST_READ.BIN` vs la linea 148 de dc-002.70-renderer-pvr.txt.
+   Se anota; no invalida ningun criterio (todos son "entra / no entra en 16 MB" y "dibuja lo mismo"),
+   pero un numero de tamaño sin el arbol que lo produjo no es reproducible.
+
+c) CONTEOS DE LINEAS IMPRECISOS EN LA EVIDENCIA (documentacion, no codigo):
+       d2core/d2render/pvr/renderer.go   314 lineas (la evidencia .70:17 dice 316)   wc -l
+       console/dc/std/csrc/pvr_sprite.c  143 lineas (la evidencia .69:62 dice 165)   wc -l
+       console/dc/poc/estado-b/main.go   381 lineas (la evidencia .70:46 dice 379)   wc -l
+       console/dc/poc/estado-b/csrc/shim.c 23 lineas (la evidencia .70:46 dice 24)   wc -l
+
+d) docs/PLAN.md:48 dice que `Surface` tiene 22 metodos; el archivo declara 21
+   (d2common/d2interface/surface.go). La propia evidencia de .69 lo explica (.69:14-16: el 22 seria
+   ShadedSurface/ShadedGridSurface, que son OTRAS interfaces). Es una linea del plan desactualizada.
+
+e) NO QUEDA TARJETA PARA LOS 4 MB QUE FALTAN (lo pidio el comentario de .68, y es correcto: no es
+   mecanica). Es una DECISION DE DISEÑO, con tres caminos ya medidos (.68:117-128):
+     (a) -Os: ~370 KB sobre 4,6 MB de .text (y se paga en velocidad del motor).
+     (b) enlazar MENOS paquetes: d2gamescreen (1,16 MB) + d2player (1,10 MB) = 2,26 MB, justo lo que falta.
+     (c) bajar el semiespacio del GC a 1024 KB: libera 2.097.152 B (revierte la decision de DC-002.51).
+   Nada de esto se toca aca. Queda como lo que hay que decidir (ver 5.b).
+
+
+5. CONCLUSION Y TARJETAS QUE SE PROPONEN (no se crean desde aca: el veredicto es lo unico que entrega)
+-----------------------------------------------------------------------------------------------
+VEREDICTO: la tanda .68/.69/.70 SOSTIENE lo que dice, con numeros que se re-midieron hoy:
+  - el motor compila entero (143/143) y el host sigue con el mismo unico paquete rojo pre-existente;
+  - el BIN grande es byte a byte el de .68 (10.337.608 B) y la pantalla entra (1228800 OK, 1835008 FALLA);
+  - los crc32 de .69 (21584 / -2001956231) y de .70 (LIENZO 3507647456, PERSONAJE 1857478036,
+    CUADRO 1321968744) se repiten EXACTOS, y la comparacion de pixeles da el 98,79 % documentado.
+  Lo que no cierra es periferia: un comando de reproduccion que no corre (a), tamaños sin el arbol de
+  origen (b), conteos de lineas (c), una linea del plan (d) y la decision pendiente de los 4 MB (e).
+
+Se propone (una tarjeta cada una, para el tablero de la fase B):
+  a) "arreglar el comando de reproduccion del POC de referencia de .70" -> docs/evidencia, coste ~15 min:
+     quitar SALTAR_MOTOR=1 o apuntar GODC_GOX al arbol del motor completo, y re-emitir la comparacion del
+     98,79 % con una captura nueva de las dos puntas.
+  b) "decidir como se ganan los 4 MB del bloque de texturas" -> decision de diseño de Daniel entre (a),
+     (b) y (c) de 4.e, con el numero de cada camino ya medido en dc-002.68-recorte.txt:117-128.
+  c) (ya declarada en .70:198) la Fase D: montar d2gamescreen sobre este Renderer.
+
+El PLAN ya tenia la Fase B.1 marcada cerrada con estos numeros (docs/PLAN.md:38-44); B.2 no tenia su
+bloque "medido en" y esta verificacion lo deja anotado.
+
+
+6. COMO SE REPRODUCE TODO ESTO (en orden, ~25 min de reloj)
+-----------------------------------------------------------
+    cd /home/dgalli/Proyectos/diablo2consoles && source scripts/console/env.sh
+    export GODC_GOX=/tmp/verif273/gox
+    bash scripts/console/build-std-gox.sh $GODC_GOX
+    bash scripts/console/build-motor-all.sh $GODC_GOX /tmp/verif273/motor          # 143 de 143
+    go build ./...                                                               # rc=1, solo 'kos'
+    PASO3=1 BASE_GOX=$GODC_GOX bash scripts/console/build-enlace-267.sh /tmp/verif273/enlace268
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/verif273/enlace268/disc.gdi 25 /tmp/verif273/c268
+    grep -a ENLACE267 /tmp/verif273/c268/flycast.log                             # la escalera
+    go run ./console/dc/poc/enlace-267                                           # las 14 lineas del host
+    BASE_GOX=$GODC_GOX bash scripts/console/build-pvr-surface.sh /tmp/verif273/pvr-surface
+    CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/verif273/pvr-surface/disc.gdi 15 /tmp/verif273/c269
+    python3 scripts/console/checar-pvr-surface.py /tmp/verif273/c269/f15s.png --consola 21584
+    BASE_GOX=$GODC_GOX bash scripts/console/build-estado-b-270.sh /tmp/verif273/estado270
+    CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/verif273/estado270/disc.gdi 150 /tmp/verif273/c270
+    python3 scripts/console/comparar-estado-b-270.py /tmp/verif273/c270/f120s.png <captura del POC de referencia>
+
+    Los logs crudos de esta corrida quedan en /tmp/verif273/ (se borran solos con /tmp).

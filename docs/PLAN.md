@@ -59,6 +59,17 @@ Criterio de aceptación de la fase: **el mismo mapa y el mismo personaje de hoy,
 `d2interface.Surface` con el backend PVR**, con la captura comparada contra la del POC (mismos
 píxeles donde debe), y sin el montón ahogado.
 
+**Medido en DC-002.69 / DC-002.70 (cerradas, reverificado en DC-002.73):** `d2render/pvr` implementa
+los **21** métodos de `Surface` (no 22: el que sobraba en este plan son `ShadedSurface`/`ShadedGridSurface`,
+que son otras interfaces) con la aserción de contrato en `surface.go:51`, y los **15** de `Renderer`
+(`renderer.go`). En Flycast la prueba de humo da 73 sprites, 21584 píxeles, `crc32 -2001956231` estable en
+360 cuadros; el POC *estado B* dibuja el mismo mapa y el mismo personaje por la interfaz con `LIENZO
+crc32 3507647456` y `PERSONAJE crc32 1857478036` (los mismos del verificador del host), el lienzo del
+cuadro en VRAM (`lienzoEnVram= 1228800`) y **98,79 %** de píxeles idénticos del cuadro (474 filas) contra
+el POC de referencia, con 0,19 % de cuantización ≤8 y el 1,03 % restante en las bandas que la referencia
+no limpia. Evidencias: `console/dc/evidencia/dc-002.69-pvr-surface.txt`,
+`dc-002.70-renderer-pvr.txt` y la verificación independiente `dc-002.73-verificacion.txt`.
+
 ## Fase C — Input y audio  ·  pendiente
 
 Maple detrás de `d2interface` (`input_service.go`, `input_manager.go`; es la más fácil) y AICA
