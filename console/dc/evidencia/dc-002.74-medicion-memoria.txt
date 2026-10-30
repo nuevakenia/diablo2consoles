@@ -112,10 +112,22 @@ COMO SE REPRODUCE
   la consola (16 MB) y 3 veces el techo del monton (6,15 MB). El cooperativo de 4 jugadores no
   es "un poco mas de RAM": depende por completo de cuanto se cachee.
 
-  HALLAZGO 5: los caches del AssetManager NO tienen tope ni LRU.
-  d2core/d2asset/asset_manager.go:36 define `defaultCacheEntryWeight = 1` y todas las inserciones
-  usan ese peso constante (d2interface.Cache). No hay limite, no hay desalojo: lo que se carga
-  queda. Con 1 heroe eso ya llena el monton; con 4, se multiplica por 4 sin freno.
+  HALLAZGO 5 (CORREGIDO 30/10 13:50): los caches TIENEN LRU y presupuesto -- pero con presupuestos
+  de PC, que en una consola de 16 MB equivalen a "sin limite":
+  d2core/d2asset/asset_manager.go:40-47
+      animationBudget        1024*1024*128 =  134.217.728 B  (128 MB)
+      dt1Budget        4096*2048*128       = 1.073.741.824 B  (1 GB)
+      ds1Budget        4096*2048*128       = 1.073.741.824 B  (1 GB)
+      cofBudget        4096*2048*128       = 1.073.741.824 B  (1 GB)
+      dccBudget        4096*2048*128       = 1.073.741.824 B  (1 GB)
+      fontBudget = 128 · paletteBudget = 64 · paletteTransformBudget = 64
+  y se instancian en d2core/d2asset/d2asset.go:31-38 con d2cache.CreateCache(budget).
+  El Cache de d2cache SI desaloja el menos usado (cache.go:86 y su test
+  TestCacheInsertEvictsLeastRecentlyUsed): con budget de 1 GB nunca llega a desalojar nada, pero la
+  maquinaria existe. O sea: acotar los presupuestos es un cambio de CONSTANTES, no una reescritura
+  del cache. Eso convierte la palanca del cooperativo en algo barato y de bajo riesgo.
+  Y los caches son UNO SOLO por AssetManager: los 4 jugadores ya comparten assets por diseño; lo que
+  falta es que el presupuesto alcance para los 4 y que la evicion no tire lo que otro esta usando.
 
 
 5. UNA ZONA
@@ -138,5 +150,5 @@ CONCLUSION MEDIDA
       -gc-sections ......................... 448 KB    (ya aplicado, es el techo)
       enlazar menos paquetes ............... 2,26 MB   (saca d2gamescreen+d2player = la UI)
   Y las que atacan el problema real del cooperativo, que no es la imagen sino el runtime:
-      cache con tope por jugador + assets compartidos entre jugadores
+      bajar los presupuestos de cache a numeros de consola (el LRU ya existe: son constantes)
       no pedir el bloque de texturas de 4 MB de una: cargarlo por zona/por partes
