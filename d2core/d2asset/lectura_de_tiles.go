@@ -110,6 +110,11 @@ var (
 // palanca `LEER=` del POC de zonas para medir los dos caminos con el mismo binario.
 func UsarLecturaPrestadaDeTiles(v bool) { lecturaPrestadaDeTiles = v }
 
+// LecturaPrestadaDeTiles dice si la ruta de tiles esta leyendo el MPQ con memoria prestada (DC-002.81). Es el
+// estado REAL de la palanca -- no el que el que llama creia haber pedido --, que es lo que hay que ver en el
+// log del motor: `lecturaPrestada= true`.
+func LecturaPrestadaDeTiles() bool { return lecturaPrestadaDeTiles }
+
 // EstadoDelPrestamoDeTiles devuelve el instrumento del prestamo de la lectura (y si hay prestamo armado).
 func EstadoDelPrestamoDeTiles() (d2mpq.EstadoDelPrestamo, bool) {
 	candadoDeTiles.Lock()

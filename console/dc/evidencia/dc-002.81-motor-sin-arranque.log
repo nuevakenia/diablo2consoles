@@ -1,0 +1,114 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:028 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:271 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:371 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:371 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:374 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:378 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:392 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f55f17f0000 RAM(16 MB) 0x7f55fd7f0000 VRAM64(8 MB) 0x7f55f57f0000 ARAM(2 MB) 0x7f56117f0000
+00:00:398 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:405 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f55f17f0000 RAM(16 MB) 0x7f55fd7f0000 VRAM64(8 MB) 0x7f55f57f0000 ARAM(2 MB) 0x7f56117f0000
+00:00:409 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:412 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:412 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:456 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:456 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:456 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2eb820
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351958080
+ARQ-MARCA   gc_init-semiespacio1 v=2354055264
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=608 cused=4353280 gsemi=95864/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+ZONAS: arranca DC-002.81 -- el MOTOR carga las zonas con la ruta de tiles cerrada en el POC
+ZONAS: palancas: porBuffer= false leerConPrestamo= true sinCacheDt1= false gcEntreArchivos= false porMotor= true arranqueDeConsola= false
+ZONAS: monton de C al arrancar: arena=4357984 usado=4354312 libre=3672 sbrk=0x0x8c712000 techo=0x0x8cff0000
+ZONAS: ARRANQUE=0 -- el motor como arranca HOY: sin la linea, camino de la PC
+ZONAS: presupuestos vigentes: animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824 sumaDatos= 134217728
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+MOTOR: assetmanager armado por el camino del motor (NewAssetManager + AddSource, como d2app)
+MOTOR: caminoDeTilesDeConsola= false lecturaPrestada= true lecturaDeArchivosDeConsola= false prefetchApagado= false
+MOTOR: monton con el assetmanager del motor: arena=4710240 usado=4709312 libre=928 sbrk=0x0x8c768000 techo=0x0x8cff0000
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+ZONAS: video andando, monton: arena=4710240 usado=4709336 libre=904 sbrk=0x0x8c768000 techo=0x0x8cff0000
+
+ZONAS: ===== a) ENTRA AL PUEBLO =====
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=122248
+ZONAS: monton antes de la fase: usado= 5064336 tras GC= 5064336 (el GC devolvio 0 bytes)
+ARQ-CARGA entra /data/global/tiles/act1/town/townn1.ds1 cfree=2256 cused=5064336 gsemi=123144/2097152 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/act1/town/townn1.ds1
+ARQ-CARGA volvio /data/global/tiles/act1/town/townn1.ds1 cfree=2256 cused=5064336 gsemi=126168/2097152 gc=1
+ARQ-CARGA lee-entra /data/global/tiles/act1/town/townn1.ds1 cfree=2256 cused=5064336 gsemi=126168/2097152 gc=1
+ARQ-CARGA lee-volvio /data/global/tiles/act1/town/townn1.ds1 cfree=2256 cused=5064336 gsemi=629584/2097152 gc=1
+ZONAS: DS1-INSERT (motor) clave= act1/town/townn1.ds1 crudo= 57652 vivo= 225428 monton= arena=5066592 usado=5064336 libre=2256 sbrk=0x0x8c7bf000 techo=0x0x8cff0000
+ZONAS: ds1 version= 18 acto= 1 w= 57 h= 41 files= 8 crudo= 57652 vivo= 225428 monton= arena=5066592 usado=5064336 libre=2256 sbrk=0x0x8c7bf000 techo=0x0x8cff0000
+ARQ-CARGA entra /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=1904 cused=5552112 gsemi=1564712/2097152 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/act1\outdoors\treegroups.dt1
+ARQ-CARGA volvio /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=1904 cused=5552112 gsemi=1568720/2097152 gc=1
+ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=1904 cused=5552112 gsemi=1568720/2097152 gc=1
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574400
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=432048
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575072
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=441936
+ARQ-CARGA lee-volvio /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=2456 cused=10372552 gsemi=559840/2097152 gc=3
+ZONAS: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 tiles= 21 vivo= 489812 evicto= 0 pesoCache= 1 monton= arena=10375008 usado=10372552 libre=2456 sbrk=0x0x8cccf000 techo=0x0x8cff0000
+ARQ-CARGA entra /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=2456 cused=10372552 gsemi=586568/2097152 gc=3
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/act1\outdoors\stonewall.dt1
+ARQ-CARGA volvio /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=2456 cused=10372552 gsemi=590472/2097152 gc=3
+ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=2456 cused=10372552 gsemi=590472/2097152 gc=3
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575168
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=466992
+Out of memory. Requested sbrk_base 0x8cff8000, was 0x8cf99000, diff 389120
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=13299552 used=13298048 free=1504

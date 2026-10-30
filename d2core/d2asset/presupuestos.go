@@ -185,6 +185,40 @@ func NuevosCachesDeAssets() *CachesDeAssets {
 	}
 }
 
+// CachesDeAssets devuelve los ocho caches de un AssetManager ya armado, para medirlos (DC-002.81).
+//
+// POR QUE HACE FALTA. `NuevoAssetManagerDeConsola` devuelve los caches porque los crea; `NewAssetManager`
+// -- el que usa el MOTOR (`d2app/app.go:134`) -- no. Sin esto, medir el camino del motor obligaba a mirar el
+// AssetManager por dentro desde otro paquete, o sea a duplicarlo. Es ADITIVO: no cambia el AssetManager ni
+// el camino de la PC.
+func (am *AssetManager) CachesDeAssets() *CachesDeAssets {
+	if am == nil {
+		return nil
+	}
+
+	return &CachesDeAssets{
+		Animations: cacheConcreto(am.animations),
+		Fonts:      cacheConcreto(am.fonts),
+		Palettes:   cacheConcreto(am.palettes),
+		Transforms: cacheConcreto(am.transforms),
+		Dt1s:       cacheConcreto(am.dt1s),
+		Ds1s:       cacheConcreto(am.ds1s),
+		Cofs:       cacheConcreto(am.cofs),
+		Dccs:       cacheConcreto(am.dccs),
+	}
+}
+
+// cacheConcreto baja un cache de la interfaz al tipo real, que es el que lleva los desalojos y el peso.
+func cacheConcreto(c d2interface.Cache) *d2cache.Cache {
+	if c == nil {
+		return nil
+	}
+
+	concreto, _ := c.(*d2cache.Cache)
+
+	return concreto
+}
+
 // Pesar devuelve el peso con el que se inserta una entrada de cache de datos.
 //
 // En la PC devuelve defaultCacheEntryWeight (1 por entrada), que es lo que hacia el motor hasta

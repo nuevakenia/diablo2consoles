@@ -112,6 +112,19 @@ de la lógica del POC. Acá aparece el riesgo real: **16 MB de RAM** contra un m
 
 Criterio: **acto 1 jugable de punta a punta con el control de Dreamcast, sin el POC en el medio.**
 
+**Medido en DC-002.81 (el arranque del motor, cerrado):** el `main` de consola tiene que llamar
+**una** función — `d2asset.ArrancarComoConsola()` — antes de `d2app.Create`; junta las tres palancas
+que antes vivían sueltas (presupuestos de consola de .75, lectura con tamaño reservado de .79 y arena
+de tiles con lectura prestada de .78/.80). Con esa línea, el AssetManager del motor
+(`NewAssetManager`, `d2app/app.go:134`) queda con `caminoDeTilesDeConsola= true`,
+`lecturaPrestada= true`, `lecturaDeArchivosDeConsola= true`, `prefetchApagado= true` y los caches en
+2.949.120 B, y las tres fases de zona cargan en Flycast sin OOM y sin excepción con
+`pico(c) - pico(a) = 0 B` y el pueblo en crc32 3507647456. Sin la línea, el mismo camino muere en el
+**segundo** `.dt1` de la primera zona (`gc_external_alloc: OOM`). El `.ds1` y los `.dt1` ya los carga
+el motor (`am.LoadDS1` / `am.LoadDT1`); lo que falta de la fase es el compositor (`d2mapengine` +
+`d2mapstamp`), que necesita las ~70 tablas de `d2resource.DataDictionaries()`, y las pantallas.
+Evidencia: `console/dc/evidencia/dc-002.81-arranque-de-consola-en-el-motor.txt`.
+
 ---
 
 ## Lo que se reusa (no se tira)

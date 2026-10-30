@@ -43,6 +43,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset/types"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"
@@ -170,18 +171,65 @@ type medida struct {
 }
 
 func main() {
-	println("ZONAS: arranca DC-002.80 -- dos zonas y la vuelta sin pedir memoria por archivo (lectura prestada)")
+	println("ZONAS: arranca DC-002.81 -- el MOTOR carga las zonas con la ruta de tiles cerrada en el POC")
 	println("ZONAS: palancas: porBuffer=", porBuffer, "leerConPrestamo=", leerConPrestamo,
-		"sinCacheDt1=", sinCacheDt1, "gcEntreArchivos=", gcEntreArchivos)
+		"sinCacheDt1=", sinCacheDt1, "gcEntreArchivos=", gcEntreArchivos,
+		"porMotor=", porMotor, "arranqueDeConsola=", arranqueDeConsola)
 	println("ZONAS: monton de C al arrancar: " + estado())
 
-	// lo que hace el arranque de la consola (DC-002.75): acota los caches y los pone a pesar en BYTES
-	d2asset.AjustarPresupuestosDeConsola()
+	// DC-002.81: el ARRANQUE de la consola. En el motor de verdad esto son las tres palancas juntas
+	// (`d2asset.ArrancarComoConsola`), y el binario de consola del motor lo llama ANTES de d2app.Create.
+	// La palanca `MOTOR=1 ARRANQUE=0` es el ANTES: el motor tal como arranca hoy, sin la linea, con el
+	// camino de la PC -- para que "el main no lo usaba" sea una medicion y no una sospecha.
+	switch {
+	case porMotor && !arranqueDeConsola:
+		println("ZONAS: ARRANQUE=0 -- el motor como arranca HOY: sin la linea, camino de la PC")
+	case porMotor:
+		d2asset.ArrancarComoConsola()
+	default:
+		// los caminos de DC-002.78/.80, tal cual quedaron medidos: el POC prende lo suyo a mano
+		d2asset.AjustarPresupuestosDeConsola()
+	}
+
 	p := d2asset.PresupuestosVigentes()
 	println("ZONAS: presupuestos vigentes: animaciones=", p.Animaciones, "cofs=", p.CoFs, "dccs=", p.DCCs,
 		"dt1s=", p.DT1s, "ds1s=", p.DS1s, "sumaDatos=", p.SumaDeLosCachesDeDatos())
 
-	if porBuffer {
+	if porMotor {
+		// ================= EL CAMINO DEL MOTOR (DC-002.81) =================
+		// El AssetManager lo arma el MOTOR: `NewAssetManager` (d2app/app.go:134) + la fuente MPQ que
+		// agrega su arranque (d2app/initialization.go:92). Antes de esta tarjeta ese camino dejaba los
+		// presupuestos de PC y las tres palancas apagadas; con la linea del arranque queda el mismo
+		// objeto que arma `NuevoAssetManagerDeConsola`, sin cambiar ni una linea de la PC.
+		d2asset.UsarLecturaPrestadaDeTiles(leerConPrestamo)
+
+		var err error
+
+		am, err = d2asset.NewAssetManager(d2util.LogLevelDefault)
+		if err != nil {
+			println("MOTOR: NewAssetManager FALLO:", err.Error())
+
+			return
+		}
+
+		if err := am.AddSource(rutaMPQ, types.AssetSourceMPQ); err != nil {
+			println("MOTOR: AddSource FALLO:", err.Error())
+
+			return
+		}
+
+		caches = am.CachesDeAssets()
+
+		arena := d2asset.EstadoDeLosTiles()
+		archivos := d2asset.EstadoDeLosArchivos()
+
+		println("MOTOR: assetmanager armado por el camino del motor (NewAssetManager + AddSource, como d2app)")
+		println("MOTOR: caminoDeTilesDeConsola=", arena.CaminoDeConsola,
+			"lecturaPrestada=", d2asset.LecturaPrestadaDeTiles(),
+			"lecturaDeArchivosDeConsola=", archivos.CaminoDeConsola,
+			"prefetchApagado=", archivos.PrefetchApagado)
+		println("MOTOR: monton con el assetmanager del motor: " + estado())
+	} else if porBuffer {
 		// la palanca de medicion de DC-002.78: prende la ruta del arena. Desde DC-002.80 el camino lo prende
 		// `NuevoAssetManagerDeConsola` solo; aca se adelanta para que el informe de abajo salga con la ruta
 		// ya prendida (y para poder medir con `BUFFER=0`, sin AssetManager de consola, igual que antes).
@@ -500,7 +548,16 @@ func cargarZona(mpq *d2mpq.MPQ, rotulo, ruta string, centroX, centroY int) *zona
 
 // cargarDS1: el camino del motor -- Retrieve del cache, y si falta, leer del MPQ, parsear e Insert con
 // el peso en bytes. Devuelve nil si no se pudo.
+//
+// DC-002.81: con la palanca `porMotor` el .ds1 lo carga el MOTOR (`am.LoadDS1`), que es el camino real del
+// juego: `LoadFileHandoff` -> `LoadFile`, o sea la lectura con el tamano reservado de DC-002.79 (y sin el
+// prefetch del MPQ). El DS1 del pueblo mide 57.652 B, debajo del umbral de 64 KB del monton externo, pero es
+// el archivo que dice QUE .dt1 hay que cargar y es el que en el motor se pide por esta funcion.
 func cargarDS1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2ds1.DS1, int) {
+	if porMotor {
+		return cargarDS1PorElMotor(clave, v)
+	}
+
 	if valor, encontrado := caches.Ds1s.Retrieve(clave); encontrado {
 		cuentaDS1s.aciertos++
 		v.muestra("ds1 del cache")
@@ -546,6 +603,39 @@ func cargarDS1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2ds1.DS1, int) {
 	return d, crudo
 }
 
+// cargarDS1PorElMotor (DC-002.81): el .ds1 por `am.LoadDS1`, el mismo camino que usa el motor. El crudo se
+// informa con el tamano que declara la fuente (`TamanoDeArchivo`), que es lo que el motor reserva.
+func cargarDS1PorElMotor(clave string, v *vigilante) (*d2ds1.DS1, int) {
+	relativa := ClaveRelativaDelDS1(clave)
+
+	if _, encontrado := caches.Ds1s.Retrieve(relativa); encontrado {
+		cuentaDS1s.aciertos++
+		v.muestra("ds1 del cache")
+	} else {
+		cuentaDS1s.faltas++
+		v.muestra("ds1 antes de leer (motor)")
+	}
+
+	d, err := am.LoadDS1(relativa)
+	if err != nil {
+		println("ZONAS: DS1-LEER FALLO (motor):", relativa, err.Error())
+
+		return nil, 0
+	}
+
+	v.muestra("ds1 leido por el motor")
+
+	crudo := 0
+	if tamano, sabido := am.TamanoDeArchivo("/data/global/tiles/" + relativa); sabido {
+		crudo = tamano
+	}
+
+	println("ZONAS: DS1-INSERT (motor) clave=", relativa, "crudo=", crudo, "vivo=", d2asset.TamanoDS1(d),
+		"monton=", estado())
+
+	return d, crudo
+}
+
 // cargarDT1: lo mismo para un .dt1: es donde el monton se mueve (el archivo mas grande mide 1 MB crudo).
 // Devuelve tambien el puntero al crudo (0 si no hay que liberarlo): con el camino sin cache, el que llama
 // lo libera despues de componer.
@@ -572,7 +662,11 @@ func cargarDT1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2dt1.DT1, uintptr)
 		crudo uintptr
 	)
 
-	if porBuffer {
+	// DC-002.81: el camino del MOTOR tambien cuando se mide el arranque del motor (`porMotor`). Sin esto, la
+	// corrida del motor cargaba los .dt1 por el camino viejo del POC (mpq.ReadFile + d2dt1.LoadDT1), que deja
+	// el crudo tomado por archivo -- MEDIDO: usado 5.064.336 -> 9.902.840 en la fase (a) y `gc_external_alloc:
+	// OOM` al volver al pueblo. Con esta condicion el .dt1 entra por `am.LoadDT1`, que es el camino real.
+	if porBuffer || porMotor {
 		// la ruta del MOTOR: arena. El tamano del archivo lo informa el instrumento del arena (no hay
 		// crudo que medir de este lado).
 		//
@@ -634,7 +728,7 @@ func cargarDT1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2dt1.DT1, uintptr)
 		return dt1, crudo
 	}
 
-	if porBuffer {
+	if porBuffer || porMotor {
 		// el motor YA lo inserto en el cache: aca solo se informa como quedo
 		println("ZONAS: DT1", clave, "tiles=", len(dt1.Tiles), "vivo=", peso,
 			"evicto=", caches.Dt1s.Evictions(), "pesoCache=", caches.Dt1s.GetWeight(), "monton=", estado())
@@ -661,6 +755,15 @@ func cargarDT1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2dt1.DT1, uintptr)
 // que el propio LoadDT1 antepone.
 func ClaveRelativaDelDT1(ruta string) string {
 	return strings.TrimPrefix(ruta, "data/global/tiles/")
+}
+
+// ClaveRelativaDelDS1 (DC-002.81): lo que pide `am.LoadDS1` -- la ruta del .ds1 en barras normales, en
+// minusculas y SIN el prefijo "/data/global/tiles/", que el propio LoadDS1 antepone (es la misma forma que
+// trae `lvlprest.txt`: `act1/town/townn1.ds1`).
+func ClaveRelativaDelDS1(ruta string) string {
+	normal := strings.ToLower(strings.ReplaceAll(ruta, barraInvertida, "/"))
+
+	return strings.TrimPrefix(normal, "data/global/tiles/")
 }
 
 // estado: los cuatro numeros del monton de C, juntos.

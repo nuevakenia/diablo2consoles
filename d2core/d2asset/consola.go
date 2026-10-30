@@ -24,6 +24,9 @@ package d2asset
 // midio en Flycast y la ruta cierra (tres fases, `pico(c) - pico(a) = 0`, crc32 3507647456, con el
 // recolector normal y con el recolector frenado). Prenderlo ACA y no en `AjustarPresupuestosDeConsola` deja
 // el contrato claro: la ruta va con el AssetManager, no con los numeros de los presupuestos.
+//
+// DC-002.81: y desde aca se llama a `ArrancarComoConsola`, que es el arranque UNICO de la consola (ver
+// abajo): asi el AssetManager de consola y el arranque del motor prenden exactamente las mismas palancas.
 
 import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2tbl"
@@ -32,6 +35,29 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 )
+
+// ArrancarComoConsola es EL ARRANQUE DE LA CONSOLA EN UNA SOLA LLAMADA (DC-002.81).
+//
+// POR QUE EXISTE. El `main` del motor no arma el AssetManager: lo arma `d2app` (`d2app/app.go:134`) con
+// `NewAssetManager`, que es el camino de la PC, y en la consola eso deja los presupuestos de PC (128 MB de
+// animaciones, 1 GB por cache de datos, peso 1 por entrada) y las TRES palancas apagadas. Las tres vivian en
+// tres funciones sueltas que cada POC se acordaba de llamar por su cuenta:
+//
+//  1. `AjustarPresupuestosDeConsola` (DC-002.75) -- los caches acotados y pesando en bytes.
+//  2. `ActivarLecturaDeConsola`     (DC-002.79) -- `LoadFile` reserva el tamano exacto en vez de `ReadAll`,
+//     y apaga el prefetch del MPQ (hasta 2 MB por archivo). Sin esta, el motor se cae leyendo el animdata o
+//     cualquier archivo de mas de 64 KB.
+//  3. `ActivarCaminoDeTilesDeConsola` (DC-002.78/.80) -- cada .dt1 se lee ADENTRO de un arena pedido UNA
+//     vez, con la lectura del MPQ por memoria prestada (`lecturaPrestadaDeTiles`).
+//
+// ACA quedan juntas, para que el arranque de la consola sea UNA linea y no tres que se pueden olvidar (que es
+// justo lo que esta tarjeta viene a comprobar: que nada se pierda al arrancar el motor entero). La PC no la
+// llama NUNCA: `NewAssetManager`, el camino del host, queda exactamente como estaba.
+func ArrancarComoConsola() {
+	AjustarPresupuestosDeConsola()
+	ActivarLecturaDeConsola()
+	ActivarCaminoDeTilesDeConsola()
+}
 
 // NuevoAssetManagerDeConsola arma el AssetManager de la consola: los ocho caches con los presupuestos
 // vigentes y una fuente MPQ por cada ruta que se le pasa (en el orden en que las recibe: el loader
@@ -59,9 +85,10 @@ func NuevoAssetManagerDeConsola(nivelDeLog d2util.LogLevel, rutasMPQ ...string) 
 
 	caches := NuevosCachesDeAssets()
 
-	// DC-002.80: con AssetManager de consola, los .dt1 se cargan por el arena y se leen con memoria
-	// prestada. Medido: la ruta cierra (ver el comentario de arriba).
-	ActivarCaminoDeTilesDeConsola()
+	// DC-002.81: el arranque de consola de UNA sola llamada (presupuestos + lectura completa + arena de
+	// tiles). Antes aca se prendia solo la ruta del arena; la lectura con tamano reservado (DC-002.79) se
+	// quedaba afuera, o sea que este constructor NO dejaba el AssetManager completo para el motor.
+	ArrancarComoConsola()
 
 	manager := &AssetManager{
 		Logger:     logger,

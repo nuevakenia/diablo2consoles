@@ -1,0 +1,209 @@
+DC-002.81 -- EL MAIN DEL MOTOR CARGA LAS ZONAS CON LA RUTA DE TILES CERRADA EN EL POC
+Rama DC-002, checkout unico en /home/dgalli/Proyectos/diablo2consoles, sin worktrees.
+Fecha: 2026-10-30. Base: HEAD c1a2069d (cierre de DC-002.78).
+Medido en Flycast con el binario de consola; ninguna corrida toco la Dreamcast fisica.
+
+
+0. Resumen en una linea
+-----------------------
+El AssetManager del MOTOR en consola (`NewAssetManager`, el que llama `d2app/app.go:134`) quedaba con los
+presupuestos de la PC y las TRES palancas apagadas -- medido. Con UNA linea en el arranque de consola
+(`d2asset.ArrancarComoConsola`) el MISMO camino del motor queda con `caminoDeTilesDeConsola= true`,
+`lecturaPrestada= true`, `lecturaDeArchivosDeConsola= true` y `prefetchApagado= true`, y las tres fases de
+zona cargan sin OOM y sin excepcion con `pico(c) - pico(a) = 0 B` y el lienzo del pueblo en crc32 3507647456.
+
+
+1. Lo que se pidio comprobar, y lo que habia
+--------------------------------------------
+DC-002.78 cerro la ruta de tiles con el POC `console/dc/poc/zonas-waypoint`, que arma el AssetManager a mano
+(`NuevoAssetManagerDeConsola`). Lo que no estaba medido es el arranque del MOTOR: `d2app` arma su AssetManager
+con `NewAssetManager` (d2app/app.go:134), que es el camino de la PC.
+
+Medido en esta tarjeta, con el binario de consola, ANTES de tocar nada (palanca `MOTOR=1 ARRANQUE=0`, log
+`dc-002.81-motor-sin-arranque.log`):
+
+  ZONAS: presupuestos vigentes: animaciones= 134217728 cofs= 1073741824 dccs= 1073741824
+                                 dt1s= 1073741824 ds1s= 1073741824 sumaDatos= 134217728
+  MOTOR: caminoDeTilesDeConsola= false lecturaPrestada= true
+         lecturaDeArchivosDeConsola= false prefetchApagado= false
+
+O sea: los ocho caches con los numeros de la PC (el presupuesto de dt1s es 1 GB = "sin limite"), el peso de
+cada entrada en 1 (`pesoCache= 1` en el log) y las dos rutas de la consola apagadas. Cargar la zona del acto 1
+por ahi:
+
+  - 1er .dt1 (treegroups.dt1, 505.504 B): el monton de C pasa de 5.064.336 a 10.372.552 B (+5.308.216 B por
+    archivo: `LoadFile` -> `io.ReadAll` duplicando el buffer, mas lo parseado).
+  - 2do .dt1 (stonewall.dt1): muere.
+
+  ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=2456 cused=10372552 ...
+  Out of memory. Requested sbrk_base 0x8cff8000, was 0x8cf99000, diff 389120
+  fatal error: gc_external_alloc: OOM
+  Memory: arena=13299552 used=13298048 free=1504
+
+Cero zonas cargadas, cero cuadros. Ese es el "antes" del motor, y confirma lo que la tarjeta sospechaba: el
+main del motor NO usaba la ruta de consola -- no por olvido de una palanca, sino porque `NewAssetManager` no
+tiene forma de prenderla (el main de consola tendria que llamar a mano a tres funciones distintas, y hoy no
+llama a ninguna).
+
+
+2. El arreglo: UNA linea, y donde va
+------------------------------------
+`d2core/d2asset/consola.go` gana una funcion:
+
+  func ArrancarComoConsola() {
+      AjustarPresupuestosDeConsola()   // DC-002.75: caches acotados y pesando en bytes
+      ActivarLecturaDeConsola()        // DC-002.79: LoadFile reserva el tamano exacto + prefetch del MPQ off
+      ActivarCaminoDeTilesDeConsola()  // DC-002.78/.80: arena pedido una vez + lectura prestada
+  }
+
+Son las TRES palancas que estaban repartidas en tres funciones que cada POC prendia por su cuenta (y la
+tercera, la de la lectura completa, ni siquiera la prendia el POC de zonas: la prendia solo el POC de
+`loadfile-grande`). `NuevoAssetManagerDeConsola` ahora la llama tambien, asi que el constructor del POC y el
+arranque del motor prenden exactamente lo mismo y no hay dos versiones del arranque.
+
+El main de consola del motor -- el binario que llama a `d2app.Create(...).Run()` -- todavia no existe como
+pieza (es la Fase D: montar `d2gamescreen`). Lo que existe hoy es el binario de MEDICION, que arranca por el
+camino del motor: la palanca `MOTOR=1` del POC llama a `d2asset.ArrancarComoConsola()` (la linea) y despues
+arma el AssetManager con `NewAssetManager` + `AddSource` exactamente como `d2app` (app.go:134 y
+initialization.go:92), y carga el .ds1 y los .dt1 por las funciones del motor (`am.LoadDS1` y `am.LoadDT1`).
+Cuando se monte el main de la Fase D, la linea va tal cual en su `main`, antes de `d2app.Create`.
+
+Instrumentos nuevos (aditivos, la PC no los usa): `d2asset.LecturaPrestadaDeTiles()` -- el estado REAL de la
+palanca, no el que el que llama creia haber pedido -- y `(*AssetManager).CachesDeAssets()`, que devuelve los
+ocho caches de un AssetManager ya armado. Sin eso, medir el camino del motor obligaba a mirar el AssetManager
+por dentro desde otro paquete (o sea a duplicarlo).
+
+
+3. La corrida del motor: tres fases, cero OOM (log dc-002.81-motor.log)
+-----------------------------------------------------------------------
+Palancas: `MOTOR=1` (con la linea). AssetManager por `NewAssetManager` + `AddSource(D2DATA.MPQ)`;
+.ds1 por `am.LoadDS1`; .dt1 por `am.LoadDT1`; arena con lectura prestada.
+
+  MOTOR: assetmanager armado por el camino del motor (NewAssetManager + AddSource, como d2app)
+  MOTOR: caminoDeTilesDeConsola= true lecturaPrestada= true
+         lecturaDeArchivosDeConsola= true prefetchApagado= true
+  ZONAS: presupuestos vigentes: animaciones= 1048576 cofs= 65536 dccs= 524288
+                                 dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+
+LAS TRES FASES (el mismo mapa y las mismas zonas de DC-002.70/.75/.77/.78):
+
+  fase                      pico usado   arena pico   libre min   ms      crc32 lienzo
+  a) entra al pueblo         10.401.264   10.403.680   1.904      29.149  -787.319.840  (3.507.647.456)
+  b) waypoint a 2da zona     10.401.264   10.403.680   2.416      15.030   2.133.856.858
+  c) vuelve al pueblo        10.401.264   10.403.680   2.416      29.023  -787.319.840  (3.507.647.456)
+
+  pico(c) - pico(a) = 0 bytes (margen admitido +- 65.536)          -> EVCICION OK
+  arena(c) - arena(a) = 0 bytes
+  LIENZO OK: crc32 -787.319.840 y 193.538 pixeles en la entrada y en la vuelta
+  OOM: 0.  "Unhandled exception": 0.  La corrida termina con el veredicto y el cuadro.
+
+LOS CACHES Y EL ARENA (los mismos numeros que el control del POC, seccion 5):
+
+  dt1s aciertos= 0 faltas= 20 evicto= 14 pesoEnCache= 721552 de 1048576
+  ds1s aciertos= 1 faltas= 2  evicto= 0  pesoEnCache= 253320 de 262144
+  ARENA de tiles del motor: caminoDeConsola= true capacidad= 4849148 usado= 1739431
+                            reinicios= 2 archivos= 20
+  PRESTAMO de la lectura: lecturas= 20 sectores= 2691 reservado= 14272 crecidas= 6
+
+Dos numeros que valen: el arena se pide UNA vez (4.849.148 B) y con eso entran los 4,35 MB de .dt1 de las
+tres fases; y `ds1s aciertos= 1` es nuevo respecto del POC -- porque el .ds1 ahora lo pide el motor con su
+propia clave (`act1/town/townn1.ds1`) y la vuelta al pueblo le da en el cache. El POC lo leia con su clave y
+nunca acertaba.
+
+Despues de entrar y salir de tres zonas el PVR sigue sano: se dibuja la ultima y el cuadro sale con
+177.657 pixeles no vacios y crc32 782.674.532, y 60 cuadros despues el monton sigue plano
+(usado= 10.401.264, libre= 2.416).
+
+
+4. El contraste: el motor sin la linea no pasa de la primera zona
+-----------------------------------------------------------------
+Misma corrida, misma imagen, misma palanca `MOTOR=1`, solo `ARRANQUE=0` (log dc-002.81-motor-sin-arranque.log):
+presupuestos de PC, las dos rutas de consola en false y `gc_external_alloc: OOM` en el SEGUNDO .dt1 de la
+primera zona (arena=13.299.552, usado=13.298.048, libre=1.504, pidiendo 389.120 B).
+
+Es la diferencia que la tarjeta venia a medir: la linea no es cosmetica. Sin ella el motor en consola no
+carga ni una zona.
+
+
+5. El control: la ruta del POC de .78 sigue dando los mismos numeros
+-------------------------------------------------------------------
+`BUFFER=1` (la corrida de cierre de DC-002.78, sin la palanca del motor), log dc-002-81-poc-control.log:
+
+  a) pico 10.401.264  b) pico 10.401.264  c) pico 10.401.264      pico(c)-pico(a)= 0
+  dt1s faltas= 20 evicto= 14 pesoEnCache= 721552 de 1048576
+  ds1s aciertos= 1 faltas= 2 pesoEnCache= 253320 de 262144
+  ARENA capacidad= 4849148 usado= 1739431 reinicios= 2 archivos= 20
+  crc32 pueblo -787.319.840 (entrada y vuelta), segunda zona 2.133.856.858
+
+Identico a `dc-002.78-cierre78-prestamo.log` en todo lo comparable (picos, desalojos, peso del cache, arena,
+prestamo, crc32). Quiere decir dos cosas: (a) el cambio de `NuevoAssetManagerDeConsola` no movio ningun numero
+de la ruta ya cerrada, y (b) el arranque del motor y el del POC convergen al mismo estado -- que es el punto
+de la tarjeta.
+
+
+6. Lo que NO entra (y por que el mapa se sigue componiendo con nivel.go)
+------------------------------------------------------------------------
+El .ds1 y los 8 .dt1 de la zona los carga el MOTOR (`am.LoadDS1` / `am.LoadDT1`), pero la composicion del
+mapa -- el lienzo de 512x512 y su crc32 -- la sigue haciendo `nivel.go`, el mismo archivo compartido con
+DC-002.70/.75/.77/.78. El compositor del motor es `d2mapengine` + `d2mapstamp`, y `GenerateMap` necesita
+`asset.Records.Level.Presets` / `Level.Types`, o sea las ~70 tablas de `d2resource.DataDictionaries()`
+cargadas (`d2app.initDataDictionaries`). Eso es la Fase D (montar `d2gamescreen`), no esta tarjeta: aca no se
+toca el presupuesto de los caches (.75) ni el semiespacio del GC (.78 seccion 4) ni el cooperativo (.76).
+
+Queda anotado para la Fase D, medido hoy: el arranque del motor en consola son TRES palancas juntas
+(`d2asset.ArrancarComoConsola`), y el .ds1 tambien tiene que entrar por el camino del motor -- si el main
+arma el AssetManager a mano con los numeros de la PC, muere en el segundo .dt1 (seccion 4).
+
+
+7. Archivos de esta tarjeta
+---------------------------
+  tocados   d2core/d2asset/consola.go            (`ArrancarComoConsola`; el constructor de consola la usa)
+            d2core/d2asset/presupuestos.go       (`(*AssetManager).CachesDeAssets`, instrumento)
+            d2core/d2asset/lectura_de_tiles.go   (`LecturaPrestadaDeTiles`, instrumento)
+            console/dc/poc/zonas-waypoint/main.go (palanca `MOTOR`/`ARRANQUE`, .ds1 por `am.LoadDS1`)
+            console/dc/poc/zonas-waypoint/knobs.go (documentacion de las dos palancas nuevas)
+            scripts/console/build-zonas-277.sh   (genera `porMotor` y `arranqueDeConsola`)
+  nuevos    console/dc/evidencia/dc-002.81-arranque-de-consola-en-el-motor.txt (este)
+            console/dc/evidencia/dc-002.81-motor.log            (motor con la linea: tres fases OK)
+            console/dc/evidencia/dc-002.81-motor-sin-arranque.log (motor sin la linea: OOM)
+            console/dc/evidencia/dc-002.81-poc-control.log      (la ruta de .78, para comparar)
+
+
+8. Como se reproduce (los comandos exactos que se corrieron)
+------------------------------------------------------------
+  S=$HOME/.hermes/cache/scratch/dcb280          # arbol base del estandar (.80) + este
+  cd /home/dgalli/Proyectos/diablo2consoles
+
+  # 1) el motor CON la linea del arranque (tres fases)
+  MOTOR=1 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-motor
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=none \
+      bash scripts/console/run-flycast.sh $S/out-motor/disc.gdi 180 $S/cap-motor-final
+
+  # 2) el contraste: el motor SIN la linea (muere en el 2do .dt1)
+  MOTOR=1 ARRANQUE=0 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-motor-antes
+  WAYLAND_DISPLAY=... CAPTURE=none bash scripts/console/run-flycast.sh $S/out-motor-antes/disc.gdi 180 $S/cap-motor-antes2
+
+  # 3) el control de .78 con el arbol de hoy
+  BUFFER=1 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-control81
+  WAYLAND_DISPLAY=... CAPTURE=none bash scripts/console/run-flycast.sh $S/out-control81/disc.gdi 180 $S/cap-control81
+
+  # 4) el host
+  go build ./d2common/... ./d2core/... ./d2game/... ./d2app/... ./console/dc/medidas/...
+  go vet ./d2core/d2asset/ ./d2common/d2fileformats/d2mpq/
+  go test -count=1 ./d2common/d2fileformats/d2mpq/ ./d2common/d2fileformats/d2dt1/ ./d2common/d2cache/
+
+  Los tres discos se arman con el mismo `d2data.mpq` del disco del juego y el mismo `nivel.go` (el script lo
+  copia del POC del personaje y lo compara por sha256 contra el verificador: paso 0/6).
+
+
+9. Verificacion en el host (esta tarjeta)
+-----------------------------------------
+  go build ./d2common/... ./d2core/... ./d2game/... ./d2app/... ./console/dc/medidas/...   -> rc=0
+  go vet ./d2core/d2asset/ ./d2common/d2fileformats/d2mpq/                                 -> rc=0
+  go test -count=1 d2mpq d2dt1 d2cache                                                     -> ok (3 paquetes)
+  NO: `go test ./d2core/d2asset/` -- el paquete levanta ebiten/GLFW en un init de una dependencia y en este
+  host headless muere con `PlatformError: X11: ...` ANTES de correr un test (lo mismo que documenta .80).
+
+  El camino de la PC queda intacto por construccion: `NewAssetManager` no cambia ni una linea; lo que se
+  agrego son una funcion nueva (`ArrancarComoConsola`) y dos instrumentos, y `NuevoAssetManagerDeConsola`
+  -- que la PC no llama -- pasa a prender las tres palancas en vez de una.

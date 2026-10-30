@@ -51,4 +51,15 @@ const (
 	// carga del PRIMER .dt1 y el runtime moria pidiendo 3.328 B. El prestamo es lo que saca a la lectura del
 	// semiespacio; apagar esta palanca deja exactamente la corrida del .78 para comparar.
 	leerConPrestamo = true
+
+	// porMotor (DC-002.81): el binario mide el ARRANQUE DEL MOTOR, no el del POC. El AssetManager lo arma
+	// `NewAssetManager` -- la funcion que llama `d2app` (d2app/app.go:134) -- y la fuente MPQ la agrega el
+	// binario igual que `d2app/initialization.go:92`; ademas el .ds1 lo carga el motor (`am.LoadDS1`). Con
+	// la palanca prendida el camino es el del juego, no el del POC.
+	porMotor = false
+	// arranqueDeConsola (DC-002.81): la LINEA que tiene que llamar el main de consola antes de armar nada
+	// (`d2asset.ArrancarComoConsola`: presupuestos + lectura con tamano reservado + arena de tiles). Con
+	// `MOTOR=1 ARRANQUE=0` se mide el ANTES: el motor tal como arranca hoy, con el camino de la PC y las
+	// tres palancas apagadas. Esa es la comparacion que dice si la linea hace falta o no.
+	arranqueDeConsola = true
 )

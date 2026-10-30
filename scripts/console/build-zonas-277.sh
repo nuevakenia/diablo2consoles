@@ -131,6 +131,14 @@ INHIBE_VAL=false
 # separa "el destino no pide memoria" (que ya estaba) de "la lectura no pide memoria" (que es esta tarjeta).
 LEER_VAL=true
 [ "${LEER:-prestamo}" = "stream" ] && LEER_VAL=false
+# MOTOR=1 (DC-002.81): mide el ARRANQUE DEL MOTOR en vez del arranque del POC -- el AssetManager lo arma
+# `NewAssetManager` (d2app/app.go:134) con la fuente MPQ que agrega el propio binario (como d2app) y el .ds1
+# lo carga `am.LoadDS1`. ARRANQUE=0 deja el ANTES: el motor sin la linea del arranque de consola, o sea con
+# los presupuestos de PC y las tres palancas apagadas.
+MOTOR_VAL=false
+[ "${MOTOR:-0}" = "1" ] && MOTOR_VAL=true
+ARRANQUE_VAL=true
+[ "${ARRANQUE:-1}" = "0" ] && ARRANQUE_VAL=false
 {
     printf 'package main\n\n'
     printf '// Palancas generadas por build-zonas-277.sh. El porque de cada una, en knobs.go.\n'
@@ -139,8 +147,10 @@ LEER_VAL=true
     printf 'const gcEntreArchivos = %s\n' "$GCENTRE_VAL"
     printf 'const sinCacheDt1 = %s\n' "$SUELTA_VAL"
     printf 'const leerConPrestamo = %s\n' "$LEER_VAL"
+    printf 'const porMotor = %s\n' "$MOTOR_VAL"
+    printf 'const arranqueDeConsola = %s\n' "$ARRANQUE_VAL"
 } > "$SRCB/knobs.go"
-echo "   palancas: porBuffer=$BUFFER_VAL gcInhibido=$INHIBE_VAL gcEntreArchivos=$GCENTRE_VAL sinCacheDt1=$SUELTA_VAL leerConPrestamo=$LEER_VAL"
+echo "   palancas: porBuffer=$BUFFER_VAL gcInhibido=$INHIBE_VAL gcEntreArchivos=$GCENTRE_VAL sinCacheDt1=$SUELTA_VAL leerConPrestamo=$LEER_VAL porMotor=$MOTOR_VAL arranqueDeConsola=$ARRANQUE_VAL"
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
