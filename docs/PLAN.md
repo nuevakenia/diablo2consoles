@@ -35,19 +35,27 @@ Dos mitades, y la primera va antes porque la medición de DC-002.67 lo manda:
 puede reservar **ni 1 MB** (4 MB, 1 MB y 1.228.800 B fallan; 256 KB entra). Enlazar más grande no
 sirve: hay que recortar (DC-002.68).
 
-**B.2 — La interfaz de render y el backend PVR.** Hoy `d2core/d2render` es sólo la carpeta
-`ebiten`: no hay contrato. Se extrae la interfaz que consume `d2ui` (42 imports) y se escribe el
-backend PVR detrás, partiendo del rasterizador por software que ya tiene el stub de ebiten
-(`console/dc/engine/ebiten`, 10 archivos, 96.720 B; 463 líneas de C suben la pantalla al PVR).
+**B.2 — La interfaz de render y el backend PVR.** *Corregido el 2026-10-29 midiendo el árbol:* el
+contrato **ya existe** y no hay que extraerlo — `d2common/d2interface/surface.go` define
+`Surface` (22 métodos: `DrawRect`, `DrawTextf`, `PushSkew`, `PushScale`, `PushFilter`, `Render`,
+`RenderSection`, `ReplacePixels`, `Screenshot`…) y `d2common/d2interface/renderer.go` define
+`Renderer` (15 métodos: `Run`, `CreateSurface`, `NewSurface`, `CurrentFPS`, `PrintAt`…). `d2ui`,
+`d2gui`, `d2asset` y `d2font` ya consumen esas interfaces, no la implementación.
 
-Criterio de aceptación de la fase: **el mismo mapa y el mismo personaje de hoy, dibujados por la
-interfaz nueva, con la captura comparada contra la del POC** (mismos píxeles donde debe), y sin el
-montón ahogado.
+Lo que falta es la **implementación para la consola**: hoy `d2core/d2render` tiene sólo
+`d2render/ebiten`. Se escribe `d2render/pvr` detrás de esas mismas interfaces, partiendo del
+rasterizador por software que ya tiene el stub de ebiten (`console/dc/engine/ebiten`, 10 archivos,
+96.720 B; 463 líneas de C suben la pantalla al PVR) y del código de dibujo del POC.
+
+Criterio de aceptación de la fase: **el mismo mapa y el mismo personaje de hoy, dibujados por
+`d2interface.Surface` con el backend PVR**, con la captura comparada contra la del POC (mismos
+píxeles donde debe), y sin el montón ahogado.
 
 ## Fase C — Input y audio  ·  pendiente
 
-Maple detrás de `d2input` (la interfaz está limpia, es la más fácil) y AICA detrás de `d2audio`
-(la lógica ya está separada del backend; el POC ya tiene 64 canales sonando).
+Maple detrás de `d2interface` (`input_service.go`, `input_manager.go`; es la más fácil) y AICA
+detrás de `d2interface` (`audio_provider.go`, `pcm_stream.go`, `sound_effect.go`; la lógica ya está
+separada del backend y el POC ya tiene 64 canales sonando).
 
 Criterio: la cruceta y los botones del control mueven al personaje **del motor**, y un sonido del
 juego suena por AICA distinguiéndose del que genera el POC.
