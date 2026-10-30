@@ -1,0 +1,241 @@
+DC-002.77 -- TILES POR ZONA Y WAYPOINT: el pico de monton SI crece al cambiar de escenario, y no es el cache
+=============================================================================================================
+Fecha: 2026-10-30
+Rama: DC-002 (checkout unico, /home/dgalli/Proyectos/diablo2consoles)
+Tarjeta: t_0f6625f3 · Feature: Fase B.1d de docs/PLAN.md
+
+Que se hizo, en una linea
+-------------------------
+Se resolvio la lectura de los .tg1 (que ya era un campo traducido a .dt1, no un problema del MPQ), se midio
+el peso real de dos zonas del acto 1 en el host, y se corrio en Flycast un POC que entra al pueblo, se va
+por waypoint a una segunda zona y vuelve, midiendo el pico del monton paso a paso: el pico de (a) es
+12.073.160 B y la segunda zona YA NO ENTRA -- la consola muere con `gc_external_alloc: OOM`. La causa no es
+el cache (desaloja 6 veces y queda en 721.552 B de 1.048.576): es que el runtime de la consola NO DEVUELVE
+NADA de lo que asigna en bloques de mas de 64 KB, y cada .dt1 mide entre 300 KB y 1 MB.
+
+
+1. Los .tg1: lo que la tarjeta daba por trabado ya estaba resuelto, y el instrumento del host estaba roto
+---------------------------------------------------------------------------------------------------------
+La tarjeta decia "los 8 .tg1 no se pudieron medir: se probaron 3 variantes de nombre y las 3 fallaron".
+Las 3 variantes eran las de `console/dc/medidas/zona/main.go` y el problema NO era la tabla del MPQ: el .ds1
+guarda la ruta del DISCO DE INSTALACION y el MPQ la tiene con otro nombre y otra extension.
+
+    el .ds1 dice:  \d2\data\global\tiles\act1\town\floor.tg1
+    el MPQ tiene:  data\global\tiles\ACT1\TOWN\floor.dt1
+
+La traduccion es la que ya hace el motor en `MapEngine.AddDS1` (`nivel.go:RutaDelDT1`): minusculas, se le
+saca todo lo que hay hasta la ultima "tiles", **y la extension .tg1 es .dt1**. Se arreglo el instrumento
+(`medidas/zona`, ahora con `-listar` para mirar la tabla del MPQ en vez de suponer nombres) y los ocho
+archivos salen con su peso. Para que quede dicho: `.tg1` es el nombre VIEJO de los archivos de tiles; el
+contenido es un DT1 en los dos casos.
+
+  comando (host):  go run ./console/dc/medidas/zona -ds1 'data\global\tiles\ACT1\TOWN\townN1.ds1,...'
+                   go run ./console/dc/medidas/zona -listar 'tiles\ACT1' -ext .ds1     (597 .ds1 en acto 1)
+
+
+2. El peso real de las dos zonas (host, con el lector del motor)
+----------------------------------------------------------------
+  ZONA A -- el pueblo (data\global\tiles\ACT1\TOWN\townN1.ds1), 57x41 celdas, 41 objetos
+    townN1.ds1                                  57.652 B crudos    225.428 B vivos
+    outdoors/treegroups.dt1                    505.504            489.812   21 tiles
+    outdoors/stonewall.dt1                     439.569            420.161   52
+    town/floor.dt1                           1.008.003            921.903  144   <- el mas grande del acto
+    barracks/warp.dt1                          658.158            629.046   81
+    outdoors/river.dt1                         316.344            289.488   45
+    town/objects.dt1                           661.515            622.083   91
+    town/fence.dt1                             423.367            407.675   31
+    outdoors/objects.dt1                       338.205            313.877   42
+    ---------------------------------------------------------------------------------
+    TOTAL                                      4.408.317 B (4,20 MB) leidos · 4.319.473 B vivos
+
+  ZONA B -- el preset de exteriores del acto 1 (data\global\tiles\ACT1\OUTDOORS\wild1.ds1), 17x17, 1 objeto
+    wild1.ds1                                   7.186 B crudos     27.892 B vivos
+    outdoors/stones.dt1                        318.414            294.162   41
+    outdoors/treegroups.dt1                    505.504            489.812   21  (repetido: ya esta en A)
+    outdoors/stonewall.dt1                     439.569            420.161   52  (repetido)
+    town/floor.dt1                           1.008.003            921.903  144  (repetido)
+    ---------------------------------------------------------------------------------
+    TOTAL                                      2.278.676 B (2,17 MB) leidos · 2.153.930 B vivos
+    3 de sus 4 .dt1 ya estaban en la zona A: el cache puede reusarlos (si todavia estan).
+
+  Dos numeros que mandan lo que sigue:
+    - la zona A pide 4,35 MB de archivos de tile, y el presupuesto del cache de dt1s es 1 MB (DC-002.75):
+      el cache TIENE que desalojar, y desaloja (medido abajo: 6 desalojos).
+    - lo que se lee del disco por zona es 4,20 MB (A) y 2,17 MB (B).
+
+
+3. El POC: dos zonas, el waypoint y el pico medido paso a paso
+-------------------------------------------------------------
+  consola/dc/poc/zonas-waypoint/main.go   (+ knobs.go, csrc/shim.c)
+  scripts/console/build-zonas-277.sh      (build; palancas GCENTRE=1 y SUELTA=1)
+
+Hace lo que hace el motor para entrar a una zona: `Retrieve` del cache y, si falta, leer del MPQ, parsear e
+`Insert` con el peso en bytes; despues arma la ventana de 512x512 y alimenta los .dt1 en el orden de la
+lista `Files` del DS1. El lienzo es el MISMO codigo (`nivel.go`, copiado desde el POC de DC-002.38 y
+comparado por sha256 contra el verificador del host: 2b3ebd45a8c96496). Las tres fases:
+
+    (a) ENTRA AL PUEBLO            townN1.ds1
+    (b) WAYPOINT A LA SEGUNDA ZONA wild1.ds1
+    (c) VUELVE AL PUEBLO           townN1.ds1  (la MISMA zona de (a): es la prueba de la eviccion)
+
+El instrumento son los cuatro numeros del monton de C (`mallinfo`: arena, uordblks, fordblks y el break del
+monton contra el techo de KOS), muestreados en CADA paso -- antes de leer, con el crudo leido, con el
+parseado y con el insertado -- para que un pico transitorio no quede tapado. NO se usa
+`runtime.ReadMemStats`: en esta consola devuelve ceros (medido en DC-002.9, `poc/goroutines`).
+
+
+4. Corrida 1 -- EL CAMINO DE HOY (caches con presupuestos, nada se libera): la segunda zona no entra
+---------------------------------------------------------------------------------------------------
+  bash scripts/console/build-zonas-277.sh $S/out
+      1ST_READ.BIN 2.731.240 B  sha256 362f3177de5888a4...
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=spectacle \
+    bash scripts/console/run-flycast.sh $S/out/disc.gdi 150 $S/cap
+
+  presupuestos vigentes (dichos por la consola): animaciones 1.048.576 · cofs 65.536 · dccs 524.288 ·
+      dt1s 1.048.576 · ds1s 262.144 · suma de los caches de datos 2.949.120 B
+
+  el margen que hay: monton al arrancar arena 4.358.048 / usado 4.354.312 / libre 3.736, sbrk 0x8c707000
+      contra techo 0x8cff0000  ->  9.342.976 B de margen para TODA la carga
+      (de esos 4,35 MB ya tomados, 4 MB son los dos semiespacios del recolector: gc_semispace.h:21)
+
+  (a) ENTRA AL PUEBLO
+      ds1 insertado peso= 225.428 B; los 8 .dt1 leidos uno por uno
+      dt1s: 8 faltas, 6 DESALOJOS, peso final 721.552 B de 1.048.576  <- el cache hace su trabajo
+      LIENZO pixelesNoVacios= 193538 de 262144  crc32= 3507647456    <- el MISMO de DC-002.70 y .75
+      PICO usado= 12.073.160 B  arena= 12.074.816  libreMin= 520
+           (el pico es "crudo leido outdoors/objects.dt1": el crudo y lo parseado viven juntos un instante)
+      tiempo de la carga: 31.457 ms
+
+  (b) WAYPOINT A LA SEGUNDA ZONA
+      el .ds1 de wild1 entra (27.892 B), y al leer el PRIMER .dt1 (stones.dt1, 318.414 B) la consola muere:
+          Out of memory. Requested sbrk_base 0x8d018000, was 0x8cfbe000, diff 368640
+          fatal error: gc_external_alloc: OOM
+          Memory: arena=13496128 used=13492696 free=3432
+      ultimo punto medido antes del OOM: usado= 12.987.184 B (arena 12.988.320)
+      el emulador se reinicia y repite la corrida (el log trae tres vueltas identicas)
+
+  (c) VUELVE AL PUEBLO: no se alcanza.
+
+  O sea: entrar y salir de zonas NO entra en el monton. Y el que se queda sin RAM no es el cache: su peso
+  es 721.552 B de 1.048.576. Lo que crece es lo que se LEYO (4,35 MB de .dt1), que queda tomado.
+
+
+5. Corrida 2 -- la misma corrida pidiendo el GC a mano: los numeros son IDENTICOS
+----------------------------------------------------------------------------------
+  GCENTRE=1 bash scripts/console/build-zonas-277.sh $S/out-gc   ->  1ST_READ.BIN 2.731.432 B sha256 ea3d3393...
+
+  (a) PICO usado= 12.073.160 B arena= 12.074.624   tiempo 31.451 ms    <- igual, byte por byte
+  (b) muere en el mismo pedido: diff 368640, arena=13495936
+
+  El unico cambio es el reloj (31.451 vs 31.457 ms). O sea: `runtime.GC()` no recupera NADA de esto. Esa
+  sospecha se fue a medir aparte.
+
+
+6. SONDA-GC-277 -- el mecanismo, medido: lo que pasa de 64 KB no lo recolecta nadie
+-----------------------------------------------------------------------------------
+  consola/dc/poc/sonda-gc-277   (solo stdlib: consola serie + mallinfo)
+  bash scripts/console/build-dc.sh console/dc/poc/sonda-gc-277 $S/sonda-gc   -> 1ST_READ.BIN 341.420 B
+
+  12 trozos de 256 KB tirados uno detras de otro (cada uno queda basura al siguiente):
+
+     vuelta    usado (uordblks)     delta contra la base
+       0           4.616.452           262.152
+       1           4.878.604           524.304
+       2           5.140.756           786.456
+       ...                              (lineal)
+      11           7.500.124         3.145.824
+     total: 12 x 262.144 = 3.145.728 B pedidos  ->  el monton subio 3.145.824 B
+
+  Lo mismo pidiendo `runtime.GC()` en cada vuelta: 3.145.824 B, los MISMOS deltas, uno por uno.
+  Y un tercer bloque reasignando siempre la MISMA variable: tambien 262.152 B por vuelta.
+
+  La causa esta en el runtime que trae el toolchain (`~/dreamcast/libgodc/runtime`):
+      gc_heap.c:116   if (size > GC_LARGE_OBJECT_THRESHOLD)  return gc_external_alloc(size);
+      gc_heap.c:267   void *gc_external_alloc(size_t size) { void *ptr = malloc(size); ... }
+      godc_config.h:12  #define GC_LARGE_OBJECT_THRESHOLD_KB 64
+  Todo lo que pasa de 64 KB se va al monton EXTERNO: `malloc` pelado, sin registro ni liberacion (el recolector
+  solo copia el semiespacio de 2 MB). Los .dt1 del acto 1 miden 318.414 B a 1.008.003 B: TODOS son objetos
+  grandes. Y el .ds1 (57.652 B) si entra al semiespacio, pero su crudo no es lo que pesa.
+
+
+7. Corrida 3 -- el camino ideal (leer, componer y LIBERAR el crudo): el pico baja 4 MB y la segunda zona entra
+---------------------------------------------------------------------------------------------------------------
+  SUELTA=1 bash scripts/console/build-zonas-277.sh $S/out-suelta  ->  1ST_READ.BIN 2.731.112 B sha256 4431c8ce...
+
+  Que hace distinto: lee el .dt1, compone el mapa y libera el crudo con `free()` (el mismo `malloc` que uso
+  `gc_external_alloc`), sin dejarlo en el cache. Se libera DESPUES de componer porque los bloques de cada
+  tile son SUBSLICES del crudo, no copias (`d2common/d2datautils/stream_reader.go:117`).
+
+  (a) PUEBLO   PICO usado= 8.060.648 B  arena= 8.523.712      31.139 ms   <- 4.012.512 B menos que hoy
+               LIENZO crc32= 3507647456 (identico)
+  (b) SEGUNDA  PICO usado= 10.739.000 B arena= 11.702.208     16.458 ms   <- ENTRA, compone 101 pisos/89 paredes
+  (c) VUELTA   entra al pueblo, compone 6 de sus 8 .dt1 y muere en el 7º:
+                   Out of memory. Requested sbrk_base 0x8d009000, was 0x8cfa8000, diff 397312
+                   Memory: arena=13406144 used=12478104 free=928040
+
+  Aca hay un segundo hallazgo, y es de la libreria de C, no del cache: liberar y volver a pedir TAMANOS
+  DISTINTOS fragmenta. El arena sube en cada fase aunque el libre tambien suba:
+      tras (a): arena 8.523.712   libre   801.280
+      tras (b): arena 11.702.208  libre 1.971.216
+      en (c):   arena 13.406.144  libre   928.040  <- hay 928 KB libres pero NINGUN bloque contiguo de 397 KB
+  La memoria liberada se la comen las asignaciones chicas y medianas (lienzo 262.144 B, pedidos, scratch) y
+  el siguiente archivo grande ya no encuentra donde entrar.
+
+
+8. El veredicto
+---------------
+  - El pico SI crece por escenario, y NO por el cache: el cache desaloja (6 veces en la zona A) y su peso se
+    queda en 721.552 B de 1.048.576. Medido, no supuesto.
+  - Crece porque el runtime de la consola no devuelve los buffers grandes: cada .dt1 leido (300 KB - 1 MB)
+    queda tomado para siempre. Con el camino de hoy, (a) 12,07 MB y (b) OOM: la segunda zona no entra.
+  - Si esos buffers se liberan al terminar de componer, el pico de (a) baja a 8,06 MB y (b) entra. La (c)
+    todavia no, por fragmentacion del monton (arena 13,4 MB con 928 KB libres y sin un bloque de 397 KB).
+  - Conclusion para la Fase B.1d: el requisito "que el pico no crezca al cambiar de escenario" NO se cumple
+    hoy, y no se va a cumplir arreglando el cache. Se cumple cuando la ruta de carga NO pida memoria por
+    archivo: un buffer de tamano fijo reutilizado (el mayor .dt1 mide 1.008.003 B) o copiar los bloques al
+    parsear para poder liberar el crudo al desalojar. Eso es tarjeta nueva (ver abajo).
+
+
+9. Lo que queda abierto (tarjeta nueva, no se hace aca)
+-------------------------------------------------------
+  - `runtime.FreeExternal` existe en libgodc (`gc_heap.c:280`, expuesto como `_runtime.FreeExternal`) y es
+    la palanca correcta; lo que falta es que el cache sea DUENO del crudo y lo libere al desalojar, o que el
+    parser copie los bloques (hoy: subslices). Con eso, el criterio medible es el de esta tarjeta:
+    pico(c) - pico(a) <= 64 KB.
+  - El otro numero que conviene tener a mano: el margen bajo el techo es 9.342.976 B y el arranque ya toma
+    4.354.312 (4 MB son los semiespacios del GC). Si se toca el GC, `GC_SEMISPACE_SIZE_KB` (godc_config.h:7)
+    es el numero que manda, y bajarlo devuelve RAM al juego.
+
+
+10. Reproducirlo
+----------------
+  cd /home/dgalli/Proyectos/diablo2consoles
+  S=$HOME/.hermes/cache/scratch/dcb277            # NO /tmp: en este host es tmpfs y se vacia solo
+  cp -a /tmp/gox-med $S/base                      # el arbol de .gox del motor (145 paquetes)
+  BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out              # hoy
+  SUELTA=1 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-suelta   # con liberacion
+  GCENTRE=1 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-gc      # GC a mano
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=spectacle \
+      bash scripts/console/run-flycast.sh $S/out/disc.gdi 150 $S/cap
+  # la sonda del recolector:
+  bash scripts/console/build-dc.sh console/dc/poc/sonda-gc-277 $S/sonda-gc
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=none \
+      bash scripts/console/run-flycast.sh $S/sonda-gc/disc.gdi 25 $S/cap-sonda
+  # los pesos, en el host:
+  go run ./console/dc/medidas/zona -ds1 'data\global\tiles\ACT1\TOWN\townN1.ds1,data\global\tiles\ACT1\OUTDOORS\wild1.ds1'
+
+  En los logs, la consola serie sale mezclada con los avisos del emulador: las lineas de la medicion empiezan
+  con "ZONAS:" (POC de las zonas) o "SONDA-GC:" (la sonda del recolector).
+
+
+11. Archivos y evidencia adjunta
+--------------------------------
+  console/dc/poc/zonas-waypoint/{main.go,knobs.go,csrc/shim.c}   el POC de las tres fases
+  console/dc/poc/sonda-gc-277/{main.go,csrc/shim.c}              la sonda del recolector
+  console/dc/medidas/zona/main.go                                el medidor de pesos (arreglado: -listar, .tg1->.dt1)
+  scripts/console/build-zonas-277.sh                             build con las palancas GCENTRE y SUELTA
+  console/dc/evidencia/dc-002.77-flycast-hoy.log                 corrida 1 (12.073.160 B / OOM en b)
+  console/dc/evidencia/dc-002.77-flycast-gc-entre-archivos.log   corrida 2 (identica)
+  console/dc/evidencia/dc-002.77-flycast-sin-cache.log           corrida 3 (8.060.648 / 10.739.000 / OOM en c)
+  console/dc/evidencia/dc-002.77-sonda-gc.log                    la sonda del recolector
+  console/dc/evidencia/dc-002.77-zona-host.txt                   los pesos de las dos zonas, del host

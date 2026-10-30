@@ -1,0 +1,26 @@
+== ZONA data\global\tiles\ACT1\TOWN\townN1.ds1
+   ds1  w=57 h=41 acto=1 objetos=41 archivos=8  57652 B crudo  225428 B vivos
+   data/global/tiles/act1/outdoors/treegroups.dt1       505504 B crudo    489812 B codificado     21 tiles
+   data/global/tiles/act1/outdoors/stonewall.dt1        439569 B crudo    420161 B codificado     52 tiles
+   data/global/tiles/act1/town/floor.dt1               1008003 B crudo    921903 B codificado    144 tiles
+   data/global/tiles/act1/barracks/warp.dt1             658158 B crudo    629046 B codificado     81 tiles
+   data/global/tiles/act1/outdoors/river.dt1            316344 B crudo    289488 B codificado     45 tiles
+   data/global/tiles/act1/town/objects.dt1              661515 B crudo    622083 B codificado     91 tiles
+   data/global/tiles/act1/town/fence.dt1                423367 B crudo    407675 B codificado     31 tiles
+   data/global/tiles/act1/outdoors/objects.dt1          338205 B crudo    313877 B codificado     42 tiles
+   TOTAL dt1 4350665 B crudos, 4094045 B codificados; zona completa 4408317 B (4.20 MB) leidos, 4319473 B vivos
+
+== ZONA data\global\tiles\ACT1\OUTDOORS\wild1.ds1
+   ds1  w=17 h=17 acto=1 objetos=1 archivos=4  7186 B crudo  27892 B vivos
+   data/global/tiles/act1/outdoors/stones.dt1           318414 B crudo    294162 B codificado     41 tiles
+   data/global/tiles/act1/outdoors/treegroups.dt1       505504 B crudo    489812 B codificado     21 tiles  (repetido)
+   data/global/tiles/act1/outdoors/stonewall.dt1        439569 B crudo    420161 B codificado     52 tiles  (repetido)
+   data/global/tiles/act1/town/floor.dt1               1008003 B crudo    921903 B codificado    144 tiles  (repetido)
+   TOTAL dt1 2271490 B crudos, 2126038 B codificados; zona completa 2278676 B (2.17 MB) leidos, 2153930 B vivos
+   (3 de los archivos de tile ya estaban en otra zona medida)
+
+
+== .dt1 repetidos entre las zonas medidas (se puede reusar el del cache)
+   data/global/tiles/act1\outdoors\stonewall.dt1        en 2 zonas
+   data/global/tiles/act1\outdoors\treegroups.dt1       en 2 zonas
+   data/global/tiles/act1\town\floor.dt1                en 2 zonas

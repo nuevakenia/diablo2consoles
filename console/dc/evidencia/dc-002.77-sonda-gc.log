@@ -1,0 +1,243 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:030 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:289 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:390 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:390 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:393 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:396 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:409 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f503fb30000 RAM(16 MB) 0x7f504bb30000 VRAM64(8 MB) 0x7f5043b30000 ARAM(2 MB) 0x7f505fb30000
+00:00:416 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:423 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f503fb30000 RAM(16 MB) 0x7f504bb30000 VRAM64(8 MB) 0x7f5043b30000 ARAM(2 MB) 0x7f505fb30000
+00:00:426 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:430 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:430 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:472 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:472 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:472 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac0718e0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2349359840
+ARQ-MARCA   gc_init-semiespacio1 v=2351457024
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA-GC: arranca -- el recolector de la consola devuelve memoria?
+SONDA-GC: al arrancar usado= 4354300 arena= 4355828 techo= 11898880 bytes libres bajo el techo
+SONDA-GC: A) 12 trozos de 256 KB, sin GC -- base usado= 4354300
+SONDA-GC: A vuelta= 0 usado= 4616452 delta= 262152
+SONDA-GC: A vuelta= 1 usado= 4878604 delta= 524304
+SONDA-GC: A vuelta= 2 usado= 5140756 delta= 786456
+SONDA-GC: A vuelta= 3 usado= 5402908 delta= 1048608
+SONDA-GC: A vuelta= 4 usado= 5665060 delta= 1310760
+SONDA-GC: A vuelta= 5 usado= 5927212 delta= 1572912
+SONDA-GC: A vuelta= 6 usado= 6189364 delta= 1835064
+SONDA-GC: A vuelta= 7 usado= 6451516 delta= 2097216
+SONDA-GC: A vuelta= 8 usado= 6713668 delta= 2359368
+SONDA-GC: A vuelta= 9 usado= 6975820 delta= 2621520
+SONDA-GC: A vuelta= 10 usado= 7237972 delta= 2883672
+SONDA-GC: A vuelta= 11 usado= 7500124 delta= 3145824
+SONDA-GC: A total: 12 x 262144 = 3145728 bytes pedidos; el monton subio 3145824 bytes
+SONDA-GC: B) 12 trozos de 256 KB con runtime.GC() -- base usado= 7500124
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 0 usado= 7762276 delta= 262152
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 1 usado= 8024428 delta= 524304
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 2 usado= 8286580 delta= 786456
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 3 usado= 8548732 delta= 1048608
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 4 usado= 8810884 delta= 1310760
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 5 usado= 9073036 delta= 1572912
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 6 usado= 9335188 delta= 1835064
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 7 usado= 9597340 delta= 2097216
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 8 usado= 9859492 delta= 2359368
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 9 usado= 10121644 delta= 2621520
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 10 usado= 10383796 delta= 2883672
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 11 usado= 10645948 delta= 3145824
+SONDA-GC: B total: el monton subio 3145824 bytes de los 3145728 pedidos
+SONDA-GC: C) 12 trozos de 256 KB REASIGNADOS -- base usado= 10645948
+SONDA-GC: C vuelta= 0 usado= 10908100 delta= 262152
+SONDA-GC: C vuelta= 1 usado= 11170252 delta= 524304
+SONDA-GC: C vuelta= 2 usado= 11432404 delta= 786456
+SONDA-GC: C vuelta= 3 usado= 11694556 delta= 1048608
+SONDA-GC: C vuelta= 4 usado= 11956708 delta= 1310760
+SONDA-GC: C vuelta= 5 usado= 12218860 delta= 1572912
+SONDA-GC: C vuelta= 6 usado= 12481012 delta= 1835064
+SONDA-GC: C vuelta= 7 usado= 12743164 delta= 2097216
+SONDA-GC: C vuelta= 8 usado= 13005316 delta= 2359368
+SONDA-GC: C vuelta= 9 usado= 13267468 delta= 2621520
+SONDA-GC: C vuelta= 10 usado= 13529620 delta= 2883672
+SONDA-GC: C vuelta= 11 usado= 13791772 delta= 3145824
+SONDA-GC: C total: el monton subio 3145824 bytes (lo que crezca aca es el pedido de UNO)
+SONDA-GC: al final usado= 13791772 arena= 13793012
+SONDA-GC: fin
+ARQ-MARCA main.main-volvio v=0
+ARQ-MARCA scheduler-VOLVIO v=1
+
+arch: exit return code 0
+arch: shutting down kernel
+maple: final stats -- device count = 21, vbl_cntr = 31, dma_cntr = 30
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+  DMA Buffer at ac0718e0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA-GC: arranca -- el recolector de la consola devuelve memoria?
+SONDA-GC: al arrancar usado= 156172 arena= 157428 techo= 16097280 bytes libres bajo el techo
+SONDA-GC: A) 12 trozos de 256 KB, sin GC -- base usado= 156172
+SONDA-GC: A vuelta= 0 usado= 418324 delta= 262152
+SONDA-GC: A vuelta= 1 usado= 680476 delta= 524304
+SONDA-GC: A vuelta= 2 usado= 942628 delta= 786456
+SONDA-GC: A vuelta= 3 usado= 1204780 delta= 1048608
+SONDA-GC: A vuelta= 4 usado= 1466932 delta= 1310760
+SONDA-GC: A vuelta= 5 usado= 1729084 delta= 1572912
+SONDA-GC: A vuelta= 6 usado= 1991236 delta= 1835064
+SONDA-GC: A vuelta= 7 usado= 2253388 delta= 2097216
+SONDA-GC: A vuelta= 8 usado= 2515540 delta= 2359368
+SONDA-GC: A vuelta= 9 usado= 2777692 delta= 2621520
+SONDA-GC: A vuelta= 10 usado= 3039844 delta= 2883672
+SONDA-GC: A vuelta= 11 usado= 3301996 delta= 3145824
+SONDA-GC: A total: 12 x 262144 = 3145728 bytes pedidos; el monton subio 3145824 bytes
+SONDA-GC: B) 12 trozos de 256 KB con runtime.GC() -- base usado= 3301996
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 0 usado= 3564148 delta= 262152
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 1 usado= 3826300 delta= 524304
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 2 usado= 4088452 delta= 786456
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 3 usado= 4350604 delta= 1048608
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 4 usado= 4612756 delta= 1310760
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 5 usado= 4874908 delta= 1572912
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 6 usado= 5137060 delta= 1835064
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 7 usado= 5399212 delta= 2097216
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 8 usado= 5661364 delta= 2359368
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 9 usado= 5923516 delta= 2621520
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 10 usado= 6185668 delta= 2883672
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=0
+SONDA-GC: B vuelta= 11 usado= 6447820 delta= 3145824
+SONDA-GC: B total: el monton subio 3145824 bytes de los 3145728 pedidos
+SONDA-GC: C) 12 trozos de 256 KB REASIGNADOS -- base usado= 6447820
+SONDA-GC: C vuelta= 0 usado= 6709972 delta= 262152
+SONDA-GC: C vuelta= 1 usado= 6972124 delta= 524304
+SONDA-GC: C vuelta= 2 usado= 7234276 delta= 786456
+SONDA-GC: C vuelta= 3 usado= 7496428 delta= 1048608
+SONDA-GC: C vuelta= 4 usado= 7758580 delta= 1310760
+SONDA-GC: C vuelta= 5 usado= 8020732 delta= 1572912
+SONDA-GC: C vuelta= 6 usado= 8282884 delta= 1835064
+SONDA-GC: C vuelta= 7 usado= 8545036 delta= 2097216
+SONDA-GC: C vuelta= 8 usado= 8807188 delta= 2359368
+SONDA-GC: C vuelta= 9 usado= 9069340 delta= 2621520
+SONDA-GC: C vuelta= 10 usado= 9331492 delta= 2883672
+SONDA-GC: C vuelta= 11 usado= 9593644 delta= 3145824
+SONDA-GC: C total: el monton subio 3145824 bytes (lo que crezca aca es el pedido de UNO)
+SONDA-GC: al final usado= 9593644 arena= 9594612
+SONDA-GC: fin
+ARQ-MARCA main.main-volvio v=0
+ARQ-MARCA scheduler-VOLVIO v=1
+
+arch: exit return code 0
+arch: shutting down kernel
+maple: final stats -- device count = 24, vbl_cntr = 26, dma_cntr = 26
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+00:03:728 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked
