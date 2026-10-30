@@ -1,0 +1,156 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:028 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:275 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:375 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:375 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:378 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:382 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:396 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f09fc140000 RAM(16 MB) 0x7f0a08140000 VRAM64(8 MB) 0x7f0a00140000 ARAM(2 MB) 0x7f0a1c140000
+00:00:403 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:410 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f09fc140000 RAM(16 MB) 0x7f0a08140000 VRAM64(8 MB) 0x7f0a00140000 ARAM(2 MB) 0x7f0a1c140000
+00:00:413 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:417 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:417 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:458 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:458 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:458 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2eb220
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351956544
+ARQ-MARCA   gc_init-semiespacio1 v=2354053728
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=2144 cused=4353280 gsemi=95864/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+ZONAS: arranca DC-002.80 -- dos zonas y la vuelta sin pedir memoria por archivo (lectura prestada)
+ZONAS: palancas: porBuffer= true leerConPrestamo= true sinCacheDt1= false gcEntreArchivos= false
+ZONAS: monton de C al arrancar: arena=4355424 usado=4354312 libre=1112 sbrk=0x0x8c711000 techo=0x0x8cff0000
+ZONAS: presupuestos vigentes: animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+ZONAS: camino de tiles de consola prendido: true lecturaPrestada= true monton=arena=4355424 usado=4354312 libre=1112 sbrk=0x0x8c711000 techo=0x0x8cff0000
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+ZONAS: assetmanager de consola listo, monton: arena=4711776 usado=4709312 libre=2464 sbrk=0x0x8c768000 techo=0x0x8cff0000
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+ZONAS: video andando, monton: arena=4711776 usado=4709336 libre=2440 sbrk=0x0x8c768000 techo=0x0x8cff0000
+
+ZONAS: ===== a) ENTRA AL PUEBLO =====
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=122320
+ZONAS: monton antes de la fase: usado= 5064336 tras GC= 5064336 (el GC devolvio 0 bytes)
+ZONAS: DS1-INSERT crudo= 57652 peso= 225428 monton= arena=5068128 usado=5064336 libre=3792 sbrk=0x0x8c7bf000 techo=0x0x8cff0000
+ZONAS: ds1 version= 18 acto= 1 w= 57 h= 41 files= 8 crudo= 57652 vivo= 225428 monton= arena=5068128 usado=5064336 libre=3792 sbrk=0x0x8c7bf000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 tiles= 21 vivo= 489812 evicto= 0 pesoCache= 489812 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 tiles= 52 vivo= 420161 evicto= 0 pesoCache= 909973 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\town\floor.dt1 tiles= 144 vivo= 921903 evicto= 2 pesoCache= 921903 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\barracks\warp.dt1 tiles= 81 vivo= 629046 evicto= 3 pesoCache= 629046 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\river.dt1 tiles= 45 vivo= 289488 evicto= 3 pesoCache= 918534 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1639672
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=550672
+ZONAS: DT1 data/global/tiles/act1\town\objects.dt1 tiles= 91 vivo= 622083 evicto= 4 pesoCache= 911571 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\town\fence.dt1 tiles= 31 vivo= 407675 evicto= 5 pesoCache= 1029758 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\objects.dt1 tiles= 42 vivo= 313877 evicto= 6 pesoCache= 721552 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: VENTANA lado= 512 origen= 304 1664 pisos= 1982 paredes= 330
+ZONAS: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+ZONAS: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840
+ZONAS: a) ENTRA AL PUEBLO PICO usado=10401264 arena=10405216 libreMin=3440 (el pico fue en: cargado por el motor data/global/tiles/act1\outdoors\treegroups.dt1)
+ZONAS: a) ENTRA AL PUEBLO FIN usado=10401264 libre=3952 ms=29149
+ZONAS: a) ENTRA AL PUEBLO dt1s evicto=6 peso=721552 de 1048576 | faltas=8 aciertos=0
+ZONAS: a) ENTRA AL PUEBLO ds1s evicto=0 peso=225428 de 262144 | faltas=1 aciertos=0
+
+ZONAS: ===== b) WAYPOINT A LA SEGUNDA ZONA =====
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=504848
+ZONAS: monton antes de la fase: usado= 10401264 tras GC= 10401264 (el GC devolvio 0 bytes)
+ZONAS: DS1-INSERT crudo= 7186 peso= 27892 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: ds1 version= 17 acto= 1 w= 17 h= 17 files= 4 crudo= 7186 vivo= 27892 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\stones.dt1 tiles= 41 vivo= 294162 evicto= 6 pesoCache= 1015714 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 tiles= 21 vivo= 489812 evicto= 6 pesoCache= 489812 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 tiles= 52 vivo= 420161 evicto= 6 pesoCache= 909973 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\town\floor.dt1 tiles= 144 vivo= 921903 evicto= 8 pesoCache= 921903 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: VENTANA lado= 512 origen= -336 384 pisos= 101 paredes= 89
+ZONAS: COMPUESTO pisos= 101 / 101 paredes= 89 / 89 sintilePiso= 0 sintilePared= 0 fuera= 101
+ZONAS: LIENZO pixelesNoVacios= 254715 de 262144 crc32= 2133856858
+ZONAS: b) WAYPOINT A LA SEGUNDA ZONA PICO usado=10401264 arena=10405216 libreMin=3952 (el pico fue en: arranque de la fase)
+ZONAS: b) WAYPOINT A LA SEGUNDA ZONA FIN usado=10401264 libre=3952 ms=14996
+ZONAS: b) WAYPOINT A LA SEGUNDA ZONA dt1s evicto=8 peso=921903 de 1048576 | faltas=12 aciertos=0
+ZONAS: b) WAYPOINT A LA SEGUNDA ZONA ds1s evicto=0 peso=253320 de 262144 | faltas=2 aciertos=0
+
+ZONAS: ===== c) VUELVE AL PUEBLO =====
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=555232
+ZONAS: monton antes de la fase: usado= 10401264 tras GC= 10401264 (el GC devolvio 0 bytes)
+ZONAS: ds1 version= 18 acto= 1 w= 57 h= 41 files= 8 crudo= 0 vivo= 225428 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 tiles= 21 vivo= 489812 evicto= 9 pesoCache= 489812 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 tiles= 52 vivo= 420161 evicto= 9 pesoCache= 909973 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\town\floor.dt1 tiles= 144 vivo= 921903 evicto= 11 pesoCache= 921903 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\barracks\warp.dt1 tiles= 81 vivo= 629046 evicto= 12 pesoCache= 629046 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\river.dt1 tiles= 45 vivo= 289488 evicto= 12 pesoCache= 289488 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\town\objects.dt1 tiles= 91 vivo= 622083 evicto= 12 pesoCache= 911571 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\town\fence.dt1 tiles= 31 vivo= 407675 evicto= 13 pesoCache= 1029758 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\objects.dt1 tiles= 42 vivo= 313877 evicto= 14 pesoCache= 721552 monton= arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+ZONAS: VENTANA lado= 512 origen= 304 1664 pisos= 1982 paredes= 330
+ZONAS: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+ZONAS: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840
+ZONAS: c) VUELVE AL PUEBLO PICO usado=10401264 arena=10405216 libreMin=3952 (el pico fue en: arranque de la fase)
+ZONAS: c) VUELVE AL PUEBLO FIN usado=10401264 libre=3952 ms=29007
+ZONAS: c) VUELVE AL PUEBLO dt1s evicto=14 peso=721552 de 1048576 | faltas=20 aciertos=0
+ZONAS: c) VUELVE AL PUEBLO ds1s evicto=0 peso=253320 de 262144 | faltas=2 aciertos=1
+
+ZONAS: ================ EL VEREDICTO ================
+ZONAS: (a) pueblo      picoUsado= 10401264 arena= 10405216 libreMin= 3440 ms= 29149 crc32= -787319840
+ZONAS: (b) segunda     picoUsado= 10401264 arena= 10405216 libreMin= 3952 ms= 14996 crc32= 2133856858
+ZONAS: (c) vuelta      picoUsado= 10401264 arena= 10405216 libreMin= 3952 ms= 29007 crc32= -787319840
+ZONAS: pico(c) - pico(a) = 0 bytes (margen admitido +- 65536 )
+ZONAS: arena(c) - arena(a) = 0 bytes
+ZONAS: EVCICION OK -- volver al pueblo no dejo RAM tomada de mas: el cache devuelve lo que no se usa
+ZONAS: LIENZO OK -- el pueblo de la vuelta es identico al de la entrada: crc32 -787319840 y 193538 pixeles en las dos
+ZONAS: dt1s aciertos= 0 faltas= 20 evicto= 14 pesoEnCache= 721552 de 1048576
+ZONAS: ds1s aciertos= 1 faltas= 2 evicto= 0 pesoEnCache= 253320 de 262144
+ZONAS: ARENA de tiles del motor: caminoDeConsola= true capacidad= 4849148 usado= 1739431 reinicios= 2 archivos= 20
+ZONAS: PRESTAMO de la lectura: lecturas= 20 sectores= 2691 reservado= 14272 crecidas= 6
+ZONAS: monton al final: arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+ZONAS: CUADRO pixelesNoVacios= 177657 de 307200 crc32= 782674532 tamano= 640 480 montonLibre= 3952
+ZONAS: DURANTE 60 CUADROS: monton: arena=10405216 usado=10401264 libre=3952 sbrk=0x0x8ccd6000 techo=0x0x8cff0000 dt1sPeso= 721552 ds1sPeso= 253320
