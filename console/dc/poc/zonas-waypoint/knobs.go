@@ -1,6 +1,6 @@
 package main
 
-// DC-002.77 -- LAS DOS FORMAS DE MEDIR, y por que hacen falta las dos.
+// DC-002.78 -- LAS TRES FORMAS DE MEDIR, y por que hacen falta las tres.
 //
 // EL PROBLEMA QUE SEPARA ESTE ARCHIVO. El "pico de monton" de una carga de zona tiene DOS causas que se
 // suman y que hay que separar para no echarle la culpa a la equivocada:
@@ -14,21 +14,32 @@ package main
 //     sin `runtime.GC()`. Cada .dt1 del acto 1 mide entre 300 KB y 1 MB, o sea que cada archivo que se lee
 //     queda tomado PARA SIEMPRE.
 //
-// De ahi las dos corridas (misma corrida, distinta palanca):
+// De ahi las tres palancas (misma corrida, distinta palanca):
 //
-//	caminoCache (por defecto)  el camino del motor: Retrieve/Insert en los caches y el crudo se suelta al
-//	                           parsear, pero como es un objeto grande NO se recupera. Es el "hoy".
-//	sinCacheDt1                el camino IDEAL para medir la causa: lee el .dt1, compone el mapa y LIBERA
-//	                           el crudo con `free()` (el mismo `malloc` que uso `gc_external_alloc`), sin
-//	                           dejarlo en el cache. Si con esto el pico de las tres fases es el mismo, la
-//	                           causa es la liberacion, no el cache.
+//	porBuffer (DC-002.78)      LA CURA. Los .dt1 los carga el MOTOR por su ruta de consola
+//	                           (`am.LoadDT1` -> `d2asset/lectura_de_tiles.go`): un buffer UNICO que se
+//	                           reusa entre archivos + copia de los bloques al parsear
+//	                           (`d2dt1.LoadDT1CopiaBloques`), que asi quedan en el semiespacio del
+//	                           recolector y no en el monton externo. Es lo que mide esta tarjeta.
+//	sinCacheDt1                el camino IDEAL de DC-002.77: lee el .dt1, compone el mapa y LIBERA el crudo
+//	                           con `free()` (el mismo `malloc` que uso `gc_external_alloc`), sin dejarlo en
+//	                           el cache. Queda como control: con esto la (c) moria por fragmentacion.
+//	gcEntreArchivos            pide `runtime.GC()` despues de cada archivo. En DC-002.77 dio IDENTICO al
+//	                           camino de hoy: el recolector no devuelve nada de esto.
 //
 // OJO, y esto es una piedra medida: el .dt1 parseado NO se puede liberar impunemente. Los bloques de cada
 // tile son SUBSLICES del archivo crudo (`d2common/d2datautils/stream_reader.go:117`: `ReadBytes` devuelve
-// `data[pos:pos+n]`), no copias. Por eso el camino sin cache libera DESPUES de `Alimentar` (componer), que
-// es el ultimo momento en que se tocan esos bytes. Un cache que quisiera liberar al desalojar tiene el
-// mismo requisito: o copia los bloques al parsear, o libera recien cuando la entrada sale del cache.
+// `data[pos:pos+n]`), no copias. Con `sinCacheDt1` se libera DESPUES de `Alimentar` (componer), que es el
+// ultimo momento en que se tocan esos bytes. Con `porBuffer` los bloques apuntan al ARENA del motor
+// (`d2asset/lectura_de_tiles.go`), que tampoco se libera: se reusa por cursor y se tira entero cuando no
+// entra un archivo (y con el, el cache de dt1s).
+//
+// `gcInhibido` es la sonda de la causa: con el recolector FRENADO (el mismo freno que el runtime de libgodc
+// se pone en sus secciones criticas) se ve si la muerte del camino nuevo es del recolector o del parseo.
 const (
+	porBuffer = false
+	// gcInhibido: frena el recolector durante la carga de cada .dt1 (ver csrc/shim.c)
+	gcInhibido      = false
 	gcEntreArchivos = false
 	sinCacheDt1     = false
 )

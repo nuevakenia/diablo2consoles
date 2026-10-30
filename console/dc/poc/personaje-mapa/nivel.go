@@ -103,16 +103,56 @@ type Nivel struct {
 // Las capas: hasta 2 de piso y 4 de pared (el DS1 de v18 las trae asi). Un tile con Estilo=0 y
 // Secuencia=0 es el vacio del formato y no se pide.
 func NuevoNivel(d *d2ds1.DS1, ancho, alto, centroX, centroY int) *Nivel {
+	return NuevoNivelEn(d, ancho, alto, centroX, centroY, nil)
+}
+
+// BuffersDelNivel: lo que se puede REUSAR entre una zona y la siguiente (DC-002.78).
+//
+// POR QUE EXISTE. En la Dreamcast toda asignacion de mas de 64 KB se va al monton externo del runtime y no
+// la devuelve nadie (medido en DC-002.77): el lienzo (512x512 = 262.144 B) y el scratch (160x512 = 81.920 B)
+// son justo eso, y el POC de las tres zonas los pedia DE NUEVO en cada fase -- con lo cual el pico de la
+// vuelta al pueblo (c) traia de mas los dos arreglos de la fase (b) y la comparacion contra (a) no medía lo
+// que decia medir. Con esto, el que mide le pasa los mismos arreglos a las tres fases.
+type BuffersDelNivel struct {
+	Canvas  []byte
+	Scratch []byte
+	Pedidos []Pedido
+}
+
+// NuevoNivelEn: igual que NuevoNivel, pero con los arreglos de `reuso` (nil = los pide, como siempre).
+// El lienzo y el scratch se PONEN EN CERO: una zona no puede heredar los pixeles de la anterior.
+func NuevoNivelEn(d *d2ds1.DS1, ancho, alto, centroX, centroY int, reuso *BuffersDelNivel) *Nivel {
 	cx := (centroX-centroY)*ladoCeldaX - offsetIso
 	cy := (centroX + centroY) * ladoCeldaY
+
+	reutilizar := func(actual []byte, tamano int) []byte {
+		if cap(actual) < tamano {
+			return make([]byte, tamano)
+		}
+
+		buf := actual[:tamano]
+		for i := range buf {
+			buf[i] = 0
+		}
+
+		return buf
+	}
+
+	var canvas, scratch []byte
+	var pedidos []Pedido
+
+	if reuso != nil {
+		canvas, scratch, pedidos = reuso.Canvas, reuso.Scratch, reuso.Pedidos
+	}
 
 	n := &Nivel{
 		Ancho:   ancho,
 		Alto:    alto,
 		OrigenX: cx - ancho/2,
 		OrigenY: cy - alto/2,
-		Canvas:  make([]byte, ancho*alto),
-		Scratch: make([]byte, anchoSuperficie*maxAltoTile),
+		Canvas:  reutilizar(canvas, ancho*alto),
+		Scratch: reutilizar(scratch, anchoSuperficie*maxAltoTile),
+		Pedidos: pedidos[:0],
 	}
 
 	for i := 0; i < 2; i++ {

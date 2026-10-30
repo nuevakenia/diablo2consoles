@@ -36,12 +36,14 @@ import (
 	"hash/crc32"
 	"image/color"
 	"runtime"
+	"strings"
 	"unsafe"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"
 )
@@ -70,6 +72,12 @@ func d2cSbrkActual() uint
 //extern d2c_monton_techo
 func d2cMontonTecho() uint
 
+//extern d2c_gc_frena
+func d2cGcFrena()
+
+//extern d2c_gc_suelta
+func d2cGcSuelta()
+
 // init: la consola serie es la UNICA salida de texto en la Dreamcast.
 func init() { d2cSerialInit() }
 
@@ -77,21 +85,21 @@ const (
 	rutaMPQ = "/cd/JUEGO/D2DATA.MPQ"
 
 	// zonaA: el pueblo del acto 1, la MISMA zona de DC-002.70/75 (asi los numeros se comparan).
-	zonaA = `data\global\tiles\ACT1\TOWN\townN1.ds1`
+	zonaA              = `data\global\tiles\ACT1\TOWN\townN1.ds1`
 	centroAx, centroAy = 28, 20
 
 	// zonaB: el preset de EXTERIORES del acto 1 -- el tipo de zona al que lleva un waypoint del pueblo
 	// (Cold Plains y compania se arman con estos presets). El POC no trae el generador de DRLG del
 	// motor, asi que se carga el preset tal cual, igual que la zona A se carga como townN1.ds1.
-	zonaB = `data\global\tiles\ACT1\OUTDOORS\wild1.ds1`
+	zonaB              = `data\global\tiles\ACT1\OUTDOORS\wild1.ds1`
 	centroBx, centroBy = 8, 8
 
 	palEnMPQ = "data/global/palette/ACT1/pal.dat"
 
 	ladoVentana = 512
-	ancho, alto  = 640, 480
-	mapaX        = (ancho - ladoVentana) / 2
-	mapaY        = (alto - ladoVentana) / 2
+	ancho, alto = 640, 480
+	mapaX       = (ancho - ladoVentana) / 2
+	mapaY       = (alto - ladoVentana) / 2
 
 	// cuadrosCuadro: a los cuantos cuadros se informa el monton "con el cuadro andando".
 	cuadrosCuadro = 60
@@ -101,10 +109,20 @@ const (
 type cuentas struct{ aciertos, faltas int }
 
 var (
+	// DC-002.78: cuando la palanca `porBuffer` esta prendida, los .dt1 se piden al AssetManager del MOTOR
+	// (`am.LoadDT1`): asi lo que se mide en Flycast es la ruta real del juego -- el buffer unico que se reusa
+	// y la copia de los bloques al parsear (d2core/d2asset/lectura_de_tiles.go, d2dt1.LoadDT1CopiaBloques).
+	am *d2asset.AssetManager
+
 	caches *d2asset.CachesDeAssets
 
 	cuentaDT1s cuentas
 	cuentaDS1s cuentas
+
+	// los arreglos del compositor que se reusan entre zonas (lienzo, scratch y pedidos). En la Dreamcast
+	// el lienzo (262.144 B) y el scratch (81.920 B) pasan de 64 KB: si se piden por fase, se quedan
+	// tomados para siempre y el pico de (c) trae de mas el de (b) (ver nivel.go, BuffersDelNivel).
+	reusoDelNivel BuffersDelNivel
 
 	// el lienzo y la paleta de la ULTIMA zona cargada: es lo que se dibuja al final para probar que el
 	// PVR sigue sano despues de entrar y salir de tres zonas.
@@ -152,9 +170,17 @@ type medida struct {
 }
 
 func main() {
-	println("ZONAS: arranca DC-002.77 -- dos zonas y la vuelta: el pico de monton no puede crecer")
-	println("ZONAS: palancas: GCentreArchivos=", gcEntreArchivos, "sinCacheDt1=", sinCacheDt1)
+	println("ZONAS: arranca DC-002.78 -- dos zonas y la vuelta sin pedir memoria por archivo")
+	println("ZONAS: palancas: porBuffer=", porBuffer, "sinCacheDt1=", sinCacheDt1, "gcEntreArchivos=", gcEntreArchivos)
 	println("ZONAS: monton de C al arrancar: " + estado())
+
+	// DC-002.78: el arena de tiles del motor lo pide la ruta de la consola en la PRIMERA carga de un .dt1
+	// (`AjustarPresupuestosDeConsola` -> `activarCaminoDeTilesDeConsola`), con el tamano de los .dt1 de una
+	// zona entera. Aca solo se informa si la ruta quedo prendida.
+	if porBuffer {
+		println("ZONAS: camino de tiles de consola prendido:", d2asset.EstadoDeLosTiles().CaminoDeConsola,
+			"monton="+estado())
+	}
 
 	// lo que hace el arranque de la consola (DC-002.75): acota los caches y los pone a pesar en BYTES
 	d2asset.AjustarPresupuestosDeConsola()
@@ -162,7 +188,27 @@ func main() {
 	println("ZONAS: presupuestos vigentes: animaciones=", p.Animaciones, "cofs=", p.CoFs, "dccs=", p.DCCs,
 		"dt1s=", p.DT1s, "ds1s=", p.DS1s, "sumaDatos=", p.SumaDeLosCachesDeDatos())
 
-	caches = d2asset.NuevosCachesDeAssets()
+	if porBuffer {
+		// la palanca de medicion de DC-002.78: prende la ruta del arena (el motor NO la prende solo,
+		// porque todavia no cierra -- ver d2asset/lectura_de_tiles.go)
+		d2asset.ActivarCaminoDeTilesDeConsola()
+
+		// el AssetManager del MOTOR (el mismo de DC-002.76): es el que sabe cargar un .dt1 por la ruta de
+		// la consola. Se arma ANTES del video por el mismo motivo que todo lo demas: el PVR necesita el
+		// monton ordenado al arrancar.
+		var err error
+
+		am, caches, err = d2asset.NuevoAssetManagerDeConsola(d2util.LogLevelDefault, rutaMPQ)
+		if err != nil {
+			println("ZONAS: el AssetManager no se pudo armar:", err.Error())
+
+			return
+		}
+
+		println("ZONAS: assetmanager de consola listo, monton: " + estado())
+	} else {
+		caches = d2asset.NuevosCachesDeAssets()
+	}
 
 	// el video primero: el arranque del PVR necesita el monton vacio (medido en DC-002.50)
 	renderer := pvr.NuevoRenderer()
@@ -200,16 +246,14 @@ func main() {
 
 	paletaDelMapa = palActo[:]
 
-	// el lienzo de la fase (a) NO se guarda: lo que se compara es su crc32, que ya esta en la medida.
-	// Guardarlo costaria 262.144 B por fase y esta medicion es de monton: se queda solo el ultimo.
-	a1.canvas = nil
-
+	// DC-002.78: el lienzo y el scratch se REUSAN entre las tres fases (ver nivel.go, BuffersDelNivel).
+	// Antes se pedia uno nuevo por fase: en la Dreamcast esos dos arreglos pasan de 64 KB, se van al
+	// monton externo y no los devuelve nadie, asi que el pico de (c) traia de mas los de (b) y la
+	// comparacion contra (a) media otra cosa.
 	b := cargarZona(mpq, "b) WAYPOINT A LA SEGUNDA ZONA", zonaB, centroBx, centroBy)
 	if b == nil {
 		return
 	}
-
-	b.canvas = nil
 
 	a2 := cargarZona(mpq, "c) VUELVE AL PUEBLO", zonaA, centroAx, centroAy)
 	if a2 == nil {
@@ -255,6 +299,14 @@ func main() {
 		"evicto=", caches.Dt1s.Evictions(), "pesoEnCache=", caches.Dt1s.GetWeight(), "de", caches.Dt1s.GetBudget())
 	println("ZONAS: ds1s aciertos=", cuentaDS1s.aciertos, "faltas=", cuentaDS1s.faltas,
 		"evicto=", caches.Ds1s.Evictions(), "pesoEnCache=", caches.Ds1s.GetWeight(), "de", caches.Ds1s.GetBudget())
+
+	// DC-002.78: el arena de tiles del motor -- capacidad pedida UNA vez, cuanto avanzo el cursor,
+	// cuantas veces hubo que tirarlo (cada reinicio vacia el cache de dt1s) y cuantos .dt1 se leyeron.
+	estadoArena := d2asset.EstadoDeLosTiles()
+	println("ZONAS: ARENA de tiles del motor: caminoDeConsola=", estadoArena.CaminoDeConsola,
+		"capacidad=", estadoArena.Capacidad, "usado=", estadoArena.Usado,
+		"reinicios=", estadoArena.Reinicios, "archivos=", estadoArena.ArchivosLeidos)
+
 	println("ZONAS: monton al final: " + estado())
 
 	// ============================== EL CUADRO ==============================
@@ -353,7 +405,12 @@ func cargarZona(mpq *d2mpq.MPQ, rotulo, ruta string, centroX, centroY int) *zona
 	println("ZONAS: ds1 version=", d.Version(), "acto=", int(d.Act), "w=", d.Width(), "h=", d.Height(),
 		"files=", len(d.Files), "crudo=", f.ds1Crudo, "vivo=", f.ds1Vivo, "monton=", estado())
 
-	n := NuevoNivel(d, ladoVentana, ladoVentana, centroX, centroY)
+	n := NuevoNivelEn(d, ladoVentana, ladoVentana, centroX, centroY, &reusoDelNivel)
+
+	// el compositor devuelve los MISMOS arreglos: se los guardamos para la zona siguiente (DC-002.78)
+	reusoDelNivel.Canvas = n.Canvas
+	reusoDelNivel.Scratch = n.Scratch
+	reusoDelNivel.Pedidos = n.Pedidos
 
 	for _, nombreDelDS1 := range d.Files {
 		nombre := RutaDelDT1(nombreDelDS1)
@@ -481,6 +538,11 @@ func cargarDS1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2ds1.DS1, int) {
 // cargarDT1: lo mismo para un .dt1: es donde el monton se mueve (el archivo mas grande mide 1 MB crudo).
 // Devuelve tambien el puntero al crudo (0 si no hay que liberarlo): con el camino sin cache, el que llama
 // lo libera despues de componer.
+//
+// DC-002.78: con la palanca `porBuffer` el archivo lo carga el MOTOR (`am.LoadDT1`), que en la consola lee
+// cada .dt1 ADENTRO de un arena pedido una sola vez (d2asset/lectura_de_tiles.go): la carga de una zona deja
+// de pedir memoria por archivo. Sin la palanca, el camino de siempre: `mpq.ReadFile` + `LoadDT1`, que deja
+// el crudo tomado para siempre (medido en DC-002.77).
 func cargarDT1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2dt1.DT1, uintptr) {
 	if !sinCacheDt1 {
 		if valor, encontrado := caches.Dt1s.Retrieve(clave); encontrado {
@@ -493,23 +555,63 @@ func cargarDT1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2dt1.DT1, uintptr)
 	cuentaDT1s.faltas++
 	v.muestra("antes de leer " + clave)
 
-	raw, err := LeerDelMPQ(mpq, clave)
-	if err != nil {
-		println("ZONAS: DT1", clave, "FALLO:", err.Error())
+	var (
+		dt1   *d2dt1.DT1
+		raw   []byte
+		crudo uintptr
+	)
 
-		return nil, 0
+	if porBuffer {
+		// la ruta del MOTOR: arena. El tamano del archivo lo informa el instrumento del arena (no hay
+		// crudo que medir de este lado).
+		//
+		// DC-002.78: con la palanca `gcInhibido` se FRENA el recolector durante la carga. Medido: sin el
+		// freno, el recolector salta por umbral en medio del parseo y el SH-4 salta a una direccion de
+		// monton (PC fuera del segmento de codigo del ELF). Ver el porque en csrc/shim.c.
+		if gcInhibido {
+			d2cGcFrena()
+		}
+
+		dt1Cargado, err := am.LoadDT1(ClaveRelativaDelDT1(clave))
+
+		if gcInhibido {
+			d2cGcSuelta()
+		}
+
+		if err != nil {
+			println("ZONAS: DT1", clave, "FALLO (motor):", err.Error())
+
+			return nil, 0
+		}
+
+		dt1 = dt1Cargado
+
+		v.muestra("cargado por el motor " + clave)
+	} else {
+		var err error
+
+		raw, err = LeerDelMPQ(mpq, clave)
+		if err != nil {
+			println("ZONAS: DT1", clave, "FALLO:", err.Error())
+
+			return nil, 0
+		}
+
+		v.muestra("crudo leido " + clave)
+
+		dt1, err = d2dt1.LoadDT1(raw)
+		if err != nil {
+			println("ZONAS: DT1", clave, "PARSE-FALLO:", err.Error())
+
+			return nil, 0
+		}
+
+		if len(raw) > 0 {
+			crudo = uintptr(unsafe.Pointer(&raw[0]))
+		}
+
+		v.muestra("parseado " + clave)
 	}
-
-	v.muestra("crudo leido " + clave)
-
-	dt1, err := d2dt1.LoadDT1(raw)
-	if err != nil {
-		println("ZONAS: DT1", clave, "PARSE-FALLO:", err.Error())
-
-		return nil, 0
-	}
-
-	v.muestra("parseado " + clave)
 
 	peso := d2asset.TamanoDT1(dt1)
 
@@ -518,7 +620,15 @@ func cargarDT1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2dt1.DT1, uintptr)
 		println("ZONAS: DT1", clave, "crudo=", len(raw), "vivo=", peso, "tiles=", len(dt1.Tiles),
 			"(SIN CACHE: se libera al componer)", "monton=", estado())
 
-		return dt1, uintptr(unsafe.Pointer(&raw[0]))
+		return dt1, crudo
+	}
+
+	if porBuffer {
+		// el motor YA lo inserto en el cache: aca solo se informa como quedo
+		println("ZONAS: DT1", clave, "tiles=", len(dt1.Tiles), "vivo=", peso,
+			"evicto=", caches.Dt1s.Evictions(), "pesoCache=", caches.Dt1s.GetWeight(), "monton=", estado())
+
+		return dt1, 0
 	}
 
 	if err := caches.Dt1s.Insert(clave, dt1, d2asset.Pesar(peso)); err != nil {
@@ -534,6 +644,12 @@ func cargarDT1(mpq *d2mpq.MPQ, clave string, v *vigilante) (*d2dt1.DT1, uintptr)
 	raw = nil
 
 	return dt1, 0
+}
+
+// ClaveRelativaDelDT1: lo que pide `am.LoadDT1` -- la ruta del .dt1 SIN el prefijo "/data/global/tiles/",
+// que el propio LoadDT1 antepone.
+func ClaveRelativaDelDT1(ruta string) string {
+	return strings.TrimPrefix(ruta, "data/global/tiles/")
 }
 
 // estado: los cuatro numeros del monton de C, juntos.

@@ -68,3 +68,25 @@ int d2c_monton_usado(void) {
 void d2c_libre(void *p) {
     free(p);
 }
+
+/* DC-002.78: el recolector FRENADO durante la carga de un .dt1.
+ *
+ * Por que: el recolector de libgodc es de COPIA (gc_copy.c) y su barrido de la pila es conservador. Medido en
+ * esta tarjeta: con 16.266 bloques copiados al semiespacio, el recolector salta por umbral EN MEDIO del
+ * parseo (dos veces en los dos primeros archivos) y el SH-4 muere con PC en una direccion de MONTON (fuera
+ * del segmento de codigo del ELF) -- o sea que alguien salto a un puntero que el recolector habia movido.
+ *
+ * `gc_inhibit_collection`/`gc_allow_collection` son las mismas que usa el propio runtime de libgodc para
+ * sus secciones criticas (map_dreamcast.c:773, map_fast_internal.h:157, gc_copy.c:233). No son una invencion
+ * de este POC: es el freno que el runtime ya se pone a si mismo.
+ */
+void gc_inhibit_collection(void);
+void gc_allow_collection(void);
+
+void d2c_gc_frena(void) {
+    gc_inhibit_collection();
+}
+
+void d2c_gc_suelta(void) {
+    gc_allow_collection();
+}

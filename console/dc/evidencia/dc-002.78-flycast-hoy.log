@@ -1,0 +1,134 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:028 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:269 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:368 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:368 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:371 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:375 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:388 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fc14e9f0000 RAM(16 MB) 0x7fc15a9f0000 VRAM64(8 MB) 0x7fc1529f0000 ARAM(2 MB) 0x7fc16e9f0000
+00:00:395 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:403 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fc14e9f0000 RAM(16 MB) 0x7fc15a9f0000 VRAM64(8 MB) 0x7fc1529f0000 ARAM(2 MB) 0x7fc16e9f0000
+00:00:406 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:409 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:410 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:451 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:451 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:451 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2e2ce0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351922432
+ARQ-MARCA   gc_init-semiespacio1 v=2354019616
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=3488 cused=4353280 gsemi=95768/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+ZONAS: arranca DC-002.78 -- dos zonas y la vuelta sin pedir memoria por archivo
+ZONAS: palancas: porBuffer= false sinCacheDt1= false gcEntreArchivos= false
+ZONAS: monton de C al arrancar: arena=4356768 usado=4354312 libre=2456 sbrk=0x0x8c709000 techo=0x0x8cff0000
+ZONAS: presupuestos vigentes: animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+ZONAS: video andando, monton: arena=4356768 usado=4354336 libre=2432 sbrk=0x0x8c709000 techo=0x0x8cff0000
+fs_iso9660: disc change detected
+
+ZONAS: ===== a) ENTRA AL PUEBLO =====
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=107656
+ZONAS: monton antes de la fase: usado= 4709336 tras GC= 4709336 (el GC devolvio 0 bytes)
+ZONAS: DS1-INSERT crudo= 57652 peso= 225428 monton= arena=4713120 usado=4709336 libre=3784 sbrk=0x0x8c760000 techo=0x0x8cff0000
+ZONAS: ds1 version= 18 acto= 1 w= 57 h= 41 files= 8 crudo= 57652 vivo= 225428 monton= arena=4713120 usado=4709336 libre=3784 sbrk=0x0x8c760000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576592
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=417040
+ZONAS: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 crudo= 505504 vivo= 489812 tiles= 21 evicto= 0 monton= arena=6077088 usado=6073152 libre=3936 sbrk=0x0x8c8ad000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574560
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=446024
+ZONAS: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 crudo= 439569 vivo= 420161 tiles= 52 evicto= 0 monton= arena=6863520 usado=6859776 libre=3744 sbrk=0x0x8c96d000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573104
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=481328
+ZONAS: DT1 data/global/tiles/act1\town\floor.dt1 crudo= 1008003 vivo= 921903 tiles= 144 evicto= 2 monton= arena=8563360 usado=8563168 libre=192 sbrk=0x0x8cb0c000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572960
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=606144
+ZONAS: DT1 data/global/tiles/act1\barracks\warp.dt1 crudo= 658158 vivo= 629046 tiles= 81 evicto= 3 monton= arena=9222816 usado=9221336 libre=1480 sbrk=0x0x8cbad000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575520
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=473536
+ZONAS: DT1 data/global/tiles/act1\outdoors\river.dt1 crudo= 316344 vivo= 289488 tiles= 45 evicto= 3 monton= arena=9726624 usado=9722544 libre=4080 sbrk=0x0x8cc28000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575728
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=518040
+ZONAS: DT1 data/global/tiles/act1\town\objects.dt1 crudo= 661515 vivo= 622083 tiles= 91 evicto= 4 monton= arena=10783392 usado=10781792 libre=1600 sbrk=0x0x8cd2a000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\town\fence.dt1 crudo= 423367 vivo= 407675 tiles= 31 evicto= 5 monton= arena=11479712 usado=11477472 libre=2240 sbrk=0x0x8cdd4000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576304
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=515320
+ZONAS: DT1 data/global/tiles/act1\outdoors\objects.dt1 crudo= 338205 vivo= 313877 tiles= 42 evicto= 6 monton= arena=12073632 usado=12073160 libre=472 sbrk=0x0x8ce65000 techo=0x0x8cff0000
+ZONAS: VENTANA lado= 512 origen= 304 1664 pisos= 1982 paredes= 330
+ZONAS: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+ZONAS: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840
+ZONAS: a) ENTRA AL PUEBLO PICO usado=12073160 arena=12073632 libreMin=192 (el pico fue en: crudo leido data/global/tiles/act1\outdoors\objects.dt1)
+ZONAS: a) ENTRA AL PUEBLO FIN usado=12073160 libre=472 ms=31139
+ZONAS: a) ENTRA AL PUEBLO dt1s evicto=6 peso=721552 de 1048576 | faltas=8 aciertos=0
+ZONAS: a) ENTRA AL PUEBLO ds1s evicto=0 peso=225428 de 262144 | faltas=1 aciertos=0
+
+ZONAS: ===== b) WAYPOINT A LA SEGUNDA ZONA =====
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=478184
+ZONAS: monton antes de la fase: usado= 12073160 tras GC= 12073160 (el GC devolvio 0 bytes)
+ZONAS: DS1-INSERT crudo= 7186 peso= 27892 monton= arena=12073632 usado=12073160 libre=472 sbrk=0x0x8ce65000 techo=0x0x8cff0000
+ZONAS: ds1 version= 17 acto= 1 w= 17 h= 17 files= 4 crudo= 7186 vivo= 27892 monton= arena=12073632 usado=12073160 libre=472 sbrk=0x0x8ce65000 techo=0x0x8cff0000
+ZONAS: DT1 data/global/tiles/act1\outdoors\stones.dt1 crudo= 318414 vivo= 294162 tiles= 41 evicto= 6 monton= arena=12647072 usado=12643104 libre=3968 sbrk=0x0x8cef1000 techo=0x0x8cff0000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574488
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=502208
+ZONAS: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 crudo= 505504 vivo= 489812 tiles= 21 evicto= 8 monton= arena=13519520 usado=13519144 libre=376 sbrk=0x0x8cfc6000 techo=0x0x8cff0000
+Out of memory. Requested sbrk_base 0x8d032000, was 0x8cfc6000, diff 442368
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=13519520 used=13519144 free=376
+01:00:792 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked

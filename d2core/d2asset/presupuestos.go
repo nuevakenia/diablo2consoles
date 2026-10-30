@@ -119,6 +119,19 @@ func AjustarPresupuestosDeConsola() {
 	ds1Budget = presupuestoDS1sConsola
 
 	pesoEnBytes = true
+
+	// DC-002.78 -- LA CARGA DE TILES POR ARENA QUEDA APAGADA, Y ESTO ES A PROPOSITO.
+	//
+	// `ActivarCaminoDeTilesDeConsola()` prende la ruta que lee cada .dt1 adentro de un arena pedido una sola
+	// vez (`lectura_de_tiles.go`). Se implemento, se midio en Flycast y NO CIERRA TODAVIA: sin la ruta, la
+	// zona del pueblo entra en 31,1 s y pide 12.073.160 B (y la segunda zona muere por OOM); con la ruta,
+	// el SH-4 muere antes -- el .dt1 que se lee por el stream del MPQ pide ~2 MB de SEMIESPACIO por archivo
+	// (medido: con el recolector frenado, `gc_alloc: OOM` pidiendo 3.328 B en la PRIMERA carga), o sea que
+	// el que pide memoria por archivo no es solo el destino: es la LECTURA. Mientras la lectura no deje de
+	// pedir, prender esto empeora las cosas. Los numeros y el porque, en
+	// `console/dc/evidencia/dc-002.78-carga-sin-memoria-por-archivo.txt`.
+	//
+	// d2asset.ActivarCaminoDeTilesDeConsola()
 }
 
 // Presupuestos son los ocho presupuestos vigentes, para informar y medir.

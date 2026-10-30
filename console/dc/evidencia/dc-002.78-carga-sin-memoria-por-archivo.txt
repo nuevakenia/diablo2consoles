@@ -1,0 +1,209 @@
+DC-002.78 -- CARGAR UNA ZONA SIN PEDIR MEMORIA POR ARCHIVO: que se midio, y por que NO cierra todavia
+======================================================================================================
+Fecha: 2026-10-30
+Rama: DC-002 (checkout unico, /home/dgalli/Proyectos/diablo2consoles)
+Tarjeta: t_22fd8185 · Feature: Fase B.1e de docs/PLAN.md
+Estado: **REQUISITO NO CUMPLIDO**. Se implementaron los dos caminos de la tarjeta, se midieron los dos en
+Flycast, y ninguno de los dos deja las tres fases en pie. Lo que sigue es lo medido, con los numeros.
+
+Que se hizo, en una linea
+-------------------------
+Se implemento (1) la copia de los bloques del .dt1 al parsear -- el camino (a) de la tarjeta -- y (2) un
+arena de tamano fijo pedido UNA sola vez donde se lee cada .dt1 -- el camino (b) --, y se midieron los dos
+en Flycast contra el camino de hoy: hoy la zona del pueblo entra (31,1 s, pico 12.073.160 B) y la segunda
+zona muere por OOM, como en DC-002.77; con los dos caminos nuevos el SH-4 se muere ANTES de terminar el
+pueblo. La causa no es el destino de la lectura (que ya no pide memoria): es LA LECTURA -- leer un .dt1 de
+500 KB por el stream del MPQ pide ~2 MB del semiespacio del recolector, y el recolector de esta consola,
+que es de copia y mueve objetos, no aguanta que lo llamen en medio de un parseo.
+
+
+1. Lo que ya estaba medido (DC-002.77) y no se repite aca
+---------------------------------------------------------
+  - el monton al arrancar: arena 4.358.048 / usado 4.354.312; margen bajo el techo de KOS 9.342.976 B
+    (4 MB de esos son los dos semiespacios del recolector, gc_semispace.h:21).
+  - el cache NO es el culpable: desaloja 6 veces en el pueblo y se queda en 721.552 B de 1.048.576.
+  - el culpable: en libgodc todo pedido de mas de 64 KB va a `gc_external_alloc` (malloc pelado, sin
+    liberacion). Cada .dt1 del acto 1 mide 318.414-1.008.003 B.
+  - la zona A pide 4.408.317 B crudos de .dt1 y la B 2.278.676 B (3 de sus 4 .dt1 ya estaban en A).
+
+
+2. El censo de BLOQUES: la condicion que tenia el camino (a), medida en el host ANTES de gastar una corrida
+------------------------------------------------------------------------------------------------------------
+  consola/dc/medidas/bloques  (nuevo: cuenta los bloques de cada .dt1 de las dos zonas)
+
+    BLOQUES: umbral de objeto grande del recolector = 65536 B
+    ZONA townN1.ds1 (8 archivos): bloques 10.287  sumaBloques 4.094.045  maxBloque 1.181  >64KB 0
+    ZONA wild1.ds1  (4 archivos): bloques  5.979  sumaBloques 2.126.038  maxBloque 1.181  >64KB 0
+    RESUMEN: bloques = 16.266  bytes copiados = 6.220.083  bloque mas grande = 1.181  bloques > 64 KB = 0
+    HISTOGRAMA: p50 = 256  p90 = 1016  p99 = 1153  p100 = 1181
+
+  O sea: la condicion del camino (a) SE CUMPLE -- ninguna copia de bloque pasa el umbral, todas quedarian en
+  el semiespacio y el recolector podria devolverlas. Eso es el papel. Lo que pasa de verdad, abajo.
+
+
+3. Camino (a) -- COPIAR LOS BLOQUES AL PARSEAR (`d2dt1.LoadDT1CopiaBloques`)
+---------------------------------------------------------------------------
+  Que se hizo: `LoadDT1` se partio en dos (`loadDT1(fileData, copiar)`); con `copiar` cada bloque y los bytes
+  sueltos del tile se copian a memoria propia, asi el archivo crudo se puede reusar o soltar.
+  Pruebas en el host: `d2common/d2fileformats/d2dt1/copiabloques_test.go` -- la principal PISA el crudo
+  entero despues de parsear y exige que el DT1 no cambie, y trae el MUTADOR (con `LoadDT1` sin copiar, el
+  mismo pisoton SI cambia el resultado): las dos pasan.
+
+  En la consola (Flycast, `BUFFER=1` con la primera version del camino nuevo):
+
+    ZONAS: DT1 .../treegroups.dt1 tiles= 21 vivo= 489812 ... monton= arena=6996928 usado=6996184
+    ARQ-MARCA gc-por-umbral-bytes-usados v=1574112
+    ARQ-MARCA gc_collect v=2      gc-vivo v=462784
+    ZONAS: DT1 .../stonewall.dt1  tiles= 52 vivo= 420161 ...  (llega a insertarlo)
+    ARQ-MARCA gc-por-umbral-bytes-usados v=1576376
+    ARQ-MARCA gc_collect v=3      gc-vivo v=986424
+    Unhandled exception: PC 7daed713, code 1, evt 00e0      <- PC fuera del segmento de codigo del ELF
+    R0-R7: 00000000 7daed713 8c706e1c 00000000 ...
+    Encountered Data address error (read).   PR 8c037428 -> BufferGrande.LeerTodo
+
+  Lectura: el recolector salta por umbral DOS veces en los dos primeros archivos (el semiespacio se llena
+  con las 16.266 copias de una zona, no entra en 2 MB) y el SH-4 termina saltando a una direccion de monton.
+  No es un puntero nulo: es un puntero que apunta a memoria que ya no es codigo. El recolector de libgodc es
+  de COPIA (gc_copy.c) y su barrido de pila es conservador; mover objetos mientras el parser tiene punteros
+  a los pedazos que esta armando es exactamente el caso que rompe.
+  OJO: esta corrida no dejo log propio (se reescribio al repetir con la version del arena); las lineas de
+  arriba son las que imprimio, tal cual, en la consola serie.
+
+
+4. Camino (b) -- UN ARENA DEL TAMANO DE UNA ZONA (`d2asset/lectura_de_tiles.go`)
+-------------------------------------------------------------------------------
+  Que se hizo: el motor pide UNA vez un arena de 4.848.148 B (los 4.408.317 B crudos del pueblo + 10 %) y
+  cada .dt1 se lee ADENTRO, uno detras de otro (cursor). Los bloques apuntan al arena, asi que no hay copias
+  ni presion sobre el semiespacio; cuando un archivo no entra, el arena se tira entero y con el se vacia el
+  cache de dt1s. Se suma `d2datautils.BufferGrande.LeerEn` (lee DENTRO de un tramo prestado, sin pedir
+  memoria) con sus tres pruebas en el host.
+  Los buffers del COMPOSITOR tambien se reusan ahora entre zonas (`nivel.go`: `BuffersDelNivel`): el lienzo
+  (262.144 B) y el scratch (81.920 B) pasan de 64 KB, o sea que pedirlos por fase dejaba dos pedazos
+  tomados por fase y arruinaba la comparacion pico(c) - pico(a).
+
+  En la consola (Flycast, `BUFFER=1`):
+
+    ZONAS: monton de C al arrancar: arena=4355200 usado=4354312
+    ZONAS: assetmanager de consola listo: arena=4711552 usado=4709312
+    ZONAS: ===== a) ENTRA AL PUEBLO =====
+    ARQ-MARCA gc_collect v=1  gc-vivo v=122264
+    ZONAS: DS1-INSERT crudo= 57652 peso= 225428 monton= arena=5067904 usado=5064336
+    ARQ-MARCA gc-por-umbral-bytes-usados v=1574936
+    ARQ-MARCA gc_collect v=2  gc-vivo v=463632
+    ZONAS: DT1 .../treegroups.dt1 tiles= 21 vivo= 489812  monton= arena=10773632 usado=10771792
+          (el arena de 4.848.148 B ya esta pedido: 5.064.336 + 4.848.148 = 9.912.484, y el resto es la
+           lectura del MPQ: el stream prefetchea el archivo comprimido ENTERO, sectorBytes())
+    ZONAS: DT1 .../stonewall.dt1  tiles= 52 vivo= 420161  monton= usado=11118840
+    ARQ-MARCA gc-por-umbral-bytes-usados v=1574120
+    ARQ-MARCA gc_collect v=3  gc-vivo v=492360
+    Unhandled exception: PC 8c5bce38, code 1, evt 0180      <- Illegal instruction
+    Encountered Illegal instruction.  PC == PR (salto a si misma)
+
+  Lectura: el destino de la lectura ya no pide memoria (el arena se pide una vez: +4.848.148 B en el primer
+  archivo y NADA despues), y aun asi la carga muere -- ahora en el TERCER archivo y con "illegal instruction"
+  en vez de "data address error". O sea: el camino (b) arregla la mitad del problema (el destino) y el
+  problema que queda es la LECTURA (el stream del MPQ prefetchea el comprimido entero en cada archivo y pide
+  ~2 MB de semiespacio por archivo, ver 5).
+
+
+5. La sonda que dice DONDE esta el que pide: el recolector FRENADO (`INHIBE=1`)
+-----------------------------------------------------------------------------
+  `gc_inhibit_collection`/`gc_allow_collection` son las funciones con las que el PROPIO runtime de libgodc
+  frena el recolector en sus secciones criticas (gc_copy.c:231, map_dreamcast.c:773, map_fast_internal.h:157).
+  El POC las llama por su shim C (csrc/shim.c) alrededor de `am.LoadDT1`.
+
+  En la consola (Flycast, `BUFFER=1 INHIBE=1`):
+
+    ZONAS: DS1-INSERT crudo= 57652 peso= 225428 monton= arena=5067840 usado=5064336
+    ARQ-MARCA OOM-throw v=3328
+    fatal: gc_alloc: out of memory   (el emulador reinicia y repite: tres vueltas identicas)
+
+  Lectura, y es el numero que manda: con el recolector frenado, el semiespacio de 2 MB se llena durante la
+  carga del PRIMER .dt1 y el runtime se queda sin lugar pidiendo 3.328 B. O sea que la LECTURA de UN archivo
+  de 505 KB pide ~2 MB de semiespacio. Con el recolector andando eso no se ve como OOM: se ve como un
+  `gc_collect` en medio del parseo (dos por archivo) y, mas tarde o mas temprano, como un salto a memoria
+  que no es codigo.
+  El que pide no es el destino: es `mpq.Stream` -- `loadBlockOffsets` (una posicion por sector), el
+  prefetch de `sectorBytes` (el archivo comprimido entero, `prefetchLimit = 2 MB`) y un bloque decompreso de
+  `v.Size` por sector.
+
+
+6. Los cuatro numeros por fase (los que la tarjeta pide)
+--------------------------------------------------------
+  Camino de HOY (el de DC-002.77, con los buffers del compositor ya reusados; `scripts/console/build-zonas-277.sh`):
+
+    fase                          pico usado     arena        libreMin   ms       crc32 lienzo
+    (a) ENTRA AL PUEBLO           12.073.160     12.073.632   192        31.139   3507647456 (=-787319840)
+    (b) WAYPOINT SEGUNDA ZONA     -- OOM -- al leer treegroups.dt1 (el 2º de sus 4)
+    (c) VUELVE AL PUEBLO          no se alcanza
+
+    dt1s del pueblo: faltas 8, aciertos 0, desalojos 6, peso final 721.552 de 1.048.576
+    ds1s: faltas 1, peso 225.428 de 262.144          (identico a DC-002.77: el lienzo da el MISMO crc32)
+
+  Camino (a) -- copia de bloques: muere en el pueblo, 2º archivo (Data address error).
+  Camino (b) -- arena:            muere en el pueblo, 3er archivo (Illegal instruction).
+  Camino (b) + recolector frenado: OOM del semiespacio en el 1er archivo (pedido de 3.328 B).
+
+  pico(c) - pico(a): NO SE PUEDE CALCULAR en ninguno de los tres caminos nuevos, porque (c) no se alcanza.
+
+
+7. La decision que la tarjeta pedia con numeros: tocar `GC_SEMISPACE_SIZE_KB`?
+------------------------------------------------------------------------------
+  NO CONVIENE, y los numeros lo dicen:
+  - El semiespacio hoy son 2 MB por lado = 4 MB de los 9.342.976 B de margen. La carga de UN .dt1 pide
+    ~2 MB de semiespacio (medido en 5): con 4 MB por lado el recolector saltaria la mitad de veces, no cero
+    -- el problema no es el tamano, es que se lo llama EN MEDIO del parseo y que mueve objetos.
+  - Subirlo a 4 MB por lado cuesta +4 MB: el arranque (4,35) mas el arena (4,85) mas 8 MB de semiespacios
+    no entran bajo el techo (13,4 MB de arena medida con el OOM).
+  - Lo que hay que bajar primero es lo que la lectura PIDE (secciones 5 y 8). Si despues de eso el
+    recolector sigue entrando en medio de la carga, ahi si hay que hablar de `GC_SEMISPACE_SIZE_KB`.
+
+
+8. Lo que queda abierto, con nombre y apellido (para la tarjeta siguiente)
+-------------------------------------------------------------------------
+  1. LA LECTURA SIN MEMORIA (es el 90 % del problema). `mpq.Stream` pide, por archivo: la tabla de
+     posiciones, el prefetch del comprimido entero y un bloque de `v.Size` por sector. Hace falta una
+     lectura con memoria PRESTADA -- del tipo `mpq.ReadFileInto(nombre, dst, scratch)` -- donde el scratch
+     (posiciones + bloque decompreso + comprimido) sea del que llama y se reuse. Con eso el arena queda
+     completo: destino fijo + lectura fija.
+  2. EL RECOLECTOR EN MEDIO DEL PARSEO. Con la lectura arreglada, el semiespacio deja de llenarse durante
+     la carga y el recolector deja de saltar. Si igual salta, la salida MEDIDA es frenarlo durante la carga
+     (lo que hace `INHIBE=1`, con las funciones del propio runtime), pero eso hoy solo lo puede llamar el
+     POC: el motor no tiene como llamar a C sin abrir cgo en `d2asset`.
+  3. EL GANCHO DEL NIVEL. `ReiniciarArenaDeTiles()` existe y es el contrato (el arena se tira cuando el
+     motor tira el nivel). Falta que `MapEngine` lo llame en el cambio de nivel (Fase D).
+  4. El camino de hoy NO se toca: `AjustarPresupuestosDeConsola` NO prende la ruta del arena. La palanca
+     `ActivarCaminoDeTilesDeConsola` queda solo para medir (`BUFFER=1`).
+
+
+9. Reproducirlo
+--------------
+  cd /home/dgalli/Proyectos/diablo2consoles
+  S=$HOME/.hermes/cache/scratch/dcb278            # NO /tmp: es tmpfs y se vacia solo
+  cp -a /tmp/gox-med $S/base                      # el arbol de .gox del motor
+  BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-hoy                       # hoy
+  BUFFER=1 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-buffer            # arena
+  BUFFER=1 INHIBE=1 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-inhibe   # arena + recolector frenado
+  SUELTA=1 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-suelta            # (DC-002.77) liberar el crudo
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=spectacle \
+      bash scripts/console/run-flycast.sh $S/out-buffer/disc.gdi 150 $S/cap-buffer
+  # los bloques, en el host:
+  go run ./console/dc/medidas/bloques
+
+  En los logs, las lineas de la medicion empiezan con "ZONAS:" y las del runtime/recolector con "ARQ-MARCA".
+
+
+10. Archivos y evidencia adjunta
+--------------------------------
+  d2common/d2datautils/buffergrande.go (+ _test.go)          el lector que lee DENTRO de un tramo prestado
+  d2common/d2fileformats/d2dt1/dt1.go                        LoadDT1 / LoadDT1CopiaBloques (camino (a))
+  d2common/d2fileformats/d2dt1/copiabloques_test.go          la prueba en contra (con mutador) del camino (a)
+  d2core/d2asset/lectura_de_tiles.go                         el arena del camino (b), APAGADO por defecto
+  d2core/d2asset/asset_manager.go, presupuestos.go           el enganche y el porque de que este apagado
+  console/dc/medidas/bloques/main.go                         el censo de bloques (seccion 2)
+  console/dc/poc/zonas-waypoint/{main.go,knobs.go,csrc/shim.c}  palancas BUFFER, INHIBE, SUELTA, GCENTRE
+  console/dc/poc/personaje-mapa/nivel.go + verif-personaje-238/nivel.go  BuffersDelNivel (buffers reusados)
+  scripts/console/build-zonas-277.sh                         build con las cuatro palancas
+  console/dc/evidencia/dc-002.78-flycast-hoy.log             camino de hoy: pico 12.073.160 y OOM en (b)
+  console/dc/evidencia/dc-002.78-flycast-arena.log           camino (b): Illegal instruction en el 3er .dt1
+  console/dc/evidencia/dc-002.78-flycast-inhibe.log          camino (b) + recolector frenado: OOM del semiespacio

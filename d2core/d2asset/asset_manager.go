@@ -589,17 +589,32 @@ func (am *AssetManager) commandAssetClear([]string) error {
 }
 
 // LoadDT1 loads and returns the given path as a DT1
+//
+// DC-002.78: en la consola el archivo se lee en UN buffer que se reusa entre archivos y los bloques se
+// copian al parsear (ver lectura_de_tiles.go). En la PC el camino es el de siempre.
 func (am *AssetManager) LoadDT1(dt1Path string) (*d2dt1.DT1, error) {
 	if dt1Value, found := am.dt1s.Retrieve(dt1Path); found {
 		return dt1Value.(*d2dt1.DT1), nil
 	}
 
-	fileData, err := am.LoadFileHandoff("/data/global/tiles/" + dt1Path)
-	if err != nil {
-		return nil, fmt.Errorf("could not load /data/global/tiles/%s", dt1Path)
+	var (
+		dt1 *d2dt1.DT1
+		err error
+	)
+
+	if caminoDeTilesDeConsola {
+		dt1, err = am.cargarDT1EnLaArena("/data/global/tiles/" + dt1Path)
+	} else {
+		var fileData []byte
+
+		fileData, err = am.LoadFileHandoff("/data/global/tiles/" + dt1Path)
+		if err != nil {
+			return nil, fmt.Errorf("could not load /data/global/tiles/%s", dt1Path)
+		}
+
+		dt1, err = d2dt1.LoadDT1(fileData)
 	}
 
-	dt1, err := d2dt1.LoadDT1(fileData)
 	if err != nil {
 		return nil, err
 	}

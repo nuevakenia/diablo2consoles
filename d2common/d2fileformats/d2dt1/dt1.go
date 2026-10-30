@@ -52,8 +52,36 @@ func New() *DT1 {
 
 // LoadDT1 loads a DT1 record
 //
+// Los bloques quedan APUNTANDO al archivo crudo (`fileData`): `ReadBytes` devuelve una subslica
+// (`stream_reader.go`), no una copia. Eso esta bien cuando el archivo se queda vivo (el camino de la PC:
+// el cache guarda el DT1 y el crudo lo recolecta el GC del host). NO sirve cuando el crudo se va a
+// reusar para el archivo siguiente: para eso esta `LoadDT1CopiaBloques` (DC-002.78).
+//
 //nolint:funlen,gocognit,gocyclo // Can't reduce
 func LoadDT1(fileData []byte) (dt1 *DT1, err error) {
+	return loadDT1(fileData, false)
+}
+
+// LoadDT1CopiaBloques carga un DT1 COPIANDO los datos codificados de cada bloque, para que el resultado no
+// dependa del archivo crudo y este se pueda reusar (o soltar) enseguida.
+//
+// DC-002.78 -- POR QUE HACE FALTA. En la Dreamcast todo lo que pasa de 64 KB se va al monton externo del
+// runtime y no lo devuelve nadie (medido en DC-002.77 con `console/dc/poc/sonda-gc-277`): con el parseo de
+// siempre, cada .dt1 leido (300 KB - 1 MB) deja su crudo tomado para siempre, y la segunda zona muere por
+// OOM. Copiando los bloques, el crudo se puede reusar para el archivo siguiente y lo que QUEDA son las
+// copias, una por bloque, que miden 8..1.181 B (medido con `console/dc/medidas/bloques`): todas por debajo
+// de `GC_LARGE_OBJECT_THRESHOLD`, o sea que viven en el semiespacio y el recolector las devuelve cuando el
+// cache desaloja la entrada.
+//
+// El precio es el del `TamanoDT1`: la copia pesa lo mismo que el archivo crudo (el .dt1 son casi todos
+// datos de bloque). Se paga UNA vez, en el semiespacio del recolector, en lugar de PARA SIEMPRE en el
+// monton externo.
+func LoadDT1CopiaBloques(fileData []byte) (*DT1, error) {
+	return loadDT1(fileData, true)
+}
+
+//nolint:funlen,gocognit,gocyclo // Can't reduce
+func loadDT1(fileData []byte, copiarBloques bool) (dt1 *DT1, err error) {
 	defer d2datautils.RecoverError("dt1", &err)
 
 	result := &DT1{}
@@ -155,6 +183,11 @@ func LoadDT1(fileData []byte) (dt1 *DT1, err error) {
 			return nil, err
 		}
 
+		if copiarBloques {
+			// tambien los bytes sueltos del tile: son una subslica del crudo igual que los bloques
+			tile.unknown2 = copiarBytes(tile.unknown2)
+		}
+
 		for i := range tile.SubTileFlags {
 			var subtileFlagBytes byte
 
@@ -254,11 +287,28 @@ func LoadDT1(fileData []byte) (dt1 *DT1, err error) {
 				return nil, err
 			}
 
+			if copiarBloques {
+				encodedData = copiarBytes(encodedData)
+			}
+
 			tile.Blocks[blockIndex].EncodedData = encodedData
 		}
 	}
 
 	return result, nil
+}
+
+// copiarBytes: la copia de un bloque (o de los bytes sueltos de un tile) a memoria propia, para que el
+// DT1 no dependa del archivo crudo. Ver `LoadDT1CopiaBloques`.
+func copiarBytes(datos []byte) []byte {
+	if len(datos) == 0 {
+		return datos
+	}
+
+	copia := make([]byte, len(datos))
+	copy(copia, datos)
+
+	return copia
 }
 
 // Marshal encodes dt1 data back to byte slice

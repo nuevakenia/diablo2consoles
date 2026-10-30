@@ -1,0 +1,121 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:030 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:298 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:400 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:400 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:404 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:408 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:420 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fb615390000 RAM(16 MB) 0x7fb621390000 VRAM64(8 MB) 0x7fb619390000 ARAM(2 MB) 0x7fb635390000
+00:00:427 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:434 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fb615390000 RAM(16 MB) 0x7fb621390000 VRAM64(8 MB) 0x7fb619390000 ARAM(2 MB) 0x7fb635390000
+00:00:437 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:441 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:441 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:484 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:484 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:484 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2e3300
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351924000
+ARQ-MARCA   gc_init-semiespacio1 v=2354021184
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1920 cused=4353280 gsemi=95768/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+ZONAS: arranca DC-002.78 -- dos zonas y la vuelta sin pedir memoria por archivo
+ZONAS: palancas: porBuffer= true sinCacheDt1= false gcEntreArchivos= false
+ZONAS: monton de C al arrancar: arena=4355200 usado=4354312 libre=888 sbrk=0x0x8c709000 techo=0x0x8cff0000
+ZONAS: camino de tiles de consola prendido: false monton=arena=4355200 usado=4354312 libre=888 sbrk=0x0x8c709000 techo=0x0x8cff0000
+ZONAS: presupuestos vigentes: animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+ZONAS: assetmanager de consola listo, monton: arena=4711552 usado=4709312 libre=2240 sbrk=0x0x8c760000 techo=0x0x8cff0000
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+ZONAS: video andando, monton: arena=4711552 usado=4709336 libre=2216 sbrk=0x0x8c760000 techo=0x0x8cff0000
+
+ZONAS: ===== a) ENTRA AL PUEBLO =====
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=122264
+ZONAS: monton antes de la fase: usado= 5064336 tras GC= 5064336 (el GC devolvio 0 bytes)
+ZONAS: DS1-INSERT crudo= 57652 peso= 225428 monton= arena=5067904 usado=5064336 libre=3568 sbrk=0x0x8c7b7000 techo=0x0x8cff0000
+ZONAS: ds1 version= 18 acto= 1 w= 57 h= 41 files= 8 crudo= 57652 vivo= 225428 monton= arena=5067904 usado=5064336 libre=3568 sbrk=0x0x8c7b7000 techo=0x0x8cff0000
+ARQ-CARGA entra /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=3216 cused=5552112 gsemi=1229848/2097152 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/act1\outdoors\treegroups.dt1
+ARQ-CARGA volvio /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=3216 cused=5552112 gsemi=1233912/2097152 gc=1
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574936
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=463632
+ZONAS: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 tiles= 21 vivo= 489812 evicto= 0 pesoCache= 489812 monton= arena=10773632 usado=10771792 libre=1840 sbrk=0x0x8cd28000 techo=0x0x8cff0000
+ARQ-CARGA entra /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=1840 cused=10771792 gsemi=1060568/2097152 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/act1\outdoors\stonewall.dt1
+ARQ-CARGA volvio /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=1840 cused=10771792 gsemi=1064480/2097152 gc=2
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574120
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=492360
+ZONAS: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 tiles= 52 vivo= 420161 evicto= 0 pesoCache= 909973 monton= arena=11121792 usado=11118840 libre=2952 sbrk=0x0x8cd7d000 techo=0x0x8cff0000
+ARQ-CARGA entra /data/global/tiles/act1\town\floor.dt1 cfree=2952 cused=11118840 gsemi=808952/2097152 gc=3
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/act1\town\floor.dt1
+ARQ-CARGA volvio /data/global/tiles/act1\town\floor.dt1 cfree=2952 cused=11118840 gsemi=813840/2097152 gc=3
+Unhandled exception: PC 8c5bce38, code 1, evt 0180
+ R0-R7: 00000000 00000001 0000232b 8c913f29 8c5be550 8c4f8478 00008000 00008000
+ R8-R15: 00000000 8c2b4eb4 00040000 003b924b 00040000 00000000 8c62575c 8c707c9c
+ SR 40000001 PR 8c5bce38
+Stack Trace: frame pointers not enabled!
+
+Encountered Illegal instruction. 
+
+kernel panic: unhandled IRQ/Exception
+arch: aborting the system
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+maple: active drivers:
+  DMA Buffer at ac2e2d20
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+arch: aborting the system
+00:37:178 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked
