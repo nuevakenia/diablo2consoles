@@ -1,0 +1,67 @@
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+COOP276: video andando montonLibre= 2912 vramDeLaPantalla= 1048576
+COOP276: assetmanager listo montonLibre= 3088
+COOP276: mpq a mano listos montonLibre= 3264
+COOP276: DS1 version= 18 act= 1 w= 57 h= 41 files= 8 ds1sPeso= 225428 ds1sEvicto= 0 montonLibre= 3264
+COOP276: DT1 act1\outdoors\treegroups.dt1 tiles= 21 pesoEnCache= 489812 evicto= 0 montonLibre= 3416
+COOP276: DT1 soltado montonLibre= 3416 gcColecciones= 3
+COOP276: DT1 act1\outdoors\stonewall.dt1 tiles= 52 pesoEnCache= 420161 evicto= 0 montonLibre= 3224
+COOP276: DT1 soltado montonLibre= 3224 gcColecciones= 4
+COOP276: DT1 act1\town\floor.dt1 tiles= 144 pesoEnCache= 921903 evicto= 0 montonLibre= 3768
+COOP276: DT1 soltado montonLibre= 3768 gcColecciones= 6
+COOP276: DT1 act1\barracks\warp.dt1 tiles= 81 pesoEnCache= 629046 evicto= 0 montonLibre= 960
+COOP276: DT1 soltado montonLibre= 960 gcColecciones= 7
+COOP276: DT1 act1\outdoors\river.dt1 tiles= 45 pesoEnCache= 289488 evicto= 0 montonLibre= 3560
+COOP276: DT1 soltado montonLibre= 3560 gcColecciones= 8
+COOP276: DT1 act1\town\objects.dt1 tiles= 91 pesoEnCache= 622083 evicto= 0 montonLibre= 1080
+COOP276: DT1 soltado montonLibre= 1080 gcColecciones= 10
+COOP276: DT1 act1\town\fence.dt1 tiles= 31 pesoEnCache= 407675 evicto= 0 montonLibre= 1720
+COOP276: DT1 soltado montonLibre= 1720 gcColecciones= 11
+COOP276: DT1 act1\outdoors\objects.dt1 tiles= 42 pesoEnCache= 313877 evicto= 0 montonLibre= 4048
+COOP276: DT1 soltado montonLibre= 4048 gcColecciones= 12
+COOP276: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 dt1sPeso= 0 dt1sEvicto= 0
+COOP276: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456 montonLibre= 4048
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 480
+COOP276: ANIMDATA despues del GC montonLibre= 480
+COOP276: BASELINE (N=0) montonLibre= 480 gcColecciones= 13 vramDelLienzo= 0
+Out of memory. Requested sbrk_base 0x8cff9000, was 0x8cfe9000, diff 65536
+fatal error: gc_external_alloc: OOM
+Memory: arena=13638784 used=13636264 free=2520
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+COOP276: video andando montonLibre= 2912 vramDeLaPantalla= 1048576
+COOP276: assetmanager listo montonLibre= 3088
+COOP276: mpq a mano listos montonLibre= 3264
+COOP276: DS1 version= 18 act= 1 w= 57 h= 41 files= 8 ds1sPeso= 225428 ds1sEvicto= 0 montonLibre= 3264
+COOP276: DT1 act1\outdoors\treegroups.dt1 tiles= 21 pesoEnCache= 489812 evicto= 0 montonLibre= 3416
+COOP276: DT1 soltado montonLibre= 3416 gcColecciones= 3
+COOP276: DT1 act1\outdoors\stonewall.dt1 tiles= 52 pesoEnCache= 420161 evicto= 0 montonLibre= 3224
+COOP276: DT1 soltado montonLibre= 3224 gcColecciones= 4
+COOP276: DT1 act1\town\floor.dt1 tiles= 144 pesoEnCache= 921903 evicto= 0 montonLibre= 3768
+COOP276: DT1 soltado montonLibre= 3768 gcColecciones= 6
+COOP276: DT1 act1\barracks\warp.dt1 tiles= 81 pesoEnCache= 629046 evicto= 0 montonLibre= 960
+COOP276: DT1 soltado montonLibre= 960 gcColecciones= 7
+COOP276: DT1 act1\outdoors\river.dt1 tiles= 45 pesoEnCache= 289488 evicto= 0 montonLibre= 3560
+COOP276: DT1 soltado montonLibre= 3560 gcColecciones= 8
+COOP276: DT1 act1\town\objects.dt1 tiles= 91 pesoEnCache= 622083 evicto= 0 montonLibre= 1080
+COOP276: DT1 soltado montonLibre= 1080 gcColecciones= 10
+COOP276: DT1 act1\town\fence.dt1 tiles= 31 pesoEnCache= 407675 evicto= 0 montonLibre= 1720
+COOP276: DT1 soltado montonLibre= 1720 gcColecciones= 11
+COOP276: DT1 act1\outdoors\objects.dt1 tiles= 42 pesoEnCache= 313877 evicto= 0 montonLibre= 4048
+COOP276: DT1 soltado montonLibre= 4048 gcColecciones= 12
+COOP276: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 dt1sPeso= 0 dt1sEvicto= 0
+COOP276: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456 montonLibre= 4048
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 480
+COOP276: ANIMDATA despues del GC montonLibre= 480
+COOP276: BASELINE (N=0) montonLibre= 480 gcColecciones= 13 vramDelLienzo= 0
+Out of memory. Requested sbrk_base 0x8cff9000, was 0x8cfe9000, diff 65536
+fatal error: gc_external_alloc: OOM
+Memory: arena=13638784 used=13636264 free=2520
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+COOP276: video andando montonLibre= 2912 vramDeLaPantalla= 1048576
+COOP276: assetmanager listo montonLibre= 3088

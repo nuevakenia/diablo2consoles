@@ -1,0 +1,160 @@
+DC-002.76 -- CUANTO CUESTA CADA JUGADOR (1, 2 y 4) EN LA DREAMCAST
+===================================================================
+Fecha: 2026-10-30  ~18:00 -03
+Host:  CachyOS, Flycast 2.7 (sin KVM), toolchain KOS sh-elf-gcc 15.1.0
+POC:   console/dc/poc/coop  (scripts/console/build-coop-276.sh, MODO=composite|jugador)
+Banco: 1 corrida = build ~90 s + 170 s de emulador
+
+RESUMEN EN UNA LINEA
+--------------------
+Un jugador (su Composite del motor, 6 capas .dcc) pesa 349.519 B de cache + 1.132 B de COF y tarda
+2,01 s en crearse en el SH-4. Hoy NO se pueden tener dos: la segunda creacion falla porque el GC de
+libgodc deja de encontrar las claves del map de animdata despues de recolectar. Y con el tipo
+`d2mapentity.Player` enlazado (el que pedia la tarjeta) no entra ni UN jugador: el tipo cuesta
+2,1 MB de imagen. Eso -- la imagen -- es el techo, no el costo por jugador.
+
+
+1. LO QUE SE MIDIO Y COMO
+-------------------------
+El POC levanta el `AssetManager` real con fuentes MPQ (`NuevoAssetManagerDeConsola`), el renderer PVR
+real y crea jugadores de verdad con los presupuestos de cache de DC-002.75 (2,81 MB de datos).
+Tres etapas ACUMULATIVAS en una sola corrida: N=1, N=2, N=4.
+
+  MODO=composite (por defecto)  el jugador es su `d2asset.Composite` por `am.LoadComposite`:
+                                COF + las 6 capas .dcc del modo Neutral, capas "lit", arma "hth"
+                                (el mismo bloque que `d2mapentity/jugador_consola.go`).
+  MODO=jugador                  el jugador es el `d2mapentity.Player` completo
+                                (`NuevoJugadorDeConsola`). Sirve para reproducir la pared.
+
+Todo se mide con el reloj de 64 bits del PVR (`timer_us_gettime64`), `mallinfo().fordblks` como
+"monton libre" y el contador `gc_collect` del runtime (el mismo instrumento de DC-002.51/70/75).
+
+
+2. HALLAZGO 1 -- EL TIPO `d2mapentity.Player` CUESTA 2,1 MB DE IMAGEN (y con el no entra nada)
+---------------------------------------------------------------------------------------------
+  BIN con el Composite     2.764.648 B      (.70/.75 median 2,74 MB: el mismo)
+  BIN con el Player        4.874.xxx B      (+2,11 MB de .text/.rodata por d2hero/d2records/d2ui/
+                                             d2item/d2inventory/d2drop... el cierre de d2mapentity)
+  monton (arena)           13.638.784 B  ->  11.380.992 B   (-2,26 MB)
+
+  a) CON EL PLAYER COMPLETO, LA ZONA DEL ACTO 1 NO ENTRA (log cap5):
+     los 8 .dt1 se leen uno por uno, cada uno se suelta y se fuerza GC; muere en el SEXTO:
+        DT1 act1\outdoors\river.dt1 ... ok
+        Out of memory. Requested sbrk_base 0x8d026000, was 0x8cfc5000, diff 397312
+        fatal error: gc_external_alloc: OOM      Memory: arena=11380992 used=11380392 free=600
+     (.75, con BIN 2,74 MB, compone los 8 sin problema.)
+
+  b) CON EL PLAYER COMPLETO Y SIN ZONA, TAMPOCO CARGA EL PRIMER JUGADOR (log cap6):
+        ARQ-CARGA entra .../AM/LG/AMLGlitNU1ht.dcc  gsemi=1486784/2097152
+        ARQ-MARCA gc_collect v=2 / gc-vivo v=732152   -> consola reiniciada, sin mensaje
+     O sea: no es "cuantos jugadores entran", es que el BIN no deja monton para cargar uno.
+
+  CONCLUSION: el cooperativo no se decide por el costo por jugador. Se decide por CUANTO CODIGO DEL
+  MOTOR SE ENLAZA. El tipo `Player` (que en la PC es gratis) en la consola son 2,1 MB de RAM.
+
+
+3. HALLAZGO 2 -- LA ZONA COMPONE IGUAL QUE EN DC-002.70/75 (control del banco)
+-----------------------------------------------------------------------------
+  Con BIN 2,76 MB (MODO=composite) la zona del acto 1 se compone BIT A BIT igual que en las tarjetas
+  anteriores (log cap7 y cap12):
+      DS1 version= 18 act= 1 w= 57 h= 41 files= 8 ds1sPeso= 225428
+      COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0
+      LIENZO pixelesNoVacios= 193538 de 262144   crc32= 3507647456
+  crc32 3507647456 = el mismo de dc-002.70-renderer-pvr.txt:84 y dc-002.75:161. El banco es valido.
+  Costo de monton: 8 .dt1 (4,35 MB de crudos, 4,09 MB parseados) con el cache vaciado y GC entre
+  cada uno; cada .dt1 se lee con `ReadFile` del MPQ (ver hallazgo 5).
+
+
+4. HALLAZGO 3 -- LO QUE CUESTA UN JUGADOR (medido, CONSOLA)
+-----------------------------------------------------------
+  De la corrida cap12 (N=1, MODO=composite, sin zona):
+
+      ANIMDATA vivo registros= 2556                        (la tabla de animaciones, 131 KB)
+      JUGADOR J1 creacionUs= 2011389  gcPorLaCreacion= 4  (2,01 segundos de SH-4)
+      ETAPA n= 1 gcForzadoUs= 54411                        (54 ms el GC forzado)
+      CACHES n= 1 al crear
+          cofs  peso=    1.132 B  de 65.536    (1 COF)
+          dccs  peso=  349.519 B  de 524.288   (6 capas .dcc del personaje)
+          anim  peso=  349.519 B  de 1.048.576
+      FILA n= 1  cuadros= 60  avanceUsPorCuadro= 10  dibujoUsPorCuadro= 68301  fps= 9
+
+  Lectura:
+   - RAM de assets por jugador: 349.519 B de .dcc + 1.132 B de COF = 350.651 B (~342 KB). Es lo que
+     DC-002.74 habia estimado en ~446 KB contando ademas las superficies compuestas por capa; el numero
+     de maquina es 349.519 B de cache.
+   - Los .dcc SON COMPARTIDOS: el cache es uno solo por AssetManager (DC-002.74, hallazgo 5). Con dos
+     jugadores del mismo personaje y el mismo modo, el segundo NO vuelve a pedir .dcc: lo que se paga
+     por jugador extra es la superficie clonada, no el asset. (No se pudo medir el incremento: bloqueo 2.)
+   - Creacion: 2,01 s por jugador (6 .dcc de 37 KB a 196 KB por el cargo de DCC del motor). Con 4
+     jugadores son ~8 s de carga antes del primer cuadro.
+   - CPU por cuadro: `Advance` del Composite = 10 us. El cuadro se va en otra cosa (68.301 us de
+     "dibujo", que es el flip/vsync del PVR con la ventana de Flycast, no trabajo del motor).
+
+
+5. HALLAZGO 4 -- `AssetManager.LoadFile` NO SIRVE PARA ARCHIVOS GRANDES EN LA CONSOLA (medido)
+--------------------------------------------------------------------------------------------
+  `LoadFile` es `ioutil.ReadAll` sobre el stream del MPQ. En la consola:
+
+      .ds1 de 57.652 B          ReadAll  OK
+      primer .dt1 de 505.000 B  ReadAll  -> "Unhandled exception ... Data address error (read)",
+                                           PC en `io.ReadAll` (sh-elf-addr2line: io.ReadAll ??:?)
+
+  Con `MPQ.ReadFile` (reserva el buffer de una vez y lee de un tiron, el camino de DC-002.70) los
+  ocho .dt1 y `animdata.d2` (411.104 B) se leen sin drama. Por eso el POC lee los archivos grandes con
+  un MPQ abierto a mano y deja `LoadFile` para los chicos (la paleta, 768 B).
+  PENDIENTE para el motor: `LoadAsset` tiene que reservar el tamano (o leer por bloques) en la consola.
+
+
+6. BLOQUEO 1 (duro) -- EL SEGUNDO JUGADOR NO SE PUEDE CREAR
+----------------------------------------------------------
+  (log cap12)
+      JUGADOR J2 FALLO: could not find Animation data        <- y se repite en cada cuadro
+      ANIMDATA vivo registros= 2556                          <- la tabla sigue entera
+  `Composite.createMode` busca `Records.Animation.Data.GetRecords("AMNUHTH")`; el J1 lo encuentra (sin
+  GC todavia), el J2 NO -- aunque `GetRecordsCount()` sigue diciendo 2.556. Lo que cambia entre uno y
+  otro son las recolecciones del GC (gcTotal 6 -> 8): el map sigue "lleno" pero la busqueda por clave
+  falla.
+  Antes de eso se veia igual con `Equip` DESPUES de `SetMode`: `Equip` vuelve a llamar `createMode` y
+  ahi ya habia habido GCs -> mismo error. El POC lo evita poniendo `Equip` antes de `SetMode` (un solo
+  `createMode`), y con eso J1 carga; J2 ya no.
+  O sea: el GC de libgodc (copia + espacio doble) deja el map de `animdata` inutilizable despues de una
+  recoleccion. Es del RUNTIME, no del motor: hay que arreglarlo en libgodc (o dejar la tabla de
+  animaciones fuera del monton Go) antes de hablar de cooperativo. TARJETA NUEVA.
+
+7. BLOQUEO 2 (duro) -- PINTAR UN JUGADOR MATA LA CONSOLA
+--------------------------------------------------------
+  Con las 6 capas .dcc cargadas y el jugador creado, el PRIMER cuadro que lo pinta muere:
+      Unhandled exception: PC 3fd17b4f, code 1, evt 00e0
+      R0-R7: 00c0bebc 47accc34 ac0000e0 8c001008 00000000 00000064 8c61d1b8 000071e9
+      SR 40000001 PR 3fd17b4f     (PC == PR, no resuelve a simbolo: salto a basura)
+      Encountered Data address error (read).  kernel panic ... arch: aborting the system
+  R3 = 0xac0000e0 (espacio de VRAM del PVR). No pasa por `SetDirection` (se probo sin: igual), no pasa
+  por el mapa (se probo sin zona: igual). Se apaga con `dibujarJugadores = false` para poder medir las
+  etapas; queda como bloqueo a atacar. TARJETA NUEVA.
+
+
+8. LO QUE NO ENTRA TODAVIA (declarado)
+--------------------------------------
+  - N=2 y N=4: no medidos. Los bloquea el hallazgo 6 (el segundo jugador no se crea). Los numeros de
+    RAM por jugador (349.519 B de .dcc COMPARTIDOS + superficie clonada por jugador) alcanzan para
+    estimar: 4 jugadores del mismo personaje no suman 4 x 342 KB de assets, suman 342 KB una vez y
+    las superficies compuestas de los 4. La superficie compuesta por capa no se midio en consola.
+  - El mapa NO se pudo tener junto con los jugadores: con BIN 2,76 MB la zona compone pero despues no
+    queda monton para el primer jugador (OOM a 13,6 MB de arena, log cap7). Orden: zona -> jugadores
+    NO entra hoy; jugadores -> zona tampoco (la arena no devuelve lo que se uso).
+  - Controles, camaras y UI del coop: diseno posterior a estos numeros.
+
+
+9. COMO SE REPRODUCE
+--------------------
+  # banco valido: BIN 2,76 MB, zona del acto 1 identica a DC-002.70/75
+  BASE_GOX=~/.hermes/cache/scratch/dcb276/base bash scripts/console/build-coop-276.sh /tmp/dc276
+  CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/dc276/disc.gdi 170 /tmp/dc276/cap
+  grep -a COOP276 /tmp/dc276/cap/flycast.log
+
+  # la pared del tipo Player (BIN 4,87 MB): la zona muere en el 6o .dt1
+  MODO=jugador BASE_GOX=... bash scripts/console/build-coop-276.sh /tmp/dc276j
+
+  Interruptores del POC (console/dc/poc/coop/main.go):
+      zonaActiva        compone la zona del acto 1 antes de los jugadores (hoy: false en el banco final)
+      dibujarJugadores  pinta los jugadores cada cuadro (false: es el bloqueo 2)

@@ -1,0 +1,77 @@
+00:00:466 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+COOP276: video andando montonLibre= 1536 vramDeLaPantalla= 1048576
+COOP276: assetmanager listo montonLibre= 1712
+COOP276: mpq a mano listos montonLibre= 1888
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 2416
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=495920
+COOP276: ANIMDATA despues del GC montonLibre= 2416
+COOP276: BASELINE (N=0) montonLibre= 2416 gcColecciones= 1 vramDelLienzo= 0
+ARQ-CARGA entra /data/global/chars/AM/COF/AMNUhth.COF cfree=2416 cused=6204848 gsemi=501272/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=543504/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=930040/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=1486280/2097152 gc=1
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=731528
+00:31:474 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+COOP276: video andando montonLibre= 1536 vramDeLaPantalla= 1048576
+COOP276: assetmanager listo montonLibre= 1712
+COOP276: mpq a mano listos montonLibre= 1888
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 2416
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=496232
+COOP276: ANIMDATA despues del GC montonLibre= 2416
+COOP276: BASELINE (N=0) montonLibre= 2416 gcColecciones= 1 vramDelLienzo= 0
+ARQ-CARGA entra /data/global/chars/AM/COF/AMNUhth.COF cfree=2416 cused=6204848 gsemi=501584/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=543816/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=930352/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=1486592/2097152 gc=1
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=731840
+01:02:547 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+COOP276: video andando montonLibre= 1536 vramDeLaPantalla= 1048576
+COOP276: assetmanager listo montonLibre= 1712
+COOP276: mpq a mano listos montonLibre= 1888
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 2416
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=496544
+COOP276: ANIMDATA despues del GC montonLibre= 2416
+COOP276: BASELINE (N=0) montonLibre= 2416 gcColecciones= 1 vramDelLienzo= 0
+ARQ-CARGA entra /data/global/chars/AM/COF/AMNUhth.COF cfree=2416 cused=6204848 gsemi=501896/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=544008/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=930544/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=1486784/2097152 gc=1
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=732152
+01:33:587 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+COOP276: video andando montonLibre= 1536 vramDeLaPantalla= 1048576
+COOP276: assetmanager listo montonLibre= 1712
+COOP276: mpq a mano listos montonLibre= 1888
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 2416
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=496544
+COOP276: ANIMDATA despues del GC montonLibre= 2416
+COOP276: BASELINE (N=0) montonLibre= 2416 gcColecciones= 1 vramDelLienzo= 0
+ARQ-CARGA entra /data/global/chars/AM/COF/AMNUhth.COF cfree=2416 cused=6204848 gsemi=501896/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=544008/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=930544/2097152 gc=1
+ARQ-CARGA entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=2416 cused=6204848 gsemi=1486784/2097152 gc=1
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=732152
+02:04:658 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up

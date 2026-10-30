@@ -1,0 +1,29 @@
+//go:build dreamcast
+
+package main
+
+// DC-002.76 -- EL CAMINO DEL JUGADOR COMPLETO (`d2mapentity.Player`), que la tarjeta pedia.
+//
+// ESTE ARCHIVO NO SE COMPILA POR DEFECTO (.go.txt): el build lo mete con `MODO=jugador`
+// (scripts/console/build-coop-276.sh) y entonces reemplaza a participante.go. Existe para REPRODUCIR LA
+// PARED medida: con el cierre de `d2mapentity` enlazado el BIN mide 4,87 MB y el monton del SH-4 queda en
+// 11,38 MB; la corrida muere cargando el PRIMER jugador, con el monton practicamente vacio, al leer una de
+// las capas .dcc (ver console/dc/evidencia/dc-002.76-jugador-real.log).
+//
+// El jugador es el del motor, construido con `NuevoJugadorDeConsola`
+// (d2core/d2map/d2mapentity/jugador_consola.go: `NewPlayer` sin la hoja de heroe, que en la consola todavia
+// no se puede armar porque exige Skills.txt/charstats.txt).
+
+import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
+)
+
+func nuevoParticipante(indice int, nombre string, subtiles [2]int, direccion int) (participante, error) {
+	// `Player.Advance` usa la stamina de la hoja de heroe: la stats va vacia pero no nil
+	stats := &d2hero.HeroStatsState{}
+
+	return d2mapentity.NuevoJugadorDeConsola(am, "jugador-"+nombre, nombre,
+		subtiles[0], subtiles[1], direccion, d2enum.HeroAmazon, stats)
+}

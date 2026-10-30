@@ -1,0 +1,42 @@
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+COOP276: video andando montonLibre= 2400 vramDeLaPantalla= 1048576
+COOP276: assetmanager listo montonLibre= 2576
+COOP276: mpq a mano listos montonLibre= 2752
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 3280
+COOP276: ANIMDATA despues del GC montonLibre= 3280
+COOP276: BASELINE (N=0) montonLibre= 3280 gcColecciones= 1 vramDelLienzo= 0
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+COOP276: JUGADOR J1 indice= 0 direccion= 0 celda= 28 20 subtiles= 140 100 creacionUs= 2011389 montonAntes= 3280 montonDespues= 2976 gcPorLaCreacion= 4 gcTotal= 6
+COOP276: ETAPA n= 1 montonLibre= 2976 creacionUs= 2066359 gcEnLaCreacion= 5 gcTotal= 6
+COOP276: CACHES n= 1 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+COOP276: ETAPA n= 1 gcForzadoUs= 54411 montonLibreDespuesDelGC= 2976
+COOP276: CUADRO n= 1 cuadro= 1 pixelesNoVacios= 0 crc32= -1775012268 montonLibre= 2976
+COOP276: FILA n= 1 montonLibre= 2976 gcColeccionesTotal= 7 gcEnLaEtapa= 2 cuadros= 60 avanceUsPorCuadro= 10 dibujoUsPorCuadro= 68301 trabajoUsPorCuadro= 68311 fps= 9
+COOP276: CACHES n= 1 al cerrar | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 8
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 9
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 10
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 11
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 12
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 13
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 14
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 15
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 16
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 17
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 18
+COOP276: JUGADOR J2 FALLO: could not find Animation data
+# DC-002.76 -- corrida final MODO=composite (N=1 medido; N=2 bloqueado)
+# Recortado: el fallo de J2 se repite en cada cuadro.
