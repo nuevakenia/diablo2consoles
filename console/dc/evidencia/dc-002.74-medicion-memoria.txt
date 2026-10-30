@@ -1,0 +1,142 @@
+DC-002.74 -- MEDICION DE MEMORIA: donde esta la RAM que falta, y que cuesta cada palanca
+Fecha: 2026-10-30
+Medido por: Hermes (Papu), sobre el arbol de .gox de la Fase A compilado en /tmp/gox-med
+(208 .gox = 145 paquetes del repo + 63 de la stdlib minima; gccgo 15.1.0, sh-elf, -O2 sin -g).
+
+
+POR QUE ESTA MEDICION
+---------------------
+El bloque de texturas de 4 MB no entra: pide ~8,39 MB de techo de monton y hay 6.153.956 B.
+Faltan ~2,24 MB. Antes de elegir como ganarlos habia que medir DONDE esta ese peso, porque la
+estimacion previa ("mover .rodata al disco da 2-3 MB") no estaba medida y resulto optimista.
+
+Se midieron dos cosas: (1) la IMAGEN del binario por seccion y por paquete, (2) el costo de un
+personaje (sus animaciones) y la politica de cache del motor.
+
+
+COMO SE REPRODUCE
+-----------------
+  source scripts/console/env.sh
+  bash scripts/console/build-std-gox.sh /tmp/gox-med
+  bash scripts/console/build-motor-all.sh /tmp/gox-med /tmp/log-med
+  bash scripts/console/medir-imagen.sh /tmp/gox-med /tmp/td-desglose.txt
+
+  # el personaje (necesita el MPQ del juego)
+  go run ./console/dc/medidas/personaje \
+     "$HOME/.wine-d2/drive_c/Games/Diablo II/d2char.mpq" \
+     'data\global\CHARS\AM\COF\amnuhth.cof'
+
+  # una zona (el lector de MPQ no resuelve las rutas de tile que lista el .ds1: ver PENDIENTE)
+  go run ./console/dc/medidas/zona \
+     "$HOME/.wine-d2/drive_c/Games/Diablo II/d2data.mpq" \
+     'data\global\tiles\ACT1\TOWN\townN1.ds1'
+
+
+1. LA IMAGEN, POR SECCION (208 .gox, antes del enlace)
+-------------------------------------------------------
+  text          4.539.388 B    4,33 MB
+  rodata        6.246.717 B    5,96 MB   <- lo unico ALLOC de datos
+  go_export    11.951.419 B   11,40 MB   <- NO ALLOC: no va al binario, no ocupa RAM
+  data             74.892 B    0,07 MB
+  bss              18.960 B    0,02 MB
+  ---------------------------------------------------
+  IMAGEN       10.879.957 B   10,38 MB   (text+rodata+data+bss)
+
+  HALLAZGO 1: los 11,4 MB de .go_export NO son un problema. Se verifico el flag con
+  `sh-elf-objdump -h .../d2gamescreen.gox` (seccion 2007): `CONTENTS, READONLY` -- sin ALLOC.
+  Es metadata de compilacion de gccgo y muere en el enlace. Contarla como "gorda" es un error
+  de lectura, y explica por que el BIN final es 10,3 MB y no 22,8 MB.
+  En cambio `.rodata` si es `ALLOC, LOAD, RELOC, READONLY, DATA`: viaja y ocupa RAM.
+
+  Coherencia con lo ya medido (DC-002.68): .rodata 5,63 MB en el ELF enlazado, BIN 10.337.608 B.
+  Text 4,33 + rodata 5,63 + data/bss 0,09 = 10,05 MB -> cuadra con el BIN (mas cabeceras).
+
+
+2. EL ARBOL QUE EL JUEGO REALMENTE ALCANZA (medido con `go list -deps ./d2app`)
+-------------------------------------------------------------------------------
+  alcanzables desde d2app : 132 de 145 paquetes -> 9,56 MB de imagen
+  NO alcanzables          :  11 paquetes       -> 0,19 MB
+
+  los 11 que el juego no toca (y son justo los nuevos del backend):
+      73.022 B  herogen
+      53.819 B  pvr
+      22.296 B  aica
+      14.215 B  d2udpclientconnection
+      11.027 B  maple
+      10.822 B  d2replay
+       4.223 B  d2thread
+       4.203 B  d2loadscreen
+       2.243 B  d2palshift
+           8 B  d2data
+           8 B  d2common
+
+  HALLAZGO 2: no hay MB escondidos en "paquetes que el juego no usa". El juego alcanza casi todo
+  el motor (incluye d2server -> d2networking -> d2realm/d2mp): sacar los paquetes de red NO es la
+  veta que parecia. Lo unico prescindible son 196 KB, y son precisamente los paquetes que la
+  Fase B/C acaba de escribir (pvr/aica/maple): sacarlos seria sacar el trabajo de anoche.
+
+
+3. .rodata: LA VETA DE "DATOS AL DISCO" ESTA AGOTADA
+----------------------------------------------------
+  suma de simbolos en .rodata (nm -S, tipos r/R)     1.723.382 B
+  los 100 simbolos mas grandes juntos                  192.336 B
+  el simbolo mas grande                                 14.880 B  (d2gamescreen, _go..C5202)
+
+  HALLAZGO 3: no hay tabla gigante que mover. El .rodata esta hecho de decenas de miles de
+  constantes chicas (strings de UI, tablas de switch, mensajes). El unico pez grande que habia
+  --la tabla de objectLookups, 1,78 MB-- YA se movio al disco en DC-002.42/43.
+  Mover el resto exigiria tocar miles de literales o instrumentar el linker: no es una palanca
+  de proyecto. La estimacion previa de 2-3 MB era optimista; el techo real de esta via es ~0.
+
+
+4. CUANTO PESA UN PERSONAJE (lo que decide el cooperativo)
+----------------------------------------------------------
+  COF de la amazona (data\global\CHARS\AM\COF\amnuhth.cof):
+      bytes del COF        1.132
+      direcciones          16
+      frames por direccion 8
+      frames totales       128
+      capas                8 (cuerpo, cabeza, torso, ...)
+
+  El set completo del personaje en el MPQ (12 COF medidos uno por uno):
+      NU 128   WL 128   RN 128   A1 208   A2 208   GH  96
+      DT 368   SC 320   KK 192   S1 144   TH 256   TW 128
+      ------------------------------------------------
+      TOTAL                                          2.304 frames
+
+  Frame compuesto medido en la consola (DC-002.56, evidencia
+  dc-002.56-vram-preinit.txt:172): 8.216 B.
+      2.304 frames x 8.216 B = 18.929.664 B = 18,05 MB
+
+  HALLAZGO 4: cachear TODAS las animaciones de UN personaje son 18 MB, mas que la RAM entera de
+  la consola (16 MB) y 3 veces el techo del monton (6,15 MB). El cooperativo de 4 jugadores no
+  es "un poco mas de RAM": depende por completo de cuanto se cachee.
+
+  HALLAZGO 5: los caches del AssetManager NO tienen tope ni LRU.
+  d2core/d2asset/asset_manager.go:36 define `defaultCacheEntryWeight = 1` y todas las inserciones
+  usan ese peso constante (d2interface.Cache). No hay limite, no hay desalojo: lo que se carga
+  queda. Con 1 heroe eso ya llena el monton; con 4, se multiplica por 4 sin freno.
+
+
+5. UNA ZONA
+-----------
+  townN1.ds1 (pueblo del acto 1): 57.652 B, acto 1, lista 8 archivos de tile (.tg1).
+  Los 8 .tg1 NO se pudieron medir: el lector de MPQ no resuelve las rutas que el .ds1 lista
+  ("\d2\data\global\tiles\act1\...": se probaron 3 variantes de nombre y las 3 fallaron).
+  PENDIENTE: medir el peso real de una zona con el nombre exacto de la tabla del MPQ.
+
+
+CONCLUSION MEDIDA
+-----------------
+  La imagen NO se puede recortar 2,24 MB sin sacar funcionalidad:
+      - .go_export (11,4 MB) no cuenta: no va al binario.
+      - .rodata (5,63 MB) esta fragmentado: no hay tabla que mover.
+      - el arbol del juego alcanza 132/145 paquetes: solo 196 KB no se usan.
+  Las palancas que quedan, con su costo medido:
+      -Os en vez de -O2 .................... ~370 KB   (paga CPU)
+      semiespacio del GC a 1 MB ............ 2,09 MB   (paga tirones de recoleccion)
+      -gc-sections ......................... 448 KB    (ya aplicado, es el techo)
+      enlazar menos paquetes ............... 2,26 MB   (saca d2gamescreen+d2player = la UI)
+  Y las que atacan el problema real del cooperativo, que no es la imagen sino el runtime:
+      cache con tope por jugador + assets compartidos entre jugadores
+      no pedir el bloque de texturas de 4 MB de una: cargarlo por zona/por partes
