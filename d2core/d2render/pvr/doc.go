@@ -23,10 +23,14 @@
 // de d2core/d2render/ebiten) y el sprite paletizado de 8 bits (DC6/COF) tanto por software como por el
 // PVR.
 //
-// LO QUE ESTE PAQUETE NO TRAE (y es la tarjeta siguiente, DC-002.70):
-//   - el Renderer (Run/CreateSurface/NewSurface): Surface.Renderer() devuelve nil a proposito, porque el
-//     ciclo de cuadros y el boton de la consola son otro contrato.
-//   - d2gamescreen montado: este paquete se pruebe solo, con su POC (console/dc/poc/pvr-surface).
+// EL RENDERER (DC-002.70): renderer.go es la implementacion de d2interface.Renderer (Run con el ciclo de
+// cuadros, CreateSurface/NewSurface, CurrentFPS, el cartel de panico y el texto de depuracion). Un cuadro
+// se compone en el lienzo de la Surface y el Renderer lo sube a la VRAM y lo pinta. La superficie del cuadro
+// vive en la VRAM (SuperficieDeLaPantalla) porque el monton no tiene el lienzo y el mapa del nivel a la vez.
+// El POC console/dc/poc/estado-b dibuja con todo esto el MISMO mapa y el MISMO personaje que el POC de
+// DC-002.38 (que dibuja con el shim de ebiten), y sus capturas se comparan pixel a pixel.
+//
+// LO QUE SIGUE SIN ENTRAR: d2gamescreen montado (es la Fase D).
 //
 // LO QUE NO PUEDE SER FIEL, DECLARADO (no escondido):
 //   - PushFilter(FilterLinear) se dibuja con muestreo NEAREST: el rasterizador por software no interpola.

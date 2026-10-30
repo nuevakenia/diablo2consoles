@@ -20,6 +20,10 @@ type Imagen struct {
 	pixeles []byte
 	ancho   int
 	alto    int
+
+	// vram: si los pixeles viven en la VRAM del PVR (el lienzo del cuadro, ver SuperficieDeLaPantalla).
+	// Importa para la evidencia: dice DONDE esta el cuadro, y para no confundir una copia con el original.
+	vram bool
 }
 
 // NuevaImagen: un lienzo negro del tamano pedido.

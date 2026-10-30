@@ -38,6 +38,10 @@ type Surface struct {
 	pila   []estado
 	actual estado
 
+	// renderer: el Renderer que la creo (nil si la superficie se armo sola, como en la prueba de humo de
+	// DC-002.69). Es lo que devuelve Renderer().
+	renderer *Renderer
+
 	// textos: cuantos DrawTextf se pidieron (para la evidencia: el motor llama, aunque la fuente sea la
 	// provisional).
 	textos int
@@ -78,10 +82,72 @@ func (s *Surface) RenderSprite(sp *Sprite) {
 	copiarEn(s.imagen, sp.Imagen(), s.matriz(), s.ajuste(), sinForzar)
 }
 
-// Renderer devuelve el renderer de esta superficie. En este backend es nil: el Renderer (el ciclo de
-// cuadros, CreateSurface/NewSurface) es la tarjeta siguiente (DC-002.70). Devolver nil es explicito y esta
-// declarado en doc.go: el motor no puede pedirle nada a un Renderer desde aca.
-func (s *Surface) Renderer() d2interface.Renderer { return nil }
+// Renderer devuelve el renderer de esta superficie: el que la creo (DC-002.70). Es nil solo si la
+// superficie se armo sola (NuevaSurface fuera de un Renderer, como en la prueba de humo de DC-002.69).
+func (s *Surface) Renderer() d2interface.Renderer {
+	if s.renderer == nil {
+		return nil
+	}
+
+	return s.renderer
+}
+
+// RenderIndices dibuja un mapa de INDICES de 8 bits con su paleta en la posicion actual, expandiendo los
+// pixeles AL VUELO contra el lienzo.
+//
+// POR QUE EXISTE, Y NO SE USA RenderSprite: RenderSprite cachea la expansion a RGBA del sprite, y el MAPA
+// del nivel es 512x512: 1.048.576 B de cache que el monton de la consola no tiene junto con la pantalla
+// (medido: el techo es ~1,23 MB para un bloque). Aca no se guarda nada: se lee el indice y se escribe el
+// pixel, asi que el mapa cuesta sus 262.144 B de indices y nada mas. Para el personaje y los sprites chicos
+// va RenderSprite, que es mas barato por cuadro.
+//
+// LA PALETA ES DE 8 BITS (R,G,B por indice), NO ARGB1555, y es a proposito: este es el camino por SOFTWARE
+// (el lienzo es RGBA de 8 bits), asi que cuantizar a los 5 bits del PVR seria perder color sin ninguna
+// ganancia. La paleta de 5 bits es la del camino de HARDWARE (Sprite/SubirSpritePVR), que es otra cosa.
+// Medido en DC-002.70: con la paleta ARGB1555 el cuadro de la consola coincidia con el del host en el 44,15 %
+// de los pixeles (el resto a +-8 por la cuantizacion); con la de 8 bits, ver la evidencia.
+//
+// EL INDICE 0 ES TRANSPARENTE (el convenio de los DC6/COF y del mapa del nivel: lo que no pinto ningun tile
+// se queda con lo que habia en el lienzo).
+func (s *Surface) RenderIndices(indices []byte, ancho, alto int, paleta [][3]uint8) {
+	if ancho <= 0 || alto <= 0 || len(indices) < ancho*alto || len(paleta) < 256 {
+		return
+	}
+
+	dx, dy := s.actual.x, s.actual.y
+	anchoLienzo, altoLienzo := s.imagen.ancho, s.imagen.alto
+	pixeles := s.imagen.pixeles
+
+	for y := 0; y < alto; y++ {
+		cy := dy + y
+		if cy < 0 || cy >= altoLienzo {
+			continue
+		}
+
+		base := cy * anchoLienzo * 4
+		fila := y * ancho
+
+		for x := 0; x < ancho; x++ {
+			idx := indices[fila+x]
+			if idx == 0 {
+				continue
+			}
+
+			cx := dx + x
+			if cx < 0 || cx >= anchoLienzo {
+				continue
+			}
+
+			c := paleta[idx]
+			j := base + cx*4
+
+			pixeles[j+0] = c[0]
+			pixeles[j+1] = c[1]
+			pixeles[j+2] = c[2]
+			pixeles[j+3] = 255
+		}
+	}
+}
 
 // Clear rellena el lienzo entero con el color.
 func (s *Surface) Clear(c color.Color) { s.imagen.Rellenar(aRGBA(c)) }

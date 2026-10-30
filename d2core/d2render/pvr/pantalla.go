@@ -3,6 +3,7 @@
 package pvr
 
 import (
+	"image/color"
 	"unsafe"
 )
 
@@ -29,6 +30,21 @@ func d2cPvrPantallaPintar()
 
 //extern d2c_pvr_pantalla_vram
 func d2cPvrPantallaVram() int
+
+//extern d2c_pvr_pantalla_fb_init
+func d2cPvrPantallaFbInit(w, h int) int
+
+//extern d2c_pvr_pantalla_fb
+func d2cPvrPantallaFb() uintptr
+
+//extern d2c_pvr_pantalla_fb_bytes
+func d2cPvrPantallaFbBytes() int
+
+//extern d2c_pvr_pantalla_us
+func d2cPvrUs() int
+
+//extern d2c_pvr_pantalla_mem_libre
+func d2cPvrPantallaMemLibre() int
 
 //extern d2c_pvr_sprite_subir
 func d2cPvrSpriteSubir(idx, pal uintptr, w, h, pw, ph int) int
@@ -196,3 +212,53 @@ func LiberarSpritePVR() {
 
 // VramDelSprite: cuantos bytes de VRAM ocupa el sprite subido (0 = no hay ninguno).
 func VramDelSprite() int { return spriteEnVram }
+
+// ============================================================ el LIENZO del cuadro en la VRAM
+
+// lienzoEnVram: cuantos bytes del lienzo del cuadro viven en la VRAM (0 = el lienzo esta en el monton).
+var lienzoEnVram int
+
+// SuperficieDeLaPantalla: la superficie del CUADRO del motor, con sus pixeles en la VRAM del PVR.
+//
+// POR QUE (medido, ver la cabecera de renderer.go): el lienzo 640x480x4 = 1.228.800 B y el techo del
+// monton de C es ~1,23 MB para UN bloque; con el mapa del nivel (512x512 = 262.144 B) vivo al mismo tiempo
+// no entran los dos. La palanca es la de DC-002.22, ya medida en el repo: `d2c_pvr_pantalla_fb_init`
+// reserva w*h*4 bytes de los 8 MB de VRAM y el slice de pixeles apunta ahi. El resto del backend no cambia
+// una linea: escribir un pixel sigue siendo `pixeles[i] = v`.
+//
+// LO QUE CUESTA, DICHO DE FRENTE: la VRAM se escribe sin cache, asi que componer el cuadro pixel a pixel
+// contra VRAM es mas lento que contra RAM. Se cambia RAM que no habia por velocidad de dibujado, y el costo
+// se mide (los us de cada etapa, mas abajo).
+//
+// SI LA VRAM NO DA: la superficie sale del monton (NuevaSurface) y el que mide lo sabe por
+// VramDelLienzo(), que devuelve 0. El aviso tambien va a la consola serie.
+func SuperficieDeLaPantalla(ancho, alto int) *Surface {
+	if r := d2cPvrPantallaFbInit(ancho, alto); r != 0 {
+		println("PVR-RENDERER: la VRAM no dio para el lienzo (codigo", r, "); el cuadro va al monton")
+
+		lienzoEnVram = 0
+
+		return NuevaSurface(ancho, alto)
+	}
+
+	n := ancho * alto * 4
+	// el patron del shim de DC-002.22: puntero a array de largo maximo y recorte (el runtime de la consola
+	// no tiene unsafe.Slice, y un unsafe.Pointer en un campo pide descriptores que libgodc no trae).
+	pixeles := (*[1 << 30]byte)(unsafe.Pointer(d2cPvrPantallaFb()))[:n:n]
+
+	img := &Imagen{pixeles: pixeles, ancho: ancho, alto: alto, vram: true}
+	img.Rellenar(color.RGBA{R: 0, G: 0, B: 0, A: 255})
+
+	lienzoEnVram = d2cPvrPantallaFbBytes()
+
+	println("PVR-RENDERER: el lienzo del cuadro vive en la VRAM:", lienzoEnVram, "bytes")
+
+	return SurfaceDesdeImagen(img)
+}
+
+// VramDelLienzo: cuantos bytes del lienzo del cuadro estan en la VRAM (0 = en el monton).
+func VramDelLienzo() int { return lienzoEnVram }
+
+// MemLibreDelMonton: los bytes libres del monton de C en este momento (para la evidencia: es el techo con
+// el que hay que negociar la memoria del cuadro).
+func MemLibreDelMonton() int { return d2cPvrPantallaMemLibre() }

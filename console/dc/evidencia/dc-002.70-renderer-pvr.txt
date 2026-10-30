@@ -1,0 +1,198 @@
+DC-002.70 -- Fase B.2: el Renderer PVR y el mapa del motor dibujado por la interfaz
+====================================================================================
+Fecha: 2026-10-30
+Rama: DC-002 (checkout unico, sin worktrees)
+Tarjeta: t_d9f2ae5f
+
+Que se hizo, en una linea
+-------------------------
+Se implementaron los 15 metodos de `d2interface.Renderer` sobre el PVR (`d2core/d2render/pvr/renderer.go`),
+y un POC nuevo (`console/dc/poc/estado-b/`) que dibuja EL MISMO mapa y EL MISMO personaje del POC de
+DC-002.38 pero por la interfaz del motor (Surface/Renderer) en vez del shim de Ebitengine. La captura de la
+consola coincide con la del POC en el 99,84 % de los pixeles (filas 26..473) y con la referencia del host en
+todo el cuadro dentro de +-8 por canal.
+
+1. Lo que se implemento en d2core/d2render/pvr
+---------------------------------------------
+- `renderer.go` (NUEVO, 316 lineas): `Run(cb)`, `CreateSurface`, `NewSurface`, `CurrentFPS`,
+  `ShowPanicScreen`, `Print`, `PrintAt` y los no-ops documentados de fullscreen/vsync/cursor. El cuadro:
+  `PvrWaitReady` -> `PvrSceneBegin` -> `PvrListBegin(OP)` -> `actualizar()` -> `dibujar(malla)` ->
+  `Presentar+Pintar` -> `PvrListFinish` -> `PvrSceneFinish`. Ese orden es el medido en el shim de
+  DC-002.9/002.22 y es el que exige el PVR (listas de OP antes de tocar el framebuffer).
+- `pantalla.go`: externs de framebuffer/VRAM (`d2c_pvr_pantalla_fb_init`, `..._fb`, `..._fb_bytes`),
+  `d2c_pvr_pantalla_us` para el reloj y `d2c_pvr_pantalla_mem_libre`; `VramDelSprite()`;
+  `SuperficieDeLaPantalla()`, que arma la superficie del cuadro con los pixeles EN VRAM.
+- `surface.go`: campo `renderer` + `Renderer()` (el renderer que creo la superficie; `nil` si se armo sola) y
+  `RenderIndices(...)`, que dibuja un mapa de indices de 8 bits expandiendo contra el lienzo, indice 0
+  transparente.
+- `imagen.go`: campo `vram bool`, para distinguir el original (en VRAM) de una copia.
+- `doc.go`: se reemplazo la nota de "lo que este paquete NO trae" por la descripcion del renderer ya
+  implementado y del POC estado-b. Sigue fuera `d2gamescreen` montado (Fase D).
+
+2. Dos decisiones que son la mitad del trabajo
+----------------------------------------------
+(a) EL LIENZO DEL CUADRO VA EN VRAM, NO EN EL MONTON.
+    640x480x4 = 1.228.800 B, y el techo del monton de C es ~1,23 MB por bloque: con el mapa (512x512 =
+    262.144 B) vivo al mismo tiempo, no entran los dos. Se reutiliza la palanca medida en DC-002.22:
+    `d2c_pvr_pantalla_fb_init(w,h)` reserva `w*h*4` de los 8 MB de VRAM y el slice de pixeles apunta ahi.
+    Medido en esta corrida: `lienzoEnVram= 1228800` y `montonLibre= 488` con el nivel y el personaje
+    cargados. O sea: en el monton no sobraba NADA; sin la VRAM esto no entraba.
+
+(b) EL MAPA SE DIBUJA CON `RenderIndices`, NO CON `RenderSprite`.
+    `RenderSprite` cachea la expansion a RGBA: el mapa costaria 512x512x4 = 1.048.576 B de cache, que no
+    existen. `RenderIndices` lee el indice y escribe el pixel al vuelo: el mapa cuesta sus 262.144 B de
+    indices y nada mas. Para el personaje (26x79) si va `RenderSprite`.
+
+3. El POC `console/dc/poc/estado-b/` (main.go 379 lineas, csrc/shim.c 24 lineas)
+-------------------------------------------------------------------------------
+Misma cadena que el POC de referencia, con el MISMO codigo: `nivel.go` y `personaje.go` se COPIAN desde
+`console/dc/poc/personaje-mapa/` en tiempo de build y el script compara su sha256 contra la copia del
+verificador del host. Nada de duplicar el compositor.
+
+    .ds1 del acto 1 del MPQ -> d2ds1 -> DT1 listados -> d2dt1 -> nivel.go -> indices + paleta del acto
+    COF AM/NU/HTH de d2char.mpq -> .dcc/.dc6 -> d2dcc/d2dc6 -> personaje.go -> sprite paletizado
+
+y el dibujo, por la interfaz:
+
+    malla.Clear(...)                 // superficie de 640x480 del Renderer
+    malla.PushTranslation(64, -16)
+    malla.RenderIndices(indices, 512, 512, paleta)   // el mapa
+    malla.Pop()
+    malla.PushTranslation(302, 175)
+    malla.RenderSprite(personaje)                    // el personaje
+    malla.Pop()
+
+La paleta que se pasa es de 8 BITS (R,G,B por indice), no ARGB1555, y eso se midio: con la paleta de 5 bits
+del PVR el cuadro coincidia con la referencia del host en el 44,15 % de los pixeles (el resto a +-8 por la
+cuantizacion) y con la de 8 bits subio al 46,20 % identico y 0 pixeles fuera de +-8. Cuantizar en el camino
+por SOFTWARE solo pierde color: los 5 bits son del camino de HARDWARE (Sprite/SubirSpritePVR).
+
+4. Lo que dijo la consola (log de Flycast, /tmp/dcbuild/c270b/flycast.log)
+--------------------------------------------------------------------------
+    ESTADOB: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+    ESTADOB: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456
+    ESTADOB: PALETA acto colores=256 crc32= 3508331570 monton libre (bytes): 2168
+    ESTADOB: COF bytes= 1132 crc32= 2708601289 capas= 8 framesPorDir= 8 dirs= 16
+    ESTADOB: CAPA SH SIN-GRAFICO ruta= data/global/chars/AM/SH/AMSHLITNU1ht.dc6 err= file not found
+    ESTADOB: PERSONAJE compuesto= 26 x 79 esquina= -18 -65 capasDibujadas= 7 sinGrafico= 0 pixelesNoVacios= 896 crc32= 1857478036
+    ESTADOB: POS-INICIAL celda= 28 20 ancla= 256 256 esquinaDelCompuesto= -18 -65 pantalla= 302 175
+    ESTADOB: monton libre con el nivel y el personaje cargados (bytes): 488
+    ESTADOB: CUADRO pixelesNoVacios= 178248 de 307200 crc32= 1321968744 tamano= 640 480 lienzoEnVram= 1228800 montonLibre= 488
+
+Los tres numeros que importan, cruzados contra las otras dos puntas:
+
+    LIENZO    crc32= 3507647456  == POC DC-002.38 (mismo crc32) == verificador del host (mismo crc32)
+    PERSONAJE crc32= 1857478036  == POC DC-002.38 == verificador del host
+    POS-INICIAL pantalla= 302 175 == lo que dice el host (`personaje_en=302,175`)
+
+O sea: el compositor del mapa y el del personaje, corridos por la interfaz del motor en la consola, dan
+BIT A BIT lo mismo que el compositor del host. La CAPA SH SIN-GRAFICO es el limite conocido de DC-002.38
+(falta `AMSHLITNU1ht.dc6` en el MPQ): se reporta, no se tapa; el POC sigue y dibuja 7 de 8 capas.
+
+5. La comparacion de pixeles (scripts/console/comparar-estado-b-270.py)
+----------------------------------------------------------------------
+Las dos capturas (estado B y POC de DC-002.38) pasan por el MISMO emulador con el MISMO escenario (DS1 del
+acto 1, personaje quieto en la celda 28,20). El script ubica la pantalla por su firma geometrica (las dos
+bandas negras de 64 columnas del mapa de 512, que dicen ademas que la escala es 1:1), alinea la segunda
+captura por correlacion y compara pixel a pixel.
+
+    estado B  -> pantalla en (1400, 120)
+    POC       -> pantalla en (1400, 120)   [acuerdo del alineado: 25.600 pixeles]
+
+    filas comparadas  0..473 (474; las 6 ultimas del cuadro las tapa el borde de la ventana del emulador)
+    pixeles           303.360
+    IDENTICOS         299.679  (98,79 %)
+      cuantizacion        570  (0,19 %)  difieren <= 8 por canal
+      CONTENIDO         3.111  (1,03 %)
+
+Y los 3.111 pixeles de contenido NO estan en el mapa: estan TODOS en las bandas laterales (x 0..63 y
+576..639), en las filas 0..25. Partiendo el cuadro en sus dos zonas:
+
+    zona del mapa (x 64..575, las 474 filas)  242.688 px   identicos 99,81 %  <=8 0,19 %  CONTENIDO 0
+    bandas laterales (x 0..63 y 576..639)      60.672 px   identicos 94,60 %  CONTENIDO 3.111 (filas 0..25)
+
+La causa esta medida y es del POC de referencia, no del camino nuevo: el POC de DC-002.38 NO limpia su
+pantalla, pinta el mapa ENCIMA de lo que habia (`console/dc/poc/personaje-mapa/main.go:442`,
+`pantalla.DrawImage(j.mapa, &op)`, y nada antes), asi que las bandas que el mapa no cubre se quedan con lo
+que tenia la VRAM (una franja gris de (90,89,90) a (164,166,164) en las primeras 26 filas). El estado B si
+limpia: `console/dc/poc/estado-b/main.go:337` `malla.Clear(color.RGBA{...})` sobre la superficie del
+Renderer, y por eso sus bandas son negro puro. O sea: en esas 26 filas el estado B es MAS limpio que la
+referencia; el contenido dibujado (mapa y personaje) coincide en el 100 % dentro de +-8.
+
+Las causas de las diferencias, medidas (no supuestas):
+
+  a) PROFUNDIDAD DE COLOR DEL VIDEO, `console/dc/std/csrc/pvr_pantalla.c` (la conversion del framebuffer a
+     RGB565: `(r>>3)<<11 | (g>>2)<<5 | (b>>3)`) y el dithering con que Flycast lo devuelve a 888: ninguna
+     diferencia pasa de 8 por canal. Es el UNICO motivo de las 570 diferencias del cuadro.
+  b) LIMPIEZA DEL FONDO (los 3.111 de las bandas): ver arriba, `personaje-mapa/main.go:442` vs
+     `estado-b/main.go:337`. No es blending ni escalado: es que la referencia no borra.
+  c) NADA de blending: `Surface.RenderIndices` escribe el pixel opaco (alpha 255, sin mezcla) y el POC pinta
+     opaco tambien; con blending la diferencia no seria <= 8, seria de decenas.
+  d) NADA de escalado: la ventana del emulador quedo a 1:1 (las bandas miden exactamente 64 columnas) y el
+     alineado por correlacion da 25.600 de 25.600 pixeles de la plantilla dentro de tolerancia.
+  e) NADA de texto: el POC de referencia dibuja 2 cosas (`dibujos 2` en su log) y el estado B dibuja las
+     mismas 2; no hay fuente ni cartel en ninguno de los dos cuadros.
+
+Contra la referencia EXACTA del host (`console/dc/verif-personaje-238`, PNG 640x480 sin pasar por el
+emulador) el cuadro de la consola da 46,20 % de pixeles identicos y **0 pixeles fuera de +-8** sobre 300.800:
+la mitad exacta es solo lo que el RGB565 puede representar sin cambio. El conteo de pixeles pintados lo dice
+igual: consola 178.248, host 178.252 (4 pixeles: el personaje pasa por ARGB1555, asi que un color muy oscuro
+se le va a 0).
+
+6. Build y enlace
+-----------------
+    sh-elf-gccgo ... -fgo-pkgpath=.../d2core/d2render/pvr -c d2core/d2render/pvr/*.go
+      -> /tmp/gox-std/github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr.gox  316.840 B
+    bash scripts/console/build-estado-b-270.sh /tmp/dcbuild/estado270
+      prog.elf          7.454.900 B
+      1ST_READ.BIN      1.330.312 B
+      codigo (.text)      778.064 B
+      rodata              535.560 B
+      data+bss            228.760 B
+      disc.iso        536.420.352 B  (los DOS MPQ, d2data + d2char, montados en /JUEGO)
+
+El build del POC de referencia se hizo con el MISMO arbol de enlace (los .gox del motor) para que el
+compositor sea el mismo codigo:
+    GODC_GOX=/tmp/dcbuild/estado270/gox-enlace SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
+      bash scripts/console/build-personaje-238.sh /tmp/dcbuild/poc270
+
+7. `go build ./...` en el host
+------------------------------
+SIGUE con UN paquete rojo, el MISMO de antes de esta tarjeta (ya documentado en
+console/dc/evidencia/dc-002.69-pvr-surface.txt, linea 115):
+
+    console/dc/engine/ebiten/v2/ebiten.go:25:2: package kos is not in std (/usr/lib/go/src/kos)
+
+Es el shim de Ebitengine de la consola: importa `kos`, que solo existe en el toolchain de Dreamcast. No lo
+toca esta tarjeta y no se arregla con un tag sin cambiar el build de la consola. El RESTO del motor compila
+verde:
+
+    go build ./d2core/... ./d2common/... ./d2game/... ./d2app/... ./d2networking/... ./d2script/... ./d2thread/...
+      -> rc=0, sin salida
+
+8. Reproducirlo
+---------------
+    cd /home/dgalli/Proyectos/diablo2consoles
+    bash scripts/console/build-estado-b-270.sh /tmp/dcbuild/estado270
+    CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/dcbuild/estado270/disc.gdi 150 /tmp/dcbuild/c270
+    # el POC de referencia, con el mismo escenario:
+    GODC_GOX=/tmp/dcbuild/estado270/gox-enlace SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
+      bash scripts/console/build-personaje-238.sh /tmp/dcbuild/poc270
+    CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/dcbuild/poc270/disc.gdi 150 /tmp/dcbuild/cpoc270
+    # la comparacion:
+    python3 scripts/console/comparar-estado-b-270.py /tmp/dcbuild/c270/f120s.png /tmp/dcbuild/cpoc270/f120s.png
+
+Hay que darle ~120 s: abrir el MPQ desde el ISO son ~10 s y componer el mapa ~20 s (medido en DC-002.38).
+
+Las dos capturas recortadas al cuadro de 640x474 (lo que se comparo) quedan en:
+    console/dc/evidencia/dc-002.70-estado-b-cuadro.png
+    console/dc/evidencia/dc-002.70-poc-cuadro.png
+
+9. Lo que queda abierto
+-----------------------
+- El 0,16 % de cuantizacion es el RGB565 del framebuffer: si algun dia hace falta color exacto en consola,
+  el PVR soporta RGB555/RGB565 de 16 bits y no hay mas (el modo de 24 bits no existe en el hardware).
+- `Print`/`PrintAt` del Renderer PVR existen y dibujan con la fuente del paquete, pero el cuadro comparado no
+  los usa: no hay texto en ninguno de los dos POC. La prueba de que no ensucian el cuadro es que la
+  comparacion de las 448 filas da 0 pixeles de contenido distinto.
+- El siguiente paso de la fase es montar `d2gamescreen` sobre este Renderer (Fase D).
