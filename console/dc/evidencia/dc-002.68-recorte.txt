@@ -1,0 +1,175 @@
+DC-002.68 (Fase B.1) - EL RECORTE DEL BINARIO DEL MOTOR
+======================================================
+
+Fecha: 2026-10-29. Rama DC-002. Antes: DC-002.67 (el motor entero enlaza y arranca, pero sin RAM para dibujar).
+
+LA PREGUNTA
+-----------
+DC-002.67 dejo medido el bloqueo: el binario del motor con los 125 paquetes del paso 3 pesa 11.664.488 B
+de los 16 MB de RAM, y en Flycast malloc(1.228.800) -- la pantalla 640x480 RGBA del motor -- FALLA. Esta
+tarjeta ataca el TAMANO con las tres palancas que ya estaban declaradas y medidas en el repo (-g0,
+-ffunction-sections/-fdata-sections + --gc-sections, y el .eh_frame fuera del mapa), mide cada eslabon y,
+si no alcanza, dice QUE ocupa el binario para atacar con datos.
+
+QUE SE CAMBIO (3 puntos, todos con su por que en el codigo)
+----------------------------------------------------------
+1. scripts/console/env.sh (GODC_GOFLAGS)  -- se agregan tres flags que viajan a TODOS los caminos que
+   compilan Go para la consola (stdlib minima, terceros, .gox del motor y el main del POC):
+       -g0                  fuera el DWARF de los .gox (antes 11,3 MB de los 40,6 del prog.elf)
+       -ffunction-sections  una seccion .text.<simbolo> por funcion
+       -fdata-sections      lo mismo con los datos (sin esto el .rodata del paquete es un bloque unico)
+2. scripts/console/build-dc.sh:122  -- el enlace lleva `-Wl,--gc-sections` (DC_SIN_GC=1 lo apaga) y
+   DC_LDMAP=<archivo> pide el mapa del enlazador (la unica forma de saber que objeto puso cada byte).
+3. scripts/console/build-dc.sh (nuevo bloque)  -- EL `.eh_frame` FUERA DEL MAPA con la palanca de
+   DC-002.47 (`gen-ldscript-eh-247.py`): el script de linker de KOS se REEMPLAZA por uno que manda
+   `.eh_frame` y `.eh_frame_hdr` al /DISCARD/. Con eso lo que viene detras se corre para abajo, el `_end`
+   del programa baja y el monton de C -- que arranca justo ahi -- gana ese techo. DC_SIN_EH=1 lo apaga.
+   OJO: (2) y (3) NO son solo de esta tarjeta: quedan puestos para TODOS los POC que usan build-dc.sh.
+
+LOS TRES ESLABONES (el mismo paso 3 en todos: 125 paquetes de d2ui + d2gamescreen)
+----------------------------------------------------------------------------------
+                                    sin cambios      +flags+gc        +eh fuera
+                                     (002.67)        (002.68)         (002.68)
+    .gox del motor (125)            63.622.020      59.525.804       59.525.804
+    .gox stdlib+terceros (63)        3.654.436       3.431.908        3.431.908
+    suma al enlazador               67.276.456      62.957.712       62.957.712
+    prog.elf                        40.657.228      33.127.440       32.218.540
+      depuracion (.debug)           11.335.200       4.685.515        4.685.521
+      .text                          4.886.296       4.597.016        4.597.272
+      .rodata                        5.638.632       5.636.204        5.636.236
+      .eh_frame                        878.636         878.636                4
+      .data + .bss                     312.568         305.528          305.528
+    1ST_READ.BIN                    11.664.488      11.215.944       10.337.608
+    techo del monton (0x8D000000-_end)  ~4,83 MB*      5.275.300        6.153.956
+    (* el del paso 3 de DC-002.67 se calcula: su ELF ya no estaba. Los otros dos se midieron con `nm`, y
+     la diferencia entre ellos es EXACTAMENTE el .eh_frame que se saco: 878.656 B.)
+
+    De donde sale cada byte del recorte, medido y no supuesto:
+      -g0: en d2common/d2act3 el .gox pasa de 32.664 a 30.384 B y su .debug de 4.340 a 0 B.
+      -ffunction-sections: el mismo paquete pasa de 2 secciones .text a 40 (una por funcion).
+      --gc-sections: el linker tiro 40.709 secciones (lineas "eliminando la seccion ... no utilizada" en
+        el log del enlace) y con eso el BIN bajo 448.544 B. POCO: el 96 % de lo que queda esta VIVO.
+      .eh_frame fuera: 878.336 B de la imagen Y otros tantos de techo del monton (el .bss se corre).
+
+EL MONTON EN FLYCAST (la prueba que decide, POC console/dc/poc/enlace-267, paso 3)
+---------------------------------------------------------------------------------
+La escalera nueva del POC pide y libera cada bloque y dice OK/FALLA (antes solo imprimia el numero):
+
+    bloque pedido              sin cambios (002.67)    con flags+gc      con flags+gc+eh
+    262.144   (256 KB)               OK                 OK                OK
+    1.048.576 (1 MB)                 FALLA              FALLA             OK
+    1.228.800 (la pantalla)          FALLA              FALLA             OK      <- el objetivo
+    1.572.864 (1,5 MB)               FALLA              FALLA             OK
+    1.835.008 (1,75 MB)              FALLA              FALLA             FALLA
+    1.966.080 (1,875 MB)             FALLA              FALLA             FALLA
+    2.097.152 (2 MB)                 FALLA              FALLA             FALLA
+    3.145.728 (3 MB)                 FALLA              FALLA             FALLA
+    4.194.304 (4 MB)                 FALLA              FALLA             FALLA
+
+    arena del monton: 4.358.112 / 4.355.840 / 4.355.808 B (casi todo son los DOS semiespacios del GC de
+    libgodc: 4.194.304 B, decision de DC-002.51, no se toco).
+    Techo medido del monton con el binario nuevo: entre 1.572.864 y 1.835.008 B de bloque unico.
+
+    VEREDICTO DE LOS DOS CRITERIOS DE LA TARJETA
+      * malloc 1.228.800 OK  -> CUMPLIDO. La pantalla del motor entra. El objetivo de la tarjeta se logra.
+      * malloc 4.194.304 OK  -> NO CUMPLIDO con el arbol entero. Ver "POR QUE 4 MB NO ENTRA".
+
+LAS 14 LINEAS DEL MOTOR SIGUEN IGUALES
+--------------------------------------
+    `go run ./console/dc/poc/enlace-267` (host) contra la consola serie de la corrida del binario nuevo:
+    diff VACIO, 14 lineas identicas. 0 excepciones del SH-4 en la corrida de 25 s. El recorte no cambio
+    ni un resultado del motor: se tiro codigo que no se ejecuta, no comportamiento.
+
+QUE OCUPA EL BINARIO (criterio 4 de la tarjeta: con datos, no a ciegas)
+----------------------------------------------------------------------
+Del mapa del enlazador (-Wl,-Map), agrupado (text+rodata+data+bss):
+
+    .text     motor 3.892.910 (84,7 %)   stdlib/terceros 153.884   toolchain KOS/libc/libgodc 550.422
+    .rodata   motor 5.267.447 (92,7 %)   stdlib/terceros 221.420   toolchain KOS/libc/libgodc 190.859
+    .data     motor 69.822               toolchain 15.563
+    .bss      motor 17.863               toolchain 202.077  (de los cuales 131.100 = _aligned_vertex_pool
+                                                            de libkos.a(kos.o), que no es del motor)
+
+    los 10 objetos que mas RAM ocupan (text+rodata+data+bss):
+      1.162.488  d2gamescreen.gox        (561.024 text + 600.484 rodata)
+      1.095.020  d2player.gox            (480.412 + 608.923)
+        484.620  d2monsters.gox
+        472.143  d2records.gox
+        325.125  d2monster.gox
+        311.439  d2skills.gox
+        305.625  d2skill.gox
+        262.115  d2mapengine.gox
+        251.804  d2mapentity.gox
+        238.573  d2hero.gox
+
+    Lo que NO es del motor: 553 KB de .text de KOS/libc/libgodc y 202 KB de .bss (KOS). El .rodata del
+    motor son descriptores de tipo (..types), tablas de constantes y cadenas: no hay aqui un bloque de
+    basura que se pueda tirar, es el dato del juego.
+
+POR QUE 4 MB NO ENTRA (la aritmetica, para que la decision se tome con numeros)
+-------------------------------------------------------------------------------
+    RAM util de la consola                 16.777.216 B
+    imagen+bss de hoy (10.337.608+220.092) 10.557.700 B   -> techo del monton 6.153.956 B
+    semiespacios del GC (DC-002.51, 2 x 2 MB)  4.194.304 B
+    bloque mas grande que el monton puede dar en un pedazo    ~1,8 MB (medido: 1.572.864 OK, 1.835.008 FALLA)
+
+    un malloc de 4 MB pide GC (4.194.304) + bloque (4.194.304) = 8.388.608 B de techo, o sea imagen+bss
+    de a lo sumo 8,3 MB. Hoy son 10,56 MB: FALTAN 2,24 MB de imagen. Las tres palancas que quedan, con
+    lo que cada una da medido:
+      (a) -Os en vez de -O2: medido en los 4 paquetes mas grandes ahorra 8,1 % del .text
+          (d2gamescreen 1.325.112 -> 1.223.281; d2player 1.242.839 -> 1.155.057; d2monsters 555.209 ->
+          509.210; d2records 632.917 -> 608.695), o sea ~370 KB sobre los 4,6 MB de .text. NO alcanza solo,
+          y se paga en velocidad del motor.
+      (b) enlazar MENOS paquetes: d2gamescreen (1,16 MB) + d2player (1,10 MB) son 2,26 MB, justo lo que
+          falta. El paso 3 los mete a proposito (referencia d2ui.NewUIManager y d2gamescreen.CreateGame):
+          el cierre del backend de render (d2render/ebiten + d2ui) es mas chico. Es una decision de
+          ALCANCE, no de flags.
+      (c) bajar el semiespacio del GC a 1024 KB (era el parche local que DC-002.51 revirtio a proposito):
+          libera 2.097.152 B -> techo 8,25 MB, todavia ~140 KB corto; con (a) entra.
+    Conclusion: los flags + el .eh_frame dan la PANTALLA (que es el objetivo de la fase) y dejan el 4 MB a
+    2,24 MB de distancia, con tres caminos medidos. Ninguno se toma aca: (b) es alcance y (c) revierte una
+    decision de Daniel.
+
+NO-REGRESION (los flags quedan puestos para todos los POC)
+----------------------------------------------------------
+    build-dc.sh lo usan ~20 scripts. Se corrio el POC del motor de la skill (build-monstruo-250.sh) con
+    los flags nuevos: build imprime `bestia=1 golpeSordo=0`, 90 s en Flycast, CERO excepciones del SH-4,
+    ANIM-BESTIA animando (621/622/616/615 pixeles por cuadro). Nada que romper: el recorte es del enlazador.
+
+COMO SE REPRODUCE
+-----------------
+    cd /home/dgalli/Proyectos/diablo2consoles
+    source scripts/console/env.sh
+    # 1) reconstruir el arbol de .gox del motor con los flags nuevos (~6 min: 358 s medidos)
+    GODC_GOX=/tmp/gox-268 bash scripts/console/build-std-gox.sh /tmp/gox-268
+    bash scripts/console/build-motor-all.sh /tmp/gox-268 /tmp/dcbuild/motor268      # 142 de 142
+    # 2) el paso 3 (125 paquetes) y su corrida
+    PASO3=1 BASE_GOX=/tmp/gox-268 bash scripts/console/build-enlace-267.sh /tmp/dcbuild/enlace268-eh
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/enlace268-eh/disc.gdi 25 /tmp/dcbuild/c268eh
+    grep -a ENLACE267 /tmp/dcbuild/c268eh/flycast.log          # la escalera OK/FALLA y las 14 lineas
+    DC_LDMAP=/tmp/dcbuild/exp268/map-eh.txt PASO3=1 BASE_GOX=/tmp/gox-268 \
+        bash scripts/console/build-enlace-267.sh /tmp/dcbuild/enlace268-eh   # con el mapa del enlazador
+
+PITFALLS MEDIDOS EN ESTA TARJETA
+--------------------------------
+- `--gc-sections` SIN -ffunction-sections/-fdata-sections no gana NADA (medido: 1.374.728 -> 1.374.152 B
+  en el paso 2, 576 B). Y aun CON los flags gana poco (448.544 B de 11,66 MB) porque las funciones que
+  quedan estan todas alcanzables: gccgo encadena el init de cada paquete importado, y desde ahi cuelga
+  todo el paquete. El recorte de verdad no es de secciones, es de PAQUETES.
+- El contador de paquetes de la tarjeta decia 139; hoy `build-motor-all.sh` cuenta 142 (TOTAL = carpetas
+  con .go, y el arbol de DC-002.66 ya tenia 142 en su orden-motor.txt). El criterio que importa -- que
+  compilen TODOS -- se cumple: 142 de 142, 0 bloqueados.
+- El mapa del enlazador trae los aportes en DOS formatos (nombre de seccion en una linea y tamano en la
+  siguiente, o todo en UNA linea cuando entra). Un parser que solo entiende uno inventa "3 MB de huecos":
+  lo cace leyendo los bytes del .rodata en el rango del hueco (habia una tabla de saltos y punteros, o sea
+  DATA REAL). Moraleja: un hueco que el parser reporta se verifica leyendo el ELF, no se reporta.
+- En el arbol de enlace los .gox son ENLACES SIMBOLICOS y el linker informa la ruta REAL (/tmp/gox-268/x.gox),
+  no la del enlace: agrupando por "/gox-enlace/" la stdlib aparece como "toolchain" y el informe miente.
+- `nm` no sirve para pesar secciones: los simbolos de .rodata suman 1,57 MB de los 5,64 MB de la seccion.
+  El peso por objeto sale del MAPA del enlazador.
+- El `.eh_frame` no se puede tirar con `objcopy -R` (el script de KOS lo pone en medio del mapa y el hueco
+  se rellena): hay que REEMPLAZAR el script de linker (dos `-T` juntos mueren con "section .rodata LMA
+  overlaps section .text LMA").
+- Entre corridas, algo de /tmp (los scripts de limpieza de builds) se llevo /tmp/dcbuild/enlace268 justo
+  cuando se iba a leer su _end: los numeros que se citan de ese eslabon son los que imprimio su build
+  (quedan en la evidencia), y por eso el artefacto final que se conserva es enlace268-eh.

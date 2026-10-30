@@ -22,6 +22,20 @@ func d2cRamLibre() uint
 //extern d2c_ram_pedir
 func d2cRamPedir(bytes uint) uint
 
+// pedir mide el TECHO del monton: le pide al malloc de KOS un bloque del tamano que el motor va a necesitar
+// y dice OK/FALLA con el numero. Se pide y se libera en el acto (d2c_ram_pedir hace free), asi que la
+// escalera no deja nada reservado y cada renglon es independiente del anterior.
+//
+// La escalera (DC-002.68) es lo que convierte "4 MB FALLA" en un dato: con una sola prueba grande se sabe
+// que no entra, con la escalera se sabe CUANTO entra, que es lo que decide el recorte siguiente.
+func pedir(bytes uint) {
+	if d2cRamPedir(bytes) == bytes {
+		println("ENLACE267: malloc", bytes, "OK")
+	} else {
+		println("ENLACE267: malloc", bytes, "FALLA")
+	}
+}
+
 // init corre antes de main: deja la SCIF elegida (para que el println de libgodc salga en el log de Flycast)
 // y cambia alTerminar por un bucle que mantiene el programa vivo despues del informe.
 func init() {
@@ -38,6 +52,17 @@ func init() {
 		// monton puede dar esos bloques DE UNA, que es lo que decide si este binario sirve para el render
 		println("ENLACE267: RAM pedir-4MB=", d2cRamPedir(4*1024*1024), "pedir-1MB=", d2cRamPedir(1024*1024),
 			"pedir-1.2MB=", d2cRamPedir(1228800), "pedir-256KB=", d2cRamPedir(256*1024))
+
+		// LA ESCALERA (DC-002.68), del bloque mas chico al mas grande, con OK/FALLA por tamano.
+		pedir(256 * 1024)
+		pedir(1024 * 1024)
+		pedir(1228800) // la pantalla 640x480 RGBA que pide el motor
+		pedir(1536 * 1024)
+		pedir(1792 * 1024)
+		pedir(1920 * 1024)
+		pedir(2 * 1024 * 1024)
+		pedir(3 * 1024 * 1024)
+		pedir(4 * 1024 * 1024)
 
 		for {
 			kos.ThdSleep(1000)

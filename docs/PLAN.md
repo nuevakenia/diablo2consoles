@@ -35,6 +35,14 @@ Dos mitades, y la primera va antes porque la medición de DC-002.67 lo manda:
 puede reservar **ni 1 MB** (4 MB, 1 MB y 1.228.800 B fallan; 256 KB entra). Enlazar más grande no
 sirve: hay que recortar (DC-002.68).
 
+**Medido en DC-002.68 (cerrada):** con `-g0 -ffunction-sections -fdata-sections` + `--gc-sections` +
+el `.eh_frame` fuera del mapa, el `1ST_READ.BIN` baja a **10.337.608 B** (−1.326.880, −11,4 %) y la
+**pantalla del motor (1.228.800 B) ya entra** en el montón (techo medido 6.153.956 B; el `--gc-sections`
+solo tira 448 KB porque el 96 % de lo que queda está vivo: gccgo encadena el `init` de cada paquete).
+Lo que **no** entra es el bloque de 4 MB de texturas: pide 8,39 MB de techo y hay 6,15 MB; quedan tres
+caminos medidos (enlazar menos paquetes —`d2gamescreen`+`d2player` son 2,26 MB—, `-Os` ~370 KB, o bajar
+el semiespacio del GC, decisión de DC-002.51). Evidencia: `console/dc/evidencia/dc-002.68-recorte.txt`.
+
 **B.2 — La interfaz de render y el backend PVR.** *Corregido el 2026-10-29 midiendo el árbol:* el
 contrato **ya existe** y no hay que extraerlo — `d2common/d2interface/surface.go` define
 `Surface` (22 métodos: `DrawRect`, `DrawTextf`, `PushSkew`, `PushScale`, `PushFilter`, `Render`,

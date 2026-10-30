@@ -28,7 +28,18 @@ if [ -f "$KOS_BASE/environ.sh" ]; then
 fi
 
 # ---- compilacion de Go ----
-export GODC_GOFLAGS="-O2 -ml -m4-single -fno-split-stack -mfsrra -mfsca -I$LIBGODC/kos -I$LIBGODC -I$KOS_BASE/include"
+# DC-002.68 (el recorte): el binario del motor entero no dejaba RAM para la pantalla (DC-002.67: 1ST_READ.BIN
+# de 11.664.488 B y malloc(1.228.800) FALLA en la consola). Dos flags atacan eso desde la compilacion:
+#   -g0                  los .gox traian DWARF (11,3 MB de los 40,6 del prog.elf). No va al BIN, pero engorda
+#                        los objetos y el enlace. Medido en d2common/d2act3: 4.340 B de .debug -> 0.
+#   -ffunction-sections  una seccion .text.<simbolo> por funcion (medido en el mismo paquete: 2 -> 40
+#                        secciones). Sin esto el linker NO puede tirar nada: entra el .text del paquete entero.
+#   -fdata-sections      lo mismo con los datos (tablas, cadenas, descriptores de tipo): sin esto el .rodata
+#                        del paquete es un bloque unico y --gc-sections se lo tiene que quedar completo.
+# Los tres viajan por GODC_GOFLAGS a TODOS los caminos que compilan Go para la consola (la stdlib minima,
+# los terceros, los .gox del motor y el main del POC), que es lo que hace que el enlace sea homogeneo.
+# El enlace con --gc-sections esta en build-dc.sh (ahi se tira lo que no se alcanza).
+export GODC_GOFLAGS="-O2 -g0 -ffunction-sections -fdata-sections -ml -m4-single -fno-split-stack -mfsrra -mfsca -I$LIBGODC/kos -I$LIBGODC -I$KOS_BASE/include"
 
 # ---- enlace ----
 export DC_LDPATHS="-L$LIBGODC -L$LIBGODC/kos -L$KOS_PORTS/lib -L$KOS_BASE/lib/dreamcast -L$KOS_BASE/addons/lib/dreamcast"

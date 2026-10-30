@@ -119,7 +119,45 @@ if [ -f "$GOX/orden.txt" ]; then
         STD_OBJS="$(tr '\n' ' ' < "$GOX/orden.txt")"
     fi
 fi
-kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $ROMDISK_OBJ $EXTRA_OBJS $STD_C_OBJS $STD_OBJS $DC_LDPATHS $DC_LIBS_PRE $DC_LIBS_POST
+# DC-002.68 (el recorte): --gc-sections tira del binario toda seccion que no se alcanza desde el arranque.
+# Los objetos se pasan EXPLICITOS al enlazador (no vienen de archivos .a), y aun asi el linker puede
+# descartar las secciones que nadie referencia -- pero SOLO si cada funcion y cada dato viven en su propia
+# seccion: eso lo pone la compilacion (-ffunction-sections -fdata-sections en GODC_GOFLAGS). Con los .gox
+# compilados sin esos flags el flag no gana nada (medido en DC-002.67: entraba el .text entero del paquete).
+# DC_GC_LOG=1 pide al enlazador la lista de lo que tiro (--print-gc-sections), que es la evidencia de que
+# el recorte es del enlazador y no una suposicion.
+DC_LDFLAGS_GC=""
+if [ "${DC_SIN_GC:-0}" != "1" ]; then
+    DC_LDFLAGS_GC="-Wl,--gc-sections"
+    [ "${DC_GC_LOG:-0}" = "1" ] && DC_LDFLAGS_GC="$DC_LDFLAGS_GC -Wl,--print-gc-sections"
+fi
+# DC_LDMAP=<archivo>: el mapa del enlazador, que es la unica forma de saber QUE objeto puso cada byte en
+# .rodata/.text (nm solo ve los simbolos con nombre y tamano: medido en DC-002.68, los simbolos de .rodata
+# suman 1,57 MB de los 5,64 MB de la seccion, asi que la diferencia NO son simbolos).
+[ -n "${DC_LDMAP:-}" ] && DC_LDFLAGS_GC="$DC_LDFLAGS_GC -Wl,-Map=$DC_LDMAP"
+
+# DC-002.68: EL `.eh_frame` FUERA DEL MAPA (palanca de DC-002.47, medida alla y re-medida aca).
+# En este binario el .eh_frame son 878.636 B de tablas de desenrollado. Sacarlo con `objcopy -R` NO alcanza:
+# el script de KOS lo pone EN MEDIO del mapa y el hueco se rellena. Lo que sirve es enlazar con un script
+# propio que lo manda al /DISCARD/ (`gen-ldscript-eh-247.py`): todo lo que viene detras se corre para abajo,
+# el `_end` del programa baja con ellos y el monton de C -- que arranca justo ahi -- GANA ese techo.
+# No cuesta nada medible: el panic de la consola traza con el frame pointer de KOS (arch_stk_trace) y
+# `__gccgo_personality_v0` de libgodc es un stub que no engancha nada (DC-002.32/47). DC_SIN_EH=1 lo apaga.
+DC_EH_SCRIPT=""
+if [ "${DC_SIN_EH:-0}" != "1" ]; then
+    DC_EH_SCRIPT="$OUT/ld-sin-eh.xc"
+    "$DC_PYTHON" "$HERE/gen-ldscript-eh-247.py" "$DC_EH_SCRIPT" >/dev/null
+    # OJO, MEDIDO (DC-002.47): el script de KOS se REEMPLAZA en KOS_LDFLAGS, no se agrega un `-T` al lado.
+    # Con los dos `-T` el linker acumula las dos descripciones de secciones y muere con
+    #   ld: section .rodata LMA [...] overlaps section .text LMA [...]
+    KOS_LDFLAGS="${KOS_LDFLAGS//-T$KOS_BASE\/utils\/ldscripts\/shlelf.xc/-T$DC_EH_SCRIPT}"
+    export KOS_LDFLAGS
+    case "$KOS_LDFLAGS" in
+        *"$DC_EH_SCRIPT"*) echo "   DC-002.68: el script de linker de KOS se cambio por $DC_EH_SCRIPT" ;;
+        *) echo "   DC-002.68: NO pude cambiar el script de linker (KOS_LDFLAGS no traia -T$KOS_BASE/utils/ldscripts/shlelf.xc)" >&2; exit 1 ;;
+    esac
+fi
+kos-cc -o "$OUT/prog.elf" "$OUT/main.o" $ROMDISK_OBJ $EXTRA_OBJS $STD_C_OBJS $STD_OBJS $DC_LDPATHS $DC_LDFLAGS_GC $DC_LIBS_PRE $DC_LIBS_POST
 
 echo "== 3/4 binario de arranque (1ST_READ.BIN) + IP.BIN =="
 sh-elf-objcopy -R .stack -O binary "$OUT/prog.elf" "$OUT/1ST_READ.BIN"
