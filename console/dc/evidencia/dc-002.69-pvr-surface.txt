@@ -1,0 +1,157 @@
+=== DC-002.69: d2render/pvr -- la implementacion de d2interface.Surface sobre el PVR ===
+
+QUE PIDE LA TARJETA Y COMO SE MIDIO
+    1. el paquete d2render/pvr con un Surface que cumpla d2interface.Surface ENTERO;
+    2. sprites con paleta (8 bits + PL2) y tiles, con la geometria del POC (caja y esquina iso);
+    3. RenderSection / ReplacePixels / Screenshot para poder comparar pixeles;
+    4. una prueba de humo en consola que dibuje N sprites, suba la pantalla y se pueda correr en Flycast;
+    5. `go build ./...` en el host sin romper el backend de PC.
+
+    Todo eso tiene numero abajo. Lo que NO entra (el Renderer con Run/CreateSurface/NewSurface y montar
+    d2gamescreen) queda declarado como la tarjeta siguiente, igual que pide el cuerpo.
+
+EL CONTRATO: 21 DE 21 METODOS, Y QUE HACE CADA UNO
+    d2common/d2interface/surface.go declara 21 metodos (el cuerpo de la tarjeta dice 22: el que sobra es
+    ShadedSurface/ShadedGridSurface, que son OTRAS interfaces -- d2core/d2render/ebiten las implementa
+    tambien y este backend no las cubre: queda anotado como pendiente, no como hecho).
+
+    Hay una verificacion en tiempo de compilacion (`var _ d2interface.Surface = (*Surface)(nil)` en
+    d2core/d2render/pvr/surface.go): si el contrato cambia, el paquete NO COMPILA. No es una promesa.
+
+      metodo                 | como se implemento
+      -----------------------+----------------------------------------------------------------------------
+      Renderer()             | nil DECLARADO: el Renderer es DC-002.70 (el ciclo de cuadros es otro contrato)
+      Clear(color)           | rellena el lienzo RGBA entero
+      DrawRect(w,h,c)        | rectangulo lleno en la posicion del estado
+      DrawLine(x,y,c)        | Bresenham de la posicion del estado a (x+x, y+y) (asi lo hace el backend PC)
+      DrawTextf(f,...)       | fuente 3x5 PROPIA (provisional; la de verdad es d2font + DC6, DC-002.70)
+      GetSize()              | w,h del lienzo
+      GetDepth()             | len de la pila de estados (igual que el backend de la PC)
+      Pop()/PopN(n)          | desapila; con la pila vacia PANIQUEA (misma semantica que la PC)
+      PushColor(c)           | tinte: multiplica canales y alfa
+      PushEffect(e)          | las tablas del PL2: 25/50/75% transparencia, Modulate (suma), Burn (producto),
+                             |   Mod2X (170% brillo) y Mod2XTrans (alfa por luminancia)
+      PushFilter(f)          | se guarda; el dibujado es NEAREST siempre (LIMITACION DECLARADA)
+      PushTranslation(x,y)   | SUMA a la traslacion (no la reemplaza), como la PC
+      PushSkew/PushScale     | reemplazan el valor, como la PC; la matriz sale en el mismo orden
+      PushBrightness/Sat     | HSV en float32 (identidad rgb = v(1-s) + v*s*t; mismo tono)
+      Render(sfc)            | dibuja otra Surface con la transformacion y el color del estado
+      RenderSection(sfc, r)  | lo mismo, recortando la seccion (recorte.go: recortar)
+      ReplacePixels(p)       | carga el cuadro crudo RGBA (w*h*4) en el lienzo
+      Screenshot()           | devuelve el lienzo como *image.RGBA (copia)
+
+    Ademas (fuera del contrato, y es lo que el motor va a usar para los DC6/COF):
+      RenderSprite(*Sprite)  | dibuja un sprite paletizado con el estado actual
+      SubirSpritePVR(*Sprite) / DibujarSpritePVR() | el sprite por HARDWARE (8bpp + paleta en el banco 0)
+
+LA ARQUITECTURA (y por que es esta, no otra)
+    El cuadro se compone en un lienzo RGBA en RAM (1 byte por canal), igual que en la PC; al cerrar el
+    cuadro se convierte a RGB565 por bloques de 32x32 y se sube a la VRAM con el camino YA MEDIDO en
+    DC-002.10/17/22/26 (console/dc/std/csrc/pvr_pantalla.c, 463 lineas: twiddle con tabla, pvr_txr_load por
+    Store Queues, quad con las UV por cociente). Lo que este paquete agrega es la CAPA DE CONTRATO y el
+    sprite paletizado; no reimplementa nada de video.
+
+    Por que el lienzo vive en RAM: Screenshot, ReplacePixels y RenderSection son el unico camino para
+    comparar pixeles, y leer de vuelta la VRAM en cada comparacion no es viable. Cabe: la pantalla 640x480x4
+    = 1.228.800 B, que es exactamente el bloque que DC-002.68 midio que YA ENTRA en el monton (1.572.864 OK,
+    1.835.008 FALLA).
+
+EL SPRITE PALETIZADO, POR LOS DOS CAMINOS
+    - SOFTWARE (Surface.RenderSprite): expande indices+paleta a RGBA y lo compone con la matriz del estado.
+      Es lo que permite DOS PALETAS DISTINTAS en el mismo cuadro.
+    - HARDWARE (SubirSpritePVR + DibujarSpritePVR): console/dc/std/csrc/pvr_sprite.c (nuevo, 165 lineas)
+      sube los indices de 8 bits con pvr_txr_load_ex(8BPP) y la paleta con pvr_set_pal_entry (banco 0), y
+      dibuja el quad con la geometria del POC: UV NORMALIZADAS, medio texel de recorte, fin de tira en el
+      CUARTO vertice. LIMITACION DECLARADA: el banco de paleta es UNO, asi que por hardware va una sola
+      paleta por cuadro.
+    - EL RELLENO A POTENCIA DE DOS LO HACE EL GO (potenciaDeDos + rellenarIndices): en C costaria hasta
+      256 KB de .bss por sprite; en Go es un slice temporal que el recolector libera.
+
+QUE SE MIDIO (corrida real, Flycast 2.7, sin BIOS)
+    Build (medido):
+        gox de d2render/pvr                 242.072 B
+        paquetes del motor en el enlace        6 (go list -deps, no a mano):
+          d2common/d2enum 235.252 | d2common/d2interface 259.760 | d2common/d2math 57.004 |
+          d2common/d2math/d2vector 158.308 | d2networking/.../d2clientconnectiontype 5.196 |
+          d2core/d2render/pvr 242.072
+        prog.elf 6.640.576 B | 1ST_READ.BIN 1.026.120 B | .text 650.288 B | data+bss 222.584 B
+
+    La consola serie (console/dc/poc/pvr-surface, captura en evidencia/dc-002.69-consola.png):
+        PVRSMOKE: superficie 640 x 480 - monton libre ahora (bytes): 2608
+        PVRSMOKE: sprites dibujados= 73 (8 tiles iso + 64 diamantes + 1 heroe)
+        PVRSMOKE: pixeles no-vacios= 21584 de 307200 crc32= -2001956231
+        PVRSMOKE: tamano= 640 x 480 profundidad-de-pila= 0 textos= 2
+        PVRSMOKE: pantalla del PVR 640 x 480 vram= 1048576 bytes
+        PVRSMOKE: sprite en VRAM= 1024 bytes (asset 24 x 24)
+        PVRSMOKE: cuadro 0 / 120 / 240 / 360 pintado, crc32= -2001956231   <- estable en 360 cuadros
+
+    La captura, medida con scripts/console/checar-pvr-surface.py (que UBICA la pantalla por el color de
+    fondo, no por una posicion clavada):
+        captura 3584x1080 ; pantalla del POC en (1400,120) 640x480
+        pixeles pintados (ni fondo ni marco): 21996      consola dice 21584  -> 1,91% de diferencia
+        marco amarillo: 2544 pixeles en las filas 0,1,478,479 (2 lineas arriba + 2 abajo)
+        verdes del sprite por HARDWARE (470,90)-(542,162): 2575
+        verdes del rombo por SOFTWARE (488,356)-(512,380): 265
+        RESULTADO: OK
+    O sea: el cuadro compuesto por software se ve (y su conteo de pixeles coincide con el de la consola al
+    2%), y ADEMAS se ve el sprite del camino de hardware en su caja -- que el lienzo no cubre. Los dos
+    caminos quedan separados en la misma captura.
+
+EL DEFECTO QUE LA MEDICION CAZO (y que ningun compilador iba a decir)
+    La primera corrida dio crc32= 1676823078 y la captura mostraba los tiles y el heroe NEGROS, con el
+    conteo de verdes del rombo por software en CERO. Causa: el camino rapido de dibujado (solo traslacion)
+    usaba el valor CERO de `ajuste`, y el cero de `efecto` es d2enum.DrawEffectPctTransparency25 (el iota
+    empieza ahi) con brillo y saturacion en 0 -> el HSV apagaba el color. Los diamantes, que pasan por el
+    camino general (llevan PushColor), salian bien y por eso el cuadro "parecia" andar. Arreglado con
+    ajusteNeutro() (imagen.go). Despues: 21584 pixeles y 265 verdes del rombo por software.
+    EL DATO QUE LO DELATO fue el conteo de verdes por caja, no el CRC: el CRC cambiaba y era "un numero".
+
+LO QUE NO SE PUDO (declarado, no tapado)
+    - PushFilter(FilterLinear) dibuja NEAREST: el rasterizador por software no interpola. El motor de
+      Diablo II pide NEAREST casi siempre, pero un linear pedido a proposito sale crispado.
+    - DrawTextf usa una fuente 3x5 propia: la de verdad es d2font + los DC6 de la interfaz (DC-002.70).
+    - ShadedSurface / ShadedGridSurface NO estan implementadas (son otras interfaces, no las 21 de Surface).
+    - El sprite por hardware usa el banco 0 de paleta: una paleta por cuadro (por software, las que sean).
+    - `go build ./...` en el host: SIGUE con UN paquete rojo, el MISMO de antes de esta tarjeta
+      (console/dc/engine/ebiten/v2:25 importa "kos", que solo existe para sh-elf). Medido antes y despues:
+      antes rc=1 con esa sola linea, despues rc=1 con esa sola linea. El MOTOR compila verde:
+      `go build ./d2core/... ./d2common/... ./d2game/... ./d2app/... ./d2networking/... ./d2script/...
+      ./d2thread/...` -> rc=0. Los dos paquetes nuevos van con //go:build dreamcast justamente para eso.
+    - No se corrio build-motor-all.sh completo (139 paquetes): el paquete nuevo se compilo solo con
+      sh-elf-gccgo y ENTRO al arbol de enlace (ver arriba, orden.txt de 69 objetos). Queda como el primer
+      paso de la proxima corrida del motor entero.
+
+COMO SE CORRE
+    cd ~/Proyectos/diablo2consoles
+    source scripts/console/env.sh
+
+    # 1) el .gox del paquete (medido: ~1 s)
+    sh-elf-gccgo $GODC_GOFLAGS -I /tmp/gox-std \
+      -fgo-pkgpath=github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr \
+      -c d2core/d2render/pvr/*.go \
+      -o /tmp/gox-std/github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr.gox
+
+    # 2) la prueba de humo: arbol de enlace + POC + GDI (medido: ~40 s)
+    bash scripts/console/build-pvr-surface.sh /tmp/dcbuild/pvr-surface
+
+    # 3) a Flycast con captura (medido: ~30 s)
+    CAPTURE=spectacle bash scripts/console/run-flycast.sh \
+        /tmp/dcbuild/pvr-surface/disc.gdi 15 /tmp/dcbuild/c269
+
+    # 4) la medida de la captura, contra el conteo que imprimio la consola
+    python3 scripts/console/checar-pvr-surface.py /tmp/dcbuild/c269/f15s.png --consola 21584
+
+    La salida de la consola serie queda en /tmp/dcbuild/c269/flycast.log (grep PVRSMOKE).
+
+ARCHIVOS
+    d2core/d2render/pvr/doc.go        la decision de arquitectura y los limites declarados
+    d2core/d2render/pvr/surface.go    los 21 metodos del contrato + RenderSprite
+    d2core/d2render/pvr/imagen.go     el lienzo RGBA, la matriz, el mezclado, las tablas del PL2
+    d2core/d2render/pvr/sprite.go     el sprite paletizado (indices 8bpp + paleta ARGB1555/PL2)
+    d2core/d2render/pvr/pantalla.go   la pantalla y el sprite por PVR (llamadas a C por //extern)
+    d2core/d2render/pvr/recorte.go    RenderSection (recortar) + itoa
+    d2core/d2render/pvr/fuente.go     la fuente 3x5 provisional de DrawTextf
+    console/dc/std/csrc/pvr_sprite.c  el sprite paletizado en el PVR (C; 165 lineas)
+    console/dc/poc/pvr-surface/       la prueba de humo (main.go + csrc/shim.c)
+    scripts/console/build-pvr-surface.sh   gox del motor + POC + GDI
+    scripts/console/checar-pvr-surface.py  la medida de la captura (ubica la pantalla sola)
