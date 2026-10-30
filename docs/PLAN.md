@@ -70,7 +70,7 @@ el POC de referencia, con 0,19 % de cuantización ≤8 y el 1,03 % restante en l
 no limpia. Evidencias: `console/dc/evidencia/dc-002.69-pvr-surface.txt`,
 `dc-002.70-renderer-pvr.txt` y la verificación independiente `dc-002.73-verificacion.txt`.
 
-## Fase C — Input y audio  ·  pendiente
+## Fase C — Input y audio  ·  input MEDIDO (DC-002.71), audio pendiente
 
 Maple detrás de `d2interface` (`input_service.go`, `input_manager.go`; es la más fácil) y AICA
 detrás de `d2interface` (`audio_provider.go`, `pcm_stream.go`, `sound_effect.go`; la lógica ya está
@@ -78,6 +78,16 @@ separada del backend y el POC ya tiene 64 canales sonando).
 
 Criterio: la cruceta y los botones del control mueven al personaje **del motor**, y un sonido del
 juego suena por AICA distinguiéndose del que genera el POC.
+
+**Medido en DC-002.71 (la mitad de input, cerrada):** `d2core/d2input/maple` implementa los **9**
+métodos de `InputService` sobre el bus maple, con el mapa de `control.go` (cruceta → flechas, A →
+Enter + clic izquierdo, B → Escape + clic derecho, X → X + clic del medio, Y → Y, Start → Enter,
+gatillos L/R → Q/E, palanca/cruceta → el cursor) y la aserción de contrato en `traduccion.go`. En
+Flycast los **nueve** botones llegan y se traducen con sus dos flancos (log `HITO271: FLANCO`), el
+cursor del motor pasa de 320 a 332 en un cuadro con la cruceta y se recorta en 639x479; 12 pruebas en
+el host con 8 mutantes cazados; el motor compila **144 de 144** para SH-4 (el paquete nuevo es el
+144). Evidencia: `console/dc/evidencia/dc-002.71-maple-input.txt`. Lo que falta de la fase es el
+audio (AICA) y que el personaje sea el del motor con `d2gamescreen` (Fase D).
 
 ## Fase D — Montar `d2gamescreen`  ·  pendiente
 

@@ -1,0 +1,300 @@
+DC-002.71 -- EL CONTROL DE LA DREAMCAST DETRAS DE d2interface.InputService (Fase C, la mitad de entrada)
+=======================================================================================================
+Tarjeta: t_bd057266 (feat:fase-c, prioridad 70)
+Fecha de la corrida: 2026-10-30 01:15..02:00 (America/Santiago)
+Rama: DC-002, checkout unico /home/dgalli/Proyectos/diablo2consoles, HEAD dff0e62d (sin commits de otros
+      workers durante la corrida)
+Arbol de .gox propio, para no pisar a nadie:  GODC_GOX=/tmp/dc271/gox  (stdlib 63 objetos + motor)
+
+Todos los numeros de abajo son de esta corrida, medidos en este host. El comando va al lado de cada uno.
+
+
+1. QUE SE CONSTRUYO (lo que pide la tarjeta)
+--------------------------------------------
+1.1  d2core/d2input/maple/   <- el backend de entrada de la consola: implementacion de los 9 metodos de
+     d2interface.InputService sobre el bus maple.
+         doc.go            la doctrina: de donde sale la traduccion, y que NO puede ser fiel.
+         traduccion.go     los bits del control, la TABLA de mapeo y el servicio (los 9 metodos + flancos y
+                           duracion). Es Go comun: compila y se prueba en el HOST.
+         control.go        (//go:build dreamcast) el lector del maple: llama a d2c_control_buscar /
+                           d2c_control_leer de console/dc/std/csrc/control_dc.c por //extern (los mismos que
+                           usa el shim desde DC-002.11: no se agrego una segunda lectura del bus).
+         traduccion_test.go  12 pruebas en el host; se muto la suite 8 veces para comprobar que caza.
+
+1.2  console/dc/poc/input-maple/   <- la prueba en la consola: lee el control POR LA INTERFAZ y lo muestra
+     (consola serie + pantalla, con el cursor del motor dibujado como recuadro amarillo).
+
+1.3  scripts/console/build-input-271.sh      compila maple.gox + el POC y arma el .gdi.
+     scripts/console/run-flycast-271.sh      corre en Flycast apretando el control de verdad (/dev/uinput),
+                                             y captura sincronizado con las marcas del POC.
+     scripts/console/sonda-teclas-271.sh     mide el mapeo del EMULADOR tecla por tecla (una corrida por
+                                             tecla: con secuencias habia ambiguedad, ver 3).
+
+
+2. LA TABLA DE MAPEO control -> d2enum.Key / d2enum.MouseButton
+---------------------------------------------------------------
+La tabla NO esta copiada a mano aca: la imprime el POC desde `maple.Tabla`, y `TestElMapeoEsElDelShim` la
+compara contra la lista escrita a mano del mapeo del shim (console/dc/engine/ebiten/v2/control.go). Salida
+literal del log de la corrida:
+
+    MAPEO bit= 16 boton= ARRIBA    teclas= ARRIBA    mouse= -
+    MAPEO bit= 32 boton= ABAJO     teclas= ABAJO     mouse= -
+    MAPEO bit= 64 boton= IZQUIERDA teclas= IZQUIERDA mouse= -
+    MAPEO bit= 128 boton= DERECHA  teclas= DERECHA   mouse= -
+    MAPEO bit= 4 boton= A          teclas= ENTER     mouse= IZQUIERDO
+    MAPEO bit= 2 boton= B          teclas= ESCAPE    mouse= DERECHO
+    MAPEO bit= 1024 boton= X       teclas= X         mouse= MEDIO
+    MAPEO bit= 512 boton= Y        teclas= Y         mouse= -
+    MAPEO bit= 8 boton= START      teclas= ENTER     mouse= -
+    MAPEO bit= 256 boton= Z        teclas= -         mouse= -
+    MAPEO bit= 1 boton= C          teclas= -         mouse= -
+    MAPEO bit= 2048 boton= D       teclas= -         mouse= -
+    MAPEO-GATILLOS L= Q R= E umbral= 32
+
+En tabla, con el porque (los bits son los de dc/maple/controller.h de KOS, 103-118):
+
+  BOTON DEL CONTROL    BITS      LO QUE LE LLEGA AL MOTOR            POR QUE
+  ------------------   -------   ---------------------------------   -----------------------------------
+  cruceta arriba       16        KeyUp      (d2enum.Key = 96)        los menus (d2term, npc_menu,
+  cruceta abajo        32        KeyDown    (42)                     escape_menu, main_menu) y el caminar
+  cruceta izquierda    64        KeyLeft    (79)                     por teclado del heroe
+  cruceta derecha      128       KeyRight   (89)                     (d2game/d2player/kbd_grid.go)
+  A                    4         KeyEnter (44) + mouse IZQUIERDO     "camina hasta aca" / aceptar
+  B                    2         KeyEscape (46) + mouse DERECHO      la skill / volver
+  X                    1024      KeyX (33) + mouse MEDIO             el clic del medio + el atajo X
+  Y                    512       KeyY (34)                           el golpe
+  START                8         KeyEnter (44)                       arrancar, el boton de siempre
+  Z                    256       (nada)                              en el shim es el boton "Back" del
+  C                    1         (nada)                              joystick; el motor no lo pregunta
+  D                    2048      (nada)                              por teclado/mouse
+  gatillo L            >32       KeyQ (26)                           los atajos que en la PC estan al lado
+  gatillo R            >32       KeyE (14)                           de la mano izquierda
+  palanca (analogica)  -128..127 mueve el CURSOR virtual              el juego de PC se maneja con el mouse
+  palanca + cruceta    -         se SUMAN en el cursor               8 px/cuadro palanca, 12 cruceta,
+                                                                     zona muerta 16, recortado al cuadro
+
+Los tres botones sin mapear (Z, C, D) NO son un olvido: el shim tampoco les da tecla, y la tabla los deja con
+Teclas vacia a proposito. Se pueden leer crudos con Botones()/BotonesApretados() cuando se conecte d2gamepad.
+
+
+3. EL MAPEO DEL EMULADOR (medido tecla por tecla, porque el de la nota de DC-002.50 no coincide)
+-----------------------------------------------------------------------------------------------
+El emu.cfg de este host NO tiene seccion de entrada (grep '^[' ~/.config/flycast/emu.cfg -> solo [config] y
+[window]), asi que manda el mapeo de FABRICA de Flycast 2.7. Medido con `sonda-teclas-271.sh` (UNA corrida por
+tecla: mandando secuencias con marcas entre medio, los botones no se podian atribuir sin ambiguedad -- dos
+corridas dieron resultados incompatibles y esa es la razon de medirlo asi):
+
+  TECLA DEL TECLADO   BOTON DEL CONTROL QUE PRODUCE   BITS     LO QUE VIO EL POC
+  -----------------   -----------------------------   ------   --------------------------------
+  flechas             cruceta                         128/32   DERECHA / ABAJO (KeyRight/KeyDown)
+  x                   A                               4        ENTER + clic izquierdo
+  c                   B                               2        ESCAPE + clic derecho
+  s                   X                               1024     X + clic del medio
+  d                   Y                               512      Y
+  f                   gatillo L (LT)                  -        GATILLO-L 255 -> Q
+  v                   gatillo R (RT)                  -        GATILLO-R 255 -> E
+  enter               START                           8        ENTER
+  z, y, a, q, w, e, r, espacio   NINGUN boton         -        (sin eventos en el log)
+
+  OJO: la nota de DC-002.50 decia Z->A, X->B, C->Start, V->X. Con esas teclas, en esta corrida, z no produce
+  NADA, x produce A, c produce B, v produce el gatillo R. Se midio tecla por tecla y se corrigio el runner;
+  la nota vieja queda como esta (esa tarjeta no se re-midio), pero el mapeo que vale aca es el de esta tabla.
+
+
+4. LA BATERIA DEL HOST (la traduccion probada con el go de verdad, antes de tocar la consola)
+--------------------------------------------------------------------------------------------
+    go test ./d2core/d2input/maple/ -count=1 -v      ->  12 de 12 PASS
+    go vet ./d2core/d2input/maple/                   ->  rc=0
+    gofmt -l                                         ->  (vacio: formateado)
+
+    TestTablaTieneTodosLosBitsDelControl          los 12 bits del control aparecen 1 vez; sin tecla = Z,C,D
+    TestCadaFilaProduceSusTeclasYSuBoton          apretando un bit, el motor ve sus teclas y su clic
+    TestElMapeoEsElDelShim                        la tabla contra la lista a mano del mapeo del shim
+    TestFlancosYDuracion                          apretada / recien apretada / recien soltada / duracion
+    TestClicDelMouseSigueLosFlancos               el clic izquierdo del A con sus dos flancos
+    TestTeclasApretadasSinRepetir                 A+Start = UN Enter, no dos
+    TestPalancaCrucetaYZonaMuerta                 8 px/cuadro la palanca, 12 la cruceta, zona muerta 16
+    TestCursorSeQuedaEnLaPantalla                 el cursor no se va del cuadro (319,239 y 0,0)
+    TestGatillosPorUmbral                         32 justo NO, 33 SI (y L solo aprieta Q)
+    TestTeclasRecienApretadasYSoltadas            los flancos por la via de la evidencia
+    TestSinLecturaNoContestaNada                  servicio sin leer = nada apretado, cursor al centro
+    TestElServicioCumpleElContratoPorLaInterfaz   los 9 metodos llamados A TRAVES de d2interface
+
+MUTANTES (la suite se probo EN CONTRA: 8 mutaciones, las 8 en rojo; el control sano verde al final):
+
+  mutacion                                        resultado
+  ----------------------------------------------  -----------------------------------------------
+  velocidadCruceta 12 -> 13                       ROJO  TestPalancaCrucetaYZonaMuerta
+  velocidadPalanca 8 -> 10                        ROJO  TestPalancaCrucetaYZonaMuerta
+  zonaMuertaPalanca 16 -> 0                       ROJO  TestPalancaCrucetaYZonaMuerta
+  el recorte del cursor (ancho-1 -> ancho)        ROJO  TestCursorSeQuedaEnLaPantalla
+  "recien apretada" = "apretada"                  ROJO  TestFlancosYDuracion
+  umbral del gatillo  > -> >=                     ROJO  TestGatillosPorUmbral
+  X -> clic DERECHO (en la tabla)                 ROJO  TestElMapeoEsElDelShim
+  B -> Backspace (en la tabla)                    ROJO  TestElMapeoEsElDelShim
+  sin la fila DERECHA (en la tabla)               ROJO  TestTablaTieneTodosLosBitsDelControl
+
+  DOS mutantes sobrevivieron en la PRIMERA version de la suite y se arreglaron:
+    - velocidadCruceta=13 pasaba, porque el test comparaba contra la constante del propio paquete
+      (el test medía el paquete con su propia regla). Se cambiaron los numeros del test a LITERALES.
+    - "X -> clic derecho" pasaba, porque el test comparaba la tabla consigo misma. Se agrego
+      TestElMapeoEsElDelShim, con la tabla escrita a mano.
+
+
+5. COMPILA PARA SH-4 (el criterio 1 de la tarjeta, medido por el build del motor)
+---------------------------------------------------------------------------------
+    source scripts/console/env.sh
+    GODC_GOX=/tmp/dc271/gox bash scripts/console/build-std-gox.sh /tmp/dc271/gox
+    GODC_GOX=/tmp/dc271/gox bash scripts/console/build-motor-all.sh /tmp/dc271/gox /tmp/dc271/motor
+
+        capa 1: compilados 144 de 144
+        == RESULTADO: 144 de 144 paquetes del motor compilan para SH-4 ==
+        == bloqueados: 0 (el motor compila COMPLETO) ==
+
+    Son 144 y no 143 (el numero de DC-002.73) porque el paquete nuevo es uno mas:
+        /tmp/dc271/gox/github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/maple.gox   84.040 B
+
+    y con las tres fuentes que van a la consola (los _test.go los saca el script A MANO, porque gccgo no
+    filtra por sufijo y piden `testing`):
+        control.go  doc.go  traduccion.go
+
+    Lo unico que pide del C (sh-elf-nm ... | grep " U "):
+        U _d2c_control_buscar
+        U _d2c_control_leer
+    o sea las dos funciones de console/dc/std/csrc/control_dc.c, ninguna nueva.
+
+    El contrato no es una promesa: `var _ d2interface.InputService = (*Servicio)(nil)` esta en un archivo SIN
+    //go:build, asi que lo exige el compilador del HOST y el de la consola.
+
+    Host, el arbol entero (la unica linea de error es la de siempre, pre-existente):
+        go build ./... -> rc=1
+        console/dc/engine/ebiten/v2/ebiten.go:25:2: package kos is not in std (/usr/lib/go/src/kos)
+
+
+6. EL ENLACE DE LA PRUEBA
+-------------------------
+    BASE_GOX=/tmp/dc271/gox bash scripts/console/build-input-271.sh /tmp/dc271/input
+
+        paquetes del motor en el enlace: 7
+          d2common/d2enum 222.492 B         d2common/d2interface 251.596 B
+          d2common/d2math 51.776 B          d2common/d2math/d2vector 134.684 B
+          d2core/d2input/maple 84.040 B     d2core/d2render/pvr 319.164 B
+          d2networking/d2client/d2clientconnectiontype 3.936 B
+        objetos en orden.txt: 70 (stdlib minima 63 + esos 7)
+
+        prog.elf        6.608.956 B      .text 652.560 B
+        1ST_READ.BIN    1.039.976 B      .rodata 371.600 B   data+bss 223.128 B
+        imagen: /tmp/dc271/input/disc.gdi
+
+
+7. LA CORRIDA EN FLYCast (el control apretado de verdad)
+--------------------------------------------------------
+    bash scripts/console/run-flycast-271.sh /tmp/dc271/input/disc.gdi /tmp/dc271/run
+
+Las teclas se mandan por /dev/uinput (teclas-virtuales.py) y la captura se saca cuando aparece LA MARCA DEL
+POC (`HITO271: FLANCO bajada= ...`), no por reloj. Dos cosas que hubo que arreglar y quedan documentadas en
+el script:
+  - el log del emulador va BUFFERIZADO si se redirige a un archivo: las marcas del POC aparecian recien al
+    llenarse el buffer (~4 KB) y las esperas se venciaan con las teclas ya apretadas. Se arreglo con
+    `stdbuf -o0` (medido: 18 marcas y 4.168 B a los 14 s, en vivo).
+  - `println` de Go separa los operandos con un ESPACIO, asi que la marca real es `bajada= DERECHA` (con
+    espacio). Las esperas que buscaban `bajada=DERECHA` no encontraban nada aunque el log lo tuviera.
+
+Salida literal de la consola serie (recortada a los eventos; los latidos cada 120 cuadros se sacaron):
+
+    HITO271: ARRANCA DC-002.71 -- el control de la Dreamcast por d2interface.InputService
+    HITO271: SERVICIO pantalla= 640 480 filasDeLaTabla= 12 umbralGatillo= 32
+    HITO271: PRIMER-CUADRO cuadro=1
+    HITO271: CONTROL-ENCONTRADO cuadro= 1
+    HITO271: CONTROL cuadro= 45 botones= 128 apretados= DERECHA palanca= 0 0 gatillos= 0 0 cursor= 332 240
+    HITO271: TECLA apretada= DERECHA codigo= 89 duracion= 1
+    HITO271: FLANCO bajada= DERECHA codigo= 89 cuadro= 45
+    HITO271: FLANCO subida= DERECHA codigo= 89 cuadro= 101
+    HITO271: CONTROL cuadro= 112 botones= 32 apretados= ABAJO palanca= 0 0 gatillos= 0 0 cursor= 639 252
+    HITO271: TECLA apretada= ABAJO codigo= 42 duracion= 1
+    HITO271: FLANCO bajada= ABAJO codigo= 42 cuadro= 112
+    HITO271: FLANCO subida= ABAJO codigo= 42 cuadro= 168
+    HITO271: CONTROL cuadro= 179 botones= 4 apretados= A palanca= 0 0 gatillos= 0 0 cursor= 639 479
+    HITO271: TECLA apretada= ENTER codigo= 44 duracion= 1
+    HITO271: FLANCO bajada= ENTER codigo= 44 cuadro= 179
+    HITO271: MOUSE bajada= IZQUIERDO cuadro= 179
+    HITO271: FLANCO subida= ENTER codigo= 44 cuadro= 235
+    HITO271: MOUSE subida= IZQUIERDO cuadro= 235
+    HITO271: CONTROL cuadro= 245 botones= 2 apretados= B palanca= 0 0 gatillos= 0 0 cursor= 639 479
+    HITO271: TECLA apretada= ESCAPE codigo= 46 duracion= 1
+    HITO271: FLANCO bajada= ESCAPE codigo= 46 cuadro= 245
+    HITO271: MOUSE bajada= DERECHO cuadro= 245
+    HITO271: FLANCO subida= ESCAPE codigo= 46 cuadro= 301
+    HITO271: MOUSE subida= DERECHO cuadro= 301
+    HITO271: CONTROL cuadro= 312 botones= 1024 apretados= X palanca= 0 0 gatillos= 0 0 cursor= 639 479
+    HITO271: TECLA apretada= X codigo= 33 duracion= 1
+    HITO271: FLANCO bajada= X codigo= 33 cuadro= 312
+    HITO271: MOUSE bajada= MEDIO cuadro= 312
+    HITO271: FLANCO subida= X codigo= 33 cuadro= 368
+    HITO271: MOUSE subida= MEDIO cuadro= 368
+    HITO271: CONTROL cuadro= 379 botones= 512 apretados= Y palanca= 0 0 gatillos= 0 0 cursor= 639 479
+    HITO271: TECLA apretada= Y codigo= 34 duracion= 1
+    HITO271: FLANCO bajada= Y codigo= 34 cuadro= 379
+    HITO271: FLANCO subida= Y codigo= 34 cuadro= 434
+    HITO271: CONTROL cuadro= 445 botones= 0 apretados= GATILLO-L palanca= 0 0 gatillos= 255 0 cursor= 639 479
+    HITO271: TECLA apretada= Q codigo= 26 duracion= 1
+    HITO271: FLANCO bajada= Q codigo= 26 cuadro= 445
+    HITO271: FLANCO subida= Q codigo= 26 cuadro= 501
+    HITO271: CONTROL cuadro= 512 botones= 0 apretados= GATILLO-R palanca= 0 0 gatillos= 0 255 cursor= 639 479
+    HITO271: TECLA apretada= E codigo= 14 duracion= 1
+    HITO271: FLANCO bajada= E codigo= 14 cuadro= 512
+    HITO271: FLANCO subida= E codigo= 14 cuadro= 568
+    HITO271: CONTROL cuadro= 579 botones= 8 apretados= START palanca= 0 0 gatillos= 0 0 cursor= 639 479
+    HITO271: TECLA apretada= ENTER codigo= 44 duracion= 1
+    HITO271: FLANCO bajada= ENTER codigo= 44 cuadro= 579
+    HITO271: FLANCO subida= ENTER codigo= 635
+
+Lo que dicen estos numeros, uno por uno:
+  - los NUEVE botones del control llegan y se traducen (cruceta x2, A, B, X, Y, los dos gatillos y Start).
+  - el cursor del motor lo MUEVE la cruceta: 320 -> 332 en UN cuadro (12 px, el numero de la tabla) y
+    despues sigue hasta el recorte 639x479 (el cursor se queda adentro del cuadro).
+  - las teclas traducidas tienen los codigos de d2enum.Key: DERECHA=89, ABAJO=42, ENTER=44, ESCAPE=46,
+    X=33, Y=34, Q=26, E=14.
+  - cada pulsacion tiene sus DOS flancos: bajada y subida (es lo que mueve los menus: una pulsacion, una
+    accion; dejar el boton apretado no repite).
+  - el A y el Start dan la MISMA tecla (Enter) y se distinguen por el clic del mouse: A = Enter + clic
+    izquierdo; Start = Enter solo.
+  - los gatillos son analogos: llegan con 255 y la tecla aparece por el umbral 32 (no por un bit).
+
+Capturas (recorte de la ventana del emulador, 640x480):
+    console/dc/evidencia/dc-002.71-cruceta-derecha.png   "BOTONES: DERECHA" / "TECLAS: DERECHA"
+    console/dc/evidencia/dc-002.71-boton-A.png           "BOTONES: A"       / "TECLAS: ENTER"
+    console/dc/evidencia/dc-002.71-boton-X.png           "BOTONES: X"       / "TECLAS: X"
+Cada captura muestra ademas el recuadro amarillo, que ES la posicion del cursor del motor: en la del reposo
+esta en el centro (320,240) y en las otras en la esquina a la que lo llevo la cruceta.
+
+Linea de base (SIN_TECLAS=1, la misma corrida sin apretar nada): en los ~10 s de corrida el POC no imprimio
+NI UNA linea de cambio de estado (0 lineas "CONTROL" ademas de la de CONTROL-ENCONTRADO) y las dos capturas
+(reposo y final) salen IDENTICAS byte a byte -- sha256 64dd36e1c9554a35..., cmp rc=0. En la corrida con
+teclas las mismas dos capturas son distintas (82ac0c11935e8182... vs 68c9c33c33b91882...). Es el control de
+que lo que se ve arriba es el CONTROL y no otra cosa.
+
+
+8. LO QUE NO PUEDE SER FIEL, DECLARADO
+--------------------------------------
+  - InputChars: en la consola no hay teclado; el servicio devuelve nil (no una lista vacia inventada). Los
+    campos de texto del motor (el nombre del personaje) no se pueden llenar con el control.
+  - Z, C y D del control no tienen tecla ni boton de mouse (el shim tampoco les da). Quedan legibles crudos
+    para la tarjeta que conecte d2gamepad.
+  - No hay rueda del mouse (el motor la pregunta por fuera de esta interfaz) y no hay mouse real: el cursor
+    es una posicion virtual que mueve la palanca/cruceta, como en el shim.
+  - La palanca de la consola es UNA: mueve el cursor. El stick derecho del gamepad de PC, que en d2gamepad
+    mueve el cursor, aca no existe.
+  - El motor no esta en el medio: este POC habla con la interfaz, no con d2gamescreen (eso es la Fase D).
+
+9. COMO SE REPRODUCE
+--------------------
+    cd /home/dgalli/Proyectos/diablo2consoles
+    go test ./d2core/d2input/maple/ -count=1 -v          # 12/12 en el host
+    source scripts/console/env.sh
+    GODC_GOX=/tmp/dc271/gox bash scripts/console/build-std-gox.sh /tmp/dc271/gox
+    GODC_GOX=/tmp/dc271/gox bash scripts/console/build-motor-all.sh /tmp/dc271/gox /tmp/dc271/motor
+    BASE_GOX=/tmp/dc271/gox bash scripts/console/build-input-271.sh /tmp/dc271/input
+    bash scripts/console/run-flycast-271.sh /tmp/dc271/input/disc.gdi /tmp/dc271/run
+    # y el mapeo del emulador, tecla por tecla:
+    bash scripts/console/sonda-teclas-271.sh /tmp/dc271/input/disc.gdi /tmp/dc271/mapeo
