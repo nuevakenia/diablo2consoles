@@ -170,17 +170,10 @@ type medida struct {
 }
 
 func main() {
-	println("ZONAS: arranca DC-002.78 -- dos zonas y la vuelta sin pedir memoria por archivo")
-	println("ZONAS: palancas: porBuffer=", porBuffer, "sinCacheDt1=", sinCacheDt1, "gcEntreArchivos=", gcEntreArchivos)
+	println("ZONAS: arranca DC-002.80 -- dos zonas y la vuelta sin pedir memoria por archivo (lectura prestada)")
+	println("ZONAS: palancas: porBuffer=", porBuffer, "leerConPrestamo=", leerConPrestamo,
+		"sinCacheDt1=", sinCacheDt1, "gcEntreArchivos=", gcEntreArchivos)
 	println("ZONAS: monton de C al arrancar: " + estado())
-
-	// DC-002.78: el arena de tiles del motor lo pide la ruta de la consola en la PRIMERA carga de un .dt1
-	// (`AjustarPresupuestosDeConsola` -> `activarCaminoDeTilesDeConsola`), con el tamano de los .dt1 de una
-	// zona entera. Aca solo se informa si la ruta quedo prendida.
-	if porBuffer {
-		println("ZONAS: camino de tiles de consola prendido:", d2asset.EstadoDeLosTiles().CaminoDeConsola,
-			"monton="+estado())
-	}
 
 	// lo que hace el arranque de la consola (DC-002.75): acota los caches y los pone a pesar en BYTES
 	d2asset.AjustarPresupuestosDeConsola()
@@ -189,9 +182,18 @@ func main() {
 		"dt1s=", p.DT1s, "ds1s=", p.DS1s, "sumaDatos=", p.SumaDeLosCachesDeDatos())
 
 	if porBuffer {
-		// la palanca de medicion de DC-002.78: prende la ruta del arena (el motor NO la prende solo,
-		// porque todavia no cierra -- ver d2asset/lectura_de_tiles.go)
+		// la palanca de medicion de DC-002.78: prende la ruta del arena. Desde DC-002.80 el camino lo prende
+		// `NuevoAssetManagerDeConsola` solo; aca se adelanta para que el informe de abajo salga con la ruta
+		// ya prendida (y para poder medir con `BUFFER=0`, sin AssetManager de consola, igual que antes).
 		d2asset.ActivarCaminoDeTilesDeConsola()
+
+		// DC-002.80: y como se lee cada .dt1 adentro del arena -- con la memoria de trabajo prestada
+		// (`mpq.ReadFileInto`, lo de esta tarjeta) o por el stream del MPQ (lo de DC-002.78). El
+		// descompresor de la consola lo conecta el propio `d2mpq` al arrancar (init del build `dreamcast`).
+		d2asset.UsarLecturaPrestadaDeTiles(leerConPrestamo)
+
+		println("ZONAS: camino de tiles de consola prendido:", d2asset.EstadoDeLosTiles().CaminoDeConsola,
+			"lecturaPrestada=", leerConPrestamo, "monton="+estado())
 
 		// el AssetManager del MOTOR (el mismo de DC-002.76): es el que sabe cargar un .dt1 por la ruta de
 		// la consola. Se arma ANTES del video por el mismo motivo que todo lo demas: el PVR necesita el
@@ -306,6 +308,15 @@ func main() {
 	println("ZONAS: ARENA de tiles del motor: caminoDeConsola=", estadoArena.CaminoDeConsola,
 		"capacidad=", estadoArena.Capacidad, "usado=", estadoArena.Usado,
 		"reinicios=", estadoArena.Reinicios, "archivos=", estadoArena.ArchivosLeidos)
+
+	// DC-002.80: la memoria de trabajo de la LECTURA -- pedida una vez y reusada entre archivos y zonas.
+	// `reservado` es lo que ocupa (bytes) y `crecidas` cuantas veces hubo que pedir mas: si crece durante la
+	// carga, el prestamo se quedo corto y eso es justo lo que hay que arreglar antes de prender la ruta.
+	if estPrestamo, hay := d2asset.EstadoDelPrestamoDeTiles(); hay {
+		println("ZONAS: PRESTAMO de la lectura: lecturas=", estPrestamo.Lecturas,
+			"sectores=", estPrestamo.Sectores, "reservado=", estPrestamo.Reservado,
+			"crecidas=", estPrestamo.Crecidas)
+	}
 
 	println("ZONAS: monton al final: " + estado())
 

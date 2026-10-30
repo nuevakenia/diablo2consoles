@@ -22,6 +22,7 @@ import (
 	"hash/crc32"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
@@ -75,6 +76,8 @@ func main() {
 	ds1s := flag.String("ds1", "", "zonas separadas por coma (por defecto, el pueblo del acto 1)")
 	viaCargador := flag.Bool("via-cargador", false,
 		"ademas, leer cada .dt1 por d2loader (TamanoDeArchivo + LeerEnteroEn) reusando UN buffer")
+	viaPrestamo := flag.Bool("via-prestamo", false,
+		"ademas, leer cada .dt1 con la memoria PRESTADA (mpq.ReadFileInto) e informar lo que pide cada camino")
 	flag.Parse()
 
 	// la ruta por defecto se arma con la barra del MPQ (92) para no pelear con el escapado de las comillas
@@ -107,8 +110,75 @@ func main() {
 			continue
 		}
 
-		medirZona(m, zona, *viaCargador, ruta)
+		medirZona(m, zona, *viaCargador, *viaPrestamo, ruta)
 	}
+}
+
+// ============================== DC-002.80: la lectura con memoria prestada ==============================
+
+// medirZonaConPrestamo (el que llama `medirZona` cuando la palanca esta prendida): por cada .dt1 de la zona,
+// lee el archivo con la memoria PRESTADA y lo compara contra `ReadFile`, e informa lo que pide al monton cada
+// uno de los dos caminos. Los numeros son los del HOST (el monton de la PC, no el de la consola): lo que
+// interesa es la DIFERENCIA -- el stream pide un buffer por sector, el prestamo no pide nada.
+type medidaDePrestamo struct {
+	prestamo *d2mpq.Scratch
+	destino  []byte
+}
+
+func nuevaMedidaDePrestamo() *medidaDePrestamo {
+	return &medidaDePrestamo{prestamo: &d2mpq.Scratch{}}
+}
+
+func (mp *medidaDePrestamo) medir(m *d2mpq.MPQ, nombre string, quiero []byte) {
+	enMPQ := strings.ReplaceAll(nombre, "/", barraInvertida)
+
+	if len(mp.destino) < len(quiero) {
+		mp.destino = make([]byte, len(quiero))
+	}
+
+	leidos, err := m.ReadFileInto(enMPQ, mp.destino[:len(quiero)], mp.prestamo)
+	if err != nil {
+		fmt.Printf("PRESTAMO %-42s FALLO: %v\n", nombre, err)
+
+		return
+	}
+
+	iguales := leidos == len(quiero) && bytes.Equal(mp.destino[:leidos], quiero)
+	estado := mp.prestamo.Estado()
+
+	mallStream, bytesStream := memoriaPorLectura(func() error { _, err := m.ReadFile(enMPQ); return err })
+	mallPrestamo, bytesPrestamo := memoriaPorLectura(func() error {
+		_, err := m.ReadFileInto(enMPQ, mp.destino[:len(quiero)], mp.prestamo)
+		return err
+	})
+
+	sectores := (len(quiero) + 4095) / 4096
+
+	fmt.Printf("PRESTAMO %-42s bytes=%7d sectores=%3d crc32=%d igual=%v | stream: %.1f objetos %.0f B"+
+		" | prestamo: %.1f objetos %.0f B | trabajo=%d B crecidas=%d\n",
+		nombre, leidos, sectores, crc32.ChecksumIEEE(mp.destino[:leidos]), iguales,
+		mallStream, bytesStream, mallPrestamo, bytesPrestamo, estado.Reservado, estado.Crecidas)
+}
+
+// memoriaPorLectura mide cuantos objetos y cuantos bytes pide UNA lectura (10 vueltas, promedio).
+func memoriaPorLectura(leer func() error) (float64, float64) {
+	const vueltas = 10
+
+	var antes, despues runtime.MemStats
+
+	runtime.GC()
+	runtime.ReadMemStats(&antes)
+
+	for i := 0; i < vueltas; i++ {
+		if err := leer(); err != nil {
+			return -1, -1
+		}
+	}
+
+	runtime.ReadMemStats(&despues)
+
+	return float64(despues.Mallocs-antes.Mallocs) / vueltas,
+		float64(despues.TotalAlloc-antes.TotalAlloc) / vueltas
 }
 
 // fuenteDePrueba: la MISMA fuente que arma el loader cuando se le agrega un MPQ (`mpq.NewSource`), para
@@ -136,7 +206,7 @@ func fuenteDePrueba(rutaMPQ string, aviso *string) asset.SourceDeLecturaEntera {
 	return lectora
 }
 
-func medirZona(m *d2mpq.MPQ, zona string, viaCargador bool, rutaMPQ string) {
+func medirZona(m *d2mpq.MPQ, zona string, viaCargador bool, viaPrestamo bool, rutaMPQ string) {
 	raw, err := m.ReadFile(zona)
 	if err != nil {
 		fmt.Println("DS1-LEER FALLO:", zona, err)
@@ -165,6 +235,12 @@ func medirZona(m *d2mpq.MPQ, zona string, viaCargador bool, rutaMPQ string) {
 	// el buffer UNICO que se reusa entre archivos (lo mismo que hace la consola con `LoadFileEn`)
 	var reuso []byte
 
+	// DC-002.80: la lectura con la memoria de trabajo prestada (el prestamo se reusa entre archivos)
+	var conPrestamo *medidaDePrestamo
+	if viaPrestamo {
+		conPrestamo = nuevaMedidaDePrestamo()
+	}
+
 	totalCrudo, totalComprimido := 0, 0
 
 	for _, f := range d.Files {
@@ -192,6 +268,10 @@ func medirZona(m *d2mpq.MPQ, zona string, viaCargador bool, rutaMPQ string) {
 
 		if cargador != nil {
 			compararPorElCargador(cargador, nombre, crudo, &reuso)
+		}
+
+		if conPrestamo != nil {
+			conPrestamo.medir(m, nombre, crudo)
 		}
 
 		totalCrudo += len(crudo)

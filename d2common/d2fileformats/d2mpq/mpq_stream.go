@@ -26,6 +26,11 @@ type Stream struct {
 	rawStart uint32 // archive offset of raw[0]
 
 	prefetched bool
+
+	// DC-002.80: la memoria del trabajo, prestada por el que llama. Cuando esta puesta, esta lectura NO
+	// pide memoria: la tabla de posiciones, el bloque comprimido, el descompreso y el descompresor de zlib
+	// viven ahi y se reusan entre archivos (`prestamo.go`). Sin esto (el caso de la PC), todo como siempre.
+	prestamo *Scratch
 }
 
 // CreateStream creates an MPQ stream
@@ -66,14 +71,29 @@ func (v *Stream) loadBlockOffsets() error {
 		return errors.New("sector offset table is larger than the archive")
 	}
 
-	v.Positions = make([]uint32, blockPositionCount)
-
 	// DC-002.27: la tabla de offsets del bloque se lee a mano (bytes + LittleEndian), no con
 	// binary.Read sobre el slice: el `binary` de la consola no soporta `*[]uint32` (misma pared que la
 	// cabecera, ver mpq_header.go:readHeader). Un uint32 por sector, en orden.
-	crudo := make([]byte, int(blockPositionCount)*4)
+	//
+	// DC-002.80: con la memoria prestada, las dos cosas viven en el prestamo (no se piden por archivo).
+	var crudo []byte
 
-	if _, err := io.ReadFull(io.NewSectionReader(v.MPQ.file, int64(v.Block.FilePosition), 1<<32), crudo); err != nil {
+	if v.prestamo != nil {
+		if int(blockPositionCount) > len(v.prestamo.posiciones) {
+			return errSectorNoEntra
+		}
+
+		v.Positions = v.prestamo.posiciones[:blockPositionCount]
+		crudo = v.prestamo.crudo[:int(blockPositionCount)*4]
+	} else {
+		v.Positions = make([]uint32, blockPositionCount)
+		crudo = make([]byte, int(blockPositionCount)*4)
+	}
+
+	// ReadAt y no `io.ReadFull(io.NewSectionReader(...))`: la tabla se lee entera de una y el
+	// `SectionReader` era un objeto mas por archivo. Un archivo corto devuelve error, que es lo mismo que
+	// hacia el ReadFull.
+	if _, err := v.MPQ.file.ReadAt(crudo, int64(v.Block.FilePosition)); err != nil {
 		return err
 	}
 
@@ -223,6 +243,24 @@ const prefetchLimit = 2 << 20
 // files are read whole on first use and served from memory afterwards; positional reads
 // (ReadAt) do not move the shared file offset.
 func (v *Stream) sectorBytes(offset, toRead uint32) ([]byte, error) {
+	// DC-002.80: con la memoria prestada, el bloque comprimido se lee ADENTRO del prestamo y no hay
+	// prefetch: el prefetch era llevar el archivo comprimido entero (hasta 2 MB) a un buffer propio del
+	// stream, que en la consola no lo devuelve nadie. Aca el "prefetch" es UN sector.
+	if v.prestamo != nil {
+		if int(toRead) > len(v.prestamo.comprimido) {
+			return nil, errSectorNoEntra
+		}
+
+		data := v.prestamo.comprimido[:toRead]
+		if _, err := v.MPQ.file.ReadAt(data, int64(offset)); err != nil {
+			return nil, err
+		}
+
+		v.prestamo.sectores++
+
+		return data, nil
+	}
+
 	if !v.prefetched && len(v.Positions) > 2 && !sinPrefetch { // Positions is only set for multi-sector compressed files
 		v.prefetched = true
 
@@ -292,6 +330,11 @@ func (v *Stream) loadBlock(blockIndex, expectedLength uint32) ([]byte, error) {
 
 	if v.Block.HasFlag(FileCompress) && (toRead != expectedLength) {
 		if !v.Block.HasFlag(FileSingleUnit) {
+			// DC-002.80: con la memoria prestada, el bloque descompreso se escribe en el prestamo
+			if v.prestamo != nil {
+				return v.prestamo.descomprimir(data, expectedLength)
+			}
+
 			return decompressMulti(data, expectedLength)
 		}
 

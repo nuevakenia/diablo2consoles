@@ -23,6 +23,10 @@ var (
 	errExplodeDistance = errors.New("explode: distance is too far back")
 	errExplodeEOF      = errors.New("explode: unexpected end of input")
 	errExplodeCode     = errors.New("explode: invalid code")
+
+	// DC-002.80: el stream pide mas de lo que entra en el arreglo prestado. Se dice en vez de pedir
+	// memoria: el prestamo es justo lo que evita que la lectura toque el monton.
+	errExplodeNoEntra = errors.New("explode: la salida no entra en el arreglo prestado")
 )
 
 const (
@@ -119,28 +123,96 @@ func initExplode() {
 	explodeDistTab = buildExplodeTable(explodeDistanceLengths)
 }
 
-// explode decompresses a PKWare DCL stream. sizeHint is the expected output size (0 if unknown).
+// escritorDeExplode es donde van los bytes que salen del decodificador. Dos modos y el MISMO bucle:
+//
+//   - prestado (`fijo`): escribe en el arreglo que le dan -- el del prestamo de la lectura -- y falla si no
+//     entra, en vez de pedir memoria. Es el modo de la consola (DC-002.80).
+//   - creciente: arranca con la capacidad que dice `sizeHint` y crece si el stream pide mas. Es el camino de
+//     siempre y el que usan las pruebas (que pasan pistas chicas a proposito).
+type escritorDeExplode struct {
+	prestado  bool   // true = escribe en `fijo` (y no crece)
+	fijo      []byte // modo prestado: el destino, ya del tamano que se espera
+	n         int
+	creciente []byte // modo creciente
+}
+
+// largo es cuantos bytes se escribieron: el decodificador mira para atras (las copias) hasta aca.
+func (w *escritorDeExplode) largo() int {
+	if w.prestado {
+		return w.n
+	}
+
+	return len(w.creciente)
+}
+
+func (w *escritorDeExplode) poner(b byte) error {
+	if w.prestado {
+		if w.n >= len(w.fijo) {
+			return errExplodeNoEntra
+		}
+
+		w.fijo[w.n] = b
+		w.n++
+
+		return nil
+	}
+
+	w.creciente = append(w.creciente, b)
+
+	return nil
+}
+
+func (w *escritorDeExplode) en(i int) byte {
+	if w.prestado {
+		return w.fijo[i]
+	}
+
+	return w.creciente[i]
+}
+
+// explode descomprime un stream de PKWare DCL con la salida CRECIENTE. sizeHint es una pista de capacidad,
+// no un limite (el camino de siempre).
+func explode(in []byte, sizeHint int) ([]byte, error) {
+	w := escritorDeExplode{creciente: make([]byte, 0, sizeHint)}
+	if err := decodificarExplode(in, &w); err != nil {
+		return nil, err
+	}
+
+	return w.creciente, nil
+}
+
+// explodeEn descomprime un stream de PKWare DCL DENTRO de `out` (sin pedir memoria) y devuelve cuantos bytes
+// escribio. Si el stream pide mas de lo que entra, se dice: pedir memoria es justo lo que este camino evita.
+func explodeEn(in []byte, out []byte) (int, error) {
+	w := escritorDeExplode{prestado: true, fijo: out}
+	if err := decodificarExplode(in, &w); err != nil {
+		return 0, err
+	}
+
+	return w.n, nil
+}
+
+// decodificarExplode es el decodificador: un solo bucle que escribe a traves de `w`, sea prestado o creciente.
 //
 //nolint:funlen,gocyclo // one tight loop
-func explode(in []byte, sizeHint int) ([]byte, error) {
+func decodificarExplode(in []byte, w *escritorDeExplode) error {
 	explodeOnce.Do(initExplode)
 
 	if len(in) < 2 {
-		return nil, errExplodeEOF
+		return errExplodeEOF
 	}
 
 	if in[0] > 1 {
-		return nil, errExplodeHeader
+		return errExplodeHeader
 	}
 
 	coded := in[0] == 1
 	dict := uint(in[1])
 
 	if dict < 4 || dict > 6 {
-		return nil, errExplodeDict
+		return errExplodeDict
 	}
 
-	out := make([]byte, 0, sizeHint)
 	pos := 2
 
 	var (
@@ -168,7 +240,7 @@ func explode(in []byte, sizeHint int) ([]byte, error) {
 		refill()
 
 		if pad > 8 { // consumed more than the input holds
-			return nil, errExplodeEOF
+			return errExplodeEOF
 		}
 
 		if acc&1 == 0 { // literal
@@ -180,7 +252,7 @@ func explode(in []byte, sizeHint int) ([]byte, error) {
 			if coded {
 				e := explodeLit[acc&(1<<explodeMaxBits-1)]
 				if e == 0 {
-					return nil, errExplodeCode
+					return errExplodeCode
 				}
 
 				l := uint(e & 15)
@@ -193,7 +265,9 @@ func explode(in []byte, sizeHint int) ([]byte, error) {
 				cnt -= 8
 			}
 
-			out = append(out, b)
+			if err := w.poner(b); err != nil {
+				return err
+			}
 
 			continue
 		}
@@ -203,7 +277,7 @@ func explode(in []byte, sizeHint int) ([]byte, error) {
 
 		e := explodeLenTab[acc&(1<<explodeMaxBits-1)]
 		if e == 0 {
-			return nil, errExplodeCode
+			return errExplodeCode
 		}
 
 		l := uint(e & 15)
@@ -222,7 +296,7 @@ func explode(in []byte, sizeHint int) ([]byte, error) {
 
 		e = explodeDistTab[acc&(1<<explodeMaxBits-1)]
 		if e == 0 {
-			return nil, errExplodeCode
+			return errExplodeCode
 		}
 
 		l = uint(e & 15)
@@ -239,24 +313,22 @@ func explode(in []byte, sizeHint int) ([]byte, error) {
 		acc >>= shift
 		cnt -= shift
 
-		if dist > len(out) {
-			return nil, errExplodeDistance
+		if dist > w.largo() {
+			return errExplodeDistance
 		}
 
 		// forward copy: overlapping runs repeat the last dist bytes
-		start := len(out) - dist
-		if dist >= length {
-			out = append(out, out[start:start+length]...)
-		} else {
-			for i := 0; i < length; i++ {
-				out = append(out, out[start+i])
+		start := w.largo() - dist
+		for i := 0; i < length; i++ {
+			if err := w.poner(w.en(start + i)); err != nil {
+				return err
 			}
 		}
 	}
 
 	if pad > 0 && cnt < uint(pad)*8 { // the end code used bits that were not in the input
-		return nil, errExplodeEOF
+		return errExplodeEOF
 	}
 
-	return out, nil
+	return nil
 }

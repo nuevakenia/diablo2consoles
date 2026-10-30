@@ -120,18 +120,17 @@ func AjustarPresupuestosDeConsola() {
 
 	pesoEnBytes = true
 
-	// DC-002.78 -- LA CARGA DE TILES POR ARENA QUEDA APAGADA, Y ESTO ES A PROPOSITO.
+	// DC-002.80 -- LA CARGA DE TILES POR ARENA YA NO SE APAGA ACA: la prende `NuevoAssetManagerDeConsola`
+	// (`consola.go`), que es el unico camino que arma un AssetManager en la consola.
 	//
-	// `ActivarCaminoDeTilesDeConsola()` prende la ruta que lee cada .dt1 adentro de un arena pedido una sola
-	// vez (`lectura_de_tiles.go`). Se implemento, se midio en Flycast y NO CIERRA TODAVIA: sin la ruta, la
-	// zona del pueblo entra en 31,1 s y pide 12.073.160 B (y la segunda zona muere por OOM); con la ruta,
-	// el SH-4 muere antes -- el .dt1 que se lee por el stream del MPQ pide ~2 MB de SEMIESPACIO por archivo
-	// (medido: con el recolector frenado, `gc_alloc: OOM` pidiendo 3.328 B en la PRIMERA carga), o sea que
-	// el que pide memoria por archivo no es solo el destino: es la LECTURA. Mientras la lectura no deje de
-	// pedir, prender esto empeora las cosas. Los numeros y el porque, en
-	// `console/dc/evidencia/dc-002.78-carga-sin-memoria-por-archivo.txt`.
-	//
-	// d2asset.ActivarCaminoDeTilesDeConsola()
+	// Historia, porque el comentario de DC-002.78 decia lo contrario: la ruta del arena (cada .dt1 leido
+	// adentro de un arena pedido una sola vez) se implemento en .78 y NO cerraba, porque el que pedia
+	// memoria por archivo no era solo el destino: era la LECTURA por el stream del MPQ (~2 MB de semiespacio
+	// por archivo; medido con el recolector frenado: `gc_alloc: OOM` pidiendo 3.328 B en la PRIMERA carga).
+	// DC-002.80 agrego la lectura con memoria PRESTADA (`d2mpq.ReadFileInto`) y la midio: las tres fases
+	// terminan sin OOM y sin excepcion, `pico(c) - pico(a) = 0` y el lienzo vuelve con crc32 3507647456 --
+	// con el recolector normal Y con el recolector frenado. Numeros en
+	// `console/dc/evidencia/dc-002.80-lectura-con-memoria-prestada.txt`.
 }
 
 // Presupuestos son los ocho presupuestos vigentes, para informar y medir.

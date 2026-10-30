@@ -153,3 +153,21 @@ int d2c_zlib_stream_end(int slot) {
     return 0;
 }
 
+/* DC-002.80: reinicia el slot para el bloque SIGUIENTE sin soltarlo.
+ *
+ * POR QUE. `d2c_zlib_stream_end` + `d2c_zlib_stream_init` hacen `inflateEnd` + `inflateInit2`, y ese par
+ * LIBERA y vuelve a PEDIR la ventana de 32 KB de la zlib en CADA bloque descomprimido -- 124 bloques en un
+ * .dt1 de 505 KB, o sea 124 malloc/free de 32 KB por archivo. Medido en DC-002.77: liberar y volver a pedir
+ * tamanos distintos FRAGMENTA el monton de la consola. `inflateReset` conserva la ventana y solo vuelve el
+ * estado al principio: ni un byte pedido por bloque. */
+int d2c_zlib_stream_reset(int slot) {
+    if (slot < 0 || slot >= D2C_ZLIB_SLOTS || d2c_zs_libre[slot]) return -1;
+    d2c_zs_fin[slot] = 0;
+    d2c_zs_consumido[slot] = 0;
+    if (inflateReset(&d2c_zs[slot]) != Z_OK) {
+        d2c_ultimo_rc = -101;   /* el reset: estado de la zlib, no los datos */
+        return -1;
+    }
+    return 0;
+}
+

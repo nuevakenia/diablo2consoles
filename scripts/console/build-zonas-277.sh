@@ -47,11 +47,28 @@ for f in nivel.go; do
     echo "   $f $(sha256sum "$POC_REF/$f" | cut -c1-16)"
 done
 
-echo "== 1/6 los paquetes del motor que se compilan aca (d2datautils, dt1, d2cache, d2asset y pvr)"
-for p in d2common/d2datautils d2common/d2fileformats/d2dt1 d2common/d2cache d2core/d2asset d2core/d2render/pvr; do
+echo "== 1/6 los paquetes del motor que se compilan aca (d2datautils, dt1, d2mpq, el loader, d2asset y pvr)"
+# DC-002.80: se suman d2mpq y la cadena del loader (asset -> mpq -> d2loader). La lectura con memoria prestada
+# vive en d2mpq/prestamo.go y llega al motor por `d2loader.LeerEnteroEnConPrestamo`; si esos .gox quedaran
+# viejos, en la consola correria el codigo de antes y la medicion seria de otra tarjeta.
+# El orden importa: cada paquete se compila contra los .gox que ya estan en el arbol.
+for p in \
+    d2common/d2datautils \
+    d2common/d2fileformats/d2dt1 \
+    d2common/d2fileformats/d2mpq \
+    d2common/d2cache \
+    d2common/d2loader/asset \
+    d2common/d2loader/asset/types \
+    d2common/d2loader/mpq \
+    d2common/d2loader/filesystem \
+    d2common/d2loader \
+    d2core/d2asset \
+    d2core/d2render/pvr; do
     mapfile -t SRC_P < <(ls "$REPO/$p"/*.go | grep -v '_test\.go$' |
         grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
-        grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$')
+        grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$' |
+        grep -vE '/(marca_carga_host)\.go$')
+    mkdir -p "$(dirname "$BASE_GOX/$PREFIJO/$p.gox")"
     sh-elf-gccgo $GODC_GOFLAGS -I "$BASE_GOX" \
         -fgo-pkgpath="$PREFIJO/$p" \
         -c "${SRC_P[@]}" \
@@ -109,6 +126,11 @@ BUFFER_VAL=false
 # runtime de libgodc se pone en sus secciones criticas).
 INHIBE_VAL=false
 [ "${INHIBE:-0}" = "1" ] && INHIBE_VAL=true
+# LEER=stream (DC-002.80): apaga la lectura con memoria PRESTADA y deja el camino de DC-002.78 (el .dt1 se
+# lee por el STREAM del MPQ adentro del arena). Es la corrida del ANTES, con el mismo binario y el mismo arena:
+# separa "el destino no pide memoria" (que ya estaba) de "la lectura no pide memoria" (que es esta tarjeta).
+LEER_VAL=true
+[ "${LEER:-prestamo}" = "stream" ] && LEER_VAL=false
 {
     printf 'package main\n\n'
     printf '// Palancas generadas por build-zonas-277.sh. El porque de cada una, en knobs.go.\n'
@@ -116,8 +138,9 @@ INHIBE_VAL=false
     printf 'const gcInhibido = %s\n' "$INHIBE_VAL"
     printf 'const gcEntreArchivos = %s\n' "$GCENTRE_VAL"
     printf 'const sinCacheDt1 = %s\n' "$SUELTA_VAL"
+    printf 'const leerConPrestamo = %s\n' "$LEER_VAL"
 } > "$SRCB/knobs.go"
-echo "   palancas: porBuffer=$BUFFER_VAL gcInhibido=$INHIBE_VAL gcEntreArchivos=$GCENTRE_VAL sinCacheDt1=$SUELTA_VAL"
+echo "   palancas: porBuffer=$BUFFER_VAL gcInhibido=$INHIBE_VAL gcEntreArchivos=$GCENTRE_VAL sinCacheDt1=$SUELTA_VAL leerConPrestamo=$LEER_VAL"
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 
 echo "== 4/6 compilando y enlazando contra los .gox del motor"

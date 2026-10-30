@@ -1,0 +1,222 @@
+DC-002.80 -- LA LECTURA DEL MPQ CON MEMORIA PRESTADA: las tres fases en pie y el pico que NO crece
+===================================================================================================
+Fecha: 2026-10-30
+Rama: DC-002 (checkout unico, /home/dgalli/Proyectos/diablo2consoles)
+Tarjeta: t_41289973 · Feature: Fase B.1e de docs/PLAN.md · Hermana de DC-002.78 (t_22fd8185)
+Estado: **REQUISITO CUMPLIDO**. La ruta del arena se prende, las tres fases terminan sin OOM y sin
+excepcion, `pico(c) - pico(a) = 0 bytes` y el lienzo del pueblo vuelve con crc32 3507647456.
+
+Que se hizo, en una linea
+-------------------------
+El que llama presta la memoria de trabajo de la LECTURA -- un `d2mpq.Scratch` con la tabla de posiciones, el
+bloque comprimido, el bloque descompreso y el descompresor de zlib, pedido UNA vez y reusado entre archivos y
+entre zonas --, y el `Reading` de cada `.dt1` deja de hacer `make` por archivo (sin prefetch) y por sector.
+Con eso la lectura deja de tocar el semiespacio del recolector: es lo que DC-002.78 dejo medido como la causa
+(`gc_alloc: out of memory` pidiendo 3.328 B durante el PRIMER .dt1 con el recolector frenado).
+
+
+0. El contraste, con el MISMO binario y el MISMO arbol (lo primero que hay que mirar)
+-------------------------------------------------------------------------------------
+Las dos corridas salen del mismo `scripts/console/build-zonas-277.sh`, del mismo `BASE_GOX` y de la misma
+imagen; la unica diferencia es la palanca nueva `LEER`:
+
+  LEER=prestamo (lo de esta tarjeta)  ->  3 fases, 0 excepciones, pico(c)-pico(a) = 0
+  LEER=stream    (lo de DC-002.78)    ->  MUERE con `Unhandled exception` en el TERCER .dt1
+
+  ANTES (LEER=stream BUFFER=1), las ultimas lineas antes de morir:
+    ZONAS: DT1 ...\treegroups.dt1 tiles= 21 vivo= 489812 ... usado=10771792 libre=2128
+    ZONAS: DT1 ...\stonewall.dt1  tiles= 52 vivo= 420161 ... usado=11118840 libre=3240
+    Unhandled exception: PC e50a5878, code 1, evt 0180
+
+  O sea: con la lectura por el stream, DOS archivos dejan el monton en 11.118.840 B con 3.240 B libres y el
+  tercero -- el .dt1 de 1 MB -- no entra. Es el mismo defecto de .78, reproducido en esta corrida.
+  Log: `dc-002.80-flycast-antes-stream.log`.
+
+
+1. Donde pedia memoria, y que se hizo con cada cosa
+---------------------------------------------------
+Leido en `d2common/d2fileformats/d2mpq/`:
+
+  `loadBlockOffsets`  make([]uint32, sectores+1) + make([]byte, sectores*4)
+      -> con prestamo lee la tabla DENTRO del scratch (`prestamo.posiciones`, `prestamo.crudo`) por `ReadAt`
+         directo. Cero `make` por archivo.
+
+  `sectorBytes`  el prefetch: `make([]byte, last-first)` = el archivo COMPRIMIDO ENTERO (2 MB de tope)
+      -> con prestamo el prefetch NO se usa: se lee UN sector directo a `prestamo.comprimido` (4 KB).
+
+  `decompressMulti`/`explode`  un bloque descompreso de `v.Size` y su descompresor, por sector
+      -> con prestamo el bloque descompreso va a `prestamo.descomprimido` y el descompresor se reusa
+         (`compress/zlib` con `Reset` en la PC; `inflateReset` sobre un slot de KOS en la consola).
+
+  La comprobacion de contenido es lo que hace que esto sea seguro y no una loteria: cada lectura con prestamo
+  se compara BYTE A BYTE y por CRC32 contra `ReadFile` (`prestamo_test.go`, y contra el archivo real del juego
+  con `D2_GAME_DIR`). Un solo byte distinto tira la prueba.
+
+Archivos:
+  nuevos    d2common/d2fileformats/d2mpq/prestamo.go        (`Scratch`, `ReadFileInto`, `Estado`)
+            d2common/d2fileformats/d2mpq/prestamo_test.go   (igualdad, memoria, buffer corto, explodeEn, MPQ real)
+            d2common/d2fileformats/d2mpq/prestamo_de_zlib_consola.go (tag `dreamcast`: conecta el inflador de la consola)
+  tocados   d2common/d2fileformats/d2mpq/mpq_stream.go      (`prestamo` en el `Stream`)
+            d2common/d2fileformats/d2mpq/explode.go         (`explodeEn`: escribir en un arreglo prestado)
+            d2common/d2loader/{asset/source.go,mpq/source.go,loader.go}  (lectura entera con prestamo)
+            d2core/d2asset/lectura_de_tiles.go              (el .dt1 se lee en el tramo del arena)
+            d2core/d2asset/consola.go                       (el AssetManager de consola prende la ruta del arena)
+            d2core/d2asset/presupuestos.go                  (el comentario de .78 que la apagaba, al dia)
+            console/dc/std/compress/zlib/zlib.go            (`Inflador`: un slot vivo + `inflateReset`)
+            console/dc/std/csrc/zlib_dc.c                   (`d2c_zlib_stream_reset`)
+            console/dc/medidas/dt1-crc/main.go              (`-via-prestamo`: mide los dos caminos)
+            console/dc/poc/zonas-waypoint/{main.go,knobs.go} (palanca `LEER`, estado del prestamo)
+            scripts/console/build-zonas-277.sh              (palanca `LEER`, y d2mpq/loader en el orden)
+
+  La ruta del arena queda PRENDIDA en la consola por construccion: la prende `NuevoAssetManagerDeConsola`
+  (`d2asset/consola.go`), que es el unico camino que arma un AssetManager ahi. El main del motor (Fase D) no
+  tiene que acordarse de nada.
+
+
+2. La consola: un descompresor que no copia el bloque
+-----------------------------------------------------
+En la PC el prestamo se apoya en `compress/zlib` (su lector sabe `Reset`). En la CONSOLA `compress/zlib` es
+otro paquete -- un puente a la zlib de KOS por slots -- y su `NewReader` hace `io.ReadAll` del comprimido: por
+sector eso es una copia del bloque y un `Reader` nuevo, o sea memoria pedida POR SECTOR, justo lo que la
+tarjeta saca. Se agrego `zlib.Inflador`: toma UN slot y lo mantiene vivo entre bloques con
+`d2c_zlib_stream_reset` (que es `inflateReset`, y CONSERVA la ventana de 32 KB en vez de liberarla y volver a
+pedirla -- liberar y pedir tamanos distintos es lo que fragmenta el monton, medido en DC-002.77).
+
+El enganche es una funcion (`d2mpq.ConectarInfladorDePrestamo`) que conecta el `init` de
+`d2mpq/prestamo_de_zlib_consola.go` (archivo con tag `dreamcast`, o sea que en la PC no existe): asi el codigo
+del MPQ es UNO solo y compila igual en las dos plataformas, que es la regla de este port (gccgo no filtra por
+build tag). Es asignar un puntero a funcion y nada mas -- no pide memoria ni depende de otro paquete --, asi
+que cualquier binario de consola que use `d2mpq` lee con prestamo sin que el que arranca se acuerde.
+
+
+3. La medicion en la PC: lo que pide cada camino, por archivo
+-------------------------------------------------------------
+`go run ./console/dc/medidas/dt1-crc -via-prestamo` (10 vueltas por camino, promedio de `runtime.MemStats`,
+prestamo ya caliente; zona del pueblo, 8 archivos):
+
+  archivo (crudo)                  sectores   STREAM: objetos / bytes     PRESTAMO: objetos / bytes
+  treegroups.dt1   505.504 B          124      259,4 obj  / 1.789.467 B     4,0 obj / 192 B
+  stonewall.dt1    439.569 B          108      226,3 obj  / 1.606.590 B     4,0 obj / 192 B
+  floor.dt1      1.008.003 B          247      504,3 obj  / 3.456.744 B     4,0 obj / 192 B
+  warp.dt1         658.158 B          161      332,0 obj  / 1.420.432 B     4,0 obj / 192 B
+  river.dt1        316.344 B           78      166,7 obj  / 1.022.831 B     4,0 obj / 192 B
+  objects.dt1      661.515 B          162      334,1 obj  / 2.152.187 B     4,0 obj / 192 B
+  fence.dt1        423.367 B          104      218,4 obj  / 1.421.459 B     4,0 obj / 192 B
+  outdoors/objects 338.205 B           83      176,0 obj  / 1.217.328 B     4,0 obj / 192 B
+
+  Y los ocho crc32 dan IGUAL por los dos caminos (`igual=true` en las ocho lineas).
+
+  La memoria de trabajo del prestamo, para los ocho archivos de la zona: 14.272 B (pide 13.288 B con el
+  primer archivo y crece 6 veces, hasta el .dt1 de 1 MB). Es el numero que importa: 14 KB de trabajo para
+  leer 4,35 MB de .dt1, contra 1,2-3,5 MB por archivo del camino viejo.
+
+
+4. La consola: las tres fases, con el recolector normal
+-------------------------------------------------------
+`BUFFER=1 LEER=prestamo`, Flycast, 180 s (`dc-002.80-flycast-prestamo.log`):
+
+  ZONAS: presupuestos vigentes: animaciones=1048576 cofs=65536 dccs=524288 dt1s=1048576 ds1s=262144 suma=2949120
+  ZONAS: camino de tiles de consola prendido: true lecturaPrestada= true
+  ZONAS: (a) pueblo      picoUsado= 10401264 arena= 10405280 libreMin= 3504 ms= 29149 crc32= -787319840
+  ZONAS: (b) segunda     picoUsado= 10401264 arena= 10405280 libreMin= 4016 ms= 14995 crc32= 2133856858
+  ZONAS: (c) vuelta      picoUsado= 10401264 arena= 10405280 libreMin= 4016 ms= 29005 crc32= -787319840
+  ZONAS: pico(c) - pico(a) = 0 bytes (margen admitido +- 65536 )
+  ZONAS: arena(c) - arena(a) = 0 bytes
+  ZONAS: EVCICION OK -- volver al pueblo no dejo RAM tomada de mas
+  ZONAS: LIENZO OK -- crc32 -787319840 y 193538 pixeles en las dos
+  ZONAS: dt1s aciertos= 0 faltas= 20 evicto= 14 pesoEnCache= 721552 de 1048576
+  ZONAS: ARENA de tiles del motor: caminoDeConsola= true capacidad= 4849148 usado= 1739431 reinicios= 2 archivos= 20
+  ZONAS: PRESTAMO de la lectura: lecturas= 20 sectores= 2691 reservado= 14272 crecidas= 6
+  ZONAS: monton al final: arena=10405280 usado=10401264 libre=4016 sbrk=0x0x8ccd6000 techo=0x0x8cff0000
+  ZONAS: CUADRO pixelesNoVacios= 177657 de 307200 crc32= 782674532 tamano= 640 480 montonLibre= 4016
+  0 excepciones.
+
+  Lectura: 20 archivos, 2.691 sectores descomprimidos, 14.272 B de trabajo y 6 crecidas. El monton NO se
+  mueve entre fases: 10.401.264 B usado en (a), en (b) y en (c) -- o sea que leer 4,35 MB de tiles, cambiar
+  de zona y volver no deja ni un byte tomado de mas. Los dos reinicios del arena son los cambios de zona
+  (el arena se tira entero y el cache de dt1s se vacia: 20 faltas, 14 desalojos).
+
+
+5. La consola: la sonda de DC-002.78, ahora en verde (recolector FRENADO)
+------------------------------------------------------------------------
+`BUFFER=1 INHIBE=1 LEER=prestamo` (`dc-002.80-flycast-inhibe-prestamo.log`): es la MISMA sonda que en .78
+mataba el runtime durante el primer .dt1 pidiendo 3.328 B.
+
+  ZONAS: (a) pueblo      picoUsado= 10401264 arena= 10405216 libreMin= 3440 ms= 29149 crc32= -787319840
+  ZONAS: (b) segunda     picoUsado= 10401264 arena= 10405216 libreMin= 3952 ms= 14996 crc32= 2133856858
+  ZONAS: (c) vuelta      picoUsado= 10401264 arena= 10405216 libreMin= 3952 ms= 29007 crc32= -787319840
+  ZONAS: pico(c) - pico(a) = 0 bytes
+  ZONAS: EVCICION OK / LIENZO OK
+  ZONAS: ARENA: caminoDeConsola= true capacidad= 4849148 usado= 1739431 reinicios= 2 archivos= 20
+  ZONAS: PRESTAMO de la lectura: lecturas= 20 sectores= 2691 reservado= 14272 crecidas= 6
+  0 excepciones, 0 `gc_collect` durante la carga de los archivos.
+
+  Este es el numero que cierra la tarjeta: con el recolector FRENADO -- o sea sin nadie que le devuelva el
+  semiespacio -- la carga completa las tres fases. La lectura ya no pide semiespacio: pide 14 KB una vez.
+
+
+6. Punto 3 de la tarjeta: hay que frenar el recolector o subir el semiespacio?
+-------------------------------------------------------------------------------
+NO. Con el recolector normal hay 4 `gc_collect` en toda la corrida (uno antes de (a), uno DENTRO de la carga
+de (a) -- disparado por `gc-por-umbral-bytes-usados` tras river.dt1 -- y uno al empezar (b) y otro al empezar
+(c)); el de adentro de la carga TERMINA y la fase sigue. Con el recolector frenado tambien termina. Decision
+medida: no se toca `GC_SEMISPACE_SIZE_KB` (2 MB) ni se prende `gc_inhibit` por defecto -- se siguen
+necesitando la corrida normal y la frenada como sonda, pero ninguna es requisito para que la carga cierre.
+El margen sigue siendo el de .77: `usado` 10.401.264 B contra el techo de 0x8cff0000, con el arena de
+4.849.148 B adentro.
+
+
+7. Como se reproduce (paso a paso)
+----------------------------------
+  # 1) el arbol del estandar, para no recompilarlo (una vez)
+  #    OJO: orden.txt tiene rutas ABSOLUTAS a /tmp/gox-med; si se copia el arbol a otro lado hay que
+  #    reescribirlas, o el enlace mete los .gox VIEJOS y no se ve el codigo nuevo:
+  S=$HOME/.hermes/cache/scratch/dcb280
+  cp -a /tmp/gox-med $S/base
+  sed -i "s|^/tmp/gox-med/|$S/base/|" $S/base/orden.txt
+
+  # 2) si se toco console/dc/std/compress/zlib (esta tarjeta lo toco), recompilar ese .gox:
+  sed 's|"d2std/|"|g' console/dc/std/compress/zlib/zlib.go > $S/std-src/compress/zlib/zlib.go
+  sh-elf-gccgo $GODC_GOFLAGS -I "$S/base" -fgo-pkgpath=compress/zlib \
+      -c $S/std-src/compress/zlib/zlib.go -o $S/base/compress/zlib.gox
+
+  # 3) compilar y correr
+  BUFFER=1 BASE_GOX=$S/base bash scripts/console/build-zonas-277.sh $S/out-prestamo
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=none \
+      bash scripts/console/run-flycast.sh $S/out-prestamo/disc.gdi 180 $S/cap-prestamo
+
+  # 4) el contraste y la sonda
+  LEER=stream BUFFER=1 ...   # muere en el tercer .dt1 (el ANTES)
+  BUFFER=1 INHIBE=1 ...      # las tres fases con el recolector frenado
+
+  # 5) la medicion del host
+  go run ./console/dc/medidas/dt1-crc -via-prestamo
+
+
+8. Que queda (no entra en esta tarjeta)
+---------------------------------------
+- Fase D: el `main` del MOTOR no tiene que prender nada -- la ruta del arena la prende
+  `NuevoAssetManagerDeConsola` y el inflador de la consola lo conecta el `init` de `d2mpq` --, pero si hay que
+  comprobarlo con el motor entero y no con el POC.
+- El prestamo tiene que sobrevivir al cambio de nivel: `ReiniciarArenaDeTiles` tira el arena pero el
+  `prestamoDeTiles` se conserva (no depende del tamano de la zona, solo del archivo mas grande).
+- Los archivos que NO entran en el tramo del arena devuelven `ErrNoEntraEnElBuffer` (`entro=false`) y el
+  llamador tira el arena: en esta corrida paso 2 veces (los dos reinicios), sin pedir memoria.
+- Tiempo de carga: 29,1 s el pueblo -- aceptado por Papu el 30/10, no se toca aca.
+
+
+9. Que se corrio, y que no
+--------------------------
+  SI (host):  go build ./d2common/... ./d2core/...                         -> OK
+              go vet d2core/d2asset d2common/d2fileformats/d2mpq d2common/d2loader/...
+                                                                           -> OK
+              go test ./d2common/d2fileformats/d2mpq/                      -> ok (0,06 s)
+              D2_GAME_DIR=... go test -run PrestamoEnElArchivoReal         -> ok (contra d2data.mpq real)
+              go run ./console/dc/medidas/dt1-crc -via-prestamo            -> la tabla de la seccion 3
+  SI (consola): las tres corridas de Flycast de arriba.
+  NO:  go test ./d2core/d2asset/ -- el paquete levanta ebiten/GLFW en un `init` de una dependencia y en este
+       host headless muere con `PlatformError: X11: The DISPLAY environment variable is missing` /
+       `panic: NotInitialized: The GLFW library is not initialized`, ANTES de correr ningun test. Es
+       PREEXISTENTE y ajeno a esta tarjeta (no hay servidor grafico en la sesion); lo que si cubre a
+       `d2asset` es `go build`, `go vet` y el binario de consola, que compila y corre.
+       Si alguien quiere el test de d2asset, hay que correrlo en la sesion con DISPLAY real.

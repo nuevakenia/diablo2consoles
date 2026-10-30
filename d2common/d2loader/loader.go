@@ -11,6 +11,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/filesystem"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2cache"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset/types"
@@ -165,6 +166,50 @@ func (l *Loader) LeerEnteroEn(subPath string, dst []byte) (int, error) {
 	}
 
 	return 0, fmt.Errorf(errFmtFileNotFound, subPath)
+}
+
+// LeerEnteroEnConPrestamo lee el archivo entero DENTRO del buffer que le prestan y SIN pedir memoria de
+// trabajo: la tabla de posiciones, los bloques y el descompresor viven en `prestamo`, que el que llama reusa
+// archivo tras archivo (DC-002.80). Es el camino de la consola para cargar los .dt1 de una zona.
+//
+// `dst` tiene que alcanzar para `TamanoDeArchivo`. Si la fuente no sabe leer con prestamo (una carpeta del
+// disco, por ejemplo) se dice, y el que llama decide (hoy: se vuelve al camino de siempre).
+func (l *Loader) LeerEnteroEnConPrestamo(subPath string, dst []byte, prestamo *d2mpq.Scratch) (int, error) {
+	subPath = l.rutaReal(subPath)
+
+	for idx := range l.Sources {
+		source := l.Sources[idx]
+
+		fuente, ok := source.(asset.SourceDeLecturaConPrestamo)
+		if !ok || !source.Exists(subPath) {
+			continue
+		}
+
+		return fuente.LeerEnteroEnConPrestamo(subPath, dst, prestamo)
+	}
+
+	return 0, fmt.Errorf(errFmtFileNotFound, subPath)
+}
+
+// TieneLecturaConPrestamo dice si el archivo lo tiene una fuente que sabe leer con la memoria prestada
+// (DC-002.80). Es la pregunta que hace `d2asset` para decidir si lee con prestamo o se queda con el camino de
+// siempre: con una carpeta del disco no hay MPQ del que prestar nada.
+func (l *Loader) TieneLecturaConPrestamo(subPath string) bool {
+	subPath = l.rutaReal(subPath)
+
+	for idx := range l.Sources {
+		source := l.Sources[idx]
+
+		if _, ok := source.(asset.SourceDeLecturaConPrestamo); !ok {
+			continue
+		}
+
+		if source.Exists(subPath) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // AddSource adds an asset source with the given path. The path will either resolve to a directory

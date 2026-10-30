@@ -18,6 +18,12 @@ package d2asset
 //
 // El llamador tiene que haber llamado a `AjustarPresupuestosDeConsola()` ANTES (los presupuestos se
 // congelan al crear los caches): es el mismo contrato que documenta presupuestos.go.
+//
+// DC-002.80: aca tambien se prende el camino de tiles de la consola (`ActivarCaminoDeTilesDeConsola`). Si
+// hay un AssetManager de consola, la carga de un .dt1 tiene que ir por el arena con la lectura prestada: se
+// midio en Flycast y la ruta cierra (tres fases, `pico(c) - pico(a) = 0`, crc32 3507647456, con el
+// recolector normal y con el recolector frenado). Prenderlo ACA y no en `AjustarPresupuestosDeConsola` deja
+// el contrato claro: la ruta va con el AssetManager, no con los numeros de los presupuestos.
 
 import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2tbl"
@@ -52,6 +58,10 @@ func NuevoAssetManagerDeConsola(nivelDeLog d2util.LogLevel, rutasMPQ ...string) 
 	logger.SetLevel(nivelDeLog)
 
 	caches := NuevosCachesDeAssets()
+
+	// DC-002.80: con AssetManager de consola, los .dt1 se cargan por el arena y se leen con memoria
+	// prestada. Medido: la ruta cierra (ver el comentario de arriba).
+	ActivarCaminoDeTilesDeConsola()
 
 	manager := &AssetManager{
 		Logger:     logger,

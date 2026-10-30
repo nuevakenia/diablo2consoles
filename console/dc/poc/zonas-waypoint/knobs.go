@@ -42,4 +42,13 @@ const (
 	gcInhibido      = false
 	gcEntreArchivos = false
 	sinCacheDt1     = false
+	// leerConPrestamo (DC-002.80): lee cada .dt1 con la memoria de trabajo PRESTADA (d2mpq.ReadFileInto) en
+	// vez de por el stream del MPQ. Apagada queda el camino de DC-002.78 -- el que se midio EN CONTRA -- para
+	// poder correr las dos cosas con el mismo binario y el mismo arena.
+	//
+	// POR QUE ESTA PALANCA EXISTE. En DC-002.78 se midio que el DESTINO de la lectura ya no pedia memoria
+	// (el arena) y que la LECTURA si: con el recolector frenado, el semiespacio de 2 MB se llenaba durante la
+	// carga del PRIMER .dt1 y el runtime moria pidiendo 3.328 B. El prestamo es lo que saca a la lectura del
+	// semiespacio; apagar esta palanca deja exactamente la corrida del .78 para comparar.
+	leerConPrestamo = true
 )

@@ -59,6 +59,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2datautils"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
 )
 
 const (
@@ -82,22 +83,50 @@ var (
 	// las dos mitades del camino de la consola. En la PC quedan apagadas.
 	caminoDeTilesDeConsola bool
 
+	// lecturaPrestadaDeTiles (DC-002.80): leer cada .dt1 con la memoria de trabajo PRESTADA por el arena
+	// (`d2mpq.ReadFileInto`), en vez de por el stream del MPQ. Es lo que hace que la lectura no pida
+	// memoria por archivo: medido en DC-002.78, leer UN .dt1 de 505 KB por el stream pedia ~2 MB del
+	// semiespacio del recolector y el runtime moria con `gc_alloc: out of memory`. Apagada queda el camino
+	// de DC-002.78 (que se midio EN CONTRA); la palanca existe para poder medir los dos en la misma corrida.
+	lecturaPrestadaDeTiles = true
+
+	// el prestamo: la tabla de posiciones, el bloque comprimido, el descompreso y el descompresor de zlib
+	// de la lectura. Se pide la primera vez y se reusa entre archivos y entre zonas.
+	prestamoDeTiles *d2mpq.Scratch
+
 	// el arena: pedido UNA vez, con la medida de una zona. Los .dt1 se leen adentro.
 	arenaDeTiles      []byte
 	cursorDelArena    int
 	reiniciosDelArena int
 	archivosDeTiles   int
 
-	// el lector por trozos (no pide memoria propia: lee ADENTRO del tramo que se le presta).
+	// el lector por trozos (no pide memoria propia: lee ADENTRO del tramo que se le presta). Es el camino
+	// de DC-002.78, el que se mide en contra.
 	lectorDeTiles  d2datautils.BufferGrande
 	candadoDeTiles sync.Mutex
 )
 
-// ActivarCaminoDeTilesDeConsola prende la ruta del arena. HOY NO LA LLAMA NADIE DEL MOTOR: medido en
-// Flycast, la ruta no cierra todavia (la LECTURA por el stream del MPQ pide ~2 MB de semiespacio por
-// archivo). Queda como palanca de medicion -- la usa `console/dc/poc/zonas-waypoint` con `BUFFER=1` -- y
-// como punto de partida de la tarjeta siguiente. El arena se pide en la PRIMERA carga de un .dt1 y no aca
-// (el arranque del PVR necesita el monton ordenado, DC-002.50).
+// UsarLecturaPrestadaDeTiles prende/apaga la lectura con prestamo del camino de tiles (DC-002.80). Lo usa la
+// palanca `LEER=` del POC de zonas para medir los dos caminos con el mismo binario.
+func UsarLecturaPrestadaDeTiles(v bool) { lecturaPrestadaDeTiles = v }
+
+// EstadoDelPrestamoDeTiles devuelve el instrumento del prestamo de la lectura (y si hay prestamo armado).
+func EstadoDelPrestamoDeTiles() (d2mpq.EstadoDelPrestamo, bool) {
+	candadoDeTiles.Lock()
+	defer candadoDeTiles.Unlock()
+
+	if prestamoDeTiles == nil {
+		return d2mpq.EstadoDelPrestamo{}, false
+	}
+
+	return prestamoDeTiles.Estado(), true
+}
+
+// ActivarCaminoDeTilesDeConsola prende la ruta del arena: cada .dt1 se lee adentro de un arena pedido una
+// sola vez, con la lectura del MPQ por memoria prestada (DC-002.80). La llama
+// `NuevoAssetManagerDeConsola`, o sea que en la consola va prendida siempre; sigue siendo una funcion (y no
+// una constante) porque la palanca `BUFFER=` del POC de zonas mide con y sin la ruta, y porque el arena se
+// pide en la PRIMERA carga de un .dt1 y no aca (el arranque del PVR necesita el monton ordenado, DC-002.50).
 func ActivarCaminoDeTilesDeConsola() {
 	caminoDeTilesDeConsola = true
 }
@@ -179,16 +208,11 @@ func (am *AssetManager) cargarDT1EnLaArena(filePath string) (*d2dt1.DT1, error) 
 
 // parsearDT1EnLaArena lee UN .dt1 en el tramo libre del arena y lo parsea ahi mismo. Devuelve `entro` en
 // false cuando el archivo no entra en lo que queda del arena (sin pedir memoria de mas).
+//
+// DC-002.80: la lectura del archivo tambien es prestada -- `d2mpq.ReadFileInto(nombre, tramo, prestamo)`, con
+// el prestamo que se reusa entre archivos. Antes (DC-002.78) se leia por el STREAM del MPQ, que pide ~2 MB
+// del semiespacio del recolector por archivo y mataba la consola en medio de la carga.
 func (am *AssetManager) parsearDT1EnLaArena(filePath string) (dt1 *d2dt1.DT1, entro bool, err error) {
-	archivo, err := am.LoadAsset(filePath)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if cerrable, ok := archivo.(io.Closer); ok {
-		defer func() { _ = cerrable.Close() }()
-	}
-
 	if arenaDeTiles == nil {
 		arenaDeTiles = make([]byte, capacidadDeLaArenaDeTiles)
 	}
@@ -202,7 +226,14 @@ func (am *AssetManager) parsearDT1EnLaArena(filePath string) (dt1 *d2dt1.DT1, en
 		return nil, false, nil
 	}
 
-	datos, entro, err := lectorDeTiles.LeerEn(tramo, archivo)
+	var datos []byte
+
+	if lecturaPrestadaDeTiles {
+		datos, entro, err = am.leerDT1ConPrestamo(filePath, tramo)
+	} else {
+		datos, entro, err = am.leerDT1PorElStream(filePath, tramo)
+	}
+
 	if err != nil {
 		return nil, false, err
 	}
@@ -220,4 +251,47 @@ func (am *AssetManager) parsearDT1EnLaArena(filePath string) (dt1 *d2dt1.DT1, en
 	cursorDelArena += len(datos)
 
 	return dt1, true, nil
+}
+
+// leerDT1ConPrestamo lee el archivo ADENTRO del tramo del arena con la memoria de trabajo prestada: ni el
+// destino ni la lectura piden nada. `entro` en false = el archivo no cabe en lo que queda del arena (se
+// devuelve sin pedir memoria; el que llama tira el arena y reintenta).
+func (am *AssetManager) leerDT1ConPrestamo(filePath string, tramo []byte) (datos []byte, entro bool, err error) {
+	// si ninguna fuente sabe leer con prestamo (una carpeta del disco, por ejemplo), se vuelve al camino de
+	// siempre: ahi no hay MPQ del que prestar nada
+	if !am.Loader.TieneLecturaConPrestamo(filePath) {
+		return am.leerDT1PorElStream(filePath, tramo)
+	}
+
+	if prestamoDeTiles == nil {
+		prestamoDeTiles = &d2mpq.Scratch{}
+	}
+
+	leidos, err := am.Loader.LeerEnteroEnConPrestamo(filePath, tramo, prestamoDeTiles)
+	if err != nil {
+		// no entra: no es un fallo, es que hay que tirar el arena y reintentar
+		if err == d2mpq.ErrNoEntraEnElBuffer {
+			return nil, false, nil
+		}
+
+		return nil, false, err
+	}
+
+	return tramo[:leidos], true, nil
+}
+
+// leerDT1PorElStream es el camino de DC-002.78: se pide el archivo como stream (`LoadAsset`) y se lee adentro
+// del tramo con un buffer por trozos. El DESTINO no pide memoria, pero la lectura si (~2 MB de semiespacio por
+// archivo, medido). Queda como palanca de medicion.
+func (am *AssetManager) leerDT1PorElStream(filePath string, tramo []byte) (datos []byte, entro bool, err error) {
+	archivo, err := am.LoadAsset(filePath)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if cerrable, ok := archivo.(io.Closer); ok {
+		defer func() { _ = cerrable.Close() }()
+	}
+
+	return lectorDeTiles.LeerEn(tramo, archivo)
 }

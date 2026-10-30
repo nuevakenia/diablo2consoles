@@ -16,6 +16,9 @@ var _ asset.Source = &Source{}
 // DC-002.79: ademas sabe cuanto mide un archivo y lo lee entero en un buffer prestado.
 var _ asset.SourceDeLecturaEntera = &Source{}
 
+// DC-002.80: y lo lee con la memoria de trabajo prestada por el que llama (sin pedir nada por sector).
+var _ asset.SourceDeLecturaConPrestamo = &Source{}
+
 // errSinLecturaEntera: la fuente tiene un Archive que no es un MPQ concreto (no puede decir el tamano).
 var errSinLecturaEntera = errors.New("mpq: la fuente no sabe leer enteros")
 
@@ -64,6 +67,18 @@ func (v *Source) LeerEnteroEn(nombre string, dst []byte) (int, error) {
 	}
 
 	return mpqDirecto.LeerEn(cleanName(nombre), dst)
+}
+
+// LeerEnteroEnConPrestamo lee el archivo entero con la memoria de trabajo prestada (DC-002.80): la tabla de
+// posiciones, el bloque comprimido, el descompreso y el descompresor de zlib viven en `prestamo` y se reusan
+// entre archivos. dst tiene que alcanzar para `Tamano`.
+func (v *Source) LeerEnteroEnConPrestamo(nombre string, dst []byte, prestamo *d2mpq.Scratch) (int, error) {
+	mpqDirecto, ok := v.MPQ.(*d2mpq.MPQ)
+	if !ok {
+		return 0, errSinLecturaEntera
+	}
+
+	return mpqDirecto.ReadFileInto(cleanName(nombre), dst, prestamo)
 }
 
 // Path returns the path of the MPQ on the host filesystem

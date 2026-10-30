@@ -57,6 +57,9 @@ func d2cZlibStreamFin(slot int32) int32
 //extern d2c_zlib_stream_end
 func d2cZlibStreamEnd(slot int32) int32
 
+//extern d2c_zlib_stream_reset
+func d2cZlibStreamReset(slot int32) int32
+
 // Reader: lo que devuelve NewReader. Descomprime EN STREAMING y pide los bytes en el buffer del que lee.
 type Reader struct {
 	comprimido []byte
@@ -181,4 +184,91 @@ func (z *Reader) Close() error {
 	z.comprimido = nil
 
 	return nil
+}
+
+// ==================================================================================================
+// DC-002.80 -- Inflador: descomprimir EN UN DESTINO PRESTADO, reusando UN slot (el de la lectura del MPQ).
+//
+// POR QUE EXISTE. La lectura del MPQ descomprime un bloque por sector (124 en un .dt1 de 505 KB) y en la
+// consola `NewReader` no sirve para eso: COPIA el comprimido con `io.ReadAll` y arma un `Reader` nuevo por
+// bloque, o sea memoria pedida POR SECTOR. Medido en DC-002.78: leer un .dt1 por el stream pedia ~2 MB del
+// semiespacio del recolector y el runtime moria con `gc_alloc: out of memory`.
+//
+// QUE HACE. El `z_stream` de la zlib de KOS se queda VIVO en el slot entre bloques y se reinicia con
+// `inflateReset` (que conserva la ventana de 32 KB, no la vuelve a pedir). El comprimido y el destino son
+// los dos arreglos que presta el que llama: aca no se pide un byte.
+//
+// COMO SE USA. Uno por lectura (`NuevoInflador`), `DescomprimirEn` por bloque y `Cerrar` al final -- el slot
+// se devuelve ahi: el puente tiene 4 y quedarse con uno para siempre dejaria sin zlib al resto del motor.
+// ==================================================================================================
+
+// Inflador: un descompresor de bloques de zlib con destino prestado, atado a UN slot del puente.
+type Inflador struct {
+	slot    int32
+	abierto bool
+}
+
+// NuevoInflador devuelve un inflador sin slot: el slot se toma en el primer bloque.
+func NuevoInflador() *Inflador { return &Inflador{slot: -1} }
+
+// DescomprimirEn descomprime `src` (un stream de zlib entero) dentro de `dst` y devuelve cuantos bytes
+// escribio. Escribe hasta llenar `dst`: si el flujo pide mas lugar del que hay, se corta ahi (el que llama
+// sabe cuanto tiene que salir y lo compara).
+func (i *Inflador) DescomprimirEn(src []byte, dst []byte) (int, error) {
+	if len(src) == 0 || len(dst) == 0 {
+		return 0, ErrHeader
+	}
+
+	if !i.abierto {
+		i.slot = d2cZlibStreamInit()
+		if i.slot < 0 {
+			return 0, ErrHeader
+		}
+
+		i.abierto = true
+	} else if d2cZlibStreamReset(i.slot) != 0 {
+		return 0, ErrHeader
+	}
+
+	total, pos := 0, 0
+
+	for {
+		if total >= len(dst) {
+			return total, nil
+		}
+
+		resto := src[pos:]
+		if len(resto) == 0 {
+			return total, ErrHeader
+		}
+
+		n := d2cZlibStreamStep(i.slot, uintptr(unsafe.Pointer(&resto[0])), int32(len(resto)),
+			uintptr(unsafe.Pointer(&dst[total])), int32(len(dst)-total))
+		consumido := int(d2cZlibStreamConsumido(i.slot))
+		termino := d2cZlibStreamFin(i.slot) != 0
+
+		pos += consumido
+
+		if n < 0 {
+			return total, ErrHeader
+		}
+
+		total += int(n)
+
+		if termino {
+			return total, nil
+		}
+
+		if n == 0 && consumido == 0 {
+			return total, ErrHeader
+		}
+	}
+}
+
+// Cerrar devuelve el slot al puente (y con el, la ventana de la zlib).
+func (i *Inflador) Cerrar() {
+	if i.abierto {
+		d2cZlibStreamEnd(i.slot)
+		i.abierto = false
+	}
 }
