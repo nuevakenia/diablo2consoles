@@ -180,6 +180,13 @@ a) EL COMANDO DE REPRODUCCION DEL POC DE REFERENCIA (.70) NO CORRE TAL COMO ESTA
    al arbol del motor completo. Se anota; NO se arregla aca (esa linea es evidencia de una tarjeta
    cerrada y tocarla es de otra tarjeta: ver 5.a).
    Consecuencia en el veredicto: el 98,79 % de 2.5 se apoya en la captura de referencia del worker.
+   [CORREGIDO -- DC-002.73a, tarjeta t_7c478791] El comando se arreglo y se re-midio lo que esta seccion
+   no podia: las dos puntas compiladas desde cero, capturas nuevas y la comparacion re-emitida dan los
+   MISMOS 299.679 / 570 / 3.111 (y los recortes de 640x474 son identicos byte a byte a los de .70). Contra
+   lo que dice la linea de arriba, sacar SALTAR_MOTOR NO alcanzaba: `PAQUETES238` estaba desfasado desde
+   DC-002.49/.50 (le faltaban d2txt/d2monstats/d2rand/d2monster) y ademas el arbol del estado B tiene el
+   orden.txt apuntando a otro arbol, asi que encender el motor ahi da "multiple definition". El POC se
+   compila en su propio arbol: ver console/dc/evidencia/dc-002.70-renderer-pvr.txt, secciones 5 y 6.
 
 b) LOS TAMAÑOS DE .69 Y .70 NO REPRODUCEN AL BYTE (el comportamiento SI):
        .69  1ST_READ.BIN 1.026.120 (evidencia) vs 1.004.552 (hoy)  |  pvr.gox 242.072 vs 319.180
@@ -223,6 +230,8 @@ Se propone (una tarjeta cada una, para el tablero de la fase B):
   a) "arreglar el comando de reproduccion del POC de referencia de .70" -> docs/evidencia, coste ~15 min:
      quitar SALTAR_MOTOR=1 o apuntar GODC_GOX al arbol del motor completo, y re-emitir la comparacion del
      98,79 % con una captura nueva de las dos puntas.
+     [HECHO -- DC-002.73a, t_7c478791: la comparacion re-emitida da los MISMOS 299.679 / 570 / 3.111. NO
+     alcanzaba con quitar SALTAR_MOTOR (PAQUETES238 estaba desfasado desde .49/.50): ver 4.a.]
   b) "decidir como se ganan los 4 MB del bloque de texturas" -> decision de diseño de Daniel entre (a),
      (b) y (c) de 4.e, con el numero de cada camino ya medido en dc-002.68-recorte.txt:117-128.
   c) (ya declarada en .70:198) la Fase D: montar d2gamescreen sobre este Renderer.

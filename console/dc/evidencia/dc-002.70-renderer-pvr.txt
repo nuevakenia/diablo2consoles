@@ -105,6 +105,44 @@ captura por correlacion y compara pixel a pixel.
       cuantizacion        570  (0,19 %)  difieren <= 8 por canal
       CONTENIDO         3.111  (1,03 %)
 
+  DC-002.73a -- LA COMPARACION RE-EMITIDA CON CAPTURAS NUEVAS (2026-10-30 02:35..02:41)
+  Las dos puntas se volvieron a compilar DESDE CERO y a capturar, y el script da LOS MISMOS numeros,
+  pixel a pixel. No es "parecido": los recortes de 640x474 de esta corrida son identicos byte a byte a
+  los PNG que acompanan esta evidencia (sha256 de los pixeles crudos rgb24: estado B 3e04055a.., POC
+  e3d520df.., los mismos de dc-002.70-estado-b-cuadro.png y dc-002.70-poc-cuadro.png).
+
+    estado B    /tmp/dcbuild/estado270/1ST_READ.BIN    1.317.992 B  sha256 bdeefe13..
+                arbol de enlace /tmp/dcbuild/estado270/gox-enlace -> 79 objetos en orden.txt
+                (63 de la stdlib/terceros + 16 del cierre del estado B; armado con
+                 BASE_GOX=/tmp/dcbuild/base270, copia de /tmp/gox-std, que tiene 63 en orden.txt y 145
+                 en orden-motor.txt).  prog.elf 7.217.140 B, .text 766.064, .rodata 535.328,
+                 data+bss 228.760, disc.iso 536.408.064 B.
+    POC ref.    /tmp/dcbuild/poc270/1ST_READ.BIN       1.661.064 B  sha256 821bea3e..
+                arbol de gox /tmp/dcbuild/poc270/gox -> 82 objetos en orden.txt
+                (63 de la stdlib/terceros + los 19 paquetes del motor de PAQUETES238).
+                prog.elf 7.633.164 B, disc.iso 536.752.128 B.
+
+  Los tamanos NO son los de la seccion 6 de esta evidencia (1.330.312 el estado B / 1.280.296 en la
+  verificacion): el build de entonces no anoto con que arbol de stdlib se enlazo, y cada arbol da un BIN
+  distinto en el ultimo tramo (dc-002.73-verificacion.txt:4.b). El comportamiento y los crc32 del cuadro
+  son los mismos; el BIN de esta corrida, ademas, se reprodujo byte a byte (mismo sha256) al rehacerlo
+  desde cero con el mismo arbol.
+
+    comando     python3 scripts/console/comparar-estado-b-270.py \
+                  /tmp/dcbuild/c270re/f120s.png /tmp/dcbuild/cpoc270re/f120s.png
+    salida      estado B -> pantalla en (1400, 120, 474)   POC -> (1400, 120)  [acuerdo 25.600 pixeles]
+                filas 474 | pixeles 303.360 | IDENTICOS 299.679 (98,79 %) | cuantizacion 570 (0,19 %)
+                | CONTENIDO 3.111 (1,03 %) | caja de los de contenido: x 0..639  y 0..25
+    rc          1  (el script devuelve 1 cuando hay pixeles de contenido distinto: aca es la franja de
+                   26 filas que la referencia no limpia, ver (b) mas abajo. No es un fallo de la
+                   medicion: el dibujo del mapa y del personaje coincide dentro de +-8)
+
+  Los tres numeros no se movieron (ni un pixel) y las dos puntas se cruzaron igual que entonces en la
+  consola: LIENZO crc32 3507647456 y PERSONAJE crc32 1857478036 en las DOS (ESTADOB: CUADRO crc32
+  1321968744, lienzoEnVram 1228800, montonLibre 520; HITO238: LIENZO 3507647456, PERSONAJE 1857478036).
+  Los recortes de esta corrida quedan en console/dc/evidencia/dc-002.73a-estado-b-cuadro.png y
+  dc-002.73a-poc-cuadro.png.
+
 Y los 3.111 pixeles de contenido NO estan en el mapa: estan TODOS en las bandas laterales (x 0..63 y
 576..639), en las filas 0..25. Partiendo el cuadro en sus dos zonas:
 
@@ -151,10 +189,40 @@ se le va a 0).
       data+bss            228.760 B
       disc.iso        536.420.352 B  (los DOS MPQ, d2data + d2char, montados en /JUEGO)
 
-El build del POC de referencia se hizo con el MISMO arbol de enlace (los .gox del motor) para que el
-compositor sea el mismo codigo:
-    GODC_GOX=/tmp/dcbuild/estado270/gox-enlace SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
-      bash scripts/console/build-personaje-238.sh /tmp/dcbuild/poc270
+El build del POC de referencia NO se hace con el arbol de enlace del estado B: ese arbol lleva SOLO el
+cierre del estado B (16 paquetes) y el POC importa ademas las tablas y el dado del motor (d2txt,
+d2monstats, d2rand, d2monster), asi que el enlace muere con `undefined reference` a los cuatro. Lo que
+SI se comparte es el CODIGO: nivel.go y personaje.go son el mismo archivo en los dos lados (el script
+imprime su sha256 en el paso 5/5). El comando que se corre, tal cual, desde un directorio de salida
+vacio (rc=0, 27 s, 82 objetos en orden.txt, 1ST_READ.BIN 1.661.064 B):
+
+    GODC_GOX=/tmp/dcbuild/poc270/gox bash scripts/console/build-personaje-238.sh /tmp/dcbuild/poc270
+
+DC-002.73a (tarjeta t_7c478791) corrigio aca dos cosas, las dos medidas:
+  1. el comando que estaba escrito aca
+         GODC_GOX=/tmp/dcbuild/estado270/gox-enlace SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
+           bash scripts/console/build-personaje-238.sh /tmp/dcbuild/poc270
+     NO corria: con SALTAR_MOTOR=1 se salta justo el paso que agrega paquetes a orden.txt
+     (scripts/console/build-personaje-238.sh:85-97) y ese arbol no los tiene. Lo que imprime, pegado
+     tal cual (/tmp/dcbuild/poc270-viejo.log, rc=1):
+         main.o: in function `main.Combate.GolpeDelHeroe':
+         fuente.go:(.text.main.Combate.GolpeDelHeroe+0xa4): undefined reference to `...d2math_1d2rand.Seed.Roll'
+         fuente.go:(.text.__go_init_main+0x13c): undefined reference to `...d2monster.Mode.String'
+         fuente.go:(.text.__go_init_main+0x188): undefined reference to `...d2monstats..import'
+         fuente.go:(.text.__go_init_main+0x18c): undefined reference to `...d2monster..import'
+         main.o:(.rodata.go..typelists+0x78): undefined reference to `...d2fileformats_1d2txt..types'
+         main.o:(.rodata.go..C517+0x1c): undefined reference to `...d2math_1d2rand.Seed..p'
+         main.o:(.rodata.type..map_6string...[type..map..]): undefined reference to `...d2monstats.Class..p'
+         collect2: error: ld returned 1 exit status
+  2. `PAQUETES238` del script estaba desfasado desde DC-002.49/.50: no traia d2txt/d2monstats/d2rand/
+     d2monster, que entran al POC con `monstruo.go`. O sea que tampoco alcanzaba con sacar SALTAR_MOTOR:
+     el enlace seguia muriendo con los mismos cuatro simbolos. Ahora la lista es la del POC (19 paquetes)
+     y el script la verifica sola contra `go list -deps -tags dreamcast` y avisa si alguien agrega un
+     import sin agregar el paquete.
+  Y no se puede reusar el arbol del estado B con el motor encendido: su orden.txt apunta a los .gox de
+  otro arbol y build-motor-gox.sh anota los terceros con la ruta nueva -> "multiple definition of
+  ...ebiten_1v2.Image.Huella" (medido). El POC se compila en SU arbol, que es lo que hace el comando de
+  arriba. Detalle completo en console/dc/evidencia/dc-002.73-verificacion.txt:4.a.
 
 7. `go build ./...` en el host
 ------------------------------
@@ -173,14 +241,21 @@ verde:
 8. Reproducirlo
 ---------------
     cd /home/dgalli/Proyectos/diablo2consoles
-    bash scripts/console/build-estado-b-270.sh /tmp/dcbuild/estado270
+    # el arbol de .gox del motor (/tmp/gox-std, el que deja build-motor-all.sh) se copia para no escribir
+    # en el compartido: el paso 1 del estado B compila pvr.gox ahi
+    cp -a /tmp/gox-std /tmp/dcbuild/base270
+    BASE_GOX=/tmp/dcbuild/base270 bash scripts/console/build-estado-b-270.sh /tmp/dcbuild/estado270
     CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/dcbuild/estado270/disc.gdi 150 /tmp/dcbuild/c270
-    # el POC de referencia, con el mismo escenario:
-    GODC_GOX=/tmp/dcbuild/estado270/gox-enlace SALTAR_STDLIB=1 SALTAR_MOTOR=1 \
-      bash scripts/console/build-personaje-238.sh /tmp/dcbuild/poc270
+    # el POC de referencia, con el mismo escenario y SU propio arbol de gox (DC-002.73a: el comando de
+    # esta linea no corria con el arbol del estado B, ver 6)
+    GODC_GOX=/tmp/dcbuild/poc270/gox bash scripts/console/build-personaje-238.sh /tmp/dcbuild/poc270
     CAPTURE=spectacle bash scripts/console/run-flycast.sh /tmp/dcbuild/poc270/disc.gdi 150 /tmp/dcbuild/cpoc270
     # la comparacion:
     python3 scripts/console/comparar-estado-b-270.py /tmp/dcbuild/c270/f120s.png /tmp/dcbuild/cpoc270/f120s.png
+
+Corrida de DC-002.73a con estas mismas lineas (2026-10-30 02:33..02:41): los tres numeros, la caja y los
+recortes salieron identicos a los de arriba; los logs quedaron en /tmp/dcbuild/poc270-desdecero.log y
+/tmp/dcbuild/estado270-desdecero.log, las capturas en /tmp/dcbuild/c270re y /tmp/dcbuild/cpoc270re.
 
 Hay que darle ~120 s: abrir el MPQ desde el ISO son ~10 s y componer el mapa ~20 s (medido en DC-002.38).
 

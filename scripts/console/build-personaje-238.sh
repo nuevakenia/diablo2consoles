@@ -45,11 +45,42 @@ fi
 
 # LOS PAQUETES DEL MOTOR QUE ENTRAN AL BINARIO: los de DC-002.37 mas los tres del personaje
 # (d2cof, d2dcc, d2dc6) y su cierre de dependencias.
+# DC-002.73a: el cierre se MEDIA mal. Desde DC-002.49/.50 el POC trae `monstruo.go`, que importa
+# d2fileformats/d2txt + d2monstats + d2math/d2rand + d2monster (las tablas del excel, la vida y el dado del
+# motor, los modos NU/GH/DT/DD), y esta lista no los tenia: el enlace moria con
+# `undefined reference to ...d2monstats.Class..p`, `...d2monster.Mode.String`, `...d2txt..types`,
+# `d2rand.Seed..p` (los cuatro, medidos). La lista es ahora la MISMA que la de build-monstruo-250.sh
+# (PAQUETES250, 19 paquetes) y se verifica sola abajo contra `go list -deps -tags dreamcast` del POC.
 PAQUETES238="d2common/d2enum d2common/d2math d2common/d2geom d2common/d2math/d2vector d2common/d2path \
 d2networking/d2client/d2clientconnectiontype d2common/d2interface d2common/d2datautils \
 d2common/d2data/d2compression d2common/d2fileformats/d2ds1 d2common/d2fileformats/d2dt1 \
 d2common/d2fileformats/d2mpq d2common/d2fileformats/d2cof d2common/d2fileformats/d2dcc \
-d2common/d2fileformats/d2dc6"
+d2common/d2fileformats/d2dc6 d2common/d2fileformats/d2txt d2common/d2monstats \
+d2common/d2math/d2rand d2common/d2monster"
+
+# El cierre del POC medido con `go list -deps` (no a mano): si alguien vuelve a agregar un import al POC sin
+# tocar la lista de arriba, esto lo dice ANTES de llegar al enlazador con un `undefined reference` de 200
+# lineas. Solo se exige un sentido (todo lo que el POC importa tiene que estar en la lista); la lista puede
+# traer de mas (d2geom, d2data/d2compression).
+CIERRE_POC="$( ( cd "$REPO" && go list -deps -e -tags dreamcast ./console/dc/poc/$POC 2>/dev/null ) \
+    | grep "^github.com/OpenDiablo2/OpenDiablo2/" | sed 's|.*OpenDiablo2/||' \
+    | grep -v "^console/" | sort || true)"    # sin el paquete del POC mismo (es el main, no un .gox)
+# OJO CON EL -tags: los .go del POC llevan `//go:build dreamcast`, y sin la etiqueta `go list` ni los mira
+# (medido: sin -tags el cierre sale 16 y deja afuera d2dcc/d2dc6/d2geom, que si entran al enlace).
+LISTA238=" $(printf '%s ' $PAQUETES238)"   # sin comillas: colapsa los saltos de linea de la lista
+FALTAN=""
+for p in $CIERRE_POC; do
+    case "$LISTA238" in
+        *" $p "*) ;;
+        *) FALTAN="$FALTAN $p" ;;
+    esac
+done
+if [ -n "$FALTAN" ]; then
+    echo "   AVISO: el POC importa paquetes que no estan en PAQUETES238:$FALTAN"
+    echo "          (el enlace va a fallar con undefined reference: agregalos a la lista)"
+else
+    echo "   el cierre del POC ($(printf '%s\n' $CIERRE_POC | wc -l) paquetes del motor) esta en PAQUETES238"
+fi
 
 if [ "${SALTAR_MOTOR:-0}" != "1" ]; then
     PAQUETES="$PAQUETES238" bash "$HERE/build-motor-gox.sh" "$GEN" > "$OUT/motor.log" 2>&1 || {
