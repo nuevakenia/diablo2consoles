@@ -74,19 +74,11 @@ func (l *Loader) SetCharset(charset *string) {
 // Load attempts to load an asset with the given sub-path. The sub-path is relative to the root
 // of each asset source root (regardless of the type of asset source)
 func (l *Loader) Load(subPath string) (io.ReadSeeker, error) {
-	subPath = filepath.Clean(subPath)
+	subPath = l.rutaReal(subPath)
 
 	// DC-002.43: la marca de ENTRAR va antes de tocar ninguna fuente: si la carga se muere adentro, esta es
 	// la ultima linea que queda y nombra el pedido. Los bytes de la ruta no se copian (ver marca_carga.go).
 	Marca(subPath, MarcaEntra)
-
-	if l.language != nil {
-		charset := l.charset
-		language := l.language
-
-		subPath = strings.ReplaceAll(subPath, fontToken, *charset)
-		subPath = strings.ReplaceAll(subPath, tableToken, *language)
-	}
 
 	// if it isn't in the cache, we check if each source can open the file
 	for idx := range l.Sources {
@@ -110,6 +102,69 @@ func (l *Loader) Load(subPath string) (io.ReadSeeker, error) {
 	}
 
 	return nil, fmt.Errorf(errFmtFileNotFound, subPath)
+}
+
+// rutaReal aplica al sub-path lo mismo que cada camino del loader: limpiar y sustituir los tokens de
+// idioma. Es UN lugar para no tener dos versiones de la traduccion (DC-002.79).
+func (l *Loader) rutaReal(subPath string) string {
+	subPath = filepath.Clean(subPath)
+
+	if l.language != nil {
+		charset := l.charset
+		language := l.language
+
+		subPath = strings.ReplaceAll(subPath, fontToken, *charset)
+		subPath = strings.ReplaceAll(subPath, tableToken, *language)
+	}
+
+	return subPath
+}
+
+// TamanoDeArchivo dice cuanto mide un archivo (bytes descomprimidos) segun la primera fuente que lo
+// tenga y que sepa decirlo. `false` significa "no se sabe": o el archivo no esta, o la fuente no
+// implementa `asset.SourceDeLecturaEntera` (una carpeta del disco, por ejemplo).
+//
+// DC-002.79: es la pieza que le falta a `io.ReadAll` para no ir duplicando el buffer. Ver el porque en
+// `d2mpq/lectura_entera.go`.
+func (l *Loader) TamanoDeArchivo(subPath string) (int, bool) {
+	subPath = l.rutaReal(subPath)
+
+	for idx := range l.Sources {
+		source := l.Sources[idx]
+
+		fuente, ok := source.(asset.SourceDeLecturaEntera)
+		if !ok {
+			continue
+		}
+
+		if tamano, hay := fuente.Tamano(subPath); hay {
+			return tamano, true
+		}
+	}
+
+	return 0, false
+}
+
+// LeerEnteroEn lee el archivo entero DENTRO del buffer que le prestan, de la primera fuente que lo tenga
+// y sepa hacerlo. `dst` tiene que alcanzar para `TamanoDeArchivo`; no se pide memoria aca.
+//
+// DC-002.79: este es el camino de la consola. No reemplaza a `Load` (que devuelve un stream): es el que
+// usa `d2asset.LoadFile` para no pasar por `io.ReadAll`.
+func (l *Loader) LeerEnteroEn(subPath string, dst []byte) (int, error) {
+	subPath = l.rutaReal(subPath)
+
+	for idx := range l.Sources {
+		source := l.Sources[idx]
+
+		fuente, ok := source.(asset.SourceDeLecturaEntera)
+		if !ok || !source.Exists(subPath) {
+			continue
+		}
+
+		return fuente.LeerEnteroEn(subPath, dst)
+	}
+
+	return 0, fmt.Errorf(errFmtFileNotFound, subPath)
 }
 
 // AddSource adds an asset source with the given path. The path will either resolve to a directory

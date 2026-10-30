@@ -1,0 +1,18 @@
+DT1-CRC: zona=data\global\tiles\ACT1\TOWN\townN1.ds1 ds1=57652 B archivos=8
+HOST data/global/tiles/act1\outdoors\treegroups.dt1 crudo= 505504 comprimido= 371019 crc32=720682414
+CARGADOR data/global/tiles/act1\outdoors\treegroups.dt1 bytes= 505504 crc32=720682414 igual=true buffer=0->505504
+HOST data/global/tiles/act1\outdoors\stonewall.dt1  crudo= 439569 comprimido= 347476 crc32=3658844334
+CARGADOR data/global/tiles/act1\outdoors\stonewall.dt1 bytes= 439569 crc32=3658844334 igual=true buffer=505504->505504
+HOST data/global/tiles/act1\town\floor.dt1          crudo=1008003 comprimido= 696368 crc32=231028135
+CARGADOR data/global/tiles/act1\town\floor.dt1       bytes=1008003 crc32=231028135 igual=true buffer=505504->1008003
+HOST data/global/tiles/act1\barracks\warp.dt1       crudo= 658158 comprimido=  46319 crc32=4038904381
+CARGADOR data/global/tiles/act1\barracks\warp.dt1    bytes= 658158 crc32=4038904381 igual=true buffer=1008003->1008003
+HOST data/global/tiles/act1\outdoors\river.dt1      crudo= 316344 comprimido= 185168 crc32=1771736052
+CARGADOR data/global/tiles/act1\outdoors\river.dt1   bytes= 316344 crc32=1771736052 igual=true buffer=1008003->1008003
+HOST data/global/tiles/act1\town\objects.dt1        crudo= 661515 comprimido= 398369 crc32=1353167029
+CARGADOR data/global/tiles/act1\town\objects.dt1     bytes= 661515 crc32=1353167029 igual=true buffer=1008003->1008003
+HOST data/global/tiles/act1\town\fence.dt1          crudo= 423367 comprimido= 272718 crc32=2077960125
+CARGADOR data/global/tiles/act1\town\fence.dt1       bytes= 423367 crc32=2077960125 igual=true buffer=1008003->1008003
+HOST data/global/tiles/act1\outdoors\objects.dt1    crudo= 338205 comprimido= 257801 crc32=3007654198
+CARGADOR data/global/tiles/act1\outdoors\objects.dt1 bytes= 338205 crc32=3007654198 igual=true buffer=1008003->1008003
+DT1-CRC: zona=data\global\tiles\ACT1\TOWN\townN1.ds1 TOTAL crudo=4350665 comprimido=2575238

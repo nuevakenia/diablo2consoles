@@ -3,7 +3,6 @@ package d2asset
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 	"strconv"
 
@@ -107,24 +106,14 @@ func (am *AssetManager) LoadFileStream(filePath string) (io.ReadSeeker, error) {
 
 // LoadFile loads an entire file from a source file path as a []byte
 func (am *AssetManager) LoadFile(filePath string) ([]byte, error) { // I DO NOT LIKE THIS! - Essial
-	fileAsset, err := am.LoadAsset(filePath)
-	if err != nil {
-		return nil, err
+	// DC-002.79: en la consola el archivo entero se lee con el tamano reservado de antemano, sin `ReadAll`
+	// (que va duplicando el buffer y en libgodc deja ~2 MB tomados por archivo grande). Si el arranque no
+	// llamo a `ActivarLecturaDeConsola`, se sigue por el camino de siempre: el de la PC no cambia.
+	if caminoDeLecturaDeConsola {
+		return am.loadFileDeConsola(filePath)
 	}
 
-	// DC-002.43: las dos marcas de la LECTURA COMPLETA. `LoadFile` es el que se lleva el archivo entero a la
-	// memoria: aca es donde una lectura grande puede morir por memoria, y sin marca la muerte no decia si
-	// habia sido el MPQ o este `ReadAll`.
-	d2loader.Marca(filePath, d2loader.MarcaLeeEntra)
-
-	data, err := ioutil.ReadAll(fileAsset)
-	if err != nil {
-		return nil, err
-	}
-
-	d2loader.Marca(filePath, d2loader.MarcaLeeVolvio)
-
-	return data, err
+	return am.loadFileConReadAll(filePath)
 }
 
 // FileExists checks if a file exists on the underlying file system at the given file path.

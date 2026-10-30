@@ -212,13 +212,18 @@ func (v *Stream) loadSingleUnit() (err error) {
 
 // prefetchLimit is the largest compressed file that is read from the archive in one piece instead
 // of sector by sector (a read for every 4 KB sector is slow for the many small DT1/DS1/DCC files).
+//
+// DC-002.79: el prefetch se puede APAGAR con `InhibirPrefetch(true)` (lo hace la consola), porque el
+// buffer que pide -- el tramo comprimido entero, hasta 2 MB -- pasa de 64 KB, se va al monton externo de
+// libgodc y no lo devuelve nadie: es memoria tomada POR ARCHIVO. Apagado, cada sector se lee con `ReadAt`
+// del tamano que necesita. Ver `lectura_entera.go`.
 const prefetchLimit = 2 << 20
 
 // sectorBytes returns a private copy of the toRead bytes at the archive offset. Small compressed
 // files are read whole on first use and served from memory afterwards; positional reads
 // (ReadAt) do not move the shared file offset.
 func (v *Stream) sectorBytes(offset, toRead uint32) ([]byte, error) {
-	if !v.prefetched && len(v.Positions) > 2 { // Positions is only set for multi-sector compressed files
+	if !v.prefetched && len(v.Positions) > 2 && !sinPrefetch { // Positions is only set for multi-sector compressed files
 		v.prefetched = true
 
 		first, last := v.Positions[0], v.Positions[len(v.Positions)-1]

@@ -1,0 +1,235 @@
+DC-002.79 -- LEER UN ARCHIVO GRANDE POR `LoadFile` EN LA CONSOLA: EL TAMANO SE RESERVA, NO SE ADIVINA
+=====================================================================================================
+Fecha: 2026-10-30
+Rama: DC-002 (checkout unico, /home/dgalli/Proyectos/diablo2consoles)
+Tarjeta: t_a05a90fb · Feature: Fase C.1c
+Estado: **REQUISITO CUMPLIDO**. Los ocho .dt1 de la zona del pueblo se leen por el camino del MOTOR
+(`LoadFile`/`LoadFileEn`) en Flycast, sin excepciones, con el crc32 identico al del host; el camino de
+siempre (`io.ReadAll`) sigue muriendo en el segundo archivo, y ahora se sabe por que: deja **4.820.440 B
+tomados por archivo de 505 KB**.
+
+Que se hizo, en una linea
+-------------------------
+`LoadFile` deja de usar `io.ReadAll` en la consola: le pregunta el tamano a la fuente (`d2loader.TamanoDeArchivo`,
+sale de la tabla de bloques del MPQ), reserva ESE tamano una vez y lee ahi adentro por trozos de 32 KB
+(`d2loader.LeerEnteroEn` -> `d2mpq.LeerEn`); y el prefetch del archivo comprimido entero se apaga
+(`d2mpq.InhibirPrefetch`). En la PC el camino es el de siempre, tal cual.
+
+
+1. El defecto, con el numero (por que moria)
+-------------------------------------------
+`io.ReadAll` no sabe cuanto mide el archivo: va duplicando el buffer (512 B, 1 KB, 2 KB...) hasta pasarse
+del tamano. En libgodc todo pedido de mas de 64 KB (`GC_LARGE_OBJECT_THRESHOLD`, godc_config.h:12) va a
+`gc_external_alloc` (gc_heap.c:116), que es `malloc` pelado y NO lo recolecta nadie, asi que de esa cadena
+de duplicaciones quedan tomados ~4 MB por archivo... mas el prefetch del stream, que en la primera lectura
+de un archivo comprimido se lleva el tramo comprimido ENTERO (`sectorBytes`, `prefetchLimit = 2 MB`) a un
+buffer propio del stream que tampoco se libera.
+
+Medido en esta corrida (Flycast, camino de siempre, primer .dt1 de la zona):
+
+    LECTURA: DT1 .../treegroups.dt1 bytes= 505504 crc32= 720682414 monton= arena=9531744 usado=9529752
+    LECTURA:   monton de la lectura: antes= 4709312 despues= 9529752 delta= 4820440 libreAntes= 1440
+
+4.820.440 B pedidos para leer 505.504 B (9,5x). El archivo se leyo bien, pero el monton ya estaba en
+9,53 MB de los ~13,7 MB del techo: la lectura del SEGUNDO .dt1 (`stonewall.dt1`) salta el recolector y el
+SH-4 se muere -- Flycast reinicia la maquina (`REIOS: Booting up` a los 19,5 s, sin volver a imprimir nada
+del POC). Es exactamente el defecto de DC-002.76, ahora con el mecanismo medido paso por paso.
+
+
+2. La cura: tres piezas, ninguna toca la API publica
+---------------------------------------------------
+1. **El tamano, antes de leer.** `d2mpq.TamanoDeArchivo(nombre)` sale de la tabla de bloques (no lee un
+   byte del archivo) y `d2mpq.TamanoComprimido(nombre)` dice lo que ocupa adentro del MPQ. Suben por una
+   interfaz OPCIONAL (`asset.SourceDeLecturaEntera`: `Tamano` + `LeerEnteroEn`) que implementan las fuentes
+   que saben hacerlo (hoy, la del MPQ); el `d2loader.Loader` la busca con un type assertion y, si la fuente
+   no la implementa (una carpeta del disco), se vuelve al camino de siempre.
+2. **La lectura adentro del buffer prestado.** `d2mpq.LeerEn(nombre, dst)` hace lo mismo que `ReadFile`
+   -- la copia del bloque, el nombre en minusculas, la semilla de cifrado -- pero escribe en el arreglo del
+   que llama, por trozos de 32 KB, sin pedir memoria.
+3. **El prefetch, apagado.** `d2mpq.InhibirPrefetch(true)` (lo prende `d2asset.ActivarLecturaDeConsola`)
+   evita el buffer del archivo comprimido entero: cada sector se lee con `ReadAt` del tamano que necesita.
+   Para la zona del pueblo eso son **2.575.238 B** que ya no se piden (la suma de lo comprimido de sus ocho
+   .dt1, ver la tabla de abajo).
+
+`d2asset.LoadFile` queda asi: si la consola prendio la lectura, `loadFileDeConsola`; si no, `loadFileConReadAll`
+(el de siempre, palabra por palabra). `LoadAsset` NO se toca (devuelve un stream: no reserva nada, no era el
+que moria). Se agrega -- aditiva, no cambia nada existente -- `LoadFileEn(nombre, dst)`: leer el archivo
+entero DENTRO de un buffer que el que llama reusa, que es lo que hace falta para que una zona no pida memoria
+por archivo.
+
+
+3. El ANTES en Flycast (camino de siempre, `LECTURA=vieja`)
+----------------------------------------------------------
+`console/dc/evidencia/dc-002.79-flycast-antes.log` (primer arranque, 82 lineas):
+
+    LECTURA: DS1 /data/global/tiles/ACT1/TOWN/townN1.ds1 bytes= 57652 crc32= 712973328
+    LECTURA: DT1 .../treegroups.dt1 bytes= 505504 crc32= 720682414 ... delta= 4820440   <- 9,5x el archivo
+    ARQ-CARGA entra .../stonewall.dt1 ...              <- el segundo .dt1
+    ARQ-MARCA gc-por-umbral-bytes-usados v=1580896
+    ARQ-MARCA gc_collect v=2
+    ARQ-MARCA gc-vivo v=494976
+    (no hay "lee-volvio": el SH-4 murio; a los 19,5 s) REIOS: Booting up
+
+O sea: con `io.ReadAll` se lee UN .dt1 grande y el segundo mata la consola. La corrida se repite cinco
+veces (el emulador reinicia y el POC vuelve a arrancar).
+
+
+4. El DESPUES en Flycast, dos modos medidos
+-------------------------------------------
+### 4.a `MODO=archivo` -- `am.LoadFile` (un buffer nuevo por archivo, lo que la tarjeta pide probar)
+`console/dc/evidencia/dc-002.79-flycast-despues.log`
+
+    LECTURA: camino de lectura: consola= true prefetchApagado= true
+    LECTURA: DT1 .../treegroups.dt1 bytes= 505504 ... delta= 505512   (el archivo + 8 B de cabecera)
+    LECTURA: DT1 .../stonewall.dt1  bytes= 439569 ... delta= 439576
+    LECTURA: DT1 .../floor.dt1      bytes=1008003 ... delta=1008008
+    LECTURA: DT1 .../warp.dt1       bytes= 658158 ... delta= 658168
+    LECTURA: DT1 .../river.dt1      bytes= 316344 ... delta= 316352
+    LECTURA: DT1 .../objects.dt1    bytes= 661515 ... delta= 661520
+    LECTURA: DT1 .../fence.dt1      bytes= 423367 ... delta= 423376
+    LECTURA: DT1 .../objects.dt1    bytes= 338205 ... delta= 338216
+    LECTURA: dt1 leidos= 8 de 8 fallidos= 0
+    LECTURA: bytes leidos= 4350665 en 21841 ms
+    LECTURA: monton al final: arena=9060640 usado=9060040 ...
+    LECTURA: instrumento: lecturas= 9 bytes= 4408317 sinTamano= 0 prefetchApagado= true
+    LECTURA: OK -- los 8 .dt1 de la zona se leyeron por el camino del motor
+
+- **Cada lectura pide exactamente su tamano** (+8 B de cabecera del arreglo), no 9,5x.
+- **9 lecturas completas = 4.408.317 B** (los ocho .dt1 mas el .ds1 de 57.652): el MISMO numero que
+  DC-002.77 midio como "la zona A pide 4.408.317 B crudos". Cierra por los dos lados.
+- **Ningun `gc_collect` en medio de la lectura** (el del camino de siempre aparece dos veces por archivo).
+- Monton: de 4.709.312 B (AssetManager listo) a 9.060.040 B -- +4.350.728 B, o sea los 4.350.665 B de los
+  ocho archivos. Es el costo de que `LoadFile` DEVUELVA el archivo entero, uno detras de otro, sin que nadie
+  los suelte: la consola no puede devolver un buffer de mas de 64 KB (medido en DC-002.77).
+
+### 4.b `MODO=buffer` -- `am.LoadFileEn` con UN buffer reusado
+`console/dc/evidencia/dc-002.79-flycast-buffer.log`
+
+    LECTURA: buffer crece: 0 -> 505504 por .../treegroups.dt1
+    LECTURA: DT1 .../treegroups.dt1 ... delta= 505512
+    LECTURA: DT1 .../stonewall.dt1  ... delta= 0
+    LECTURA: buffer crece: 505504 -> 1008003 por .../floor.dt1
+    LECTURA: DT1 .../floor.dt1      ... delta=1008008
+    LECTURA: DT1 .../warp.dt1       ... delta= 0
+    LECTURA: DT1 .../river.dt1      ... delta= 0
+    LECTURA: DT1 .../objects.dt1    ... delta= 0
+    LECTURA: DT1 .../fence.dt1      ... delta= 0
+    LECTURA: DT1 .../objects.dt1    ... delta= 0
+    LECTURA: dt1 leidos= 8 de 8 fallidos= 0
+    LECTURA: buffer reusado: capacidad= 1008003 crecidas= 2
+    LECTURA: monton al final: usado=6222832        (vs 9.060.040 con un buffer por archivo)
+    LECTURA: OK -- los 8 .dt1 de la zona se leyeron por el camino del motor
+
+- **Seis de las ocho lecturas no piden un byte** (delta = 0): el buffer crece dos veces, cuando aparece un
+  archivo mas grande que el anterior (505.504 y 1.008.003), y no se vuelve a pedir nada.
+- Total sobre el AssetManager: **+1.513.520 B** en vez de +4.350.728 B -- y de esos, 1.008.003 son el buffer
+  que se reserva una vez (si se reservara con el .dt1 mas grande de la zona antes de empezar, `crecidas` = 0).
+
+
+5. La prueba del contenido: crc32 del host contra la consola
+------------------------------------------------------------
+Host: `go run ./console/dc/medidas/dt1-crc -via-cargador` -> `console/dc/evidencia/dc-002.79-host-dt1-crc.txt`.
+Consola: los dos modos de Flycast (las tres corridas dan el MISMO crc32 por archivo).
+
+    archivo                               crudo     comprimido   crc32 host    crc32 consola   igual
+    act1\outdoors\treegroups.dt1         505504        371019     720682414      720682414      si
+    act1\outdoors\stonewall.dt1          439569        347476    3658844334     -636122962      si (=3658844334)
+    act1\town\floor.dt1                 1008003        696368     231028135      231028135      si
+    act1\barracks\warp.dt1               658158         46319    4038904381     -256062915      si (=4038904381)
+    act1\outdoors\river.dt1              316344        185168    1771736052     1771736052      si
+    act1\town\objects.dt1                661515        398369    1353167029     1353167029      si
+    act1\town\fence.dt1                  423367        272718    2077960125     2077960125      si
+    act1\outdoors\objects.dt1            338205        257801    3007654198    -1287313098      si (=3007654198)
+    TOTAL                               4350665       2575238
+
+Los negativos son el MISMO numero visto como int32 (el `int` del SH-4 es de 32 bits): 3.658.844.334 =
+-636.122.962, 4.038.904.381 = -256.062.915, 3.007.654.198 = -1.287.313.098.
+
+El `.ds1` del pueblo (57.652 B) da crc32 **712973328** en el host y en la consola, en las dos corridas.
+
+La ultima columna de `dc-002.79-host-dt1-crc.txt` (`CARGADOR ... igual=true`) es el camino de la consola
+(`Tamano` + `LeerEnteroEn` de la fuente MPQ, con UN buffer reusado) comparado byte por byte contra `ReadFile`
+en el host: **8 de 8 iguales**.
+
+
+6. El host: pruebas nuevas, mutador, y la suite igual que antes
+---------------------------------------------------------------
+Pruebas nuevas en `d2common/d2fileformats/d2mpq/lectura_entera_test.go` (4, sobre el MPQ sintetico de las
+pruebas -- nada del juego):
+
+    TestTamanoDeArchivoEsElDeReadFile                      PASS
+    TestLeerEnDaElMismoArchivoQueReadFile                  PASS
+    TestLeerEnNoEntraEnElBuffer                            PASS
+    TestLeerEnConPrefetchInhibidoDaLoMismoYNoPrefetchea    PASS
+
+La ultima trae el MUTADOR de la palanca: con la condicion `!sinPrefetch` sacada de `sectorBytes`, la prueba
+falla con *"el prefetch esta inhibido y el stream igual se quedo con 154 bytes comprimidos"* (medido: se
+saco la condicion, se corrio, se puso de vuelta).
+
+La suite del host **no cambia**: `go test ./d2common/... ./d2core/...` da 76 paquetes en verde y los MISMOS
+26 en rojo antes y despues del cambio (diff de las dos listas: identicas). Los 26 rojos son el arranque de
+GLFW de ebiten sin pantalla -- `PlatformError: X11: The DISPLAY environment variable is missing` -- y se
+reproducen igual en un arbol limpio de `git archive HEAD`:
+
+    # arbol limpio en HEAD, sin este cambio:
+    FAIL   d2common/d2loader   0.005s   (PlatformError: X11 ...)
+    FAIL   d2core/d2asset      0.005s   (PlatformError: X11 ...)
+
+
+7. Lo que queda abierto (para la tarjeta siguiente)
+---------------------------------------------------
+1. **El arranque de la Fase D tiene que llamar `d2asset.ActivarLecturaDeConsola()`** -- hoy lo llama el POC.
+   Es la misma forma que los presupuestos (DC-002.75): el camino nuevo no se prende solo.
+2. **El prefetch apagado cuesta tiempo.** No hay numero comparable de este lado (el camino de siempre no
+   termina la corrida): los 4,41 MB de una zona se leen en **21,8 s** (~205 KB/s). Si molesta, la palanca se
+   puede dejar prendida por archivo chico y apagada por los grandes; hoy esta todo o nada.
+3. **`LoadFile` sigue devolviendo un buffer que nadie puede devolver** (+4,35 MB por zona, medido en 4.a).
+   La forma de que una zona no pida memoria por archivo ya existe y esta medida (4.b, `LoadFileEn`): falta
+   que el motor la use -- es el engache del arena de DC-002.78 (`lectura_de_tiles.go`), que quedo esperando
+   justamente esta lectura.
+4. **El recolector en medio del parseo y el crash al pintar** siguen siendo de sus tarjetas: aca se midio la
+   LECTURA, sin parsear ningun .dt1 a proposito.
+
+
+8. Como reproducirlo
+--------------------
+    cd /home/dgalli/Proyectos/diablo2consoles
+    S=$HOME/.hermes/cache/scratch/dcb279      # NO /tmp: es tmpfs y se vacia solo
+    cp -a /tmp/gox-med $S/base                # el arbol de .gox del motor
+    BASE_GOX=$S/base LECTURA=vieja             bash scripts/console/build-loadfile-279.sh $S/out-vieja
+    BASE_GOX=$S/base LECTURA=nueva MODO=archivo bash scripts/console/build-loadfile-279.sh $S/out-nueva
+    BASE_GOX=$S/base LECTURA=nueva MODO=buffer  bash scripts/console/build-loadfile-279.sh $S/out-buffer
+    for d in vieja nueva buffer; do
+      WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=none \
+        bash scripts/console/run-flycast.sh $S/out-$d/disc.gdi 100 $S/cap-$d
+    done
+    # el crc32 de referencia, en el host:
+    go run ./console/dc/medidas/dt1-crc -via-cargador
+
+En el log las lineas de la medicion empiezan con "LECTURA:" y las del instrumento de carga del runtime con
+"ARQ-". La corrida tarda ~45 s: 10 s en abrir el D2DATA.MPQ del disco, 21 s en leer los nueve archivos, y
+el resto es el arranque.
+
+OJO con dos cosas del emulador: (1) el POC se queda quieto al final a proposito -- si `main` vuelve, la
+consola reinicia y la segunda vuelta ya no puede abrir el MPQ (llena el log de FALLOS que no son de la
+medicion); (2) la corrida del ANTES, como el SH-4 se muere, reinicia sola cinco veces: el primer arranque
+es el que vale.
+
+
+9. Archivos
+-----------
+    d2common/d2fileformats/d2mpq/lectura_entera.go        TamanoDeArchivo / TamanoComprimido / LeerEn / InhibirPrefetch
+    d2common/d2fileformats/d2mpq/mpq_stream.go            el prefetch se puede apagar (una condicion)
+    d2common/d2fileformats/d2mpq/lectura_entera_test.go   las 4 pruebas nuevas, con el mutador de la palanca
+    d2common/d2loader/asset/source.go                     la interfaz opcional SourceDeLecturaEntera
+    d2common/d2loader/mpq/source.go                       la fuente MPQ sabe el tamano y lee entero
+    d2common/d2loader/loader.go                           TamanoDeArchivo / LeerEnteroEn (y `rutaReal`, una sola version)
+    d2core/d2asset/lectura_consola.go                     el camino de la consola (LoadFile / LoadFileEn) e instrumento
+    d2core/d2asset/asset_manager.go                       `LoadFile` elige camino (la PC queda igual)
+    console/dc/poc/loadfile-grande/{main.go,knobs.go,csrc/shim.c}   el POC (tres palancas)
+    console/dc/medidas/dt1-crc/main.go                     el crc32 del host y la comparacion por la fuente MPQ
+    scripts/console/build-loadfile-279.sh                  build con las palancas
+    console/dc/evidencia/dc-002.79-flycast-antes.log       el antes: la primera lectura deja 4,82 MB y la segunda mata el SH-4
+    console/dc/evidencia/dc-002.79-flycast-despues.log     el despues: 8 de 8 por `LoadFile`
+    console/dc/evidencia/dc-002.79-flycast-buffer.log      el despues reusando un buffer: 6 de 8 lecturas con delta 0
+    console/dc/evidencia/dc-002.79-host-dt1-crc.txt        los tamanos y crc32 del host, y la comparacion por la fuente

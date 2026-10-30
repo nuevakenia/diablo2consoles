@@ -1,0 +1,82 @@
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2d2620
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351855168
+ARQ-MARCA   gc_init-semiespacio1 v=2353952352
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1120 cused=4353280 gsemi=95728/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+
+LECTURA: arranca DC-002.79 -- LoadFile con archivos grandes en la consola
+LECTURA: palancas: lecturaDeConsola= false modoBuffer= false liberaCrudo= false
+LECTURA: monton al arrancar: arena=4354400 usado=4354312 libre=88 sbrk=0x0x8c6f8000 techo=0x0x8cff0000
+LECTURA: camino de lectura: consola= false prefetchApagado= false
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+
+LECTURA: assetmanager de consola listo: arena=4710752 usado=4709312 libre=1440 sbrk=0x0x8c74f000 techo=0x0x8cff0000
+ARQ-CARGA entra /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=1440 cused=4709312 gsemi=183528/2097152 gc=0
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/ACT1/TOWN/townN1.ds1
+
+ARQ-CARGA volvio /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=1440 cused=4709312 gsemi=186680/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=1440 cused=4709312 gsemi=186680/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=1440 cused=4709312 gsemi=690096/2097152 gc=0
+LECTURA: DS1 /data/global/tiles/ACT1/TOWN/townN1.ds1 bytes= 57652 crc32= 712973328 monton= arena=4710752 usado=4709312 libre=1440 sbrk=0x0x8c74f000 techo=0x0x8cff0000
+LECTURA: DS1 w= 57 h= 41 archivos= 8
+ARQ-CARGA entra /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=1440 cused=4709312 gsemi=1092992/2097152 gc=0
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/act1\outdoors\treegroups.dt1
+
+ARQ-CARGA volvio /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=1440 cused=4709312 gsemi=1097032/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=1440 cused=4709312 gsemi=1097032/2097152 gc=0
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576520
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=536192
+ARQ-CARGA lee-volvio /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=1992 cused=9529752 gsemi=1323312/2097152 gc=1
+LECTURA: DT1 /data/global/tiles/act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton= arena=9531744 usado=9529752 libre=1992 sbrk=0x0x8cbe8000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 4709312 despues= 9529752 delta= 4820440 libreAntes= 1440
+ARQ-CARGA entra /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=1992 cused=9529752 gsemi=1323960/2097152 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/D2DATA.MPQ -> /data/global/tiles/act1\outdoors\stonewall.dt1
+
+ARQ-CARGA volvio /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=1992 cused=9529752 gsemi=1327872/2097152 gc=1
+ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=1992 cused=9529752 gsemi=1327872/2097152 gc=1
+ARQ-MARCA gc-por-umbral-bytes-usados v=1580896
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=494976
+00:19:521 reios/reios.cpp:639 N[REIOS]: -----------------
+00:19:521 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:19:521 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--

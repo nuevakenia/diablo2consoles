@@ -1,6 +1,7 @@
 package mpq
 
 import (
+	"errors"
 	"io"
 	"strings"
 
@@ -11,6 +12,12 @@ import (
 
 // static check that Source implements AssetSource
 var _ asset.Source = &Source{}
+
+// DC-002.79: ademas sabe cuanto mide un archivo y lo lee entero en un buffer prestado.
+var _ asset.SourceDeLecturaEntera = &Source{}
+
+// errSinLecturaEntera: la fuente tiene un Archive que no es un MPQ concreto (no puede decir el tamano).
+var errSinLecturaEntera = errors.New("mpq: la fuente no sabe leer enteros")
 
 // NewSource creates a new MPQ Source
 func NewSource(sourcePath string) (asset.Source, error) {
@@ -37,6 +44,26 @@ func (v *Source) Open(name string) (a io.ReadSeeker, err error) {
 func (v *Source) Exists(subPath string) bool {
 	subPath = cleanName(subPath)
 	return v.MPQ.Contains(subPath)
+}
+
+// Tamano devuelve el tamano descomprimido del archivo (DC-002.79). Ver asset.SourceDeLecturaEntera.
+func (v *Source) Tamano(nombre string) (int, bool) {
+	mpqDirecto, ok := v.MPQ.(*d2mpq.MPQ)
+	if !ok {
+		return 0, false
+	}
+
+	return mpqDirecto.TamanoDeArchivo(cleanName(nombre))
+}
+
+// LeerEnteroEn lee el archivo entero DENTRO del buffer prestado (DC-002.79).
+func (v *Source) LeerEnteroEn(nombre string, dst []byte) (int, error) {
+	mpqDirecto, ok := v.MPQ.(*d2mpq.MPQ)
+	if !ok {
+		return 0, errSinLecturaEntera
+	}
+
+	return mpqDirecto.LeerEn(cleanName(nombre), dst)
 }
 
 // Path returns the path of the MPQ on the host filesystem

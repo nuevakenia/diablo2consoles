@@ -1,0 +1,111 @@
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2d2660
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351855232
+ARQ-MARCA   gc_init-semiespacio1 v=2353952416
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1056 cused=4353280 gsemi=95728/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+
+LECTURA: arranca DC-002.79 -- LoadFile con archivos grandes en la consola
+LECTURA: palancas: lecturaDeConsola= true modoBuffer= false liberaCrudo= false
+LECTURA: monton al arrancar: arena=4358432 usado=4354312 libre=4120 sbrk=0x0x8c6f9000 techo=0x0x8cff0000
+LECTURA: camino de lectura: consola= true prefetchApagado= true
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+
+LECTURA: assetmanager de consola listo: arena=4710688 usado=4709312 libre=1376 sbrk=0x0x8c74f000 techo=0x0x8cff0000
+ARQ-CARGA lee-entra /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=1376 cused=4709312 gsemi=241648/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=1376 cused=4709312 gsemi=355240/2097152 gc=0
+LECTURA: DS1 /data/global/tiles/ACT1/TOWN/townN1.ds1 bytes= 57652 crc32= 712973328 monton= arena=4710688 usado=4709312 libre=1376 sbrk=0x0x8c74f000 techo=0x0x8cff0000
+LECTURA: DS1 w= 57 h= 41 archivos= 8
+ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=3768 cused=5214824 gsemi=758624/2097152 gc=0
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573664
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=420648
+ARQ-CARGA lee-volvio /data/global/tiles/act1\outdoors\treegroups.dt1 cfree=3768 cused=5214824 gsemi=486408/2097152 gc=1
+LECTURA: DT1 /data/global/tiles/act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton= arena=5218592 usado=5214824 libre=3768 sbrk=0x0x8c7cb000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 4709312 despues= 5214824 delta= 505512 libreAntes= 1376
+ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=2464 cused=5654400 gsemi=487544/2097152 gc=1
+ARQ-CARGA lee-volvio /data/global/tiles/act1\outdoors\stonewall.dt1 cfree=2464 cused=5654400 gsemi=1278520/2097152 gc=1
+LECTURA: DT1 /data/global/tiles/act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton= arena=5656864 usado=5654400 libre=2464 sbrk=0x0x8c836000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 5214824 despues= 5654400 delta= 439576 libreAntes= 3768
+ARQ-CARGA lee-entra /data/global/tiles/act1\town\floor.dt1 cfree=2072 cused=6662408 gsemi=1279560/2097152 gc=1
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575160
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=420616
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575664
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=421016
+ARQ-CARGA lee-volvio /data/global/tiles/act1\town\floor.dt1 cfree=2072 cused=6662408 gsemi=681808/2097152 gc=3
+LECTURA: DT1 /data/global/tiles/act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 monton= arena=6664480 usado=6662408 libre=2072 sbrk=0x0x8c92c000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 5654400 despues= 6662408 delta= 1008008 libreAntes= 2464
+ARQ-CARGA lee-entra /data/global/tiles/act1\barracks\warp.dt1 cfree=3360 cused=7320576 gsemi=682928/2097152 gc=3
+ARQ-CARGA lee-volvio /data/global/tiles/act1\barracks\warp.dt1 cfree=3360 cused=7320576 gsemi=1392520/2097152 gc=3
+LECTURA: DT1 /data/global/tiles/act1\barracks\warp.dt1 bytes= 658158 crc32= -256062915 monton= arena=7323936 usado=7320576 libre=3360 sbrk=0x0x8c9cd000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 6662408 despues= 7320576 delta= 658168 libreAntes= 2072
+ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\river.dt1 cfree=2400 cused=7636928 gsemi=1393640/2097152 gc=3
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573648
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=419936
+ARQ-CARGA lee-volvio /data/global/tiles/act1\outdoors\river.dt1 cfree=2400 cused=7636928 gsemi=744664/2097152 gc=4
+LECTURA: DT1 /data/global/tiles/act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 monton= arena=7639328 usado=7636928 libre=2400 sbrk=0x0x8ca1a000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 7320576 despues= 7636928 delta= 316352 libreAntes= 3360
+ARQ-CARGA lee-entra /data/global/tiles/act1\town\objects.dt1 cfree=336 cused=8298448 gsemi=745728/2097152 gc=4
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575480
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=420432
+ARQ-CARGA lee-volvio /data/global/tiles/act1\town\objects.dt1 cfree=336 cused=8298448 gsemi=655656/2097152 gc=5
+LECTURA: DT1 /data/global/tiles/act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 monton= arena=8298784 usado=8298448 libre=336 sbrk=0x0x8cabb000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 7636928 despues= 8298448 delta= 661520 libreAntes= 2400
+ARQ-CARGA lee-entra /data/global/tiles/act1\town\fence.dt1 cfree=2944 cused=8721824 gsemi=656696/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/tiles/act1\town\fence.dt1 cfree=2944 cused=8721824 gsemi=1356496/2097152 gc=5
+LECTURA: DT1 /data/global/tiles/act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 monton= arena=8724768 usado=8721824 libre=2944 sbrk=0x0x8cb23000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 8298448 despues= 8721824 delta= 423376 libreAntes= 336
+ARQ-CARGA lee-entra /data/global/tiles/act1\outdoors\objects.dt1 cfree=600 cused=9060040 gsemi=1357640/2097152 gc=5
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576016
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=420064
+ARQ-CARGA lee-volvio /data/global/tiles/act1\outdoors\objects.dt1 cfree=600 cused=9060040 gsemi=801040/2097152 gc=6
+LECTURA: DT1 /data/global/tiles/act1\outdoors\objects.dt1 bytes= 338205 crc32= -1287313098 monton= arena=9060640 usado=9060040 libre=600 sbrk=0x0x8cb75000 techo=0x0x8cff0000
+LECTURA:   monton de la lectura: antes= 8721824 despues= 9060040 delta= 338216 libreAntes= 2944
+
+LECTURA: ================ EL VEREDICTO ================
+LECTURA: dt1 leidos= 8 de 8 fallidos= 0
+LECTURA: bytes leidos= 4350665 en 21841 ms
+LECTURA: monton al final: arena=9060640 usado=9060040 libre=600 sbrk=0x0x8cb75000 techo=0x0x8cff0000
+LECTURA: instrumento: lecturas= 9 bytes= 4408317 sinTamano= 0 prefetchApagado= true
+LECTURA: OK -- los 8 .dt1 de la zona se leyeron por el camino del motor
