@@ -70,7 +70,7 @@ el POC de referencia, con 0,19 % de cuantización ≤8 y el 1,03 % restante en l
 no limpia. Evidencias: `console/dc/evidencia/dc-002.69-pvr-surface.txt`,
 `dc-002.70-renderer-pvr.txt` y la verificación independiente `dc-002.73-verificacion.txt`.
 
-## Fase C — Input y audio  ·  input MEDIDO (DC-002.71), audio pendiente
+## Fase C — Input y audio  ·  input MEDIDO (DC-002.71), audio MEDIDO (DC-002.72)
 
 Maple detrás de `d2interface` (`input_service.go`, `input_manager.go`; es la más fácil) y AICA
 detrás de `d2interface` (`audio_provider.go`, `pcm_stream.go`, `sound_effect.go`; la lógica ya está
@@ -86,8 +86,24 @@ gatillos L/R → Q/E, palanca/cruceta → el cursor) y la aserción de contrato 
 Flycast los **nueve** botones llegan y se traducen con sus dos flancos (log `HITO271: FLANCO`), el
 cursor del motor pasa de 320 a 332 en un cuadro con la cruceta y se recorta en 639x479; 12 pruebas en
 el host con 8 mutantes cazados; el motor compila **144 de 144** para SH-4 (el paquete nuevo es el
-144). Evidencia: `console/dc/evidencia/dc-002.71-maple-input.txt`. Lo que falta de la fase es el
-audio (AICA) y que el personaje sea el del motor con `d2gamescreen` (Fase D).
+144). Evidencia: `console/dc/evidencia/dc-002.71-maple-input.txt`. Lo que faltaba de la fase en ese
+momento era el audio (AICA, cerrado en DC-002.72) y que el personaje sea el del motor con
+`d2gamescreen` (Fase D).
+
+**Medido en DC-002.72 (la mitad de audio, cerrada):** `d2core/d2audio/aica` implementa los **3**
+métodos de `AudioProvider` (`PlayBGM` queda **no-op declarado**: la música es streaming y el cuerpo
+la deja afuera) y los **5** de `SoundEffect` sobre el canal del AICA, con el camino de KOS en
+`console/dc/std/csrc/sonido_dc.c` (`snd_init` → `snd_sfx_load_raw_buf` → `snd_sfx_play_ex`). El
+efecto de la prueba **es del motor**: `data/global/sfx/combat/impact/sword5.wav` resuelto por
+`d2soundpath` y leído de `d2Sfx.mpq` (48,9 MB, en el disco), 20170 B → 10062 muestras de 22050 Hz
+mono; el chip pasa de `canalesSonando=0` a **1** al sonar y vuelve a **0** solo a los 436 ms (el
+contador sale de `snd_is_playing`/KEYONB, y la posición avanza hasta 10062), `SetPan`/`SetVolume` en
+vuelo llegan al registro (`pan=0`, `pan=255`, `vol 204→102`) y el efecto con `loop` sigue sonando más
+allá de su duración (pos=6034 a los 700 ms = dio la vuelta). Volúmenes: `1.0→255`, `0.8→204`,
+pan `-1→0 / 0→128 / +1→255`. 10 pruebas en el host con **4 mutantes cazados** (uno destapó un hueco
+real de la suite: faltaba el caso de bloque RIFF de largo impar). El motor compila **145 de 145** para
+SH-4 (el paquete nuevo es el 145). Evidencia: `console/dc/evidencia/dc-002.72-aica-audio.txt`. Lo que
+falta de la fase es que el personaje sea el del motor con `d2gamescreen` (Fase D).
 
 ## Fase D — Montar `d2gamescreen`  ·  pendiente
 

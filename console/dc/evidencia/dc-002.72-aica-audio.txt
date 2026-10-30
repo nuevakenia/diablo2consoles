@@ -1,0 +1,226 @@
+DC-002.72 -- EL AUDIO DE LA DREAMCAST DETRAS DE d2interface.AudioProvider (Fase C, la mitad de audio)
+=======================================================================================================
+Tarjeta: t_27b77db8 (feat:fase-c, prioridad 64), "DC-002.72 Fase C: AICA detras de d2interface.AudioProvider"
+Fecha de la corrida: 2026-10-30 (America/Santiago)
+Rama: DC-002, checkout UNICO en /home/dgalli/Proyectos/diablo2consoles, HEAD e018f840 (no se creo rama nueva)
+
+Todos los numeros de abajo son de esta corrida, medidos en este host. El comando va al lado del numero.
+
+
+1. QUE SE CONSTRUYO (lo que pide la tarjeta)
+-------------------------------------------
+1.1  d2core/d2audio/aica/   <- el backend de audio de la consola: implementacion de los 3 metodos de
+     d2interface.AudioProvider sobre KOS/AICA.
+         doc.go            la doctrina: que hace, que NO hace y por que (PlayBGM no-op, sin PCMStreamer).
+         proveedor.go      (//go:build dreamcast) el Proveedor (PlayBGM/LoadSound/SetVolumes) y el Efecto
+                           (Play/Stop/SetPan/SetVolume/IsPlaying) sobre el canal del AICA.
+         sonido_dc.go      (//go:build dreamcast) las llamadas a KOS/AICA por //extern + los instrumentos
+                           (CanalesSonando, CanalesLibres, MemoriaLibre, Estado(canal), Posicion).
+         wav.go            el parseo del WAV del motor a PCM crudo (Go comun: compila y se prueba en el HOST).
+         volumen.go        las dos escalas del motor (volumen 0..1, pan -1..+1) a la del AICA (0..255, 128
+                           al centro). Go comun, probado en el host.
+         rutas.go          la ruta de d2soundpath a la CLAVE del MPQ (barras invertidas). Go comun, probado.
+         wav_test.go / rutas_test.go   10 pruebas en el host (ver 5).
+     La asercion de contrato esta en el paquete, no en una lectura:
+         var _ d2interface.AudioProvider = &Proveedor{}    (proveedor.go:18)
+         var _ d2interface.SoundEffect   = &Efecto{}       (proveedor.go:214)
+
+1.2  console/dc/std/csrc/sonido_dc.c   <- la cara C del camino de KOS al AICA (d2audio_*): snd_init,
+     snd_mem_available, snd_sfx_load_raw_buf, snd_sfx_play_ex (con loop), snd_sfx_stop, snd_is_playing,
+     snd_get_pos, los paquetes de ACTUALIZACION de volumen/pan, y el volcado del registro de 64 B del
+     canal. Vive en std/csrc (y no en el csrc de un POC) porque lo llama un paquete del MOTOR: build-dc.sh
+     compila ese directorio siempre, asi que cualquier POC que importe el paquete ya tiene el camino. Es el
+     mismo criterio que control_dc.c con el maple en DC-002.71. El POC del personaje (DC-002.62) NO se toco:
+     conserva su copia (d2c_snd_*) como referencia.
+
+1.3  console/dc/poc/audio-aica/   <- la prueba en la consola: carga un WAV DEL MOTOR de d2Sfx.mpq por la
+     interfaz, lo hace sonar por el AICA y mide los canales del chip antes/mientras/despues.
+
+1.4  scripts/console/build-aica-272.sh    compila aica.gox + el POC y arma el .gdi con el MPQ en /JUEGO.
+     console/dc/sonda-sfx/                  sonda del HOST: lista los WAV de un MPQ con su tamano (con eso
+                                            se eligieron los dos efectos de la prueba).
+
+
+2. LAS TRES PIEZAS DEL CONTRATO (y que queda declarado como no implementado)
+----------------------------------------------------------------------------
+LoadSound(sfx string, loop, bgm bool) (SoundEffect, error)
+   1) resuelve el nombre de Sounds.txt con d2core/d2audio/d2soundpath (el MISMO resolutor que usa el
+      proveedor de ebiten del host) y comprueba que exista en el MPQ;
+   2) lee los bytes del MPQ del disco (d2mpq.ReadFile);
+   3) parsea el WAV (formato PCM 1, 8 o 16 bits, 1 o 2 canales; un ADPCM se RECHAZA con error);
+   4) sube el PCM a la RAM del AICA (snd_sfx_load_raw_buf) y devuelve un Efecto con el handle.
+   Tope declarado: snd_sfx_load_raw_buf acepta 65534 muestras (snd_sfxmgr.h); un efecto mas largo devuelve
+   ERROR en vez de sonar recortado en silencio.
+   El largo del PCM se recorta a multiplo de 4 antes de subirlo: spu_memload_sq redondea hacia arriba
+   (kernel/arch/dreamcast/hardware/spu.c:75-78) y leeria hasta 3 bytes fuera de nuestro buffer.
+
+PlayBGM(song string)   -> NO-OP DECLARADO. La musica del juego es streaming desde el GD-ROM (snd_stream) y
+   el cuerpo de la tarjeta lo deja afuera ("no metas streaming de BGM desde el GD-ROM"). El metodo contesta
+   y lo escribe en la traza (una linea por tema, no una por cuadro). El motor de la consola todavia no lo
+   pide: las pantallas son la Fase D. NO se implementa d2interface.PCMStreamer (cinematicas de Bink) por el
+   mismo motivo.
+
+SetVolumes(bgmVolume, sfxVolume float64)   -> escala 0..1 del motor a 0..255 del AICA, DOCUMENTADA y probada:
+       VolumenAICA(v) = round(v*255) recortado a [0,255]     (1.0 -> 255, 0.8 -> 204, 0.5 -> 128)
+       PanAICA(p)     = round((p+1)*255/2) recortado         (-1 -> 0, 0 -> 128 CENTRO, +1 -> 255)
+   El pan del motor es -1 izquierda .. 0 centro .. +1 derecha (ebiten_sound_effect.go:101): el 0 cae en
+   127,5 y se REDONDEA a 128, que es el centro del chip (snd_sfxmgr.h). Truncar dejaria 127 (un pelo a la
+   izquierda) y el volumen maximo en 254.
+
+
+3. COMPILACION Y ENLACE (los numeros de esta corrida)
+----------------------------------------------------
+   scripts/console/build-motor-all.sh /tmp/gox-std /tmp/dc272/motor-all
+       capa 1: compilados 145 de 145
+       == RESULTADO: 145 de 145 paquetes del motor compilan para SH-4 ==
+       == bloqueados: 0 (el motor compila COMPLETO) ==
+     (143 en la verificacion DC-002.73; +d2input/maple en DC-002.71 y +d2audio/aica en esta tarjeta)
+
+   scripts/console/build-aica-272.sh /tmp/dcbuild/aica272
+       aica.gox        132448 B   (6 archivos: doc.go proveedor.go rutas.go sonido_dc.go volumen.go wav.go)
+       paquetes del motor en el enlace: 10 (aica + d2interface, d2mpq, d2soundpath y sus dependencias)
+       objetos en orden.txt: 73 (stdlib 63 + los 10 del motor)
+       prog.elf         6881432 B
+       1ST_READ.BIN     1158408 B
+       .text  717808 B   .rodata  424364 B   data+bss  228984 B
+       disc.iso        50143232 B  (el POC viaja con d2Sfx.mpq en /JUEGO/D2SFX.MPQ; medido: 48927379 B)
+
+   scripts/console/build-enlace-267.sh /tmp/dcbuild/enlace272   (el motor entero, no solo el audio)
+       1ST_READ.BIN 1238632 B, y en Flycast corre igual que en DC-002.67:
+       ENLACE267: FIN / ENLACE267: malloc 1572864 OK
+
+
+4. LA CORRIDA EN FLYCAST (log literal de la consola serie)
+----------------------------------------------------------
+   CAPTURE=none scripts/console/run-flycast.sh /tmp/dcbuild/aica272/disc.gdi 25 /tmp/dc272/final
+
+AICA t=0ms ARRANQUE DC-002.72: un sonido del MOTOR por el AICA, por d2interface.AudioProvider
+AICA t=1513ms MPQ abierto ruta=/cd/JUEGO/D2SFX.MPQ bytes=48927379 ms=1505
+AICA volumenes bgm=1.00 sfx=0.80 -> AICA bgm=255 sfx=204 (escala 0..255 con 128 al centro del pan)
+AICA t=1543ms ANTES-DE-SONAR canalesSonando=0 canalesLibres=64 aicaLibre=1900544
+AICA PCM ruta=data/global/sfx/combat/impact/sword5.wav claveMPQ=data\global\sfx\combat\impact\sword5.wav mpq=/cd/JUEGO/D2SFX.MPQ bytes=20170 formato=1 tasa=22050 bits=16 canales=1 muestras=10062 ms=456 handle=2354602512 aicaLibre=1880416 usado=20128
+AICA t=1696ms EFECTO-DEL-MOTOR ruta=data/global/sfx/combat/impact/sword5.wav tasa=22050 bits=16 canales=1 muestras=10062 ms=456 vol=204 pan=128 handle=2354602512
+AICA t=1710ms registro-ANTES-de-sonar canal=0 cmd=0 base=0 tipo=0 largo=0 loop=0 freq=0 vol=0 pan=0 pos=0
+AICA play ruta=data/global/sfx/combat/impact/sword5.wav canal=0 vol=204 pan=128 loop=0 sonando=0 canalesSonando=0
+AICA t=1729ms EFECTO-1(sin loop) disparado canal=0 sonando=1 canalesSonando=1
+AICA t=1736ms EFECTO-1(sin loop) registro-al-sonar canal=0 cmd=1 base=196608 tipo=0 largo=10062 loop=0 freq=22050 vol=204 pan=128 pos=324
+AICA t=1749ms EFECTO-1(sin loop) avanzando pos=594 de 10062 muestras canalesSonando=1
+AICA t=1756ms EFECTO-1(sin loop) avanzando pos=774 de 10062 muestras canalesSonando=1
+AICA t=1764ms EFECTO-1(sin loop) avanzando pos=954 de 10062 muestras canalesSonando=1
+AICA t=1772ms EFECTO-1(sin loop) avanzando pos=1134 de 10062 muestras canalesSonando=1
+   (... 152 lineas "avanzando" en total, pos subiendo de a ~180 muestras por sondeo: las 10062 muestras
+    del efecto se agotan en los 436 ms medidos, o sea ~23.000 muestras/s contra las 22050 Hz que declara
+    el WAV — el chip AVANZA a la velocidad del audio, no a la de la CPU)
+AICA t=2185ms EFECTO-1(sin loop) FIN el chip apago el canal a los 436ms pos=0 canalesSonando=0
+AICA t=2193ms EFECTO-1(sin loop) registro-al-terminar canal=0 cmd=1 base=196608 tipo=0 largo=10062 loop=0 freq=22050 vol=204 pan=128 pos=0
+AICA t=2205ms EN-VUELO pan=-1 volumen=0.5 -> panAICA=0 volAICA=102
+AICA play ruta=data/global/sfx/combat/impact/sword5.wav canal=2 vol=102 pan=0 loop=0 sonando=0 canalesSonando=0
+AICA t=2341ms registro-con-pan-al-maximo canal=2 cmd=1 base=196608 tipo=0 largo=10062 loop=0 freq=22050 vol=102 pan=0 pos=2755
+AICA t=2352ms EN-VUELO durante el play sonando=1 canalesSonando=1
+AICA t=2478ms registro-con-pan-al-otro-extremo canal=2 cmd=1 base=196608 tipo=0 largo=10062 loop=0 freq=22050 vol=102 pan=255 pos=5820
+AICA stop ruta=data/global/sfx/combat/impact/sword5.wav canal=2 estabaSonando=1 canalesSonando=1
+AICA t=2498ms STOP hecho sonando=0 canalesSonando=0
+AICA PCM ruta=data/global/sfx/monster/goatman/gethit4.wav claveMPQ=data\global\sfx\monster\goatman\gethit4.wav mpq=/cd/JUEGO/D2SFX.MPQ bytes=20026 formato=1 tasa=22050 bits=16 canales=1 muestras=9952 ms=451 handle=2354622720 aicaLibre=1860512 usado=19904
+AICA t=2663ms EFECTO-CON-LOOP ruta=data/global/sfx/monster/goatman/gethit4.wav muestras=9952 ms=451
+AICA play ruta=data/global/sfx/monster/goatman/gethit4.wav canal=4 vol=204 pan=128 loop=1 sonando=0 canalesSonando=0
+AICA t=2682ms EFECTO-2(loop) disparado canal=4 sonando=1 canalesSonando=1
+AICA t=2689ms EFECTO-2(loop) registro-al-sonar canal=4 cmd=1 base=216736 tipo=0 largo=9952 loop=1 freq=22050 vol=204 pan=128 pos=326
+AICA t=3404ms EFECTO-2(loop) TOPE 700ms alcanzado y el chip sigue con el canal encendido (sonando=1 pos=6034 canalesSonando=1)
+AICA stop ruta=data/global/sfx/monster/goatman/gethit4.wav canal=4 estabaSonando=1 canalesSonando=1
+AICA t=3424ms LOOP-STOP hecho sonando=0 canalesSonando=0
+AICA t=3429ms RESUMEN efectos=2 errores=0 volumenes bgm=1.00 sfx=0.80 FIN-DE-LA-PRUEBA
+AICA t=3437ms DESPUES-DE-TODO canalesSonando=0 canalesLibres=64 aicaLibre=1860512
+AICA t=3445ms fallos=0
+AICA t=4000ms latido=1 canalesSonando=0 aicaLibre=1860512
+   (... un latido cada 5 s hasta el final de la corrida: el proceso sigue vivo, no se cayo)
+
+
+5. LOS NUMEROS QUE PRUEBAN CADA CRITERIO DE LA TARJETA
+-----------------------------------------------------
+a) "La implementacion compila para sh-elf y cumple AudioProvider (que el compilador lo exija)."
+   -> aica.gox 132448 B compilado por sh-elf-gccgo (seccion 3), y las dos aserciones de contrato de 1.1.
+      145/145 del motor compilan; el enlace del motor entero (build-enlace-267) sigue corriendo.
+
+b) "En Flycast, el log muestra el canal del AICA OCUPADO al sonar y LIBRE al terminar."
+   -> canalesSonando 0 (t=1543) -> 1 (t=1729, apenas el play) -> 0 (t=2185, cuando el chip apaga el canal
+      solo, a los 436 ms de un efecto de 456 ms). El volcado del registro (cmd/base/tipo/largo/loop/freq/
+      vol/pan/pos) pasa de todo en cero a cmd=1 base=196608 largo=10062 freq=22050 vol=204 pan=128, y la
+      POSICION sube de 324 a 10062 en 152 lineas: lo que se lee es el chip, no una copia nuestra (la zona
+      AICA_MEM_CHANNELS la escribe el programa del AICA y es de solo lectura desde el SH-4).
+      El contador sale de `snd_is_playing` (el bit KEYONB de cada uno de los 64 canales, snd_iface.c:219).
+      OJO, medido y por eso hay DOS contadores: `snd_sfx_play` NO marca el canal en la tabla del sfxmgr
+      (snd_sfxmgr.c:767 solo llama a find_free_channel), asi que `CanalesLibres` (sondeo de
+      snd_sfx_chn_alloc) da 64 aunque haya efectos sonando; el que ve el efecto es `CanalesSonando`.
+      `CanalesLibres` queda como instrumento de canales RESERVADOS (el stream de musica reserva dos).
+
+c) "el efecto cargado es del MOTOR (ruta del MPQ en el log)."
+   -> ruta=data/global/sfx/combat/impact/sword5.wav (nombre de Sounds.txt resuelto por d2soundpath),
+      claveMPQ=data\global\sfx\combat\impact\sword5.wav (la clave real dentro del MPQ, con barras
+      invertidas) y mpq=/cd/JUEGO/D2SFX.MPQ (el archivo del disco, 48927379 B). El segundo efecto:
+      data/global/sfx/monster/goatman/gethit4.wav. NO hay samples dentro del binario: si el MPQ no tiene el
+      sonido, LoadSound devuelve ERROR (probado en la primera corrida, que buscaba "combat\impact\
+      sword5.wav" sin la clave con barras invertidas y fallo con "el sonido no esta en el MPQ").
+      El AICA lo confirma por RAM: aicaLibre 1900544 -> 1880416 con el primero (-20128 B = el PCM de
+      10062 muestras de 16 bits) y -> 1860512 con el segundo (-19904 B).
+
+d) Extra (no pedido, pero es el contrato entero): SetPan y SetVolume EN VUELO llegan al chip
+   (pan=0 y pan=255 en el registro, vol 204 -> 102 = 0.5*204), Stop() libera el canal en el acto
+   (canalesSonando=0 en la misma linea), y el efecto con loop sigue sonando mas alla de sus 451 ms:
+   a los 700 ms esta en pos=6034, que solo es posible si la posicion DIO LA VUELTA (700 ms * 22050 =
+   15435 muestras > las 9952 del efecto).
+
+
+6. LAS PRUEBAS DEL HOST (y los mutantes que las prueban)
+-------------------------------------------------------
+   go test ./d2core/d2audio/aica/     ->  10 pruebas, ok
+   TestParsearWAV / SaltaBloques / BloqueImpar / Estereo / TramaIncompleta / DataCortado / Rechaza
+   TestVolumenAICA / TestPanAICA / TestRutaEnElMPQ
+
+   Control de que la suite CAZA sus propios defectos (4 mutantes, los 4 en rojo y el sano en verde):
+     M1  rutaEnElMPQ sin convertir separadores (el defecto REAL que cazo la primera corrida) -> FAIL TestRutaEnElMPQ
+     M2  PanAICA truncando en vez de redondear (centro en 127)                             -> FAIL TestPanAICA
+     M3  VolumenAICA truncando (0.999 = 254)                                               -> FAIL TestVolumenAICA
+     M4  el parseo sin saltar el relleno de un bloque de largo impar                       -> FAIL TestParsearWAVBloqueImpar
+   M4 dejo al descubierto un hueco REAL de la primera version de la suite (no habia caso con bloque de
+   largo impar): se agrego TestParsearWAVBloqueImpar y recien entonces el mutante queda cazado.
+
+
+7. LO QUE NO ENTRA (declarado, no escondido)
+--------------------------------------------
+   - No hay streaming de BGM desde el GD-ROM: PlayBGM es no-op (ver 2). No se implemento
+     d2interface.PCMStreamer.
+   - No se toco el input (es DC-002.71) ni el sonido.go del POC del personaje (es la referencia).
+   - Este camino acepta PCM de 8 o 16 bits, mono o estereo. Un ADPCM (audioFormat 2, que KOS tambien
+     soporta) se rechaza con error: no es un olvido, esta escrito en wav.go.
+   - Los 2330 WAV de d2Sfx.mpq son PCM (medido con console/dc/sonda-sfx); un sonido de d2Speech/d2Music no
+     lo carga este proveedor porque el POC solo lleva d2Sfx.mpq en el disco.
+
+
+8. COMO SE REPRODUCE
+--------------------
+    cd /home/dgalli/Proyectos/diablo2consoles
+    source scripts/console/env.sh
+    bash scripts/console/build-motor-all.sh /tmp/gox-std /tmp/dc272/motor-all   # 145 de 145
+    bash scripts/console/build-aica-272.sh /tmp/dcbuild/aica272                # aica.gox + .gdi (50 MB)
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/aica272/disc.gdi 25 /tmp/dc272/final
+    grep -a AICA /tmp/dc272/final/flycast.log
+
+    go test ./d2core/d2audio/aica/        # las 10 pruebas del host
+
+
+9. PITFALLS MEDIDOS EN ESTA TARJETA (para la proxima)
+----------------------------------------------------
+   - El MPQ guarda los nombres con BARRA INVERTIDA y busca por hash del nombre EXACTO: la ruta que devuelve
+     d2soundpath (con "/") NO encuentra nada. El motor lo normaliza en d2loader/mpq/source.go:cleanName;
+     aca lo hace rutas.go. El sintoma es "el sonido no esta en el MPQ" con el archivo presente.
+   - snd_sfx_play NO marca el canal en la tabla del sfxmgr: el contador de libres (sondeo de
+     snd_sfx_chn_alloc) da 64 con efectos sonando. El estado real se pregunta al chip con snd_is_playing.
+   - spu_memload_sq redondea el largo hacia arriba a multiplo de 4: con un PCM de largo no multiplo de 4
+     leeria fuera del buffer. Se recorta el PCM (esta en proveedor.go).
+   - snd_sfx_load_raw_buf NO rechaza un efecto de mas de 65534 muestras: avisa por dbglog y lo toca
+     recortado. Aca se convierte en error (proveedor.go).
+   - El binario que no importa ebiten arranca y MUERE con "Unhandled exception" antes de imprimir una
+     linea (medido en DC-002.33): el POC importa ebiten en blanco, solo por el enlace del runtime.
+   - En Flycast `snd_get_pos` y `snd_is_playing` SI funcionan (la posicion avanza y el bit se apaga solo):
+     medido, no supuesto. Los contadores de rendimiento del SH-4 siguen dando 0 (por eso se mide con
+     timer_ms_gettime64).
