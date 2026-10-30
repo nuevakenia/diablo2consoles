@@ -20,13 +20,14 @@ type cacheNode struct {
 
 // Cache stores arbitrary data for fast retrieval
 type Cache struct {
-	head    *cacheNode
-	tail    *cacheNode
-	lookup  map[string]*cacheNode
-	weight  int
-	budget  int
-	verbose bool
-	mutex   sync.Mutex
+	head      *cacheNode
+	tail      *cacheNode
+	lookup    map[string]*cacheNode
+	weight    int
+	budget    int
+	evictions int // DC-002.75: cuantas entradas se desalojaron (para medir en la consola)
+	verbose   bool
+	mutex     sync.Mutex
 }
 
 // CreateCache creates an  instance of a Cache
@@ -47,6 +48,24 @@ func (c *Cache) GetWeight() int {
 // GetBudget gets the memory budget of a cache
 func (c *Cache) GetBudget() int {
 	return c.budget
+}
+
+// Evictions: cuantas entradas desalojo el cache desde que se creo (o desde el ultimo ResetEvictions).
+// DC-002.75: es el numero que se mide en la consola -- el mismo que el modo verbose escribe linea por
+// linea, pero sin inundar la consola serie.
+func (c *Cache) Evictions() int {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	return c.evictions
+}
+
+// ResetEvictions vuelve el contador de desalojos a cero (para medir "durante N cuadros").
+func (c *Cache) ResetEvictions() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.evictions = 0
 }
 
 // Insert inserts an object into the cache
@@ -80,6 +99,7 @@ func (c *Cache) Insert(key string, value interface{}, weight int) error {
 	for ; c.tail != nil && c.tail != c.head && c.weight > c.budget; c.tail = c.tail.prev {
 		c.weight -= c.tail.weight
 		c.tail.prev.next = nil
+		c.evictions++
 
 		if c.verbose {
 			log.Printf(

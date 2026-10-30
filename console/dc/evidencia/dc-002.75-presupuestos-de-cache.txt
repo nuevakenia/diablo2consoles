@@ -1,0 +1,237 @@
+DC-002.75 -- PRESUPUESTOS DE CACHE PARA LA CONSOLA: el LRU ya existia, los numeros eran de PC
+=============================================================================================
+Fecha: 2026-10-30
+Rama: DC-002 (checkout unico, sin worktrees)
+Tarjeta: t_982e19d4
+
+Que se hizo, en una linea
+-------------------------
+Los ocho presupuestos del AssetManager pasaron a depender de la plataforma (PC con los numeros de
+siempre, consola con los medidos), el peso de cada entrada de cache pasa a ser su TAMANO EN BYTES en la
+consola -- y solo en la consola --, y se midio en Flycast que el monton libre alcanza, que el LRU desaloja
+6 veces durante una zona y que el cuadro sale BIT A BIT identico al de DC-002.70 (100,00 % de pixeles, sin
+una sola diferencia de cuantizacion).
+
+
+1. Dos cosas que el codigo decia y no hacia (medidas, no supuestas)
+-------------------------------------------------------------------
+(a) EL PRESUPUESTO NO SE COMPARABA CONTRA BYTES. Las ocho entradas de cache se insertaban con
+    `defaultCacheEntryWeight` = 1, asi que un presupuesto de "1 GB" eran 1.073.741.824 ENTRADAS, no
+    bytes. El numero grande del codigo no significaba lo que decia -- y ademas explica por que nunca se
+    llego a desalojar nada en la PC: para desalojar hacian falta mil millones de assets.
+    Efecto en la consola: acotar el numero SIN cambiar la unidad no acota nada. Se arregla con la misma
+    palanca: en la consola el peso es el tamano en bytes (funcion `Pesar`), y en la PC sigue siendo 1.
+
+(b) EL .ds1 SE GUARDABA EN EL CACHE EQUIVOCADO. `LoadDS1` insertaba y buscaba en `am.dt1s` (el cache de
+    los tiles), y `am.ds1s` -- con su propio presupuesto -- quedaba MUERTO. En la PC no se notaba (nunca
+    desaloja), pero con presupuestos en bytes el .ds1 se comia el presupuesto de los .dt1. Se corrige:
+    ahora va a `am.ds1s`.
+
+
+2. Como quedo el codigo
+------------------------
+  d2core/d2asset/presupuestos.go   (NUEVO)
+      los ocho presupuestos, como `var`: arrancan en los de PC (identicos a los de antes) y
+      `AjustarPresupuestosDeConsola()` los pasa a los de consola y pone `pesoEnBytes = true`.
+      `NuevosCachesDeAssets()` crea los ocho caches: es el UNICO lugar donde se crean (lo usan el
+      AssetManager y el POC, asi los numeros de la medicion son por construccion los del motor).
+      `Pesar(bytes)` devuelve 1 en la PC (comportamiento de siempre) y los bytes en la consola.
+      `TamanoDT1/DS1/DCC/DC6/DeAnimacion`: el tamano real de lo que queda vivo en el cache.
+  d2core/d2asset/d2asset.go        usa NuevosCachesDeAssets()
+  d2core/d2asset/asset_manager.go  los 8 Insert pasan `Pesar(...)` con el tamano medido; LoadDS1 al cache
+                                   correcto. Fuentes, paletas y transformaciones NO se tocan (siguen con
+                                   peso 1: sus presupuestos ya son de consola, 128 y 64 entradas).
+  d2common/d2cache/cache.go        `Evictions()` y `ResetEvictions()`: el desalojo contado, que es lo que
+                                   pide la tarjeta. Es el mismo numero que el modo verbose escribe linea
+                                   por linea, pero sin inundar la consola serie.
+  d2core/d2asset/presupuestos_test.go (NUEVO)  y  d2common/d2cache/cache_test.go (`TestCacheCountsEvictions`)
+
+POR QUE VARIABLES Y NO UN ARCHIVO CON BUILD TAG: gccgo NO filtra por build tag (compila todos los .go del
+paquete: DC-002.2), asi que dos archivos por plataforma darian "redeclared" en el build de la consola. Se
+elige en tiempo de ejecucion, que ademas es lo unico medible.
+
+
+3. Los numeros elegidos (y de donde sale cada uno)
+--------------------------------------------------
+Medido con el host: `go run ./console/dc/medidas/presupuestos <d2data.mpq> <d2char.mpq>`
+
+  LA ZONA (acto 1, townN1)
+    townN1.ds1              57.652 B crudos    225.428 B en memoria (57x41 celdas)
+    treegroups.dt1         505.504 B           489.812 B vivos
+    stonewall.dt1          439.569 B           420.161 B
+    floor.dt1            1.008.003 B           921.903 B   <- el mas grande
+    warp.dt1               658.158 B           629.046 B
+    river.dt1              316.344 B           289.488 B
+    objects.dt1 (town)     661.515 B           622.083 B
+    fence.dt1              423.367 B           407.675 B
+    objects.dt1 (outdoors) 338.205 B           313.877 B
+    ----------------------------------------------------------------
+    LOS OCHO .dt1        4.350.665 B         4.094.045 B  (4,12 MB con el .ds1)
+
+  EL PERSONAJE (amazona AM/NU/HTH, un modo)
+    amnuhth.cof              1.132 B             1.388 B cacheado (8 capas, 8 frames, 16 direcciones)
+    HD  10.931 B crudos  ->   40.619 B vivos
+    LA  12.765 B         ->   59.997 B
+    LG  37.659 B         ->  196.179 B   <- la capa mas grande
+    RA  10.986 B         ->   49.010 B
+    S1   3.781 B         ->   11.941 B
+    S2   4.902 B         ->   16.398 B
+    TR  17.401 B         ->   68.457 B
+    (SH: sin grafico en el MPQ, el limite conocido de DC-002.38)
+    ----------------------------------------------------------------
+    TOTAL del personaje                         442.601 B
+
+  DOS CONSECUENCIAS QUE MANDAN LOS NUMEROS:
+    - los ocho .dt1 de UNA zona (4,09 MB) no entran en el monton (~6,15 MB) ni con la zona armada: el
+      cache de dt1s TIENE que desalojar. No es un defecto, es la unica forma de que el .dt1 grande entre.
+    - un modo del personaje son 442.601 B (no los 18 MB de los doce modos que estimo DC-002.74): el
+      cache de dccs con 512 KB se guarda un modo entero, o sea que el jugador que se dibuja no se queda
+      sin su capa.
+
+  LOS PRESUPUESTOS (bytes), con el techo de la tarjeta en 3 MB:
+
+    cache           PC (antes)        consola (ahora)   de donde sale
+    --------------- ----------------- ----------------- ------------------------------------------------
+    animaciones       134.217.728        1.048.576      2 modos de personaje (2 x 442.601 B) + margen
+    dccs            1.073.741.824          524.288      1 modo del personaje entero (442.601 B)
+    dt1s            1.073.741.824        1.048.576      el .dt1 mas grande (921.903 B)
+    ds1s            1.073.741.824          262.144      la zona del acto 1 (225.428 B)
+    cofs            1.073.741.824           65.536      1.388 B por COF: 47 caben (4 jugadores + NPC)
+    fuentes                   128              128      NO se tocan
+    paletas                    64               64      NO se tocan
+    transformaciones           64               64      NO se tocan
+    --------------- ----------------- -----------------
+    SUMA DE DATOS     134.217.728        2.949.120      = 2,81 MB  <=  3 MB (el techo de la tarjeta)
+
+  Nota de contabilidad honesta: el Animation de un DCC se APOYA en el DCC (no lo copia), asi que los
+  caches de animaciones y de dccs cuentan la misma RAM dos veces. Contar de mas es del lado seguro
+  (desaloja antes, nunca despues) y esta escrito en el codigo (`TamanoDeAnimacion`).
+
+
+4. La corrida en Flycast (el numero, no la impresion)
+-----------------------------------------------------
+  bash scripts/console/build-presupuestos-275.sh /tmp/dcbuild/presup275b
+      d2cache.gox      57.192 B     d2asset.gox  1.078.836 B     pvr.gox  319.164 B
+      48 paquetes del motor en el enlace, 111 objetos en orden.txt
+      prog.elf        9.959.264 B   1ST_READ.BIN  2.738.376 B   disc.iso  537.829.376 B
+      (.text 1.294.480 · rodata 1.412.508 · data+bss 242.360)
+      1ST_READ.BIN sha256 f6a527c1e1ed0132b72403b26341852814fc26fc40874e42bd0d7a0cd913fcc4
+
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=spectacle \
+    bash scripts/console/run-flycast.sh /tmp/dcbuild/presup275b/disc.gdi 130 /tmp/dcbuild/cap275
+
+  (La corrida se repitio TRES veces con los mismos numeros -- los tres BIN dieron el mismo sha256
+  f6a527c1... y las tres capturas el mismo PNG. La ultima corrida, ya con el codigo commiteado, se hizo
+  desde $HOME/.hermes/cache/scratch/dcb275: /tmp en este host es tmpfs y dos directorios de build se
+  vaciaron solos en el medio de la sesion (medido, no supuesto), asi que la evidencia se reproduce desde
+  el scratch. El log completo queda en console/dc/evidencia/dc-002.75-flycast.log.)
+
+  a) LOS PRESUPUESTOS VIGENTES, DICHOS POR LA CONSOLA
+      PRESUPUESTOS:   animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824
+                      ds1s= 1073741824 fuentes= 128 paletas= 64 transformaciones= 64
+      PRESUPUESTOS:   suma de los caches de datos= 134217728
+      PRESUPUESTOS:   animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144
+                      fuentes= 128 paletas= 64 transformaciones= 64
+      PRESUPUESTOS:   suma de los caches de datos= 2949120
+      PRESUPUESTOS: la suma de los caches de DATOS paso de 134217728 a 2949120 bytes
+
+  b) EL MONTON LIBRE (mallinfo().fordblks, el mismo instrumento de DC-002.51)
+      al arrancar ................................ 568 B
+      con el video andando ....................... 544 B
+      al insertar el .ds1 (225.428 B) ........... 1.896 B
+      con la zona compuesta (8 .dt1 pasados) .... 2.680 B
+      con la zona y el personaje cargados ....... 1.000 B
+      en el cuadro (y a los 60 cuadros) ......... 1.000 B
+    O sea: con los caches acotados el escenario ENTERO (zona + personaje + cuadro) deja 1.000 B libres,
+    contra los 488 B que dejaba el estado B de DC-002.70 sin caches. La diferencia no es del cache: es
+    que aca el .ds1 y los .dt1 se liberan en el orden del motor y el pico de cada .dt1 no coincide con el
+    de las capas del personaje.
+
+  c) LAS EVICCIONES (Cache.Evictions, contador nuevo)
+      durante la carga de la zona:  dt1s 6 desalojos / 8 faltas, ds1s 0, cofs 0, dccs 0, animaciones 0
+      durante 60 cuadros:           dt1s 0, ds1s 0, cofs 0, dccs 0, animaciones 0
+      peso final de cada cache:     dt1s 721.552 B (de 1.048.576) · ds1s 225.428 (de 262.144)
+                                    cofs 1.132 (de 65.536) · dccs 349.519 (de 524.288)
+                                    animaciones 349.519 (de 1.048.576)
+    El LRU trabaja donde tiene que trabajar: los ocho .dt1 (4,09 MB) entrando en un presupuesto de 1 MB
+    desalojan 6 veces. En los 60 cuadros siguientes no se desaloja nada porque el cuadro ya esta armado
+    y el POC no vuelve a pedir assets (como el estado B: no anima).
+
+  d) EL CUADRO NO CAMBIO -- ni un pixel
+      PRESUPUESTOS: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456
+      PRESUPUESTOS: PERSONAJE compuesto= 26 x 79 ... pixelesNoVacios= 896 crc32= 1857478036
+      PRESUPUESTOS: POS-INICIAL celda= 28 20 ancla= 256 256 ... pantalla= 302 175
+      PRESUPUESTOS: CUADRO pixelesNoVacios= 178248 de 307200 crc32= 1321968744
+      (los tres crc32 son EXACTAMENTE los de DC-002.70: LIENZO 3507647456, PERSONAJE 1857478036,
+       CUADRO 1321968744)
+
+      Y fuera del emulador, pixel a pixel contra la evidencia de DC-002.70:
+
+        python3 scripts/console/comparar-presupuestos-275.py <captura> \
+            console/dc/evidencia/dc-002.73a-estado-b-cuadro.png
+
+        captura    f90s.png (3584x1080) -> pantalla en (210, 238)
+        referencia dc-002.73a-estado-b-cuadro.png (640x474)
+
+        cuadro completo (x 0..639)    303.360 px    IDENTICOS 303.360 (100,00 %)   CONTENIDO 0
+        area del mapa (x 64..575)     242.688 px    IDENTICOS 242.688 (100,00 %)   CONTENIDO 0
+        bandas laterales               60.672 px    IDENTICOS  60.672 (100,00 %)   CONTENIDO 0
+
+        0 pixeles de cuantizacion: las dos capturas son del MISMO emulador con el MISMO contenido, asi que
+        ni el RGB565 ni el dithering se mueven. El criterio de la tarjeta era >= 99,8 % en el mapa.
+
+      Y mas fuerte todavia: los pixeles crudos del recorte nuevo son BYTE A BYTE los de la evidencia --
+        sha256 de los pixeles rgb24 (640x474) de dc-002.75-presupuestos-cuadro.png = 3e04055a94cacd20...
+        el MISMO 3e04055a... que la evidencia de DC-002.70 reporta para la captura del estado B.
+
+  e) SIN EXCEPCIONES: 0 lineas con "SH4 exception" / "Fatal" en el log de la corrida (las 143 lineas del
+     log estan en console/dc/evidencia/dc-002.75-flycast.log).
+
+
+5. El host: compila y sus pruebas pasan
+---------------------------------------
+  go build ./d2core/... ./d2common/... ./d2game/... ./d2app/... ./d2networking/... ./d2script/... ./d2thread/...
+      -> rc=0, sin salida
+  go test ./d2common/d2cache/     -> ok   (incluye el nuevo TestCacheCountsEvictions)
+  go test ./d2core/d2asset/       -> ok   (incluye TestPresupuestosDePCNoCambian y
+                                           TestPresupuestosDeConsolaQuedanAcotados)
+  OJO CON EL ENTORNO: ese paquete importa d2util -> ebiten, y sin display el init de GLFW paniquea
+  ("NotInitialized: The GLFW library is not initialized"). Es de ANTES de esta tarjeta (se verifico con
+  `git stash`: el mismo panic). Aca se corrio con
+      DISPLAY=:0 XAUTHORITY=/run/user/1000/xauth_BCMhqx go test ./d2core/d2asset/ ./d2common/d2cache/
+  y las dos suites dan ok.
+
+  `consola/dc/engine/ebiten/v2` sigue siendo el unico paquete rojo de `go build ./...` (importa `kos`),
+  el MISMO de antes (ya documentado en dc-002.69-pvr-surface.txt:115). No lo toca esta tarjeta.
+
+
+6. Reproducirlo
+----------------
+  cd /home/dgalli/Proyectos/diablo2consoles
+  S=$HOME/.hermes/cache/scratch/dcb275          # NO /tmp: en este host es tmpfs y se vacia solo
+  # el arbol de .gox del motor (145 paquetes) se copia para no escribir en el compartido: el script
+  # recompila ahi d2cache, d2asset y pvr
+  cp -a /tmp/gox-std $S/base
+  BASE_GOX=$S/base bash scripts/console/build-presupuestos-275.sh $S/out
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 CAPTURE=spectacle \
+    bash scripts/console/run-flycast.sh $S/out/disc.gdi 130 $S/cap
+  python3 scripts/console/comparar-presupuestos-275.py $S/cap/f90s.png \
+    console/dc/evidencia/dc-002.73a-estado-b-cuadro.png
+  # la medicion de tamanos, en el host:
+  go run ./console/dc/medidas/presupuestos "$HOME/.wine-d2/drive_c/Games/Diablo II/d2data.mpq" \
+     "$HOME/.wine-d2/drive_c/Games/Diablo II/d2char.mpq"
+
+  OJO (medido en esta tarjeta): sin WAYLAND_DISPLAY/XDG_RUNTIME_DIR puestos, `spectacle` aborta
+  ("Abortado (core generado)") en esta sesion y no deja capturas, aunque el POC corra perfecto. El
+  emulador abre igual; lo que falla es la captura. Con las dos variables anda.
+
+
+7. Lo que queda abierto (y lo que NO entra aca)
+------------------------------------------------
+- El cooperativo de 4 jugadores es DC-002.76. Lo que esta tarjeta deja medido para esa: un jugador
+  cuesta 442.601 B de animaciones en el peor caso por modo, y los caches le dejan 2,81 MB a los datos.
+- El .ds1 del acto 1 entra entero (225.428 B en 262.144). Una zona mas grande lo va a desalojar y
+  recargar: no se midio, no hay una zona grande a mano en el POC.
+- El cache de fuentes/paletas/transformaciones sigue en ENTRADAS (128/64): se decidio no tocarlo.
+- Cuando la Fase D monte el motor en la consola, `AjustarPresupuestosDeConsola()` tiene que ir en su
+  main, ANTES de `d2asset.NewAssetManager`. Hoy el unico llamador es el POC de esta tarjeta.

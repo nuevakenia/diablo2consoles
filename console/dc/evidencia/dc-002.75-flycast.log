@@ -1,0 +1,143 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:029 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:272 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:372 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:372 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:375 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:379 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:392 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f6b723f0000 RAM(16 MB) 0x7f6b7e3f0000 VRAM64(8 MB) 0x7f6b763f0000 ARAM(2 MB) 0x7f6b923f0000
+00:00:399 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:406 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f6b723f0000 RAM(16 MB) 0x7f6b7e3f0000 VRAM64(8 MB) 0x7f6b763f0000 ARAM(2 MB) 0x7f6b923f0000
+00:00:410 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:413 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:413 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:456 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:456 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:456 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2e2440
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351920224
+ARQ-MARCA   gc_init-semiespacio1 v=2354017408
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1600 cused=4353280 gsemi=94976/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+PRESUPUESTOS: arranca DC-002.75 -- los caches del motor con presupuestos de consola
+PRESUPUESTOS: monton libre al arrancar (bytes): 568
+PRESUPUESTOS: budgets DE PC (los de siempre):
+PRESUPUESTOS:   animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824 fuentes= 128 paletas= 64 transformaciones= 64
+PRESUPUESTOS:   suma de los caches de datos= 134217728
+PRESUPUESTOS: budgets DE CONSOLA (acotados):
+PRESUPUESTOS:   animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 fuentes= 128 paletas= 64 transformaciones= 64
+PRESUPUESTOS:   suma de los caches de datos= 2949120
+PRESUPUESTOS: la suma de los caches de DATOS paso de 134217728 a 2949120 bytes
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+PRESUPUESTOS: video andando, monton libre (bytes): 544 vram de la textura del cuadro: 1048576
+fs_iso9660: disc change detected
+PRESUPUESTOS: DS1-INSERT peso= 225428 bytes (crudo 57652 )
+PRESUPUESTOS: DS1 version= 18 act= 1 w= 57 h= 41 files= 8 ficultades= falta evicto= 0 pesoEnCache= 225428 presupuesto= 262144 montonLibre= 1896
+PRESUPUESTOS: VENTANA lado= 512 origen= 304 1664 pisos= 1982 paredes= 330
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572968
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=413352
+PRESUPUESTOS: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 tiles= 21 evicto= 0 pesoEnCache= 489812 presupuesto= 1048576 montonLibre= 2048
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575672
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=438544
+PRESUPUESTOS: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 tiles= 52 evicto= 0 pesoEnCache= 909973 presupuesto= 1048576 montonLibre= 1856
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573008
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=473936
+PRESUPUESTOS: DT1 data/global/tiles/act1\town\floor.dt1 tiles= 144 evicto= 2 pesoEnCache= 921903 presupuesto= 1048576 montonLibre= 2400
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574024
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=598824
+PRESUPUESTOS: DT1 data/global/tiles/act1\barracks\warp.dt1 tiles= 81 evicto= 3 pesoEnCache= 629046 presupuesto= 1048576 montonLibre= 3688
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573184
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=465584
+PRESUPUESTOS: DT1 data/global/tiles/act1\outdoors\river.dt1 tiles= 45 evicto= 3 pesoEnCache= 918534 presupuesto= 1048576 montonLibre= 2192
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576968
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=510744
+PRESUPUESTOS: DT1 data/global/tiles/act1\town\objects.dt1 tiles= 91 evicto= 4 pesoEnCache= 911571 presupuesto= 1048576 montonLibre= 3808
+PRESUPUESTOS: DT1 data/global/tiles/act1\town\fence.dt1 tiles= 31 evicto= 5 pesoEnCache= 1029758 presupuesto= 1048576 montonLibre= 352
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575456
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=508200
+PRESUPUESTOS: DT1 data/global/tiles/act1\outdoors\objects.dt1 tiles= 42 evicto= 6 pesoEnCache= 721552 presupuesto= 1048576 montonLibre= 2680
+PRESUPUESTOS: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+PRESUPUESTOS: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456
+PRESUPUESTOS: DT1S al terminar la zona: aciertos= 0 faltas= 8 evicto= 6 pesoEnCache= 721552
+PRESUPUESTOS: PALETA acto colores=256 crc32= 3508331570 monton libre (bytes): 2680
+PRESUPUESTOS: COF capas= 8 framesPorDir= 8 dirs= 16 evicto= 0 pesoEnCache= 1132 presupuesto= 65536
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=545832
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=625808
+ARQ-MARCA gc-por-umbral-bytes-usados v=1589744
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=877728
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=842016
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=911088
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=942904
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=979328
+PRESUPUESTOS: CAPA SH SIN-GRAFICO ruta= data/global/chars/AM/SH/AMSHLITNU1ht.dc6 err= file not found
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=979400
+ARQ-MARCA gc_collect v=16
+ARQ-MARCA gc-vivo v=1067696
+PRESUPUESTOS: PERSONAJE compuesto= 26 x 79 esquina= -18 -65 capasDibujadas= 7 sinGrafico= 0 pixelesNoVacios= 896 crc32= 1857478036
+PRESUPUESTOS: DCCS aciertos= 0 faltas= 7 evicto= 0 pesoEnCache= 349519 presupuesto= 524288
+PRESUPUESTOS: ANIMACIONES evicto= 0 pesoEnCache= 349519 presupuesto= 1048576
+PRESUPUESTOS: POS-INICIAL celda= 28 20 ancla= 256 256 esquinaDelCompuesto= -18 -65 pantalla= 302 175
+PRESUPUESTOS: monton libre con la zona y el personaje cargados (bytes): 1000
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+PRESUPUESTOS: CUADRO pixelesNoVacios= 178248 de 307200 crc32= 1321968744 tamano= 640 480 lienzoEnVram= 1228800 montonLibre= 1000
+PRESUPUESTOS: DURANTE 60 CUADROS: dt1s evicto= 0 peso= 721552 / ds1s evicto= 0 peso= 225428 / cofs evicto= 0 peso= 1132 / dccs evicto= 0 peso= 349519 / animaciones evicto= 0 peso= 349519
+PRESUPUESTOS: DURANTE 60 CUADROS: montonLibre= 1000

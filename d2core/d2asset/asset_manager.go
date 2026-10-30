@@ -36,16 +36,9 @@ const (
 	defaultCacheEntryWeight = 1
 )
 
-const (
-	animationBudget        = 1024 * 1024 * 128
-	fontBudget             = 128
-	paletteBudget          = 64
-	paletteTransformBudget = 64
-	dt1Budget              = 4096 * 2048 * 128
-	ds1Budget              = 4096 * 2048 * 128
-	cofBudget              = 4096 * 2048 * 128
-	dccBudget              = 4096 * 2048 * 128
-)
+// DC-002.75: los presupuestos de los ocho caches ya NO viven aca. Estan en presupuestos.go, porque
+// ahora dependen de la plataforma (PC con los numeros de siempre, consola con los medidos) y porque el
+// peso de cada entrada paso a poder medirse en bytes.
 
 const (
 	defaultLanguage    = "ENG"
@@ -268,7 +261,8 @@ func (am *AssetManager) loadAnimation(animationPath, palettePath string,
 		return nil, fmt.Errorf("unknown Animation format for file: %s", animationPath)
 	}
 
-	err = am.animations.Insert(cachePath, animation, defaultCacheEntryWeight)
+	// DC-002.75: el peso es el tamano de la animacion en bytes (en la PC `Pesar` devuelve 1, como antes)
+	err = am.animations.Insert(cachePath, animation, Pesar(TamanoDeAnimacion(animation)))
 	if ensureOnly {
 		animation = nil
 	}
@@ -610,7 +604,7 @@ func (am *AssetManager) LoadDT1(dt1Path string) (*d2dt1.DT1, error) {
 		return nil, err
 	}
 
-	if err := am.dt1s.Insert(dt1Path, dt1, defaultCacheEntryWeight); err != nil {
+	if err := am.dt1s.Insert(dt1Path, dt1, Pesar(TamanoDT1(dt1))); err != nil {
 		return nil, err
 	}
 
@@ -618,8 +612,12 @@ func (am *AssetManager) LoadDT1(dt1Path string) (*d2dt1.DT1, error) {
 }
 
 // LoadDS1 loads and returns the given path as a DS1
+//
+// DC-002.75: el DS1 se guardaba en el cache de los DT1s (`am.dt1s`), no en el suyo (`am.ds1s`), que
+// quedaba muerto. En la PC no se notaba (1 GB de entradas: nunca desaloja) pero acotando los
+// presupuestos en bytes el .ds1 le comeria el presupuesto a los tiles. Se corrige aca.
 func (am *AssetManager) LoadDS1(ds1Path string) (*d2ds1.DS1, error) {
-	if ds1Value, found := am.dt1s.Retrieve(ds1Path); found {
+	if ds1Value, found := am.ds1s.Retrieve(ds1Path); found {
 		return ds1Value.(*d2ds1.DS1), nil
 	}
 
@@ -633,7 +631,7 @@ func (am *AssetManager) LoadDS1(ds1Path string) (*d2ds1.DS1, error) {
 		return nil, fmt.Errorf("loading ds1 file %s: %v", "/data/global/tiles"+ds1Path, err)
 	}
 
-	if err := am.dt1s.Insert(ds1Path, ds1, defaultCacheEntryWeight); err != nil {
+	if err := am.ds1s.Insert(ds1Path, ds1, Pesar(TamanoDS1(ds1))); err != nil {
 		return nil, err
 	}
 
@@ -662,7 +660,7 @@ func (am *AssetManager) LoadCOF(cofPath string) (*d2cof.COF, error) {
 		return nil, err
 	}
 
-	if err := am.cofs.Insert(cofPath, cof, defaultCacheEntryWeight); err != nil {
+	if err := am.cofs.Insert(cofPath, cof, Pesar(len(fileData))); err != nil {
 		return nil, err
 	}
 
@@ -691,7 +689,7 @@ func (am *AssetManager) LoadDCC(dccPath string) (*d2dcc.DCC, error) {
 		return nil, err
 	}
 
-	if err := am.dccs.Insert(dccPath, dcc, defaultCacheEntryWeight); err != nil {
+	if err := am.dccs.Insert(dccPath, dcc, Pesar(TamanoDCC(dcc))); err != nil {
 		return nil, err
 	}
 

@@ -1,7 +1,6 @@
 package d2asset
 
 import (
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2cache"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2tbl"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
@@ -24,18 +23,22 @@ func NewAssetManager(logLevel d2util.LogLevel) (*AssetManager, error) {
 	logger.SetPrefix(logPrefix)
 	logger.SetLevel(logLevel)
 
+	// DC-002.75: los ocho caches se crean en UN solo lugar (presupuestos.go), con los presupuestos
+	// vigentes: los de PC, o los de consola si el arranque llamo a AjustarPresupuestosDeConsola.
+	caches := NuevosCachesDeAssets()
+
 	manager := &AssetManager{
 		Logger:     logger,
 		Loader:     loader,
 		tables:     make([]d2tbl.TextDictionary, 0),
-		animations: d2cache.CreateCache(animationBudget),
-		fonts:      d2cache.CreateCache(fontBudget),
-		palettes:   d2cache.CreateCache(paletteBudget),
-		transforms: d2cache.CreateCache(paletteTransformBudget),
-		dt1s:       d2cache.CreateCache(dt1Budget),
-		ds1s:       d2cache.CreateCache(ds1Budget),
-		cofs:       d2cache.CreateCache(cofBudget),
-		dccs:       d2cache.CreateCache(dccBudget),
+		animations: caches.Animations,
+		fonts:      caches.Fonts,
+		palettes:   caches.Palettes,
+		transforms: caches.Transforms,
+		dt1s:       caches.Dt1s,
+		ds1s:       caches.Ds1s,
+		cofs:       caches.Cofs,
+		dccs:       caches.Dccs,
 		Records:    records,
 	}
 

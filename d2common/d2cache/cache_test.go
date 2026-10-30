@@ -91,3 +91,61 @@ func TestClear(t *testing.T) {
 		t.Fatal("Still able to retrieve nodes after cache was cleared")
 	}
 }
+
+// DC-002.75: el contador de desalojos es lo que se mide en la consola ("cuantas veces evicta cada
+// cache"). Cuenta cada entrada desalojada, no cada Insert, y un acierto no lo mueve.
+func TestCacheCountsEvictions(t *testing.T) {
+	cache := CreateCache(3)
+
+	concreto := cache.(*Cache)
+
+	if concreto.Evictions() != 0 {
+		t.Fatalf("un cache recien creado ya cuenta %d desalojos", concreto.Evictions())
+	}
+
+	// tres entradas de peso 1 en un presupuesto de 3: no se desaloja nada
+	for _, k := range []string{"A", "B", "C"} {
+		_ = cache.Insert(k, "", 1)
+	}
+
+	if concreto.Evictions() != 0 {
+		t.Fatalf("desalojo %d entradas sin pasarse del presupuesto", concreto.Evictions())
+	}
+
+	// un acierto no desaloja
+	cache.Retrieve("A")
+
+	if concreto.Evictions() != 0 {
+		t.Fatalf("un Retrieve conto como desalojo (%d)", concreto.Evictions())
+	}
+
+	// la cuarta entrada de peso 1 desaloja exactamente una (la menos usada, que despues de promover A
+	// es B) y la que mas pesa desaloja a las que hagan falta
+	_ = cache.Insert("D", "", 1)
+
+	if concreto.Evictions() != 1 {
+		t.Fatalf("esperaba 1 desalojo, conto %d", concreto.Evictions())
+	}
+
+	if _, found := cache.Retrieve("B"); found {
+		t.Fatal("se desalojo la entrada equivocada: B (la menos usada) sigue en el cache")
+	}
+
+	if _, found := cache.Retrieve("A"); !found {
+		t.Fatal("se desalojo A, que era la mas recientemente usada")
+	}
+
+	// una entrada que sola pesa mas que todo el presupuesto deja el cache con una sola cosa
+	_ = cache.Insert("pesada", "", 10)
+
+	if concreto.Evictions() != 4 {
+		t.Fatalf("esperaba 4 desalojos en total, conto %d", concreto.Evictions())
+	}
+
+	// y ResetEvictions sirve para medir "durante N cuadros"
+	concreto.ResetEvictions()
+
+	if concreto.Evictions() != 0 {
+		t.Fatalf("ResetEvictions no volvio el contador a cero (%d)", concreto.Evictions())
+	}
+}
