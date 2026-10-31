@@ -89,6 +89,12 @@ type Fuente struct {
 	mpq  *d2mpq.MPQ
 	ruta string
 
+	// cedido: el MPQ NO es de la fuente (lo abrio el que llama y lo cierra el). DC-002.100: los POC que ya
+	// tienen el MPQ abierto para el camino que NO es de assets (el `personaje-mapa` lo abre con
+	// `d2mpq.FromFile` para el mapa y los DT1) no pueden abrirlo dos veces -- el indice del d2data son varios
+	// MB. Asi la misma fuente presta los .dcc/.cof por `Pedir`/`Liberar` sin duplicar el MPQ.
+	cedido bool
+
 	// liberador: con que se devuelve un tramo grande al monton. nil = no se libera a mano (la PC).
 	liberador Liberador
 
@@ -131,6 +137,14 @@ func Abrir(ruta string) (*Fuente, error) {
 	return &Fuente{mpq: m, ruta: ruta}, nil
 }
 
+// Envolver arma la Source de consola sobre un MPQ que YA ABRIO el que llama (DC-002.100): la fuente presta
+// archivos por `Pedir` y libera tramos, pero el MPQ sigue siendo del que llamo -- `Cerrar` no lo cierra. Es lo
+// que usan los POC que ya tienen el MPQ abierto para su propio camino (el `personaje-mapa` lee el .ds1 y los
+// DT1 con `mpq.ReadFile`): abrirlo otra vez costaria el indice entero (varios MB en la consola).
+func Envolver(m *d2mpq.MPQ, ruta string) *Fuente {
+	return &Fuente{mpq: m, ruta: ruta, cedido: true}
+}
+
 // UsarLiberador dice con que se devuelve al monton un tramo grande. En la consola se pasa el `free` del
 // shim (ver la cabecera); sin el, `Liberar` solo suelta la referencia y el tramo queda tomado hasta que
 // termine el programa -- que es justo el defecto que esta tarjeta viene a cerrar.
@@ -140,6 +154,13 @@ func (f *Fuente) UsarLiberador(l Liberador) { f.liberador = l }
 // `Pedir` (por eso el dueno es explicito).
 func (f *Fuente) Cerrar() error {
 	if f.mpq == nil {
+		return nil
+	}
+
+	// el MPQ cedido (Envolver) lo cierra el que lo abrio: aca solo se suelta la referencia
+	if f.cedido {
+		f.mpq = nil
+
 		return nil
 	}
 

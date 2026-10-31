@@ -38,6 +38,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/OpenDiablo2/OpenDiablo2/console/dc/fuenteconsola"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2cof"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dc6"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc"
@@ -61,6 +62,21 @@ func d2cHeapLibre() uint
 
 //extern d2c_free_external
 func d2cFreeExternal(p uintptr)
+
+//extern d2c_monton_usado
+func d2cMontonUsado() uint
+
+//extern d2c_monton_arena
+func d2cMontonArena() uint
+
+//extern d2c_gc_n
+func d2cGcN() uint
+
+//extern d2c_gc_usado
+func d2cGcUsado() uint
+
+//extern d2c_gc_total
+func d2cGcTotal() uint
 
 const (
 	// El disco: los DOS MPQ del juego que hacen falta, por ISO9660. El mapa y las paletas estan en
@@ -168,6 +184,19 @@ var animar = false
 // cicloSordo: EL MUTANTE del criterio 3 de DC-002.49. El cuadro se queda en 0: el personaje QUIETO se dibuja
 // siempre igual, asi que dos capturas separadas en el tiempo tienen que dar 0 pixeles de diferencia.
 var cicloSordo = false
+
+// censoCiclo: INSTRUMENTO de DC-002.100. Compone el ciclo COMPLETO del jugador (COF NU, dir 0, todos sus
+// cuadros) por el camino del mapa (`cargarCicloCon`, o sea LoadDirection + arena + Pedir/Liberar) y deja el
+// crc32 de cada cuadro en la consola serie, para leerlo contra la tabla del host. Arranca APAGADO a proposito:
+// con esto apagado el binario es el de siempre (el personaje tieso en el mapa). El script
+// `scripts/console/build-dcc-2100.sh` lo enciende con un sed y recompila, igual que `animar`/`bestia`.
+var censoCiclo = false
+
+// sinArena: LA BASELINE de DC-002.100, con la misma corrida y el mismo codigo. Con esto encendido el gancho
+// `d2dcc.PedirDeArena` NO se instala: el decodificador pide sus buffers con `make`, o sea al semiespacio del
+// recolector (el camino viejo). Todo lo demas -- LoadDirection, `Pedir`/`Liberar` de la Source, el censo -- es
+// identico, asi que la diferencia entre las dos corridas es LA ARENA y nada mas.
+var sinArena = false
 
 // bestia: ENCIENDE el monstruo y el golpe (DC-002.50). Arranca APAGADO a proposito: con esto apagado el
 // binario es el de DC-002.49 (el personaje animado y nada mas), que es lo que compara su corpus. El script
@@ -905,6 +934,12 @@ func main() {
 	// (despues del bicho), porque en la consola la RAM es una sola y el indice del d2data tiene que volver
 	// antes de componer los ciclos del personaje. Cerrarlo dos veces seria un error del disco.
 
+	// DC-002.100: la MISMA Source de consola sobre el MPQ que ya esta abierto (Envolver no lo duplica ni lo
+	// cierra: el d2data lo cierra este main en `cargarBestia`). De aca salen los .cof/.dcc de las capas del
+	// heroe y del bicho, con dueno explicito.
+	fuenteDatos := fuenteconsola.Envolver(mpq, rutaMPQ)
+	fuenteDatos.UsarLiberador(func(p uintptr) { d2cFreeExternal(p) })
+
 	println("HITO238: MPQ-ABRIR OK", rutaMPQ, "ms=", int64(d2cMs())-t0)
 
 	t1 := int64(d2cMs())
@@ -1057,6 +1092,8 @@ func main() {
 	// ============================== 3. el personaje ==============================
 	tCoF := int64(d2cMs())
 
+	marcaCiclo("personaje-antes")
+
 	mc, err := d2mpq.FromFile(rutaMPQChars)
 	if err != nil {
 		println("HITO238: MPQ-CHARS-ABRIR FALLO:", err.Error())
@@ -1065,26 +1102,48 @@ func main() {
 
 	// lo mismo que el d2data: se cierra EXPLICITAMENTE cuando los tres ciclos del heroe ya estan compuestos.
 
+	// DC-002.100: los .cof/.dcc/.dc6 de esta punta se leen por la Source de consola (DC-002.96), con el dueno
+	// EXPLICITO: `Pedir` presta el archivo entero y `Tramo.Liberar` lo devuelve (si paso los 64 KB, es un `free`
+	// de verdad sobre el monton de C). La fuente ENVUELVE el MPQ que ya abrimos (`Envolver`) porque el
+	// d2char.mpq lo cierra este main cuando el personaje ya no lo necesita: abrirlo dos veces costaria su indice.
+	fuenteChar := fuenteconsola.Envolver(mc, rutaMPQChars)
+	fuenteChar.UsarLiberador(func(p uintptr) { d2cFreeExternal(p) })
+
+	// lo mismo que el d2data: se cierra EXPLICITAMENTE cuando los tres ciclos del heroe ya estan compuestos.
+
 	println("HITO238: MPQ-CHARS-ABRIR OK", rutaMPQChars, "ms=", int64(d2cMs())-tCoF)
 
-	rawCof, err := mc.ReadFile(cofEnMPQ)
+	tramoCof, err := fuenteChar.Pedir(cofEnMPQ)
 	if err != nil {
 		println("HITO238: COF-LEER FALLO:", err.Error())
 		return
 	}
 
-	cof, err := d2cof.Unmarshal(rawCof)
+	bytesCof, crcCof := len(tramoCof.Datos), crc32.ChecksumIEEE(tramoCof.Datos)
+
+	cof, err := d2cof.Unmarshal(tramoCof.Datos)
+	tramoCof.Liberar()
+
 	if err != nil {
 		println("HITO238: COF-PARSE FALLO:", err.Error())
 		return
 	}
 
-	println("HITO238: COF", cofEnMPQ, "bytes=", len(rawCof), "crc32=", crc32.ChecksumIEEE(rawCof),
+	println("HITO238: COF", cofEnMPQ, "bytes=", bytesCof, "crc32=", crcCof,
 		"capas=", cof.NumberOfLayers, "framesPorDir=", cof.FramesPerDirection,
 		"dirs=", cof.NumberOfDirections, "speed=", cof.Speed)
 
 	per := NuevoPersonaje(cof, dirPersonaje, framePersonaje)
 	println("HITO238: ORDEN capas=", len(per.Claves), "orden=", len(per.Orden))
+
+	// LA ARENA DEL DECODIFICADOR (DC-002.100): `d2dcc.PedirDeArena` apunta a la arena del POC, asi que los
+	// pixeles de los cuadros y las celdas de la direccion salen del MONTON DE C en vez del semiespacio del
+	// recolector (2 MB, DC-002.98). La arena es la duena y la suelta el que la pidio; mientras este puesta, los
+	// `PixelData` de los cuadros APUNTAN ADENTRO (no se copian).
+	arenaPJ := &arenaDCC{}
+	conArena(arenaPJ)
+
+	println("HITO2100: ARENA DE LA CAPA sinArena=", sinArena)
 
 	for i := range cof.CofLayers {
 		tCapa := int64(d2cMs())
@@ -1094,47 +1153,60 @@ func main() {
 		for _, ext := range []string{"dcc", "dc6"} {
 			nombre := per.RutaDeLaCapa(i, ext)
 
-			crudo, err := LeerDelMPQ(mc, nombre)
+			tramo, err := fuenteChar.Pedir(nombre)
 			if err != nil {
 				ultimaRuta, ultimoErr = nombre, err.Error()
 
 				continue
 			}
 
+			bytesCapa, crcCapa := len(tramo.Datos), crc32.ChecksumIEEE(tramo.Datos)
+
 			if ext == "dcc" {
-				dd, err := d2dcc.Load(crudo)
+				// UNA DIRECCION, no las 16 del COF (DC-002.100): se dibuja esta y las otras 15 eran 15/16 del
+				// trabajo y de la basura que le quedaba al recolector (en DC-002.58/59 esa basura era lo que
+				// ponia al semiespacio al borde).
+				dd, err := d2dcc.LoadDirection(tramo.Datos, dirPersonaje)
+				tramo.Liberar()
+
 				if err != nil {
 					println("HITO238: CAPA", per.Claves[i], "PARSE-FALLO:", err.Error())
+
 					break
 				}
 
 				caja := dd.Directions[dirPersonaje].Box
 				pix := dd.Directions[dirPersonaje].Frames[framePersonaje].PixelData
 
-				println("HITO238: CAPA", per.Claves[i], "bytes=", len(crudo), "crc32=", crc32.ChecksumIEEE(crudo),
+				println("HITO238: CAPA", per.Claves[i], "bytes=", bytesCapa, "crc32=", crcCapa,
 					"caja=", caja.Left, caja.Top, caja.Width, caja.Height, "pixeles=", noCero(pix),
 					"ms=", int64(d2cMs())-tCapa)
 
 				per.Agregar(per.Tipos[i], per.Claves[i], caja.Left, caja.Top, caja.Width, caja.Height, pix)
 				encontrada = true
 
-				// el DCC entero (16 direcciones x 8 frames) se suelta: se queda SOLO el frame que se dibuja
+				// el DCC se queda con una referencia al archivo crudo (`fileData`): se suelta despues de sacar
+				// la caja y los pixeles, que ya estan decodificados (los pixeles, en la arena)
 				dd = nil
-				crudo = nil
 
 				break
 			}
 
-			dc, err := d2dc6.Load(crudo)
+			dc, err := d2dc6.Load(tramo.Datos)
 			if err != nil {
+				tramo.Liberar()
 				println("HITO238: CAPA", per.Claves[i], "PARSE-FALLO:", err.Error())
+
 				break
 			}
 
 			fr := dc.Frames[framePersonaje]
 			pix := dc.DecodeFrame(framePersonaje)
 
-			println("HITO238: CAPA", per.Claves[i], "bytes=", len(crudo), "crc32=", crc32.ChecksumIEEE(crudo),
+			// los pixeles ya estan decodificados (DecodeFrame pide su propio buffer): el archivo se devuelve
+			tramo.Liberar()
+
+			println("HITO238: CAPA", per.Claves[i], "bytes=", bytesCapa, "crc32=", crcCapa,
 				"caja=", fr.OffsetX, fr.OffsetY, fr.Width, fr.Height, "pixeles=", noCero(pix),
 				"ms=", int64(d2cMs())-tCapa)
 
@@ -1143,7 +1215,6 @@ func main() {
 			encontrada = true
 
 			dc = nil
-			crudo = nil
 
 			break
 		}
@@ -1153,13 +1224,31 @@ func main() {
 		}
 
 		runtime.GC()
+
+		// DC-002.100: capa por capa, lo que quedo tomado DESPUES de recoger. En la baseline los pixeles del
+		// .dcc siguen en el semiespacio del recolector (el `dd` se suelta pero el GC no siempre lo recoge) y el
+		// C heap no se toca; con la arena el numero que importa es que el C heap VUELVA al liberar.
+		marcaCiclo("capa-" + per.Claves[i])
 	}
 
 	per.Componer()
 
+	// LA ARENA SE SUELTA ACA Y NO ANTES: los `PixelData` de las capas estaban ADENTRO y `Componer` es el que los
+	// pega en el lienzo del personaje. Liberar antes de componer seria leer memoria ajena (y el shim la devuelve
+	// al monton en el acto, sin esperar al recolector).
+	arenaPJ.liberar()
+	d2dcc.PedirDeArena = nil
+
+	println("HITO238: ARENA personaje capas=", len(per.Capas), "pedidos=", arenaPJ.pedidos,
+		"entregado=", arenaPJ.entregado, "tramos=", arenaPJ.liberados, "capacidad=", arenaPJ.capacidad())
+
+	runtime.GC()
+
 	println("HITO238: PERSONAJE compuesto=", per.Ancho, "x", per.Alto, "esquina=", per.Izq, per.Arriba,
 		"capasDibujadas=", per.CapasDibujadas, "sinGrafico=", per.CapasSinGrafico,
 		"pixelesNoVacios=", per.PixelesNoVacios, "crc32=", per.CRC32())
+
+	marcaCiclo("personaje-despues")
 
 	// la paleta de las UNIDADES (la de los personajes) y el compuesto a una imagen con alfa
 	pbu, err := LeerDelMPQ(mpq, palUnidadesMPQ)
@@ -1249,7 +1338,7 @@ func main() {
 		}
 
 		for _, m := range modosDelHeroe {
-			cofModo, nombreCOF, bytesCOF, ok := cofDelModo(mc, m.modo)
+			cofModo, nombreCOF, bytesCOF, ok := cofDelModo(fuenteChar, m.modo)
 			if !ok {
 				println("HITO249: SIN COF PARA EL MODO", m.modo)
 				continue
@@ -1277,7 +1366,7 @@ func main() {
 				"dirsCOF", dirsCOFDelPersonaje)
 
 			for _, dirPedida := range pedidas {
-				ciclos = append(ciclos, cargarCiclo(mc, cofModo, dirPedida, m.modo, m.ms, palUni))
+				ciclos = append(ciclos, cargarCiclo(fuenteChar, cofModo, dirPedida, m.modo, m.ms, palUni))
 
 				println("HITO249B: DIR modo", m.modo, "dir", dirPedida)
 
@@ -1367,6 +1456,41 @@ func main() {
 		j.cargarItems(mpq)
 	}
 
+	// ============================== 3c-bis. EL CICLO DEL JUGADOR, CENSADO (DC-002.100) ==============
+	//
+	// CON `censoCiclo` el POC compone el ciclo COMPLETO del jugador -- el COF NU, la direccion 0 y TODOS sus
+	// cuadros -- por el MISMO camino que usa el mapa para los ciclos (`cargarCicloCon`: LoadDirection + arena del
+	// monton de C + Pedir/Liberar de la Source), y deja el crc32 de cada cuadro compuesto en la consola serie.
+	// Eso es lo que se lee contra la tabla del host: `go run ./console/dc/verif-personaje-238 -censo-dirs NU
+	// -crc-dirs` (lineas CRC249B, la columna crc32 por direccion y cuadro).
+	//
+	// VA CON EL VIDEO YA ANDANDO: componer un ciclo entero ANTES de `IniciarPantalla` es lo que deja al PVR sin
+	// sus ~70 KB de monton de C (medido en DC-002.50), y esta tarjeta mide decodificacion, no el arranque del
+	// video. El camino que se mide es exactamente el mismo (la arena se libera al final del ciclo).
+	if censoCiclo {
+		marcaCiclo("censo-nu-antes")
+
+		if cofCenso, nombreCenso, bytesCenso, ok := cofDelModo(fuenteChar, modoDelPersonaje); ok {
+			println("HITO2100: CENSO COF", nombreCenso, "bytes=", bytesCenso,
+				"cuadrosPorDir=", cofCenso.FramesPerDirection, "dirs=", cofCenso.NumberOfDirections)
+
+			cCenso := cargarCicloCon(fuenteChar, cofCenso, dirPersonaje, modoDelPersonaje, msQuieto, palUni,
+				nil, "HITO2100", false)
+
+			println("HITO2100: CENSO CICLO", modoDelPersonaje, "dir", dirPersonaje,
+				"cuadros=", len(cCenso.Cuadros), "de", cofCenso.FramesPerDirection)
+
+			cofCenso = nil
+			cCenso = nil
+		} else {
+			println("HITO2100: CENSO SIN COF PARA", modoDelPersonaje)
+		}
+
+		runtime.GC()
+
+		marcaCiclo("censo-nu-despues")
+	}
+
 	// ============================== 3d. LOS CICLOS DEL BICHO, CON EL VIDEO YA ANDANDO (DC-002.50) ==========
 	//
 	// POR QUE ACA Y NO EN 3b (medido en la consola): componer los tres modos del bicho son ~420 KB del monton de
@@ -1393,29 +1517,33 @@ func main() {
 		} {
 			runtime.GC()
 
-			crudoCOF, err := mpq.ReadFile(RutaCOFBestia(m.modo, "HTH"))
-			if err != nil || len(crudoCOF) == 0 {
+			// DC-002.100: el .cof del bicho tambien por la Source, con dueno
+			tramoCOF, err := fuenteDatos.Pedir(RutaCOFBestia(m.modo, "HTH"))
+			if err != nil || len(tramoCOF.Datos) == 0 {
 				println("HITO250: SIN COF PARA EL MODO DEL BICHO", m.modo)
 
 				continue
 			}
 
-			cofBestia, err := d2cof.Unmarshal(crudoCOF)
+			bytesCOF, crcCOF := len(tramoCOF.Datos), crc32.ChecksumIEEE(tramoCOF.Datos)
+
+			cofBestia, err := d2cof.Unmarshal(tramoCOF.Datos)
+			tramoCOF.Liberar()
+
 			if err != nil {
 				println("HITO250: COF DEL BICHO", m.modo, "PARSE-FALLO:", err.Error())
 
 				continue
 			}
 
-			println("HITO250: COF DEL BICHO", m.modo, "bytes=", len(crudoCOF), "crc32=", crc32.ChecksumIEEE(crudoCOF),
+			println("HITO250: COF DEL BICHO", m.modo, "bytes=", bytesCOF, "crc32=", crcCOF,
 				"capas=", cofBestia.NumberOfLayers, "framesPorDir=", cofBestia.FramesPerDirection,
 				"dirs=", cofBestia.NumberOfDirections)
 
-			ciclosBestia = append(ciclosBestia, cargarCicloCon(mpq, cofBestia, dirBestia, m.modo, m.ms,
+			ciclosBestia = append(ciclosBestia, cargarCicloCon(fuenteDatos, cofBestia, dirBestia, m.modo, m.ms,
 				palUni, rutaDeLaCapaDelBicho, "HITO250", m.unTiro))
 
 			cofBestia = nil
-			crudoCOF = nil
 
 			memoria("modo-" + m.modo)
 
@@ -1505,11 +1633,11 @@ func main() {
 			cargarBestia()
 
 			// EL CICLO DEL GOLPE DEL HEROE (A1): 13 cuadros a 40 ms.
-			if cofA1, nombreA1, bytesA1, ok := cofDelModo(mc, modoGolpePersonaje); ok {
+			if cofA1, nombreA1, bytesA1, ok := cofDelModo(fuenteChar, modoGolpePersonaje); ok {
 				println("HITO250: COF DEL GOLPE", nombreA1, "bytes=", bytesA1,
 					"framesPorDir=", cofA1.FramesPerDirection, "dirs=", cofA1.NumberOfDirections)
 
-				ciclos = append(ciclos, cargarCiclo(mc, cofA1, dirPersonaje, modoGolpePersonaje, msGolpeHeroe, palUni))
+				ciclos = append(ciclos, cargarCiclo(fuenteChar, cofA1, dirPersonaje, modoGolpePersonaje, msGolpeHeroe, palUni))
 
 				cofA1 = nil
 
@@ -1569,6 +1697,22 @@ func memoria(etapa string) {
 	println("HITO250: MEMORIA etapa=", etapa, "libre=", int64(d2cHeapLibre()))
 }
 
+// marcaCiclo: EL INSTRUMENTO de DC-002.100, con los tres numeros que hacen falta para decir si el ciclo del
+// personaje entra y si DEVUELVE lo que toma:
+//   - gc:      las recolecciones del recolector de libgodc (en DC-002.98 eran 45 seguidas antes de morir);
+//   - montonC: mallinfo().uordblks, lo USADO del monton de C (el unico monton de la consola);
+//   - libreC:  mallinfo().fordblks, lo que queda libre. Es el numero que compara esta tarjeta: si la arena del
+//     decodificador devuelve sus tramos, el libre al final del ciclo tiene que quedar POR ENCIMA del de la
+//     baseline (que tenia los buffers vivos en el semiespacio del recolector y solo los soltaba el GC).
+//
+// Va con el prefijo HITO2100 para que el log de la corrida se lea solo, igual que las otras marcas.
+func marcaCiclo(etapa string) {
+	println("HITO2100: MEMORIA etapa=", etapa, "gc=", int64(d2cGcN()),
+		"goUsado=", int64(d2cGcUsado()), "/", int64(d2cGcTotal()),
+		"montonC_usado=", int64(d2cMontonUsado()),
+		"montonC_libre=", int64(d2cHeapLibre()), "montonC_arena=", int64(d2cMontonArena()), "ms=", int64(d2cMs()))
+}
+
 // leerDeMPQ: lee UN archivo de un MPQ que solo se usa para eso (el patch_D2.mpq: se abre, se lee la tabla y se
 // cierra, para no dejar 8 MB de indice en la RAM de la consola).
 func leerDeMPQ(rutaMPQ, nombre string) []byte {
@@ -1591,24 +1735,31 @@ func leerDeMPQ(rutaMPQ, nombre string) []byte {
 }
 
 // cofDelModo: el COF de un modo (AMTNHTH para parado, AMTWHTH para caminando), con el MISMO criterio que la
-// sonda del censo: se prueba el arma HTH primero (el personaje de la prueba va desarmado).
-func cofDelModo(mc *d2mpq.MPQ, modo string) (*d2cof.COF, string, int, bool) {
+// sonda del censo: se prueba el arma HTH primero (el personaje de la prueba va desarmado). DC-002.100: el .cof
+// se lee por la Source de consola, con dueno (`Pedir`/`Liberar`).
+func cofDelModo(fuente *fuenteconsola.Fuente, modo string) (*d2cof.COF, string, int, bool) {
 	for _, wc := range []string{"hth", "1hs", "bow", "stf", "2hs"} {
 		nombre := `data\global\chars\AM\COF\AM` + modo + wc + `.COF`
 
-		crudo, err := mc.ReadFile(nombre)
-		if err != nil || len(crudo) == 0 {
+		tramo, err := fuente.Pedir(nombre)
+		if err != nil || len(tramo.Datos) == 0 {
 			continue
 		}
 
-		cof, err := d2cof.Unmarshal(crudo)
+		bytesCrudo, crcCrudo := len(tramo.Datos), crc32.ChecksumIEEE(tramo.Datos)
+
+		cof, err := d2cof.Unmarshal(tramo.Datos)
+		tramo.Liberar()
+
 		if err != nil {
 			println("HITO249: COF DEL MODO", modo, "PARSE-FALLO:", err.Error())
 
 			return nil, nombre, 0, false
 		}
 
-		return cof, nombre, len(crudo), true
+		println("HITO249: COF DEL MODO", nombre, "bytes=", bytesCrudo, "crc32=", crcCrudo)
+
+		return cof, nombre, bytesCrudo, true
 	}
 
 	return nil, "", 0, false
@@ -1621,19 +1772,26 @@ func cofDelModo(mc *d2mpq.MPQ, modo string) (*d2cof.COF, string, int, bool) {
 // POR QUE UN CUADRO POR VEZ Y NO EL DCC ENTERO: un DCC trae 16 direcciones x 16 cuadros de cada capa (son
 // ~140 KB decodificados por capa); guardarlos todos no entra en la consola. Se decodifica la capa una vez,
 // se copian los cuadros de ESTA direccion y el DCC se suelta.
-func cargarCiclo(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadro int,
+func cargarCiclo(fuente *fuenteconsola.Fuente, cof *d2cof.COF, dir int, modo string, msPorCuadro int,
 	pal [256][3]uint8) *ciclo {
-	return cargarCicloCon(mc, cof, dir, modo, msPorCuadro, pal, nil, "HITO249", false)
+	return cargarCicloCon(fuente, cof, dir, modo, msPorCuadro, pal, nil, "HITO249", false)
 }
 
 // cargarCicloCon: el MISMO compositor para cualquier COF. `rutas` dice donde esta el grafico de cada capa
 // (nil = el esquema del personaje) y `hito` es el prefijo de las marcas de la consola serie; `unTiro` marca
 // los modos que NO dan vueltas (GH y DT del bicho, DC-002.50).
-func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCuadro int,
+//
+// DC-002.100: las capas se decodifican por `LoadDirection` (una direccion, no las 16 del COF) y con la ARENA
+// del decodificador puesta; la arena de este ciclo se suelta cuando los cuadros ya estan compuestos, porque los
+// `PixelData` de las capas viven adentro hasta que `Componer` los pega en el lienzo.
+func cargarCicloCon(fuente *fuenteconsola.Fuente, cof *d2cof.COF, dir int, modo string, msPorCuadro int,
 	pal [256][3]uint8, rutas func(*Personaje, int, string, string) string, hito string, unTiro bool) *ciclo {
 	n := cof.FramesPerDirection
 	per0 := NuevoPersonaje(cof, dir, 0)
 	capas := make([]capaCiclo, 0, len(cof.CofLayers))
+
+	arenaCiclo := &arenaDCC{}
+	conArena(arenaCiclo)
 
 	for i := range cof.CofLayers {
 		tCapa := int64(d2cMs())
@@ -1645,7 +1803,7 @@ func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCu
 				nombre = rutas(per0, i, modo, ext)
 			}
 
-			crudo, err := LeerDelMPQ(mc, nombre)
+			tramo, err := fuente.Pedir(nombre)
 			if err != nil {
 				continue
 			}
@@ -1653,7 +1811,9 @@ func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCu
 			c := capaCiclo{tipo: per0.Tipos[i], clave: per0.Claves[i]}
 
 			if ext == "dcc" {
-				dd, err := d2dcc.LoadDirection(crudo, dir)
+				dd, err := d2dcc.LoadDirection(tramo.Datos, dir)
+				tramo.Liberar()
+
 				if err != nil {
 					println(hito+": CAPA", c.clave, "DEL MODO", modo, "PARSE-FALLO:", err.Error())
 					break
@@ -1670,14 +1830,15 @@ func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCu
 				encontrada = true
 
 				dd = nil
-				crudo = nil
 
 				break
 			}
 
-			dc, err := d2dc6.Load(crudo)
+			dc, err := d2dc6.Load(tramo.Datos)
 			if err != nil {
+				tramo.Liberar()
 				println(hito+": CAPA", c.clave, "DEL MODO", modo, "PARSE-FALLO:", err.Error())
+
 				break
 			}
 
@@ -1691,11 +1852,12 @@ func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCu
 				c.cuadros = append(c.cuadros, dc.DecodeFrame(f))
 			}
 
+			tramo.Liberar()
+
 			capas = append(capas, c)
 			encontrada = true
 
 			dc = nil
-			crudo = nil
 
 			break
 		}
@@ -1703,6 +1865,12 @@ func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCu
 		if encontrada {
 			if hito != "HITO249" {
 				println(hito+": MEMORIA-CAPA modo=", modo, "capa=", per0.Claves[i], "libre=", int64(d2cHeapLibre()))
+			}
+
+			// DC-002.100: con el censo encendido, el estado del recolector DESPUES de cada capa del ciclo: es
+			// donde se ve si los buffers del decodificador quedaron en el semiespacio (sin arena) o no (con arena).
+			if censoCiclo {
+				marcaCiclo("ciclo-" + modo + "-" + per0.Claves[i])
 			}
 
 			println(hito+": CAPA DEL CICLO", modo, per0.Claves[i], "cuadros", len(capas[len(capas)-1].cuadros),
@@ -1742,6 +1910,16 @@ func cargarCicloCon(mc *d2mpq.MPQ, cof *d2cof.COF, dir int, modo string, msPorCu
 		println(hito+": CUADRO DEL CICLO", modo, f, "de", n, "caja", cu.Ancho, cu.Alto,
 			"esquina", cu.Izq, cu.Arriba, "pixeles", cu.PixelesNoVacios, "crc32", cu.CRC)
 	}
+
+	// LA ARENA SE SUELTA ACA (DC-002.100), no antes: los `PixelData` de las capas vivian ADENTRO y recien ahora
+	// estan pegados en los cuadros compuestos. Es el punto que mide la tarjeta: lo que el decodificador tomo del
+	// monton de C tiene que volver antes de soltar el ciclo.
+	arenaCiclo.liberar()
+	d2dcc.PedirDeArena = nil
+
+	println(hito+": ARENA DEL CICLO", modo, "dir", dir, "pedidos=", arenaCiclo.pedidos,
+		"entregado=", arenaCiclo.entregado, "tramos=", arenaCiclo.liberados,
+		"montonC_libre=", int64(d2cHeapLibre()), "gc=", int64(d2cGcN()))
 
 	// los pixeles de las capas ya estan pegados en los cuadros: se sueltan
 	capas = nil

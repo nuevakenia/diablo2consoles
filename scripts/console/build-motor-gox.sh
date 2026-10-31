@@ -44,7 +44,14 @@ PAQUETES="${PAQUETES:-d2common/d2enum d2common/d2math d2common/d2math/d2vector d
 
 mkdir -p "$GEN"
 for p in $PAQUETES; do
-    srcs=$(ls "$REPO/$p"/*.go | grep -v _test.go)
+    # DC-002.100: los archivos de PLATAFORMA se sacan a mano. gccgo no respeta los tags, asi que un paquete con
+    # un lado host y un lado consola (d2loader: marca_carga_host.go vs marca_carga_godc.go) se compila DOS veces
+    # y el segundo define lo mismo (`previous definition of ‘Marca’`). El filtro es el mismo de
+    # build-dcc-298.sh: los _<so>.go y _<arch>.go no van, y los del camino del host tampoco.
+    srcs=$(ls "$REPO/$p"/*.go | grep -v '_test\.go$' |
+        grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
+        grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64)\.go$' |
+        grep -vE '/(marca_carga_host)\.go$')
     out="$GEN/$PREFIJO/$p.gox"
     mkdir -p "$(dirname "$out")"
     # shellcheck disable=SC2086

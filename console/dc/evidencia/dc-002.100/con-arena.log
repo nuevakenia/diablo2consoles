@@ -1,0 +1,105 @@
+HITO238: arranca (DC-002.38, el personaje en el mapa moviendose con el control de la Dreamcast)
+HITO238: runtime dreamcast sh4
+HITO238: MPQ-ABRIR OK /cd/JUEGO/D2DATA.MPQ ms= 10153
+HITO238: DS1-LEER OK bytes= 57652 crc32= 712973328 ms= 74
+HITO238: DS1 version= 18 act= 1 w= 57 h= 41 objetos= 41 files= 8
+HITO238: VENTANA lado= 512 origen= 304 1664 centroCelda= 28 20
+HITO238: PEDIDOS pisos= 1982 paredes= 330 total= 2312
+HITO238: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 tiles= 21 ms= 3566
+HITO238: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 bytes= 439569 crc32= 3658844334 tiles= 52 ms= 3301
+HITO238: DT1 data/global/tiles/act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 tiles= 144 ms= 6759
+HITO238: DT1 data/global/tiles/act1\barracks\warp.dt1 bytes= 658158 crc32= 4038904381 tiles= 81 ms= 774
+HITO238: DT1 data/global/tiles/act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 tiles= 45 ms= 1831
+HITO238: DT1 data/global/tiles/act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 tiles= 91 ms= 3904
+HITO238: DT1 data/global/tiles/act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 tiles= 31 ms= 2662
+HITO238: DT1 data/global/tiles/act1\outdoors\objects.dt1 bytes= 338205 crc32= 3007654198 tiles= 42 ms= 2490
+HITO250: MEMORIA etapa= nivel libre= 800536
+HITO238: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+HITO238: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456
+HITO238: LIENZO pixelesPiso= 179484 pixelesPared= 146567
+HITO238: PALETA acto bytes= 768 colores=256 crc32= 3508331570 ms= 25
+HITO250: MEMORIA etapa= mapa-en-imagen libre= 800520
+HITO238: MAPA-IMAGEN bytes= 1048576 vram_libre= sin-init
+HITO2100: MEMORIA etapa= personaje-antes gc= 8 goUsado= 372384 / 2097152 montonC_usado= 9819576 montonC_libre= 800520 montonC_arena= 10620096 ms= 44804
+HITO238: MPQ-CHARS-ABRIR OK /cd/JUEGO/D2CHAR.MPQ ms= 3512
+HITO238: COF data\global\CHARS\AM\COF\amnuhth.cof bytes= 1132 crc32= 2708601289 capas= 8 framesPorDir= 8 dirs= 16 speed= 128
+HITO238: ORDEN capas= 8 orden= 8
+HITO2100: ARENA DE LA CAPA sinArena= false
+HITO238: CAPA HD bytes= 10931 crc32= 4009831868 caja= -7 -65 15 17 pixeles= 148 ms= 103
+HITO2100: MEMORIA etapa= capa-HD gc= 9 goUsado= 408864 / 2097152 montonC_usado= 10402392 montonC_libre= 217704 montonC_arena= 10620096 ms= 48471
+HITO238: CAPA LA bytes= 12765 crc32= 1313645261 caja= -18 -48 18 27 pixeles= 172 ms= 119
+HITO2100: MEMORIA etapa= capa-LA gc= 10 goUsado= 410752 / 2097152 montonC_usado= 10402392 montonC_libre= 217704 montonC_arena= 10620096 ms= 48622
+HITO238: CAPA LG bytes= 37659 crc32= 2352162040 caja= -14 -37 21 51 pixeles= 487 ms= 341
+HITO2100: MEMORIA etapa= capa-LG gc= 11 goUsado= 435776 / 2097152 montonC_usado= 10402392 montonC_libre= 217704 montonC_arena= 10620096 ms= 48995
+HITO238: CAPA RA bytes= 10986 crc32= 261487157 caja= -7 -53 13 15 pixeles= 68 ms= 91
+HITO2100: MEMORIA etapa= capa-RA gc= 12 goUsado= 409104 / 2097152 montonC_usado= 10402392 montonC_libre= 217704 montonC_arena= 10620096 ms= 49122
+HITO238: CAPA S1 bytes= 3781 crc32= 2779618826 caja= -5 -54 10 8 pixeles= 39 ms= 49
+HITO2100: MEMORIA etapa= capa-S1 gc= 13 goUsado= 402056 / 2097152 montonC_usado= 10402392 montonC_libre= 217704 montonC_arena= 10620096 ms= 49204
+HITO238: CAPA S2 bytes= 4902 crc32= 3830512632 caja= -8 -51 9 9 pixeles= 71 ms= 50
+HITO2100: MEMORIA etapa= capa-S2 gc= 14 goUsado= 403176 / 2097152 montonC_usado= 10402392 montonC_libre= 217704 montonC_arena= 10620096 ms= 49288
+HITO238: CAPA SH SIN-GRAFICO ruta= data/global/chars/AM/SH/AMSHLITNU1ht.dc6 err= fuenteconsola: la fuente no sabe el tamano del archivo: data/global/chars/AM/SH/AMSHLITNU1ht.dc6
+HITO2100: MEMORIA etapa= capa-SH gc= 15 goUsado= 403296 / 2097152 montonC_usado= 10402392 montonC_libre= 217704 montonC_arena= 10620096 ms= 49329
+HITO238: CAPA TR bytes= 17401 crc32= 320674826 caja= -10 -54 15 25 pixeles= 244 ms= 163
+HITO2100: MEMORIA etapa= capa-TR gc= 16 goUsado= 415680 / 2097152 montonC_usado= 10402392 montonC_libre= 217704 montonC_arena= 10620096 ms= 49525
+HITO238: ARENA personaje capas= 7 pedidos= 133 entregado= 86208 tramos= 1 capacidad= 0
+HITO238: PERSONAJE compuesto= 26 x 79 esquina= -18 -65 capasDibujadas= 7 sinGrafico= 0 pixelesNoVacios= 896 crc32= 1857478036
+HITO2100: MEMORIA etapa= personaje-despues gc= 17 goUsado= 417704 / 2097152 montonC_usado= 10140240 montonC_libre= 479856 montonC_arena= 10620096 ms= 49570
+HITO238: PERSONAJE-IMAGEN bytes= 8216 vram_libre= sin-init
+HITO250: MPQ-CERRADOS vram_libre= sin-init
+HITO238: MOTOR velocidad=subtilesPorSegundo= 9.375 celdasPorSegundo= 1.875
+HITO238: POS-INICIAL subtiles= 140 100 celda= 28 20 ancla= 256 256 pantalla= 320 240
+HITO238: hay control en el puerto 0
+HITO250: PVR antes-de-pvr_init_defaults
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+HITO2100: MEMORIA etapa= censo-nu-antes gc= 17 goUsado= 438232 / 2097152 montonC_usado= 10140464 montonC_libre= 479632 montonC_arena= 10620096 ms= 49675
+HITO249: COF DEL MODO data\global\chars\AM\COF\AMNUhth.COF bytes= 1132 crc32= 2708601289
+HITO2100: CENSO COF data\global\chars\AM\COF\AMNUhth.COF bytes= 1132 cuadrosPorDir= 8 dirs= 16
+HITO2100: MEMORIA-CAPA modo= NU capa= HD libre= 217480
+HITO2100: MEMORIA etapa= ciclo-NU-HD gc= 17 goUsado= 463512 / 2097152 montonC_usado= 10402616 montonC_libre= 217480 montonC_arena= 10620096 ms= 49826
+HITO2100: CAPA DEL CICLO NU HD cuadros 8 caja 15 17 ms 122
+HITO2100: MEMORIA-CAPA modo= NU capa= LA libre= 217480
+HITO2100: MEMORIA etapa= ciclo-NU-LA gc= 18 goUsado= 470120 / 2097152 montonC_usado= 10402616 montonC_libre= 217480 montonC_arena= 10620096 ms= 49976
+HITO2100: CAPA DEL CICLO NU LA cuadros 8 caja 18 27 ms 132
+HITO2100: MEMORIA-CAPA modo= NU capa= LG libre= 217480
+HITO2100: MEMORIA etapa= ciclo-NU-LG gc= 19 goUsado= 497504 / 2097152 montonC_usado= 10402616 montonC_libre= 217480 montonC_arena= 10620096 ms= 50351
+HITO2100: CAPA DEL CICLO NU LG cuadros 8 caja 21 51 ms 354
+HITO2100: MEMORIA-CAPA modo= NU capa= RA libre= 217480
+HITO2100: MEMORIA etapa= ciclo-NU-RA gc= 20 goUsado= 494904 / 2097152 montonC_usado= 10402616 montonC_libre= 217480 montonC_arena= 10620096 ms= 50477
+HITO2100: CAPA DEL CICLO NU RA cuadros 8 caja 13 15 ms 108
+HITO2100: MEMORIA-CAPA modo= NU capa= S1 libre= 217480
+HITO2100: MEMORIA etapa= ciclo-NU-S1 gc= 21 goUsado= 460976 / 2097152 montonC_usado= 10402616 montonC_libre= 217480 montonC_arena= 10620096 ms= 50559
+HITO2100: CAPA DEL CICLO NU S1 cuadros 8 caja 10 8 ms 64
+HITO2100: MEMORIA-CAPA modo= NU capa= S2 libre= 217480
+HITO2100: MEMORIA etapa= ciclo-NU-S2 gc= 22 goUsado= 454968 / 2097152 montonC_usado= 10402616 montonC_libre= 217480 montonC_arena= 10620096 ms= 50642
+HITO2100: CAPA DEL CICLO NU S2 cuadros 8 caja 9 9 ms 65
+HITO2100: MEMORIA-CAPA modo= NU capa= TR libre= 217480
+HITO2100: MEMORIA etapa= ciclo-NU-TR gc= 23 goUsado= 470832 / 2097152 montonC_usado= 10402616 montonC_libre= 217480 montonC_arena= 10620096 ms= 50846
+HITO2100: CAPA DEL CICLO NU TR cuadros 8 caja 15 25 ms 185
+HITO2100: CUADRO DEL CICLO NU 0 de 8 caja 26 79 esquina -18 -65 pixeles 896 crc32 1857478036
+HITO2100: CUADRO DEL CICLO NU 1 de 8 caja 26 79 esquina -18 -65 pixeles 889 crc32 2138394951
+HITO2100: CUADRO DEL CICLO NU 2 de 8 caja 26 79 esquina -18 -65 pixeles 898 crc32 3790466078
+HITO2100: CUADRO DEL CICLO NU 3 de 8 caja 26 79 esquina -18 -65 pixeles 897 crc32 1891057005
+HITO2100: CUADRO DEL CICLO NU 4 de 8 caja 26 79 esquina -18 -65 pixeles 906 crc32 3705376215
+HITO2100: CUADRO DEL CICLO NU 5 de 8 caja 26 79 esquina -18 -65 pixeles 914 crc32 1415443346
+HITO2100: CUADRO DEL CICLO NU 6 de 8 caja 26 79 esquina -18 -65 pixeles 917 crc32 3716097957
+HITO2100: CUADRO DEL CICLO NU 7 de 8 caja 26 79 esquina -18 -65 pixeles 902 crc32 127741840
+HITO2100: ARENA DEL CICLO NU dir 0 pedidos= 133 entregado= 86208 tramos= 1 montonC_libre= 479632 gc= 24
+HITO2100: MEMORIA-COMPUESTO modo= NU libre= 479632
+HITO249: CICLO NU cuadros 8 msPorCuadro 128 cicloMs 1024 imagen 26 79
+HITO2100: CENSO CICLO NU dir 0 cuadros= 8 de 8
+HITO2100: MEMORIA etapa= censo-nu-despues gc= 26 goUsado= 440144 / 2097152 montonC_usado= 10140464 montonC_libre= 479632 montonC_arena= 10620096 ms= 51001
+HITO250: MEMORIA etapa= d2char-cerrado libre= 479960
+HITO238: dibujando (mapa 512 x 512 en 64 -16 ; personaje 26 x 79 )
+HITO238: POS cuadro 1 ms 51077 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 1
+HITO238: POS cuadro 30 ms 52306 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2
+HITO238: POS cuadro 60 ms 53424 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2
+HITO238: POS cuadro 90 ms 54543 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2
+HITO238: POS cuadro 120 ms 55661 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2
+HITO238: POS cuadro 150 ms 56779 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2
+HITO238: POS cuadro 180 ms 57898 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2
+HITO238: POS cuadro 210 ms 59019 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2
+HITO238: POS cuadro 240 ms 60137 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2
+HITO238: POS cuadro 270 ms 61256 botones 0 subtiles 140 100 celda 28 20 tile 28 20 ancla 256 256 pantalla 320 240 caminado 0 tiempo 0 pasos 0 dtCero 0 dtGrande 2

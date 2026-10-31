@@ -74,6 +74,55 @@ unsigned int d2c_heap_libre(void) {
     return (unsigned int)mi.fordblks;
 }
 
+/* DC-002.100: los otros dos numeros de `mallinfo` que hacen falta para decir "esto lo tomo el decodificador
+ * y lo devolvio": `uordblks` es lo USADO del monton de C y `arena` el total que pidio el monton al sistema.
+ * El instrumento de esta tarjeta es el par (usado, libre): lo que se toma durante el ciclo tiene que volver
+ * cuando el dueno libera la arena, y el libre al final tiene que ser MAYOR que el de la baseline (que tenia
+ * los buffers del decodificador vivos en el semiespacio del recolector). */
+unsigned int d2c_monton_usado(void) {
+    return (unsigned int)mallinfo().uordblks;
+}
+
+unsigned int d2c_monton_arena(void) {
+    return (unsigned int)mallinfo().arena;
+}
+
+/* d2c_gc_n: las recolecciones de libgodc (`gc_stats`, runtime/gc_heap.c). En esta rama es EL contador del
+ * defecto: 45 recolecciones seguidas y muerte en DC-002.98. Con la arena del monton de C la decodificacion del
+ * .dcc tiene que dar 0. OJO con los tipos: `used`/`total` son cuentas (size_t), el contador es uint32_t. */
+extern void gc_stats(size_t *usado, size_t *total, uint32_t *colecciones);
+
+unsigned int d2c_gc_n(void) {
+    size_t usado = 0, total = 0;
+    uint32_t colecciones = 0;
+
+    gc_stats(&usado, &total, &colecciones);
+
+    return (unsigned int)colecciones;
+}
+
+/* d2c_gc_usado / d2c_gc_total: el semiespacio ACTIVO del recolector (bytes usados y su tamano). Es el otro
+ * instrumento de DC-002.100: la arena del decodificador saca sus buffers de aca, asi que con la arena el usado
+ * durante el ciclo tiene que quedar por debajo del de la corrida sin arena (mismo binario, palanca `sinArena`).
+ * En la consola el semiespacio son 2.097.152 B. */
+unsigned int d2c_gc_usado(void) {
+    size_t usado = 0, total = 0;
+    uint32_t colecciones = 0;
+
+    gc_stats(&usado, &total, &colecciones);
+
+    return (unsigned int)usado;
+}
+
+unsigned int d2c_gc_total(void) {
+    size_t usado = 0, total = 0;
+    uint32_t colecciones = 0;
+
+    gc_stats(&usado, &total, &colecciones);
+
+    return (unsigned int)total;
+}
+
 /* d2c_tex_init: sube los indices de 8 bits y la paleta ARGB1555 que le pasa el Go.
  * Devuelve 0 si todo bien; 1 textura demasiado grande; 2 sin VRAM. */
 int d2c_tex_init(unsigned int idx, unsigned int pal, int w, int h, int pw, int ph) {
