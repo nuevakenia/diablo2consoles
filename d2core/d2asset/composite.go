@@ -72,6 +72,10 @@ func (c *Composite) Render(target d2interface.Surface) error {
 	for _, layerIndex := range c.mode.cof.Priority[direction][c.mode.frameIndex] {
 		layer := c.mode.layers[layerIndex]
 
+		if SondaDeRender != nil {
+			SondaDeRender(c.direction, c.mode.frameIndex, direction, layerIndex, c.mode.layers, layer, true)
+		}
+
 		if layer != nil {
 			layer.RenderFromOrigin(target, true)
 		}
@@ -79,6 +83,11 @@ func (c *Composite) Render(target d2interface.Surface) error {
 
 	for _, layerIndex := range c.mode.cof.Priority[direction][c.mode.frameIndex] {
 		layer := c.mode.layers[layerIndex]
+
+		if SondaDeRender != nil {
+			SondaDeRender(c.direction, c.mode.frameIndex, direction, layerIndex, c.mode.layers, layer, false)
+		}
+
 		if layer != nil {
 			layer.RenderFromOrigin(target, false)
 		}

@@ -1,0 +1,187 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:033 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:278 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:379 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:379 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:381 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:385 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:398 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f37e6d90000 RAM(16 MB) 0x7f37f2d90000 VRAM64(8 MB) 0x7f37ead90000 ARAM(2 MB) 0x7f3806d90000
+00:00:404 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:412 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f37e6d90000 RAM(16 MB) 0x7f37f2d90000 VRAM64(8 MB) 0x7f37ead90000 ARAM(2 MB) 0x7f3806d90000
+00:00:415 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:419 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:419 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:461 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:461 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:461 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f2600
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351986208
+ARQ-MARCA   gc_init-semiespacio1 v=2354083392
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1152 cused=4353280 gsemi=95864/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 96 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 272
+COOP276: mpq a mano listos montonLibre= 448
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=448 cused=5705664 gsemi=395800/2097152 gc=0
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=448 cused=5705664 gsemi=397704/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 976
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=490528
+COOP276: ANIMDATA despues del GC montonLibre= 976
+COOP276: BASELINE (N=0) montonLibre= 976 gcColecciones= 1 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=490664
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=976 cused=6204848 gsemi=497360/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=976 cused=6204848 gsemi=500552/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=976 cused=6204848 gsemi=516992/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=976 cused=6204848 gsemi=519872/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=976 cused=6204848 gsemi=539216/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=976 cused=6204848 gsemi=552208/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=976 cused=6204848 gsemi=910464/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=976 cused=6204848 gsemi=925296/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=976 cused=6204848 gsemi=1461008/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=976 cused=6204848 gsemi=1500784/2097152 gc=2
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573288
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=768168
+ARQ-MARCA gc-por-umbral-bytes-usados v=1583456
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=909640
+ARQ-CARGA lee-entra /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=672 cused=6618848 gsemi=1197584/2097152 gc=4
+ARQ-CARGA lee-volvio /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=672 cused=6618848 gsemi=1210632/2097152 gc=4
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578512
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=971008
+ARQ-CARGA lee-entra /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=672 cused=6618848 gsemi=1015992/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=672 cused=6618848 gsemi=1021816/2097152 gc=5
+ARQ-CARGA lee-entra /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=672 cused=6618848 gsemi=1150400/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=672 cused=6618848 gsemi=1157352/2097152 gc=5
+ARQ-CARGA lee-entra /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=672 cused=6618848 gsemi=1340664/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=672 cused=6618848 gsemi=1360144/2097152 gc=5
+ARQ-MARCA gc-por-umbral-bytes-usados v=1581976
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1101664
+COOP276: JUGADOR J1 indice= 0 direccion= 0 celda= 28 20 subtiles= 140 100 creacionUs= 1904472 montonAntes= 976 montonDespues= 672 gcPorLaCreacion= 4 gcTotal= 6
+COOP276: ETAPA n= 1 montonLibre= 672 creacionUs= 1975992 gcEnLaCreacion= 5 gcTotal= 6
+COOP276: CACHES n= 1 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1119648
+COOP276: ETAPA n= 1 gcForzadoUs= 73001 montonLibreDespuesDelGC= 672
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943821284 dato= -1940425704
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943821284 dato= -1940425584
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943821284 dato= -1940425344
+00:32:896 reios/reios.cpp:639 N[REIOS]: -----------------
+00:32:896 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:32:896 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f2600
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351986208
+ARQ-MARCA   gc_init-semiespacio1 v=2354083392
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1152 cused=4353280 gsemi=95232/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 96 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 272

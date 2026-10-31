@@ -1,0 +1,463 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:028 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:273 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:374 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:374 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:377 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:381 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:396 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f4dfb1f0000 RAM(16 MB) 0x7f4e071f0000 VRAM64(8 MB) 0x7f4dff1f0000 ARAM(2 MB) 0x7f4e1b1f0000
+00:00:403 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:410 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f4dfb1f0000 RAM(16 MB) 0x7f4e071f0000 VRAM64(8 MB) 0x7f4dff1f0000 ARAM(2 MB) 0x7f4e1b1f0000
+00:00:413 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:421 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:421 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:461 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:461 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:461 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f3120
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), 64 ranuras de histograma
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351989056
+ARQ-MARCA   gc_init-semiespacio1 v=2354086240
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=2400 cused=4353280 gsemi=95752/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 1344 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=1 top 8c122942:80 8c11e736:9 8c11e73a:3 8c122698:2 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=2 top 8c122942:98 8c10e89e:1 8c01f5ea:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=3 top 8c122942:96 8c046408:1 8c046450:1 8c04a0d2:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=4 top 8c122942:98 8c10e89e:1 8c01f5e2:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=5 top 8c122942:98 8c01f5e2:1 8c0463fa:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=6 top 8c122942:98 8c046480:1 8c04a0ae:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=7 top 8c122942:99 8c0463f2:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=8 top 8c122942:97 8c04a0ae:1 8c04a0d2:1 8c13986c:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=9 top 8c122942:98 8c01f784:1 8c046458:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=10 top 8c122942:97 8c01f784:1 8c0468a4:1 8c04a0d2:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=11 top 8c122942:97 8c04a106:1 8c01f790:1 8c0463f2:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=12 top 8c122942:98 8c04a106:1 8c0463f2:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=13 top 8c122942:98 8c01f790:1 8c13986c:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 1520
+SONDA-PC t=14 top 8c122942:94 8c01f784:1 8c046894:1 8c10e89e:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=15 top 8c122942:99 8c04657c:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=16 top 8c122942:98 8c04a106:1 8c046450:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=17 top 8c122942:99 8c046408:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=18 top 8c122942:97 8c10e89e:1 8c04a0d2:1 8c0463fa:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=19 top 8c122942:98 8c046408:1 8c13986c:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=20 top 8c122942:98 8c046408:1 8c01f5e2:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=21 top 8c122942:97 8c04a106:1 8c10e89e:1 8c13986c:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=22 top 8c122942:99 8c01f5e2:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=23 top 8c122942:97 8c0468a4:1 8c04a0ae:1 8c13986c:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=24 top 8c122942:96 8c04a0d2:2 8c01f784:1 8c10e89e:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=25 top 8c122942:98 8c10e89e:1 8c04a0ae:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+SONDA-PC t=26 top 8c122942:98 8c046524:1 8c01f5d4:1 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+COOP276: mpq a mano listos montonLibre= 1696
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=1696 cused=5705664 gsemi=395504/2097152 gc=0
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=1696 cused=5705664 gsemi=397408/2097152 gc=0
+SONDA-PC t=27 top 8c122942:90 8c01f790:2 8c11e736:2 8c045e9e:1 pc=8c045ffc pr=8c045ff2 fp=8c045c4c sp=8c717b3c fuera=0
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 2224
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=491152
+COOP276: ANIMDATA despues del GC montonLibre= 2224
+COOP276: BASELINE (N=0) montonLibre= 2224 gcColecciones= 1 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=491288
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=2224 cused=6204848 gsemi=497984/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=2224 cused=6204848 gsemi=501176/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=2224 cused=6204848 gsemi=517736/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=2224 cused=6204848 gsemi=520616/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=2224 cused=6204848 gsemi=539960/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=2224 cused=6204848 gsemi=552952/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=2224 cused=6204848 gsemi=911088/2097152 gc=2
+SONDA-PC t=28 top 8c122942:28 8c11e736:4 8c045e90:3 8c0391b4:3 pc=8c122942 pr=8c122d9c fp=ffffffff sp=8c2ebf3c fuera=0
+ARQ-CARGA lee-volvio /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=2224 cused=6204848 gsemi=925920/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=2224 cused=6204848 gsemi=1461632/2097152 gc=2
+SONDA-PC RACHA pc=8c122942 racha=30 pr=8c122d9c fp=ffffffff sp=8c2ebf3c
+ARQ-CARGA lee-volvio /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=2224 cused=6204848 gsemi=1501408/2097152 gc=2
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573912
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=785080
+ARQ-MARCA gc-por-umbral-bytes-usados v=1600368
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=926552
+ARQ-CARGA lee-entra /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=1920 cused=6618848 gsemi=1214616/2097152 gc=4
+ARQ-CARGA lee-volvio /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=1920 cused=6618848 gsemi=1227664/2097152 gc=4
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573272
+ARQ-MARCA gc_collect v=5
+SONDA-PC t=29 top 8c122942:43 8c11e736:5 8c139850:5 8c03751e:3 pc=8c139850 pr=8c0d7f68 fp=8c717248 sp=8c717248 fuera=0
+ARQ-MARCA gc-vivo v=945448
+ARQ-CARGA lee-entra /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=1920 cused=6618848 gsemi=1012704/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=1920 cused=6618848 gsemi=1018528/2097152 gc=5
+ARQ-CARGA lee-entra /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=1920 cused=6618848 gsemi=1147112/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=1920 cused=6618848 gsemi=1154064/2097152 gc=5
+ARQ-CARGA lee-entra /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=1920 cused=6618848 gsemi=1337376/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=1920 cused=6618848 gsemi=1356856/2097152 gc=5
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578688
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1106856
+SONDA-FALLO evt=ffffffff expevt=000000e0 intevt=00000400 pc=ffffffff pr=8c08bd3a
+SONDA-FALLO r0=00000007
+SONDA-FALLO r1=ffffffff
+SONDA-FALLO r2=8c717e30
+SONDA-FALLO r3=00000000
+SONDA-FALLO r4=8c31f548
+SONDA-FALLO r5=00000054
+SONDA-FALLO r6=8c464490
+SONDA-FALLO r7=480006f0
+SONDA-FALLO r8=0000001f
+SONDA-FALLO r9=00000007
+SONDA-FALLO r10=8c3895e8
+SONDA-FALLO r11=000006e8
+SONDA-FALLO r12=8c463da8
+SONDA-FALLO r13=8c460388
+SONDA-FALLO r14=8c3ae450
+SONDA-FALLO r15=8c717dec
+SONDA-FALLO pila+00 000001ba
+SONDA-FALLO pila+04 8c42d6cc
+SONDA-FALLO pila+08 8c31f548
+SONDA-FALLO pila+0c 8c463da5
+SONDA-FALLO pila+10 8c717e84
+SONDA-FALLO pila+14 8c3ae450
+SONDA-FALLO pila+18 000001ba
+SONDA-FALLO pila+1c 000001ba
+SONDA-FALLO pila+20 00000000
+SONDA-FALLO pila+24 00000000
+SONDA-FALLO pila+28 00000000
+SONDA-FALLO pila+2c 00000000
+SONDA-FALLO pila+30 00000000
+SONDA-FALLO pila+34 3ff00000
+SONDA-FALLO pila+38 00000000
+SONDA-FALLO pila+3c 3ff00000
+SONDA-FALLO pila+40 00000000
+SONDA-FALLO pila+44 00000000
+SONDA-FALLO pila+48 8c0c9d3e
+SONDA-FALLO pila+4c 8c463ad0
+SONDA-FALLO pila+50 8c463890
+SONDA-FALLO pila+54 8c09121a
+SONDA-FALLO pila+58 8c2e6050
+SONDA-FALLO pila+5c 8c460388
+SONDA-FALLO pila+60 00000000
+SONDA-FALLO pila+64 00000000
+SONDA-FALLO pila+68 8c3895e8
+SONDA-FALLO pila+6c 8c717f6c
+SONDA-FALLO pila+70 8c460388
+SONDA-FALLO pila+74 8c42d6cc
+SONDA-FALLO pila+78 8c31f548
+SONDA-FALLO pila+7c 8c321c50
+SONDA-FALLO pila+80 0000001a
+SONDA-FALLO pila+84 8c3219a8
+SONDA-FALLO pila+88 00000011
+SONDA-FALLO pila+8c 8c3ae450
+SONDA-FALLO pila+90 000001ba
+SONDA-FALLO pila+94 000001ba
+SONDA-FALLO pila+98 8c463890
+SONDA-FALLO pila+9c 00000240
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-FALLO evt=ffffffff expevt=000000e0 intevt=00000400 pc=ffffffff pr=8c08bd3a
+SONDA-FALLO r0=00000007
+SONDA-FALLO r1=ffffffff
+SONDA-FALLO r2=8c717e30
+SONDA-FALLO r3=00000000
+SONDA-FALLO r4=8c31f548
+SONDA-FALLO r5=00000054
+SONDA-FALLO r6=8c464490
+SONDA-FALLO r7=480006f0
+SONDA-FALLO r8=0000001f
+SONDA-FALLO r9=00000007
+SONDA-FALLO r10=8c3895e8
+SONDA-FALLO r11=000006e8
+SONDA-FALLO r12=8c463da8
+SONDA-FALLO r13=8c460388
+SONDA-FALLO r14=8c3ae450
+SONDA-FALLO r15=8c717dec
+SONDA-FALLO pila+00 000001ba
+SONDA-FALLO pila+04 8c42d6cc
+SONDA-FALLO pila+08 8c31f548
+SONDA-FALLO pila+0c 8c463da5
+SONDA-FALLO pila+10 8c717e84
+SONDA-FALLO pila+14 8c3ae450
+SONDA-FALLO pila+18 000001ba
+SONDA-FALLO pila+1c 000001ba
+SONDA-FALLO pila+20 00000000
+SONDA-FALLO pila+24 00000000
+SONDA-FALLO pila+28 00000000
+SONDA-FALLO pila+2c 00000000
+SONDA-FALLO pila+30 00000000
+SONDA-FALLO pila+34 3ff00000
+SONDA-FALLO pila+38 00000000
+SONDA-FALLO pila+3c 3ff00000
+SONDA-FALLO pila+40 00000000
+SONDA-FALLO pila+44 00000000
+SONDA-FALLO pila+48 8c0c9d3e
+SONDA-FALLO pila+4c 8c463ad0
+SONDA-FALLO pila+50 8c463890
+SONDA-FALLO pila+54 8c09121a
+SONDA-FALLO pila+58 8c2e6050
+SONDA-FALLO pila+5c 8c460388
+SONDA-FALLO pila+60 00000000
+SONDA-FALLO pila+64 00000000
+SONDA-FALLO pila+68 8c3895e8
+SONDA-FALLO pila+6c 8c717f6c
+SONDA-FALLO pila+70 8c460388
+SONDA-FALLO pila+74 8c42d6cc
+SONDA-FALLO pila+78 8c31f548
+SONDA-FALLO pila+7c 8c321c50
+SONDA-FALLO pila+80 0000001a
+SONDA-FALLO pila+84 8c3219a8
+SONDA-FALLO pila+88 00000011
+SONDA-FALLO pila+8c 8c3ae450
+SONDA-FALLO pila+90 000001ba
+SONDA-FALLO pila+94 000001ba
+SONDA-FALLO pila+98 8c463890
+SONDA-FALLO pila+9c 00000240
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-FALLO evt=ffffffff expevt=000000e0 intevt=00000400 pc=ffffffff pr=8c08bd3a
+SONDA-FALLO r0=00000007
+SONDA-FALLO r1=ffffffff
+SONDA-FALLO r2=8c717e30
+SONDA-FALLO r3=00000000
+SONDA-FALLO r4=8c31f548
+SONDA-FALLO r5=00000054
+SONDA-FALLO r6=8c464490
+SONDA-FALLO r7=480006f0
+SONDA-FALLO r8=0000001f
+SONDA-FALLO r9=00000007
+SONDA-FALLO r10=8c3895e8
+SONDA-FALLO r11=000006e8
+SONDA-FALLO r12=8c463da8
+SONDA-FALLO r13=8c460388
+SONDA-FALLO r14=8c3ae450
+SONDA-FALLO r15=8c717dec
+SONDA-FALLO pila+00 000001ba
+SONDA-FALLO pila+04 8c42d6cc
+SONDA-FALLO pila+08 8c31f548
+SONDA-FALLO pila+0c 8c463da5
+SONDA-FALLO pila+10 8c717e84
+SONDA-FALLO pila+14 8c3ae450
+SONDA-FALLO pila+18 000001ba
+SONDA-FALLO pila+1c 000001ba
+SONDA-FALLO pila+20 00000000
+SONDA-FALLO pila+24 00000000
+SONDA-FALLO pila+28 00000000
+SONDA-FALLO pila+2c 00000000
+SONDA-FALLO pila+30 00000000
+SONDA-FALLO pila+34 3ff00000
+SONDA-FALLO pila+38 00000000
+SONDA-FALLO pila+3c 3ff00000
+SONDA-FALLO pila+40 00000000
+SONDA-FALLO pila+44 00000000
+SONDA-FALLO pila+48 8c0c9d3e
+SONDA-FALLO pila+4c 8c463ad0
+SONDA-FALLO pila+50 8c463890
+SONDA-FALLO pila+54 8c09121a
+SONDA-FALLO pila+58 8c2e6050
+SONDA-FALLO pila+5c 8c460388
+SONDA-FALLO pila+60 00000000
+SONDA-FALLO pila+64 00000000
+SONDA-FALLO pila+68 8c3895e8
+SONDA-FALLO pila+6c 8c717f6c
+SONDA-FALLO pila+70 8c460388
+SONDA-FALLO pila+74 8c42d6cc
+SONDA-FALLO pila+78 8c31f548
+SONDA-FALLO pila+7c 8c321c50
+SONDA-FALLO pila+80 0000001a
+SONDA-FALLO pila+84 8c3219a8
+SONDA-FALLO pila+88 00000011
+SONDA-FALLO pila+8c 8c3ae450
+SONDA-FALLO pila+90 000001ba
+SONDA-FALLO pila+94 000001ba
+SONDA-FALLO pila+98 8c463890
+SONDA-FALLO pila+9c 00000240
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC FUERA pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC RACHA pc=ffffffff racha=30 pr=8c08bd3a fp=8c3ae450 sp=8c717dec
+SONDA-PC t=30 top ffffffff:44 8c122942:26 8c037544:4 8c03755c:3 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=44
+SONDA-PC t=31 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=144
+SONDA-PC RACHA sigue pc=ffffffff racha=230 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=32 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=244
+SONDA-PC t=33 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=344
+SONDA-PC RACHA sigue pc=ffffffff racha=430 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=34 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=444
+SONDA-PC t=35 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=544
+SONDA-PC RACHA sigue pc=ffffffff racha=630 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=36 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=644
+SONDA-PC t=37 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=744
+SONDA-PC RACHA sigue pc=ffffffff racha=830 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=38 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=844
+SONDA-PC t=39 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=944
+SONDA-PC RACHA sigue pc=ffffffff racha=1030 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=40 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1044
+SONDA-PC t=41 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1144
+SONDA-PC RACHA sigue pc=ffffffff racha=1230 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=42 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1244
+SONDA-PC t=43 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1344
+SONDA-PC RACHA sigue pc=ffffffff racha=1430 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=44 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1444
+SONDA-PC t=45 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1544
+SONDA-PC RACHA sigue pc=ffffffff racha=1630 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=46 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1644
+SONDA-PC t=47 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1744
+SONDA-PC RACHA sigue pc=ffffffff racha=1830 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=48 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1844
+SONDA-PC t=49 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=1944
+SONDA-PC RACHA sigue pc=ffffffff racha=2030 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=50 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2044
+SONDA-PC t=51 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2144
+SONDA-PC RACHA sigue pc=ffffffff racha=2230 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=52 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2244
+SONDA-PC t=53 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2344
+SONDA-PC RACHA sigue pc=ffffffff racha=2430 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=54 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2444
+SONDA-PC t=55 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2544
+SONDA-PC RACHA sigue pc=ffffffff racha=2630 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=56 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2644
+SONDA-PC t=57 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2744
+SONDA-PC RACHA sigue pc=ffffffff racha=2830 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=58 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2844
+SONDA-PC t=59 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=2944
+SONDA-PC RACHA sigue pc=ffffffff racha=3030 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=60 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3044
+SONDA-PC t=61 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3144
+SONDA-PC RACHA sigue pc=ffffffff racha=3230 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=62 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3244
+SONDA-PC t=63 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3344
+SONDA-PC RACHA sigue pc=ffffffff racha=3430 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=64 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3444
+SONDA-PC t=65 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3544
+SONDA-PC RACHA sigue pc=ffffffff racha=3630 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=66 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3644
+SONDA-PC t=67 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3744
+SONDA-PC RACHA sigue pc=ffffffff racha=3830 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=68 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3844
+SONDA-PC t=69 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=3944
+SONDA-PC RACHA sigue pc=ffffffff racha=4030 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=70 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4044
+SONDA-PC t=71 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4144
+SONDA-PC RACHA sigue pc=ffffffff racha=4230 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=72 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4244
+SONDA-PC t=73 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4344
+SONDA-PC RACHA sigue pc=ffffffff racha=4430 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=74 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4444
+SONDA-PC t=75 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4544
+SONDA-PC RACHA sigue pc=ffffffff racha=4630 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=76 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4644
+SONDA-PC t=77 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4744
+SONDA-PC RACHA sigue pc=ffffffff racha=4830 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=78 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4844
+SONDA-PC t=79 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=4944
+SONDA-PC RACHA sigue pc=ffffffff racha=5030 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=80 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=5044
+SONDA-PC t=81 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=5144
+SONDA-PC RACHA sigue pc=ffffffff racha=5230 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=82 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=5244
+SONDA-PC t=83 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=5344
+SONDA-PC RACHA sigue pc=ffffffff racha=5430 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=84 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=5444
+SONDA-PC t=85 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=5544
+SONDA-PC RACHA sigue pc=ffffffff racha=5630 pr=8c08bd3a fp=8c3ae450
+SONDA-PC t=86 top ffffffff:100 pc=ffffffff pr=8c08bd3a fp=8c3ae450 sp=8c717dec fuera=5644

@@ -100,12 +100,20 @@ const (
 	subtilesPorCelda = 5
 )
 
-// dibujarJugadores: si el cuadro pinta a los jugadores. Medido en esta tarjeta: con los seis .dcc del
-// personaje cargados, el PRIMER cuadro que los pinta muere con "Unhandled exception ... Data address error"
-// (PC 3fd17b4f, PR identico, R3 apuntando a VRAM) y la consola se reinicia. Se apaga para que la corrida
-// llegue a las tres etapas y mida lo que la tarjeta pregunta (RAM y tiempo de creacion por jugador); el
-// fallo del pintado queda como bloqueo declarado en la evidencia.
-const dibujarJugadores = false
+// dibujarJugadores: si el cuadro pinta a los jugadores. Encendido desde DC-002.84: el fallo del pintado
+// (DC-002.76: "Unhandled exception ... Data address error" en el primer cuadro, PC 3fd17b4f y R3 en VRAM)
+// quedo resuelto en el runtime; ver la evidencia dc-002.84-*.txt.
+const dibujarJugadores = true
+
+// precalentarCapas: crea las 16 superficies de cada capa al crear el jugador (ver el comentario en
+// crearJugador). Es el experimento que separa "el GC mueve las clausuras de la animacion" de "el cuadro
+// pide demasiado monton de golpe".
+const precalentarCapas = false
+
+// pintarSoloLaCapa: el experimento de aislamiento de DC-002.84 -- pintar UNA sola capa .dcc (la que el COF
+// pone primera en la prioridad) en vez del composite entero. Sirve para separar "es esta capa" de "es la
+// llamada por interfaz": el fallo del cuadro 1 se reproduce igual con una sola capa.
+const pintarSoloLaCapa = false
 
 // zonaActiva: si el POC compone la zona del acto 1 (el .ds1 y sus ocho .dt1) antes de los jugadores. Con el
 // jugador completo enlazado esto NO entra (ver el comentario en main y la evidencia); con el Composite
@@ -400,6 +408,9 @@ func prepararEtapa() {
 
 	informeDeCaches(nEtapa, "al crear")
 
+	// DC-002.84: la foto de las capas del jugador 1 ANTES y DESPUES de la recoleccion forzada. Si el GC
+	// mueve los objetos, la sonda de las capas tiene que mostrar los punteros actualizados; si una queda
+	// apuntando al semiespacio viejo, esa es la capa que revienta al pintarse.
 	// una recoleccion FORZADA, cronometrada: el numero que el GC agrega al cuadro cuando corre.
 	t0 := d2cUs()
 	runtime.GC()
@@ -441,6 +452,25 @@ func crearJugador(indice int) {
 	}
 
 	jugadores = append(jugadores, jugador)
+
+	// DC-002.84: PRECALENTAR las capas. La primera vez que una capa se pinta, `Animation.ensureSurfaces`
+	// llama a la clausura `ensureDirection` y crea las 16 superficies del cuadro (cientos de KB) EN MEDIO
+	// del cuadro, despues de la recoleccion forzada del POC. Con el precalentado esas superficies ya estan
+	// vivas ANTES de la primera recoleccion, y el GC las copia como cualquier otro objeto.
+	if precalentarCapas {
+		if d, ok := jugador.(*jugadorDeComposite); ok {
+			h0 := d2cHeapLibre()
+
+			for _, capa := range d.compuesto.Capas() {
+				if capa != nil {
+					capa.BindRenderer(renderer)
+					capa.GetCurrentFrameSurface()
+				}
+			}
+
+			println("COOP276: PRECALENTADO", nombre, "montonAntes=", int(h0), "montonDespues=", int(d2cHeapLibre()))
+		}
+	}
 
 	println("COOP276: JUGADOR", nombre, "indice=", indice, "direccion=", direcciones[indice],
 		"celda=", celda[0], celda[1], "subtiles=", subtiles[0], subtiles[1],
@@ -542,6 +572,12 @@ func dibujar(superficie d2interface.Surface) error {
 	}
 
 	for i := 0; i < nEtapa && dibujarJugadores; i++ {
+		if pintarSoloLaCapa && capaUnica != nil {
+			capaUnica.RenderFromOrigin(malla, false)
+
+			continue
+		}
+
 		jugadores[i].Render(malla)
 	}
 
