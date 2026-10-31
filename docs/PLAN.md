@@ -153,6 +153,21 @@ punteros se registran y se barren en el lugar, sin copiarlos. Medido en Flycast:
 POC del cooperativo crea **J1, J2, J3 y J4** sin una sola linea `FALLO` (antes J2 respondia "could not find
 Animation data" en cada cuadro). Evidencia: `console/dc/evidencia/dc-002.83-el-map-de-animdata-y-el-gc.txt`.
 
+**Medido en DC-002.86 (las tablas de records NO son la pared: 0,9 % de uso y el presupuesto del compositor):**
+instrumento nuevo `console/dc/medidas/uso-tablas` (host) que mide el otro lado del numero de DC-002.82 — lo
+que el pueblo **usa**. De las 12 tablas del compositor (4.240.928 B cargadas) el pueblo pide **40.040 B
+(0,9 %)**: 6 tablas no se tocan ni una vez (LvlWarp, AutoMap, Levels, LvlMaze, LvlSub, objtype) y de las 6 que
+si, lo maximo es 8 de 733 filas (monstats), 8 de 573 (Objects, ids {35,36,37,39,78,119,267,385}), 8 de 229
+(monpreset), 1 de 1091 (LvlPrest) y 1 de 36 (LvlTypes). Camino elegido: **(a) cargar solo las tablas que el
+nivel pide** (435.248 B en el host / 409.816 B medidos en consola, contra 4,04 MB de las 12 y contra los
+28.576 B de monton externo que quedan despues del arena). Aplicado y medido en Flycast: 2 tablas OK (92 y
+467 ms), y el pueblo muere igual en el arena de tiles, faltando **299.008 B** (4.849.148 B de una sola `make`
+contra 4.550.656 de margen). **La pared no son las tablas**: con CERO tablas el compositor pide 6.168.348 B
+(arena constante 4.848.148 + estructuras 967.944 + AssetManager 352.352) contra 5.230.592 de margen, o sea
+faltan **937.756 B** igual; de las tablas solo compite LvlPrest (324.112 B). Queda para la proxima tarjeta el
+recorte del arena/imagen con ese presupuesto. Evidencia:
+`console/dc/evidencia/dc-002.86-tablas-lo-usado-y-el-camino.txt`.
+
 ---
 
 ## Lo que se reusa (no se tira)

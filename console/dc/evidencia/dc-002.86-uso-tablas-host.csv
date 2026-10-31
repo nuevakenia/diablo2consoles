@@ -1,0 +1,13 @@
+tabla;filas;usadas;usadas_casillas;cargada_B;usado_B;bytes_por_fila;uso
+/data/global/excel/monstats.txt;733;8;0;1916496;20912;2614;Stamp.EntitiesWhere: Stats[preset]
+/data/global/excel/monstats2.txt;609;8;0;794536;10432;1304;d2mapentity.NewNPC: Stats2[monstat.ExtraDataKey]
+/data/global/excel/Objects.txt;573;8;0;408976;5704;713;Stamp.EntitiesWhere: Details[lookup.ObjectsTxtId]
+/data/global/excel/AutoMap.txt;2603;0;0;373600;0;143;NADIE en el compositor (lo usa d2gamescreen para el automapa)
+/data/global/excel/LvlPrest.txt;1091;1;1;339568;311;311;LoadStamp: Presets[1]
+/data/global/excel/Levels.txt;137;0;0;257928;0;1882;NADIE en el compositor (lo usa d2level/d2gamescreen)
+/data/global/excel/LvlTypes.txt;36;1;1;85024;2361;2361;ResetMap/LoadStamp: Types[1]
+/data/global/excel/objtype.txt;410;0;0;27776;0;67;NADIE en el compositor (objtype lo usa d2mapentity para la colision, no la carga)
+/data/global/excel/LvlWarp.txt;71;0;0;14952;0;210;NADIE en el compositor (d2mapengine/warps.go usa los warps del DS1, no la tabla)
+/data/global/excel/LvlMaze.txt;81;0;0;9280;0;114;NADIE en el compositor (solo los generadores de laberinto)
+/data/global/excel/monpreset.txt;229;8;0;9264;320;40;Stamp.EntitiesWhere: Presets[act][id]
+/data/global/excel/LvlSub.txt;13;0;0;3528;0;271;NADIE en el compositor (lo usa d2mapgen)

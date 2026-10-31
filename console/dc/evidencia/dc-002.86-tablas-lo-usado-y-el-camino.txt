@@ -1,0 +1,233 @@
+DC-002.86 -- LAS TABLAS DE RECORDS NO SON LA PARED DEL COMPOSITOR: 0,9 % DE LO CARGADO SE USA, Y CON CERO
+TABLAS EL PUEBLO TODAVIA NO ENTRA
+Rama DC-002, checkout unico en /home/dgalli/Proyectos/diablo2consoles, sin worktrees.
+Fecha: 2026-10-31. Base: HEAD 56b92fff (cierre de DC-002.85).
+Medido en Flycast con el binario de consola; ninguna corrida toco la Dreamcast fisica.
+
+
+0. Resumen en tres lineas
+-------------------------
+1) Medido tabla por tabla (instrumento nuevo `console/dc/medidas/uso-tablas`): las 12 tablas del compositor
+   cargan 4.240.928 B y el pueblo USA 40.040 B -- el 0,9 %. De 12 tablas, 6 no se tocan ni una vez
+   (LvlWarp, AutoMap, Levels, LvlMaze, LvlSub, objtype) y de las 6 que si, el uso maximo es 8 filas de 733
+   (monstats), 8 de 573 (Objects), 8 de 229 (monpreset), 1 de 1091 (LvlPrest) y 1 de 36 (LvlTypes).
+2) Con las tablas de HOY (`modoTablas=3`, o sea el camino (a) ya aplicado) el pueblo muere en el arena de
+   tiles con 299.008 B de menos -- y ese numero NO depende de las tablas: el presupuesto del compositor con
+   CERO tablas es 6.168.348 B (arena constante del codigo) contra un margen de 5.230.592 B, o sea que faltan
+   937.756 B igual. De las tablas, lo unico que compite con el arena es el monton de C de LvlPrest
+   (324.112 B): sacarla entera dejaria el faltante en 937.756 B, o sea el mismo veredicto.
+3) Camino elegido: (a) -- cargar solo las tablas que el nivel pide --, porque es el unico de los tres que
+   cabe en el monton (435.248 B en el host / 409.816 B medidos en la consola, contra 4,06 MB de las 12 y
+   contra 28.576 B de monton externo libre despues del arena). Queda aplicado y medido. Lo que impide ver el
+   pueblo compuesto es OTRA pared (el arena de 4.849.148 B de una sola `make` + 967.944 B de estructuras del
+   mapa), y esa queda con su presupuesto medido para la tarjeta que sigue.
+
+
+1. Lo que se pidio, y lo que habia
+----------------------------------
+La tarjeta pide tres cosas:
+  (1) medir, tabla por tabla, cuanto se usa de verdad al cargar el pueblo;
+  (2) elegir camino con la medicion delante, entre (a) solo las tablas que el nivel pide, (b) leerlas del
+      MPQ por registro bajo demanda y (c) dejarlas en el monton externo de C con malloc/free;
+  (3) si (a) alcanza, aplicarlo y medir el pueblo de punta a punta.
+
+Lo que habia de DC-002.82: lo CARGADO por tabla (14,26 MB las 85, 4,24 MB las 12 del compositor) y la pared
+del arena medida (el primer `.dt1` del `LoadStamp` pide 4.849.148 B cuando quedan 4.554.752 B). Faltaba el
+otro lado del numero -- lo USADO --, que es lo que decide entre (a), (b) y (c).
+
+
+2. Lo USADO vs lo CARGADO, tabla por tabla
+------------------------------------------
+Instrumento nuevo: `console/dc/medidas/uso-tablas` (host). Carga las 12 tablas por el camino del motor
+(`d2txt.LoadDataDictionary` + `Records.Load`, el mismo de DC-002.82, con el delta de `HeapAlloc` por tabla) y
+despues HACE LAS MISMAS LECTURAS QUE HACE EL COMPOSITOR con el pueblo real:
+
+  - `ResetMap`/`LoadStamp`: `Records.Level.Types[1]` y `Records.Level.Presets[1]`
+    (d2mapengine/engine.go:113, d2mapstamp/factory.go:49 y :79).
+  - `Stamp.EntitiesWhere` (el camino de las entidades): por cada objeto del `.ds1` del pueblo, Character ->
+    `Monster.Presets[act][id]` -> `Monster.Stats[nombre]` -> `Monster.Stats2[monstat.ExtraDataKey]`
+    (d2mapstamp/stamp.go:145-146, d2mapentity/factory.go:233); Item -> `FindObject(act,typ,id).ObjectsTxtId`
+    -> `Object.Details[id]` (d2mapstamp/stamp.go:165-171).
+
+El pueblo que se mide es el de siempre: `RegionAct1Town` (level type 1), preset 1, `act1/town/townn1.ds1`
+-- 57x41, 8 `.dt1` de los 9 del level type, 41 objetos: **15 Character (NPC) y 26 Item**.
+
+  tabla                 filas  usadas   %uso  casillas   cargada B   usado B  B/fila
+  monstats.txt            733       8   1,1%        0     1.916.496    20.912   2.614
+  monstats2.txt           609       8   1,3%        0       794.536    10.432   1.304
+  Objects.txt             573       8   1,4%        0       408.976     5.704     713
+  AutoMap.txt            2603       0   0,0%        0       373.600         0     143
+  LvlPrest.txt           1091       1   0,1%        1       339.568       311     311
+  Levels.txt              137       0   0,0%        0       257.928         0   1.882
+  LvlTypes.txt             36       1   2,8%        1        85.024     2.361   2.361
+  objtype.txt             410       0   0,0%        0        27.776         0      67
+  LvlWarp.txt              71       0   0,0%        0        14.952         0     210
+  LvlMaze.txt              81       0   0,0%        0         9.280         0     114
+  monpreset.txt           229       8   3,5%        0         9.264       320      40
+  LvlSub.txt               13       0   0,0%        0         3.528         0     271
+
+  TOTAL cargado por las 12:                                 4.240.928 B (4,04 MB) = 404 % del semiespacio
+  TOTAL de las filas que el pueblo usa (casillas+entidades):   40.040 B  = 0,9 % de lo cargado
+  TOTAL de las filas de la composicion de casillas sola:        2.672 B  (Types[1] + Presets[1])
+
+Las filas concretas que pide el pueblo, para que el numero se pueda auditar fila por fila:
+  * `LvlTypes`: la 1 ("Act 1 - Town"). `LvlPrest`: la 1 ("Act 1 - Town 1").
+  * `Objects.txt`: 8 filas distintas, ids {35, 36, 37, 39, 78, 119, 267, 385} (los 26 Item del `.ds1` caen en
+    esos 8 ids via la tabla de lookups).
+  * `monpreset`: 8 nombres (los 15 Character del `.ds1` son 8 NPC distintos); `monstats` 8 filas;
+    `monstats2` 8 filas.
+  * `LvlWarp`, `AutoMap`, `Levels`, `LvlMaze`, `LvlSub`, `objtype`: CERO. No es una suposicion: en
+    `d2mapengine` y `d2mapstamp` no hay una sola lectura de esos `Records` (los warps del nivel salen del
+    `.ds1`, el automapa lo usa `d2gamescreen`, `Levels`/`LvlSub`/`LvlMaze` los usan los generadores).
+
+Nota de conteo: las filas de aca son los REGISTROS que quedan en el `RecordManager`. DC-002.82 contaba las
+lineas del CSV (con el encabezado y el vacio final), de ahi la diferencia de 1 en varias tablas (37 vs 36 en
+LvlTypes, 1092 vs 1091 en LvlPrest, ...). Los bytes difieren < 1 % por lo mismo, y entre corridas del
+instrumento varian unas decenas de bytes (4.240.928 / 4.256.888 en dos corridas): es el ruido del asignador
+del host, no una tabla distinta.
+
+
+3. El presupuesto del compositor (lo que NO son tablas)
+------------------------------------------------------
+El numero que decide no es lo que pesan las tablas: es lo que el compositor pide ADEMAS. Medido con los
+archivos del pueblo y los `sizeof` que imprime el POC en la consola (MapTile 264 B, d2dt1.Tile 272 B,
+d2ds1.Tile 20 B):
+
+  los 9 .dt1 del level type del pueblo (crudos) ............. 4.652.603 B  (603 tiles)
+  arena de tiles que pide HOY el codigo (constante de
+    d2asset, dimensionada con los 8 .dt1 del POC de zonas) . 4.848.148 B  (UN solo pedido)
+    (si se dimensionara al pueblo con el mismo 10 % de aire:  5.117.863 B)
+  dt1TileData (603 tiles x 272 B) ..........................   164.016 B
+  casillas del mapa (57 x 41 = 2337 x 264 B) ...............   616.968 B  (una sola `make` en ResetMap)
+  .ds1 desarmado (4 capas x 2337 x 20 B) ...................   186.960 B
+  AssetManager del motor (medido en la consola) ............   352.352 B
+  ----------------------------------------------------------------
+  estructuras del mapa (dt1TileData + casillas + .ds1) .....   967.944 B
+  TOTAL con CERO tablas (arena constante) .................. 6.168.348 B  (5,88 MB)
+  TOTAL con CERO tablas (arena dimensionado al pueblo) ..... 6.438.063 B  (6,14 MB)
+  margen del monton con el binario del compositor .......... 5.230.592 B  (4,99 MB)
+  FALTAN (caso constante) ..................................   937.756 B
+  FALTAN (caso dimensionado al pueblo) ..................... 1.207.471 B
+
+O sea: aunque las tablas costaran CERO, al compositor le faltan entre 937 KB y 1,2 MB para cargar el pueblo.
+De las tablas, lo unico que compite por ese monton es LvlPrest en el monton de C (324.112 B medidos; los
+records de LvlTypes, 85.704 B, van al semiespacio de Go, que ya esta reservado y no compite con el arena).
+La pared NO son las tablas: son el arena de tiles + las estructuras del mapa contra una imagen que ya se come
+2.277.728 B mas de monton que el POC de zonas (DC-002.82, medido: 1ST_READ 6.847.080 contra 4.569.352 y el
+monton al arrancar 2.273.280 B mas chico, 1:1).
+
+
+4. Los tres caminos, con numeros
+--------------------------------
+Presupuesto del monton (consola, medido hoy, log dc-002.86-consola-pueblo-a.log):
+  techo de KOS 0x8cff0000 | sbrk al arrancar 0x8caf3000 | margen al arrancar 5.230.592 B
+  despues del AssetManager        margen 4.874.240 B
+  despues de las 2 tablas (a)     margen 4.550.656 B   (LvlTypes +40 B de monton de C y 85.704 B de
+                                                       semiespacio; LvlPrest +324.112 B de C, 1091
+                                                       presets, 467 ms)
+  lo que pide el arena de una     4.849.148 B (sbrk diff 4.849.664) -> faltan 299.008 B
+
+ (a) CARGAR SOLO LAS TABLAS QUE EL NIVEL PIDE.
+     Cuales son, con el codigo: la composicion de casillas pide LvlTypes + LvlPrest; las entidades agregan
+     Objects + monpreset + monstats + monstats2 (y la tabla de lookups, que ya vive en disco por DC-002.42).
+     Numeros: 2 tablas = 435.248 B en el host / 409.816 B medidos en la consola (324.112 de monton de C +
+     85.704 de semiespacio). Con entidades: +3.129.256 B en el host -> imposible en 2 MB de semiespacio
+     (DC-002.82 midio que la 5a tabla -- Objects.txt -- mata la corrida, con el recolector frenado y libre).
+     Veredicto: ES EL UNICO QUE CABE, y no alcanza para el pueblo ni por casualidad: con (a) aplicado
+     faltan 299.008 B SOLO para el arena, y detras vienen 967.944 B de estructuras del mapa.
+     Costo de aplicarlo: cero codigo nuevo (ya es `modoTablas=3` del POC).
+
+ (b) LEERLAS DEL MPQ POR REGISTRO BAJO DEMANDA.
+     El MPQ no tiene indice por fila: `ReadFile` descomprime el archivo ENTERO (medido hoy en la consola:
+     LvlTypes 92 ms, LvlPrest 467 ms por archivo). Leer "una fila" del MPQ cuesta el archivo completo y,
+     peor, el parseo del CSV es justo lo que llena el semiespacio: no ahorra nada de lo que duele.
+     El unico camino medido que lee POR REGISTRO en esta consola es el de los lookups de objetos
+     (DC-002.42): un PACK en el disco (773.869 B, 7.891 registros) con indice de 31.564 B + ventana de
+     4 KiB en RAM y solo los registros que el motor pide. Llevado a las tablas de records: RAM ~= indice +
+     4 KiB + los 40 registros del pueblo (< 10 KB), contra 4,04 MB cargadas. Precio: un formato + un
+     generador por tabla (como `gen-lookups-pack`) y tocar el camino de carga de CADA tabla -- o sea el
+     RecordManager, que esta tarjeta NO puede reescribir.
+     Veredicto: es el camino con la RAM mas baja y el mas caro en codigo; no se implementa aca.
+
+ (c) DEJARLAS EN EL MONTON EXTERNO DE C CON malloc/free.
+     Meter los 4,04 MB de tablas en malloc no los hace gratis: el monton externo es el MISMO que tiene que
+     dar el arena. Despues del AssetManager quedan 4.874.240 B y el arena sola pide 4.849.664 B: quedan
+     28.576 B para TODAS las tablas. Y en libgodc el bloque grande no vuelve: `gc_external_alloc` es
+     `malloc` pelado y Go no tiene `FreeExternal` (solo C, `d2c_libre`); DC-002.78 midio que liberar y
+     volver a pedir tamanios distintos fragmenta el monton (13,4 MB de arena con 928 KB libres y sin bloque
+     contiguo de 397 KB).
+     Veredicto: no cabe ni con las tablas vacias (28.576 B libres contra 4,04 MB).
+
+ CAMINO ELEGIDO: (a). Es el unico que entra en el presupuesto y el unico que no toca el RecordManager. NO
+ resuelve el pueblo, y eso NO es culpa de las tablas: es el arena + las estructuras (seccion 3).
+
+
+5. Lo aplicado y lo medido de punta a punta
+-------------------------------------------
+Se aplico (a) tal cual: `TABLAS=3` (solo LvlTypes + LvlPrest) `MAPA=1 ARENA=1 LIENZO=0 GCENTRE=1 GCINHIBE=1`,
+binario nuevo (1ST_READ 6.849.864 B) y corrida en Flycast. El log completo esta en
+`dc-002.86-consola-pueblo-a.log`; lo que dice, en orden:
+
+  TABLAS: monton al arrancar: arena=4355808 usado=4354312 libre=1496 sbrk=0x8caf3000 techo=0x8cff0000
+                                 margen=5230592
+  TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true ... margen=4874240
+  TABLA 1 /data/global/excel/LvlTypes.txt OK usado=4709680 delta=40    ms= 92 | types= 36
+  TABLA 2 /data/global/excel/LvlPrest.txt OK usado=5033792 delta=324112 ms=467 | presets= 1091
+  TABLAS: intentadas= 2 cargadas= 2 fallidas= 0 ms= 756
+  ARENA: capacidad que pide d2asset = 4849148 B (constante de DC-002.78)
+  ARENA: los 9 .dt1 del level type del pueblo miden 4652603 B crudos;
+         margen del monton antes de pedirla = 4550656
+  Out of memory. Requested sbrk_base 0x8d039000, was 0x8cb99000, diff 4849664
+  fatal error: gc_external_alloc: OOM
+  Memory: arena=5035744 used=5033792 free=1952
+
+Contra DC-002.82 (mismos numeros, codigo de hoy): margen al arrancar identico (5.230.592 B), AssetManager
+352.352 B, LvlTypes 92 ms, LvlPrest 467 ms/+324.112 B, y la misma muerte con 299.008 B de menos (en .82
+eran 294.912 B: la diferencia son los 4.096 B de mas que ocupa hoy el AssetManager).
+La consola REARRANCA en bucle despues del OOM (el log muestra "REIOS: Booting up" cada ~28 s): no es un
+bucle del POC, es el runtime muriendo y el BIOS volviendo a arrancar la imagen.
+
+El pueblo NO queda compuesto. No se maquilla: la parte (3) de la tarjeta ("si (a) alcanza, aplicarlo y medir
+el pueblo completo") queda aplicada y medida hasta la pared, y la pared con su presupuesto (937.756 B con
+cero tablas, con el arena que pide hoy el codigo) se entrega para la tarjeta que sigue.
+
+
+6. Que habria que recortar, con el presupuesto de la seccion 3
+--------------------------------------------------------------
+En orden de peso, y todo medido o sacado de constantes del binario:
+  a) El arena de tiles: 4.848.148 B de una sola `make` (y 5.117.863 B si se dimensiona al pueblo con el
+     mismo 10 % de aire de la constante actual). Dimensionarlo al pueblo sin aire son 4.652.603 B: con las
+     2 tablas el margen es 4.550.656, o sea que ni asi entra; con cero tablas el margen es 4.874.240 y entra,
+     pero entonces muere en el `make` de las casillas.
+  b) Las estructuras del mapa: 616.968 B de una sola `make` (casillas) + 164.016 + 186.960 = 967.944 B.
+  c) La imagen: -2.277.728 B es lo que separa este binario del de zonas y lo que se come el monton 1:1. Es
+     la palanca grande, y es decision de arquitectura (que el compositor no arrastre d2ui/d2hero/d2item).
+  d) Las tablas: 324.112 B en el monton de C (LvlPrest). Aun a cero no cambia el veredicto -- ya esta medido.
+  e) La doble lectura por fase (9,3 MB con un cache de dt1 de 1.048.576 B): no cambia el pico, pero es el
+     tiempo.
+
+
+7. Como se reproduce
+--------------------
+  # el instrumento de lo USADO (host; el overlay vacia debug_print.go, que es el unico que arrastra ebiten)
+  go build -overlay=/tmp/dc282-overlay.json -o /tmp/dc286-uso ./console/dc/medidas/uso-tablas/
+  /tmp/dc286-uso -dir "$HOME/.wine-d2/drive_c/Games/Diablo II" -csv /tmp/dc286-uso.csv
+
+  # el binario de consola con (a) aplicado y su corrida
+  bash scripts/console/build-std-gox.sh /tmp/gox-286
+  bash scripts/console/build-motor-all.sh /tmp/gox-286 /tmp/dcbuild/motor-286
+  BASE_GOX=/tmp/gox-286 TABLAS=3 MAPA=1 LIENZO=0 ARENA=1 GCENTRE=1 GCINHIBE=1 \
+      bash scripts/console/build-tablas-282.sh /tmp/dcbuild/tablas286
+  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/tablas286/disc.gdi 150 /tmp/dc286-run-a
+
+  (En esta corrida se reuso el arbol /tmp/gox-282 de DC-002.82 DESPUES de recompilarlo entero contra HEAD
+  con build-motor-all: 145 de 145 paquetes, 0 bloqueados. Sin eso el POC moria compilando d2render/pvr,
+  que desde DC-002.85 usa `d2util.ImgIndexToRGBAEn` y el d2util.gox viejo no lo tenia. Leccion para la
+  proxima: el arbol de gox de una tarjeta NO sirve para otra sin recompilarlo.)
+
+
+8. Evidencia
+------------
+  dc-002.86-uso-tablas-host.txt / .csv ...... las 12 tablas: cargado, usado, presupuesto del compositor
+  dc-002.86-consola-pueblo-a.log ............ (a) aplicado en la consola: 2 tablas, 409.816 B medidos,
+                                              arena de 4.849.148 B contra 4.550.656 de margen -> OOM
