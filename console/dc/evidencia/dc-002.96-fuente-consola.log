@@ -1,0 +1,53 @@
+FUENTE296: arranca DC-002.96 -- la Source de consola, los seis formatos con dueno
+FUENTE296: palancas: noLibera= false
+FUENTE296: monton al arrancar: arena=4355680 usado=4354312 libre=1368 sbrk=0x0x8c5b1000 techo=0x0x8cff0000
+FUENTE296: base del monton (tras GC) usado= 4354312 libre= 1368
+FUENTE296: MPQ abierto con la Source de consola; liberador conectado= true monton=arena=4712032 usado=4709312 libre=2720 sbrk=0x0x8c608000 techo=0x0x8cff0000
+FUENTE296: prestamo calentado: reservado= 14272 crecidas= 4 monton=arena=4712032 usado=4709312 libre=2720 sbrk=0x0x8c608000 techo=0x0x8cff0000
+FUENTE296: ===== A) LA ZONA (el pueblo) =====
+FUENTE296: DS1 bytes= 57652 crc32= 712973328
+FUENTE296: DS1 w= 57 h= 41 archivos= 8 ventana= 512 origen= 304 1664
+FUENTE296: PEDIDOS pisos= 1982 paredes= 330 total= 2312
+FUENTE296: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton antes= 5197088 despues= 5197088 delta= 0
+FUENTE296: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton antes= 5197088 despues= 5197088 delta= 0
+FUENTE296: DT1 data/global/tiles/act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 monton antes= 5197088 despues= 5197088 delta= 0
+FUENTE296: DT1 data/global/tiles/act1\barracks\warp.dt1 bytes= 658158 crc32= -256062915 monton antes= 5197088 despues= 5197088 delta= 0
+FUENTE296: DT1 data/global/tiles/act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 monton antes= 5197088 despues= 5197088 delta= 0
+FUENTE296: DT1 data/global/tiles/act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 monton antes= 5197088 despues= 5197088 delta= 0
+FUENTE296: DT1 data/global/tiles/act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 monton antes= 5197088 despues= 5197088 delta= 0
+FUENTE296: DT1 data/global/tiles/act1\outdoors\objects.dt1 bytes= 338205 crc32= -1287313098 monton antes= 5197088 despues= 5197088 delta= 0
+FUENTE296: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+FUENTE296: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840 dt1 leidos= 8 de 8 ms= 29140
+FUENTE296: monton tras la zona: usado= 5197088 libre= 2368
+FUENTE296: .dt1 LIDO bytes=1008003 crc32=231028135 monton=6205096
+FUENTE296: .dt1 data\global\tiles\ACT1\TOWN\floor.dt1 bytes=1008003 crc32=231028135 parseado tiles=144 monton antes=5197088 despues=5197088 delta=0 volvio=si
+FUENTE296: .ds1 LIDO bytes=57652 crc32=712973328 monton=5197088
+FUENTE296: .ds1 data\global\tiles\ACT1\TOWN\townN1.ds1 bytes=57652 crc32=712973328 parseado w=57 h=41 objetos=41 archivos=8 monton antes=5197088 despues=5197088 delta=0 volvio=si
+FUENTE296: .dcc LIDO bytes=144996 crc32=2017674847 monton=5342088
+FUENTE296: .dcc data\global\objects\AA\S2\aas2litnuhth.dcc bytes=144996 crc32=2017674847 solo lectura  monton antes=5197088 despues=5197088 delta=0 volvio=si
+FUENTE296: .cof LIDO bytes=253 crc32=739968331 monton=5197088
+FUENTE296: .cof data\global\objects\E2\COF\e2S1HTH.cof bytes=253 crc32=739968331 parseado capas=1 framesPorDir=108 monton antes=5197088 despues=5197088 delta=0 volvio=si
+FUENTE296: .dc6 LIDO bytes=948410 crc32=1270291959 monton=6145504
+FUENTE296: .dc6 data\global\ui\FrontEnd\ts11b.DC6 bytes=948410 crc32=1270291959 parseado cuadros=30 caja=200x200 pixeles=26518 monton antes=5197088 despues=5197088 delta=0 volvio=si
+FUENTE296: animdata LIDO bytes=411104 crc32=-1972879551 monton=5608200
+FUENTE296: animdata data\global\AnimData.D2 bytes=411104 crc32=-1972879551 solo lectura  monton antes=5197088 despues=5197088 delta=0 volvio=si
+FUENTE296: ===== C) LA PRUEBA DEL 1 MB =====
+FUENTE296: 1MB bytes= 1008003 crc32= 231028135
+FUENTE296: 1MB monton antes= 5197088 con el tramo vivo= 6205096 despues de liberar= 5197088 delta= 0 margen= 4096 volvioALaBase= true
+FUENTE296: 1MB OK -- el monton volvio al nivel de partida despues del archivo de 1 MB
+FUENTE296: ===== D) LOS MISMOS SEIS SIN DUENO (el camino de hoy) =====
+FUENTE296: SINDUENO .dt1 data\global\tiles\ACT1\TOWN\floor.dt1 bytes=1008003 crc32=231028135 monton=6900480
+FUENTE296: SINDUENO .ds1 data\global\tiles\ACT1\TOWN\townN1.ds1 bytes=57652 crc32=712973328 monton=6900480
+FUENTE296: SINDUENO .dcc data\global\objects\AA\S2\aas2litnuhth.dcc bytes=144996 crc32=2017674847 monton=7045480
+FUENTE296: SINDUENO .cof data\global\objects\E2\COF\e2S1HTH.cof bytes=253 crc32=739968331 monton=7045480
+FUENTE296: SINDUENO .dc6 data\global\ui\FrontEnd\ts11b.DC6 bytes=948410 crc32=1270291959 monton=8419408
+FUENTE296: SINDUENO animdata data\global\AnimData.D2 bytes=411104 crc32=-1972879551 monton=8830520
+FUENTE296: SINDUENO monton antes= 5197088 despues= 8830520 tomado= 3633432 (es lo que el camino de hoy deja por archivo)
+FUENTE296: ================ EL VEREDICTO ================
+FUENTE296: cargas por la Source nueva= 16 por el camino viejo= 6
+FUENTE296: seis formatos: aciertos= 6 de 6 fallos= 0
+FUENTE296: instrumento de la fuente: pedidos= 17 liberados= 17 bytesVivos= 0 externos= 14 dobles= 0 enBuffer= 6 conPrestamo= 17 prestamo= 14272 crecidas= 4
+FUENTE296: DUENO OK -- todos los tramos que se pidieron se devolvieron (0 bytes vivos)
+FUENTE296: ZONA OK -- el pueblo compone igual: crc32 -787319840 == 3507647456
+FUENTE296: monton al final: usado= 8830520 libre= 2088  (el bloque D deja tomado lo que no se libera: 3633432 bytes)
+FUENTE296: 1MB OK en el veredicto -- el monton volvio a la base con el archivo de 1 MB

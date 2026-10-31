@@ -1,0 +1,39 @@
+FUENTE296: arranca DC-002.96 -- la Source de consola, los seis formatos con dueno
+FUENTE296: palancas: noLibera= true
+FUENTE296: monton al arrancar: arena=4355584 usado=4354312 libre=1272 sbrk=0x0x8c5b1000 techo=0x0x8cff0000
+FUENTE296: base del monton (tras GC) usado= 4354312 libre= 1272
+FUENTE296: MPQ abierto con la Source de consola; liberador conectado= false monton=arena=4711936 usado=4709312 libre=2624 sbrk=0x0x8c608000 techo=0x0x8cff0000
+FUENTE296: prestamo calentado: reservado= 14272 crecidas= 4 monton=arena=5719552 usado=5717320 libre=2232 sbrk=0x0x8c6fe000 techo=0x0x8cff0000
+FUENTE296: ===== A) LA ZONA (el pueblo) =====
+FUENTE296: DS1 bytes= 57652 crc32= 712973328
+FUENTE296: DS1 w= 57 h= 41 archivos= 8 ventana= 512 origen= 304 1664
+FUENTE296: PEDIDOS pisos= 1982 paredes= 330 total= 2312
+FUENTE296: DT1 data/global/tiles/act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton antes= 6205096 despues= 6710608 delta= 505512
+FUENTE296: DT1 data/global/tiles/act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton antes= 6710608 despues= 7150184 delta= 439576
+FUENTE296: DT1 data/global/tiles/act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 monton antes= 7150184 despues= 8158192 delta= 1008008
+FUENTE296: DT1 data/global/tiles/act1\barracks\warp.dt1 bytes= 658158 crc32= -256062915 monton antes= 8158192 despues= 8816360 delta= 658168
+FUENTE296: DT1 data/global/tiles/act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 monton antes= 8816360 despues= 9132712 delta= 316352
+FUENTE296: DT1 data/global/tiles/act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 monton antes= 9132712 despues= 9794232 delta= 661520
+FUENTE296: DT1 data/global/tiles/act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 monton antes= 9794232 despues= 10217608 delta= 423376
+FUENTE296: DT1 data/global/tiles/act1\outdoors\objects.dt1 bytes= 338205 crc32= -1287313098 monton antes= 10217608 despues= 10555824 delta= 338216
+FUENTE296: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+FUENTE296: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840 dt1 leidos= 8 de 8 ms= 29140
+FUENTE296: monton tras la zona: usado= 10555824 libre= 1104
+FUENTE296: .dt1 LIDO bytes=1008003 crc32=231028135 monton=11563832
+FUENTE296: .dt1 data\global\tiles\ACT1\TOWN\floor.dt1 bytes=1008003 crc32=231028135 parseado tiles=144 monton antes=10555824 despues=11563832 delta=1008008 volvio=no
+FUENTE296: .ds1 LIDO bytes=57652 crc32=712973328 monton=11563832
+FUENTE296: .ds1 data\global\tiles\ACT1\TOWN\townN1.ds1 bytes=57652 crc32=712973328 parseado w=57 h=41 objetos=41 archivos=8 monton antes=11563832 despues=11563832 delta=0 volvio=si
+FUENTE296: .dcc LIDO bytes=144996 crc32=2017674847 monton=11708832
+FUENTE296: .dcc data\global\objects\AA\S2\aas2litnuhth.dcc bytes=144996 crc32=2017674847 solo lectura  monton antes=11563832 despues=11708832 delta=145000 volvio=no
+FUENTE296: .cof LIDO bytes=253 crc32=739968331 monton=11708832
+FUENTE296: .cof data\global\objects\E2\COF\e2S1HTH.cof bytes=253 crc32=739968331 parseado capas=1 framesPorDir=108 monton antes=11708832 despues=11708832 delta=0 volvio=si
+FUENTE296: .dc6 LIDO bytes=948410 crc32=1270291959 monton=12657248
+FUENTE296: .dc6 data\global\ui\FrontEnd\ts11b.DC6 bytes=948410 crc32=1270291959 parseado cuadros=30 caja=200x200 pixeles=26518 monton antes=11708832 despues=12657248 delta=948416 volvio=no
+FUENTE296: animdata LIDO bytes=411104 crc32=-1972879551 monton=13068360
+FUENTE296: animdata data\global\AnimData.D2 bytes=411104 crc32=-1972879551 solo lectura  monton antes=12657248 despues=13068360 delta=411112 volvio=no
+FUENTE296: ===== C) LA PRUEBA DEL 1 MB =====
+FUENTE296: 1MB bytes= 1008003 crc32= 231028135
+FUENTE296: 1MB monton antes= 13068360 con el tramo vivo= 14076368 despues de liberar= 14076368 delta= 1008008 margen= 4096 volvioALaBase= false
+FUENTE296: 1MB MAL -- el tramo NO se devolvio: quedan 1008008 bytes tomados
+FUENTE296: ===== D) LOS MISMOS SEIS SIN DUENO (el camino de hoy) =====
+01:05:032 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked

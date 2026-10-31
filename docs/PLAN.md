@@ -184,6 +184,23 @@ compone el pueblo con los crc -1596781041 / -205471136 / -1596781041 y margen 49
 nuevo: `scripts/console/medir-hueco-gc-293.sh` (`leer` un log, o `escalera` completa). Evidencia:
 `console/dc/evidencia/dc-002.93-el-hueco-de-gc-init.md`.
 
+**Medido en DC-002.96 (la Source de consola: los seis formatos con dueño y el montón que vuelve):** el camino de
+consola lee ahora TODOS los assets grandes por una sola `asset.Source` (`console/dc/fuenteconsola`) que
+implementa las tres interfaces y tiene **dueño explícito del buffer** (`Pedir`/`Liberar`, con el `free` del
+bloque externo que el recolector no devuelve). Medido en Flycast, un solo arranque sin excepciones: la zona del
+pueblo compone igual que DC-002.38/.81/.88 (**crc32 del lienzo 3.507.647.456**, 1982/1982 pisos, 330/330
+paredes, 8 de 8 `.dt1`, 29.140 ms) con **delta de montón 0 en los ocho `.dt1`**, y los seis formatos dan el
+mismo crc32 que el medidor del host (`.dt1` 231028135, `.ds1` 712973328, `.dcc` 2017674847, `.cof` 739968331,
+`.dc6` 1270291959, `animdata` 2322087745). El archivo de 1 MB sube el montón 1.008.008 B con el tramo vivo y
+lo devuelve al byte al liberar; el mismo archivo leído como lo lee `d2asset.LoadFile` (`make` sin dueño) deja
+**3.633.432 B** tomados. El mutante (`NO_LIBERA=1`) convierte cada delta en el tamaño del archivo (+8 B), deja
+4.350.728 B tomados en la zona y mata la consola con el montón agotado: el instrumento mide el dueño y no el
+ruido. Dos paredes medidas y no tapadas: el decodificador del `.dcc` no entra en el montón de Go (45
+recolecciones, `FATAL: recover without checkpoint`), así que el `.dcc` y el `animdata` entran como lectura
+(igual que DC-002.50), y `d2asset.LoadFile` **sigue** pidiendo `make` por archivo (la fuente está lista y
+`RegistrarEn` la pone primera; falta que el motor la use). Cuatro pruebas en el host, 4 de 4 verdes.
+Evidencia: `console/dc/evidencia/dc-002.96-la-source-de-consola.md`.
+
 ---
 
 ## Lo que se reusa (no se tira)
