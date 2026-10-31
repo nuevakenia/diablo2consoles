@@ -1,0 +1,156 @@
+DC-002.91 -- EL ARBOL DE .gox VIEJO AVISA ANTES DE COMPILAR
+============================================================
+
+Criterio de la tarjeta: con un arbol viejo a proposito (un .gox tocado hacia atras), el aviso sale ANTES
+de compilar y dice el paquete y la receta; con un arbol fresco, no molesta.
+
+RESULTADO, en tres lineas:
+
+  1. UN CHEQUEO DE FECHAS ANTES DE COMPILAR. `scripts/console/revisar-arbol-gox.sh` (nuevo) compara cada
+     `.gox` del arbol (BASE_GOX) contra la fuente mas nueva del paquete que le corresponde -- stdlib de la
+     consola, terceros reescritos y motor -- y si alguno es mas viejo (o no existe) imprime un RECUADRO
+     con el paquete, las dos fechas, el archivo culpable y la receta de rehacer el arbol. Aborta el build
+     sin compilar. Tarda 65 ms: dos `find` y un `awk`, no un build.
+
+  2. LOS CUATRO BUILDS QUE USAN BASE_GOX LO LLAMAN. `build-tablas-282.sh`, `build-coop-276.sh`,
+     `build-zonas-277.sh` y `build-loadfile-279.sh`. Ademas, la lista de paquetes que cada build recompila
+     paso a ser UNA variable (`PAQUETES_MOTOR`) que se usa dos veces: la lee el chequeo (para no quejarse
+     de lo que el propio build rehace) y la recorre el paso de compilacion. Una sola lista (la leccion de
+     DC-002.90: dos listas del mismo numero se separan).
+
+  3. LA PRUEBA, 30 EN VERDE Y 0 EN ROJO. `scripts/console/checar-arbol-gox-291.sh`: arbol fresco ->
+     silencio y exit 0 (65 ms); `.gox` envejecido a proposito -> el recuadro sale ANTES de compilar, dice
+     `compress/zlib`, la fecha del objeto (01/01 00:00) contra la de la fuente, y la receta; y con TODOS
+     los `.gox` envejecidos grita por 212 paquetes (si el detector se rompiera y dijera "todo fresco", esa
+     prueba se pone roja). De paso: el build real con el arbol fresco sigue dando el 1ST_READ.BIN de la
+     referencia, 6.859.016 B, sha256 6a399115926dc75b... (checar-palancas-290.sh: 24 en verde, 0 en rojo).
+
+
+1. QUE SE AGREGO
+----------------
+  scripts/console/revisar-arbol-gox.sh        (nuevo)  el chequeo
+  scripts/console/checar-arbol-gox-291.sh     (nuevo)  la prueba, 10 grupos y 30 afirmaciones
+  scripts/console/build-tablas-282.sh         lo llama antes de compilar; PAQUETES_MOTOR (17 paquetes)
+  scripts/console/build-coop-276.sh           lo llama; PAQUETES_MOTOR (5 paquetes)
+  scripts/console/build-zonas-277.sh          lo llama; PAQUETES_MOTOR (11 paquetes)
+  scripts/console/build-loadfile-279.sh       lo llama; PAQUETES_MOTOR (10 paquetes)
+
+  Como se mapea cada fuente a su .gox (esto es lo que hace que el aviso diga el paquete de verdad):
+    stdlib      console/dc/std/<pkg>/*.go          -> $BASE_GOX/<pkg>.gox
+    terceros    console/dc/engine/<pkgpath>/*.go   -> $BASE_GOX/<pkgpath>.gox
+    motor       d2common|d2core|d2game|d2app|...   -> $BASE_GOX/github.com/OpenDiablo2/OpenDiablo2/<pkg>.gox
+
+  La tabla de terceros NO se escribe en el chequeo: se lee de los `compilar_tercero "<pkgpath>" "<dir>"`
+  de build-std-gox.sh (12 llamadas). Si mañana entra un tercero nuevo, el chequeo lo ve sin que nadie se
+  acuerde de aca. Los `cmd/` de la stdlib (gen-casos, medir-math) quedan fuera: son del host, no del arbol.
+
+  Lo mismo para los archivos del motor: se excluyen por nombre los mismos que excluye build-motor-all.sh
+  (_darwin.go, _amd64.go, marca_carga_host.go, object_lookup_record_data.go, object_lookups_host.go),
+  para no llorar por fuentes que el arbol no tiene por que haber compilado.
+
+
+2. QUE DECIDE (aborta o avisa)
+------------------------------
+  ABORTA, sin compilar, cuando el viejo es un .gox que este build va a USAR y no va a rehacer:
+     * cualquier paquete de la stdlib o de los terceros (ningun build los recompila: estan en el arbol)
+     * un paquete del motor que no esta en su PAQUETES_MOTOR
+     * un .gox que no existe (FALTA)
+
+  AVISA Y SIGUE (solo lo informa como "se recompila aca") cuando el viejo esta en PAQUETES_MOTOR: lo
+  rehace el mismo build antes de enlazar, asi que no hay nada que rehacer en el arbol.
+
+  Dos palancas:
+     GOX_VIEJO_SEGUIR=1   avisa lo mismo y NO aborta (para medir A PROPOSITO con un arbol viejo)
+     GOX_CHEQUEO=0        se salta el chequeo entero
+
+  POR QUE ABORTA EN VEZ DE SOLO AVISAR: el sintoma de DC-002.90 no fue un build lento, fue un mensaje que
+  culpaba al codigo (`reference to undefined identifier 'zlib.NuevoInflador'`) y un rato perdido buscando
+  en el lugar equivocado. Cortar antes de compilar es lo unico que garantiza que ese mensaje no aparezca.
+
+
+3. EL CASO REAL, REPRODUCIDO (DC-002.90)
+----------------------------------------
+  Con el arbol viejo que dejo la tarjeta anterior (/tmp/gox-med, 30/10 13:22), el chequeo dice:
+
+     #  LA STDLIB DE LA CONSOLA (console/dc/std -> $BASE_GOX/<pkg>.gox)
+        paquete                                .gox (arbol)  fuente mas nueva la fuente
+        compress/zlib                          30/10 13:22   30/10 19:05   console/dc/std/compress/zlib/zlib.go
+     #  EL MOTOR (d2* -> $BASE_GOX/github.com/OpenDiablo2/OpenDiablo2/<pkg>.gox)
+        d2common/d2util                        30/10 13:23   31/10 01:10   d2common/d2util/palette.go
+     #  VIEJOS PERO NO IMPORTA: este build los recompila antes de enlazar (no hace falta rehacer nada)
+        d2common/d2cache ... d2core/d2map/d2mapengine   (los 10 del build de tablas)
+     ...
+     #  -> ABORTA ACA, sin compilar. Para seguir igual a proposito: GOX_VIEJO_SEGUIR=1
+
+  `compress/zlib` es EXACTAMENTE el paquete de `zlib.NuevoInflador` (DC-002.80, 30/10 19:24): el aviso
+  aparece antes y nombra lo que hay que rehacer. Los cuatro builds, con ese mismo arbol, se cortan antes
+  de compilar y sin dejar build.log ni 1ST_READ.BIN:
+
+     build-tablas-282.sh   exit 1   build.log NO   1ST_READ NO
+     build-coop-276.sh     exit 1   build.log NO   1ST_READ NO
+     build-zonas-277.sh    exit 1   build.log NO   1ST_READ NO
+     build-loadfile-279.sh exit 1   build.log NO   1ST_READ NO
+
+
+4. LA PRUEBA: scripts/console/checar-arbol-gox-291.sh (30 en verde, 0 en rojo)
+------------------------------------------------------------------------------
+  == 1. el arbol FRESCO (/tmp/gox-290) no molesta
+     OK  fresco: exit 0 / dice que esta al dia / sin recuadro / tarda 65 ms
+  == 2. la stdlib envejecida a proposito: paquete, dos fechas y receta
+     OK  zlib viejo: aborta (exit 1); el aviso dice 'compress/zlib', '01/01 00:00', 'build-std-gox.sh',
+         'build-motor-all.sh', 'ABORTA'; y nombra la fuente mas nueva (zlib.go)
+  == 3. GOX_VIEJO_SEGUIR=1 avisa igual pero no aborta
+  == 4. un paquete del motor que ESTE build recompila: informa ("se recompila aca"), no aborta
+  == 5. el mismo .gox viejo FUERA de RECOMPILA: aborta y lo nombra
+  == 6. un tercero reescrito: se busca por su RUTA DE IMPORTACION (github.com/hajimehoshi/ebiten/v2)
+  == 7. un .gox que no existe en el arbol: se informa como "(no existe)"
+  == 8. GOX_CHEQUEO=0 se lo salta
+  == 9. el build de verdad ABORTA ANTES de compilar: no llega al paso 1/6 y no deja build.log
+  == 10. EN CONTRA: con TODOS los .gox envejecidos nombra 212 paquetes (si dijera "fresco", se rompio)
+
+  El "envejecer" es real: se copia el .gox, se lo reemplaza por la copia (inodo nuevo) y se le pone fecha
+  2020-01-01. El arbol de verdad no se toca.
+
+  Y no alcanza con que el chequeo hable: el build con el arbol fresco sigue produciendo el binario de la
+  referencia (seccion 6).
+
+
+5. UN DEFECTO QUE SE CAZO EN EL CAMINO (y como quedo la prueba)
+---------------------------------------------------------------
+  La primera version de la prueba clonaba el arbol con ENLACES DUROS (`cp -al`) para envejecerlo sin
+  copiar 68 MB. Envejecer un .gox de un clon por enlace duro le cambia la fecha al inodo COMPARTIDO: la
+  prueba dejo /tmp/gox-290 entero en 01/01/00:00 y, a partir de ahi, el arbol "fresco" se reportaba viejo
+  (lo que es cierto: asi quedo). Se arreglo de dos maneras: la prueba ahora COPIA el arbol
+  (`cp -a --reflink=auto`, menos de un segundo) y el arbol se rehizo desde cero con la receta de la
+  tarjeta (stdlib 63 + motor 145/145, bloqueados 0), que es tambien la prueba de que la receta del
+  recuadro funciona.
+
+  Comando de la receta, tal cual figura en el aviso:
+     bash scripts/console/build-std-gox.sh    /tmp/gox-290
+     bash scripts/console/build-motor-all.sh  /tmp/gox-290 /tmp/log-290
+     -> == RESULTADO: 145 de 145 paquetes del motor compilan para SH-4 ==
+        == bloqueados: 0 (el motor compila COMPLETO) ==
+
+
+6. EL BUILD CON EL ARBOL FRESCO: sigue dando el binario de la referencia
+-----------------------------------------------------------------------
+  `BASE_GOX=/tmp/gox-290 scripts/console/checar-palancas-290.sh /tmp/dcbuild/chequeo-290b`
+     ... | == arbol de .gox: /tmp/gox-290 -- 208 objetos, ninguno mas viejo que su fuente
+     OK  1ST_READ.BIN = 6859016 B, sha256 6a399115926dc75b... (la corrida de referencia de DC-002.88/.89)
+     OK  el knobs.go del build coincide en valores con el del POC (8/8)
+     == resumen: 24 en verde, 0 en rojo
+
+  El sha256 es el MISMO de DC-002.90: cambiar el bucle de 17 paquetes escritos a mano por la variable
+  PAQUETES_MOTOR no movio un byte del binario. (Los 6 checks que faltan contra las 30 de DC-002.90 son
+  los de la corrida de 240 s en Flycast, que esta prueba no hace: no se re-midio imagen, palancas, OOM
+  ni el compositor, que es lo que la tarjeta deja afuera.)
+
+
+7. QUE NO ENTRA (respetado)
+---------------------------
+  * No se re-midio imagen, palancas, OOM ni el compositor (DC-002.88/.89/.90 cerradas).
+  * No cambio el default BASE_GOX (/tmp/gox-med) ni se versiono ningun arbol .gox.
+  * Los otros scripts que usan BASE_GOX con otros defaults (build-presupuestos-275, build-estado-b-270,
+    build-aica-272, build-enlace-267, build-input-271) NO se tocan: la tarjeta nombra -276, -277, -279 y
+    -282. Si alguno se quiere sumar, es una linea:
+       BASE_GOX="$BASE_GOX" RECOMPILA="<sus paquetes>" "$HERE/revisar-arbol-gox.sh"

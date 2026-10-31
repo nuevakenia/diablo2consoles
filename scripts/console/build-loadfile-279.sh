@@ -33,21 +33,34 @@ GEN="$OUT/gox-enlace"
 PREFIJO="github.com/OpenDiablo2/OpenDiablo2"
 SRCB="$OUT/src"
 
+# LOS PAQUETES DEL MOTOR QUE ESTE BUILD RECOMPILA EN EL ARBOL, en orden (cada uno se compila contra los
+# .gox de los anteriores). La lista se usa DOS veces: la lee el chequeo del arbol de .gox (DC-002.91) para
+# no quejarse de los que este mismo script rehace, y la recorre el paso 1/6. Una sola lista, porque dos se
+# separan (la leccion de DC-002.90).
+PAQUETES_MOTOR="d2common/d2datautils
+ d2common/d2fileformats/d2dt1
+ d2common/d2cache
+ d2common/d2fileformats/d2mpq
+ d2common/d2loader/asset
+ d2common/d2loader/asset/types
+ d2common/d2loader/mpq
+ d2common/d2loader/filesystem
+ d2common/d2loader
+ d2core/d2asset"
+
 [ -f "$BASE_GOX/orden.txt" ] || { echo "falta el arbol del motor en $BASE_GOX (corre build-motor-all.sh)" >&2; exit 1; }
 mkdir -p "$OUT"
 
+# ============================== EL ARBOL DE .gox (DC-002.91) ==============================
+# ANTES de compilar: si un .gox del arbol es mas viejo que su fuente, gccgo muere por un simbolo que SI
+# existe en el repo y el mensaje apunta al CODIGO (medido en DC-002.90: `zlib.NuevoInflador` con
+# /tmp/gox-med del 30/10 13:22 contra la stdlib del 30/10 19:24). El chequeo dice el paquete, las dos
+# fechas y la receta, y aborta. Los paquetes de PAQUETES_MOTOR no abortan: los rehace este mismo build.
+BASE_GOX="$BASE_GOX" RECOMPILA="$PAQUETES_MOTOR" "$HERE/revisar-arbol-gox.sh"
+
+
 echo "== 1/6 los paquetes del motor que se compilan aca (d2mpq, el loader y d2asset)"
-for p in \
-    d2common/d2datautils \
-    d2common/d2fileformats/d2dt1 \
-    d2common/d2cache \
-    d2common/d2fileformats/d2mpq \
-    d2common/d2loader/asset \
-    d2common/d2loader/asset/types \
-    d2common/d2loader/mpq \
-    d2common/d2loader/filesystem \
-    d2common/d2loader \
-    d2core/d2asset; do
+for p in $PAQUETES_MOTOR; do
     mapfile -t SRC_P < <(ls "$REPO/$p"/*.go | grep -v '_test\.go$' |
         grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
         grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$' |
