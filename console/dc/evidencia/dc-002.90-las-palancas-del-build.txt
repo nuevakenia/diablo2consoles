@@ -1,0 +1,138 @@
+DC-002.90 -- LAS PALANCAS DEL BUILD: UNA SOLA FUENTE DE VERDAD
+==============================================================
+
+Criterio de la tarjeta: (1) correr el script SIN variables no puede producir un binario que OOMee sin
+avisar, y (2) el 6.859.016 B de la corrida de referencia queda verificado por una prueba.
+
+RESULTADO, en tres lineas:
+
+  1. UNA SOLA FUENTE DE VERDAD. `scripts/console/build-tablas-282.sh` ya no tiene palancas escritas a
+     mano: LEE los ocho valores de `console/dc/poc/tablas-mapengine/knobs.go`. El entorno puede
+     pisarlos, y cuando los pisa el script lo dice en un recuadro con cual se piso y cuanto mide el
+     binario de la referencia. Correrlo sin variables da el binario de la referencia.
+
+  2. knobs.go ALINEADO CON LO QUE SE CORRIO. Antes decia `lienzoReferencia = true` y
+     `pedirArenaPrimero = true` mientras las corridas de DC-002.88/.89 usaban 0/0, y el comentario de
+     cabecera afirmaba que esos eran "los valores de la corrida por defecto" cuando el default del
+     script era otro (1/1/1). Ahora el archivo declara arriba, sin ambiguedad, las ocho palancas de la
+     corrida de referencia y cada valor explica por que esta donde esta.
+
+  3. EL NUMERO DE LA REFERENCIA VERIFICADO POR UNA PRUEBA.
+     `scripts/console/checar-palancas-290.sh`: 30 en verde, 0 en rojo. El build sin variables da
+     1ST_READ.BIN de 6.859.016 B (sha256 6a399115926dc75ba5...) y, corrido 240 s en Flycast, saca las
+     3 fases del pueblo con crc -1596781041 / -205471136, pico 9.525.408 B y NINGUN
+     "fatal error"/"out of memory". Mutante para probar que la prueba muerde: con knobs.go devuelto a
+     las palancas viejas (1/true/true) el mismo script da 8 en rojo y sale 1.
+
+
+1. LA CORRIDA DE REFERENCIA (las ocho palancas, sin adivinar)
+-------------------------------------------------------------
+  TABLAS=3  MAPA=1  ENTIDADES=0  LIENZO=0  GCENTRE=1  GCINHIBE=1  ARENA=0  TILES=1
+  (DC-002.88 commit d2b59155 y DC-002.89 commit 258412ca; es la de 6.859.016 B)
+
+  En `knobs.go` del POC eso es:
+     modoTablas = 3   hacerMapa = true    conEntidades = false   lienzoReferencia = false
+     gcEntreTablas = true   gcInhibidoTablas = true   pedirArenaPrimero = false   tilesDelStamp = true
+
+  LO QUE SE CORRIO ES ESO, no lo que decia el archivo: el knobs.go del repo decia
+  `lienzoReferencia = true` y `pedirArenaPrimero = true` (y su cabecera decia "los valores de aca son
+  los de la corrida por defecto"), mientras el default del script era TABLAS=1 LIENZO=1 ARENA=1. Dos
+  fuentes de verdad, y la que se medía (6.863.464 B) no era ninguna de las dos buenas.
+
+
+2. LA TRAMPA QUE SE PAGA CON UNA CORRIDA, AHORA AVISADA
+------------------------------------------------------
+  El binario de las palancas viejas (TABLAS=1 LIENZO=1 ARENA=1) mide 6.863.464 B (+4.448 B) y NO
+  ENTRA: muere con `fatal error: out of memory` en la cuarta tabla (arena 5.034.368 B, libre 576 B)
+  antes de componer el pueblo -- medido en DC-002.89. Ese default ya no existe: sale de knobs.go.
+
+  Lo que el script hace ahora con el entorno:
+    - palanca NO pasada  -> toma el valor de knobs.go (fuente unica).
+    - palanca pasada con el MISMO valor -> no es una pisada, no avisa.
+    - palanca pasada con OTRO valor -> recuadro en stderr:
+
+      ###########################################################################################
+      #  OJO: EL ENTORNO ESTA PISANDO LAS PALANCAS DE knobs.go
+      #    LIENZO=1  (knobs.go dice 0)
+      #  Este binario NO es el de la corrida de referencia (DC-002.88/.89, 1ST_READ 6859016 B).
+      #  Y ojo con el default viejo del script (TABLAS=1 LIENZO=1 ARENA=1): ese binario mide
+      #  6.863.464 B y NO ENTRA -- muere con 'fatal error: out of memory' en la cuarta tabla
+      #  (arena 5.034.368 B, libre 576 B), medido en DC-002.89. Si lo que queres es medir la
+      #  referencia, corré el script SIN variables: ahora las saca de knobs.go.
+      ###########################################################################################
+
+    - al final del build, si las palancas son las de knobs.go y el 1ST_READ no mide 6.859.016 B, otro
+      recuadro con la diferencia en bytes: el techo de monton de la consola paga 1:1 lo que crezca la
+      imagen (ley de DC-002.82), asi que crecer por aca es acercarse al OOM y se dice.
+
+  `SOLO_PALANCAS=1` resuelve e imprime las palancas, escribe el knobs.go y sale sin compilar: es la
+  forma barata de ver la fuente unica (y asi la prueba la usa, en 2 segundos).
+
+
+3. LO QUE MIDIO LA PRUEBA (scripts/console/checar-palancas-290.sh)
+------------------------------------------------------------------
+  $ BASE_GOX=/tmp/gox-290 bash scripts/console/checar-palancas-290.sh /tmp/dcbuild/chequeo-290
+  == resumen: 30 en verde, 0 en rojo  (exit 0)
+
+  1/4 knobs.go del POC == las ocho palancas de la referencia .................... 8 OK
+  2/4 build sin variables: resuelve 3/1/0/0/1/1/0/1, NO avisa de pisadas, y el
+      knobs.go generado coincide en VALORES con el del POC .................... 10 OK
+  3/4 pisada (LIENZO=1): avisa en grande, dice cual y contra que valor, pone al
+      lado los 6.859.016 B de la referencia y la pisada llega al knobs.go ......... 4 OK
+  4/4 build completo sin variables:
+        prog.elf        18.436.348 B
+        1ST_READ.BIN     6.859.016 B   sha256 6a399115926dc75ba599adddc0a7011acbc1e5ffe4dc42a2f0428e54fdeddbda
+        .text            2.232.720 B     .rodata 2.901.728 B     data+bss 1.927.128 B
+        disc.iso       279.267.328 B
+      knobs.go DEL BUILD == knobs.go del POC (8/8) ............................. 3 OK
+
+  LA CORRIDA (CORRER=1, 240 s en Flycast, CAPTURE=none):
+      MAPA: a) ENTRA AL PUEBLO      pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 25300
+      MAPA: b) TRANSICION ESTE      pisos=  369 paredes=  39 crcGrilla=  -205471136 ms= 14818
+      MAPA: c) VUELVE AL PUEBLO     pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 28421
+      MAPA: GRILLA OK -- el pueblo de la vuelta es identico al de la entrada
+      MAPA: PICO usado= 9525408 (en PlaceStamp) arena= 9528032 libreMin= 904 / 2624
+      TABLAS: monton al final: arena=9528032 usado=9525408 libre=2624 sbrk=0x8cfe4000 margen=49152
+      "fatal error" / "out of memory": 0 lineas en las 1.142 del log serie.
+  Los mismos numeros que DC-002.88/.89: la corrida de referencia queda reproducida y sin OOM, que es
+  lo que la tarjeta pide (no solo el tamano).
+
+  MUTANTE (la prueba tiene que poder ponerse roja; medido):
+    knobs.go devuelto a las palancas viejas (modoTablas=1, pedirArenaPrimero=true,
+    lienzoReferencia=true) y `SALTAR_BUILD=1 bash checar-palancas-290.sh` -> 16 en verde, 8 en ROJO,
+    exit 1: 3 rojos en 1/4 (los valores), 1 en 3/4 (con LIENZO=1 ya no hay pisada que avisar) y 3 en
+    4/4 (el knobs.go del build contra el del POC). Despues se restauro knobs.go.
+
+
+4. HALLAZGO DE PASO: EL ARBOL DE .GOX POR DEFECTO ESTABA VIEJO
+---------------------------------------------------------------
+  El primer intento de la prueba dio rojo en el build completo, y no era de esta tarjeta:
+
+    /d2common/d2fileformats/d2mpq/prestamo_de_zlib_consola.go:26:21:
+       error: reference to undefined identifier 'zlib.NuevoInflador'
+
+  `/tmp/gox-med` (el BASE_GOX por defecto) se armo el 30/10 a las 13:22 y `NuevoInflador` entro a
+  `console/dc/std/compress/zlib` en DC-002.80 (commit 97a5c183, 30/10 19:24): el arbol tenia la stdlib
+  de antes. Se rehizo el arbol y con eso sale el numero:
+
+    bash scripts/console/build-std-gox.sh /tmp/gox-290            # 63 objetos (stdlib + terceros)
+    bash scripts/console/build-motor-all.sh /tmp/gox-290 /tmp/log-290
+                                                # RESULTADO: 145 de 145, bloqueados: 0
+
+  El `checar` ahora imprime la pista cuando el build muere por un simbolo que falta, para que el
+  proximo no persiga un problema que esta en el arbol y no en el codigo.
+
+
+5. COMO SE REPRODUCE
+--------------------
+  # el arbol de .gox (una vez; hay que rehacerlo cuando cambie console/dc/std)
+  bash scripts/console/build-std-gox.sh /tmp/gox-290
+  bash scripts/console/build-motor-all.sh /tmp/gox-290 /tmp/log-290
+
+  # la fuente unica, en 2 segundos (no compila)
+  SOLO_PALANCAS=1 bash scripts/console/build-tablas-282.sh /tmp/palancas
+  SOLO_PALANCAS=1 TABLAS=1 LIENZO=1 ARENA=1 bash scripts/console/build-tablas-282.sh /tmp/palancas-viejas
+
+  # la prueba completa (build sin variables + 6.859.016 B) y con la corrida en la consola
+  BASE_GOX=/tmp/gox-290 bash scripts/console/checar-palancas-290.sh /tmp/dcbuild/chequeo-290
+  BASE_GOX=/tmp/gox-290 CORRER=1 bash scripts/console/checar-palancas-290.sh /tmp/dcbuild/chequeo-290

@@ -23,6 +23,14 @@
 # Uso:  scripts/console/build-tablas-282.sh [dir_salida]
 #       BASE_GOX=...    arbol del motor compilado (por defecto /tmp/gox-med)
 #       SALTAR_GEN=1    reusar el arbol de enlace ya armado
+#       SOLO_PALANCAS=1 resolver las palancas, imprimirlas, escribir el knobs.go y SALIR sin compilar
+#
+# LAS PALANCAS NO SE ESCRIBEN ACA (DC-002.90). Se leen de `console/dc/poc/tablas-mapengine/knobs.go`, que
+# es la unica fuente de verdad, y se escriben en el knobs.go del directorio de build. Cualquiera de
+# TABLAS / MAPA / ENTIDADES / LIENZO / GCENTRE / GCINHIBE / ARENA / TILES se puede pisar por entorno; si la
+# pisada se aparta de knobs.go el script lo avisa EN GRANDE con el tamano del binario de referencia, porque
+# el binario de las palancas viejas (TABLAS=1 LIENZO=1 ARENA=1, 6.863.464 B) NO ENTRA en la consola (OOM).
+# La corrida de referencia (DC-002.88/.89) es la que sale SIN pasar una sola variable: 1ST_READ 6.859.016 B.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
@@ -40,6 +48,110 @@ SRCB="$OUT/src"
 
 [ -f "$BASE_GOX/orden.txt" ] || { echo "falta el arbol del motor en $BASE_GOX (corre build-motor-all.sh)" >&2; exit 1; }
 mkdir -p "$OUT"
+
+# ============================== LAS PALANCAS (DC-002.90) ==============================
+# UNA SOLA FUENTE DE VERDAD: el `knobs.go` del POC. El script lee de ahi los ocho valores y los escribe en
+# el knobs.go del directorio de build; el entorno solo puede PISARLOS y, cuando los pisa, lo dice EN GRANDE
+# con el tamano del binario de referencia al lado.
+#
+# POR QUE (medido en DC-002.89, commit 258412ca). Hasta DC-002.89 este script traia las palancas escritas a
+# mano con OTROS valores que knobs.go (TABLAS=1 LIENZO=1 ARENA=1 contra 3/0/0), asi que correrlo sin
+# variables daba un 1ST_READ de 6.863.464 B que NO ENTRA en la consola: `fatal error: out of memory` en la
+# cuarta tabla (arena 5.034.368 B, libre 576 B) antes de componer el pueblo. Con las palancas de las
+# tarjetas el MISMO codigo mide 6.859.016 B y las 3 fases salen con crc -1596781041 / -205471136 y pico
+# 9.525.408 B. Dos fuentes de verdad para el mismo numero cuestan una corrida entera: ahora hay una.
+POC_KNOBS="$SRC/knobs.go"
+REF_1ST_READ=6859016     # corrida de referencia DC-002.88/.89; lo verifica scripts/console/checar-palancas-290.sh
+PISADAS=()
+
+[ -f "$POC_KNOBS" ] || { echo "falta $POC_KNOBS: no hay de donde leer las palancas" >&2; exit 1; }
+
+leer_knob() {  # $1 = const de knobs.go -> imprime su valor tal cual (numero o true/false), sirva `X = v` o `const X = v`
+    local v
+    v="$(awk -v n="$1" '
+        {
+            if ($1 == "const") { nom = $2; igual = $3; val = $4 } else { nom = $1; igual = $2; val = $3 }
+            if (nom == n && igual == "=" && !visto) { print val; visto = 1; exit }
+        }' "$POC_KNOBS")"
+    [ -n "$v" ] || { echo "knobs.go ($POC_KNOBS) no declara $1" >&2; exit 1; }
+    printf '%s' "$v"
+}
+
+palanca() {  # $1 = variable de entorno, $2 = const de knobs.go, $3 = num|bool
+    local env="$1" knob="$2" tipo="$3" v pedido
+    v="$(leer_knob "$knob")"
+    case "$tipo" in
+        num)  case "$v" in ''|*[!0-9]*) echo "knobs.go: $knob no es un numero ($v)" >&2; exit 1 ;; esac ;;
+        bool) case "$v" in true) v=1 ;; false) v=0 ;;
+                   *) echo "knobs.go: $knob tiene que ser true o false ($v)" >&2; exit 1 ;; esac ;;
+    esac
+    if [[ -v $env ]]; then
+        pedido="${!env}"
+        case "$tipo" in
+            num)  case "$pedido" in ''|*[!0-9]*) echo "$env=$pedido no es un numero" >&2; exit 1 ;; esac ;;
+            bool) case "$pedido" in 0|1) ;; *) echo "$env=$pedido tiene que ser 0 o 1" >&2; exit 1 ;; esac ;;
+        esac
+        # pisar con el MISMO valor no es una pisada: el binario sigue siendo el de la referencia
+        [ "$pedido" = "$v" ] || PISADAS+=("$env=$pedido  (knobs.go dice $v)")
+        export "$env=$pedido"
+    else
+        export "$env=$v"
+    fi
+}
+
+palanca TABLAS    modoTablas        num
+palanca MAPA      hacerMapa         bool
+palanca ENTIDADES conEntidades      bool
+palanca LIENZO    lienzoReferencia  bool
+palanca GCENTRE   gcEntreTablas     bool
+palanca GCINHIBE  gcInhibidoTablas  bool
+palanca ARENA     pedirArenaPrimero bool
+palanca TILES     tilesDelStamp     bool
+
+bool_go() { [ "$1" = "1" ] && echo true || echo false; }
+
+escribir_knobs() {  # $1 = destino. Las palancas YA resueltas, con la misma forma que knobs.go.
+    {
+        printf 'package main\n\n'
+        printf '// Palancas generadas por build-tablas-282.sh a partir del knobs.go del POC (DC-002.90).\n'
+        printf '// El porque de cada una esta alla: aca solo viajan los valores resueltos.\n'
+        printf 'const modoTablas = %s\n' "$TABLAS"
+        printf 'const hacerMapa = %s\n' "$(bool_go "$MAPA")"
+        printf 'const conEntidades = %s\n' "$(bool_go "$ENTIDADES")"
+        printf 'const lienzoReferencia = %s\n' "$(bool_go "$LIENZO")"
+        printf 'const gcEntreTablas = %s\n' "$(bool_go "$GCENTRE")"
+        printf 'const gcInhibidoTablas = %s\n' "$(bool_go "$GCINHIBE")"
+        printf 'const pedirArenaPrimero = %s\n' "$(bool_go "$ARENA")"
+        printf 'const tilesDelStamp = %s\n' "$(bool_go "$TILES")"
+    } > "$1"
+}
+
+echo "== palancas (fuente unica: ${POC_KNOBS#"$REPO"/})"
+printf '   TABLAS=%s MAPA=%s ENTIDADES=%s LIENZO=%s GCENTRE=%s GCINHIBE=%s ARENA=%s TILES=%s\n' \
+    "$TABLAS" "$MAPA" "$ENTIDADES" "$LIENZO" "$GCENTRE" "$GCINHIBE" "$ARENA" "$TILES"
+if [ "${#PISADAS[@]}" -eq 0 ]; then
+    echo "   son las de la corrida de referencia (DC-002.88/.89): ese binario mide $REF_1ST_READ B"
+else
+    {
+        echo ""
+        echo "###########################################################################################"
+        echo "#  OJO: EL ENTORNO ESTA PISANDO LAS PALANCAS DE knobs.go"
+        for p in "${PISADAS[@]}"; do echo "#    $p"; done
+        echo "#  Este binario NO es el de la corrida de referencia (DC-002.88/.89, 1ST_READ $REF_1ST_READ B)."
+        echo "#  Y ojo con el default viejo del script (TABLAS=1 LIENZO=1 ARENA=1): ese binario mide"
+        echo "#  6.863.464 B y NO ENTRA -- muere con 'fatal error: out of memory' en la cuarta tabla"
+        echo "#  (arena 5.034.368 B, libre 576 B), medido en DC-002.89. Si lo que queres es medir la"
+        echo "#  referencia, corré el script SIN variables: ahora las saca de knobs.go."
+        echo "###########################################################################################"
+        echo ""
+    } >&2
+fi
+
+if [ "${SOLO_PALANCAS:-0}" = "1" ]; then
+    escribir_knobs "$OUT/knobs.go"
+    echo "   SOLO_PALANCAS=1: no se compila nada; el knobs.go resuelto queda en $OUT/knobs.go"
+    exit 0
+fi
 
 echo "== 0/6 el archivo compartido del mapa (el mismo del POC y del verificador)"
 for f in nivel.go; do
@@ -114,20 +226,9 @@ cp "$SRC"/*.go "$SRCB"/
 cp -r "$SRC/csrc" "$SRCB"/
 cp "$POC_REF/nivel.go" "$SRCB"/
 
-# las palancas (el porque de cada una, en knobs.go)
-{
-    printf 'package main\n\n'
-    printf '// Palancas generadas por build-tablas-282.sh. El porque de cada una, en knobs.go.\n'
-    printf 'const modoTablas = %s\n' "${TABLAS:-1}"
-    printf 'const hacerMapa = %s\n' "$([ "${MAPA:-1}" = "1" ] && echo true || echo false)"
-    printf 'const conEntidades = %s\n' "$([ "${ENTIDADES:-0}" = "1" ] && echo true || echo false)"
-    printf 'const lienzoReferencia = %s\n' "$([ "${LIENZO:-1}" = "1" ] && echo true || echo false)"
-    printf 'const gcEntreTablas = %s\n' "$([ "${GCENTRE:-1}" = "1" ] && echo true || echo false)"
-    printf 'const gcInhibidoTablas = %s\n' "$([ "${GCINHIBE:-1}" = "1" ] && echo true || echo false)"
-    printf 'const pedirArenaPrimero = %s\n' "$([ "${ARENA:-1}" = "1" ] && echo true || echo false)"
-    printf 'const tilesDelStamp = %s\n' "$([ "${TILES:-1}" = "1" ] && echo true || echo false)"
-} > "$SRCB/knobs.go"
-echo "   palancas: modoTablas=${TABLAS:-1} hacerMapa=${MAPA:-1} conEntidades=${ENTIDADES:-0} lienzoReferencia=${LIENZO:-1} gcEntreTablas=${GCENTRE:-1} gcInhibidoTablas=${GCINHIBE:-1} pedirArenaPrimero=${ARENA:-1} tilesDelStamp=${TILES:-1}"
+# las palancas (el porque de cada una, en knobs.go del POC; aca solo se escriben las resueltas)
+escribir_knobs "$SRCB/knobs.go"
+echo "   palancas escritas en $SRCB/knobs.go (modoTablas=$TABLAS lienzoReferencia=$(bool_go "$LIENZO") pedirArenaPrimero=$(bool_go "$ARENA"))"
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
@@ -156,3 +257,30 @@ printf '   codigo (.text)  %10s B\n' "$(sh-elf-size -A "$OUT/prog.elf" | awk '$1
 printf '   rodata          %10s B\n' "$(sh-elf-size -A "$OUT/prog.elf" | awk '$1==".rodata"{print $2}')"
 printf '   data+bss        %10s B\n' "$(sh-elf-size -A "$OUT/prog.elf" | awk '$1==".data"||$1==".bss"{s+=$2} END{print s}')"
 [ -f "$OUT/disc.gdi" ] && echo "   imagen:         $OUT/disc.gdi"
+
+# ============================== EL NUMERO DE LA REFERENCIA (DC-002.90) ==============================
+# El binario de la corrida de referencia tiene un tamano medido y el monton de la consola se come 1 byte de
+# imagen por cada byte de codigo (ley de DC-002.82), asi que crecer por aca es acercarse al OOM. Si las
+# palancas son las de knobs.go y el numero no da, el codigo (o el arbol de gox) se movio: se dice con
+# numeros y no se deja pasar como si nada.
+TAM_BIN="$(stat -c%s "$OUT/1ST_READ.BIN")"
+if [ "${#PISADAS[@]}" -gt 0 ]; then
+    printf '   OJO 1ST_READ.BIN %s B con palancas pisadas: NO comparable con la referencia (%s B)\n' \
+        "$TAM_BIN" "$REF_1ST_READ"
+elif [ "$TAM_BIN" != "$REF_1ST_READ" ]; then
+    {
+        echo ""
+        echo "###########################################################################################"
+        echo "#  OJO: LAS PALANCAS SON LAS DE LA REFERENCIA PERO EL BINARIO NO MIDE LO MISMO"
+        echo "#    referencia DC-002.88/.89: $REF_1ST_READ B"
+        echo "#    medido ahora:              $TAM_BIN B  ($((TAM_BIN - REF_1ST_READ)) B)"
+        echo "#  El codigo o el arbol de .gox se movio respecto de esa corrida. El techo de monton de la"
+        echo "#  consola paga esa diferencia 1:1 (ley de DC-002.82): si crecio, puede morir con 'fatal"
+        echo "#  error: out of memory'. Actualiza el numero de referencia A PROPOSITO (build-tablas-282.sh"
+        echo "#  y checar-palancas-290.sh) cuando el cambio este medido en la consola."
+        echo "###########################################################################################"
+        echo ""
+    } >&2
+else
+    echo "   1ST_READ.BIN = $REF_1ST_READ B: es el binario de la corrida de referencia (DC-002.88/.89)"
+fi
