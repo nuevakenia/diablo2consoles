@@ -1,0 +1,92 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:051 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:299 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:402 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:402 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:404 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:409 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:423 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f458b340000 RAM(16 MB) 0x7f4597340000 VRAM64(8 MB) 0x7f458f340000 ARAM(2 MB) 0x7f45ab340000
+00:00:430 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:437 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f458b340000 RAM(16 MB) 0x7f4597340000 VRAM64(8 MB) 0x7f458f340000 ARAM(2 MB) 0x7f45ab340000
+00:00:440 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:444 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:444 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:503 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:503 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:503 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6fde40
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356228096
+ARQ-MARCA   gc_init-semiespacio0 v=2356227680
+ARQ-MARCA   gc_init-semiespacio1 v=0
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=3136 cused=2256128 gsemi=196048/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+MAPA102: arranca DC-002.102 -- el censo del arranque con video y los tres caminos del monton
+MAPA102: modo de tablas= fuente soltarLecturas= true
+MAPA102: MEMORIA al-arrancar usado= 2257160 libre= 2104 arena= 2259264 sbrk= -1936572416 techo= -1929445376 pico= 2257160
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+MAPA102: PVR andando; vram de la textura del cuadro= 1048576
+MAPA102: MEMORIA despues-del-video usado= 2257184 libre= 2080 arena= 2259264 sbrk= -1936572416 techo= -1929445376 pico= 2257184
+MAPA102: tablasPorLaFuente= true
+MAPA102: MEMORIA despues-de-arrancar-como-consola usado= 2257184 libre= 2080 arena= 2259264 sbrk= -1936572416 techo= -1929445376 pico= 2257184
+MAPA102: assetmanager listo
+MAPA102: MEMORIA despues-del-assetmanager usado= 2257184 libre= 2080 arena= 2259264 sbrk= -1936572416 techo= -1929445376 pico= 2257184
+fs_iso9660: disc change detected
+MAPA102: fuente registrada /cd/JUEGO/D2DATA.MPQ
+MAPA102: fuente registrada /cd/JUEGO/PATCH_D2.MPQ
+MAPA102: fuentes en el loader= 2
+MAPA102: MEMORIA despues-de-las-fuentes usado= 2612512 libre= 3104 arena= 2615616 sbrk= -1936216064 techo= -1929445376 pico= 2612512
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=3104 cused=2612512 gsemi=374160/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=3104 cused=2612512 gsemi=449384/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=3104 cused=2612512 gsemi=459496/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=3104 cused=2612512 gsemi=553488/2097152 gc=0
+MAPA102: TABLA fuente /data/global/excel/LvlTypes.txt bytes= 10719 montonDelta= 0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=3328 cused=2747456 gsemi=555464/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=3328 cused=2747456 gsemi=692168/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=3328 cused=2747456 gsemi=699976/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=174688

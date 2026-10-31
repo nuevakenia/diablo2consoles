@@ -429,14 +429,21 @@ func (am *AssetManager) LoadPaletteTransform(path string) (*d2pl2.PL2, error) {
 // del RecordManager y vuelve. El comentario de mas abajo sobre el cacheo sigue valiendo (no se cachea el
 // DataDictionary: no se puede recorrer dos veces, ni con un stream ni con los bytes de antes).
 func (am *AssetManager) LoadDataDictionary(path string) (*d2txt.DataDictionary, error) {
-	stream, err := am.LoadAsset(path)
-	if err != nil {
-		return nil, err
+	// DC-002.102: en la consola la tabla entra entera por el tramo de la fuente (monton de C, reusado, con
+	// dueno) en vez de abrir el stream del MPQ, que prefetchea el comprimido entero y no lo devuelve.
+	// Ver `tablas_por_la_fuente.go`. En la PC nunca esta prendido: se sigue por el stream de siempre.
+	if tablasPorLaFuente && caminoDeLecturaDeConsola {
+		datos, err := am.LoadFile(path)
+		if err != nil {
+			return nil, err
+		}
+
+		am.Debugf(fmtLoadDict, path)
+
+		return d2txt.LoadDataDictionary(datos), nil
 	}
 
-	am.Debugf(fmtLoadDict, path)
-
-	return d2txt.LoadDataDictionaryReader(stream), nil
+	return am.LoadDataDictionaryPorStream(path)
 }
 
 // LoadRecords will load the records for the given path into the record manager.
