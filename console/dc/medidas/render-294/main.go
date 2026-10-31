@@ -68,16 +68,18 @@ func main() {
 	perezoso := flag.Bool("perezoso", false, "cache de tiles perezosa (la de la consola: se arma al dibujar)")
 	indices := flag.Bool("indices", false, "cache de tiles en INDICES de 8 bits (1 B/px) en vez de RGBA (4 B/px)")
 	cuadros := flag.Int("cuadros", 1, "cuantos cuadros componer (el 2do en adelante mide la cache ya armada)")
+	histograma := flag.Bool("histograma", false, "censo de tamanos de la cache de indices contra el umbral de 64 KB de libgodc")
 	flag.Parse()
 
-	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *indices, *cuadros); err != nil {
+	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *indices, *cuadros,
+		*histograma); err != nil {
 		fmt.Println("RENDER294: FALLO --", err)
 		os.Exit(1)
 	}
 }
 
 func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida string,
-	perezoso, indices bool, cuadros int) error {
+	perezoso, indices bool, cuadros int, histograma bool) error {
 	if dir == "" {
 		dir = autodetectarD2()
 	}
@@ -214,6 +216,10 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 
 	fmt.Printf("RENDER294: CUADRO total ms=%d (promedio %.1f)\n", msTotal, float64(msTotal)/float64(cuadros))
 
+	if histograma {
+		fmt.Print(censoDeLaCache(mr.TamanosDeLaCache()))
+	}
+
 	final, ok := sup.(*Cuadro)
 	if !ok {
 		return fmt.Errorf("la Surface del cuadro no es la de este medidor")
@@ -227,6 +233,38 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 	fmt.Println("RENDER294: FIN")
 
 	return nil
+}
+
+// censoDeLaCache: los tamanos de las imagenes de la cache contra el umbral de 64 KB de libgodc.
+//
+// POR QUE IMPORTA EL UMBRAL. En libgodc (`runtime/gc_heap.c:116`) toda asignacion de mas de
+// `GC_LARGE_OBJECT_THRESHOLD_KB` (64 KB) va a `gc_external_alloc` = monton de C, que el recolector NO toca ni
+// devuelve; las de menos van al SEMIESPACIO del recolector, que en la consola del pueblo mide 1.792 KB
+// (vendor de DC-002.102) y por lo tanto es el techo REAL de lo que puede vivir ahi. Este censo dice cuantas
+// imagenes caen de cada lado, que es lo que decide si la cache puede vivir en el semiespacio o tiene que
+// pedirse en un tramo propio (ADR 0001).
+func censoDeLaCache(tamanos []int) string {
+	const umbral = 64 * 1024
+
+	chicas, bytesChicas, grandes, bytesGrandes, mayor := 0, 0, 0, 0, 0
+
+	for _, t := range tamanos {
+		if t > umbral {
+			grandes++
+			bytesGrandes += t
+		} else {
+			chicas++
+			bytesChicas += t
+		}
+
+		if t > mayor {
+			mayor = t
+		}
+	}
+
+	return fmt.Sprintf("RENDER294: CENSO101 total=%d bytes=%d | enSemiespacio(<64KB)=%d bytes=%d | "+
+		"externas(>64KB)=%d bytes=%d | mayor=%d\n",
+		len(tamanos), bytesChicas+bytesGrandes, chicas, bytesChicas, grandes, bytesGrandes, mayor)
 }
 
 // escribirPNG: el cuadro a disco, para compararlo despues contra la captura de Flycast.

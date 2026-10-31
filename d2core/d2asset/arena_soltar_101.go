@@ -78,3 +78,36 @@ func SoltarArenaDeBloques() (tramos, bytes int) {
 
 	return tramos, bytes
 }
+
+// SoltarPrestamoDeLecturaDeTiles devuelve al monton SOLO el buffer prestado de la lectura del `.dt1` crudo
+// (el `scratchDeLectura`), y devuelve cuantos bytes solto (0 si no habia ninguno).
+//
+// POR QUE ES OTRA COSA QUE `SoltarArenaDeBloques` (DC-002.103). El contrato de arriba tiene dos mitades con
+// vidas distintas y las dos estan medidas en el pueblo:
+//
+//	el buffer prestado   1.008.003 B  lo usa `cargarDT1EnBloquesUsados` para leer UN archivo y parsearlo.
+//	                                  Muere cuando el ULTIMO `.dt1` del nivel termino de cargarse: nadie lo
+//	                                  vuelve a mirar. Si un nivel nuevo lo necesita, se vuelve a pedir solo
+//	                                  (`cargarDT1EnBloquesUsados` lo rehace cuando el suyo es chico).
+//	los tramos de bloque  2.621.440 B los `EncodedData` de cada tile APUNTAN ahi: viven hasta que la cache de
+//	                                  imagenes esta armada (por eso `SoltarArenaDeBloques` exige cache armada).
+//
+// Esta funcion suelta SOLO la primera mitad, asi que se puede llamar en cuanto el nivel esta compuesto y NO
+// invalida nada: es la unica parte del arena que se puede devolver sin esperar a la cache. No prende ni apaga
+// `bloquesUsados`: los tramos siguen siendo validos.
+func SoltarPrestamoDeLecturaDeTiles() int {
+	candadoDeTiles.Lock()
+	defer candadoDeTiles.Unlock()
+
+	if liberadorDeExternos == nil || len(scratchDeLectura) == 0 {
+		return 0
+	}
+
+	liberadorDeExternos(uintptr(unsafe.Pointer(&scratchDeLectura[0])))
+	bytes := cap(scratchDeLectura)
+
+	scratchDeLectura = nil
+	scratchDelNivel = 0
+
+	return bytes
+}

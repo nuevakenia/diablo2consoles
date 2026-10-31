@@ -105,6 +105,26 @@ func (mr *MapRenderer) setCacheDeIndices(style, sequence byte, tileType int, ran
 	mr.indicesCacheRecords[claveDeCache(style, sequence, tileType, randomIndex)] = im
 }
 
+// TamanosDeLaCache devuelve el tamano de CADA imagen de la cache en indices, uno por entrada (DC-002.103).
+//
+// POR QUE EXISTE. `EstadoDeLaCache` da el total, y el total no dice DONDE puede vivir la cache: en libgodc
+// toda asignacion de mas de 64 KB (`GC_LARGE_OBJECT_THRESHOLD_KB`, libgodc/runtime/gc_heap.c) se va al monton
+// de C y el recolector no la toca, mientras que las de menos van al SEMIESPACIO (1.792 KB en el vendor de
+// DC-002.102) y hay que copiarlas en cada recoleccion. Con el total solo no se puede decidir si la cache
+// entra en el semiespacio; con la lista de tamanos si.
+//
+// Es un INSTRUMENTO: solo lo lee el medidor del host. La consola no lo llama (una lista de 86 enteros no
+// entra gratis en el monton, y alli el numero que importa es el que ya da `EstadoDeLaCache`).
+func (mr *MapRenderer) TamanosDeLaCache() []int {
+	tamanos := make([]int, 0, len(mr.indicesCacheRecords))
+
+	for _, im := range mr.indicesCacheRecords {
+		tamanos = append(tamanos, im.Bytes())
+	}
+
+	return tamanos
+}
+
 // dibujarImagenDeIndices pinta una imagen de indices en el destino, si el destino sabe hacerlo.
 func (mr *MapRenderer) dibujarImagenDeIndices(target interface{}, im *imagenDeIndices) {
 	lienzo, ok := target.(lienzoDeIndices)
