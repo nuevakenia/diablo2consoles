@@ -1,0 +1,243 @@
+DC-002.89 -- LA IMAGEN POR RAMA Y EL CORTE DEL CAMINO DE ENTIDADES
+==================================================================
+
+Criterio de la tarjeta: (1) la imagen atribuida por rama con numero, (2) la palanca de cortar el camino
+de entidades de `PlaceStampClippedWhere` medida o propuesta con numero, y (3) el pico del monton de las
+3 fases medido otra vez, comparable con DC-002.88.
+
+RESULTADO, en tres lineas:
+
+  1. LA IMAGEN TIENE DUENO. 6.902.621 B de imagen quedan atribuidos objeto por objeto con el mapa del
+     enlazador: 0 B "sin dueno", contra el 69,1 % que deja sin dueno la atribucion por simbolo. (El
+     1ST_READ mide 6.859.016 B: la atribucion suma 43.605 B mas, 0,6 %, porque el mapa suma las
+     secciones de entrada y el objcopy recorta y alinea al volcar el binario.) Lo mas gordo:
+     d2records 2.265.682 B (32,8 %), el blob/tipos de las entidades 2.126.391 B (30,8 %), C+KOS+libgodc
+     1.085.585 B (15,7 %).
+
+  2. LA PALANCA DEL CORTE, MEDIDA EN DOS ESCALONES:
+       - quitar SOLO la llamada (`PlaceStampClippedWhere` sin el bucle de entidades): 1ST_READ
+         6.859.016 -> **6.859.016 B, 0 B de ganancia**. El enlazador no puede tirar nada porque el
+         camino sigue alcanzable por `PlaceStamp`, `Entities()`, `AddEntity` y `Advance`.
+       - cortar la ARQUITECTURA (d2mapstamp deja de fabricar entidades y d2mapengine pierde el factory y
+         el mapa de entidades): 1ST_READ **6.482.728 B, -376.288 B (-5,49 %)** y el techo del monton
+         pasa de 49.152 B a **425.984 B libres** (+376.832 B, medido en Flycast, 1:1 con la imagen).
+
+  3. EL PICO NO BAJA, EL AIRE SI. Con el corte, el pueblo sigue pesando lo mismo (pico 9.525.408 B, el
+     mismo numero que DC-002.88) y la grilla da el mismo crc, pero el monton termina con 425.984 B al
+     techo en vez de 49.152 B. La corrida base de esta tarjeta reproduce DC-002.88 exacto.
+
+
+0. LA CORRIDA BASE, REPRODUCIDA (build /tmp/dcbuild/tablas289c, corrida /tmp/dc289-run-289c)
+---------------------------------------------------------------------------------------------
+  MAPA: a) ENTRA AL PUEBLO   tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 25300
+  MAPA: b) TRANSICION ESTE   tiles=  369 pisos=  369 paredes=  39 crcGrilla=  -205471136 ms= 14818
+  MAPA: c) VUELVE AL PUEBLO  tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 28421
+  pico usado: 9.525.408 B (en PlaceStamp, fase a)  arena pico: 9.528.032 B  libreMin: 904 / 2.624 B
+  monton al final: arena=9528032 usado=9525408 libre=2624 sbrk=0x8cfe4000 techo=0x8cff0000 margen=49152
+  1ST_READ.BIN: 6.859.016 B
+
+  Mismos numeros que DC-002.88 (commit d2b59155), byte por byte. OJO con la trampa que costo una
+  corrida: `scripts/console/build-tablas-282.sh` SIN variables de entorno usa TABLAS=1 LIENZO=1 ARENA=1,
+  que NO son las palancas de las corridas de las tarjetas (knobs.go dice 3/true/true) y el binario que
+  sale NO ENTRA: muere con `fatal error: out of memory` en la cuarta tabla (medido: 1ST_READ 6.863.464
+  B, 4.448 B mas, arena 5.034.368 libre 576). La corrida de esta tarjeta y la de .88 son:
+
+    TABLAS=3 LIENZO=0 ARENA=0 BASE_GOX=/tmp/gobx DC_LDMAP=<mapa> bash scripts/console/build-tablas-282.sh <salida>
+
+
+1. EL INSTRUMENTO: EL MAPA DEL ENLAZADOR (nuevo, en el repo)
+------------------------------------------------------------
+  scripts/console/relink-con-mapa.sh       reenlaza un build YA HECHO con `-Wl,-Map` (22 MB de mapa) y
+                                           verifica que el prog.elf salga igual al de ese directorio:
+                                           si el sha256 coincide, el mapa describe ESE binario.
+  scripts/console/atribuir-imagen.py       imagen por objeto/paquete/rama desde el mapa. Cuenta solo las
+                                           secciones con direccion != 0 (las que viajan en el 1ST_READ) y
+                                           deja .bss aparte porque no viaja (se pone a cero al arrancar).
+  scripts/console/atribuir-simbolos.py     los simbolos de `nm -S` cruzados por DIRECCION con las
+                                           secciones del mapa (para el blob de gccgo, ver seccion 3).
+
+  Por que el mapa y no `nm`: `nm` solo ve simbolos con nombre y tamano, y en este binario el 69,1 % de
+  los bytes estan en simbolos que no llevan el paquete en el nombre. El mapa lista cada seccion de
+  entrada con SU OBJETO, y un `.gox` es un paquete de Go: con eso el 100 % de la imagen tiene dueno.
+
+  El .88 (prog.elf de /tmp/dcbuild/tablas288j) se reenlazo con el instrumento y salio el MISMO sha256
+  (f289eb13a157eb7e...): el mapa /tmp/dcbuild/tablas289/prog-289.map describe el binario de .88.
+  La base de esta tarjeta se reenlaza igual (build-289c): mapa /tmp/dcbuild/tablas289/base88.map.
+
+
+2. LA IMAGEN POR RAMA (mapa base88.map; detalle en dc-002.89-imagen-por-rama.txt)
+----------------------------------------------------------------------------------
+  Las secciones que viajan: .text 2.232.664  .rodata 2.945.574  .data 1.717.166  .eh_frame 7.089
+  (+ .init .fini .got .ctors .dtors, 128 B). Fuera del 1ST_READ: .go_export 3.973.722, .debug_* 5.567.711,
+  .comment 10.069. El .bss (209.764 B) no viaja.
+
+  rama                                    bytes      %      que es
+  --------------------------------------------------------------------------------------------------
+  records/tablas                        2265682   32,8   d2core/d2records y sus tablas
+  C: libc/KOS/libgodc/otros              746301   10,8   libkallisti 225.826, libc 85.234, libgodc 39.603...
+  entidades: skills/stats/combate        709850   10,3   d2skill 296.423, d2s 105.396, d2missile 102.186...
+  resto del repo                         527708    7,6
+  entidades: objetos/items               509024    7,4   diablo2item 189.615, d2drop 184.404, d2itemdesc...
+  assets y formato de archivos           462259    6,7   d2asset 174.760, d2ds1 59.172, d2mpq 53.795...
+  C/KOS/libgodc: terceros                339284    4,9   la stdlib de Go para la consola (os, fmt, image...)
+  entidades: monstruos                   315396    4,6   d2monster
+  render/UI                              246474    3,6   d2ui 193.496, d2gamepad 52.978
+  entidades: heroe y sus records         204542    3,0   d2hero
+  entidades: quests                      200673    2,9   d2quest
+  mapa: compositor y stamp               188522    2,7   d2mapengine 162.988
+  entidades: mapa/entidad y tipos        186906    2,7   d2mapentity
+  --------------------------------------------------------------------------------------------------
+  TOTAL atribuido                       6902621  100,0   (el binario mide 6.859.016: +43.605, 0,6 %)
+
+  Las seis ramas de entidades suman 2.126.391 B (30,8 %) -- el numero que la tarjeta tenia en la mira.
+  El "resto del repo" y el desglose por paquete completo estan en dc-002.89-imagen-por-paquete.csv.
+
+  Del lado C (776.603 B en objetos .o/.a, el resto son los .gox): libjpeg 84.366, libvorbis 80.689,
+  libpng 68.932, libz 18.040 y libogg 12.021 son 264.048 B de decodificadores de imagen/sonido que este
+  binario enlaza. `shim.o` son los 44.505 B de puentes del POC y `main.o` 30.302 B.
+
+
+3. EL BLOB DE GCCGO: `nm` MIENTE CON EL TAMANO
+----------------------------------------------
+  La atribucion por simbolo (`nm -S`, 65.024 simbolos con tamano) deja 3.789.616 B (69,1 %) sin dueno:
+  43.409 simbolos empiezan con `_go` y 6.730 con `_type`. El mas grande es uno solo:
+
+    _go..C3075   0x8c4fc770   0x1986bc (= 1.672.892 B)   d (local, .data)
+
+  Esos 1.672.892 B NO son 1,67 MB del binario: la direccion cae en una seccion de 6.240 B de
+  d2skill.gox. `nm` esta dando el tamano del GRUPO COMDAT, no el de la seccion que el linker dejo.
+  Al recortar cada simbolo a lo que le queda de seccion, 15.446 simbolos se recortan y 3.442.386 B
+  desaparecen de la cuenta: los simbolos con tamano suman 2.045.834 B de los 6.902.621 B de imagen.
+
+  Conclusion practica: el tamano por simbolo no sirve para atribuir esta imagen; el mapa si, porque
+  cuenta SECCIONES y las secciones si son bytes. Con el recorte, el mismo simbolo `_go..C3075` aporta
+  6.240 B en vez de 1.672.892 B, y el blob entero (47,2 % de los simbolos recortados) queda repartido
+  por paquete: d2records 69.048 B, stdlib-runtime_dc.o 47.094 B, jdmarker 34.240 B, runtime_sh4_minimal
+  32.964 B, kos.o 32.289 B, d2skill 26.802 B, d2ui 23.584 B, d2monster 21.932 B... Los 3,4 MB "sin
+  dueno" que aparecian en la atribucion por nombre eran, en su mayoria, tamano inflado de nm.
+
+
+4. LA PALANCA DEL CORTE DE ENTIDADES (medida, no propuesta)
+-----------------------------------------------------------
+  El pueblo se compone con `PlaceStampClippedWhere(stamp, 0,0, w,h, keep=false, monsters=false)`: no
+  crea UNA sola entidad (`entidades= 0` en las tres fases), pero el codigo para crearlas esta enlazado
+  porque el motor lo alcanza por otros metodos. Se midio en dos escalones, sobre el build base
+  (/tmp/dcbuild/tablas289c), con las copias de los paquetes fuera del repo:
+
+    scripts/console/exp-corte-entidades-289.sh A|B <build_base> <salida>
+    scripts/console/corte-entidades-289.py A|B <copias>       (aplica el corte, falla si no encuentra el patron)
+
+  ESCALON A -- solo la llamada (se saca el bucle de `PlaceStampClippedWhere`, los imports quedan):
+    1ST_READ  6.859.016 -> 6.859.016 B      delta 0 B
+    La imagen sale IDENTICA seccion por seccion. --gc-sections no puede tirar d2mapentity porque el
+    `MapEngine` sigue teniendo el campo del factory, el mapa de entidades y cuatro metodos que las usan.
+
+  ESCALON B -- la arquitectura (d2mapstamp no fabrica entidades + d2mapengine sin factory ni mapa):
+    1ST_READ  6.859.016 -> 6.482.728 B      delta -376.288 B (-5,49 %)
+    imagen atribuida: 6.902.621 -> 6.526.438 B   (repo -358.008 B, C/KOS -18.280 B)
+    .gox: d2mapstamp 603.416 -> 361.368 B, d2mapengine 1.340.848 -> 709.936 B
+
+    Lo que se va, por paquete (delta de bytes de imagen, los 25 con delta != 0):
+      d2common/d2monster        -166.412      d2common/d2quest             -5.360
+      d2core/d2input/d2gamepad   -36.401      d2core/d2item/d2itemdesc     -5.305
+      d2core/d2config            -26.560      d2common/d2difficulty        -4.595
+      d2common/d2automap         -17.747      d2core/d2item/diablo2item    -4.104
+      d2common/d2hireling        -17.396      d2core/d2map/d2mapentity     -3.100
+      d2core/d2item/d2drop       -13.031      d2common/d2trade             -2.276
+      d2core/d2inventory          -9.448      d2common/d2display           -2.034
+      d2core/d2hero               -8.848      d2core/d2stats/diablo2stats    -888
+      d2core/d2map/d2lightmap     -7.880      main (el POC)                  -376
+      d2common/d2monstats         -7.844      d2core/d2item                  -224
+      d2common/d2reward           -6.774      d2core/d2stats                 -136
+      d2common/d2equip            -5.653      d2common/d2fileformats/d2s      -56
+      d2core/d2ui                 -5.560      -------------------------------------
+                                              TOTAL REPO                 -358.008
+    (tabla completa en dc-002.89-imagen-por-paquete-corte.csv contra dc-002.89-imagen-por-paquete.csv;
+     el resto hasta -376.288 son 18.280 B del lado C/KOS)
+
+    LO QUE NO SE VA, y esto es el hallazgo: las seis ramas de entidades pesaban 2.126.391 B y el corte
+    se lleva 222.565 B de ellas (10,5 %): d2monster 166.412, objetos/items 32.112, heroe 8.848, quests
+    5.360, skills/stats/combate 6.733, d2mapentity 3.100. Los otros 1.903.826 B SIGUEN enlazados porque
+    `d2records` -que el pueblo necesita- referencia los TIPOS de entidad en sus tablas (MonStat2Record,
+    los mapas de objetos por acto): los descriptores de tipo de d2mapentity, d2hero, d2quest, d2skill y
+    compania siguen alcanzables desde d2records. La entidad como CODIGO se va; como TIPO no, mientras
+    las tablas de records sean las del motor. Los otros -155.443 B del total vienen de paquetes que
+    colgaban del camino de entidades (d2config, d2gamepad, d2automap, d2hireling, lightmap, monstats...).
+
+  COSTO DE ARQUITECTURA del escalon B (lo que hay que tocar de verdad, hoy solo en la copia):
+    - d2mapstamp: `NewStampFactory(asset, l, entity *d2mapentity.MapEntityFactory)` pierde el parametro,
+      el `Stamp` pierde su campo `entity`, y `EntitiesWhere` deja de fabricar NPC/objetos;
+    - d2mapengine: pierde los campos `*d2mapentity.MapEntityFactory` y `entities`, los bucles de
+      `PlaceStamp`/`PlaceStampClippedWhere`/`AddStampObjects`, `AddEntity`/`RemoveEntity` y el de `Advance`;
+    - doors.go: `trackEntity`, `syncDoor` y `SetDoorOpen` hablan de `*d2mapentity.Object`, o sea que el
+      seguimiento de puertas se va con las entidades.
+    O sea: no es un flag, es partir `MapEngine` en dos (motor de casillas / motor con entidades) o meter
+    la fabrica detras de una interfaz que la consola no enlace. Los numeros para decidirlo son los de
+    arriba: 376.288 B de imagen y 376.832 B de techo de monton.
+
+
+5. LA CORRIDA DE 3 FASES CON EL CORTE (build /tmp/dcbuild/exp-289/vB88, corrida /tmp/dc289-run-vB)
+---------------------------------------------------------------------------------------------------
+  MAPA: a) ENTRA AL PUEBLO   tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 24701
+  MAPA: b) TRANSICION ESTE   tiles=  369 pisos=  369 paredes=  39 crcGrilla=  -205471136 ms= 14795
+  MAPA: c) VUELVE AL PUEBLO  tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 27387
+  MAPA: GRILLA OK -- el pueblo de la vuelta es identico al de la entrada (crc -1596781041)
+
+  numero                              base (DC-002.88)   con el corte    delta
+  ---------------------------------------------------------------------------------------
+  1ST_READ.BIN                          6.859.016 B      6.482.728 B   -376.288
+  pico usado del monton                 9.525.408 B      9.525.408 B          0
+  arena en el pico                      9.528.032 B      9.527.840 B       -192
+  libreMin (fase a)                           904 B            712 B       -192
+  libreMin (fases b y c)                    2.624 B          2.432 B       -192
+  sbrk al final                          0x8cfe4000       0x8cf88000   -376.832
+  margen al techo (0x8cff0000)             49.152 B        425.984 B   +376.832
+  crc de la grilla a/c                 -1596781041      -1596781041          0
+  crc de la grilla b                    -205471136       -205471136          0
+
+  Lectura: el pueblo pesa EXACTAMENTE lo mismo (el pico de usado no se mueve: las casillas, el arena de
+  bloques y las estructuras del nivel son las de .88), pero el monton ya no esta al filo: le quedan
+  425.984 B al techo en vez de 49.152 B, o sea 8,7 veces mas aire. El arena y el libre bajan 192 B
+  porque la fabrica de entidades ya no se construye y el patron de pedidos cambia un pelo.
+
+  Y confirma la ley de DC-002.82 (1 byte de imagen = 1 byte de monton) de forma directa: -376.288 de
+  imagen, +376.832 de margen. La diferencia de 544 B es redondeo de pagina del break.
+
+  El .elf del corte tambien se atribuyo (dc-002.89-imagen-por-rama.txt, segunda mitad): 6.526.438 B de
+  imagen, d2records sube al 34,7 % del total y el C/KOS+terceros al 16,3 % -- o sea que despues del
+  corte las dos palancas que quedan son las tablas de records (2.265.682 B, ya medida en DC-002.86:
+  el pueblo usa el 0,9 % de lo que carga) y los decodificadores de C (264.048 B de jpeg/vorbis/png/z/ogg).
+
+
+6. LO QUE HAY QUE DECIDIR (propuesta con numero)
+------------------------------------------------
+  El corte de entidades compra 376 KB de techo por un cambio de API en dos paquetes del motor. Las dos
+  alternativas, con su numero:
+
+    a) CORTE LIMPIO (escalon B de esta tarjeta): -376.288 B de imagen, +376.832 B de monton. Toca
+       d2mapstamp (NewStampFactory, Stamp.entity, EntitiesWhere) y d2mapengine (factory, entities,
+       PlaceStamp*, AddEntity/RemoveEntity, Advance, doors.go). El resto del motor (d2game, d2mapgen)
+       compila contra la misma API, asi que el corte es "el motor deja de saber de entidades" o
+       "interfaz opcional que la consola no enlaza": la segunda no rompe a nadie.
+    b) NO CORTAR y atacar d2records (2.265.682 B, 32,8 %): DC-002.86 ya midio que el pueblo usa el
+       0,9 % de las 12 tablas del compositor. Cualquier recorte de tablas son bytes de imagen y de
+       monton 1:1, y ademas suelta los tipos de entidad que hoy arrastran d2hero/d2skill/d2quest.
+
+  No se corto el repo: el corte vive solo en las copias de /tmp/dcbuild/exp-289 (el experimento es
+  reproducible con los dos scripts de la seccion 4). La decision es de Papu.
+
+
+7. COMO SE REPRODUCE
+--------------------
+  # la base (identica a DC-002.88)
+  TABLAS=3 LIENZO=0 ARENA=0 BASE_GOX=<gox del motor> DC_LDMAP=/tmp/base88.map \
+      bash scripts/console/build-tablas-282.sh /tmp/dcbuild/tablas289c
+  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/tablas289c/disc.gdi 240 /tmp/dc289-run-289c
+
+  # la imagen por rama
+  scripts/console/atribuir-imagen.py /tmp/base88.map --csv /tmp/por-paquete.csv
+  scripts/console/atribuir-simbolos.py /tmp/base88.map <sh-elf-nm -S del prog.elf>
+
+  # el corte de entidades y su corrida
+  bash scripts/console/exp-corte-entidades-289.sh B /tmp/dcbuild/tablas289c /tmp/dcbuild/exp-289/vB88
+  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/exp-289/vB88/disc.gdi 240 /tmp/dc289-run-vB

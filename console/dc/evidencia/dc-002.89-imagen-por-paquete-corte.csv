@@ -1,0 +1,76 @@
+bytes,paquete,rama
+2265682,d2core/d2records,records/tablas
+296423,d2common/d2skill,entidades: skills/stats/combate
+195694,d2core/d2hero,entidades: heroe y sus records
+195313,d2common/d2quest,entidades: quests
+187936,d2core/d2ui,render/UI
+185511,d2core/d2item/diablo2item,entidades: objetos/items
+183806,d2core/d2map/d2mapentity,entidades: mapa/entidad y tipos
+174760,d2core/d2asset,assets y formato de archivos
+171373,d2core/d2item/d2drop,entidades: objetos/items
+162988,d2core/d2map/d2mapengine,mapa: compositor y stamp
+148984,d2common/d2monster,entidades: monstruos
+105340,d2common/d2fileformats/d2s,entidades: skills/stats/combate
+102178,d2common/d2missile,entidades: skills/stats/combate
+95879,d2core/d2item/d2itemdesc,entidades: objetos/items
+59172,d2common/d2fileformats/d2ds1,assets y formato de archivos
+58012,d2common/d2statlist,entidades: skills/stats/combate
+52945,d2common/d2equip,entidades: skills/stats/combate
+48546,d2common/d2fileformats/d2mpq,assets y formato de archivos
+45429,d2common/d2combat,entidades: skills/stats/combate
+37134,d2common/d2state,resto del repo
+36697,d2core/d2stats/diablo2stats,entidades: skills/stats/combate
+33683,d2common/d2level,resto del repo
+31853,d2common/d2enum,resto del repo
+29926,main (el POC),resto del repo
+29620,d2common/d2interface,resto del repo
+25534,d2core/d2map/d2mapstamp,mapa: compositor y stamp
+25019,d2common/d2path,resto del repo
+24602,d2common/d2locale,resto del repo
+23313,d2common/d2datautils,assets y formato de archivos
+22319,d2core/d2inventory,entidades: objetos/items
+21453,d2common/d2math/d2vector,resto del repo
+20764,d2common/d2fileformats/d2dcc,assets y formato de archivos
+19502,d2common/d2calc,resto del repo
+18820,d2common/d2herostats,resto del repo
+18189,d2common/d2fileformats/d2dt1,assets y formato de archivos
+16895,d2common/d2loader,assets y formato de archivos
+16577,d2core/d2input/d2gamepad,render/UI
+15795,d2common/d2automap,resto del repo
+15493,d2common/d2animspeed,resto del repo
+14105,d2common/d2calculation/d2parser,resto del repo
+13952,d2common/d2fileformats/d2animdata,assets y formato de archivos
+12517,d2common/d2hireling,resto del repo
+12183,d2common/d2fileformats/d2tbl,assets y formato de archivos
+11483,d2common/d2trade,resto del repo
+10627,d2common/d2fileformats/d2cof,assets y formato de archivos
+9608,d2common/d2fileformats/d2pl2,assets y formato de archivos
+9549,d2common/d2util,resto del repo
+8926,d2common/d2data/d2compression,resto del repo
+8904,d2core/d2config,resto del repo
+8610,d2common/d2fileformats/d2dc6,assets y formato de archivos
+8604,d2common/d2reward,resto del repo
+7631,d2common/d2resource,resto del repo
+7500,d2common/d2loader/mpq,assets y formato de archivos
+7426,d2core/d2map/d2lightmap,resto del repo
+7108,d2common/d2calculation,resto del repo
+7015,d2common/d2cache,assets y formato de archivos
+6770,d2common/d2difficulty,resto del repo
+6566,d2common/d2loader/filesystem,assets y formato de archivos
+6508,d2common/d2monstats,resto del repo
+6273,d2common/d2calculation/d2lexer,resto del repo
+6237,d2common/d2fileformats/d2font,assets y formato de archivos
+6093,d2core/d2stats,entidades: skills/stats/combate
+5370,d2common/d2fileformats/d2dat,assets y formato de archivos
+4830,d2common/d2fileformats/d2txt,assets y formato de archivos
+4473,d2common/d2math,resto del repo
+3394,d2common/d2skilldesc,resto del repo
+2722,d2common/d2loader/asset,assets y formato de archivos
+2719,d2common/d2fileformats/d2font/d2fontglyph,assets y formato de archivos
+2681,d2common/d2loader/asset/types,assets y formato de archivos
+2422,d2common/d2geom,resto del repo
+2277,d2common/d2util/assets,resto del repo
+1830,d2core/d2item,entidades: objetos/items
+1789,d2common/d2math/d2rand,resto del repo
+664,d2common/d2display,resto del repo
+503,d2networking/d2client/d2clientconnectiontype,resto del repo

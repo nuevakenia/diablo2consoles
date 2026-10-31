@@ -1,0 +1,160 @@
+mapa: /tmp/dcbuild/tablas289/base88.map
+secciones cargadas: .bss .ctors .data .dtors .eh_frame .fini .fini_array .got .got.funcdesc .init .init_array .ocram .preinit_array .rela.dyn .rodata .rofixup .tdata .text
+secciones NO cargadas (direccion 0): .comment .debug_abbrev .debug_aranges .debug_frame .debug_info .debug_line .debug_str .go_export
+
+== POR SECCION ==
+    3973722  .go_export           fuera
+    2945574  .rodata              EN EL 1ST_READ
+    2232664  .text                EN EL 1ST_READ
+    2071791  .debug_str           fuera
+    1717166  .data                EN EL 1ST_READ
+    1617829  .debug_info          fuera
+    1448154  .debug_line          fuera
+     266305  .debug_abbrev        fuera
+     209764  .bss                 bss (no viaja, se pone a cero)
+     143388  .debug_frame         fuera
+      30248  .debug_aranges       fuera
+      10069  .comment             fuera
+       7089  .eh_frame            EN EL 1ST_READ
+         54  .init                EN EL 1ST_READ
+         42  .fini                EN EL 1ST_READ
+         12  .got                 EN EL 1ST_READ
+         12  .ctors               EN EL 1ST_READ
+          8  .dtors               EN EL 1ST_READ
+          0  .rela.dyn            EN EL 1ST_READ
+          0  .rofixup             EN EL 1ST_READ
+          0  .got.funcdesc        EN EL 1ST_READ
+
+imagen atribuida a objetos (sin .bss): 6902621 B (6.583 MB)
+no cargado (fuera del 1ST_READ): 9561506 B (9.12 MB)
+
+== POR RAMA ==
+      bytes      %  rama
+    2265682  32.8%  records/tablas
+     746301  10.8%  C: libc/KOS/libgodc/otros
+     709850  10.3%  entidades: skills/stats/combate
+     527708   7.6%  resto del repo
+     509024   7.4%  entidades: objetos/items
+     462259   6.7%  assets y formato de archivos
+     339284   4.9%  C/KOS/libgodc: terceros
+     315396   4.6%  entidades: monstruos
+     246474   3.6%  render/UI
+     204542   3.0%  entidades: heroe y sus records
+     200673   2.9%  entidades: quests
+     188522   2.7%  mapa: compositor y stamp
+     186906   2.7%  entidades: mapa/entidad y tipos
+
+== POR PAQUETE DEL REPO (top 30) ==
+      bytes   %img  paquete                                  rama
+    2265682  32.8%  d2core/d2records                         records/tablas
+     315396   4.6%  d2common/d2monster                       entidades: monstruos
+     296423   4.3%  d2common/d2skill                         entidades: skills/stats/combate
+     204542   3.0%  d2core/d2hero                            entidades: heroe y sus records
+     200673   2.9%  d2common/d2quest                         entidades: quests
+     193496   2.8%  d2core/d2ui                              render/UI
+     189615   2.7%  d2core/d2item/diablo2item                entidades: objetos/items
+     186906   2.7%  d2core/d2map/d2mapentity                 entidades: mapa/entidad y tipos
+     184404   2.7%  d2core/d2item/d2drop                     entidades: objetos/items
+     174760   2.5%  d2core/d2asset                           assets y formato de archivos
+     162988   2.4%  d2core/d2map/d2mapengine                 mapa: compositor y stamp
+     105396   1.5%  d2common/d2fileformats/d2s               entidades: skills/stats/combate
+     102178   1.5%  d2common/d2missile                       entidades: skills/stats/combate
+     101184   1.5%  d2core/d2item/d2itemdesc                 entidades: objetos/items
+      59172   0.9%  d2common/d2fileformats/d2ds1             assets y formato de archivos
+      58598   0.8%  d2common/d2equip                         entidades: skills/stats/combate
+      58012   0.8%  d2common/d2statlist                      entidades: skills/stats/combate
+      52978   0.8%  d2core/d2input/d2gamepad                 render/UI
+      48546   0.7%  d2common/d2fileformats/d2mpq             assets y formato de archivos
+      45429   0.7%  d2common/d2combat                        entidades: skills/stats/combate
+      37585   0.5%  d2core/d2stats/diablo2stats              entidades: skills/stats/combate
+      37134   0.5%  d2common/d2state                         resto del repo
+      35464   0.5%  d2core/d2config                          resto del repo
+      33683   0.5%  d2common/d2level                         resto del repo
+      33542   0.5%  d2common/d2automap                       resto del repo
+      31853   0.5%  d2common/d2enum                          resto del repo
+      31767   0.5%  d2core/d2inventory                       entidades: objetos/items
+      30302   0.4%  main (el POC)                            resto del repo
+      29913   0.4%  d2common/d2hireling                      resto del repo
+      29620   0.4%  d2common/d2interface                     resto del repo
+
+csv: /tmp/dcbuild/tablas289/base88.csv
+mapa: /tmp/dcbuild/exp-289/vB88/prog-289-B.map
+secciones cargadas: .bss .ctors .data .dtors .eh_frame .fini .fini_array .got .got.funcdesc .init .init_array .ocram .preinit_array .rela.dyn .rodata .rofixup .tdata .text
+secciones NO cargadas (direccion 0): .comment .debug_abbrev .debug_aranges .debug_frame .debug_info .debug_line .debug_str .go_export
+
+== POR SECCION ==
+    4121198  .go_export           fuera
+    2792499  .rodata              EN EL 1ST_READ
+    2071791  .debug_str           fuera
+    2018164  .text                EN EL 1ST_READ
+    1709374  .data                EN EL 1ST_READ
+    1617829  .debug_info          fuera
+    1448154  .debug_line          fuera
+     266305  .debug_abbrev        fuera
+     209400  .bss                 bss (no viaja, se pone a cero)
+     143388  .debug_frame         fuera
+      30248  .debug_aranges       fuera
+      10012  .comment             fuera
+       6273  .eh_frame            EN EL 1ST_READ
+         54  .init                EN EL 1ST_READ
+         42  .fini                EN EL 1ST_READ
+         12  .got                 EN EL 1ST_READ
+         12  .ctors               EN EL 1ST_READ
+          8  .dtors               EN EL 1ST_READ
+          0  .rela.dyn            EN EL 1ST_READ
+          0  .rofixup             EN EL 1ST_READ
+          0  .got.funcdesc        EN EL 1ST_READ
+
+imagen atribuida a objetos (sin .bss): 6526438 B (6.224 MB)
+no cargado (fuera del 1ST_READ): 9708925 B (9.26 MB)
+
+== POR RAMA ==
+      bytes      %  rama
+    2265682  34.7%  records/tablas
+     746253  11.4%  C: libc/KOS/libgodc/otros
+     703117  10.8%  entidades: skills/stats/combate
+     476912   7.3%  entidades: objetos/items
+     462259   7.1%  assets y formato de archivos
+     434226   6.7%  resto del repo
+     321157   4.9%  C/KOS/libgodc: terceros
+     204513   3.1%  render/UI
+     195694   3.0%  entidades: heroe y sus records
+     195313   3.0%  entidades: quests
+     188522   2.9%  mapa: compositor y stamp
+     183806   2.8%  entidades: mapa/entidad y tipos
+     148984   2.3%  entidades: monstruos
+
+== POR PAQUETE DEL REPO (top 30) ==
+      bytes   %img  paquete                                  rama
+    2265682  34.7%  d2core/d2records                         records/tablas
+     296423   4.5%  d2common/d2skill                         entidades: skills/stats/combate
+     195694   3.0%  d2core/d2hero                            entidades: heroe y sus records
+     195313   3.0%  d2common/d2quest                         entidades: quests
+     187936   2.9%  d2core/d2ui                              render/UI
+     185511   2.8%  d2core/d2item/diablo2item                entidades: objetos/items
+     183806   2.8%  d2core/d2map/d2mapentity                 entidades: mapa/entidad y tipos
+     174760   2.7%  d2core/d2asset                           assets y formato de archivos
+     171373   2.6%  d2core/d2item/d2drop                     entidades: objetos/items
+     162988   2.5%  d2core/d2map/d2mapengine                 mapa: compositor y stamp
+     148984   2.3%  d2common/d2monster                       entidades: monstruos
+     105340   1.6%  d2common/d2fileformats/d2s               entidades: skills/stats/combate
+     102178   1.6%  d2common/d2missile                       entidades: skills/stats/combate
+      95879   1.5%  d2core/d2item/d2itemdesc                 entidades: objetos/items
+      59172   0.9%  d2common/d2fileformats/d2ds1             assets y formato de archivos
+      58012   0.9%  d2common/d2statlist                      entidades: skills/stats/combate
+      52945   0.8%  d2common/d2equip                         entidades: skills/stats/combate
+      48546   0.7%  d2common/d2fileformats/d2mpq             assets y formato de archivos
+      45429   0.7%  d2common/d2combat                        entidades: skills/stats/combate
+      37134   0.6%  d2common/d2state                         resto del repo
+      36697   0.6%  d2core/d2stats/diablo2stats              entidades: skills/stats/combate
+      33683   0.5%  d2common/d2level                         resto del repo
+      31853   0.5%  d2common/d2enum                          resto del repo
+      29926   0.5%  main (el POC)                            resto del repo
+      29620   0.5%  d2common/d2interface                     resto del repo
+      25534   0.4%  d2core/d2map/d2mapstamp                  mapa: compositor y stamp
+      25019   0.4%  d2common/d2path                          resto del repo
+      24602   0.4%  d2common/d2locale                        resto del repo
+      23313   0.4%  d2common/d2datautils                     assets y formato de archivos
+      22319   0.3%  d2core/d2inventory                       entidades: objetos/items
+
+csv: /tmp/dcbuild/tablas289/vB88.csv
