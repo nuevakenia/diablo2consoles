@@ -1,0 +1,456 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:056 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:295 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:398 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:398 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:401 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:405 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:418 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fc343ae0000 RAM(16 MB) 0x7fc34fae0000 VRAM64(8 MB) 0x7fc347ae0000 ARAM(2 MB) 0x7fc363ae0000
+00:00:425 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:432 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fc343ae0000 RAM(16 MB) 0x7fc34fae0000 VRAM64(8 MB) 0x7fc347ae0000 ARAM(2 MB) 0x7fc363ae0000
+00:00:435 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:439 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:439 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:496 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:496 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:496 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f2d80
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), 64 ranuras de histograma
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351988128
+ARQ-MARCA   gc_init-semiespacio1 v=2354085312
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=3328 cused=4353280 gsemi=95752/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 2272 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=1 top 8c11e60a:11 8c13979c:3 8c12256c:2 8c046380:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=2 top 8c122822:98 8c049fd2:1 8c10e772:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=3 top 8c122822:96 8c046308:2 8c049fd2:1 8c10e772:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=4 top 8c122822:98 8c01f4ea:1 8c10e772:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=5 top 8c122822:98 8c01f4e2:1 8c0462fa:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=6 top 8c122822:98 8c046380:1 8c049fae:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=7 top 8c122822:99 8c0462f2:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=8 top 8c122822:97 8c13974c:1 8c049fd2:1 8c01f4d4:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=9 top 8c122822:98 8c046308:1 8c01f690:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=10 top 8c122822:97 8c0467bc:1 8c0467ce:1 8c049fd2:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=11 top 8c122822:97 8c046380:1 8c0467bc:1 8c01f4d4:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=12 top 8c122822:98 8c046390:1 8c049fae:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=13 top 8c122822:98 8c0467bc:1 8c13974c:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 2448
+SONDA-PC t=14 top 8c122822:95 8c11e60a:1 8c049fae:1 8c0467bc:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=15 top 8c122822:99 8c046308:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=16 top 8c122822:98 8c046308:1 8c049fd2:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=17 top 8c122822:99 8c046390:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=18 top 8c122822:98 8c046380:1 8c049fd2:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=19 top 8c122822:98 8c046350:1 8c01f4d4:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=20 top 8c122822:98 8c049fae:1 8c0462f2:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=21 top 8c122822:98 8c046370:1 8c10e772:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=22 top 8c122822:98 8c01f4e2:1 8c0462f2:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=23 top 8c122822:97 8c0467da:1 8c01f4e2:1 8c10ba78:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=24 top 8c122822:96 8c046794:1 8c049fae:1 8c01f4e2:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=25 top 8c122822:99 8c04647c:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+SONDA-PC RACHA pc=8c122822 racha=30 pr=8c122c7c fp=ffffffff sp=8c2ebb9c
+SONDA-PC t=26 top 8c122822:97 8c04a006:1 8c13979c:1 8c13974c:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+COOP276: mpq a mano listos montonLibre= 2624
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=2624 cused=5705664 gsemi=395504/2097152 gc=0
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=2624 cused=5705664 gsemi=397408/2097152 gc=0
+SONDA-PC t=27 top 8c122822:93 8c04a006:1 8c11e60a:1 8c11e60e:1 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 3152
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=575064
+COOP276: ANIMDATA despues del GC montonLibre= 3152
+COOP276: BASELINE (N=0) montonLibre= 3152 gcColecciones= 1 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=575200
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=3152 cused=6204848 gsemi=581896/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=3152 cused=6204848 gsemi=585088/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=3152 cused=6204848 gsemi=601648/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=3152 cused=6204848 gsemi=604528/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=3152 cused=6204848 gsemi=623872/2097152 gc=2
+SONDA-PC t=28 top 8c122822:17 8c11e60a:7 8c0d8458:6 8c045d9e:4 pc=8c122822 pr=8c122c7c fp=ffffffff sp=8c2ebb9c fuera=0
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=3152 cused=6204848 gsemi=636864/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=3152 cused=6204848 gsemi=995000/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=3152 cused=6204848 gsemi=1009832/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=3152 cused=6204848 gsemi=1545544/2097152 gc=2
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576304
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=808288
+ARQ-CARGA lee-volvio /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=3152 cused=6204848 gsemi=817304/2097152 gc=3
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574120
+ARQ-MARCA gc_collect v=4
+SONDA-PC t=29 top 8c122822:46 8c11e60a:5 8c0d8458:3 8c0d80e4:3 pc=8c0d7d8c pr=8c0d809c fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1361016
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576896
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=1405176
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573696
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1514088
+ARQ-CARGA lee-entra /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=2848 cused=6618848 gsemi=1548728/2097152 gc=6
+ARQ-CARGA lee-volvio /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=2848 cused=6618848 gsemi=1561776/2097152 gc=6
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576848
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1465360
+SONDA-PC t=30 top 8c0d80f0:11 8c0d85bc:6 8c0d8458:6 8c0d80e4:6 pc=8c13979c pr=8c0d17b2 fp=8c716f8c sp=8c716f8c fuera=0
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572936
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=1521944
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=1464496
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578048
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=1539792
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572936
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=1544088
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573440
+ARQ-MARCA gc_collect v=12
+SONDA-PC t=31 top 8c0d8458:10 8c0d80e4:10 8c139730:6 8c0d85bc:5 pc=8c0d80f0 pr=8c0d84c4 fp=8c716dec sp=8c716dec fuera=0
+ARQ-MARCA gc-vivo v=1535944
+ARQ-MARCA gc-por-umbral-bytes-usados v=1580888
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=1561696
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=1556736
+ARQ-CARGA lee-entra /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=2848 cused=6618848 gsemi=1563920/2097152 gc=14
+ARQ-CARGA lee-volvio /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=2848 cused=6618848 gsemi=1569744/2097152 gc=14
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573064
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=1556312
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574784
+ARQ-MARCA gc_collect v=16
+SONDA-PC t=32 top 8c0d8458:8 8c0d80f6:8 8c0d80fc:7 8c11e60e:4 pc=8c0d8022 pr=8c0d848a fp=8c716dec sp=8c716dec fuera=0
+ARQ-MARCA gc-vivo v=1572688
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=17
+ARQ-MARCA gc-vivo v=1555304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573016
+ARQ-MARCA gc_collect v=18
+ARQ-MARCA gc-vivo v=1510912
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572968
+ARQ-MARCA gc_collect v=19
+ARQ-MARCA gc-vivo v=1517936
+ARQ-CARGA lee-entra /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=2848 cused=6618848 gsemi=1544848/2097152 gc=19
+ARQ-CARGA lee-volvio /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=2848 cused=6618848 gsemi=1551800/2097152 gc=19
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572936
+ARQ-MARCA gc_collect v=20
+SONDA-PC t=33 top 8c0d80f0:13 8c0d8458:10 8c0d80e4:6 8c0d80f6:6 pc=8c0d80e4 pr=8c0d855a fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1490480
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572920
+ARQ-MARCA gc_collect v=21
+ARQ-MARCA gc-vivo v=1503016
+ARQ-CARGA lee-entra /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=2848 cused=6618848 gsemi=1582832/2097152 gc=21
+ARQ-MARCA gc-por-umbral-bytes-usados v=1582832
+ARQ-MARCA gc_collect v=22
+ARQ-MARCA gc-vivo v=1550464
+ARQ-CARGA lee-volvio /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=2848 cused=6618848 gsemi=1569944/2097152 gc=22
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572872
+ARQ-MARCA gc_collect v=23
+SONDA-PC t=34 top 8c0d80f0:17 8c122822:15 8c0d80e4:8 8c0d80f6:7 pc=8c0d80f6 pr=8c0d844e fp=8c716ee8 sp=8c716ee8 fuera=0
+ARQ-MARCA gc-vivo v=1544168
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573248
+ARQ-MARCA gc_collect v=24
+ARQ-MARCA gc-vivo v=1566344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573320
+ARQ-MARCA gc_collect v=25
+ARQ-MARCA gc-vivo v=1559016
+ARQ-MARCA gc-por-umbral-bytes-usados v=1579120
+ARQ-MARCA gc_collect v=26
+ARQ-MARCA gc-vivo v=1579024
+ARQ-MARCA gc-por-umbral-bytes-usados v=1579128
+ARQ-MARCA gc_collect v=27
+SONDA-PC t=35 top 8c0d80f0:12 8c0d80e4:11 8c0d8458:10 8c0d80f6:10 pc=8c139730 pr=8c0d7e3c fp=8c716dbc sp=8c716dbc fuera=0
+ARQ-MARCA gc-vivo v=1558000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588824
+ARQ-MARCA gc_collect v=28
+ARQ-MARCA gc-vivo v=1582200
+ARQ-MARCA gc-por-umbral-bytes-usados v=1582320
+ARQ-MARCA gc_collect v=29
+ARQ-MARCA gc-vivo v=1550392
+ARQ-MARCA gc-por-umbral-bytes-usados v=1585216
+ARQ-MARCA gc_collect v=30
+SONDA-PC t=36 top 8c0d80f0:23 8c0d80e4:13 8c0d80f6:12 8c0d8458:7 pc=8c0d80f0 pr=8c0d848a fp=8c716dec sp=8c716dec fuera=0
+ARQ-MARCA gc-vivo v=1578712
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578832
+ARQ-MARCA gc_collect v=31
+ARQ-MARCA gc-vivo v=1525168
+ARQ-MARCA gc-por-umbral-bytes-usados v=1590232
+ARQ-MARCA gc_collect v=32
+ARQ-MARCA gc-vivo v=1574920
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575048
+ARQ-MARCA gc_collect v=33
+ARQ-MARCA gc-vivo v=1SONDA-PC t=37 top 8c0d80f0:25 8c0d80e4:13 8c0d8458:11 8c0d80f6:6 pc=8c11e60a pr=8c11e684 fp=8c716e5c sp=8c716dc8 fuera=0
+584 fp=ARQ-MARCA gc-por-umbral-bytes-usados v=1584240
+ARQ-MARCA gc_collect v=34
+ARQ-MARCA gc-vivo v=1588824
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588952
+ARQ-MARCA gc_collect v=35
+ARQ-MARCA gc-vivo v=1568520
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572904
+ARQ-MARCA gc_collect v=36
+SONDA-PC t=38 top 8c0d80f0:24 8c0d80f6:13 8c0d80e4:12 8c0d8458:6 pc=8c0d8a3e pr=8c0d8b58 fp=8c716f14 sp=8c716f14 fuera=0
+ARQ-MARCA gc-vivo v=1545496
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576544
+ARQ-MARCA gc_collect v=37
+ARQ-MARCA gc-vivo v=1569792
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573136
+ARQ-MARCA gc_collect v=38
+ARQ-MARCA gc-vivo v=1554128
+ARQ-MARCA gc-por-umbral-bytes-usados v=1585368
+ARQ-MARCA gc_collect v=39
+ARQ-MARCA gc-vivo v=1578456
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578576
+ARQ-MARCA gc_collect v=40
+SONDA-PC t=39 top 8c0d80f0:21 8c0d80e4:11 8c0d80f6:8 8c0d8458:7 pc=8c0d80f0 pr=8c0d855a fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1555904
+ARQ-MARCA gc-por-umbral-bytes-usados v=1587448
+ARQ-MARCA gc_collect v=41
+ARQ-MARCA gc-vivo v=1579304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1579424
+ARQ-MARCA gc_collect v=42
+ARQ-MARCA gc-vivo v=1578496
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578904
+ARQ-MARCA gc_collect v=43
+SONDA-PC t=40 top 8c0d80f0:19 8c0d80e4:11 8c0d85bc:6 8c139730:5 pc=8c0d8100 pr=8c0d848a fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1577360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1577768
+ARQ-MARCA gc_collect v=44
+ARQ-MARCA gc-vivo v=1577768
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578176
+ARQ-MARCA gc_collect v=45
+ARQ-MARCA gc-vivo v=1556920
+ARQ-MARCA gc-por-umbral-bytes-usados v=1586912
+ARQ-MARCA gc_collect v=46
+SONDA-PC t=41 top 8c0d80f0:28 8c0d80e4:13 8c0d8458:11 8c0d80f6:7 pc=8c0d80f0 pr=8c0d85b2 fp=8c716dec sp=8c716dec fuera=0
+ARQ-MARCA gc-vivo v=1581592
+ARQ-MARCA gc-por-umbral-bytes-usados v=1581696
+ARQ-MARCA gc_collect v=47
+ARQ-MARCA gc-vivo v=1579240
+ARQ-MARCA gc-por-umbral-bytes-usados v=1579632
+ARQ-MARCA gc_collect v=48
+ARQ-MARCA gc-vivo v=1579632
+ARQ-MARCA gc-por-umbral-bytes-usados v=1580024
+ARQ-MARCA gc_collect v=49
+SONDA-PC t=42 top 8c0d80f0:27 8c0d80e4:14 8c0d80f6:7 8c0d80fc:7 pc=8c0d7fe6 pr=8c0d81ee fp=8c716e04 sp=8c716e04 fuera=0
+ARQ-MARCA gc-vivo v=1579800
+ARQ-MARCA gc-por-umbral-bytes-usados v=1580192
+ARQ-MARCA gc_collect v=50
+ARQ-MARCA gc-vivo v=1579416
+ARQ-MARCA gc-por-umbral-bytes-usados v=1579808
+ARQ-MARCA gc_collect v=51
+SONDA-PC t=43 top 8c0d80e4:26 8c0d80f0:21 8c0d80f6:12 8c0d8458:5 pc=8c0d80e4 pr=8c0d84c4 fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1579080
+ARQ-MARCA gc-por-umbral-bytes-usados v=1579472
+ARQ-MARCA gc_collect v=52
+ARQ-MARCA gc-vivo v=1578696
+ARQ-MARCA gc-por-umbral-bytes-usados v=1579088
+ARQ-MARCA gc_collect v=53
+ARQ-MARCA gc-vivo v=1578312
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578704
+ARQ-MARCA gc_collect v=54
+SONDA-PC t=44 top 8c0d80f6:12 8c0d80e4:11 8c0d80fc:5 8c0d8420:3 pc=8c0d8086 pr=8c0d844e fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1577928
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578320
+ARQ-MARCA gc_collect v=55
+ARQ-MARCA gc-vivo v=1577544
+ARQ-MARCA gc-por-umbral-bytes-usados v=1577936
+ARQ-MARCA gc_collect v=56
+SONDA-PC t=45 top 8c0d80f0:33 8c0d80e4:18 8c0d80fc:12 8c0d8458:6 pc=8c0d80f0 pr=8c0d848a fp=8c717148 sp=8c717148 fuera=0
+ARQ-MARCA gc-vivo v=1558240
+ARQ-MARCA gc-por-umbral-bytes-usados v=1585968
+ARQ-MARCA gc_collect v=57
+ARQ-MARCA gc-vivo v=1583544
+ARQ-MARCA gc-por-umbral-bytes-usados v=1583664
+ARQ-MARCA gc_collect v=58
+SONDA-PC t=46 top 8c0d80f0:29 8c0d80f6:14 8c0d80e4:10 8c0d8458:5 pc=8c0d85b4 pr=8c0d85b2 fp=8c716e18 sp=8c716e18 fuera=0
+ARQ-MARCA gc-vivo v=1583584
+ARQ-MARCA gc-por-umbral-bytes-usados v=1583992
+ARQ-MARCA gc_collect v=59
+ARQ-MARCA gc-vivo v=1583992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584400
+ARQ-MARCA gc_collect v=60
+ARQ-MARCA gc-vivo v=1584744
+ARQ-MARCA gc-por-umbral-bytes-usados v=1585152
+ARQ-MARCA gc_collect v=61
+SONDA-PC t=47 top 8c0d80f0:25 8c0d80e4:20 8c0d80f6:11 8c0d8458:7 pc=8c0d80e4 pr=8c0d855a fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1583920
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584328
+ARQ-MARCA gc_collect v=62
+ARQ-MARCA gc-vivo v=1594560
+ARQ-MARCA gc-por-umbral-bytes-usados v=1594968
+ARQ-MARCA gc_collect v=63
+SONDA-PC t=48 top 8c0d80f0:33 8c0d80e4:15 8c0d80f6:15 8c0d80fc:6 pc=8c0d80e4 pr=8c0d848a fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1583184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1583592
+ARQ-MARCA gc_collect v=64
+ARQ-MARCA gc-vivo v=1582816
+ARQ-MARCA gc-por-umbral-bytes-usados v=1583224
+ARQ-MARCA gc_collect v=65
+SONDA-PC t=49 top 8c0d80f0:29 8c0d80e4:16 8c0d80f6:14 8c0d80fc:5 pc=8c0d84cc pr=8c0d85b2 fp=8c716e18 sp=8c716e18 fuera=0
+ARQ-MARCA gc-vivo v=1582448
+ARQ-MARCA gc-por-umbral-bytes-usados v=1582856
+ARQ-MARCA gc_collect v=66
+ARQ-MARCA gc-vivo v=1582088
+ARQ-MARCA gc-por-umbral-bytes-usados v=1582496
+ARQ-MARCA gc_collect v=67
+SONDA-PC t=50 top 8c0d80f0:24 8c0d80e4:23 8c0d80f6:19 8c0d80fc:4 pc=8c0d85bc pr=8c0d85b2 fp=8c717170 sp=8c717170 fuera=0
+ARQ-MARCA gc-vivo v=1561640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1589368
+ARQ-MARCA gc_collect v=68
+ARQ-MARCA gc-vivo v=1587936
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588056
+ARQ-MARCA gc_collect v=69
+ARQ-MARCA gc-vivo v=1588008
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588416
+ARQ-MARCA gc_collect v=70
+SONDA-PC t=51 top 8c0d80f0:24 8c0d80e4:19 8c0d80f6:9 8c0d8420:5 pc=8c0d80e4 pr=8c0d85b2 fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1588392
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588800
+ARQ-MARCA gc_collect v=71
+ARQ-MARCA gc-vivo v=1588680
+ARQ-MARCA gc-por-umbral-bytes-usados v=1589088
+ARQ-MARCA gc_collect v=72
+SONDA-PC t=52 top 8c0d80f0:22 8c0d80e4:21 8c0d80f6:18 8c0d8458:8 pc=8c0d7fd4 pr=8c0d82b0 fp=8c716e2c sp=8c716e2c fuera=0
+ARQ-MARCA gc-vivo v=1588312
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588720
+ARQ-MARCA gc_collect v=73
+ARQ-MARCA gc-vivo v=1587944
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588352
+ARQ-MARCA gc_collect v=74
+ARQ-MARCA gc-vSONDA-PC t=53 top 8c0d80f0:35 8c0d80e4:21 8c0d80fc:5 8c0d8420:4 pc=8c11e60a pr=8c11e684 fp=8c716e5c sp=8c716dc8 fuera=0
+i=8c11e684 fp=ARQ-MARCA gc-por-umbral-bytes-usados v=1587984
+ARQ-MARCA gc_collect v=75
+ARQ-MARCA gc-vivo v=1587208
+ARQ-MARCA gc-por-umbral-bytes-usados v=1587616
+ARQ-MARCA gc_collect v=76
+SONDA-PC t=54 top 8c0d80f0:30 8c0d80e4:25 8c0d80f6:12 8c0d80fc:7 pc=8c0d8100 pr=8c0d84fa fp=8c716df0 sp=8c716df0 fuera=0
+ARQ-MARCA gc-vivo v=1586840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1587248
+ARQ-MARCA gc_collect v=77
+ARQ-MARCA gc-vivo v=1586472
+ARQ-MARCA gc-por-umbral-bytes-usados v=1586880
+ARQ-MARCA gc_collect v=78
+SONDA-PC t=55 top 8c0d80f0:36 8c0d80e4:16 8c0d80f6:8 8c0d80fc:8 pc=8c0d80fc pr=8c0d855a fp=8c717148 sp=8c717148 fuera=0
+ARQ-MARCA gc-vivo v=1585544
+ARQ-MARCA gc-por-umbral-bytes-usados v=1585576
+ARQ-MARCA gc_collect v=79
+ARQ-MARCA gc-vivo v=1584368
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584408
+ARQ-MARCA gc_collect v=80
+SONDA-PC t=56 top 8c0d80f0:29 8c0d80e4:20 8c0d80f6:12 8c0d80fc:7 pc=8c0d80f6 pr=8c0d848a fp=8c716f3c sp=8c716f3c fuera=0
+ARQ-MARCA gc-vivo v=1584408
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584800
+ARQ-MARCA gc_collect v=81
+ARQ-MARCA gc-vivo v=1583992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584080
+ARQ-MARCA gc_collect v=82
+SONDA-PC t=57 top 8c0d80f0:30 8c0d80e4:21 8c0d80f6:12 8c0d80fc:4 pc=8c0d80f0 pr=8c0d85b2 fp=8c716ea8 sp=8c716ea8 fuera=0
+ARQ-MARCA gc-vivo v=1584080
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584168
+ARQ-MARCA gc_collect v=83
+ARQ-MARCA gc-vivo v=1584168
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584256
+ARQ-MARCA gc_collect v=84
+SONDA-PC t=58 top 8c0d80f0:35 8c0d80e4:16 8c0d80f6:15 8c0d8458:4 pc=8c0d80f0 pr=8c0d84fa fp=8c716ea8 sp=8c716ea8 fuera=0
+ARQ-MARCA gc-vivo v=1584256
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584344
+ARQ-MARCA gc_collect v=85
+ARQ-MARCA gc-vivo v=1584344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584432
+ARQ-MARCA gc_collect v=86
+SONDA-PC t=59 top 8c0d80f0:29 8c0d80f6:17 8c0d80e4:16 8c0d8458:8 pc=8c0d802a pr=8c0d844e fp=8c716ea8 sp=8c716ea8 fuera=0
+ARQ-MARCA gc-vivo v=1584392
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584480
+ARQ-MARCA gc_collect v=87
+ARQ-MARCA gc-vivo v=1584480
+ARQ-MARCA gc-por-umbral-bytes-usados v=1584568
+ARQ-MARCA gc_collect v=88
+SONDA-PC t=60 top 8c0d80f0:28 8c0d80e4:21 8c0d80f6:10 8c0d80fc:6 pc=8c0d80e4 pr=8c0d855a fp=8c716ea8 sp=8c716ea8 fuera=0

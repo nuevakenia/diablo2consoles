@@ -1,0 +1,482 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:054 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:297 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:399 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:399 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:402 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:406 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:419 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f56013f0000 RAM(16 MB) 0x7f560d3f0000 VRAM64(8 MB) 0x7f56053f0000 ARAM(2 MB) 0x7f56213f0000
+00:00:425 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:432 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f56013f0000 RAM(16 MB) 0x7f560d3f0000 VRAM64(8 MB) 0x7f56053f0000 ARAM(2 MB) 0x7f56213f0000
+00:00:435 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:439 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:439 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:462 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:462 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:462 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f3320
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), 64 ranuras de histograma
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351989568
+ARQ-MARCA   gc_init-semiespacio1 v=2354086752
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1888 cused=4353280 gsemi=95712/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 832 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=1 top 8c122ab2:80 8c11e89a:9 8c139a2c:3 8c11e89e:2 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=286 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=2 top 8c122ab2:98 8c046380:1 8c0462f2:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=561 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=3 top 8c122ab2:97 8c10ea02:2 8c01f4e2:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=763 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=4 top 8c122ab2:98 8c046308:1 8c1399dc:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=1038 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=5 top 8c122ab2:97 8c046380:1 8c049fd2:1 8c1399dc:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=1252 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=6 top 8c122ab2:97 8c10ea02:1 8c049fd2:1 8c01f4d4:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=1539 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=7 top 8c122ab2:97 8c10ea02:1 8c049fae:1 8c1399dc:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=1753 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=8 top 8c122ab2:98 8c046308:1 8c01f4ea:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=2029 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=9 top 8c122ab2:98 8c046380:1 8c01f684:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=2305 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=10 top 8c122ab2:99 8c0467bc:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=2571 saltados=0
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=11 top 8c122ab2:97 8c10ea02:1 8c11e89a:1 8c01f66e:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=2786 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=12 top 8c122ab2:98 8c049fd2:1 8c01f4f6:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=3063 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=13 top 8c122ab2:97 8c10ea02:1 8c0467ce:1 8c01f658:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=3351 saltados=0
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 1008
+SONDA-PC t=14 top 8c122ab2:95 8c04a006:1 8c046794:1 8c11e89a:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=3493 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=15 top 8c122ab2:99 8c046308:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=3759 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=16 top 8c122ab2:98 8c01f4d4:1 8c0462f2:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=3963 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=17 top 8c122ab2:98 8c1399cc:1 8c0462fa:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=4240 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=18 top 8c122ab2:98 8c049fd2:1 8c01f4e2:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=4590 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=19 top 8c122ab2:98 8c046308:1 8c046370:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=4794 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=20 top 8c122ab2:99 8c046308:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=5060 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=21 top 8c122ab2:98 8c046314:1 8c01f4d4:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=5337 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=22 top 8c122ab2:97 8c10ea02:1 8c1399dc:1 8c04647c:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=5552 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=23 top 8c122ab2:96 8c04a006:1 8c0467a4:1 8c01f4d4:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=5767 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=24 top 8c122ab2:97 8c04a006:2 8c046794:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=5971 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=25 top 8c122ab2:98 8c10ea02:1 8c046350:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=6248 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+SONDA-PC t=26 top 8c122ab2:98 8c04a006:1 8c0464a8:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=6452 saltados=0
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+COOP276: mpq a mano listos montonLibre= 1184
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=1160 cused=5705688 gsemi=395808/2097152 gc=0
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=1160 cused=5705688 gsemi=397712/2097152 gc=0
+SONDA-PC t=27 top 8c122ab2:88 8c11e89a:4 8c10ea02:1 8c045d90:1 pc=8c122ab2 pr=8c122f0c fp=ffffffff sp=8c2ec13c fuera=0 chars=6667 saltados=0
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 1688
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=491848
+COOP276: ANIMDATA despues del GC montonLibre= 1688
+COOP276: BASELINE (N=0) montonLibre= 1688 gcColecciones= 1 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=491984
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=1672 cused=6204888 gsemi=498632/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=1672 cused=6204888 gsemi=501824/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=1656 cused=6204904 gsemi=518240/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=1656 cused=6204904 gsemi=521120/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=1656 cused=6204904 gsemi=540344/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=1656 cused=6204904 gsemi=553336/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=1632 cused=6204928 gsemi=911440/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=1632 cused=6204928 gsemi=926272/209SONDA-PC t=28 top 8c122ab2:30 8c11e89a:8 8c036b7c:7 8c0390b4:5 pc=8c11e89a pr=8c11e914 fp=8c3876e8 sp=8c71754c fuera=0 chars=6809 saltados=0
+7152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=1632 cused=6204928 gsemi=1462104/2097152 gc=2
+SONDA-PC RACHA pc=8c122ab2 racha=30 pr=8c122f0c fp=ffffffff sp=8c2ec13c
+ARQ-CARGA lee-volvio /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=1632 cused=6204928 gsemi=1501880/2097152 gc=2
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574384
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=785784
+ARQ-MARCA gc-por-umbral-bytes-usados v=1601072
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=927280
+ARQ-CARGA lee-entra /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=1328 cused=6618928 gsemi=1215144/2097152 gc=4
+ARQ-CARGA lee-volvio /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=1328 cused=6618928 gsemi=1228192/2097152 gc=4
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572928
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=945208
+SONDA-PC t=29 top 8c122ab2:41 8c11e89a:4 8c03c83e:3 8c0d8512:2 pc=8c03745c pr=8c03ce2c fp=00000000 sp=8c717430 fuera=0 chars=7024 saltados=0
+ARQ-CARGA lee-entra /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=1328 cused=6618928 gsemi=1013336/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=1328 cused=6618928 gsemi=1019160/2097152 gc=5
+ARQ-CARGA lee-entra /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=1328 cused=6618928 gsemi=1147744/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=1328 cused=6618928 gsemi=1154696/2097152 gc=5
+ARQ-CARGA lee-entra /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=1328 cused=6618928 gsemi=1338008/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=1328 cused=6618928 gsemi=1357488/2097152 gc=5
+ARQ-MARCA gc-por-umbral-bytes-usados v=1579320
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1103072
+COOP276: JUGADOR J1 indice= 0 direccion= 0 celda= 28 20 subtiles= 140 100 creacionUs= 1905768 montonAntes= 1688 montonDespues= 1328 gcPorLaCreacion= 4 gcTotal= 6
+COOP276: ETAPA n= 1 montonLibre= 1328 creacionUs= 1977520 gcEnLaCreacion= 5 gcTotal= 6
+COOP276: CACHES n= 1 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1120128
+COOP276: ETAPA n= 1 gcForzadoUs= 69458 montonLibreDespuesDelGC= 1328
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421856
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421736
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421496
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940429592
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421616
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940429320
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421376
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421856
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421736
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421496
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940429592
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421616
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940429320
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421376
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: CUADRO n= 1 cuadro= 1 pixelesNoVacios= 1018 crc32= -2090631827 montonLibre= 1328
+SONDA-PC t=30 top 8c122ab2:25 8c11e89a:24 8c11e89e:4 8c0c8ede:3 pc=8c01393c pr=8c01398c fp=8c2c1a08 sp=8c7182f4 fuera=0 chars=7167 saltados=0
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421856
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421736
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421496
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940429592
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421616
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940429320
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940421376
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421856
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421736
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421496
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940429592
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421616
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940429320
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940421376
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+SONDA-PC t=31 top 8c01393c:24 8c0c8eec:19 8c11e89a:15 8c0c8ed0:11 pc=8c0c8ed0 pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=7312 saltados=0
+SONDA-PC t=32 top 8c01393c:32 8c0c8ede:17 8c0c8eec:12 8c0c8ed0:11 pc=8c0c8ede pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=7457 saltados=0
+SONDA-PC t=33 top 8c01393c:33 8c0c8ede:16 8c0c8eec:14 8c0c8ec2:6 pc=8c0c8eec pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=7601 saltados=0
+SONDA-PC t=34 top 8c0c8ed0:20 8c0c8ebc:14 8c0c8eec:14 8c0c8ede:11 pc=8c0c8eec pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=7746 saltados=0
+SONDA-PC t=35 top 8c01393c:24 8c0c8ed0:15 8c0c8ede:13 8c0c8eec:13 pc=8c0c8ed0 pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=7891 saltados=0
+SONDA-PC t=36 top 8c01393c:28 8c0c8ede:18 8c0c8eec:13 8c0c8ec2:9 pc=8c0d12ea pr=8c0d12ea fp=8c718180 sp=8c718180 fuera=0 chars=8035 saltados=0
+COOP276: FILA n= 1 montonLibre= 1328 gcColeccionesTotal= 7 gcEnLaEtapa= 2 cuadros= 60 avanceUsPorCuadro= 10 dibujoUsPorCuadro= 79358 trabajoUsPorCuadro= 79368 fps= 8
+COOP276: CACHES n= 1 al cerrar | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=1217352
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 8
+COOP276: JUGADOR J2 indice= 1 direccion= 16 celda= 31 20 subtiles= 155 100 creacionUs= 10928 montonAntes= 1328 montonDespues= 1192 gcPorLaCreacion= 0 gcTotal= 8
+COOP276: ETAPA n= 2 montonLibre= 1192 creacionUs= 98854 gcEnLaCreacion= 1 gcTotal= 8
+COOP276: CACHES n= 2 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=1263920
+COOP276: ETAPA n= 2 gcForzadoUs= 70831 montonLibreDespuesDelGC= 1192
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940879168
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940253696
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940261272
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940380616
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940311256
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940380344
+SONDA-PC t=37 top 8c01393c:24 8c0c8ede:15 8c11e89a:14 8c0c8ec2:5 pc=8c142b60 pr=8c137694 fp=00000006 sp=8c718194 fuera=0 chars=8179 saltados=0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940311824
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940879168
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940253696
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940261272
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940380616
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940311256
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940380344
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940311824
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367520
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367400
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367160
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367640
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367280
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367760
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367040
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367520
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367400
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367160
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367640
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367280
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367760
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367040
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: CUADRO n= 2 cuadro= 1 pixelesNoVacios= 2041 crc32= -34562710 montonLibre= 1192
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940879168
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940253696
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940261272
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940380616
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940311256
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940380344
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940311824
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940879168
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940253696
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940261272
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940380616
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940311256
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940380344
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940311824
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367520
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367400
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367160
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367640
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367280
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367760
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1940367040
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367520
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367400
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367160
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367640
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367280
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367760
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1940367040
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+SONDA-PC t=38 top 8c11e89a:44 8c11e89e:11 8c01393c:8 8c010dec:7 pc=8c01393c pr=8c01398c fp=8c2c1a10 sp=8c7182f4 fuera=0 chars=8322 saltados=0
+SONDA-PC t=39 top 8c0c8ebc:20 8c0c8ede:17 8c0c8eec:11 8c0c8ec2:9 pc=8c01393c pr=8c01398c fp=8c2c19bc sp=8c7182f4 fuera=0 chars=8466 saltados=0
+SONDA-PC t=40 top 8c01393c:29 8c0c8ede:19 8c0c8ed0:9 8c0c8eec:8 pc=8c0c8ebc pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=8609 saltados=0
+SONDA-PC t=41 top 8c01393c:30 8c0c8ede:22 8c0c8eec:11 8c0c8ec2:5 pc=8c0c8ede pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=8753 saltados=0
+SONDA-PC t=42 top 8c0c8ed0:18 8c0c8ebc:16 8c0c8eec:12 8c0c8ede:10 pc=8c0c8ede pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=8898 saltados=0
+SONDA-PC t=43 top 8c0c8ed0:18 8c0c8ebc:17 8c0c8eec:12 8c0c8ede:11 pc=8c01393c pr=8c01398c fp=8c2c19d8 sp=8c7182f4 fuera=0 chars=9043 saltados=0
+SONDA-PC t=44 top 8c01393c:29 8c0c8ede:16 8c0c8eec:15 8c0c8ed0:8 pc=8c0c8ebc pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=9187 saltados=0
+COOP276: FILA n= 2 montonLibre= 1192 gcColeccionesTotal= 9 gcEnLaEtapa= 8 cuadros= 60 avanceUsPorCuadro= 19 dibujoUsPorCuadro= 88552 trabajoUsPorCuadro= 88571 fps= 7
+COOP276: CACHES n= 2 al cerrar | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=1263920
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 10
+COOP276: JUGADOR J3 indice= 2 direccion= 32 celda= 28 23 subtiles= 140 115 creacionUs= 10880 montonAntes= 1192 montonDespues= 1192 gcPorLaCreacion= 0 gcTotal= 10
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=1310496
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 11
+COOP276: JUGADOR J4 indice= 3 direccion= 48 celda= 31 23 subtiles= 155 115 creacionUs= 10841 montonAntes= 1192 montonDespues= 1192 gcPorLaCreacion= 0 gcTotal= 11
+COOP276: ETAPA n= 4 montonLibre= 1192 creacionUs= 201576 gcEnLaCreacion= 2 gcTotal= 11
+COOP276: CACHES n= 4 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=1357056
+COOP276: ETAPA n= 4 gcForzadoUs= 73097 montonLibreDespuesDelGC= 1192
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942976336
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942350032
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942357608
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942477368
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942407864
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942477096
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942408432
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942976336
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942350032
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942357608
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942477368
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942407864
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942477096
+COOP276: SONDA n= 4 cuadro= SONDA-PC t=45 top 8c01393c:17 8c11e89a:15 8c0c8ede:10 8c0c8eec:5 pc=8c11e89a pr=8c11e914 fp=8c2f2e54 sp=8c717f40 fuera=0 chars=9331 saltados=0
+1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942408432
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349608
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349488
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349248
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349728
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349368
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349848
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349128
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349608
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349488
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349248
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349728
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349368
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349848
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349128
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348768
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348648
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348408
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348888
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348528
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349008
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348288
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348768
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348648
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348408
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348888
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348528
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349008
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348288
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942464128
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942464008
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942463768
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942464248
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942463888
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942464368
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942463648
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942464128
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942464008
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942463768
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942464248
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942463888
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942464368
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942463648
+COOP276: SONDA n= 4 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: CUADRO n= 4 cuadro= 1 pixelesNoVacios= 4076 crc32= 989278966 montonLibre= 1192
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942976336
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942350032
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942357608
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942477368
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942407864
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942477096
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942408432
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942976336
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942350032
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942357608
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942477368
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942407864
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942477096
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942408432
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349608
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349488
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349248
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349728
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349368
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349848
+SONDA-PC t=46 top 8c11e89a:56 8c11e89e:14 8c010dec:7 8c11e722:5 pc=8c142fc0 pr=8c143508 fp=8c7180ac sp=8c717fc8 fuera=0 chars=9474 saltados=0
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349128
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349608
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349488
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349248
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349728
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349368
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349848
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349128
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348768
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348648
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348408
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348888
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348528
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942349008
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942348288
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348768
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348648
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348408
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348888
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348528
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942349008
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942348288
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942464128
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942464008
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942463768
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942464248
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942463888
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942464368
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943818712 dato= -1942463648
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942464128
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942464008
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942463768
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942464248
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942463888
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942464368
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943818712 dato= -1942463648
+COOP276: SONDA n= 4 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+SONDA-PC t=47 top 8c11e89a:33 8c01393c:17 8c0c8ede:8 8c11e722:6 pc=8c0c8ebc pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=9617 saltados=0
+SONDA-PC t=48 top 8c0c8ebc:18 8c0c8ede:13 8c0c8ed0:11 8c0c8eec:11 pc=8c0c8ed0 pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=9762 saltados=0
+SONDA-PC t=49 top 8c0c8eec:19 8c0c8ed0:14 8c0c8ebc:13 8c0c8ede:10 pc=8c0c8eec pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=9907 saltados=0
+SONDA-PC t=50 top 8c01393c:27 8c0c8ede:19 8c0c8eec:11 8c0c8ed0:7 pc=8c0ccda0 pr=8c0ccda0 fp=8c717f80 sp=8c717e64 fuera=0 chars=10051 saltados=0
+SONDA-PC t=51 top 8c01393c:29 8c0c8ede:13 8c0c8eec:10 8c0c8ec2:9 pc=8c01393c pr=8c01398c fp=8c2c19c0 sp=8c7182f4 fuera=0 chars=10196 saltados=0
+SONDA-PC t=52 top 8c01393c:28 8c0c8eec:12 8c0c8ede:11 8c0c8ed0:8 pc=8c0c8ebc pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=10341 saltados=0
+SONDA-PC t=53 top 8c0c8ed0:18 8c0c8eec:13 8c0c8ebc:12 8c0c8ede:12 pc=8c0c8ec2 pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=10487 saltados=0
+COOP276: CUADRO n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 1192
+COOP276: SIGUE n= 4 cuadros= 60 montonLibre= 1192 gcColeccionesTotal= 12 fps= 8.10082
+SONDA-PC t=54 top 8c0c8eec:15 8c0c8ed0:12 8c0c8ebc:9 8c0c8ec2:9 pc=8c0c8ed0 pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=10631 saltados=0
+SONDA-PC t=55 top 8c01393c:26 8c0c8ede:20 8c0c8eec:10 8c0c8ec2:6 pc=8c0ccd30 pr=8c0ccda0 fp=8c717f80 sp=8c717e64 fuera=0 chars=10776 saltados=0
+SONDA-PC t=56 top 8c01393c:27 8c0c8ede:16 8c0c8eec:10 8c0c8ed0:8 pc=8c122718 pr=8c12ee14 fp=8c2c1a14 sp=8c7182c0 fuera=0 chars=10921 saltados=0
+SONDA-PC t=57 top 8c01393c:30 8c0c8eec:14 8c0c8ede:12 8c0c8ed0:9 pc=8c0c8eec pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=11066 saltados=0
+SONDA-PC t=58 top 8c0c8ebc:17 8c0c8ede:12 8c0c8eec:12 8c0c8ed0:11 pc=8c0c8ebc pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=11212 saltados=0
+SONDA-PC t=59 top 8c0c8eec:17 8c0c8ed0:15 8c0c8ebc:14 8c0c8ede:5 pc=8c0c8ed0 pr=8c0c8f48 fp=00000000 sp=8c7182ec fuera=0 chars=11357 saltados=0
+SONDA-PC t=60 top 8c0c8eec:15 8c0c8ede:12 8c0c8ec2:9 8c0c8ed0:9 pc=8c0ccb7c pr=8c0cc966 fp=8c717ea4 sp=8c717dec fuera=0 chars=11501 saltados=0

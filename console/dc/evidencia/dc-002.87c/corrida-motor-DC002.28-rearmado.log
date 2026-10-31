@@ -1,0 +1,56 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:052 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:309 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:413 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:413 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:417 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:421 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:436 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fefbf3f0000 RAM(16 MB) 0x7fefcb3f0000 VRAM64(8 MB) 0x7fefc33f0000 ARAM(2 MB) 0x7fefdf3f0000
+00:00:443 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:451 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fefbf3f0000 RAM(16 MB) 0x7fefcb3f0000 VRAM64(8 MB) 0x7fefc33f0000 ARAM(2 MB) 0x7fefdf3f0000
+00:00:454 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:461 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:461 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:517 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:517 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:517 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at acd6c5c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+fs_romdisk: mounting image at 0x8c4e1944 at /rd
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+C-CONSTRUCTOR (antes de main): la consola serie ya esta; sbrk=0x8cd82000 techo=0x8cff0000 arena=94656 libre=2152
+SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), 64 ranuras de histograma
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+Out of memory. Requested sbrk_base 0x8d182000, was 0x8cf82000, diff 2097152
+ARQ-MARCA   gc_init-semiespacio0 v=2362972064
+ARQ-MARCA   gc_init-semiespacio1 v=0
+
+fatal error: gc_init: alloc failed
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=94656 used=92504 free=2152
+SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), 64 ranuras de histograma
+00:03:176 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked

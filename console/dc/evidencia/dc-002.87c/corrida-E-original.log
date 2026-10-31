@@ -1,0 +1,288 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:050 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:303 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:406 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:406 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:409 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:413 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:427 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f045b9f0000 RAM(16 MB) 0x7f04679f0000 VRAM64(8 MB) 0x7f045f9f0000 ARAM(2 MB) 0x7f047b9f0000
+00:00:434 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:442 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f045b9f0000 RAM(16 MB) 0x7f04679f0000 VRAM64(8 MB) 0x7f045f9f0000 ARAM(2 MB) 0x7f047b9f0000
+00:00:445 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:449 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:449 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:509 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:509 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:509 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f2660
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351986304
+ARQ-MARCA   gc_init-semiespacio1 v=2354083488
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1056 cused=4353280 gsemi=95864/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 4096 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 176
+COOP276: mpq a mano listos montonLibre= 352
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=352 cused=5705664 gsemi=395800/2097152 gc=0
+ARQ-MARCA itab-cache-acierto v=2352381040
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=352 cused=5705664 gsemi=397704/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 880
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=490552
+COOP276: ANIMDATA despues del GC montonLibre= 880
+COOP276: BASELINE (N=0) montonLibre= 880 gcColecciones= 1 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=490688
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=880 cused=6204848 gsemi=497384/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=880 cused=6204848 gsemi=500576/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352498528
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=880 cused=6204848 gsemi=517016/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=880 cused=6204848 gsemi=519896/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=880 cused=6204848 gsemi=539240/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=880 cused=6204848 gsemi=552232/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352498528
+ARQ-MARCA itab-cache-acierto v=2352498528
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=880 cused=6204848 gsemi=910488/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-volvio /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=880 cused=6204848 gsemi=925320/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352498528
+ARQ-MARCA itab-cache-acierto v=2352498528
+ARQ-MARCA itab-cache-acierto v=2352881968
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=880 cused=6204848 gsemi=1461032/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-MARCA itab-cache-acierto v=2352481704
+ARQ-CARGA lee-volvio /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=880 cused=6204848 gsemi=1500808/2097152 gc=2
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573312
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=768344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1583632
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=909816
+ARQ-MARCA itab-cache-acierto v=2353168832
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-CARGA lee-entra /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=576 cused=6618848 gsemi=1197760/2097152 gc=4
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-CARGA lee-volvio /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=576 cused=6618848 gsemi=1210808/2097152 gc=4
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578688
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=971184
+ARQ-MARCA itab-cache-acierto v=2353168832
+ARQ-MARCA itab-cache-VIEJO v=2353168832
+ARQ-MARCA itab-cache-acierto v=2353168832
+ARQ-MARCA itab-cache-VIEJO v=2353168832
+ARQ-MARCA itab-cache-acierto v=2353171112
+ARQ-MARCA itab-cache-VIEJO v=2353171112
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-CARGA lee-entra /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=576 cused=6618848 gsemi=1016168/2097152 gc=5
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-CARGA lee-volvio /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=576 cused=6618848 gsemi=1021992/2097152 gc=5
+ARQ-MARCA itab-cache-acierto v=2353168832
+ARQ-MARCA itab-cache-VIEJO v=2353168832
+ARQ-MARCA itab-cache-acierto v=2353168832
+ARQ-MARCA itab-cache-VIEJO v=2353168832
+ARQ-MARCA itab-cache-acierto v=2353171112
+ARQ-MARCA itab-cache-VIEJO v=2353171112
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-CARGA lee-entra /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=576 cused=6618848 gsemi=1150576/2097152 gc=5
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-CARGA lee-volvio /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=576 cused=6618848 gsemi=1157528/2097152 gc=5
+ARQ-MARCA itab-cache-acierto v=2353168832
+ARQ-MARCA itab-cache-VIEJO v=2353168832
+ARQ-MARCA itab-cache-acierto v=2353168832
+ARQ-MARCA itab-cache-VIEJO v=2353168832
+ARQ-MARCA itab-cache-acierto v=2353171112
+ARQ-MARCA itab-cache-VIEJO v=2353171112
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-CARGA lee-entra /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=576 cused=6618848 gsemi=1340840/2097152 gc=5
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-MARCA itab-cache-acierto v=2353172144
+ARQ-MARCA itab-cache-VIEJO v=2353172144
+ARQ-CARGA lee-volvio /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=576 cused=6618848 gsemi=1360320/2097152 gc=5
+ARQ-MARCA gc-por-umbral-bytes-usados v=1582152
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1101840
+COOP276: JUGADOR J1 indice= 0 direccion= 0 celda= 28 20 subtiles= 140 100 creacionUs= 2121521 montonAntes= 880 montonDespues= 576 gcPorLaCreacion= 4 gcTotal= 6
+COOP276: ETAPA n= 1 montonLibre= 576 creacionUs= 2193045 gcEnLaCreacion= 5 gcTotal= 6
+COOP276: CACHES n= 1 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1119672
+COOP276: ETAPA n= 1 gcForzadoUs= 73494 montonLibreDespuesDelGC= 576
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943821212 dato= -1940425584
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943821212 dato= -1940425464
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943821212 dato= -1940425224
+00:33:165 reios/reios.cpp:639 N[REIOS]: -----------------
+00:33:165 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:33:165 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f2660
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2351986304
+ARQ-MARCA   gc_init-semiespacio1 v=2354083488
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1056 cused=4353280 gsemi=95232/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 4096 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 176
+COOP276: mpq a mano listos montonLibre= 352
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=352 cused=5705664 gsemi=395352/2097152 gc=0
+ARQ-MARCA itab-cache-acierto v=2352380592
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=352 cused=5705664 gsemi=397256/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 880
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=491552
+COOP276: ANIMDATA despues del GC montonLibre= 880
+COOP276: BASELINE (N=0) montonLibre= 880 gcColecciones= 1 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=491688
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=880 cused=6204848 gsemi=498384/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=880 cused=6204848 gsemi=501576/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352499528
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=880 cused=6204848 gsemi=518016/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=880 cused=6204848 gsemi=520896/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=880 cused=6204848 gsemi=540120/2097152 gc=2
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-MARCA itab-cache-acierto v=2352482704
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=880 cused=6204848 gsemi=553112/2097152 gc=2
+ARQ-M
