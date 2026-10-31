@@ -1,0 +1,133 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:030 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:280 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:381 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:381 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:384 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:387 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:400 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f59a2df0000 RAM(16 MB) 0x7f59aedf0000 VRAM64(8 MB) 0x7f59a6df0000 ARAM(2 MB) 0x7f59c2df0000
+00:00:406 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:413 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f59a2df0000 RAM(16 MB) 0x7f59aedf0000 VRAM64(8 MB) 0x7f59a6df0000 ARAM(2 MB) 0x7f59c2df0000
+00:00:463 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:463 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:463 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac0777a0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2349384096
+ARQ-MARCA   gc_init-semiespacio1 v=2351481280
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA-MAP: arranca (DC-002.83, el mapa de animdata y el GC)
+SONDA-MAP: runtime dreamcast sh4
+SONDA-MAP: armado claves= 2556 ms= 31 libre= 3
+SONDA-MAP: ronda= 0 gcTotal= 0 formaA count= 2556 buckets=0x 2353645848 B= 9 desbordes= 40
+SONDA-MAP: avanceA ronda= 0 i= 256 bien= 256 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 0 i= 512 bien= 512 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 0 i= 768 bien= 768 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 0 i= 1024 bien= 1024 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 0 i= 1280 bien= 1280 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 0 i= 1536 bien= 1536 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 0 i= 1792 bien= 1792 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 0 i= 2048 bien= 2048 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 0 i= 2304 bien= 2304 faltan= 0 rotas= 0
+SONDA-MAP: ronda= 0 A_bien= 2556 A_faltan= 0 A_rotas= 0 A_fantasmas= 0 A_claves= 2556 A_valores= 2556 A_clavesRotas= 0 A_valoresRotas= 0 A_hc= 3454362305 A_hv= 3454362305
+SONDA-MAP: ronda= 0 B_bien= 16 B_claves= 16 B_valores= 16 B_hc= 4028613690 B_hv= 640635168
+SONDA-MAP: ronda= 0 C_bien= 255 C_faltan= 1 C_rotas= 0 C_suma= 97920
+SONDA-MAP: ronda= 0 D_bien= 256 D_faltan= 0
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=134640
+SONDA-MAP: ronda= 1 gc_ms= 8 libre= 3
+SONDA-MAP: ronda= 1 gcTotal= 1 formaA count= 2556 buckets=0x 2353645848 B= 9 desbordes= 40
+SONDA-MAP: avanceA ronda= 1 i= 256 bien= 256 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 1 i= 512 bien= 512 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 1 i= 768 bien= 768 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 1 i= 1024 bien= 1024 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 1 i= 1280 bien= 1280 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 1 i= 1536 bien= 1536 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 1 i= 1792 bien= 1792 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 1 i= 2048 bien= 2048 faltan= 0 rotas= 0
+SONDA-MAP: avanceA ronda= 1 i= 2304 bien= 2304 faltan= 0 rotas= 0
+SONDA-MAP: ronda= 1 A_bien= 2556 A_faltan= 0 A_rotas= 0 A_fantasmas= 0 A_claves= 2556 A_valores= 2556 A_clavesRotas= 0 A_valoresRotas= 0 A_hc= 3454362305 A_hv= 3454362305
+SONDA-MAP: ronda= 1 B_bien= 16 B_claves= 16 B_valores= 16 B_hc= 4028613690 B_hv= 640635168
+SONDA-MAP: ronda= 1 C_bien= 255 C_faltan= 1 C_rotas= 0 C_suma= 97920
+SONDA-MAP: ronda= 1 D_bien= 256 D_faltan= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=134640
+SONDA-MAP: ronda= 2 gc_ms= 8 libre= 3
+SONDA-MAP: ronda= 2 gcTotal= 2 formaA count= 2556 buckets=0x 2353645848 B= 9 desbordes= 40
+SONDA-MAP: avanceA ronda= 2 i= 256 bien= 47 faltan= 209 rotas= 0
+SONDA-MAP: avanceA ronda= 2 i= 512 bien= 303 faltan= 209 rotas= 0
+SONDA-MAP: avanceA ronda= 2 i= 768 bien= 559 faltan= 209 rotas= 0
+SONDA-MAP: avanceA ronda= 2 i= 1024 bien= 815 faltan= 209 rotas= 0
+SONDA-MAP: avanceA ronda= 2 i= 1280 bien= 1071 faltan= 209 rotas= 0
+SONDA-MAP: avanceA ronda= 2 i= 1536 bien= 1327 faltan= 209 rotas= 0
+SONDA-MAP: avanceA ronda= 2 i= 1792 bien= 1583 faltan= 209 rotas= 0
+SONDA-MAP: avanceA ronda= 2 i= 2048 bien= 1839 faltan= 209 rotas= 0
+SONDA-MAP: avanceA ronda= 2 i= 2304 bien= 2095 faltan= 209 rotas= 0
+SONDA-MAP: ronda= 2 A_bien= 2347 A_faltan= 209 A_rotas= 0 A_fantasmas= 0 A_claves= 2556 A_valores= 2367 A_clavesRotas= 416 A_valoresRotas= 365 A_hc= 524847950 A_hv= 1322045833
+SONDA-MAP: ronda= 2 B_bien= 16 B_claves= 16 B_valores= 16 B_hc= 4028613690 B_hv= 640635168
+SONDA-MAP: ronda= 2 C_bien= 255 C_faltan= 1 C_rotas= 0 C_suma= 97920
+SONDA-MAP: ronda= 2 D_bien= 256 D_faltan= 0
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=134640
+SONDA-MAP: ronda= 3 gc_ms= 8 libre= 3
+SONDA-MAP: ronda= 3 gcTotal= 3 formaA count= 2556 buckets=0x 2353645848 B= 9 desbordes= 40
+SONDA-MAP: avanceA ronda= 3 i= 256 bien= 0 faltan= 256 rotas= 0
+SONDA-MAP: avanceA ronda= 3 i= 512 bien= 0 faltan= 512 rotas= 0
+SONDA-MAP: avanceA ronda= 3 i= 768 bien= 68 faltan= 700 rotas= 0
+SONDA-MAP: avanceA ronda= 3 i= 1024 bien= 324 faltan= 700 rotas= 0
+SONDA-MAP: avanceA ronda= 3 i= 1280 bien= 580 faltan= 700 rotas= 0
+SONDA-MAP: avanceA ronda= 3 i= 1536 bien= 836 faltan= 700 rotas= 0
+SONDA-MAP: avanceA ronda= 3 i= 1792 bien= 1092 faltan= 700 rotas= 0
+SONDA-MAP: avanceA ronda= 3 i= 2048 bien= 1348 faltan= 700 rotas= 0
+SONDA-MAP: avanceA ronda= 3 i= 2304 bien= 1604 faltan= 700 rotas= 0
+SONDA-MAP: ronda= 3 A_bien= 1856 A_faltan= 700 A_rotas= 0 A_fantasmas= 0 A_claves= 2556 A_valores= 2267 A_clavesRotas= 541 A_valoresRotas= 410 A_hc= 2052585338 A_hv= 966888576
+SONDA-MAP: ronda= 3 B_bien= 16 B_claves= 16 B_valores= 16 B_hc= 4028613690 B_hv= 640635168
+SONDA-MAP: ronda= 3 C_bien= 255 C_faltan= 1 C_rotas= 0 C_suma= 97920
+SONDA-MAP: ronda= 3 D_bien= 256 D_faltan= 0
+SONDA-MAP: E (armado despues del GC) bien= 256 de 256 ms= 3
+SONDA-MAP: fin ms= 532
+ARQ-MARCA main.main-volvio v=0
+ARQ-MARCA scheduler-VOLVIO v=1
+
+arch: exit return code 0
+arch: shutting down kernel
+maple: final stats -- device count = 21, vbl_cntr = 45, dma_cntr = 44
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.

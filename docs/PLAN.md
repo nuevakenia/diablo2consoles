@@ -140,6 +140,19 @@ imagen del compositor es **2.277.728 B mas grande** (1ST_READ 6.847.080 contra 4
 arrancar **2.273.280 B mas chico** -- imagen y monton se mueven 1:1. Evidencia:
 `console/dc/evidencia/dc-002.82-compositor-en-la-consola.txt`.
 
+**Medido en DC-002.83 (el cooperativo desbloqueado: el map de animdata ya no se pierde en el GC):** el
+bloqueo que dejo DC-002.76 ("el 2º jugador no se crea") no era del mapa sino del camino de los objetos
+grandes del recolector: `gc_alloc` manda todo pedido de mas de 64 KB a `malloc` (fuera de los dos
+semiespacios), y ahi el GC no barre nada. El array de buckets de `map[string][]*AnimationDataRecord` con
+2.556 claves pesa **88.064 B** (bucket de 172 B x 512) y se iba por ese camino: los nombres de 8 letras y
+los registros colgaban solo de el, quedaban invisibles (`gc-vivo` = 134.640 B con el mapa lleno) y en la
+segunda recoleccion -- cuando el espacio viejo se reusa -- se reciclaban: la busqueda por clave fallaba
+mientras el `count` seguia en 2.556. Arreglado en el runtime (`fix-libgodc-externos.py`): los externos con
+punteros se registran y se barren en el lugar, sin copiarlos. Medido en Flycast: sonda `map-gc`, 2.556 de
+2.556 claves encontradas en las rondas 0, 1, 2 y 3 (antes 2347 y 1856, con 209 y 700 claves perdidas), y el
+POC del cooperativo crea **J1, J2, J3 y J4** sin una sola linea `FALLO` (antes J2 respondia "could not find
+Animation data" en cada cuadro). Evidencia: `console/dc/evidencia/dc-002.83-el-map-de-animdata-y-el-gc.txt`.
+
 ---
 
 ## Lo que se reusa (no se tira)

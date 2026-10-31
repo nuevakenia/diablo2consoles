@@ -1,0 +1,139 @@
+DC-002.83 -- EL MAPA DE ANIMDATA NO SOBREVIVE AL GC: EL 2o JUGADOR NO SE CREA
+================================================================================
+
+(1) EL SINTOMA (DC-002.76, console/dc/evidencia/dc-002.76-corrida-composite.log)
+--------------------------------------------------------------------------------
+    COOP276: ANIMDATA vivo registros= 2556 gcTotal= 8
+    COOP276: JUGADOR J2 FALLO: could not find Animation data
+
+`GetRecordsCount()` sigue diciendo 2.556 -- el mapa sigue "lleno" -- pero `GetRecords("AMNUHTH")`, que
+busca POR CLAVE, no encuentra nada, y se repite en cada cuadro despues de las recolecciones que dispara la
+creacion del jugador 1.
+
+(2) LA SONDA MINIMA (console/dc/poc/map-gc, nueva en esta tarjeta)
+------------------------------------------------------------------
+Cinco camas en UNA corrida, con las recolecciones forzadas una por una y midiendo despues de cada una:
+
+  A  map[string][]*registro con 2.556 claves de 8 letras armADAS DEL MONTON (la forma exacta del mapa de
+     AnimData.d2: nombre -> slice de punteros). La busqueda REARMA la clave en el momento (no guarda
+     ninguna copia viva fuera del mapa: guardarlas hacia que la sonda dijera "OK" con el defecto puesto,
+     porque las cadenas del que busca seguian vivas y sus bytes no se reciclaban).
+  B  el mismo mapa con claves CONSTANTES (.rodata): el GC no las puede tocar.
+  C  map[int]int (sin punteros: el GC lo marca NOSCAN).
+  D  map[string]string con clave y valor del monton.
+  E  un mapa armado DESPUES de las recolecciones (control sano del mapa).
+
+SIN EL ARREGLO (console/dc/evidencia/dc-002.83-sonda-mapgc-sin-arreglo.log):
+
+    ronda 0   A_bien=2556 A_faltan=0   A_clavesRotas=0   A_hc=3454362305
+    ronda 1   A_bien=2556 A_faltan=0   A_clavesRotas=0   A_hc=3454362305
+    ronda 2   A_bien=2347 A_faltan=209 A_clavesRotas=416 A_hc=524847950
+    ronda 3   A_bien=1856 A_faltan=700 A_clavesRotas=541 A_hc=2052585338
+    B 16/16, C 255/255, D 256/256, E 256/256 en TODAS las rondas.
+
+O sea: el unico mapa que se rompe es el grande (2.556 claves), y se rompe DESPUES de la segunda
+recoleccion, cuando el espacio viejo se reutiliza de verdad. Los controles quedan enteros, asi que el mapa
+en si funciona: lo que esta mal es el camino de los objetos grandes.
+
+    ARQ-MARCA gc-vivo v=134640        (con el mapa lleno de 2.556 claves + 2.556 registros)
+
+El conjunto vivo que ve el recolector son los 96 KB del conjunto de prueba mas ~36 KB del runtime: el mapa
+no aporta ni un byte, aunque este vivo y se consulte bien.
+
+(3) EL DIAGNOSTICO (medido, no supuesto)
+----------------------------------------
+1. `gc_alloc()` (runtime/gc_heap.c) manda TODO pedido mayor que `GC_LARGE_OBJECT_THRESHOLD` (64 KB) a
+   `gc_external_alloc()`, que es `malloc()` pelado: un bloque FUERA de los dos semiespacios, sin
+   encabezado de GC. El recolector nunca lo copia y nunca lo barre: no existe para el.
+2. `allocBuckets()` (runtime/map_dreamcast.c) pide el array de buckets con
+   `gc_alloc(count * bucketsize, MAPTYPE_BUCKET(t))`. Para `map[string][]*T` el bucket mide 172 B
+   (topbits[8] + 8 claves string(8) + 8 valores slice(12) + overflow(4)); con 2.556 claves el mapa llega a
+   B=9, o sea 512 * 172 = 88.064 B > 64 KB -> camino externo. Medido en la corrida: el puntero del array
+   (0x8C4C...) cae FUERA de los dos semiespacios (0x8C0A0000 y 0x8C2A0000, 2 MB cada uno) y no se mueve
+   nunca entre recolecciones.
+3. El tipo del bucket SI trae su mapa de punteros. Leido del ELF con `scripts/console/leer-tipos-elf.py`:
+
+       mapa  0x8c055e84: size=4 ptrdata=4 code=53(kind=21)  keysize=8 valsize=12 bucketsize=172
+                         bucket=0x8c055ec0
+       bucket 0x8c055ec0: size=172 ptrdata=172 gcdata=0x8c056120  (gcdata: 54 55 25 49 92 04 ...)
+
+   Es decir: si el array estuviera en el monton Go, el barrido sabria exactamente que palabras seguir (las
+   primeras palabras de cada string y las de cada slice). El problema no es el tipo: es que el bloque no
+   esta en el monton.
+4. Lo que cuelga SOLO de esos buckets -- los bytes de los nombres de 8 letras y los `[]*registro` de cada
+   clave -- queda invisible. Cuando el espacio viejo se reusa, esos bytes se pisan: la busqueda por clave
+   falla y el `count` sigue intacto porque el header del mapa (28 B) SI es un objeto chico del monton Go.
+
+Por que el sintoma aparece en el cooperativo y no en un mapa chico: hace falta pasar de 64 KB de buckets.
+Con el mismo mapa de 2.556 claves de animdata (172 B por bucket) eso pasa en B=9, que es exactamente donde
+esta el mapa de AnimData.d2, y no en los mapas de 256 claves de las camas de control.
+
+(4) EL ARREGLO (scripts/console/fix-libgodc-externos.py, idempotente, con --quitar de mutante)
+---------------------------------------------------------------------------------------------
+El bloque grande sigue fuera del monton (en una consola de 16 MB copiar 88 KB en cada recoleccion es
+caro), pero sus PUNTEROS se siguen: se registra en una tabla chica (`gc_externos`, 48 entradas) con el tipo
+y el tamano, y en cada recoleccion se barre igual que un array del monton (`gc_scan_single_element` por
+elemento) antes del barrido de Cheney. Los punteros adentro se ponen al dia EN EL LUGAR.
+
+Solo se registra lo que TIENE punteros (`__ptrdata > 0`): las imagenes, los .dcc y los buffers crudos del
+MPQ (que son []uint8) siguen yendo a malloc sin tabla, como hasta ahora. Si la tabla se llena, el bloque se
+pide al monton Go (mas presion, pero correcto) y la marca `gc-externo-sin-lugar` lo dice.
+
+Lo que cambia en el runtime: runtime/gc_semispace.h (la tabla), runtime/gc_heap.c (registrar/olvidar y el
+camino de objetos grandes) y runtime/gc_copy.c (el barrido). No se toca ninguna linea del motor ni de la
+tabla de animdata: la tabla sigue donde estaba.
+
+(5) MEDIDO DESPUES (console/dc/evidencia/dc-002.83-sonda-mapgc-con-arreglo.log)
+--------------------------------------------------------------------------------
+    ARQ-MARCA gc-externo-con-punteros v=88064      (el array de buckets, registrado)
+    ARQ-MARCA gc-vivo v=365096                     (134.640 -> 365.096: el mapa ahora SI esta vivo)
+
+    ronda 0   A_bien=2556 A_faltan=0 A_clavesRotas=0 A_hc=3454362305 A_hv=3454362305
+    ronda 1   A_bien=2556 A_faltan=0 A_clavesRotas=0 A_hc=3454362305 A_hv=3454362305
+    ronda 2   A_bien=2556 A_faltan=0 A_clavesRotas=0 A_hc=3454362305 A_hv=3454362305
+    ronda 3   A_bien=2556 A_faltan=0 A_clavesRotas=0 A_hc=3454362305 A_hv=3454362305
+    B 16/16, C 255/255, D 256/256, E 256/256.
+
+La huella de claves y de valores es la MISMA que en la ronda 0: las 2.556 claves se encuentran y sus bytes
+son los que eran despues de tres recolecciones forzadas.
+
+El criterio se verifica con un comando (verde/rojo, sale 1 si algo falla):
+
+    python3 scripts/console/checar-mapgc-283.py <log de flycast>
+    # VEREDICTO: VERDE -- las 2.556 claves del mapa se encuentran despues de 3 recolecciones
+
+(6) EL MUTANTE (mismo comando, arreglo sacado: console/dc/evidencia/dc-002.83-mutante-sin-arreglo.log)
+-----------------------------------------------------------------------------------------------------
+    python3 scripts/console/fix-libgodc-externos.py --quitar --build
+    bash scripts/console/build-dc.sh console/dc/poc/map-gc /tmp/dcbuild/mapgc-mut
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/mapgc-mut/prog.elf 20 /tmp/dc-run-mapgc-mut
+    python3 scripts/console/checar-mapgc-283.py /tmp/dc-run-mapgc-mut/flycast.log
+
+    ronda 2   A_bien=2347 A_faltan=209 A_clavesRotas=416
+    ronda 3   A_bien=1856 A_faltan=700 A_clavesRotas=541
+    VEREDICTO: ROJO
+
+Los numeros son LOS MISMOS que los de la corrida de antes del arreglo (209 y 700 claves perdidas, 416 y
+541 claves recicladas): el defecto es determinista y lo que lo saca es el arreglo, no otra cosa. Despues se
+reaplico (`fix-libgodc-externos.py --build`) y la sonda volvio a dar VERDE en una corrida nueva.
+
+(7) EL COOPERATIVO CON EL ARREGLO (console/dc/evidencia/dc-002.83-coop-con-arreglo.log)
+---------------------------------------------------------------------------------------
+Mismo binario y mismo build de DC-002.76 (MODO=composite), reenlazado contra el libgodc arreglado:
+
+    ARQ-MARCA gc-externo-con-punteros v=88064       (el array de buckets de animdata, 88.064 B exactos)
+
+    COOP276: ANIMDATA vivo registros= 2556 gcTotal= 8
+    COOP276: JUGADOR J2 indice= 1 direccion= 16 celda= 31 20 subtiles= 155 100 creacionUs= 10938 ...
+    COOP276: JUGADOR J3 indice= 2 direccion= 32 celda= 28 23 subtiles= 140 115 creacionUs= 10898 ...
+    COOP276: JUGADOR J4 indice= 3 direccion= 48 celda= 31 23 subtiles= 155 115 creacionUs= 10877 ...
+    COOP276: SIGUE n= 4 cuadros= 120 montonLibre= 1432 gcColeccionesTotal= 12 fps= 9.40751
+
+Ni una linea `FALLO`: el jugador 2 se crea en el mismo intento en que antes respondia "could not find
+Animation data", y la etapa de N=4 corre 120 cuadros. El `gc-vivo` sube con cada jugador (490.528 ->
+971.160 B): el mapa y los jugadores ahora SI estan vivos para el recolector.
+
+Nota de build: el arbol de .gox de DC-002.76 estaba viejo frente a HEAD (faltaban los metodos de d2mpq de
+DC-002.79/80), asi que se armo uno nuevo con `scripts/console/build-std-gox.sh` +
+`scripts/console/armar-gox-coop-283.sh` (el cierre del POC, 49 paquetes) en vez de reusar el de la tarjeta
+anterior. `BASE_GOX` de build-coop-276.sh apunta a ese arbol.
