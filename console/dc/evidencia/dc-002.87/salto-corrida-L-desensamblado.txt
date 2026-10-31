@@ -1,0 +1,19 @@
+
+/tmp/t8coop/L/prog.elf:     file format elf32-shl
+
+
+Disassembly of section .text:
+
+8c08bd24 <_github_0com_1OpenDiablo2_1OpenDiablo2_1d2common_1d2util.ImgIndexToRGBA+0x48>:
+8c08bd24:	93 60       	mov	r9,r0
+8c08bd26:	ec 05       	mov.b	@(r0,r14),r5
+8c08bd28:	5c 65       	extu.b	r5,r5
+8c08bd2a:	58 25       	tst	r5,r5
+8c08bd2c:	4f 8d       	bt.s	8c08bdce <_github_0com_1OpenDiablo2_1OpenDiablo2_1d2common_1d2util.ImgIndexToRGBA+0xf2>
+8c08bd2e:	f1 52       	mov.l	@(4,r15),r2
+8c08bd30:	f2 54       	mov.l	@(8,r15),r4
+8c08bd32:	21 51       	mov.l	@(4,r2),r1
+8c08bd34:	f3 62       	mov	r15,r2
+8c08bd36:	0b 41       	jsr	@r1
+8c08bd38:	44 72       	add	#68,r2
+8c08bd3a:	40 e0       	mov	#64,r0

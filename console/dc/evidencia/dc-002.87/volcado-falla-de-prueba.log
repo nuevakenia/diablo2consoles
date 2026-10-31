@@ -1,0 +1,137 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:073 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:322 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:427 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:427 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:432 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:438 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:452 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f3d33d10000 RAM(16 MB) 0x7f3d3fd10000 VRAM64(8 MB) 0x7f3d37d10000 ARAM(2 MB) 0x7f3d53d10000
+00:00:458 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:465 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f3d33d10000 RAM(16 MB) 0x7f3d3fd10000 VRAM64(8 MB) 0x7f3d37d10000 ARAM(2 MB) 0x7f3d53d10000
+00:00:469 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:473 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:473 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:531 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:531 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:531 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac4aa8a0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), 64 ranuras de histograma
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2353789120
+ARQ-MARCA   gc_init-semiespacio1 v=2355886304
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=480 cused=4353280 gsemi=96008/2097152 gc=0
+COOP287: RELLENO bytes= 1 primero= 0 reservaPedida= 0 reservaQuedo= 0 fallaDePrueba= true
+COOP287: FALLA DE PRUEBA -- escritura a 0xBAAAAAAD, el volcado tiene que salir AHORA
+00:03:025 hw/sh4/interpr/sh4_opcodes.cpp:929 W[INTERPRETER]: TRAP #20
+SONDA-REG FALLO evt=0160 pc=8c01302a pr=8c010cd0 sr=40000101 fp=8c8cfdb4 sp=8c8cfd90
+SONDA-REG  r0-r7  00000001 8c013028 8c4a8f70 00000200 8c4a8f88 00000055 00000001 00000194
+SONDA-REG  r8-r15 8c0d36d4 8c0d85d4 8c0d36b0 8c0d36c8 00000000 00000000 8c8cfdb4 8c8cfd90
+SONDA-REG  pila 8c8cfd90: 00000000 00000000 8c012e68 00000000 00000000 00000000 00000000 8c0d633c
+SONDA-REG  marco 8c8cfdb4: 8c0d66e2 8c8cfdc0 00000000 8c0d67e4 00000000 8c0d67e4 00000000 00000000
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 3520 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=1 top 8c123e52:78 8c11fc46:12 8c13adcc:3 8c123ba8:2 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=2 top 8c123e52:99 8c046698:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=3 top 8c123e52:98 8c046698:1 8c01f872:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=4 top 8c123e52:99 8c046682:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=5 top 8c123e52:98 8c04668a:1 8c04a362:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=6 top 8c123e52:98 8c04a396:1 8c10fdae:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=7 top 8c123e52:98 8c0466e0:1 8c01f87a:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=8 top 8c123e52:99 8c046698:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=9 top 8c123e52:97 8c10fdae:1 8c13adcc:1 8c01f872:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=10 top 8c123e52:97 8c01fa14:1 8c10fdae:1 8c01f87a:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+SONDA-PC t=11 top 8c123e52:97 8c04668a:1 8c04a362:1 8c01f864:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=12 top 8c123e52:98 8c046838:1 8c04a362:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=13 top 8c123e52:99 8c01f9f6:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 3696
+SONDA-PC t=14 top 8c123e52:96 8c04a396:1 8c10d0b4:1 8c0d42d8:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=15 top 8c123e52:98 8c046710:1 8c04a362:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=16 top 8c123e52:98 8c10fdae:1 8c13ad7c:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=17 top 8c123e52:99 8c046682:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=18 top 8c123e52:98 8c04a396:1 8c046698:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=19 top 8c123e52:99 8c046710:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=20 top 8c123e52:98 8c04668a:1 8c04a396:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=21 top 8c123e52:99 8c046698:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc
+SONDA-PC t=22 top 8c123e52:97 8c04a33e:1 8c0466e0:1 8c13ad7c:1 pc=8c123e52 pr=8c1242ac fp=ffffffff sp=8c4a36bc fuera=0
+SONDA-PC RACHA pc=8c123e52 racha=30 pr=8c1242ac fp=ffffffff sp=8c4a36bc

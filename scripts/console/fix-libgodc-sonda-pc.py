@@ -86,6 +86,8 @@ CABECERA = """/* libgodc/runtime/sonda_pc.c -- DC-002.24b
 #define SONDA_RACHA        30u      /* el mismo PC 0,3 s seguidos = clavado */
 #define SONDA_RACHA_AVISO  200u     /* despues del primero, un aviso cada 2 s */
 #define SONDA_FUERA_TOPE   20u      /* tope de lineas del aviso de PC fuera de la RAM */
+#define SONDA_FALLOS_TOPE  8u       /* DC-002.87: volcados completos de excepcion */
+#define SONDA_PILA_PALABRAS 8       /* palabras de pila y de marco que acompanan al volcado */
 #define SONDA_RAM_MIN      0x8c000000UL
 #define SONDA_RAM_MAX      0x8d000000UL
 
@@ -94,7 +96,61 @@ static uint32_t sonda_n_ranura[SONDA_RANURAS];
 static uint32_t sonda_muestras, sonda_ventana;
 static uint32_t sonda_pc_ant, sonda_racha;
 static uint32_t sonda_pc, sonda_pr, sonda_fp, sonda_sp, sonda_fuera;
+static uint32_t sonda_fallos, sonda_evt_ant, sonda_pc_fallo;
 static int      sonda_activa;
+
+/* DC-002.87: EL VOLCADO COMPLETO DEL INSTANTE.
+ *
+ * La sonda muestrea a 100 Hz, y a 100 Hz el SH-4 ya esta sumergido en el manejador de la excepcion que
+ * disparo el salto: los registros que se leen son los del manejador, no los del codigo que salto. Por eso
+ * la corrida L mostro `pc=ffffffff pr=...` durante 86 segundos y nunca dijo QUE puntero era basura.
+ *
+ * Aca se engancha el MISMO manejador global pero en las excepciones generales (code 1/2: address error,
+ * instruccion ilegal, TLB, FPU -- todo lo que en `irq_t` es MENOR que 0x200, que es donde arrancan las
+ * interrupciones externas). En ese instante `irq_srt_addr` tiene el contexto del codigo INTERRUMPIDO:
+ * pc, pr y los 16 registros enteros, o sea el puntero que se fue al pasto tal como estaba en el registro.
+ * Se acompaña con 8 palabras de la pila y 8 del marco, que es donde vive el valor de interfaz que se
+ * estaba leyendo cuando salto.
+ *
+ * Se guarda para no inundar: una vez por cada par (evento, pc) y hasta SONDA_FALLOS_TOPE volcados. La
+ * primera excepcion es la que importa: las siguientes suelen ser el mismo PC reintentado o un fallo en
+ * cascada. */
+static int sonda_en_ram(uint32_t a)
+{
+    return a >= SONDA_RAM_MIN && a < SONDA_RAM_MAX;
+}
+
+static void sonda_volcar_palabras(const char *que, uint32_t donde)
+{
+    int i;
+
+    if(!sonda_en_ram(donde)) {
+        dbgio_printf("SONDA-REG  %%s %%08lx (fuera de RAM: no se lee)\\n", que, (unsigned long)donde);
+        return;
+    }
+
+    dbgio_printf("SONDA-REG  %%s %%08lx:", que, (unsigned long)donde);
+    for(i = 0; i < SONDA_PILA_PALABRAS; i++)
+        dbgio_printf(" %%08lx", (unsigned long)((const uint32_t *)(uintptr_t)donde)[i]);
+    dbgio_printf("\\n");
+}
+
+static void sonda_volcar_registros(irq_t evt, irq_context_t *ctx)
+{
+    dbgio_printf("SONDA-REG FALLO evt=%%04x pc=%%08lx pr=%%08lx sr=%%08lx fp=%%08lx sp=%%08lx\\n",
+                 (unsigned)evt, (unsigned long)ctx->pc, (unsigned long)ctx->pr,
+                 (unsigned long)ctx->sr, (unsigned long)ctx->r[14], (unsigned long)ctx->r[15]);
+    dbgio_printf("SONDA-REG  r0-r7  %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx\\n",
+                 (unsigned long)ctx->r[0], (unsigned long)ctx->r[1], (unsigned long)ctx->r[2],
+                 (unsigned long)ctx->r[3], (unsigned long)ctx->r[4], (unsigned long)ctx->r[5],
+                 (unsigned long)ctx->r[6], (unsigned long)ctx->r[7]);
+    dbgio_printf("SONDA-REG  r8-r15 %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx\\n",
+                 (unsigned long)ctx->r[8], (unsigned long)ctx->r[9], (unsigned long)ctx->r[10],
+                 (unsigned long)ctx->r[11], (unsigned long)ctx->r[12], (unsigned long)ctx->r[13],
+                 (unsigned long)ctx->r[14], (unsigned long)ctx->r[15]);
+    sonda_volcar_palabras("pila", ctx->r[15]);
+    sonda_volcar_palabras("marco", ctx->r[14]);
+}
 
 static void sonda_volcar(void)
 {
@@ -165,13 +221,27 @@ static void sonda_muestra(uint32_t pc, uint32_t pr, uint32_t fp, uint32_t sp)
     if(sonda_ventana >= SONDA_VENTANA) sonda_volcar();
 }
 
-/* El manejador GLOBAL: KOS lo llama en TODA excepcion/interrupcion antes de los especificos. Aca solo
-   interesa el tick del sistema de hilos (TMU0 = 0x400): es el muestreo. */
+/* El manejador GLOBAL: KOS lo llama en TODA excepcion/interrupcion antes de los especificos. El tick del
+   sistema de hilos (TMU0 = 0x400) es el muestreo; una EXCEPCION GENERAL es el instante del salto y ahi se
+   vuelcan los 16 registros (DC-002.87). */
 static void sonda_tick(irq_t evt, irq_context_t *ctx, void *data)
 {
     (void)data;
 
-    if(!sonda_activa || evt != EXC_TMU0_TUNI0 || ctx == 0) return;
+    if(!sonda_activa || ctx == 0) return;
+
+    if(evt != EXC_TMU0_TUNI0) {
+        /* Las interrupciones externas arrancan en 0x200 y no son fallos. Lo que interesa es lo de abajo:
+           address error, instruccion ilegal, TLB, FPU, trapa. */
+        if((unsigned)evt < 0x200u && sonda_fallos < SONDA_FALLOS_TOPE &&
+           (sonda_fallos == 0u || evt != sonda_evt_ant || ctx->pc != sonda_pc_fallo)) {
+            sonda_evt_ant = (uint32_t)evt;
+            sonda_pc_fallo = ctx->pc;
+            sonda_fallos++;
+            sonda_volcar_registros(evt, ctx);
+        }
+        return;
+    }
 
     sonda_muestra(ctx->pc, ctx->pr, ctx->r[14], ctx->r[15]);
 }
