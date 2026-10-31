@@ -1,0 +1,165 @@
+DC-002.88 -- EL ARENA DE BLOQUES USADOS: EL COMPOSITOR DEL MOTOR CARGA EL PUEBLO EN LA DREAMCAST
+==================================================================================================
+
+Criterio de la tarjeta: el compositor de `d2mapengine` (LoadStamp + ResetMap del pueblo + PlaceStamp)
+carga "Act 1 - Town" ENTERO en la consola, medido en Flycast.
+
+RESULTADO: **SI ENTRA**. Tres fases (entrar al pueblo / cambiar a la transicion Este / volver), sin OOM,
+sin excepcion, `exit return code 0`, y la grilla de la vuelta sale identica a la de la entrada.
+Pico del monton: 9.525.408 B de 9.528.032 B de arena (2.624 B libres, 49.152 B de techo sin usar).
+
+El pueblo compuesto (corrida /tmp/dc288-run-j, build /tmp/dcbuild/tablas288j):
+
+  MAPA: a) ENTRA AL PUEBLO   tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 25300
+  MAPA: b) TRANSICION ESTE   tiles=  369 pisos=  369 paredes=  39 crcGrilla=  -205471136 ms= 14818
+  MAPA: c) VUELVE AL PUEBLO  tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 28421
+  MAPA: pico(c) - pico(a) = 0 bytes
+  MAPA: arena(c) - arena(a) = 0 bytes
+  MAPA: GRILLA OK -- el pueblo de la vuelta es identico al de la entrada (crc -1596781041)
+  TABLAS: monton al final: arena=9528032 usado=9525408 libre=2624 sbrk=0x8cfe4000 techo=0x8cff0000 margen=49152
+
+  El `censo del .ds1` del pueblo, medido en el host con `console/dc/medidas/arena`:
+  celdas=2337 conPiso=2337, y 244 claves (estilo, secuencia, tipo) distintas. Los 2337 pisos del motor
+  son las 2337 casillas del `.ds1`: el motor copio el pueblo entero, casilla por casilla.
+
+
+1. EL NUMERO QUE ABRIO LA PUERTA (medido en el host, `console/dc/medidas/arena`)
+------------------------------------------------------------------------------------------
+Los 8 `.dt1` que el `.ds1` del pueblo lista son 4.350.665 B crudos y traen 507 tiles, pero el `.ds1`
+solo referencia (en sus 2 capas de piso y 4 de pared) 311 de esos 507 tiles:
+
+  archivo                     crudo    tiles  tiles usados  bloques B  bloques de lo usado
+  act1/outdoors/treegroups.dt1  505504     21       21          489812       489812
+  act1/outdoors/stonewall.dt1   439569     52       25          373913       210111
+  act1/town/floor.dt1          1008003    144       89          851883       570268
+  act1/barracks/warp.dt1        658158     81        3          629046        23298  <-- 3 de 81
+  act1/outdoors/river.dt1       316344     45       45          277217       277217
+  act1/town/objects.dt1         661515     91       83          563104       481781
+  act1/town/fence.dt1           423367     31       27          385845       322100
+  act1/outdoors/objects.dt1     338205     42       18          305116       171902
+  -----------------------------------------------------------------------------------------
+  TOTAL                       4350665    507      311         4360271     2586489
+
+  O sea: de los 4.360.271 B de bloque que hay en los archivos, el nivel mira 2.586.489 B (59,3 %).
+  El resto son tiles de adorno que ese nivel no pinta (el caso mas brutal es `warp.dt1`: 81 tiles,
+  629.046 B de bloque, y el pueblo usa 3 tiles y 23.298 B).
+
+  El arena de las cabeceras no se toca: los 507 tiles x 272 B van a `dt1TileData` (que ahora son 311
+  tiles si se filtra por clave, 84.592 B en vez de 137.904 B).
+
+
+2. EL CAMINO QUE SE IMPLEMENTO
+------------------------------------------------------------------------------------------
+Antes (DC-002.78 y DC-002.88 primera parte): el arena de d2asset guardaba los `.dt1` CRUDOS y los
+bloques de cada `d2dt1.Tile` apuntaban adentro del arena. El crudo de los 8 archivos es 4.350.665 B y
+el monton no lo tiene: la corrida /tmp/dc288-run-a (arena recortado a la suma exacta del `.ds1`, sin
+empacar bloques) murio pidiendo el arena:
+
+  Out of memory. Requested sbrk_base 0x8d057000, was 0x8cc30000, diff 4354048
+  fatal error: gc_external_alloc: OOM
+
+  (el pedido era 4.354.048 B y al monton le quedaban 3.932.160 B: faltaban 421.888 B)
+
+Ahora: `d2asset` tiene un SEGUNDO camino para la consola, el arena de bloques usados:
+
+  - Cada `.dt1` se lee en UN buffer prestado, del tamano del `.dt1` mas grande del nivel
+    (1.008.003 B, `floor.dt1`), pedido UNA vez y REUSADO por cada archivo.
+  - Se parsea ese crudo y se COPIA al arena solo el bloque RLE de los tiles cuya clave
+    `(estilo, secuencia, tipo)` esta en la lista de claves del nivel (`Stamp.ClavesDeTiles`).
+  - El arena de bloques son TRAMOS de 512 KB pedidos a medida (`tramoDeBloques`), asi que no hay que
+    saber de antemano cuanto va a sumar: se pide lo que haga falta. Los tramos NO se tiran al cambiar
+    de nivel: se vuelven a usar desde el primero.
+  - Los tiles que el nivel no usa NO se copian y NO se devuelven: una casilla solo puede referenciar
+    claves de un `.dt1` que el `.ds1` lista, y esas son justo las que se conservan.
+
+  Medido en la consola (fase a):
+    MAPA: BLOQUES de tiles: usados= true bytes= 2586489 tramos= 5 capacidad= 2621440 scratch= 1008003
+
+  2.586.489 B copiados, 2.621.440 B pedidos en 5 tramos (el ultimo tramo queda a medias) + 1.008.003 B
+  del buffer prestado = 3.629.443 B, contra 4.350.665 B del arena de crudos. 721.222 B menos, y sin la
+  restriccion de que el pedido grande encuentre el hueco entero.
+
+
+3. LO QUE COSTO CADA ESTRUCTURA (consola, build tablas288j)
+------------------------------------------------------------------------------------------
+  margen de sbrk al arrancar (tras el arranque de d2asset) 4.542.464 B  (sbrk 0x8cb9b000, techo 0x8cff0000)
+  las 2 tablas que pide el nivel: LvlTypes +40 B, LvlPrest +324.112 B
+  monton ya usado al crear el MapEngine                     5.033.792 B
+  LoadStamp del pueblo (el `.ds1` de 57x41)                    +24 B
+  ResetMapParaStamp: 8 `.dt1` empacados -> el monton usado pasa a 9.525.392 B
+  pico (en PlaceStamp, el compositor del pueblo)              9.525.408 B, libreMin= 904 B
+  arena del monton al final                                   9.528.032 B (libre 2.624 B, techo 49.152 B)
+
+  Desglose del salto de 4.491.600 B que mete ResetMapParaStamp:
+    arena de bloques usados (5 tramos)   2.621.440 B  (de los cuales 2.586.489 van llenos)
+    buffer prestado de lectura           1.008.003 B
+    casillas 57x41 x 264 B                 616.968 B
+    `dt1TileData` 311 tiles x 272 B         84.592 B  (+ crecimiento por duplicacion hasta 512 tiles)
+    ds1 desarmado (4 capas x 2337 x 20)    186.960 B  (al semiespacio del GC, no al monton externo)
+    el resto: los mapas de `extendRank`, `dt1Index`, el object collision y el censo
+
+  El monton externo NO devuelve nada al techo: por eso las estructuras del nivel se piden UNA vez y se
+  reusan cuando el nivel nuevo no necesita mas (`MapTile`, `dt1TileData`, `dt1Files`, `dt1Starts`,
+  `dt1Rank` y los tramos del arena). Sin eso, las fases b y c morian pidiendo lo que ya estaba pedido:
+
+    run-d: Out of memory ... diff 524288   (el sexto tramo: el `.ds1` del pueblo cargado dos veces)
+    run-i: Out of memory ... diff 73728     (fase c: `dt1TileData` creciendo a 256 tiles = 69.632 B)
+
+
+4. HALLAZGO APARTE: UN MAPA CON CLAVE `[3]int32` MATA LA SH-4
+------------------------------------------------------------------------------------------
+El primer intento de filtrar por clave uso `map[[3]int32]bool` y el compositor murio en:
+
+  Unhandled exception: PC ..., code 1 (illegal instruction), PR ... -> runtime.mapassign
+
+Con la sonda del POC (`sondaDeMapas`, 700 entradas por mapa) quedo claro que NO es el hint ni el valor:
+
+  SONDA: int64 como clave   -> OK len= 700
+  SONDA: string como clave  -> OK len= 260
+  SONDA: [3]int32 como clave -> revienta (runtime.mapassign, illegal instruction)
+
+y el muro siguiente era el propio motor: `MapEngine.dt1KeyCount` (`map[[3]int32]int`) lo escribe
+`extendRank` al cargar cada `.dt1`. Los mapas de los caches de d2asset (`map[string]*cacheNode`) SI
+funcionan: lo que no anda es la clave de tipo arreglo.
+
+Arreglo: la clave pasa a `int64` empaquetado (21 bits por campo) en todo el motor --
+`dt1Rank`/`dt1Index`/`dt1KeyCount` y el censo de `TileStats` -- con `claveDeTile` en `d2mapengine` y
+`d2asset.ClaveDeTile` para el lado de d2asset (mismo empaquetado). En la PC no cambia nada.
+
+
+5. LO QUE QUEDA ABIERTO (para la proxima tarjeta, con numero)
+------------------------------------------------------------------------------------------
+  a) 2.586.489 B de bloque es el piso de ESTE nivel con este filtro. Se podria bajar mas ordenando los
+     bloques por tile usado (hoy se copian enteros los tiles usados: 311 tiles, no sus bloques sueltos)
+     y bajando el `tramoDeBloques` para desperdiciar menos en el ultimo tramo (hoy sobran 34.951 B).
+  b) El buffer prestado de 1.008.003 B se podria repartir en tramos si algun dia un nivel trae un `.dt1`
+     mas grande que lo que entra: hoy se pide del tamano del mas grande y listo.
+  c) La grilla se compara contra si misma (entrada vs vuelta) y los pisos contra el censo del `.ds1`
+     (2337 = 2337). Las PAREDES del motor son 338 y el censo crudo del `.ds1` da 2337 casillas con
+     pared, porque las capas de pared traen tiles "hidden": falta un censo que cuente solo las paredes
+     que se pintan, para poder comparar pared por pared.
+  d) El motor carga un NOVENO `.dt1` que el `.ds1` no lista (`dt1s= 9` con 8 rutas): lo pide
+     `exactComponent` (d2mapengine/exact_tile.go:32), que carga bajo demanda el archivo que nombra un
+     `ExactTile` (la libreria Blank/InvisWal/Warp). Aporta 0 bloques usados, o sea que ninguna casilla
+     del pueblo referencia una clave de ese archivo: no se pierde nada. Si un nivel futuro si la
+     referenciara, la clave estaria en la lista del `.ds1` y el tile se copiaria igual.
+  e) `entidades= 0` en las tres fases: `PlaceStampClippedWhere` se llamo con monstruos apagados, como
+     en DC-002.85/86. Las entidades son otra tarjeta (y el camino de entidades es la palanca grande del
+     tamano del binario: ver DC-002.86 seccion 3).
+
+
+6. COMO SE REPRODUCE
+------------------------------------------------------------------------------------------
+  cd ~/Proyectos/diablo2consoles
+  BASE_GOX=/tmp/gox-282 TABLAS=3 MAPA=1 LIENZO=0 ARENA=0 GCENTRE=1 GCINHIBE=1 TILES=1 \
+      bash scripts/console/build-tablas-282.sh /tmp/dcbuild/tablas288j
+  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/tablas288j/disc.gdi 240 /tmp/dc288-run-j
+
+  Lineas a buscar en /tmp/dc288-run-j/flycast.log:
+    SONDA: int64 OK len= 700
+    MAPA: a) ENTRA AL PUEBLO BLOQUES usados= true bytes= 2586489 tramos= 5 capacidad= 2621440
+    MAPA: GRILLA OK -- el pueblo de la vuelta es identico al de la entrada (crc -1596781041)
+    TABLAS: FIN
+
+  Y en el host, las medidas de este documento:
+    go build -o /tmp/dc288-arena ./console/dc/medidas/arena/ && /tmp/dc288-arena

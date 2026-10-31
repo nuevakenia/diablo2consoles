@@ -32,6 +32,11 @@ const (
 	// (d2animdata), que este binario NO carga: prendida, lo que se mide es el costo de PEDIRLAS.
 	conEntidades = false
 
+	// tilesDelStamp: con `true`, `ResetMapParaStamp` (los `.dt1` que el `.ds1` del stamp lista) en vez de
+	// `ResetMap` (los 32 campos del level type). Es la palanca de DC-002.88: el level type del pueblo lista 9
+	// archivos y el `.ds1` usa 8, y son listas distintas (sobran trees/bridge, falta warp.dt1).
+	tilesDelStamp = true
+
 	// lienzoReferencia: componer al final el lienzo del POC (`nivel.go`) sobre el mismo .ds1, para dejar
 	// en la misma corrida el crc32 3507647456 de las tarjetas anteriores. Va ULTIMO porque el lienzo
 	// (262.144 B) y el scratch (81.920 B) pasan de 64 KB y en esta consola no se devuelven.

@@ -36,9 +36,9 @@ type MapEngine struct {
 	startSubTileY int                       // Starting Y position
 	dt1Files      []string                  // List of DS1 strings
 	dt1Starts     []int                     // index into dt1TileData of the first tile of each dt1Files entry
-	dt1Index      map[[3]int32][]int32      // (style, sequence, type) -> indices into dt1TileData, ascending (see extendRank)
+	dt1Index      map[int64][]int32         // (style, sequence, type) -> indices into dt1TileData, ascending (see extendRank)
 	dt1Rank       []int                     // for every dt1TileData entry: its position among the tiles of its (style, sequence, type)
-	dt1KeyCount   map[[3]int32]int          // tiles seen per (style, sequence, type) while filling dt1Rank
+	dt1KeyCount   map[int64]int             // tiles seen per (style, sequence, type) while filling dt1Rank
 	objBlock      *ObjectCollision          // run-time collision of doors
 
 	gridPaths     bool        // PathFind uses d2path (see UseCollisionPaths)
@@ -108,26 +108,125 @@ func (m *MapEngine) World() World { return m.world }
 
 // ResetMap clears all map and entity data and reloads it from the cached files.
 func (m *MapEngine) ResetMap(levelType d2enum.RegionIdType, width, height int) {
+	m.resetMapBase(levelType, width, height)
+
+	for idx := range m.levelType.Files {
+		m.addDT1(m.levelType.Files[idx])
+	}
+}
+
+// ResetMapParaStamp (DC-002.88) es ResetMap para el nivel que se compone desde un stamp: las casillas, las
+// mismas, pero los `.dt1` salen de la lista del `.ds1` del stamp en vez de los 32 campos del level type, y el
+// arena de tiles se reserva con la suma EXACTA de esos archivos.
+//
+// POR QUE, CON EL NUMERO. El level type del pueblo (`Act 1 - Town`) lista 9 `.dt1` = 4.652.603 B crudos. El
+// `.ds1` del pueblo usa 8 = 4.350.665 B: el level type trae `act1/town/trees.dt1` (511.673 B) y
+// `act1/outdoors/bridge.dt1` (448.423 B) que ninguna casilla del `.ds1` referencia -- el `.ds1` solo puede
+// referenciar estilos de los `.dt1` que el mismo lista, asi que cargarlos es arena regalada -- y a cambio
+// lista `act1/barracks/warp.dt1` (658.158 B), que el level type NO tiene. O sea: la lista del level type no
+// es la del nivel, ni de mas ni de menos.
+//
+// En la PC esto NO cambia: `SoloLosTilesDelDS1` lo prende el arranque de la consola, y con la politica
+// apagada esta funcion se comporta como `ResetMap`.
+func (m *MapEngine) ResetMapParaStamp(levelType d2enum.RegionIdType, width, height int, stamp *d2mapstamp.Stamp) {
+	rutas := stamp.TilesDelDS1()
+	if len(rutas) == 0 {
+		// un stamp sin `.ds1` no dice nada de los tiles: se vuelve al level type, que es el camino de siempre
+		m.resetMapBase(levelType, width, height)
+
+		for idx := range m.levelType.Files {
+			m.addDT1(m.levelType.Files[idx])
+		}
+
+		return
+	}
+
+	// el AssetManager en una variable y las funciones del paquete: con `m.asset.MetodoNuevo` gccgo 15.1 no
+	// resuelve los metodos recien agregados a d2asset desde este paquete (medido en el build de esta
+	// tarjeta: "reference to undefined field or method 'ReservarArenaParaLosTiles'").
+	am := m.asset
+
+	// las claves del nivel prenden el arena de bloques usados: se copia SOLO lo que el `.ds1` referencia
+	// (2.586.489 B de bloque de los 4.360.271 B de los 8 `.dt1` del pueblo) y el crudo se lee en un buffer
+	// prestado que se reusa por archivo (el del `.dt1` mas grande).
+	claves := stamp.ClavesDeTiles()
+	if claves == nil {
+		// una clave que no entra en 21 bits: se empaca igual pero sin filtrar (se copian todos los tiles del
+		// `.dt1`, que es correcto aunque gaste mas arena). El `nil` de la lista ordenada NO puede significar
+		// "apaga el camino": eso lo dice el scratch, que siempre es > 0 con un `.ds1` en la mano.
+		claves = []int64{}
+	}
+
+	d2asset.PrepararArenaDeBloquesUsados(claves, d2asset.TamanoDelDT1MasGrande(am.Loader, rutas))
+
+	// el arena y el cache de `dt1s` son del nivel: los tiles cacheados del nivel anterior solo tienen los
+	// bloques que ESE nivel usaba.
+	am.ReiniciarArenaDeTiles()
+
+	m.resetMapBase(levelType, width, height)
+
+	for idx := range rutas {
+		// UN SOLO recorrido: `addDT1` carga el `.dt1` (y lo empaca al arena) la primera vez. Cargarlos antes de
+		// `resetMapBase` y despues volver a pedirlos NO sirve: el cache de `dt1s` tiene presupuesto y desaloja,
+		// y la segunda pasada volvio a leer `treegroups.dt1` (505.504 B) y sus bloques (489.812 B) no entraron
+		// en el sexto tramo (OOM con los 2.586.489 B de bloques ya copiados).
+		m.addDT1(rutas[idx])
+	}
+}
+
+// ReservarArenaParaEstosTiles: deja el arena de crudos dimensionado a la suma exacta de estos `.dt1`
+// (camino de DC-002.78, sin el empacado de bloques). Se usa cuando NO se prende el arena de bloques usados.
+func (m *MapEngine) ReservarArenaParaEstosTiles(rutas []string) int {
+	if m.asset == nil || len(rutas) == 0 {
+		return 0
+	}
+
+	am := m.asset
+
+	suma := d2asset.ReservarArenaParaLosTiles(am.Loader, rutas)
+	if suma > 0 {
+		m.Debugf("arena de tiles reservado en %d B para %d .dt1", suma, len(rutas))
+	}
+
+	return suma
+}
+
+// resetMapBase: todo lo que las dos formas de ResetMap hacen igual -- el nivel, el tamano y las casillas.
+func (m *MapEngine) resetMapBase(levelType d2enum.RegionIdType, width, height int) {
 	m.entities = make(map[string]d2interface.MapEntity)
 	m.objBlock = NewObjectCollision()
 	m.levelType = *m.asset.Records.Level.Types[levelType]
 	m.size = d2geom.Size{Width: width, Height: height}
-	m.tiles = make([]MapTile, width*height)
-	m.dt1TileData = make([]d2dt1.Tile, 0)
-	m.dt1Files = make([]string, 0)
-	m.dt1Starts = make([]int, 0)
-	m.dt1Rank = nil
+
+	// DC-002.88: las casillas se PIDEN UNA VEZ y se reusan cuando el nivel nuevo no necesita mas. El monton
+	// externo de la consola no devuelve nada al techo: entrar al pueblo (57x41 = 2337 casillas x 264 B =
+	// 616.968 B) y despues cambiar a la transicion Este (9x41 = 369 casillas, 97.416 B) pedia 98.304 B nuevos
+	// -- que es exactamente lo que no habia (medido: 49.152 B de techo). Se pone a cero, asi que el nivel
+	// nuevo ve las casillas limpias igual que con un `make`.
+	cuantas := width * height
+	if cap(m.tiles) >= cuantas {
+		m.tiles = m.tiles[:cuantas]
+
+		for i := range m.tiles {
+			m.tiles[i] = MapTile{}
+		}
+	} else {
+		m.tiles = make([]MapTile, cuantas)
+	}
+	// DC-002.88: estas cuatro se reusan con `[:0]` (no `make`) por lo mismo que las casillas: el monton externo
+	// no devuelve nada al techo y volver al pueblo pedia 73.728 B nuevos para `dt1TileData` (507 tiles x 272 B
+	// crecen por duplicacion: 69.632 B de un pedido). Con `[:0]` el arreglo del nivel anterior se reusa.
+	m.dt1TileData = m.dt1TileData[:0]
+	m.dt1Files = m.dt1Files[:0]
+	m.dt1Starts = m.dt1Starts[:0]
+	m.dt1Rank = m.dt1Rank[:0]
 	m.dt1Index = nil
-	m.dt1KeyCount = map[[3]int32]int{}
+	m.dt1KeyCount = map[int64]int{}
 	m.startOverride = nil
 	m.world = World{}
 	m.warpDest = nil
 	m.gridPaths = false
 	m.population = nil
-
-	for idx := range m.levelType.Files {
-		m.addDT1(m.levelType.Files[idx])
-	}
 }
 
 func (m *MapEngine) addDT1(fileName string) {
@@ -144,7 +243,11 @@ func (m *MapEngine) addDT1(fileName string) {
 
 	dt1, err := m.asset.LoadDT1(fileName)
 	if err != nil {
+		// DC-002.88: un `.dt1` que el nivel nombra y la fuente no tiene se DICE y se saltea. Antes se
+		// informaba y se seguia igual, dereferenciando `dt1` (nil) en la linea de abajo.
 		m.Error(err.Error())
+
+		return
 	}
 
 	m.dt1Starts = append(m.dt1Starts, len(m.dt1TileData))
@@ -422,7 +525,7 @@ func (m *MapEngine) GetTiles(style, sequence int, tileType d2enum.TileType) []d2
 
 	if len(m.dt1Rank) == len(m.dt1TileData) && m.dt1Index != nil {
 		// indexed lookup: same tiles in the same (file, tile) order as the scan below
-		for _, idx := range m.dt1Index[[3]int32{int32(style), int32(sequence), int32(tileType)}] {
+		for _, idx := range m.dt1Index[claveDeTile(int32(style), int32(sequence), int32(tileType))] {
 			tiles = append(tiles, m.dt1TileData[idx])
 		}
 	} else {

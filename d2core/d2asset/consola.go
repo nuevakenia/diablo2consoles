@@ -57,6 +57,11 @@ func ArrancarComoConsola() {
 	AjustarPresupuestosDeConsola()
 	ActivarLecturaDeConsola()
 	ActivarCaminoDeTilesDeConsola()
+
+	// DC-002.88: el nivel carga solo los `.dt1` que su `.ds1` lista (ver `lectura_de_tiles.go`). El
+	// compositor del motor (`LoadStamp` + `ResetMap`) cargaba los 32 campos del level type y el pueblo tiene
+	// dos `.dt1` ahi que el `.ds1` no lista: 960.096 B de arena que ninguna casilla mira.
+	CargarSoloLosTilesDelDS1(true)
 }
 
 // NuevoAssetManagerDeConsola arma el AssetManager de la consola: los ocho caches con los presupuestos

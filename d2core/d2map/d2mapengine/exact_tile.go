@@ -132,21 +132,40 @@ func (m *MapEngine) SetExactTiles(x, y int, region d2enum.RegionIdType, keepMark
 }
 
 // extendRank fills dt1Rank for the DT1 tiles loaded since the last call.
+//
+// DC-002.88: la clave del mapa es un `int64` empaquetado (`claveDeTile`) y NO un `[3]int32`. Medido en la
+// consola: `map[[3]int32]int` mata la SH-4 en `runtime.mapassign` (illegal instruction) al primer tile, y el
+// compositor del pueblo no pasa de ahi; `map[int64]int` y `map[string]int` funcionan (sonda en el POC
+// `tablas-mapengine`). En la PC el tipo de la clave no cambia nada.
 func (m *MapEngine) extendRank() {
 	if m.dt1KeyCount == nil {
-		m.dt1KeyCount = map[[3]int32]int{}
+		m.dt1KeyCount = map[int64]int{}
 	}
 
 	for i := len(m.dt1Rank); i < len(m.dt1TileData); i++ {
 		t := &m.dt1TileData[i]
-		k := [3]int32{t.Style, t.Sequence, t.Type}
+		k := claveDeTile(t.Style, t.Sequence, t.Type)
 		m.dt1Rank = append(m.dt1Rank, m.dt1KeyCount[k])
 
 		if m.dt1Index == nil {
-			m.dt1Index = map[[3]int32][]int32{}
+			m.dt1Index = map[int64][]int32{}
 		}
 
 		m.dt1Index[k] = append(m.dt1Index[k], int32(i))
 		m.dt1KeyCount[k]++
 	}
 }
+
+// claveDeTile: `(estilo, secuencia, tipo)` en un `int64` (21 bits cada uno, el mismo empaquetado que
+// `d2asset.ClaveDeTile`). Si un `.dt1` trajera un valor que no entra, se usa la clave truncada igual: seria un
+// dato roto del juego, y el motor ya trata esos tiles como intercambiables por clave.
+func claveDeTile(estilo, secuencia, tipo int32) int64 {
+	return int64(estilo)&mascaraDeClave<<(2*bitsDeLaClave) |
+		int64(secuencia)&mascaraDeClave<<bitsDeLaClave |
+		int64(tipo)&mascaraDeClave
+}
+
+const (
+	bitsDeLaClave  = 21
+	mascaraDeClave = (1 << bitsDeLaClave) - 1
+)

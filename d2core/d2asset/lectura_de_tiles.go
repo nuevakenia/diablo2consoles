@@ -60,14 +60,328 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2datautils"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader"
 )
 
 const (
 	// capacidadDeLaArenaDeTiles: los .dt1 de la zona mas pesada del acto 1 (el pueblo: 8 archivos,
 	// 4.408.317 B crudos, medido en DC-002.77) mas un 10 % de aire. Es el numero que hace que entrar a
 	// una zona no pida memoria: los 4,41 MB entran de una y los archivos se leen uno detras de otro.
+	//
+	// DC-002.88: este numero es el PISO por defecto, no el unico. El compositor del motor no carga una
+	// zona sino un NIVEL, y el nivel dice archivos distintos: con `ReservarArenaDeTiles` el que llama
+	// fija la capacidad con la suma exacta de los `.dt1` que va a cargar (medido: el level type del pueblo
+	// lista 9 archivos = 4.652.603 B, pero el `.ds1` del pueblo usa 8 = 4.350.665 B, y la constante de
+	// 4.848.148 B sobraba por dos motivos distintos: el aire del 10 % y los archivos que el `.ds1` no
+	// lista). Sin la llamada, esto queda exactamente como estaba en DC-002.78.
 	capacidadDeLaArenaDeTiles = 4408317 + 440831 // 4.848.148 B
 )
+
+// capacidadPedidaDelArena: la capacidad con la que se pide el arena, fijada por `ReservarArenaDeTiles`
+// (DC-002.88). 0 = se usa `capacidadDeLaArenaDeTiles`. Solo tiene efecto ANTES del primer `.dt1`: una vez
+// pedido el arena no se puede agrandar ni achicar sin tirarlo (los bloques de los `.dt1` ya cargados
+// apuntan adentro), y por eso la reserva se pide temprano y se dice en el estado del instrumento.
+var capacidadPedidaDelArena int
+
+// ============================== DC-002.88: las claves de tile ==============================
+//
+// Una clave de tile es `(estilo, secuencia, tipo)`: lo unico que identifica un tile adentro de los `.dt1` del
+// nivel (`d2dt1.Tile.Style/Sequence/Type`). El `.ds1` la referencia en cada casilla, y el motor la usa como
+// llave (`MapEngine.dt1KeyCount`). Aca se empaqueta en un `int64` para poder guardar la lista de claves del
+// nivel en una LISTA ORDENADA (no un mapa: ver `Stamp.ClavesDeTiles`).
+const bitsPorClave = 21
+
+const mascaraDeClave = (1 << bitsPorClave) - 1
+
+// ClaveDeTile empaqueta `(estilo, secuencia, tipo)` en un `int64` (21 bits cada uno). Devuelve -1 si alguno
+// no entra en 21 bits: ahi el filtro NO se puede usar (una clave truncada se comeria tiles buenos).
+func ClaveDeTile(estilo, secuencia, tipo int64) int64 {
+	if estilo < 0 || secuencia < 0 || tipo < 0 ||
+		estilo > mascaraDeClave || secuencia > mascaraDeClave || tipo > mascaraDeClave {
+		return -1
+	}
+
+	return estilo<<(2*bitsPorClave) | secuencia<<bitsPorClave | tipo
+}
+
+// OrdenarClavesDeTiles ordena la lista de claves (quicksort de Hoare, sin reflexion: no hay `sort.Slice` en
+// la consola y 2337 claves se ordenan en nada).
+func OrdenarClavesDeTiles(claves []int64) { ordenarClaves(claves) }
+
+func ordenarClaves(c []int64) {
+	if len(c) < 2 {
+		return
+	}
+
+	pivote := c[len(c)/2]
+	i, j := 0, len(c)-1
+
+	for i <= j {
+		for c[i] < pivote {
+			i++
+		}
+
+		for c[j] > pivote {
+			j--
+		}
+
+		if i <= j {
+			c[i], c[j] = c[j], c[i]
+			i++
+			j--
+		}
+	}
+
+	if j > 0 {
+		ordenarClaves(c[:j+1])
+	}
+
+	if i < len(c)-1 {
+		ordenarClaves(c[i:])
+	}
+}
+
+// HayClave dice si la clave esta en la lista ordenada (busqueda binaria).
+func HayClave(claves []int64, clave int64) bool {
+	izq, der := 0, len(claves)-1
+
+	for izq <= der {
+		medio := (izq + der) / 2
+
+		switch {
+		case claves[medio] == clave:
+			return true
+		case claves[medio] < clave:
+			izq = medio + 1
+		default:
+			der = medio - 1
+		}
+	}
+
+	return false
+}
+
+// ============================== DC-002.88: EL ARENA DE BLOQUES USADOS ==============================
+//
+// EL NUMERO QUE LO PIDE (medido con `console/dc/medidas/arena` sobre el pueblo). El arena guarda los `.dt1`
+// CRUDOS, y el crudo trae mucho mas de lo que el nivel mira: de los 8 `.dt1` que el `.ds1` del pueblo lista
+// (4.350.665 B, 507 tiles), las casillas del `.ds1` solo referencian 311 tiles, y los bloques RLE de esos 311
+// tiles son 2.586.489 B. El resto son tiles que el nivel no toca (`act1/barracks/warp.dt1` aporta 3 tiles de
+// 81: 23.298 B de bloque de 629.046) mas las cabeceras del archivo.
+//
+// COMO FUNCIONA. En vez de dejar el crudo entero en el arena, cada `.dt1` se lee en UN buffer prestado (el
+// del archivo mas grande del nivel, pedido una vez y reusado), se parsea, y SOLO los bloques de los tiles
+// que el nivel usa se COPIAN al arena de bloques (tramos de 512 KB, pedidos a medida). Los tiles que el nivel
+// no usa no se copian y no se devuelven: no pueden aparecer en ninguna casilla (una casilla solo referencia
+// `(estilo, secuencia, tipo)` de un `.dt1` que el `.ds1` lista, y esos son justo los que se conservan).
+//
+// POR QUE COPIAR Y NO APUNTAR AL CRUDO. El contrato de DC-002.78 dice que los bloques de un `.dt1` cargado
+// asi APUNTAN AL ARENA. Aca se invierte: apuntan a un arena de BLOQUES que ya no es el archivo, y por eso el
+// archivo se puede reusar en el siguiente. Lo que NO se hace es copiar al SEMIESPACIO del recolector: DC-002.78
+// midio que eso mata la consola en medio del parseo (el recolector salta por umbral y mueve lo que el parser
+// esta armando). El arena de bloques es monton externo y no lo toca el recolector.
+var (
+	// bloquesUsados: prende el camino de arriba. Lo prende `PrepararArenaDeBloquesUsados`.
+	bloquesUsados bool
+
+	// clavesDelNivel: las claves `(estilo, secuencia, tipo)` que el `.ds1` del nivel referencia, empaquetadas
+	// y ORDENADAS (`d2asset.ClaveDeTile`). Solo los tiles con una de estas claves se copian al arena de bloques.
+	clavesDelNivel []int64
+
+	// arenaDeBloques: los tramos del arena. Cada tramo es un pedido propio, asi que los punteros de los
+	// bloques ya copiados NO se invalidan cuando hace falta un tramo nuevo. Los tramos NO se tiran al reiniciar
+	// el arena: se vuelven a usar desde el primero (medido: si se tiran, el segundo nivel del POC vuelve a
+	// pedir 2,6 MB y muere en el `make` de las casillas, que solo pedian 98.304 B).
+	arenaDeBloques [][]byte
+
+	// tramoActual/cursorDelBloque: por donde va el empacado del nivel vivo.
+	tramoActual     int
+	cursorDelBloque int
+
+	// bytesDeBloques: lo copiado en total (el numero que se informa).
+	bytesDeBloques int
+
+	// scratchDeLectura: el `.dt1` crudo, prestado. UNO para todo el nivel (el del archivo mas grande), asi
+	// leer el archivo no pide memoria por archivo.
+	scratchDeLectura []byte
+	scratchDelNivel  int
+)
+
+// tramoDeBloques: lo que se le pide al monton cuando el tramo actual no alcanza. 512 KB entra en un pedido
+// externo (todo lo que pasa de 64 KB va a `gc_external_alloc`) y deja el monton con pedidos grandes y pocos:
+// con 2,5 MB de bloques son 6 pedidos por nivel, no 40.
+const tramoDeBloques = 512 * 1024
+
+// PrepararArenaDeBloquesUsados prende el camino del arena de bloques y lo dimensiona (DC-002.88):
+//   - `claves`: las `(estilo, secuencia, tipo)` del `.ds1` del nivel. `nil` apaga el camino.
+//   - `scratch`: el tamano del `.dt1` mas grande del nivel (el buffer prestado para leerlo entero).
+//
+// Se llama ANTES de cargar los `.dt1` del nivel, y despues hay que tirar el arena (`ReiniciarArenaDeTiles`)
+// porque los tiles cacheados del nivel anterior solo tienen los bloques que ese nivel usaba.
+func PrepararArenaDeBloquesUsados(claves []int64, scratch int) {
+	candadoDeTiles.Lock()
+	defer candadoDeTiles.Unlock()
+
+	if scratch <= 0 {
+		bloquesUsados = false
+		clavesDelNivel = nil
+
+		return
+	}
+
+	bloquesUsados = true
+	clavesDelNivel = claves
+	scratchDelNivel = scratch
+
+	// el buffer prestado NO se tira si ya hay uno del tamano: es la lectura de cada `.dt1` y pedirlo de nuevo
+	// por nivel es mas monton que no vuelve.
+	if len(scratchDeLectura) < scratchDelNivel {
+		scratchDeLectura = make([]byte, scratchDelNivel)
+	}
+}
+
+// EnBloquesUsados dice si el camino del arena de bloques esta prendido (lo consulta el instrumento).
+func EnBloquesUsados() bool { return bloquesUsados }
+
+// reservarEnElArenaDeBloques: devuelve un tramo de `n` bytes del arena de bloques, reusando los tramos que ya
+// se pidieron en niveles anteriores y pidiendo uno nuevo solo cuando no alcanzan.
+func reservarEnElArenaDeBloques(n int) []byte {
+	if n == 0 {
+		return nil
+	}
+
+	for {
+		if tramoActual < len(arenaDeBloques) {
+			if resto := len(arenaDeBloques[tramoActual]) - cursorDelBloque; n <= resto {
+				tramo := arenaDeBloques[tramoActual][cursorDelBloque : cursorDelBloque+n]
+				cursorDelBloque += n
+				bytesDeBloques += n
+
+				return tramo
+			}
+
+			// no entra en lo que queda de este tramo: se pasa al siguiente (lo que sobra se pierde, y con
+			// bloques de hasta ~40 KB contra tramos de 512 KB es a lo sumo el ultimo bloque de cada tramo)
+			tramoActual++
+			cursorDelBloque = 0
+
+			continue
+		}
+
+		tamano := tramoDeBloques
+		if n > tamano {
+			tamano = n
+		}
+
+		arenaDeBloques = append(arenaDeBloques, make([]byte, tamano))
+	}
+}
+
+// cargarDT1EnBloquesUsados: un `.dt1` leido en el buffer prestado y empacado al arena de bloques. Ver la
+// cabecera de esta seccion.
+func (am *AssetManager) cargarDT1EnBloquesUsados(filePath string) (*d2dt1.DT1, error) {
+	tam, hay := am.Loader.TamanoDeArchivo(filePath)
+	if !hay {
+		return nil, errDT1NoEntraEnLaArena
+	}
+
+	if tam > scratchDelNivel {
+		scratchDelNivel = tam
+	}
+
+	if len(scratchDeLectura) < scratchDelNivel {
+		scratchDeLectura = make([]byte, scratchDelNivel)
+	}
+
+	if prestamoDeTiles == nil {
+		prestamoDeTiles = &d2mpq.Scratch{}
+	}
+
+	leidos, err := am.Loader.LeerEnteroEnConPrestamo(filePath, scratchDeLectura[:tam], prestamoDeTiles)
+	if err != nil {
+		return nil, err
+	}
+
+	dt1, err := d2dt1.LoadDT1(scratchDeLectura[:leidos])
+	if err != nil {
+		return nil, err
+	}
+
+	// los bloques de los tiles que el nivel usa se COPIAN al arena de bloques; los demas tiles se tiran
+	conservados := 0
+
+	for t := range dt1.Tiles {
+		clave := ClaveDeTile(int64(dt1.Tiles[t].Style), int64(dt1.Tiles[t].Sequence), int64(dt1.Tiles[t].Type))
+		if len(clavesDelNivel) > 0 && !HayClave(clavesDelNivel, clave) {
+			continue
+		}
+
+		for b := range dt1.Tiles[t].Blocks {
+			datos := dt1.Tiles[t].Blocks[b].EncodedData
+			if len(datos) == 0 {
+				continue
+			}
+
+			destino := reservarEnElArenaDeBloques(len(datos))
+			copy(destino, datos)
+
+			dt1.Tiles[t].Blocks[b].EncodedData = destino
+		}
+
+		dt1.Tiles[conservados] = dt1.Tiles[t]
+		conservados++
+	}
+
+	dt1.Tiles = dt1.Tiles[:conservados]
+	archivosDeTiles++
+
+	return dt1, nil
+}
+
+// soloLosTilesDelDS1 (DC-002.88): en la consola, un nivel carga SOLO los `.dt1` que su `.ds1` lista, no
+// los 32 campos de archivo del level type. Es lo que hace el motor de la PC en los niveles generados
+// (`AddDS1`), y la razon por la que el compositor no entra en el monton: el level type del pueblo lista 9
+// archivos (4.652.603 B) y el `.ds1` usa 8 (4.350.665 B) -- `act1/town/trees.dt1` (511.673 B) y
+// `act1/outdoors/bridge.dt1` (448.423 B) se cargan al arena sin que una sola casilla los mire, porque no
+// estan en la lista del `.ds1`. Una casilla del `.ds1` solo puede referenciar estilos de los `.dt1` que el
+// propio `.ds1` lista, asi que la lista del `.ds1` alcanza y sobra.
+//
+// La PC NO CAMBIA: la prenda `ArrancarComoConsola` (consola.go), y `ResetMap` sigue usando el level type.
+var soloLosTilesDelDS1 bool
+
+// CargarSoloLosTilesDelDS1 prende/apaga la politica del `.ds1` (ver arriba). La prende el arranque de la
+// consola; la PC no la llama nunca.
+func CargarSoloLosTilesDelDS1(v bool) { soloLosTilesDelDS1 = v }
+
+// SoloLosTilesDelDS1 dice si la politica esta prendida (lo consultan d2mapengine y d2mapstamp).
+func SoloLosTilesDelDS1() bool { return soloLosTilesDelDS1 }
+
+// ReservarArenaDeTiles fija la capacidad del arena (DC-002.88) y la devuelve. Es una RESERVA, no una
+// asignacion: el arena se sigue pidiendo en la primera carga de un `.dt1` (el arranque del PVR necesita el
+// monton ordenado, DC-002.50). Despues de eso la reserva no hace nada y el estado lo dice
+// (`EstadoDeLosTiles().CapacidadPedida` contra `.Capacidad`).
+//
+// Un valor <= 0 devuelve la capacidad a la constante de DC-002.78.
+func ReservarArenaDeTiles(capacidad int) int {
+	candadoDeTiles.Lock()
+	defer candadoDeTiles.Unlock()
+
+	if capacidad <= 0 {
+		capacidadPedidaDelArena = 0
+	} else {
+		capacidadPedidaDelArena = capacidad
+	}
+
+	return capacidad
+}
+
+// CapacidadReservadaDelArena es la capacidad que se va a pedir (0 = la constante del codigo).
+func CapacidadReservadaDelArena() int {
+	candadoDeTiles.Lock()
+	defer candadoDeTiles.Unlock()
+
+	return capacidadPedidaDelArena
+}
 
 // errores del camino de la consola
 var (
@@ -140,9 +454,17 @@ func ActivarCaminoDeTilesDeConsola() {
 type EstadoDelArenaDeTiles struct {
 	CaminoDeConsola bool
 	Capacidad       int // lo que se pidio UNA vez (0 = todavia no se pidio)
+	CapacidadPedida int // la reserva de DC-002.88 (0 = la constante del codigo)
 	Usado           int // lo que avanzo el cursor con los .dt1 vivos
 	Reinicios       int // cuantas veces se tiro el arena (cada uno vacia el cache de dt1s)
 	ArchivosLeidos  int // cuantos .dt1 se cargaron por este camino
+
+	// DC-002.88: el camino del arena de bloques usados.
+	BloquesUsados    bool
+	BloquesBytes     int // lo copiado al arena de bloques
+	BloquesTramos    int // cuantos pedidos se hicieron
+	BloquesCapacidad int // lo pedido al monton en tramos
+	Scratch          int // el buffer prestado para leer cada .dt1
 }
 
 // EstadoDeLosTiles devuelve el estado del arena (para medir en la consola).
@@ -150,13 +472,76 @@ func EstadoDeLosTiles() EstadoDelArenaDeTiles {
 	candadoDeTiles.Lock()
 	defer candadoDeTiles.Unlock()
 
-	return EstadoDelArenaDeTiles{
-		CaminoDeConsola: caminoDeTilesDeConsola,
-		Capacidad:       cap(arenaDeTiles),
-		Usado:           cursorDelArena,
-		Reinicios:       reiniciosDelArena,
-		ArchivosLeidos:  archivosDeTiles,
+	capacidadTramos := 0
+
+	for i := range arenaDeBloques {
+		capacidadTramos += len(arenaDeBloques[i])
 	}
+
+	return EstadoDelArenaDeTiles{
+		CaminoDeConsola:  caminoDeTilesDeConsola,
+		Capacidad:        cap(arenaDeTiles),
+		CapacidadPedida:  capacidadPedidaDelArena,
+		Usado:            cursorDelArena,
+		Reinicios:        reiniciosDelArena,
+		ArchivosLeidos:   archivosDeTiles,
+		BloquesUsados:    bloquesUsados,
+		BloquesBytes:     bytesDeBloques,
+		BloquesTramos:    len(arenaDeBloques),
+		BloquesCapacidad: capacidadTramos,
+		Scratch:          len(scratchDeLectura),
+	}
+}
+
+// ReservarArenaParaLosTiles (DC-002.88): reserva el arena con la suma EXACTA de los `.dt1` que se van a
+// cargar, preguntando el tamano en el MPQ (tabla de bloques: no lee ni un byte de los archivos). Devuelve la
+// suma; 0 si no pudo averiguar ningun tamano (ahi no se reserva nada y queda la constante).
+//
+// Es una FUNCION y no un metodo a proposito: gccgo 15.1 no resuelve los metodos NUEVOS de un paquete
+// importado desde un paquete grande (`d2mapengine` daba "reference to undefined field or method" con
+// `am.ReservarArenaParaLosTiles`, y la MISMA llamada compilaba desde `package main`; medido en el build de
+// esta tarjeta). Las funciones del paquete si resuelven siempre.
+//
+// Las rutas son las del motor, o sea relativas a `data/global/tiles` ("act1/town/floor.dt1"). Los archivos
+// que la fuente no tiene (un `.dt1` que el `.ds1` nombra y el MPQ no trae) no suman: el que los pida se va a
+// enterar al cargarlos, no aca.
+func ReservarArenaParaLosTiles(loader *d2loader.Loader, rutas []string) int {
+	if loader == nil {
+		return 0
+	}
+
+	suma := 0
+
+	for i := range rutas {
+		if tam, hay := loader.TamanoDeArchivo("/data/global/tiles/" + rutas[i]); hay {
+			suma += tam
+		}
+	}
+
+	if suma > 0 {
+		// el candado lo toma `ReservarArenaDeTiles`
+		ReservarArenaDeTiles(suma)
+	}
+
+	return suma
+}
+
+// TamanoDelDT1MasGrande: el tamano descomprimido del `.dt1` mas grande de la lista. Es lo que hay que prestar
+// para leer un archivo entero con el arena de bloques usados (el prestamo es uno y se reusa entre archivos).
+func TamanoDelDT1MasGrande(loader *d2loader.Loader, rutas []string) int {
+	if loader == nil {
+		return 0
+	}
+
+	masGrande := 0
+
+	for i := range rutas {
+		if tam, hay := loader.TamanoDeArchivo("/data/global/tiles/" + rutas[i]); hay && tam > masGrande {
+			masGrande = tam
+		}
+	}
+
+	return masGrande
 }
 
 // ReiniciarArenaDeTiles tira el arena y VACIA el cache de dt1s (sus entradas apuntan adentro del arena).
@@ -172,6 +557,14 @@ func (am *AssetManager) reiniciarArenaDeTilesSinCandado() {
 	cursorDelArena = 0
 	reiniciosDelArena++
 
+	// DC-002.88: el arena de bloques usados se REINICIA con el arena (los punteros de los bloques que el motor
+	// ya copio a `dt1TileData` apuntan ahi, pero el que reinicia es porque tira el nivel, o sea que nadie los
+	// usa mas -- el mismo contrato del arena de DC-002.78). Los TRAMOS NO SE TIRAN: se vuelven a usar desde el
+	// primero, porque el monton de C no baja y pedirlos de nuevo es lo que mataba el segundo nivel.
+	tramoActual = 0
+	cursorDelBloque = 0
+	bytesDeBloques = 0
+
 	if am != nil && am.dt1s != nil {
 		am.dt1s.Clear()
 	}
@@ -182,6 +575,12 @@ func (am *AssetManager) reiniciarArenaDeTilesSinCandado() {
 func (am *AssetManager) cargarDT1EnLaArena(filePath string) (*d2dt1.DT1, error) {
 	candadoDeTiles.Lock()
 	defer candadoDeTiles.Unlock()
+
+	// DC-002.88: el camino del arena de bloques usados (ver la cabecera de esa seccion). Reemplaza al arena
+	// de crudos: el archivo se lee en un buffer prestado y solo se copian los bloques de los tiles del nivel.
+	if bloquesUsados {
+		return am.cargarDT1EnBloquesUsados(filePath)
+	}
 
 	dt1, entro, err := am.parsearDT1EnLaArena(filePath)
 	if err != nil {
@@ -219,7 +618,12 @@ func (am *AssetManager) cargarDT1EnLaArena(filePath string) (*d2dt1.DT1, error) 
 // del semiespacio del recolector por archivo y mataba la consola en medio de la carga.
 func (am *AssetManager) parsearDT1EnLaArena(filePath string) (dt1 *d2dt1.DT1, entro bool, err error) {
 	if arenaDeTiles == nil {
-		arenaDeTiles = make([]byte, capacidadDeLaArenaDeTiles)
+		capacidad := capacidadDeLaArenaDeTiles
+		if capacidadPedidaDelArena > 0 {
+			capacidad = capacidadPedidaDelArena
+		}
+
+		arenaDeTiles = make([]byte, capacidad)
 	}
 
 	if arenaDeTiles == nil {

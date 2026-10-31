@@ -125,8 +125,9 @@ cp "$POC_REF/nivel.go" "$SRCB"/
     printf 'const gcEntreTablas = %s\n' "$([ "${GCENTRE:-1}" = "1" ] && echo true || echo false)"
     printf 'const gcInhibidoTablas = %s\n' "$([ "${GCINHIBE:-1}" = "1" ] && echo true || echo false)"
     printf 'const pedirArenaPrimero = %s\n' "$([ "${ARENA:-1}" = "1" ] && echo true || echo false)"
+    printf 'const tilesDelStamp = %s\n' "$([ "${TILES:-1}" = "1" ] && echo true || echo false)"
 } > "$SRCB/knobs.go"
-echo "   palancas: modoTablas=${TABLAS:-1} hacerMapa=${MAPA:-1} conEntidades=${ENTIDADES:-0} lienzoReferencia=${LIENZO:-1} gcEntreTablas=${GCENTRE:-1} gcInhibidoTablas=${GCINHIBE:-1}"
+echo "   palancas: modoTablas=${TABLAS:-1} hacerMapa=${MAPA:-1} conEntidades=${ENTIDADES:-0} lienzoReferencia=${LIENZO:-1} gcEntreTablas=${GCENTRE:-1} gcInhibidoTablas=${GCINHIBE:-1} pedirArenaPrimero=${ARENA:-1} tilesDelStamp=${TILES:-1}"
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 
 echo "== 4/6 compilando y enlazando contra los .gox del motor"

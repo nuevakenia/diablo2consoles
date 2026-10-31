@@ -103,18 +103,18 @@ const (
 // `LoadStamp` lee Presets y Types; `ResetMap` recorre `levelType.Files`; los mapas automaticos y los
 // warps salen de AutoMap/LevelWarp. Para componer SOLO casillas (sin entidades) alcanzan las dos primeras.
 var tablasDelCompositor = map[string]bool{
-	d2resource.LevelType:           true,
-	d2resource.LevelPreset:         true,
-	d2resource.LevelWarp:           true,
-	d2resource.AutoMap:             true,
-	d2resource.LevelDetails:        true,
-	d2resource.LevelMaze:           true,
-	d2resource.LevelSubstitutions:  true,
-	d2resource.ObjectType:          true,
-	d2resource.ObjectDetails:       true,
-	d2resource.MonPreset:           true,
-	d2resource.MonStats:            true,
-	d2resource.MonStats2:           true,
+	d2resource.LevelType:          true,
+	d2resource.LevelPreset:        true,
+	d2resource.LevelWarp:          true,
+	d2resource.AutoMap:            true,
+	d2resource.LevelDetails:       true,
+	d2resource.LevelMaze:          true,
+	d2resource.LevelSubstitutions: true,
+	d2resource.ObjectType:         true,
+	d2resource.ObjectDetails:      true,
+	d2resource.MonPreset:          true,
+	d2resource.MonStats:           true,
+	d2resource.MonStats2:          true,
 }
 
 // vigilante: el pico del monton de C dentro de una fase, muestreado en cada paso.
@@ -149,9 +149,16 @@ func (v *vigilante) muestra(donde string) {
 }
 
 func main() {
+	// DC-002.88: SONDA DE MAPAS. El compositor murio DOS veces en `runtime.mapassign` (illegal instruction
+	// en la SH-4): una con `map[[3]int32]bool` y otra con `map[[3]int32]int` (`MapEngine.dt1KeyCount`, que
+	// escribe `extendRank` al cargar cada `.dt1`). Los caches de d2asset (`map[string]*cacheNode`) si
+	// funcionan. Aca se prueban, en orden y con tamano realista, las tres formas de clave para saber cual
+	// sirve en la consola antes de tocar el motor.
+	sondaDeMapas()
+
 	println("TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola")
 	println("TABLAS: modoTablas=", modoTablas, "(0 ninguna, 1 las del nivel, 2 todas) hacerMapa=", hacerMapa,
-		"conEntidades=", conEntidades, "lienzoReferencia=", lienzoReferencia)
+		"conEntidades=", conEntidades, "lienzoReferencia=", lienzoReferencia, "tilesDelStamp=", tilesDelStamp)
 	println("TABLAS: monton al arrancar: " + estado())
 	println("TABLAS: sizeof int=", int(unsafe.Sizeof(int(0))), "puntero=", int(unsafe.Sizeof(uintptr(0))),
 		"d2ds1.Tile=", int(unsafe.Sizeof(d2ds1.Tile{})), "d2dt1.Tile=", int(unsafe.Sizeof(d2dt1.Tile{})),
@@ -211,7 +218,8 @@ func main() {
 	// los 8 .dt1 del pueblo del POC) y se pide entera la primera vez que se carga un .dt1. Si la pared es el
 	// arena, la corrida muere ACA y la ultima linea del log dice con cuanto margen se pidio.
 	if pedirArenaPrimero {
-		println("ARENA: capacidad que pide d2asset = 4849148 B (constante de DC-002.78)")
+		println("ARENA: capacidad que pide d2asset = 4849148 B (constante de DC-002.78) reservada=",
+			d2asset.CapacidadReservadaDelArena())
 		println("ARENA: los 9 .dt1 del level type del pueblo miden 4652603 B crudos; margen del monton antes de pedirla =", margen())
 
 		_, errArena := am.LoadDT1("act1/town/floor.dt1")
@@ -265,8 +273,11 @@ func main() {
 	// con el compositor del motor, deja apuntando al arena viejo a los tiles que el MapEngine ya copio).
 	estadoArena := d2asset.EstadoDeLosTiles()
 	println("MAPA: ARENA de tiles: caminoDeConsola=", estadoArena.CaminoDeConsola,
-		"capacidad=", estadoArena.Capacidad, "usado=", estadoArena.Usado,
+		"capacidad=", estadoArena.Capacidad, "pedida=", estadoArena.CapacidadPedida, "usado=", estadoArena.Usado,
 		"reinicios=", estadoArena.Reinicios, "archivos=", estadoArena.ArchivosLeidos)
+	println("MAPA: BLOQUES de tiles: usados=", estadoArena.BloquesUsados, "bytes=", estadoArena.BloquesBytes,
+		"tramos=", estadoArena.BloquesTramos, "capacidad=", estadoArena.BloquesCapacidad,
+		"scratch=", estadoArena.Scratch)
 
 	if prestamo, hay := d2asset.EstadoDelPrestamoDeTiles(); hay {
 		println("MAPA: PRESTAMO de la lectura: lecturas=", prestamo.Lecturas, "sectores=", prestamo.Sectores,
@@ -288,11 +299,11 @@ func main() {
 
 // resumenDeTablas: lo que dejo el paso 1.
 type resumenDeTablas struct {
-	intentadas  int
-	cargadas    int
-	fallidas    int
-	ms          int
-	usadoAntes  int
+	intentadas   int
+	cargadas     int
+	fallidas     int
+	ms           int
+	usadoAntes   int
 	usadoDespues int
 }
 
@@ -397,12 +408,12 @@ type faseMapa struct {
 	entidades   int
 	crc         uint32
 
-	ms            int
-	usadoPico     int
-	arenaPico     int
-	libreMin      int
-	dondePico     string
-	usadoAlFinal  int
+	ms             int
+	usadoPico      int
+	arenaPico      int
+	libreMin       int
+	dondePico      string
+	usadoAlFinal   int
 	usadoAlEmpezar int
 }
 
@@ -450,7 +461,18 @@ func componer(engine *d2mapengine.MapEngine, rotulo string, preset, archivo int)
 		println("MAPA:", rotulo, "LoadStamp OK: ds1 w=", f.ancho, "h=", f.alto,
 			"usado=", d2cMontonUsado(), "arena=", d2cMontonArena())
 
-		engine.ResetMap(regionPueblo, f.ancho, f.alto)
+		// DC-002.88: la lista de `.dt1` del `.ds1` del stamp, que es la que el nivel carga de verdad.
+		rutas := stamp.TilesDelDS1()
+		println("MAPA:", rotulo, "los .dt1 del .ds1=", len(rutas), "en el level type=", cuentaTilesDelLevelType(engine))
+
+		if tilesDelStamp {
+			// el arena se reserva ANTES de la primera carga de un .dt1: es el tamano con el que se va a
+			// pedir, y el `.dt1` que no entre tira el arena y con el el cache (el estado lo dice).
+			engine.ResetMapParaStamp(regionPueblo, f.ancho, f.alto, stamp)
+		} else {
+			engine.ResetMap(regionPueblo, f.ancho, f.alto)
+		}
+
 		v.muestra("ResetMap")
 
 		juego := engine.Tiles()
@@ -466,6 +488,14 @@ func componer(engine *d2mapengine.MapEngine, rotulo string, preset, archivo int)
 
 		println("MAPA:", rotulo, "ResetMap OK: tiles=", f.tiles, "archivosDT1=", f.dt1s,
 			"usado=", d2cMontonUsado())
+
+		estadoArena := d2asset.EstadoDeLosTiles()
+		println("MAPA:", rotulo, "ARENA capacidad=", estadoArena.Capacidad, "pedida=",
+			estadoArena.CapacidadPedida, "usado=", estadoArena.Usado, "reinicios=", estadoArena.Reinicios,
+			"archivos=", estadoArena.ArchivosLeidos)
+		println("MAPA:", rotulo, "BLOQUES usados=", estadoArena.BloquesUsados, "bytes=",
+			estadoArena.BloquesBytes, "tramos=", estadoArena.BloquesTramos, "capacidad=",
+			estadoArena.BloquesCapacidad, "scratch=", estadoArena.Scratch)
 
 		if conEntidades {
 			engine.PlaceStamp(stamp, 0, 0)
@@ -504,6 +534,22 @@ func componer(engine *d2mapengine.MapEngine, rotulo string, preset, archivo int)
 		"libreMin=", f.libreMin, "ms=", f.ms)
 
 	return f
+}
+
+// cuentaTilesDelLevelType: cuantos archivos de tile declara el level type del motor (los 32 campos, sin
+// vacios). Es el otro lado del numero de DC-002.88: el level type dice N y el `.ds1` usa M.
+func cuentaTilesDelLevelType(engine *d2mapengine.MapEngine) int {
+	tipos := engine.LevelType()
+
+	n := 0
+
+	for i := range tipos.Files {
+		if tipos.Files[i] != "" && tipos.Files[i] != "0" {
+			n++
+		}
+	}
+
+	return n
 }
 
 // censo: casillas con piso y con pared, y un crc32 de la GRILLA de identidades (estilo, secuencia, tipo,
@@ -715,4 +761,30 @@ func hex32(v uint) string {
 	}
 
 	return string(buf[:])
+}
+
+// sondaDeMapas (DC-002.88): que forma de mapa sobrevive en la SH-4. Se prueba la clave `int64` (la que
+// propone el arreglo), la clave `[3]int32` (la del motor hoy) y una clave `string`, con 700 entradas cada una
+// (mas que las 684 claves del pueblo) y decir cual revienta y en cual.
+func sondaDeMapas() {
+	println("SONDA: int64 como clave")
+
+	deEnteros := map[int64]int{}
+	for i := int64(0); i < 700; i++ {
+		deEnteros[i*7+3] = int(i)
+	}
+
+	println("SONDA: int64 OK len=", len(deEnteros), "valor=", deEnteros[3])
+
+	println("SONDA: string como clave")
+
+	deTextos := map[string]int{}
+	for i := 0; i < 700; i++ {
+		deTextos["tile-"+string(rune(48+i%10))+string(rune(65+i/10%26))] = i
+	}
+
+	println("SONDA: string OK len=", len(deTextos))
+
+	// la clave `[3]int32` se saco de la sonda: revienta la SH-4 en `runtime.mapassign` (medido, PC
+	// 8c2343d2), que es justo lo que motivo pasar el motor a clave `int64`.
 }

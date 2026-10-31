@@ -63,10 +63,10 @@ func (m *MapEngine) hasTile(style, seq, typ int32) bool {
 // the drawable floors, walls and shadows and the references without a DT1 tile.
 func (m *MapEngine) TileStats() TileStats {
 	s := TileStats{MissingKeys: map[string]int{}}
-	known := map[[3]int32]bool{}
+	known := map[int64]bool{}
 
 	has := func(style, seq, typ int32) bool {
-		k := [3]int32{style, seq, typ}
+		k := claveDeTile(style, seq, typ)
 		if v, ok := known[k]; ok {
 			return v
 		}
