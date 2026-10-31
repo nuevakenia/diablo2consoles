@@ -116,7 +116,7 @@ func (v *DCCDirectionFrame) recalculateCells(direction *DCCDirection) {
 		cellHeights[v.VerticalCellCount-1] = v.Height - h - (4 * (v.VerticalCellCount - 2))
 	}
 
-	v.Cells = make([]DCCCell, v.HorizontalCellCount*v.VerticalCellCount)
+	v.Cells = pedirCeldas(v.HorizontalCellCount * v.VerticalCellCount)
 	offsetY := v.Box.Top - direction.Box.Top
 
 	for y := 0; y < v.VerticalCellCount; y++ {

@@ -1,0 +1,172 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:048 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:303 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:413 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:413 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:416 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:420 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:433 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fd063340000 RAM(16 MB) 0x7fd06f340000 VRAM64(8 MB) 0x7fd067340000 ARAM(2 MB) 0x7fd083340000
+00:00:440 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:448 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fd063340000 RAM(16 MB) 0x7fd06f340000 VRAM64(8 MB) 0x7fd067340000 ARAM(2 MB) 0x7fd083340000
+00:00:453 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:456 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:457 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:515 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:515 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:515 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac18e9c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2350530560
+ARQ-MARCA   gc_init-semiespacio0 v=2350528992
+ARQ-MARCA   gc_init-semiespacio1 v=2352626176
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=192 cused=4353280 gsemi=2320/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+DCC298: arranca -- el .dcc con arena del monton de C, sin mapa y sin video
+DCC298: BASELINE gc=0 goUsado=2352/2097152 montonC usado=4354312 libre=3256 arena=4357568
+fs_iso9660: disc change detected
+DCC298: DCC leido bytes= 144996 crc32= 2017674847
+DCC298: ===== A) EL .dcc SOLO (una direccion) =====
+DCC298: A) SIN ARENA -- el decodificador pide al monton de Go (el defecto)
+ARQ-MARCA gc-por-umbral-bytes-usados v=1598064
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=1520984
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576416
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=1569960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1594544
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=1547016
+ARQ-MARCA gc-por-umbral-bytes-usados v=1596184
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=1499336
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573088
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=1428360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575864
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1285288
+ARQ-MARCA gc-por-umbral-bytes-usados v=1580296
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1009544
+DCC298: A) decodificado: gc=7 goUsado=1132464 (antes 90872) montonC=5393120 (antes 4854312) libreC=736 ms=977
+DCC298: A) cuadros= 30 caja= 135 x 182 pixelesPorCuadro= 24570 pixeles= 737100
+DCC298: A) celdasDeLosCuadros= 44900 entradasDeLaTabla= 44900 crc32DeLosCuadros= 1543323145
+DCC298: A) arena entregado= 0 en 0 pedidos, capacidad= 0
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=764656
+DCC298: A) despues de liberar la arena: gc=1 goUsado=764656 (antes 1132464) montonC=11705544 (antes 5393120) libreC=248 ms=171
+DCC298: A) SIN ARENA -- no hay nada que liberar (el monton de Go lo recoge el GC)
+DCC298: ===== B) EL JUGADOR (las capas del COF, compuestas) =====
+DCC298: B) COF capas= 8 framesPorDir= 8 dirs= 16
+DCC298: B) CAPA HD cuadros= 8 caja= 15 x 17 crc32= 1325934338
+DCC298: B) CAPA LA cuadros= 8 caja= 18 x 27 crc32= 321443905
+DCC298: B) CAPA LG cuadros= 8 caja= 21 x 51 crc32= -1170605457
+DCC298: B) CAPA RA cuadros= 8 caja= 13 x 15 crc32= -1677557776
+DCC298: B) CAPA S1 cuadros= 8 caja= 10 x 8 crc32= -931199834
+DCC298: B) CAPA S2 cuadros= 8 caja= 9 x 9 crc32= 2103313138
+DCC298: B) CAPA SH SIN-GRAFICO: fuenteconsola: la fuente no sabe el tamano del archivo: data/global/chars/AM/SH/AMSHLITNU1ht.dcc
+DCC298: B) CAPA TR cuadros= 8 caja= 15 x 25 crc32= 570829176
+DCC298: B) capas decodificadas: gc=0 goUsado=1031360 (antes 906600) montonC=12143032 (antes 11880880) libreC=148488 ms=940
+DCC298: B) capas= 7 de 8 arena entregado= 86208 en 133 pedidos, capacidad= 262144
+DCC298: B) CUADRO 0 caja= 26 x 79 esquina= -18 -65 pixelesNoVacios= 896 crc32= 1857478036
+DCC298: B) CUADRO 1 caja= 26 x 79 esquina= -18 -65 pixelesNoVacios= 889 crc32= 2138394951
+DCC298: B) CUADRO 2 caja= 26 x 79 esquina= -18 -65 pixelesNoVacios= 898 crc32= -504501218
+DCC298: B) con los cuadros compuestos, sin liberar: gc=8 goUsado=1040872/2097152 montonC usado=12143032 libre=148488 arena=12291520
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=857608
+DCC298: B) despues de liberar la arena: gc=1 goUsado=857608 (antes 1040872) montonC=11880880 (antes 12143032) libreC=148496 ms=24
+DCC298: B) montonC usado= 11880880 libre= 148496 arena= 12029376
+ARQ-MARCA main.main-volvio v=0
+ARQ-MARCA scheduler-VOLVIO v=1
+
+arch: exit return code 0
+arch: shutting down kernel
+maple: final stats -- device count = 21, vbl_cntr = 1035, dma_cntr = 1035
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+  DMA Buffer at ac18e9c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2350526464
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=4024 cused=155144 gsemi=860200/2097152 gc=9
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+DCC298: arranca -- el .dcc con arena del monton de C, sin mapa y sin video
+DCC298: BASELINE gc=9 goUsado=860232/2097152 montonC usado=156176 libre=2992 arena=159168
+fs_iso9660: disc change detected
+DCC298: DCC leido bytes= 144996 crc32= 2017674847
+DCC298: ===== A) EL .dcc SOLO (una direccion) =====
+DCC298: A) SIN ARENA -- el decodificador pide al monton de Go (el defecto)
+ARQ-MARCA gc-por-umbral-bytes-usados v=1592592
+ARQ-MARCA gc_collect v=1
+Unhandled exception: PC 8c48e590, code 1, evt 0180
+ R0-R7: 00000000 8c48e4f0 96001878 80000000 8c499ee8 8c48db80 8c48db80 8c48db7d
+ R8-R15: 8c48e588 8c48e568 077cb531 8c04d7f4 8c143518 00000090 8c48e548 8c1b285c
+ SR 40000000 PR 8c48e528
+Stack Trace: frame pointers not enabled!
+
+Encountered Illegal instruction. 
+
+kernel panic: unhandled IRQ/Exception
+arch: aborting the system
+00:31:576 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked

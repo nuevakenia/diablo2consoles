@@ -198,13 +198,13 @@ func (v *DCCDirection) generateFrames(pcd *d2datautils.BitMuncher) {
 		cell.LastHeight = -1
 	}
 
-	v.PixelData = make([]byte, v.Box.Width*v.Box.Height)
+	v.PixelData = pedirBytes(v.Box.Width * v.Box.Height)
 	frameIndex := -1
 
 	for _, frame := range v.Frames {
 		frameIndex++
 
-		frame.PixelData = make([]byte, v.Box.Width*v.Box.Height)
+		frame.PixelData = pedirBytes(v.Box.Width * v.Box.Height)
 		c := -1
 
 		for _, cell := range frame.Cells {
@@ -297,21 +297,25 @@ func (v *DCCDirection) fillPixelBuffer(pcd, ec, pm, et, rp *d2datautils.BitMunch
 	var pixelMaskLookup = []int{0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4}
 
 	lastPixel := uint32(0)
-	maxCellX := 0
-	maxCellY := 0
+
+	// EL TAMANO DE LA TABLA (DC-002.98, medido): el decodificador usa UNA entrada por celda decodificada, o
+	// sea como maximo la suma de las celdas de los cuadros. El codigo pedia `maxCellX*maxCellY`: la suma de
+	// las columnas POR la suma de las filas, que con 30 cuadros de 34x46 da 1.347.029 entradas donde se usan
+	// 44.900 (30 veces mas: 16,2 MB en la consola y 32,3 MB en la PC, para un archivo de 144.996 B). El
+	// camino de la PC no cambia de resultado, solo de tamano.
+	totalDeCeldas := 0
 
 	for _, frame := range v.Frames {
 		if frame == nil {
 			continue
 		}
 
-		maxCellX += frame.HorizontalCellCount
-		maxCellY += frame.VerticalCellCount
+		totalDeCeldas += frame.HorizontalCellCount * frame.VerticalCellCount
 	}
 
-	v.PixelBuffer = make([]DCCPixelBufferEntry, maxCellX*maxCellY)
+	v.PixelBuffer = pedirEntradas(totalDeCeldas)
 
-	for i := 0; i < maxCellX*maxCellY; i++ {
+	for i := range v.PixelBuffer {
 		v.PixelBuffer[i].Frame = -1
 		v.PixelBuffer[i].FrameCellIndex = -1
 	}
@@ -460,16 +464,19 @@ func (v *DCCDirection) calculateCells() {
 	v.Cells = make([]*DCCCell, v.VerticalCellCount*v.HorizontalCellCount)
 	yOffset := 0
 
+	arena := pedirCeldas(v.VerticalCellCount * v.HorizontalCellCount)
+
 	for y := 0; y < v.VerticalCellCount; y++ {
 		xOffset := 0
 
 		for x := 0; x < v.HorizontalCellCount; x++ {
-			v.Cells[x+(y*v.HorizontalCellCount)] = &DCCCell{
-				Width:   cellWidths[x],
-				Height:  cellHeights[y],
-				XOffset: xOffset,
-				YOffset: yOffset,
-			}
+			celda := &arena[x+(y*v.HorizontalCellCount)]
+			celda.Width = cellWidths[x]
+			celda.Height = cellHeights[y]
+			celda.XOffset = xOffset
+			celda.YOffset = yOffset
+
+			v.Cells[x+(y*v.HorizontalCellCount)] = celda
 
 			xOffset += 4
 		}
