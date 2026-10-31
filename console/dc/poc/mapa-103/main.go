@@ -23,7 +23,9 @@ package main
 import (
 	"hash/crc32"
 	"runtime"
+	"unsafe"
 
+	"github.com/OpenDiablo2/OpenDiablo2/console/dc/fuenteconsola"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
@@ -31,9 +33,9 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2term"
-	"github.com/OpenDiablo2/OpenDiablo2/console/dc/fuenteconsola"
 )
 
 //extern d2c_serial_init
@@ -59,6 +61,12 @@ func d2cMontonTecho() uint
 
 //extern d2c_libre
 func d2cLibre(p uintptr)
+
+//extern d2c_soltar_filas
+func d2cSoltarFilas(mapa uintptr) int
+
+//extern d2c_soltar_tramo
+func d2cSoltarTramo(tramo uintptr, tamano int) int
 
 func init() { d2cSerialInit() }
 
@@ -111,6 +119,10 @@ var (
 
 	// tramoDePixeles: el tramo de la cache reservado al arranque (DC-002.104), nil si la palanca esta apagada.
 	tramoDePixeles *d2maprenderer.TramoDeLaCache
+
+	// tablasCargadas (DC-002.105): las tablas que se cargaron de verdad, por nombre. Es la lista que se le
+	// pasa a `SoltarFilasDeLasTablas` (se suelta lo que se cargo, no "todo lo que haya").
+	tablasCargadas []string
 )
 
 func memoria(etapa string) {
@@ -127,7 +139,8 @@ func memoria(etapa string) {
 func main() {
 	println("MAPA103: arranca DC-002.103 -- el pueblo en pantalla de punta a punta; orden=", orden)
 	println("MAPA103: cuadros=", cuadros, "modoTablas=", modoTablas, "soltarLecturas=", soltarLecturas,
-		"tramoDeLaCache=", tramoDeLaCache, "tramoAlArranque=", tramoAlArranque)
+		"tramoDeLaCache=", tramoDeLaCache, "tramoAlArranque=", tramoAlArranque,
+		"soltarDespuesDeComponer=", soltarDespuesDeComponer)
 	memoria("al-arrancar")
 
 	// ============================== 0. EL VIDEO PRIMERO ==============================
@@ -155,6 +168,14 @@ func main() {
 	// ============================== 1. EL MOTOR ==============================
 	d2asset.ArrancarComoConsola()
 	d2asset.UsarLiberadorDeExternos(func(p uintptr) { d2cLibre(p) })
+
+	// DC-002.105: las filas de las tablas no son rebanadas (el tablero de un mapa se lee en C) y las tablas del
+	// MPQ se devuelven con el `free` del shim. Los dos liberadores son los del shim, no un `free` suelto desde
+	// Go (que en el semiespacio del recolector corrompe el monton).
+	d2asset.UsarLiberadorDeFilas(&d2records.LiberadorDeFilas{
+		SoltarMapa:  func(mapa unsafe.Pointer) int { return d2cSoltarFilas(uintptr(mapa)) },
+		SoltarTramo: func(bloque unsafe.Pointer, bytes int) int { return d2cSoltarTramo(uintptr(bloque), bytes) },
+	})
 
 	if modoTablas != "stream" {
 		d2asset.ActivarTablasPorLaFuente()
@@ -189,16 +210,18 @@ func main() {
 	cargadas := 0
 
 	for i := 0; i < tablasQueSeCargan && i < len(tablasDelCompositor); i++ {
-		if modoTablas == "stream" {
-			if cargarTablaPorStream(am, tablasDelCompositor[i]) {
-				cargadas++
-			}
+		var ok bool
 
-			continue
+		if modoTablas == "stream" {
+			ok = cargarTablaPorStream(am, tablasDelCompositor[i])
+		} else {
+			ok = cargarTablaPorLaFuente(am, tablasDelCompositor[i])
 		}
 
-		if cargarTablaPorLaFuente(am, tablasDelCompositor[i]) {
+		if ok {
 			cargadas++
+			// DC-002.105: la lista de lo que se cargo es lo que despues se suelta (por nombre, no "todo")
+			tablasCargadas = append(tablasCargadas, tablasDelCompositor[i])
 		}
 	}
 
@@ -255,6 +278,12 @@ func main() {
 			"lecturas=", tramos.Lecturas, "bytes=", int(tramos.Bytes))
 		memoria("despues-de-soltar-las-lecturas-del-mapa")
 	}
+
+	// ============================== 3.b LO QUE EL CUADRO NO LEE (DC-002.105) ==============================
+	// Con el pueblo compuesto, estas dos piezas ya no las mira nadie: las filas de las tablas (el compositor las
+	// leyo para armar las casillas y el renderer usa la copia del levelType) y las dos fuentes MPQ (el cuadro no
+	// lee un byte de ahi). Se devuelven al monton de C AHORA, que es de donde tiene que salir la cache.
+	soltarLoQueElCuadroNoLee(am)
 
 	// ============================== 4. LO QUE SE SUELTA ANTES DE DIBUJAR ==============================
 	switch orden {
@@ -316,6 +345,83 @@ func main() {
 	}
 
 	println("MAPA103: FIN pico del monton=", picoMonton, "de arena=", d2cMontonArena())
+}
+
+// soltarLoQueElCuadroNoLee (DC-002.105): devuelve al monton de C las dos piezas que el CUADRO NO USA -- las
+// filas ya parseadas de las tablas del compositor y las dos Source de consola (las tablas del MPQ y la memoria
+// de trabajo de la lectura) -- en el orden que dice el knob `soltarDespuesDeComponer`. Devuelve los bytes.
+//
+// POR QUE ACA Y NO DESPUES DEL PRIMER CUADRO: la cache de tiles se arma en el primer Render y pide 2.723.840 B
+// (DC-002.103/.104); si se suelta despues, esos bytes ya no estan para la cache, que es para lo que se juntan.
+//
+// LO QUE EL CUADRO SI LEE, y por eso se precarga: cuando el renderer arma la cache lee del MPQ la paleta del acto
+// (`pal.dat`, cacheada por el AssetManager) y su tabla de sombreado (`pal.pl2`, ahora por el cache de
+// transformaciones, ver `d2maprenderer/lighting.go`). Las dos se piden ANTES de cerrar las fuentes.
+func soltarLoQueElCuadroNoLee(am *d2asset.AssetManager) int {
+	if soltarDespuesDeComponer == "nada" {
+		println("MAPA103: no se suelta nada despues de componer (el camino de DC-002.103)")
+		return 0
+	}
+
+	total := 0
+
+	if soltarDespuesDeComponer == "fuentes" || soltarDespuesDeComponer == "todo" {
+		precargarLoQueElCuadroLee(am)
+	}
+
+	if soltarDespuesDeComponer == "tablas" || soltarDespuesDeComponer == "todo" {
+		memoria("antes-de-soltar-las-tablas")
+
+		res := am.SoltarFilasDeLasTablas(tablasCargadas)
+
+		println("MAPA103: TABLAS SOLTADAS tablas=", res.Tablas, "tramos=", res.Tramos, "bytes=", res.Bytes,
+			"vacias=", len(res.Vacias), "noSoportadas=", len(res.NoSoportadas))
+
+		total += res.Bytes
+
+		memoria("despues-de-soltar-las-tablas")
+	}
+
+	if soltarDespuesDeComponer == "fuentes" || soltarDespuesDeComponer == "todo" {
+		for _, f := range fuentesDeConsola {
+			r := f.Soltar(func(tramo uintptr, bytes int) int { return d2cSoltarTramo(tramo, bytes) })
+
+			println("MAPA103: FUENTE SOLTADA", r.Ruta, "tablas=", r.Tablas.Total,
+				"enElMontonDeC=", r.Tablas.Externas, "bytesTablas=", r.BytesTablas,
+				"bytesTrabajo=", r.BytesTrabajo, "bytes=", r.Bytes, "cedido=", r.Cedido,
+				"yaSoltada=", r.YaSoltada)
+
+			total += r.Bytes
+		}
+
+		memoria("despues-de-soltar-las-fuentes")
+	}
+
+	println("MAPA103: SOLTADO despues de componer bytes=", total, "libre=", d2cMontonLibre(),
+		"sbrk=", int(d2cSbrkActual()), "techo=", int(d2cMontonTecho()))
+
+	return total
+}
+
+// precargarLoQueElCuadroLee pide al AssetManager la paleta del acto y su PL2 de sombreado MIENTRAS las fuentes
+// estan abiertas: son los dos archivos que el renderer lee del MPQ al armar la cache. Despues de `Soltar` el MPQ
+// no se puede leer, asi que sin esta precarga el cuadro saldria con sombreado lineal (y el crc32 no seria el del
+// host) o sin paleta.
+func precargarLoQueElCuadroLee(am *d2asset.AssetManager) {
+	usado := d2cMontonUsado()
+
+	paleta := d2resource.PaletteAct1
+	pl2 := paleta[:len(paleta)-len(".dat")] + ".pl2"
+
+	if _, err := am.LoadPalette(paleta); err != nil {
+		println("MAPA103: no se pudo precargar la paleta del acto:", err.Error())
+	}
+
+	if _, err := am.LoadPaletteTransform(pl2); err != nil {
+		println("MAPA103: no se pudo precargar el PL2 del acto:", err.Error())
+	}
+
+	println("MAPA103: PRECARGADO lo que el cuadro lee del MPQ", paleta, pl2, "delta=", d2cMontonUsado()-usado)
 }
 
 // registrarFuente abre el MPQ con la Source de consola, le inyecta el `free` del shim y la pone PRIMERA en

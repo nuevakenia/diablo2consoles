@@ -54,7 +54,8 @@ PAQUETES_MOTOR="d2common/d2datautils
  d2core/d2map/d2mapentity
  d2core/d2map/d2mapstamp
  d2core/d2map/d2mapengine
- d2core/d2map/d2maprenderer"
+ d2core/d2map/d2maprenderer
+ console/dc/fuenteconsola"
 
 [ -f "$BASE_GOX/orden.txt" ] || { echo "falta el arbol del motor en $BASE_GOX (corre build-motor-all.sh)" >&2; exit 1; }
 mkdir -p "$OUT"
@@ -144,6 +145,30 @@ if [ -n "${ORDEN:-}" ] && [ "$ORDEN" != "$ORDEN_KNOB" ]; then
     ORDEN_KNOB="$ORDEN"
 fi
 echo "   orden=$ORDEN_KNOB cuadros=$(leer_knob cuadros) modoTablas=$(leer_knob modoTablas)"
+
+# DC-002.105: las palancas de esta tarjeta -- cuanto pide el tramo de la cache, si se reserva al arranque y que se
+# suelta despues de componer. Misma regla que `orden`: se pisan SOLO por entorno y se avisa en grande.
+pisa_knob() {  # $1 = nombre en knobs.go, $2 = valor nuevo (sin comillas), $3 = comillas (1 = cadena)
+    local actual
+    actual="$(leer_knob "$1")"
+    [ -n "$actual" ] || { echo "   knobs.go no declara '$1'" >&2; exit 1; }
+    [ "$actual" = "$2" ] && return 0
+    echo "   ****************************************************************"
+    printf '   * PISADA DE PALANCA: %-24s %s -> %s\n' "$1" "$actual" "$2"
+    echo "   * el binario NO es el de la referencia del POC"
+    echo "   ****************************************************************"
+    if [ "${3:-0}" = "1" ]; then
+        sed -i "s/^\t$1 = \".*\"$/\t$1 = \"$2\"/" "$SRCB/knobs.go"
+    else
+        sed -i "s/^\t$1 = .*/\t$1 = $2/" "$SRCB/knobs.go"
+    fi
+}
+
+[ -n "${TRAMO_CACHE:-}" ] && pisa_knob tramoDeLaCache "$TRAMO_CACHE"
+[ -n "${TRAMO_ARRANQUE:-}" ] && pisa_knob tramoAlArranque "$TRAMO_ARRANQUE"
+[ -n "${SOLTAR:-}" ] && pisa_knob soltarDespuesDeComponer "$SOLTAR" 1
+
+echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoAlArranque=$(leer_knob tramoAlArranque)"
 
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 

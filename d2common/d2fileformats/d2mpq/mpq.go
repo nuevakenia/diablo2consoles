@@ -37,6 +37,10 @@ type MPQ struct {
 	blockTable   []byte
 	header       Header
 	fileSize     int64 // size of the archive on disk, to reject offsets and sizes beyond it
+
+	// DC-002.105: las tablas ya se devolvieron al monton (`LiberarTablas`). El MPQ no sirve para leer mas:
+	// los caminos de lectura dicen `ErrTablasSoltadas` en vez de contestar con tablas vacias.
+	soltada bool
 }
 
 // TableChecksum returns the byte checksum of the two tables of the archive (hash table, block table).
@@ -125,6 +129,11 @@ func FromFile(fileName string) (*MPQ, error) {
 
 // getFileBlockData gets a block table entry
 func (mpq *MPQ) getFileBlockData(fileName string) (*Block, error) {
+	// DC-002.105: sin tablas no hay nada que buscar (y contestar "file not found" mentiria sobre la causa)
+	if mpq.soltada {
+		return nil, ErrTablasSoltadas
+	}
+
 	blockIndex, ok := mpq.buscarHash(fileName)
 	if !ok {
 		return nil, errors.New("file not found")
@@ -226,6 +235,11 @@ func (mpq *MPQ) Path() string {
 
 // Contains returns bool for whether the given filename exists in the mpq
 func (mpq *MPQ) Contains(filename string) bool {
+	// DC-002.105: con las tablas devueltas al monton no hay ranuras que mirar
+	if mpq.soltada {
+		return false
+	}
+
 	_, ok := mpq.buscarHash(filename)
 	return ok
 }

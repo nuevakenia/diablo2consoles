@@ -122,18 +122,18 @@ func (mr *MapRenderer) SetLightInput(in LightInput) {
 }
 
 // loadShadeTable derives the shade factors from the act's PL2.
+//
+// DC-002.105: el PL2 se toma del CACHE de transformaciones del AssetManager (`LoadPaletteTransform`) en vez de
+// leerlo del MPQ con `LoadFile`. El archivo y el parseo son los mismos -- `d2pl2.Load` con los mismos bytes, o
+// sea las MISMAS tablas de sombreado -- pero el cache lo deja PRECARGADO: en la consola eso es lo que permite
+// cerrar las dos fuentes MPQ despues de componer (que es de donde salen los 355.328 B de la cache de tiles,
+// DC-002.105) y que el primer cuadro siga teniendo su PL2 sin leer un byte del MPQ.
 func (mr *MapRenderer) loadShadeTable(dat string) {
 	pl2Path := strings.TrimSuffix(dat, ".dat") + ".pl2"
 
-	data, err := mr.asset.LoadFile(pl2Path)
+	pl2, err := mr.asset.LoadPaletteTransform(pl2Path)
 	if err != nil {
 		mr.Warningf("no PL2 for lighting (%s), using linear shading: %v", pl2Path, err)
-		return
-	}
-
-	pl2, err := d2pl2.Load(data)
-	if err != nil {
-		mr.Warningf("bad PL2 %s: %v", pl2Path, err)
 		return
 	}
 

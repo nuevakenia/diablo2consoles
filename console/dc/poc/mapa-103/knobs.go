@@ -61,4 +61,23 @@ const (
 	//                               446.464 B. Ese es el numero de DC-002.105.
 	// Con las tablas y las fuentes soltadas (.105) el camino es este: reservar temprano y colgarlo despues.
 	tramoAlArranque = false
+
+	// soltarDespuesDeComponer (DC-002.105): que se devuelve al monton de C en cuanto el pueblo esta compuesto,
+	// ANTES de crear el renderer y de armar la cache. Son las dos piezas que el cuadro NO usa:
+	//
+	//	nada     el camino de DC-002.103/.104 (la referencia): no se suelta nada y la cuenta de lo que falta
+	//	         queda como la midio la .103
+	//	tablas   las filas ya parseadas de las tablas del compositor (LvlTypes + LvlPrest): 324.112 B medidos,
+	//	         de los cuales los que viven en el monton de C son los tableros del mapa de `LvlPrest`
+	//	fuentes  las dos Source de consola (las tablas del MPQ + la memoria de trabajo de la lectura): 355.328 B
+	//	         medidos al abrirlas (354.656 son de `d2data.mpq`)
+	//	todo     las dos cosas: es lo que la .103 llama "las dos piezas que se pueden devolver" (679.440 B)
+	//
+	// OJO, y es parte del contrato: el cuadro SI lee DOS archivos del MPQ cuando el renderer arma la cache -- la
+	// paleta del acto (`pal.dat`) y su tabla de sombreado (`pal.pl2`). Por eso, cuando se sueltan las fuentes,
+	// las dos se PRECARGAN antes (ver `main.go`): despues de soltar, el MPQ no se puede leer.
+	//
+	// El valor de la referencia del POC es "nada" (la corrida de la .103); las de esta tarjeta se hacen con
+	// `SOLTAR=todo` por entorno, y el build lo avisa.
+	soltarDespuesDeComponer = "nada"
 )

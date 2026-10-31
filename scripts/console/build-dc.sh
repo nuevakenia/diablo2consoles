@@ -104,7 +104,10 @@ EXTRA_OBJS=""
 for f in "$SRC"/*.c "$SRC"/csrc/*.c; do
   [ -f "$f" ] || continue
   o="$OUT/$(basename "${f%.c}").o"
-  kos-cc -O2 -ml -m4-single -I"$SRC" -I"$SRC/csrc" -I"$OUT/gen" -c "$f" -o "$o"
+  # DC-002.105: -I del runtime de libgodc, para los headers que describen lo que el shim de C tiene que saber
+  # de verdad: `gc_semispace.h` (la tabla de externos y el umbral de 64 KB) y `map_dreamcast.h` (el layout del
+  # `GoMap`, con sus `_Static_assert`). Sin esos headers el shim tendria que repetir los numeros a mano.
+  kos-cc -O2 -ml -m4-single -I"$SRC" -I"$SRC/csrc" -I"$OUT/gen" -I"$LIBGODC/runtime" -c "$f" -o "$o"
   EXTRA_OBJS="$EXTRA_OBJS $o"
 done
 

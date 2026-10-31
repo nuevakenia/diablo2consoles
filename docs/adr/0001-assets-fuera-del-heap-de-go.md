@@ -203,6 +203,26 @@ Resultado de hoy, medido:
 - Los `_test.go` no entran: un test pide la referencia al MPQ para comparar (`fuente_test.go` lo hace) y no
   viaja al binario de la consola.
 
+### 4.6 Soltar: la otra mitad de la disciplina (DC-002.105)
+
+Pedir y liberar el tramo no alcanza cuando lo que sobra es **de la fuente o de las tablas**: lo que el runtime
+manda a `gc_external_alloc` (más de `GC_LARGE_OBJECT_THRESHOLD` = 64 KB) el recolector **no lo devuelve nunca**,
+y en la consola eso es el montón del que sale la caché de tiles. Por eso, **cuando el cuadro ya no lo usa**, se
+suelta con liberador inyectado (jamás un `free` suelto desde Go):
+
+- `Fuente.Soltar(libre)` devuelve las tablas del MPQ y la memoria de trabajo de la lectura. Después de soltar, el
+  MPQ contesta `ErrTablasSoltadas`/`errSinMPQ`, **no** un falso "archivo no encontrado"; es idempotente; si el MPQ
+  es prestado (`Envolver`) no le toca las tablas y lo dice (`Cedido`).
+- `asset.SoltarFilasDeLasTablas(nombres)` devuelve las filas ya parseadas (`LevelPresets`, `LevelTypes`). Un mapa
+  de Go no es una rebanada: su tablero se libera desde C, y **sólo si está en `gc_externos`** (la prueba de que
+  el runtime lo mandó a `malloc`) — un tablero del semiespacio no se toca a mano.
+- **Sólo después de componer** y con el nivel ya en el motor: antes, el compositor todavía lee del MPQ y de las
+  filas. Y lo que el cuadro **sí** lee del MPQ (la paleta del acto y su `pal.pl2` de sombreado) se **precarga**
+  antes de cerrar nada; el PL2 se toma del cache de transformaciones para que la precarga sirva.
+- **Medido** (DC-002.105): 570.720 B devueltos (216.064 de las filas + 354.656 de `d2data.mpq`; las tablas del
+  `patch_d2` viven en el semiespacio y no se tocan). De los 679.440 B que se esperaban, **108.048 no son
+  recuperables**: son el tablero de 128 buckets que el crecimiento del mapa abandonó y que nadie referencia.
+
 ---
 
 ## 5. Si la regla te pinta rojo (la receta)
