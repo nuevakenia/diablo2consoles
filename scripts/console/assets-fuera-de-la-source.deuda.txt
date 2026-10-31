@@ -1,0 +1,60 @@
+# DEUDA DECLARADA de la regla "los assets del camino de consola se leen SÓLO por la Source".
+#
+# La regla vive en scripts/console/regla-assets-por-la-source/main.go y su envoltorio es
+# scripts/console/checar-assets-por-la-source.sh. El porqué de la decisión está en
+# docs/adr/0001-assets-fuera-del-heap-de-go.md.
+#
+# PARA QUE SIRVE ESTE ARCHIVO. Cuando se escribió la regla (DC-002.95) había lecturas que ya existían:
+# taparlas con un comentario habría dejado el chequeo verde sin decir la verdad, y dejarlas rojas habría
+# dejado el árbol en rojo por trabajo de otras tarjetas. Se declaran acá, una por una, con el motivo y la
+# tarjeta que las paga. Lo que NO está acá es una violación nueva y el chequeo sale ROJO (exit 1).
+#
+# EL NÚMERO SÓLO BAJA: el que migra una lectura a la Source borra su línea (el chequeo lo avisa como
+# "pagada"), y el que agrega una no tiene dónde esconderla.
+#
+# FORMATO, una entrada por línea:
+#
+#   archivo|funcion|llamada|n   TIPO   motivo
+#
+#   archivo  ruta relativa a la raíz del repo (con "/")
+#   funcion  la función envolvente tal como la nombra el chequeo: `main`, `main.clausura` (una clausura dentro
+#            de main), `Proveedor.cargar` (un método, con el tipo), `Fuente.Open`
+#   llamada  lo escrito en el código: `os.ReadFile`, `io.ReadAll`, `mpq.ReadFile`, `m.ReadFile`, `ReadFile`
+#            (cuando el receptor es un campo, como `p.mpq.ReadFile`)
+#   n        el ordinal: cuántas veces aparece esa misma llamada DENTRO de esa función, hasta ésa inclusive.
+#            Una segunda lectura igual en la misma función es una entrada aparte (no se esconde detrás de la
+#            primera).
+#   TIPO     DEUDA      = hay que pagarla: ese camino se migra a la Source.
+#            PERMANENTE = no es un asset o la interfaz obliga a tenerla; el motivo lo dice. No se paga.
+#
+# El motivo NO puede llevar "|" (el "|" es el separador). Se puede escribir cualquier cosa después del TIPO.
+
+# ---------------------------------------------------------------------------------------------------------
+# PERMANENTES (1)
+# ---------------------------------------------------------------------------------------------------------
+
+# La fuente ES la que lee: es el fondo de la cadena. `asset.Source` (d2common/d2loader/asset/source.go) obliga
+# a implementar `Open(name) (io.ReadSeeker, error)`, y el stream del MPQ prefetchea el archivo comprimido
+# entero sin dueño. La propia función lo dice y lo CUENTA (`f.abiertos`), y las cargas grandes del camino de
+# consola no pasan por ahí: van por `Pedir`, `LeerEnteroEn` o `LeerEnteroEnConPrestamo` (DC-002.96).
+console/dc/fuenteconsola/fuente.go|Fuente.Open|ReadFileStream|1   PERMANENTE   la interfaz asset.Source obliga a Open; el camino sin dueño está documentado y contado en f.abiertos
+
+# ---------------------------------------------------------------------------------------------------------
+# DEUDAS A PAGAR (8)
+# ---------------------------------------------------------------------------------------------------------
+
+# El POC del personaje es el producto que hoy corre con control (DC-002.38 y sucesivas). Sus lecturas son del
+# camino viejo y DC-002.96 §6.3 las dejó contadas para su propia tarjeta: migrarlo a la Source es trabajo
+# aparte, no de esta regla.
+console/dc/poc/personaje-mapa/main.go|main|mpq.ReadFile|1                    DEUDA   el .ds1 del pueblo por el camino viejo (DC-002.96 §6.3)
+console/dc/poc/personaje-mapa/main.go|main.clausura|mpq.ReadFile|1           DEUDA   el .cof de la bestia dentro de una clausura de main (DC-002.96 §6.3)
+console/dc/poc/personaje-mapa/main.go|leerDeMPQ|m.ReadFile|1                 DEUDA   el helper leerDeMPQ: la paleta de unidades y demás (DC-002.96 §6.3)
+console/dc/poc/personaje-mapa/nivel.go|LeerDelMPQ|m.ReadFile|1               DEUDA   LeerDelMPQ de nivel.go: lo que pide el compositor del nivel (DC-002.96 §6.3)
+console/dc/poc/personaje-mapa/objetos.go|leerTablaDeObjetos|mpq.ReadFile|1   DEUDA   objects.txt por el camino viejo (DC-002.96 §6.3)
+console/dc/poc/personaje-mapa/objetos.go|cargarGraficoDeItem|mpq.ReadFile|1  DEUDA   el .cof o .dcc de un objeto (DC-002.96 §6.3)
+console/dc/poc/personaje-mapa/objetos.go|cargarGraficoDeItem|mpq.ReadFile|2  DEUDA   el segundo gráfico del mismo objeto (DC-002.96 §6.3)
+
+# El adaptador de audio lee el WAV del efecto del MPQ en cada `cargar`, sin dueño: es un asset y le corresponde
+# un tramo de la Source como a los otros cinco formatos. Está medido que el WAV entra (48,9 MB el MPQ, 20.170 B
+# el efecto de DC-002.72), así que es una migración, no una pared.
+d2core/d2audio/aica/proveedor.go|Proveedor.cargar|ReadFile|1                 DEUDA   el WAV del efecto por mpq.ReadFile: le corresponde un tramo de la Source (DC-002.72)

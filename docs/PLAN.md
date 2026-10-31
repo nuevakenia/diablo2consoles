@@ -14,6 +14,9 @@ Reglas que no se negocian:
 - Todo se cierra con **evidencia medida** en `console/dc/evidencia/` (número, log o captura).
   "Funciona" sin número es un verde mentiroso.
 - El POC **no crece como juego**: es el banco de pruebas del backend de plataforma.
+- **Ningún asset del camino de consola se lee por fuera de la `asset.Source` de consola.** Antes de tocar
+  assets, se lee `docs/adr/0001-assets-fuera-del-heap-de-go.md`; la regla que lo hace cumplir es
+  `scripts/console/checar-assets-por-la-source.sh` (y su mutador, que prueba que caza).
 - Toda tarjeta lleva su `PLAN (peso · hecho · qué)`; el porcentaje se deriva, no se escribe.
 
 ---
@@ -200,6 +203,23 @@ recolecciones, `FATAL: recover without checkpoint`), así que el `.dcc` y el `an
 (igual que DC-002.50), y `d2asset.LoadFile` **sigue** pidiendo `make` por archivo (la fuente está lista y
 `RegistrarEn` la pone primera; falta que el motor la use). Cuatro pruebas en el host, 4 de 4 verdes.
 Evidencia: `console/dc/evidencia/dc-002.96-la-source-de-consola.md`.
+
+---
+
+**Decidido y hecho cumplir en DC-002.95 (el ADR de los assets y la regla que lo obliga):** la decisión de Daniel
+del 31/10 (1b/2a/3a — assets grandes **fuera del montón de Go con liberación explícita**, **el motor no se
+toca** y todo lo de consola detrás de la interfaz `Source`) quedó escrita en
+[`docs/adr/0001-assets-fuera-del-heap-de-go.md`](adr/0001-assets-fuera-del-heap-de-go.md) con los cuatro topes
+medidos (el arena de `.dt1` de 4.849.148 B de una sola reserva, la lectura del MPQ con el buffer que se duplica,
+el buffer de pintado y el barrido del GC que no devuelve lo que va a `malloc`), las cinco alternativas
+descartadas con su número y las consecuencias. Y quedó **una regla ejecutable** que la vigila:
+`scripts/console/checar-assets-por-la-source.sh` (Go con `go/ast`, no grep: el árbol está lleno de prosa que
+nombra `io.ReadAll`) revisa **10 directorios y 40 archivos** del camino de consola, encuentra **42** lecturas por
+el camino con dueño y **9** fuera de la Source, de las cuales **8 son deuda declarada** (7 del POC del personaje,
+1 del adaptador de audio) y **1 permanente** (`Fuente.Open`, que la interfaz `asset.Source` obliga a tener). Con
+el árbol de hoy da **VERDE**; su mutador da **7 de 7** (copia limpia verde; `os.ReadFile`, `io.ReadAll` y
+`mpq.ReadFile` en una función nueva, rojos; `ReadFileInto`, la prosa y la deuda pagada, verdes). Deuda y motivo:
+`scripts/console/assets-fuera-de-la-source.deuda.txt`.
 
 ---
 
