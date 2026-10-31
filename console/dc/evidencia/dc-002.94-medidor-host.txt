@@ -1,0 +1,57 @@
+RENDER294: patch_d2.mpq = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/patch_D2.mpq
+RENDER294: d2data.mpq  = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2data.mpq
+RENDER294: ================ 1. LAS TABLAS ================
+RENDER294: TABLA /data/global/excel/LvlTypes.txt                            OK (types=36 presets=0)
+RENDER294: TABLA /data/global/excel/LvlPrest.txt                            OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlWarp.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/AutoMap.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/Levels.txt                              OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlMaze.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlSub.txt                              OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/objtype.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/Objects.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monpreset.txt                           OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monstats.txt                            OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monstats2.txt                           OK (types=36 presets=1091)
+RENDER294: ================ 2. EL PUEBLO POR EL MOTOR ================
+RENDER294: LoadStamp OK ds1 w=57 h=41 dt1sDelDS1=8
+RENDER294: MAPA tiles=2337 pisos=2337 paredes=338 crcGrilla=2698186255 ms=32
+RENDER294: ================ 3. EL RENDERER DEL MAPA Y SU CACHE ================
+RENDER294: CACHE superficies=277 bytesRGBA=30789632 (29.36 MB) picoPorSuperficie=160x480
+RENDER294: ================ 4. EL CUADRO ================
+RENDER294: CUADRO 1 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 ms=21
+RENDER294: CUADRO 1 superficiesNuevas=0 bytesNuevos=0 cacheSuperficies=278 cacheBytes=32018432
+RENDER294: CUADRO total ms=21 (promedio 21.0)
+RENDER294: PNG de referencia = /tmp/cuadro-host-294.png
+RENDER294: FIN
+RENDER294: patch_d2.mpq = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/patch_D2.mpq
+RENDER294: d2data.mpq  = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2data.mpq
+RENDER294: ================ 1. LAS TABLAS ================
+RENDER294: TABLA /data/global/excel/LvlTypes.txt                            OK (types=36 presets=0)
+RENDER294: TABLA /data/global/excel/LvlPrest.txt                            OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlWarp.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/AutoMap.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/Levels.txt                              OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlMaze.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlSub.txt                              OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/objtype.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/Objects.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monpreset.txt                           OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monstats.txt                            OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monstats2.txt                           OK (types=36 presets=1091)
+RENDER294: ================ 2. EL PUEBLO POR EL MOTOR ================
+RENDER294: LoadStamp OK ds1 w=57 h=41 dt1sDelDS1=8
+RENDER294: MAPA tiles=2337 pisos=2337 paredes=338 crcGrilla=2698186255 ms=31
+RENDER294: ================ 3. EL RENDERER DEL MAPA Y SU CACHE ================
+RENDER294: cache PEREZOSA (la de la consola: las imagenes se arman al dibujar)
+RENDER294: CACHE superficies=0 bytesRGBA=0 (0.00 MB) picoPorSuperficie=0x0
+RENDER294: ================ 4. EL CUADRO ================
+RENDER294: CUADRO 1 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 ms=31
+RENDER294: CUADRO 1 superficiesNuevas=86 bytesNuevos=10895360 cacheSuperficies=87 cacheBytes=12124160
+RENDER294: CUADRO 2 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 ms=19
+RENDER294: CUADRO 2 superficiesNuevas=0 bytesNuevos=0 cacheSuperficies=87 cacheBytes=12124160
+RENDER294: CUADRO 3 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 ms=19
+RENDER294: CUADRO 3 superficiesNuevas=0 bytesNuevos=0 cacheSuperficies=87 cacheBytes=12124160
+RENDER294: CUADRO total ms=69 (promedio 23.0)
+RENDER294: PNG de referencia = /tmp/cuadro-host-294.png
+RENDER294: FIN

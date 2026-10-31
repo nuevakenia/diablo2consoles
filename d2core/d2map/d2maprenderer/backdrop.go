@@ -1,7 +1,6 @@
 package d2maprenderer
 
 import (
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2display"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
@@ -72,7 +71,7 @@ func (mr *MapRenderer) renderBackdrops(target d2interface.Surface) {
 		return
 	}
 
-	sz := d2display.Get()
+	sz := mr.TamanoDelCuadro()
 	cam := mr.viewport.camera
 
 	if cam == nil || cam.GetPosition() == nil {

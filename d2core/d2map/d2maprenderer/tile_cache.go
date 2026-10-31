@@ -43,6 +43,13 @@ func (mr *MapRenderer) generateTileCache() {
 		mr.Error(err.Error())
 	}
 
+	// DC-002.94: con la cache perezosa NO se arma nada aca. La cache entera del pueblo son 277
+	// superficies (29,36 MB de RGBA, medidos en el host con console/dc/medidas/render-294) y en la consola
+	// no entran en 16 MB: cada imagen se arma la primera vez que se dibuja (ver asegurarImagen).
+	if mr.cachePerezoso {
+		return
+	}
+
 	tiles := *mr.mapEngine.Tiles()
 	for idx := range tiles {
 		tile := &tiles[idx]
@@ -254,6 +261,31 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 	mr.setImageCacheRecord(tile.Style, tile.Sequence, tile.Type, tile.RandomIndex, image)
 }
 
+// asegurarImagen (DC-002.94): con la cache perezosa, arma la imagen del tile que se va a dibujar si todavia
+// no esta. Las condiciones son LAS MISMAS de generateTileCache, para que la cache acabe con lo mismo que
+// tendria armada de entrada (y el cuadro sea identico).
+func (mr *MapRenderer) asegurarImagen(tile *d2ds1.Tile, clase d2enum.TileType) {
+	if !mr.cachePerezoso {
+		return
+	}
+
+	switch clase {
+	case d2enum.TileShadow:
+		if !tile.Hidden() && tile.Prop1 != 0 {
+			mr.generateShadowCache(tile)
+		}
+	case 0: // piso: el tipo 0 de la capa de pisos
+		if !tile.Hidden() && tile.Prop1 != 0 {
+			mr.generateFloorCache(tile)
+		}
+	default: // pared, techo, arbol, columna...
+		if !tile.Hidden() && tile.Prop1 != 0 && !clase.Special() {
+			mr.generateWallCache(tile)
+		}
+	}
+}
+
+// blankWallKey: la clave de una pared sin grafico (colision sin dibujo).
 func blankWallKey(tile *d2ds1.Tile) uint32 {
 	return uint32(tile.Style)<<24 | uint32(tile.Sequence)<<16 | uint32(tile.Type)<<8 | uint32(tile.RandomIndex)
 }

@@ -85,13 +85,70 @@ type MapRenderer struct {
 	backdrops           []*backdropLayer // neighbouring levels drawn beyond the map edge, see backdrop.go
 	offX, offY          int              // a backdrop renderer: tile offset to the main map (light and fade keys)
 
+	// tamanoDelCuadro: si esta puesto, Render usa ESTE tamano en vez del de d2display (DC-002.94).
+	// Existe porque el cuadro de la consola es 640x480 y d2display.Clamp sube todo a 800x600: sin esta
+	// palanca el renderer hierve en un viewport que no es el de la Surface. En la PC queda en cero y el
+	// camino es el de siempre (d2display.Get()).
+	tamanoDelCuadro d2display.Size
+	tieneTamano     bool
+
+	// cachePerezoso: la cache de tiles se arma a medida que se dibuja, no entera al crear el renderer
+	// (DC-002.94). Ver ActivarCachePerezoso.
+	cachePerezoso bool
+
 	*d2util.Logger
+}
+
+// ActivarCachePerezoso: la cache de tiles se arma al dibujar (DC-002.94).
+//
+// POR QUE EXISTE. `generateTileCache` arma UNA superficie por grafico distinto del nivel entero: en el
+// pueblo son 277 superficies y 29,36 MB de RGBA (medido en el host con console/dc/medidas/render-294), y el
+// monton de la Dreamcast no tiene eso ni de lejos. Con esta palanca la cache arranca vacia y cada imagen se
+// arma la primera vez que un tile visible la pide. Es ADITIVA: sin llamarla, el camino es el de siempre.
+func (mr *MapRenderer) ActivarCachePerezoso() { mr.cachePerezoso = true }
+
+// CachePerezosa: si la cache se arma al dibujar.
+func (mr *MapRenderer) CachePerezosa() bool { return mr.cachePerezoso }
+
+// FijarTamanoDelCuadro: el tamano del cuadro que este renderer compone, en pixeles, para la consola
+// (DC-002.94). Sin llamarla, el tamano sale de d2display como siempre.
+func (mr *MapRenderer) FijarTamanoDelCuadro(ancho, alto int) {
+	mr.tamanoDelCuadro = d2display.Size{W: ancho, H: alto}
+	mr.tieneTamano = ancho > 0 && alto > 0
+
+	if mr.tieneTamano {
+		mr.viewport.Resize(ancho, alto)
+	}
+}
+
+// TamanoDelCuadro: el tamano efectivo del cuadro (el de la consola si se fijo, el de d2display si no).
+func (mr *MapRenderer) TamanoDelCuadro() d2display.Size {
+	if mr.tieneTamano {
+		return mr.tamanoDelCuadro
+	}
+
+	return d2display.Get()
+}
+
+// Opcion es un ajuste que se aplica al renderer ANTES de armar la cache de tiles (DC-002.94). Es variadica
+// a proposito: los llamadores de la PC (`d2gamescreen`) no cambian una linea.
+type Opcion func(*MapRenderer)
+
+// ComoConsola: el cuadro es de 640x480 (o el tamano que se pida) y no el de d2display (DC-002.94).
+func ComoConsola(ancho, alto int) Opcion {
+	return func(mr *MapRenderer) { mr.FijarTamanoDelCuadro(ancho, alto) }
+}
+
+// CacheDeTilesPerezosa: las imagenes de los tiles se arman al dibujar, no todas al crear el renderer
+// (DC-002.94: la cache entera del pueblo son 29,36 MB de RGBA y en la consola no entran).
+func CacheDeTilesPerezosa() Opcion {
+	return func(mr *MapRenderer) { mr.ActivarCachePerezoso() }
 }
 
 // CreateMapRenderer creates a new MapRenderer, sets the required fields and returns a pointer to it.
 func CreateMapRenderer(asset *d2asset.AssetManager, renderer d2interface.Renderer,
 	mapEngine *d2mapengine.MapEngine,
-	term d2interface.Terminal, l d2util.LogLevel, startX, startY float64) *MapRenderer {
+	term d2interface.Terminal, l d2util.LogLevel, startX, startY float64, opciones ...Opcion) *MapRenderer {
 	result := &MapRenderer{
 		asset:     asset,
 		renderer:  renderer,
@@ -109,6 +166,12 @@ func CreateMapRenderer(asset *d2asset.AssetManager, renderer d2interface.Rendere
 	startPosition := d2vector.NewPosition(rx, ry)
 	result.Camera.position = &startPosition
 	result.viewport.SetCamera(&result.Camera)
+
+	// las palancas van ANTES de la cache: `CacheDeTilesPerezosa` tiene que estar puesta cuando se llama a
+	// generateTileCache, o la cache se arma entera igual
+	for _, opcion := range opciones {
+		opcion(result)
+	}
 
 	var name, desc, level string
 
@@ -194,7 +257,7 @@ func (mr *MapRenderer) Render(target d2interface.Surface) {
 
 	mapSize := mr.mapEngine.Size()
 
-	sz := d2display.Get()
+	sz := mr.TamanoDelCuadro()
 	mr.viewport.Resize(sz.W, sz.H)
 
 	startX, startY, endX, endY := TileRange(mr.viewport, sz.W, sz.H, mapSize.Width, mapSize.Height)
@@ -498,6 +561,9 @@ func (mr *MapRenderer) renderTilePass3(tile *d2mapengine.MapTile, target d2inter
 }
 
 func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, tileX, tileY int) {
+	// DC-002.94: con la cache perezosa, la imagen se arma aca la primera vez
+	mr.asegurarImagen(&tile, 0)
+
 	var img d2interface.Surface
 	if !tile.Animated {
 		img = mr.getImageCacheRecord(tile.Style, tile.Sequence, 0, tile.RandomIndex)
@@ -530,6 +596,9 @@ func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, 
 
 func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2interface.Surface,
 	tileX, tileY, idx int, upper bool) {
+	// DC-002.94: con la cache perezosa, la imagen (y el YAdjust que esta funcion usa) se arman aca
+	mr.asegurarImagen(&tile, tile.Type)
+
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, tile.Type, tile.RandomIndex)
 	if img == nil {
 		if !mr.blankWalls[blankWallKey(&tile)] {
@@ -572,6 +641,9 @@ func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2
 // light map in the real game).
 func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2interface.Surface,
 	tileX, tileY, idx int) {
+	// DC-002.94: con la cache perezosa, la imagen se arma aca la primera vez
+	mr.asegurarImagen(&tile, tile.Type)
+
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, tile.Type, tile.RandomIndex)
 	if img == nil {
 		mr.Warningf("Render called on uncached wall {%v,%v,%v}", tile.Style, tile.Sequence, tile.Type)
@@ -691,6 +763,8 @@ func (mr *MapRenderer) renderLitEntity(target d2interface.Surface, e d2interface
 const shadowAlpha = 160.0 / 255.0
 
 func (mr *MapRenderer) renderShadow(tile d2ds1.Tile, target d2interface.Surface, tileX, tileY int) {
+	mr.asegurarImagen(&tile, d2enum.TileShadow)
+
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, 13, tile.RandomIndex)
 	if img == nil {
 		// shadow tiles without graphics (width or height 0) are never cached;

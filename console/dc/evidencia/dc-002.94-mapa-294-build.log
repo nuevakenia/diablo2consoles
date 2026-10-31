@@ -1,0 +1,14 @@
+== sin bake.conf en /tmp/dcbuild/mapa294/src: no hay assets que hornear ==
+== 1/4 compilando Go (/tmp/dcbuild/mapa294/src) ==
+== 2/4 enlazando ELF ==
+   DC-002.68: el script de linker de KOS se cambio por /tmp/dcbuild/mapa294/ld-sin-eh.xc
+== 3/4 binario de arranque (1ST_READ.BIN) + IP.BIN ==
+== 4/4 imagen ==
+ISO+: /tmp/dcbuild/mapa294/1ST_READ.BIN -> /1ST_READ.BIN;1 (7014920 bytes)
+CUE: /tmp/dcbuild/mapa294/disc.cue (TRACK 01 MODE1/2048 -> disc.iso)
+ISO: /tmp/dcbuild/mapa294/disc.iso (7077888 bytes, con IP.BIN en el area de sistema)
+GDI: /tmp/dcbuild/mapa294/disc.gdi (7077888 bytes = 3456 sectores; el arranque lee en FAD 45150; la sesion de datos se monta de la zona de alta)
+
+ELF:        /tmp/dcbuild/mapa294/prog.elf   (19135720 bytes)
+1ST_READ:   /tmp/dcbuild/mapa294/1ST_READ.BIN   (7014920 bytes)
+imagen:     /tmp/dcbuild/mapa294/disc.iso
