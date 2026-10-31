@@ -61,6 +61,12 @@ func d2cSerialInit()
 //extern d2c_heap_libre
 func d2cHeapLibre() uint
 
+//extern d2c_heap_usado
+func d2cHeapUsado() uint
+
+//extern d2c_heap_arena
+func d2cHeapArena() uint
+
 //extern d2c_us
 func d2cUs() uint64
 
@@ -389,6 +395,10 @@ func prepararEtapa() {
 	usAntes := d2cUs()
 	gcAntes := d2cGcN()
 
+	// DC-002.85: la foto del lienzo ANTES de crear los jugadores. Es la mitad del "monton antes/despues" de
+	// la tarjeta; la otra mitad es el informe de abajo, con las capas ya creadas.
+	informeDeLienzo("antes de crear")
+
 	for len(jugadores) < nObjetivo {
 		crearJugador(len(jugadores))
 	}
@@ -417,6 +427,28 @@ func prepararEtapa() {
 	t1 := d2cUs()
 
 	println("COOP276: ETAPA n=", nEtapa, "gcForzadoUs=", int64(t1-t0), "montonLibreDespuesDelGC=", int(d2cHeapLibre()))
+
+	// DC-002.85: la otra mitad de la foto: cuantas superficies se crearon, cuanta memoria de lienzo pidieron
+	// y por que camino entro cada cuadro (directo al lienzo = sin buffer intermedio).
+	informeDeLienzo("despues de crear")
+}
+
+// informeDeLienzo imprime los contadores del backend de video (DC-002.85, d2core/d2render/pvr/cuenta.go) y
+// el monton libre: las superficies y sus bytes de lienzo, los cuadros expandidos DIRECTO en el lienzo y los
+// que todavia llegan como buffer ajeno y se copian.
+//
+// POR QUE ES UN NUMERO Y NO UNA LECTURA DEL CODIGO: lo que la tarjeta cambia es CUANTOS buffers de 4 x
+// pixeles pide cada cuadro. `bytesDeLienzo` es lo inevitable (un lienzo por superficie); `bytesDirectos`
+// reemplaza a un buffer intermedio del mismo tamano. Antes de este cambio, por cada cuadro habia un
+// `bytesCopiados` igual a `bytesDirectos` y un buffer mas pidiendo memoria al monton de C.
+func informeDeLienzo(cuando string) {
+	c := renderer.CuentaDeLienzo()
+
+	println("COOP276: LIENZO", cuando, "superficies=", c.Superficies, "bytesDeLienzo=", c.BytesDeLienzo,
+		"directas=", c.Directas, "bytesDirectos=", c.BytesDirectos,
+		"copias=", c.Copias, "bytesCopiados=", c.BytesCopiados,
+		"montonLibre=", int(d2cHeapLibre()), "montonUsado=", int(d2cHeapUsado()),
+		"arena=", int(d2cHeapArena()))
 }
 
 // crearJugador instancia UN jugador y cuenta lo que costo. El COMO lo decide participante.go: el Composite
@@ -514,6 +546,9 @@ func cerrarEtapa() {
 		"trabajoUsPorCuadro=", avancePorCuadro+dibujoPorCuadro, "fps=", fps)
 
 	informeDeCaches(nEtapa, "al cerrar")
+
+	// DC-002.85: la foto final de la etapa: cuadros por cada camino de expansion y monton libre.
+	informeDeLienzo("al cerrar")
 }
 
 // actualizar: un cuadro de juego. Avanza los N jugadores (es el costo de CPU del cooperativo) y cuenta los

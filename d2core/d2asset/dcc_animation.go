@@ -3,8 +3,6 @@ package d2asset
 import (
 	"errors"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
-
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc"
@@ -187,15 +185,15 @@ func (a *DCCAnimation) createFrameSurface(directionIndex, frameIndex int) (d2int
 		return nil, errors.New("pixel data incorrect")
 	}
 
-	colorData := d2util.ImgIndexToRGBA(indexData, a.palette)
-
 	if a.renderer == nil {
 		return nil, errors.New("no renderer")
 	}
 
 	sfc := a.renderer.NewSurface(animFrame.width, animFrame.height)
 
-	sfc.ReplacePixels(colorData)
+	// DC-002.85: la expansion va DIRECTO al lienzo de la superficie si el backend sabe hacerlo (consola);
+	// si no, queda el buffer intermedio de siempre (ver cuadro_paletizado.go).
+	cargarCuadroEnSuperficie(sfc, indexData, a.palette)
 
 	return sfc, nil
 }

@@ -45,8 +45,10 @@ for f in nivel.go; do
     echo "   $f $(sha256sum "$POC_REF/$f" | cut -c1-16)"
 done
 
-echo "== 1/6 los paquetes del motor que se compilan aca (d2cache, d2asset, pvr y d2mapentity)"
-for p in d2common/d2cache d2core/d2asset d2core/d2render/pvr d2core/d2map/d2mapentity; do
+echo "== 1/6 los paquetes del motor que se compilan aca (d2cache, d2util, d2asset, pvr y d2mapentity)"
+# d2common/d2util entra desde DC-002.85: ahi vive ImgIndexToRGBAEn (la expansion de indices en un buffer
+# prestado), y el pvr la usa para escribir derecho en el lienzo de la superficie.
+for p in d2common/d2cache d2common/d2util d2core/d2asset d2core/d2render/pvr d2core/d2map/d2mapentity; do
     mapfile -t SRC_P < <(ls "$REPO/$p"/*.go | grep -v '_test\.go$' |
         grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
         grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$')

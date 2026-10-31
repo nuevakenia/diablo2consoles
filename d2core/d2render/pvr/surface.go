@@ -8,6 +8,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 )
 
 // Surface es la implementacion de d2interface.Surface sobre el lienzo en memoria + el PVR.
@@ -149,6 +150,31 @@ func (s *Surface) RenderIndices(indices []byte, ancho, alto int, paleta [][3]uin
 	}
 }
 
+// ExpandirIndices expande indices de 8 bits con su paleta DIRECTAMENTE en el lienzo de esta superficie, sin
+// buffer intermedio.
+//
+// POR QUE EXISTE (DC-002.85). El motor cargaba un cuadro de animacion con `d2util.ImgIndexToRGBA` (que pide
+// 4 x pixeles en el monton) + `ReplacePixels` (que los copia al lienzo y despues los tira): DOS buffers de
+// 4 x pixeles vivos por cuadro, y el primero es basura apenas se copia. DC-002.84 midio que el primer cuadro
+// de un `Composite` crea ~96 superficies de capa, o sea ~192 buffers; en la consola ese pedido es el recurso
+// que se agota. Aca el que expande escribe en el lienzo que ya existe: UN buffer por cuadro.
+//
+// LAS REGLAS SON LAS MISMAS DE SIEMPRE (las de `d2util.ImgIndexToRGBAEn`, byte a byte): el indice 0 queda
+// transparente (0,0,0,0) sin importar la paleta y el resto toma R,G,B,A de su color. La expansion es de
+// arriba a abajo y de izquierda a derecha, IGNORANDO la traslacion/escala del estado: es la CARGA de un
+// cuadro entero (lo mismo que ReplacePixels), no un dibujado -- el dibujado es Render/RenderSprite.
+//
+// SI LOS INDICES NO SON DEL TAMANO DEL LIENZO NO SE ADIVINA: se expande lo que entra y el resto del lienzo
+// queda como estaba, igual que ReplacePixels. Un buffer corto es un error del que llama.
+func (s *Surface) ExpandirIndices(indices []byte, paleta d2interface.Palette) {
+	d2util.ImgIndexToRGBAEn(s.imagen.pixeles, indices, paleta)
+
+	if s.renderer != nil {
+		s.renderer.expansionesDirectas++
+		s.renderer.bytesExpandidos += len(indices) * 4
+	}
+}
+
 // Clear rellena el lienzo entero con el color.
 func (s *Surface) Clear(c color.Color) { s.imagen.Rellenar(aRGBA(c)) }
 
@@ -274,6 +300,12 @@ func (s *Surface) RenderSection(sfc d2interface.Surface, bound image.Rectangle) 
 // compararan cosas distintas creyendo que son las mismas.
 func (s *Surface) ReplacePixels(pixeles []byte) {
 	n := len(s.imagen.pixeles)
+
+	if s.renderer != nil {
+		s.renderer.copiasDeBuffer++
+		s.renderer.bytesCopiados += len(pixeles)
+	}
+
 	copy(s.imagen.pixeles, pixeles[:minInt(len(pixeles), n)])
 }
 

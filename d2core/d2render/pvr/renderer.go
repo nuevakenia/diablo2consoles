@@ -74,6 +74,14 @@ type Renderer struct {
 	cuadrosVen int
 
 	ultimoError error
+
+	// contadores del lienzo (DC-002.85): ver cuenta.go.
+	lienzosCreados      int
+	bytesDeLienzos      int
+	expansionesDirectas int
+	bytesExpandidos     int
+	copiasDeBuffer      int
+	bytesCopiados       int
 }
 
 // que el contrato se cumpla no es una suposicion: si d2interface.Renderer cambia, esto no compila.
@@ -216,6 +224,9 @@ func (r *Renderer) CreateSurface(surface d2interface.Surface) (d2interface.Surfa
 func (r *Renderer) NewSurface(ancho, alto int) d2interface.Surface {
 	s := NuevaSurface(ancho, alto)
 	s.renderer = r
+
+	r.lienzosCreados++
+	r.bytesDeLienzos += len(s.imagen.pixeles)
 
 	return s
 }

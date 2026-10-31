@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dc6"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc"
@@ -168,7 +167,6 @@ func (a *DC6Animation) createFrameSurface(directionIndex, frameIndex int) (d2int
 	startFrame := directionIndex * int(a.dc6.FramesPerDirection)
 	dc6Frame := a.dc6.Frames[startFrame+frameIndex]
 	indexData := a.dc6.DecodeFrame(startFrame + frameIndex)
-	colorData := d2util.ImgIndexToRGBA(indexData, a.palette)
 
 	if a.renderer == nil {
 		return nil, errors.New("no renderer")
@@ -176,7 +174,9 @@ func (a *DC6Animation) createFrameSurface(directionIndex, frameIndex int) (d2int
 
 	sfc := a.renderer.NewSurface(int(dc6Frame.Width), int(dc6Frame.Height))
 
-	sfc.ReplacePixels(colorData)
+	// DC-002.85: la expansion va DIRECTO al lienzo de la superficie si el backend sabe hacerlo (consola);
+	// si no, queda el buffer intermedio de siempre (ver cuadro_paletizado.go).
+	cargarCuadroEnSuperficie(sfc, indexData, a.palette)
 
 	return sfc, nil
 }

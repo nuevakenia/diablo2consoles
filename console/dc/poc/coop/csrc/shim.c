@@ -30,6 +30,25 @@ unsigned int d2c_heap_libre(void) {
     return (unsigned int)mi.fordblks;
 }
 
+/* DC-002.85: cuanta memoria del monton esta EN USO y de que tamano es el arena.
+ *
+ * POR QUE HACEN FALTA LOS DOS. `fordblks` (libre) no es comparable entre builds: malloc solo agranda el
+ * arena cuando le hace falta (sbrk a pedazos), asi que un arbol que pide mas memoria puede mostrar MAS
+ * libre que uno que pide menos, solo porque agrando el arena antes. Lo que si se compara es lo USADO
+ * (`uordblks`, que es la suma de los bloques vivos) contra el arena total.
+ */
+unsigned int d2c_heap_usado(void) {
+    struct mallinfo mi = mallinfo();
+
+    return (unsigned int)mi.uordblks;
+}
+
+unsigned int d2c_heap_arena(void) {
+    struct mallinfo mi = mallinfo();
+
+    return (unsigned int)(mi.uordblks + mi.fordblks);
+}
+
 uint64_t d2c_us(void) {
     return (uint64_t)timer_us_gettime64();
 }
