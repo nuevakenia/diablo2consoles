@@ -68,6 +68,9 @@ func d2cSoltarFilas(mapa uintptr) int
 //extern d2c_soltar_tramo
 func d2cSoltarTramo(tramo uintptr, tamano int) int
 
+//extern d2c_servible
+func d2cServible(tope uint) uint
+
 func init() { d2cSerialInit() }
 
 const (
@@ -139,7 +142,8 @@ func memoria(etapa string) {
 func main() {
 	println("MAPA103: arranca DC-002.103 -- el pueblo en pantalla de punta a punta; orden=", orden)
 	println("MAPA103: cuadros=", cuadros, "modoTablas=", modoTablas, "soltarLecturas=", soltarLecturas,
-		"tramoDeLaCache=", tramoDeLaCache, "tramoAlArranque=", tramoAlArranque,
+		"tramoDeLaCache=", tramoDeLaCache, "tramoEnPedazos=", tramoEnPedazos, "sonda=", pedazoLoDiceElMonton,
+		"tramoAlArranque=", tramoAlArranque,
 		"soltarDespuesDeComponer=", soltarDespuesDeComponer)
 	memoria("al-arrancar")
 
@@ -158,7 +162,15 @@ func main() {
 	// ============================== 0.b EL TRAMO DE LA CACHE (DC-002.104) ==============================
 	// Se reserva ACA y no al crear el renderer: el monton de C (dlmalloc sobre `mm_sbrk`) se fragmenta con el
 	// mapa y despues un pedido de 2,7 MB de un solo golpe ya no entra aunque "haya" memoria libre.
-	if tramoDeLaCache > 0 && tramoAlArranque {
+	//
+	// DC-002.106: en PEDAZOS no se reserva nada aca -- los bloques se piden en el primer cuadro, a medida que
+	// las imagenes llegan, y asi el monton los sirve de los huecos que dejo lo que se solto. Reservar temprano
+	// era la cura del pedido unico (que necesitaba contiguidad), no la del pedido por bloques.
+	if tramoDeLaCache > 0 && tramoEnPedazos > 0 {
+		println("MAPA103: el tramo de la cache se pide EN PEDAZOS (techo=", tramoDeLaCache, "pedazo=",
+			tramoEnPedazos, "): no se reserva nada al arranque, se pide en el primer cuadro (DC-002.106)")
+		memoria("despues-del-tramo-de-la-cache")
+	} else if tramoDeLaCache > 0 && tramoAlArranque {
 		tramoDePixeles = d2maprenderer.ReservarTramoDeLaCache(tramoDeLaCache)
 
 		println("MAPA103: TRAMO DE LA CACHE reservado AL ARRANQUE bytes=", tramoDePixeles.Bytes())
@@ -325,6 +337,13 @@ func main() {
 		// y no del semiespacio del recolector.
 		opciones = append(opciones, d2maprenderer.CacheDeTilesEnTramo(tramoDePixeles))
 		println("MAPA103: TRAMO DE LA CACHE en uso (reservado al arranque) bytes=", tramoDePixeles.Bytes())
+	} else if tramoDeLaCache > 0 && tramoEnPedazos > 0 {
+		// DC-002.106: el tramo en BLOQUES -- cada bloque se pide cuando una imagen no entra en los que hay, y
+		// el monton lo sirve de sus huecos (el pedido unico necesitaba contiguidad y no la hay).
+		opciones = append(opciones, d2maprenderer.CacheDeTilesEnTramoEnPedazos(tramoDeLaCache, tramoEnPedazos,
+			sondaDelTramo()...))
+		println("MAPA103: TRAMO DE LA CACHE EN PEDAZOS techo=", tramoDeLaCache, "pedazo=", tramoEnPedazos,
+			"pedazoLoDiceElMonton=", pedazoLoDiceElMonton)
 	} else if tramoDeLaCache > 0 {
 		opciones = append(opciones, d2maprenderer.CacheDeTilesEnUnTramo(tramoDeLaCache))
 		println("MAPA103: TRAMO DE LA CACHE pedido TARDE (en el renderer) bytes=", tramoDeLaCache)
@@ -452,7 +471,9 @@ func censoDelTramo(etapa string) {
 
 	e := rendererDelMapa.CensoDelTramo()
 	println("MAPA103: TRAMO", etapa, "activa=", e.Activa, "bytes=", e.Bytes, "usado=", e.Usado,
-		"libre=", e.Libre, "imagenes=", e.Imagenes, "derrames=", e.Derrames, "bytesDerramados=", e.BytesDerramados)
+		"libre=", e.Libre, "imagenes=", e.Imagenes, "derrames=", e.Derrames, "bytesDerramados=", e.BytesDerramados,
+		"enPedazos=", e.EnPedazos, "pedazos=", e.Pedazos, "pedazoMenor=", e.PedazoMenor,
+		"pedazoMayor=", e.PedazoMayor, "techo=", e.Techo)
 }
 
 // instrumentoDeLasFuentes: el censo de la fuente (pedidos, liberados, vivos, prestamo) para el log.
@@ -544,8 +565,13 @@ func dibujar(superficie d2interface.Surface) error {
 
 	crudo := crc32.ChecksumIEEE(pixeles)
 
+	// DC-002.106: ademas del crc32 del RGBA, el del RGB solo. Si los dos cuadros (consola y host) coinciden en
+	// este y no en el otro, lo unico que difiere es el canal ALFA -- que es lo que paso hasta que se midio.
+	crudoRGB := crcSoloRGB(pixeles)
+
 	cache := rendererDelMapa.EstadoDeLaCache()
 	println("MAPA103: CUADRO", cuadro, "pixelesNoVacios=", llenos, "de", ancho*alto, "crc32=", int(crudo),
+		"crc32RGB=", int(crudoRGB),
 		"hostPixeles=", pixelesHost, "hostCrc=", int(crcHost), "ms=", ms,
 		"cacheSuperficies=", cache.Superficies, "cacheBytes=", cache.Bytes, "cacheEnIndices=", cache.EnIndices)
 	censoDelTramo("despues-del-cuadro")
@@ -563,6 +589,50 @@ func dibujar(superficie d2interface.Surface) error {
 }
 
 func actualizar() error { return nil }
+
+// crcSoloRGB (DC-002.106): el crc32 del cuadro mirando SOLO los canales de color, sin el alfa.
+//
+// POR QUE ES UN INSTRUMENTO Y NO UN CAPRICHO. El crc32 del RGBA es la comparacion contra el host, pero cuando
+// los dos numeros no coinciden no dice QUE cambio. Con este, si el RGB coincide y el RGBA no, lo unico que
+// difiere es el canal ALFA -- que fue exactamente lo que paso en esta tarjeta: 565415037 contra 1437022778 con
+// el RGB identico (2507235743 en los dos lados) y la diferencia en los 4 pixeles que ningun tile pinta (el
+// lienzo de la consola se rellenaba opaco y el del host arranca transparente). Se arma por tandas en un buffer
+// chico: 640x480x3 en el monton no entra.
+func crcSoloRGB(pixeles []byte) uint32 {
+	var tanda [3 * 1024]byte
+
+	dig := crc32.NewIEEE()
+	n := 0
+
+	for j := 0; j+3 < len(pixeles); j += 4 {
+		tanda[n], tanda[n+1], tanda[n+2] = pixeles[j], pixeles[j+1], pixeles[j+2]
+		n += 3
+
+		if n == len(tanda) {
+			_, _ = dig.Write(tanda[:n])
+
+			n = 0
+		}
+	}
+
+	_, _ = dig.Write(tanda[:n])
+
+	return dig.Sum32()
+}
+
+// sondaDelTramo (DC-002.106): la funcion que le pregunta al monton cuanto puede servir, o nil para pedir los
+// bloques de `tramoEnPedazos` a tamano fijo.
+//
+// POR QUE ES UNA PALANCA Y NO EL UNICO CAMINO. Con el tamano fijo se MIDIO donde se corta (Flycast: el ultimo
+// bloque de 286.720 B con 159.744 de break y las migas libres sin poderse coser). Con la sonda el mismo monton
+// sirve lo que puede y la cache entra igual. Tener las dos deja el A/B en el mismo binario.
+func sondaDelTramo() []func(int) int {
+	if !pedazoLoDiceElMonton {
+		return nil
+	}
+
+	return []func(int) int{func(tope int) int { return int(d2cServible(uint(tope))) }}
+}
 
 // censo: pisos, paredes y el crc32 de la grilla de identidades (el MISMO numero de DC-002.88: -1596781041).
 func censo(engine *d2mapengine.MapEngine) (pisos, paredes int, crc uint32) {

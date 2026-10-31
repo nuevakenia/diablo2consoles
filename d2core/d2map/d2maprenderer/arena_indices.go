@@ -44,28 +44,92 @@ package d2maprenderer
 // al monton de C; lo que no, al semiespacio del recolector.
 const UmbralDelObjetoGrande = 64 * 1024
 
-// TramoDeLaCache: UN buffer del que se recortan los pixeles de las imagenes de indices.
+// TramoDeLaCache: los buffers de los que se recortan los pixeles de las imagenes de indices.
+//
+// DOS FORMAS, la misma idea (un buffer con dueno del que se reparten las imagenes):
+//
+//	UN GOLPE (DC-002.104)  `bytes`: un solo `make` del tamano del censo entero. En la consola eso es UNA
+//	                       asignacion del monton de C, y dlmalloc la sirve por `sbrk` de un tiron: si el
+//	                       break room (techo - sbrk) no llega, no entra aunque "haya" memoria libre
+//	                       repartida en huecos (medido en DC-002.105: 2.849.816 B disponibles, 1.204.224
+//	                       de break, pedido de 2.723.840 de un golpe -> muere).
+//	EN PEDAZOS (DC-002.106) `pedazos`: el mismo total pedido de a bloques de `pedazo` B, cada uno cuando
+//	                       hace falta. Cada pedazo si se sirve de los huecos y del top, asi que la pared deja
+//	                       de ser la CONTIGUIDAD. Lo que se pierde es la cola de cada pedazo (unos KB por
+//	                       bloque): por eso el total es un TECHO (`total`) y lo que sobra se cuenta.
 type TramoDeLaCache struct {
-	bytes           []byte
+	bytes []byte // el tramo de UN GOLPE (nil en el modo en pedazos)
+
+	// modo en pedazos (DC-002.106): `total` es el techo de bytes, `pedazo` el tamano de cada bloque,
+	// `pedido` lo que se le pidio al monton hasta ahora y `usadoEn` cuanto se recorto de cada bloque.
+	// `pedazos` arranca vacio: se pide lo que haga falta, cuando haga falta (asi el monton decide de donde
+	// sale cada bloque con el estado que tiene EN ESE MOMENTO, no con el del arranque).
+	pedazos [][]byte
+	usadoEn []int
+	pedazo  int
+	total   int
+	pedido  int
+
+	// servible (DC-002.106): si esta puesto, el tamano de cada bloque nuevo lo dice el MONTON -- le pregunta
+	// "cuanto podes servir de hasta `pedazo` B ahora" -- en vez de pedir siempre `pedazo`. Es la diferencia
+	// entre cortarse en el ultimo bloque (medido en Flycast: 286.720 B pedidos con 159.744 de break y las
+	// migas libres sin poder coserse) y seguir bajando de tamano hasta que entra. Nil = tamano fijo.
+	servible func(tope int) int
+
+	// pedazoMenor / pedazoMayor: el rango de tamanos con el que el monton fue sirviendo los bloques, para el
+	// censo (0 = todavia no se pidio ninguno).
+	pedazoMenor int
+	pedazoMayor int
+
 	usado           int
 	imagenes        int
 	derrames        int
 	bytesDerramados int
 }
 
-// Bytes: el tamano del tramo (lo que se pidio de una sola vez).
+// Bytes: el tamano del tramo (lo que se pidio de una sola vez, o lo que lleva pedido el modo en pedazos).
 func (t *TramoDeLaCache) Bytes() int {
 	if t == nil {
 		return 0
 	}
 
+	if t.pedazo > 0 {
+		return t.pedido
+	}
+
 	return len(t.bytes)
 }
+
+// Pedazos: cuantos bloques se pidieron (0 en el modo de un golpe).
+func (t *TramoDeLaCache) Pedazos() int {
+	if t == nil {
+		return 0
+	}
+
+	return len(t.pedazos)
+}
+
+// Techo: el total que el modo en pedazos puede llegar a pedir (0 en el modo de un golpe, que ya lo pidio todo).
+func (t *TramoDeLaCache) Techo() int {
+	if t == nil {
+		return 0
+	}
+
+	return t.total
+}
+
+// EnPedazos: si el tramo se pide por bloques (DC-002.106).
+func (t *TramoDeLaCache) EnPedazos() bool { return t != nil && t.pedazo > 0 }
 
 // CensoDelTramo: el censo del tramo, para el log de la consola.
 type CensoDelTramo struct {
 	Activa          bool
-	Bytes           int // el tamano del tramo (0 = apagada)
+	EnPedazos       bool
+	Pedazos         int // cuantos bloques se pidieron (modo en pedazos)
+	PedazoMenor     int // el bloque mas chico que el monton sirvio (0 = todavia no se pidio ninguno)
+	PedazoMayor     int // el bloque mas grande
+	Techo           int // lo que el modo en pedazos puede llegar a pedir
+	Bytes           int // el tamano del tramo (0 = apagada); en pedazos, lo pedido hasta ahora
 	Usado           int // lo que se recorto para las imagenes
 	Libre           int
 	Imagenes        int // imagenes servidas del tramo
@@ -91,8 +155,69 @@ func ReservarTramoDeLaCache(bytes int) *TramoDeLaCache {
 	return &TramoDeLaCache{bytes: make([]byte, bytes)}
 }
 
+// ReservarTramoDeLaCacheEnPedazos: el tramo de la cache pedido en BLOQUES de `pedazo` B, con un techo de
+// `total` B (DC-002.106).
+//
+// POR QUE EN PEDAZOS. Medido en DC-002.105: con todo lo que el cuadro no lee devuelto, el monton tiene
+// 2.849.816 B disponibles (1.645.592 de libres + 1.204.224 de break room) y la cache pide 2.723.840, o sea que
+// ALCANZA -- pero el tramo de un solo golpe muere igual, porque dlmalloc lo pide ENTERO por `sbrk` y el break
+// room no llega a 2,7 MB. Pedido de a `pedazo` B, cada bloque si se sirve de los huecos y del top, y la pared
+// deja de ser "faltan bytes contiguos".
+//
+// POR QUE NO SE PIDE NADA ACA. Los bloques se piden en `pedirIndicesDelTile`, a medida que las imagenes llegan
+// (cache perezosa): asi el monton decide de donde sale cada bloque con el estado que tiene en ese momento y no
+// se reserva de mas antes de saber si el cuadro lo necesita. Esta funcion solo deja escrito el plan.
+//
+// EL TECHO (`total`) ES LO QUE PROTEGE EL MONTON. La cola que se pierde en cada bloque (una imagen no entra en
+// lo que queda y el bloque se cierra) es real, y pedir "hasta que alcance" terminaria en un pedido que el
+// monton no puede servir -- que en la consola es fatal (`gc_external_alloc` tira OOM). Con techo, lo que no
+// entra en el tramo se derrama al camino de siempre y se cuenta.
+//
+// Devuelve nil si algunos de los dos numeros no pasa el corte de 64 KB del objeto grande de libgodc: un tramo
+// chico iria al semiespacio del recolector y no compra nada (lo mismo que `ReservarTramoDeLaCache`).
+//
+// `sonda` (opcional) es la que pregunta cuanto puede servir el monton (DC-002.106: en la consola el puente
+// `d2c_servible` del shim, que sondea con `malloc` y se queda con el bloque mas grande que entra). Con sonda,
+// el tamano de cada bloque es `min(pedazo, lo que el monton sirva)`; sin sonda, siempre `pedazo`.
+func ReservarTramoDeLaCacheEnPedazos(total, pedazo int, sonda ...func(tope int) int) *TramoDeLaCache {
+	if total <= UmbralDelObjetoGrande || pedazo <= UmbralDelObjetoGrande {
+		return nil
+	}
+
+	if pedazo > total {
+		pedazo = total
+	}
+
+	t := &TramoDeLaCache{pedazo: pedazo, total: total}
+
+	if len(sonda) > 0 && sonda[0] != nil {
+		t.servible = sonda[0]
+	}
+
+	return t
+}
+
 // UsarTramoDeLaCache: la cache de indices pide sus pixeles a ESTE tramo (ya reservado).
 func (mr *MapRenderer) UsarTramoDeLaCache(t *TramoDeLaCache) { mr.tramo = t }
+
+// ActivarTramoDeLaCacheEnPedazos: reserva el tramo en pedazos y lo usa, en un paso. Es la forma corta de
+// `UsarTramoDeLaCache(ReservarTramoDeLaCacheEnPedazos(total, pedazo))` (DC-002.106). ADITIVA igual que las
+// otras: sin llamarla, la cache pide sus pixeles con `make` como siempre.
+func (mr *MapRenderer) ActivarTramoDeLaCacheEnPedazos(total, pedazo int, sonda ...func(tope int) int) {
+	t := ReservarTramoDeLaCacheEnPedazos(total, pedazo, sonda...)
+
+	if t == nil {
+		mr.tramo = nil
+		mr.Warningf("el tramo en pedazos de la cache no se activa con total=%d pedazo=%d B (los dos tienen que "+
+			"pasar los %d B del objeto grande de libgodc, DC-002.106)", total, pedazo, UmbralDelObjetoGrande)
+
+		return
+	}
+
+	mr.tramo = t
+
+	mr.Debugf("tramo de la cache en pedazos: techo %d B en bloques de %d B (DC-002.106)", total, pedazo)
+}
 
 // ActivarTramoDeLaCache: reserva el tramo y lo usa, en un paso. Es la forma corta de
 // `UsarTramoDeLaCache(ReservarTramoDeLaCache(bytes))`. Es ADITIVA: sin llamarla, cada imagen se pide con
@@ -121,9 +246,14 @@ func (mr *MapRenderer) CensoDelTramo() CensoDelTramo {
 
 	return CensoDelTramo{
 		Activa:          true,
-		Bytes:           len(mr.tramo.bytes),
+		EnPedazos:       mr.tramo.EnPedazos(),
+		Pedazos:         mr.tramo.Pedazos(),
+		PedazoMenor:     mr.tramo.pedazoMenor,
+		PedazoMayor:     mr.tramo.pedazoMayor,
+		Techo:           mr.tramo.Techo(),
+		Bytes:           mr.tramo.Bytes(),
 		Usado:           mr.tramo.usado,
-		Libre:           len(mr.tramo.bytes) - mr.tramo.usado,
+		Libre:           mr.tramo.Bytes() - mr.tramo.usado,
 		Imagenes:        mr.tramo.imagenes,
 		Derrames:        mr.tramo.derrames,
 		BytesDerramados: mr.tramo.bytesDerramados,
@@ -141,6 +271,15 @@ func (mr *MapRenderer) pedirIndicesDelTile(n int) []byte {
 	}
 
 	if mr.tramo != nil {
+		// modo en pedazos (DC-002.106): el bloque lo elige `pedirDelTramoEnPedazos`, que devuelve nil si derrama
+		if mr.tramo.EnPedazos() {
+			if p := mr.pedirDelTramoEnPedazos(n); p != nil {
+				return p
+			}
+
+			return make([]byte, n)
+		}
+
 		if mr.tramo.usado+n <= len(mr.tramo.bytes) {
 			desde := mr.tramo.usado
 			mr.tramo.usado += n
@@ -156,11 +295,104 @@ func (mr *MapRenderer) pedirIndicesDelTile(n int) []byte {
 	return make([]byte, n)
 }
 
+// pedirDelTramoEnPedazos: busca el bloque donde entra la imagen de `n` B y devuelve su pedazo; si no hay
+// ninguno con lugar, PIDE un bloque nuevo (hasta el techo); si ya no hay techo, devuelve nil y la imagen se
+// pide con `make` como siempre.
+//
+// POR QUE EL BLOQUE MAS JUSTO (best fit) Y NO EL DE EN CURSO. La cola de un bloque que no se llena se pierde,
+// y los tamanos de las imagenes de la cache son MUY distintos (20.480 B las comunes, hasta 71.680 las cuatro
+// grandes del pueblo): llenando el bloque en curso, una imagen que no entra en la cola abre otro bloque y deja
+// la cola muerta. Con el bloque mas justo, la imagen chica cae en la cola que le sirve y el desperdicio total
+// baja a la mitad, que es lo que decide si el tramo entra en el monton (DC-002.106: medido en el host, 61.440 B
+// de cola contra 148.480 del camino en curso para 11 bloques de 250 KB).
+func (mr *MapRenderer) pedirDelTramoEnPedazos(n int) []byte {
+	t := mr.tramo
+
+	if !t.EnPedazos() {
+		return nil
+	}
+
+	// una imagen sola mas grande que un bloque no cabe con este plan: se pide como siempre y se cuenta
+	if n > t.pedazo {
+		t.derrames++
+		t.bytesDerramados += n
+
+		return nil
+	}
+
+	mejor := -1
+
+	for i := range t.pedazos {
+		libre := len(t.pedazos[i]) - t.usadoEn[i]
+		if libre < n {
+			continue
+		}
+
+		if mejor < 0 || libre < len(t.pedazos[mejor])-t.usadoEn[mejor] {
+			mejor = i
+		}
+	}
+
+	if mejor < 0 {
+		restante := t.total - t.pedido
+		if restante <= UmbralDelObjetoGrande {
+			// no se pide un bloque que iria al semiespacio del recolector: seria un derrame disfrazado
+			t.derrames++
+			t.bytesDerramados += n
+
+			return nil
+		}
+
+		tam := t.pedazo
+		if restante < tam {
+			tam = restante
+		}
+
+		// DC-002.106: el tamano lo dice el monton. Se pide el mayor bloque servible de hasta `tam`; si ni el
+		// mas chico que sirve entra la imagen, se derrama (`make` como siempre) en vez de tirar el runtime.
+		if t.servible != nil {
+			s := t.servible(tam)
+			if s < n || s <= UmbralDelObjetoGrande {
+				t.derrames++
+				t.bytesDerramados += n
+
+				return nil
+			}
+
+			tam = s
+		}
+
+		t.pedazos = append(t.pedazos, make([]byte, tam))
+		t.usadoEn = append(t.usadoEn, 0)
+		t.pedido += tam
+		mejor = len(t.pedazos) - 1
+
+		if t.pedazoMenor == 0 || tam < t.pedazoMenor {
+			t.pedazoMenor = tam
+		}
+
+		if tam > t.pedazoMayor {
+			t.pedazoMayor = tam
+		}
+	}
+
+	desde := t.usadoEn[mejor]
+	t.usadoEn[mejor] += n
+	t.usado += n
+	t.imagenes++
+
+	return t.pedazos[mejor][desde : desde+n : desde+n]
+}
+
 // reiniciarTramo: el nivel cambio, la cache se descarta y el tramo se reusa desde el byte 0. El tramo NO se
 // libera (en la consola el monton externo no se devuelve, ADR 0001 §1.4): se reusa.
 func (mr *MapRenderer) reiniciarTramo() {
 	if mr.tramo == nil {
 		return
+	}
+
+	for i := range mr.tramo.usadoEn {
+		mr.tramo.usadoEn[i] = 0
 	}
 
 	mr.tramo.usado = 0

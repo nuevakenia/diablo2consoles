@@ -253,7 +253,18 @@ func SuperficieDeLaPantalla(ancho, alto int) *Surface {
 	pixeles := (*[1 << 30]byte)(unsafe.Pointer(d2cPvrPantallaFb()))[:n:n]
 
 	img := &Imagen{pixeles: pixeles, ancho: ancho, alto: alto, vram: true}
-	img.Rellenar(color.RGBA{R: 0, G: 0, B: 0, A: 255})
+	// DC-002.106: el lienzo arranca NEGRO TRANSPARENTE (alfa 0) y no negro opaco.
+	//
+	// POR QUE. El alfa de este lienzo no llega a la pantalla: `Presentar` lo convierte a RGB565 (5-6-5 bits,
+	// `pvr_pantalla.c`), asi que esos bytes solo existen para COMPARAR el cuadro contra el de la PC. Y el
+	// medidor del host arranca su lienzo en cero, igual que cualquier superficie de Go. Medido en esta tarjeta:
+	// con el relleno opaco el cuadro de la consola daba crc32 565415037 y el del host 1437022778, y la UNICA
+	// diferencia eran los 4 pixeles que ningun tile pinta (alfa 255 contra 0; el RGB era identico: crc32 de los
+	// canales de color 2507235743 en los dos lados). Con el lienzo transparente los dos cuadros son el mismo
+	// byte a byte.
+	// OJO: los pixeles que si se pintan quedan con alfa 255 (lo pone el dibujado), asi que esto solo cambia los
+	// que nadie toca.
+	img.Rellenar(color.RGBA{R: 0, G: 0, B: 0, A: 0})
 
 	lienzoEnVram = d2cPvrPantallaFbBytes()
 

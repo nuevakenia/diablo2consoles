@@ -188,6 +188,14 @@ func CacheDeTilesEnTramo(t *TramoDeLaCache) Opcion {
 	return func(mr *MapRenderer) { mr.UsarTramoDeLaCache(t) }
 }
 
+// CacheDeTilesEnTramoEnPedazos: los pixeles de la cache en indices salen de bloques de `pedazo` B pedidos a
+// medida, con un techo de `total` B (DC-002.106). Es la forma que entra en la consola cuando el tramo de un
+// solo golpe no: cada bloque si se sirve de los huecos del monton de C y del break room, mientras que el pedido
+// entero tiene que ser contiguo y no lo es (medido en DC-002.105). Aditiva como las demas.
+func CacheDeTilesEnTramoEnPedazos(total, pedazo int, sonda ...func(tope int) int) Opcion {
+	return func(mr *MapRenderer) { mr.ActivarTramoDeLaCacheEnPedazos(total, pedazo, sonda...) }
+}
+
 // CreateMapRenderer creates a new MapRenderer, sets the required fields and returns a pointer to it.
 func CreateMapRenderer(asset *d2asset.AssetManager, renderer d2interface.Renderer,
 	mapEngine *d2mapengine.MapEngine,

@@ -158,3 +158,152 @@ func TestElNivelNuevoReusaElTramo(t *testing.T) {
 		t.Fatalf("el tramo tiene que seguir vivo y vacio: %+v", e)
 	}
 }
+
+// ============================== DC-002.106: EL TRAMO EN PEDAZOS ==============================
+
+// TestElTramoEnPedazosReparteLosPixeles: las imagenes salen de VARIOS bloques, ninguna se pisa, y el censo
+// cuadra al byte (bloques pedidos, techo, usado). Es la prueba de que el modo en pedazos reparte igual que el
+// de un solo golpe: la unica diferencia es DONDE vive cada bloque.
+func TestElTramoEnPedazosReparteLosPixeles(t *testing.T) {
+	mr := &MapRenderer{}
+	// techo 300 KB en bloques de 100 KB (los dos pasan el corte de 64 KB del objeto grande)
+	mr.ActivarTramoDeLaCacheEnPedazos(300*1024, 100*1024)
+
+	if e := mr.CensoDelTramo(); !e.Activa || !e.EnPedazos || e.Pedazos != 0 || e.Bytes != 0 {
+		t.Fatalf("el tramo en pedazos se reserva SIN pedir nada (se pide al dibujar): %+v", e)
+	}
+
+	tamanos := []int{1010, 4800, 70 * 1024, 12, 50 * 1024, 48 * 1024, 30 * 1024}
+
+	pedazos := make([][]byte, len(tamanos))
+	suma := 0
+
+	for i, n := range tamanos {
+		pedazos[i] = mr.pedirIndicesDelTile(n)
+		suma += n
+
+		if len(pedazos[i]) != n || cap(pedazos[i]) != n {
+			t.Fatalf("imagen %d: len=%d cap=%d, queria %d/%d (un pedazo del tramo no se puede crecer)",
+				i, len(pedazos[i]), cap(pedazos[i]), n, n)
+		}
+
+		for j := range pedazos[i] {
+			pedazos[i][j] = byte(i*17 + j)
+		}
+	}
+
+	for i, n := range tamanos {
+		for j := 0; j < n; j++ {
+			if pedazos[i][j] != byte(i*17+j) {
+				t.Fatalf("imagen %d byte %d = %d: otra imagen la piso", i, j, pedazos[i][j])
+			}
+		}
+	}
+
+	e := mr.CensoDelTramo()
+
+	if e.Pedazos < 2 {
+		t.Fatalf("300 KB de techo en bloques de 100 KB: el censo tiene que ver varios bloques: %+v", e)
+	}
+
+	if e.Usado != suma || e.Libre != e.Bytes-suma || e.Techo != 300*1024 {
+		t.Fatalf("censo del tramo: %+v (usado debia ser %d)", e, suma)
+	}
+
+	if e.Imagenes != len(tamanos) || e.Derrames != 0 {
+		t.Fatalf("censo del tramo: %+v (%d imagenes y cero derrames)", e, len(tamanos))
+	}
+}
+
+// TestElTramoEnPedazosUsaLaColaDelBloque: una imagen que no entra en el bloque en curso pero si en la cola de
+// otro bloque que ya esta abierto tiene que irse a la cola (best fit). Es el numero que decide si el tramo
+// entra en el monton de la consola: la cola que se abandona se pierde.
+func TestElTramoEnPedazosUsaLaColaDelBloque(t *testing.T) {
+	mr := &MapRenderer{}
+	mr.ActivarTramoDeLaCacheEnPedazos(4*100*1024, 100*1024)
+
+	// bloque 1: 60 KB usados, 40 KB de cola
+	mr.pedirIndicesDelTile(60 * 1024)
+	// 70 KB no entra en la cola del bloque 1: abre el bloque 2
+	mr.pedirIndicesDelTile(70 * 1024)
+
+	bloquesAntes := mr.CensoDelTramo().Pedazos
+
+	// 30 KB SI entran en la cola del bloque 1: no tiene que abrir un tercer bloque
+	mr.pedirIndicesDelTile(30 * 1024)
+
+	e := mr.CensoDelTramo()
+	if e.Pedazos != bloquesAntes {
+		t.Fatalf("la imagen chica abrio un bloque nuevo en vez de usar la cola: %+v", e)
+	}
+
+	if e.Pedazos != 2 || e.Usado != 160*1024 {
+		t.Fatalf("censo del tramo: %+v (2 bloques y 160 KB usados)", e)
+	}
+}
+
+// TestElTramoEnPedazosRespetaElTecho: con techo, lo que no entra en el tramo se pide con `make` y se CUENTA.
+// Es la guarda que evita el pedido que mata al monton en la consola (un `make` que el monton no puede servir
+// es fatal en libgodc), y el ultimo bloque se RECORTA a lo que queda del techo en vez de pasarse.
+func TestElTramoEnPedazosRespetaElTecho(t *testing.T) {
+	mr := &MapRenderer{}
+	// techo de 180 KB: el primer bloque pide los 100 KB enteros y el segundo se recorta a los 80 KB que quedan
+	mr.ActivarTramoDeLaCacheEnPedazos(180*1024, 100*1024)
+
+	uno := mr.pedirIndicesDelTile(60 * 1024)
+	dos := mr.pedirIndicesDelTile(60 * 1024)
+	tres := mr.pedirIndicesDelTile(60 * 1024)
+
+	e := mr.CensoDelTramo()
+
+	if e.Bytes > 180*1024 {
+		t.Fatalf("el tramo se paso del techo: %+v", e)
+	}
+
+	if e.Pedazos != 2 || e.Bytes != 180*1024 {
+		t.Fatalf("censo del tramo: %+v (2 bloques: 100 KB + 80 KB recortado al techo)", e)
+	}
+
+	if e.Usado != 120*1024 {
+		t.Fatalf("censo del tramo: %+v (dos imagenes de 60 KB adentro)", e)
+	}
+
+	if e.Derrames != 1 || e.BytesDerramados != 60*1024 {
+		t.Fatalf("la imagen que no entro tenia que derramar y contarse: %+v", e)
+	}
+
+	// la que derramo es un buffer propio del tamano pedido, y no pisa el tramo
+	if len(tres) != 60*1024 || cap(tres) != 60*1024 {
+		t.Fatalf("el derrame tiene que ser un buffer del tamano pedido: len=%d cap=%d", len(tres), cap(tres))
+	}
+
+	for j := range tres {
+		tres[j] = 0xFF
+	}
+
+	if uno[0] != 0 || dos[0] != 0 {
+		t.Fatalf("el derrame piso el tramo")
+	}
+}
+
+// TestElTramoEnPedazosSeApagaSolo: ni el techo ni el bloque pueden irse al semiespacio del recolector (seria
+// una asignacion chica mas, no un tramo), y el tramo de un solo golpe sigue funcionando como antes.
+func TestElTramoEnPedazosSeApagaSolo(t *testing.T) {
+	for _, caso := range [][2]int{{0, 100 * 1024}, {300 * 1024, 0}, {64 * 1024, 100 * 1024}, {300 * 1024, 64 * 1024}} {
+		mr := &MapRenderer{}
+		mr.ActivarTramoDeLaCacheEnPedazos(caso[0], caso[1])
+
+		if e := mr.CensoDelTramo(); e.Activa {
+			t.Fatalf("un tramo en pedazos de total=%d pedazo=%d no se tiene que activar: %+v", caso[0], caso[1], e)
+		}
+	}
+
+	unGolpe := &MapRenderer{}
+	unGolpe.ActivarTramoDeLaCache(200 * 1024)
+
+	p := unGolpe.pedirIndicesDelTile(1000)
+
+	if e := unGolpe.CensoDelTramo(); e.EnPedazos || e.Pedazos != 0 || e.Usado != 1000 || len(p) != 1000 {
+		t.Fatalf("el tramo de un solo golpe tiene que seguir igual: %+v", e)
+	}
+}

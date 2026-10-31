@@ -176,3 +176,37 @@ int d2c_soltar_filas(void *pMapa) {
 
     return bytes;
 }
+
+/* ============================== 5) DC-002.106: EL PEDAZO QUE EL MONTON PUEDE SERVIR ==============================
+ *
+ * POR QUE. El tramo de la cache pedido en pedazos de tamano FIJO (DC-002.106, `tramoEnPedazos`) se corto en el
+ * ultimo bloque medido en Flycast: con 7 bloques de 348.160 B puestos, al monton le quedaban 249.440 B libres
+ * (en migas, repartidas) y 159.744 B de break room, y el ultimo bloque (286.720 B, lo que faltaba del techo)
+ * murio en `gc_external_alloc` porque NI un hueco ni el break alcanzaban para 286.720 DE UNA VEZ -- pero la
+ * memoria total SI estaba (409.184 B). dlmalloc no cose un pedido con trozos.
+ *
+ * QUE HACE. Le pregunta al monton, en C (donde un `malloc` que falla devuelve NULL en vez de tirar el runtime),
+ * cual es el bloque mas grande que puede servir AHORA sin pasarse de `tope`. Baja de a mitades hasta que el
+ * pedido entra. Cada sonda se libera en el acto, asi que no cuesta memoria: lo que vino de un hueco se vuelve a
+ * fundir con el, y lo que vino del top se queda como top (que es de donde saldria el pedido de verdad).
+ *
+ * OJO CON EL ORDEN. Esto NO elige un tamano "comodo": dice el MAXIMO que entra. El que llama decide si ese
+ * tamano le sirve (tiene que pasar los 64 KB del objeto grande, si no la asignacion se iria al semiespacio del
+ * recolector y no compraria nada).
+ */
+unsigned int d2c_servible(unsigned int tope) {
+    if (tope > (1u << 30))
+        return 0;
+
+    for (unsigned int t = tope; t > (unsigned)GC_LARGE_OBJECT_THRESHOLD; t = (t / 2) & ~511u) {
+        void *p = malloc(t);
+
+        if (p != NULL) {
+            free(p);
+
+            return t;
+        }
+    }
+
+    return 0;
+}

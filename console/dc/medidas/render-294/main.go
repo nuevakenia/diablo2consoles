@@ -25,6 +25,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -56,6 +57,11 @@ var tablasDelCompositor = []string{
 	d2resource.MonStats2,
 }
 
+// pedazoDelTramo (DC-002.106): si no es 0, el tramo de `-tramo` se pide en bloques de este tamano en vez de
+// un solo golpe. Se resuelve con un global y no con un parametro mas de `correr` porque el medidor ya lleva una
+// docena y este knob no cambia NADA del camino del cuadro (solo de donde salen sus pixeles).
+var pedazoDelTramo int
+
 func main() {
 	dir := flag.String("dir", "", "carpeta con d2data.mpq y patch_d2.mpq (por defecto la instalacion del juego)")
 	preset := flag.Int("preset", 1, "preset del nivel en LvlPrest (1 = Act 1 - Town 1)")
@@ -71,7 +77,11 @@ func main() {
 		"de C en la consola); 0 = apagado (make por imagen, el camino de la PC)")
 	cuadros := flag.Int("cuadros", 1, "cuantos cuadros componer (el 2do en adelante mide la cache ya armada)")
 	histograma := flag.Bool("histograma", false, "censo de tamanos de la cache de indices contra el umbral de 64 KB de libgodc")
+	pedazo := flag.Int("pedazo", 0, "DC-002.106: el MISMO tramo de -tramo pero pedido EN BLOQUES de N B (> 64 KB); "+
+		"0 = de un solo golpe. En la consola el de un golpe no entra -- cada bloque si se sirve de los huecos")
 	flag.Parse()
+
+	pedazoDelTramo = *pedazo
 
 	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *indices, *tramo,
 		*cuadros, *histograma); err != nil {
@@ -167,9 +177,15 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 	}
 
 	if tramo > 0 {
-		opciones = append(opciones, d2maprenderer.CacheDeTilesEnUnTramo(tramo))
-		fmt.Printf("RENDER294: cache en UN TRAMO de %d B (DC-002.104: un solo make grande; en la consola es el "+
-			"monton de C y no el semiespacio)\n", tramo)
+		if pedazoDelTramo > 0 {
+			opciones = append(opciones, d2maprenderer.CacheDeTilesEnTramoEnPedazos(tramo, pedazoDelTramo))
+			fmt.Printf("RENDER294: cache en TRAMO EN PEDAZOS techo=%d B pedazo=%d B (DC-002.106: cada bloque se "+
+				"sirve de los huecos del monton de C)\n", tramo, pedazoDelTramo)
+		} else {
+			opciones = append(opciones, d2maprenderer.CacheDeTilesEnUnTramo(tramo))
+			fmt.Printf("RENDER294: cache en UN TRAMO de %d B (DC-002.104: un solo make grande; en la consola es el "+
+				"monton de C y no el semiespacio)\n", tramo)
+		}
 	}
 
 	mr := d2maprenderer.CreateMapRenderer(am, r, engine, term, d2util.LogLevelError, cx, cy, opciones...)
@@ -211,8 +227,8 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 		msTotal += ms
 
 		espacio := mr.TamanoDelCuadro()
-		fmt.Printf("RENDER294: CUADRO %d tamano=%dx%d pixelesNoVacios=%d de %d crc32=%d ms=%d\n",
-			cuadro, espacio.W, espacio.H, llenos, ancho*alto, crc32.ChecksumIEEE(crudo), ms)
+		fmt.Printf("RENDER294: CUADRO %d tamano=%dx%d pixelesNoVacios=%d de %d crc32=%d crc32RGB=%d ms=%d\n",
+			cuadro, espacio.W, espacio.H, llenos, ancho*alto, crc32.ChecksumIEEE(crudo), crcSoloRGB(crudo), ms)
 		fmt.Printf("RENDER294: CUADRO %d superficiesNuevas=%d bytesNuevos=%d cacheSuperficies=%d cacheBytes=%d\n",
 			cuadro, despuesDeRender.Superficies-antesDeRender.Superficies,
 			despuesDeRender.Bytes-antesDeRender.Bytes,
@@ -225,12 +241,15 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 	fmt.Printf("RENDER294: CUADRO total ms=%d (promedio %.1f)\n", msTotal, float64(msTotal)/float64(cuadros))
 
 	tramoEstado := mr.CensoDelTramo()
-	fmt.Printf("RENDER294: TRAMO104 activa=%v bytes=%d usado=%d libre=%d imagenes=%d derrames=%d bytesDerramados=%d\n",
+	fmt.Printf("RENDER294: TRAMO104 activa=%v bytes=%d usado=%d libre=%d imagenes=%d derrames=%d bytesDerramados=%d "+
+		"enPedazos=%v pedazos=%d techo=%d\n",
 		tramoEstado.Activa, tramoEstado.Bytes, tramoEstado.Usado, tramoEstado.Libre, tramoEstado.Imagenes,
-		tramoEstado.Derrames, tramoEstado.BytesDerramados)
+		tramoEstado.Derrames, tramoEstado.BytesDerramados, tramoEstado.EnPedazos, tramoEstado.Pedazos,
+		tramoEstado.Techo)
 
 	if histograma {
 		fmt.Print(censoDeLaCache(mr.TamanosDeLaCache()))
+		fmt.Print(listaDeTamanos(mr.TamanosDeLaCache()))
 	}
 
 	final, ok := sup.(*Cuadro)
@@ -246,6 +265,34 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 	fmt.Println("RENDER294: FIN")
 
 	return nil
+}
+
+// crcSoloRGB (DC-002.106): el crc32 del cuadro mirando SOLO los canales de color, sin el alfa. Es el mismo
+// instrumento del POC de la consola: si el RGB coincide entre los dos lados y el RGBA no, lo que difiere es el
+// canal alfa de la mezcla y no el dibujo.
+func crcSoloRGB(pixeles []byte) uint32 {
+	dig := crc32.NewIEEE()
+
+	for j := 0; j+3 < len(pixeles); j += 4 {
+		_, _ = dig.Write(pixeles[j : j+3])
+	}
+
+	return dig.Sum32()
+}
+
+// listaDeTamanos (DC-002.106): los tamanos de las 86 imagenes de la cache, en una sola linea con comas.
+//
+// POR QUE HACE FALTA. El tramo de la cache en PEDAZOS (DC-002.106) reparte las imagenes en bloques de `pedazo`
+// B; cuanto se desperdicia en la cola de cada bloque depende del TAMANO de cada imagen y del ORDEN en que se
+// piden, y eso no se puede adivinar: se simula con los tamanos de verdad. Esta linea es la entrada de esa
+// simulacion (y la prueba de que la consola pide los mismos 86 tamanos).
+func listaDeTamanos(tamanos []int) string {
+	partes := make([]string, len(tamanos))
+	for i, t := range tamanos {
+		partes[i] = strconv.Itoa(t)
+	}
+
+	return fmt.Sprintf("RENDER294: TAMANOS101 n=%d bytes=%s\n", len(tamanos), strings.Join(partes, ","))
 }
 
 // censoDeLaCache: los tamanos de las imagenes de la cache contra el umbral de 64 KB de libgodc.

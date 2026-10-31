@@ -51,6 +51,31 @@ const (
 	// compilo el binario.
 	tramoDeLaCache = 2723840
 
+	// tramoEnPedazos (DC-002.106): el MISMO tramo de arriba pero pedido EN BLOQUES de este tamano en vez de un
+	// solo golpe. 0 = de un solo golpe (el camino de DC-002.104).
+	//
+	// POR QUE. Medido en DC-002.105: con las tablas y las fuentes soltadas el monton tiene 2.849.816 B
+	// disponibles (1.645.592 de libres + 1.204.224 de break room) y la cache pide 2.723.840: ALCANZA. Pero el
+	// tramo de un solo golpe muere igual porque dlmalloc lo pide ENTERO por `sbrk` y el break room no llega a
+	// 2,7 MB (`Requested sbrk_base 0x8d163000, was 0x8ceca000`). Pedido de a `pedazo` B, cada bloque si se
+	// sirve de los huecos del monton y del top, y la pared deja de ser la CONTIGUIDAD.
+	//
+	// EL NUMERO. 348.160 B = 340 KB = 68 filas de 5.120 B, el grano de los tamanos de la cache (el censo por
+	// imagen del host: 20.480 B las comunes, hasta 71.680 las cuatro grandes del pueblo). Con los 86 tamanos
+	// de verdad y el reparto al bloque mas justo el tramo se llena en 8 bloques y deja 71.680 B de cola
+	// perdida, que es el 2,6 % del censo: el pedido total queda en 2.723.840 (el techo) y lo que no entra se
+	// derrama al camino de siempre (`make`), contado en el log. Medido en el host con
+	// `render-294 -perezoso -indices -tramo 2723840 -pedazo 348160`: mismo crc32 1437022778 y mismo sha256 de
+	// PNG que el tramo de un golpe; pedazos=8 usado=2.652.160 derrames=2 bytesDerramados=71.680.
+	tramoEnPedazos = 348160
+
+	// pedazoLoDiceElMonton (DC-002.106): el tamano de cada bloque lo decide el MONTON (la sonda `d2c_servible`
+	// del shim: el mayor bloque de hasta `tramoEnPedazos` que puede servir AHORA) en vez de pedir ese tamano
+	// fijo. Con la sonda, cuando el monton se queda con migas y poco break, los ultimos bloques salen mas
+	// chicos en vez de morir -- que es lo que paso medido con tamano fijo (7 bloques de 340 KB puestos, y el
+	// ultimo de 286.720 B murio con 409.184 B todavia disponibles pero en pedazos que dlmalloc no cose).
+	pedazoLoDiceElMonton = true
+
 	// tramoAlArranque (DC-002.104): reservar el tramo de la cache ANTES de cargar nada, en vez de cuando se
 	// crea el renderer. Medido en esta tarjeta:
 	//   false (el de la referencia) el monton de C ya esta fragmentado al crear el renderer y el pedido de
@@ -77,7 +102,8 @@ const (
 	// paleta del acto (`pal.dat`) y su tabla de sombreado (`pal.pl2`). Por eso, cuando se sueltan las fuentes,
 	// las dos se PRECARGAN antes (ver `main.go`): despues de soltar, el MPQ no se puede leer.
 	//
-	// El valor de la referencia del POC es "nada" (la corrida de la .103); las de esta tarjeta se hacen con
-	// `SOLTAR=todo` por entorno, y el build lo avisa.
-	soltarDespuesDeComponer = "nada"
+	// El valor de la referencia del POC es "todo": desde DC-002.106 el binario de referencia es el que dibuja
+	// el pueblo, y para eso hay que soltar. Las corridas de .103/.104/.105 se hicieron pisandolo por entorno
+	// (SOLTAR=nada para sus referencias).
+	soltarDespuesDeComponer = "todo"
 )

@@ -325,7 +325,10 @@ func (c *Cuadro) mezclar(x, y int, r, g, b, a uint8) {
 	c.pix[i] = uint8((int(r)*ia + int(c.pix[i])*resto) / byteMaximo)
 	c.pix[i+1] = uint8((int(g)*ia + int(c.pix[i+1])*resto) / byteMaximo)
 	c.pix[i+2] = uint8((int(b)*ia + int(c.pix[i+2])*resto) / byteMaximo)
-	c.pix[i+3] = uint8((ia*ia + int(c.pix[i+3])*resto) / byteMaximo)
+	// DC-002.106: el alfa del resultado es el de la cuenta source-over de verdad -- a_s + a_d*(1 - a_s) -- y
+	// no `a_s*a_s` como estaba. En el pueblo la cache de tiles se pinta con alfa 160 (las sombras) y ahi las
+	// dos cuentas se separan byte a byte: es el canal que separaba el cuadro de la consola del del host.
+	c.pix[i+3] = uint8(ia + int(c.pix[i+3])*resto/byteMaximo)
 }
 
 // rgba8: el color de la interfaz a cuatro bytes (color.Color.RGBA devuelve 16 bits con alfa premultiplicado).

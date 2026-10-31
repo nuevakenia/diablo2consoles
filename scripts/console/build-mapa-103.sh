@@ -165,10 +165,12 @@ pisa_knob() {  # $1 = nombre en knobs.go, $2 = valor nuevo (sin comillas), $3 = 
 }
 
 [ -n "${TRAMO_CACHE:-}" ] && pisa_knob tramoDeLaCache "$TRAMO_CACHE"
+[ -n "${PEDAZO:-}" ] && pisa_knob tramoEnPedazos "$PEDAZO"
+[ -n "${SONDA:-}" ] && pisa_knob pedazoLoDiceElMonton "$SONDA"
 [ -n "${TRAMO_ARRANQUE:-}" ] && pisa_knob tramoAlArranque "$TRAMO_ARRANQUE"
 [ -n "${SOLTAR:-}" ] && pisa_knob soltarDespuesDeComponer "$SOLTAR" 1
 
-echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoAlArranque=$(leer_knob tramoAlArranque)"
+echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoEnPedazos=$(leer_knob tramoEnPedazos) pedazoLoDiceElMonton=$(leer_knob pedazoLoDiceElMonton) tramoAlArranque=$(leer_knob tramoAlArranque)"
 
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 

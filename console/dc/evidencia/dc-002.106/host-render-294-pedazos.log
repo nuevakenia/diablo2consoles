@@ -1,0 +1,17 @@
+RENDER294: MAPA tiles=2337 pisos=2337 paredes=338 crcGrilla=2698186255 ms=31
+RENDER294: ================ 3. EL RENDERER DEL MAPA Y SU CACHE ================
+RENDER294: cache en TRAMO EN PEDAZOS techo=2723840 B pedazo=348160 B (DC-002.106: cada bloque se sirve de los huecos del monton de C)
+RENDER294: ================ 4. EL CUADRO ================
+RENDER294: CUADRO 1 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 crc32RGB=2507235743 ms=15
+RENDER294: CUADRO 1 superficiesNuevas=0 bytesNuevos=0 cacheSuperficies=1 cacheBytes=1228800
+RENDER294: CUADRO 1 cache101 nuevas=86 bytesNuevos=2723840 cacheSuperficies=86 cacheBytes=2723840 (2.60 MB)
+RENDER294: CUADRO 2 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 crc32RGB=2507235743 ms=12
+RENDER294: CUADRO 2 superficiesNuevas=0 bytesNuevos=0 cacheSuperficies=1 cacheBytes=1228800
+RENDER294: CUADRO 2 cache101 nuevas=0 bytesNuevos=0 cacheSuperficies=86 cacheBytes=2723840 (2.60 MB)
+RENDER294: CUADRO 3 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 crc32RGB=2507235743 ms=12
+RENDER294: CUADRO 3 superficiesNuevas=0 bytesNuevos=0 cacheSuperficies=1 cacheBytes=1228800
+RENDER294: CUADRO 3 cache101 nuevas=0 bytesNuevos=0 cacheSuperficies=86 cacheBytes=2723840 (2.60 MB)
+RENDER294: CUADRO total ms=39 (promedio 13.0)
+RENDER294: TRAMO104 activa=true bytes=2723840 usado=2652160 libre=71680 imagenes=84 derrames=2 bytesDerramados=71680 enPedazos=true pedazos=8 techo=2723840
+== sha256 ==
+2b6c64db6d0c922755c63cafa10fa7d38d7fc7ae9f4232e3569b03d19fa9d12d  /tmp/cuadro-host-106-final.png
