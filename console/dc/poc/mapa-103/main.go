@@ -139,13 +139,67 @@ func memoria(etapa string) {
 		"pico=", picoMonton)
 }
 
+// pruebaDeEscrituraEnVram (DC-002.108): escribe un patron conocido en un bloque de la VRAM y lo vuelve a leer.
+// Es el instrumento que separa dos causas cuando la cache puesta en VRAM no da el mismo numero que en el monton:
+// ¿la memoria no se puede usar como RAM (se pierden las escrituras) o el dato se corrompe en otra parte?
+//
+// Va con `pruebaDeVram` y se suelta el bloque en el acto, asi que no le quita VRAM a la cache.
+func pruebaDeEscrituraEnVram() {
+	const bytes = 348160
+
+	b := pvr.VramReservar(bytes)
+	if b == nil {
+		println("MAPA103: PRUEBA VRAM no se pudo reservar", bytes, "B")
+
+		return
+	}
+
+	for i := 0; i < len(b); i++ {
+		b[i] = byte(i*7 + 3)
+	}
+
+	malos := 0
+	primero := -1
+
+	for i := 0; i < len(b); i++ {
+		if b[i] != byte(i*7+3) {
+			malos++
+
+			if primero < 0 {
+				primero = i
+			}
+		}
+	}
+
+	println("MAPA103: PRUEBA VRAM bytes=", len(b), "malos=", malos, "primeroMal=", primero,
+		"leido=", int(b[0]), "esperado=", 3)
+
+	pvr.VramSoltar(b)
+}
+
+// vram (DC-002.108): el censo de la VRAM del PVR en cada etapa. `total` es el pool de texturas del chip
+// (8 MB), `disponible` lo que el PVR puede repartir AHORA (pvr_mem_available: arena - usado + el top), `pedida`
+// lo que este proceso tiene tomado por el paquete pvr (los bloques de la cache) y `lienzo` el framebuffer RGBA
+// del cuadro -- que es el que ocupa la VRAM antes que nada y con el que hay que negociar.
+//
+// ES EL INSTRUMENTO DEL PUNTO 1 DE LA TARJETA: "medir la VRAM disponible con el framebuffer de 640x480 puesto".
+// Con esta linea por etapa, la resta sale del log: disponible(al arrancar la pantalla) - disponible(con el
+// lienzo) - disponible(con la cache) y no hay que suponer cuanto tomó cada cosa.
+func vram(etapa string) {
+	c := pvr.FotoDeLaVram()
+
+	println("MAPA103: VRAM", etapa, "total=", c.Total, "disponible=", c.Disponible, "pedida=", c.Pedida,
+		"pedidos=", c.Pedidos, "pedidoMayor=", c.PedidoMayor, "lienzo=", c.LienzoDelCuadro)
+}
+
 func main() {
 	println("MAPA103: arranca DC-002.103 -- el pueblo en pantalla de punta a punta; orden=", orden)
 	println("MAPA103: cuadros=", cuadros, "modoTablas=", modoTablas, "soltarLecturas=", soltarLecturas,
 		"tramoDeLaCache=", tramoDeLaCache, "tramoEnPedazos=", tramoEnPedazos, "sonda=", pedazoLoDiceElMonton,
-		"tramoAlArranque=", tramoAlArranque,
+		"tramoAlArranque=", tramoAlArranque, "cacheEnVram=", cacheEnVram,
 		"soltarDespuesDeComponer=", soltarDespuesDeComponer)
 	memoria("al-arrancar")
+	vram("al-arrancar")
 
 	// ============================== 0. EL VIDEO PRIMERO ==============================
 	renderer := pvr.NuevoRenderer()
@@ -158,6 +212,11 @@ func main() {
 
 	println("MAPA103: PVR andando; vram de la textura del cuadro=", pvr.VramDeLaPantalla())
 	memoria("despues-del-video")
+	vram("despues-del-video")
+
+	if pruebaDeVram {
+		pruebaDeEscrituraEnVram()
+	}
 
 	// ============================== 0.b EL TRAMO DE LA CACHE (DC-002.104) ==============================
 	// Se reserva ACA y no al crear el renderer: el monton de C (dlmalloc sobre `mm_sbrk`) se fragmenta con el
@@ -325,6 +384,7 @@ func main() {
 	}
 
 	memoria("antes-del-renderer")
+	vram("antes-del-renderer")
 
 	opciones := []d2maprenderer.Opcion{
 		d2maprenderer.ComoConsola(ancho, alto),
@@ -337,6 +397,16 @@ func main() {
 		// y no del semiespacio del recolector.
 		opciones = append(opciones, d2maprenderer.CacheDeTilesEnTramo(tramoDePixeles))
 		println("MAPA103: TRAMO DE LA CACHE en uso (reservado al arranque) bytes=", tramoDePixeles.Bytes())
+	} else if tramoDeLaCache > 0 && tramoEnPedazos > 0 && cacheEnVram {
+		// DC-002.108: el tramo en BLOQUES, pero de la VRAM DEL PVR. Es el mismo mecanismo de DC-002.106 con el
+		// origen cambiado: el monton de C no pide ni un byte de la cache y la pared de la contiguidad
+		// desaparece. La sonda es la de la VRAM (`pvr_mem_malloc`/`free`), no la del monton de C.
+		opciones = append(opciones, d2maprenderer.CacheDeTilesEnBloquesDe(tramoDeLaCache, tramoEnPedazos,
+			pvr.VramReservar, "vram", sondaDelTramoDeVram()...))
+		println("MAPA103: TRAMO DE LA CACHE EN BLOQUES DE VRAM techo=", tramoDeLaCache, "pedazo=",
+			tramoEnPedazos, "pedazoLoDiceLaVram=", pedazoLoDiceElMonton,
+			"vramDisponible=", pvr.VramDisponible(),
+			"vramServiriaDeUnGolpe=", pvr.VramServible(tramoDeLaCache))
 	} else if tramoDeLaCache > 0 && tramoEnPedazos > 0 {
 		// DC-002.106: el tramo en BLOQUES -- cada bloque se pide cuando una imagen no entra en los que hay, y
 		// el monton lo sirve de sus huecos (el pedido unico necesitaba contiguidad y no la hay).
@@ -344,6 +414,13 @@ func main() {
 			sondaDelTramo()...))
 		println("MAPA103: TRAMO DE LA CACHE EN PEDAZOS techo=", tramoDeLaCache, "pedazo=", tramoEnPedazos,
 			"pedazoLoDiceElMonton=", pedazoLoDiceElMonton)
+	} else if tramoDeLaCache > 0 && cacheEnVram {
+		// DC-002.108: el pedido ENTERO de la cache, de un solo golpe, a la VRAM. Es el mismo pedido que en el
+		// monton de C muere por CONTIGUIDAD (DC-002.104/.105) y aca tiene que entrar o devolver nil.
+		opciones = append(opciones, d2maprenderer.CacheDeTilesEnUnTramoDe(tramoDeLaCache, pvr.VramReservar, "vram"))
+		println("MAPA103: TRAMO DE LA CACHE EN UN GOLPE DE VRAM bytes=", tramoDeLaCache,
+			"vramDisponible=", pvr.VramDisponible(),
+			"vramServiriaDeUnGolpe=", pvr.VramServible(tramoDeLaCache))
 	} else if tramoDeLaCache > 0 {
 		opciones = append(opciones, d2maprenderer.CacheDeTilesEnUnTramo(tramoDeLaCache))
 		println("MAPA103: TRAMO DE LA CACHE pedido TARDE (en el renderer) bytes=", tramoDeLaCache)
@@ -470,7 +547,7 @@ func censoDelTramo(etapa string) {
 	}
 
 	e := rendererDelMapa.CensoDelTramo()
-	println("MAPA103: TRAMO", etapa, "activa=", e.Activa, "bytes=", e.Bytes, "usado=", e.Usado,
+	println("MAPA103: TRAMO", etapa, "activa=", e.Activa, "origen=", e.Origen, "bytes=", e.Bytes, "usado=", e.Usado,
 		"libre=", e.Libre, "imagenes=", e.Imagenes, "derrames=", e.Derrames, "bytesDerramados=", e.BytesDerramados,
 		"enPedazos=", e.EnPedazos, "pedazos=", e.Pedazos, "pedazoMenor=", e.PedazoMenor,
 		"pedazoMayor=", e.PedazoMayor, "techo=", e.Techo)
@@ -540,6 +617,7 @@ func dibujar(superficie d2interface.Surface) error {
 	}
 
 	println("MAPA103: CUADRO", cuadro, "ARRANCA libre=", d2cMontonLibre())
+	vram("cuadro-antes")
 
 	t0 := d2cMs()
 
@@ -575,6 +653,9 @@ func dibujar(superficie d2interface.Surface) error {
 		"hostPixeles=", pixelesHost, "hostCrc=", int(crcHost), "ms=", ms,
 		"cacheSuperficies=", cache.Superficies, "cacheBytes=", cache.Bytes, "cacheEnIndices=", cache.EnIndices)
 	censoDelTramo("despues-del-cuadro")
+	huella, imagenes, bytesDeIndices := rendererDelMapa.HuellaDeLaCache()
+	println("MAPA103: HUELLA DE LA CACHE fnv=", int(huella), "imagenes=", imagenes, "bytes=", bytesDeIndices)
+	vram("despues-del-cuadro")
 	memoria("despues-del-cuadro")
 
 	if cuadro == 1 && orden != "tarjeta" {
@@ -632,6 +713,18 @@ func sondaDelTramo() []func(int) int {
 	}
 
 	return []func(int) int{func(tope int) int { return int(d2cServible(uint(tope))) }}
+}
+
+// sondaDelTramoDeVram (DC-002.108): la misma idea que `sondaDelTramo`, pero le pregunta al pool de texturas del
+// PVR cuanto puede servir. Es una palanca aparte y no un `if` adentro de la otra a proposito: son dos montones
+// distintos (dlmalloc sobre `mm_sbrk` en RAM contra el dlmalloc recortado de la VRAM) y el log tiene que decir
+// cual de los dos decidio el tamano del bloque.
+func sondaDelTramoDeVram() []func(int) int {
+	if !pedazoLoDiceElMonton {
+		return nil
+	}
+
+	return []func(int) int{func(tope int) int { return pvr.VramServible(tope) }}
 }
 
 // censo: pisos, paredes y el crc32 de la grilla de identidades (el MISMO numero de DC-002.88: -1596781041).

@@ -108,7 +108,14 @@ rm -f "$GEN/orden.txt"
 # SIMBOLICOS a esos mismos archivos: si se copian tal cual y despues se agregan las rutas de `$GEN`, el
 # enlazador ve DOS veces el mismo .gox ("multiple definition of ...", medido en este build). Se reescribe el
 # prefijo para que cada paquete quede UNA vez, apuntando al arbol de enlace.
-sed "s|^$BASE_GOX/|$GEN/|" "$BASE_GOX/orden.txt" > "$GEN/orden.txt"
+#
+# DC-002.108: el prefijo NO siempre es el del arbol que se esta usando. `orden.txt` se escribe cuando se arma el
+# arbol, y si despues el arbol se COPIA a otro lado (paso en esta tarjeta: /tmp es tmpfs y estaba lleno, asi que
+# el arbol se copio a ~/gox108) las rutas siguen apuntando al original. Con el `sed` de un solo prefijo el
+# enlazador veia los DOS (el de `orden.txt` y el del arbol de enlace) y moria con "multiple definition of ...".
+# Ahora el prefijo se DEDUCE del propio archivo (la carpeta de su primera linea) y se reescribe ese.
+RAIZ_ORDEN="$(sed -n '1{s|/[^/]*$||;p}' "$BASE_GOX/orden.txt")"
+sed -e "s|^$BASE_GOX/|$GEN/|" -e "s|^$RAIZ_ORDEN/|$GEN/|" "$BASE_GOX/orden.txt" > "$GEN/orden.txt"
 for p in $PAQUETES; do
     f="$GEN/$PREFIJO/$p.gox"
     [ -f "$f" ] || { echo "   FALTA $p.gox en el arbol del motor: no se puede enlazar lo que no existe" >&2; exit 1; }
@@ -165,12 +172,13 @@ pisa_knob() {  # $1 = nombre en knobs.go, $2 = valor nuevo (sin comillas), $3 = 
 }
 
 [ -n "${TRAMO_CACHE:-}" ] && pisa_knob tramoDeLaCache "$TRAMO_CACHE"
+[ -n "${ENVRAM:-}" ] && { case "$ENVRAM" in 0) v=false ;; 1) v=true ;; *) v="$ENVRAM" ;; esac; pisa_knob cacheEnVram "$v"; }
 [ -n "${PEDAZO:-}" ] && pisa_knob tramoEnPedazos "$PEDAZO"
 [ -n "${SONDA:-}" ] && pisa_knob pedazoLoDiceElMonton "$SONDA"
 [ -n "${TRAMO_ARRANQUE:-}" ] && pisa_knob tramoAlArranque "$TRAMO_ARRANQUE"
 [ -n "${SOLTAR:-}" ] && pisa_knob soltarDespuesDeComponer "$SOLTAR" 1
 
-echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoEnPedazos=$(leer_knob tramoEnPedazos) pedazoLoDiceElMonton=$(leer_knob pedazoLoDiceElMonton) tramoAlArranque=$(leer_knob tramoAlArranque)"
+echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) cacheEnVram=$(leer_knob cacheEnVram) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoEnPedazos=$(leer_knob tramoEnPedazos) pedazoLoDiceElMonton=$(leer_knob pedazoLoDiceElMonton) tramoAlArranque=$(leer_knob tramoAlArranque)"
 
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 

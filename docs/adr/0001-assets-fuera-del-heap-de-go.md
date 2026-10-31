@@ -77,6 +77,24 @@ Ninguno de los cuatro se arregla pidiendo memoria en otro lado: el montón de Go
 el recolector no devuelve los grandes. **La memoria de un asset no puede ser del recolector: tiene que tener
 dueño y devolverse.** Eso, que suena a idea, se puede medir: `Pedidos == Liberados` y `BytesVivos == 0`.
 
+### 1.6 El quinto lugar: la VRAM del PVR (y para qué alcanza, medido en DC-002.108)
+
+Hay **un** lugar más donde poner un buffer grande, y no es RAM: el pool de texturas del PVR, **8.388.608 B**
+(8 MB) que la CPU escribe y lee como RAM (los punteros de `pvr_mem_malloc` son punteros del SH-4). Medido con
+el framebuffer de 640×480 y el lienzo del cuadro ya puestos quedan **3.511.976 B libres**, y la caché de tiles
+del pueblo (2.723.840 B) entra **de un solo golpe**, con 788 KB de sobra.
+
+La diferencia con los cuatro topes de arriba es que este **sí** resuelve la caché, porque la pared de
+DC-002.104/105 no era "faltan bytes" sino "faltan bytes CONTIGUOS" **en dlmalloc**: el mismo pedido de
+2.723.840 B que en el montón de C muere en `gc_external_alloc` entra en el pool de texturas en **un**
+`pvr_mem_malloc`, con 86 imágenes y **cero derrames**. Con la caché en la VRAM el montón de C queda **igual
+antes y después del cuadro** (8.308.008 B) y su break room pasa de **8.192 B** a **1.191.936 B**.
+
+La regla que sale de esto, para no repetir el trabajo: **lo que se guarda en el pool de texturas son datos
+que lee la CPU, y el bloque tiene que venir EN CERO** (`make` devuelve cero; la VRAM no). Lo que NO se hace es
+dibujar con esos datos por hardware: eso cambia el mezclado y el orden, y con eso el cuadro (que tiene que salir
+idéntico al del host). Evidencia: `console/dc/evidencia/dc-002.108-la-cache-de-tiles-en-vram.md`.
+
 ---
 
 ## 2. Decisión (1b / 2a / 3a)

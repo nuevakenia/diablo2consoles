@@ -76,6 +76,26 @@ const (
 	// ultimo de 286.720 B murio con 409.184 B todavia disponibles pero en pedazos que dlmalloc no cose).
 	pedazoLoDiceElMonton = true
 
+	// cacheEnVram (DC-002.108): los bloques de la cache se piden a la VRAM DEL PVR en vez del monton de C
+	// (`pvr.VramReservar`, que es `pvr_mem_malloc` del pool de texturas de KOS).
+	//
+	// POR QUE. La cache de tiles en indices son 2.723.840 B y el monton de C los aguanta solo en pedazos: con
+	// las tablas y las fuentes soltadas quedan 2.849.816 B disponibles (DC-002.105) pero no contiguos, y el
+	// camino en pedazos (DC-002.106) entra dejando el monton en 12.288 B de break room. En una Dreamcast de
+	// verdad esos pixeles viven en la VRAM: son 8 MB de los que el motor usa ~2,3 MB (la textura del cuadro
+	// 1.048.576 B + el lienzo RGBA 640x480x4 1.228.800 B), y lo que sobra lo reparte el PVR con su propio
+	// dlmalloc.
+	//
+	// LO QUE NO CAMBIA. El dibujado sigue leyendo los indices con la CPU y expandiendolos con la paleta del
+	// acto: el cuadro tiene que salir identico al byte al del host (crc32 1437022778). Lo que cambia es DONDE
+	// VIVE el buffer. El costo (la VRAM se toca sin cache) se mide en los ms de cada cuadro.
+	cacheEnVram = true
+
+	// pruebaDeVram (DC-002.108): escribir un patron conocido en un bloque de la VRAM y releerlo, al arrancar el
+	// video. Es el instrumento que dice si la VRAM se puede usar como RAM (escrituras que se pierden) antes de
+	// culpar a la cache. No deja nada reservado: el bloque se suelta en el acto.
+	pruebaDeVram = true
+
 	// tramoAlArranque (DC-002.104): reservar el tramo de la cache ANTES de cargar nada, en vez de cuando se
 	// crea el renderer. Medido en esta tarjeta:
 	//   false (el de la referencia) el monton de C ya esta fragmentado al crear el renderer y el pedido de

@@ -196,6 +196,25 @@ func CacheDeTilesEnTramoEnPedazos(total, pedazo int, sonda ...func(tope int) int
 	return func(mr *MapRenderer) { mr.ActivarTramoDeLaCacheEnPedazos(total, pedazo, sonda...) }
 }
 
+// CacheDeTilesEnUnTramoDe (DC-002.108): UN tramo de `bytes` B para los pixeles de la cache, reservado por
+// `reserva` en vez de un `make`. Es el modo de un solo golpe con el origen cambiado -- con la VRAM del PVR, el
+// pedido entero de 2.723.840 B que en el monton de C muere por contiguidad.
+func CacheDeTilesEnUnTramoDe(bytes int, reserva func(bytes int) []byte, origen string) Opcion {
+	return func(mr *MapRenderer) { mr.ActivarTramoDeLaCacheDe(bytes, reserva, origen) }
+}
+
+// CacheDeTilesEnBloquesDe (DC-002.108): los mismos bloques de la anterior, pero el que los da es `reserva` y
+// no el monton de C. Es la palanca con la que la cache de tiles del pueblo (86 imagenes, 2.723.840 B) vive en
+// la VRAM del PVR en vez de pelear con dlmalloc: el monton de C no la pide y la pared de la contiguidad
+// desaparece. `origen` es el nombre del lugar ("vram") y viaja al censo.
+//
+// ADITIVA: sin llamarla, todo es como antes. Si `reserva` devuelve nil (no habia lugar) la imagen se derrama al
+// `make` de siempre y se cuenta en el censo.
+func CacheDeTilesEnBloquesDe(total, pedazo int, reserva func(bytes int) []byte, origen string,
+	sonda ...func(tope int) int) Opcion {
+	return func(mr *MapRenderer) { mr.ActivarTramoDeLaCacheEnBloquesDe(total, pedazo, reserva, origen, sonda...) }
+}
+
 // CreateMapRenderer creates a new MapRenderer, sets the required fields and returns a pointer to it.
 func CreateMapRenderer(asset *d2asset.AssetManager, renderer d2interface.Renderer,
 	mapEngine *d2mapengine.MapEngine,

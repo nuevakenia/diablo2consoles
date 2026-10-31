@@ -76,6 +76,17 @@ type TramoDeLaCache struct {
 	// migas libres sin poder coserse) y seguir bajando de tamano hasta que entra. Nil = tamano fijo.
 	servible func(tope int) int
 
+	// reserva (DC-002.108): DE DONDE SALEN los bloques. Nil = `make` (el monton de C en la consola, el monton
+	// de Go en la PC), que es el camino de DC-002.106. Puesto, cada bloque lo pide esta funcion y si devuelve
+	// nil (el que reserva no tenia lugar) la imagen se derrama al camino de siempre y se cuenta. Es la palanca
+	// que pone los 2,7 MB de la cache EN LA VRAM del PVR sin que este paquete sepa que existe un PVR.
+	reserva func(bytes int) []byte
+
+	// origen: de donde vienen los bloques, para el censo y el log ("monton" si `reserva` es nil, "vram" si el
+	// que llama puso ahi la VRAM). Es un string y no un enum a proposito: este paquete no tiene por que
+	// conocer los backends.
+	origen string
+
 	// pedazoMenor / pedazoMayor: el rango de tamanos con el que el monton fue sirviendo los bloques, para el
 	// censo (0 = todavia no se pidio ninguno).
 	pedazoMenor int
@@ -121,16 +132,44 @@ func (t *TramoDeLaCache) Techo() int {
 // EnPedazos: si el tramo se pide por bloques (DC-002.106).
 func (t *TramoDeLaCache) EnPedazos() bool { return t != nil && t.pedazo > 0 }
 
+// origenDeLosBloques: de donde salen los bloques, para el censo (DC-002.108). Sin reservador es el monton.
+func (t *TramoDeLaCache) origenDeLosBloques() string {
+	if t == nil {
+		return ""
+	}
+
+	if t.reserva == nil {
+		return "monton"
+	}
+
+	if t.origen == "" {
+		return "otro"
+	}
+
+	return t.origen
+}
+
+// nuevoBloque: UN bloque de `tam` B, del reservador si lo hay y del monton si no (DC-002.108). Devuelve nil
+// cuando el reservador no tenia lugar: el que llama derrama la imagen al `make` de siempre y lo cuenta.
+func (t *TramoDeLaCache) nuevoBloque(tam int) []byte {
+	if t.reserva != nil {
+		return t.reserva(tam)
+	}
+
+	return make([]byte, tam)
+}
+
 // CensoDelTramo: el censo del tramo, para el log de la consola.
 type CensoDelTramo struct {
 	Activa          bool
 	EnPedazos       bool
-	Pedazos         int // cuantos bloques se pidieron (modo en pedazos)
-	PedazoMenor     int // el bloque mas chico que el monton sirvio (0 = todavia no se pidio ninguno)
-	PedazoMayor     int // el bloque mas grande
-	Techo           int // lo que el modo en pedazos puede llegar a pedir
-	Bytes           int // el tamano del tramo (0 = apagada); en pedazos, lo pedido hasta ahora
-	Usado           int // lo que se recorto para las imagenes
+	Origen          string // de donde salen los bloques (DC-002.108): "monton" o el nombre que puso el que llama ("vram")
+	Pedazos         int    // cuantos bloques se pidieron (modo en pedazos)
+	PedazoMenor     int    // el bloque mas chico que el monton sirvio (0 = todavia no se pidio ninguno)
+	PedazoMayor     int    // el bloque mas grande
+	Techo           int    // lo que el modo en pedazos puede llegar a pedir
+	Bytes           int    // el tamano del tramo (0 = apagada); en pedazos, lo pedido hasta ahora
+	Usado           int    // lo que se recorto para las imagenes
 	Libre           int
 	Imagenes        int // imagenes servidas del tramo
 	Derrames        int // imagenes que no entraron y se pidieron por `make` (como siempre)
@@ -197,8 +236,106 @@ func ReservarTramoDeLaCacheEnPedazos(total, pedazo int, sonda ...func(tope int) 
 	return t
 }
 
+// ReservarTramoDeLaCacheDe (DC-002.108): UN tramo de `bytes` B pedido al RESERVADOR (la VRAM del PVR en la
+// consola) en vez de un `make`. Es el modo de un solo golpe de DC-002.104 con el origen cambiado, y es la
+// medida mas directa de la tarjeta: el pedido de 2.723.840 B que en el monton de C muere por contiguidad
+// (`gc_external_alloc`, DC-002.104) entra en la VRAM de un golpe o no entra (en ese caso devuelve nil y el que
+// llama se queda con el camino en bloques).
+func ReservarTramoDeLaCacheDe(bytes int, reserva func(bytes int) []byte, origen string) *TramoDeLaCache {
+	if bytes <= UmbralDelObjetoGrande || reserva == nil {
+		return nil
+	}
+
+	b := reserva(bytes)
+	if b == nil {
+		return nil
+	}
+
+	if origen == "" {
+		origen = "monton"
+	}
+
+	return &TramoDeLaCache{bytes: b, reserva: reserva, origen: origen}
+}
+
 // UsarTramoDeLaCache: la cache de indices pide sus pixeles a ESTE tramo (ya reservado).
 func (mr *MapRenderer) UsarTramoDeLaCache(t *TramoDeLaCache) { mr.tramo = t }
+
+// ActivarTramoDeLaCacheDe: reserva el tramo de UN golpe con reservador propio y lo usa (DC-002.108).
+func (mr *MapRenderer) ActivarTramoDeLaCacheDe(bytes int, reserva func(bytes int) []byte, origen string) {
+	t := ReservarTramoDeLaCacheDe(bytes, reserva, origen)
+
+	if t == nil {
+		mr.tramo = nil
+		mr.Warningf("el tramo unico de la cache de %s no se activa con %d B (tiene que pasar los %d B del "+
+			"objeto grande de libgodc, y el que reserva tiene que dar lugar; DC-002.108)", origen, bytes,
+			UmbralDelObjetoGrande)
+
+		return
+	}
+
+	mr.tramo = t
+
+	mr.Debugf("tramo UNICO de la cache de %s: %d B en un solo pedido (DC-002.108)", origen, len(t.bytes))
+}
+
+// ReservarTramoDeLaCacheEnBloquesDe (DC-002.108): el tramo en bloques de `pedazo` B con techo `total`, pero
+// los bloques los pide `reserva` en vez de un `make`. Es el mismo mecanismo de DC-002.106 con el ORIGEN
+// cambiado: en la consola la cache de tiles vive en la VRAM del PVR (8 MB, de los que el motor tiene ~2,3 MB
+// tomados), no en el monton de C -- que es lo que la tarjeta mide.
+//
+// POR QUE UNA FUNCION Y NO UN `import` DEL PVR. Este paquete es del MOTOR y se compila tambien para la PC:
+// pedirle que conozca el backend de la consola rompe las dos cosas (el camino de la PC y la prueba del host).
+// La reserva entra como funcion, que es el mismo patron de `servible` (DC-002.106) y del `PedirDeArena` del
+// decodificador (DC-002.98).
+//
+// SI EL QUE RESERVA NO TIENE LUGAR devuelve nil: la imagen se derrama al `make` de siempre y se cuenta en el
+// censo (`Derrames` / `BytesDerramados`). No es un error: es el numero que dice cuanto falto.
+//
+// `origen` es solo para el log y el censo ("vram"). Sin `origen`, se informa "monton".
+func ReservarTramoDeLaCacheEnBloquesDe(total, pedazo int, reserva func(bytes int) []byte, origen string,
+	sonda ...func(tope int) int) *TramoDeLaCache {
+	if total <= UmbralDelObjetoGrande || pedazo <= UmbralDelObjetoGrande || reserva == nil {
+		return nil
+	}
+
+	if pedazo > total {
+		pedazo = total
+	}
+
+	if origen == "" {
+		origen = "monton"
+	}
+
+	t := &TramoDeLaCache{pedazo: pedazo, total: total, reserva: reserva, origen: origen}
+
+	if len(sonda) > 0 && sonda[0] != nil {
+		t.servible = sonda[0]
+	}
+
+	return t
+}
+
+// ActivarTramoDeLaCacheEnBloquesDe: reserva el tramo de bloques con reservador propio y lo usa, en un paso
+// (DC-002.108). Es la forma corta de `UsarTramoDeLaCache(ReservarTramoDeLaCacheEnBloquesDe(...))`.
+func (mr *MapRenderer) ActivarTramoDeLaCacheEnBloquesDe(total, pedazo int, reserva func(bytes int) []byte,
+	origen string, sonda ...func(tope int) int) {
+	t := ReservarTramoDeLaCacheEnBloquesDe(total, pedazo, reserva, origen, sonda...)
+
+	if t == nil {
+		mr.tramo = nil
+		mr.Warningf("el tramo de la cache en bloques de %s no se activa con total=%d pedazo=%d B (los dos tienen "+
+			"que pasar los %d B del objeto grande de libgodc, DC-002.108)", origen, total, pedazo,
+			UmbralDelObjetoGrande)
+
+		return
+	}
+
+	mr.tramo = t
+
+	mr.Debugf("tramo de la cache en bloques de %s: techo %d B en bloques de %d B (DC-002.108)", origen, total,
+		pedazo)
+}
 
 // ActivarTramoDeLaCacheEnPedazos: reserva el tramo en pedazos y lo usa, en un paso. Es la forma corta de
 // `UsarTramoDeLaCache(ReservarTramoDeLaCacheEnPedazos(total, pedazo))` (DC-002.106). ADITIVA igual que las
@@ -247,6 +384,7 @@ func (mr *MapRenderer) CensoDelTramo() CensoDelTramo {
 	return CensoDelTramo{
 		Activa:          true,
 		EnPedazos:       mr.tramo.EnPedazos(),
+		Origen:          mr.tramo.origenDeLosBloques(),
 		Pedazos:         mr.tramo.Pedazos(),
 		PedazoMenor:     mr.tramo.pedazoMenor,
 		PedazoMayor:     mr.tramo.pedazoMayor,
@@ -362,17 +500,27 @@ func (mr *MapRenderer) pedirDelTramoEnPedazos(n int) []byte {
 			tam = s
 		}
 
-		t.pedazos = append(t.pedazos, make([]byte, tam))
-		t.usadoEn = append(t.usadoEn, 0)
-		t.pedido += tam
-		mejor = len(t.pedazos) - 1
+		// DC-002.108: el bloque lo da el reservador si hay uno (la VRAM del PVR, en la consola). Si el
+		// reservador no tenia lugar, la imagen se derrama al `make` de siempre: no se tira el runtime.
+		bloque := t.nuevoBloque(tam)
+		if bloque == nil {
+			t.derrames++
+			t.bytesDerramados += n
 
-		if t.pedazoMenor == 0 || tam < t.pedazoMenor {
-			t.pedazoMenor = tam
+			return nil
 		}
 
-		if tam > t.pedazoMayor {
-			t.pedazoMayor = tam
+		t.pedazos = append(t.pedazos, bloque)
+		t.usadoEn = append(t.usadoEn, 0)
+		t.pedido += len(bloque)
+		mejor = len(t.pedazos) - 1
+
+		if t.pedazoMenor == 0 || len(bloque) < t.pedazoMenor {
+			t.pedazoMenor = len(bloque)
+		}
+
+		if len(bloque) > t.pedazoMayor {
+			t.pedazoMayor = len(bloque)
 		}
 	}
 

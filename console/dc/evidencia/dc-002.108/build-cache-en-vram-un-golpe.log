@@ -1,0 +1,64 @@
+
+###########################################################################################
+#  OJO: EL ARBOL DE .gox ES MAS VIEJO QUE SUS FUENTES -- NO ES UN ERROR DEL CODIGO
+#  arbol: /home/dgalli/gox108
+#
+#  VIEJOS PERO NO IMPORTA: este build los recompila antes de enlazar (no hace falta rehacer nada)
+   d2core/d2map/d2maprenderer             31/10 18:26   se recompila aca (la fuente mas nueva es d2core/d2map/d2maprenderer/renderer.go)
+#
+#  gccgo va a decir algo como
+#     error: reference to undefined identifier 'X.Y'
+#  y el simbolo SI existe en el repo: lo que falta es el OBJETO COMPILADO. La receta (~6 min):
+#
+#     bash scripts/console/build-std-gox.sh    /tmp/gox-nuevo            # stdlib + terceros
+#     bash scripts/console/build-motor-all.sh  /tmp/gox-nuevo /tmp/log-nuevo
+#     BASE_GOX=/tmp/gox-nuevo bash scripts/console/build-XXXX.sh          # el build de la tarjeta
+#
+#  (medido en DC-002.90: stdlib 63 objetos, motor 145 de 145, bloqueados 0)
+#  -> no aborta: todo lo viejo lo recompila este mismo build
+###########################################################################################
+
+== 1/5 los paquetes que se compilan aca (el motor que se dibuja)
+   d2datautils.gox                       175628 B
+   d2dt1.gox                              99276 B
+   d2ds1.gox                             340164 B
+   d2mpq.gox                             319152 B
+   d2cache.gox                            57192 B
+   d2txt.gox                              55940 B
+   types.gox                              27976 B
+   asset.gox                              61996 B
+   mpq.gox                                90708 B
+   filesystem.gox                         68936 B
+   d2loader.gox                          146196 B
+   d2records.gox                        2185576 B
+   d2asset.gox                          1288172 B
+   d2term.gox                            119504 B
+   pvr.gox                               365708 B
+   d2lightmap.gox                        114028 B
+   d2mapentity.gox                      1576944 B
+   d2mapstamp.gox                        604080 B
+   d2mapengine.gox                      1341528 B
+   d2maprenderer.gox                    1123428 B
+   fuenteconsola.gox                     136024 B
+== 2/5 el arbol de enlace (/home/dgalli/dcbuild108/vram1/gox-enlace)
+   paquetes del motor en el enlace: 78
+   objetos en orden.txt: 141
+== 3/5 el directorio de fuentes del POC
+   orden=prestamo cuadros=3 modoTablas=fuente
+   ****************************************************************
+   * PISADA DE PALANCA: tramoEnPedazos           348160 -> 0
+   * el binario NO es el de la referencia del POC
+   ****************************************************************
+   soltarDespuesDeComponer=todo cacheEnVram=true tramoDeLaCache=2723840 tramoEnPedazos=0 pedazoLoDiceElMonton=true tramoAlArranque=false
+   2 archivos .go: knobs.go main.go 
+== 4/5 compilando y enlazando contra los .gox del motor
+== 5/5 la imagen con PATCH_D2.MPQ y D2DATA.MPQ en /JUEGO
+CUE: /home/dgalli/dcbuild108/vram1/disc.cue (TRACK 01 MODE1/2048 -> disc.iso)
+ISO: /home/dgalli/dcbuild108/vram1/disc.iso (277692416 bytes, con IP.BIN en el area de sistema)
+GDI: /home/dgalli/dcbuild108/vram1/disc.gdi (277692416 bytes = 135592 sectores; el arranque lee en FAD 45150; la sesion de datos se monta de la zona de alta)
+   prog.elf         17489100 B
+   1ST_READ.BIN      5285032 B
+   disc.iso        277692416 B
+   codigo (.text)     2320848 B
+   data+bss            260952 B
+   imagen:         /home/dgalli/dcbuild108/vram1/disc.gdi

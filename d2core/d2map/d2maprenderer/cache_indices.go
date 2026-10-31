@@ -125,6 +125,68 @@ func (mr *MapRenderer) TamanosDeLaCache() []int {
 	return tamanos
 }
 
+// HuellaDeLaCache (DC-002.108): un FNV-1a de los pixeles de la cache en indices -- clave, tamano y bytes de
+// cada imagen, por clave ORDENADA, para que dos corridas den el mismo numero.
+//
+// POR QUE EXISTE. Cuando la cache se muda de lugar (del monton de C a la VRAM del PVR) hay dos preguntas
+// distintas y el crc32 del cuadro no las separa: ¿son los MISMOS pixeles? y ¿los lee bien el dibujado? Con la
+// huella se responde la primera sola: si dos corridas dan la misma huella, la cache es la misma byte a byte
+// aunque uno de los dos haya escrito en VRAM; lo que cambie despues es del camino de dibujado.
+//
+// ES A MANO Y SIN IMPORTS (FNV-1a y una ordenacion por insercion): este paquete entra al binario de la consola
+// y no vale la pena arrastrar `hash/crc32` y `sort` a su cierre por un instrumento.
+func (mr *MapRenderer) HuellaDeLaCache() (uint32, int, int) {
+	claves := make([]uint32, 0, len(mr.indicesCacheRecords))
+
+	for k := range mr.indicesCacheRecords {
+		claves = append(claves, k)
+	}
+
+	// ordenacion por insercion: son 86 claves en el pueblo
+	for i := 1; i < len(claves); i++ {
+		for j := i; j > 0 && claves[j] < claves[j-1]; j-- {
+			claves[j], claves[j-1] = claves[j-1], claves[j]
+		}
+	}
+
+	const (
+		fnvBase  = 2166136261
+		fnvPrimo = 16777619
+	)
+
+	h := uint32(fnvBase)
+	bytes := 0
+
+	mezclar := func(b byte) {
+		h ^= uint32(b)
+		h *= fnvPrimo
+	}
+
+	for _, k := range claves {
+		im := mr.indicesCacheRecords[k]
+		if im == nil {
+			continue
+		}
+
+		for s := 0; s < 4; s++ {
+			mezclar(byte(k >> (8 * s)))
+		}
+
+		n := len(im.indices)
+		for s := 0; s < 4; s++ {
+			mezclar(byte(n >> (8 * s)))
+		}
+
+		for _, b := range im.indices {
+			mezclar(b)
+		}
+
+		bytes += n
+	}
+
+	return h, len(claves), bytes
+}
+
 // dibujarImagenDeIndices pinta una imagen de indices en el destino, si el destino sabe hacerlo.
 func (mr *MapRenderer) dibujarImagenDeIndices(target interface{}, im *imagenDeIndices) {
 	lienzo, ok := target.(lienzoDeIndices)
