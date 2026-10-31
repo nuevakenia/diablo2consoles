@@ -174,8 +174,14 @@ func potenciaDeDos(v int) int {
 
 // rellenarIndices: los indices del sprite en una textura de pw x ph, con el relleno en INDICE 0 (que es
 // transparente). Sin esto el PVR leeria memoria que no es del asset en el borde del sprite.
+//
+// DC-002.97: este el tercer sitio donde nace un buffer de pixeles (el relleno de potencia de dos), y se
+// cuenta como Relleno.
 func rellenarIndices(indices []byte, ancho, alto, pw, ph int) []byte {
 	relleno := make([]byte, pw*ph)
+
+	pedidosDeBuffer.Rellenos++
+	pedidosDeBuffer.BytesRellenos += pw * ph
 
 	for y := 0; y < alto; y++ {
 		copy(relleno[y*pw:y*pw+ancho], indices[y*ancho:(y+1)*ancho])

@@ -32,7 +32,7 @@ func (i *Imagen) recortar(r image.Rectangle) *Imagen {
 		y1 = i.alto
 	}
 
-	out := NuevaImagen(x1-x0, y1-y0)
+	out := nuevaImagenDeRecorte(x1-x0, y1-y0)
 	if x1 <= x0 || y1 <= y0 {
 		return out
 	}

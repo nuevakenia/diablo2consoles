@@ -107,3 +107,38 @@ extern unsigned long marca_gc_n;
 unsigned int d2c_gc_n(void) {
     return (unsigned int)marca_gc_n;
 }
+
+/* DC-002.97: EL MONTON DE GO, EN USO.
+ *
+ * POR QUE. El criterio de la tarjeta es "cero pedidos de buffer por cuadro en regimen" y "el monton estable".
+ * `mallinfo()` solo ve el monton de C; lo que el recolector de Go tiene en uso en el semiespacio activo no
+ * aparece ahi, y es justo donde caen los buffers chicos (menos de GC_LARGE_OBJECT_THRESHOLD). `gc_stats` es
+ * la funcion del runtime de libgodc que devuelve esas tres cosas (runtime/gc_heap.c:328):
+ *
+ *     usado        alloc_ptr - base del semiespacio activo: lo que el recolector tiene TOMADO ahora
+ *     total        el tamano de UN semiespacio
+ *     colecciones  el contador del recolector (el mismo de marca_gc_n)
+ *
+ * Con esto, la diferencia de `usado` entre el principio y el fin de un cuadro es lo que ese cuadro dejo
+ * tomado del lado de Go; si el camino de pintado no pide buffers por cuadro, tiene que dar ~0.
+ *
+ * OJO CON EL TIPO DE `usado`: `alloc_ptr` es un puntero de direcciones virtuales del SH-4 (0x8C...), no un
+ * contador. La cuenta de arriba es `size_t`, y por eso va a un size_t y no a un unsigned int -- es la misma
+ * trampa que DC-002.85 documento para `mallinfo`. */
+extern void gc_stats(size_t *usado, size_t *total, uint32_t *colecciones);
+
+static size_t gc_usado, gc_total;
+static uint32_t gc_colecciones;
+
+unsigned int d2c_gc_heap_usado(void) {
+    gc_stats(&gc_usado, &gc_total, &gc_colecciones);
+
+    return (unsigned int)gc_usado;
+}
+
+unsigned int d2c_gc_heap_total(void) {
+    gc_stats(&gc_usado, &gc_total, &gc_colecciones);
+
+    return (unsigned int)gc_total;
+}
+

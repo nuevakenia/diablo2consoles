@@ -1,0 +1,836 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:050 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:309 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:415 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:415 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:418 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:423 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:437 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f81712d0000 RAM(16 MB) 0x7f817d2d0000 VRAM64(8 MB) 0x7f81752d0000 ARAM(2 MB) 0x7f81912d0000
+00:00:444 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:451 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f81712d0000 RAM(16 MB) 0x7f817d2d0000 VRAM64(8 MB) 0x7f81752d0000 ARAM(2 MB) 0x7f81912d0000
+00:00:455 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:459 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:459 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:520 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:520 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:520 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f68a0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2352005120
+ARQ-MARCA   gc_init-semiespacio0 v=2352003264
+ARQ-MARCA   gc_init-semiespacio1 v=2354100448
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=480 cused=4353280 gsemi=95808/2097152 gc=0
+COOP287: RELLENO bytes= 1 primero= 0 reservaPedida= 0 reservaQuedo= 0 fallaDePrueba= false
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 3520 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 3696
+COOP276: mpq a mano listos montonLibre= 3872
+ARQ-CARGA lee-entra /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=3848 cused=5705688 gsemi=452664/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=3848 cused=5705688 gsemi=566224/2097152 gc=0
+COOP276: DS1 version= 18 act= 1 w= 57 h= 41 files= 8 ds1sPeso= 225428 ds1sEvicto= 0 montonLibre= 3848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575176
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=433216
+COOP276: DT1 act1\outdoors\treegroups.dt1 tiles= 21 pesoEnCache= 489812 evicto= 0 montonLibre= 1792
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=449624
+COOP276: DT1 soltado montonLibre= 1792 gcColecciones= 2
+COOP276: DT1 act1\outdoors\stonewall.dt1 tiles= 52 pesoEnCache= 420161 evicto= 0 montonLibre= 488
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=459408
+COOP276: DT1 soltado montonLibre= 488 gcColecciones= 3
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576216
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=468648
+COOP276: DT1 act1\town\floor.dt1 tiles= 144 pesoEnCache= 921903 evicto= 0 montonLibre= 96
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=566616
+COOP276: DT1 soltado montonLibre= 96 gcColecciones= 5
+COOP276: DT1 act1\barracks\warp.dt1 tiles= 81 pesoEnCache= 629046 evicto= 0 montonLibre= 1384
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=477416
+COOP276: DT1 soltado montonLibre= 1384 gcColecciones= 6
+COOP276: DT1 act1\outdoors\river.dt1 tiles= 45 pesoEnCache= 289488 evicto= 0 montonLibre= 424
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=468872
+COOP276: DT1 soltado montonLibre= 424 gcColecciones= 7
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573048
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=513616
+COOP276: DT1 act1\town\objects.dt1 tiles= 91 pesoEnCache= 622083 evicto= 0 montonLibre= 2456
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=493200
+COOP276: DT1 soltado montonLibre= 2456 gcColecciones= 9
+COOP276: DT1 act1\town\fence.dt1 tiles= 31 pesoEnCache= 407675 evicto= 0 montonLibre= 968
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=451056
+COOP276: DT1 soltado montonLibre= 968 gcColecciones= 10
+COOP276: DT1 act1\outdoors\objects.dt1 tiles= 42 pesoEnCache= 313877 evicto= 0 montonLibre= 2720
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=464880
+COOP276: DT1 soltado montonLibre= 2720 gcColecciones= 11
+COOP276: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 dt1sPeso= 0 dt1sEvicto= 0
+COOP276: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456 montonLibre= 2720
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=2720 cused=10544192 gsemi=466352/2097152 gc=11
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=2720 cused=10544192 gsemi=468256/2097152 gc=11
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 3248
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=783592
+COOP276: ANIMDATA despues del GC montonLibre= 3248
+COOP276: BASELINE (N=0) montonLibre= 3248 gcColecciones= 12 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+COOP276: LIENZO antes de crear superficies= 0 bytesDeLienzo= 0 directas= 0 bytesDirectos= 0 copias= 0 bytesCopiados= 0 montonLibre= 3248 montonUsado= 11043376 arena= 11046624
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=783728
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 13
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=3232 cused=11043392 gsemi=790376/2097152 gc=13
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=3232 cused=11043392 gsemi=793568/2097152 gc=13
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=3216 cused=11043408 gsemi=809984/2097152 gc=13
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=3216 cused=11043408 gsemi=812864/2097152 gc=13
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=3216 cused=11043408 gsemi=832088/2097152 gc=13
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=3216 cused=11043408 gsemi=845080/2097152 gc=13
+ARQ-CARGA lee-entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=3192 cused=11043432 gsemi=1203184/2097152 gc=13
+ARQ-CARGA lee-volvio /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=3192 cused=11043432 gsemi=1218016/2097152 gc=13
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578848
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=946392
+ARQ-CARGA lee-entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=3192 cused=11043432 gsemi=1121272/2097152 gc=14
+ARQ-CARGA lee-volvio /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=3192 cused=11043432 gsemi=1161048/2097152 gc=14
+ARQ-MARCA gc-por-umbral-bytes-usados v=1622760
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=1155432
+ARQ-MARCA gc-por-umbral-bytes-usados v=1581512
+ARQ-MARCA gc_collect v=16
+ARQ-MARCA gc-vivo v=1222136
+ARQ-CARGA lee-entra /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=2888 cused=11457432 gsemi=1510000/2097152 gc=16
+ARQ-CARGA lee-volvio /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=2888 cused=11457432 gsemi=1523048/2097152 gc=16
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572896
+ARQ-MARCA gc_collect v=17
+ARQ-MARCA gc-vivo v=1197480
+ARQ-CARGA lee-entra /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=2888 cused=11457432 gsemi=1560496/2097152 gc=17
+ARQ-CARGA lee-volvio /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=2888 cused=11457432 gsemi=1566320/2097152 gc=17
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574736
+ARQ-MARCA gc_collect v=18
+ARQ-MARCA gc-vivo v=1264384
+ARQ-CARGA lee-entra /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=2888 cused=11457432 gsemi=1384552/2097152 gc=18
+ARQ-CARGA lee-volvio /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=2888 cused=11457432 gsemi=1391504/2097152 gc=18
+ARQ-CARGA lee-entra /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=2888 cused=11457432 gsemi=1574936/2097152 gc=18
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574936
+ARQ-MARCA gc_collect v=19
+ARQ-MARCA gc-vivo v=1346752
+ARQ-CARGA lee-volvio /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=2888 cused=11457432 gsemi=1366232/2097152 gc=19
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588064
+ARQ-MARCA gc_collect v=20
+ARQ-MARCA gc-vivo v=1402472
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=21
+ARQ-MARCA gc-vivo v=1401608
+COOP276: JUGADOR J1 indice= 0 direccion= 0 celda= 28 20 subtiles= 140 100 creacionUs= 2293645 montonAntes= 3248 montonDespues= 2888 gcPorLaCreacion= 8 gcTotal= 21
+COOP276: ETAPA n= 1 montonLibre= 2888 creacionUs= 2391810 gcEnLaCreacion= 9 gcTotal= 21
+COOP276: CACHES n= 1 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 225428 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=22
+ARQ-MARCA gc-vivo v=1414920
+COOP276: ETAPA n= 1 gcForzadoUs= 81921 montonLibreDespuesDelGC= 2888
+COOP276: LIENZO despues de crear superficies= 0 bytesDeLienzo= 0 directas= 0 bytesDirectos= 0 copias= 0 bytesCopiados= 0 montonLibre= 2888 montonUsado= 11457432 arena= 11460320
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401296
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401176
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942400936
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942466744
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401056
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942466472
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942400816
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401296
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401176
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942400936
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942466744
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401056
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942466472
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942400816
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP297: PEDIDOS n= 1 cuadro= 1 lienzos= 56 bytesLienzos= 88576 recortes= 0 rellenos= 0 expansion= 0 bytesExpansion= 0 total= 56 bytesTotales= 88576 saltoHeapGo= 97752 saltoHeapC= 16 heapGo= 1512672 de 2097152 heapC= 11457448 arena= 11460320 libre= 2872
+COOP276: CUADRO n= 1 cuadro= 1 pixelesNoVacios= 177715 crc32= -1915199840 montonLibre= 2872
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401296
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401176
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942400936
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942466744
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401056
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942466472
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942400816
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401296
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401176
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942400936
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942466744
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401056
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942466472
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942400816
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP297: PEDIDOS n= 1 cuadro= 2 lienzos= 0 bytesLienzos= 0 recortes= 0 rellenos= 0 expansion= 0 bytesExpansion= 0 total= 0 bytesTotales= 0 saltoHeapGo= 0 saltoHeapC= 0 heapGo= 1512672 de 2097152 heapC= 11457448 arena= 11460320 libre= 2872
+COOP276: FILA n= 1 montonLibre= 2872 gcColeccionesTotal= 22 gcEnLaEtapa= 13 cuadros= 60 avanceUsPorCuadro= 10 dibujoUsPorCuadro= 125634 trabajoUsPorCuadro= 125644 fps= 6
+COOP276: CACHES n= 1 al cerrar | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 225428 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+COOP276: LIENZO al cerrar superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2872 montonUsado= 11457448 arena= 11460320
+COOP297: REGIMEN n= 1 cuadros= 60 conPedidos= 1 sinPedidos= 58 peorLienzos= 56 peorRecortes= 0 peorRellenos= 0 peorExpansion= 0 peorBytes= 88576 picoHeapGo= 97752 picoHeapC= 16 enElCuadro= 1 heapGo= 1512672 heapC= 11457448 libre= 2872 gcTotal= 22
+COOP276: LIENZO antes de crear superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2872 montonUsado= 11457448 arena= 11460320
+ARQ-MARCA gc_collect v=23
+ARQ-MARCA gc-vivo v=1512144
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 23
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573120
+ARQ-MARCA gc_collect v=24
+ARQ-MARCA gc-vivo v=1547584
+COOP276: JUGADOR J2 indice= 1 direccion= 16 celda= 31 20 subtiles= 155 100 creacionUs= 103150 montonAntes= 2872 montonDespues= 2736 gcPorLaCreacion= 1 gcTotal= 24
+COOP276: ETAPA n= 2 montonLibre= 2736 creacionUs= 218480 gcEnLaCreacion= 2 gcTotal= 24
+COOP276: CACHES n= 2 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 225428 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=25
+ARQ-MARCA gc-vivo v=1552240
+COOP276: ETAPA n= 2 gcForzadoUs= 82396 montonLibreDespuesDelGC= 2736
+COOP276: LIENZO despues de crear superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2736 montonUsado= 11457584 arena= 11460320
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940865448
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940134152
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940141728
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940320584
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940193296
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940320312
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940193864
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940865448
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940134152
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940141728
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940320584
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940193296
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940320312
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940193864
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249776
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249656
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249416
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249896
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249536
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940250016
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249296
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249776
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249656
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249416
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249896
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249536
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940250016
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249296
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP297: PEDIDOS n= 2 cuadro= 1 lienzos= 0 bytesLienzos= 0 recortes= 0 rellenos= 0 expansion= 0 bytesExpansion= 0 total= 0 bytesTotales= 0 saltoHeapGo= 0 saltoHeapC= 0 heapGo= 1552240 de 2097152 heapC= 11457584 arena= 11460320 libre= 2736
+COOP276: CUADRO n= 2 cuadro= 1 pixelesNoVacios= 177712 crc32= 1271764587 montonLibre= 2736
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940865448
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940134152
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940141728
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940320584
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940193296
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940320312
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940193864
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940865448
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940134152
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940141728
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940320584
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940193296
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940320312
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940193864
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249776
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249656
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249416
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249896
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249536
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940250016
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249296
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249776
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249656
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249416
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249896
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249536
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940250016
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249296
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP297: PEDIDOS n= 2 cuadro= 2 lienzos= 0 bytesLienzos= 0 recortes= 0 rellenos= 0 expansion= 0 bytesExpansion= 0 total= 0 bytesTotales= 0 saltoHeapGo= 0 saltoHeapC= 0 heapGo= 1552240 de 2097152 heapC= 11457584 arena= 11460320 libre= 2736
+COOP276: FILA n= 2 montonLibre= 2736 gcColeccionesTotal= 25 gcEnLaEtapa= 23 cuadros= 60 avanceUsPorCuadro= 19 dibujoUsPorCuadro= 134982 trabajoUsPorCuadro= 135001 fps= 5
+COOP276: CACHES n= 2 al cerrar | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 225428 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+COOP276: LIENZO al cerrar superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2736 montonUsado= 11457584 arena= 11460320
+COOP297: REGIMEN n= 2 cuadros= 60 conPedidos= 0 sinPedidos= 59 peorLienzos= 0 peorRecortes= 0 peorRellenos= 0 peorExpansion= 0 peorBytes= 0 picoHeapGo= 0 picoHeapC= 0 enElCuadro= 0 heapGo= 1552240 heapC= 11457584 libre= 2736 gcTotal= 25
+COOP276: LIENZO antes de crear superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2736 montonUsado= 11457584 arena= 11460320
+ARQ-MARCA gc_collect v=26
+ARQ-MARCA gc-vivo v=1552240
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 26
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572872
+ARQ-MARCA gc_collect v=27
+ARQ-MARCA gc-vivo v=1562792
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572912
+ARQ-MARCA gc_collect v=28
+ARQ-MARCA gc-vivo v=1562520
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573032
+ARQ-MARCA gc_collect v=29
+ARQ-MARCA gc-vivo v=1562640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573152
+ARQ-MARCA gc_collect v=30
+ARQ-MARCA gc-vivo v=1562760
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=31
+ARQ-MARCA gc-vivo v=1562280
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572872
+ARQ-MARCA gc_collect v=32
+ARQ-MARCA gc-vivo v=1567152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573240
+ARQ-MARCA gc_collect v=33
+ARQ-MARCA gc-vivo v=1571824
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573000
+ARQ-MARCA gc_collect v=34
+ARQ-MARCA gc-vivo v=1573000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573392
+ARQ-MARCA gc_collect v=35
+ARQ-MARCA gc-vivo v=1573392
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573784
+ARQ-MARCA gc_collect v=36
+ARQ-MARCA gc-vivo v=1573784
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574176
+ARQ-MARCA gc_collect v=37
+ARQ-MARCA gc-vivo v=1566416
+COOP276: JUGADOR J3 indice= 2 direccion= 32 celda= 28 23 subtiles= 140 115 creacionUs= 1004589 montonAntes= 2736 montonDespues= 2736 gcPorLaCreacion= 11 gcTotal= 37
+ARQ-MARCA gc_collect v=38
+ARQ-MARCA gc-vivo v=1566456
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 38
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572872
+ARQ-MARCA gc_collect v=39
+ARQ-MARCA gc-vivo v=1567720
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572992
+ARQ-MARCA gc_collect v=40
+ARQ-MARCA gc-vivo v=1572096
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=41
+ARQ-MARCA gc-vivo v=1572880
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573272
+ARQ-MARCA gc_collect v=42
+ARQ-MARCA gc-vivo v=1573272
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573664
+ARQ-MARCA gc_collect v=43
+ARQ-MARCA gc-vivo v=1573664
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574056
+ARQ-MARCA gc_collect v=44
+ARQ-MARCA gc-vivo v=1574056
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574448
+ARQ-MARCA gc_collect v=45
+ARQ-MARCA gc-vivo v=1574448
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574840
+ARQ-MARCA gc_collect v=46
+ARQ-MARCA gc-vivo v=1567320
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573128
+ARQ-MARCA gc_collect v=47
+ARQ-MARCA gc-vivo v=1570040
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573176
+ARQ-MARCA gc_collect v=48
+ARQ-MARCA gc-vivo v=1573176
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573568
+ARQ-MARCA gc_collect v=49
+ARQ-MARCA gc-vivo v=1573568
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573960
+ARQ-MARCA gc_collect v=50
+ARQ-MARCA gc-vivo v=1573960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574352
+ARQ-MARCA gc_collect v=51
+ARQ-MARCA gc-vivo v=1574352
+
+panic: index out of range
+
+goroutine 1 [running]:
+Stack Trace: frame pointers not enabled!
+
+Memory: arena=11460320 used=11457584 free=2736
+01:25:910 reios/reios.cpp:639 N[REIOS]: -----------------
+01:25:910 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+01:25:910 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f68a0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2352005120
+ARQ-MARCA   gc_init-semiespacio0 v=2352003264
+ARQ-MARCA   gc_init-semiespacio1 v=2354100448
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=480 cused=4353280 gsemi=95808/2097152 gc=0
+COOP287: RELLENO bytes= 1 primero= 0 reservaPedida= 0 reservaQuedo= 0 fallaDePrueba= false
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 3520 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 3696
+COOP276: mpq a mano listos montonLibre= 3872
+ARQ-CARGA lee-entra /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=3848 cused=5705688 gsemi=452664/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/tiles/ACT1/TOWN/townN1.ds1 cfree=3848 cused=5705688 gsemi=566224/2097152 gc=0
+COOP276: DS1 version= 18 act= 1 w= 57 h= 41 files= 8 ds1sPeso= 225428 ds1sEvicto= 0 montonLibre= 3848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575176
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=433216
+COOP276: DT1 act1\outdoors\treegroups.dt1 tiles= 21 pesoEnCache= 489812 evicto= 0 montonLibre= 1792
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=449624
+COOP276: DT1 soltado montonLibre= 1792 gcColecciones= 2
+COOP276: DT1 act1\outdoors\stonewall.dt1 tiles= 52 pesoEnCache= 420161 evicto= 0 montonLibre= 488
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=459408
+COOP276: DT1 soltado montonLibre= 488 gcColecciones= 3
+ARQ-MARCA gc-por-umbral-bytes-usados v=1576216
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=468648
+COOP276: DT1 act1\town\floor.dt1 tiles= 144 pesoEnCache= 921903 evicto= 0 montonLibre= 96
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=566616
+COOP276: DT1 soltado montonLibre= 96 gcColecciones= 5
+COOP276: DT1 act1\barracks\warp.dt1 tiles= 81 pesoEnCache= 629046 evicto= 0 montonLibre= 1384
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=477416
+COOP276: DT1 soltado montonLibre= 1384 gcColecciones= 6
+COOP276: DT1 act1\outdoors\river.dt1 tiles= 45 pesoEnCache= 289488 evicto= 0 montonLibre= 424
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=468872
+COOP276: DT1 soltado montonLibre= 424 gcColecciones= 7
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573048
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=513616
+COOP276: DT1 act1\town\objects.dt1 tiles= 91 pesoEnCache= 622083 evicto= 0 montonLibre= 2456
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=493200
+COOP276: DT1 soltado montonLibre= 2456 gcColecciones= 9
+COOP276: DT1 act1\town\fence.dt1 tiles= 31 pesoEnCache= 407675 evicto= 0 montonLibre= 968
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=451056
+COOP276: DT1 soltado montonLibre= 968 gcColecciones= 10
+COOP276: DT1 act1\outdoors\objects.dt1 tiles= 42 pesoEnCache= 313877 evicto= 0 montonLibre= 2720
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=464880
+COOP276: DT1 soltado montonLibre= 2720 gcColecciones= 11
+COOP276: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 dt1sPeso= 0 dt1sEvicto= 0
+COOP276: LIENZO pixelesNoVacios= 193538 de 262144 crc32= 3507647456 montonLibre= 2720
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=2720 cused=10544192 gsemi=466352/2097152 gc=11
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=2720 cused=10544192 gsemi=468256/2097152 gc=11
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 3248
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=783592
+COOP276: ANIMDATA despues del GC montonLibre= 3248
+COOP276: BASELINE (N=0) montonLibre= 3248 gcColecciones= 12 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+COOP276: LIENZO antes de crear superficies= 0 bytesDeLienzo= 0 directas= 0 bytesDirectos= 0 copias= 0 bytesCopiados= 0 montonLibre= 3248 montonUsado= 11043376 arena= 11046624
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=783728
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 13
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=3232 cused=11043392 gsemi=790376/2097152 gc=13
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=3232 cused=11043392 gsemi=793568/2097152 gc=13
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=3216 cused=11043408 gsemi=809984/2097152 gc=13
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=3216 cused=11043408 gsemi=812864/2097152 gc=13
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=3216 cused=11043408 gsemi=832088/2097152 gc=13
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=3216 cused=11043408 gsemi=845080/2097152 gc=13
+ARQ-CARGA lee-entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=3192 cused=11043432 gsemi=1203184/2097152 gc=13
+ARQ-CARGA lee-volvio /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=3192 cused=11043432 gsemi=1218016/2097152 gc=13
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578848
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=946392
+ARQ-CARGA lee-entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=3192 cused=11043432 gsemi=1121272/2097152 gc=14
+ARQ-CARGA lee-volvio /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=3192 cused=11043432 gsemi=1161048/2097152 gc=14
+ARQ-MARCA gc-por-umbral-bytes-usados v=1622760
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=1155432
+ARQ-MARCA gc-por-umbral-bytes-usados v=1581512
+ARQ-MARCA gc_collect v=16
+ARQ-MARCA gc-vivo v=1222136
+ARQ-CARGA lee-entra /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=2888 cused=11457432 gsemi=1510000/2097152 gc=16
+ARQ-CARGA lee-volvio /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=2888 cused=11457432 gsemi=1523048/2097152 gc=16
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572896
+ARQ-MARCA gc_collect v=17
+ARQ-MARCA gc-vivo v=1197480
+ARQ-CARGA lee-entra /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=2888 cused=11457432 gsemi=1560496/2097152 gc=17
+ARQ-CARGA lee-volvio /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=2888 cused=11457432 gsemi=1566320/2097152 gc=17
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574736
+ARQ-MARCA gc_collect v=18
+ARQ-MARCA gc-vivo v=1264384
+ARQ-CARGA lee-entra /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=2888 cused=11457432 gsemi=1384552/2097152 gc=18
+ARQ-CARGA lee-volvio /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=2888 cused=11457432 gsemi=1391504/2097152 gc=18
+ARQ-CARGA lee-entra /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=2888 cused=11457432 gsemi=1574936/2097152 gc=18
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574936
+ARQ-MARCA gc_collect v=19
+ARQ-MARCA gc-vivo v=1346752
+ARQ-CARGA lee-volvio /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=2888 cused=11457432 gsemi=1366232/2097152 gc=19
+ARQ-MARCA gc-por-umbral-bytes-usados v=1588064
+ARQ-MARCA gc_collect v=20
+ARQ-MARCA gc-vivo v=1402472
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=21
+ARQ-MARCA gc-vivo v=1401608
+COOP276: JUGADOR J1 indice= 0 direccion= 0 celda= 28 20 subtiles= 140 100 creacionUs= 2275224 montonAntes= 3248 montonDespues= 2888 gcPorLaCreacion= 8 gcTotal= 21
+COOP276: ETAPA n= 1 montonLibre= 2888 creacionUs= 2373176 gcEnLaCreacion= 9 gcTotal= 21
+COOP276: CACHES n= 1 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 225428 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=22
+ARQ-MARCA gc-vivo v=1414920
+COOP276: ETAPA n= 1 gcForzadoUs= 79167 montonLibreDespuesDelGC= 2888
+COOP276: LIENZO despues de crear superficies= 0 bytesDeLienzo= 0 directas= 0 bytesDirectos= 0 copias= 0 bytesCopiados= 0 montonLibre= 2888 montonUsado= 11457432 arena= 11460320
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401296
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401176
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942400936
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942466744
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401056
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942466472
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942400816
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401296
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401176
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942400936
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942466744
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401056
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942466472
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942400816
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP297: PEDIDOS n= 1 cuadro= 1 lienzos= 56 bytesLienzos= 88576 recortes= 0 rellenos= 0 expansion= 0 bytesExpansion= 0 total= 56 bytesTotales= 88576 saltoHeapGo= 97752 saltoHeapC= 16 heapGo= 1512672 de 2097152 heapC= 11457448 arena= 11460320 libre= 2872
+COOP276: CUADRO n= 1 cuadro= 1 pixelesNoVacios= 177715 crc32= -1915199840 montonLibre= 2872
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401296
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401176
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942400936
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942466744
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942401056
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942466472
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1942400816
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401296
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401176
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942400936
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942466744
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942401056
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942466472
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1942400816
+COOP276: SONDA n= 1 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP297: PEDIDOS n= 1 cuadro= 2 lienzos= 0 bytesLienzos= 0 recortes= 0 rellenos= 0 expansion= 0 bytesExpansion= 0 total= 0 bytesTotales= 0 saltoHeapGo= 0 saltoHeapC= 0 heapGo= 1512672 de 2097152 heapC= 11457448 arena= 11460320 libre= 2872
+COOP276: FILA n= 1 montonLibre= 2872 gcColeccionesTotal= 22 gcEnLaEtapa= 13 cuadros= 60 avanceUsPorCuadro= 10 dibujoUsPorCuadro= 125643 trabajoUsPorCuadro= 125653 fps= 6
+COOP276: CACHES n= 1 al cerrar | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 225428 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+COOP276: LIENZO al cerrar superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2872 montonUsado= 11457448 arena= 11460320
+COOP297: REGIMEN n= 1 cuadros= 60 conPedidos= 1 sinPedidos= 58 peorLienzos= 56 peorRecortes= 0 peorRellenos= 0 peorExpansion= 0 peorBytes= 88576 picoHeapGo= 97752 picoHeapC= 16 enElCuadro= 1 heapGo= 1512672 heapC= 11457448 libre= 2872 gcTotal= 22
+COOP276: LIENZO antes de crear superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2872 montonUsado= 11457448 arena= 11460320
+ARQ-MARCA gc_collect v=23
+ARQ-MARCA gc-vivo v=1512144
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 23
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573120
+ARQ-MARCA gc_collect v=24
+ARQ-MARCA gc-vivo v=1547584
+COOP276: JUGADOR J2 indice= 1 direccion= 16 celda= 31 20 subtiles= 155 100 creacionUs= 102622 montonAntes= 2872 montonDespues= 2736 gcPorLaCreacion= 1 gcTotal= 24
+COOP276: ETAPA n= 2 montonLibre= 2736 creacionUs= 217769 gcEnLaCreacion= 2 gcTotal= 24
+COOP276: CACHES n= 2 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 225428 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=25
+ARQ-MARCA gc-vivo v=1552240
+COOP276: ETAPA n= 2 gcForzadoUs= 84715 montonLibreDespuesDelGC= 2736
+COOP276: LIENZO despues de crear superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2736 montonUsado= 11457584 arena= 11460320
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940865448
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940134152
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940141728
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940320584
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940193296
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940320312
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940193864
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940865448
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940134152
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940141728
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940320584
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940193296
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940320312
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940193864
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249776
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249656
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249416
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249896
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249536
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940250016
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249296
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249776
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249656
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249416
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249896
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249536
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940250016
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249296
+COOP276: SONDA n= 2 cuadro= 1 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP297: PEDIDOS n= 2 cuadro= 1 lienzos= 0 bytesLienzos= 0 recortes= 0 rellenos= 0 expansion= 0 bytesExpansion= 0 total= 0 bytesTotales= 0 saltoHeapGo= 0 saltoHeapC= 0 heapGo= 1552240 de 2097152 heapC= 11457584 arena= 11460320 libre= 2736
+COOP276: CUADRO n= 2 cuadro= 1 pixelesNoVacios= 177712 crc32= 1271764587 montonLibre= 2736
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940865448
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940134152
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940141728
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940320584
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940193296
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940320312
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940193864
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940865448
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940134152
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940141728
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940320584
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940193296
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940320312
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940193864
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249776
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249656
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249416
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249896
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249536
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940250016
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= true nil= false itab= -1943808196 dato= -1940249296
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= true nil= true itab= 0 dato= 0
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249776
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249656
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249416
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 1 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249896
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 4 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249536
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 0 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940250016
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 9 capas= 16 sombra= false nil= false itab= -1943808196 dato= -1940249296
+COOP276: SONDA n= 2 cuadro= 2 dir= 0 dirCof= 0 capa= 7 capas= 16 sombra= false nil= true itab= 0 dato= 0
+COOP297: PEDIDOS n= 2 cuadro= 2 lienzos= 0 bytesLienzos= 0 recortes= 0 rellenos= 0 expansion= 0 bytesExpansion= 0 total= 0 bytesTotales= 0 saltoHeapGo= 0 saltoHeapC= 0 heapGo= 1552240 de 2097152 heapC= 11457584 arena= 11460320 libre= 2736
+COOP276: FILA n= 2 montonLibre= 2736 gcColeccionesTotal= 25 gcEnLaEtapa= 23 cuadros= 60 avanceUsPorCuadro= 19 dibujoUsPorCuadro= 134965 trabajoUsPorCuadro= 134984 fps= 5
+COOP276: CACHES n= 2 al cerrar | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 225428 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+COOP276: LIENZO al cerrar superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2736 montonUsado= 11457584 arena= 11460320
+COOP297: REGIMEN n= 2 cuadros= 60 conPedidos= 0 sinPedidos= 59 peorLienzos= 0 peorRecortes= 0 peorRellenos= 0 peorExpansion= 0 peorBytes= 0 picoHeapGo= 0 picoHeapC= 0 enElCuadro= 0 heapGo= 1552240 heapC= 11457584 libre= 2736 gcTotal= 25
+COOP276: LIENZO antes de crear superficies= 56 bytesDeLienzo= 88576 directas= 56 bytesDirectos= 88576 copias= 0 bytesCopiados= 0 montonLibre= 2736 montonUsado= 11457584 arena= 11460320
+ARQ-MARCA gc_collect v=26
+ARQ-MARCA gc-vivo v=1552240
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 26
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572872
+ARQ-MARCA gc_collect v=27
+ARQ-MARCA gc-vivo v=1562792
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572912
+ARQ-MARCA gc_collect v=28
+ARQ-MARCA gc-vivo v=1562520
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573032
+ARQ-MARCA gc_collect v=29
+ARQ-MARCA gc-vivo v=1562640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573152
+ARQ-MARCA gc_collect v=30
+ARQ-MARCA gc-vivo v=1562760
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=31
+ARQ-MARCA gc-vivo v=1562280
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572872
+ARQ-MARCA gc_collect v=32
+ARQ-MARCA gc-vivo v=1567152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573240
+ARQ-MARCA gc_collect v=33
+ARQ-MARCA gc-vivo v=1571824
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573000
+ARQ-MARCA gc_collect v=34
+ARQ-MARCA gc-vivo v=1573000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573392
+ARQ-MARCA gc_collect v=35
+ARQ-MARCA gc-vivo v=1573392
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573784
+ARQ-MARCA gc_collect v=36
+ARQ-MARCA gc-vivo v=1573784
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574176
+ARQ-MARCA gc_collect v=37
+ARQ-MARCA gc-vivo v=1566416
+COOP276: JUGADOR J3 indice= 2 direccion= 32 celda= 28 23 subtiles= 140 115 creacionUs= 1000531 montonAntes= 2736 montonDespues= 2736 gcPorLaCreacion= 11 gcTotal= 37
+ARQ-MARCA gc_collect v=38
+ARQ-MARCA gc-vivo v=1566456
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 38
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572872
+ARQ-MARCA gc_collect v=39
+ARQ-MARCA gc-vivo v=1567720
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572992
+ARQ-MARCA gc_collect v=40
+ARQ-MARCA gc-vivo v=1572096
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572880
+ARQ-MARCA gc_collect v=41
+ARQ-MARCA gc-vivo v=1572880
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573272
+ARQ-MARCA gc_collect v=42
+ARQ-MARCA gc-vivo v=1573272
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573664
+ARQ-MARCA gc_collect v=43
+ARQ-MARCA gc-vivo v=1573664
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574056
+ARQ-MARCA gc_collect v=44
+ARQ-MARCA gc-vivo v=1574056
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574448
+ARQ-MARCA gc_collect v=45
+ARQ-MARCA gc-vivo v=1574448
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574840
+ARQ-MARCA gc_collect v=46
+ARQ-MARCA gc-vivo v=1567320
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573128
+ARQ-MARCA gc_collect v=47
+ARQ-MARCA gc-vivo v=1570040
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573176
+ARQ-MARCA gc_collect v=48
+ARQ-MARCA gc-vivo v=1573176
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573568
+ARQ-MARCA gc_collect v=49
+ARQ-MARCA gc-vivo v=1573568
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573960
+ARQ-MARCA gc_collect v=50
+ARQ-MARCA gc-vivo v=1573960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574352
+ARQ-MARCA gc_collect v=51
+ARQ-MARCA gc-vivo v=1574352
+
+panic: index out of range
+
+goroutine 1 [running]:
+Stack Trace: frame pointers not enabled!
+
+Memory: arena=11460320 used=11457584 free=2736
+02:51:022 reios/reios.cpp:639 N[REIOS]: -----------------
+02:51:022 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+02:51:022 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f68a0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2352005120
+ARQ-MARCA   gc_init-semiespacio0 v=2352003264
+ARQ-MARCA   gc_init-semiespacio1 v=2354100448
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=480 cused=4353280 gsemi=95808/2097152 gc=0
+COOP287: RELLENO bytes= 1 primero= 0 reservaPedida= 0 reservaQuedo= 0 fallaDePrueba= false
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 3520 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected

@@ -40,3 +40,39 @@ func (r *Renderer) CuentaDeLienzo() CuentaDelLienzo {
 		BytesCopiados: r.bytesCopiados,
 	}
 }
+
+// ============================================================ LOS PEDIDOS DE BUFFER (DC-002.97)
+
+// Pedidos es la cuenta de buffers de PIXELES que pidio este backend en toda su vida. Son TRES los sitios
+// donde nace uno, y cada uno tiene su campo:
+//
+//	Lienzos   una superficie nueva (`NuevaSurface` -> el lienzo donde se pinta una capa o el cuadro)
+//	Recortes  la seccion de otra superficie (`RenderSection` -> `recortar`, un buffer del tamano del recorte)
+//	Rellenos  la textura de potencia de dos de un sprite (`rellenarIndices`, camino de hardware)
+//
+// POR QUE UN CONTADOR Y NO UNA IMPRESION. El criterio de la tarjeta es "cero pedidos de buffer por cuadro
+// en regimen": con esto el POC toma la foto al empezar y al terminar cada cuadro y la diferencia es lo que
+// se pidio EN ESE CUADRO, sin leer el codigo y sin creerle a un comentario. Lo que no nace en estos tres
+// sitios es porque no es un buffer de pixeles (un estado, una copia a un lienzo que ya existe, la VRAM).
+//
+// VIVE EN EL PAQUETE Y NO EN EL Renderer: `recortar` y `rellenarIndices` se llaman tambien desde imagenes
+// que no tienen renderer (una superficie armada a mano, una prueba de humo), y si el contador viviera en el
+// Renderer esos pedidos no se contarian. El ciclo de cuadros de la consola es de un hilo.
+type Pedidos struct {
+	Lienzos       int
+	BytesLienzos  int
+	Recortes      int
+	BytesRecortes int
+	Rellenos      int
+	BytesRellenos int
+}
+
+// Suma: el total de buffers pedidos (los tres sitios) y sus bytes. Es lo que se compara contra cero.
+func (p Pedidos) Suma() int  { return p.Lienzos + p.Recortes + p.Rellenos }
+func (p Pedidos) Bytes() int { return p.BytesLienzos + p.BytesRecortes + p.BytesRellenos }
+
+var pedidosDeBuffer Pedidos
+
+// PedidosDeBuffer devuelve la foto acumulada de los pedidos. La diferencia entre dos fotos es lo que se
+// pidio entre las dos (el POC la usa por cuadro).
+func PedidosDeBuffer() Pedidos { return pedidosDeBuffer }

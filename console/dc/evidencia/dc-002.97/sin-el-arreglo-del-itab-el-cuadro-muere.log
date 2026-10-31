@@ -1,0 +1,150 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:083 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:394 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:534 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:534 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:537 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:544 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:559 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f581faf0000 RAM(16 MB) 0x7f582baf0000 VRAM64(8 MB) 0x7f5823af0000 ARAM(2 MB) 0x7f583faf0000
+00:00:567 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:575 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f581faf0000 RAM(16 MB) 0x7f582baf0000 VRAM64(8 MB) 0x7f5823af0000 ARAM(2 MB) 0x7f583faf0000
+00:00:579 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:583 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:584 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:676 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:676 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:676 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac2f5940
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2352001024
+ARQ-MARCA   gc_init-semiespacio0 v=2351999328
+ARQ-MARCA   gc_init-semiespacio1 v=2354096512
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=320 cused=4353280 gsemi=95808/2097152 gc=0
+COOP287: RELLENO bytes= 1 primero= 0 reservaPedida= 0 reservaQuedo= 0 fallaDePrueba= false
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 3360 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 3536
+COOP276: mpq a mano listos montonLibre= 3712
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=3712 cused=5705664 gsemi=395400/2097152 gc=0
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=3712 cused=5705664 gsemi=397304/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 144
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=491512
+COOP276: ANIMDATA despues del GC montonLibre= 144
+COOP276: BASELINE (N=0) montonLibre= 144 gcColecciones= 1 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+COOP276: LIENZO antes de crear superficies= 0 bytesDeLienzo= 0 directas= 0 bytesDirectos= 0 copias= 0 bytesCopiados= 0 montonLibre= 144 montonUsado= 6204848 arena= 6204992
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=491648
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=144 cused=6204848 gsemi=498344/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=144 cused=6204848 gsemi=501536/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=144 cused=6204848 gsemi=517976/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=144 cused=6204848 gsemi=520856/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=144 cused=6204848 gsemi=540080/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=144 cused=6204848 gsemi=553072/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=144 cused=6204848 gsemi=911208/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/LA/AMLAlitNU1ht.dcc cfree=144 cused=6204848 gsemi=926040/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=144 cused=6204848 gsemi=1461872/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/LG/AMLGlitNU1ht.dcc cfree=144 cused=6204848 gsemi=1501648/2097152 gc=2
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574152
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=785504
+ARQ-MARCA gc-por-umbral-bytes-usados v=1600792
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=926976
+ARQ-CARGA lee-entra /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=3936 cused=6618848 gsemi=1214920/2097152 gc=4
+ARQ-CARGA lee-volvio /data/global/chars/AM/RA/AMRAlitNUhth.dcc cfree=3936 cused=6618848 gsemi=1227968/2097152 gc=4
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573576
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=945744
+ARQ-CARGA lee-entra /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=3936 cused=6618848 gsemi=1013000/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/S1/AMS1litNU1ht.dcc cfree=3936 cused=6618848 gsemi=1018824/2097152 gc=5
+ARQ-CARGA lee-entra /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=3936 cused=6618848 gsemi=1147408/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/S2/AMS2litNU1ht.dcc cfree=3936 cused=6618848 gsemi=1154360/2097152 gc=5
+ARQ-CARGA lee-entra /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=3936 cused=6618848 gsemi=1337672/2097152 gc=5
+ARQ-CARGA lee-volvio /data/global/chars/AM/TR/AMTRlitNU1ht.dcc cfree=3936 cused=6618848 gsemi=1357152/2097152 gc=5
+ARQ-MARCA gc-por-umbral-bytes-usados v=1578984
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1102800
+COOP276: JUGADOR J1 indice= 0 direccion= 0 celda= 28 20 subtiles= 140 100 creacionUs= 1919195 montonAntes= 144 montonDespues= 3936 gcPorLaCreacion= 4 gcTotal= 6
+COOP276: ETAPA n= 1 montonLibre= 3936 creacionUs= 2011179 gcEnLaCreacion= 5 gcTotal= 6
+COOP276: CACHES n= 1 al crear | dt1s peso= 0 evicto= 0 de 1048576 | ds1s peso= 0 evicto= 0 de 262144 | cofs peso= 1132 evicto= 0 de 65536 | dccs peso= 349519 evicto= 0 de 524288 | anim peso= 349519 evicto= 0 de 1048576
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1138296
+COOP276: ETAPA n= 1 gcForzadoUs= 80151 montonLibreDespuesDelGC= 3936
+COOP276: LIENZO despues de crear superficies= 0 bytesDeLienzo= 0 directas= 0 bytesDirectos= 0 copias= 0 bytesCopiados= 0 montonLibre= 3936 montonUsado= 6618848 arena= 6622784
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 2 capas= 16 sombra= true nil= false itab= -1943812124 dato= -1940411808
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 3 capas= 16 sombra= true nil= false itab= -1943812124 dato= -1940411688
+COOP276: SONDA n= 1 cuadro= 1 dir= 0 dirCof= 0 capa= 8 capas= 16 sombra= true nil= false itab= -1943812124 dato= -1940411448
+Unhandled exception: PC ffffffff, code 1, evt 00e0
+ R0-R7: 8c61ebc0 ffffffff 8c71a3ec 8c58c1d4 8c578e90 0000002b 000000e0 00000038
+ R8-R15: 00000002 000000e0 00000001 8c71a588 8c62d930 0000000b 00000008 8c71a3a4
+ SR 40000000 PR 8c08c7fe
+Stack Trace: frame pointers not enabled!
+
+Encountered Data address error (read). Use this template terminal command to help diagnose:
+
+	$KOS_ADDR2LINE -f -C -i -e prog.elf 8c08c7fe
+
+kernel panic: unhandled IRQ/Exception
+arch: aborting the system
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+arch: aborting the system
+00:33:437 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked

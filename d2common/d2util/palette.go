@@ -8,9 +8,21 @@ import (
 
 // ImgIndexToRGBA converts the given indices byte slice and palette into
 // a byte slice of RGBA values
+//
+// DC-002.97 (instrumento): cada llamada PIDE un buffer de 4 x pixeles y lo devuelve como copia. En el camino
+// de pintado de la consola tiene que dar CERO -- ahi la expansion va directo al lienzo de la superficie
+// (`ImgIndexToRGBAEn` por `Surface.ExpandirIndices`), y este contador es lo que lo prueba cuadro a cuadro.
+var (
+	PedidosDeExpansion int
+	BytesDeExpansion   int
+)
+
 func ImgIndexToRGBA(indexData []byte, palette d2interface.Palette) []byte {
 	bytesPerPixel := 4
 	colorData := make([]byte, len(indexData)*bytesPerPixel)
+
+	PedidosDeExpansion++
+	BytesDeExpansion += len(colorData)
 
 	ImgIndexToRGBAEn(colorData, indexData, palette)
 

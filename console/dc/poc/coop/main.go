@@ -33,7 +33,6 @@ package main
 
 import (
 	"hash/crc32"
-	"image/color"
 	"runtime"
 	"strings"
 
@@ -72,6 +71,15 @@ func d2cUs() uint64
 
 //extern d2c_gc_n
 func d2cGcN() uint
+
+// DC-002.97: el monton de Go EN USO (el semiespacio activo) y su tamano total. `mallinfo` solo ve el monton
+// de C; los buffers chicos del camino de pintado caen del lado de Go y hay que medirlos ahi.
+//
+//extern d2c_gc_heap_usado
+func d2cGcHeapUsado() uint
+
+//extern d2c_gc_heap_total
+func d2cGcHeapTotal() uint
 
 func init() { d2cSerialInit() }
 
@@ -160,6 +168,123 @@ var (
 	dibujoUs   int64
 	creacionUs int64
 )
+
+// ============================================================ DC-002.97: LOS PEDIDOS DEL PINTADO
+//
+// QUE SE MIDE, Y POR QUE CON CONTADORES. El criterio de la tarjeta es "cero pedidos de buffer por cuadro en
+// regimen" y "el monton de C estable". Un pedido se ve en los contadores del backend
+// (`pvr.PedidosDeBuffer`: lienzos, recortes y rellenos; ver cuenta.go) y en el de la expansion intermedia
+// (`d2util.PedidosDeExpansion`, que es el buffer de 4 x pixeles que DC-002.85 saco del camino). La foto se
+// toma al empezar y al terminar cada cuadro: la diferencia ES lo que ese cuadro pidio, sin leer el codigo.
+//
+// Y LOS DOS MONTONES. `heapGo` es el semiespacio activo del recolector (gc_stats de libgodc) y `heapC` es
+// `mallinfo().uordblks`: los buffers chicos caen del lado de Go y los grandes (> 64 KB, gc_external_alloc =
+// malloc) del de C, asi que un cuadro puede pedir memoria sin que el monton de C se mueva. Se guarda el PEOR
+// salto de cada uno, que es el numero de "el monton en el peor cuadro".
+
+// foto: los cinco numeros de un instante.
+type foto struct {
+	pedidos        pvr.Pedidos
+	expansiones    int
+	bytesExpansion int
+	heapGo         int
+	heapC          int
+}
+
+func tomarFoto() foto {
+	return foto{
+		pedidos:        pvr.PedidosDeBuffer(),
+		expansiones:    d2util.PedidosDeExpansion,
+		bytesExpansion: d2util.BytesDeExpansion,
+		heapGo:         int(d2cGcHeapUsado()),
+		heapC:          int(d2cHeapUsado()),
+	}
+}
+
+// regimenDeLaEtapa: lo peor visto en la etapa y cuantos cuadros pidieron algo.
+type regimenDeLaEtapa struct {
+	conPedidos    int
+	sinPedidos    int
+	peorPedidos   pvr.Pedidos
+	peorExpansion int
+	picoHeapGo    int // el mayor salto del semiespacio de Go en un cuadro (bytes)
+	picoHeapC     int // el mayor salto del monton de C en un cuadro (bytes)
+	peorCuadro    int // en que cuadro de la etapa fue el peor de los dos
+}
+
+var regimen regimenDeLaEtapa
+
+// restarPedidos: lo que se pidio entre dos fotos (la de antes y la de despues).
+func restarPedidos(despues, antes pvr.Pedidos) pvr.Pedidos {
+	return pvr.Pedidos{
+		Lienzos:       despues.Lienzos - antes.Lienzos,
+		BytesLienzos:  despues.BytesLienzos - antes.BytesLienzos,
+		Recortes:      despues.Recortes - antes.Recortes,
+		BytesRecortes: despues.BytesRecortes - antes.BytesRecortes,
+		Rellenos:      despues.Rellenos - antes.Rellenos,
+		BytesRellenos: despues.BytesRellenos - antes.BytesRellenos,
+	}
+}
+
+// medirElCuadro cierra la cuenta de UN cuadro contra la foto de su principio: cuantos buffers pidio, cuantos
+// bytes, y cuanto subieron los dos montones. Imprime en el cuadro 1 y 2 (donde caen las superficies de las
+// capas, que es cuando aparece el unico pedido legitimo), en el 300 (el corte de la tarjeta), en el ultimo de
+// la etapa y cada `cuadrosPorEtapa`.
+func medirElCuadro(antes foto) {
+	deEsteCuadro := restarPedidos(pvr.PedidosDeBuffer(), antes.pedidos)
+	deEstaExpansion := d2util.PedidosDeExpansion - antes.expansiones
+
+	saltoGo := int(d2cGcHeapUsado()) - antes.heapGo
+	saltoC := int(d2cHeapUsado()) - antes.heapC
+
+	if saltoGo > regimen.picoHeapGo {
+		regimen.picoHeapGo = saltoGo
+	}
+
+	if saltoC > regimen.picoHeapC {
+		regimen.picoHeapC = saltoC
+		regimen.peorCuadro = cuadros
+	}
+
+	if deEsteCuadro.Suma()+deEstaExpansion > 0 {
+		regimen.conPedidos++
+	} else {
+		regimen.sinPedidos++
+	}
+
+	if deEsteCuadro.Suma()+deEstaExpansion > regimen.peorPedidos.Suma()+regimen.peorExpansion {
+		regimen.peorPedidos = deEsteCuadro
+		regimen.peorExpansion = deEstaExpansion
+	}
+
+	if cuadros <= 2 || cuadros == 300 || cuadros%cuadrosPorEtapa == 0 {
+		println("COOP297: PEDIDOS n=", nEtapa, "cuadro=", cuadros,
+			"lienzos=", deEsteCuadro.Lienzos, "bytesLienzos=", deEsteCuadro.BytesLienzos,
+			"recortes=", deEsteCuadro.Recortes, "rellenos=", deEsteCuadro.Rellenos,
+			"expansion=", deEstaExpansion, "bytesExpansion=", d2util.BytesDeExpansion-antes.bytesExpansion,
+			"total=", deEsteCuadro.Suma()+deEstaExpansion,
+			"bytesTotales=", deEsteCuadro.Bytes()+d2util.BytesDeExpansion-antes.bytesExpansion,
+			"saltoHeapGo=", saltoGo, "saltoHeapC=", saltoC,
+			"heapGo=", int(d2cGcHeapUsado()), "de", int(d2cGcHeapTotal()),
+			"heapC=", int(d2cHeapUsado()), "arena=", int(d2cHeapArena()), "libre=", int(d2cHeapLibre()))
+	}
+}
+
+// informeDelRegimen: la fila de la etapa. Los tres numeros que la tarjeta pide de un tiron:
+//
+//	conPedidos / sinPedidos   cuantos cuadros pidieron un buffer y cuantos ninguno
+//	peorCuadro...             el peor cuadro de la etapa (los pedidos y sus bytes)
+//	picoHeapGo / picoHeapC    el mayor salto de cada monton en un cuadro
+func informeDelRegimen() {
+	println("COOP297: REGIMEN n=", nEtapa, "cuadros=", cuadros,
+		"conPedidos=", regimen.conPedidos, "sinPedidos=", regimen.sinPedidos,
+		"peorLienzos=", regimen.peorPedidos.Lienzos, "peorRecortes=", regimen.peorPedidos.Recortes,
+		"peorRellenos=", regimen.peorPedidos.Rellenos, "peorExpansion=", regimen.peorExpansion,
+		"peorBytes=", regimen.peorPedidos.Bytes()+regimen.peorExpansion,
+		"picoHeapGo=", regimen.picoHeapGo, "picoHeapC=", regimen.picoHeapC, "enElCuadro=", regimen.peorCuadro,
+		"heapGo=", int(d2cGcHeapUsado()), "heapC=", int(d2cHeapUsado()),
+		"libre=", int(d2cHeapLibre()), "gcTotal=", int(d2cGcN()))
+}
 
 func main() {
 	println("COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola")
@@ -395,6 +520,9 @@ func prepararEtapa() {
 	usAntes := d2cUs()
 	gcAntes := d2cGcN()
 
+	// DC-002.97: la etapa arranca con el regimen en cero. Lo que se mide es DE ESTA ETAPA.
+	regimen = regimenDeLaEtapa{}
+
 	// DC-002.85: la foto del lienzo ANTES de crear los jugadores. Es la mitad del "monton antes/despues" de
 	// la tarjeta; la otra mitad es el informe de abajo, con las capas ya creadas.
 	informeDeLienzo("antes de crear")
@@ -549,6 +677,10 @@ func cerrarEtapa() {
 
 	// DC-002.85: la foto final de la etapa: cuadros por cada camino de expansion y monton libre.
 	informeDeLienzo("al cerrar")
+
+	// DC-002.97: y la fila de los pedidos: cuantos cuadros pidieron buffer, el peor cuadro y el pico de cada
+	// monton.
+	informeDelRegimen()
 }
 
 // actualizar: un cuadro de juego. Avanza los N jugadores (es el costo de CPU del cooperativo) y cuenta los
@@ -596,9 +728,13 @@ func dibujar(superficie d2interface.Surface) error {
 		return nil
 	}
 
+	// DC-002.97: la foto del principio del cuadro. Todo lo que se pida entre esta linea y la de abajo es lo
+	// que este cuadro se llevo del monton y no devolvio.
+	antesDelCuadro := tomarFoto()
+
 	t0 := d2cUs()
 
-	malla.Clear(color.RGBA{R: 0, G: 0, B: 0, A: 255})
+	malla.ClearRGBA(0, 0, 0, 255)
 
 	if mapaIndices != nil {
 		malla.PushTranslation(mapaX, mapaY)
@@ -617,6 +753,9 @@ func dibujar(superficie d2interface.Surface) error {
 	}
 
 	dibujoUs += int64(d2cUs() - t0)
+
+	// DC-002.97: y la foto del final: los pedidos de ESTE cuadro y el salto de los dos montones.
+	medirElCuadro(antesDelCuadro)
 
 	if cuadros == 1 || cuadros == cuadrosPorEtapa || cuadros == cuadrosPorEtapa+cuadrosDeEpilogo {
 		pixeles := malla.Imagen().Pixeles()

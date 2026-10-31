@@ -27,7 +27,22 @@ type Imagen struct {
 }
 
 // NuevaImagen: un lienzo negro del tamano pedido.
+//
+// DC-002.97: es UNO de los tres sitios donde nace un buffer de pixeles, asi que se cuenta (ver Pedidos en
+// cuenta.go). El POC mide la diferencia entre el principio y el fin de cada cuadro: lo que se pidio en ese
+// cuadro. Un lienzo que se pide una vez y se reusa cuadro a cuadro da 0 ahi, que es el criterio.
 func NuevaImagen(ancho, alto int) *Imagen {
+	img := nuevaImagen(ancho, alto)
+
+	pedidosDeBuffer.Lienzos++
+	pedidosDeBuffer.BytesLienzos += len(img.pixeles)
+
+	return img
+}
+
+// nuevaImagen es el lienzo SIN CONTAR: lo usan los constructores que ya cuentan su propio pedido (el
+// recorte de RenderSection), para que un buffer no se cuente dos veces.
+func nuevaImagen(ancho, alto int) *Imagen {
 	if ancho <= 0 {
 		ancho = 1
 	}
@@ -37,6 +52,18 @@ func NuevaImagen(ancho, alto int) *Imagen {
 	}
 
 	return &Imagen{pixeles: make([]byte, ancho*alto*4), ancho: ancho, alto: alto}
+}
+
+// nuevaImagenDeRecorte: el buffer temporal que pide `RenderSection` para la seccion de otra superficie. Se
+// cuenta como Recorte y no como Lienzo (es el buffer que DC-002.97 pone en el punto de mira: se pide por
+// llamada, se dibuja y se tira).
+func nuevaImagenDeRecorte(ancho, alto int) *Imagen {
+	img := nuevaImagen(ancho, alto)
+
+	pedidosDeBuffer.Recortes++
+	pedidosDeBuffer.BytesRecortes += len(img.pixeles)
+
+	return img
 }
 
 // Ancho y Alto del lienzo.

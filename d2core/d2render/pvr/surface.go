@@ -178,6 +178,21 @@ func (s *Surface) ExpandirIndices(indices []byte, paleta d2interface.Palette) {
 // Clear rellena el lienzo entero con el color.
 func (s *Surface) Clear(c color.Color) { s.imagen.Rellenar(aRGBA(c)) }
 
+// ClearRGBA rellena el lienzo entero SIN pasar por un `color.Color`.
+//
+// POR QUE EXISTE (DC-002.97, medido). El contrato pide `Clear(color.Color)`, o sea una INTERFAZ: cada llamada
+// con un literal (`color.RGBA{R:0,G:0,B:0,A:255}`) boxea el color en el monton de Go, y el ciclo de cuadros lo
+// hace UNA vez por cuadro. Con el instrumento de esta tarjeta (`gc_stats` por cuadro, ver el POC del
+// cooperativo) eso se ve como un pedido de 16 B POR CUADRO que no es ningun buffer: el semiespacio sube
+// 16 B/cuadro (1.024 B/s a 8 fps) con el camino de pintado sin pedir un solo buffer de pixeles.
+//
+// La cuenta es la misma que `Clear`: `aRGBA` ya devuelve un color.RGBA y `Rellenar` lo recibe por valor.
+// `Clear` se queda como esta porque es el contrato (`d2interface.Surface`); este metodo es la puerta por
+// donde el que pinta muchos cuadros evita el boxeo.
+func (s *Surface) ClearRGBA(r, g, b, a uint8) {
+	s.imagen.Rellenar(color.RGBA{R: r, G: g, B: b, A: a})
+}
+
 // DrawRect pinta un rectangulo lleno con la esquina en la posicion actual.
 func (s *Surface) DrawRect(ancho, alto int, c color.Color) {
 	s.imagen.Rectangulo(s.actual.x, s.actual.y, ancho, alto, aRGBA(c))
