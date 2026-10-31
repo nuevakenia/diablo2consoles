@@ -1,0 +1,263 @@
+DC-002.82 -- EL COMPOSITOR DEL MOTOR EN LA CONSOLA: LAS TABLAS PESAN LO QUE LA PC DICE, Y LA PARED ES EL ARENA
+Rama DC-002, checkout unico en /home/dgalli/Proyectos/diablo2consoles, sin worktrees.
+Fecha: 2026-10-30. Base: HEAD 05f3ca73 (cierre de DC-002.81).
+Medido en Flycast con el binario de consola; ninguna corrida toco la Dreamcast fisica.
+
+
+0. Resumen en tres lineas
+-------------------------
+1) Las ~85 tablas de `d2resource.DataDictionaries()` pesan en el host 14.954.280 B (14,26 MB) y las 12 del
+   compositor de nivel 4.243.176 B (4,05 MB = 405 % del semiespacio de 1024 KB). Medido tabla por tabla.
+2) En la consola entran CUATRO de esas doce (LvlTypes, LvlPrest, LvlWarp, objtype = 618.552 B medidos) y la
+   quinta (`Objects.txt`, 574 filas, 408.976 B en el host) mata la corrida con `OOM-throw v=16`: la basura del
+   lector CSV llena el semiespacio de 2 MB cuando el recolector esta frenado, y con el recolector libre el SH-4
+   se va a una direccion movida (la leccion de DC-002.78, otra vez).
+3) El compositor del motor NO entra, y la pared NO son las tablas: con solo LvlTypes + LvlPrest (las dos
+   imprescindibles, 421.536 B en el host) `d2mapengine.CreateMapEngine` se crea y `LoadStamp` del pueblo pide
+   el arena de tiles -- 4.849.148 B de UNA vez -- cuando al monton le quedan 4.554.752 B. Faltan 294.912 B
+   solo para el arena, y detras vienen ~9,3 MB de lectura de .dt1 por fase y ~1,0 MB de estructuras.
+
+
+1. Lo que se pidio comprobar, y lo que habia
+--------------------------------------------
+DC-002.81 cerro el arranque del motor en consola: `d2asset.ArrancarComoConsola()` deja el AssetManager con
+`caminoDeTilesDeConsola= true` y las zonas del POC cargan por el camino del motor. Lo que quedo abierto es el
+compositor (`d2mapengine` + `d2mapstamp`), que necesita tablas de records: `LvlTypes`/`LvlPrest` para las
+casillas y `Objects`/`monpreset`/`monstats`/`monstats2` para las entidades.
+
+Esta tarjeta pide tres cosas:
+  (1) el numero por tabla (vivas, monton) de `d2resource.DataDictionaries()`, primero en el host y despues en
+      la consola, con el veredicto de cuales entran;
+  (2) el pueblo compuesto por `d2mapengine` en la consola (entrar, transicion Este, volver) si entra;
+  (3) el censo/crc32 del mapa compuesto, comparable con el `.ds1` de referencia.
+
+Se armo para eso un instrumento de host (`console/dc/medidas/tablas`, no toca ebiten ni GLFW) y un POC de
+consola con palancas (`console/dc/poc/tablas-mapengine`), mas el script de build
+`scripts/console/build-tablas-282.sh` y un control: el POC de zonas de DC-002.81 recompilado con el MISMO
+arbol de `.gox` y corrido de nuevo, para separar "lo que cuesta el motor" de "lo que cuesta el binario".
+Evidencia cruda en `console/dc/evidencia/dc-002.82-*`.
+
+
+2. El numero por tabla en el HOST (instrumento, 85 tablas)
+----------------------------------------------------------
+`console/dc/medidas/tablas` recorre `DataDictionaries()` y carga cada tabla por el camino del motor
+(`LoadDataDictionary` + `Records.Load`), midiendo con `runtime.ReadMemStats` el delta de `HeapAlloc` de cada
+una y dejando vivo el RecordManager entre tabla y tabla (como en el arranque real).
+
+  ACUMULADO vivo de las 85 tablas (suma de los deltas): 14954280 B (14.26 MB)
+  semiespacio de la consola (1024 KB): 1048576 B -> 1426 %
+  las 15 mayores juntas: 12379408 B (82.8 % del total)
+  solo las tablas del compositor de nivel (12): 4243176 B (405 % del semiespacio)
+
+Las doce del compositor, con filas y objetos (csv `dc-002.82-tablas-host.csv`):
+
+  tabla         archivo      filas    vivo B   objetos
+  LvlTypes        10719         37     85040       401
+  LvlPrest       134937       1092    336496      4250
+  LvlWarp          3935         71     14952       217
+  objtype          7003        410     33096       578
+  Objects        211970        574    408976      1876
+  monpreset        3594        229      9264       230
+  AutoMap        122022       2603    373600      8800
+  Levels          66615        138    257928      2644
+  LvlMaze          3463         82      9280       166
+  LvlSub           3466         35      3528        43
+  monstats       432634        735   1916480     12034
+  monstats2      138542        610    794536     12608
+
+Dos cosas que valen de esta corrida:
+  * el total NO se puede sacar de `HeapAlloc(final) - HeapAlloc(inicial)`: esa resta da 67.232 B con ~6,4 MB de
+    records vivos, porque el recolector se lleva el RecordManager al final. El numero honesto es la SUMA de los
+    deltas por tabla (con `runtime.KeepAlive` del RecordManager en cada vuelta).
+  * los MPQ se abren en el orden del motor (`patch_D2.mpq`, `d2data.mpq`, `d2char.mpq`) y en disco el del parche
+    es `patch_D2.mpq` con D2 en mayuscula: el instrumento resuelve el nombre contra el directorio, sin cambiar
+    el codigo del motor.
+
+Reproducir:
+  /tmp/dc282-tablas -dir "$HOME/.wine-d2/drive_c/Games/Diablo II" -csv /tmp/dc282-tablas-host.csv
+  (se compila con `go build -overlay=/tmp/dc282-overlay.json -o /tmp/dc282-tablas ./console/dc/medidas/tablas/`
+   -- el overlay vacia `d2common/d2util/debug_print.go`, que es el unico que arrastra ebiten).
+
+
+3. El numero por tabla en la CONSOLA
+------------------------------------
+En la consola no hay contador vivo por tabla (`runtime.ReadMemStats` da 0 en libgodc, DC-002.9). Se mide el
+monton de C con las cuatro sondas `d2c_monton_usado` / `d2c_monton_arena` / `d2c_monton_libre` / `d2c_sbrk` y,
+para lo que vive en el semiespacio de Go, la marca `gc-vivo` del runtime parcheado. Corrida `TABLAS=1` (las 12
+del compositor), log `dc-002.82-consola-tablas-12.log`:
+
+  TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+  TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+  TABLAS: monton al arrancar: arena=4358336 usado=4354312 libre=4024 sbrk=0x8caf3000 techo=0x8cff0000 margen=5230592
+
+  TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 4709640 delta= 0       ms=  92 | types= 36 presets= 0
+  TABLA 2 /data/global/excel/LvlPrest.txt OK usado= 5033752 delta= 324112  ms= 450 | types= 36 presets= 1091
+  TABLA 3 /data/global/excel/LvlWarp.txt  OK usado= 5033752 delta= 0       ms=  77 | types= 36 presets= 1091
+  TABLA 4 /data/global/excel/objtype.txt  OK usado= 5033752 delta= 0       ms= 102 | types= 36 presets= 1091
+  TABLA 5 /data/global/excel/Objects.txt  <-- cargando ...
+  ARQ-MARCA OOM-throw v=16
+
+  (marca gc-vivo del runtime, entre tablas: arranque 175072 -> 260776 -> 260816 -> 272104 -> 294440)
+
+Lectura de esos numeros, sin adornos:
+  * `delta` de `monton usado` (uordblks de mallinfo) NO ve lo que se asigna dentro del semiespacio de Go: ese
+    semiespacio (2 MB por mitad, 4 MB las dos) se pide a malloc UNA vez al arrancar y queda contado en el arena
+    inicial. Por eso LvlTypes da `delta= 0` y en cambio la marca `gc-vivo` sube 85.704 B -- que es, al byte, lo
+    que el mismo archivo pesa en el host (85.040 B).
+  * LvlPrest, en cambio, se va al monton de C (`+324.112 B`, sus 4.250 objetos son arreglos grandes) y el host
+    le mide 336.496 B: la consola cuesta 3,7 % menos, no la mitad, aunque los punteros sean de 4 bytes.
+  * Las cuatro que entran suman 618.552 B medidos. La quinta (`Objects.txt`: 574 filas, 1.876 objetos,
+    408.976 B en el host) mata la corrida en el semiespacio de 2 MB.
+
+Por que muere la quinta, y las corridas que lo aislan (mismo binario, solo cambian dos palancas):
+  * recolector LIBRE durante la carga (`GCENTRE=1 GCINHIBE=0`, log `dc-002.82-consola-gc-libre.log`): con solo
+    DOS tablas, en el parseo de LvlPrest el recolector salta por umbral (`gc-por-umbral-bytes-usados
+    v=1572872`), colecta (`gc_collect v=3`, `gc-vivo v=305320`) y la consola se resetea sin mensaje. Y es
+    FLAKY: la misma tabla pasa entera en otras corridas (`dc-002.82-consola-tablas-85-sin-gc.log`). Es la
+    leccion de DC-002.78 otra vez: el recolector de libgodc es de COPIA y si le toca correr en medio del parseo,
+    con los punteros del lector vivos, el SH-4 se va a una direccion movida.
+  * recolector FRENADO y sin compactar (`GCENTRE=0 GCINHIBE=1`, log `dc-002.82-consola-gc-frenado-sin-compactar.log`):
+    la basura del lector CSV se acumula, el semiespacio revienta en la SEGUNDA tabla (`fatal error: out of
+    memory`, `Memory: arena=5034848 used=5033752 free=1096`).
+  * recolector FRENADO y compactado ENTRE tablas (`GCENTRE=1 GCINHIBE=1`, log `dc-002.82-consola-tablas-12.log`):
+    aguanta cuatro tablas y muere en la quinta con `OOM-throw v=16`. Es la mejor combinacion medida y la que usan
+    las corridas que siguen.
+  * sin freno ni compactacion (`TABLAS=2`, las 85, log `dc-002.82-consola-tablas-85-sin-gc.log`): llega a las
+    MISMAS cuatro tablas y muere en la misma quinta (`arch: aborting the system`, SH-4 exception). O sea que la
+    quinta tabla no es un artefacto de las palancas del recolector: `Objects.txt` no entra de ninguna manera con
+    el semiespacio de 2 MB.
+  * aparte quedo un bug propio, documentado porque va a volver: con `for i, ruta := range tablas` la cadena de la
+    vuelta se lee ANTES del recolector y despues del GC llega vacia -- la corrida intenta cargar "file not found:
+    ." desde la tercera tabla (log `dc-002.82-consola-cadena-despues-del-gc.log`). Se arregla releyendo
+    `tablas[i]` DESPUES del GC, en cada vuelta (lo mismo que anoto DC-002.39 para las cadenas de gccgo).
+
+Veredicto de las tablas, que es lo que pedia el punto (1): de las 12 del compositor entran 4. Las dos que el
+compositor de casillas no puede dejar de tener -- LvlTypes y LvlPrest -- SI entran (85.704 B y 324.112 B) y con
+esas dos `d2mapengine` se crea. Las de entidades (Objects, monpreset, monstats, monstats2 = 3.129.256 B en el
+host) no entran; y con las 85 del arranque del motor (14,26 MB) no hay conversacion posible.
+
+
+4. El compositor del motor: donde esta la pared, con numeros
+-----------------------------------------------------------
+Corrida `TABLAS=3` (solo LvlTypes + LvlPrest) `MAPA=1 ARENA=1`, log `dc-002.82-consola-arena.log`:
+
+  TABLA 1 /data/global/excel/LvlTypes.txt OK delta= 0      ms= 92   | types= 36
+  TABLA 2 /data/global/excel/LvlPrest.txt OK delta= 324112 ms= 450  | presets= 1091
+  ARENA: capacidad que pide d2asset = 4849148 B (constante de DC-002.78)
+  ARENA: los 9 .dt1 del level type del pueblo miden 4652603 B crudos; margen del monton antes de pedirla = 4554752
+  Out of memory. Requested sbrk_base 0x8d038000, was 0x8cb98000, diff 4849664
+  fatal error: gc_external_alloc: OOM
+  Memory: arena=5034176 used=5033752 free=424
+
+Y en la corrida gemela, sin la sonda previa (`ARENA=0`, log `dc-002.82-consola-sin-sonda-de-arena.log`), el
+mismo camino llega un paso mas alla y muere en el MISMO numero: la peticion sale de dentro de `LoadStamp`, al
+cargar el primer `.dt1` del level type.
+
+  MAPA: MapEngine creado; monton= arena=5034656 usado=5033752 libre=904 sbrk=0x8cb98000 techo=0x8cff0000 margen=4554752
+  MAPA: ===== a) ENTRA AL PUEBLO =====
+  MAPA: a) ENTRA AL PUEBLO monton antes (tras GC): 5033752 arena= 5034656 libre= 904
+  Out of memory. Requested sbrk_base 0x8d038000, was 0x8cb98000, diff 4849664
+  fatal error: gc_external_alloc: OOM
+  Memory: arena=5034656 used=5033752 free=904
+
+O sea: `CreateMapEngine` se crea bien; lo que no pasa es el PRIMER `.dt1` del `LoadStamp`, porque la primera
+lectura pide el arena completo de una vez. La cuenta, con los cuatro numeros del monton:
+
+  techo de KOS                     0x8cff0000
+  monton al arrancar               sbrk 0x8caf3000 -> margen 5.230.592 B
+  despues del AssetManager         4.878.336 B de margen
+  despues de LvlTypes+LvlPrest     4.554.752 B de margen   (usado 5.033.752 de 5.034.176)
+  lo que pide el arena             4.849.148 B  -> hay que mover el break 4.849.664 B
+  FALTAN                             294.912 B  (y con el arena al tamaño real de los 9 .dt1 del level type,
+                                                  4.652.603 B, seguirian faltando 97.851 B)
+
+Y detras del arena, medido o sacado de las constantes del binario (sizeof de la propia corrida: MapTile 264 B,
+d2dt1.Tile 272 B, d2ds1.Tile 20 B):
+
+  * los 9 .dt1 del level type del pueblo: 4.652.603 B de archivo, y por fase el motor los lee DOS veces
+    (`LoadStamp` una vez y `ResetMap` otra) = 9.305.206 B de lectura contra un arena de 4.849.148 B. El cache de
+    dt1 es de 1.048.576 B (presupuesto de consola de DC-002.75), o sea que la segunda pasada NO la sirve el cache:
+    son reinicios del arena y el ciclo de siempre (en el control de .81, con 20 archivos y tres fases, el arena
+    ya se reinicio 2 veces y solo uso 1.739.431 B, porque el POC de zonas lee cada .dt1 UNA vez por zona).
+  * las estructuras del mapa compuesto, dimensionadas en DC-002.77 con el .ds1 del pueblo (488x472 casillas
+    utiles, 603 tiles distintos): MapTile 2.337 x 264 = 616.968 B, dt1TileData 603 x 272 = 164.016 B, y el .ds1
+    parseado 4 capas x 2.337 x 20 = 186.960 B; mas las celdas con sus cinco slices, que caen en el semiespacio.
+  * y las entidades, que ni se intentaron (`conEntidades= false`): ademas de Objects/monpreset/monstats/monstats2
+    piden los lookups de objetos y `d2animdata`, que este binario no carga.
+
+Conclusion del punto (2), con la pared medida: el compositor del motor NO entra en la consola con este binario.
+No es que "falte un poco": el arena solo ya no cabe, y detras hay 9,3 MB de lectura por fase y ~1 MB de
+estructuras. Punto (3): el censo/crc32 del mapa compuesto NO se pudo tomar porque no hay mapa compuesto; el
+control de abajo cubre la comparacion que si se puede hacer hoy.
+
+
+5. El control: el mismo camino, con el binario de DC-002.81
+-----------------------------------------------------------
+Para que la pared no se lea como "el motor no puede", se recompilo el POC de zonas de DC-002.81 con el MISMO
+arbol de `.gox` de esta tarjeta (`BASE_GOX=/tmp/gox-282 MOTOR=1`, imagen `/tmp/dcbuild/zonas-baseline`) y se
+corrio en Flycast (log `dc-002.82-control-zonas-81.log`): reproduce .81 exacto.
+
+  ZONAS: monton de C al arrancar: arena=4354624 usado=4354312 libre=312 sbrk=0x8c8c7000 techo=0x8cff0000
+                                  (margen 7.503.872 B)
+  ZONAS: (a) pueblo      picoUsado= 10401264 arena= 10404416 ms= 29227 crc32= -787319840
+  ZONAS: (c) vuelta      picoUsado= 10401264 arena= 10404416 ms= 29017 crc32= -787319840
+  ZONAS: pico(c) - pico(a) = 0 bytes
+  ZONAS: ARENA de tiles del motor: caminoDeConsola= true capacidad= 4849148 usado= 1739431 reinicios= 2
+                                   archivos= 20
+
+La diferencia entre los dos binarios, medida:
+
+  POC de zonas (02.81)   1ST_READ 4.569.352 B   margen al arrancar 7.503.872 B
+  POC del compositor     1ST_READ 6.847.080 B   margen al arrancar 5.230.592 B
+  diferencia            +2.277.728 B de imagen = -2.273.280 B de monton  (1:1)
+
+O sea: cada byte de imagen que se compila es un byte de monton que no existe. El stack del mapa
+(`d2mapengine` + `d2mapstamp` + `d2mapentity` + lo que arrastra: d2ui, d2hero, d2item, d2inventory) cuesta
+2,28 MB de imagen, y con eso el mismo arena que en .81 uso y sobro, aca no entra. El crc32 del pueblo sigue
+siendo el mismo (3507647456 sin signo = -787319840): el `.ds1` que carga el motor es el mismo de DC-002.75/.77.
+
+
+6. Que habria que recortar, en orden de peso
+-------------------------------------------
+  a) El arena de tiles, 4.849.148 B de una sola vez. Esta dimensionado con los 8 `.dt1` del POC de zonas +
+     10 % de aire (440.831 B); el level type del pueblo tiene 9 (4.652.603 B). Aun quitandole el aire no entra:
+     faltarian 97.851 B. La ruta que no pide arena por archivo ya existe y esta medida en DC-002.80 (192 B por
+     archivo), pero es la que en DC-002.77 moria por otro lado; no se probo aca y no se declara nada sobre ella.
+  b) La doble lectura por fase (9,3 MB). Con el cache de dt1 en 1.048.576 B, `ResetMap` no puede reusar lo que
+     `LoadStamp` acaba de leer. Para que el compositor del motor entre, el cache de dt1 tendria que ser del
+     tamaño de los datos (4,36 MB) -- que es justo lo que no hay.
+  c) La imagen: -2,28 MB de stack de mapa es lo que separa este binario del de .81, y con eso el arena entra con
+     ~2 MB de sobra. La pregunta es si el compositor se puede tener sin arrastrar d2ui/d2hero/d2item (que es lo
+     que de verdad engorda el binario) -- eso es una decision de arquitectura, no una medicion, y queda para la
+     proxima tarjeta.
+  d) El semiespacio de 2 MB y la basura del lector CSV (la quinta tabla). Con el recolector frenado no alcanza
+     para `Objects.txt`; con el recolector libre, el parseo mata el SH-4. Es la misma pared que DC-002.78 midio
+     del otro lado, y la salida (semiespacio mas grande o lector sin basura) es de la seccion 4 de esa tarjeta,
+     fuera de alcance aca.
+
+
+7. Como se reproduce
+--------------------
+  # stdlib y motor para SH-4, una vez (la stdlib de /tmp/gox-med es anterior a DC-002.80 y no trae zlib.NuevoInflador)
+  bash scripts/console/build-std-gox.sh /tmp/gox-282
+  bash scripts/console/build-motor-all.sh /tmp/gox-282 /tmp/dcbuild/motor-282
+
+  # el POC del compositor, con las palancas de cada corrida (TABLAS 0/1/2/3, MAPA, ARENA, LIENZO, GCENTRE, GCINHIBE)
+  BASE_GOX=/tmp/gox-282 TABLAS=1 MAPA=1 LIENZO=0 ARENA=0 GCENTRE=1 GCINHIBE=1 bash scripts/console/build-tablas-282.sh
+  CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/tablas282/disc.gdi 240 /tmp/dc282-r7
+
+  # el control de DC-002.81 con el mismo arbol
+  BASE_GOX=/tmp/gox-282 MOTOR=1 bash scripts/console/build-zonas-277.sh /tmp/dcbuild/zonas-baseline
+
+
+8. Evidencia
+------------
+  dc-002.82-tablas-host.txt / .csv ......... las 85 tablas en el host, una por una
+  dc-002.82-consola-tablas-12.log .......... modo 1 (12 tablas del compositor): 4 entran, la 5a mata
+  dc-002.82-consola-tablas-85-sin-gc.log ... modo 2 (las 85) sin freno del recolector: muere en la 5a
+  dc-002.82-consola-gc-libre.log ........... recolector libre: excepcion del SH-4 dentro del parseo
+  dc-002.82-consola-gc-frenado-sin-compactar.log ... frenado sin compactar: OOM-throw en la 2a
+  dc-002.82-consola-cadena-despues-del-gc.log ..... el bug de la cadena leida antes del GC ("file not found: .")
+  dc-002.82-consola-arena.log .............. el arena pedido con 4.554.752 B de margen: gc_external_alloc: OOM
+  dc-002.82-consola-sin-sonda-de-arena.log . la misma pared sin la sonda: muere dentro de LoadStamp, mismo diff
+  dc-002.82-control-zonas-81.log ........... el POC de .81 recompilado con el mismo gox: tres fases OK, crc 3507647456

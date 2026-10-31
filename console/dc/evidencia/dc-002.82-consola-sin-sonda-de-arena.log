@@ -1,0 +1,109 @@
+Authorization required, but no authorization protocol specified
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:034 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:284 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:385 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:385 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:389 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:392 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:405 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fb5499f0000 RAM(16 MB) 0x7fb5559f0000 VRAM64(8 MB) 0x7fb54d9f0000 ARAM(2 MB) 0x7fb5699f0000
+00:00:412 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:420 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fb5499f0000 RAM(16 MB) 0x7fb5559f0000 VRAM64(8 MB) 0x7fb54d9f0000 ARAM(2 MB) 0x7fb5699f0000
+00:00:423 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:427 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:427 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:471 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:471 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:471 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cc4e0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2356024576
+ARQ-MARCA   gc_init-semiespacio1 v=2358121760
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1440 cused=4353280 gsemi=196144/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false
+TABLAS: monton al arrancar: arena=4354720 usado=4354312 libre=408 sbrk=0x8caf2000 techo=0x8cff0000 margen=5234688
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=4711072 usado=4709640 libre=1432 sbrk=0x8cb49000 techo=0x8cff0000 margen=4878336
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=174384
+TABLA 1 GC devolvio= 0 monton=arena=4711072 usado=4709640 libre=1432 sbrk=0x8cb49000 techo=0x8cff0000 margen=4878336
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 4709640 arena= 4711072 libre= 1432 margen= 4878336
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=1432 cused=4709640 gsemi=174960/2097152 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=1432 cused=4709640 gsemi=177720/2097152 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=1432 cused=4709640 gsemi=243584/2097152 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=1432 cused=4709640 gsemi=345928/2097152 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 4709640 delta= 0 ms= 92 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260088
+TABLA 2 GC devolvio= 0 monton=arena=4711072 usado=4709640 libre=1432 sbrk=0x8cb49000 techo=0x8cff0000 margen=4878336
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 4709640 arena= 4711072 libre= 1432 margen= 4878336
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=1432 cused=4709640 gsemi=260664/2097152 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=1432 cused=4709640 gsemi=263640/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=1432 cused=4709640 gsemi=276424/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=904 cused=5033752 gsemi=1916064/2097152 gc=2
+TABLA 2 /data/global/excel/LvlPrest.txt OK usado= 5033752 delta= 324112 ms= 450 | types= 36 presets= 1091 objects= 0 monstats= 0
+TABLAS: ================ TABLAS: VEREDICTO ================
+TABLAS: intentadas= 2 cargadas= 2 fallidas= 0 ms= 739
+TABLAS: monton usado al empezar las tablas= 4709640 al terminar= 5033752 delta= 324112
+TABLAS: arena al terminar= 5034656 libre= 904
+ARQ-MARCA gc-por-umbral-bytes-usados v=1916064
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=294264
+MAPA: MapEngine creado; monton= arena=5034656 usado=5033752 libre=904 sbrk=0x8cb98000 techo=0x8cff0000 margen=4554752
+
+MAPA: ===== a) ENTRA AL PUEBLO =====
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=295144
+MAPA: a) ENTRA AL PUEBLO monton antes (tras GC): 5033752 arena= 5034656 libre= 904
+Out of memory. Requested sbrk_base 0x8d038000, was 0x8cb98000, diff 4849664
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=5034656 used=5033752 free=904
+00:28:812 reios/reios.cpp:639 N[REIOS]: -----------------

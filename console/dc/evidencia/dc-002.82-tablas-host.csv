@@ -1,0 +1,86 @@
+tabla;archivo;filas;vivo;objetos;ms;nivel;fallo
+/data/global/excel/LvlTypes.txt;10719;37;85040;401;0;true;
+/data/global/excel/LvlPrest.txt;134937;1092;336496;4250;2;true;
+/data/global/excel/LvlWarp.txt;3935;71;14952;217;0;true;
+/data/global/excel/objtype.txt;7003;410;33096;578;0;true;
+/data/global/excel/Objects.txt;211970;574;408976;1876;3;true;
+/data/global/excel/weapons.txt;118029;307;1042176;14326;8;false;
+/data/global/excel/armor.txt;76370;203;687808;9687;5;false;
+/data/global/excel/misc.txt;55821;152;521320;5759;7;false;
+/data/global/excel/books.txt;315;3;1016;18;0;false;
+/data/global/excel/ItemTypes.txt;8775;104;74360;392;0;false;
+/data/global/excel/UniqueItems.txt;73610;403;413992;8088;2;false;
+/data/global/excel/Missiles.txt;192979;684;1552096;10651;7;false;
+/data/global/excel/Sounds.txt;505304;4699;1244752;14114;7;false;
+/data/global/excel/monstats.txt;432634;735;1916480;12034;17;true;
+/data/global/excel/monstats2.txt;138542;610;794536;12608;4;true;
+/data/global/excel/monpreset.txt;3594;229;9264;230;0;true;
+/data/global/excel/Monprop.txt;2454;13;18248;294;0;false;
+/data/global/excel/Montype.txt;1363;59;10328;133;0;false;
+/data/global/excel/monmode.txt;238;16;2056;39;0;false;
+/data/global/excel/MagicPrefix.txt;57588;670;278672;4647;4;false;
+/data/global/excel/MagicSuffix.txt;65863;748;330048;5785;4;false;
+/data/global/excel/ItemStatCost.txt;40109;359;179608;1221;2;false;
+/data/global/excel/itemratio.txt;662;6;1656;20;0;false;
+/data/global/excel/StorePage.txt;0;0;0;0;0;false;file not found
+/data/global/excel/Overlay.txt;27588;294;67352;879;0;false;
+/data/global/excel/charstats.txt;3360;8;8040;97;0;false;
+/data/global/excel/hireling.txt;26415;120;98224;908;0;false;
+/data/global/excel/experience.txt;7116;101;25240;308;0;false;
+/data/global/excel/gems.txt;7793;69;38240;336;0;false;
+/data/global/excel/qualityitems.txt;1035;8;1408;18;0;false;
+/data/global/excel/runes.txt;20512;169;86648;2134;1;false;
+/data/global/excel/difficultylevels.txt;586;3;816;8;0;false;
+/data/global/excel/AutoMap.txt;122022;2603;373600;8800;4;true;
+/data/global/excel/Levels.txt;66615;138;257928;2644;2;true;
+/data/global/excel/LvlMaze.txt;3463;82;9280;166;0;true;
+/data/global/excel/LvlSub.txt;3466;35;3528;43;0;true;
+/data/global/excel/cubemain.txt;30516;151;250640;1798;2;false;
+/data/global/excel/SuperUniques.txt;8071;67;25688;461;0;false;
+/data/global/excel/inventory.txt;8843;33;35976;612;0;false;
+/data/global/excel/skills.txt;173535;357;1646576;16986;7;false;
+/data/global/excel/skillcalc.txt;2017;73;8128;166;0;false;
+/data/global/excel/misscalc.txt;1143;43;4392;96;0;false;
+/data/global/excel/Properties.txt;26815;269;138200;2603;1;false;
+/data/global/excel/skilldesc.txt;65136;221;795336;12237;2;false;
+/data/global/excel/bodylocs.txt;0;0;0;0;0;false;file not found
+/data/global/excel/Sets.txt;6321;33;23672;617;0;false;
+/data/global/excel/SetItems.txt;26934;128;184504;3571;2;false;
+/data/global/excel/automagic.txt;0;0;0;0;0;false;file not found
+/data/global/excel/TreasureClass.txt;9403;95;66440;2166;0;false;
+/data/global/excel/TreasureClassEx.txt;88253;853;315216;9363;3;false;
+/data/global/excel/states.txt;20920;185;91208;612;1;false;
+/data/global/excel/soundenviron.txt;5741;50;12944;104;0;false;
+/data/global/excel/shrines.txt;2262;23;5232;90;0;false;
+/data/global/excel/ElemTypes.txt;195;13;1160;32;0;false;
+/data/global/excel/PlrMode.txt;302;20;1960;45;0;false;
+/data/global/excel/pettype.txt;1288;20;5480;65;0;false;
+/data/global/excel/npc.txt;1367;17;6520;110;0;false;
+/data/global/excel/monumod.txt;2492;43;9304;221;0;false;
+/data/global/excel/monequip.txt;1763;45;8936;267;0;false;
+/data/global/excel/UniqueAppellation.txt;294;25;2296;55;0;false;
+/data/global/excel/monlvl.txt;14707;111;30808;115;0;false;
+/data/global/excel/monsounds.txt;22927;141;106312;1070;0;false;
+/data/global/excel/monseq.txt;27761;1010;72744;1526;0;false;
+/data/global/excel/PlayerClass.txt;0;0;0;0;0;false;file not found
+/data/global/excel/MonPlace.txt;658;37;1856;38;0;false;
+/data/global/excel/objgroup.txt;7967;97;27672;295;0;false;
+/data/global/excel/compcode.txt;1862;115;12272;243;0;false;
+/data/global/excel/monai.txt;7687;148;10960;275;0;false;
+/data/global/excel/RarePrefix.txt;2210;46;20560;656;0;false;
+/data/global/excel/RareSuffix.txt;7123;155;69936;2207;0;false;
+/data/global/excel/events.txt;420;13;528;26;0;false;
+/data/global/excel/colors.txt;0;0;0;0;0;false;file not found
+/data/global/excel/ArmType.txt;45;3;400;8;0;false;
+/data/global/excel/WeaponClass.txt;0;0;0;0;0;false;file not found
+/data/global/excel/PlrType.txt;79;5;512;13;0;false;
+/data/global/excel/Composit.txt;207;16;1768;37;0;false;
+/data/global/excel/HitClass.txt;0;0;0;0;0;false;file not found
+/data/global/excel/UniquePrefix.txt;392;53;7272;217;0;false;
+/data/global/excel/UniqueSuffix.txt;527;69;10216;281;0;false;
+/data/global/excel/CubeMod.txt;0;0;0;0;0;false;file not found
+/data/global/excel/CubeType.txt;0;0;0;0;0;false;file not found
+/data/global/excel/HireDesc.txt;0;0;0;0;0;false;file not found
+/data/global/excel/lowqualityitems.txt;44;4;160;9;0;false;
+/data/global/excel/belts.txt;2154;7;4400;16;0;false;
+/data/global/excel/gamble.txt;1699;107;8816;225;0;false;

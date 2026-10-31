@@ -125,6 +125,21 @@ el motor (`am.LoadDS1` / `am.LoadDT1`); lo que falta de la fase es el compositor
 `d2mapstamp`), que necesita las ~70 tablas de `d2resource.DataDictionaries()`, y las pantallas.
 Evidencia: `console/dc/evidencia/dc-002.81-arranque-de-consola-en-el-motor.txt`.
 
+**Medido en DC-002.82 (el compositor del motor, con la pared puesta en numeros):** las ~85 tablas de
+`DataDictionaries()` pesan **14.954.280 B (14,26 MB)** en el host y las 12 del compositor **4.243.176 B**;
+en la consola entran **4** de esas 12 (LvlTypes, LvlPrest, LvlWarp, objtype = 618.552 B medidos) y la quinta
+(`Objects.txt`) muere en el semiespacio de 2 MB con el recolector frenado y tambien con el recolector libre.
+Con las dos imprescindibles (LvlTypes + LvlPrest) `d2mapengine.CreateMapEngine` **si** se crea, y el pueblo
+NO se compone: el primer `.dt1` de `LoadStamp` pide el arena de tiles entero (4.849.148 B de una sola `make`)
+cuando al monton le quedan 4.554.752 B -- `fatal error: gc_external_alloc: OOM`, faltan 294.912 B. Detras del
+arena hay ~9,3 MB de lectura por fase (LoadStamp + ResetMap leen los mismos 9 `.dt1`, con un cache de dt1 de
+1.048.576 B) y ~1,0 MB de estructuras (MapTile 2.337x264 = 616.968 B, dt1TileData 603x272 = 164.016 B, .ds1
+parseado 186.960 B). El control con el POC de zonas de .81 recompilado con el mismo arbol de `.gox` reproduce
+.81 exacto (pico 10.401.264 B, pico(c)-pico(a) = 0, crc32 del pueblo 3507647456) y deja la causa medida: la
+imagen del compositor es **2.277.728 B mas grande** (1ST_READ 6.847.080 contra 4.569.352) y el monton al
+arrancar **2.273.280 B mas chico** -- imagen y monton se mueven 1:1. Evidencia:
+`console/dc/evidencia/dc-002.82-compositor-en-la-consola.txt`.
+
 ---
 
 ## Lo que se reusa (no se tira)
