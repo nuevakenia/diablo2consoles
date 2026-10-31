@@ -1,0 +1,451 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:045 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:302 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:406 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:406 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:409 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:413 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:426 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fcf80df0000 RAM(16 MB) 0x7fcf8cdf0000 VRAM64(8 MB) 0x7fcf84df0000 ARAM(2 MB) 0x7fcfa0df0000
+00:00:432 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:440 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fcf80df0000 RAM(16 MB) 0x7fcf8cdf0000 VRAM64(8 MB) 0x7fcf84df0000 ARAM(2 MB) 0x7fcfa0df0000
+00:00:443 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:447 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:447 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:506 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:506 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:506 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2358134784
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=4353280 gsemi=195568/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=4358080 usado=4354312 libre=3768 sbrk=0x8caf6000 techo=0x8cff0000 margen=5218304
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=4710336 usado=4709640 libre=696 sbrk=0x8cb4c000 techo=0x8cff0000 margen=4866048
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=174344
+TABLA 1 GC devolvio= 0 monton=arena=4710336 usado=4709640 libre=696 sbrk=0x8cb4c000 techo=0x8cff0000 margen=4866048
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 4709640 arena= 4710336 libre= 696 margen= 4866048
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=4709640 gsemi=174920/2097152 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=4709640 gsemi=177680/2097152 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=4709640 gsemi=243664/2097152 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=4709640 gsemi=346008/2097152 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 4709640 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260048
+TABLA 2 GC devolvio= 0 monton=arena=4710336 usado=4709640 libre=696 sbrk=0x8cb4c000 techo=0x8cff0000 margen=4866048
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 4709640 arena= 4710336 libre= 696 margen= 4866048
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=4709640 gsemi=260624/2097152 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=4709640 gsemi=263600/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=4709640 gsemi=276384/2097152 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=168 cused=5033752 gsemi=1907464/2097152 gc=2
+TABLA 2 /data/global/excel/LvlPrest.txt OK usado= 5033752 delta= 324112 ms= 466 | types= 36 presets= 1091 objects= 0 monstats= 0
+TABLAS: ================ TABLAS: VEREDICTO ================
+TABLAS: intentadas= 2 cargadas= 2 fallidas= 0 ms= 756
+TABLAS: monton usado al empezar las tablas= 4709640 al terminar= 5033752 delta= 324112
+TABLAS: arena al terminar= 5033920 libre= 168
+ARQ-MARCA gc-por-umbral-bytes-usados v=1907464
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=457704
+MAPA: MapEngine creado; monton= arena=5033920 usado=5033752 libre=168 sbrk=0x8cb9b000 techo=0x8cff0000 margen=4542464
+
+MAPA: ===== a) ENTRA AL PUEBLO =====
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=458584
+MAPA: a) ENTRA AL PUEBLO monton antes (tras GC): 5033752 arena= 5033920 libre= 168
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=168 cused=5033752 gsemi=518264/2097152 gc=4
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=168 cused=5033752 gsemi=581544/2097152 gc=4
+MAPA: a) ENTRA AL PUEBLO LoadStamp OK: ds1 w= 57 h= 41 usado= 5033752 arena= 5033920
+MAPA: a) ENTRA AL PUEBLO los .dt1 del .ds1= 8 en el level type= 0
+ARQ-MARCA gc-externo-con-punteros v=616968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573544
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=914768
+ARQ-MARCA gc-externo-con-punteros v=72352
+ARQ-MARCA gc-externo-con-punteros v=81328
+ARQ-MARCA gc-externo-con-punteros v=91392
+MAPA: a) ENTRA AL PUEBLO ResetMap OK: tiles= 2337 archivosDT1= 9 usado= 9525312
+MAPA: a) ENTRA AL PUEBLO ARENA capacidad= 0 pedida= 0 usado= 0 reinicios= 1 archivos= 8
+MAPA: a) ENTRA AL PUEBLO BLOQUES usados= true bytes= 2586489 tramos= 5 capacidad= 2621440 scratch= 1008003
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573400
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1006616
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574400
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1019768
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 1 %!d(fmt.Stringer=shadow)]
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574328
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=1032440
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573568
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=1046328
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573368
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=1057272
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574992
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=1071576
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573248
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=1083704
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574416
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=1096664
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573864
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=1108696
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574232
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=1123088
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575328
+ARQ-MARCA gc_collect v=16
+ARQ-MARCA gc-vivo v=1133336
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573000
+ARQ-MARCA gc_collect v=17
+ARQ-MARCA gc-vivo v=1140008
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 1 %!d(fmt.Stringer=shadow)]
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573656
+ARQ-MARCA gc_collect v=18
+ARQ-MARCA gc-vivo v=1157032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573248
+ARQ-MARCA gc_collect v=19
+ARQ-MARCA gc-vivo v=1168152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573608
+ARQ-MARCA gc_collect v=20
+ARQ-MARCA gc-vivo v=1181112
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573552
+ARQ-MARCA gc_collect v=21
+ARQ-MARCA gc-vivo v=1192760
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573248
+ARQ-MARCA gc_collect v=22
+ARQ-MARCA gc-vivo v=1204184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573096
+ARQ-MARCA gc_collect v=23
+ARQ-MARCA gc-vivo v=1213512
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573512
+ARQ-MARCA gc_collect v=24
+ARQ-MARCA gc-vivo v=1225240
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573280
+ARQ-MARCA gc_collect v=25
+ARQ-MARCA gc-vivo v=1234984
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574368
+ARQ-MARCA gc_collect v=26
+ARQ-MARCA gc-vivo v=1243832
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574624
+ARQ-MARCA gc_collect v=27
+ARQ-MARCA gc-vivo v=1252456
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574656
+ARQ-MARCA gc_collect v=28
+ARQ-MARCA gc-vivo v=1260856
+MAPA: a) ENTRA AL PUEBLO CASILLAS pisos= 2337 paredes= 338 crcGrilla= -1596781041 entidades= 0
+MAPA: a) ENTRA AL PUEBLO PICO usado= 9525312 (en: ResetMap) arena= 9527232 libreMin= 168 ms= 25136
+
+MAPA: ===== b) CAMBIA A LA TRANSICION ESTE =====
+ARQ-MARCA gc_collect v=29
+ARQ-MARCA gc-vivo v=1065560
+MAPA: b) CAMBIA A LA TRANSICION ESTE monton antes (tras GC): 9525312 arena= 9527232 libre= 1920
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownETrans.ds1 cfree=1920 cused=9525312 gsemi=1076760/2097152 gc=29
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownETrans.ds1 cfree=1920 cused=9525312 gsemi=1088576/2097152 gc=29
+MAPA: b) CAMBIA A LA TRANSICION ESTE LoadStamp OK: ds1 w= 9 h= 41 usado= 9525312 arena= 9527232
+MAPA: b) CAMBIA A LA TRANSICION ESTE los .dt1 del .ds1= 4 en el level type= 9
+MAPA: b) CAMBIA A LA TRANSICION ESTE ResetMap OK: tiles= 369 archivosDT1= 9 usado= 9525312
+MAPA: b) CAMBIA A LA TRANSICION ESTE ARENA capacidad= 0 pedida= 0 usado= 0 reinicios= 2 archivos= 12
+MAPA: b) CAMBIA A LA TRANSICION ESTE BLOQUES usados= true bytes= 772344 tramos= 5 capacidad= 2621440 scratch= 1008003
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573776
+ARQ-MARCA gc_collect v=30
+ARQ-MARCA gc-vivo v=1160240
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573352
+ARQ-MARCA gc_collect v=31
+ARQ-MARCA gc-vivo v=1157848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575240
+ARQ-MARCA gc_collect v=32
+ARQ-MARCA gc-vivo v=1166936
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572936
+ARQ-MARCA gc_collect v=33
+ARQ-MARCA gc-vivo v=1177584
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573120
+ARQ-MARCA gc_collect v=34
+ARQ-MARCA gc-vivo v=1184160
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574776
+ARQ-MARCA gc_collect v=35
+ARQ-MARCA gc-vivo v=1188088
+MAPA: b) CAMBIA A LA TRANSICION ESTE CASILLAS pisos= 369 paredes= 39 crcGrilla= -205471136 entidades= 0
+MAPA: b) CAMBIA A LA TRANSICION ESTE PICO usado= 9525312 (en: arranque de la fase) arena= 9527232 libreMin= 1920 ms= 14709
+
+MAPA: ===== c) VUELVE AL PUEBLO =====
+ARQ-MARCA gc_collect v=36
+ARQ-MARCA gc-vivo v=1155256
+MAPA: c) VUELVE AL PUEBLO monton antes (tras GC): 9525312 arena= 9527232 libre= 1920
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=1920 cused=9525312 gsemi=1214936/2097152 gc=36
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=1920 cused=9525312 gsemi=1278216/2097152 gc=36
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573360
+ARQ-MARCA gc_collect v=37
+ARQ-MARCA gc-vivo v=1491584
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573232
+ARQ-MARCA gc_collect v=38
+ARQ-MARCA gc-vivo v=1477760
+MAPA: c) VUELVE AL PUEBLO LoadStamp OK: ds1 w= 57 h= 41 usado= 9525312 arena= 9527232
+MAPA: c) VUELVE AL PUEBLO los .dt1 del .ds1= 8 en el level type= 9
+ARQ-MARCA gc-por-umbral-bytes-usados v=1597912
+ARQ-MARCA gc_collect v=39
+ARQ-MARCA gc-vivo v=1376632
+ARQ-MARCA gc-por-umbral-bytes-usados v=1622568
+ARQ-MARCA gc_collect v=40
+ARQ-MARCA gc-vivo v=1403928
+ARQ-MARCA gc-por-umbral-bytes-usados v=1590560
+ARQ-MARCA gc_collect v=41
+ARQ-MARCA gc-vivo v=1097480
+MAPA: c) VUELVE AL PUEBLO ResetMap OK: tiles= 2337 archivosDT1= 9 usado= 9525312
+MAPA: c) VUELVE AL PUEBLO ARENA capacidad= 0 pedida= 0 usado= 0 reinicios= 3 archivos= 20
+MAPA: c) VUELVE AL PUEBLO BLOQUES usados= true bytes= 2586489 tramos= 5 capacidad= 2621440 scratch= 1008003
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573904
+ARQ-MARCA gc_collect v=42
+ARQ-MARCA gc-vivo v=1242640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573616
+ARQ-MARCA gc_collect v=43
+ARQ-MARCA gc-vivo v=1187944
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 1 %!d(fmt.Stringer=shadow)]
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572888
+ARQ-MARCA gc_collect v=44
+ARQ-MARCA gc-vivo v=1196232
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574728
+ARQ-MARCA gc_collect v=45
+ARQ-MARCA gc-vivo v=1211288
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573296
+ARQ-MARCA gc_collect v=46
+ARQ-MARCA gc-vivo v=1226824
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573128
+ARQ-MARCA gc_collect v=47
+ARQ-MARCA gc-vivo v=1235616
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573208
+ARQ-MARCA gc_collect v=48
+ARQ-MARCA gc-vivo v=1236936
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573024
+ARQ-MARCA gc_collect v=49
+ARQ-MARCA gc-vivo v=1240472
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574480
+ARQ-MARCA gc_collect v=50
+ARQ-MARCA gc-vivo v=1254184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574552
+ARQ-MARCA gc_collect v=51
+ARQ-MARCA gc-vivo v=1260296
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573464
+ARQ-MARCA gc_collect v=52
+ARQ-MARCA gc-vivo v=1270096
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572936
+ARQ-MARCA gc_collect v=53
+ARQ-MARCA gc-vivo v=1276144
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574528
+ARQ-MARCA gc_collect v=54
+ARQ-MARCA gc-vivo v=1282360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573176
+ARQ-MARCA gc_collect v=55
+ARQ-MARCA gc-vivo v=1286888
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573328
+ARQ-MARCA gc_collect v=56
+ARQ-MARCA gc-vivo v=1295344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574568
+ARQ-MARCA gc_collect v=57
+ARQ-MARCA gc-vivo v=1305480
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573016
+ARQ-MARCA gc_collect v=58
+ARQ-MARCA gc-vivo v=1314304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572920
+ARQ-MARCA gc_collect v=59
+ARQ-MARCA gc-vivo v=1319592
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573056
+ARQ-MARCA gc_collect v=60
+ARQ-MARCA gc-vivo v=1326072
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 1 %!d(fmt.Stringer=shadow)]
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572928
+ARQ-MARCA gc_collect v=61
+ARQ-MARCA gc-vivo v=1333992
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573320
+ARQ-MARCA gc_collect v=62
+ARQ-MARCA gc-vivo v=1340824
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574072
+ARQ-MARCA gc_collect v=63
+ARQ-MARCA gc-vivo v=1347544
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573040
+ARQ-MARCA gc_collect v=64
+ARQ-MARCA gc-vivo v=1354040
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572904
+ARQ-MARCA gc_collect v=65
+ARQ-MARCA gc-vivo v=1362720
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573080
+ARQ-MARCA gc_collect v=66
+ARQ-MARCA gc-vivo v=1371616
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574992
+ARQ-MARCA gc_collect v=67
+ARQ-MARCA gc-vivo v=1372632
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573720
+ARQ-MARCA gc_collect v=68
+ARQ-MARCA gc-vivo v=1377592
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574176
+ARQ-MARCA gc_collect v=69
+ARQ-MARCA gc-vivo v=1384504
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573960
+ARQ-MARCA gc_collect v=70
+ARQ-MARCA gc-vivo v=1388904
+ARQ-MARCA gc-por-umbral-bytes-usados v=1574840
+ARQ-MARCA gc_collect v=71
+ARQ-MARCA gc-vivo v=1395032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573904
+ARQ-MARCA gc_collect v=72
+ARQ-MARCA gc-vivo v=1399320
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573968
+ARQ-MARCA gc_collect v=73
+ARQ-MARCA gc-vivo v=1405560
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573168
+ARQ-MARCA gc_collect v=74
+ARQ-MARCA gc-vivo v=1410600
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573848
+ARQ-MARCA gc_collect v=75
+ARQ-MARCA gc-vivo v=1414856
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573808
+ARQ-MARCA gc_collect v=76
+ARQ-MARCA gc-vivo v=1419000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573656
+ARQ-MARCA gc_collect v=77
+ARQ-MARCA gc-vivo v=1423032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573392
+ARQ-MARCA gc_collect v=78
+ARQ-MARCA gc-vivo v=1426952
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573016
+ARQ-MARCA gc_collect v=79
+ARQ-MARCA gc-vivo v=1430760
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572992
+ARQ-MARCA gc_collect v=80
+ARQ-MARCA gc-vivo v=1432664
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573968
+ARQ-MARCA gc_collect v=81
+ARQ-MARCA gc-vivo v=1438152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573440
+ARQ-MARCA gc_collect v=82
+ARQ-MARCA gc-vivo v=1440648
+MAPA: c) VUELVE AL PUEBLO CASILLAS pisos= 2337 paredes= 338 crcGrilla= -1596781041 entidades= 0
+MAPA: c) VUELVE AL PUEBLO PICO usado= 9525312 (en: arranque de la fase) arena= 9527232 libreMin= 1920 ms= 28761
+
+MAPA: ================ MAPA: VEREDICTO ================
+MAPA: a) ENTRA AL PUEBLO w= 57 h= 41 tiles= 2337 dt1s= 9 tilesDT1= 0 pisos= 2337 paredes= 338 entidades= 0
+MAPA: a) ENTRA AL PUEBLO crcGrilla= -1596781041 ms= 25136 picoUsado= 9525312 (en: ResetMap) arenaPico= 9527232 libreMin= 168
+MAPA: a) ENTRA AL PUEBLO monton al terminar= 9525312 arena= 9527232 libre= 1920
+MAPA: b) CAMBIA A LA TRANSICION ESTE w= 9 h= 41 tiles= 369 dt1s= 9 tilesDT1= 0 pisos= 369 paredes= 39 entidades= 0
+MAPA: b) CAMBIA A LA TRANSICION ESTE crcGrilla= -205471136 ms= 14709 picoUsado= 9525312 (en: arranque de la fase) arenaPico= 9527232 libreMin= 1920
+MAPA: b) CAMBIA A LA TRANSICION ESTE monton al terminar= 9525312 arena= 9527232 libre= 1920
+MAPA: c) VUELVE AL PUEBLO w= 57 h= 41 tiles= 2337 dt1s= 9 tilesDT1= 0 pisos= 2337 paredes= 338 entidades= 0
+MAPA: c) VUELVE AL PUEBLO crcGrilla= -1596781041 ms= 28761 picoUsado= 9525312 (en: arranque de la fase) arenaPico= 9527232 libreMin= 1920
+MAPA: c) VUELVE AL PUEBLO monton al terminar= 9525312 arena= 9527232 libre= 1920
+MAPA: pico(c) - pico(a) = 0 bytes
+MAPA: arena(c) - arena(a) = 0 bytes
+MAPA: GRILLA OK -- el pueblo de la vuelta es identico al de la entrada (crc -1596781041 )
+MAPA: ARENA de tiles: caminoDeConsola= true capacidad= 0 pedida= 0 usado= 0 reinicios= 3 archivos= 20
+MAPA: BLOQUES de tiles: usados= true bytes= 2586489 tramos= 5 capacidad= 2621440 scratch= 1008003
+MAPA: PRESTAMO de la lectura: lecturas= 20 sectores= 2723 reservado= 14272 crecidas= 6
+TABLAS: monton al final: arena=9527232 usado=9525312 libre=1920 sbrk=0x8cfe4000 techo=0x8cff0000 margen=49152
+TABLAS: FIN
+ARQ-MARCA main.main-volvio v=0
+ARQ-MARCA scheduler-VOLVIO v=1
+
+arch: exit return code 0
+arch: shutting down kernel
+maple: final stats -- device count = 21, vbl_cntr = 4950, dma_cntr = 4950
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356035584
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-MARCA gc-por-umbral-bytes-usados v=1575424
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=174128
+Out of memory. Requested sbrk_base 0x8d03e000, was 0x8cf28000, diff 1138688
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=8757184 used=8753200 free=3984
+01:25:841 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked

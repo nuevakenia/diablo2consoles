@@ -168,6 +168,22 @@ faltan **937.756 B** igual; de las tablas solo compite LvlPrest (324.112 B). Que
 recorte del arena/imagen con ese presupuesto. Evidencia:
 `console/dc/evidencia/dc-002.86-tablas-lo-usado-y-el-camino.txt`.
 
+**Medido en DC-002.93 (el hueco de `gc_init`: los 450.560 B eran de otro binario):** el `gc_init: alloc
+failed` de DC-002.87c se midio sobre el motor de DC-002.28 (13.775.848 B); el MISMO camino rearmado con el
+arbol de hoy mide **11.650.536 B** y **pasa los dos semiespacios** (separacion 2.097.184 B, monton de C
+despues del GC **481.056 B**), llega a `main.main` y a `d2app.Create().Run()`, y muere 50 s despues en
+`gc_external_alloc` (131.072 pedidos, 45.056 al techo). Escalera medida: 1536 KB de semiespacio lo lleva a
+las tablas (muere pidiendo 212.992 B), 768 KB lo mantiene vivo 60 s pero con **511 recolecciones** (el
+semiespacio al 80 %: thrashing), y 1024 KB se cae por el defecto de barrido de DC-002.92. Con las dos
+palancas juntas — **semiespacio 1536 KB + `.eh_frame` fuera (DC-002.47, −920.864 B de imagen = +920.864 B
+de monton, 1:1)** — el motor queda con **2.450.496 B** de monton de C, **5 tablas completas** y **10
+recolecciones**, y a los 180 s sigue sin OOM ni excepcion (se queda en la lectura de `weapons.txt`: la
+proxima pared, ya no de RAM). El compositor de las tres fases **no baja de 2048 KB** (con 1536 y 1024 muere
+por conjunto vivo), asi que el semiespacio es una palanca POR BINARIO: comprobado a HEAD, el compositor
+compone el pueblo con los crc -1596781041 / -205471136 / -1596781041 y margen 49.152 B al techo. Instrumento
+nuevo: `scripts/console/medir-hueco-gc-293.sh` (`leer` un log, o `escalera` completa). Evidencia:
+`console/dc/evidencia/dc-002.93-el-hueco-de-gc-init.md`.
+
 ---
 
 ## Lo que se reusa (no se tira)

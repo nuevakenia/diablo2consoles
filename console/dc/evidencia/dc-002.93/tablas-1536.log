@@ -1,0 +1,787 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:058 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:321 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:424 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:424 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:427 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:432 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:445 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f1df5300000 RAM(16 MB) 0x7f1e01300000 VRAM64(8 MB) 0x7f1df9300000 ARAM(2 MB) 0x7f1e15300000
+00:00:452 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:460 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f1df5300000 RAM(16 MB) 0x7f1e01300000 VRAM64(8 MB) 0x7f1df9300000 ARAM(2 MB) 0x7f1e15300000
+00:00:463 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:467 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:467 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:532 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:532 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:532 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196424/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=175136
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175712/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=178472/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=244336/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346680/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260840
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=261416/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=264392/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=277056/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=32
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
+00:28:502 reios/reios.cpp:639 N[REIOS]: -----------------
+00:28:502 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:28:502 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196872/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=175160
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175736/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=178496/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=244480/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346824/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260864
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=261440/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=264416/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=277080/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=16
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
+00:56:503 reios/reios.cpp:639 N[REIOS]: -----------------
+00:56:503 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:56:503 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196784/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=174616
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175192/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=177952/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=243816/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346160/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260320
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=260896/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=263872/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=276656/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=16
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
+01:24:532 reios/reios.cpp:639 N[REIOS]: -----------------
+01:24:532 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+01:24:532 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196784/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=174616
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175192/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=177952/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=243816/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346160/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260320
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=260896/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=263872/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=276656/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=16
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
+01:52:535 reios/reios.cpp:639 N[REIOS]: -----------------
+01:52:535 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+01:52:535 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196872/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=175160
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175736/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=178496/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=244480/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346824/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260864
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=261440/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=264416/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=277080/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=16
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
+02:20:536 reios/reios.cpp:639 N[REIOS]: -----------------
+02:20:536 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+02:20:536 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196872/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=175160
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175736/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=178496/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=244480/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346824/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260864
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=261440/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=264416/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=277080/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=16
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
+02:48:548 reios/reios.cpp:639 N[REIOS]: -----------------
+02:48:548 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+02:48:548 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196784/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=174616
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175192/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=177952/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=243816/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346160/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260320
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=260896/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=263872/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=276656/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=16
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
+03:16:566 reios/reios.cpp:639 N[REIOS]: -----------------
+03:16:566 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+03:16:566 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196872/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=175160
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175736/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=178496/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=244480/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346824/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260864
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=261440/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=264416/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=277080/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=16
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
+03:44:567 reios/reios.cpp:639 N[REIOS]: -----------------
+03:44:567 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+03:44:567 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6cf7c0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356039680
+ARQ-MARCA   gc_init-semiespacio0 v=2356037600
+ARQ-MARCA   gc_init-semiespacio1 v=2357610496
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=704 cused=3304704 gsemi=196872/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+SONDA: int64 como clave
+SONDA: int64 OK len= 700 valor= 0
+SONDA: string como clave
+SONDA: string OK len= 260
+TABLAS: arranca DC-002.82 -- el compositor del MOTOR (d2mapengine) carga el pueblo en la consola
+TABLAS: modoTablas= 3 (0 ninguna, 1 las del nivel, 2 todas) hacerMapa= true conEntidades= false lienzoReferencia= false tilesDelStamp= true
+TABLAS: monton al arrancar: arena=3309504 usado=3305736 libre=3768 sbrk=0x8c9f6000 techo=0x8cff0000 margen=6266880
+TABLAS: sizeof int= 4 puntero= 4 d2ds1.Tile= 20 d2dt1.Tile= 272 MapTile= 264
+TABLAS: presupuestos: dt1s= 1048576 ds1s= 262144 sumaDatos= 2949120
+fs_iso9660: disc change detected
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/PATCH_D2.MPQ'
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+TABLAS: assetmanager del motor listo; caminoDeTilesDeConsola= true monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=175160
+TABLA 1 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 1 de 2 /data/global/excel/LvlTypes.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=175736/1572864 gc=1
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=178496/1572864 gc=1
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=244480/1572864 gc=1
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=696 cused=3661064 gsemi=346824/1572864 gc=1
+TABLA 1 /data/global/excel/LvlTypes.txt OK usado= 3661064 delta= 0 ms= 91 | types= 36 presets= 0 objects= 0 monstats= 0
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=260864
+TABLA 2 GC devolvio= 0 monton=arena=3661760 usado=3661064 libre=696 sbrk=0x8ca4c000 techo=0x8cff0000 margen=5914624
+TABLA 2 de 2 /data/global/excel/LvlPrest.txt <-- cargando usado= 3661064 arena= 3661760 libre= 696 margen= 5914624
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=261440/1572864 gc=2
+[35m[File Loader][32m[INFO][0m Loaded /cd/JUEGO/PATCH_D2.MPQ -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=264416/1572864 gc=2
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=696 cused=3661064 gsemi=277080/1572864 gc=2
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA OOM-throw v=16
+
+fatal error: out of memory
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=3985344 used=3985176 free=168
