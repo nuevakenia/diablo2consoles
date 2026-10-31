@@ -1,0 +1,106 @@
+CARGA299: arranca DC-002.99 -- LoadFile del motor por el tramo prestado
+CARGA299: palancas: noLibera= true
+CARGA299: monton al arrancar: arena=4357568 usado=4354312 libre=3256 sbrk=0x0x8c709000 techo=0x0x8cff0000
+CARGA299: base del monton (tras GC) usado= 4354312 libre= 3256
+CARGA299: MPQ abierto, liberador= false prestamo= 14272 monton=arena=5717440 usado=5717320 libre=120 sbrk=0x0x8c855000 techo=0x0x8cff0000
+CARGA299: palancas del motor: lecturaDeConsola=true tramos= true
+CARGA299: ===== C) LA ZONA (el pueblo) =====
+CARGA299: DS1 bytes= 57652 crc32= 712973328 w= 57 h= 41 archivos= 8
+CARGA299: DT1 act1\outdoors\treegroups.dt1 monton antes= 6205096 despues= 6710608 delta= 505512
+CARGA299: DT1 act1\outdoors\stonewall.dt1 monton antes= 6710608 despues= 7150184 delta= 439576
+CARGA299: DT1 act1\town\floor.dt1 monton antes= 7150184 despues= 8158192 delta= 1008008
+CARGA299: DT1 act1\barracks\warp.dt1 monton antes= 8158192 despues= 8816360 delta= 658168
+CARGA299: DT1 act1\outdoors\river.dt1 monton antes= 8816360 despues= 9132712 delta= 316352
+CARGA299: DT1 act1\town\objects.dt1 monton antes= 9132712 despues= 9794232 delta= 661520
+CARGA299: DT1 act1\town\fence.dt1 monton antes= 9794232 despues= 10217608 delta= 423376
+CARGA299: DT1 act1\outdoors\objects.dt1 monton antes= 10217608 despues= 10555824 delta= 338216
+CARGA299: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+CARGA299: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840 dt1 leidos= 8 de 8 ms= 28810
+CARGA299: monton tras la zona: usado= 10555824 libre= 3088
+CARGA299: ===== B) LOS OCHO .dt1 POR LoadFile CON TRAMO (DC-002.99) =====
+CARGA299: TRAMO act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton antes= 10555824 despues= 11061336 delta= 505512 tramo= 505504 reusos= 0 pedidos= 1
+CARGA299: TRAMO act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton antes= 11061336 despues= 11061336 delta= 0 tramo= 505504 reusos= 1 pedidos= 1
+CARGA299: TRAMO act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 monton antes= 11061336 despues= 12069344 delta= 1008008 tramo= 1008003 reusos= 1 pedidos= 2
+CARGA299: TRAMO act1\barracks\warp.dt1 bytes= 658158 crc32= -256062915 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 2 pedidos= 2
+CARGA299: TRAMO act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 3 pedidos= 2
+CARGA299: TRAMO act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 4 pedidos= 2
+CARGA299: TRAMO act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 5 pedidos= 2
+CARGA299: TRAMO act1\outdoors\objects.dt1 bytes= 338205 crc32= -1287313098 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 6 pedidos= 2
+CARGA299: TRAMO monton antes= 10555824 con los ocho= 12069344 tras soltar= 12069344 delta= 1513520 margen= 4096 volvioALaBase= false
+CARGA299: TRAMO instrumento: pedidos= 2 reusos= 6 bytesDelTramo= 0 unTramo= true
+CARGA299: TRAMO MAL -- delta= 1513520 pedidos= 2 reusos= 6 de 8 archivos
+CARGA299: ===== A) LOS MISMOS OCHO SIN DUENO (el camino de ayer) =====
+CARGA299: SINDUENO act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton= 12574856
+CARGA299: SINDUENO act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton= 13014432
+CARGA299: arranca DC-002.99 -- LoadFile del motor por el tramo prestado
+CARGA299: palancas: noLibera= true
+CARGA299: monton al arrancar: arena=4357568 usado=4354312 libre=3256 sbrk=0x0x8c709000 techo=0x0x8cff0000
+CARGA299: base del monton (tras GC) usado= 4354312 libre= 3256
+CARGA299: MPQ abierto, liberador= false prestamo= 14272 monton=arena=5717440 usado=5717320 libre=120 sbrk=0x0x8c855000 techo=0x0x8cff0000
+CARGA299: palancas del motor: lecturaDeConsola=true tramos= true
+CARGA299: ===== C) LA ZONA (el pueblo) =====
+CARGA299: DS1 bytes= 57652 crc32= 712973328 w= 57 h= 41 archivos= 8
+CARGA299: DT1 act1\outdoors\treegroups.dt1 monton antes= 6205096 despues= 6710608 delta= 505512
+CARGA299: DT1 act1\outdoors\stonewall.dt1 monton antes= 6710608 despues= 7150184 delta= 439576
+CARGA299: DT1 act1\town\floor.dt1 monton antes= 7150184 despues= 8158192 delta= 1008008
+CARGA299: DT1 act1\barracks\warp.dt1 monton antes= 8158192 despues= 8816360 delta= 658168
+CARGA299: DT1 act1\outdoors\river.dt1 monton antes= 8816360 despues= 9132712 delta= 316352
+CARGA299: DT1 act1\town\objects.dt1 monton antes= 9132712 despues= 9794232 delta= 661520
+CARGA299: DT1 act1\town\fence.dt1 monton antes= 9794232 despues= 10217608 delta= 423376
+CARGA299: DT1 act1\outdoors\objects.dt1 monton antes= 10217608 despues= 10555824 delta= 338216
+CARGA299: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+CARGA299: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840 dt1 leidos= 8 de 8 ms= 28810
+CARGA299: monton tras la zona: usado= 10555824 libre= 3088
+CARGA299: ===== B) LOS OCHO .dt1 POR LoadFile CON TRAMO (DC-002.99) =====
+CARGA299: TRAMO act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton antes= 10555824 despues= 11061336 delta= 505512 tramo= 505504 reusos= 0 pedidos= 1
+CARGA299: TRAMO act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton antes= 11061336 despues= 11061336 delta= 0 tramo= 505504 reusos= 1 pedidos= 1
+CARGA299: TRAMO act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 monton antes= 11061336 despues= 12069344 delta= 1008008 tramo= 1008003 reusos= 1 pedidos= 2
+CARGA299: TRAMO act1\barracks\warp.dt1 bytes= 658158 crc32= -256062915 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 2 pedidos= 2
+CARGA299: TRAMO act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 3 pedidos= 2
+CARGA299: TRAMO act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 4 pedidos= 2
+CARGA299: TRAMO act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 5 pedidos= 2
+CARGA299: TRAMO act1\outdoors\objects.dt1 bytes= 338205 crc32= -1287313098 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 6 pedidos= 2
+CARGA299: TRAMO monton antes= 10555824 con los ocho= 12069344 tras soltar= 12069344 delta= 1513520 margen= 4096 volvioALaBase= false
+CARGA299: TRAMO instrumento: pedidos= 2 reusos= 6 bytesDelTramo= 0 unTramo= true
+CARGA299: TRAMO MAL -- delta= 1513520 pedidos= 2 reusos= 6 de 8 archivos
+CARGA299: ===== A) LOS MISMOS OCHO SIN DUENO (el camino de ayer) =====
+CARGA299: SINDUENO act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton= 12574856
+CARGA299: SINDUENO act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton= 13014432
+CARGA299: arranca DC-002.99 -- LoadFile del motor por el tramo prestado
+CARGA299: palancas: noLibera= true
+CARGA299: monton al arrancar: arena=4357568 usado=4354312 libre=3256 sbrk=0x0x8c709000 techo=0x0x8cff0000
+CARGA299: base del monton (tras GC) usado= 4354312 libre= 3256
+CARGA299: MPQ abierto, liberador= false prestamo= 14272 monton=arena=5717440 usado=5717320 libre=120 sbrk=0x0x8c855000 techo=0x0x8cff0000
+CARGA299: palancas del motor: lecturaDeConsola=true tramos= true
+CARGA299: ===== C) LA ZONA (el pueblo) =====
+CARGA299: DS1 bytes= 57652 crc32= 712973328 w= 57 h= 41 archivos= 8
+CARGA299: DT1 act1\outdoors\treegroups.dt1 monton antes= 6205096 despues= 6710608 delta= 505512
+CARGA299: DT1 act1\outdoors\stonewall.dt1 monton antes= 6710608 despues= 7150184 delta= 439576
+CARGA299: DT1 act1\town\floor.dt1 monton antes= 7150184 despues= 8158192 delta= 1008008
+CARGA299: DT1 act1\barracks\warp.dt1 monton antes= 8158192 despues= 8816360 delta= 658168
+CARGA299: DT1 act1\outdoors\river.dt1 monton antes= 8816360 despues= 9132712 delta= 316352
+CARGA299: DT1 act1\town\objects.dt1 monton antes= 9132712 despues= 9794232 delta= 661520
+CARGA299: DT1 act1\town\fence.dt1 monton antes= 9794232 despues= 10217608 delta= 423376
+CARGA299: DT1 act1\outdoors\objects.dt1 monton antes= 10217608 despues= 10555824 delta= 338216
+CARGA299: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+CARGA299: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840 dt1 leidos= 8 de 8 ms= 28810
+CARGA299: monton tras la zona: usado= 10555824 libre= 3088
+CARGA299: ===== B) LOS OCHO .dt1 POR LoadFile CON TRAMO (DC-002.99) =====
+CARGA299: TRAMO act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton antes= 10555824 despues= 11061336 delta= 505512 tramo= 505504 reusos= 0 pedidos= 1
+CARGA299: TRAMO act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton antes= 11061336 despues= 11061336 delta= 0 tramo= 505504 reusos= 1 pedidos= 1
+CARGA299: TRAMO act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 monton antes= 11061336 despues= 12069344 delta= 1008008 tramo= 1008003 reusos= 1 pedidos= 2
+CARGA299: TRAMO act1\barracks\warp.dt1 bytes= 658158 crc32= -256062915 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 2 pedidos= 2
+CARGA299: TRAMO act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 3 pedidos= 2
+CARGA299: TRAMO act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 4 pedidos= 2
+CARGA299: TRAMO act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 5 pedidos= 2
+CARGA299: TRAMO act1\outdoors\objects.dt1 bytes= 338205 crc32= -1287313098 monton antes= 12069344 despues= 12069344 delta= 0 tramo= 1008003 reusos= 6 pedidos= 2
+CARGA299: TRAMO monton antes= 10555824 con los ocho= 12069344 tras soltar= 12069344 delta= 1513520 margen= 4096 volvioALaBase= false
+CARGA299: TRAMO instrumento: pedidos= 2 reusos= 6 bytesDelTramo= 0 unTramo= true
+CARGA299: TRAMO MAL -- delta= 1513520 pedidos= 2 reusos= 6 de 8 archivos
+CARGA299: ===== A) LOS MISMOS OCHO SIN DUENO (el camino de ayer) =====
+CARGA299: SINDUENO act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton= 12574856
+CARGA299: SINDUENO act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton= 13014432
+CARGA299: arranca DC-002.99 -- LoadFile del motor por el tramo prestado
+CARGA299: palancas: noLibera= true
+CARGA299: monton al arrancar: arena=4357568 usado=4354312 libre=3256 sbrk=0x0x8c709000 techo=0x0x8cff0000
+CARGA299: base del monton (tras GC) usado= 4354312 libre= 3256

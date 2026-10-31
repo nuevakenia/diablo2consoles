@@ -34,6 +34,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset"
 )
 
 var (
@@ -46,6 +47,94 @@ var (
 	bytesLeidosCompletos int64
 	lecturasSinTamano    int
 )
+
+// DC-002.99 -- LA LECTURA DEL MOTOR CON DUENO: EL ULTIMO `make` POR ARCHIVO.
+//
+// EL DEFECTO QUE ARREGLA (medido en DC-002.96, seccion 6.1). Con `ActivarLecturaDeConsola` el motor ya
+// reservaba el TAMANO exacto, pero lo reservaba POR ARCHIVO (`make([]byte, tamano)` en
+// `loadFileDeConsola`). En libgodc todo pedido de mas de 64 KB va a `gc_external_alloc` (malloc pelado) y el
+// recolector NO lo devuelve jamas: leer los ocho `.dt1` del pueblo por `d2asset.LoadFile` dejaba tomado lo que
+// mide cada archivo, para siempre (DC-002.96 §3.5: los seis formatos de prueba dejaban 3.633.432 B).
+//
+// LA CURA. `LoadFile` no reserva: pide UN tramo a la fuente (`asset.SourceDeTramos`, opcional) y lee adentro.
+// El tramo es UNO y se reusa archivo tras archivo (crece cuando aparece un archivo mas grande que el tramo), y
+// lo devuelve `SoltarLecturasDeConsola` -- o el proximo crecimiento. En la consola el tramo sale del monton de
+// C con `free` inyectado (`console/dc/fuenteconsola`), asi que devolverlo es devolverlo DE VERDAD.
+//
+// EL CONTRATO, Y ES EL QUE HAY QUE RESPETAR AL USAR ESTO. Lo que devuelve `LoadFile` con este camino deja de
+// ser un buffer propio: **vale hasta la proxima lectura del motor**. Es el mismo contrato que ya tiene el
+// arena de tiles (DC-002.78: los bloques de un `.dt1` apuntan al arena) y por eso el que GUARDA los bytes para
+// un segundo consumidor (`LoadFileHandoff`, que es lo que usan el `.ds1` y el `.dt1` del camino de la PC) NO
+// los pasa por el tramo: los lee con buffer propio (ver `leerParaElHandoff`).
+//
+// LA PC NO SE ENTERA: el camino se prende con `ActivarLecturasPorTramos`, que `ArrancarComoConsola` llama y
+// `NewAssetManager` (el de la PC) nunca.
+var (
+	// caminoDeTramosDeConsola: prende la lectura por tramo prestado (DC-002.99).
+	caminoDeTramosDeConsola bool
+
+	// tramoDeLecturas: EL reservorio. Uno solo para todo el motor, reusado archivo tras archivo.
+	tramoDeLecturas asset.TramoPrestado
+
+	// el instrumento: los tramos pedidos, los reusos y lo que mide el tramo vigente.
+	tramosPedidos       int
+	tramosLiberados     int
+	tramosReusados      int
+	lecturasPorTramo    int
+	bytesPorTramo       int64
+	bytesDelTramoActual int
+)
+
+// ActivarLecturasPorTramos prende la lectura del motor por el tramo prestado de la fuente (DC-002.99). La
+// llama el arranque de la consola; la PC no. Requiere que la fuente implemente `asset.SourceDeTramos` (la de
+// consola lo hace): si no, cada carga se va al camino de DC-002.79 y el instrumento lo cuenta.
+func ActivarLecturasPorTramos() {
+	caminoDeTramosDeConsola = true
+}
+
+// EstadoDeLasLecturasPorTramo: el instrumento de DC-002.99, aparte del de DC-002.79 para no cambiar el
+// tamano de `EstadoDeLaLectura` (que ya leen otros binarios).
+type EstadoDeLasLecturasPorTramo struct {
+	Camino        bool  // el camino esta prendido
+	Pedidos       int   // tramos pedidos a la fuente (el reservorio y sus crecimientos)
+	Liberados     int   // tramos devueltos con Liberar
+	Reusos        int   // lecturas hechas en el tramo que ya estaba (memoria no pedida)
+	BytesDelTramo int   // bytes del tramo vigente (0 = no hay tramo)
+	Lecturas      int   // lecturas que pasaron por el tramo
+	Bytes         int64 // bytes leidos por el tramo
+}
+
+// EstadoDeLosTramos devuelve el estado de la lectura por tramo (para medir en la consola).
+func EstadoDeLosTramos() EstadoDeLasLecturasPorTramo {
+	return EstadoDeLasLecturasPorTramo{
+		Camino:        caminoDeTramosDeConsola,
+		Pedidos:       tramosPedidos,
+		Liberados:     tramosLiberados,
+		Reusos:        tramosReusados,
+		BytesDelTramo: bytesDelTramoActual,
+		Lecturas:      lecturasPorTramo,
+		Bytes:         bytesPorTramo,
+	}
+}
+
+// SoltarLecturasDeConsola devuelve al monton el tramo de las lecturas del motor (DC-002.99): despues de esto
+// el monton de C vuelve al nivel de partida. Se llama al terminar de cargar (o al tirar el nivel); la proxima
+// `LoadFile` pide un tramo nuevo. En la PC no hace nada porque nunca hay tramo.
+func SoltarLecturasDeConsola() {
+	soltarTramoDeLecturas()
+}
+
+// soltarTramoDeLecturas: el cuerpo, sin ceremonia, para usarlo adentro del paquete.
+func soltarTramoDeLecturas() {
+	if tramoDeLecturas == nil {
+		return
+	}
+
+	tramoDeLecturas.Liberar()
+	tramoDeLecturas = nil
+	bytesDelTramoActual = 0
+	tramosLiberados++
+}
 
 // ActivarLecturaDeConsola prende la lectura completa con el tamano reservado de antemano y APAGA el
 // prefetch del MPQ (ver la cabecera de este archivo). La llama el arranque de la consola; la PC no.
@@ -77,7 +166,21 @@ func EstadoDeLosArchivos() EstadoDeLaLectura {
 // loadFileDeConsola: el camino de la consola -- tamano primero, buffer exacto, lectura por trozos dentro
 // de ese buffer. Si la fuente no sabe el tamano (una carpeta del disco, por ejemplo), se vuelve al camino
 // de siempre en vez de inventar un numero.
+//
+// DC-002.99: si ademas esta prendida la lectura por tramo y la fuente sabe prestar memoria, el buffer NO se
+// pide por archivo: se pide un tramo y se reusa (ver la cabecera de DC-002.99).
 func (am *AssetManager) loadFileDeConsola(filePath string) ([]byte, error) {
+	if caminoDeTramosDeConsola && am.Loader.TieneTramos(filePath) {
+		return am.loadFilePorTramo(filePath)
+	}
+
+	return am.loadFileDeConsolaConTamano(filePath)
+}
+
+// loadFileDeConsolaConTamano: el camino de DC-002.79, sin tramo -- `make` del tamano exacto y lectura adentro.
+// Es el que se usa cuando la fuente no sabe prestar memoria, y el que usa el handoff (que se queda con los
+// bytes, ver `leerParaElHandoff`).
+func (am *AssetManager) loadFileDeConsolaConTamano(filePath string) ([]byte, error) {
 	tamano, sabido := am.Loader.TamanoDeArchivo(filePath)
 	if !sabido {
 		lecturasSinTamano++
@@ -86,6 +189,86 @@ func (am *AssetManager) loadFileDeConsola(filePath string) ([]byte, error) {
 	}
 
 	return am.loadFileDeConsolaEn(filePath, make([]byte, tamano), tamano)
+}
+
+// loadFilePorTramo: la lectura del motor por el tramo prestado de la fuente (DC-002.99).
+//
+// EL TRAMO ES UNO. La primera lectura pide a la fuente un tramo del tamano del archivo; la siguiente lee
+// adentro del mismo si entra, y solo cuando aparece un archivo MAS GRANDE se devuelve el tramo viejo y se pide
+// uno nuevo. O sea: `LoadFile` deja de pedir memoria por archivo, que es el defecto que cierra esta tarjeta.
+//
+// LO QUE DEVUELVE VALE HASTA LA PROXIMA LECTURA (ver la cabecera de DC-002.99): es el precio de no pedir
+// memoria, y el que lo consume lo tiene que saber. Los que GUARDAN los bytes (el handoff) no pasan por aca.
+func (am *AssetManager) loadFilePorTramo(filePath string) ([]byte, error) {
+	tamano, sabido := am.Loader.TamanoDeArchivo(filePath)
+	if !sabido {
+		lecturasSinTamano++
+
+		return am.loadFileDeConsolaConTamano(filePath)
+	}
+
+	// el tramo vigente sirve si entra el archivo; si no, se devuelve y se pide uno del tamano nuevo
+	tramo := tramoDeLecturas
+	reuso := tramo != nil && len(tramo.Bytes()) >= tamano
+
+	if !reuso {
+		soltarTramoDeLecturas()
+
+		nuevo, err := am.Loader.Prestar(filePath, tamano)
+		if err != nil {
+			// la fuente no sabe prestar (o fallo): no se inventa nada, se lee con buffer propio
+			return am.loadFileDeConsolaConTamano(filePath)
+		}
+
+		tramo = nuevo
+		tramoDeLecturas = nuevo
+		tramosPedidos++
+		bytesDelTramoActual = len(nuevo.Bytes())
+	} else {
+		tramosReusados++
+	}
+
+	dst := tramo.Bytes()[:tamano]
+
+	d2loader.Marca(filePath, d2loader.MarcaLeeEntra)
+
+	var (
+		leidos int
+		err    error
+	)
+
+	// la lectura no pide memoria de trabajo si la fuente sabe leer con prestamo (DC-002.80); si no, se lee
+	// igual al `dst` del que llama, que es lo que importa aca
+	if am.Loader.TieneLecturaConPrestamo(filePath) {
+		leidos, err = am.Loader.LeerEnteroEnConPrestamo(filePath, dst, nil)
+	} else {
+		leidos, err = am.Loader.LeerEnteroEn(filePath, dst)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	d2loader.Marca(filePath, d2loader.MarcaLeeVolvio)
+
+	lecturasCompletas++
+	bytesLeidosCompletos += int64(leidos)
+	lecturasPorTramo++
+	bytesPorTramo += int64(leidos)
+
+	return dst[:leidos], nil
+}
+
+// leerParaElHandoff: la lectura de los archivos que un SEGUNDO consumidor va a leer despues (`LoadFileHandoff`
+// guarda los bytes). No puede ir por el tramo -- el tramo se reusa en la proxima lectura y el segundo
+// consumidor leeria memoria de otro archivo -- asi que se reserva un buffer propio, que es el camino de hoy.
+// En la PC es el mismo `io.ReadAll` de siempre.
+func (am *AssetManager) leerParaElHandoff(filePath string) ([]byte, error) {
+	if caminoDeLecturaDeConsola {
+		return am.loadFileDeConsolaConTamano(filePath)
+	}
+
+	return am.loadFileConReadAll(filePath)
 }
 
 // loadFileConReadAll es el camino de siempre (`io.ReadAll` sobre el stream del MPQ), y es al que se vuelve

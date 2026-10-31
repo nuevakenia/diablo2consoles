@@ -52,3 +52,29 @@ type SourceDeLecturaConPrestamo interface {
 	// dst tiene que alcanzar para `Tamano` y el prestamo NO se puede compartir entre goroutines.
 	LeerEnteroEnConPrestamo(nombre string, dst []byte, prestamo *d2mpq.Scratch) (int, error)
 }
+
+// TramoPrestado es MEMORIA PRESTADA CON DUENO EXPLICITO: el que la pide la usa y la devuelve con `Liberar`
+// (DC-002.99).
+//
+// PARA QUE. `LoadFile` devuelve un `[]byte` sin dueno: nadie sabe a quien le toca devolverlo, asi que en la
+// consola el bloque que el runtime mando al monton externo (>64 KB, `gc_external_alloc`) se queda tomado
+// para siempre. Con un tramo, el que pide la memoria es el que la devuelve, y el que la devuelve sabe cuando
+// (al terminar la lectura, o cuando la reusa para el archivo siguiente).
+type TramoPrestado interface {
+	// Bytes devuelve el tramo. Vale hasta el proximo `Liberar`.
+	Bytes() []byte
+	// Liberar devuelve el tramo a la fuente. Es idempotente: dos liberaciones no liberan dos veces.
+	Liberar()
+}
+
+// SourceDeTramos lo implementan las fuentes que saben PRESTAR memoria de lectura con dueno explicito
+// (DC-002.99): la fuente decide de donde sale (en la consola, del monton de C con el `free` inyectado) y el
+// que llama la devuelve cuando termino.
+//
+// Es OPCIONAL, como las otras dos: una fuente que no la implemente (una carpeta del disco) sigue por el
+// camino de siempre. El loader la busca con un type assertion.
+type SourceDeTramos interface {
+	// Prestar devuelve un tramo de AL MENOS `minimo` bytes para leer `nombre` adentro. `nombre` es para el
+	// instrumento de la fuente; el que lee es el que llama (`LeerEnteroEn` / `LeerEnteroEnConPrestamo`).
+	Prestar(nombre string, minimo int) (TramoPrestado, error)
+}

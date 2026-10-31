@@ -18,6 +18,9 @@ type fileHandoff struct {
 // second call returns them and forgets them, so a tile file is decompressed once instead of
 // twice and the raw bytes are not kept afterwards. A file that is only ever read once stays in the
 // (bounded) handoff table, so the table is capped. The returned slice must not be modified.
+//
+// DC-002.99: como esta tabla GUARDA los bytes para un segundo consumidor, no puede usar el tramo prestado de
+// `LoadFile` (que se reusa en la proxima lectura): se lee con buffer propio (`leerParaElHandoff`).
 func (am *AssetManager) LoadFileHandoff(filePath string) ([]byte, error) {
 	h := &am.handoff
 
@@ -33,7 +36,7 @@ func (am *AssetManager) LoadFileHandoff(filePath string) ([]byte, error) {
 
 	h.mu.Unlock()
 
-	b, err := am.LoadFile(filePath)
+	b, err := am.leerParaElHandoff(filePath)
 	if err != nil {
 		return nil, err
 	}

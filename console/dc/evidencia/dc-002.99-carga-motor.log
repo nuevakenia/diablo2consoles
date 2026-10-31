@@ -1,0 +1,48 @@
+CARGA299: arranca DC-002.99 -- LoadFile del motor por el tramo prestado
+CARGA299: palancas: noLibera= false
+CARGA299: monton al arrancar: arena=4357664 usado=4354312 libre=3352 sbrk=0x0x8c709000 techo=0x0x8cff0000
+CARGA299: base del monton (tras GC) usado= 4354312 libre= 3352
+CARGA299: MPQ abierto, liberador= true prestamo= 14272 monton=arena=4709920 usado=4709312 libre=608 sbrk=0x0x8c75f000 techo=0x0x8cff0000
+CARGA299: palancas del motor: lecturaDeConsola=true tramos= true
+CARGA299: ===== C) LA ZONA (el pueblo) =====
+CARGA299: DS1 bytes= 57652 crc32= 712973328 w= 57 h= 41 archivos= 8
+CARGA299: DT1 act1\outdoors\treegroups.dt1 monton antes= 5197088 despues= 5197088 delta= 0
+CARGA299: DT1 act1\outdoors\stonewall.dt1 monton antes= 5197088 despues= 5197088 delta= 0
+CARGA299: DT1 act1\town\floor.dt1 monton antes= 5197088 despues= 5197088 delta= 0
+CARGA299: DT1 act1\barracks\warp.dt1 monton antes= 5197088 despues= 5197088 delta= 0
+CARGA299: DT1 act1\outdoors\river.dt1 monton antes= 5197088 despues= 5197088 delta= 0
+CARGA299: DT1 act1\town\objects.dt1 monton antes= 5197088 despues= 5197088 delta= 0
+CARGA299: DT1 act1\town\fence.dt1 monton antes= 5197088 despues= 5197088 delta= 0
+CARGA299: DT1 act1\outdoors\objects.dt1 monton antes= 5197088 despues= 5197088 delta= 0
+CARGA299: COMPUESTO pisos= 1982 / 1982 paredes= 330 / 330 sintilePiso= 0 sintilePared= 0 fuera= 2239
+CARGA299: LIENZO pixelesNoVacios= 193538 de 262144 crc32= -787319840 dt1 leidos= 8 de 8 ms= 28810
+CARGA299: monton tras la zona: usado= 5197088 libre= 256
+CARGA299: ===== B) LOS OCHO .dt1 POR LoadFile CON TRAMO (DC-002.99) =====
+CARGA299: TRAMO act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton antes= 5197088 despues= 5702600 delta= 505512 tramo= 505504 reusos= 0 pedidos= 1
+CARGA299: TRAMO act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton antes= 5702600 despues= 5702600 delta= 0 tramo= 505504 reusos= 1 pedidos= 1
+CARGA299: TRAMO act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 monton antes= 5702600 despues= 6205096 delta= 502496 tramo= 1008003 reusos= 1 pedidos= 2
+CARGA299: TRAMO act1\barracks\warp.dt1 bytes= 658158 crc32= -256062915 monton antes= 6205096 despues= 6205096 delta= 0 tramo= 1008003 reusos= 2 pedidos= 2
+CARGA299: TRAMO act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 monton antes= 6205096 despues= 6205096 delta= 0 tramo= 1008003 reusos= 3 pedidos= 2
+CARGA299: TRAMO act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 monton antes= 6205096 despues= 6205096 delta= 0 tramo= 1008003 reusos= 4 pedidos= 2
+CARGA299: TRAMO act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 monton antes= 6205096 despues= 6205096 delta= 0 tramo= 1008003 reusos= 5 pedidos= 2
+CARGA299: TRAMO act1\outdoors\objects.dt1 bytes= 338205 crc32= -1287313098 monton antes= 6205096 despues= 6205096 delta= 0 tramo= 1008003 reusos= 6 pedidos= 2
+CARGA299: TRAMO monton antes= 5197088 con los ocho= 6205096 tras soltar= 5197088 delta= 0 margen= 4096 volvioALaBase= true
+CARGA299: TRAMO instrumento: pedidos= 2 reusos= 6 bytesDelTramo= 0 unTramo= true
+CARGA299: TRAMO OK --  8 archivos en 2 tramos y el monton volvio al nivel de partida
+CARGA299: ===== A) LOS MISMOS OCHO SIN DUENO (el camino de ayer) =====
+CARGA299: SINDUENO act1\outdoors\treegroups.dt1 bytes= 505504 crc32= 720682414 monton= 5702600
+CARGA299: SINDUENO act1\outdoors\stonewall.dt1 bytes= 439569 crc32= -636122962 monton= 6142176
+CARGA299: SINDUENO act1\town\floor.dt1 bytes= 1008003 crc32= 231028135 monton= 7150184
+CARGA299: SINDUENO act1\barracks\warp.dt1 bytes= 658158 crc32= -256062915 monton= 7808352
+CARGA299: SINDUENO act1\outdoors\river.dt1 bytes= 316344 crc32= 1771736052 monton= 8124704
+CARGA299: SINDUENO act1\town\objects.dt1 bytes= 661515 crc32= 1353167029 monton= 8786224
+CARGA299: SINDUENO act1\town\fence.dt1 bytes= 423367 crc32= 2077960125 monton= 9209600
+CARGA299: SINDUENO act1\outdoors\objects.dt1 bytes= 338205 crc32= -1287313098 monton= 9547816
+CARGA299: SINDUENO monton antes= 5197088 despues= 9547816 tomado= 4350728 (un buffer por archivo que no vuelve)
+CARGA299: ================ EL VEREDICTO ================
+CARGA299: instrumento del tramo: pedidos= 2 liberados= 2 reusos= 6 lecturas= 8 bytes= 4350665 bytesDelTramo= 0
+CARGA299: instrumento de la fuente: pedidos= 10 liberados= 10 prestamos= 2 bytesVivos= 0 externos= 11 dobles= 0 prestamo= 14272 crecidas= 4
+CARGA299: monton al final: usado= 9547816 libre= 3576  (el bloque A deja tomado lo que no se libera: 4350728 bytes)
+CARGA299: DUENO OK -- todos los tramos que se pidieron se devolvieron (0 bytes vivos)
+CARGA299: ZONA OK -- el pueblo compone igual: crc32 -787319840 == 3507647456
+CARGA299: TRAMO OK -- los ocho .dt1 del pueblo por LoadFile con el monton de C de vuelta a la base

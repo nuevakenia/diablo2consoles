@@ -61,6 +61,7 @@ var (
 	_ asset.Source                     = (*Fuente)(nil)
 	_ asset.SourceDeLecturaEntera      = (*Fuente)(nil)
 	_ asset.SourceDeLecturaConPrestamo = (*Fuente)(nil)
+	_ asset.SourceDeTramos             = (*Fuente)(nil)
 )
 
 // umbralExterno: el mismo corte que usa libgodc para mandar una asignacion al monton de C
@@ -111,6 +112,13 @@ type Fuente struct {
 	bytesLeidos     int // bytes que se leyeron en total
 	bytesVivos      int // bytes prestados que todavia no se devolvieron (tiene que volver a 0)
 	pedidosFallidos int // Pedir que no pudo leer: el buffer NO se entrega
+
+	// DC-002.99: los tramos de ESPACIO (`Prestar`), que son los del reservorio del motor. Se cuentan aparte
+	// de `Pedir` a proposito: `Pedir` trae UN ARCHIVO y `Prestar` trae MEMORIA para leer adentro, y el numero
+	// que prueba esta tarjeta es que los segundos son UNO (y sus crecimientos), no uno por archivo.
+	prestamos          int // Prestar: cuantos tramos de espacio se prestaron
+	prestamosLiberados int // de esos, cuantos se devolvieron
+	bytesDePrestamos   int // bytes reservados por esos tramos
 }
 
 // Abrir abre el MPQ con la Source de consola. La ruta es la del disco (en la Dreamcast, `/cd/JUEGO/...`).
@@ -243,12 +251,27 @@ type Tramo struct {
 	// Datos: el contenido del archivo. Vale hasta `Liberar`.
 	Datos []byte
 
-	fuente   *Fuente
+	fuente *Fuente
+
+	// deEspacio: el tramo salio de `Prestar` (memoria para leer adentro) y no de `Pedir` (un archivo entero).
+	// Es solo para el instrumento: cada clase lleva su cuenta de pedidos y liberaciones.
+	deEspacio bool
+
 	liberado bool
 }
 
 // Liberado dice si el tramo ya se devolvio (para no leer un `Datos` que ya no es del que llama).
 func (t *Tramo) Liberado() bool { return t == nil || t.liberado }
+
+// Bytes devuelve el tramo: es `Datos`, con la firma de `asset.TramoPrestado` (DC-002.99). Despues de
+// `Liberar` devuelve nil, para que un uso tardio se vea como una rebanada vacia y no como memoria de otro.
+func (t *Tramo) Bytes() []byte {
+	if t == nil || t.liberado {
+		return nil
+	}
+
+	return t.Datos
+}
 
 // Liberar devuelve el tramo al monton. Si paso del umbral externo se le hace `free()` con el liberador que
 // se inyecto; si no, el bloque vive en el semiespacio del recolector y lo recoge el GC (liberarlo a mano
@@ -268,7 +291,15 @@ func (t *Tramo) Liberar() {
 	f := t.fuente
 	n := len(t.Datos)
 
-	f.liberados++
+	// DC-002.99: los tramos son de DOS clases -- el de un archivo (`Pedir`) y el de ESPACIO (`Prestar`, el
+	// reservorio del motor) -- y cada clase lleva su cuenta. Asi `Pedidos == Liberados` sigue queriendo decir
+	// "los archivos que se pidieron se devolvieron" (lo que mide DC-002.96) y los de espacio se miran aparte.
+	if t.deEspacio {
+		f.prestamosLiberados++
+	} else {
+		f.liberados++
+	}
+
 	f.bytesVivos -= n
 
 	if n > umbralExterno && f.liberador != nil {
@@ -323,6 +354,34 @@ func (f *Fuente) Pedir(nombre string) (*Tramo, error) {
 	return &Tramo{Nombre: nombre, Datos: datos[:leidos], fuente: f}, nil
 }
 
+// Prestar presta MEMORIA, no un archivo: devuelve un tramo de al menos `minimo` bytes para que el que llama
+// lea adentro lo que quiera (DC-002.99). Es la pieza del reservorio de `d2asset.LoadFile`: se pide UNA vez,
+// del tamano del archivo mas grande, y despues cada archivo se lee ahi adentro (`LeerEnteroEn` /
+// `LeerEnteroEnConPrestamo`, que escriben en el `dst` del que llama y no piden memoria).
+//
+// El tramo es del que llama y se devuelve con `Tramo.Liberar`, igual que el de `Pedir`: si paso el umbral
+// externo se le hace `free()` con el liberador inyectado. `Datos` viene con el largo pedido (no leido: la
+// lectura la hace el que llama).
+func (f *Fuente) Prestar(nombre string, minimo int) (asset.TramoPrestado, error) {
+	if f.mpq == nil {
+		return nil, errSinMPQ
+	}
+
+	// un tramo de 0 bytes no puede terminar en `&dst[0]`: se reserva uno para que la direccion exista
+	reserva := minimo
+	if reserva < 1 {
+		reserva = 1
+	}
+
+	datos := make([]byte, reserva)
+
+	f.prestamos++
+	f.bytesDePrestamos += reserva
+	f.bytesVivos += reserva
+
+	return &Tramo{Nombre: nombre, Datos: datos, fuente: f, deEspacio: true}, nil
+}
+
 // Estado: el instrumento. Es lo que hay que mirar para decir, con numeros, cuantas cargas pasaron por la
 // Source nueva, por que camino, y si el dueno devolvio todo lo que pidio.
 type Estado struct {
@@ -341,6 +400,12 @@ type Estado struct {
 	BytesPedidos    int64 // bytes prestados en total
 	BytesLeidos     int64 // bytes leidos en total (los tres caminos)
 	BytesVivos      int64 // bytes prestados sin devolver (0 = el dueno devolvio todo)
+
+	// DC-002.99: los tramos de ESPACIO (el reservorio del motor). `Pedidos` cuenta archivos enteros;
+	// `Prestamos` cuenta reservas de memoria, y tiene que ser UNO por reservorio (mas sus crecimientos).
+	Prestamos          int   // Prestar: tramos de espacio prestados
+	PrestamosLiberados int   // de esos, cuantos se devolvieron con Liberar
+	BytesDePrestamos   int64 // bytes que reservaron esos tramos
 
 	// la memoria de trabajo de la lectura
 	PrestamoReservado int // bytes del prestamo (se pide una vez)
@@ -363,6 +428,9 @@ func (f *Fuente) Estado() Estado {
 		BytesPedidos:        int64(f.bytesPedidos),
 		BytesLeidos:         int64(f.bytesLeidos),
 		BytesVivos:          int64(f.bytesVivos),
+		Prestamos:           f.prestamos,
+		PrestamosLiberados:  f.prestamosLiberados,
+		BytesDePrestamos:    int64(f.bytesDePrestamos),
 		Tamanos:             f.tamanos,
 	}
 

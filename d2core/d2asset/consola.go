@@ -49,6 +49,8 @@ import (
 //     cualquier archivo de mas de 64 KB.
 //  3. `ActivarCaminoDeTilesDeConsola` (DC-002.78/.80) -- cada .dt1 se lee ADENTRO de un arena pedido UNA
 //     vez, con la lectura del MPQ por memoria prestada (`lecturaPrestadaDeTiles`).
+//  4. `ActivarLecturasPorTramos`   (DC-002.99) -- `LoadFile` deja de pedir un buffer por archivo: lee en un
+//     tramo de la fuente y lo devuelve con `SoltarLecturasDeConsola` (el ultimo `make` por archivo del motor).
 //
 // ACA quedan juntas, para que el arranque de la consola sea UNA linea y no tres que se pueden olvidar (que es
 // justo lo que esta tarjeta viene a comprobar: que nada se pierda al arrancar el motor entero). La PC no la
@@ -62,6 +64,12 @@ func ArrancarComoConsola() {
 	// compositor del motor (`LoadStamp` + `ResetMap`) cargaba los 32 campos del level type y el pueblo tiene
 	// dos `.dt1` ahi que el `.ds1` no lista: 960.096 B de arena que ninguna casilla mira.
 	CargarSoloLosTilesDelDS1(true)
+
+	// DC-002.99: la lectura del motor deja de pedir un buffer por archivo. `LoadFile` lee en UN tramo de la
+	// fuente (`console/dc/fuenteconsola`, que lo saca del monton de C con `free` inyectado) y lo devuelve con
+	// `SoltarLecturasDeConsola`. OJO CON EL CONTRATO: con esta palanca prendida, lo que devuelve `LoadFile`
+	// vale hasta la proxima lectura (es el precio de no pedir memoria; ver la cabecera de lectura_consola.go).
+	ActivarLecturasPorTramos()
 }
 
 // NuevoAssetManagerDeConsola arma el AssetManager de la consola: los ocho caches con los presupuestos

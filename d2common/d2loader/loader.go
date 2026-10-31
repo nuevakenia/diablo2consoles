@@ -212,6 +212,51 @@ func (l *Loader) TieneLecturaConPrestamo(subPath string) bool {
 	return false
 }
 
+// TieneTramos dice si el archivo lo tiene una fuente que sabe PRESTAR memoria con dueno explicito
+// (DC-002.99). Es la pregunta que hace `d2asset.LoadFile` para decidir si lee en un tramo que despues
+// devuelve o se queda con el camino de siempre.
+func (l *Loader) TieneTramos(subPath string) bool {
+	subPath = l.rutaReal(subPath)
+
+	for idx := range l.Sources {
+		source := l.Sources[idx]
+
+		if _, ok := source.(asset.SourceDeTramos); !ok {
+			continue
+		}
+
+		if source.Exists(subPath) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Prestar pide a la primera fuente que lo tenga un tramo de AL MENOS `minimo` bytes, con dueno explicito: el
+// que llama lo usa y lo devuelve con `TramoPrestado.Liberar` (DC-002.99).
+//
+// PARA QUE. Es la pieza que le falta a `LoadFile`: reservar UNA vez la memoria de la lectura (del archivo mas
+// grande que se vaya a leer) y leer cada archivo ahi adentro, en vez de un `make` por archivo que en la
+// consola se queda en el monton externo. Si ninguna fuente sabe prestar, se dice con un error y el que llama
+// decide (hoy: se vuelve al camino de siempre).
+func (l *Loader) Prestar(subPath string, minimo int) (asset.TramoPrestado, error) {
+	subPath = l.rutaReal(subPath)
+
+	for idx := range l.Sources {
+		source := l.Sources[idx]
+
+		fuente, ok := source.(asset.SourceDeTramos)
+		if !ok || !source.Exists(subPath) {
+			continue
+		}
+
+		return fuente.Prestar(subPath, minimo)
+	}
+
+	return nil, fmt.Errorf(errFmtFileNotFound, subPath)
+}
+
 // AddSource adds an asset source with the given path. The path will either resolve to a directory
 // or a file on the host filesystem. In the case that it is a file, the file extension is used
 // to determine the type of asset source. In the case that the path points to a directory, a

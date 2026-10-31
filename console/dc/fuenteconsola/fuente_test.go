@@ -282,6 +282,82 @@ func TestRegistrarEnPoneLaFuentePrimeroYAtiendeLasCargas(t *testing.T) {
 	}
 }
 
+// TestPrestarPrestaMemoriaConDueno: `Prestar` de DC-002.99 no trae un archivo, trae ESPACIO. Lo que hay que
+// exigirle: el largo pedido, que la lectura caiga adentro sin pedir nada, y que liberarlo devuelva el bloque
+// con el `free` inyectado (es el reservorio de `d2asset.LoadFile`).
+func TestPrestarPrestaMemoriaConDueno(t *testing.T) {
+	f := abrirDePrueba(t)
+
+	var liberados []uintptr
+
+	f.UsarLiberador(func(direccion uintptr) { liberados = append(liberados, direccion) })
+
+	const rutaDT1 = `data\global\tiles\ACT1\TOWN\floor.dt1`
+
+	quiero, err := f.mpq.ReadFile(limpiar(rutaDT1))
+	if err != nil {
+		t.Fatalf("el camino de siempre fallo: %v", err)
+	}
+
+	eAntes := f.Estado()
+
+	tramo, err := f.Prestar(rutaDT1, len(quiero))
+	if err != nil {
+		t.Fatalf("Prestar: %v", err)
+	}
+
+	if len(tramo.Bytes()) != len(quiero) {
+		t.Fatalf("el tramo mide %d y se pidieron %d", len(tramo.Bytes()), len(quiero))
+	}
+
+	// la lectura va DENTRO del tramo y no pide memoria
+	leidos, err := f.LeerEnteroEnConPrestamo(rutaDT1, tramo.Bytes(), nil)
+	if err != nil {
+		t.Fatalf("LeerEnteroEnConPrestamo dentro del tramo: %v", err)
+	}
+
+	if leidos != len(quiero) || crc32.ChecksumIEEE(tramo.Bytes()[:leidos]) != crc32.ChecksumIEEE(quiero) {
+		t.Fatalf("lo leido dentro del tramo no es el archivo (%d bytes)", leidos)
+	}
+
+	e := f.Estado()
+
+	if e.Prestamos != eAntes.Prestamos+1 {
+		t.Fatalf("prestamos=%d, quiero %d", e.Prestamos, eAntes.Prestamos+1)
+	}
+
+	// el tramo de espacio NO se cuenta como un archivo: `Pedidos`/`Liberados` siguen midiendo archivos
+	if e.Pedidos != eAntes.Pedidos || e.Liberados != eAntes.Liberados {
+		t.Fatalf("un tramo de espacio se conto como archivo: pedidos %d->%d liberados %d->%d",
+			eAntes.Pedidos, e.Pedidos, eAntes.Liberados, e.Liberados)
+	}
+
+	if e.BytesVivos != int64(len(quiero)) {
+		t.Fatalf("bytesVivos=%d con el tramo vivo, quiero %d", e.BytesVivos, len(quiero))
+	}
+
+	tramo.Liberar()
+
+	e = f.Estado()
+
+	if e.BytesVivos != 0 {
+		t.Fatalf("quedaron %d bytes vivos despues de liberar", e.BytesVivos)
+	}
+
+	if e.PrestamosLiberados != eAntes.PrestamosLiberados+1 {
+		t.Fatalf("prestamosLiberados=%d, quiero %d", e.PrestamosLiberados, eAntes.PrestamosLiberados+1)
+	}
+
+	// el .dt1 del pueblo pasa de 64 KB: el bloque fue al monton externo y se devuelve con el liberador
+	if len(liberados) != 1 {
+		t.Fatalf("el liberador se llamo %d veces, quiero 1", len(liberados))
+	}
+
+	if tramo.Bytes() != nil {
+		t.Fatalf("el tramo conserva su vista despues de liberar")
+	}
+}
+
 // abrirDePrueba abre el d2data.mpq de la instalacion del juego. Sin instalacion, la prueba se SALTA (no se
 // inventa un MPQ: lo que se compara es el contenido real).
 func abrirDePrueba(t *testing.T) *Fuente {

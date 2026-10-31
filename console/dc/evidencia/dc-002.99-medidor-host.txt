@@ -1,0 +1,22 @@
+MEDIDOR299: mpq = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2data.mpq
+MEDIDOR299: REFERENCIA act1\outdoors\treegroups.dt1                   bytes=  505504 crc32=720682414
+MEDIDOR299: REFERENCIA act1\outdoors\stonewall.dt1                    bytes=  439569 crc32=3658844334
+MEDIDOR299: REFERENCIA act1\town\floor.dt1                            bytes= 1008003 crc32=231028135
+MEDIDOR299: REFERENCIA act1\barracks\warp.dt1                         bytes=  658158 crc32=4038904381
+MEDIDOR299: REFERENCIA act1\outdoors\river.dt1                        bytes=  316344 crc32=1771736052
+MEDIDOR299: REFERENCIA act1\town\objects.dt1                          bytes=  661515 crc32=1353167029
+MEDIDOR299: REFERENCIA act1\town\fence.dt1                            bytes=  423367 crc32=2077960125
+MEDIDOR299: REFERENCIA act1\outdoors\objects.dt1                      bytes=  338205 crc32=3007654198
+MEDIDOR299: ===== A) SIN TRAMO (el camino de la PC) =====
+MEDIDOR299: SIN-TRAMO OK -- los 8 archivos leidos con buffer propio (0 tramos)
+MEDIDOR299: ===== B) CON TRAMO (DC-002.99) =====
+MEDIDOR299: TRAMO act1\outdoors\treegroups.dt1                   bytes=  505504 crc32=720682414 tramo=  505504 reusos=0 pedidos=1
+MEDIDOR299: TRAMO act1\outdoors\stonewall.dt1                    bytes=  439569 crc32=3658844334 tramo=  505504 reusos=1 pedidos=1
+MEDIDOR299: TRAMO act1\town\floor.dt1                            bytes= 1008003 crc32=231028135 tramo= 1008003 reusos=1 pedidos=2
+MEDIDOR299: TRAMO act1\barracks\warp.dt1                         bytes=  658158 crc32=4038904381 tramo= 1008003 reusos=2 pedidos=2
+MEDIDOR299: TRAMO act1\outdoors\river.dt1                        bytes=  316344 crc32=1771736052 tramo= 1008003 reusos=3 pedidos=2
+MEDIDOR299: TRAMO act1\town\objects.dt1                          bytes=  661515 crc32=1353167029 tramo= 1008003 reusos=4 pedidos=2
+MEDIDOR299: TRAMO act1\town\fence.dt1                            bytes=  423367 crc32=2077960125 tramo= 1008003 reusos=5 pedidos=2
+MEDIDOR299: TRAMO act1\outdoors\objects.dt1                      bytes=  338205 crc32=3007654198 tramo= 1008003 reusos=6 pedidos=2
+MEDIDOR299: TRAMO OK -- 8 archivos en 2 tramos (6 reusos), y al soltar pedidos=2 liberados=2 bytesDelTramo=0
+MEDIDOR299: OK -- los ocho .dt1 dan el mismo crc32 por el motor, y el tramo es uno
