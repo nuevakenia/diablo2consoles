@@ -79,6 +79,8 @@ CABECERA = """/* libgodc/runtime/sonda_pc.c -- DC-002.24b
 #include <arch/irq.h>
 #include <arch/timer.h>
 #include <stdint.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 #define SONDA_RANURAS      %(ranuras)d
 #define SONDA_VENTANA      100u     /* muestras por volcado: a 100 Hz, 1 s */
@@ -90,6 +92,59 @@ CABECERA = """/* libgodc/runtime/sonda_pc.c -- DC-002.24b
 #define SONDA_PILA_PALABRAS 8       /* palabras de pila y de marco que acompanan al volcado */
 #define SONDA_RAM_MIN      0x8c000000UL
 #define SONDA_RAM_MAX      0x8d000000UL
+
+/* DC-002.87b: LA CONSOLA QUE SE MUERE SOLA, Y COMO LA SONDA LA SORTEA.
+ *
+ * Medido en el barrido de acomodo de esta tarjeta: en varios acomodos la corrida se queda MUDA a los ~28 s
+ * (ni una linea mas del programa ni de la sonda) y el cuadro SI se pinta despues (captura de pantalla a los
+ * 40 y 60 s: los cuatro personajes, animando). O sea que "no hay linea de CUADRO en el log" NO es "no
+ * pinto": es la CONSOLA la que se cae.
+ *
+ * El porque, medido en el kernel: `scif_write()` (kos/kernel/arch/dreamcast/hardware/scif.c) espera el bit
+ * TDFE con un tope de 800.000 vueltas y, si se le acaba, hace `serial_enabled = 0` -- y ahi TODA escritura
+ * posterior devuelve EIO sin imprimir nada, para siempre. Un tropiezo transitorio del FIFO deja la corrida
+ * muda hasta el final, y el volcado de registros que se busca no se ve NUNCA.
+ *
+ * Por eso la sonda, que es el instrumento, deja de usar dbgio (que pasa por ese `serial_enabled`) y escribe
+ * los registros del SCIF a mano: espera el mismo bit TDFE, pero con un tope mas corto, y si no hay lugar se
+ * SALTA el caracter en vez de quedarse muda, anotando cuantos salto. Asi el volcado sale mientras el FIFO
+ * tenga aire, aunque KOS ya haya apagado su consola. */
+#define SONDA_SCFSR2      (*(volatile uint16_t *)0xffe80010UL)   /* estado: bit 0x20 = FIFO de transmision con lugar */
+#define SONDA_SCFTDR2     (*(volatile uint8_t  *)0xffe8000cUL)   /* dato a transmitir */
+#define SONDA_PUTC_TOP    20000                                  /* ~1/40 del tope de KOS: no clava la sonda */
+
+static uint32_t sonda_chars, sonda_saltados;
+
+static void sonda_putc(char c)
+{
+    int t = SONDA_PUTC_TOP;
+
+    while(!(SONDA_SCFSR2 & 0x20) && t > 0) t--;
+    if(t <= 0) {
+        sonda_saltados++;
+        return;
+    }
+    SONDA_SCFTDR2 = (uint8_t)c;
+    SONDA_SCFSR2 &= 0xff9f;
+    sonda_chars++;
+}
+
+static void sonda_imprime(const char *fmt, ...)
+{
+    char buf[192];
+    int n, i;
+    va_list ap;
+
+    va_start(ap, fmt);
+    n = vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    if(n < 0) return;
+    if(n > (int)sizeof(buf) - 1) n = (int)sizeof(buf) - 1;
+    for(i = 0; i < n; i++) {
+        if(buf[i] == '\\n') sonda_putc('\\r');
+        sonda_putc(buf[i]);
+    }
+}
 
 static uint32_t sonda_pc_ranura[SONDA_RANURAS];
 static uint32_t sonda_n_ranura[SONDA_RANURAS];
@@ -125,26 +180,26 @@ static void sonda_volcar_palabras(const char *que, uint32_t donde)
     int i;
 
     if(!sonda_en_ram(donde)) {
-        dbgio_printf("SONDA-REG  %%s %%08lx (fuera de RAM: no se lee)\\n", que, (unsigned long)donde);
+        sonda_imprime("SONDA-REG  %%s %%08lx (fuera de RAM: no se lee)\\n", que, (unsigned long)donde);
         return;
     }
 
-    dbgio_printf("SONDA-REG  %%s %%08lx:", que, (unsigned long)donde);
+    sonda_imprime("SONDA-REG  %%s %%08lx:", que, (unsigned long)donde);
     for(i = 0; i < SONDA_PILA_PALABRAS; i++)
-        dbgio_printf(" %%08lx", (unsigned long)((const uint32_t *)(uintptr_t)donde)[i]);
-    dbgio_printf("\\n");
+        sonda_imprime(" %%08lx", (unsigned long)((const uint32_t *)(uintptr_t)donde)[i]);
+    sonda_imprime("\\n");
 }
 
 static void sonda_volcar_registros(irq_t evt, irq_context_t *ctx)
 {
-    dbgio_printf("SONDA-REG FALLO evt=%%04x pc=%%08lx pr=%%08lx sr=%%08lx fp=%%08lx sp=%%08lx\\n",
+    sonda_imprime("SONDA-REG FALLO evt=%%04x pc=%%08lx pr=%%08lx sr=%%08lx fp=%%08lx sp=%%08lx\\n",
                  (unsigned)evt, (unsigned long)ctx->pc, (unsigned long)ctx->pr,
                  (unsigned long)ctx->sr, (unsigned long)ctx->r[14], (unsigned long)ctx->r[15]);
-    dbgio_printf("SONDA-REG  r0-r7  %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx\\n",
+    sonda_imprime("SONDA-REG  r0-r7  %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx\\n",
                  (unsigned long)ctx->r[0], (unsigned long)ctx->r[1], (unsigned long)ctx->r[2],
                  (unsigned long)ctx->r[3], (unsigned long)ctx->r[4], (unsigned long)ctx->r[5],
                  (unsigned long)ctx->r[6], (unsigned long)ctx->r[7]);
-    dbgio_printf("SONDA-REG  r8-r15 %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx\\n",
+    sonda_imprime("SONDA-REG  r8-r15 %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx %%08lx\\n",
                  (unsigned long)ctx->r[8], (unsigned long)ctx->r[9], (unsigned long)ctx->r[10],
                  (unsigned long)ctx->r[11], (unsigned long)ctx->r[12], (unsigned long)ctx->r[13],
                  (unsigned long)ctx->r[14], (unsigned long)ctx->r[15]);
@@ -156,7 +211,7 @@ static void sonda_volcar(void)
 {
     int k, i, mejor;
 
-    dbgio_printf("SONDA-PC t=%%lu top", (unsigned long)(sonda_muestras / 100u));
+    sonda_imprime("SONDA-PC t=%%lu top", (unsigned long)(sonda_muestras / 100u));
     for(k = 0; k < SONDA_TOP; k++) {
         mejor = -1;
         for(i = 0; i < (int)SONDA_RANURAS; i++) {
@@ -164,13 +219,14 @@ static void sonda_volcar(void)
             if(mejor < 0 || sonda_n_ranura[i] > sonda_n_ranura[mejor]) mejor = i;
         }
         if(mejor < 0) break;
-        dbgio_printf(" %%08lx:%%lu", (unsigned long)sonda_pc_ranura[mejor],
+        sonda_imprime(" %%08lx:%%lu", (unsigned long)sonda_pc_ranura[mejor],
                      (unsigned long)sonda_n_ranura[mejor]);
         sonda_n_ranura[mejor] = 0u;   /* no repetirlo en el top */
     }
-    dbgio_printf(" pc=%%08lx pr=%%08lx fp=%%08lx sp=%%08lx fuera=%%lu\\n",
+    sonda_imprime(" pc=%%08lx pr=%%08lx fp=%%08lx sp=%%08lx fuera=%%lu chars=%%lu saltados=%%lu\\n",
                  (unsigned long)sonda_pc, (unsigned long)sonda_pr, (unsigned long)sonda_fp,
-                 (unsigned long)sonda_sp, (unsigned long)sonda_fuera);
+                 (unsigned long)sonda_sp, (unsigned long)sonda_fuera,
+                 (unsigned long)sonda_chars, (unsigned long)sonda_saltados);
 
     /* la ventana siguiente arranca limpia: el top es de ESTE segundo y no de la corrida entera */
     for(i = 0; i < (int)SONDA_RANURAS; i++) sonda_n_ranura[i] = 0u;
@@ -201,11 +257,11 @@ static void sonda_muestra(uint32_t pc, uint32_t pr, uint32_t fp, uint32_t sp)
     }
 
     if(sonda_racha == SONDA_RACHA) {
-        dbgio_printf("SONDA-PC RACHA pc=%%08lx racha=%%lu pr=%%08lx fp=%%08lx sp=%%08lx\\n",
+        sonda_imprime("SONDA-PC RACHA pc=%%08lx racha=%%lu pr=%%08lx fp=%%08lx sp=%%08lx\\n",
                      (unsigned long)pc, (unsigned long)sonda_racha, (unsigned long)pr,
                      (unsigned long)fp, (unsigned long)sp);
     } else if(sonda_racha > SONDA_RACHA && ((sonda_racha - SONDA_RACHA) %% SONDA_RACHA_AVISO) == 0u) {
-        dbgio_printf("SONDA-PC RACHA sigue pc=%%08lx racha=%%lu pr=%%08lx fp=%%08lx\\n",
+        sonda_imprime("SONDA-PC RACHA sigue pc=%%08lx racha=%%lu pr=%%08lx fp=%%08lx\\n",
                      (unsigned long)pc, (unsigned long)sonda_racha, (unsigned long)pr,
                      (unsigned long)fp);
     }
@@ -213,7 +269,7 @@ static void sonda_muestra(uint32_t pc, uint32_t pr, uint32_t fp, uint32_t sp)
     if(pc < SONDA_RAM_MIN || pc >= SONDA_RAM_MAX) {
         sonda_fuera++;
         if(sonda_fuera <= SONDA_FUERA_TOPE) {
-            dbgio_printf("SONDA-PC FUERA pc=%%08lx pr=%%08lx fp=%%08lx sp=%%08lx\\n",
+            sonda_imprime("SONDA-PC FUERA pc=%%08lx pr=%%08lx fp=%%08lx sp=%%08lx\\n",
                          (unsigned long)pc, (unsigned long)pr, (unsigned long)fp, (unsigned long)sp);
         }
     }
@@ -250,7 +306,7 @@ void sonda_pc_iniciar(void)
 {
     sonda_activa = 1;
     irq_set_global_handler(sonda_tick, 0);
-    dbgio_printf("SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), %%d ranuras de histograma\\n",
+    sonda_imprime("SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), %%d ranuras de histograma\\n",
                  (int)SONDA_RANURAS);
 }
 

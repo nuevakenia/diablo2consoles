@@ -2,6 +2,8 @@
 
 package main
 
+import "runtime"
+
 // DC-002.87 -- LOS TRES MANDOS DE LA CACERIA: el relleno de `.bss`, la reserva del monton de C y la falla de
 // prueba.
 //
@@ -37,6 +39,13 @@ const reservaDeMonton = 0
 // fallaDePrueba: si esta prendido, el POC se cae a proposito al arrancar para probar el volcado de registros.
 const fallaDePrueba = false
 
+// recoleccionesDePrueba (DC-002.87b): cuantas recolecciones FORZADAS se hacen al arrancar, antes de que el
+// POC cargue nada. Es el otro eje del acomodo, el que DC-002.84 no movio: una recoleccion de mas o de menos
+// cambia QUE SEMIESPACIO esta activo cuando el motor arma el primer cuadro, sin tocar una linea de la logica
+// del POC ni del motor. Se cambia solo desde `scripts/console/repro-layout-287.sh` (4o parametro) y el init
+// imprime con cuantas se corrio.
+var recoleccionesDePrueba = 0
+
 //extern d2c_reservar
 func d2cReservar(bytes uint) uint
 
@@ -55,5 +64,15 @@ func init() {
 		println("COOP287: FALLA DE PRUEBA -- escritura a 0xBAAAAAAD, el volcado tiene que salir AHORA")
 
 		d2cFallaDePrueba()
+	}
+
+	// DC-002.87b: el eje de las recolecciones. Va DESPUES del aviso, para que el log diga con cuantas se
+	// corrio y para que las recolecciones ocurran con el runtime ya en marcha (que es cuando mueven el
+	// semiespacio activo).
+	for i := 0; i < recoleccionesDePrueba; i++ {
+		runtime.GC()
+	}
+	if recoleccionesDePrueba > 0 {
+		println("COOP287: RECOLECCIONES forzadas=", recoleccionesDePrueba, "antes de cargar nada")
 	}
 }

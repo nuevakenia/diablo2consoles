@@ -10,10 +10,12 @@
 # imagen con los dos MPQ y corre Flycast. Imprime solo las lineas que importan: el relleno con el que se
 # corrio, el cuadro, el volcado de registros y las excepciones.
 #
-# Uso:  scripts/console/repro-layout-287.sh <bytes_de_relleno> [dir_base] [segundos]
+# Uso:  scripts/console/repro-layout-287.sh <bytes_de_relleno> [dir_base] [segundos] [recolecciones]
 #       <dir_base>   directorio de un build del cooperativo ya hecho (por defecto /tmp/dc287/A); de ahi se
 #                    toman `gox-enlace` y el arbol de enlace. La salida va a <dir_base>/relleno-<bytes>.
 #       <segundos>   0 = solo compilar y armar la imagen, sin correr el emulador (por defecto 70).
+#       <recolecciones> DC-002.87b: recolecciones FORZADAS al arrancar (0 = ninguna). Es el otro eje del
+#                    acomodo: cambia que semiespacio esta activo en el primer cuadro sin tocar la logica.
 #
 # OJO: los .gox del motor NO se rehacen aca. Si lo que se quiere medir es un cambio en el MOTOR, esto no
 # alcanza: hay que rehacer el cierre (scripts/console/armar-gox-coop-283.sh).
@@ -23,12 +25,13 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/env.sh"
 
 REPO="$(cd "$HERE/../.." && pwd)"
-BYTES="${1:?uso: repro-layout-287.sh <bytes_de_relleno> [dir_base] [segundos]}"
+BYTES="${1:?uso: repro-layout-287.sh <bytes_de_relleno> [dir_base] [segundos] [recolecciones]}"
 BASE="${2:-/tmp/dc287/A}"
 SECS="${3:-70}"
+RECS="${4:-${RECOLECCIONES:-0}}"
 RESERVA="${RESERVA:-0}"
 FALLA="${FALLA:-0}"
-OUT="$BASE/relleno-$BYTES-r$RESERVA-f$FALLA"
+OUT="$BASE/relleno-$BYTES-r$RESERVA-f$FALLA-g$RECS"
 SRC="$OUT/src"
 GEN="$BASE/gox-enlace"
 
@@ -41,11 +44,11 @@ cp "$REPO/console/dc/poc/coop"/*.go "$SRC"/
 cp -r "$REPO/console/dc/poc/coop/csrc" "$SRC"/
 cp "$REPO/console/dc/poc/personaje-mapa/nivel.go" "$SRC"/
 
-"$DC_PYTHON" - "$SRC/relleno.go" "$BYTES" "$RESERVA" "$FALLA" <<'PY'
+"$DC_PYTHON" - "$SRC/relleno.go" "$BYTES" "$RESERVA" "$FALLA" "$RECS" <<'PY'
 import re
 import sys
 
-ruta, bytes_pedidos, reserva, falla = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+ruta, bytes_pedidos, reserva, falla, recs = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 if bytes_pedidos < 1:
     sys.exit("el relleno tiene que ser >= 1 byte (el init toca el arreglo)")
 
@@ -53,11 +56,13 @@ t = open(ruta).read()
 t, uno = re.subn(r"var rellenoDeLayout = \[\d+\]byte\{\}", "var rellenoDeLayout = [%d]byte{}" % bytes_pedidos, t)
 t, dos = re.subn(r"const reservaDeMonton = \d+", "const reservaDeMonton = %d" % reserva, t)
 t, tres = re.subn(r"const fallaDePrueba = \w+", "const fallaDePrueba = %s" % ("true" if falla else "false"), t)
-if uno != 1 or dos != 1 or tres != 1:
-    sys.exit("no encontre los mandos en %s (relleno=%d reserva=%d falla=%d)" % (ruta, uno, dos, tres))
+t, cuatro = re.subn(r"var recoleccionesDePrueba = \d+", "var recoleccionesDePrueba = %d" % recs, t)
+if uno != 1 or dos != 1 or tres != 1 or cuatro != 1:
+    sys.exit("no encontre los mandos en %s (relleno=%d reserva=%d falla=%d recolecciones=%d)"
+             % (ruta, uno, dos, tres, cuatro))
 open(ruta, "w").write(t)
 PY
-grep -n "var rellenoDeLayout\|const reservaDeMonton\|const fallaDePrueba" "$SRC/relleno.go"
+grep -n "var rellenoDeLayout\|const reservaDeMonton\|const fallaDePrueba\|var recoleccionesDePrueba" "$SRC/relleno.go"
 
 echo "== 2/5 compilando y enlazando (sin rehacer los .gox del motor)"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRC" "$OUT" > "$OUT/build.log" 2>&1 || {

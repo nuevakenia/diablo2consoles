@@ -1,0 +1,160 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:044 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:290 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:393 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:393 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:395 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:400 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:413 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f7daad20000 RAM(16 MB) 0x7f7db6d20000 VRAM64(8 MB) 0x7f7daed20000 ARAM(2 MB) 0x7f7dcad20000
+00:00:419 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:426 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f7daad20000 RAM(16 MB) 0x7f7db6d20000 VRAM64(8 MB) 0x7f7daed20000 ARAM(2 MB) 0x7f7dcad20000
+00:00:429 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:433 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:433 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:455 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:455 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:455 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac4aa820
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+SONDA-PC activa: 100 Hz sobre el tick de KOS (TMU0), 64 ranuras de histograma
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc_init-semiespacio0 v=2353788992
+ARQ-MARCA   gc_init-semiespacio1 v=2355886176
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=608 cused=4353280 gsemi=96008/2097152 gc=0
+COOP287: RELLENO bytes= 1 primero= 0 reservaPedida= 0 reservaQuedo= 0 fallaDePrueba= false
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+COOP276: arranca -- cuanto cuesta cada jugador (1, 2 y 4) en la consola
+COOP276: budgets DE PC animaciones= 134217728 cofs= 1073741824 dccs= 1073741824 dt1s= 1073741824 ds1s= 1073741824
+COOP276: budgets DE CONSOLA animaciones= 1048576 cofs= 65536 dccs= 524288 dt1s= 1048576 ds1s= 262144 sumaDeDatos= 2949120
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+COOP276: video andando montonLibre= 3648 vramDeLaPantalla= 1048576
+fs_iso9660: disc change detected
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=1 top 8c123e32:79 8c11fc1e:11 8c123b80:3 8c13adac:2 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=2 top 8c123e32:97 8c04a33a:1 8c13ad5c:1 8c04a36e:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=3 top 8c123e32:99 8c04678c:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=4 top 8c123e32:98 8c04a316:1 8c04665a:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=5 top 8c123e32:99 8c046670:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=6 top 8c123e32:98 8c04a36e:1 8c046670:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=7 top 8c123e32:99 8c0466c0:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=8 top 8c123e32:98 8c04665a:1 8c04a36e:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=9 top 8c123e32:99 8c04665a:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC t=10 top 8c123e32:97 8c046b36:1 8c01f84a:1 8c13ad5c:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2DATA.MPQ'
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=11 top 8c123e32:97 8c0466c0:1 8c046b42:1 8c01f84a:1 pc=8c0466c0 pr=8c04a3a8 fp=00000003 sp=8c8cf458 fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=12 top 8c123e32:99 8c046810:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=13 top 8c123e32:98 8c10fd86:1 8c04a36e:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/JUEGO/D2CHAR.MPQ'
+COOP276: assetmanager listo montonLibre= 3824
+SONDA-PC t=14 top 8c123e32:96 8c0d6810:1 8c04a33a:1 8c01f84a:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=15 top 8c123e32:97 8c110fa8:1 8c04a33a:1 8c046670:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=16 top 8c123e32:98 8c10fd86:1 8c01f84a:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=17 top 8c123e32:98 8c01f83c:1 8c04667c:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=18 top 8c123e32:99 8c04667c:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=19 top 8c123e32:98 8c046662:1 8c04a36e:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=20 top 8c123e32:98 8c10fd86:1 8c01f83c:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=21 top 8c123e32:98 8c01f84a:1 8c0467e4:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=22 top 8c123e32:98 8c13ad5c:1 8c0466e8:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=23 top 8c123e32:98 8c046b24:1 8c04a33a:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=24 top 8c123e32:98 8c046b42:1 8c01f84a:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=25 top 8c123e32:97 8c10fd86:1 8c04678c:1 8c04a33a:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC t=26 top 8c123e32:98 8c04a33a:1 8c0467e4:1 pc=8c123e32 pr=8c12428c fp=ffffffff sp=8c4a363c fuera=0
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+SONDA-PC RACHA pc=8c123e32 racha=30 pr=8c12428c fp=ffffffff sp=8c4a363c
+COOP276: mpq a mano listos montonLibre= 4000
+COOP276: ZONA no compuesta: el jugador del motor y la zona del acto 1 no entran juntos (ver la evidencia)
+ARQ-CARGA lee-entra data/global/palette/ACT1/pal.dat cfree=3976 cused=5705688 gsemi=395760/2097152 gc=0
+ARQ-CARGA lee-volvio data/global/palette/ACT1/pal.dat cfree=3976 cused=5705688 gsemi=397664/2097152 gc=0
+SONDA-PC t=27 top 8c123e32:92 8c11fc1e:3 8c046afc:2 8c046106:1 pc=8c0460ec pr=8c0463cc fp=8c045eb4 sp=8c8cf200 fuera=0
+ARQ-MARCA gc-externo-con-punteros v=88064
+COOP276: ANIMDATA registros= 2556 crudo= 411104 montonLibre= 408
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=491432
+COOP276: ANIMDATA despues del GC montonLibre= 408
+COOP276: BASELINE (N=0) montonLibre= 408 gcColecciones= 1 vramDelLienzo= 0
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+COOP276: LIENZO antes de crear superficies= 0 bytesDeLienzo= 0 directas= 0 bytesDirectos= 0 copias= 0 bytesCopiados= 0 montonLibre= 408 montonUsado= 6204872 arena= 6205280
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=491568
+COOP276: ANIMDATA vivo registros= 2556 gcTotal= 2
+ARQ-CARGA lee-entra /data/global/chars/AM/COF/AMNUhth.COF cfree=392 cused=6204888 gsemi=498216/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/COF/AMNUhth.COF cfree=392 cused=6204888 gsemi=501408/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/palette/units/pal.dat cfree=376 cused=6204904 gsemi=517944/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/palette/units/pal.dat cfree=376 cused=6204904 gsemi=520824/2097152 gc=2
+ARQ-CARGA lee-entra /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=376 cused=6204904 gsemi=540168/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/chars/AM/HD/AMHDlitNU1ht.dcc cfree=376 cused=6204904 gsemi=553160/2097152 gc=2
+SONDA-PC t=28 top 8c123e32:19 8c11fc1e:6 8c03941c:4 8c0463c6:4 pc=8c11faa6 pr=8c11fce6 fp=8c53eac0 sp=8c8cea4c fuera=0

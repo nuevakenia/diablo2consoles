@@ -1,0 +1,9 @@
+arr-1            bin=4606088  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3608
+arr-32           bin=4606088  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3576
+arr-64           bin=4606088  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3544
+arr-96           bin=4606088  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3512
+arr-128          bin=4606088  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3480
+arr-256          bin=4606088  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3352
+arr-4096         bin=4606088  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3608
+arr-65536        bin=4606088  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3608
+rec3-1           bin=4606216  exc=0  fuera=0  t=57   | n= 4 cuadro= 60 pixelesNoVacios= 4087 crc32= -1835736160 montonLibre= 3480
