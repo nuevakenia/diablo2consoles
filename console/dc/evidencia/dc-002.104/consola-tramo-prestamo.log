@@ -1,0 +1,773 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:049 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:298 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:400 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:400 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:403 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:407 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:421 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f6611320000 RAM(16 MB) 0x7f661d320000 VRAM64(8 MB) 0x7f6615320000 ARAM(2 MB) 0x7f6631320000
+00:00:427 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:435 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7f6611320000 RAM(16 MB) 0x7f661d320000 VRAM64(8 MB) 0x7f6615320000 ARAM(2 MB) 0x7f6631320000
+00:00:438 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:442 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:442 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:507 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:507 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:507 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac549ec0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2354442240
+ARQ-MARCA   gc_init-semiespacio0 v=2354441952
+ARQ-MARCA   gc_init-semiespacio1 v=2356276992
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=3008 cused=3828992 gsemi=196216/1835008 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+MAPA103: arranca DC-002.103 -- el pueblo en pantalla de punta a punta; orden= prestamo
+MAPA103: cuadros= 3 modoTablas= fuente soltarLecturas= true tramoDeLaCache= 2723840 tramoAlArranque= false
+MAPA103: MEMORIA al-arrancar usado= 3830024 libre= 1976 arena= 3832000 sbrk= -1936785408 techo= -1929445376 pico= 3830024
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+MAPA103: PVR andando; vram de la textura del cuadro= 1048576
+MAPA103: MEMORIA despues-del-video usado= 3830048 libre= 1952 arena= 3832000 sbrk= -1936785408 techo= -1929445376 pico= 3830048
+MAPA103: tablasPorLaFuente= true liberadorDeExternos= true
+MAPA103: MEMORIA despues-de-arrancar-como-consola usado= 3830048 libre= 1952 arena= 3832000 sbrk= -1936785408 techo= -1929445376 pico= 3830048
+MAPA103: assetmanager listo
+MAPA103: MEMORIA despues-del-assetmanager usado= 3830048 libre= 1952 arena= 3832000 sbrk= -1936785408 techo= -1929445376 pico= 3830048
+fs_iso9660: disc change detected
+MAPA103: fuente registrada /cd/JUEGO/D2DATA.MPQ
+MAPA103: fuente registrada /cd/JUEGO/PATCH_D2.MPQ
+MAPA103: fuentes en el loader= 2
+MAPA103: MEMORIA despues-de-las-fuentes usado= 4185376 libre= 2976 arena= 4188352 sbrk= -1936429056 techo= -1929445376 pico= 4185376
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=2976 cused=4185376 gsemi=374328/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=2976 cused=4185376 gsemi=449552/1835008 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=2976 cused=4185376 gsemi=459664/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=2976 cused=4185376 gsemi=553656/1835008 gc=0
+MAPA103: TABLA fuente /data/global/excel/LvlTypes.txt bytes= 10719 montonDelta= 0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=3200 cused=4320320 gsemi=555632/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=3200 cused=4320320 gsemi=692336/1835008 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=3200 cused=4320320 gsemi=700144/1835008 gc=0
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376264
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=419520
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=2672 cused=4644432 gsemi=1226048/1835008 gc=1
+MAPA103: TABLA fuente /data/global/excel/LvlPrest.txt bytes= 134937 montonDelta= 459056
+MAPA103: tablas cargadas= 2 de 2
+MAPA103: FUENTE despues-de-las-tablas /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 0 pedidos= 0 liberados= 0 vivos= 0 prestamos= 0 prestamosLib= 0 prestamoReservado= 0
+MAPA103: FUENTE despues-de-las-tablas /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 134937 prestamos= 2 prestamosLib= 1 prestamoReservado= 12560
+MAPA103: MEMORIA despues-de-las-tablas usado= 4644432 libre= 2672 arena= 4647104 sbrk= -1935970304 techo= -1929445376 pico= 4644432
+MAPA103: LECTURAS soltadas; tramoAntes= 134937 pedidos= 2 reusos= 0 liberados= 2
+MAPA103: MEMORIA despues-de-soltar-las-lecturas-de-las-tablas usado= 4509488 libre= 137616 arena= 4647104 sbrk= -1935970304 techo= -1929445376 pico= 4644432
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=477312
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=137616 cused=4509488 gsemi=540608/1835008 gc=2
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=137616 cused=4509488 gsemi=556360/1835008 gc=2
+ARQ-MARCA gc-externo-con-punteros v=616968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1382496
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=813568
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376264
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=1191360
+ARQ-MARCA gc-externo-con-punteros v=72352
+ARQ-MARCA gc-externo-con-punteros v=81328
+ARQ-MARCA gc-externo-con-punteros v=91392
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378336
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=1098256
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376464
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1101000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376272
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1110272
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376984
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=1110136
+ARQ-MARCA gc-por-umbral-bytes-usados v=1379824
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=1120792
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376888
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=1127624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376760
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=1130816
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376704
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=1136848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376376
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=1145528
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376824
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=1153312
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376696
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=1159352
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377848
+ARQ-MARCA gc_collect v=16
+ARQ-MARCA gc-vivo v=1160376
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377728
+ARQ-MARCA gc_collect v=17
+ARQ-MARCA gc-vivo v=1166424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377192
+ARQ-MARCA gc_collect v=18
+ARQ-MARCA gc-vivo v=1173080
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376920
+ARQ-MARCA gc_collect v=19
+ARQ-MARCA gc-vivo v=1178456
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377600
+ARQ-MARCA gc_collect v=20
+ARQ-MARCA gc-vivo v=1183944
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376312
+ARQ-MARCA gc_collect v=21
+ARQ-MARCA gc-vivo v=1184728
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377024
+ARQ-MARCA gc_collect v=22
+ARQ-MARCA gc-vivo v=1192008
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377536
+ARQ-MARCA gc_collect v=23
+ARQ-MARCA gc-vivo v=1194536
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376384
+ARQ-MARCA gc_collect v=24
+ARQ-MARCA gc-vivo v=1199328
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376808
+ARQ-MARCA gc_collect v=25
+ARQ-MARCA gc-vivo v=1203808
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378176
+ARQ-MARCA gc_collect v=26
+ARQ-MARCA gc-vivo v=1209928
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376752
+ARQ-MARCA gc_collect v=27
+ARQ-MARCA gc-vivo v=1211144
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376496
+ARQ-MARCA gc_collect v=28
+ARQ-MARCA gc-vivo v=1216520
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376520
+ARQ-MARCA gc_collect v=29
+ARQ-MARCA gc-vivo v=1219224
+ARQ-MARCA gc-por-umbral-bytes-usados v=1379664
+ARQ-MARCA gc_collect v=30
+ARQ-MARCA gc-vivo v=1227736
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377992
+ARQ-MARCA gc_collect v=31
+ARQ-MARCA gc-vivo v=1228136
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376480
+ARQ-MARCA gc_collect v=32
+ARQ-MARCA gc-vivo v=1233992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376744
+ARQ-MARCA gc_collect v=33
+ARQ-MARCA gc-vivo v=1238096
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377512
+ARQ-MARCA gc_collect v=34
+ARQ-MARCA gc-vivo v=1243592
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376384
+ARQ-MARCA gc_collect v=35
+ARQ-MARCA gc-vivo v=1246952
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376408
+ARQ-MARCA gc_collect v=36
+ARQ-MARCA gc-vivo v=1252472
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376416
+ARQ-MARCA gc_collect v=37
+ARQ-MARCA gc-vivo v=1252664
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377600
+ARQ-MARCA gc_collect v=38
+ARQ-MARCA gc-vivo v=1258152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376680
+ARQ-MARCA gc_collect v=39
+ARQ-MARCA gc-vivo v=1263576
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376392
+ARQ-MARCA gc_collect v=40
+ARQ-MARCA gc-vivo v=1267584
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376376
+ARQ-MARCA gc_collect v=41
+ARQ-MARCA gc-vivo v=1270352
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377848
+ARQ-MARCA gc_collect v=42
+ARQ-MARCA gc-vivo v=1271144
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377008
+ARQ-MARCA gc_collect v=43
+ARQ-MARCA gc-vivo v=1274616
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378000
+ARQ-MARCA gc_collect v=44
+ARQ-MARCA gc-vivo v=1277304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377104
+ARQ-MARCA gc_collect v=45
+ARQ-MARCA gc-vivo v=1279352
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377184
+ARQ-MARCA gc_collect v=46
+ARQ-MARCA gc-vivo v=1283248
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376392
+ARQ-MARCA gc_collect v=47
+ARQ-MARCA gc-vivo v=1284896
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376744
+ARQ-MARCA gc_collect v=48
+ARQ-MARCA gc-vivo v=1288304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377504
+ARQ-MARCA gc_collect v=49
+ARQ-MARCA gc-vivo v=1291080
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378080
+ARQ-MARCA gc_collect v=50
+ARQ-MARCA gc-vivo v=1294104
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376744
+ARQ-MARCA gc_collect v=51
+ARQ-MARCA gc-vivo v=1297056
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377664
+ARQ-MARCA gc_collect v=52
+ARQ-MARCA gc-vivo v=1298360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377328
+ARQ-MARCA gc_collect v=53
+ARQ-MARCA gc-vivo v=1301160
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376304
+ARQ-MARCA gc_collect v=54
+ARQ-MARCA gc-vivo v=1304368
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376304
+ARQ-MARCA gc_collect v=55
+ARQ-MARCA gc-vivo v=1305728
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378368
+ARQ-MARCA gc_collect v=56
+ARQ-MARCA gc-vivo v=1307640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376376
+ARQ-MARCA gc_collect v=57
+ARQ-MARCA gc-vivo v=1309432
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378168
+ARQ-MARCA gc_collect v=58
+ARQ-MARCA gc-vivo v=1311224
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376288
+ARQ-MARCA gc_collect v=59
+ARQ-MARCA gc-vivo v=1313576
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378016
+ARQ-MARCA gc_collect v=60
+ARQ-MARCA gc-vivo v=1315256
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376416
+ARQ-MARCA gc_collect v=61
+ARQ-MARCA gc-vivo v=1315304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376608
+ARQ-MARCA gc_collect v=62
+ARQ-MARCA gc-vivo v=1318784
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376816
+ARQ-MARCA gc_collect v=63
+ARQ-MARCA gc-vivo v=1320776
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376624
+ARQ-MARCA gc_collect v=64
+ARQ-MARCA gc-vivo v=1322232
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378080
+ARQ-MARCA gc_collect v=65
+ARQ-MARCA gc-vivo v=1323688
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377352
+ARQ-MARCA gc_collect v=66
+ARQ-MARCA gc-vivo v=1324056
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377792
+ARQ-MARCA gc_collect v=67
+ARQ-MARCA gc-vivo v=1326488
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378040
+ARQ-MARCA gc_collect v=68
+ARQ-MARCA gc-vivo v=1327832
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377200
+ARQ-MARCA gc_collect v=69
+ARQ-MARCA gc-vivo v=1330272
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376432
+ARQ-MARCA gc_collect v=70
+ARQ-MARCA gc-vivo v=1330960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377200
+ARQ-MARCA gc_collect v=71
+ARQ-MARCA gc-vivo v=1331528
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376600
+ARQ-MARCA gc_collect v=72
+ARQ-MARCA gc-vivo v=1331672
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376816
+ARQ-MARCA gc_collect v=73
+ARQ-MARCA gc-vivo v=1333880
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376840
+ARQ-MARCA gc_collect v=74
+ARQ-MARCA gc-vivo v=1335000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377960
+ARQ-MARCA gc_collect v=75
+ARQ-MARCA gc-vivo v=1336120
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376896
+ARQ-MARCA gc_collect v=76
+ARQ-MARCA gc-vivo v=1336152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377000
+ARQ-MARCA gc_collect v=77
+ARQ-MARCA gc-vivo v=1338248
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376912
+ARQ-MARCA gc_collect v=78
+ARQ-MARCA gc-vivo v=1339256
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377920
+ARQ-MARCA gc_collect v=79
+ARQ-MARCA gc-vivo v=1340264
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376744
+ARQ-MARCA gc_collect v=80
+ARQ-MARCA gc-vivo v=1340184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376736
+ARQ-MARCA gc_collect v=81
+ARQ-MARCA gc-vivo v=1342168
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376536
+ARQ-MARCA gc_collect v=82
+ARQ-MARCA gc-vivo v=1343064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377432
+ARQ-MARCA gc_collect v=83
+ARQ-MARCA gc-vivo v=1343960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378328
+ARQ-MARCA gc_collect v=84
+ARQ-MARCA gc-vivo v=1344856
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377040
+ARQ-MARCA gc_collect v=85
+ARQ-MARCA gc-vivo v=1346848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376920
+ARQ-MARCA gc_collect v=86
+ARQ-MARCA gc-vivo v=1347632
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376608
+ARQ-MARCA gc_collect v=87
+ARQ-MARCA gc-vivo v=1347872
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376928
+ARQ-MARCA gc_collect v=88
+ARQ-MARCA gc-vivo v=1347992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378064
+ARQ-MARCA gc_collect v=89
+ARQ-MARCA gc-vivo v=1348776
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376664
+ARQ-MARCA gc_collect v=90
+ARQ-MARCA gc-vivo v=1350656
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376432
+ARQ-MARCA gc_collect v=91
+ARQ-MARCA gc-vivo v=1351328
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377104
+ARQ-MARCA gc_collect v=92
+ARQ-MARCA gc-vivo v=1352000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376680
+ARQ-MARCA gc_collect v=93
+ARQ-MARCA gc-vivo v=1352128
+MAPA103: MAPA tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 29497
+MAPA103: ARENA DE BLOQUES usados= true bytes= 2586489 tramos= 5 capacidad= 2621440 scratch= 1008003
+MAPA103: FUENTE despues-de-componer /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 9 pedidos= 0 liberados= 0 vivos= 57652 prestamos= 1 prestamosLib= 0 prestamoReservado= 12416
+MAPA103: FUENTE despues-de-componer /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 0 prestamos= 2 prestamosLib= 2 prestamoReservado= 12560
+MAPA103: MEMORIA despues-de-componer usado= 9001048 libre= 65640 arena= 9066688 sbrk= -1931550720 techo= -1929445376 pico= 9001048
+MAPA103: LECTURAS soltadas despues de componer; tramo= 57652 lecturas= 3 bytes= 203308
+MAPA103: MEMORIA despues-de-soltar-las-lecturas-del-mapa usado= 9001048 libre= 65640 arena= 9066688 sbrk= -1931550720 techo= -1929445376 pico= 9001048
+MAPA103: ORDEN prestamo -- se suelta SOLO el buffer prestado de lectura (el arena de bloques queda)
+MAPA103: PRESTAMO DE LECTURA SOLTADO bytes= 1008003
+MAPA103: MEMORIA despues-de-soltar-el-prestamo usado= 7993040 libre= 1073648 arena= 9066688 sbrk= -1931550720 techo= -1929445376 pico= 9001048
+MAPA103: MEMORIA antes-del-renderer usado= 7993040 libre= 1073648 arena= 9066688 sbrk= -1931550720 techo= -1929445376 pico= 9001048
+MAPA103: TRAMO DE LA CACHE pedido TARDE (en el renderer) bytes= 2723840
+Out of memory. Requested sbrk_base 0x8d087000, was 0x8cdee000, diff 2723840
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=9066688 used=7993040 free=1073648
+00:45:946 reios/reios.cpp:639 N[REIOS]: -----------------
+00:45:946 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:45:946 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac549ec0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2354442240
+ARQ-MARCA   gc_init-semiespacio0 v=2354441952
+ARQ-MARCA   gc_init-semiespacio1 v=2356276992
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=3008 cused=3828992 gsemi=196216/1835008 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+MAPA103: arranca DC-002.103 -- el pueblo en pantalla de punta a punta; orden= prestamo
+MAPA103: cuadros= 3 modoTablas= fuente soltarLecturas= true tramoDeLaCache= 2723840 tramoAlArranque= false
+MAPA103: MEMORIA al-arrancar usado= 3830024 libre= 1976 arena= 3832000 sbrk= -1936785408 techo= -1929445376 pico= 3830024
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+MAPA103: PVR andando; vram de la textura del cuadro= 1048576
+MAPA103: MEMORIA despues-del-video usado= 3830048 libre= 1952 arena= 3832000 sbrk= -1936785408 techo= -1929445376 pico= 3830048
+MAPA103: tablasPorLaFuente= true liberadorDeExternos= true
+MAPA103: MEMORIA despues-de-arrancar-como-consola usado= 3830048 libre= 1952 arena= 3832000 sbrk= -1936785408 techo= -1929445376 pico= 3830048
+MAPA103: assetmanager listo
+MAPA103: MEMORIA despues-del-assetmanager usado= 3830048 libre= 1952 arena= 3832000 sbrk= -1936785408 techo= -1929445376 pico= 3830048
+fs_iso9660: disc change detected
+MAPA103: fuente registrada /cd/JUEGO/D2DATA.MPQ
+MAPA103: fuente registrada /cd/JUEGO/PATCH_D2.MPQ
+MAPA103: fuentes en el loader= 2
+MAPA103: MEMORIA despues-de-las-fuentes usado= 4185376 libre= 2976 arena= 4188352 sbrk= -1936429056 techo= -1929445376 pico= 4185376
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=2976 cused=4185376 gsemi=373776/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=2976 cused=4185376 gsemi=449000/1835008 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=2976 cused=4185376 gsemi=459112/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=2976 cused=4185376 gsemi=553104/1835008 gc=0
+MAPA103: TABLA fuente /data/global/excel/LvlTypes.txt bytes= 10719 montonDelta= 0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=3200 cused=4320320 gsemi=555080/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=3200 cused=4320320 gsemi=691784/1835008 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=3200 cused=4320320 gsemi=699472/1835008 gc=0
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376264
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=420616
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=2672 cused=4644432 gsemi=1225616/1835008 gc=1
+MAPA103: TABLA fuente /data/global/excel/LvlPrest.txt bytes= 134937 montonDelta= 459056
+MAPA103: tablas cargadas= 2 de 2
+MAPA103: FUENTE despues-de-las-tablas /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 0 pedidos= 0 liberados= 0 vivos= 0 prestamos= 0 prestamosLib= 0 prestamoReservado= 0
+MAPA103: FUENTE despues-de-las-tablas /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 134937 prestamos= 2 prestamosLib= 1 prestamoReservado= 12560
+MAPA103: MEMORIA despues-de-las-tablas usado= 4644432 libre= 2672 arena= 4647104 sbrk= -1935970304 techo= -1929445376 pico= 4644432
+MAPA103: LECTURAS soltadas; tramoAntes= 134937 pedidos= 2 reusos= 0 liberados= 2
+MAPA103: MEMORIA despues-de-soltar-las-lecturas-de-las-tablas usado= 4509488 libre= 137616 arena= 4647104 sbrk= -1935970304 techo= -1929445376 pico= 4644432
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=472960
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=137616 cused=4509488 gsemi=536256/1835008 gc=2
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=137616 cused=4509488 gsemi=552008/1835008 gc=2
+ARQ-MARCA gc-externo-con-punteros v=616968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378144
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=809216
+ARQ-MARCA gc-externo-con-punteros v=72352
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376432
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=1081288
+ARQ-MARCA gc-externo-con-punteros v=81328
+ARQ-MARCA gc-externo-con-punteros v=91392
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376504
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=1093640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377728
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1096536
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376856
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1101336
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376440
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=1109288
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376808
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=1118552
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377128
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=1124296
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376776
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=1131656
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376864
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=1137704
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376736
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=1142848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377920
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=1150024
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376800
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=1155096
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377840
+ARQ-MARCA gc_collect v=16
+ARQ-MARCA gc-vivo v=1162064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376288
+ARQ-MARCA gc_collect v=17
+ARQ-MARCA gc-vivo v=1170064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376496
+ARQ-MARCA gc_collect v=18
+ARQ-MARCA gc-vivo v=1173144
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376792
+ARQ-MARCA gc_collect v=19
+ARQ-MARCA gc-vivo v=1176232
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376352
+ARQ-MARCA gc_collect v=20
+ARQ-MARCA gc-vivo v=1179512
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376648
+ARQ-MARCA gc_collect v=21
+ARQ-MARCA gc-vivo v=1185360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1379184
+ARQ-MARCA gc_collect v=22
+ARQ-MARCA gc-vivo v=1191736
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377336
+ARQ-MARCA gc_collect v=23
+ARQ-MARCA gc-vivo v=1191496
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376288
+ARQ-MARCA gc_collect v=24
+ARQ-MARCA gc-vivo v=1196520
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376328
+ARQ-MARCA gc_collect v=25
+ARQ-MARCA gc-vivo v=1202360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377760
+ARQ-MARCA gc_collect v=26
+ARQ-MARCA gc-vivo v=1207704
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377632
+ARQ-MARCA gc_collect v=27
+ARQ-MARCA gc-vivo v=1213192
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376336
+ARQ-MARCA gc_collect v=28
+ARQ-MARCA gc-vivo v=1215624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377080
+ARQ-MARCA gc_collect v=29
+ARQ-MARCA gc-vivo v=1220488
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377288
+ARQ-MARCA gc_collect v=30
+ARQ-MARCA gc-vivo v=1224152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376280
+ARQ-MARCA gc_collect v=31
+ARQ-MARCA gc-vivo v=1230456
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377280
+ARQ-MARCA gc_collect v=32
+ARQ-MARCA gc-vivo v=1235576
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376744
+ARQ-MARCA gc_collect v=33
+ARQ-MARCA gc-vivo v=1238360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376824
+ARQ-MARCA gc_collect v=34
+ARQ-MARCA gc-vivo v=1242376
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376760
+ARQ-MARCA gc_collect v=35
+ARQ-MARCA gc-vivo v=1247560
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376760
+ARQ-MARCA gc_collect v=36
+ARQ-MARCA gc-vivo v=1250072
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376440
+ARQ-MARCA gc_collect v=37
+ARQ-MARCA gc-vivo v=1254840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376544
+ARQ-MARCA gc_collect v=38
+ARQ-MARCA gc-vivo v=1257672
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377528
+ARQ-MARCA gc_collect v=39
+ARQ-MARCA gc-vivo v=1261784
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376424
+ARQ-MARCA gc_collect v=40
+ARQ-MARCA gc-vivo v=1263688
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376504
+ARQ-MARCA gc_collect v=41
+ARQ-MARCA gc-vivo v=1266744
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376344
+ARQ-MARCA gc_collect v=42
+ARQ-MARCA gc-vivo v=1270328
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377544
+ARQ-MARCA gc_collect v=43
+ARQ-MARCA gc-vivo v=1274920
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376392
+ARQ-MARCA gc_collect v=44
+ARQ-MARCA gc-vivo v=1276488
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377224
+ARQ-MARCA gc_collect v=45
+ARQ-MARCA gc-vivo v=1279880
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377656
+ARQ-MARCA gc_collect v=46
+ARQ-MARCA gc-vivo v=1284216
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376544
+ARQ-MARCA gc_collect v=47
+ARQ-MARCA gc-vivo v=1285592
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376888
+ARQ-MARCA gc_collect v=48
+ARQ-MARCA gc-vivo v=1288776
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376880
+ARQ-MARCA gc_collect v=49
+ARQ-MARCA gc-vivo v=1292104
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378024
+ARQ-MARCA gc_collect v=50
+ARQ-MARCA gc-vivo v=1294344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377608
+ARQ-MARCA gc_collect v=51
+ARQ-MARCA gc-vivo v=1297256
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376696
+ARQ-MARCA gc_collect v=52
+ARQ-MARCA gc-vivo v=1298296
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377808
+ARQ-MARCA gc_collect v=53
+ARQ-MARCA gc-vivo v=1301400
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377168
+ARQ-MARCA gc_collect v=54
+ARQ-MARCA gc-vivo v=1303000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378216
+ARQ-MARCA gc_collect v=55
+ARQ-MARCA gc-vivo v=1305992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376840
+ARQ-MARCA gc_collect v=56
+ARQ-MARCA gc-vivo v=1306808
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378352
+ARQ-MARCA gc_collect v=57
+ARQ-MARCA gc-vivo v=1310360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376912
+ARQ-MARCA gc_collect v=58
+ARQ-MARCA gc-vivo v=1311064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377688
+ARQ-MARCA gc_collect v=59
+ARQ-MARCA gc-vivo v=1313832
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378336
+ARQ-MARCA gc_collect v=60
+ARQ-MARCA gc-vivo v=1316184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376328
+ARQ-MARCA gc_collect v=61
+ARQ-MARCA gc-vivo v=1317752
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377896
+ARQ-MARCA gc_collect v=62
+ARQ-MARCA gc-vivo v=1319320
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377280
+ARQ-MARCA gc_collect v=63
+ARQ-MARCA gc-vivo v=1321984
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376736
+ARQ-MARCA gc_collect v=64
+ARQ-MARCA gc-vivo v=1322896
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377728
+ARQ-MARCA gc_collect v=65
+ARQ-MARCA gc-vivo v=1323688
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377352
+ARQ-MARCA gc_collect v=66
+ARQ-MARCA gc-vivo v=1324056
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377792
+ARQ-MARCA gc_collect v=67
+ARQ-MARCA gc-vivo v=1326488
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378040
+ARQ-MARCA gc_collect v=68
+ARQ-MARCA gc-vivo v=1327832
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377200
+ARQ-MARCA gc_collect v=69
+ARQ-MARCA gc-vivo v=1330272
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376432
+ARQ-MARCA gc_collect v=70
+ARQ-MARCA gc-vivo v=1330960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377200
+ARQ-MARCA gc_collect v=71
+ARQ-MARCA gc-vivo v=1331528
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376600
+ARQ-MARCA gc_collect v=72
+ARQ-MARCA gc-vivo v=1331672
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376816
+ARQ-MARCA gc_collect v=73
+ARQ-MARCA gc-vivo v=1333880
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376840
+ARQ-MARCA gc_collect v=74
+ARQ-MARCA gc-vivo v=1335000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377960
+ARQ-MARCA gc_collect v=75
+ARQ-MARCA gc-vivo v=1336120
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376896
+ARQ-MARCA gc_collect v=76
+ARQ-MARCA gc-vivo v=1336152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377000
+ARQ-MARCA gc_collect v=77
+ARQ-MARCA gc-vivo v=1338248
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376912
+ARQ-MARCA gc_collect v=78
+ARQ-MARCA gc-vivo v=1339256
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377920
+ARQ-MARCA gc_collect v=79
+ARQ-MARCA gc-vivo v=1340264
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376744
+ARQ-MARCA gc_collect v=80
+ARQ-MARCA gc-vivo v=1340184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376736
+ARQ-MARCA gc_collect v=81
+ARQ-MARCA gc-vivo v=1342168
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376536
+ARQ-MARCA gc_collect v=82
+ARQ-MARCA gc-vivo v=1343064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377432
+ARQ-MARCA gc_collect v=83
+ARQ-MARCA gc-vivo v=1343960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1378328
+ARQ-MARCA gc_collect v=84
+ARQ-MARCA gc-vivo v=1344856
+ARQ-MARCA gc-por-umbral-bytes-usados v=1377040
+ARQ-MARCA gc_collect v=85
+ARQ-MARCA gc-vivo v=1346848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376920
+ARQ-MARCA gc_collect v=86
+ARQ-MARCA gc-vivo v=1347632
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376608
+ARQ-MARCA gc_collect v=87
+ARQ-MARCA gc-vivo v=1347872
+MAPA103: MAPA tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 28933
+MAPA103: ARENA DE BLOQUES usados= true bytes= 2586489 tramos= 5 capacidad= 2621440 scratch= 1008003
+MAPA103: FUENTE despues-de-componer /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 9 pedidos= 0 liberados= 0 vivos= 57652 prestamos= 1 prestamosLib= 0 prestamoReservado= 12416
+MAPA103: FUENTE despues-de-componer /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 0 prestamos= 2 prestamosLib= 2 prestamoReservado= 12560
+MAPA103: MEMORIA despues-de-componer usado= 9001048 libre= 65640 arena= 9066688 sbrk= -1931550720 techo= -1929445376 pico= 9001048
+MAPA103: LECTURAS soltadas despues de componer; tramo= 57652 lecturas= 3 bytes= 203308
+MAPA103: MEMORIA despues-de-soltar-las-lecturas-del-mapa usado= 9001048 libre= 65640 arena= 9066688 sbrk= -1931550720 techo= -1929445376 pico= 9001048
+MAPA103: ORDEN prestamo -- se suelta SOLO el buffer prestado de lectura (el arena de bloques queda)
+MAPA103: PRESTAMO DE LECTURA SOLTADO bytes= 1008003
+MAPA103: MEMORIA despues-de-soltar-el-prestamo usado= 7993040 libre= 1073648 arena= 9066688 sbrk= -1931550720 techo= -1929445376 pico= 9001048
+MAPA103: MEMORIA antes-del-renderer usado= 7993040 libre= 1073648 arena= 9066688 sbrk= -1931550720 techo= -1929445376 pico= 9001048
+MAPA103: TRAMO DE LA CACHE pedido TARDE (en el renderer) bytes= 2723840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376320
+ARQ-MARCA gc_collect v=88
+ARQ-MARCA gc-vivo v=1109208
+Out of memory. Requested sbrk_base 0x8d087000, was 0x8cdee000, diff 2723840
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=9066688 used=7993040 free=1073648
+01:43:633 ui/gui.cpp:484 E[COMMON]: Flycast has stopped: Fatal: SH4 exception when blocked

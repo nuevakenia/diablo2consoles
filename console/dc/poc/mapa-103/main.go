@@ -108,6 +108,9 @@ var (
 	rendererDelMapa *d2maprenderer.MapRenderer
 	cuadro          int
 	picoMonton      int
+
+	// tramoDePixeles: el tramo de la cache reservado al arranque (DC-002.104), nil si la palanca esta apagada.
+	tramoDePixeles *d2maprenderer.TramoDeLaCache
 )
 
 func memoria(etapa string) {
@@ -123,7 +126,8 @@ func memoria(etapa string) {
 
 func main() {
 	println("MAPA103: arranca DC-002.103 -- el pueblo en pantalla de punta a punta; orden=", orden)
-	println("MAPA103: cuadros=", cuadros, "modoTablas=", modoTablas, "soltarLecturas=", soltarLecturas)
+	println("MAPA103: cuadros=", cuadros, "modoTablas=", modoTablas, "soltarLecturas=", soltarLecturas,
+		"tramoDeLaCache=", tramoDeLaCache, "tramoAlArranque=", tramoAlArranque)
 	memoria("al-arrancar")
 
 	// ============================== 0. EL VIDEO PRIMERO ==============================
@@ -137,6 +141,16 @@ func main() {
 
 	println("MAPA103: PVR andando; vram de la textura del cuadro=", pvr.VramDeLaPantalla())
 	memoria("despues-del-video")
+
+	// ============================== 0.b EL TRAMO DE LA CACHE (DC-002.104) ==============================
+	// Se reserva ACA y no al crear el renderer: el monton de C (dlmalloc sobre `mm_sbrk`) se fragmenta con el
+	// mapa y despues un pedido de 2,7 MB de un solo golpe ya no entra aunque "haya" memoria libre.
+	if tramoDeLaCache > 0 && tramoAlArranque {
+		tramoDePixeles = d2maprenderer.ReservarTramoDeLaCache(tramoDeLaCache)
+
+		println("MAPA103: TRAMO DE LA CACHE reservado AL ARRANQUE bytes=", tramoDePixeles.Bytes())
+		memoria("despues-del-tramo-de-la-cache")
+	}
 
 	// ============================== 1. EL MOTOR ==============================
 	d2asset.ArrancarComoConsola()
@@ -271,15 +285,29 @@ func main() {
 
 	memoria("antes-del-renderer")
 
-	rendererDelMapa = d2maprenderer.CreateMapRenderer(am, renderer, engine, term, d2util.LogLevelError,
-		celdaX, celdaY,
+	opciones := []d2maprenderer.Opcion{
 		d2maprenderer.ComoConsola(ancho, alto),
 		d2maprenderer.CacheDeTilesPerezosa(),
-		d2maprenderer.CacheDeTilesEnIndices())
+		d2maprenderer.CacheDeTilesEnIndices(),
+	}
+
+	if tramoDePixeles != nil {
+		// DC-002.104: los pixeles de la cache salen del tramo reservado al arranque (en la consola, monton de C)
+		// y no del semiespacio del recolector.
+		opciones = append(opciones, d2maprenderer.CacheDeTilesEnTramo(tramoDePixeles))
+		println("MAPA103: TRAMO DE LA CACHE en uso (reservado al arranque) bytes=", tramoDePixeles.Bytes())
+	} else if tramoDeLaCache > 0 {
+		opciones = append(opciones, d2maprenderer.CacheDeTilesEnUnTramo(tramoDeLaCache))
+		println("MAPA103: TRAMO DE LA CACHE pedido TARDE (en el renderer) bytes=", tramoDeLaCache)
+	}
+
+	rendererDelMapa = d2maprenderer.CreateMapRenderer(am, renderer, engine, term, d2util.LogLevelError,
+		celdaX, celdaY, opciones...)
 
 	espacio := rendererDelMapa.TamanoDelCuadro()
 	println("MAPA103: renderer listo; cuadro=", espacio.W, espacio.H,
 		"cachePerezosa=", rendererDelMapa.CachePerezosa(), "cacheEnIndices=", rendererDelMapa.CacheDeIndices())
+	censoDelTramo("despues-del-renderer")
 	memoria("despues-del-renderer")
 
 	// ============================== 6. EL CUADRO EN PANTALLA ==============================
@@ -307,6 +335,18 @@ func registrarFuente(am *d2asset.AssetManager, ruta string) bool {
 	fuentesDeConsola = append(fuentesDeConsola, f)
 
 	return true
+}
+
+// censoDelTramo (DC-002.104): donde viven los pixeles de la cache. `imagenes` del tramo contra `derrames` es
+// el numero que dice si el tramo alcanza; `bytesDerramados` cuanto habria que agrandarlo.
+func censoDelTramo(etapa string) {
+	if rendererDelMapa == nil {
+		return
+	}
+
+	e := rendererDelMapa.CensoDelTramo()
+	println("MAPA103: TRAMO", etapa, "activa=", e.Activa, "bytes=", e.Bytes, "usado=", e.Usado,
+		"libre=", e.Libre, "imagenes=", e.Imagenes, "derrames=", e.Derrames, "bytesDerramados=", e.BytesDerramados)
 }
 
 // instrumentoDeLasFuentes: el censo de la fuente (pedidos, liberados, vivos, prestamo) para el log.
@@ -402,6 +442,7 @@ func dibujar(superficie d2interface.Surface) error {
 	println("MAPA103: CUADRO", cuadro, "pixelesNoVacios=", llenos, "de", ancho*alto, "crc32=", int(crudo),
 		"hostPixeles=", pixelesHost, "hostCrc=", int(crcHost), "ms=", ms,
 		"cacheSuperficies=", cache.Superficies, "cacheBytes=", cache.Bytes, "cacheEnIndices=", cache.EnIndices)
+	censoDelTramo("despues-del-cuadro")
 	memoria("despues-del-cuadro")
 
 	if cuadro == 1 && orden != "tarjeta" {

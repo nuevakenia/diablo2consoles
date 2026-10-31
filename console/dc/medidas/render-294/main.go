@@ -67,19 +67,21 @@ func main() {
 	salida := flag.String("out", "/tmp/cuadro-host-294.png", "PNG de referencia del cuadro")
 	perezoso := flag.Bool("perezoso", false, "cache de tiles perezosa (la de la consola: se arma al dibujar)")
 	indices := flag.Bool("indices", false, "cache de tiles en INDICES de 8 bits (1 B/px) en vez de RGBA (4 B/px)")
+	tramo := flag.Int("tramo", 0, "DC-002.104: los pixeles de la cache salen de UN tramo de N B (> 64 KB = monton "+
+		"de C en la consola); 0 = apagado (make por imagen, el camino de la PC)")
 	cuadros := flag.Int("cuadros", 1, "cuantos cuadros componer (el 2do en adelante mide la cache ya armada)")
 	histograma := flag.Bool("histograma", false, "censo de tamanos de la cache de indices contra el umbral de 64 KB de libgodc")
 	flag.Parse()
 
-	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *indices, *cuadros,
-		*histograma); err != nil {
+	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *indices, *tramo,
+		*cuadros, *histograma); err != nil {
 		fmt.Println("RENDER294: FALLO --", err)
 		os.Exit(1)
 	}
 }
 
 func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida string,
-	perezoso, indices bool, cuadros int, histograma bool) error {
+	perezoso, indices bool, tramo int, cuadros int, histograma bool) error {
 	if dir == "" {
 		dir = autodetectarD2()
 	}
@@ -164,6 +166,12 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 		fmt.Println("RENDER294: cache en INDICES (DC-002.101: 1 B por pixel en vez de 4)")
 	}
 
+	if tramo > 0 {
+		opciones = append(opciones, d2maprenderer.CacheDeTilesEnUnTramo(tramo))
+		fmt.Printf("RENDER294: cache en UN TRAMO de %d B (DC-002.104: un solo make grande; en la consola es el "+
+			"monton de C y no el semiespacio)\n", tramo)
+	}
+
 	mr := d2maprenderer.CreateMapRenderer(am, r, engine, term, d2util.LogLevelError, cx, cy, opciones...)
 
 	supCache := r.Estadisticas()
@@ -215,6 +223,11 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 	}
 
 	fmt.Printf("RENDER294: CUADRO total ms=%d (promedio %.1f)\n", msTotal, float64(msTotal)/float64(cuadros))
+
+	tramoEstado := mr.CensoDelTramo()
+	fmt.Printf("RENDER294: TRAMO104 activa=%v bytes=%d usado=%d libre=%d imagenes=%d derrames=%d bytesDerramados=%d\n",
+		tramoEstado.Activa, tramoEstado.Bytes, tramoEstado.Usado, tramoEstado.Libre, tramoEstado.Imagenes,
+		tramoEstado.Derrames, tramoEstado.BytesDerramados)
 
 	if histograma {
 		fmt.Print(censoDeLaCache(mr.TamanosDeLaCache()))

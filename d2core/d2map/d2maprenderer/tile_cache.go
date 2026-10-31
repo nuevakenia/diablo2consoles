@@ -31,6 +31,9 @@ func (mr *MapRenderer) resetLevelCaches() {
 	// DC-002.101: la cache de indices y la paleta expandida son del mismo nivel (la paleta cambia por acto).
 	mr.indicesCacheRecords = nil
 	mr.paletaDeIndices = nil
+	// DC-002.104: el tramo de la cache tampoco se libera (en la consola el monton externo no se devuelve): se
+	// reusa desde el byte 0, que es lo mismo que decir que el nivel nuevo pide sus imagenes de nuevo.
+	mr.reiniciarTramo()
 	mr.blankShadows = nil
 	mr.blankWalls = nil
 	mr.light.resetFades()
@@ -160,7 +163,7 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 		tileYOffset := d2math.AbsInt32(tileYMinimum)
 		tileHeight := d2math.AbsInt32(tileData[i].Height)
 
-		indexData := make([]byte, tileData[i].Width*tileHeight)
+		indexData := mr.pedirIndicesDelTile(int(tileData[i].Width * tileHeight))
 		d2dt1.DecodeTileGfxData(tileData[i].Blocks, &indexData, tileYOffset, tileData[i].Width)
 
 		if mr.cacheEnIndices {
@@ -217,7 +220,7 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 		return
 	}
 
-	indexData := make([]byte, tileData.Width*int32(tileHeight))
+	indexData := mr.pedirIndicesDelTile(int(tileData.Width) * tileHeight)
 	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileData.Width)
 
 	if mr.cacheEnIndices {
@@ -303,7 +306,7 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 		return
 	}
 
-	indexData := make([]byte, tileSurfaceWidth*realHeight)
+	indexData := mr.pedirIndicesDelTile(int(tileSurfaceWidth * realHeight))
 
 	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileSurfaceWidth)
 

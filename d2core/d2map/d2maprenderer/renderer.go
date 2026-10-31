@@ -102,6 +102,11 @@ type MapRenderer struct {
 	indicesCacheRecords map[uint32]*imagenDeIndices
 	paletaDeIndices     [][4]uint8 // la paleta del nivel expandida para las imagenes en indices
 
+	// tramo: de donde salen los pixeles de las imagenes de indices cuando la palanca esta puesta: UN solo
+	// buffer de mas de 64 KB (en la consola, monton de C) repartido entre las imagenes (DC-002.104). Nil = la
+	// cache pide sus pixeles con `make` como siempre, que es el camino de la PC.
+	tramo *TramoDeLaCache
+
 	*d2util.Logger
 }
 
@@ -168,6 +173,19 @@ func CacheDeTilesPerezosa() Opcion {
 // (DC-002.101: 1 B/pixel contra 4). El destino del dibujado tiene que implementar `lienzoDeIndices`.
 func CacheDeTilesEnIndices() Opcion {
 	return func(mr *MapRenderer) { mr.ActivarCacheDeIndices() }
+}
+
+// CacheDeTilesEnUnTramo: los pixeles de la cache en indices salen de UN tramo de `bytes` B (un solo `make`
+// grande = en la consola una asignacion del monton de C) repartido entre las imagenes (DC-002.104, ADR 0001).
+// Es aditiva y va con `CacheDeTilesEnIndices`: sin ella, una `make` por imagen, que es el camino de la PC.
+func CacheDeTilesEnUnTramo(bytes int) Opcion {
+	return func(mr *MapRenderer) { mr.ActivarTramoDeLaCache(bytes) }
+}
+
+// CacheDeTilesEnTramo: igual que `CacheDeTilesEnUnTramo`, pero con el tramo YA reservado
+// (`ReservarTramoDeLaCache`), que es lo que permite pedirlo cuando el monton de C todavia no esta fragmentado.
+func CacheDeTilesEnTramo(t *TramoDeLaCache) Opcion {
+	return func(mr *MapRenderer) { mr.UsarTramoDeLaCache(t) }
 }
 
 // CreateMapRenderer creates a new MapRenderer, sets the required fields and returns a pointer to it.

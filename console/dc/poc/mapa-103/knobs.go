@@ -40,4 +40,25 @@ const (
 
 	// soltarLecturas: devolver el tramo de lecturas de la fuente antes de componer y despues de componer.
 	soltarLecturas = true
+
+	// tramoDeLaCache (DC-002.104): los pixeles de la cache en indices se piden a UN tramo de este tamano en vez
+	// de un `make` por imagen. En libgodc, un `make` de mas de 64 KB se va al monton de C
+	// (`gc_external_alloc`) y el recolector no lo copia; las 82 imagenes chicas de la cache (2.447.360 B) hoy
+	// van al SEMIESPACIO y mueren ahi (DC-002.103). El numero es el censo medido en el host con
+	// `console/dc/medidas/render-294 -perezoso -indices`: 86 imagenes, 2.723.840 B, 0 derrames.
+	//
+	// 0 = apagado (cada imagen con su `make`, el camino de la .103 y el de la PC). El build imprime con cual se
+	// compilo el binario.
+	tramoDeLaCache = 2723840
+
+	// tramoAlArranque (DC-002.104): reservar el tramo de la cache ANTES de cargar nada, en vez de cuando se
+	// crea el renderer. Medido en esta tarjeta:
+	//   false (el de la referencia) el monton de C ya esta fragmentado al crear el renderer y el pedido de
+	//                               2.723.840 B de un solo golpe muere en `gc_external_alloc`
+	//                               (`Requested sbrk_base 0x8d086000, was 0x8cded000`): faltan 548.864 B de break
+	//   true                         el tramo entra de una al arranque, pero entonces la COMPOSICION del pueblo
+	//                               muere en el monton de C pidiendo 524.288 B con 77.824 de techo: faltan
+	//                               446.464 B. Ese es el numero de DC-002.105.
+	// Con las tablas y las fuentes soltadas (.105) el camino es este: reservar temprano y colgarlo despues.
+	tramoAlArranque = false
 )

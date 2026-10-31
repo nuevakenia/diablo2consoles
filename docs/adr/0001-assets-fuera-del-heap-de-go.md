@@ -51,6 +51,16 @@ cuadro; los 56 lienzos / 88.576 B son del cuadro 1, DC-002.97). Lo que sí pesab
 RGBA: 10.895.360 B (10,39 MB)** para el pueblo, más que el montón entero (DC-002.94). DC-002.101 la dejó en
 **índices de 8 bits: 2.723.840 B (2,60 MB), 4× menos, con el cuadro idéntico al byte** (`crc32 1437022778`).
 
+Y no bastó, porque **dónde vive** la caché también pesa (DC-002.103/.104): de sus 86 imágenes, **82 pesan menos
+de 64 KB** (**2.447.360 B**) y por eso caían en el **semiespacio** del recolector (1.792 KB, con ~1,35 MB de
+conjunto vivo) y ahí morían con el montón de C casi vacío. La decisión 1b aplicada a la caché es un **tramo
+propio**: un solo `make` de **2.723.840 B** (o sea una sola asignación del montón de C) del que se recortan las
+86 imágenes (`d2maprenderer`, palanca `CacheDeTilesEnUnTramo`/`ReservarTramoDeLaCache`, DC-002.104). Medido: el
+cuadro del host sale **byte a byte igual** (51 de 51 cuadros con `crc32 1437022778`, mismo PNG) y las 86
+imágenes salen del tramo con **cero derrames**. En la consola eso mueve la pared: ya no es el semiespacio sino
+**cuánto queda en el montón de C** (faltan **446.464 B** para reservar el tramo al arranque y componer el
+pueblo: el número de DC-002.105). Evidencia: `console/dc/evidencia/dc-002.104-la-cache-en-un-tramo-propio.md`.
+
 ### 1.4 El barrido del GC: lo que va a `malloc` no vuelve
 
 En el runtime de la consola (`libgodc`), **todo pedido de más de 64 KB** se va a `gc_external_alloc` —es decir
@@ -222,8 +232,8 @@ Resultado de hoy, medido:
 
 ## 7. Referencias
 
-- Evidencias: `console/dc/evidencia/dc-002.{78,79,80,81,82,83,86,92,93,94,96,97,98,99,100,101}-*.md`
-  (los cuatro topes: 1.1 → .82/.86, 1.2 → .78/.79/.80/.96, 1.3 → .94/.97/.101, 1.4 → .28/.77/.83/.92).
+- Evidencias: `console/dc/evidencia/dc-002.{78,79,80,81,82,83,86,92,93,94,96,97,98,99,100,101,102,103,104}-*.md`
+  (los cuatro topes: 1.1 → .82/.86, 1.2 → .78/.79/.80/.96, 1.3 → .94/.97/.101/.104, 1.4 → .28/.77/.83/.92).
 - La decisión medida en el camino de consola: `dc-002.96-la-source-de-consola.md`.
 - El plan y la fase: `docs/PLAN.md` (Fase D y la regla en las "Reglas que no se negocian").
 - El código: `console/dc/fuenteconsola/fuente.go`, `d2common/d2loader/asset/source.go`.
