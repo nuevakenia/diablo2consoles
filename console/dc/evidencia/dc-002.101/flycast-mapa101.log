@@ -1,0 +1,431 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:060 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:311 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:415 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:415 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:418 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:423 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:437 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fb711ff0000 RAM(16 MB) 0x7fb71dff0000 VRAM64(8 MB) 0x7fb715ff0000 ARAM(2 MB) 0x7fb731ff0000
+00:00:444 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:451 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fb711ff0000 RAM(16 MB) 0x7fb71dff0000 VRAM64(8 MB) 0x7fb715ff0000 ARAM(2 MB) 0x7fb731ff0000
+00:00:455 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:458 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:459 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:515 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:515 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:515 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6f9fc0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356211712
+ARQ-MARCA   gc_init-semiespacio0 v=2356211712
+ARQ-MARCA   gc_init-semiespacio1 v=2358308928
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=2720 cused=4353312 gsemi=196496/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+MAPA101: arranca DC-002.101 -- el pueblo EN PANTALLA con el video encendido
+MAPA101: MEMORIA al-arrancar usado= 4354344 libre= 1688 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+MAPA101: PVR andando; vram de la textura del cuadro= 1048576
+MAPA101: MEMORIA despues-del-video usado= 4354368 libre= 1664 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+fs_iso9660: disc change detected
+MAPA101: assetmanager listo
+MAPA101: MEMORIA despues-del-assetmanager usado= 4709696 libre= 2688 arena= 4712384 sbrk= -1934135296 techo= -1929445376
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=362192/2097152 gc=0
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=363328/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=429312/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=531656/2097152 gc=0
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=531920/2097152 gc=0
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=533272/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=546056/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572888
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=381552
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=2160 cused=5033808 gsemi=992648/2097152 gc=1
+MAPA101: tablas cargadas= 2 de 2
+MAPA101: MEMORIA despues-de-las-tablas usado= 5033808 libre= 2160 arena= 5035968 sbrk= -1933811712 techo= -1929445376
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=459416
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=2160 cused=5033808 gsemi=520616/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=2160 cused=5033808 gsemi=583896/2097152 gc=2
+ARQ-MARCA gc-externo-con-punteros v=616968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573272
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=915592
+ARQ-MARCA gc-externo-con-punteros v=72352
+Out of memory. Requested sbrk_base 0x8cff8000, was 0x8cfe4000, diff 81920
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=9353152 used=9352632 free=520
+00:36:046 reios/reios.cpp:639 N[REIOS]: -----------------
+00:36:046 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:36:046 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6f9fc0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356211712
+ARQ-MARCA   gc_init-semiespacio0 v=2356211712
+ARQ-MARCA   gc_init-semiespacio1 v=2358308928
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=2720 cused=4353312 gsemi=196496/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+MAPA101: arranca DC-002.101 -- el pueblo EN PANTALLA con el video encendido
+MAPA101: MEMORIA al-arrancar usado= 4354344 libre= 1688 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+MAPA101: PVR andando; vram de la textura del cuadro= 1048576
+MAPA101: MEMORIA despues-del-video usado= 4354368 libre= 1664 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+fs_iso9660: disc change detected
+MAPA101: assetmanager listo
+MAPA101: MEMORIA despues-del-assetmanager usado= 4709696 libre= 2688 arena= 4712384 sbrk= -1934135296 techo= -1929445376
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=362192/2097152 gc=0
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=363328/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=429312/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=531656/2097152 gc=0
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=531920/2097152 gc=0
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=533272/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=546056/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572888
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=381552
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=2160 cused=5033808 gsemi=992648/2097152 gc=1
+MAPA101: tablas cargadas= 2 de 2
+MAPA101: MEMORIA despues-de-las-tablas usado= 5033808 libre= 2160 arena= 5035968 sbrk= -1933811712 techo= -1929445376
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=459416
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=2160 cused=5033808 gsemi=520616/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=2160 cused=5033808 gsemi=583896/2097152 gc=2
+ARQ-MARCA gc-externo-con-punteros v=616968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573272
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=915592
+ARQ-MARCA gc-externo-con-punteros v=72352
+Out of memory. Requested sbrk_base 0x8cff8000, was 0x8cfe4000, diff 81920
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=9353152 used=9352632 free=520
+01:11:452 reios/reios.cpp:639 N[REIOS]: -----------------
+01:11:452 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+01:11:452 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6f9fc0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356211712
+ARQ-MARCA   gc_init-semiespacio0 v=2356211712
+ARQ-MARCA   gc_init-semiespacio1 v=2358308928
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=2720 cused=4353312 gsemi=198056/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+MAPA101: arranca DC-002.101 -- el pueblo EN PANTALLA con el video encendido
+MAPA101: MEMORIA al-arrancar usado= 4354344 libre= 1688 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+MAPA101: PVR andando; vram de la textura del cuadro= 1048576
+MAPA101: MEMORIA despues-del-video usado= 4354368 libre= 1664 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+fs_iso9660: disc change detected
+MAPA101: assetmanager listo
+MAPA101: MEMORIA despues-del-assetmanager usado= 4709696 libre= 2688 arena= 4712384 sbrk= -1934135296 techo= -1929445376
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=364120/2097152 gc=0
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=365256/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=431120/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=533464/2097152 gc=0
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=533728/2097152 gc=0
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=535080/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=547864/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572872
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=387976
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=2160 cused=5033808 gsemi=996616/2097152 gc=1
+MAPA101: tablas cargadas= 2 de 2
+MAPA101: MEMORIA despues-de-las-tablas usado= 5033808 libre= 2160 arena= 5035968 sbrk= -1933811712 techo= -1929445376
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=461840
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=2160 cused=5033808 gsemi=523040/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=2160 cused=5033808 gsemi=586320/2097152 gc=2
+ARQ-MARCA gc-externo-con-punteros v=616968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573200
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=915064
+ARQ-MARCA gc-externo-con-punteros v=72352
+Out of memory. Requested sbrk_base 0x8cff8000, was 0x8cfe4000, diff 81920
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=9353152 used=9352632 free=520
+01:46:868 reios/reios.cpp:639 N[REIOS]: -----------------
+01:46:868 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+01:46:868 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6f9fc0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356211712
+ARQ-MARCA   gc_init-semiespacio0 v=2356211712
+ARQ-MARCA   gc_init-semiespacio1 v=2358308928
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=2720 cused=4353312 gsemi=196496/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+MAPA101: arranca DC-002.101 -- el pueblo EN PANTALLA con el video encendido
+MAPA101: MEMORIA al-arrancar usado= 4354344 libre= 1688 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+MAPA101: PVR andando; vram de la textura del cuadro= 1048576
+MAPA101: MEMORIA despues-del-video usado= 4354368 libre= 1664 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+fs_iso9660: disc change detected
+MAPA101: assetmanager listo
+MAPA101: MEMORIA despues-del-assetmanager usado= 4709696 libre= 2688 arena= 4712384 sbrk= -1934135296 techo= -1929445376
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=362192/2097152 gc=0
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=363328/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=429312/2097152 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=2688 cused=4709696 gsemi=531656/2097152 gc=0
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=531920/2097152 gc=0
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=533272/2097152 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=2688 cused=4709696 gsemi=546056/2097152 gc=0
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1572888
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=381552
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=2160 cused=5033808 gsemi=992648/2097152 gc=1
+MAPA101: tablas cargadas= 2 de 2
+MAPA101: MEMORIA despues-de-las-tablas usado= 5033808 libre= 2160 arena= 5035968 sbrk= -1933811712 techo= -1929445376
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=459416
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=2160 cused=5033808 gsemi=520616/2097152 gc=2
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=2160 cused=5033808 gsemi=583896/2097152 gc=2
+ARQ-MARCA gc-externo-con-punteros v=616968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1573272
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=915592
+ARQ-MARCA gc-externo-con-punteros v=72352
+Out of memory. Requested sbrk_base 0x8cff8000, was 0x8cfe4000, diff 81920
+
+fatal error: gc_external_alloc: OOM
+
+Stack Trace: frame pointers not enabled!
+Memory: arena=9353152 used=9352632 free=520
+02:22:297 reios/reios.cpp:639 N[REIOS]: -----------------
+02:22:297 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+02:22:297 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac6f9fc0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2356211712
+ARQ-MARCA   gc_init-semiespacio0 v=2356211712
+ARQ-MARCA   gc_init-semiespacio1 v=2358308928
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=2720 cused=4353312 gsemi=198056/2097152 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+MAPA101: arranca DC-002.101 -- el pueblo EN PANTALLA con el video encendido
+MAPA101: MEMORIA al-arrancar usado= 4354344 libre= 1688 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+MAPA101: PVR andando; vram de la textura del cuadro= 1048576
+MAPA101: MEMORIA despues-del-video usado= 4354368 libre= 1664 arena= 4356032 sbrk= -1934491648 techo= -1929445376
+fs_iso9660: disc change detected

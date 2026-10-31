@@ -252,6 +252,28 @@ func (c *Cuadro) RenderSection(superficie d2interface.Surface, seccion image.Rec
 	}
 }
 
+// RenderIndicesTintado: dibuja indices de 8 bits con la MISMA cuenta que el backend PVR (DC-002.101): traslacion
+// del estado, color que multiplica y alfa source-over. Asi el cuadro del camino de indices se puede comparar
+// pixel a pixel contra el del camino RGBA.
+func (c *Cuadro) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [][4]uint8) {
+	if ancho <= 0 || alto <= 0 || len(indices) < ancho*alto || len(paleta) < 256 {
+		return
+	}
+
+	for y := 0; y < alto; y++ {
+		for x := 0; x < ancho; x++ {
+			idx := indices[y*ancho+x]
+			if idx == 0 {
+				continue
+			}
+
+			p := paleta[idx]
+			r, g, b, a := c.tintado(p[0], p[1], p[2], p[3])
+			c.mezclar(c.actual.tx+x, c.actual.ty+y, r, g, b, a)
+		}
+	}
+}
+
 // ReplacePixels: carga el cuadro crudo (RGBA de 8 bits, w*h*4) en el lienzo.
 func (c *Cuadro) ReplacePixels(pixeles []byte) {
 	if len(pixeles) < len(c.pix) {

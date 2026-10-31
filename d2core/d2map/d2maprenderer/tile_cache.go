@@ -28,9 +28,36 @@ func (mr *MapRenderer) resetLevelCaches() {
 	// previous level's images: Lut Gholein drew Rogue Encampment grass on the tiles both share
 	// (Act-1 looking green tiles in later acts).
 	mr.imageCacheRecords = nil
+	// DC-002.101: la cache de indices y la paleta expandida son del mismo nivel (la paleta cambia por acto).
+	mr.indicesCacheRecords = nil
+	mr.paletaDeIndices = nil
 	mr.blankShadows = nil
 	mr.blankWalls = nil
 	mr.light.resetFades()
+}
+
+// paletaEnRGBA: la paleta del nivel expandida a [][4]uint8, UNA vez, para las imagenes en indices. Es la
+// misma paleta que usa `ImgIndexToRGBA` (R,G,B,A de cada color), asi el camino de indices pinta los mismos
+// bytes que el de RGBA.
+func (mr *MapRenderer) paletaEnRGBA() [][4]uint8 {
+	if mr.paletaDeIndices != nil {
+		return mr.paletaDeIndices
+	}
+
+	pal := make([][4]uint8, 256)
+
+	for i := 0; i < 256; i++ {
+		c, err := mr.palette.GetColor(i)
+		if err != nil || c == nil {
+			continue
+		}
+
+		pal[i] = [4]uint8{c.R(), c.G(), c.B(), c.A()}
+	}
+
+	mr.paletaDeIndices = pal
+
+	return pal
 }
 
 func (mr *MapRenderer) generateTileCache() {
@@ -115,7 +142,12 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 
 		cachedImage := mr.getImageCacheRecord(tile.Style, tile.Sequence, 0, tileIndex)
 
-		if cachedImage != nil {
+		if mr.cacheEnIndices {
+			// DC-002.101: cache en indices -- el "ya esta" es la entrada de indices
+			if mr.getCacheDeIndices(tile.Style, tile.Sequence, 0, tileIndex) != nil {
+				return
+			}
+		} else if cachedImage != nil {
 			return
 		}
 
@@ -127,10 +159,19 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 
 		tileYOffset := d2math.AbsInt32(tileYMinimum)
 		tileHeight := d2math.AbsInt32(tileData[i].Height)
-		image := mr.renderer.NewSurface(int(tileData[i].Width), int(tileHeight))
 
 		indexData := make([]byte, tileData[i].Width*tileHeight)
 		d2dt1.DecodeTileGfxData(tileData[i].Blocks, &indexData, tileYOffset, tileData[i].Width)
+
+		if mr.cacheEnIndices {
+			mr.setCacheDeIndices(tile.Style, tile.Sequence, 0, tileIndex, &imagenDeIndices{
+				indices: indexData, ancho: int(tileData[i].Width), alto: int(tileHeight), paleta: mr.paletaEnRGBA(),
+			})
+
+			continue
+		}
+
+		image := mr.renderer.NewSurface(int(tileData[i].Width), int(tileHeight))
 		pixels := d2util.ImgIndexToRGBA(indexData, mr.palette)
 
 		image.ReplacePixels(pixels)
@@ -167,14 +208,27 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 	tile.YAdjust = int(tileMinY + shadowAdjustY)
 
 	cachedImage := mr.getImageCacheRecord(tile.Style, tile.Sequence, d2enum.TileShadow, tile.RandomIndex)
-	if cachedImage != nil {
+
+	if mr.cacheEnIndices {
+		if mr.getCacheDeIndices(tile.Style, tile.Sequence, int(d2enum.TileShadow), tile.RandomIndex) != nil {
+			return
+		}
+	} else if cachedImage != nil {
+		return
+	}
+
+	indexData := make([]byte, tileData.Width*int32(tileHeight))
+	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileData.Width)
+
+	if mr.cacheEnIndices {
+		mr.setCacheDeIndices(tile.Style, tile.Sequence, int(d2enum.TileShadow), tile.RandomIndex, &imagenDeIndices{
+			indices: indexData, ancho: int(tileData.Width), alto: tileHeight, paleta: mr.paletaEnRGBA(),
+		})
+
 		return
 	}
 
 	image := mr.renderer.NewSurface(int(tileData.Width), tileHeight)
-
-	indexData := make([]byte, tileData.Width*int32(tileHeight))
-	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileData.Width)
 	pixels := d2util.ImgIndexToRGBA(indexData, mr.palette)
 
 	image.ReplacePixels(pixels)
@@ -227,7 +281,12 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 	}
 
 	cachedImage := mr.getImageCacheRecord(tile.Style, tile.Sequence, tile.Type, tile.RandomIndex)
-	if cachedImage != nil {
+
+	if mr.cacheEnIndices {
+		if mr.getCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex) != nil {
+			return
+		}
+	} else if cachedImage != nil {
 		return
 	}
 
@@ -244,8 +303,6 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 		return
 	}
 
-	image := mr.renderer.NewSurface(tileSurfaceWidth, int(realHeight))
-
 	indexData := make([]byte, tileSurfaceWidth*realHeight)
 
 	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileSurfaceWidth)
@@ -254,6 +311,15 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 		d2dt1.DecodeTileGfxData(newTileData.Blocks, &indexData, tileYOffset, tileSurfaceWidth)
 	}
 
+	if mr.cacheEnIndices {
+		mr.setCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex, &imagenDeIndices{
+			indices: indexData, ancho: tileSurfaceWidth, alto: int(realHeight), paleta: mr.paletaEnRGBA(),
+		})
+
+		return
+	}
+
+	image := mr.renderer.NewSurface(tileSurfaceWidth, int(realHeight))
 	pixels := d2util.ImgIndexToRGBA(indexData, mr.palette)
 
 	image.ReplacePixels(pixels)

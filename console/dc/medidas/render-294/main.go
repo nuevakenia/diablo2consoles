@@ -66,17 +66,18 @@ func main() {
 	cy := flag.Float64("cy", 20, "celda Y del centro de la camara")
 	salida := flag.String("out", "/tmp/cuadro-host-294.png", "PNG de referencia del cuadro")
 	perezoso := flag.Bool("perezoso", false, "cache de tiles perezosa (la de la consola: se arma al dibujar)")
+	indices := flag.Bool("indices", false, "cache de tiles en INDICES de 8 bits (1 B/px) en vez de RGBA (4 B/px)")
 	cuadros := flag.Int("cuadros", 1, "cuantos cuadros componer (el 2do en adelante mide la cache ya armada)")
 	flag.Parse()
 
-	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *cuadros); err != nil {
+	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *indices, *cuadros); err != nil {
 		fmt.Println("RENDER294: FALLO --", err)
 		os.Exit(1)
 	}
 }
 
 func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida string,
-	perezoso bool, cuadros int) error {
+	perezoso, indices bool, cuadros int) error {
 	if dir == "" {
 		dir = autodetectarD2()
 	}
@@ -156,12 +157,22 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 		fmt.Println("RENDER294: cache PEREZOSA (la de la consola: las imagenes se arman al dibujar)")
 	}
 
+	if indices {
+		opciones = append(opciones, d2maprenderer.CacheDeTilesEnIndices())
+		fmt.Println("RENDER294: cache en INDICES (DC-002.101: 1 B por pixel en vez de 4)")
+	}
+
 	mr := d2maprenderer.CreateMapRenderer(am, r, engine, term, d2util.LogLevelError, cx, cy, opciones...)
 
 	supCache := r.Estadisticas()
 	fmt.Printf("RENDER294: CACHE superficies=%d bytesRGBA=%d (%.2f MB) picoPorSuperficie=%dx%d\n",
 		supCache.Superficies, supCache.Bytes, float64(supCache.Bytes)/(1024*1024),
 		supCache.AnchoMaximo, supCache.AltoMaximo)
+
+	cacheInicial := mr.EstadoDeLaCache()
+	fmt.Printf("RENDER294: CACHE101 enIndices=%v superficies=%d bytes=%d (%.2f MB) pixeles=%d\n",
+		cacheInicial.EnIndices, cacheInicial.Superficies, cacheInicial.Bytes,
+		float64(cacheInicial.Bytes)/(1024*1024), cacheInicial.Pixeles)
 
 	fmt.Println("RENDER294: ================ 4. EL CUADRO ================")
 
@@ -171,12 +182,14 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 
 	for cuadro := 1; cuadro <= cuadros; cuadro++ {
 		antesDeRender := r.Estadisticas()
+		antes101 := mr.EstadoDeLaCache()
 
 		t0 := time.Now()
 		mr.Render(sup)
 		ms := time.Since(t0).Milliseconds()
 
 		despuesDeRender := r.Estadisticas()
+		despues101 := mr.EstadoDeLaCache()
 
 		c, ok := sup.(*Cuadro)
 		if !ok {
@@ -194,6 +207,9 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 			cuadro, despuesDeRender.Superficies-antesDeRender.Superficies,
 			despuesDeRender.Bytes-antesDeRender.Bytes,
 			despuesDeRender.Superficies, despuesDeRender.Bytes)
+		fmt.Printf("RENDER294: CUADRO %d cache101 nuevas=%d bytesNuevos=%d cacheSuperficies=%d cacheBytes=%d (%.2f MB)\n",
+			cuadro, despues101.Superficies-antes101.Superficies, despues101.Bytes-antes101.Bytes,
+			despues101.Superficies, despues101.Bytes, float64(despues101.Bytes)/(1024*1024))
 	}
 
 	fmt.Printf("RENDER294: CUADRO total ms=%d (promedio %.1f)\n", msTotal, float64(msTotal)/float64(cuadros))

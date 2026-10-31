@@ -150,6 +150,77 @@ func (s *Surface) RenderIndices(indices []byte, ancho, alto int, paleta [][3]uin
 	}
 }
 
+// RenderIndicesTintado dibuja un mapa de INDICES de 8 bits aplicando el ESTADO actual: la traslacion, el color
+// (multiplica los canales) y el alfa (source-over sobre el lienzo).
+//
+// POR QUE EXISTE (DC-002.101). `RenderIndices` (DC-002.70) pinta opaco y sin color: sirve para el mapa del
+// nivel, que se dibuja sin estado. La cache de tiles del renderer del mapa, en cambio, se pinta con
+// `PushColor` para las sombras (alfa 160) y con la traslacion de la vista, asi que necesita la misma cuenta de
+// mezcla que hace `copiarEn`/`mezclar`. La paleta es RGBA de 8 bits (no ARGB1555) por lo mismo que
+// `RenderIndices`: el lienzo es RGBA y cuantizar a 5 bits perderia color sin ganar nada.
+func (s *Surface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [][4]uint8) {
+	if ancho <= 0 || alto <= 0 || len(indices) < ancho*alto || len(paleta) < 256 {
+		return
+	}
+
+	dx, dy := s.actual.x, s.actual.y
+	anchoLienzo, altoLienzo := s.imagen.ancho, s.imagen.alto
+	pixeles := s.imagen.pixeles
+
+	rojo, verde, azul, alfa := uint16(255), uint16(255), uint16(255), uint16(255)
+
+	if s.actual.col != nil {
+		c := aRGBA(s.actual.col)
+		rojo, verde, azul, alfa = uint16(c.R), uint16(c.G), uint16(c.B), uint16(c.A)
+	}
+
+	for y := 0; y < alto; y++ {
+		cy := dy + y
+		if cy < 0 || cy >= altoLienzo {
+			continue
+		}
+
+		base := cy * anchoLienzo * 4
+		fila := y * ancho
+
+		for x := 0; x < ancho; x++ {
+			idx := indices[fila+x]
+			if idx == 0 {
+				continue
+			}
+
+			cx := dx + x
+			if cx < 0 || cx >= anchoLienzo {
+				continue
+			}
+
+			p := paleta[idx]
+			r := uint8(uint16(p[0]) * rojo / 255)
+			g := uint8(uint16(p[1]) * verde / 255)
+			b := uint8(uint16(p[2]) * azul / 255)
+			a := uint16(uint16(p[3]) * alfa / 255)
+
+			if a == 0 {
+				continue
+			}
+
+			j := base + cx*4
+
+			if a == 255 {
+				pixeles[j+0], pixeles[j+1], pixeles[j+2], pixeles[j+3] = r, g, b, 255
+
+				continue
+			}
+
+			resto := 255 - a
+			pixeles[j+0] = uint8((uint16(r)*a + uint16(pixeles[j+0])*resto) / 255)
+			pixeles[j+1] = uint8((uint16(g)*a + uint16(pixeles[j+1])*resto) / 255)
+			pixeles[j+2] = uint8((uint16(b)*a + uint16(pixeles[j+2])*resto) / 255)
+			pixeles[j+3] = uint8(a + uint16(pixeles[j+3])*resto/255)
+		}
+	}
+}
+
 // ExpandirIndices expande indices de 8 bits con su paleta DIRECTAMENTE en el lienzo de esta superficie, sin
 // buffer intermedio.
 //

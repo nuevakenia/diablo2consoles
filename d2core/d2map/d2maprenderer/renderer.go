@@ -96,6 +96,12 @@ type MapRenderer struct {
 	// (DC-002.94). Ver ActivarCachePerezoso.
 	cachePerezoso bool
 
+	// cacheEnIndices: la cache guarda INDICES de 8 bits (1 B/pixel) en vez de RGBA (4 B/pixel) y el dibujado
+	// va por `lienzoDeIndices.RenderIndicesTintado` (DC-002.101). Aditivo: sin la palanca, todo como antes.
+	cacheEnIndices      bool
+	indicesCacheRecords map[uint32]*imagenDeIndices
+	paletaDeIndices     [][4]uint8 // la paleta del nivel expandida para las imagenes en indices
+
 	*d2util.Logger
 }
 
@@ -109,6 +115,19 @@ func (mr *MapRenderer) ActivarCachePerezoso() { mr.cachePerezoso = true }
 
 // CachePerezosa: si la cache se arma al dibujar.
 func (mr *MapRenderer) CachePerezosa() bool { return mr.cachePerezoso }
+
+// ActivarCacheDeIndices: la cache de tiles guarda indices de 8 bits (1 B/pixel) y no RGBA (4 B/pixel)
+// (DC-002.101). El dibujado usa `RenderIndicesTintado` del destino; la PC no la llama nunca.
+func (mr *MapRenderer) ActivarCacheDeIndices() {
+	mr.cacheEnIndices = true
+
+	if mr.indicesCacheRecords == nil {
+		mr.indicesCacheRecords = make(map[uint32]*imagenDeIndices)
+	}
+}
+
+// CacheDeIndices: si la cache guarda indices en vez de RGBA.
+func (mr *MapRenderer) CacheDeIndices() bool { return mr.cacheEnIndices }
 
 // FijarTamanoDelCuadro: el tamano del cuadro que este renderer compone, en pixeles, para la consola
 // (DC-002.94). Sin llamarla, el tamano sale de d2display como siempre.
@@ -143,6 +162,12 @@ func ComoConsola(ancho, alto int) Opcion {
 // (DC-002.94: la cache entera del pueblo son 29,36 MB de RGBA y en la consola no entran).
 func CacheDeTilesPerezosa() Opcion {
 	return func(mr *MapRenderer) { mr.ActivarCachePerezoso() }
+}
+
+// CacheDeTilesEnIndices: las imagenes de los tiles se guardan como indices de 8 bits en vez de RGBA
+// (DC-002.101: 1 B/pixel contra 4). El destino del dibujado tiene que implementar `lienzoDeIndices`.
+func CacheDeTilesEnIndices() Opcion {
+	return func(mr *MapRenderer) { mr.ActivarCacheDeIndices() }
 }
 
 // CreateMapRenderer creates a new MapRenderer, sets the required fields and returns a pointer to it.
@@ -564,15 +589,23 @@ func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, 
 	// DC-002.94: con la cache perezosa, la imagen se arma aca la primera vez
 	mr.asegurarImagen(&tile, 0)
 
-	var img d2interface.Surface
-	if !tile.Animated {
-		img = mr.getImageCacheRecord(tile.Style, tile.Sequence, 0, tile.RandomIndex)
-	} else {
-		img = mr.getImageCacheRecord(tile.Style, tile.Sequence, 0,
-			byte(tileAnimFrame(mr.animTicks, 0, mr.animFrames[uint16(tile.Style)<<8|uint16(tile.Sequence)])))
+	var (
+		img    d2interface.Surface
+		indice *imagenDeIndices
+	)
+
+	clave := tile.RandomIndex
+	if tile.Animated {
+		clave = byte(tileAnimFrame(mr.animTicks, 0, mr.animFrames[uint16(tile.Style)<<8|uint16(tile.Sequence)]))
 	}
 
-	if img == nil {
+	if mr.cacheEnIndices {
+		indice = mr.getCacheDeIndices(tile.Style, tile.Sequence, 0, clave)
+	} else {
+		img = mr.getImageCacheRecord(tile.Style, tile.Sequence, 0, clave)
+	}
+
+	if img == nil && indice == nil {
 		mr.Warningf("Render called on uncached floor {%v,%v}", tile.Style, tile.Sequence)
 		return
 	}
@@ -586,7 +619,25 @@ func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, 
 	defer target.Pop()
 
 	if mr.light.active() {
+		if indice != nil {
+			mr.Warningf("la cache en indices no pinta con la luz prendida (DC-002.101)")
+
+			return
+		}
+
 		mr.renderShadedImage(target, img, floorShadeCols, floorShadeRows, 1, shadeFloor, tileX, tileY)
+
+		return
+	}
+
+	mr.pintarTile(target, img, indice)
+}
+
+// pintarTile dibuja la imagen cacheada del tile: los indices por el camino de DC-002.101 o la superficie
+// RGBA por el de siempre. Es UN punto para las cuatro capas (piso, sombra, pared y techo).
+func (mr *MapRenderer) pintarTile(target d2interface.Surface, img d2interface.Surface, indice *imagenDeIndices) {
+	if indice != nil {
+		mr.dibujarImagenDeIndices(target, indice)
 
 		return
 	}
@@ -600,7 +651,13 @@ func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2
 	mr.asegurarImagen(&tile, tile.Type)
 
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, tile.Type, tile.RandomIndex)
-	if img == nil {
+	indice := (*imagenDeIndices)(nil)
+
+	if mr.cacheEnIndices {
+		indice = mr.getCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex)
+	}
+
+	if img == nil && indice == nil {
 		if !mr.blankWalls[blankWallKey(&tile)] {
 			mr.Warningf("Render called on uncached wall {%v,%v,%v}", tile.Style, tile.Sequence, tile.Type)
 		}
@@ -621,7 +678,14 @@ func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2
 	defer target.Pop()
 
 	if !mr.light.active() {
-		target.Render(img)
+		mr.pintarTile(target, img, indice)
+
+		return
+	}
+
+	if indice != nil {
+		mr.Warningf("la cache en indices no pinta con la luz prendida (DC-002.101)")
+
 		return
 	}
 
@@ -645,7 +709,13 @@ func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2
 	mr.asegurarImagen(&tile, tile.Type)
 
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, tile.Type, tile.RandomIndex)
-	if img == nil {
+	indice := (*imagenDeIndices)(nil)
+
+	if mr.cacheEnIndices {
+		indice = mr.getCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex)
+	}
+
+	if img == nil && indice == nil {
 		mr.Warningf("Render called on uncached wall {%v,%v,%v}", tile.Style, tile.Sequence, tile.Type)
 		return
 	}
@@ -659,6 +729,12 @@ func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2
 	defer target.Pop()
 
 	if mr.light.active() {
+		if indice != nil {
+			mr.Warningf("la cache en indices no pinta con la luz prendida (DC-002.101)")
+
+			return
+		}
+
 		alpha := mr.light.roofAlpha(wallKey{tileX + mr.offX, tileY + mr.offY, idx},
 			mr.roofCover[[2]int{tileX + mr.offX, tileY + mr.offY}])
 		if alpha < 1 {
@@ -673,7 +749,7 @@ func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2
 		defer target.Pop()
 	}
 
-	target.Render(img)
+	mr.pintarTile(target, img, indice)
 }
 
 // updateRoofCover recomputes which roof tiles the hero is under (see roof_fade.go).
@@ -766,7 +842,13 @@ func (mr *MapRenderer) renderShadow(tile d2ds1.Tile, target d2interface.Surface,
 	mr.asegurarImagen(&tile, d2enum.TileShadow)
 
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, 13, tile.RandomIndex)
-	if img == nil {
+	indice := (*imagenDeIndices)(nil)
+
+	if mr.cacheEnIndices {
+		indice = mr.getCacheDeIndices(tile.Style, tile.Sequence, int(d2enum.TileShadow), tile.RandomIndex)
+	}
+
+	if img == nil && indice == nil {
 		// shadow tiles without graphics (width or height 0) are never cached;
 		// the exact room tiles of the outdoor generator contain such markers
 		key := uint32(tile.Style)<<16 | uint32(tile.Sequence)<<8 | uint32(tile.RandomIndex)
@@ -800,6 +882,12 @@ func (mr *MapRenderer) renderShadow(tile d2ds1.Tile, target d2interface.Surface,
 	defer target.Pop()
 
 	if mr.light.active() {
+		if indice != nil {
+			mr.Warningf("la cache en indices no pinta con la luz prendida (DC-002.101)")
+
+			return
+		}
+
 		// lit like the floor underneath
 		mr.renderShadedImage(target, img, floorShadeCols, floorShadeRows, shadowAlpha, shadeFloor, tileX, tileY)
 
@@ -809,7 +897,7 @@ func (mr *MapRenderer) renderShadow(tile d2ds1.Tile, target d2interface.Surface,
 	target.PushColor(color.RGBA{R: 255, G: 255, B: 255, A: 160}) //nolint:gomnd // Not a magic number...
 	defer target.Pop()
 
-	target.Render(img)
+	mr.pintarTile(target, img, indice)
 }
 
 func (mr *MapRenderer) renderMapDebug(mapDebugVisLevel int, target d2interface.Surface, startX, startY, endX, endY int) {
