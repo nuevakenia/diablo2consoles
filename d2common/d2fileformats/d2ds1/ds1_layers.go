@@ -42,6 +42,12 @@ type ds1Layers struct {
 	Walls         layerGroup
 	Shadows       layerGroup
 	Substitutions layerGroup
+
+	// `arena` es el bloque de celdas del monton de C del que cuelgan las filas de TODAS las capas del `.ds1`;
+	// `arenaUsada` es el cursor de reparto. Los dos son nil/0 cuando el `.ds1` vive en el monton de Go (la PC, o
+	// un `.ds1` que no llega al umbral de los 64 KB).
+	arena      []Tile
+	arenaUsada int
 }
 
 func (l *ds1Layers) ensureInit() {
@@ -144,6 +150,11 @@ func (l *ds1Layers) SetHeight(h int) {
 func (l *ds1Layers) push(t LayerGroupType, layer *Layer) {
 	l.ensureInit()
 	l.cull()
+
+	// DC-002.110: la capa se muda al bloque del `.ds1` ANTES de que se le de tamaño, asi `SetSize` rearma las
+	// vistas de las filas adentro del bloque y no pide una rejilla en el semiespacio del recolector.
+	l.ponerEnElArena(layer)
+
 	layer.SetSize(l.Size())
 
 	group := l.GetLayersGroup(t)
@@ -202,6 +213,8 @@ func (l *ds1Layers) insert(t LayerGroupType, idx int, newLayer *Layer) {
 	if newLayer == nil {
 		return
 	}
+
+	l.ponerEnElArena(newLayer) // DC-002.110: igual que en `push`
 
 	newLayer.SetSize(l.Size())
 

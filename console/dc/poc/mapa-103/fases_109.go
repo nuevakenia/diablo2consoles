@@ -51,6 +51,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
@@ -165,6 +166,14 @@ func cicloDeNiveles(superficie d2interface.Surface) {
 	println("MAPA109: CICLO gcPercent de vuelta a", d2cGcPercent(gcPercentAntes))
 	println("MAPA109: CICLO FIN pico de la corrida=", picoMonton, "de arena=", d2cMontonArena(),
 		"libre=", d2cMontonLibre(), "sbrk=", int(d2cSbrkActual()), "techo=", int(d2cMontonTecho()))
+
+	// DC-002.110: el censo de la arena del `.ds1`. `vivos` tiene que ser 0 (cada bloque devuelto con el
+	// liberador); `pedidas` = 3 si las tres fases se compusieron (una por nivel) y `soltadas` igual.
+	arena := d2ds1.EstadoDeLaArena()
+	println("MAPA110: ARENA DEL DS1 pedidas=", arena.Pedidas, "soltadas=", arena.Soltadas,
+		"bytesPedidos=", arena.Bytes, "bytesDevueltos=", arena.Devueltos, "vivos=", arena.Vivos,
+		"chicas=", arena.Chicas, "sinLugar=", arena.SinLugar, "celdasFuera=", arena.Celdas,
+		"capasFuera=", arena.Capas, "bytesPorCelda=", d2ds1.BytesPorCelda())
 
 	if volver.ok && volver.crc == crcDelCuadroAlEntrar {
 		println("MAPA109: CRITERIO el cuadro de VOLVER es el mismo que el de ENTRAR crc32=", int(volver.crc),
@@ -356,10 +365,13 @@ func reabrirFuentesYTablas(nombre string) bool {
 }
 
 // componerNivel (DC-002.109): compone `preset/archivo` en el motor y devuelve el censo de la grilla. El `Stamp`
-// y su `.ds1` parseado NO salen de aca: en libgodc el `.ds1` de un nivel son ~400 KB en el SEMIESPACIO del
-// recolector (las capas de casillas son rebanadas de menos de 64 KB, o sea que no van al monton de C) y una
-// variable local del que llama lo deja clavado en la pila -- que es exactamente lo que la TRANSICION necesita
-// libre para parsear el nivel nuevo.
+// y su `.ds1` parseado NO salen de aca: una variable local del que llama lo deja clavado en la pila, y en
+// libgodc el barrido de pila es CONSERVADOR, asi que el `.ds1` de un marco muerto cuenta como raiz (medido en
+// DC-002.109: 413.184 B vivos despues de una recoleccion completa).
+//
+// DC-002.110: por eso las celdas de las capas del `.ds1` viven en UN bloque del monton de C, y este es el lugar
+// donde se devuelve (`Stamp.SoltarLosTilesDelDS1`, despues de `PlaceStampClippedWhere`). Con eso el nivel que
+// se deja no ocupa el semiespacio de la fase siguiente, y la vuelta tiene donde parsear su `.ds1`.
 //
 // `fase` vacia = el camino de la corrida de referencia (el log es el de DC-002.106, sin lineas de mas).
 func componerNivel(engine *d2mapengine.MapEngine, preset, archivo int, fase string) (pisos, paredes int, crc uint32, ok bool) {
@@ -372,13 +384,32 @@ func componerNivel(engine *d2mapengine.MapEngine, preset, archivo int, fase stri
 
 	tamano := stamp.Size()
 
+	// DC-002.110: donde vive el `.ds1` de este nivel. `bloque` es lo que se saco del semiespacio (0 si la
+	// palanca esta apagada o el nivel no llega a los 64 KB: ahi sigue en el monton de Go, como en DC-002.109).
+	enArena := stamp.TilesDelDS1EnArena()
+	bloque := stamp.BytesDeLaArenaDelDS1()
+
 	if fase != "" {
-		println("MAPA109: FASE", fase, "DS1", stamp.RegionPath(), "ancho=", tamano.Width, "alto=", tamano.Height)
+		println("MAPA109: FASE", fase, "DS1", stamp.RegionPath(), "ancho=", tamano.Width, "alto=", tamano.Height,
+			"enArena=", enArena, "bloque=", bloque)
 		semiespacio(fase + "-despues-de-loadstamp")
 	}
 
 	engine.ResetMapParaStamp(regionPueblo, tamano.Width, tamano.Height, stamp)
 	engine.PlaceStampClippedWhere(stamp, 0, 0, tamano.Width, tamano.Height, func(int) bool { return false }, false)
+
+	// ============================== EL `.ds1` SE SUELTA ACA (DC-002.110) ==============================
+	// Con el nivel compuesto, el `.ds1` no lo mira nadie: las casillas del mapa son COPIAS de sus celdas. Se
+	// devuelve su bloque al monton de C en el acto (contrato de `Stamp.SoltarLosTilesDelDS1`), y desde aca el
+	// nivel que se acaba de componer NO ocupa el semiespacio de la fase siguiente -- que es exactamente lo que
+	// la vuelta del cambio de nivel necesitaba (ver knobs.go y evidencia/dc-002.110).
+	soltados := stamp.SoltarLosTilesDelDS1()
+
+	if fase != "" {
+		println("MAPA110: FASE", fase, "DS1 SOLTADO", stamp.RegionPath(), "enArena=", enArena, "bloque=", bloque,
+			"devueltos=", soltados, "montonLibre=", d2cMontonLibre())
+		semiespacio(fase + "-despues-de-soltar-el-ds1")
+	}
 
 	pisos, paredes, crc = censo(engine)
 

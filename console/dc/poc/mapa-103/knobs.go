@@ -176,4 +176,28 @@ const (
 	// la cache de tiles.
 	transicionPreset  = 1
 	transicionArchivo = 1
+
+	// ============================== DC-002.110: EL .DS1 FUERA DEL SEMIESPACIO ==============================
+	//
+	// arenaDelDS1: las celdas de las capas de un `.ds1` se piden en UN bloque del monton de C (con liberador
+	// explicito) en vez de una rejilla por fila en el semiespacio del recolector (ver
+	// `d2common/d2fileformats/d2ds1/arena_110.go`).
+	//
+	// POR QUE. Medido en DC-002.109: un nivel compuesto deja ~413.000 B vivos en el semiespacio despues de una
+	// recoleccion COMPLETA (el barrido de pila de libgodc es conservador y el puntero al `.ds1` de un marco ya
+	// muerto cuenta como raiz), asi que VOLVER pide 1.735.048 + 382.632 contra 1.835.008 y no entra. Las
+	// casillas del `.ds1` de un nivel son 2337 celdas x 20 B x 4 capas = 186.960 B en el SH-4 (224.352 B en el
+	// host), y son lo que se saca del semiespacio.
+	//
+	//	encendido  el bloque del monton de C. MEDIDO en DC-002.110: la carga del `.ds1` pasa de +422.776 B a
+	//	           +42.232 B de semiespacio (380.544 B menos), o sea que por semiespacio la vuelta ya entraria
+	//	           (1.309.984 + 42.232 + 382.632 = 1.734.848 de 1.835.008) -- pero el monton de C NO tiene esos
+	//	           186.960 B en el pico de componer (el arena de bloques de DC-002.101 son 4,04 MB y el techo se
+	//	           toca justo: la corrida muere en la TRANSICION con `gc_external_alloc: OOM`).
+	//	apagado    el camino de siempre, el de DC-002.109 (donde VOLVER muere en el semiespacio).
+	//
+	// POR ESO EL DEFAULT ES APAGADO: encendido es medible pero hoy NO COMPLETA LAS TRES FASES. Cuando el monton de
+	// C suelte ~200.000 B antes del pico de componer (los candidatos estan en la evidencia de la tarjeta, seccion
+	// 6), se prende y la vuelta entra. Se pisa por entorno con ARENA_DS1=.
+	arenaDelDS1 = "apagado"
 )

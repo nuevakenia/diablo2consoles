@@ -185,6 +185,16 @@ func (ds1 *DS1) loadBody(stream *d2datautils.StreamReader) error {
 		return err
 	}
 
+	// DC-002.110 -- EL BLOQUE DE LAS CELDAS, PEDIDO ANTES DE ARMAR LAS CAPAS. Aca ya se saben el tamaño del
+	// nivel (la cabecera) y cuantas capas hay (los cuatro contadores de arriba), que es todo lo que hace falta
+	// para pedir UN bloque del tamaño exacto en el monton de C. Se pide ANTES de los `Push*` para que las filas
+	// de cada capa sean rebanadas de ese bloque: pedirlo despues seria volver a copiar las cuatro rejillas.
+	numCapas := int(numWalls + numFloors + numShadows + numSubstitutions)
+	numCapas += len(ds1.ds1Layers.Floors) + len(ds1.ds1Layers.Walls) + len(ds1.ds1Layers.Shadows) +
+		len(ds1.ds1Layers.Substitutions) // las que ya empujo la cabecera (la de sustitucion)
+
+	ds1.reservarArenaDeTiles(numCapas)
+
 	for ; numWalls > 0; numWalls-- {
 		ds1.PushWall(&Layer{})
 	}

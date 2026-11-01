@@ -24,6 +24,10 @@
 #       DC-002.109: FASE=encendido prende el ciclo de las tres fases, ORDEN_FASES=a|b elige el orden, y
 #       TPRESET=/TARCHIVO= el `.ds1` de la TRANSICION (por defecto el preset 1 del pueblo, archivo 1 =
 #       TownE1.ds1). Sin FASE el binario es la corrida de referencia de DC-002.106/.108.
+#       DC-002.110: ARENA_DS1=encendido pone las rejillas de celdas del `.ds1` en UN bloque del monton de C (medido:
+#       la carga del `.ds1` baja de +422.776 B a +42.232 B de semiespacio, pero el monton de C no tiene los 186.960 B
+#       en el pico de componer y la corrida muere con `gc_external_alloc: OOM`); apagado -- el default de knobs.go --
+#       es el camino de DC-002.109, donde VOLVER muere en el semiespacio.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
@@ -186,8 +190,10 @@ pisa_knob() {  # $1 = nombre en knobs.go, $2 = valor nuevo (sin comillas), $3 = 
 [ -n "${TPRESET:-}" ] && pisa_knob transicionPreset "$TPRESET"
 [ -n "${TARCHIVO:-}" ] && pisa_knob transicionArchivo "$TARCHIVO"
 
+[ -n "${ARENA_DS1:-}" ] && pisa_knob arenaDelDS1 "$ARENA_DS1" 1
+
 echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) cacheEnVram=$(leer_knob cacheEnVram) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoEnPedazos=$(leer_knob tramoEnPedazos) pedazoLoDiceElMonton=$(leer_knob pedazoLoDiceElMonton) tramoAlArranque=$(leer_knob tramoAlArranque)"
-echo "   cicloDeFases='$(leer_knob cicloDeFases)' ordenDeLasFases=$(leer_knob ordenDeLasFases) transicion=$(leer_knob transicionPreset)/$(leer_knob transicionArchivo)"
+echo "   cicloDeFases='$(leer_knob cicloDeFases)' ordenDeLasFases=$(leer_knob ordenDeLasFases) transicion=$(leer_knob transicionPreset)/$(leer_knob transicionArchivo) arenaDelDS1=$(leer_knob arenaDelDS1)"
 
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 

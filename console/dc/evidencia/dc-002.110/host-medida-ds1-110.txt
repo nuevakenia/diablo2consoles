@@ -1,0 +1,18 @@
+sizeof(d2ds1.Tile) = 24 B
+
+======================== /data/global/tiles/act1/town/TownN1.ds1
+  archivo crudo = 57652 B
+  57x41 = 2337 celdas; capas: walls=2 floors=1 shadows=1 subs=0 -> 4
+  celdas x 24 B x capas = 224352 B
+  objetos = 41  archivos = 8  grupos de sustitucion = 0
+  monton de Go despues de parsear y recolectar = + 166880 B
+  monton de Go despues de soltarlo y recolectar = -70232 B (la diferencia es lo que vuelve)
+
+======================== /data/global/tiles/act1/town/TownE1.ds1
+  archivo crudo = 57691 B
+  57x41 = 2337 celdas; capas: walls=2 floors=1 shadows=1 subs=0 -> 4
+  celdas x 24 B x capas = 224352 B
+  objetos = 43  archivos = 9  grupos de sustitucion = 0
+  monton de Go despues de parsear y recolectar = + 171896 B
+  monton de Go despues de soltarlo y recolectar = -65552 B (la diferencia es lo que vuelve)
+

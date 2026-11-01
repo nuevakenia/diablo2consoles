@@ -27,6 +27,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/console/dc/fuenteconsola"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
@@ -244,6 +245,18 @@ func main() {
 	// ============================== 1. EL MOTOR ==============================
 	d2asset.ArrancarComoConsola()
 	d2asset.UsarLiberadorDeExternos(func(p uintptr) { d2cLibre(p) })
+
+	// DC-002.110: las celdas de las capas de un `.ds1` se piden en UN bloque del monton de C (mas de 64 KB: en
+	// libgodc `gc_external_alloc`) y se devuelven con el liberador del shim. Es lo que deja el semiespacio libre
+	// para la vuelta del cambio de nivel (ver knobs.go y d2ds1/arena_110.go).
+	if arenaDelDS1 == "encendido" {
+		d2ds1.ActivarArenaDelDS1()
+		d2ds1.UsarLiberadorDeLaArena(func(p uintptr, bytes int) int { return d2cSoltarBloque(p, bytes) })
+	}
+
+	arena := d2ds1.EstadoDeLaArena()
+	println("MAPA110: ARENA DEL DS1 palanca=", arenaDelDS1, "encendida=", arena.Encendida,
+		"conLiberador=", arena.ConLiberador, "bytesPorCelda=", d2ds1.BytesPorCelda())
 
 	// DC-002.105: las filas de las tablas no son rebanadas (el tablero de un mapa se lee en C) y las tablas del
 	// MPQ se devuelven con el `free` del shim. Los dos liberadores son los del shim, no un `free` suelto desde
