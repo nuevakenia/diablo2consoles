@@ -35,6 +35,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$HERE/env.sh"
+# shellcheck source=palancas-del-build.sh
+. "$HERE/palancas-del-build.sh"   # DC-002.107: las exclusiones del build, por el camino unico
 
 REPO="$(cd "$HERE/../.." && pwd)"
 SRC="$REPO/console/dc/poc/tablas-mapengine"
@@ -83,7 +85,11 @@ mkdir -p "$OUT"
 # tarjetas el MISMO codigo mide 6.859.016 B y las 3 fases salen con crc -1596781041 / -205471136 y pico
 # 9.525.408 B. Dos fuentes de verdad para el mismo numero cuestan una corrida entera: ahora hay una.
 POC_KNOBS="$SRC/knobs.go"
-REF_1ST_READ=6859016     # corrida de referencia DC-002.88/.89; lo verifica scripts/console/checar-palancas-290.sh
+# DC-002.107: la referencia BAJO porque el build ahora aplica la palanca que le faltaba: la exclusion de la
+# tabla de objectLookups (DC-002.42) por el camino unico (`palancas-del-build.sh`). Antes de esta tarjeta,
+# medido hoy y con el mismo arbol: 6.877.096 B (ya 18.080 B arriba del historico 6.859.016 por el codigo que
+# crecio desde DC-002.89). Con la tabla afuera: 5.083.784 B. La diferencia (1.793.312 B) es la tabla.
+REF_1ST_READ=5083784     # referencia NUEVA de DC-002.107 (la de DC-002.88/.89, 6.859.016, llevaba la tabla dentro); lo verifica scripts/console/checar-palancas-290.sh
 PISADAS=()
 
 [ -f "$POC_KNOBS" ] || { echo "falta $POC_KNOBS: no hay de donde leer las palancas" >&2; exit 1; }
@@ -194,11 +200,11 @@ done
 echo "== 1/6 los paquetes del motor que se compilan aca (el arena de tiles, los records y el compositor)"
 # El orden importa: cada paquete se compila contra los .gox que ya estan en el arbol. La lista es
 # PAQUETES_MOTOR (arriba), la misma que lee el chequeo del arbol de .gox.
+aviso_mutante_lookups
 for p in $PAQUETES_MOTOR; do
-    mapfile -t SRC_P < <(ls "$REPO/$p"/*.go | grep -v '_test\.go$' |
-        grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
-        grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$' |
-        grep -vE '/(marca_carga_host)\.go$')
+    # DC-002.107: la lista de fuentes del paquete la da el CAMINO UNICO (`palancas-del-build.sh`). Sin eso,
+    # este build metia en la imagen la tabla de objectLookups (+1.788.960 B) que el motor no lleva.
+    mapfile -t SRC_P < <(fuentes_del_paquete "$REPO" "$p")
     mkdir -p "$(dirname "$BASE_GOX/$PREFIJO/$p.gox")"
     sh-elf-gccgo $GODC_GOFLAGS -I "$BASE_GOX" \
         -fgo-pkgpath="$PREFIJO/$p" \
@@ -223,7 +229,12 @@ if [ "${SALTAR_GEN:-0}" != "1" ]; then
     cp -rs "$BASE_GOX/." "$GEN"/
 fi
 rm -f "$GEN/orden.txt"
-cp "$BASE_GOX/orden.txt" "$GEN/orden.txt"
+# DC-002.107: `orden.txt` se escribe cuando se arma el arbol, asi que su prefijo NO siempre es el del arbol
+# que se esta usando: si el arbol vive en otro lado (medido hoy: $HOME/gox108 con rutas de /tmp/gox-296) las
+# rutas apuntan al original y el enlazador ve los DOS ("multiple definition of ...", el defecto de
+# DC-002.108). El prefijo se DEDUCE del archivo y se reescriben los dos.
+RAIZ_ORDEN="$(sed -n '1{s|/[^/]*$||;p}' "$BASE_GOX/orden.txt")"
+sed -e "s|^$BASE_GOX/|$GEN/|" -e "s|^$RAIZ_ORDEN/|$GEN/|" "$BASE_GOX/orden.txt" > "$GEN/orden.txt"
 for p in $PAQUETES; do
     f="$GEN/$PREFIJO/$p.gox"
     [ -f "$f" ] || { echo "   FALTA $p.gox en el arbol del motor: no se puede enlazar lo que no existe" >&2; exit 1; }
@@ -247,6 +258,19 @@ echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }
+
+# DC-002.107 -- LA GUARDIA: el build NO SALE con la tabla de objectLookups adentro. Lo que se mide no es
+# la bandera que se paso sino el BINARIO que se produjo: un simbolo de datos de mas de 1 MB en un ejecutable
+# de la consola es, hoy, el volcado de la tabla (1.672.892 B, medidos con `sh-elf-nm -S` en DC-002.107).
+if lleva_la_tabla_de_lookups "$OUT/prog.elf"; then
+    echo "   FALLA: $OUT/prog.elf lleva la tabla de objectLookups:" >&2
+    lleva_la_tabla_de_lookups "$OUT/prog.elf" | sed 's/^/      /' >&2
+    echo "   la lista de fuentes del build es scripts/console/palancas-del-build.sh (DC-002.107)" >&2
+    # el binario que salio NO se puede quedar con el nombre que viaja a la imagen: se renombra para que
+    # nadie lo empaquete por error, y queda a la vista como evidencia del build fallado
+    [ -f "$OUT/1ST_READ.BIN" ] && mv -f "$OUT/1ST_READ.BIN" "$OUT/1ST_READ.BIN.CON-LA-TABLA"
+    exit 1
+fi
 
 echo "== 5/6 la imagen con PATCH_D2.MPQ y D2DATA.MPQ en /JUEGO"
 D2DIR="${D2_DIR:-$HOME/.wine-d2/drive_c/Games/Diablo II}"

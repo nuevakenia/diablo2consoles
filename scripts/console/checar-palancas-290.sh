@@ -35,7 +35,11 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 SALIDA="${1:-/tmp/dcbuild/chequeo-290}"
 KNOBS="$REPO/console/dc/poc/tablas-mapengine/knobs.go"
 BUILD="$REPO/scripts/console/build-tablas-282.sh"
-REF_1ST_READ=6859016
+# DC-002.107: la referencia bajo de 6.859.016 a 5.083.784 B porque el build ahora aplica la exclusion de la
+# tabla de objectLookups (DC-002.42) por el camino unico (`palancas-del-build.sh`). Es la MISMA corrida de
+# palancas; lo que sale de la imagen es la tabla, que va en el disco. Medido hoy, con y sin la palanca, sobre
+# el mismo arbol: 6.877.096 -> 5.083.784 B (-1.793.312 B) en scripts/console/checar-palancas-poc-107.sh.
+REF_1ST_READ=5083784
 
 # las ocho palancas de la corrida de referencia (DC-002.88 commit d2b59155 / DC-002.89 commit 258412ca)
 PALANCAS="modoTablas=3 hacerMapa=true conEntidades=false lienzoReferencia=false gcEntreTablas=true gcInhibidoTablas=true pedirArenaPrimero=false tilesDelStamp=true"

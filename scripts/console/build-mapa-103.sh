@@ -25,6 +25,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$HERE/env.sh"
+# shellcheck source=palancas-del-build.sh
+. "$HERE/palancas-del-build.sh"   # DC-002.107: las exclusiones del build, por el camino unico
 
 REPO="$(cd "$HERE/../.." && pwd)"
 SRC="$REPO/console/dc/poc/mapa-103"
@@ -64,24 +66,19 @@ mkdir -p "$OUT"
 BASE_GOX="$BASE_GOX" RECOMPILA="$PAQUETES_MOTOR" "$HERE/revisar-arbol-gox.sh"
 
 echo "== 1/5 los paquetes que se compilan aca (el motor que se dibuja)"
+aviso_mutante_lookups
 if [ "${SALTAR_MOTOR:-0}" = "1" ]; then
     echo "   SALTAR_MOTOR=1: se reusan los .gox del arbol $BASE_GOX (no cambio ningun paquete del motor)"
     PAQUETES_MOTOR=""
 fi
 for p in $PAQUETES_MOTOR; do
-    mapfile -t SRC_P < <(ls "$REPO/$p"/*.go | grep -v '_test\.go$' |
-        grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
-        grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$' |
-        grep -vE '/(marca_carga_host)\.go$' |
-        grep -vE '/(object_lookup_record_data|object_lookups_host)\.go$')
-    # DC-002.103 -- LA EXCLUSION QUE FALTABA (defecto encontrado en esta tarjeta, medido). El build de consola
-    # (`build-motor-all.sh`, DC-002.42) NO compila el VOLCADO de la tabla de objectLookups ni su lado del host:
-    # `object_lookup_record_data.go` es UN simbolo de .data de 1.672.892 B mas 116.048 de sus cadenas =
-    # 1.788.960 B de imagen, y el lugar de esa tabla es el DISCO (`/JUEGO/OBJECTLOOKUPS.PACK`, que el motor lee
-    # por registro). Los builds de los POC de DC-002.101/.102 (de donde sale este script) NO traian esa
-    # exclusion, asi que sus imagenes median 7,03 MB y el monton de C arrancaba 1,79 MB mas abajo que en el
-    # binario del motor. Medido en esta tarjeta con `sh-elf-nm -S` sobre el .gox: `_go..C3075 d 01672892`.
-    # OJO: gccgo NO respeta `//go:build`, la exclusion es por NOMBRE (medido en DC-002.42).
+    # DC-002.107 -- LA EXCLUSION DE LA TABLA DE OBJECTLOOKUPS POR EL CAMINO UNICO. En DC-002.103 esta
+    # exclusion se escribio ACA, copiada de build-motor-all.sh: eso es una segunda fuente de verdad, y es
+    # lo mismo que dejo sin la exclusion a los builds de DC-002.101/.102 (1.788.960 B de imagen de regalo:
+    # `object_lookup_record_data.go` es UN simbolo de .data de 1.672.892 B mas 116.048 B de sus cadenas).
+    # El lugar de la tabla es el DISCO (`/JUEGO/OBJECTLOOKUPS.PACK`, que el motor lee por registro) y la
+    # lista de lo que entra al build la da `palancas-del-build.sh`, no este archivo.
+    mapfile -t SRC_P < <(fuentes_del_paquete "$REPO" "$p")
     mkdir -p "$(dirname "$BASE_GOX/$PREFIJO/$p.gox")"
     sh-elf-gccgo $GODC_GOFLAGS -I "$BASE_GOX" \
         -fgo-pkgpath="$PREFIJO/$p" \
@@ -185,6 +182,19 @@ echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '
 echo "== 4/5 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }
+
+# DC-002.107 -- LA GUARDIA: el build NO SALE con la tabla de objectLookups adentro. Lo que se mide no es
+# la bandera que se paso sino el BINARIO que se produjo: un simbolo de datos de mas de 1 MB en un ejecutable
+# de la consola es, hoy, el volcado de la tabla (1.672.892 B, medidos con `sh-elf-nm -S` en DC-002.107).
+if lleva_la_tabla_de_lookups "$OUT/prog.elf"; then
+    echo "   FALLA: $OUT/prog.elf lleva la tabla de objectLookups:" >&2
+    lleva_la_tabla_de_lookups "$OUT/prog.elf" | sed 's/^/      /' >&2
+    echo "   la lista de fuentes del build es scripts/console/palancas-del-build.sh (DC-002.107)" >&2
+    # el binario que salio NO se puede quedar con el nombre que viaja a la imagen: se renombra para que
+    # nadie lo empaquete por error, y queda a la vista como evidencia del build fallado
+    [ -f "$OUT/1ST_READ.BIN" ] && mv -f "$OUT/1ST_READ.BIN" "$OUT/1ST_READ.BIN.CON-LA-TABLA"
+    exit 1
+fi
 
 echo "== 5/5 la imagen con PATCH_D2.MPQ y D2DATA.MPQ en /JUEGO"
 D2DIR="${D2_DIR:-$HOME/.wine-d2/drive_c/Games/Diablo II}"

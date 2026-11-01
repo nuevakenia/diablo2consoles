@@ -12,6 +12,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$HERE/env.sh"
+# shellcheck source=palancas-del-build.sh
+. "$HERE/palancas-del-build.sh"
 
 REPO="$(cd "$HERE/../.." && pwd)"
 GEN="${1:-${GODC_GOX:-$DC_ROOT/gox}}"
@@ -34,32 +36,19 @@ PENDIENTES="$PAQ"
 for CAPA in $(seq 1 20); do
     FALLARON=""
     for p in $PENDIENTES; do
-        # gccgo NO filtra por sufijo de plataforma como hace el go de verdad: si se le pasan
-        # _darwin.go o _windows.go los intenta compilar (uno importa "C") y el paquete "falla" por un
-        # archivo que no tiene nada que ver con la Dreamcast. Se excluyen a mano.
-        srcs=$(ls "$REPO/$p"/*.go 2>/dev/null | grep -v _test.go |
-            grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
-            grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$')
-        # DC-002.42: el VOLCADO de la tabla de objectLookups y su lado del host (d2core/d2records/
-        # object_lookup_record_data.go: 1.672.892 B de .data + 116.048 de sus cadenas, 1.788.960 de imagen;
-        # y object_lookups_host.go, el registro de la tabla como fuente y el escritor del .pack) NO entran al
-        # binario de la consola. El lugar de la tabla es el DISCO: viaja en /JUEGO/OBJECTLOOKUPS.PACK (la arma
-        # console/dc/gen-lookups-pack desde esa misma tabla) y el motor la lee POR REGISTRO cuando la usa
-        # (d2core/d2records/object_lookups_store.go). gccgo NO respeta //go:build -- medido: un archivo con
-        # //go:build dreamcast se compila igual -- asi que la exclusion es por NOMBRE, aca.
-        # MUTANTE (criterio 3 de la tarjeta): DC_TABLA_LOOKUPS=dentro las vuelve a meter en el binario.
-        # DC-002.43: `marca_carga_host.go` es el otro par mutuamente excluyente del motor (las marcas de
-        # carga: `marca_carga_godc.go` es el de la consola). Se saca por NOMBRE por lo mismo.
-        srcs=$(echo "$srcs" | grep -vE '/(marca_carga_host)\.go$' || true)
-        if [ "${DC_TABLA_LOOKUPS:-fuera}" = "fuera" ]; then
-            srcs=$(echo "$srcs" | grep -vE '/(object_lookup_record_data|object_lookups_host)\.go$' || true)
-        fi
-        [ -n "$srcs" ] || continue
+        # DC-002.107: la lista de fuentes del paquete NO se escribe aca. La da el camino unico
+        # (`palancas-del-build.sh`), que es donde viven las cuatro palancas por NOMBRE: gccgo NO filtra
+        # por sufijo de plataforma (se le pasarian `_darwin.go`/`_windows.go`, uno importa "C", y el
+        # paquete "fallaria" por un archivo que no tiene nada que ver con la Dreamcast), no respeta
+        # `//go:build` (la tabla de objectLookups y `marca_carga_host` se sacan por NOMBRE, DC-002.42/.43)
+        # y con `DC_TABLA_LOOKUPS=dentro` se vuelven a meter (el mutante con el que se mide y se caza).
+        mapfile -t srcs < <(fuentes_del_paquete "$REPO" "$p")
+        [ "${#srcs[@]}" -gt 0 ] || continue
         out="$GEN/$PREFIJO/$p.gox"
         mkdir -p "$(dirname "$out")"
         logp="$LOG/$(echo "$p" | tr / _).log"
         # shellcheck disable=SC2086
-        if sh-elf-gccgo $GODC_GOFLAGS -I "$GEN" -fgo-pkgpath="$PREFIJO/$p" -c $srcs -o "$out" > "$logp" 2>&1; then
+        if sh-elf-gccgo $GODC_GOFLAGS -I "$GEN" -fgo-pkgpath="$PREFIJO/$p" -c "${srcs[@]}" -o "$out" > "$logp" 2>&1; then
             OK=$((OK + 1))
             echo "$out" >> "$GEN/orden-motor.txt"
             rm -f "$logp"

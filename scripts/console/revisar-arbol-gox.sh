@@ -44,9 +44,12 @@ DIRS_MOTOR="d2common d2core d2game d2app d2networking d2script d2thread"
 # gccgo no filtra por sufijo de plataforma (lo hace a mano build-motor-all.sh) y hay dos archivos del
 # host que no entran al binario de la consola: si se miraran, el chequeo lloraria por fuentes que el
 # arbol no tiene por que haber compilado.
-EXCLUIR_MOTOR='(_darwin|_windows|_js|_wasm|_plan9|_freebsd|_netbsd|_openbsd|_linux|_android|_ios|_solaris|_aix)[.]go$'
-EXCLUIR_MOTOR="$EXCLUIR_MOTOR"'|_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)[.]go$'
-EXCLUIR_MOTOR="$EXCLUIR_MOTOR"'|/marca_carga_host[.]go$|/object_lookup_record_data[.]go$|/object_lookups_host[.]go$'
+# DC-002.107: la lista NO se escribe aca. Es la MISMA que usa el que compila (`palancas-del-build.sh`),
+# pedida por el camino unico: cuando esta copiada en dos lados, uno de los dos se queda viejo (medido: el
+# build de los POC de DC-002.101/.102 sin la exclusion de objectLookups, 1.788.960 B de imagen de regalo).
+# shellcheck source=palancas-del-build.sh
+. "$HERE/palancas-del-build.sh"
+EXCLUIR_MOTOR="$(exclusiones_del_build)"
 
 if [ "${GOX_CHEQUEO:-1}" = "0" ]; then
     echo "== arbol de .gox: chequeo saltado (GOX_CHEQUEO=0)"

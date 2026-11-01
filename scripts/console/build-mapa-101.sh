@@ -21,6 +21,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$HERE/env.sh"
+# shellcheck source=palancas-del-build.sh
+. "$HERE/palancas-del-build.sh"   # DC-002.107: las exclusiones del build, por el camino unico
 
 REPO="$(cd "$HERE/../.." && pwd)"
 SRC="$REPO/console/dc/poc/mapa-101"
@@ -59,11 +61,12 @@ mkdir -p "$OUT"
 BASE_GOX="$BASE_GOX" RECOMPILA="$PAQUETES_MOTOR" "$HERE/revisar-arbol-gox.sh"
 
 echo "== 1/5 los paquetes que se compilan aca (el motor que se dibuja)"
+aviso_mutante_lookups
 for p in $PAQUETES_MOTOR; do
-    mapfile -t SRC_P < <(ls "$REPO/$p"/*.go | grep -v '_test\.go$' |
-        grep -vE '_(darwin|windows|js|wasm|plan9|freebsd|netbsd|openbsd|linux|android|ios|solaris|aix)\.go$' |
-        grep -vE '_(386|amd64|arm|arm64|ppc64|ppc64le|mips|mipsle|mips64|mips64le|riscv64|s390x|loong64|wasm)\.go$' |
-        grep -vE '/(marca_carga_host)\.go$')
+    # DC-002.107: la lista de fuentes del paquete la da el CAMINO UNICO (`palancas-del-build.sh`), no una
+    # copia de los `grep -vE` de build-motor-all.sh. Esa copia es la que se quedo sin la exclusion de la
+    # tabla de objectLookups en DC-002.101/.102 y le puso 1.788.960 B de regalo a cada imagen.
+    mapfile -t SRC_P < <(fuentes_del_paquete "$REPO" "$p")
     mkdir -p "$(dirname "$BASE_GOX/$PREFIJO/$p.gox")"
     sh-elf-gccgo $GODC_GOFLAGS -I "$BASE_GOX" \
         -fgo-pkgpath="$PREFIJO/$p" \
@@ -90,7 +93,13 @@ rm -f "$GEN/orden.txt"
 # SIMBOLICOS a esos mismos archivos: si se copian tal cual y despues se agregan las rutas de `$GEN`, el
 # enlazador ve DOS veces el mismo .gox ("multiple definition of ...", medido en este build). Se reescribe el
 # prefijo para que cada paquete quede UNA vez, apuntando al arbol de enlace.
-sed "s|^$BASE_GOX/|$GEN/|" "$BASE_GOX/orden.txt" > "$GEN/orden.txt"
+# DC-002.107: el prefijo de `orden.txt` NO siempre es el del arbol que se esta usando. `orden.txt` se
+# escribe cuando se arma el arbol, y si despues el arbol se COPIA a otro lado (o vive en $HOME y no en
+# /tmp) las rutas siguen apuntando al original: el enlazador ve los DOS y muere con "multiple definition
+# of ..." (medido hoy con $HOME/gox108, que traia rutas de /tmp/gox-296; y ya medido en DC-002.108). El
+# prefijo se DEDUCE del propio archivo y se reescriben los dos.
+RAIZ_ORDEN="$(sed -n '1{s|/[^/]*$||;p}' "$BASE_GOX/orden.txt")"
+sed -e "s|^$BASE_GOX/|$GEN/|" -e "s|^$RAIZ_ORDEN/|$GEN/|" "$BASE_GOX/orden.txt" > "$GEN/orden.txt"
 for p in $PAQUETES; do
     f="$GEN/$PREFIJO/$p.gox"
     [ -f "$f" ] || { echo "   FALTA $p.gox en el arbol del motor: no se puede enlazar lo que no existe" >&2; exit 1; }
@@ -109,6 +118,19 @@ echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '
 echo "== 4/5 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }
+
+# DC-002.107 -- LA GUARDIA: el build NO SALE con la tabla de objectLookups adentro. Lo que se mide no es
+# la bandera que se paso sino el BINARIO que se produjo: un simbolo de datos de mas de 1 MB en un ejecutable
+# de la consola es, hoy, el volcado de la tabla (1.672.892 B, medidos con `sh-elf-nm -S` en DC-002.107).
+if lleva_la_tabla_de_lookups "$OUT/prog.elf"; then
+    echo "   FALLA: $OUT/prog.elf lleva la tabla de objectLookups:" >&2
+    lleva_la_tabla_de_lookups "$OUT/prog.elf" | sed 's/^/      /' >&2
+    echo "   la lista de fuentes del build es scripts/console/palancas-del-build.sh (DC-002.107)" >&2
+    # el binario que salio NO se puede quedar con el nombre que viaja a la imagen: se renombra para que
+    # nadie lo empaquete por error, y queda a la vista como evidencia del build fallado
+    [ -f "$OUT/1ST_READ.BIN" ] && mv -f "$OUT/1ST_READ.BIN" "$OUT/1ST_READ.BIN.CON-LA-TABLA"
+    exit 1
+fi
 
 echo "== 5/5 la imagen con PATCH_D2.MPQ y D2DATA.MPQ en /JUEGO"
 D2DIR="${D2_DIR:-$HOME/.wine-d2/drive_c/Games/Diablo II}"
