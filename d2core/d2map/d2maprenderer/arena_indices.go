@@ -87,6 +87,16 @@ type TramoDeLaCache struct {
 	// conocer los backends.
 	origen string
 
+	// cero (DC-002.109): como se deja EN CERO un bloque que se REUSA, si el que reserva sabe hacerlo mas
+	// barato que un bucle de Go (la VRAM del PVR se toca sin cache: alli el que la pone en cero es el `memset`
+	// de C, `pvr.VramPonerEnCero`). Nil = bucle de Go, que es lo que corresponde a la PC y al monton.
+	//
+	// HACE FALTA PORQUE EL TRAMO NO SE LIBERA AL CAMBIAR DE NIVEL, SE REUSA (ADR 0001 §1.4): el decodificador
+	// del .dt1 escribe SOLO donde algun bloque del tile pinta, asi que un bloque reusado arrastra los pixeles
+	// del nivel que se fue. Medido en el host con el tramo puesto: el cuadro de VOLVER daba crc32 1533561935
+	// en vez de 1437022778.
+	cero func(bloque []byte)
+
 	// pedazoMenor / pedazoMayor: el rango de tamanos con el que el monton fue sirviendo los bloques, para el
 	// censo (0 = todavia no se pidio ninguno).
 	pedazoMenor int
@@ -532,11 +542,48 @@ func (mr *MapRenderer) pedirDelTramoEnPedazos(n int) []byte {
 	return t.pedazos[mejor][desde : desde+n : desde+n]
 }
 
+// limpiarLosBloquesDelTramo (DC-002.109): deja en cero cada bloque vivo del tramo, por el camino que el que
+// reservo haya puesto (`cero`: el `memset` de la VRAM) o con un bucle de Go (la PC, el monton de C).
+func (mr *MapRenderer) limpiarLosBloquesDelTramo() {
+	t := mr.tramo
+
+	if t == nil {
+		return
+	}
+
+	limpiar := t.cero
+	if limpiar == nil {
+		limpiar = func(bloque []byte) {
+			for i := range bloque {
+				bloque[i] = 0
+			}
+		}
+	}
+
+	if len(t.bytes) > 0 {
+		limpiar(t.bytes)
+
+		return
+	}
+
+	for i := range t.pedazos {
+		limpiar(t.pedazos[i])
+	}
+}
+
 // reiniciarTramo: el nivel cambio, la cache se descarta y el tramo se reusa desde el byte 0. El tramo NO se
 // libera (en la consola el monton externo no se devuelve, ADR 0001 §1.4): se reusa.
 func (mr *MapRenderer) reiniciarTramo() {
 	if mr.tramo == nil {
 		return
+	}
+
+	// DC-002.109: lo que se va a reusar se deja LIMPIO. Los bloques del tramo arrastran los pixeles del nivel
+	// anterior en los lugares que el decodificador no pinta, y el tramo NO se libera al cambiar de nivel (ADR
+	// 0001 §1.4): se reusa desde el byte 0. Se limpia solo si habia algo usado (en la primera vuelta los
+	// bloques ya vienen en cero y limpiarlos seria pagar 2,7 MB por nada).
+	if mr.tramo.usado > 0 {
+		mr.limpiarLosBloquesDelTramo()
 	}
 
 	for i := range mr.tramo.usadoEn {

@@ -21,6 +21,9 @@
 #                       main del POC, los .gox del motor son los mismos de la corrida anterior)
 #       ORDEN=...       pisa la palanca `orden` de knobs.go (contrato|prestamo|tarjeta). Se AVISA EN GRANDE:
 #                       el knobs.go del POC es la unica fuente de verdad (la leccion de DC-002.90)
+#       DC-002.109: FASE=encendido prende el ciclo de las tres fases, ORDEN_FASES=a|b elige el orden, y
+#       TPRESET=/TARCHIVO= el `.ds1` de la TRANSICION (por defecto el preset 1 del pueblo, archivo 1 =
+#       TownE1.ds1). Sin FASE el binario es la corrida de referencia de DC-002.106/.108.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
@@ -175,7 +178,16 @@ pisa_knob() {  # $1 = nombre en knobs.go, $2 = valor nuevo (sin comillas), $3 = 
 [ -n "${TRAMO_ARRANQUE:-}" ] && pisa_knob tramoAlArranque "$TRAMO_ARRANQUE"
 [ -n "${SOLTAR:-}" ] && pisa_knob soltarDespuesDeComponer "$SOLTAR" 1
 
+# DC-002.109: el ciclo de las tres fases y su orden. FASE= ("" | a | b) y ORDEN_FASES= (a | b). El resto de las
+# palancas de la tarjeta (el ds1 de la transicion) se pisan con TPRESET= / TARCHIVO=.
+[ -n "${FASE:-}" ] && pisa_knob cicloDeFases "$FASE" 1
+[ -n "${ORDEN_FASES:-}" ] && pisa_knob ordenDeLasFases "$ORDEN_FASES" 1
+[ -n "${DIAGNOSTICO:-}" ] && { case "$DIAGNOSTICO" in 0) v=false ;; 1) v=true ;; *) v="$DIAGNOSTICO" ;; esac; pisa_knob diagnosticoDeLasImagenes "$v"; }
+[ -n "${TPRESET:-}" ] && pisa_knob transicionPreset "$TPRESET"
+[ -n "${TARCHIVO:-}" ] && pisa_knob transicionArchivo "$TARCHIVO"
+
 echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) cacheEnVram=$(leer_knob cacheEnVram) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoEnPedazos=$(leer_knob tramoEnPedazos) pedazoLoDiceElMonton=$(leer_knob pedazoLoDiceElMonton) tramoAlArranque=$(leer_knob tramoAlArranque)"
+echo "   cicloDeFases='$(leer_knob cicloDeFases)' ordenDeLasFases=$(leer_knob ordenDeLasFases) transicion=$(leer_knob transicionPreset)/$(leer_knob transicionArchivo)"
 
 echo "   $(ls "$SRCB"/*.go | wc -l) archivos .go: $(cd "$SRCB" && ls *.go | tr '\n' ' ')"
 

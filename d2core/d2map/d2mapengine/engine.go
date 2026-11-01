@@ -115,6 +115,37 @@ func (m *MapEngine) ResetMap(levelType d2enum.RegionIdType, width, height int) {
 	}
 }
 
+// SoltarLasCasillasDelNivelAnterior (DC-002.109): tira las casillas del nivel que se esta dejando ANTES de
+// parsear el nivel nuevo.
+//
+// POR QUE, CON EL NUMERO. Cada casilla compuesta guarda tres rebanadas chicas (`Components.Floors/Walls/
+// Shadows`, de decenas de bytes cada una) que en libgodc viven en el SEMIESPACIO del recolector, porque no pasan
+// el corte de 64 KB. En el pueblo son 2337 casillas x 3 = ~280.000 B, y `m.tiles` -- que es un bloque EXTERNO de
+// 616.968 B y por eso el recolector lo recorre como raiz -- las mantiene vivas. `resetMapBase` las limpia, pero
+// lo hace DESPUES de `LoadStamp`, o sea con el `.ds1` nuevo ya parseado: medido en Flycast, la vuelta al pueblo
+// moria en el semiespacio (1.573.032 B vivos + 430.000 del `.ds1` contra 1.835.008) aunque las casillas del
+// nivel de la transicion ya no las usara nadie.
+//
+// Limpiarlas antes de parsear deja ese lugar libre justo cuando se necesita. `resetMapBase` las vuelve a limpiar
+// (no cuesta nada: ya estan en cero) y el nivel nuevo se compone igual.
+func (m *MapEngine) SoltarLasCasillasDelNivelAnterior() {
+	if m == nil {
+		return
+	}
+
+	for i := range m.tiles {
+		m.tiles[i] = MapTile{}
+	}
+
+	// las entidades del nivel (los objetos del `.ds1`) y lo que cuelga de ellas: el mapa de entidades es una
+	// raiz del recolector y `resetMapBase` lo tira recien DESPUES de parsear el nivel nuevo.
+	m.entities = nil
+	m.objBlock = NewObjectCollision()
+	m.population = nil
+	m.warpDest = nil
+	m.startOverride = nil
+}
+
 // ResetMapParaStamp (DC-002.88) es ResetMap para el nivel que se compone desde un stamp: las casillas, las
 // mismas, pero los `.dt1` salen de la lista del `.ds1` del stamp en vez de los 32 campos del level type, y el
 // arena de tiles se reserva con la suma EXACTA de esos archivos.

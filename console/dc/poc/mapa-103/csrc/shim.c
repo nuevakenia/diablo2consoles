@@ -210,3 +210,85 @@ unsigned int d2c_servible(unsigned int tope) {
 
     return 0;
 }
+
+/* ============================== 6) DC-002.109: SOLTAR UN BLOQUE DE LA CACHE ==============================
+ *
+ * POR QUE. Las tres fases (entrar / transicion / volver) piden reabrir las dos fuentes MPQ y recargar las
+ * tablas -- 570.720 B -- y despues COMPONER el nivel nuevo, que son ~3,63 MB de arena de bloques + buffer
+ * prestado. Con el tramo de la cache tomado (2.723.840 B que el recolector no devuelve) el monton de C no
+ * llega. La decision "a" de la tarjeta es soltar la cache del nivel que se deja ANTES de reabrir: estos
+ * bloques son pedazos de un tramo, o sea rebanadas de Go que fueron a `gc_external_alloc` por tamano.
+ *
+ * POR QUE `gc_external_free` Y NO `free` PELADO. El bloque puede estar en la tabla de externos del runtime
+ * (`gc_externos`, la que se barre en cada recoleccion desde DC-002.83). `gc_external_free` lo SACA de la tabla
+ * antes de liberarlo; un `free` suelto deja una entrada con un puntero a memoria devuelta que despues se barre.
+ * `d2c_soltar_tramo` (arriba) existe para los tramos que NO son de Go (las tablas del MPQ, que se piden en C).
+ *
+ * LAS DOS GUARDAS SON LAS MISMAS DE `d2c_soltar_tramo`: si el bloque no paso el umbral del objeto grande o cae
+ * adentro de un semiespacio, su dueno es el recolector y no se toca (se devuelve 0 y el tramo lo reusa).
+ */
+int d2c_soltar_bloque(void *p, unsigned tamano) {
+    if (p == NULL || tamano <= (unsigned)GC_LARGE_OBJECT_THRESHOLD)
+        return 0;
+
+    if (gc_solapa_semiespacio(p, tamano))
+        return 0;
+
+    gc_external_free(p);
+
+    return (int)tamano;
+}
+
+/* ============================== 7) DC-002.109: EL SEMIESPACIO DEL RECOLECTOR ==============================
+ *
+ * POR QUE. La primera corrida del ciclo de las tres fases murio en la TRANSICION con el monton de C sano
+ * (3,58 MB libres) y el log lleno de `ARQ-MARCA gc_collect`: el que se quedo sin lugar fue el SEMIESPACIO del
+ * recolector (1.835.008 B, y a partir del 75 % recolecta en CADA asignacion). `runtime.ReadMemStats` no sirve
+ * en libgodc (`ms.Alloc` = 0, medido en DC-002.9); `gc_stats` si, y da los tres numeros que importan: lo que
+ * ocupa el semiespacio activo, cuanto mide y cuantas recolecciones hubo. Es el instrumento que separa "no hay
+ * memoria" de "no hay memoria DONDE se pide" -- las dos paredes que ya midieron DC-002.101/.103, ahora en el
+ * cambio de nivel.
+ */
+void gc_stats(size_t *used, size_t *total, uint32_t *collections);
+
+unsigned int d2c_gc_usado(void) {
+    size_t usado = 0;
+    uint32_t colecciones = 0;
+
+    gc_stats(&usado, NULL, &colecciones);
+
+    return (unsigned int)usado;
+}
+
+unsigned int d2c_gc_total(void) {
+    size_t total = 0;
+
+    gc_stats(NULL, &total, NULL);
+
+    return (unsigned int)total;
+}
+
+unsigned int d2c_gc_colecciones(void) {
+    uint32_t colecciones = 0;
+
+    gc_stats(NULL, NULL, &colecciones);
+
+    return (unsigned int)colecciones;
+}
+
+/* d2c_gc_percent: el umbral al que el recolector de libgodc salta (el `debug.SetGCPercent` del runtime, que
+ * ya existe en libgodc -- gc_runtime.c: 100 = recolecta cuando el semiespacio esta lleno, 50 = a la mitad,
+ * negativo = solo con runtime.GC()). Devuelve el valor anterior.
+ *
+ * POR QUE HACE FALTA (medido en DC-002.109). El default del runtime en el POC es 100, y el codigo de
+ * `gc_heap.c` lo traduce a "recolecta a partir del 75 % del semiespacio" (1.376.256 de 1.835.008). Un nivel
+ * compuesto deja ~1,17 MB VIVOS en el semiespacio; el `.ds1` del nivel siguiente agrega ~255 KB mientras se
+ * parsea, o sea 1,43 MB: por arriba del 75 %. A partir de ahi el recolector corre en CADA asignacion y no
+ * libera nada (el conjunto vivo no baja del umbral): medido en Flycast, 1.585 recolecciones seguidas y la
+ * composicion sin avanzar. No es que falte memoria -- sobran 400 KB --: es el umbral.
+ */
+int32_t debug_SetGCPercent(int32_t percent) __asm__("debug.SetGCPercent");
+
+int d2c_gc_percent(int nuevo) {
+    return (int)debug_SetGCPercent((int32_t)nuevo);
+}

@@ -1,0 +1,106 @@
+MAPA103: arranca DC-002.103 -- el pueblo en pantalla de punta a punta; orden= prestamo
+MAPA103: cuadros= 3 modoTablas= fuente soltarLecturas= true tramoDeLaCache= 2723840 tramoEnPedazos= 348160 sonda= true tramoAlArranque= false cacheEnVram= false soltarDespuesDeComponer= todo
+MAPA103: MEMORIA al-arrancar usado= 3830024 libre= 248 arena= 3830272 sbrk= -1936748544 techo= -1929445376 pico= 3830024
+MAPA103: VRAM al-arrancar total= 8388608 disponible= 0 pedida= 0 pedidos= 0 pedidoMayor= 0 lienzo= 0
+MAPA103: PVR andando; vram de la textura del cuadro= 1048576
+MAPA103: MEMORIA despues-del-video usado= 3830048 libre= 224 arena= 3830272 sbrk= -1936748544 techo= -1929445376 pico= 3830048
+MAPA103: VRAM despues-del-video total= 8388608 disponible= 4740808 pedida= 0 pedidos= 0 pedidoMayor= 0 lienzo= 0
+MAPA103: PRUEBA VRAM bytes= 348160 malos= 0 primeroMal= -1 leido= 3 esperado= 3
+MAPA103: el tramo de la cache se pide EN PEDAZOS (techo= 2723840 pedazo= 348160 ): no se reserva nada al arranque, se pide en el primer cuadro (DC-002.106)
+MAPA103: MEMORIA despues-del-tramo-de-la-cache usado= 3830048 libre= 224 arena= 3830272 sbrk= -1936748544 techo= -1929445376 pico= 3830048
+MAPA103: tablasPorLaFuente= true liberadorDeExternos= true
+MAPA103: MEMORIA despues-de-arrancar-como-consola usado= 3830048 libre= 224 arena= 3830272 sbrk= -1936748544 techo= -1929445376 pico= 3830048
+MAPA103: assetmanager listo
+MAPA103: MEMORIA despues-del-assetmanager usado= 3830048 libre= 224 arena= 3830272 sbrk= -1936748544 techo= -1929445376 pico= 3830048
+MAPA103: fuente registrada /cd/JUEGO/D2DATA.MPQ
+MAPA103: fuente registrada /cd/JUEGO/PATCH_D2.MPQ
+MAPA103: fuentes en el loader= 2
+MAPA103: MEMORIA despues-de-las-fuentes usado= 4185376 libre= 1248 arena= 4186624 sbrk= -1936392192 techo= -1929445376 pico= 4185376
+MAPA103: TABLA fuente /data/global/excel/LvlTypes.txt bytes= 10719 montonDelta= 0
+MAPA103: TABLA fuente /data/global/excel/LvlPrest.txt bytes= 134937 montonDelta= 459056
+MAPA103: tablas cargadas= 2 de 2
+MAPA103: FUENTE despues-de-las-tablas /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 0 pedidos= 0 liberados= 0 vivos= 0 prestamos= 0 prestamosLib= 0 prestamoReservado= 0
+MAPA103: FUENTE despues-de-las-tablas /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 134937 prestamos= 2 prestamosLib= 1 prestamoReservado= 12560
+MAPA103: MEMORIA despues-de-las-tablas usado= 4644432 libre= 944 arena= 4645376 sbrk= -1935933440 techo= -1929445376 pico= 4644432
+MAPA103: LECTURAS soltadas; tramoAntes= 134937 pedidos= 2 reusos= 0 liberados= 2
+MAPA103: MEMORIA despues-de-soltar-las-lecturas-de-las-tablas usado= 4509488 libre= 135888 arena= 4645376 sbrk= -1935933440 techo= -1929445376 pico= 4644432
+MAPA103: MAPA tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 29477
+MAPA103: ARENA DE BLOQUES usados= true bytes= 2586489 tramos= 5 capacidad= 2621440 scratch= 1008003
+MAPA103: FUENTE despues-de-componer /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 9 pedidos= 0 liberados= 0 vivos= 57652 prestamos= 1 prestamosLib= 0 prestamoReservado= 12416
+MAPA103: FUENTE despues-de-componer /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 0 prestamos= 2 prestamosLib= 2 prestamoReservado= 12560
+MAPA103: MEMORIA despues-de-componer usado= 9001048 libre= 63912 arena= 9064960 sbrk= -1931513856 techo= -1929445376 pico= 9001048
+MAPA103: LECTURAS soltadas despues de componer; tramo= 57652 lecturas= 3 bytes= 203308
+MAPA103: MEMORIA despues-de-soltar-las-lecturas-del-mapa usado= 9001048 libre= 63912 arena= 9064960 sbrk= -1931513856 techo= -1929445376 pico= 9001048
+MAPA103: PRECARGADO lo que el cuadro lee del MPQ /data/global/palette/act1/pal.dat /data/global/palette/act1/pal.pl2 delta= 886368
+MAPA103: MEMORIA antes-de-soltar-las-tablas usado= 9887416 libre= 66376 arena= 9953792 sbrk= -1930625024 techo= -1929445376 pico= 9887416
+MAPA103: TABLAS SOLTADAS tablas= 2 tramos= 1 bytes= 216064 vacias= 0 noSoportadas= 0
+MAPA103: MEMORIA despues-de-soltar-las-tablas usado= 9671344 libre= 282448 arena= 9953792 sbrk= -1930625024 techo= -1929445376 pico= 9887416
+MAPA103: FUENTE SOLTADA /cd/JUEGO/D2DATA.MPQ tablas= 363104 enElMontonDeC= 354656 bytesTablas= 354656 bytesTrabajo= 0 bytes= 354656 cedido= false yaSoltada= false
+MAPA103: FUENTE SOLTADA /cd/JUEGO/PATCH_D2.MPQ tablas= 9072 enElMontonDeC= 0 bytesTablas= 0 bytesTrabajo= 0 bytes= 0 cedido= false yaSoltada= false
+MAPA103: MEMORIA despues-de-soltar-las-fuentes usado= 9316016 libre= 637776 arena= 9953792 sbrk= -1930625024 techo= -1929445376 pico= 9887416
+MAPA103: SOLTADO despues de componer bytes= 570720 libre= 637776 sbrk= -1930625024 techo= -1929445376
+MAPA103: ORDEN prestamo -- se suelta SOLO el buffer prestado de lectura (el arena de bloques queda)
+MAPA103: PRESTAMO DE LECTURA SOLTADO bytes= 1008003
+MAPA103: MEMORIA despues-de-soltar-el-prestamo usado= 8308008 libre= 1645784 arena= 9953792 sbrk= -1930625024 techo= -1929445376 pico= 9887416
+MAPA103: MEMORIA antes-del-renderer usado= 8308008 libre= 1645784 arena= 9953792 sbrk= -1930625024 techo= -1929445376 pico= 9887416
+MAPA103: VRAM antes-del-renderer total= 8388608 disponible= 4740808 pedida= 0 pedidos= 1 pedidoMayor= 348160 lienzo= 0
+MAPA103: TRAMO DE LA CACHE EN PEDAZOS techo= 2723840 pedazo= 348160 pedazoLoDiceElMonton= true
+MAPA103: renderer listo; cuadro= 640 480 cachePerezosa= true cacheEnIndices= true
+MAPA103: TRAMO despues-del-renderer activa= true origen= monton bytes= 0 usado= 0 libre= 0 imagenes= 0 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 0 pedazoMenor= 0 pedazoMayor= 0 techo= 2723840
+MAPA103: MEMORIA despues-del-renderer usado= 8308008 libre= 1645784 arena= 9953792 sbrk= -1930625024 techo= -1929445376 pico= 9887416
+MAPA103: CUADRO 1 ARRANCA libre= 1645784
+MAPA103: VRAM cuadro-antes total= 8388608 disponible= 3511976 pedida= 0 pedidos= 1 pedidoMayor= 348160 lienzo= 1228800
+MAPA103: CUADRO 1 pixelesNoVacios= 307196 de 307200 crc32= 1437022778 crc32RGB= -1787731553 hostPixeles= 307196 hostCrc= 1437022778 ms= 860 cacheSuperficies= 86 cacheBytes= 2723840 cacheEnIndices= true
+MAPA103: TRAMO despues-del-cuadro activa= true origen= monton bytes= 2652160 usado= 2570240 libre= 81920 imagenes= 82 derrames= 4 bytesDerramados= 153600 enPedazos= true pedazos= 9 pedazoMenor= 71680 pedazoMayor= 348160 techo= 2723840
+MAPA103: HUELLA DE LA CACHE fnv= -226402332 imagenes= 86 bytes= 2723840
+MAPA103: VRAM despues-del-cuadro total= 8388608 disponible= 3511976 pedida= 0 pedidos= 1 pedidoMayor= 348160 lienzo= 1228800
+MAPA103: MEMORIA despues-del-cuadro usado= 10960240 libre= 107664 arena= 11067904 sbrk= -1929510912 techo= -1929445376 pico= 10960240
+MAPA103: ARENA DE BLOQUES SOLTADA (despues de la cache) tramos= 5 bytes= 2621440 libre= 2729144
+MAPA103: MEMORIA despues-de-soltar-el-arena usado= 8338760 libre= 2729144 arena= 11067904 sbrk= -1929510912 techo= -1929445376 pico= 10960240
+MAPA109: CICLO DE FASES arranca ordenDeLasFases= a transicion=preset 1 archivo 1 cacheEnVram= false tramoEnPedazos= 348160
+MAPA109: CICLO gcPercent 100 -> 95 SEMIESPACIO total= 1835008
+MAPA103: SEMIESPACIO ciclo-con-el-umbral-puesto usado= 1150776 total= 1835008 pct= 62 colecciones= 97
+MAPA103: MEMORIA ciclo-antes-de-la-transicion usado= 8338760 libre= 2729144 arena= 11067904 sbrk= -1929510912 techo= -1929445376 pico= 10960240
+MAPA103: SEMIESPACIO ciclo-antes-de-la-transicion usado= 1150776 total= 1835008 pct= 62 colecciones= 97
+MAPA103: TRAMO ciclo-antes-de-la-transicion activa= true origen= monton bytes= 2652160 usado= 2570240 libre= 81920 imagenes= 82 derrames= 4 bytesDerramados= 153600 enPedazos= true pedazos= 9 pedazoMenor= 71680 pedazoMayor= 348160 techo= 2723840
+MAPA103: VRAM ciclo-antes-de-la-transicion total= 8388608 disponible= 3511976 pedida= 0 pedidos= 1 pedidoMayor= 348160 lienzo= 1228800
+MAPA109: FASE TRANSICION ARRANCA ds1=preset 1 archivo 1 libre= 2729144 usado= 8338760
+MAPA103: MEMORIA TRANSICION-antes usado= 8338760 libre= 2729144 arena= 11067904 sbrk= -1929510912 techo= -1929445376 pico= 10960240
+MAPA103: TRAMO TRANSICION-antes activa= true origen= monton bytes= 2652160 usado= 2570240 libre= 81920 imagenes= 82 derrames= 4 bytesDerramados= 153600 enPedazos= true pedazos= 9 pedazoMenor= 71680 pedazoMayor= 348160 techo= 2723840
+MAPA103: SEMIESPACIO TRANSICION-antes usado= 1150776 total= 1835008 pct= 62 colecciones= 97
+MAPA109: FASE TRANSICION ORDEN a -- cache del nivel que se deja SOLTADA ANTES de reabrir bytes= 2652160 libre= 4267264
+MAPA103: TRAMO TRANSICION-despues-de-soltar-la-cache activa= true origen= monton bytes= 0 usado= 0 libre= 0 imagenes= 0 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 0 pedazoMenor= 0 pedazoMayor= 0 techo= 2723840
+MAPA103: VRAM TRANSICION-despues-de-soltar-la-cache total= 8388608 disponible= 3511976 pedida= 0 pedidos= 1 pedidoMayor= 348160 lienzo= 1228800
+MAPA103: MEMORIA TRANSICION-despues-de-soltar-la-cache usado= 5686528 libre= 4267264 arena= 9953792 sbrk= -1930625024 techo= -1929445376 pico= 10960240
+MAPA103: fuente registrada /cd/JUEGO/D2DATA.MPQ
+MAPA103: fuente registrada /cd/JUEGO/PATCH_D2.MPQ
+MAPA103: TABLA fuente /data/global/excel/LvlTypes.txt bytes= 10719 montonDelta= 0
+MAPA103: TABLA fuente /data/global/excel/LvlPrest.txt bytes= 134937 montonDelta= 324112
+MAPA103: PRECARGADO lo que el cuadro lee del MPQ /data/global/palette/act1/pal.dat /data/global/palette/act1/pal.pl2 delta= 0
+MAPA109: FASE TRANSICION REABIERTO fuentes= 2 tablas= 2 de 2 montonDelta= 679440
+MAPA103: FUENTE TRANSICION-despues-de-reabrir /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 0 pedidos= 0 liberados= 0 vivos= 0 prestamos= 0 prestamosLib= 0 prestamoReservado= 0
+MAPA103: FUENTE TRANSICION-despues-de-reabrir /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 0 prestamos= 0 prestamosLib= 0 prestamoReservado= 12560
+MAPA103: MEMORIA TRANSICION-despues-de-reabrir usado= 6365968 libre= 3587824 arena= 9953792 sbrk= -1930625024 techo= -1929445376 pico= 10960240
+MAPA103: SEMIESPACIO TRANSICION-antes-de-componer usado= 1172568 total= 1835008 pct= 63 colecciones= 101
+MAPA109: FASE TRANSICION DS1 Act1/Town/TownE1.ds1 ancho= 57 alto= 41
+MAPA103: SEMIESPACIO TRANSICION-despues-de-loadstamp usado= 1595296 total= 1835008 pct= 86 colecciones= 101
+MAPA103: FASE TRANSICION MAPA tiles= 2337 pisos= 2333 paredes= 366 crcGrilla= 1349481406 ms= 31073
+MAPA103: SEMIESPACIO TRANSICION-despues-de-componer usado= 1680480 total= 1835008 pct= 91 colecciones= 163
+MAPA103: FASE TRANSICION ARENA DE BLOQUES usados= true bytes= 3029194 tramos= 6 capacidad= 3145728 scratch= 1008003
+MAPA103: MEMORIA TRANSICION-despues-de-componer usado= 10622576 libre= 379792 arena= 11002368 sbrk= -1929576448 techo= -1929445376 pico= 10960240
+MAPA103: TRAMO TRANSICION-despues-de-colgar activa= true origen= monton bytes= 0 usado= 0 libre= 0 imagenes= 0 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 0 pedazoMenor= 0 pedazoMayor= 0 techo= 2723840
+MAPA103: MEMORIA TRANSICION-despues-de-colgar usado= 10622576 libre= 379792 arena= 11002368 sbrk= -1929576448 techo= -1929445376 pico= 10960240
+MAPA103: SEMIESPACIO TRANSICION-despues-de-colgar usado= 1680560 total= 1835008 pct= 91 colecciones= 163
+MAPA103: PRECARGADO lo que el cuadro lee del MPQ /data/global/palette/act1/pal.dat /data/global/palette/act1/pal.pl2 delta= 0
+MAPA103: MEMORIA antes-de-soltar-las-tablas usado= 10622576 libre= 379792 arena= 11002368 sbrk= -1929576448 techo= -1929445376 pico= 10960240
+MAPA103: TABLAS SOLTADAS tablas= 2 tramos= 1 bytes= 216064 vacias= 0 noSoportadas= 0
+MAPA103: MEMORIA despues-de-soltar-las-tablas usado= 10406504 libre= 595864 arena= 11002368 sbrk= -1929576448 techo= -1929445376 pico= 10960240
+MAPA103: FUENTE SOLTADA /cd/JUEGO/D2DATA.MPQ tablas= 363104 enElMontonDeC= 354656 bytesTablas= 354656 bytesTrabajo= 0 bytes= 354656 cedido= false yaSoltada= false
+MAPA103: FUENTE SOLTADA /cd/JUEGO/PATCH_D2.MPQ tablas= 9072 enElMontonDeC= 0 bytesTablas= 0 bytesTrabajo= 0 bytes= 0 cedido= false yaSoltada= false
+MAPA103: MEMORIA despues-de-soltar-las-fuentes usado= 10051176 libre= 951192 arena= 11002368 sbrk= -1929576448 techo= -1929445376 pico= 10960240
+MAPA103: SOLTADO despues de componer bytes= 570720 libre= 951192 sbrk= -1929576448 techo= -1929445376
+MAPA109: FASE TRANSICION LIENZO limpio (0,0,0,0) antes del cuadro, como el del cuadro 1
+MAPA103: VRAM TRANSICION-antes-del-cuadro total= 8388608 disponible= 3511976 pedida= 0 pedidos= 1 pedidoMayor= 348160 lienzo= 1228800
+MAPA103: MEMORIA TRANSICION-antes-del-cuadro usado= 10051176 libre= 951192 arena= 11002368 sbrk= -1929576448 techo= -1929445376 pico= 10960240
+ARQ-MARCA OOM-throw v=25608
+fatal error: out of memory

@@ -126,4 +126,54 @@ const (
 	// el pueblo, y para eso hay que soltar. Las corridas de .103/.104/.105 se hicieron pisandolo por entorno
 	// (SOLTAR=nada para sus referencias).
 	soltarDespuesDeComponer = "todo"
+
+	// ============================== DC-002.109: LAS TRES FASES ==============================
+	//
+	// cicloDeFases: el ciclo ENTRAR / TRANSICION / VOLVER de una sola corrida (ver `fases_109.go`).
+	//
+	//	apagado     el default. La corrida es EXACTAMENTE la de DC-002.106/.108 (un nivel, tres cuadros):
+	//	            es la referencia con la que se comparan los numeros, y por eso la palanca es aditiva.
+	//	encendido   las tres fases. El ORDEN lo dice `ordenDeLasFases` (abajo), no esta palanca: son dos
+	//	            preguntas distintas ("hay ciclo" y "en que orden") y el log tiene que poder decir cual de
+	//	            las dos se movio.
+	cicloDeFases = "apagado"
+
+	// ordenDeLasFases: cual de los dos ordenes de la tarjeta usa el ciclo ("a" o "b"):
+	//
+	//	a  soltar la cache del nivel que se deja (el tramo, con el liberador de verdad: `pvr.VramSoltar` si los
+	//	   bloques viven en la VRAM / `d2c_soltar_bloque` si salieron del monton de C) ANTES de reabrir las
+	//	   fuentes y recargar las tablas.
+	//	b  no soltar nada: la cache vieja sigue tomada durante la reapertura y la composicion, y el reinicio del
+	//	   tramo pasa recien al colgar el nivel nuevo en el renderer.
+	//
+	// Se pisa por entorno con ORDEN_FASES=. Con `cicloDeFases` apagado no se mira.
+	ordenDeLasFases = "a"
+
+	// diagnosticoDeLasImagenes (DC-002.109, INSTRUMENTO): prende el censo por imagen de la cache (clave y
+	// cuantas variantes devolvio el motor). Es el numero que dice si el nivel pide una variante que su `.dt1` no
+	// trae. Apagado = el log de referencia no cambia.
+	diagnosticoDeLasImagenes = false
+
+	// gcPercentDelCiclo (DC-002.109): el umbral del recolector mientras corre el ciclo de las tres fases
+	// (`debug.SetGCPercent` de libgodc: 100 = recolecta con el semiespacio lleno, o sea al 75 % -- ver
+	// `gc_heap.c`; negativo = solo con runtime.GC()).
+	//
+	// POR QUE, CON EL NUMERO. Un nivel compuesto deja ~1,17 MB vivos en el semiespacio (1.835.008 B) y el
+	// `.ds1` del nivel siguiente agrega ~255 KB mientras se parsea: 1,43 MB, arriba del 75 % (1.376.256). Desde
+	// ahi el recolector corre en CADA asignacion sin liberar nada y la TRANSICION no avanza (medido: 1.585
+	// recolecciones seguidas, cero progreso, con 3,58 MB libres en el monton de C). Con 95 el umbral pasa a
+	// 1,74 MB: el parseo del `.ds1` entra sin una sola recoleccion.
+	//
+	// Se aplica SOLO si el ciclo esta prendido y se devuelve al valor anterior al terminar; la corrida de
+	// referencia (palanca apagada) no lo toca nunca.
+	gcPercentDelCiclo = 95
+
+	// transicionPreset / transicionArchivo: el `.ds1` que compone la fase TRANSICION. El preset 1 del pueblo
+	// (region 1, "Act 1 - Town") trae CUATRO archivos -- TownN1/TownE1/TownS1/TownW1, medido en el host con
+	// `go run ./console/dc/medidas/presets-scratch ~/.wine-d2/drive_c/Games/'Diablo II'` -- asi que el archivo
+	// 1 es un mapa DISTINTO del mismo level type: no cambia la paleta (y el crc32 del cuadro de VOLVER se
+	// puede comparar contra el de ENTRAR sin que el acto meta ruido) pero si las casillas, los .dt1 usados y
+	// la cache de tiles.
+	transicionPreset  = 1
+	transicionArchivo = 1
 )

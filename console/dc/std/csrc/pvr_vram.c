@@ -118,6 +118,24 @@ unsigned int d2c_pvr_vram_pedir_cero(unsigned int bytes) {
     return (unsigned int)(uintptr_t)p;
 }
 
+/* Pone EN CERO un bloque del pool que YA se tiene (pedido con `d2c_pvr_vram_pedir*`).
+ *
+ * POR QUE HACE FALTA (medido en DC-002.109, en el host). El tramo de la cache NO se libera al cambiar de nivel:
+ * se reusa desde el byte 0 (ADR 0001 §1.4). Pero los pixeles de las imagenes de la cache los escribe el
+ * decodificador del .dt1 SOLO donde algun bloque del tile pinta, asi que un bloque REUSADO arrastra los pixeles
+ * del nivel anterior y el cuadro del nivel nuevo sale con la huella del viejo (medido en el host: VOLVER daba
+ * crc32 1533561935 en vez de 1437022778 -- los mismos 307.200 pixeles y distinto contenido). Un bloque reusado
+ * tiene que darse limpio, byte a byte como lo daria un `make([]byte, n)`; esto es el `memset` que lo deja asi
+ * (de a 4 bytes y sin el costo de un bucle de Go sobre VRAM, que se toca sin cache).
+ */
+void d2c_pvr_vram_poner_en_cero(unsigned int bloque, unsigned int bytes) {
+    if (bloque == 0 || bytes == 0) {
+        return;
+    }
+
+    memset((void *)(uintptr_t)bloque, 0, (size_t)bytes);
+}
+
 /* El mayor bloque de hasta `tope` que el pool puede servir AHORA. Es la misma idea que `d2c_servible`
  * (console/dc/poc/mapa-103/csrc/shim.c:5) pero sobre la VRAM: el pool de KOS es un dlmalloc recortado
  * (pvr_mem_core.c) y tambien puede dejar de servir un tamano cuando quedan migas.

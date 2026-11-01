@@ -134,6 +134,11 @@ func memoria(etapa string) {
 		picoMonton = usado
 	}
 
+	// DC-002.109: el pico de la fase que se esta midiendo (el de la corrida entera es `picoMonton`)
+	if usado > picoEnLaFase {
+		picoEnLaFase = usado
+	}
+
 	println("MAPA103: MEMORIA", etapa, "usado=", usado, "libre=", d2cMontonLibre(),
 		"arena=", d2cMontonArena(), "sbrk=", int(d2cSbrkActual()), "techo=", int(d2cMontonTecho()),
 		"pico=", picoMonton)
@@ -263,6 +268,9 @@ func main() {
 		return
 	}
 
+	// DC-002.109: el ciclo de las tres fases reabre las fuentes y las tablas sobre ESTE AssetManager
+	gestorDeAssets = am
+
 	// las dos fuentes se abren UNA sola vez, con la Source de consola (DC-002.102: `AddSource` ademas abre los
 	// dos MPQ DOS VECES y cuesta 355.328 B mas de monton de C).
 	println("MAPA103: assetmanager listo")
@@ -316,24 +324,17 @@ func main() {
 
 	engine := d2mapengine.CreateMapEngine(d2util.LogLevelError, am)
 
-	t0 := d2cMs()
+	// DC-002.109: el ciclo de las tres fases compone los niveles siguientes sobre ESTE motor
+	motorDelMapa = engine
 
-	stamp := engine.LoadStamp(regionPueblo, presetA, archivoA)
-	if stamp == nil {
+	// DC-002.109: la composicion va por `componerNivel` para que el `Stamp` (y con el el `.ds1` parseado, que
+	// vive en el SEMIESPACIO del recolector) NO se quede pegado en la pila de `main`: es el objeto que la
+	// TRANSICION necesita tener libre para parsear el `.ds1` nuevo.
+	if _, _, _, ok := componerNivel(engine, presetA, archivoA, ""); !ok {
 		println("MAPA103: LoadStamp devolvio nil")
 
 		return
 	}
-
-	tamano := stamp.Size()
-
-	engine.ResetMapParaStamp(regionPueblo, tamano.Width, tamano.Height, stamp)
-	engine.PlaceStampClippedWhere(stamp, 0, 0, tamano.Width, tamano.Height, func(int) bool { return false }, false)
-
-	pisos, paredes, crcGrilla := censo(engine)
-
-	println("MAPA103: MAPA tiles=", len(*engine.Tiles()), "pisos=", pisos, "paredes=", paredes,
-		"crcGrilla=", int(crcGrilla), "ms=", int(d2cMs()-t0))
 
 	estado := d2asset.EstadoDeLosTiles()
 	println("MAPA103: ARENA DE BLOQUES usados=", estado.BloquesUsados, "bytes=", estado.BloquesBytes,
@@ -428,6 +429,14 @@ func main() {
 
 	rendererDelMapa = d2maprenderer.CreateMapRenderer(am, renderer, engine, term, d2util.LogLevelError,
 		celdaX, celdaY, opciones...)
+
+	// DC-002.109: el tramo que se REUSA al cambiar de nivel se deja limpio con el `memset` de la VRAM (un bucle
+	// de Go sobre VRAM cuesta mas para lo mismo). Solo tiene sentido si los bloques viven ahi.
+	if tramoDeLaCache > 0 && cacheEnVram && tramoDePixeles == nil {
+		rendererDelMapa.PonerEnCeroLosBloquesDelTramoCon(pvr.VramPonerEnCero)
+	}
+
+	d2maprenderer.DiagnosticoDeLasImagenes = diagnosticoDeLasImagenes
 
 	espacio := rendererDelMapa.TamanoDelCuadro()
 	println("MAPA103: renderer listo; cuadro=", espacio.W, espacio.H,
@@ -664,6 +673,21 @@ func dibujar(superficie d2interface.Surface) error {
 		println("MAPA103: ARENA DE BLOQUES SOLTADA (despues de la cache) tramos=", tramos, "bytes=", bytes,
 			"libre=", d2cMontonLibre())
 		memoria("despues-de-soltar-el-arena")
+	}
+
+	// DC-002.109: el ciclo de las tres fases (ENTRAR / TRANSICION / VOLVER) corre en el cuadro 2, con el arena de
+	// bloques ya soltado (el estado que dejo medido DC-002.106).
+	//
+	// POR QUE EN EL 2 Y NO EN EL 1. El cuadro se PRESENTA cuando `dibujar` vuelve, y el ciclo se lleva ~60 s
+	// (reabrir fuentes, componer, dibujar): colgado del cuadro 1 la pantalla se queda en negro todo el rato
+	// (medido: las capturas de Flycast salian negras). Con el 2, el pueblo queda presentado y el cuadro de la
+	// TRANSICION se presenta al volver de la fase.
+	//
+	// Con la palanca en `apagado` (el default de knobs.go) no se ejecuta una sola linea y la corrida de
+	// referencia de DC-002.106/.108 queda igual.
+	if cuadro == 2 && cicloDeFases != "apagado" {
+		guardarCuadro1(crudo, llenos)
+		cicloDeNiveles(superficie)
 	}
 
 	return nil

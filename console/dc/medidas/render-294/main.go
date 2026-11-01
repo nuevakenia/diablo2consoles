@@ -62,6 +62,15 @@ var tablasDelCompositor = []string{
 // docena y este knob no cambia NADA del camino del cuadro (solo de donde salen sus pixeles).
 var pedazoDelTramo int
 
+// cambioDeNivel (DC-002.109): si no es 0, DESPUES de los cuadros de `-cuadros` el medidor hace el cambio de
+// nivel del POC de la consola sobre el MISMO motor y el MISMO renderer: suelta la cache del nivel que se deja
+// (`SoltarLaCacheDelNivel`, sin liberador: en el host no hay monton externo que devolver), compone el `.ds1`
+// de `-cambio-preset`/`-cambio-archivo`, lo cuelga con `SetMapEngine` y dibuja un cuadro mas. Es la
+// reproduccion en el host del ciclo de las tres fases: si algo del renderer no aguanta un cambio de nivel, se
+// ve aca con la pila de Go completa (en la consola el panic no trae traza: sin frame pointers).
+var cambioDeNivel bool
+var cambioPreset, cambioArchivo int
+
 func main() {
 	dir := flag.String("dir", "", "carpeta con d2data.mpq y patch_d2.mpq (por defecto la instalacion del juego)")
 	preset := flag.Int("preset", 1, "preset del nivel en LvlPrest (1 = Act 1 - Town 1)")
@@ -79,9 +88,15 @@ func main() {
 	histograma := flag.Bool("histograma", false, "censo de tamanos de la cache de indices contra el umbral de 64 KB de libgodc")
 	pedazo := flag.Int("pedazo", 0, "DC-002.106: el MISMO tramo de -tramo pero pedido EN BLOQUES de N B (> 64 KB); "+
 		"0 = de un solo golpe. En la consola el de un golpe no entra -- cada bloque si se sirve de los huecos")
+	cambio := flag.Bool("cambio", false, "DC-002.109: despues de los cuadros, hace el cambio de nivel (soltar la "+
+		"cache + componer -cambio-preset/-cambio-archivo + SetMapEngine) y dibuja un cuadro mas")
+	presetDelCambio := flag.Int("cambio-preset", 1, "DC-002.109: preset del nivel del cambio")
+	archivoDelCambio := flag.Int("cambio-archivo", 1, "DC-002.109: archivo del preset del cambio")
 	flag.Parse()
 
 	pedazoDelTramo = *pedazo
+	cambioDeNivel = *cambio
+	cambioPreset, cambioArchivo = *presetDelCambio, *archivoDelCambio
 
 	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *indices, *tramo,
 		*cuadros, *histograma); err != nil {
@@ -205,6 +220,7 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 	sup := r.NewSurface(ancho, alto)
 
 	var msTotal int64
+	var crcPrimero uint32
 
 	for cuadro := 1; cuadro <= cuadros; cuadro++ {
 		antesDeRender := r.Estadisticas()
@@ -227,6 +243,10 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 		msTotal += ms
 
 		espacio := mr.TamanoDelCuadro()
+		if cuadro == 1 {
+			crcPrimero = crc32.ChecksumIEEE(crudo)
+		}
+
 		fmt.Printf("RENDER294: CUADRO %d tamano=%dx%d pixelesNoVacios=%d de %d crc32=%d crc32RGB=%d ms=%d\n",
 			cuadro, espacio.W, espacio.H, llenos, ancho*alto, crc32.ChecksumIEEE(crudo), crcSoloRGB(crudo), ms)
 		fmt.Printf("RENDER294: CUADRO %d superficiesNuevas=%d bytesNuevos=%d cacheSuperficies=%d cacheBytes=%d\n",
@@ -252,6 +272,12 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 		fmt.Print(listaDeTamanos(mr.TamanosDeLaCache()))
 	}
 
+	if cambioDeNivel {
+		if err := elCambioDeNivel(mr, engine, sup.(*Cuadro), ancho, alto, crcPrimero); err != nil {
+			return err
+		}
+	}
+
 	final, ok := sup.(*Cuadro)
 	if !ok {
 		return fmt.Errorf("la Surface del cuadro no es la de este medidor")
@@ -263,6 +289,83 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 
 	fmt.Println("RENDER294: PNG de referencia =", salida)
 	fmt.Println("RENDER294: FIN")
+
+	return nil
+}
+
+// elCambioDeNivel (DC-002.109): el ciclo del POC de la consola, en el host y con las mismas llamadas que hace
+// `fases_109.go`: soltar la cache del nivel que se deja, componer el `.ds1` nuevo sobre el mismo motor,
+// colgarlo con `SetMapEngine` y dibujar un cuadro con el lienzo limpio. Sin liberador de bloques (`nil`): en
+// este medidor el tramo es un `make` de Go y lo devuelve el recolector.
+//
+// LO QUE MIDE: el crc32 del cuadro del nivel nuevo y el del nivel de vuelta (los dos se imprimen), que es lo
+// que en la consola no se pudo leer porque el panic no trae traza.
+func elCambioDeNivel(mr *d2maprenderer.MapRenderer, engine *d2mapengine.MapEngine, sup *Cuadro,
+	ancho, alto int, crcDelPrimero uint32) error {
+	fmt.Println("RENDER294: ================ 5. EL CAMBIO DE NIVEL (DC-002.109) ================")
+
+	// DC-002.109: el POC de la consola suelta el ARENA DE BLOQUES despues del cuadro 1 (contrato de
+	// DC-002.101: con la cache armada ya nadie mira los tiles crudos). El liberador de aca NO libera nada (en
+	// el host esa memoria la devuelve el recolector), pero el CAMINO se ejecuta igual: `arenaDeBloques = nil`,
+	// cursores en cero, `bloquesUsados = false` y el buffer prestado tirado -- que es lo que deja el estado en
+	// el que el nivel nuevo se tiene que volver a componer ENTERO. Sin esto el medidor no ve el mismo camino
+	// que la consola.
+	d2asset.UsarLiberadorDeExternos(func(uintptr) {})
+
+	tramos, bytesDelArena := d2asset.SoltarArenaDeBloques()
+	fmt.Printf("RENDER294: CAMBIO soltarElArena tramos=%d bytes=%d (liberador no-op: es el CAMINO, no la memoria)\n",
+		tramos, bytesDelArena)
+
+	soltado := mr.SoltarLaCacheDelNivel(nil)
+	e := mr.CensoDelTramo()
+	fmt.Printf("RENDER294: CAMBIO soltarLaCache bytes=%d (pedazos=%d usado=%d) -- sin liberador: los bloques se "+
+		"reusan desde el byte 0\n", soltado, e.Pedazos, e.Usado)
+
+	for _, fase := range []struct {
+		nombre  string
+		preset  int
+		archivo int
+	}{
+		{"TRANSICION", cambioPreset, cambioArchivo},
+		{"VOLVER", 1, 0},
+	} {
+		stamp := engine.LoadStamp(d2enum.RegionAct1Town, fase.preset, fase.archivo)
+		if stamp == nil {
+			return fmt.Errorf("el cambio de nivel: LoadStamp nil (%d/%d)", fase.preset, fase.archivo)
+		}
+
+		tamano := stamp.Size()
+		engine.ResetMapParaStamp(d2enum.RegionAct1Town, tamano.Width, tamano.Height, stamp)
+		engine.PlaceStampClippedWhere(stamp, 0, 0, tamano.Width, tamano.Height, func(int) bool { return false }, false)
+
+		pisos, paredes, crcGrilla := censo(engine)
+		fmt.Printf("RENDER294: CAMBIO %s ds1=%s w=%d h=%d pisos=%d paredes=%d crcGrilla=%d\n", fase.nombre,
+			stamp.RegionPath(), tamano.Width, tamano.Height, pisos, paredes, crcGrilla)
+
+		mr.SetMapEngine(engine)
+
+		// el lienzo limpio: el del cuadro 1 arranco en cero, y el crc32 solo se compara contra la misma
+		// condicion (DC-002.109: la consola borra el suyo con ClearRGBA(0,0,0,0))
+		for i := range sup.Pixeles() {
+			sup.Pixeles()[i] = 0
+		}
+
+		t0 := time.Now()
+		mr.Render(sup)
+		ms := time.Since(t0).Milliseconds()
+
+		cache := mr.EstadoDeLaCache()
+		tramo := mr.CensoDelTramo()
+		fmt.Printf("RENDER294: CAMBIO %s CUADRO pixelesNoVacios=%d de %d crc32=%d crc32RGB=%d ms=%d "+
+			"cacheSuperficies=%d cacheBytes=%d tramoUsado=%d pedazos=%d\n", fase.nombre, sup.PixelesNoVacios(),
+			ancho*alto, crc32.ChecksumIEEE(sup.Pixeles()), crcSoloRGB(sup.Pixeles()), ms, cache.Superficies,
+			cache.Bytes, tramo.Usado, tramo.Pedazos)
+
+		if fase.nombre == "VOLVER" {
+			fmt.Printf("RENDER294: CAMBIO VOLVER contra ENTRAR: crc32 %d contra %d (igual=%v)\n",
+				crc32.ChecksumIEEE(sup.Pixeles()), crcDelPrimero, crc32.ChecksumIEEE(sup.Pixeles()) == crcDelPrimero)
+		}
+	}
 
 	return nil
 }

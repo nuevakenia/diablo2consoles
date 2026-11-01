@@ -109,6 +109,8 @@ func (mr *MapRenderer) generateTileCache() {
 func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 	tileOptions := mr.mapEngine.GetTiles(int(tile.Style), int(tile.Sequence), 0)
 
+	diagImagen("piso", tile, len(tileOptions))
+
 	var tileData []*d2dt1.Tile
 
 	if tileOptions == nil {
@@ -186,6 +188,8 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 	tileOptions := mr.mapEngine.GetTiles(int(tile.Style), int(tile.Sequence), d2enum.TileShadow)
 
+	diagImagen("sombra", tile, len(tileOptions))
+
 	var tileData *d2dt1.Tile
 
 	if tileOptions == nil {
@@ -242,6 +246,8 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 	tileOptions := mr.mapEngine.GetTiles(int(tile.Style), int(tile.Sequence), tile.Type)
 
+	diagImagen("pared", tile, len(tileOptions))
+
 	var tileData *d2dt1.Tile
 
 	if tileOptions == nil {
@@ -257,7 +263,15 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 			int(tile.Style), int(tile.Sequence),
 			d2enum.TileLeftPartOfNorthCornerWall,
 		)
-		newTileData = &newTileOptions[tile.RandomIndex]
+		diagImagen("pared-par-de-la-esquina", tile, len(newTileOptions))
+
+		// DC-002.109: `GetTiles` devuelve nil cuando el `.dt1` del nivel no tiene esa variante, y aca se
+		// indexaba a ciegas: era un "index out of range" esperando al nivel que no la trae (la TRANSICION del
+		// pueblo cambio de nivel y murio en este punto en la consola). Sin la pieza izquierda se arma la pared
+		// con la derecha, que es el mismo camino que toma el renderer cuando `newTileData` sale mas alta.
+		if int(tile.RandomIndex) < len(newTileOptions) {
+			newTileData = &newTileOptions[tile.RandomIndex]
+		}
 	}
 
 	tileMinY := int32(0)
@@ -357,4 +371,20 @@ func (mr *MapRenderer) asegurarImagen(tile *d2ds1.Tile, clase d2enum.TileType) {
 // blankWallKey: la clave de una pared sin grafico (colision sin dibujo).
 func blankWallKey(tile *d2ds1.Tile) uint32 {
 	return uint32(tile.Style)<<24 | uint32(tile.Sequence)<<16 | uint32(tile.Type)<<8 | uint32(tile.RandomIndex)
+}
+
+// DiagnosticoDeLasImagenes (DC-002.109, INSTRUMENTO): prende el censo por imagen de la cache en el log de la
+// consola. Dice, para cada imagen que se arma, la clave (estilo/secuencia/tipo/variante) y CUANTAS variantes
+// devolvio el motor para esa clave: es lo que separa "el nivel pide una variante que su `.dt1` no trae" (un
+// dato del nivel, y el `[variante]` de arriba se sale de rango) de "la imagen se armo y el cuadro murio
+// despues". Apagado por default: sin prenderlo no se imprime una sola linea.
+var DiagnosticoDeLasImagenes bool
+
+func diagImagen(que string, tile *d2ds1.Tile, opciones int) {
+	if !DiagnosticoDeLasImagenes || tile == nil {
+		return
+	}
+
+	println("MAPA103: IMAGEN", que, "estilo=", int(tile.Style), "sec=", int(tile.Sequence),
+		"tipo=", int(tile.Type), "variante=", int(tile.RandomIndex), "opciones=", opciones)
 }

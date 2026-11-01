@@ -50,6 +50,9 @@ func d2cPvrVramSoltar(bloque uint)
 //extern d2c_pvr_vram_servible
 func d2cPvrVramServible(tope uint) uint
 
+//extern d2c_pvr_vram_poner_en_cero
+func d2cPvrVramPonerEnCero(bloque uint, bytes uint)
+
 // VramDisponible: los bytes que el pool de texturas del PVR puede repartir en este momento (0 si el PVR
 // todavia no arranco, que es la verdad antes de `pvr_init_defaults`).
 func VramDisponible() int { return d2cPvrVramDisponible() }
@@ -115,6 +118,20 @@ func VramSoltar(b []byte) int {
 	vramPedida -= n
 
 	return n
+}
+
+// VramPonerEnCero: deja EN CERO un bloque vivo del pool, sin liberarlo. Es el `memset` de C (escribe de a 4
+// bytes y sin cache) para el caso en que un bloque se REUSA en vez de liberarse: el tramo de la cache al
+// cambiar de nivel (DC-002.109). Sin esto el bloque reusado arrastra los pixeles del nivel anterior y el
+// cuadro del nivel nuevo sale distinto -- medido en el host, crc32 1533561935 en vez de 1437022778.
+func VramPonerEnCero(b []byte) int {
+	if len(b) == 0 {
+		return 0
+	}
+
+	d2cPvrVramPonerEnCero(uint(uintptr(unsafe.Pointer(&b[0]))), uint(len(b)))
+
+	return len(b)
 }
 
 // los contadores: lo que esta tarjeta le tomo a la VRAM, para poder decirlo en la evidencia.

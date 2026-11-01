@@ -1,0 +1,40 @@
+RENDER294: patch_d2.mpq = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/patch_D2.mpq
+RENDER294: d2data.mpq  = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2data.mpq
+RENDER294: ================ 1. LAS TABLAS ================
+RENDER294: TABLA /data/global/excel/LvlTypes.txt                            OK (types=36 presets=0)
+RENDER294: TABLA /data/global/excel/LvlPrest.txt                            OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlWarp.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/AutoMap.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/Levels.txt                              OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlMaze.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlSub.txt                              OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/objtype.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/Objects.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monpreset.txt                           OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monstats.txt                            OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monstats2.txt                           OK (types=36 presets=1091)
+RENDER294: ================ 2. EL PUEBLO POR EL MOTOR ================
+RENDER294: LoadStamp OK ds1 w=57 h=41 dt1sDelDS1=8
+RENDER294: MAPA tiles=2337 pisos=2337 paredes=338 crcGrilla=2698186255 ms=33
+RENDER294: ================ 3. EL RENDERER DEL MAPA Y SU CACHE ================
+RENDER294: cache PEREZOSA (la de la consola: las imagenes se arman al dibujar)
+RENDER294: cache en INDICES (DC-002.101: 1 B por pixel en vez de 4)
+RENDER294: cache en TRAMO EN PEDAZOS techo=2723840 B pedazo=348160 B (DC-002.106: cada bloque se sirve de los huecos del monton de C)
+RENDER294: CACHE superficies=0 bytesRGBA=0 (0.00 MB) picoPorSuperficie=0x0
+RENDER294: CACHE101 enIndices=true superficies=0 bytes=0 (0.00 MB) pixeles=0
+RENDER294: ================ 4. EL CUADRO ================
+RENDER294: CUADRO 1 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 crc32RGB=2507235743 ms=14
+RENDER294: CUADRO 1 superficiesNuevas=0 bytesNuevos=0 cacheSuperficies=1 cacheBytes=1228800
+RENDER294: CUADRO 1 cache101 nuevas=86 bytesNuevos=2723840 cacheSuperficies=86 cacheBytes=2723840 (2.60 MB)
+RENDER294: CUADRO total ms=14 (promedio 14.0)
+RENDER294: TRAMO104 activa=true bytes=2723840 usado=2652160 libre=71680 imagenes=84 derrames=2 bytesDerramados=71680 enPedazos=true pedazos=8 techo=2723840
+RENDER294: ================ 5. EL CAMBIO DE NIVEL (DC-002.109) ================
+RENDER294: CAMBIO soltarElArena tramos=0 bytes=1008003 (liberador no-op: es el CAMINO, no la memoria)
+RENDER294: CAMBIO soltarLaCache bytes=0 (pedazos=8 usado=0) -- sin liberador: los bloques se reusan desde el byte 0
+RENDER294: CAMBIO TRANSICION ds1=Act1/Town/TownE1.ds1 w=57 h=41 pisos=2333 paredes=366 crcGrilla=1349481406
+RENDER294: CAMBIO TRANSICION CUADRO pixelesNoVacios=307200 de 307200 crc32=584380401 crc32RGB=4078011717 ms=10 cacheSuperficies=85 cacheBytes=1950720 tramoUsado=1950720 pedazos=8
+RENDER294: CAMBIO VOLVER ds1=Act1/Town/TownN1.ds1 w=57 h=41 pisos=2337 paredes=338 crcGrilla=2698186255
+RENDER294: CAMBIO VOLVER CUADRO pixelesNoVacios=307196 de 307200 crc32=1437022778 crc32RGB=2507235743 ms=14 cacheSuperficies=86 cacheBytes=2723840 tramoUsado=2672640 pedazos=8
+RENDER294: CAMBIO VOLVER contra ENTRAR: crc32 1437022778 contra 1437022778 (igual=true)
+RENDER294: PNG de referencia = /tmp/cuadro-cambio-109.png
+RENDER294: FIN
