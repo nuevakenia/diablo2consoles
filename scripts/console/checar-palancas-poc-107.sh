@@ -24,6 +24,17 @@
 #       BASE_GOX=...    arbol de .gox para esos builds (por defecto $HOME/gox108; /tmp puede estar lleno)
 #       DIRS="a b c"    en vez de construir, verifica estos directorios de build (los cinco por defecto)
 #       MUTANTE=1       se salta 1/5 y 5/5 y corre solo el control del mutante (2/5 y 4/5)
+#
+# LO QUE MIDIO EN DC-002.107 (1ST_READ.BIN de cada POC: con la tabla adentro -> por el camino unico):
+#   mapa-101    7.052.520 -> 5.259.240 B   sha256 fe1efdbc1a9bd1d5...   -1.793.280
+#   mapa-102    7.069.896 -> 5.276.456 B   sha256 7aa7481b84077cbc...   -1.793.440
+#   mapa-103    7.078.984 -> 5.285.672 B   sha256 adcbb79acb8f55d7...   -1.793.312
+#   mapa-294    7.050.760 -> 5.257.512 B   sha256 a997ddafb4a82a2e...   -1.793.248
+#   tablas-282  6.877.096 -> 5.083.784 B   sha256 3edaf6d5d5dcc2d6...   -1.793.312
+# El "antes" NO es un numero copiado: es el build de hoy con `DC_TABLA_LOOKUPS=dentro`, y los cuatro de
+# mapa-101/102/294 y tablas-282 salen con el MISMO sha256 que los builds viejos de DC-002.103. La tabla de
+# evidencia (logs, los .CON-LA-TABLA, el mutante POC por POC) esta en
+# console/dc/evidencia/dc-002.107-las-palancas-de-los-poc.txt.
 # sale: 0 = todo en verde; 1 = alguna prueba en rojo; 3 = no se pudo correr
 set -o pipefail
 

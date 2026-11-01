@@ -1,0 +1,173 @@
+DC-002.107 -- LOS BUILDS DE POC SIN LA EXCLUSION DE LOOKUPS: 1.788.960 B DE REGALO
+==================================================================================
+
+Criterio de la tarjeta: (1) ningun build de POC sale sin las palancas del build del motor (la
+exclusion de la tabla de objectLookups entre ellas), (2) hay un chequeo que lo caza, y (3) los
+tamanos y sha256 de cada POC quedan escritos.
+
+RESULTADO, en tres lineas:
+
+  1. LAS PALANCAS EN UN SOLO LUGAR. `scripts/console/palancas-del-build.sh` es LA fuente de verdad
+     de las cuatro exclusiones por NOMBRE (plataforma, arquitectura, marca de carga del host y la
+     tabla de objectLookups). Los siete scripts que compilan Go para la consola la PIDEN: los dos
+     del motor (`build-motor-all.sh`, `revisar-arbol-gox.sh`) y los cinco de POC
+     (`build-mapa-101/102/103/294.sh`, `build-tablas-282.sh`). Ninguno escribe ya su lista.
+
+  2. HAY CHEQUEO, Y MUERDE. `scripts/console/checar-palancas-poc-107.sh`: 40 en verde, 0 en rojo,
+     exit 0. Y cada uno de los cinco scripts de POC lleva una GUARDIA adentro: si el `prog.elf`
+     que salio tiene un simbolo de datos de 1 MB o mas (el volcado de la tabla), el build FALLA,
+     renombra la imagen a `1ST_READ.BIN.CON-LA-TABLA` y sale 1. Probado con el mutante
+     `DC_TABLA_LOOKUPS=dentro` en los cinco: exit 1 en los cinco.
+
+  3. LOS NUMEROS (1ST_READ.BIN, medido, antes y despues):
+
+       POC           antes (tabla adentro)              despues (camino unico)            delta
+       mapa-101      7.052.520 B  a2a6389881ff4a0f...   5.259.240 B  fe1efdbc1a9bd1d5...  -1.793.280
+       mapa-102      7.069.896 B  b00ddc75450a5aaf...   5.276.456 B  7aa7481b84077cbc...  -1.793.440
+       mapa-103      7.078.984 B  1a711ca065d9a697...   5.285.672 B  adcbb79acb8f55d7...  -1.793.312
+       mapa-294      7.050.760 B  d60ba8705831d71a...   5.257.512 B  a997ddafb4a82a2e...  -1.793.248
+       tablas-282    6.877.096 B  dac70a92866e4a35...   5.083.784 B  3edaf6d5d5dcc2d6...  -1.793.312
+
+     El "antes" es el build de HOY con la palanca puesta (`DC_TABLA_LOOKUPS=dentro`, es decir el
+     defecto reproducido), no un numero de otra tarjeta: los cuatro binarios de mapa-101/102/294 y
+     tablas-282 salen con el MISMO sha256 que los builds viejos que midio DC-002.103 -- el defecto
+     queda reproducido al byte. El caso de mapa-103 es aparte: su script YA traia la exclusion
+     copiada (se la escribio DC-002.103), asi que su build viejo medía 5.285.672 B; el mutante de
+     hoy, con el mismo codigo, da 7.078.984 B. Lo que se arregla en 103 no es el numero sino la
+     COPIA (ahora pide la lista al camino unico).
+
+
+1. QUE SE SACO DE CADA SCRIPT (la segunda fuente de verdad)
+-----------------------------------------------------------
+  Antes, cada script tenia los `grep -vE` escritos a mano. Copias que habia:
+
+    build-motor-all.sh      las cuatro palancas (era la "buena", la de DC-002.42/.43)
+    revisar-arbol-gox.sh    las cuatro, para no llorar por .go que no van al build
+    build-mapa-101.sh       3 de 4: LE FALTABA la tabla de objectLookups  <-- el defecto
+    build-mapa-102.sh       3 de 4: LE FALTABA la tabla de objectLookups  <-- el defecto
+    build-mapa-103.sh       las cuatro (copiadas en DC-002.103, despues de medir el defecto)
+    build-mapa-294.sh       3 de 4: LE FALTABA la tabla de objectLookups
+    build-tablas-282.sh     3 de 4: LE FALTABA la tabla de objectLookups
+
+  Lo que cuesta la tabla en la imagen, medido con `sh-elf-nm -S`:
+    `object_lookup_record_data.go` = UN simbolo de .data de 1.672.892 B (`_go..C3075`, tipo `d`)
+    + 116.048 B de sus cadenas = 1.788.960 B de imagen. En el .gox de `d2core/d2records`:
+    2.185.576 B sin la tabla  ->  4.663.692 B con ella.
+
+  Ahora el que compila no arma la lista: la pide.
+    mapfile -t SRC_P < <(fuentes_del_paquete "$REPO" "$p")
+    sh-elf-gccgo $GODC_GOFLAGS -I "$BASE_GOX" -fgo-pkgpath="$PREFIJO/$p" -c "${SRC_P[@]}" -o "$out"
+
+  API de `palancas-del-build.sh`:
+    fuentes_del_paquete <repo> <paquete>    las fuentes del build, con las cuatro palancas
+    exclusiones_del_build                   el regex completo (lo usa revisar-arbol-gox.sh)
+    lookups_fuera_de_la_imagen              true si la tabla va fuera (lo normal)
+    lleva_la_tabla_de_lookups <elf|gox>     0 si el binario lleva el volcado (lo que NO queremos)
+    palancas_del_build                      la linea que el build deja en su log
+    aviso_mutante_lookups                   el recuadro en grande cuando se corre el mutante
+
+
+2. LA GUARDIA DENTRO DE CADA BUILD (no solo el chequeo de afuera)
+-----------------------------------------------------------------
+  El chequeo que corre despues sirve si alguien lo corre. Para que no dependa de eso, cada uno de
+  los cinco scripts de POC mide el BINARIO que produjo, no la bandera que paso:
+
+    if lleva_la_tabla_de_lookups "$OUT/prog.elf"; then
+        echo "   FALLA: $OUT/prog.elf lleva la tabla de objectLookups:" >&2
+        ...
+        [ -f "$OUT/1ST_READ.BIN" ] && mv -f "$OUT/1ST_READ.BIN" "$OUT/1ST_READ.BIN.CON-LA-TABLA"
+        exit 1
+    fi
+
+  Medido, con `DC_TABLA_LOOKUPS=dentro` (el mutante) y un arbol de .gox aparte
+  (`/tmp/gox108-mut107`, para no dejar el arbol compartido con la tabla adentro):
+
+    mapa-101   exit 1   1ST_READ.BIN.CON-LA-TABLA   7.052.520 B
+    mapa-102   exit 1   1ST_READ.BIN.CON-LA-TABLA   7.069.896 B
+    mapa-103   exit 1   1ST_READ.BIN.CON-LA-TABLA   7.078.984 B
+    mapa-294   exit 1   1ST_READ.BIN.CON-LA-TABLA   7.050.760 B
+    tablas-282 exit 1   1ST_READ.BIN.CON-LA-TABLA   6.877.096 B
+
+    y en el log de cada uno:  FALLA: .../prog.elf lleva la tabla de objectLookups:
+                              8c50.... 001986bc d _go..C3075
+
+  El renombre es a proposito: el binario gordo NO se queda con el nombre que viaja a la imagen.
+
+
+3. LO QUE MIDIO EL CHEQUEO (scripts/console/checar-palancas-poc-107.sh)
+-----------------------------------------------------------------------
+  $ CONSTRUIR=1 bash scripts/console/checar-palancas-poc-107.sh $HOME/dcbuild107/chequeo
+  == resumen: 40 en verde, 0 en rojo   (exit 0)
+
+  1/5 LAS PALANCAS EN UN SOLO LUGAR ................................................ 22 OK
+      los siete scripts piden la lista al camino unico, la usan, y NINGUNO tiene una copia
+      (el chequeo lee las lineas EJECUTABLES, no los comentarios: `copias_de_la_lista`).
+      `palancas-del-build.sh` declara las cuatro palancas.
+
+  2/5 EL CAMINO UNICO DEJA LA TABLA AFUERA, Y EL MUTANTE LA METE .................... 4 OK
+      compila `d2core/d2records` de las dos maneras y mira el BINARIO:
+        fuera:  2.185.576 B, 175 fuentes, ningun simbolo de datos de 1 MB o mas
+        dentro: 4.663.692 B, 177 fuentes, simbolo de 1.672.892 B (`_go..C3075`)
+        engorda 2.478.116 B y el simbolo mide exactamente lo de la referencia.
+
+  3/5 CADA POC CONSTRUIDO: EL BINARIO NO LLEVA LA TABLA ..................... 5 x 2 OK
+      los cinco, con su script y el arbol /home/dgalli/gox108:
+        mapa-101    1ST_READ.BIN = 5259240 B  sha256 fe1efdbc1a9bd1d5...  .data+.bss 260792 B
+        mapa-102    1ST_READ.BIN = 5276456 B  sha256 7aa7481b84077cbc...  .data+.bss 260856 B
+        mapa-103    1ST_READ.BIN = 5285672 B  sha256 adcbb79acb8f55d7...  .data+.bss 260952 B
+        mapa-294    1ST_READ.BIN = 5257512 B  sha256 a997ddafb4a82a2e...  .data+.bss 260792 B
+        tablas-282  1ST_READ.BIN = 5083784 B  sha256 3edaf6d5d5dcc2d6...  .data+.bss 254296 B
+      (los tres criterios del verificador: ningun simbolo de datos >= 1 MB; .data+.bss < 1 MB;
+      1ST_READ.BIN < 6 MB. Los topes estan escritos UNA vez, en el tope del script.)
+
+  4/5 LA PRUEBA EN CONTRA: EL MUTANTE PONE EL CHEQUEO EN ROJO ...................... 1 OK
+      el MISMO verificador de 3/5, aplicado a un binario con la tabla adentro, tiene que decir que
+      NO. Si dijera que si, el chequeo no caza nada.
+
+  5/5 LOS CINCO DE PUNTA A PUNTA CON SU SCRIPT (CONSTRUIR=1) ....................... 10 OK
+      cada build termina y su binario pasa el verificador (los cinco de 3/5, con su log).
+
+  Los numeros completos de cada build (prog.elf, 1ST_READ.BIN, disc.iso, .text, data+bss) quedaron
+  en `$HOME/dcbuild107/chequeo/build-<poc>.log`.
+
+
+4. LO QUE SE TOCA DE PASO (y por que)
+-------------------------------------
+  - `checar-palancas-290.sh`: la referencia del POC de las tablas baja de 6.859.016 a 5.083.784 B
+    (la de DC-002.88/.89 llevaba la tabla DENTRO). Es la misma corrida de palancas; lo que sale de
+    la imagen es la tabla, que viaja en el disco (`/JUEGO/OBJECTLOOKUPS.PACK`).
+  - `build-tablas-282.sh`: `REF_1ST_READ` = 5.083.784 B por lo mismo.
+  - `revisar-arbol-gox.sh`: la lista de exclusiones que usa para comparar fechas ahora la pide al
+    camino unico (`exclusiones_del_build`); si no, el que mira fechas y el que compila pueden
+    discrepar (es exactamente el defecto de esta tarjeta, un escalon mas arriba).
+
+  Y los dos chequeos de al lado, corridos DESPUES del cambio (con $HOME/gox108), siguen verdes:
+    $ BASE_GOX=$HOME/gox108 bash scripts/console/checar-palancas-290.sh /tmp/chequeo-290b
+      == resumen: 24 en verde, 0 en rojo  (exit 0)
+      build sin variables -> 1ST_READ.BIN = 5.083.784 B, sha256 3edaf6d5d5dcc2d6... (la referencia
+      nueva), .text 2.238.512 B, .rodata 2.793.596 B
+    (este tarjeta: 40 en verde, 0 en rojo)
+
+
+5. COMO SE REPRODUCE
+--------------------
+  # el arbol de .gox (una vez)
+  bash scripts/console/build-std-gox.sh $HOME/gox108
+  bash scripts/console/build-motor-all.sh $HOME/gox108 /tmp/log-108
+
+  # el chequeo completo: 1/5..4/5 sin construir (30 s) y 5/5 construyendo los cinco (~2,5 min)
+  BASE_GOX=$HOME/gox108 bash scripts/console/checar-palancas-poc-107.sh /tmp/chequeo107
+  CONSTRUIR=1 BASE_GOX=$HOME/gox108 bash scripts/console/checar-palancas-poc-107.sh /tmp/chequeo107
+
+  # verificar directorios ya construidos en vez de construir
+  DIRS="/tmp/dcbuild/mapa101 /tmp/dcbuild/mapa103" bash scripts/console/checar-palancas-poc-107.sh
+
+  # el defecto, reproducido a proposito (el build TIENE que fallar)
+  DC_TABLA_LOOKUPS=dentro bash scripts/console/build-mapa-101.sh /tmp/guardia101 ; echo "exit $?"
+
+
+6. LO QUE NO ENTRA
+-------------------
+  No se toco el motor ni los POC: es el build. Ningun `.go` del motor ni de los POC cambia de
+  comportamiento por esta tarjeta (el mutante es una variable de entorno del build, no una palanca
+  del codigo).
