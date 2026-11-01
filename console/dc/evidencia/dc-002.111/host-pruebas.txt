@@ -1,0 +1,25 @@
+== go vet ./d2core/d2asset/ ./d2core/d2map/... ./console/dc/poc/mapa-103/
+
+== go test -count=1 ./d2core/d2asset/ ./d2core/d2map/...
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset	0.012s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2lightmap	0.003s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine	0.661s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity	0.009s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapgen	0.011s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer	0.017s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2objspawn	0.010s
+
+== go test -count=1 -run Scratch|Arena|Tramo|Bloques -v ./d2core/d2asset/
+=== RUN   TestScratchPorArchivoNoSePideEnPreparar
+--- PASS: TestScratchPorArchivoNoSePideEnPreparar (0.00s)
+=== RUN   TestScratchDelNivelSePideEnPreparar
+--- PASS: TestScratchDelNivelSePideEnPreparar (0.00s)
+=== RUN   TestElTramoEsUnoYSeReusa
+--- PASS: TestElTramoEsUnoYSeReusa (0.00s)
+=== RUN   TestSoltarDevuelveElTramoYElCrecimientoLoDevuelveAntes
+--- PASS: TestSoltarDevuelveElTramoYElCrecimientoLoDevuelveAntes (0.00s)
+=== RUN   TestElHandoffNoPasaPorElTramo
+--- PASS: TestElHandoffNoPasaPorElTramo (0.00s)
+=== RUN   TestEnLaPCNoSePideNiUnTramo
+--- PASS: TestEnLaPCNoSePideNiUnTramo (0.00s)
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset	0.008s

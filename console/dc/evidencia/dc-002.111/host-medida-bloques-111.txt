@@ -1,0 +1,21 @@
+BLOQUES: umbral de objeto grande del recolector = 65536 B
+
+ZONA data\global\tiles\ACT1\TOWN\townN1.ds1   celdas 57 x 41  archivos 8
+   data/global/tiles/act1\outdoors\treegroups.dt1 crudo=   505504 bloques=  670 sumaBloques=   489812 maxBloque=   1181 >64KB=0 tiles=21
+   data/global/tiles/act1\outdoors\stonewall.dt1 crudo=   439569 bloques=  707 sumaBloques=   420161 maxBloque=   1153 >64KB=0 tiles=52
+   data/global/tiles/act1\town\floor.dt1    crudo=  1008003 bloques= 3600 sumaBloques=   921903 maxBloque=    317 >64KB=0 tiles=144
+   data/global/tiles/act1\barracks\warp.dt1 crudo=   658158 bloques= 1053 sumaBloques=   629046 maxBloque=   1152 >64KB=0 tiles=81
+   data/global/tiles/act1\outdoors\river.dt1 crudo=   316344 bloques= 1113 sumaBloques=   289488 maxBloque=   1152 >64KB=0 tiles=45
+   data/global/tiles/act1\town\objects.dt1  crudo=   661515 bloques= 1521 sumaBloques=   622083 maxBloque=   1154 >64KB=0 tiles=91
+   data/global/tiles/act1\town\fence.dt1    crudo=   423367 bloques=  622 sumaBloques=   407675 maxBloque=   1153 >64KB=0 tiles=31
+   data/global/tiles/act1\outdoors\objects.dt1 crudo=   338205 bloques= 1001 sumaBloques=   313877 maxBloque=   1153 >64KB=0 tiles=42
+
+ZONA data\global\tiles\ACT1\OUTDOORS\wild1.ds1   celdas 17 x 17  archivos 4
+   data/global/tiles/act1\outdoors\stones.dt1 crudo=   318414 bloques= 1002 sumaBloques=   294162 maxBloque=   1155 >64KB=0 tiles=41
+   data/global/tiles/act1\outdoors\treegroups.dt1 crudo=   505504 bloques=  670 sumaBloques=   489812 maxBloque=   1181 >64KB=0 tiles=21
+   data/global/tiles/act1\outdoors\stonewall.dt1 crudo=   439569 bloques=  707 sumaBloques=   420161 maxBloque=   1153 >64KB=0 tiles=52
+   data/global/tiles/act1\town\floor.dt1    crudo=  1008003 bloques= 3600 sumaBloques=   921903 maxBloque=    317 >64KB=0 tiles=144
+
+RESUMEN: bloques = 16266  bytes copiados = 6220083  bloque mas grande = 1181  bloques > 64 KB = 0
+VEREDICTO: ningun bloque pasa de 64 KB -- la copia de cada bloque queda en el semiespacio del recolector
+HISTOGRAMA (percentiles de longitud de bloque): p50 = 256  p90 = 1016  p99 = 1153  p100 = 1181

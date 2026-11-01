@@ -191,6 +191,11 @@ pisa_knob() {  # $1 = nombre en knobs.go, $2 = valor nuevo (sin comillas), $3 = 
 [ -n "${TARCHIVO:-}" ] && pisa_knob transicionArchivo "$TARCHIVO"
 
 [ -n "${ARENA_DS1:-}" ] && pisa_knob arenaDelDS1 "$ARENA_DS1" 1
+[ -n "${SCRATCH_POR_ARCHIVO:-}" ] && { case "$SCRATCH_POR_ARCHIVO" in 0) v=false ;; 1) v=true ;; *) v="$SCRATCH_POR_ARCHIVO" ;; esac; pisa_knob scratchPorArchivo "$v"; }
+[ -n "${TRAMO_ARENA:-}" ] && { case "$TRAMO_ARENA" in 0) v=false ;; 1) v=true ;; *) v="$TRAMO_ARENA" ;; esac; pisa_knob tramoDelArenaPorElMonton "$v"; }
+[ -n "${TRAMOS_AL_CAMBIAR:-}" ] && { case "$TRAMOS_AL_CAMBIAR" in 0) v=false ;; 1) v=true ;; *) v="$TRAMOS_AL_CAMBIAR" ;; esac; pisa_knob soltarTramosAlCambiarDeNivel "$v"; }
+[ -n "${SALTAR_REAPERTURA:-}" ] && { case "$SALTAR_REAPERTURA" in 0) v=false ;; 1) v=true ;; *) v="$SALTAR_REAPERTURA" ;; esac; pisa_knob saltarLaReapertura "$v"; }
+[ -n "${SOLTAR_EN_EL_CICLO:-}" ] && { case "$SOLTAR_EN_EL_CICLO" in 0) v=false ;; 1) v=true ;; *) v="$SOLTAR_EN_EL_CICLO" ;; esac; pisa_knob soltarEnElCiclo "$v"; }
 
 echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) cacheEnVram=$(leer_knob cacheEnVram) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoEnPedazos=$(leer_knob tramoEnPedazos) pedazoLoDiceElMonton=$(leer_knob pedazoLoDiceElMonton) tramoAlArranque=$(leer_knob tramoAlArranque)"
 echo "   cicloDeFases='$(leer_knob cicloDeFases)' ordenDeLasFases=$(leer_knob ordenDeLasFases) transicion=$(leer_knob transicionPreset)/$(leer_knob transicionArchivo) arenaDelDS1=$(leer_knob arenaDelDS1)"

@@ -127,6 +127,11 @@ var (
 	// tablasCargadas (DC-002.105): las tablas que se cargaron de verdad, por nombre. Es la lista que se le
 	// pasa a `SoltarFilasDeLasTablas` (se suelta lo que se cargo, no "todo lo que haya").
 	tablasCargadas []string
+
+	// tablasYFuentesSoltadas (DC-002.111): si las fuentes MPQ y las tablas se devolvieron al monton despues de
+	// componer. Con `soltarDespuesDeComponer` distinto de "nada" lo estan, y entonces la fase siguiente tiene
+	// que reabrirlas; con "nada" siguen vivas y no hay nada que reabrir (ver `reabrirFuentesYTablas`).
+	tablasYFuentesSoltadas bool
 )
 
 func memoria(etapa string) {
@@ -138,6 +143,17 @@ func memoria(etapa string) {
 	// DC-002.109: el pico de la fase que se esta midiendo (el de la corrida entera es `picoMonton`)
 	if usado > picoEnLaFase {
 		picoEnLaFase = usado
+	}
+
+	// DC-002.111: el pico del monton de C DURANTE la carga de los `.dt1` (la sonda `muestrearElMonton` de
+	// d2asset: el POC no alcanza a muestrear adentro del bucle de `ResetMapParaStamp`). Es el mismo numero
+	// (`mallinfo().uordblks`), asi que se compara y se informa junto.
+	if picoDeLaCarga := d2asset.PicoDelMontonDeC(); picoDeLaCarga > picoMonton {
+		picoMonton = picoDeLaCarga
+
+		if picoDeLaCarga > picoEnLaFase {
+			picoEnLaFase = picoDeLaCarga
+		}
 	}
 
 	println("MAPA103: MEMORIA", etapa, "usado=", usado, "libre=", d2cMontonLibre(),
@@ -258,6 +274,29 @@ func main() {
 	println("MAPA110: ARENA DEL DS1 palanca=", arenaDelDS1, "encendida=", arena.Encendida,
 		"conLiberador=", arena.ConLiberador, "bytesPorCelda=", d2ds1.BytesPorCelda())
 
+	// DC-002.111: el buffer prestado de lectura de los `.dt1`, por archivo (ver knobs.go y
+	// `d2asset/arena_soltar_101.go`). Es lo que saca el `.dt1` mas grande del pico del monton de C.
+	d2asset.UsarScratchPorArchivo(scratchPorArchivo)
+
+	println("MAPA111: SCRATCH DE LECTURA porArchivo=", d2asset.ScratchPorArchivoActivo(),
+		"liberador=", d2asset.HayLiberadorDeExternos())
+
+	// DC-002.111: el tamano de los tramos del arena de bloques lo dice el monton (la misma sonda de DC-002.106
+	// que ya usa la cache) y el pico de lo usado durante la carga se mide adentro de la carga.
+	d2asset.UsarMedidorDelMontonDeC(func() int { return d2cMontonUsado() })
+
+	if tramoDelArenaPorElMonton {
+		d2asset.UsarSondaDelMontonDeC(func(tope int) int { return int(d2cServible(uint(tope))) })
+	}
+
+	println("MAPA111: TRAMO DEL ARENA DE BLOQUES porElMonton=", tramoDelArenaPorElMonton,
+		"sondaInstalada=", d2asset.HaySondaDelMontonDeC())
+
+	// DC-002.111: al tirar un nivel, los tramos del arena de bloques vuelven al monton de C (ver knobs.go).
+	d2asset.UsarSoltarTramosAlReiniciar(soltarTramosAlCambiarDeNivel)
+
+	println("MAPA111: TRAMOS AL CAMBIAR DE NIVEL seDevuelven=", d2asset.SoltarTramosAlReiniciarActivo())
+
 	// DC-002.105: las filas de las tablas no son rebanadas (el tablero de un mapa se lee en C) y las tablas del
 	// MPQ se devuelven con el `free` del shim. Los dos liberadores son los del shim, no un `free` suelto desde
 	// Go (que en el semiespacio del recolector corrompe el monton).
@@ -351,7 +390,11 @@ func main() {
 
 	estado := d2asset.EstadoDeLosTiles()
 	println("MAPA103: ARENA DE BLOQUES usados=", estado.BloquesUsados, "bytes=", estado.BloquesBytes,
-		"tramos=", estado.BloquesTramos, "capacidad=", estado.BloquesCapacidad, "scratch=", estado.Scratch)
+		"tramos=", estado.BloquesTramos, "capacidad=", estado.BloquesCapacidad, "tramoMenor=", estado.TramoMenor,
+		"scratch=", estado.Scratch, "scratchPorArchivo=", estado.ScratchPorArchivo,
+		"scratchSoltados=", estado.ScratchSoltados, "scratchBytes=", estado.ScratchBytes,
+		"picoDelMonton=", estado.PicoDelMonton, "tramosDevueltos=", estado.TramosDevueltos,
+		"tramosBytes=", estado.TramosBytes)
 	instrumentoDeLasFuentes("despues-de-componer")
 	memoria("despues-de-componer")
 
@@ -481,6 +524,25 @@ func soltarLoQueElCuadroNoLee(am *d2asset.AssetManager) int {
 		return 0
 	}
 
+	// DC-002.111: en el CICLO no se sueltan ni las fuentes ni las tablas.
+	//
+	// POR QUE. Soltarlas obliga a la fase siguiente a REABRIRLAS (es lo que media DC-002.109), y cada reapertura
+	// deja una copia mas de sus estructuras de Go en el semiespacio que la recoleccion no puede tirar (el barrido
+	// de pila de libgodc es conservador). Medido con la reapertura puesta: la base de la VUELTA quedaba 409.096 B
+	// arriba de la de la TRANSICION (1.309.520 contra 934.464 B) y la fase pedia 1.824.256 B de 1.835.008 y no
+	// entraba. Sin reapertura la base queda en 1.022.784 B, la fase pide 1.600.984 B (87 %) y entra con el
+	// recolector de DC-002.109 sin tocarle el umbral.
+	//
+	// Lo que se paga en el monton de C son 679.440 B que quedan tomados toda la corrida, y con las palancas de
+	// esta tarjeta (scratch por archivo, tramo por el monton, tramos devueltos al cambiar de nivel) el pico del
+	// ciclo es 10.199.016 B de 10.227.936: entran. Con el ciclo apagado la corrida de referencia no cambia --
+	// sigue soltando todo despues del unico cuadro, como en DC-002.106.
+	if !soltarEnElCiclo && cicloDeFases != "apagado" {
+		println("MAPA111: en el CICLO no se sueltan las fuentes ni las tablas: reabrirlas en cada fase deja " +
+			"copias vivas en el semiespacio y la VUELTA no tiene ese lugar (ver DC-002.111)")
+		return 0
+	}
+
 	total := 0
 
 	if soltarDespuesDeComponer == "fuentes" || soltarDespuesDeComponer == "todo" {
@@ -517,6 +579,11 @@ func soltarLoQueElCuadroNoLee(am *d2asset.AssetManager) int {
 
 	println("MAPA103: SOLTADO despues de componer bytes=", total, "libre=", d2cMontonLibre(),
 		"sbrk=", int(d2cSbrkActual()), "techo=", int(d2cMontonTecho()))
+
+	// DC-002.111: lo que se solto hay que volver a abrirlo en la fase siguiente (y lo que no, no)
+	if total > 0 {
+		tablasYFuentesSoltadas = true
+	}
 
 	return total
 }

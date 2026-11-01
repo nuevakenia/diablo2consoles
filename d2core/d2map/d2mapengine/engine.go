@@ -203,6 +203,15 @@ func (m *MapEngine) ResetMapParaStamp(levelType d2enum.RegionIdType, width, heig
 		// en el sexto tramo (OOM con los 2.586.489 B de bloques ya copiados).
 		m.addDT1(rutas[idx])
 	}
+
+	// DC-002.111: con el ULTIMO `.dt1` del nivel cargado, el buffer prestado de lectura ya no lo mira nadie
+	// (los bloques que el nivel usa estan COPIADOS al arena de bloques y el `.dt1` parseado se quedo con
+	// punteros al arena, no al crudo). Se devuelve al monton de C antes de que el compositor y el arena del
+	// `.ds1` pidan lo suyo. Con la palanca por archivo -- `UsarScratchPorArchivo` -- cada archivo ya devolvio
+	// el suyo, asi que aca no queda nada y devuelve 0. En la PC no hace nada: no hay liberador instalado.
+	if soltados := d2asset.SoltarPrestamoDeLecturaDeTiles(); soltados > 0 {
+		m.Debugf("scratch de lectura soltado con el nivel cargado: %d B", soltados)
+	}
 }
 
 // ReservarArenaParaEstosTiles: deja el arena de crudos dimensionado a la suma exacta de estos `.dt1`

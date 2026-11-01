@@ -212,6 +212,8 @@ func correrFase(superficie d2interface.Surface, nombre string, preset, archivo i
 			"reapertura y la composicion (se reinicia al colgar el nivel nuevo)")
 	}
 
+	semiespacio(nombre + "-despues-de-soltar-la-cache")
+
 	// ============================== REABRIR FUENTES Y TABLAS ==============================
 	if !reabrirFuentesYTablas(nombre) {
 		println("MAPA109: FASE", nombre, "NO se pudieron reabrir las fuentes o las tablas")
@@ -219,6 +221,9 @@ func correrFase(superficie d2interface.Surface, nombre string, preset, archivo i
 		return f
 	}
 
+	// DC-002.111: el censo del semiespacio en cada paso de la fase. La diferencia entre la TRANSICION y la
+	// VUELTA (409.096 B) esta en alguno de estos tramos y no se puede adivinar: se mide.
+	semiespacio(nombre + "-despues-de-reabrir")
 	memoria(nombre + "-despues-de-reabrir")
 
 	// ============================== COMPONER EL NIVEL NUEVO ==============================
@@ -244,7 +249,11 @@ func correrFase(superficie d2interface.Surface, nombre string, preset, archivo i
 
 	estado := d2asset.EstadoDeLosTiles()
 	println("MAPA103: FASE", nombre, "ARENA DE BLOQUES usados=", estado.BloquesUsados, "bytes=", estado.BloquesBytes,
-		"tramos=", estado.BloquesTramos, "capacidad=", estado.BloquesCapacidad, "scratch=", estado.Scratch)
+		"tramos=", estado.BloquesTramos, "capacidad=", estado.BloquesCapacidad, "tramoMenor=", estado.TramoMenor,
+		"scratch=", estado.Scratch, "scratchPorArchivo=", estado.ScratchPorArchivo,
+		"scratchSoltados=", estado.ScratchSoltados, "scratchBytes=", estado.ScratchBytes,
+		"picoDelMonton=", estado.PicoDelMonton, "tramosDevueltos=", estado.TramosDevueltos,
+		"tramosBytes=", estado.TramosBytes)
 	memoria(nombre + "-despues-de-componer")
 
 	// ============================== COLGAR EL NIVEL NUEVO ==============================
@@ -323,6 +332,17 @@ func cuadroDeLaFase(superficie d2interface.Surface, nombre string) (ms int, crc,
 // se registran PRIMERAS en el loader (las muertas devuelven `Exists` = false y el loader las saltea) y se
 // vuelven a cargar las dos tablas del compositor.
 func reabrirFuentesYTablas(nombre string) bool {
+	// DC-002.111: si lo que se reabriria esta VIVO (nadie lo solto), no hay nada que reabrir. Abrir las dos
+	// fuentes otra vez seria pedir dos MPQ mas y dejar los de antes tomados.
+	if saltarLaReapertura && !tablasYFuentesSoltadas {
+		println("MAPA109: FASE", nombre, "Nada que reabrir: las fuentes y las tablas siguen vivas (no se "+
+			"solto nada despues de componer); se sigue con las mismas")
+
+		precargarLoQueElCuadroLee(gestorDeAssets)
+
+		return true
+	}
+
 	usado := d2cMontonUsado()
 
 	fuentesDeConsola = nil
@@ -361,6 +381,10 @@ func reabrirFuentesYTablas(nombre string) bool {
 		"de", tablasQueSeCargan, "montonDelta=", d2cMontonUsado()-usado)
 	instrumentoDeLasFuentes(nombre + "-despues-de-reabrir")
 
+	// DC-002.111: recien abiertas y recargadas -- la fase siguiente no las va a encontrar vivas salvo que
+	// esta misma no las suelte (ver `soltarLoQueElCuadroNoLee`).
+	tablasYFuentesSoltadas = false
+
 	return cargadas == tablasQueSeCargan
 }
 
@@ -393,6 +417,21 @@ func componerNivel(engine *d2mapengine.MapEngine, preset, archivo int, fase stri
 		println("MAPA109: FASE", fase, "DS1", stamp.RegionPath(), "ancho=", tamano.Width, "alto=", tamano.Height,
 			"enArena=", enArena, "bloque=", bloque)
 		semiespacio(fase + "-despues-de-loadstamp")
+	}
+
+	// ============================== EL RECOLECTOR, CON EL MARCO YA REESCRITO (DC-002.111) ==============================
+	// El barrido de pila de libgodc es conservador: el `.ds1` y el `Stamp` del nivel que se deja siguen en el
+	// marco muerto de esta MISMA funcion (la fase anterior) y cuentan como raiz, asi que la recoleccion que
+	// corre en `correrFase` antes de componer no los puede tirar (medido: 409.096 B mas de vivos en la VUELTA
+	// que en la TRANSICION). Aca el marco ya se reescribio con el nivel nuevo: la variable `stamp` es la raiz
+	// de verdad, el `.ds1` vive en el monton de C (DC-002.110) y todavia no se toco un solo `.dt1`, asi que
+	// nada se puede mover bajo los pies de un parser. Es la recoleccion que deja lugar para el nivel nuevo.
+	if recolectarDespuesDeCargarElDs1 {
+		runtime.GC()
+
+		if fase != "" {
+			semiespacio(fase + "-despues-de-recolectar")
+		}
 	}
 
 	engine.ResetMapParaStamp(regionPueblo, tamano.Width, tamano.Height, stamp)

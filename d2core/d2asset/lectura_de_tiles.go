@@ -222,6 +222,9 @@ func PrepararArenaDeBloquesUsados(claves []int64, scratch int) {
 	candadoDeTiles.Lock()
 	defer candadoDeTiles.Unlock()
 
+	// DC-002.111: el pico del monton de C se mide por nivel (ver `muestrearElMonton`)
+	picoDelMontonDeC = 0
+
 	if scratch <= 0 {
 		bloquesUsados = false
 		clavesDelNivel = nil
@@ -232,6 +235,14 @@ func PrepararArenaDeBloquesUsados(claves []int64, scratch int) {
 	bloquesUsados = true
 	clavesDelNivel = claves
 	scratchDelNivel = scratch
+
+	// DC-002.111: con la palanca por archivo NO se pide nada aca. El buffer se pide al leer cada `.dt1` (del
+	// tamano de ESE archivo) y se devuelve en cuanto sus bloques estan copiados al arena; pedirlo del tamano
+	// del archivo mas grande y dejarlo tomado todo el nivel es lo que ponia 1.008.003 B en el pico del monton
+	// de C (medido en DC-002.110).
+	if scratchPorArchivo {
+		return
+	}
 
 	// el buffer prestado NO se tira si ya hay uno del tamano: es la lectura de cada `.dt1` y pedirlo de nuevo
 	// por nivel es mas monton que no vuelve.
@@ -273,7 +284,21 @@ func reservarEnElArenaDeBloques(n int) []byte {
 			tamano = n
 		}
 
+		// DC-002.111: el tamano del tramo lo decide el MONTON (la sonda `d2c_servible`: el mayor bloque de
+		// hasta `tramoDeBloques` que puede servir AHORA). Con 1,4 MB libres pero sin un hueco de 512 KB, el
+		// tramo fijo moria en `gc_external_alloc`; con la sonda sale del tamano que hay. Si la sonda no puede
+		// servir el tamano que el bloque necesita, se pide el fijo de siempre (mismo error que antes, no uno
+		// nuevo). Sin sonda instalada -- la PC -- el camino queda exactamente como en DC-002.101.
+		if sondaDelMontonDeC != nil && tamano > n {
+			if servible := sondaDelMontonDeC(tamano); servible >= n && servible < tamano {
+				tamano = servible
+			}
+		}
+
 		arenaDeBloques = append(arenaDeBloques, make([]byte, tamano))
+
+		// DC-002.111: el pico del monton de C durante la carga se mide aca (es el unico lugar donde ocurre).
+		muestrearElMonton()
 	}
 }
 
@@ -289,9 +314,19 @@ func (am *AssetManager) cargarDT1EnBloquesUsados(filePath string) (*d2dt1.DT1, e
 		scratchDelNivel = tam
 	}
 
-	if len(scratchDeLectura) < scratchDelNivel {
-		scratchDeLectura = make([]byte, scratchDelNivel)
+	// DC-002.111: con la palanca por archivo el buffer es del tamano de ESTE archivo (no del mas grande del
+	// nivel) y se devuelve al final de esta funcion.
+	pedido := scratchDelNivel
+	if scratchPorArchivo {
+		pedido = tam
 	}
+
+	if len(scratchDeLectura) < pedido {
+		scratchDeLectura = make([]byte, pedido)
+	}
+
+	// DC-002.111: el buffer de un archivo grande tambien es un pedido que puede ser el pico
+	muestrearElMonton()
 
 	if prestamoDeTiles == nil {
 		prestamoDeTiles = &d2mpq.Scratch{}
@@ -334,6 +369,14 @@ func (am *AssetManager) cargarDT1EnBloquesUsados(filePath string) (*d2dt1.DT1, e
 
 	dt1.Tiles = dt1.Tiles[:conservados]
 	archivosDeTiles++
+
+	// DC-002.111: los bloques que este nivel usa ya estan COPIADOS al arena de bloques, asi que del crudo no
+	// queda un puntero vivo: el buffer se devuelve ACA, antes de que la carga pida el tramo siguiente. Es lo
+	// que saca el `.dt1` mas grande del pueblo (1.008.003 B) del pico del monton de C y lo que deja su hueco
+	// para los tramos que vienen (ver `arena_soltar_101.go`).
+	if scratchPorArchivo {
+		soltarScratchDeLectura()
+	}
 
 	return dt1, nil
 }
@@ -464,7 +507,25 @@ type EstadoDelArenaDeTiles struct {
 	BloquesBytes     int // lo copiado al arena de bloques
 	BloquesTramos    int // cuantos pedidos se hicieron
 	BloquesCapacidad int // lo pedido al monton en tramos
-	Scratch          int // el buffer prestado para leer cada .dt1
+	Scratch          int // el buffer prestado para leer cada `.dt1` (0 si esta suelto)
+
+	// DC-002.111: el buffer de lectura por archivo -- cuantas veces se devolvio al monton de C y cuantos
+	// bytes. Con la palanca encendida es la prueba de que el buffer no estuvo tomado todo el nivel.
+	ScratchPorArchivo bool
+	ScratchSoltados   int
+	ScratchBytes      int
+
+	// DC-002.111: el pico de lo USADO durante la carga de los `.dt1` del nivel (muestreado en cada pedido
+	// grande, ver `muestrearElMonton`) y el tramo mas chico que se pidio (la prueba de que la sonda del
+	// monton achico alguno en vez de morir con el tamano fijo).
+	PicoDelMonton int
+	TramoMenor    int
+
+	// DC-002.111: los tramos devueltos al tirar un nivel (`soltarTramosAlReiniciar`): cuantas veces y cuantos
+	// bytes. Es lo que devuelve al monton de C los 3 MB del arena de bloques entre una fase y la siguiente.
+	TramosAlReiniciar bool
+	TramosDevueltos   int
+	TramosBytes       int
 }
 
 // EstadoDeLosTiles devuelve el estado del arena (para medir en la consola).
@@ -473,9 +534,14 @@ func EstadoDeLosTiles() EstadoDelArenaDeTiles {
 	defer candadoDeTiles.Unlock()
 
 	capacidadTramos := 0
+	tramoMenor := 0
 
 	for i := range arenaDeBloques {
 		capacidadTramos += len(arenaDeBloques[i])
+
+		if tramoMenor == 0 || len(arenaDeBloques[i]) < tramoMenor {
+			tramoMenor = len(arenaDeBloques[i])
+		}
 	}
 
 	return EstadoDelArenaDeTiles{
@@ -490,6 +556,17 @@ func EstadoDeLosTiles() EstadoDelArenaDeTiles {
 		BloquesTramos:    len(arenaDeBloques),
 		BloquesCapacidad: capacidadTramos,
 		Scratch:          len(scratchDeLectura),
+
+		ScratchPorArchivo: scratchPorArchivo,
+		ScratchSoltados:   scratchSoltados,
+		ScratchBytes:      scratchBytesSoltados,
+
+		PicoDelMonton: picoDelMontonDeC,
+		TramoMenor:    tramoMenor,
+
+		TramosAlReiniciar: soltarTramosAlReiniciar,
+		TramosDevueltos:   tramosDevueltosAlReiniciar,
+		TramosBytes:       tramosBytesDevueltos,
 	}
 }
 
@@ -559,8 +636,23 @@ func (am *AssetManager) reiniciarArenaDeTilesSinCandado() {
 
 	// DC-002.88: el arena de bloques usados se REINICIA con el arena (los punteros de los bloques que el motor
 	// ya copio a `dt1TileData` apuntan ahi, pero el que reinicia es porque tira el nivel, o sea que nadie los
-	// usa mas -- el mismo contrato del arena de DC-002.78). Los TRAMOS NO SE TIRAN: se vuelven a usar desde el
-	// primero, porque el monton de C no baja y pedirlos de nuevo es lo que mataba el segundo nivel.
+	// usa mas -- el mismo contrato del arena de DC-002.78).
+	//
+	// DC-002.111: ademas se pueden DEVOLVER al monton de C. DC-002.88 los dejaba tomados ("se vuelven a usar
+	// desde el primero, porque pedirlos de nuevo mataba el segundo nivel: el monton de C no baja"), y con eso
+	// el tramo se convierte en el bloque mas grande que el monton nunca recupera: 3.145.728 B que en la VUELTA
+	// siguen tomados mientras se carga el nivel nuevo, y son justo los que no dejan un hueco de 1.008.003 B
+	// para el `.dt1` mas grande del pueblo (medido: `used=9.909.584 free=1.170.352` -- 1,17 MB libres en
+	// trozos y el pedido de 1 MB murio con el `sbrk` en el techo). Lo que cambio desde DC-002.88 es la sonda
+	// del monton (`sondaDelMontonDeC`): los tramos se vuelven a pedir del tamano que el monton puede servir,
+	// no de 512 KB a ciegas.
+	if soltarTramosAlReiniciar && liberadorDeExternos != nil {
+		if tramos, bytes := soltarLosTramos(); tramos > 0 {
+			tramosDevueltosAlReiniciar++
+			tramosBytesDevueltos += bytes
+		}
+	}
+
 	tramoActual = 0
 	cursorDelBloque = 0
 	bytesDeBloques = 0

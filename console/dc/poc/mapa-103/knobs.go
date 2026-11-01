@@ -166,6 +166,16 @@ const (
 	//
 	// Se aplica SOLO si el ciclo esta prendido y se devuelve al valor anterior al terminar; la corrida de
 	// referencia (palanca apagada) no lo toca nunca.
+	//
+	// DC-002.111: 95 -> 98 -> 95. Con el `.ds1` en el arena y las fuentes reabiertas, la VUELTA pide
+	// ~1.752.568 B de semiespacio (95,5 % de 1.835.008) y con el umbral en 95 % (1.743.257 B) el recolector
+	// recolecciona en cada asignacion sin bajar el conjunto vivo: 893 recolecciones seguidas y la vuelta sin
+	// avanzar. Se probo 98 (umbral 1.798.308) y tampoco: el conjunto vivo llego a 1.813.680 B (98,8 %) y
+	// siguio recoleccionando -- o sea que el problema NO era el umbral sino lo que ocupa el semiespacio. Lo
+	// que lo ocupa son los restos del nivel ANTERIOR (su `.ds1` y su `Stamp`), que sobreviven a la
+	// recoleccion porque el barrido de pila de libgodc es conservador; el recolector que los tira es el que
+	// corre DENTRO de `componerNivel` con el marco ya reescrito (ver `recolectarDespuesDeCargarElDs1`). Con
+	// esa recoleccion la vuelta entra con el umbral de DC-002.109, sin tocarlo.
 	gcPercentDelCiclo = 95
 
 	// transicionPreset / transicionArchivo: el `.ds1` que compone la fase TRANSICION. El preset 1 del pueblo
@@ -200,4 +210,98 @@ const (
 	// C suelte ~200.000 B antes del pico de componer (los candidatos estan en la evidencia de la tarjeta, seccion
 	// 6), se prende y la vuelta entra. Se pisa por entorno con ARENA_DS1=.
 	arenaDelDS1 = "apagado"
+
+	// ============================== DC-002.111: EL SCRATCH DE LECTURA POR ARCHIVO ==============================
+	//
+	// scratchPorArchivo: el buffer prestado con el que se lee cada `.dt1` se pide del tamano de ESE archivo y
+	// se devuelve en cuanto sus bloques estan COPIADOS al arena de bloques, en vez de pedirse UNA vez del
+	// tamano del archivo mas grande del nivel y quedarse tomado hasta despues de armar la cache.
+	//
+	// POR QUE, CON EL NUMERO. Medido en DC-002.110: con `arenaDelDS1=encendido` la TRANSICION muere con
+	// `gc_external_alloc: OOM` pidiendo un tramo del arena de bloques de 524.288 B con el monton de C en
+	// 10.285.248 usados y 379.104 libres. El pico lo arman, a la vez: el scratch (1.008.003 B = el
+	// `act1/town/floor.dt1` del pueblo), los tramos del arena de bloques (3.029.194 B) y las fuentes + tablas
+	// reabiertas (679.440 B). El scratch se usa para leer UN archivo: si se devuelve por archivo, el pico
+	// deja de tener el archivo mas grande encima durante el resto de la carga, y el hueco que deja (1 MB
+	// contiguo) es lo que despues sirve para el tramo siguiente.
+	//
+	//	porArchivo  el buffer se pide y se suelta por archivo (arriba). Es el default: es menos memoria en el
+	//	            pico y el liberador ya esta inyectado.
+	//	delNivel    el camino de DC-002.101: un buffer del tamano del archivo mas grande, pedido antes del
+	//	            primer `.dt1` y devuelto despues de armar la cache. Queda para el A/B.
+	//
+	// Se pisa por entorno con SCRATCH_POR_ARCHIVO=.
+	scratchPorArchivo = true
+
+	// tramoDelArenaPorElMonton: el tamano de cada tramo del ARENA DE BLOQUES (los pedidos de 512 KB donde se
+	// copian los bloques de los `.dt1`) lo decide el monton -- la sonda `d2c_servible` de DC-002.106 -- en vez
+	// de ser fijo.
+	//
+	// POR QUE, CON EL NUMERO. Con el scratch ya por archivo, la corrida dejo de morir por BYTES y murio por
+	// CONTIGUIDAD: en el septimo tramo el monton tenia `used=9.658.128 free=1.398.512` -- 1,4 MB libres y ni
+	// un hueco de 524.288 --, y `gc_external_alloc` pidio `sbrk` (que ya estaba en el techo) y tiro el runtime
+	// en vez de devolver NULL.
+	//
+	//	true   cada tramo se pide del mayor tamano (hasta 512 KB) que el monton puede servir AHORA
+	//	false  el tamano fijo de DC-002.101 (512 KB), que es el A/B
+	//
+	// Se pisa por entorno con TRAMO_ARENA=.
+	tramoDelArenaPorElMonton = true
+
+	// soltarTramosAlCambiarDeNivel: al TIRAR un nivel (`ReiniciarArenaDeTiles`, o sea cuando ya se vacio el
+	// cache de `.dt1` y nadie tiene un puntero adentro del arena) los tramos del arena de bloques se devuelven
+	// al monton de C en vez de quedarse tomados para el nivel siguiente (lo que hacia DC-002.88).
+	//
+	// POR QUE, CON EL NUMERO. La TRANSICION ya completa con el scratch por archivo y el tramo por el monton
+	// (pico 10.307.056 B). Lo que muere ahora es la VUELTA: pide el buffer del `act1/town/floor.dt1`
+	// (1.008.003 B, CONTIGUO) con el monton en `used=9.909.584 free=1.170.352` -- mas libre que el pedido,
+	// pero en trozos, y con el `sbrk` en el techo: `Requested sbrk_base 0x8d0dc000, was 0x8cfe6000, diff
+	// 1007616`. Los 3.145.728 B de tramos de la fase anterior son justo lo que ocupa ese lugar.
+	//
+	//	true   los tramos se devuelven al tirar el nivel y el nivel nuevo los vuelve a pedir (con la sonda)
+	//	false  el camino de DC-002.88: los tramos se reusan desde el primero y no vuelven al monton
+	//
+	// Se pisa por entorno con TRAMOS_AL_CAMBIAR=.
+	soltarTramosAlCambiarDeNivel = true
+
+	// recolectarDespuesDeCargarElDs1: un `runtime.GC()` DENTRO de `componerNivel`, con el `.ds1` nuevo ya
+	// cargado y ANTES de tocar un `.dt1` del nivel nuevo.
+	//
+	// POR QUE. El barrido de pila de libgodc es CONSERVADOR: los punteros del nivel que se deja -- su `.ds1`
+	// parseado y su `Stamp` -- siguen en el marco muerto de `componerNivel` y cuentan como raiz, asi que la
+	// recoleccion que corre en `correrFase` (la de DC-002.109, antes de componer) NO los puede tirar. Medido
+	// en la VUELTA: 1.309.712 B vivos despues de esa recoleccion, contra los 900.608 B de la TRANSICION (la
+	// misma cuenta, 409.096 B mas) -- y con eso el semiespacio se llena a 1.813.680 B (98,8 %) y el recolector
+	// recolecciona sin avanzar, aunque el total sea 1.835.008.
+	//
+	// La recoleccion que SI los tira es la que corre cuando el marco ya se reescribio con el nivel nuevo: aca.
+	// El `Stamp` nuevo es una variable local de `componerNivel`, o sea una raiz de verdad, y el `.ds1` vive en
+	// el monton de C (DC-002.110), asi que no hay nada que se pueda mover bajo los pies del parser.
+	recolectarDespuesDeCargarElDs1 = true
+
+	// saltarLaReapertura: si las fuentes MPQ y las tablas del compositor NO se soltaron despues de componer
+	// (`soltarDespuesDeComponer`), la fase siguiente no tiene nada que reabrir: se saltea la reapertura.
+	//
+	// POR QUE. Con el monton de C resuelto (scratch por archivo, tramo por el monton y los tramos devueltos al
+	// tirar el nivel) el muro de la VUELTA paso al SEMIESPACIO: la fase pide ~1.824.256 B de 1.835.008 (99,4 %)
+	// y el recolector recolecciona en cada asignacion. Reabrir las fuentes y recargar las tablas es lo que
+	// agrega vivos en cada fase (medido: +120.520 B en la TRANSICION y +146.120 B en la VUELTA, y la vuelta no
+	// tiene ese lugar). Con `SOLTAR=nada` la reapertura no existe y esos bytes no se piden.
+	//
+	// OJO CON EL CONTRATO: sin reapertura, la fase siguiente NO puede reabrir nada -- el camino que mide la
+	// reapertura es el de la .109 y sigue siendo el default. Esta palanca es la que mide si la vuelta entra
+	// cuando no hay nada que reabrir.
+	//
+	// Se pisa por entorno con SALTAR_REAPERTURA=.
+	saltarLaReapertura = true
+
+	// soltarEnElCiclo: si en el ciclo de niveles se sueltan (o no) las fuentes MPQ y las tablas despues de
+	// componer. `false` (default de DC-002.111) = no se sueltan, o sea no hay nada que reabrir en la fase
+	// siguiente; el porque y los numeros estan en `soltarLoQueElCuadroNoLee`.
+	//
+	// La corrida de referencia (ciclo apagado) NO depende de esta palanca: sigue soltando todo despues del
+	// unico cuadro, como en DC-002.106.
+	//
+	// Se pisa por entorno con SOLTAR_EN_EL_CICLO=.
+	soltarEnElCiclo = false
 )
