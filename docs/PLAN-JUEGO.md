@@ -91,6 +91,20 @@ que se toca con las manos (matar, recoger, guardar), después lo narrativo (ques
   devolviendo.
 - Riesgo alto de memoria: `d2ui` son 3.834 líneas de widgets y la grilla del inventario tiene cientos de
   celdas de 4 px. Medir antes de escribir.
+- **La grilla y el alijo, medidos y andando** (DC-002.124): la tarjeta se cumple sin portar `d2ui`. Las
+  dimensiones salen de `d2inventory.Dims` (10x4 y 6x8; 2.112 B de celdas), el panel es una imagen de índices
+  armada una vez (75.392 B) y los tres colores salen de la paleta de las unidades, no de un RGB inventado. El
+  objeto recogido entra a la grilla en la celda 0,0 con su huella 1x3 y se ve pintado en su celda; el alijo
+  guarda y devuelve. Con el panel cerrado no se pinta un pixel: el crc32 del lienzo es el mismo antes y después
+  de llamar al inventario, cuadro por cuadro (19 cuadros medidos). Costo: 79.856 B de memoria viva, 93-115 ms por
+  cuadro con los paneles abiertos (8-12 % del cuadro) y 14.532 B de binario.
+  - Lo que el mapa de este disco NO trae: el cofre. Los cuatro `.ds1` del pueblo tienen 170 objetos y 13 ids, y
+    ninguno es stash (las filas 186/187/188/203..205 existen en `objects.txt` pero no están colocadas). El POC lo
+    declara y lo pone en una celda conocida.
+  - Lo que falta: el cinturón (4 celdas, 96 B medidos), mover objetos DENTRO de la grilla, y la validación de
+    `d2inventory` ("esto no cabe en ese hueco").
+  - Con split, cada mitad tiene su grilla y su panel (18-19 ms por panel, medido con dos jugadores); lo que en el
+    split todavía no pasa es recoger (eso es del camino de un jugador).
 
 ### E4 · El HUD del juego
 

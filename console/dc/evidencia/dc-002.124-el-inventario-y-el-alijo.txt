@@ -1,0 +1,221 @@
+DC-002.124 -- EL INVENTARIO Y EL ALIJO: LA GRILLA DEL JUGADOR Y EL COFRE DEL PUEBLO
+
+Rama DC-002, checkout unico /home/dgalli/Proyectos/diablo2consoles. Fecha: 2026-11-02.
+POC: console/dc/poc/juego-124 (copia de juego-123, sin tocar 123). Sonda del host: console/dc/sonda-inventario-124.
+Scripts: scripts/console/build-juego-124.sh y scripts/console/run-flycast-124.sh.
+Capturas: console/dc/evidencia/dc-002.124-los-dos-paneles.png y dc-002.124-el-panel-del-jugador.png.
+
+El criterio de la tarjeta, contestado con numeros de la corrida final:
+
+  JUEGO124: INV CRITERIO elObjetoEntroALaGrilla= true seVeEnSuCelda= true elAlijoGuardo= true
+      elAlijoDevolvio= true elCuadroDelPuebloIntacto= true anchoDeCelda= 28 huellaDelObjeto= 1x3
+
+  JUEGO124: INV RESUMEN celdasJugador= 40 celdasAlijo= 48 bytesDeCeldas= 2112
+      bytesDeIndicesDelObjeto= 2352 bytesDeLosPaneles= 75392 pixelesDelPanel= 75392 msDelPanel= 124
+      cuadrosConPanel= 8 cuadrosSinPanel= 13 jugador= 3/40/aqv@0,0 alijo= 0.00/48/vacia
+
+El bicho muere, suelta el carcaj (`aqv`), el jugador lo recoge y el objeto ENTRA a la grilla del inventario en la
+celda 0,0 con su huella de 1x3 celdas; el panel del jugador se abre en el cuadro 14 y muestra el objeto pintado en
+su celda; el alijo se abre en el cuadro 16, GUARDA el objeto en el cuadro 17 y lo DEVUELVE al inventario en el 18;
+y en los 19 cuadros con el panel cerrado no se pinta un solo pixel: el crc32 del lienzo es el mismo antes y despues
+de llamar al inventario, cuadro por cuadro.
+
+===============================================================================
+1. LO QUE SE MIDIO ANTES DE ESCRIBIR (la sonda, en el host, sin emulador)
+===============================================================================
+
+`go run ./console/dc/sonda-inventario-124` -- abre los MPQ que abre la consola (d2data.mpq, patch_d2.mpq y
+d2char.mpq) y contesta las tres preguntas de la tarjeta antes de tocar un solo archivo del POC.
+
+  == 1. EL COSTO: la grilla del inventario, medido y no supuesto
+     celda de la grilla: 24 B (celda = 24 B, estado = 1 B)
+     d2inventory.Dims inventario 10x4 = 40 celdas -> 960 B
+     d2inventory.Dims alijo      6x8 = 48 celdas -> 1152 B
+     cinturon (4 celdas)                  -> 96 B
+     TOTAL grilla del POC (jugador+alijo+cinturon) = 2208 B
+
+Las dimensiones NO son constantes inventadas: salen de `d2inventory.Dims(ContainerInventory, true)` = 10x4 y
+`Dims(ContainerStash, true)` = 6x8, que es la tabla del motor. El POC arma jugador + alijo (no el cinturon) y
+gasta 960 + 1152 = 2.112 B en celdas, que es lo que informa el resumen de la corrida.
+
+El grafico del objeto en la celda: el `invfile` de la fila del arma (28 x 84 px) son 2.352 B de indices, medidos y
+tambien en el resumen. El ancho de celda es 28 px: la huella del carcaj da 1x3.
+
+`d2core/d2ui` NO se porta: son 3.834 lineas de widgets y arrastra `d2common/d2interface`, `d2asset` y la fuente de
+texto. El panel de esta tarjeta es una imagen de indices armada a mano (2.4 KB de codigo, 75.392 B de datos) con la
+paleta que el POC ya tiene cargada para los sprites.
+
+===============================================================================
+2. EL ALIJO DEL PUEBLO: DONDE ESTA Y QUE SE HIZO CUANDO NO ESTA
+===============================================================================
+
+La sonda leyo los CUATRO .ds1 del pueblo de d2data.mpq y conto los objetos:
+
+  data\global\tiles\act1\town\townE1.ds1  57691 B  crc32=1192942274  objetos=43
+  data\global\tiles\act1\town\townN1.ds1  57652 B  crc32= 712973328  objetos=41
+  data\global\tiles\act1\town\townW1.ds1  57700 B  crc32= 159262185  objetos=44
+  data\global\tiles\act1\town\townS1.ds1  57672 B  crc32= 674507625  objetos=42
+  objetos de los cuatro .ds1 del pueblo: 170; los que son alijo: 0
+
+En `objects.txt` (571 filas) SI estan las filas de alijo (186, 187, 188, 203..205, y los hidden stash 125..128, 155,
+159, 274, 416, 463), pero el .ds1 de ESTE disco no coloca ninguna. O sea: el cofre del pueblo no aparece en el mapa
+medido, y eso es un dato de la instalacion, no una decision.
+
+Como la tarjeta pide probar el alijo (abrir, guardar, devolver) y el mapa no lo trae, el POC lo declara y lo pone en
+una celda conocida, y lo dice en el log en vez de taparlo:
+
+  JUEGO124: ALIJO ORIGEN id= 187 nombre= stash celdaDelPueblo= 28 , 20 elDs1LoTrae= false radio= 2 grilla= 6 x 8 celdas= 48
+  JUEGO124: ALIJO AVISO el .ds1 del pueblo de este disco NO coloca el cofre (170 objetos, 13 ids, ninguno es stash:
+      sonda-inventario-124): el POC lo pone en la celda de arranque del jugador
+
+La apertura no es un truco del guion: se mide la distancia del jugador al cofre en celdas y se abre si entra en el
+radio (`RADIO_ALIJO`, 2):
+
+  JUEGO124: ALIJO ABRE jugador= P1 celda= 28.8894 21.2965 alijo= 28 , 20 distancia= 1.57221 radio= 2 cuadro= 16 panel= 232 96 grilla= 6 x 8
+
+===============================================================================
+3. LA GRILLA, CELDA POR CELDA
+===============================================================================
+
+  JUEGO124: INV GRILLA contenedor= jugador w= 10 h= 4 celdas= 40 bytes= 960 celdaPx= 28 panel= 288 x 120 origen= 176 344
+  JUEGO124: INV GRILLA contenedor= alijo w= 6 h= 8 celdas= 48 bytes= 1152 celdaPx= 28 panel= 176 x 232 origen= 232 96
+  JUEGO124: INV PANEL contenedor= jugador ancho= 288 alto= 120 bytes= 34560 indices=fondo 225 celda 212 borde 255
+  JUEGO124: INV PANEL contenedor= alijo ancho= 176 alto= 232 bytes= 40832 indices=fondo 225 celda 212 borde 255
+
+Los tres colores del panel (fondo, celda, borde) se eligen de la PALETA DE LAS UNIDADES que el POC ya carga para los
+sprites: el indice mas oscuro, uno del medio y el mas claro, medidos con la luminancia de los 255 indices. No hay un
+RGB inventado en el codigo.
+
+El objeto entra a la grilla con su huella (1x3) desde la primera celda libre:
+
+  JUEGO124: INV ENTRA elObjetoRecogido=true cuadro= 13 jugador= P1
+
+y el panel abierto lo muestra en su celda, no en un lugar fijo:
+
+  JUEGO124: INV CUADRO 14 abierto=si paneles= 1 pixelesPintados= 34560 msPanel= 93 crcConPanel= 750071661
+      mapaSolo= 1437022778 jugador= 3/40/aqv@0,0 alijo= 0.00/48/vacia
+
+===============================================================================
+4. EL A/B DEL CUADRO: CON EL PANEL CERRADO NO SE PINTA NADA
+===============================================================================
+
+La tarjeta pide que con el panel cerrado el cuadro del pueblo quede intacto. Se mide DENTRO DE LA MISMA CORRIDA:
+crc32 del lienzo justo antes de llamar al inventario y justo despues, cuadro por cuadro. (Comparar dos corridas
+distintas no sirve: la animacion avanza por reloj, `d2cMs`, no por cuadro, y los crc32 de dos corridas no coinciden
+ni sin inventario. Medido, y es la razon por la que el A/B se hace asi.)
+
+  JUEGO124: INV CUADRO  1 abierto=no pixelesPintados=0 crcAntes= 1264942291 crcDespues= 1264942291 elCuadroNoCambio= true
+  ...
+  JUEGO124: INV CUADRO 13 abierto=no pixelesPintados=0 crcAntes= -969926787 crcDespues= -969926787 elCuadroNoCambio= true
+  JUEGO124: INV CUADRO 14 abierto=si paneles= 1 pixelesPintados= 34560 msPanel= 93 ...
+  JUEGO124: INV CUADRO 14 elCuadroCambio= true
+  ...
+  JUEGO124: INV CUADRO 17 abierto=si paneles= 1 pixelesPintados= 40832 msPanel= 96 ...
+  JUEGO124: INV CUADRO 18 abierto=no pixelesPintados=0 crcAntes= 1234418323 crcDespues= 1234418323 elCuadroNoCambio= true
+  ...
+  JUEGO124: INV CUADRO 23 abierto=no pixelesPintados=0 crcAntes= 1551968288 crcDespues= 1551968288 elCuadroNoCambio= true
+
+19 cuadros con el panel cerrado, los 19 con el mismo crc32 antes y despues y 0 pixeles pintados; 4 cuadros con el
+panel abierto, los 4 con el crc32 cambiado. Es exactamente lo que se pide: el inventario es un overlay.
+
+===============================================================================
+5. EL COSTO: MEMORIA, TIEMPO Y BINARIO
+===============================================================================
+
+Memoria viva del inventario y el alijo (contada, no estimada):
+
+  celdas de las dos grillas (40 + 48)      2.112 B
+  indices del objeto en su celda           2.352 B   (28 x 84 px, el invfile del arma)
+  imagenes de los dos paneles             75.392 B   (288x120 + 176x232, indices de paleta)
+  ------------------------------------------------------------------
+  TOTAL por corrida                       79.856 B   (~78 KB, pedidos UNA vez al arrancar)
+
+Tiempo por cuadro (medido con `d2cMs` alrededor del bloque de dibujo, en el SH4 emulado):
+
+  panel del jugador solo      93 ms  (34.560 px)
+  los dos paneles a la vez   115 ms  (75.392 px)
+
+El mapa solo cuesta ~900-1.100 ms por cuadro, asi que los paneles agregan entre 8 % y 12 % SOLO en los cuadros en
+que estan abiertos. En los cerrados: 0 ms de pintado (0 pixeles).
+
+Binario, mismo build con las palancas en si y en no (la unica diferencia son las dos palancas):
+
+  prog.elf con INVENTARIO=si ALIJO=si   17.863.124 B
+  prog.elf con INVENTARIO=no ALIJO=no   17.848.592 B
+  ------------------------------------------------------------------
+  lo que suma la tarjeta                  14.532 B  (.text 2.468.848 B con inventario)
+
+De `d2core/d2inventory` se toma UNA funcion, `Dims`: el paquete entra al binario en las dos versiones (tambien en la
+de INVENTARIO=no, porque `Dims` es lo que dice el tamano de la grilla), asi que esos 14.532 B son el codigo propio
+de la tarjeta (inventario_124.go + alijo_124.go + la integracion en main.go).
+
+===============================================================================
+5b. EL SPLIT: CADA MITAD CON SU INVENTARIO
+===============================================================================
+
+El criterio del punto 4 de la tarjeta ("con split, que cada mitad tenga su inventario") se cumple con una grilla
+por jugador y el panel ubicado DENTRO del lienzo de 320x480 de cada mitad (no en las coordenadas de la pantalla
+entera, que con dos mitades se saldria del lienzo). Corrida con JUGADORES=2 SPLIT=si:
+
+  JUEGO124: INV MITAD jugador= 1 grilla= 10 x 4 bytesDeLaGrilla= 960 bytesDelPanel= 34560
+  JUEGO124: INV SPLIT cuadro= 8 mitad= 0 jugador= P1 panel= 288 x 120 origen= 16 352 pixeles= 34560 msPanel= 18
+      bytesDeLaGrilla= 960 bytesDelPanel= 34560 ocupadas= 0
+  JUEGO124: INV SPLIT cuadro= 8 mitad= 1 jugador= P2 panel= 288 x 120 origen= 16 352 pixeles= 34560 msPanel= 19
+      bytesDeLaGrilla= 960 bytesDelPanel= 34560 ocupadas= 0
+
+Cada mitad tiene la suya (ver la captura dc-002.124-el-inventario-en-split.png: un panel abajo a la izquierda y
+otro abajo a la derecha). Dos cosas que se dicen y no se tapan:
+
+- En el split cada panel cuesta 18-19 ms por cuadro y no 93: el lienzo de la mitad es de 320x480 y el pincel de
+  indices recorre la textura de destino, no la de 640x480. Medido.
+- En el split el objeto NO entra a la grilla (`ocupadas= 0` en las dos mitades): recoger es del camino de un solo
+  jugador (DC-002.123) y esta tarjeta no lo cambio. Lo que se prueba en el split es que cada mitad tiene SU grilla
+  y su panel, no el recoger. La corrida del objeto hasta el alijo y de vuelta es la del punto 3 (un jugador).
+- Memoria con split: 2 grillas x (960 + 34.560) = 71.040 B, mas el alijo (1.152 + 40.832) = 113.024 B en total.
+
+===============================================================================
+6. EL GUION DE LA CORRIDA (como se reproduce)
+===============================================================================
+
+  cd ~/Proyectos/diablo2consoles
+  CUADROS=20 JUGADORES=1 GUION_POC=quieto CAMARA=fija CELDA_P1="0 1" PATRULLA="1 0 0" \
+    DIRS_ATAQUE_LISTA="14" MODOS_DIRS=1 DROP=si SEMILLA_DROP=8 RECOGER_AUTO=si FASE=apagado \
+    INVENTARIO=si ALIJO=si CUADRO_INVENTARIO=14 CUADRO_ALIJO=16 CERRAR_PANELES=si \
+    SALTAR_MOTOR=1 bash scripts/console/build-juego-124.sh /tmp/dcbuild/juego124f
+
+  timeout 320 env CAPTURAS=6 INTERVALO=2 bash scripts/console/run-flycast-124.sh \
+      /tmp/dcbuild/juego124f/disc.gdi /tmp/dc124f 1400 120
+
+Palancas nuevas de esta tarjeta (las de antes siguen igual):
+
+  INVENTARIO=si|no        en no, la corrida es la de DC-002.123 (el panel no se dibuja ni se abre)
+  ALIJO=si|no             el alijo, con su apertura por distancia
+  CUADRO_INVENTARIO=<n>   cuadro en que se abre el panel del jugador (instrumento: el emulador no tiene teclado)
+  CUADRO_ALIJO=<n>        cuadro en que se abre el alijo y guarda el objeto
+  RADIO_ALIJO=<celdas>    a que distancia se abre el alijo (default 2)
+  CERRAR_PANELES=si|no    si los paneles se cierran despues de usarse (para el A/B del cuadro cerrado DESPUES de
+                          haberlo abierto) o quedan abiertos hasta el final (para que la captura los muestre:
+                          los cuadros con panel duran ~1 s y la captura del script es cada 2 s)
+
+Para la captura con los dos paneles a la vista se corrio la MISMA tarjeta con CERRAR_PANELES=no (los paneles quedan
+abiertos hasta el final y el ultimo cuadro, congelado, los muestra): /tmp/dc124v, de ahi salen las dos capturas.
+
+El split se corre igual, con dos jugadores y el split prendido (los paneles no se cierran, para que la captura los
+tome):
+
+  CUADROS=14 JUGADORES=2 SPLIT=si GUION_POC=quieto CAMARA=fija CELDA_P1="0 1" PATRULLA="1 0 0" \
+    DIRS_ATAQUE_LISTA="14" MODOS_DIRS=1 DROP=si SEMILLA_DROP=8 RECOGER_AUTO=si FASE=apagado \
+    INVENTARIO=si ALIJO=si CUADRO_INVENTARIO=8 CUADRO_ALIJO=10 CERRAR_PANELES=no \
+    SALTAR_MOTOR=1 bash scripts/console/build-juego-124.sh /tmp/dcbuild/juego124s
+
+===============================================================================
+7. LO QUE ESTA TARJETA NO HIZO (para la que sigue)
+===============================================================================
+
+- El cinturon (4 celdas) no se dibuja: `Dims(ContainerBelt, true)` esta medido (96 B) pero no hay panel.
+- No hay movimiento de objetos DENTRO de la grilla ni intercambio entre celdas: se guarda en la primera celda libre
+  y se devuelve a la primera celda libre. La huella (1x3) se respeta al ocupar y al vaciar.
+- Los objetos no se pueden arrastrar con el puntero (el emulador de las corridas no lo tiene).
+- No se porta la validacion de `d2inventory` (que un item de 2x4 no entre en un hueco de 1x3): la huella se calcula
+  y se ocupa, pero la regla de "cabe o no cabe" es la de esta tarjeta, no la del motor.
+- El grafico del objeto sale del `invfile` de la fila del arma en `weapons.txt`; armaduras y misc no se probaron.
