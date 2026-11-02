@@ -75,6 +75,13 @@ type Renderer struct {
 
 	ultimoError error
 
+	// DC-002.116 (el split vertical): con estos dos puestos, el ciclo NO usa el lienzo de 640x480 ni
+	// `PresentarEnPantalla`. `superficiePropia` es la superficie que recibe `dibujar` (uno de los dos lienzos
+	// del split) y `presentar` es el que sube los dos lienzos, cada uno a su mitad de la pantalla. Sin
+	// ponerlos, el camino es el de siempre (y los otros POC no cambian una linea).
+	superficiePropia *Surface
+	presentar        func() error
+
 	// contadores del lienzo (DC-002.85): ver cuenta.go.
 	lienzosCreados      int
 	bytesDeLienzos      int
@@ -132,7 +139,16 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 
 	// LA SUPERFICIE DEL CUADRO, con los pixeles en la VRAM si da (ver la cabecera). Si no da, cae al
 	// monton y lo dice: el numero que lo decide es el que se imprime.
-	r.superficie = SuperficieDeLaPantalla(r.ancho, r.alto)
+	//
+	// DC-002.116: si el que arranca puso SU superficie (el split, que compone en dos lienzos de 320x480), no
+	// se reserva el lienzo de 640x480: reservarlo igual seria 1.228.800 B de VRAM para un cuadro que nadie
+	// escribe, y en el split esos bytes son justo los de las dos mitades.
+	if r.superficiePropia != nil {
+		r.superficie = r.superficiePropia
+	} else {
+		r.superficie = SuperficieDeLaPantalla(r.ancho, r.alto)
+	}
+
 	r.superficie.renderer = r
 
 	kos.PvrSetBgColor(0, 0, 0)
@@ -169,7 +185,17 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 			}
 		}
 
-		if err := PresentarEnPantalla(r.superficie.Imagen()); err != nil {
+		if r.presentar != nil {
+			// DC-002.116: el cuadro partido en dos lienzos, cada uno a su mitad de la pantalla.
+			if err := r.presentar(); err != nil {
+				r.ultimoError = err
+
+				kos.PvrListFinish()
+				kos.PvrSceneFinish()
+
+				return err
+			}
+		} else if err := PresentarEnPantalla(r.superficie.Imagen()); err != nil {
 			r.ultimoError = err
 
 			kos.PvrListFinish()
@@ -317,6 +343,16 @@ func (r *Renderer) PrintAt(target interface{}, str string, x, y int) {
 // Surface: la superficie del cuadro (la que se le pasa al callback de dibujado). Es para la evidencia y
 // para el que quiera medir el cuadro sin pasar por el callback.
 func (r *Renderer) Surface() *Surface { return r.superficie }
+
+// UsarSuperficieDelCuadro (DC-002.116): la superficie que el ciclo le pasa a `dibujar`, en vez del lienzo de
+// 640x480 de la pantalla. Es lo que usa el split vertical: el ciclo le entrega al POC UNO de sus dos lienzos de
+// 320x480 y el POC compone el otro en el mismo callback. Tiene que llamarse ANTES de Run.
+func (r *Renderer) UsarSuperficieDelCuadro(s *Surface) { r.superficiePropia = s }
+
+// UsarPresentador (DC-002.116): con esto puesto, el ciclo NO presenta el lienzo de la pantalla con
+// `PresentarEnPantalla`: llama a `f`, que es el que decide que subir y donde. El split sube los dos lienzos de
+// 320x480 a las columnas 0 y 320 y pinta. Tiene que llamarse ANTES de Run.
+func (r *Renderer) UsarPresentador(f func() error) { r.presentar = f }
 
 // Cuadros: cuantos cuadros se presentaron (el instrumento del ciclo).
 func (r *Renderer) Cuadros() int { return r.cuadros }

@@ -271,26 +271,28 @@ int d2c_pvr_pantalla_subir(unsigned int rgba, int w, int h) {
  * (x, y) dan el indice (twid_tabla[x] << 1 | twid_tabla[y]), y el bloque arranca en indice_tile(x0, y0).
  */
 
-int d2c_pvr_pantalla_convertir(unsigned int rgba, int w, int h) {
-    const unsigned char *src = (const unsigned char *)rgba;
-
-    armar_twiddle();
-
-    if (src == NULL || pant_tex == NULL) {
-        return -1;
-    }
-    if (w != PANT_W || h != PANT_H) {
-        return -2;
-    }
-
+/* El cuerpo de la conversion, con una COLUMNA DE DESTINO (DC-002.116).
+ *
+ * POR QUE TIENE UN `x_dest` Y NO ES SIEMPRE 0. Hasta DC-002.115 el motor tenia UN lienzo de 640x480 y se subia
+ * entero a la textura de la pantalla, asi que el destino siempre empezaba en la columna 0. El split vertical de
+ * DC-002.116 tiene DOS lienzos de 320x480 (uno por jugador) y cada uno va a SU mitad de la pantalla: el de la
+ * izquierda a la columna 0 y el de la derecha a la 320. La cuenta del pixel es la misma de siempre; lo unico que
+ * cambia es de donde se lee (`src` tiene ancho propio, w) y donde se escribe (`x_dest + x0` en la textura).
+ *
+ * OJO CON EL STRIDE: `src` se recorre con SU ancho (w), no con PANT_W. Leer un lienzo de 320 con el paso de 640
+ * da una imagen cortada en diagonal, y es el defecto que este comentario evita.
+ *
+ * `x_dest` TIENE QUE SER MULTIPLO DE 32: cada bloque de 32x32 de la textura es contiguo (ver `indice_tile`), y
+ * 320 lo es, asi que las dos mitades caen en bloques enteros. El que llama lo comprueba y devuelve -4 si no. */
+static int convertir_a_columnas(const unsigned char *src, int w, int h, int x_dest) {
     for (int y0 = 0; y0 < h; y0 += LADO_TILE) {
         int alto_tile = (h - y0 < LADO_TILE) ? (h - y0) : LADO_TILE;
 
         for (int x0 = 0; x0 < w; x0 += LADO_TILE) {
             int ancho_tile = (w - x0 < LADO_TILE) ? (w - x0) : LADO_TILE;
 
-            /* un bloque que NO esta completo (solo pasa si la pantalla no es multiplo de 32: 640x480 SI
-             * lo es, asi que hoy nunca entra) se rellena con cero para no dejar pixeles de la vuelta
+            /* un bloque que NO esta completo (solo pasa si la pantalla no es multiplo de 32: 640x480 SI lo
+             * es, asi que hoy nunca entra) se rellena con cero para no dejar pixeles de la vuelta
              * anterior en la parte que no se escribe */
             if (ancho_tile != LADO_TILE || alto_tile != LADO_TILE) {
                 memset(conv_tile, 0, sizeof(conv_tile));
@@ -315,11 +317,56 @@ int d2c_pvr_pantalla_convertir(unsigned int rgba, int w, int h) {
             }
 
             /* y el bloque a la VRAM. 1.024 pixeles = 2.048 bytes, de una sola copia por Store Queues. */
-            pvr_txr_load(conv_tile, (pvr_ptr_t)((uint16_t *)pant_tex + indice_tile(x0, y0)),
+            pvr_txr_load(conv_tile, (pvr_ptr_t)((uint16_t *)pant_tex + indice_tile(x_dest + x0, y0)),
                          LADO_TILE * LADO_TILE * 2);
         }
     }
+
     return 0;
+}
+
+int d2c_pvr_pantalla_convertir(unsigned int rgba, int w, int h) {
+    const unsigned char *src = (const unsigned char *)rgba;
+
+    armar_twiddle();
+
+    if (src == NULL || pant_tex == NULL) {
+        return -1;
+    }
+    if (w != PANT_W || h != PANT_H) {
+        return -2;
+    }
+
+    return convertir_a_columnas(src, w, h, 0);
+}
+
+/* DC-002.116: un lienzo de w x h a la COLUMNA x_dest de la textura de la pantalla (el split vertical).
+ *
+ * Es el MISMO camino que `d2c_pvr_pantalla_convertir` -- misma tabla del twiddle, mismo bloque de 32x32, mismas
+ * Store Queues -- y por eso cuesta lo mismo POR PIXEL que la conversion de la pantalla entera: dos lienzos de
+ * 320x480 son los mismos 307.200 pixeles que uno de 640x480. Lo que NO hace falta es el lienzo de 640x480:
+ * los dos de 320x480 son, juntos, los mismos 1.228.800 B que antes vivian en la VRAM como un solo cuadro.
+ *
+ * Devuelve 0 si anduvo, -1 sin video, -2 tamano/columna invalidos, -4 columna que no es multiplo de 32. */
+int d2c_pvr_pantalla_convertir_en(unsigned int rgba, int w, int h, int x_dest) {
+    const unsigned char *src = (const unsigned char *)rgba;
+
+    armar_twiddle();
+
+    if (src == NULL || pant_tex == NULL) {
+        return -1;
+    }
+    if (w <= 0 || h <= 0 || x_dest < 0) {
+        return -2;
+    }
+    if (x_dest + w > PANT_W || h > PANT_H) {
+        return -2;
+    }
+    if ((x_dest % LADO_TILE) != 0) {
+        return -4;
+    }
+
+    return convertir_a_columnas(src, w, h, x_dest);
 }
 
 int d2c_pvr_pantalla_subir_vram(void) {

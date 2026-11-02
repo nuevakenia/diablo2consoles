@@ -1,0 +1,184 @@
+DC-002.116 -- EL SPLIT VERTICAL PARA DOS: DOS CAMARAS Y DOS LIENZOS DE 320x480 EN EL MISMO CUADRO
+================================================================================================
+
+QUE SE CONSTRUYO. El POC `console/dc/poc/juego-116/` (el de DC-002.115, dos jugadores uno por PUERTO del bus
+maple) con la pantalla partida: DOS lienzos de 320x480 lado a lado en el cuadro de 640x480 de la consola, con UNA
+CAMARA POR JUGADOR. El lienzo de 640x480 de DC-002.115 NO se reserva: los dos de 320x480 son sus MISMOS 1.228.800
+bytes, repartidos distinto. El renderer del mapa se pone en 320x480 (`FijarTamanoDelCuadro`) y cada mitad se
+dibuja con la camara de SU jugador, asi que cada uno cae en el centro de SU lienzo (ancla 160,283, la misma del
+cuadro unico). La presentacion son dos conversiones RGBA->RGB565 de 320x480, cada una a su columna de la textura
+de la pantalla (0 y 320) y un solo `PintarPantalla`: los pixeles convertidos son los mismos 307.200 de siempre.
+
+LO QUE SE AGREGO AL MOTOR (todo ADITIVO: sin las palancas puestas el camino de todos los POC anteriores es el de
+antes). En `d2core/d2render/pvr`: `UsarSuperficieDelCuadro` y `UsarPresentador` (el ciclo deja de presentar el
+lienzo de la pantalla), `PresentarEnColumna` y `SuperficieEnBloque` (`presentar_116.go`). En C, en
+`console/dc/std/csrc/pvr_pantalla.c`: `convertir_a_columnas(src, w, h, x_dest)`, que pide `x_dest` multiplo de 32
+(los bloques de 32x32 son contiguos; 320 lo es) y devuelve -4 si no, y que avanza las filas de la FUENTE con su
+propio ancho -- usar el paso de 640 en un lienzo de 320 da la imagen cortada en diagonal.
+
+COMO SE CORRE (los dos comandos, medidos en este host):
+    bash scripts/console/build-juego-116.sh /tmp/dcbuild/j116
+    CAPTURAS=6 INTERVALO=4 bash scripts/console/run-flycast-116.sh /tmp/dcbuild/j116/disc.gdi /tmp/dc116
+El A/B es la MISMA compilacion con una palanca: SPLIT=si (dos lienzos) | SPLIT=no (el cuadro de DC-002.115).
+
+
+LOS NUMEROS DEL CRITERIO
+------------------------
+  criterio de la tarjeta                    medido
+  ----------------------------------------  ---------------------------------------------------------------
+  dos camaras y dos lienzos en un cuadro     SI: 15 cuadros, 307.197 de 307.200 pixeles en cada uno
+  el mismo cuadro en las dos mitades         crc32 del cuadro partido IDENTICO en los 15 (-1939454453)
+  cada mitad con su mapa (no la misma)       crc de P1 -2142277791 | crc de P2 -1821214407
+  cada jugador en el centro de SU lienzo     ancla 160 283 en las DOS mitades, cajaDentro= si
+  separados mas de 20 celdas                 25,2982 celdas (P1 28,20 / P2 52,12)
+  ninguno se sale de su mitad                cuadrosFueraDeSuMitad= 0 sobre 15 cuadros
+  repetibilidad por mitad                    igualesPorMitad= true, igualAlCuadro1P1/P2= true
+  lienzos de 320x480                         2 x 614.400 = 1.228.800 B en VRAM (el de 640x480 NO se reserva)
+
+MS POR CUADRO: UN LIENZO CONTRA DOS (misma consola, mismo POC, misma zona del pueblo)
+  --------------------------------------------------------  --------------  ---------------
+                                                           1 lienzo 640    2 lienzos 320
+  --------------------------------------------------------  --------------  ---------------
+  mapa (msMapaPorCuadro)                                       569,0           688,9
+  jugadores (msJugadorPorCuadro)                                 2,0             1,3
+  presentacion (msPresentarPorCuadro, dos conversiones)          s/d            34,3
+  cuadro de punta a punta (msCuadro)                         1.019           1.104 .. 1.154
+  --------------------------------------------------------  --------------  ---------------
+  El mapa de las dos mitades cuesta +119,9 ms (+21,1 %): son las mismas 2.312 peticiones de tile repartidas en dos
+  pasadas de 320x480 en vez de una de 640x480 (mas llamadas, mismo trabajo de pixeles). La presentacion son 34,3 ms
+  por las dos conversiones. El cuadro entero sube ~0,09..0,13 s (+9..13 %); el resto del cuadro es la espera del
+  PVR y el flip, que no cambia (~0,38 s en el split, ~0,45 s en el unico).
+
+VRAM Y MONTON
+  lienzos                                   2 x 614.400 = 1.228.800 B   (los mismos del unico de 640x480)
+  cache de tiles (tramo)                    techo 3.481.600 B (10 bloques) | servido 3.133.440 B | 108 imagenes
+  derrames al monton                        0
+  VRAM disponible al final                  30.024 B (despues de 4.710.400 B pedidos por este POC)
+  monton libre al final del split           1.090.832 B (arena 9.399.040, usado 8.308.208)
+  monton libre al final del cuadro unico    2.019.128 B (arena 7.705.856, usado 5.686.728)
+  semiespacio (pila)                        1.515.728 de 1.835.008 (82 %) | 138 colecciones
+  EL TECHO DEL SPLIT: la cache tiene que tener las DOS zonas del mapa, no una. Con las dos zonas de la corrida
+  (2.600.960 + 675.840 B) entra; con (28,20)+(50,20) (3.694.080 B) NO entra, y lo que sobra no se puede derramar
+  al monton sin que el recolector muera (punto 7). De ahi que el jugador 2 arranque en (52,12): una zona barata,
+  a 25,3 celdas, con mapa lleno (153.600 de 153.600 pixeles).
+
+LO QUE NO ENTRA EN ESTA TARJETA (y no se toco): el leash no se aplica con el split (son las dos alternativas del
+cooperativo: `SPLIT=no` sigue midiendo y aplicando el leash de DC-002.115, y su corrida esta en el punto 6); con
+el split los dos jugadores quietos se dibujan igual (el guion `split-quieto` de la corrida del criterio) y el guion
+que CAMINA existe (`GUION_POC=split`) pero la cache no aguanta el movimiento de las dos camaras -- es el proximo
+trabajo: 4 jugadores (DC-002.117) y/o desalojo en la cache de tiles para que quepan dos zonas que se mueven.
+
+
+================================================================
+ 1. EL SPLIT: LOS DOS LIENZOS, LAS DOS CAMARAS Y EL LIENZO QUE NO SE RESERVA
+================================================================
+JUEGO116: VRAM antes-del-renderer total= 8388608 disponible= 4740808 pedida= 0 pedidos= 1 pedidoMayor= 348160 lienzo= 0
+JUEGO116: TRAMO DE LA CACHE EN BLOQUES DE VRAM techo= 3481600 pedazo= 348160 pedazoLoDiceLaVram= true vramDisponible= 4740808 vramServiriaDeUnGolpe= 3481600
+JUEGO116: SPLIT LIENZOS n= 2 tamano= 320 480 bytesPorLienzo= 614400 bytesTotales= 1228800 origen= vram rendererCuadro= 320 480 elLienzoDe640x480NoSeReserva= true
+JUEGO116: VRAM split-despues-de-los-lienzos total= 8388608 disponible= 3511944 pedida= 1228800 pedidos= 3 pedidoMayor= 614400 lienzo= 0
+JUEGO116: SPLIT CAMARAS camaraP1= 640 1920 camaraP2= 3200 2560 centroDeCadaLienzo= 160 240 celdaP1= 28 20 celdaP2= 52 12
+
+================================================================
+ 2. LOS 15 CUADROS: EL MISMO crc32 EN TODOS, 307.197 DE 307.200 PIXELES, ms DE CADA PARTE
+================================================================
+JUEGO116: SPLIT CUADRO 1 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 818 msJugadores= 2 msPresentar= 0 msCuadro= 0 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 2 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 674 msJugadores= 0 msPresentar= 36 msCuadro= 1.293 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 3 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 676 msJugadores= 0 msPresentar= 37 msCuadro= 1.104 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 4 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 679 msJugadores= 1 msPresentar= 37 msCuadro= 1.106 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 5 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 677 msJugadores= 1 msPresentar= 39 msCuadro= 1.112 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 6 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 677 msJugadores= 2 msPresentar= 37 msCuadro= 1.127 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 7 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 677 msJugadores= 1 msPresentar= 37 msCuadro= 1.11 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 8 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 678 msJugadores= 1 msPresentar= 36 msCuadro= 1.107 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 9 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 674 msJugadores= 1 msPresentar= 36 msCuadro= 1.108 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 10 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 683 msJugadores= 1 msPresentar= 37 msCuadro= 1.107 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 11 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 683 msJugadores= 2 msPresentar= 36 msCuadro= 1.129 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 12 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 684 msJugadores= 2 msPresentar= 37 msCuadro= 1.114 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 13 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 685 msJugadores= 1 msPresentar= 36 msCuadro= 1.114 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 14 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 682 msJugadores= 2 msPresentar= 37 msCuadro= 1.144 celdas= 25.2982 jugadores= 2
+JUEGO116: SPLIT CUADRO 15 lienzos= 2 crc32= -1939454453 pixelesNoVacios= 307197 de 307200 msMapa= 686 msJugadores= 2 msPresentar= 36 msCuadro= 1.154 celdas= 25.2982 jugadores= 2
+
+================================================================
+ 3. CADA MITAD: SU CAMARA, SU CELDA, SU ANCLA Y SU CAJA (los dos en el centro de SU lienzo)
+================================================================
+JUEGO116: SPLIT MITAD cuadro= 1 mitad= IZQUIERDA jugador= P1 lienzo= 320 480 celda= 28 20 camara= 28 20 ancla= 160 283 caja= 142 218 168 297 tamano= 26 x 79 cajaDentro= si pixelesNoVacios= 153597 de 153600 crcMapa= -2142277791 crcConJugador= 752150666 pixelesDelJugador= 896 msMapa= 520 msJugador= 1 cuadroDelCiclo= 0
+JUEGO116: SPLIT MITAD cuadro= 1 mitad= DERECHA jugador= P2 lienzo= 320 480 celda= 52 12 camara= 52 12 ancla= 160 283 caja= 142 218 168 297 tamano= 26 x 79 cajaDentro= si pixelesNoVacios= 153600 de 153600 crcMapa= -1821214407 crcConJugador= 417387187 pixelesDelJugador= 896 msMapa= 298 msJugador= 1 cuadroDelCiclo= 0
+JUEGO116: SPLIT MITAD cuadro= 13 mitad= IZQUIERDA jugador= P1 lienzo= 320 480 celda= 28 20 camara= 28 20 ancla= 160 283 caja= 142 218 168 297 tamano= 26 x 79 cajaDentro= si pixelesNoVacios= 153597 de 153600 crcMapa= -2142277791 crcConJugador= 752150666 pixelesDelJugador= 896 msMapa= 407 msJugador= 1 cuadroDelCiclo= 0
+JUEGO116: SPLIT MITAD cuadro= 13 mitad= DERECHA jugador= P2 lienzo= 320 480 celda= 52 12 camara= 52 12 ancla= 160 283 caja= 142 218 168 297 tamano= 26 x 79 cajaDentro= si pixelesNoVacios= 153600 de 153600 crcMapa= -1821214407 crcConJugador= 417387187 pixelesDelJugador= 896 msMapa= 278 msJugador= 0 cuadroDelCiclo= 0
+
+================================================================
+ 4. LA SEPARACION: 25,2982 CELDAS, MAS DE LAS 20 DEL CRITERIO, Y NINGUN CUADRO FUERA
+================================================================
+JUEGO116: SPLIT SEPARACION cuadro= 1 jugadores= 2 celdas= 25.2982 masDe20= si p1= 28 20 p2= 52 12 maxCeldas= 25.2982 cuadrosMasDe20= 1 cuadrosFuera= 0
+JUEGO116: SPLIT SEPARACION cuadro= 10 jugadores= 2 celdas= 25.2982 masDe20= si p1= 28 20 p2= 52 12 maxCeldas= 25.2982 cuadrosMasDe20= 10 cuadrosFuera= 0
+JUEGO116: SPLIT SEPARACION cuadro= 13 jugadores= 2 celdas= 25.2982 masDe20= si p1= 28 20 p2= 52 12 maxCeldas= 25.2982 cuadrosMasDe20= 13 cuadrosFuera= 0
+JUEGO116: SPLIT SEPARACION cuadro= 14 jugadores= 2 celdas= 25.2982 masDe20= si p1= 28 20 p2= 52 12 maxCeldas= 25.2982 cuadrosMasDe20= 14 cuadrosFuera= 0
+JUEGO116: SPLIT SEPARACION cuadro= 15 jugadores= 2 celdas= 25.2982 masDe20= si p1= 28 20 p2= 52 12 maxCeldas= 25.2982 cuadrosMasDe20= 15 cuadrosFuera= 0
+
+================================================================
+ 5. EL CIERRE: ORIGEN, REPETIBILIDAD Y LOS NUMEROS DEL CRITERIO
+================================================================
+JUEGO116: SPLIT ORIGEN cuadro= 13 crcP1= -2142277791 crcP2= -1821214407
+JUEGO116: SPLIT REPETIBILIDAD cuadro= 14 crcP1= -2142277791 crcP1DelCuadroAnterior= -2142277791 crcP2= -1821214407 crcP2DelCuadroAnterior= -1821214407 igualesPorMitad= true igualesConJugador= true crcP1DelCuadro1= -2142277791 igualAlCuadro1P1= true crcP2DelCuadro1= -1821214407 igualAlCuadro1P2= true
+JUEGO116: MEMORIA split-fin usado= 8308208 libre= 1090832 arena= 9399040 sbrk= -1931079680 techo= -1929445376 pico= 8879408
+JUEGO116: SEMIESPACIO split-fin usado= 1515728 total= 1835008 pct= 82 colecciones= 138
+JUEGO116: SPLIT RESUMEN lienzos= 2 tamano= 320 480 bytesPorLienzo= 614400 bytesDeLienzos= 1228800 origen= vram cuadrosPintados= 15 msMapaTotal= 10333 msJugadorTotal= 19 msPresentarTotal= 514 msMapaPorCuadro= 688.867 msJugadorPorCuadro= 1.26667 msPresentarPorCuadro= 34.2667
+JUEGO116: SPLIT CRITERIO separacionMinCeldas= 25.2982 separacionMaxCeldas= 25.2982 masDe20= si cuadrosMasDe20= 15 cuadrosVigilados= 15 cuadrosFueraDeSuMitad= 0 lienzo= 320 480 dosMitades= true
+JUEGO116: SPLIT MEMORIA vramTotal= 8388608 vramDisponible= 30024 vramPedidaPorEstePoc= 4710400 lienzoDeLaPantalla= 0 cacheDelTramoBytes= 3481600 cacheUsado= 3133440 cacheImagenes= 108 cacheDerrames= 0 montonLibre= 1090832 semiespacioUsado= 1515728 semiespacioTotal= 1835008 colecciones= 138
+JUEGO116: SPLIT FIN crcP1= -2142277791 crcP2= -1821214407 crcCuadro1P1= -2142277791 crcCuadro1P2= -1821214407 crcConJugadorP1= 752150666 crcConJugadorP2= 417387187
+
+================================================================
+ 6. EL A/B: EL MISMO POC CON UN SOLO LIENZO DE 640x480 (SPLIT=no, los dos a 2 celdas, el leash de DC-002.115)
+================================================================
+JUEGO116: VRAM despues-del-video total= 8388608 disponible= 4740808 pedida= 0 pedidos= 0 pedidoMayor= 0 lienzo= 0
+JUEGO116: LEASH AUTOCHEQUEO camara= 28 20 ancla= 320 283 esperado= 320 283 igual= true
+JUEGO116: LEASH MEDIDA peorCeldas= 5.3 leashCeldas= 5.25 palanca= 0 paso= 0.05 caja= 34 x 82 lienzo= 640 480
+JUEGO116: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307197 de 307200 crc32= -1803170647 hostPixeles= 307196 hostCrc= 1437022778 ms= 778 igualAlHost= false camaraCelda= 29 20 jugadores= 2
+JUEGO116: COOP RESUMEN jugadores= 2 cuadrosPintados= 15 msMapa= 569 msJugadores= 2 msCuadro= 1019 p1Caminado= 0 p1Ticks= 0 p1Celda= 28 20 p2Caminado= 0 p2Ticks= 0 p2Celda= 30 20 p2Inyecta= true semiespacioUsado= 1649960 semiespacioTotal= 1835008 colecciones= 130 montonLibre= 2019128 guionSegundos= 5
+JUEGO116: MEMORIA coop-fin usado= 5686728 libre= 2019128 arena= 7705856 sbrk= -1932775424 techo= -1929445376 pico= 8879408
+JUEGO116: SEMIESPACIO coop-fin usado= 1649960 total= 1835008 pct= 89 colecciones= 130
+
+  OJO CON `igualAlHost= false` DE LA LINEA DE ARRIBA: no es una regresion. En esta corrida el jugador 2 arranca a
+  2 celdas (30,20), asi que la camara del grupo cae en la celda 29,20 y el cuadro es otro que el de la referencia
+  del host, que es la de un solo jugador en (28,20). El cuadro tiene los mismos 307.197 de 307.200 pixeles y el
+  camino del cuadro unico es el de DC-002.115, sin una linea tocada (el A/B usa la MISMA compilacion con
+  SPLIT=no).
+
+================================================================
+ 7. EL LIMITE MEDIDO (las dos corridas que NO terminaron, y por que)
+================================================================
+(a) 13 bloques de cache (4.526.080 B) con los dos lienzos de 320x480 en la VRAM:
+    despues de los lienzos quedan 3.511.944 B, asi que el pedazo 11 del tramo no entra y el PVR contesta
+    "pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted" en cada pedido; el programa se cae
+    (Flycast: "Fatal: SH4 exception when blocked") y el emulador reinicia el POC 4 veces.
+
+(b) 9 bloques (3.133.440 B) con las dos zonas caras, P2 en (50,20):
+    las dos ventanas cuestan 2.600.960 + 1.093.120 = 3.694.080 B y no entran; lo que sobra se DERRAMA al monton
+    de Go, donde es VIVO, y el recolector muere:
+      fatal error: GC to-space overflow - your live data doesn't fit in the heap.
+      Memory: arena=9399200 used=8374776 free=1024424
+    El cuadro 2 tarda 7.201 ms (contra 407 del mismo cuadro con la cache en VRAM) y no hay cuadro 3.
+
+LA LECCION: el split entra si la UNION de las dos ventanas entra en el tramo. Con las dos zonas baratas
+(3.133.440 B servidos, 108 imagenes, 0 derrames) entra; con dos zonas caras (3.694.080 B) no, y no hay forma de
+derramar sin que el GC se caiga (el semiespacio es de 1.835.008 B y el monton tiene 1,09 MB libres).
+
+================================================================
+ 8. LA MEDIDA DEL HOST (render-294, 320x480 por celda: cuantas imagenes de cache pide cada ventana)
+================================================================
+  celda (28,20)  P1 (la del POC):   82 imagenes  2.600.960 B  153.597 de 153.600 pixeles
+  celda (52,12)  P2 (la elegida):   33 imagenes    675.840 B  153.600 de 153.600 pixeles
+  celda (50,20)  P2 (descartada):   51 imagenes  1.093.120 B      la suma con P1 no entra en la VRAM
+  otras: (52,28) 34/696.320 - (51,10) 41/839.680 - (44,32) 54/1.469.440 - (46,24) 81/2.110.464
+
+LA SUMA P1+P2 ES UNA COTA: la cache guarda 108 imagenes y sirve 3.133.440 B, o sea que las dos ventanas comparten
+piezas (115 - 108 = 7 imagenes) y la union real entra con 348.160 B de sobra.
+
+================================================================
+ 9. LO QUE SE VE (capturas)
+================================================================
+  dc-002.116-split.png        la ventana del emulador recortada a 640x480: las dos mitades, un personaje en cada
+                              una, y a la izquierda cesped/valla/carro de madera contra piedra oscura y rocas a
+                              la derecha (dos zonas distintas del pueblo).
+  dc-002.116-costura-x4.png   la franja de 120 px centrada en la costura, ampliada x4: el corte vertical en
+                              x=320, donde los objetos de una mitad se truncan en seco y no continuan del otro
+                              lado. Eso es lo que prueba que son dos camaras y no una.
