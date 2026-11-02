@@ -113,6 +113,16 @@ var introMessages = map[int]MsgSound{
 func loadMessages() {
 	messages = messageData{tables: map[string][][]Speech{}, sounds: map[int]MsgSound{}}
 
+	// DC-002.128: SIN CSV NO HAY TABLAS, Y ESO NO ES UN ERROR. Con el embed apagado (el parche de port de arriba)
+	// `messagesCSV` es la cadena vacia y el `panic` de abajo salia SIEMPRE en la consola: el primer `newDenOfEvil` ->
+	// `speechTables` tumbaba la partida antes del primer cuadro (medido en la Dreamcast:
+	// "panic: d2quest: bad embedded messages.csv: EOF"). El guardia de DC-002.48 miraba `len(rows) == 0` y nunca
+	// llegaba, porque el error de la lectura cortaba antes. Se declara el limite al principio, que es donde se sabe:
+	// en la PC el CSV viaja adentro y este camino no se toma nunca.
+	if strings.TrimSpace(messagesCSV) == "" {
+		return
+	}
+
 	rows, err := csv.NewReader(strings.NewReader(messagesCSV)).ReadAll()
 	if err != nil {
 		panic(fmt.Sprintf("d2quest: bad embedded messages.csv: %v", err))

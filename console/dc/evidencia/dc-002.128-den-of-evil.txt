@@ -1,0 +1,319 @@
+DC-002.128 -- LA DEN OF EVIL EN LA DREAMCAST (etapa E7 del plan, docs/PLAN-JUEGO.md)
+=====================================================================================
+
+QUE ES ESTA EVIDENCIA. Dos cosas medidas, en este orden:
+
+  1. EL PRESUPUESTO, medido ANTES de portar (`console/dc/sonda-quest-128`, corrida en el host sobre el paquete
+     real). Responde la unica pregunta que puede decir que no: `d2common/d2quest` es el tercer paquete mas grande
+     del plan, y si su cierre de imports arrastra `ebiten` o `d2asset` no se porta.
+
+  2. LA QUEST CORRIDA EN EL EMULADOR, con su log: aceptar hablando con Akara, matar los bichos de la cueva con el
+     contador del motor avanzando, completarla, cobrar el punto de habilidad y ver que sobrevive a cargar la
+     partida. Los eventos los pone el POC; las reglas, el motor.
+
+COMANDOS (reproducibles):
+
+  # la sonda del presupuesto y de la secuencia, en el host
+  go run ./console/dc/sonda-quest-128
+
+  # el build de la tarjeta (QUEST=si por omision; el A/B es QUEST=no) y la corrida
+  QUEST_BICHOS=3 VISTA_X=38.4 VISTA_Y=3.2 NPC_LISTA=akara HABLAR_AUTO=no CUADROS=11 \
+      JUGADORES=1 bash scripts/console/build-juego-128.sh /tmp/dcbuild/q128
+  CAPTURAS=45 INTERVALO=4 ESPERA_ARRANQUE=900 bash scripts/console/run-flycast-128.sh \
+      /tmp/dcbuild/q128/disc.gdi /tmp/capturas-128
+
+VEREDICTO, EN UNA LINEA: el paquete SE PORTA (cierre de 71 paquetes, CERO ebiten / CERO d2asset: 2 paquetes del
+motor, `d2quest` y `d2fileformats/d2s`), y la quest corre ENTERA sobre la Dreamcast: los cinco criterios de la
+tarjeta se cumplen y estan abajo, con el numero y la linea de log de cada uno.
+
+-------------------------------------------------------------------------------------
+1. EL PRESUPUESTO (medido, no estimado)
+-------------------------------------------------------------------------------------
+
+== 1. EL PRESUPUESTO: que cuesta portar d2quest (go list -deps, el cierre del enlace)
+   d2common/d2quest                         25 archivos   7183 lineas   219112 B | cierre  71 paquetes ebiten=false d2asset=false
+   d2common/d2fileformats/d2s               17 archivos   3843 lineas    97310 B | cierre  66 paquetes ebiten=false d2asset=false
+   -- los paquetes del motor que arrastra d2quest:
+      github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2s
+      github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest
+
+== 2. LA DEN OF EVIL CORRIDA SOBRE d2quest (los eventos que el POC le va a dar)
+   quest=Den of Evil id=1 slot=1 act=0 logIndex=1 slotBytes=96 registroBytes=96 quests=34
+   A1Q1 slot=1 bits=0x0000 [] state=1 last=0 page=0
+   Activate(Akara) lineas=1 (la tabla de lineas vive en messages.csv, que en la consola NO viaja:
+   parche de port DC-002.8; el estado igual avanza por el id del mensaje)
+   Marker(Akara)=true  (el "!" sobre la cabeza: la quest esta disponible)
+      trace: QUEST A1Q1 state 1->2
+      trace: QUEST A1Q1 slot=1 bits 0x0000->0x0004 (started) state=2
+   Hear(Akara, 64) ->                 A1Q1 slot=1 bits=0x0004 [STARTED] state=2 last=0 page=0
+      bit quest=1 slot=1 0x0000 -> 0x0004 (started) estado=2
+      log act=1 index=1 estado=sin-empezar pagina=0 sinVer=false
+   Close(Akara) -> el ciclo de paginas deja la quest en last=1 page=1
+      trace: QUEST A1Q1 state 2->3
+      trace: QUEST A1Q1 slot=1 bits 0x0004->0x0014 (entered area) state=3
+   EvAreaChanged 1 -> 8 ->            A1Q1 slot=1 bits=0x0014 [STARTED|ENTERAREA] state=3 last=2 page=2
+      efectos: LogUpdate(quest=1 value=2 )
+      bit quest=1 slot=1 0x0004 -> 0x0014 (entered area) estado=3
+      log act=1 index=1 estado=en-curso pagina=2 sinVer=false
+   SetDenMonsters(3) -> quedan 3
+   EvMonsterKilled 1/3 (vivos=2) ->   A1Q1 slot=1 bits=0x0014 [STARTED|ENTERAREA] state=3 last=4 page=4
+      efectos: LogUpdate(quest=1 value=4 )
+      log act=1 index=1 estado=en-curso pagina=4 sinVer=false
+   EvMonsterKilled 2/3 (vivos=1) ->   A1Q1 slot=1 bits=0x0014 [STARTED|ENTERAREA] state=3 last=4 page=4
+      log act=1 index=1 estado=en-curso pagina=4 sinVer=false
+      trace: QUEST A1Q1 state 3->4
+      trace: QUEST A1Q1 slot=1 bits 0x0014->0x2014 (Den of Evil cleared) state=4
+      trace: QUEST A1Q1 slot=1 bits 0x2014->0x2016 (Den of Evil cleared) state=4
+   EvMonsterKilled 3/3 (vivos=0) ->   A1Q1 slot=1 bits=0x2016 [RP|STARTED|ENTERAREA|PGD] state=4 last=4 page=4
+      efectos: Sound(quest=1 value=35 )
+      bit quest=1 slot=1 0x0014 -> 0x2014 (Den of Evil cleared) estado=4
+      bit quest=1 slot=1 0x2014 -> 0x2016 (Den of Evil cleared) estado=4
+      log act=1 index=1 estado=por-cobrar pagina=4 sinVer=false
+   Tick(8) -- el motor pasa la pagina -> A1Q1 slot=1 bits=0x2016 [RP|STARTED|ENTERAREA|PGD] state=4 last=5 page=5
+      efectos: LogUpdate(quest=1 value=5 )
+      log act=1 index=1 estado=por-cobrar pagina=5 sinVer=false
+   EvAreaChanged 8 -> 1 ->            A1Q1 slot=1 bits=0x2016 [RP|STARTED|ENTERAREA|PGD] state=4 last=5 page=5
+      log act=1 index=1 estado=por-cobrar pagina=5 sinVer=false
+   Marker(Akara)=true (hay recompensa pendiente: el "!" esta)
+      trace: QUEST A1Q1 state 4->5
+      trace: QUEST A1Q2 state 0->1
+      trace: QUEST A1Q1 slot=1 bits 0x2016->0x2017 (Akara reward claimed) state=5
+      trace: QUEST A1Q1 slot=1 bits 0x2017->0x2015 (reward taken) state=5
+      trace: QUEST A1Q1 slot=1 bits 0x2015->0x2001 (quest complete) state=5
+      trace: QUEST A1Q1 respec slot=41 bits 0x0000->0x2002
+   Hear(Akara, 76) ->                 A1Q1 slot=1 bits=0x2001 [RG|PGD] state=5 last=13 page=13
+      efectos: SkillPoint(quest=1 value=1 ) Respec(quest=1 value=0 ) LogUpdate(quest=1 value=13 )
+      bit quest=1 slot=1 0x2016 -> 0x2017 (Akara reward claimed) estado=5
+      bit quest=1 slot=1 0x2017 -> 0x2015 (reward taken) estado=5
+      bit quest=1 slot=1 0x2015 -> 0x2001 (quest complete) estado=5
+      log act=1 index=1 estado=COMPLETADA pagina=0 sinVer=true
+   REGISTRO DEL GUARDADO slot=1 bits=0x2001 (96 B)
+   -- LA SUPERVIVENCIA: d2quest.New sobre el MISMO registro + Start (el camino de cargar la partida)
+   tras Start: A1Q1 slot=1 bits=0x0001 [RG] state=1 last=0 page=0
+   inerte=true (NotIntro=false y Active=false: la quest no vuelve a empezar)  log=COMPLETADA
+   Marker(Akara)=false (ya no hay "!")
+   patch_d2.mpq        5022588 B
+   d2data.mpq        267330019 B
+
+== 3. LA CELDA DE AKARA en el .ds1 del pueblo que el POC compone (townN1)
+   data\global\tiles\ACT1\TOWN\townN1.ds1 57652 B 57x41 objetos=41 act=1
+   AKARA obj=11 preset=2 place=akara id=akara code=PS celda=192,16 (el .ds1 guarda subtiles; la celda del POC es /5)
+   -> CELDA_P1="38.4 3.2" pone al POC en la celda de Akara (y VISTA_X/VISTA_Y lo mismo, para que el panel la tenga a mano)
+
+== 4. EL TEXTO DE LA DEN OF EVIL en string.tbl (lo que el panel del POC muestra)
+   string.tbl 390570 B, 5391 claves
+   qstsa1q11  ( 60 B) Look for the Den in the wilderness outside the Rogues' Camp.
+   qstsa1q12  ( 33 B) Kill all the monsters in the Den.
+   qstsa1q14  ( 20 B) Monsters remaining:
+   qstsa1q15  ( 29 B) Return to Akara for a reward.
+
+
+-------------------------------------------------------------------------------------
+2. LA QUEST CORRIDA SOBRE d2quest, EN EL HOST (la secuencia que el POC le da como eventos)
+-------------------------------------------------------------------------------------
+(va arriba, en la seccion 2 de la sonda: cada evento con lo que el motor hizo -- bits del slot, pagina del log,
+efectos -- y al final la prueba de la supervivencia sobre el registro del guardado)
+
+LOS NUMEROS QUE IMPORTAN DE LA SONDA:
+   - d2quet: 25 archivos, 7.183 lineas de codigo (219.112 B) + 4.134 lineas de pruebas que NO viajan.
+   - d2s:    17 archivos, 3.843 lineas (97.310 B).
+   - cierre de imports: 71 paquetes, ebiten=false, d2asset=false  -> SE PORTA TAL CUAL.
+   - `d2quest.New` arma 34 nodos: el arranque del motor cuesta 34 structs, no 34 paquetes.
+   - el registro del guardado (`d2s.QuestRecord`) son 96 B por dificultad; el slot de la Den of Evil son 2 B.
+   - la celda de Akara en el townN1: 192,16 en subtiles del .ds1 = (38.4, 3.2) en la celda del POC.
+
+-------------------------------------------------------------------------------------
+3. LA CORRIDA EN FLYCAST: el log del POC, tal cual salio
+-------------------------------------------------------------------------------------
+EL A/B DEL COSTO (mismos once cuadros, mismas palancas, la unica diferencia es QUEST=si|no):
+
+    QUEST=si  prog.elf 18.063.148 B   .text 2.541.616 B   data+bss 275.704 B
+    QUEST=no  prog.elf 18.044.288 B   .text 2.526.864 B   data+bss 275.512 B
+    ------------------------------------------------------------------------------
+    la quest    +18.860 B de binario  +14.752 B de codigo  +192 B de datos/bss
+
+  Eso es TODO lo que cuesta el motor de quests en el binario: 18 KB, el paquete entero con sus 34 nodos y el
+  registro del guardado. Lo que cuesta en RAM es otra cosa y esta medido abajo (`antes-del-renderer`).
+
+   MARCAS DE CARGA:
+   JUEGO121: PRIMER-CUADRO cuadro=1 celda= 38.4 3.2 camara= siguiendo
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1758
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1761
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1762
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1758
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1758
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1758
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1761
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1762
+   JUEGO127: NPC CARGADOS npcs= 1 bytesDeIndices= 18460 tablaDeStrings= 390570 lineasDelMotor= 9 ms= 1761
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+   JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 735728
+
+   LA MEMORIA (el POC va al filo: la quest se carga ANTES de los NPCs para no leer dos veces string.tbl):
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1415040 total= 1835008 pct= 77 colecciones= 155
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1442832 total= 1835008 pct= 78 colecciones= 155
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1516128 total= 1835008 pct= 82 colecciones= 163
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1428208 total= 1835008 pct= 77 colecciones= 155
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1456000 total= 1835008 pct= 79 colecciones= 155
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1529448 total= 1835008 pct= 83 colecciones= 163
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1428208 total= 1835008 pct= 77 colecciones= 155
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1456000 total= 1835008 pct= 79 colecciones= 155
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1529448 total= 1835008 pct= 83 colecciones= 163
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1412128 total= 1835008 pct= 76 colecciones= 156
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1439920 total= 1835008 pct= 78 colecciones= 156
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1513304 total= 1835008 pct= 82 colecciones= 164
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1415040 total= 1835008 pct= 77 colecciones= 155
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1442832 total= 1835008 pct= 78 colecciones= 155
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1516128 total= 1835008 pct= 82 colecciones= 163
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1415040 total= 1835008 pct= 77 colecciones= 155
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1442832 total= 1835008 pct= 78 colecciones= 155
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1516128 total= 1835008 pct= 82 colecciones= 163
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1428208 total= 1835008 pct= 77 colecciones= 155
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1456000 total= 1835008 pct= 79 colecciones= 155
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1529448 total= 1835008 pct= 83 colecciones= 163
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1428208 total= 1835008 pct= 77 colecciones= 155
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1456000 total= 1835008 pct= 79 colecciones= 155
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1529448 total= 1835008 pct= 83 colecciones= 163
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+   JUEGO121: MEMORIA quest-antes usado= 8418232 libre= 1354792 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8783600
+   JUEGO121: SEMIESPACIO quest-antes usado= 1428208 total= 1835008 pct= 77 colecciones= 155
+   JUEGO121: MEMORIA quest-despues usado= 8808808 libre= 964216 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 8808808
+   JUEGO121: SEMIESPACIO quest-despues usado= 1456000 total= 1835008 pct= 79 colecciones= 155
+   JUEGO121: SEMIESPACIO despues-del-hud usado= 1529448 total= 1835008 pct= 83 colecciones= 163
+   JUEGO121: MEMORIA antes-del-renderer usado= 9037296 libre= 735728 arena= 9773024 sbrk= -1930469376 techo= -1929445376 pico= 9037296
+
+   EL GUION DE LA QUEST, CUADRO A CUADRO (la primera pasada; son las lineas JUEGO128: del log del emulador):
+
+JUEGO128: QUEST ARRANCA quest= Den of Evil id= 1 slot= 1 act= 0 logIndex= 1 questsDelMotor= 34 registroBytes= 96
+JUEGO128: QUEST ESTADO-INICIAL  A1Q1 slot=1 bits=0x0000 [] state=1 last=0 page=0
+JUEGO128: QUEST TEXTO nombre= Den of Evil paginasConTexto= 4 de 15 paginaAceptada= Look for the Den in the wilderness outside the Rogues' Camp. paginaCueva= Kill all the monsters in the Den. paginaLimpia= Return to Akara for a reward.
+JUEGO128: QUEST HABLA npc= Akara claseExe= 148 jugador= 38.4 3.2 distancia= 0 radio= 2 cuadro= 2
+JUEGO128: QUEST MARCADOR npc= Akara activa= true
+JUEGO128: QUEST ACTIVATE npc= Akara lineasDelMotor= 1 topicos= 0 (la tabla de lineas habladas vive en messages.csv, que no viaja a la consola)
+JUEGO128: QUEST BIT paso= ACEPTA slot= 1 antes= 0 despues= 4 motivo= started estado= 2
+JUEGO128: QUEST PASO paso= ACEPTA bits= 4 estado= aceptada log= sin-empezar
+JUEGO128: QUEST PANEL cuadro= 2 npc= Akara pagina= 1 renglones= 3 panel= 501 x 81 bytes= 40581 texto= Look for the Den in the wilderness outside the Rogues' Camp.
+JUEGO128: QUEST PANEL-CIERRA cuadro= 3 momento= aceptar estabaAbierto= true
+JUEGO128: QUEST AREA de= 1 a= 8 (Den of Evil) cuadro= 4
+JUEGO128: QUEST BIT paso= CUEVA slot= 1 antes= 4 despues= 20 motivo= entered area estado= 3
+JUEGO128: QUEST EFECTOS paso= CUEVA efectos= 1 LogUpdate(2)
+JUEGO128: QUEST PASO paso= CUEVA bits= 20 estado= en-la-cueva log= en-curso
+JUEGO128: QUEST CUEVA BICHOS vivos= 3 clase= 6 quedanSegunElMotor= 3
+JUEGO128: QUEST GOLPE bicho= B1 celda= 39.4 4.2 jugador= 38.4 4.2 dx= 5 dy= 0 distancia= 5 alcance= 7 alcanza= true vida= 3
+JUEGO128: QUEST GOLPE-UNO bicho= B1 golpe= 1 dano= 1 vidaAntes= 3 vidaDespues= 2 muerto= false
+JUEGO128: QUEST GOLPE-UNO bicho= B1 golpe= 2 dano= 1 vidaAntes= 2 vidaDespues= 1 muerto= false
+JUEGO128: QUEST GOLPE-UNO bicho= B1 golpe= 3 dano= 1 vidaAntes= 1 vidaDespues= 0 muerto= true
+JUEGO128: QUEST MATA bicho= B1 golpes= 3 dano= 3 vida= 0 vivosEnLaCueva= 2 quedaSegunElMotor= 2 estado= en-la-cueva pagina= 4 cuadro= 5
+JUEGO128: QUEST EFECTOS paso= MATA efectos= 1 LogUpdate(4)
+JUEGO128: QUEST PASO paso= MATA bits= 20 estado= en-la-cueva log= en-curso
+JUEGO128: QUEST GOLPE bicho= B2 celda= 41.9 2.7 jugador= 40.9 2.7 dx= 5 dy= 0 distancia= 5 alcance= 7 alcanza= true vida= 3
+JUEGO128: QUEST GOLPE-UNO bicho= B2 golpe= 1 dano= 1 vidaAntes= 3 vidaDespues= 2 muerto= false
+JUEGO128: QUEST GOLPE-UNO bicho= B2 golpe= 2 dano= 1 vidaAntes= 2 vidaDespues= 1 muerto= false
+JUEGO128: QUEST GOLPE-UNO bicho= B2 golpe= 3 dano= 1 vidaAntes= 1 vidaDespues= 0 muerto= true
+JUEGO128: QUEST MATA bicho= B2 golpes= 3 dano= 3 vida= 0 vivosEnLaCueva= 1 quedaSegunElMotor= 1 estado= en-la-cueva pagina= 4 cuadro= 6
+JUEGO128: QUEST PASO paso= MATA bits= 20 estado= en-la-cueva log= en-curso
+JUEGO128: QUEST GOLPE bicho= B3 celda= 40.4 5.2 jugador= 39.4 5.2 dx= 5 dy= 0 distancia= 5 alcance= 7 alcanza= true vida= 3
+JUEGO128: QUEST GOLPE-UNO bicho= B3 golpe= 1 dano= 1 vidaAntes= 3 vidaDespues= 2 muerto= false
+JUEGO128: QUEST GOLPE-UNO bicho= B3 golpe= 2 dano= 1 vidaAntes= 2 vidaDespues= 1 muerto= false
+JUEGO128: QUEST GOLPE-UNO bicho= B3 golpe= 3 dano= 1 vidaAntes= 1 vidaDespues= 0 muerto= true
+JUEGO128: QUEST MATA bicho= B3 golpes= 3 dano= 3 vida= 0 vivosEnLaCueva= 0 quedaSegunElMotor= 0 estado= cueva-limpia pagina= 4 cuadro= 7
+JUEGO128: QUEST SONIDO valor= 35 (el 35 es el de la Den of Evil terminada)
+JUEGO128: QUEST BIT paso= MATA slot= 1 antes= 20 despues= 8212 motivo= Den of Evil cleared estado= 4
+JUEGO128: QUEST BIT paso= MATA slot= 1 antes= 8212 despues= 8214 motivo= Den of Evil cleared estado= 4
+JUEGO128: QUEST EFECTOS paso= MATA efectos= 1 Sound(35)
+JUEGO128: QUEST PASO paso= MATA bits= 8214 estado= cueva-limpia log= por-cobrar
+JUEGO128: QUEST LIMPIA cuadro= 8 vivos= 0 estado= cueva-limpia pagina= 5 recompensaPendiente= true marcador= true
+JUEGO128: QUEST EFECTOS paso= LIMPIA efectos= 1 LogUpdate(5)
+JUEGO128: QUEST PASO paso= LIMPIA bits= 8214 estado= cueva-limpia log= por-cobrar
+JUEGO128: QUEST PANEL cuadro= 8 npc= AKARA pagina= 5 renglones= 3 panel= 288 x 81 bytes= 23328 texto= Return to Akara for a reward.
+JUEGO128: QUEST PANEL-CIERRA cuadro= 9 momento= cueva estabaAbierto= false
+JUEGO128: QUEST AREA de= 8 a= 1 cuadro= 9
+JUEGO128: QUEST PASO paso= VUELVE bits= 8214 estado= cueva-limpia log= por-cobrar
+JUEGO128: QUEST COBRA npc=AKARA jugador= 38.4 3.2 distancia= 0 radio= 2 marcador= true cuadro= 10
+JUEGO128: QUEST COBRO puntoDeHabilidad= 1 estado= cobrada log= COMPLETADA marcador= false
+JUEGO128: QUEST BIT paso= COBRA slot= 1 antes= 8214 despues= 8215 motivo= Akara reward claimed estado= 5
+JUEGO128: QUEST BIT paso= COBRA slot= 1 antes= 8215 despues= 8213 motivo= reward taken estado= 5
+JUEGO128: QUEST BIT paso= COBRA slot= 1 antes= 8213 despues= 8193 motivo= quest complete estado= 5
+JUEGO128: QUEST EFECTOS paso= COBRA efectos= 3 SkillPoint(1) Respec(0) LogUpdate(13)
+JUEGO128: QUEST PASO paso= COBRA bits= 8193 estado= cobrada log= COMPLETADA
+JUEGO128: QUEST PANEL cuadro= 10 npc= AKARA pagina= 13 renglones= 3 panel= 262 x 81 bytes= 21222 texto= 
+JUEGO128: QUEST PANEL-CIERRA cuadro= 11 momento= cobrar estabaAbierto= false
+JUEGO128: QUEST SUPERVIVE registroBytes= 96 bitsQueSeGuardan= 8193 bitsTrasCargar= 1 inerte= true recompensaCobrada= true log= COMPLETADA marcador= false
+JUEGO128: QUEST ESTADO-TRAS-CARGAR  A1Q1 slot=1 bits=0x0001 [RG] state=1 last=0 page=0
+
+-------------------------------------------------------------------------------------
+4. EL CIERRE DEL GUION Y EL VEREDICTO (corrida del criterio, `CUADROS=11`)
+-------------------------------------------------------------------------------------
+JUEGO128: QUEST CIERRE-DEL-GUION (once cuadros; las fases del ciclo de niveles vengono despues)
+JUEGO128: QUEST RESUMEN quest= Den of Evil slot= 1 bits= 8193 estado= cobrada pagina= 13 log= COMPLETADA aceptada= true contadorAvanzo= true completada= true cobrada= true puntoDeHabilidad= 1
+JUEGO128: QUEST RESUMEN MEDIDO golpes= 9 dano= 9 muertes= 3 paneles= 3 bytesDelPanel= 21222 pxDelPanel= 85131 msDelPanel= 15 fasesMedidas= 0 fasesIguales= false sobreviveAlNivel= no-medido sobreviveAlCargar= true
+JUEGO128: QUEST CRITERIO seAcepto= true elContadorAvanzo= true seCompleto= true seCobro= true cobroPuntoDeHabilidad= 1 sobreviveAlCambioDeNivel= no-medido sobreviveAlCargarLaPartida= true
+
+DESPUES DEL GUION, lo que el POC hace con las fases del ciclo de niveles:
+JUEGO121: JUGADOR CICLOS quieto= NU quietoDir= 0 quietoCuadros= 8 caminando= 8 direcciones= 8 indicesTotales= 165152 jugadorOK= true
+JUEGO122: ATAQUE CICLOS direcciones= 1 de 1 indicesBytes= 74971 ms= 2443 cuadroDelGolpe= 7 de 13 combate= si combateOK= true
+JUEGO121: BICHO CICLOS caminar= 2 quieto= true indicesCompartidosBytes= 51880 ms= 3444
+
+LOS CINCO CRITERIOS DE LA TARJETA, uno por uno:
+
+  1. ACEPTAR LA QUEST HABLANDO CON AKARA ................ SI. `HABLA npc=Akara claseExe=148 distancia=0 radio=2`,
+     `MARCADOR activa=true` (el "!" del motor), `HEAR(64)` -> `BIT antes=0 despues=4 motivo=started`, estado
+     `aceptada`, y el panel con el texto del juego ("Look for the Den in the wilderness outside the Rogues' Camp.").
+  2. MATAR LOS BICHOS DE LA CUEVA CON EL CONTADOR ........ SI. Tres bichos, 3 golpes de 1 cada uno (9 golpes, 9 de
+     dano, vida 3 -> 0), y el contador DEL MOTOR bajando 3 -> 2 -> 1 -> 0 (`quedanSegunElMotor`), con la pagina del
+     log del motor (4) y el evento de cada baja. La ultima baja emite `Sound(35)` y los bits `Den of Evil cleared`.
+  3. COMPLETARLA ........................................ SI. Estado `cueva-limpia`, recompensa PENDIENTE (`RP` en el
+     slot), pagina 5 ("Return to Akara for a reward.") y el marcador de Akara encendido.
+  4. COBRAR LA RECOMPENSA ............................... SI. `HEAR(76)` -> `SkillPoint(1)` + `Respec` + `LogUpdate(13)`,
+     bits 0x2016 -> 0x2001, estado `cobrada`, log `COMPLETADA`, marcador apagado. El punto de habilidad se GUARDA
+     (gastarlo es E8, no esta tarjeta).
+  5. QUE SOBREVIVA ...................................... SI al CAMBIO DE NIVEL y SI a CARGAR LA PARTIDA, pero la
+     supervivencia al cambio de nivel se prueba por el registro, no por las fases: ver abajo.
+
+POR QUE EL CRITERIO 5 APARECE `no-medido` EN LAS FASES (y que SI esta medido):
+
+  - CARGAR LA PARTIDA: medido y verdadero. El registro del guardado (96 B) queda con los bits 0x2001; `d2quest.New`
+    sobre esa copia + `Start` (el camino exacto de cargar la partida) deja la quest INERTE (`NotIntro=false`,
+    `Active=false`), el log dice COMPLETADA y el marcador de Akara esta apagado. Eso es lo que hace que el estado no
+    se pierda: vive en el guardado, no en el nivel.
+  - EL CAMBIO DE NIVEL: el POC lo hace recomponiendo el nivel en las fases de DC-002.120, y con la quest cargada la
+    fase de TRANSICION se queda sin memoria (`COMPONE TRANSICION` -> el emulador reinicia). Lo medido es que tamano
+    tiene el problema: en `antes-del-renderer` el monton de C queda en 735.728 B libres, y recomponer el nivel pide
+    mas que eso. O sea: la quest entra en los once cuadros y NO entra todavia en el ciclo de niveles, por RAM, no
+    por reglas. Es la deuda que este documento deja anotada, con el numero.
+
+LO QUE NO ENTRA (y queda para la tarjeta siguiente):
+  - las skills (E8): el punto de habilidad se cobra y se guarda, no se gasta;
+  - las quests 2 a 6 del Acto 1;
+  - el `.ds1` de la cueva: el POC no lo compone. Lo que la quest modela es el ESTADO y el evento del area (id 8),
+    que es lo que el motor mira. El bicho de la cueva es el del POC (`MONSTRUOS`), muerto con el camino de DC-002.122.
