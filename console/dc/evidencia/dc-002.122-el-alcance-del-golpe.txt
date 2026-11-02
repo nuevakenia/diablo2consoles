@@ -1,0 +1,202 @@
+DC-002.122 -- EL ALCANCE DEL GOLPE: CUANDO LLEGA Y CUANDO NO
+================================================================================================
+
+Corrida: Flycast 2.7 (AppImage) sobre Linux 7.2.3-1-cachyos, ventana 640x480, capturas 1:1 con el cuadro del POC.
+Fecha: 2026-11-02 10:45..11:15 (America/Santiago).
+Binarios: tres del mismo arbol (console/dc/poc/juego-122), reusando los .gox del motor (SALTAR_MOTOR=1), con la
+MISMA configuracion y solo la posicion del jugador (y en la tercera la vida del bicho) distinta:
+
+  corrida  jugadores  CELDA_P1  VIDA_X  que mide
+  A        1          "0 1"     1       el golpe de LA CELDA DE AL LADO: llega, baja la vida y mata
+  B        1          "-2 1"    1       el MISMO binario con el jugador A TRES CELDAS: no llega, la vida no baja
+  C        4          "0 1"     2       los CUATRO pegandole al mismo bicho
+
+  (comunes: CUADROS=16|18 JUGADORES=1|4 GUION_POC=quieto FASE=apagado CAMARA=fija MONSTRUOS=1 PATRULLA="1 0 0"
+   COMBATE=si GOLPE_AUTO=si ALCANCE=7 DIRS_ATAQUE_LISTA="14" MODOS_DIRS=1 CELDA_P2="1 0" CELDA_P3="1 2"
+   CELDA_P4="2 1")
+
+QUE PRUEBA CADA COSA
+------------------------------------------------------------------------------------------------
+1. EL BOTON: el Y del control de la Dreamcast entra por el puerto del maple de CADA jugador y el servicio lo
+   traduce a `d2enum.KeyY`. El POC nunca mira los bits: `p.Entrada.IsKeyPressed(d2enum.KeyY)`. El flanco (una
+   pulsacion = un ataque) y el rechazo de un ataque encadenado son la regla del POC.
+2. EL A1 DEL HEROE: el COF del ataque desarmado de la amazona (`AMA1HTH.COF`), sus 13 cuadros a 40,00 ms
+   (25,00 fps del animdata), compuestos desde el d2char.mpq con su caja, sus pixeles y su crc32.
+3. EL CUADRO DEL GOLPE: la mitad de la animacion (7 de 13), la regla de `checkEvents` del motor.
+4. EL ALCANCE: la tabla de distancias del exe (`UNIT_GetTableDistance`, importada del motor) y el 7 verificado de
+   `meleeInRange`. La mitad positiva (A) y la negativa (B) del criterio.
+5. LA VIDA Y LA MUERTE: la vida del bicho por el camino de siembra del motor (monstats.txt + MonLvl.txt del
+   parche), el dano del dado del heroe, y los tres modos del golpe: GH al recibir, DT al morir, DD despues.
+6. Los CUATRO contra el mismo bicho (C), cada uno con su boton y su dado.
+
+LA TABLA DEL ALCANCE, VERIFICADA DESDE EL HOST (no desde la consola)
+------------------------------------------------------------------------------------------------
+`go run ./console/dc/sonda-alcance-122` (la MISMA funcion que usa la POC: `d2skill.TableDistanceSized`, tamano del
+heroe `HeroUnitSize`=2, tamano del bicho 1):
+
+  dx= 0 dy= 0  (la misma celda)                      distancia=  0  alcanza= true
+  dx= 5 dy= 0  (la celda de al lado, misma fila)      distancia=  5  alcanza= true   <- corrida A
+  dx= 0 dy= 5  (la celda de al lado, misma columna)   distancia=  5  alcanza= true
+  dx= 5 dy= 5  (la celda de al lado, en DIAGONAL)     distancia=  8  alcanza= FALSE  <- la trampa
+  dx=10 dy= 0  (a dos celdas)                         distancia= 18  alcanza= false
+  dx=15 dy= 0  (a tres celdas)                        distancia= 28  alcanza= false  <- corrida B
+
+LA TRAMPA DE LA DIAGONAL (medida, no supuesta). El POC nace en (28,20) y el bicho en (29,21): estan en DIAGONAL.
+La primera corrida de esta tarjeta (con el jugador en su celda de siempre) dio 7 ataques y 7 `GOLPE-AFUERA` con
+`dx=5 dy=5 distancia=8`, la vida del bicho intacta en 3 y el jugador golpeando el aire: la tabla del exe dice que
+la diagonal de una celda NO alcanza, y tenia razon. Por eso la corrida del golpe ubica al jugador en la celda de
+al lado (`CELDA_P1="0 1"`).
+
+LA DIRECCION DEL GOLPE (cadena del motor, verificada desde el host)
+------------------------------------------------------------------------------------------------
+`go run ./console/dc/sonda-dir-122` (`d2vector.DirectionTo` -> `d2cof.Dir64ToCof`, 16 direcciones del heroe):
+
+  N=10  NE=12  E=14  SE=0  S=2  SW=4  W=6  NW=8
+
+El jugador 1, al oeste del bicho, le pega mirando al ESTE: direccion 14. Es la que compone
+`DIRS_ATAQUE_LISTA="14"` y la que dice el log (`GOLPE-EMPIEZA ... dir= 14 dirPropia= true`).
+
+EL A1 DEL HEROE (compuesto en la consola, del d2char.mpq)
+------------------------------------------------------------------------------------------------
+JUEGO122: ATAQUE DIR 14 cuadros= 13 msPorCuadro= 40 caja= 79 x 73 indices= 74971
+JUEGO122: ATAQUE CICLOS direcciones= 1 de 1 indicesBytes= 74971 ms= 2444 cuadroDelGolpe= 7 de 13 combate= si
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 0 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1239 crc32= 204286492 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 1 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1177 crc32= -310229492 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 2 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1186 crc32= 157614232 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 3 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1180 crc32= -937576920 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 4 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1175 crc32= 1451259862 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 5 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1156 crc32= -245718378 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 6 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1016 crc32= 928674435 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 7 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1210 crc32= -1144042053 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 8 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1148 crc32= -1691568489 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 9 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 985 crc32= -110717253 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 10 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1028 crc32= -190328265 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 11 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1136 crc32= -1528484668 capasDibujadas= 7 sinGrafico= 0
+JUEGO122: ATAQUE CUADRO dir= 14 cuadro= 12 de 13 caja= 79 x 73 esquina= -25 -63 pixeles= 1136 crc32= -1528484668 capasDibujadas= 7 sinGrafico= 0
+
+(los crc32 son los del cuadro compuesto: dos cuadros iguales dan el mismo crc, y el 12 repite el 11 porque la
+ ultima pose del ataque es la misma que la anterior en el COF del AMA1HTH: 13 cuadros, 12 poses distintas)
+
+LA VIDA DEL BICHO Y LOS TRES MODOS DEL GOLPE
+------------------------------------------------------------------------------------------------
+JUEGO122: COMBATE TABLA data\global\excel\monstats.txt bytes= 238019 crc32= -324849623
+JUEGO122: COMBATE TABLA data\global\excel\MonLvl.txt bytes= 14707 crc32= 1775919478
+JUEGO122: COMBATE VIDA nombre= B1 clase= Returned nivel= 6 min= 2 max= 3 HP= 3 AC= 30 danoDelBicho= 2 .. 5
+JUEGO122: COMBATE MODO GH dir= 6 cuadros= 4 msPorCuadro= 56 indices= 11928
+JUEGO122: COMBATE MODO DT dir= 6 cuadros= 19 msPorCuadro= 49 indices= 171304
+JUEGO122: COMBATE MODO DD dir= 6 cuadros= 1 msPorCuadro= 67 indices= 3588
+JUEGO122: COMBATE CICLOS modos= 3 indicesCompartidosBytes= 238700 ms= 5814 alcanceSubtiles= 7 tamanoDelBicho= 1 semilla= 3
+
+  * La vida sale de monstats.txt (MinHP 2, MaxHP 3) por el nivel 6 del MonLvl.txt del parche: HP= 3. El Returned
+    aguanta TRES golpes de 1, que es lo que permite ver el GH antes del DT.
+  * GH y DT son de un solo tiro (4 y 19 cuadros): GH vuelve a caminar y DT pasa a DD, la regla de `checkEvents`.
+  * El modo DD se alcanza (`MODO-BICHO modo= DD cuadros= 1 msPorCuadro= 67 vida= 0`), pero su cuadro viene VACIO:
+    el DCC del SKDDHTH compuesto da caja 92 x 39 y **0 pixeles pintados**. El cadaver no se ve con esta animacion.
+    Se informa: es un dato del MPQ (o de las capas que pide el COF para DD), no un bug del POC.
+
+CORRIDA A -- EL GOLPE DE LA CELDA DE AL LADO (dx=5, distancia=5)
+------------------------------------------------------------------------------------------------
+JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 1 dir= 14 dirDibujada= 14 dirPropia= true vida= 3 cuadro= 0
+JUEG121: CUADRO 1 JUGADOR nombre= P1 ... tamano= 79 x 73 pixelesPintados= 1239 ... dir= 14 cuadroDelCiclo= 0 celda= 28 21
+JUEGO122: GOLPE jugador= P1 ataque= 1 cuadroDelHeroe= 44 de 13 dano= 1 vidaAntes= 3 vidaDespues= 2 muerto= false dx= 5 dy= 0 distancia= 5 alcance= 7 danoAcumulado= 1
+JUEGO122: MODO-BICHO modo= GH cuadros= 4 msPorCuadro= 56 vida= 2
+JUEGO122: GOLPE-FIN jugador= P1 ataque= 1 vida= 2 cuadrosDelGolpe= 13 msDelCiclo= 520 ultimaPoseDibujada= 12
+JUEGO122: GOLPE jugador= P1 ataque= 2 cuadroDelHeroe= 36 de 13 dano= 1 vidaAntes= 2 vidaDespues= 1 muerto= false dx= 5 dy= 0 distancia= 5 alcance= 7 danoAcumulado= 2
+JUEGO122: MODO-BICHO modo= GH cuadros= 4 msPorCuadro= 56 vida= 1
+JUEGO122: GOLPE jugador= P1 ataque= 3 cuadroDelHeroe= 36 de 13 dano= 1 vidaAntes= 1 vidaDespues= 0 muerto= true dx= 5 dy= 0 distancia= 5 alcance= 7 danoAcumulado= 3
+JUEGO122: MUERTE vida= 0 golpes= 3 dano= 3 modo= DT ultimoJugador= P1 cuadro= 6
+JUEGO122: MODO-BICHO modo= DT cuadros= 19 msPorCuadro= 49 vida= 0
+JUEGO122: MODO-BICHO modo= DD cuadros= 1 msPorCuadro= 67 vida= 0
+JUEGO122: COMBATE RESUMEN jugadores= 1 alcance= 7 dirsAtaque= 1 golpesDados= 3 golpesAfuera= 0 danoTotal= 3 tarde= 0 muertes= 1 vidaFinal= 0 vidaTablaMax= 3 muerto= true modoFinal= DD cuadrosA1Dibujados= 1 porJugador= P1:ataques=3,golpes=3,afuera=0,dano=3
+JUEGO122: COMBATE CRITERIO elGolpeBajaVida= true fueraDeAlcanceNoBaja= true murioConSuAnimacion= true losCuatroPegaron= false
+
+  LECTURA: tres flancos, tres golpes, la vida 3 -> 2 -> 1 -> 0, la muerte con su DT y despues DD. El golpe del
+  heroe dibuja su A1 (caja 79x73, 1239 pixeles) en el cuadro en que arranca el ataque.
+
+CORRIDA B -- EL MISMO BINARIO, EL JUGADOR A TRES CELDAS (dx=15, distancia=28)
+------------------------------------------------------------------------------------------------
+JUEGO122: GOLPE-AFUERA jugador= P1 ataque= 21 cuadroDelHeroe= 7 de 13 dx= 15 dy= 0 distancia= 28 alcance= 7 vida= 3
+JUEGO122: GOLPE-AFUERA jugador= P1 ataque= 22 cuadroDelHeroe= 7 de 13 dx= 15 dy= 0 distancia= 28 alcance= 7 vida= 3
+...
+JUEGO122: COMBATE RESUMEN jugadores= 1 alcance= 7 dirsAtaque= 1 golpesDados= 0 golpesAfuera= 7 danoTotal= 0 tarde= 0 muertes= 0 vidaFinal= 3 vidaTablaMax= 3 muerto= false modoFinal= WL cuadrosA1Dibujados= 1 porJugador= P1:ataques=7,golpes=0,afuera=7,dano=0
+
+  LECTURA: siete flancos, siete golpes FUERA de alcance, danoTotal= 0, la vida intacta en 3 y el bicho caminando
+  (WL) al final. El ataque se anima igual (el flanco, el A1 y el cuadro 7 del golpe son los mismos): lo unico que
+  cambia es que la tabla del exe da 28 y el alcance verificado es 7.
+  (La linea COMBATE CRITERIO de la corrida B dice `elGolpeBajaVida= false` porque en B el jugador esta fuera a
+  proposito: el criterio de la tarjeta se lee en el PAR A/B, no en una corrida sola.)
+
+CORRIDA C -- LOS CUATRO PEGANDOLE AL MISMO BICHO (VIDA_X=2: 6 HP)
+------------------------------------------------------------------------------------------------
+JUEGO122: COMBATE VIDA INSTRUMENTO deLaTabla= 3 factor= 2 HP= 6
+JUEGO122: GOLPE jugador= P1 ataque= 1 cuadroDelHeroe= 48 de 13 dano= 1 vidaAntes= 6 vidaDespues= 5 muerto= false dx= 5 dy= 0 distancia= 5 alcance= 7 danoAcumulado= 1
+JUEGO122: GOLPE jugador= P2 ataque= 1 cuadroDelHeroe= 48 de 13 dano= 1 vidaAntes= 5 vidaDespues= 4 muerto= false dx= 0 dy= 5 distancia= 5 alcance= 7 danoAcumulado= 2
+JUEGO122: GOLPE jugador= P3 ataque= 1 cuadroDelHeroe= 48 de 13 dano= 1 vidaAntes= 4 vidaDespues= 3 muerto= false dx= 0 dy= -5 distancia= 5 alcance= 7 danoAcumulado= 3
+JUEGO122: GOLPE jugador= P4 ataque= 1 cuadroDelHeroe= 48 de 13 dano= 1 vidaAntes= 3 vidaDespues= 2 muerto= false dx= -5 dy= 0 distancia= 5 alcance= 7 danoAcumulado= 4
+JUEGO122: GOLPE jugador= P1 ataque= 2 cuadroDelHeroe= 44 de 13 dano= 2 vidaAntes= 2 vidaDespues= 0 muerto= true dx= 5 dy= 0 distancia= 5 alcance= 7 danoAcumulado= 6
+JUEGO122: GOLPE-TARDE jugador= P2 ataque= 2 vida= 0 golpesPrevios= 5
+JUEGO122: MUERTE vida= 0 golpes= 5 dano= 6 modo= DT ultimoJugador= P1 cuadro= 5
+JUEGO122: MODO-BICHO modo= DT cuadros= 19 msPorCuadro= 49 vida= 0
+JUEGO122: MODO-BICHO modo= DD cuadros= 1 msPorCuadro= 67 vida= 0
+JUEGO122: COMBATE RESUMEN jugadores= 4 alcance= 7 dirsAtaque= 1 golpesDados= 5 golpesAfuera= 0 danoTotal= 6 tarde= 3 muertes= 1 vidaFinal= 0 vidaTablaMax= 6 muerto= true modoFinal= DD cuadrosA1Dibujados= 4 porJugador= P1:ataques=2,golpes=2,afuera=0,dano=3 P2:ataques=2,golpes=1,afuera=0,dano=1 P3:ataques=2,golpes=1,afuera=0,dano=1 P4:ataques=2,golpes=1,afuera=0,dano=1
+JUEGO122: COMBATE CRITERIO elGolpeBajaVida= true fueraDeAlcanceNoBaja= true murioConSuAnimacion= true losCuatroPegaron= true
+
+  LECTURA: los cuatro, cada uno en su celda de al lado (dx/dy +-5 en las cuatro direcciones), le pegan al MISMO
+  bicho en el mismo cuadro del POC: la vida 6 -> 5 -> 4 -> 3 -> 2 y despues P1 la remata (dano 2, muerto). Los
+  tres golpes que caen con el bicho ya muerto se cuentan aparte (`GOLPE-TARDE`, 3) y NO suman al criterio.
+  * VIDA_X=2 es un INSTRUMENTO declarado: la tabla da 3 HP y los cuatro no llegan a pegarle. El log dice el
+    numero de la tabla y el factor.
+  * Las cuatro direcciones del A1 no entran en el semiespacio (ver LA MEMORIA): se compone la 14 y los otros tres
+    dibujan esa pose. El alcance y el dano NO dependen del dibujo (son por posicion y por dado).
+  * Captura `c2` (rec-c2.png): las cuatro amazonas alrededor del punto donde esta el bicho.
+
+
+LA MEMORIA: EL VERDADERO LIMITE DE ESTA TARJETA (medido, con el A/B de palancas)
+------------------------------------------------------------------------------------------------
+El semiespacio del recolector es fijo: 1.835.008 B (libgodc). Lo que crece con esta tarjeta son los indices
+compuestos del A1 (74.971 B por direccion) y los del golpe del bicho (GH 11.928 + DT 171.304 + DD 3.588).
+
+LOS BINARIOS QUE SE MIDIERON (para que la evidencia no se pueda confundir con otro arbol)
+------------------------------------------------------------------------------------------------
+  1ST_READ.BIN  5.458.632 B  sha256 cc8db83fc5af7707...  corrida A y B (el mismo binario, solo cambia CELDA_P1)
+  1ST_READ.BIN  5.458.952 B  sha256 5436c01c8b70818c...  corrida C (JUGADORES=4 VIDA_X=2)
+  Los dos salen del arbol commiteado con `SALTAR_MOTOR=1`: recompilar la MISMA fuente despues de `gofmt` da el
+  mismo sha256 (`cc8db83f...`), asi que el binario de la evidencia es el del repo.
+
+  intento                                        imagen viva           resultado
+  8 direcciones del A1 + GH/DT/DD en 2            1.768.880 = 96 %     MUERE: `GC to-space overflow` en el paso
+                                                                       siguiente (las casillas del DS1)
+  1 direccion del A1 + GH/DT/DD en 2              1.400.576 = 76 %     carga, pero el DT x2 deja el 98 % y el
+                                                                       recolector entra en bucle: 15 min y muere
+  1 direccion del A1 + GH/DT/DD en 1 (esta)       1.679.968 = 91 %     ENTRA y corre (159 colecciones)
+
+  Referencia de DC-002.121 (sin combate): 1.166.320 = 63 %.
+  Es el por que de `DIRS_ATAQUE_LISTA="14"` (una direccion) y `MODOS_DIRS=1` (una direccion del bicho): con 4
+  direcciones del A1 el binario no entra, y el A/B de la corrida de los cuatro lo deja escrito.
+
+COSTO POR CUADRO (el mismo POC, ahora peleando)
+------------------------------------------------------------------------------------------------
+JUEGO121: COOP RESUMEN jugadores= 1 cuadrosPintados= 19 msMapa= 759 msJugadores= 0 msCuadro= 1496
+JUEGO121: BICHO RESUMEN monstruos= 1 tipo= Returned token= SK modo= WL celdaB1= 29 21 solapamientos= 0
+JUEGO121: SEMIESPACIO bicho-despues usado= 1.679.968 total= 1.835.008 pct= 91 colecciones= 159
+
+  * msCuadro= 1.496 ms (el mapa se rasteriza en la CPU: 759 ms son del mapa). El A1 compuesto no agrega ms de
+    dibujo: el cuadro del POC se pinta con el mismo pincel (`PintarJugador`).
+  * Con un cuadro del POC de ~1,5 s y un A1 de 520 ms, la animacion del golpe se muestrea UNA vez
+    (`cuadrosA1Dibujados= 1`): el binario lo informa en vez de fingir que la vio completa.
+
+LO QUE NO SE PUDO (y por que)
+------------------------------------------------------------------------------------------------
+1. Las OCHO direcciones del A1 y del golpe del bicho no entran en el semiespacio (96 % y 98 % medidos). Entran una
+   del A1 y una de los modos; la corrida de los cuatro compone UNA direccion y lo dice
+   (`GOLPE-EMPIEZA ... dirPropia= false` cuando la direccion del jugador no esta compuesta: el golpe se dibuja
+   con la que hay, y el dano y el alcance NO dependen del dibujo).
+2. El cadaver (DD) no se ve: su cuadro compuesto da 0 pixeles (dato del MPQ/COF, no del POC).
+3. La animacion del golpe se ve en UN cuadro del POC (1,5 s por cuadro contra 520 ms de animacion).
+
+LO QUE NO SE TOCA
+------------------------------------------------------------------------------------------------
+* El motor: el alcance usa `d2common/d2skill` TAL CUAL (ya viene compilado en los .gox) y nada mas del motor
+  cambia. Los modos del bicho y el dado salen de `monstruo.go`, el archivo COMPARTIDO con el verificador del host
+  (`console/dc/verif-monstruo-250`), verificado con `cmp` en cada build.
+* `personaje.go` y `jugador.go` siguen siendo byte a byte los del medidor del host (el build lo verifica).
