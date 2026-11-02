@@ -26,9 +26,50 @@
 static maple_device_t *control = NULL;
 static int ya_se_busco = 0;
 
+/* ============================== DC-002.113: EL ESTADO INYECTADO ==============================
+ *
+ * POR QUE. La corrida del criterio de DC-002.113 aprieta la cruceta con el teclado virtual del host y es FLYCAST
+ * el que arma el estado en el bus maple: ahi esto queda APAGADO y no cambia nada. Pero si el emulador no toma ese
+ * teclado, la prueba tiene que poder correr igual, y el camino es el shim: el estado se deja a un costado y
+ * `d2c_control_leer` lo devuelve en vez de leer el bus. El estado entra por la MISMA puerta que un control de
+ * verdad (el servicio lo traduce bits -> teclas y el juego pregunta por las teclas): lo unico que cambia es de
+ * donde salieron los bits, y el POC lo imprime en la evidencia.
+ *
+ * APAGADO POR OMISION: `inyectando = 0`, asi que ningun otro POC cambia de comportamiento por este archivo.
+ */
+static int inyectando = 0;
+static cont_state_t estado_inyectado;
+
+/* d2c_control_inyectar: deja el estado inyectado y, si `encendido` es distinto de cero, lo enciende (o lo apaga
+ * con 0). Devuelve 1 si quedo encendido. */
+int d2c_control_inyectar(unsigned int botones, int palanca_x, int palanca_y,
+                         int gatillo_l, int gatillo_r, int encendido) {
+    estado_inyectado.buttons = botones;
+    estado_inyectado.joyx = palanca_x;
+    estado_inyectado.joyy = palanca_y;
+    estado_inyectado.ltrig = gatillo_l;
+    estado_inyectado.rtrig = gatillo_r;
+    estado_inyectado.joy2x = 0;
+    estado_inyectado.joy2y = 0;
+
+    inyectando = encendido != 0 ? 1 : 0;
+
+    return inyectando;
+}
+
+/* d2c_control_inyectando: si el estado lo esta poniendo el shim. */
+int d2c_control_inyectando(void) {
+    return inyectando;
+}
+
 /* d2c_control_buscar: busca el control en el puerto 0. Devuelve 1 si hay control y 0 si no.
- * Se busca UNA vez (maple_enum_type recorre el bus), no en cada cuadro. */
+ * Se busca UNA vez (maple_enum_type recorre el bus), no en cada cuadro. Con el estado inyectado contesta que si:
+ * para el servicio es un control mas. */
 int d2c_control_buscar(void) {
+    if (inyectando) {
+        return 1;
+    }
+
     if (!ya_se_busco) {
         control = maple_enum_type(0, MAPLE_FUNC_CONTROLLER);
         ya_se_busco = 1;
@@ -49,14 +90,18 @@ int d2c_control_leer(unsigned int *botones, int *palanca_x, int *palanca_y,
                      int *gatillo_l, int *gatillo_r, int *palanca2_x, int *palanca2_y) {
     cont_state_t *estado;
 
-    if (control == NULL) {
-        return -1;
-    }
+    if (inyectando) {
+        estado = &estado_inyectado;
+    } else {
+        if (control == NULL) {
+            return -1;
+        }
 
-    /* maple_dev_status espera a que el estado sea valido: no devuelve una lectura a medio hacer */
-    estado = (cont_state_t *)maple_dev_status(control);
-    if (estado == NULL) {
-        return -2;
+        /* maple_dev_status espera a que el estado sea valido: no devuelve una lectura a medio hacer */
+        estado = (cont_state_t *)maple_dev_status(control);
+        if (estado == NULL) {
+            return -2;
+        }
     }
 
     if (botones != NULL) {
