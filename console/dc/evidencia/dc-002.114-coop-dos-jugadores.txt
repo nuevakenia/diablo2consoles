@@ -1,0 +1,104 @@
+DC-002.114 -- DOS JUGADORES EN LA MISMA PANTALLA (POC console/dc/poc/juego-114)
+
+Flycast 2.7, ventana 640x480, mismo motor y mismos MPQ que DC-002.113. Las lineas de abajo son COPIA del
+log serial de la consola, no un resumen: cada numero salio de la corrida que se dice.
+
+================ CORRIDA A: JUGADORES=1 (la referencia de DC-002.113) ================
+build:   JUGADORES=1 SALTAR_MOTOR=1     -> /tmp/dcbuild/j114-uno/disc.gdi
+corrida: TECLAS=1 GUION='derecha 4 nada 2'  (el teclado virtual llega al puerto A: el camino REAL del bus
+         maple -> tabla del backend -> teclas del motor, el mismo de DC-002.113)
+
+JUEGO114: COOP jugadores= 1 puertoJugador1= 0 puertoJugador2= 1 celdaP2= 30 20 compartirJugador2= si guionCoopSegundos= 15 guionJugador2= si cuadros= 24
+JUEGO114: COOP MEMORIA jugadores= 1 cuadrosCompartidosBytes= 165152 estadoPorJugadorBytes= 104 estadoTotalBytes= 104 noCompartidoBytes= 165152 compartirJugador2= si direcciones= 8 jugadorOK= true
+JUEGO114: COOP CONTROL cuadro= 1 jugadores= 1 P1:botones=0,ejes=0/0,inyecta=no
+JUEGO114: CUADRO 1 ARRANCA libre= 1091376
+JUEGO114: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostPixeles= 307196 hostCrc= 1437022778 ms= 677 igualAlHost= true camaraCelda= 28 20 jugadores= 1
+JUEGO114: CUADRO 1 JUGADOR nombre= P1 puerto= 0 inyecta= false ancla= 320 283 caja= 302 218 328 297 tamano= 26 x 79 pixelesPintados= 896 crc32DelCiclo= 1857478036 dir= 0 caminando= false cuadroDelCiclo= 0 ms= 0 celda= 28 20
+JUEGO114: CUADRO 1 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 pixelesDelJugador= 896 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= NU msMapa= 677 msJugador= 0 jugadores= 1 celda= 28 20
+JUEGO114: CUADRO 1 REFERENCIA igualAlDeDC002112= true crc32= 1363871674 esperado= 1363871674 ancla= 320 283
+JUEGO114: COOP CONTROL cuadro= 2 jugadores= 1 P1:botones=0,ejes=0/0,inyecta=no
+JUEGO114: COOP TRAMO SOLO-P1 segundos= 4.196 p1Ticks= 0 p1Celdas= 0 p1CeldasPorSegundo= 0 p2Ticks= 0 p2Celdas= 0 p2CeldasPorSegundo= 0 p1Ini= 28 20 p1Fin= 28 20 p2Ini= 0 0 p2Fin= 0 0 jugadores= 1
+JUEGO114: COOP CONTROL cuadro= 7 jugadores= 1 P1:botones=128,ejes=1/0,inyecta=no
+JUEGO114: COOP CONTROL cuadro= 8 jugadores= 1 P1:botones=128,ejes=1/0,inyecta=no
+JUEGO114: COOP CONTROL cuadro= 9 jugadores= 1 P1:botones=128,ejes=1/0,inyecta=no
+JUEGO114: COOP CONTROL cuadro= 10 jugadores= 1 P1:botones=128,ejes=1/0,inyecta=no
+JUEGO114: COOP TRAMO SOLO-P2 segundos= 3.867 p1Ticks= 95 p1Celdas= 7.125 p1CeldasPorSegundo= 1.84251 p2Ticks= 0 p2Celdas= 0 p2CeldasPorSegundo= 0 p1Ini= 29.2728 18.7272 p1Fin= 33.0381 14.9619 p2Ini= 0 0 p2Fin= 0 0 jugadores= 1
+JUEGO114: COOP TRAMO LOS-DOS segundos= 4.023 p1Ticks= 0 p1Celdas= 0 p1CeldasPorSegundo= 0 p2Ticks= 0 p2Celdas= 0 p2CeldasPorSegundo= 0 p1Ini= 33.0381 14.9619 p1Fin= 33.0381 14.9619 p2Ini= 0 0 p2Fin= 0 0 jugadores= 1
+JUEGO114: REPETIBILIDAD cuadro= 26 camara= siguiendo crcMapa= 1334245619 crcMapaDelCuadroAnterior= 1334245619 igualAlCuadroAnterior= true crcConJugador= 1265288563 crcConJugadorDelCuadroAnterior= 1265288563 igualConJugador= true ancla= 320 283 celda= 28 20 llenos= 307200 llenosDelCuadroAnterior= 307200 crcMapaDelCuadro1= 1437022778 igualAlCuadro1= false llenosDelCuadro1= 307196 cachePerezosa= true
+JUEGO114: COOP RESUMEN jugadores= 1 cuadrosPintados= 27 msMapa= 611 msJugadores= 1 msCuadro= 1014 p1Caminado= 35.625 p1Ticks= 95 p1Celda= 33.0381 14.9619 p2Caminado= 35.625 p2Ticks= 95 p2Celda= 0 0 p2Inyecta= false semiespacioUsado= 1622904 semiespacioTotal= 1835008 colecciones= 172 montonLibre= 2017112 guionSegundos= 15
+
+================ CORRIDA B: JUGADORES=2 (el cooperativo) ================
+build:   JUGADORES=2 INYECTAR_P1=si SALTAR_MOTOR=1  -> /tmp/dcbuild/j114-dos/disc.gdi
+corrida: TECLAS=0  (a los dos los mueve el guion del POC, cada uno por SU puerto del bus maple: el jugador 1
+         en el puerto 0 y el 2 en el 1; en Flycast el puerto 1 NO tiene aparato y el log lo dice: aparato= 0)
+
+JUEGO114: COOP jugadores= 2 puertoJugador1= 0 puertoJugador2= 1 celdaP2= 30 20 compartirJugador2= si guionCoopSegundos= 15 guionJugador2= si cuadros= 24
+JUEGO114: PUERTO jugador= P1 puerto= 0 aparato= 16777216 hayControl= true inyecta= false guionJugador2= si
+JUEGO114: PUERTO jugador= P2 puerto= 1 aparato= 0 hayControl= false inyecta= true guionJugador2= si
+JUEGO114: PUERTO jugador=P1 FORZADO AL GUION (inyectarJugador1=si): el estado de su puerto lo pone el shim, no el teclado del emulador; aparatoReal= 16777216
+JUEGO114: COOP MEMORIA jugadores= 2 cuadrosCompartidosBytes= 165152 estadoPorJugadorBytes= 104 estadoTotalBytes= 208 noCompartidoBytes= 330304 compartirJugador2= si direcciones= 8 jugadorOK= true
+JUEGO114: COOP CONTROL cuadro= 1 jugadores= 2 P1:botones=128,ejes=1/0,inyecta=si P2:botones=0,ejes=0/0,inyecta=si
+JUEGO114: CUADRO 1 ARRANCA libre= 1090768
+JUEGO114: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307197 de 307200 crc32= -1803170647 hostPixeles= 307196 hostCrc= 1437022778 ms= 879 igualAlHost= false camaraCelda= 29 20 jugadores= 2
+JUEGO114: CUADRO 1 JUGADOR nombre= P1 puerto= 0 inyecta= true ancla= 240 243 caja= 222 175 253 254 tamano= 31 x 79 pixelesPintados= 1057 crc32DelCiclo= 715008237 dir= 0 caminando= true cuadroDelCiclo= 0 ms= 1 celda= 28 20
+JUEGO114: CUADRO 1 JUGADOR nombre= P2 puerto= 1 inyecta= true ancla= 400 323 caja= 382 258 408 337 tamano= 26 x 79 pixelesPintados= 896 crc32DelCiclo= 1857478036 dir= 0 caminando= false cuadroDelCiclo= 0 ms= 0 celda= 30 20
+JUEGO114: CUADRO 1 CON-JUGADOR pixelesNoVacios= 307197 de 307200 crc32= -564838013 pixelesDelJugador= 1057 ancla= 240 243 dir= 0 cuadroDelCiclo= 0 modo= TW msMapa= 879 msJugador= 1 jugadores= 2 celda= 28 20
+JUEGO114: CUADRO 1 REFERENCIA igualAlDeDC002112= false crc32= -564838013 esperado= 1363871674 ancla= 240 243
+JUEGO114: COOP CONTROL cuadro= 2 jugadores= 2 P1:botones=128,ejes=1/0,inyecta=si P2:botones=0,ejes=0/0,inyecta=si
+JUEGO114: CUADRO 2 JUGADOR nombre= P1 puerto= 0 inyecta= true ancla= 346 243 caja= 333 181 361 255 tamano= 28 x 74 pixelesPintados= 1059 crc32DelCiclo= 190366337 dir= 12 caminando= true cuadroDelCiclo= 2 ms= 0 celda= 29.3258 18.6742
+JUEGO114: CUADRO 2 JUGADOR nombre= P2 puerto= 1 inyecta= true ancla= 293 323 caja= 275 258 301 337 tamano= 26 x 79 pixelesPintados= 896 crc32DelCiclo= 1857478036 dir= 0 caminando= false cuadroDelCiclo= 0 ms= 1 celda= 30 20
+JUEGO114: COOP CONTROL cuadro= 3 jugadores= 2 P1:botones=128,ejes=1/0,inyecta=si P2:botones=0,ejes=0/0,inyecta=si
+JUEGO114: COOP CONTROL cuadro= 4 jugadores= 2 P1:botones=128,ejes=1/0,inyecta=si P2:botones=0,ejes=0/0,inyecta=si
+JUEGO114: COOP CONTROL cuadro= 5 jugadores= 2 P1:botones=128,ejes=1/0,inyecta=si P2:botones=0,ejes=0/0,inyecta=si
+JUEGO114: COOP TRAMO SOLO-P1 segundos= 4.743 p1Ticks= 100 p1Celdas= 7.5 p1CeldasPorSegundo= 1.58128 p2Ticks= 0 p2Celdas= 0 p2CeldasPorSegundo= 0 p1Ini= 28 20 p1Fin= 33.3033 14.6967 p2Ini= 30 20 p2Fin= 30 20 jugadores= 2
+JUEGO114: COOP CONTROL cuadro= 7 jugadores= 2 P1:botones=0,ejes=0/0,inyecta=si P2:botones=64,ejes=-1/0,inyecta=si
+JUEGO114: COOP CONTROL cuadro= 8 jugadores= 2 P1:botones=0,ejes=0/0,inyecta=si P2:botones=64,ejes=-1/0,inyecta=si
+JUEGO114: COOP CONTROL cuadro= 9 jugadores= 2 P1:botones=0,ejes=0/0,inyecta=si P2:botones=64,ejes=-1/0,inyecta=si
+JUEGO114: COOP TRAMO SOLO-P2 segundos= 3.28 p1Ticks= 0 p1Celdas= 0 p1CeldasPorSegundo= 0 p2Ticks= 75 p2Celdas= 5.625 p2CeldasPorSegundo= 1.71494 p1Ini= 33.3033 14.6967 p1Fin= 33.3033 14.6967 p2Ini= 28.6742 21.3258 p2Fin= 26.0225 23.9775 jugadores= 2
+JUEGO114: COOP CONTROL cuadro= 11 jugadores= 2 P1:botones=80,ejes=-1/-1,inyecta=si P2:botones=160,ejes=1/1,inyecta=si
+JUEGO114: COOP CONTROL cuadro= 12 jugadores= 2 P1:botones=80,ejes=-1/-1,inyecta=si P2:botones=160,ejes=1/1,inyecta=si
+JUEGO114: COOP CONTROL cuadro= 13 jugadores= 2 P1:botones=80,ejes=-1/-1,inyecta=si P2:botones=160,ejes=1/1,inyecta=si
+JUEGO114: COOP CONTROL cuadro= 14 jugadores= 2 P1:botones=80,ejes=-1/-1,inyecta=si P2:botones=160,ejes=1/1,inyecta=si
+JUEGO114: COOP TRAMO LOS-DOS segundos= 4.478 p1Ticks= 100 p1Celdas= 7.5 p1CeldasPorSegundo= 1.67485 p2Ticks= 100 p2Celdas= 7.5 p2CeldasPorSegundo= 1.67485 p1Ini= 31.5245 14.1038 p1Fin= 26.1882 12.325 p2Ini= 27.8013 24.5704 p2Fin= 33.1376 26.3492 jugadores= 2
+JUEGO114: CUADRO 26 JUGADOR nombre= P1 puerto= 0 inyecta= true ancla= 240 243 caja= 222 178 248 257 tamano= 26 x 79 pixelesPintados= 896 crc32DelCiclo= 1857478036 dir= 0 caminando= false cuadroDelCiclo= 0 ms= 0 celda= 28 20
+JUEGO114: CUADRO 26 JUGADOR nombre= P2 puerto= 1 inyecta= true ancla= 400 323 caja= 382 258 408 337 tamano= 26 x 79 pixelesPintados= 896 crc32DelCiclo= 1857478036 dir= 0 caminando= false cuadroDelCiclo= 0 ms= 1 celda= 30 20
+JUEGO114: COOP RESUMEN jugadores= 2 cuadrosPintados= 27 msMapa= 632 msJugadores= 0 msCuadro= 1049 p1Caminado= 75 p1Ticks= 200 p1Celda= 26.1882 12.325 p2Caminado= 65.625 p2Ticks= 175 p2Celda= 33.1376 26.3492 p2Inyecta= true semiespacioUsado= 1604144 semiespacioTotal= 1835008 colecciones= 186 montonLibre= 2016504 guionSegundos= 15
+
+================ LOS NUMEROS, EN UNA TABLA ================
+magnitud                              1 jugador                 2 jugadores
+cuadros compuestos (assets)            165152 B                  165152 B   <- el segundo jugador cuesta 0 B
+estado por jugador                     104 B                     104 B (208 B los dos)
+si NO se compartieran los cuadros                                330304 B
+ms del mapa (por cuadro)               611                       632 .. 1295  (la varianza entre corridas es
+                                                                             mayor que la diferencia)
+ms de los jugadores                    1                         0 .. 1      (pintar los dos es < 1 ms)
+ms del cuadro completo                 1014                      1049 .. 1713
+semiespacio al cerrar                  1622904 / 1835008 (88 %)  1604144 .. 1657112 / 1835008 (87 .. 90 %)
+cuadro 1 == el de DC-002.112           si (1363871674)           no: la camara va al CENTRO del grupo (29,20)
+mapa solo == el del host               si (1437022778)           no: misma razon (camara 29,20 vs 28,20)
+
+LA INDEPENDENCIA DEL INPUT (los tres tramos del guion, corrida B; del log COOP TRAMO):
+  tramo     p1Ticks  p2Ticks  p1CeldasPorSegundo  p2CeldasPorSegundo
+  SOLO-P1   100       0        1,58                0
+  SOLO-P2   0         75       0                   1,71
+  LOS-DOS   100       100      1,67                1,67
+
+  En SOLO-P1 el unico que pide es el jugador 1 y el jugador 2 tiene 0 ticks: su input no lo mueve. En SOLO-P2 al
+  reves. En LOS-DOS los dos caminan en el mismo cuadro, cada uno a la velocidad del exe (9,375 subtiles/s / 5 =
+  1,875 celdas/s; el 1,58/1,71 es el promedio del tramo, que incluye el cuadro en que la tecla todavia no entro).
+
+LO QUE SE VE (capturas recortadas a la ventana del emulador, 640x480):
+  c00-quieto.png (cuadro 1): DOS amazonas en el mismo cuadro, anclas 240,243 y 400,323.
+  c01.png        (cuadro 2): las DOS amazonas, una a cada lado del carro.
+  Capturas crudas (3584x1080, pantalla completa): /tmp/dc114-run-dos4/*.png
+  Recortes 640x480: /tmp/dc114-recorte4/*.png
+
+EL LIMITE MEDIDO (y por que el split screen es otra tarjeta):
+  Con la camara en el centro del grupo, dos jugadores a 20 celdas de separacion en el mapa se salen los dos del
+  lienzo de 640x480 (anclas 828,-279 y -189,844 en la primera corrida, con tramos de 6 s). La proyeccion del motor
+  estira la diagonal: 3 celdas de diferencia ya son ~340 px de pantalla. El cooperativo en UNA pantalla necesita
+  que los jugadores esten a pocas celdas (el "leash" del juego original); para separaciones mayores hace falta
+  partir la pantalla.
+
+REGRESION: el binario de DC-002.113 (scripts/console/build-juego-113.sh, SALTAR_MOTOR=1) sigue compilando y
+enlazando contra el mismo maple.gox con la capa por puerto, y su cartel de numeros esperados no cambio.

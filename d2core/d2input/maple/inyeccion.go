@@ -39,3 +39,33 @@ func (s *Servicio) DejarDeInyectar() {
 func (s *Servicio) Inyectando() bool {
 	return d2cControlInyectando() == 1
 }
+
+// ============================ DC-002.114: LA INYECCION, PUERTO POR PUERTO ============================
+//
+// POR QUE. El cooperativo de esta tarjeta necesita DOS estados a la vez: el del jugador 1, que viene del bus (el
+// teclado del emulador en el puerto A), y el del jugador 2, que no tiene aparato en el puerto B. La inyeccion de
+// DC-002.113 es UNA sola para todo el bus (`d2c_control_inyectar`), asi que encenderla para el jugador 2 tambien
+// pisaria al jugador 1. Las tres de abajo son la misma idea, con el puerto como primer argumento.
+
+//extern d2c_control_inyectar_puerto
+func d2cControlInyectarPuerto(puerto, botones uintptr, palancaX, palancaY, gatilloL, gatilloR, encendido uintptr) int
+
+//extern d2c_control_inyectando_puerto
+func d2cControlInyectandoPuerto(puerto uint) int
+
+// InyectarBotonesEn: desde ahora `ActualizarDesdeElControlEn(puerto)` lee ESTE estado en vez del bus, y solo para
+// ese puerto.
+func (s *Servicio) InyectarBotonesEn(puerto int, botones uint32) {
+	d2cControlInyectarPuerto(uintptr(puerto), uintptr(botones), 0, 0, 0, 0, 1)
+}
+
+// DejarDeInyectarEn: ese puerto vuelve a leer el bus maple.
+func (s *Servicio) DejarDeInyectarEn(puerto int) {
+	d2cControlInyectarPuerto(uintptr(puerto), 0, 0, 0, 0, 0, 0)
+}
+
+// InyectandoEn: si ese puerto lo pone el shim (la evidencia lo imprime: no es lo mismo un jugador con control que
+// uno con guion).
+func (s *Servicio) InyectandoEn(puerto int) bool {
+	return d2cControlInyectandoPuerto(uint(puerto)) == 1
+}

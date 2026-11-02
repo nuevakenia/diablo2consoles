@@ -132,6 +132,12 @@ def main():
             return 2
         pasos = []
         for i in range(0, len(resto), 2):
+            # DC-002.114: "nada" es un tramo con la CRUCETA SUELTA. Existe porque el guion del cooperativo tiene
+            # pausas en las que el jugador 1 NO tiene que moverse: sin este tramo, la tecla del tramo anterior
+            # seguiria apretada (el aparato mantiene el estado) y el tramo SOLO-P2 quedaria contaminado.
+            if resto[i] == "nada":
+                pasos.append(([], float(resto[i + 1])))
+                continue
             combinacion = resto[i].split("+")
             for n in combinacion:
                 if n not in TECLAS:
