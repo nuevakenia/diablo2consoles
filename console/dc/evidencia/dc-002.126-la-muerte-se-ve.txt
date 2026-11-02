@@ -1,0 +1,229 @@
+========================================================================
+DC-002.126 -- LA MUERTE SE VE (Dreamcast / Flycast, Go + gox)
+========================================================================
+Fecha de las corridas: 2026-11-02
+POC: console/dc/poc/juego-126  (copia congelada de juego-124; el 124 no se toca)
+Sonda de host: console/dc/sonda-muerte-126
+Build: bash scripts/console/build-juego-126.sh /tmp/dcbuild/<dir>
+Corrida: bash scripts/console/run-flycast-126.sh /tmp/dcbuild/<dir>/disc.gdi /tmp/<out>
+
+QUE DICE LA TARJETA: que la muerte del Returned se VEA -- que se vea la caida (el DT cuadro a
+cuadro), que se vea el cadaver (el DD), que el cadaver desaparezca (~12 s) y que el lienzo vuelva
+al mapa. Con numeros medidos en el emulador, no con relatos.
+
+========================================================================
+1. POR QUE EN DC-002.122 EL DD "VENIA VACIO" (EL DIAGNOSTICO)
+========================================================================
+
+La 122 midio `MODO-BICHO modo= DD cuadros= 1 msPorCuadro= 67 vida= 0` y un cuadro compuesto con
+0 pixeles. La conclusion facil era "el .cof del DD viene vacio". NO ES ESO.
+
+1.1 Lo que dice el disco (sonda-muerte-126, con los lectores de d2common: d2mpq / d2dcc / d2cof):
+
+    SONDA126: LISTFILE nombres=11083 delBicho=423 grafiasDD=9
+    SONDA126: COF DD bytes=148 crc32=2228234389 capas=7 cuadrosPorDir=1 dirs=8
+    SONDA126: COF DT bytes=1335 crc32=3809108645 capas=8 cuadrosPorDir=19 dirs=8
+
+    Las 7 capas del DD, con su caja y sus pixeles no vacios (todas OK, ninguna "file not found"):
+
+    SONDA126: CAPA modo=DD tipo=TR prioridad=0 estado=OK SKTRLITDD1hs.dcc caja=-36,0 89x37 cuadros=1 pixelesPorCuadro=[302]
+    SONDA126: CAPA modo=DD tipo=HD prioridad=6 estado=OK SKHDLITDD1hs.dcc caja=-12,14 24x20 cuadros=1 pixelesPorCuadro=[83]
+    SONDA126: CAPA modo=DD tipo=LA prioridad=1 estado=OK SKLALITDD1hs.dcc caja=-20,0 29x12 cuadros=1 pixelesPorCuadro=[90]
+    SONDA126: CAPA modo=DD tipo=LG prioridad=2 estado=OK SKLGLITDD1hs.dcc caja=-5,-2 48x20 cuadros=1 pixelesPorCuadro=[276]
+    SONDA126: CAPA modo=DD tipo=RA prioridad=3 estado=OK SKRALITDD1hs.dcc caja=3,14 37x8 cuadros=1 pixelesPorCuadro=[79]
+    SONDA126: CAPA modo=DD tipo=S1 prioridad=4 estado=OK SKS1LITDD1hs.dcc caja=46,17 10x10 cuadros=1 pixelesPorCuadro=[62]
+    SONDA126: CAPA modo=DD tipo=S2 prioridad=5 estado=OK SKS2LITDD1hs.dcc caja=-32,12 7x9 cuadros=1 pixelesPorCuadro=[42]
+
+    SONDA126: COMPUESTO DD dir=6 cuadro=0 caja=92x39 pixelesNoVacios=819
+    SONDA126: COMPUESTO DT dir=6 cuadro=18 caja=92x98 pixelesNoVacios=870
+
+    La clase de arma de la muerte es 1HS en TODAS las capas (los graficos son `<CAPA>LITDD1hs.dcc`):
+    la declara cada capa del COF, no un campo global.
+
+1.2 Lo que dice el POC (la misma cuenta adentro del binario de la consola):
+
+    JUEGO126: MUERTE COF-DD modo= DD dir= 6 cuadros= 1 msPorCuadro= 67 caja= 92 x 39
+              pixelesCompuestos= 819 crc32= 1212887229 capasDibujadas= 7 capasSinGrafico= 0
+              vacio= false crc32DelHost= 1212887229 pixelesDelHost= 819
+
+    El compuesto del DD en la consola da la MISMA caja (92x39) y los MISMOS pixeles (819) que la
+    sonda del host. El crc32 difiere del crc32 del .dcc porque el de la sonda es el del archivo y
+    el del POC es el del lienzo compuesto; lo que importa es pixeles y caja, y coinciden.
+
+1.3 Entonces, por que 0 pixeles en la 122: porque con DOS O MAS jugadores el POC dibuja por el
+    camino de la pantalla partida (`split.go`) y ese camino NO dibujaba monstruos (679 lineas,
+    cero referencias a `bicho`). El bicho no se pintaba nunca: el 0 era de DIBUJO, no de datos.
+    En esta tarjeta se pinta en cada mitad con la camara de esa mitad (ver seccion 4).
+
+========================================================================
+2. EL PROBLEMA DEL RELOJ (Y LA PALANCA QUE LO RESUELVE)
+========================================================================
+
+    DT del Returned: 19 cuadros x 49 ms = 931 ms (`JUEGO126: MUERTE EMPIEZA ... cicloDelMotorMs= 931`).
+    Cuadro del POC:  ~1,3-1,6 s (dos pasadas del mapa, cuatro jugadores, Flycast sin KVM).
+
+    Con el reloj de PARED del motor, 931 ms de caida caben en MENOS de un cuadro del POC: la caida
+    se muestrea una sola vez y en pantalla el bicho pasa de parado a cadaver de un salto. Medido en
+    la 122 (0 cuadros dibujados de 19 y un solo cuadro del DT a la vista).
+
+    PALANCA `muertePorCuadro` (env `MUERTE_POR_CUADRO`): "si" = EL INSTRUMENTO: cada cuadro del POC
+    pide el cuadro SIGUIENTE del DT (uno por cuadro), asi que los 19 cuadros se ven uno por uno.
+    Lo que NO cambia: el ciclo, sus 19 cuadros, su caja, sus pixeles y su crc32 salen del animdata
+    y del COF del motor; lo unico que cambia es CADA CUANTO se pide el cuadro siguiente, porque la
+    consola no dibuja a 20 fps. "no" = el reloj de pared del motor (la corrida de la 122, el A/B).
+
+    PALANCA `cadaverKnob` (env `CADAVER`): "si" = el cadaver expira a los 12,0 s del motor
+    (`corpseSeconds` en `d2core/d2monsters/director.go`: "corpses are removed after this long:
+    ENGINE CHOICE"). "no" = el cadaver queda para siempre (el A/B de "desaparece del cuadro").
+
+========================================================================
+3. CORRIDA DE REFERENCIA -- /tmp/dc126d (LA QUE SOSTIENE EL CRITERIO)
+========================================================================
+
+Build (el script imprime los knobs con los que compilo):
+
+    MUERTE muertePorCuadro=si cadaver=si
+    cuadros= 90  fase= apagado  jugadores= 4  split= no  guionPoc= cuatro
+    combate= si  golpeAuto= si  alcanceGolpe= 7  dirsAtaque= 2  vidaMultiplicada= 1
+    patrullaDx= 1,0  patrullaDy= -1,0  patrullaLargo= 1
+
+    bash scripts/console/build-juego-126.sh /tmp/dcbuild/juego126d   (CUADROS=90 FASE=apagado
+        PATRULLA="1 0 1" MUERTE_POR_CUADRO=si CADAVER=si SALTAR_MOTOR=1)
+    CAPTURAS=40 INTERVALO=2 bash scripts/console/run-flycast-126.sh \
+        /tmp/dcbuild/juego126d/disc.gdi /tmp/dc126d
+
+3.1 LA CAIDA, CUADRO A CUADRO (19 cuadros del DT, uno por cuadro del POC, cada uno con su crc32):
+
+    JUEGO126: MUERTE EMPIEZA bicho= B1 modo= DT cuadrosDT= 19 msPorCuadro= 49 cicloDelMotorMs= 931
+              reloj= un cuadro por cuadro del POC (INSTRUMENTO: la consola no dibuja a 20 fps)
+              cadaverMs= 12000 cadaver= si vida= 0 cuadro= 12
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 0 de 19 caja= 92 x 98 pixelesCompuestos= 618 pixelesPintados= 618 crc32= 1454087487  ms= 1 lienzoRestaurado= true cuadro= 13
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 1 de 19 caja= 92 x 98 pixelesCompuestos= 792 pixelesPintados= 792 crc32= -887701509  ms= 1 lienzoRestaurado= true cuadro= 14
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 2 de 19 caja= 92 x 98 pixelesCompuestos= 822 pixelesPintados= 822 crc32= -1178463961 ms= 1 lienzoRestaurado= true cuadro= 15
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 3 de 19 caja= 92 x 98 pixelesCompuestos= 820 pixelesPintados= 820 crc32= -1917060391 ms= 1 lienzoRestaurado= true cuadro= 16
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 4 de 19 caja= 92 x 98 pixelesCompuestos= 853 pixelesPintados= 853 crc32= 544089184   ms= 1 lienzoRestaurado= true cuadro= 17
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 5 de 19 caja= 92 x 98 pixelesCompuestos= 850 pixelesPintados= 849 crc32= -609655996  ms= 1 lienzoRestaurado= true cuadro= 18
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 6 de 19 caja= 92 x 98 pixelesCompuestos= 849 pixelesPintados= 849 crc32= -1764603463 ms= 1 lienzoRestaurado= true cuadro= 19
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 7 de 19 caja= 92 x 98 pixelesCompuestos= 797 pixelesPintados= 797 crc32= 1165970373  ms= 1 lienzoRestaurado= true cuadro= 20
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 8 de 19 caja= 92 x 98 pixelesCompuestos= 800 pixelesPintados= 800 crc32= -105988085  ms= 1 lienzoRestaurado= true cuadro= 21
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 9 de 19 caja= 92 x 98 pixelesCompuestos= 837 pixelesPintados= 837 crc32= -955277680  ms= 1 lienzoRestaurado= true cuadro= 22
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=10 de 19 caja= 92 x 98 pixelesCompuestos= 814 pixelesPintados= 814 crc32= 1277162910  ms= 1 lienzoRestaurado= true cuadro= 23
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=11 de 19 caja= 92 x 98 pixelesCompuestos= 806 pixelesPintados= 806 crc32= -23213884   ms= 1 lienzoRestaurado= true cuadro= 24
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=12 de 19 caja= 92 x 98 pixelesCompuestos= 818 pixelesPintados= 818 crc32= 1198423912  ms= 1 lienzoRestaurado= true cuadro= 25
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=13 de 19 caja= 92 x 98 pixelesCompuestos= 808 pixelesPintados= 808 crc32= 599325495   ms= 1 lienzoRestaurado= true cuadro= 26
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=14 de 19 caja= 92 x 98 pixelesCompuestos= 836 pixelesPintados= 836 crc32= 385656096   ms= 1 lienzoRestaurado= true cuadro= 27
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=15 de 19 caja= 92 x 98 pixelesCompuestos= 849 pixelesPintados= 849 crc32= -1495688282 ms= 1 lienzoRestaurado= true cuadro= 28
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=16 de 19 caja= 92 x 98 pixelesCompuestos= 861 pixelesPintados= 861 crc32= 1057808142  ms= 1 lienzoRestaurado= true cuadro= 29
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=17 de 19 caja= 92 x 98 pixelesCompuestos= 872 pixelesPintados= 872 crc32= 565217654   ms= 1 lienzoRestaurado= true cuadro= 30
+    JUEGO126: MUERTE CUADRO modo= DT cuadro=18 de 19 caja= 92 x 98 pixelesCompuestos= 870 pixelesPintados= 870 crc32= 1671002120  ms= 1 lienzoRestaurado= true cuadro= 31
+    JUEGO126: MUERTE CAE bicho= B1 cuadrosDTDibujados= 19 de 19 msDeLaCaida= 61789 msDelMotor= 931 cuadro= 31
+
+    19 cuadros DISTINTOS, cada uno con su crc32 (no hay dos iguales), la caja del DT de 92x98 y
+    entre 618 y 872 pixeles pintados por cuadro. La caja y los pixeles del ultimo cuadro (870)
+    son los mismos que los del host (`SONDA126: COMPUESTO DT dir=6 cuadro=18 ... pixelesNoVacios=870`).
+
+3.2 EL CADAVER (el DD) Y SU EXPIRACION:
+
+    JUEGO126: MUERTE CUADRO modo= DD cuadro= 0 de 1 caja= 92 x 39 pixelesCompuestos= 819
+              pixelesPintados= 819 crc32= 1212887229 lienzoRestaurado= true cuadro= 32
+    ...
+    JUEGO126: CADAVER EXPIRA bicho= B1 ms= 12879 cuadrosDelCadaver= 4 cuadrosDelPOC= 23
+              vida= 0 cuadro= 35
+
+    Y el mismo cuadro contado por el camino de los bichos (que es el que pinta el lienzo):
+
+    JUEGO121: BICHO CUADRO 33 ... pixelesPintados= 819 crcConBichos= -1262462476 mapaSolo= 173308762
+              lienzoRestaurado= true detalle= B1:...tamano=92x39,dir=6,cuadro=0,pixeles=819
+    JUEGO121: BICHO CUADRO 34 ... pixelesPintados= 819 crcConBichos= -1262462476 mapaSolo= 173308762
+    JUEGO121: BICHO CUADRO 35 ... pixelesPintados= 819 crcConBichos= -1262462476 mapaSolo= 173308762
+    JUEGO121: BICHO CUADRO 36 ... pixelesPintados= 0   crcConBichos= 483565111 mapaSolo= 173308762
+    JUEGO121: BICHO CUADRO 37 ... pixelesPintados= 0   crcConBichos= 483565111 mapaSolo= 173308762
+    JUEGO121: BICHO CUADRO 38 ... pixelesPintados= 0   crcConBichos= 483565111 mapaSolo= 173308762
+    JUEGO121: BICHO CUADRO 39 ... pixelesPintados= 0   crcConBichos= 483565111 mapaSolo= 173308762
+
+    TRES cuadros con el cadaver a la vista (819 pixeles, crc32 del lienzo con cadaver -1262462476
+    distinto del mapa solo 173308762) y desde el cuadro 36 CERO pixeles: el cadaver desaparecio del
+    cuadro y el lienzo volvio al crc32 que tenia sin el (483565111 = mapa + jugadores, el mismo en
+    los cuatro cuadros siguientes). El `mapaSolo` no se movio en toda la muerte (173308762).
+
+    Los 12,0 s del motor se midieron en 12879 ms de consola: el plazo se comprueba una vez por
+    cuadro y los cuadros del POC son de ~1,3 s, asi que el cadaver se queda hasta el primer cuadro
+    que pasa los 12 s (4 cuadros enteros a la vista).
+
+3.3 EL CIERRE (la linea que sostiene el criterio):
+
+    JUEGO126: MUERTE RESUMEN bicho= B1 modoFinal= DD reloj= si cuadrosDT= 19 dibujadosDT= 19
+              cuadroDD= true cuadrosDelCadaver= 4 expirado= true vida= 0 msDeLaCaida= 61789
+              msDelMotor= 931 pixelesDT= 870 pixelesDD= 819 msDibujoDT= 19 msDibujoDD= 4
+              crcdtPrimerCuadro= 1454087487 crcDTUltimoCuadro= 1671002120 crcDD= 1212887229
+              cuadrosConLienzoRestaurado= 23 cuadrosConLienzoDistinto= 0 lienzoRestaurado= true
+
+    JUEGO126: MUERTE CRITERIO laCaidaSeVe= true cuadrosDeLaCaida= 19 elCadaverSeVe= true
+              elCadaverDesaparece= true elLienzoVuelveAlMapa= true losDosRelojes= true cadaver= si
+
+    JUEGO126: MUERTE COF-DD crc32DelCompuesto= 1212887229 pixeles= 819 crc32DelHost= 1212887229
+              pixelesDelHost= 819 coincide= true
+
+    Lectura: 19 de 19 cuadros de la caida dibujados (distintos), el cuadro del cadaver dibujado una
+    vez y repetido mientras dura (4 cuadros), el cadaver expirado a los 12,0 s del motor y el lienzo
+    restaurado en TODOS los 23 cuadros que hubo un bicho en muerte (cuadrosConLienzoDistinto= 0).
+    Los 61.789 ms de caida son el reloj de la consola: es el INSTRUMENTO (19 cuadros x ~3,2 s), no
+    lo que duraria en el juego, que son los 931 ms del animdata.
+
+    La regla de "misma entrada, misma salida" de las tarjetas anteriores se rompe aca a proposito:
+    con `muertePorCuadro=si` el reloj es el del POC, asi que dos corridas dan los mismos CUADROS y
+    los mismos crc32 (medido: 126c y 126d dan los 19 crc32 del DT identicos) pero distinto
+    `msDeLaCaida`. El crc32 del mapa solo (173308762) si es estable entre corridas.
+
+========================================================================
+4. LA PANTALLA PARTIDA (la causa raiz del 0 de la 122, arreglada)
+========================================================================
+
+`split.go` dibuja cada mitad con su camara y no dibujaba bichos. Ahora, DESPUES del jugador de la
+mitad y con la camara de esa mitad todavia puesta, pinta los bichos con el mismo pincel y la misma
+cuenta de caja que la pantalla de uno (guarda lo de abajo, pinta, mide, devuelve el mapa, compara
+crc32), y los vuelve a pintar al final para que se queden en pantalla.
+
+Corrida /tmp/dc126e y /tmp/dc126f (JUGADORES=2 SPLIT=si CUADROS=90 FASE=apagado PATRULLA="1 0 1"):
+
+    JUEGO126: BICHO MITAD 0 cuadro= 1 bichos= 1 pixeles= 616 ms= 0 lienzoRestaurado= true
+    JUEGO126: BICHO MITAD 0 cuadro= 2 bichos= 1 pixeles= 210 ms= 1 lienzoRestaurado= true
+    JUEGO126: BICHO MITAD 1 cuadro= 2 bichos= 1 pixeles= 603 ms= 1 lienzoRestaurado= true
+    JUEGO126: BICHO MITAD 1 cuadro= 4 bichos= 1 pixeles= 616 ms= 0 lienzoRestaurado= true
+    ...
+
+    Antes de esta tarjeta esas lineas no existian y el bicho no se pintaba en NINGUNA mitad: es el
+    "0 pixeles" con el que la 122 concluyo que el COF del DD venia vacio.
+
+    La muerte entera corre igual por el camino del split (corrida /tmp/dc126f, mismos crc32 del DT
+    que la corrida de referencia):
+
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 0 de 19 caja= 92 x 98 pixelesCompuestos= 618 pixelesPintados= 618 crc32= 1454087487 ...
+    JUEGO126: MUERTE CUADRO modo= DT cuadro= 1 de 19 caja= 92 x 98 pixelesCompuestos= 792 pixelesPintados= 266 crc32= -887701509 ...
+    JUEGO126: MUERTE CAE bicho= B1 cuadrosDTDibujados= 19 de 19 msDeLaCaida= 64653 msDelMotor= 931 cuadro= 47
+    JUEGO126: CADAVER EXPIRA bicho= B1 ms= 13390 cuadrosDelCadaver= 4 cuadrosDelPOC= 23 vida= 0 cuadro= 51
+
+    En el split el mismo bicho se pinta en las dos mitades del mismo cuadro, asi que la anotacion de
+    la muerte se DEDUPLICA por cuadro del POC (`UltimoCuadroAnotado`): los contadores del resumen
+    cuentan cuadros, no mitades (los 4 cuadros del cadaver son 4, no 8).
+
+========================================================================
+5. EL CRITERIO DE LA TARJETA
+========================================================================
+
+    laCaidaSeVe          = true   (19 cuadros del DT distintos, dibujados uno por cuadro del POC)
+    elCadaverSeVe        = true   (el DD compuesto: 819 pixeles, caja 92x39, crc32 1212887229)
+    elCadaverDesaparece  = true   (expira a los 12,0 s del motor; desde el cuadro 36 pinta 0)
+    elLienzoVuelveAlMapa = true   (cuadrosConLienzoDistinto= 0 en los 23 cuadros de la muerte)
+
+========================================================================
+6. LO QUE NO HACE (para que no se lea de mas)
+========================================================================
+
+    - No toca el motor: ni `corpseSeconds`, ni los modos, ni el dano. El plazo del cadaver es el
+      que ya tenia (`d2core/d2monsters/director.go`).
+    - No cambia la vida ni el golpe (DC-002.122), ni el drop (DC-002.123), ni el inventario/alijo
+      (DC-002.124): esas lineas salen igual en la misma corrida.
+    - El cadaver no ocupa celda ni bloquea el paso: eso ya era asi desde la 122.
+    - No se probo en hardware (Dreamcast/GDEMU): todo lo de arriba es emulador (Flycast).
+========================================================================

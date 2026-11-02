@@ -60,12 +60,19 @@ que se toca con las manos (matar, recoger, guardar), después lo narrativo (ques
 - `d2monster`, `d2monstats`, `d2path`, `d2combat` (parte).
 - Criterio: un monstruo se dibuja, patrulla y muere con su animación cuando el jugador le pega. **Cumplido**
   (DC-002.121 el bicho dibujado y patrullando; DC-002.122 el golpe, el alcance del exe, la vida, la muerte y
-  los cuatro contra el mismo bicho).
+  los cuatro contra el mismo bicho; DC-002.126 la muerte **se ve**: los 19 cuadros del DT uno por cuadro del
+  POC, el cadáver con su compuesto de 819 px y su expiración a los 12,0 s del motor).
 - Riesgo: el `.dcc` de monstruo es más grande que el del jugador; medir cuántos caben en el tramo. **Medido**: el
   DT del Returned son 171.304 B por dirección y el A1 del héroe 74.971 B: con 8 direcciones del A1 y 2 del golpe
   el semiespacio (1.835.008 B fijos) muere al 96 %. Entra 1 dirección del A1 y 1 de los modos (91 %).
-- Lo que falta para cerrarla del todo: IA (persecución y ataque del bicho al jugador), que es otra tarjeta, y
-  que el cuadro DD del SK viene vacío (0 píxeles): el cadáver no se ve con esta animación.
+- Lo que falta para cerrarla del todo: IA (persecución y ataque del bicho al jugador), que es otra tarjeta.
+- **La muerte se ve, medido** (DC-002.126): el "DD vacío (0 píxeles)" de la 122 era del DIBUJO, no de los datos:
+  con 2+ jugadores el POC dibuja por `split.go` y ese camino no pintaba monstruos. El `.cof` del DD son 148 B con
+  7 capas, 1 cuadro y 8 direcciones, y compone 92x39 con 819 px (dir 6, `1HS` declarado por capa); en pantalla se
+  ven 19 cuadros distintos del DT (crc32 por cuadro, idénticos entre corridas), 4 cuadros con el cadáver
+  (`crc32=1212887229`) y 0 px desde el cuadro 36, con el mapa solo intacto en `173308762`. El reloj del DT es
+  `muertePorCuadro` (instrumento: un cuadro de animación por cuadro del POC) porque los 931 ms del animdata no
+  alcanzan para el cuadro de la consola (~3,2 s con cuatro jugadores).
 
 ### E2 · Objetos y drop — HECHA EN LO BÁSICO
 
