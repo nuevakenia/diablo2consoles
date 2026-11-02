@@ -175,6 +175,11 @@ Build (el script imprime los knobs con los que compilo):
     los mismos crc32 (medido: 126c y 126d dan los 19 crc32 del DT identicos) pero distinto
     `msDeLaCaida`. El crc32 del mapa solo (173308762) si es estable entre corridas.
 
+    Reproducido en una tercera corrida (/tmp/dc126i, mismo disco, CAPTURAS=40 INTERVALO=3): el DD
+    otra vez en el cuadro 32 con pixelesPintados= 819 y crc32= 1212887229, el cadaver expirado a los
+    12879 ms con cuadrosDelCadaver= 4, dibujadosDT= 19 de 19, cuadrosConLienzoDistinto= 0 y el
+    criterio con los cuatro true: es reproducible, no una corrida de suerte.
+
 ========================================================================
 4. LA PANTALLA PARTIDA (la causa raiz del 0 de la 122, arreglada)
 ========================================================================
@@ -217,7 +222,28 @@ Corrida /tmp/dc126e y /tmp/dc126f (JUGADORES=2 SPLIT=si CUADROS=90 FASE=apagado 
     elLienzoVuelveAlMapa = true   (cuadrosConLienzoDistinto= 0 en los 23 cuadros de la muerte)
 
 ========================================================================
-6. LO QUE NO HACE (para que no se lea de mas)
+6. LAS CAPTURAS (lo que hay y lo que no)
+========================================================================
+
+    Las corridas dejan capturas de pantalla completa en /tmp/dc126i (42 PNG) y /tmp/dc126d (42 PNG),
+    tomadas con `spectacle` sobre el escritorio entero (2560x1080) con la ventana de Flycast en
+    1400,120 de 640x480.
+
+    Lo que NO se pudo: recortar la caja del cadaver (92x39 en 397,241 del lienzo -> 1797,361 en
+    pantalla) y que se leyera a ojo. Se probo con el recorte ampliado x6 y x8 y el resultado no es
+    concluyente: el cadaver son 819 pixeles de arte de 92x39 y a esa escala (y con la ventana de
+    640x480 dentro de un ultrawide) no se distingue de la valla y el terreno. O sea: este informe NO
+    se apoya en las capturas.
+
+    De que SI se apoya el "se ve": de los pixeles del lienzo, que es la misma vara con la que este
+    proyecto viene midiendo desde DC-002.113 -- `pixelesPintados` cuenta los pixeles de la caja del
+    bicho que NO son los del mapa (guardando lo de abajo y comparando), el `crc32` del lienzo cambia
+    cuando el cadaver esta (1212887229 compuesto, -1262462476 el lienzo) y vuelve al del mapa cuando
+    expira. Un cuadro que se ve es, por definicion de esta instrumentacion, un cuadro con pixeles
+    propios y crc32 propio en el lienzo que se manda al PVR.
+
+========================================================================
+7. LO QUE NO HACE (para que no se lea de mas)
 ========================================================================
 
     - No toca el motor: ni `corpseSeconds`, ni los modos, ni el dano. El plazo del cadaver es el
