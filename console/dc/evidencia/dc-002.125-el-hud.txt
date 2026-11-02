@@ -197,7 +197,9 @@ Corrida: /tmp/run125split
   HUD MITAD cuadro= 3 mitad= 1 jugador= P2 pixeles= 15384 ms= 10
 
 O sea: **cada mitad dibuja SU HUD con SUS valores** (P1 con 50 de vida, P2 con 52 de maximo y 50
-actual: vida= 50 / 52). 9-10 ms por mitad.
+actual: vida= 50 / 52). 9-10 ms por mitad. (La captura de pantalla de esa corrida salio sobre otra
+ventana -- el emulador no estaba en 1400,120 en ese momento --, asi que la prueba del split son estas
+lineas del log, no una foto.)
 
 Y el limite, medido y con CONTROL: la corrida del split con HUD llega al cuadro 4 y muere con
 `fatal error: GC to-space overflow - your live data doesn't fit in the heap` (vivo 1.650.000 de
