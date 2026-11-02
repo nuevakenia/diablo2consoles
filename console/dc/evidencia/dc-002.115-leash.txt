@@ -1,0 +1,184 @@
+DC-002.115 -- EL LEASH: QUE NINGUNO DE LOS DOS SE SALGA DEL LIENZO (POC console/dc/poc/juego-115)
+
+Flycast 2.7, ventana 640x480, mismo motor y mismos MPQ que DC-002.113/.114. Las lineas de abajo son
+COPIA del log serial de la consola, no un resumen: cada numero salio de la corrida que se dice.
+
+QUE SE MIDIO Y COMO (nada elegido a ojo).
+  La separacion en pantalla no es proporcional a la distancia en el mapa: el motor proyecta una celda a
+  (80,40) px ortogonales (d2core/d2map/d2maprenderer/viewport.go: tileWidth=80, tileHeight=40), asi que dos
+  jugadores separados (dx,dy) celdas caen a ((dx-dy)*80, (dx+dy)*40) px. Correr en la diagonal de celdas
+  (1,-1) son 113 px por celda en X; correr en la otra diagonal son 56 px por celda en Y. Por eso el leash se
+  mide DIRECCION POR DIRECCION: el POC barre, al arranque, la distancia de 0,05 en 0,05 celdas en cada una de
+  las 8 direcciones de la cruceta (pasadas por `DireccionDelPiso`, el mismo camino que usa el movimiento), con
+  la caja compuesta MAS GRANDE de los 9 ciclos, y se queda con la mayor distancia en la que las DOS cajas
+  entran en 640x480. La peor de las 8 es la que se aplica.
+
+  En el juego original no hay una constante que sacar para esto: el "leash" de Diablo II es el de los
+  MONSTRUOS (d2monster: la distancia a su ancla de aparicion) y el cooperativo en UNA pantalla no existe en el
+  PC. El numero sale de la geometria del motor, medido en la consola, y el POC lo imprime con la medida.
+
+================ 1. LA MEDIDA (al arranque, con los cuadros ya compuestos) ================
+
+JUEGO115: LEASH CAJA-PEOR izq= -20 arriba= -69 ancho= 34 alto= 82 de= quieto ciclos= 9
+JUEGO115: LEASH AUTOCHEQUEO camara= 28 20 ancla= 320 283 esperado= 320 283 igual= true
+JUEGO115: LEASH DIRECCION DERECHA maxCeldas= 5.3 pxX= 599 pxY= 0 px= 599 anclas= 20 283 619 283 vector= 0.707107 -0.707107
+JUEGO115: LEASH DIRECCION ABAJO+DERECHA maxCeldas= 7.3 pxX= 369 pxY= 369 px= 521 anclas= 135 98 504 467 vector= 0.948683 0.316228
+JUEGO115: LEASH DIRECCION ABAJO maxCeldas= 6.5 pxX= 0 pxY= 367 px= 367 anclas= 320 99 320 466 vector= 0.707107 0.707107
+JUEGO115: LEASH DIRECCION ABAJO+IZQUIERDA maxCeldas= 7.3 pxX= -369 pxY= 369 px= 521 anclas= 504 98 135 467 vector= 0.316228 0.948683
+JUEGO115: LEASH DIRECCION IZQUIERDA maxCeldas= 5.3 pxX= -599 pxY= 0 px= 599 anclas= 619 283 20 283 vector= -0.707107 0.707107
+JUEGO115: LEASH DIRECCION ARRIBA+IZQUIERDA maxCeldas= 7.3 pxX= -369 pxY= -369 px= 521 anclas= 504 467 135 98 vector= -0.948683 -0.316228
+JUEGO115: LEASH DIRECCION ARRIBA maxCeldas= 6.5 pxX= 0 pxY= -367 px= 367 anclas= 320 466 320 99 vector= -0.707107 -0.707107
+JUEGO115: LEASH DIRECCION ARRIBA+DERECHA maxCeldas= 7.3 pxX= 369 pxY= -369 px= 521 anclas= 135 467 504 98 vector= -0.316228 -0.948683
+JUEGO115: LEASH MEDIDA peorCeldas= 5.3 leashCeldas= 5.25 palanca= 0 paso= 0.05 caja= 34 x 82 lienzo= 640 480
+
+  LECTURA: la direccion mas DIFICIL es DERECHA/IZQUIERDA (5,3 celdas = 599 px, casi todo el ancho del lienzo)
+  porque separa en la diagonal de celdas; la mas FLOJA es la diagonal de pantalla (7,3 celdas). Con 5,25 celdas
+  las anclas caen en 20..619 y 99..467 y las cajas (34x82 la peor) entran: por eso el leash es la PEOR de las 8
+  y no un promedio. El AUTOCHEQUEO dice que la cuenta de pantalla del barrido es la del motor: camara en 28,20
+  -> ancla 320,283, el mismo numero medido en DC-002.112. El 3 celdas ~ 340 px que anoto DC-002.114 es
+  exactamente esta diagonal (3 celdas x 113 px = 339 px).
+
+================ 2. LA CORRIDA (63,9 s intentando separarse) ================
+
+build:   SALTAR_MOTOR=1 INYECTAR_P1=si bash scripts/console/build-juego-115.sh /tmp/dcbuild/j115-final
+corrida: CAPTURAS=12 INTERVALO=9 bash scripts/console/run-flycast-115.sh \
+             /tmp/dcbuild/j115-final/disc.gdi /tmp/dc115-final
+         guionPoc=leash: 8 tramos de 7 s (con 1 s de pausa) en los que el jugador 1 camina en una direccion de la
+         cruceta y el 2 en la CONTRARIA. Los dos van por el guion del POC, cada uno por SU puerto del bus maple
+         (P1 en el 0, P2 en el 1): el teclado del host no interviene.
+
+JUEGO115: GUION poc= leash tramos= 8 segundos= 64
+JUEGO115: COOP jugadores= 2 puertoJugador1= 0 puertoJugador2= 1 celdaP2= 30 20 compartirJugador2= si guionCoopSegundos= 64 guionPoc= leash guionJugador2= si cuadros= 84
+JUEGO115: PUERTO jugador= P1 puerto= 0 aparato= 16777216 hayControl= true inyecta= false guionJugador2= si
+JUEGO115: PUERTO jugador= P2 puerto= 1 aparato= 0 hayControl= false inyecta= true guionJugador2= si
+JUEGO115: PUERTO jugador=P1 FORZADO AL GUION (inyectarJugador1=si): el estado de su puerto lo pone el shim, no el teclado del emulador; aparatoReal= 16777216
+JUEGO115: PRIMER-CUADRO cuadro=1 celda= 28 20 camara= siguiendo
+
+================ 3. EL CRITERIO: NINGUNO SE SALE DEL LIENZO ================
+
+JUEGO115: RESUMEN cuadrosPintados= 87 tramos= 8 tramosReportados= 8 segundosCaminados= 52 subtiles= 86.8257 celdas= 17.3651 celdasPorSegundo= 0.333945 teoricoCeldasPorSegundo= 1.875 ticks= 1300 recortes= 52 pasoMayor= 1 celdasFinales= 28.1692 17.51 direcciones= 8 camara= siguiendo inyectarGuion= false reloj= 92.913
+JUEGO115: COOP RESUMEN jugadores= 2 cuadrosPintados= 87 msMapa= 630 msJugadores= 2 msCuadro= 1087 p1Caminado= 86.8257 p1Ticks= 1300 p1Celda= 28.1692 17.51 p2Caminado= 86.8257 p2Ticks= 1300 p2Celda= 29.8308 22.49 p2Inyecta= true semiespacioUsado= 1194904 semiespacioTotal= 1835008 colecciones= 233 montonLibre= 2016728 guionSegundos= 64
+JUEGO115: LEASH RESUMEN jugadores= 2 leashCeldas= 5.25 palanca= 0 maxCeldasDeLaCorrida= 5.25 maxPXDeLaCorrida= 593 cuadrosVigilados= 87 cuadrosFuera= 0 recortes= 100 celdasRecortadas= 160.27 lienzo= 640 480 cajaPeor= 34 x 82
+
+  cuadrosVigilados= 87: uno por cuadro, y cada cuadro revisa las DOS anclas y las DOS cajas SIN recortar
+  (dentroDelLienzo). 174 revisiones de jugador, TODAS "si"; cuadrosFuera= 0; ninguna linea LEASH FUERA.
+  maxCeldasDeLaCorrida= 5.25 = el leash exacto; maxPXDeLaCorrida= 593 px entre anclas.
+  recortes= 100 (veces que el leash freno a un jugador) y celdasRecortadas= 160.27: lo que los dos caminaron
+  contra el leash, que se les devuelve a su cuenta de movimiento (por eso la velocidad por tramo que imprime el
+  log es la de verdad y no la del input).
+
+MUESTRAS, cuadro por cuadro (anclas y cajas de verdad, con la camara de verdad):
+
+  JUEGO115: LEASH SEPARACION cuadro= 1 jugadores= 2 celdas= 2 pxX= 160 pxY= 80 px= 178 maxCeldasDeLaCorrida= 2 maxPXDeLaCorrida= 178 cuadrosFuera= 0 camaraCelda= 29 20
+  JUEGO115: LEASH cuadro= 1 jugador= P1 ancla= 240 243 caja= 222 175 253 254 dentroDelLienzo= si celda= 28 20 leashCeldas= 5.25 recortes= 0 celdasRecortadas= 0
+  JUEGO115: LEASH cuadro= 1 jugador= P2 ancla= 400 323 caja= 382 255 413 334 dentroDelLienzo= si celda= 30 20 leashCeldas= 5.25 recortes= 0 celdasRecortadas= 0
+
+  JUEGO115: LEASH SEPARACION cuadro= 3 jugadores= 2 celdas= 5.25 pxX= -579 pxY= 67 px= 582 maxCeldasDeLaCorrida= 5.25 maxPXDeLaCorrida= 582 cuadrosFuera= 0 camaraCelda= 29 20
+  JUEGO115: LEASH cuadro= 3 jugador= P1 ancla= 609 249 caja= 596 187 624 261 dentroDelLienzo= si celda= 30.3878 17.7719 leashCeldas= 5.25 recortes= 0 celdasRecortadas= 0.481437
+  JUEGO115: LEASH cuadro= 3 jugador= P2 ancla= 30 316 caja= 15 247 42 329 dentroDelLienzo= si celda= 27.6122 22.2281 leashCeldas= 5.25 recortes= 0 celdasRecortadas= 0.481437
+
+  JUEGO115: LEASH SEPARACION cuadro= 4 jugadores= 2 celdas= 5.25 pxX= -593 pxY= 21 px= 593 maxCeldasDeLaCorrida= 5.25 maxPXDeLaCorrida= 593 cuadrosFuera= 0 camaraCelda= 29 20
+  JUEGO115: LEASH cuadro= 4 jugador= P1 ancla= 616 272 caja= 603 210 631 284 dentroDelLienzo= si celda= 30.7257 18.0219 leashCeldas= 5.25 recortes= 1 celdasRecortadas= 1.93612
+  JUEGO115: LEASH cuadro= 4 jugador= P2 ancla= 23 293 caja= 8 224 35 306 dentroDelLienzo= si celda= 27.2743 21.9781 leashCeldas= 5.25 recortes= 1 celdasRecortadas= 1.93612
+
+  JUEGO115: LEASH SEPARACION cuadro= 20 jugadores= 2 celdas= 5.25 pxX= -3 pxY= -297 px= 297 maxCeldasDeLaCorrida= 5.25 maxPXDeLaCorrida= 593 cuadrosFuera= 0 camaraCelda= 29 20
+  JUEGO115: LEASH cuadro= 20 jugador= P1 ancla= 321 431 caja= 303 363 334 442 dentroDelLienzo= si celda= 30.863 21.8493 leashCeldas= 5.25 recortes= 15 celdasRecortadas= 23.9223
+  JUEGO115: LEASH cuadro= 20 jugador= P2 ancla= 318 134 caja= 303 65 331 147 dentroDelLienzo= si celda= 27.137 18.1507 leashCeldas= 5.25 recortes= 15 celdasRecortadas= 23.9223
+
+  JUEGO115: LEASH SEPARACION cuadro= 40 jugadores= 2 celdas= 5.25 pxX= 361 pxY= 237 px= 431 maxCeldasDeLaCorrida= 5.25 maxPXDeLaCorrida= 593 cuadrosFuera= 0 camaraCelda= 29 20
+  JUEGO115: LEASH cuadro= 40 jugador= P1 ancla= 139 164 caja= 124 100 158 173 dentroDelLienzo= si celda= 26.3986 19.6488 leashCeldas= 5.25 recortes= 33 celdasRecortadas= 51.1785
+  JUEGO115: LEASH cuadro= 40 jugador= P2 ancla= 500 401 caja= 484 333 513 414 dentroDelLienzo= si celda= 31.6014 20.3512 leashCeldas= 5.25 recortes= 33 celdasRecortadas= 51.1785
+
+  JUEGO115: LEASH SEPARACION cuadro= 60 jugadores= 2 celdas= 5.25 pxX= -265 pxY= 265 px= 374 maxCeldasDeLaCorrida= 5.25 maxPXDeLaCorrida= 593 cuadrosFuera= 0 camaraCelda= 29 20
+  JUEGO115: LEASH cuadro= 60 jugador= P1 ancla= 452 150 caja= 434 85 460 164 dentroDelLienzo= si celda= 28.1692 17.51 leashCeldas= 5.25 recortes= 50 celdasRecortadas= 80.1349
+  JUEGO115: LEASH cuadro= 60 jugador= P2 ancla= 187 415 caja= 169 350 195 429 dentroDelLienzo= si celda= 29.8308 22.49 leashCeldas= 5.25 recortes= 50 celdasRecortadas= 80.1349
+
+  JUEGO115: LEASH SEPARACION cuadro= 87 jugadores= 2 celdas= 5.25 pxX= -265 pxY= 265 px= 374 maxCeldasDeLaCorrida= 5.25 maxPXDeLaCorrida= 593 cuadrosFuera= 0 camaraCelda= 29 20
+  JUEGO115: LEASH cuadro= 87 jugador= P1 ancla= 452 150 caja= 434 85 460 164 dentroDelLienzo= si celda= 28.1692 17.51 leashCeldas= 5.25 recortes= 50 celdasRecortadas= 80.1349
+  JUEGO115: LEASH cuadro= 87 jugador= P2 ancla= 187 415 caja= 169 350 195 429 dentroDelLienzo= si celda= 29.8308 22.49 leashCeldas= 5.25 recortes= 50 celdasRecortadas= 80.1349
+
+
+================ 4. LOS OCHO TRAMOS: LOS DOS CAMINAN (los ticks de cada uno) ================
+
+JUEGO115: COOP TRAMO SEPARAR-DERECHA segundos= 7.915 p1Ticks= 175 p1Celdas= 3.86626 p1CeldasPorSegundo= 0.488473 p2Ticks= 175 p2Celdas= 3.86626 p2CeldasPorSegundo= 0.488473 p1Ini= 28 20 p1Fin= 30.8553 18.143 p2Ini= 30 20 p2Fin= 27.1447 21.857 jugadores= 2
+JUEGO115: COOP TRAMO SEPARAR-ABAJO+DERECHA segundos= 6.626 p1Ticks= 150 p1Celdas= 2.87905 p1CeldasPorSegundo= 0.434508 p2Ticks= 150 p2Celdas= 2.87905 p2CeldasPorSegundo= 0.434508 p1Ini= 31.5633 19.4342 p1Fin= 31.4914 20.8269 p2Ini= 26.4367 20.5658 p2Fin= 26.5086 19.1731 jugadores= 2
+JUEGO115: COOP TRAMO SEPARAR-ABAJO segundos= 6.657 p1Ticks= 150 p1Celdas= 1.21627 p1CeldasPorSegundo= 0.182705 p2Ticks= 150 p2Celdas= 1.21627 p2CeldasPorSegundo= 0.182705 p1Ini= 31.1205 21.5474 p1Fin= 30.8567 21.8556 p2Ini= 26.8795 18.4526 p2Fin= 27.1433 18.1444 jugadores= 2
+JUEGO115: COOP TRAMO SEPARAR-ABAJO+IZQUIERDA segundos= 7.592 p1Ticks= 175 p1Celdas= 1.21426 p1CeldasPorSegundo= 0.159939 p2Ticks= 175 p2Celdas= 1.21426 p2CeldasPorSegundo= 0.159939 p1Ini= 30.2036 22.3328 p1Fin= 28.359 22.5455 p2Ini= 27.7964 17.6672 p2Fin= 29.641 17.4545 jugadores= 2
+JUEGO115: COOP TRAMO SEPARAR-IZQUIERDA segundos= 7.547 p1Ticks= 175 p1Celdas= 2.88051 p1CeldasPorSegundo= 0.381677 p2Ticks= 175 p2Celdas= 2.88051 p2CeldasPorSegundo= 0.381677 p1Ini= 28.359 22.5455 p1Fin= 27.1445 21.8568 p2Ini= 29.641 17.4545 p2Fin= 30.8555 18.1432 jugadores= 2
+JUEGO115: COOP TRAMO SEPARAR-ARRIBA+IZQUIERDA segundos= 6.459 p1Ticks= 150 p1Celdas= 2.87882 p1CeldasPorSegundo= 0.445707 p2Ticks= 150 p2Celdas= 2.87882 p2CeldasPorSegundo= 0.445707 p1Ini= 26.4367 20.5656 p1Fin= 26.5086 19.1731 p2Ini= 31.5633 19.4344 p2Fin= 31.4914 20.8269 jugadores= 2
+JUEGO115: COOP TRAMO SEPARAR-ARRIBA segundos= 7.601 p1Ticks= 175 p1Celdas= 1.21683 p1CeldasPorSegundo= 0.160089 p2Ticks= 175 p2Celdas= 1.21683 p2CeldasPorSegundo= 0.160089 p1Ini= 26.8795 18.4526 p1Fin= 27.1437 18.144 p2Ini= 31.1205 21.5474 p2Fin= 30.8563 21.856 jugadores= 2
+JUEGO115: COOP TRAMO SEPARAR-ARRIBA+DERECHA segundos= 6.539 p1Ticks= 150 p1Celdas= 1.21313 p1CeldasPorSegundo= 0.185523 p2Ticks= 150 p2Celdas= 1.21313 p2CeldasPorSegundo= 0.185523 p1Ini= 27.7966 17.6671 p1Fin= 28.1692 17.51 p2Ini= 30.2034 22.3329 p2Fin= 29.8308 22.49 jugadores= 2
+
+  En los 8 tramos p1Ticks y p2Ticks son iguales y > 0 (150..175 ticks de 25 Hz por tramo): los dos estan
+  pidiendo moverse todo el tiempo y el que se aleja es el que el leash frena. Las celdas caminadas por tramo
+  son chicas (1,2 a 3,9) porque el leash se come el resto: la pareja llega al borde en el primer segundo y ahi
+  se queda. Los 8 tramos suman 56,9 s de input mas 7 s de pausa = 63,9 s intentando separarse (el reloj del
+  guion cierra en 92,9 s porque los cuadros de cierre se dibujan despues).
+
+================ 5. LO QUE NO SE ROMPE ================
+
+JUEGO115: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307197 de 307200 crc32= -1803170647 hostPixeles= 307196 hostCrc= 1437022778 ms= 776 igualAlHost= false camaraCelda= 29 20 jugadores= 2
+JUEGO115: CUADRO 1 JUGADOR nombre= P1 puerto= 0 inyecta= true ancla= 240 243 caja= 222 175 253 254 tamano= 31 x 79 pixelesPintados= 1057 crc32DelCiclo= 715008237 dir= 0 caminando= true cuadroDelCiclo= 0 ms= 1 celda= 28 20
+JUEGO115: CUADRO 1 JUGADOR nombre= P2 puerto= 1 inyecta= true ancla= 400 323 caja= 382 255 413 334 tamano= 31 x 79 pixelesPintados= 1057 crc32DelCiclo= 715008237 dir= 0 caminando= true cuadroDelCiclo= 0 ms= 0 celda= 30 20
+JUEGO115: CUADRO 1 CON-JUGADOR pixelesNoVacios= 307197 de 307200 crc32= -670070585 pixelesDelJugador= 1057 ancla= 240 243 dir= 0 cuadroDelCiclo= 0 modo= TW msMapa= 776 msJugador= 1 jugadores= 2 celda= 28 20
+JUEGO115: CUADRO 1 REFERENCIA igualAlDeDC002112= false crc32= -670070585 esperado= 1363871674 ancla= 240 243
+JUEGO115: REPETIBILIDAD cuadro= 86 camara= siguiendo crcMapa= -164749445 crcMapaDelCuadroAnterior= -164749445 igualAlCuadroAnterior= true crcConJugador= 1183848769 crcConJugadorDelCuadroAnterior= 1183848769 igualConJugador= true ancla= 240 243 celda= 28 20 llenos= 307200 llenosDelCuadroAnterior= 307200 crcMapaDelCuadro1= -1803170647 igualAlCuadro1= false llenosDelCuadro1= 307197 cachePerezosa= true
+
+JUEGO115: MEMORIA despues-de-componer usado= 7993040 libre= 1406160 arena= 9399200 sbrk= -1931091968 techo= -1929445376 pico= 8409464
+JUEGO115: SEMIESPACIO despues-de-componer usado= 1328256 total= 1835008 pct= 72 colecciones= 108
+JUEGO115: MEMORIA coop-fin usado= 5686728 libre= 2016728 arena= 7703456 sbrk= -1932787712 techo= -1929445376 pico= 8879408
+JUEGO115: SEMIESPACIO coop-fin usado= 1194904 total= 1835008 pct= 65 colecciones= 233
+
+  El semiespacio cierra en 1.194.904/1.835.008 (65 %) y el monton de C queda con 2.016.728 B libres: la corrida
+  de 87 cuadros termina sin OOM (el pico del semiespacio durante la corrida es 72 %, el de despues de componer). La repetibilidad sigue igual que en DC-002.114 (dos cuadros con el mismo
+  estado dan el mismo crc32 del mapa y del cuadro con los jugadores).
+
+================ 6. EL PITFALL QUE COSTO UNA CORRIDA (medido y corregido) ================
+
+  La primera version del leash proyectaba al que se pasaba sobre el circulo alrededor de la posicion YA MOVIDA
+  del otro jugador. Eso ARRASTRA al que esta frenado con el otro, y como los dos empujan para lados contrarios
+  la pareja se iba caminando por el mapa (~1 celda por cuadro) y en 63 s se alejo ~10 celdas del pueblo: la
+  cache de tiles se lleno, el monton de Go crecio hasta el semiespacio y el POC murio por OOM en el cuadro ~50
+  (de las tres corridas de ese binario, ninguna paso de 50 cuadros):
+
+      pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+      ARQ-MARCA gc-por-umbral-bytes-usados v=1824440
+      ARQ-MARCA gc_collect v=447
+      ARQ-MARCA OOM-throw v=20488
+      fatal error: out of memory
+
+  La version que quedo hace dos cosas: (1) recorta SOLO la parte RADIAL del paso, medida contra donde estaba el
+  otro al EMPEZAR el cuadro (el movimiento lateral se conserva y al que esta quieto no se lo empuja), y (2) si
+  los dos empujaron para afuera, los acerca a los dos por igual hacia el MEDIO del grupo. El medio no se mueve:
+  la camara se queda en 29,20 los 87 cuadros y la pareja no viaja. Eso es lo que hace que 63 s de intento
+  entren en el POC sin llenar la cache de tiles.
+
+  OTRO DATO DEL CAMINO: la primera corrida se hizo con `inyectarJugador1=no` (el default de DC-002.114, donde
+  el jugador 1 leia el control del bus). Sin teclado del host, ese jugador NO se movia: p1Ticks= 0 en los 8
+  tramos. La corrida del criterio va con INYECTAR_P1=si.
+
+================ 7. LO QUE SE VE (capturas recortadas a la ventana del emulador, 640x480) ================
+
+  dc-002.115-leash-horizontal-593px.png  el leash a la separacion MAXIMA de la corrida (cuadro 5: pxX= -593,
+                                         pxY= 5): P1 ancla 616,280 (caja 603..631) y P2 ancla 23,285 (caja
+                                         8..35). Las dos amazonas enteras, una al lado de cada borde y sin
+                                         cortarse.
+  dc-002.115-leash-diagonal-376px.png    la pareja rotada sobre el circulo del leash (cuadro 44: pxX= 267,
+                                         pxY= 265, px= 376): P1 ancla 186,150 y P2 ancla 453,415. La
+                                         separacion ahora es en diagonal y tambien entra entera.
+  Capturas crudas (pantalla completa):   /tmp/dc115-final/c*.png
+
+================ 8. COMO SE REPRODUCE ================
+
+  cd ~/Proyectos/diablo2consoles
+  SALTAR_MOTOR=1 INYECTAR_P1=si bash scripts/console/build-juego-115.sh /tmp/dcbuild/j115-final
+  CAPTURAS=12 INTERVALO=9 bash scripts/console/run-flycast-115.sh \
+      /tmp/dcbuild/j115-final/disc.gdi /tmp/dc115-final
+
+  LEASH=7 bash scripts/console/build-juego-115.sh ... deja la palanca puesta a mano: el log AVISA que la medida
+  es 5,3 y que con 7 los jugadores se pueden salir del lienzo. La palanca es para el A/B, no para elegir el
+  resultado.
+
+REGRESION: `personaje.go` y `jugador.go` del POC siguen siendo BYTE A BYTE los del medidor del host
+(`console/dc/medidas/render-294/`); el build lo verifica con `cmp` antes de compilar.
+
