@@ -1,0 +1,259 @@
+========================================================================
+DC-002.125 -- EL HUD: BARRAS, CINTURON Y EL NOMBRE DE LA ZONA
+(Dreamcast / Flycast, Go + gox)
+========================================================================
+Fecha de las corridas: 2026-11-02
+POC: console/dc/poc/juego-125  (copia de juego-126; el 126 no se toca)
+Sonda de host: console/dc/sonda-hud-125   (mide ANTES de portar: go list -deps, DC6, tablas)
+Build: bash scripts/console/build-juego-125.sh /tmp/dcbuild/juego125
+       (variables HUD=si|no, HUD_PIEZAS=todas|esenciales, HUD_INSTRUMENTO, NIVELES, CLASE, NIVEL,
+        SPLIT, JUGADORES, FASE, CUADROS)
+Corrida: CAPTURAS=45 INTERVALO=1.5 bash scripts/console/run-flycast-125.sh \
+            /tmp/dcbuild/juego125/disc.gdi /tmp/run125h 1400 120
+Salida de la sonda: /tmp/sonda-hud-125.txt (190 lineas)
+
+QUE DICE LA TARJETA: medir el presupuesto de d2ui y d2automap ANTES de portar, dibujar las barras de
+vida y mana con los valores REALES del jugador, el cinturon de 4 pociones y el texto de la zona, decir
+si el minimapa entra o el numero de por que no, y medir en Flycast los ms por cuadro, la memoria y el
+split. Todo con numeros medidos, no con opiniones.
+
+========================================================================
+1. EL PRESUPUESTO DE d2ui Y d2automap (medido, go list -deps)
+========================================================================
+
+Se midio con el MISMO `go list -deps` que usa el build para armar el enlace, no a ojo:
+
+  paquete                  archivos  lineas      bytes  cierre  ebiten  d2asset
+  d2core/d2ui                    22    3713     100460     173    true     true
+  d2common/d2automap              11    1490      41714      65   false    false
+  d2common/d2statlist             10    1895      56788      67   false    false
+  d2common/d2display               4     536      15161      67   false    false
+  d2common/d2fileformats/d2font     2     216       4492      74   false    false
+  d2game/d2player                123   27174     813891     264    true     true
+
+LA RESPUESTA, y es la que ordena todo lo demas:
+
+  - d2ui NO SE PORTA. Su cierre son 173 paquetes y arrastra **ebiten** (GLFW, OpenGL, shaders,
+    graphicsdriver) y **d2asset**. Ebiten no existe en SH-4: portar d2ui es portar el motor grafico
+    de escritorio. Los 100.460 B de codigo son lo de menos; lo que no entra es el cierre.
+  - d2automap SI ES PORTABLE: 41.714 B, cierre de 65 paquetes, **sin ebiten y sin d2asset**. Es modelo
+    puro (celdas de 32 B, layout, proyeccion). Pero el HUD de esta tarjeta no lo necesita: las barras,
+    el cinturon y el texto salen de DC6 sueltos del MPQ, no del automapa. Por eso el automapa queda para
+    la tarjeta del minimapa (seccion 5).
+
+Conclusion operativa: el HUD de la 125 se dibuja con las piezas del motor que ya sabemos leer
+(DC6 + paleta + fuente), sin portar d2ui ni d2automap. Es lo que se hizo.
+
+========================================================================
+2. LOS GRAFICOS QUE USA EL HUD, UNO POR UNO (sonda, del MPQ)
+========================================================================
+
+  pieza                          archivo (MPQ)                       bytes   caja     px
+  globos vida+mana               data\global\ui\PANEL\hlthmana.DC6   21189   80x80    5024 (c0 vida) / 5025 (c1 mana)
+  tapa de los globos             data\global\ui\PANEL\overlap.DC6     1743   82x88     364 / 443
+  cinturon desplegable           ...\PANEL\ctrlpnl_popbelt.DC6        4127  125x32    4000
+  panel del HUD                  ...\PANEL\ctrlpnl7.DC6             34138  117x104    7137 (c0)
+  pocion de vida                 data\global\items\invhp1.dc6          412   28x28     237
+  pocion de mana                 data\global\items\invmp1.dc6          412   28x28     237
+  fuente del nombre de zona      data\local\font\latin\font16        35214   14x16      92 por glifo
+  paleta de los globos           data\global\ui\PAL\sky.pal             768      --      --
+  paleta de las unidades         data\global\...\units\pal.dat          768      --      --
+
+Dos cosas que la sonda dejo al descubierto y que valen:
+
+  - **`panel` (el nombre que pide el motor) NO ESTA en ningun MPQ**: el archivo real es `ctrlpnl7.DC6`.
+  - **`minimapa` de 8x16 NO ESTA**: el que hay es `maximaps.DC6`, 234.458 B con 1260 cuadros de 16x32
+    (= 645.120 indices). Ver seccion 5.
+
+Valores medidos, no supuestos: `Rogue Encampment` con font16 son **141 px** (avanzando con
+`FontGlyph.Width()`); con el ancho de la caja del cuadro daba 224 px y el texto se salia de pantalla.
+
+========================================================================
+3. LOS VALORES REALES DEL JUGADOR (charstats.txt -> d2statlist -> BaseMax)
+========================================================================
+
+El camino es el del motor, no una tabla copiada: `charstats.txt` (patch_d2.mpq, 3360 B, 7 filas) ->
+`d2statlist.ParseClasses` -> `Class.BaseMax(nivel, vit, ene)`, el mismo que usa `d2hero/hero_totals.go`.
+
+  clase        vit  ene  hpadd   vida  mana  aguante   (nivel 1)
+  Amazon        20   15     30     50    15       84    <- el heroe del POC
+  Assassin      20   25     30     50    25       95
+  Barbarian     25   10     30     55    10       92
+  Druid         25   20     30     55    20       84
+  Necromancer   15   25     30     45    25       79
+  Paladin       25   15     30     55    15       89
+  Sorceress     10   35     30     40    35       74
+
+Y subiendo de nivel (Amazon, `PerLevel` = 8 de vida y 6 de mana cada 2 niveles):
+
+  nivel   vida   mana   aguante
+      1     50     15       84
+      2     52     16       85
+      3     54     18       86
+      4     56     19       87
+
+El POC usa esos cuatro niveles, uno por jugador (`NIVELES=si`), para que en el split cada mitad muestre
+SUS valores y se vea que la barra sigue al numero.
+
+========================================================================
+4. EL HUD EN LA CONSOLA (Flycast): lo que se midio
+========================================================================
+
+4.1 LA PIEZA QUE FALTABA ERA LA MEMORIA, NO EL DIBUJO
+
+El POC llega al momento de cargar el HUD con el semiespacio del recolector casi lleno. Tres corridas lo
+dejaron medido:
+
+  a) HUD cargado DESPUES de `soltarDespuesDeComponer` -> `HUD SIN GRAFICO` en las diez piezas y
+     `HUD SIN CHARSTATS`: la fuente ya estaba cerrada. Cuadros de 0 pixeles.
+  b) HUD cargado ANTES, con las diez piezas (49.448 B vivos) -> `gc_external_alloc: OOM` en la fase
+     TRANSICION: arena 10.216.192, libre 1.248.920, pidio 1.007.616.
+  c) Con las SEIS esenciales + fuente (7 piezas, 22.848 B) cargadas al final, antes del paso 5:
+     entra. Es la configuracion que se entrega.
+
+Y aun con 22.848 B, el arte decodificado NO cabia en el semiespacio: cargarlo ahi costo **3,2 s por
+pocion y 61,7 s por la fuente** (cada asignacion disparaba una recoleccion completa) y la corrida murio
+con `fatal error: out of memory` con el vivo en 1.816.240 de 1.835.008 B. La solucion medida: el arte
+del HUD se aparta en el **monton de C** (`d2c_pedir_bloque` = `malloc`), donde habia 1,3 MB libres y el
+recolector no lo cuenta. El archivo se pide y se suelta en el acto (`Pedir`/`Liberar`), no por
+`am.LoadFile`, que lo deja cacheado.
+
+4.2 LOS NUMEROS DE LA CORRIDA BUENA (/tmp/run125h, FASE=apagado CUADROS=40)
+
+  HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 1330240
+  HUD FUENTE tabla= 3596 sprite= 35214 cuadros= 256 glifosDeLaZona= 13 texto= Rogue Encampment
+            anchoDelTexto= 141
+  HUD cuadro= 1 ... pixelesPintados= 15840 ms= 10 vida= 50 / 50 rellenoVida= 80 de 80 mana= 15 / 15
+  HUD cuadro= 2 ... pixelesPintados= 15636 ms= 12 vida= 49 / 50 rellenoVida= 78 de 80 mana= 14 / 15
+  HUD RESUMEN piezas= 7 palancaPiezas= esenciales glifos= 13 bytesEnRAM= 22848 zona= Rogue Encampment
+            clase= Amazon cuadrosConHUD= 43 ultimoPixelesPintados= 6393 ultimoMs= 4 conSplit= false
+  HUD CRITERIO elHUDSeDibujo= true pintoPixeles= true lasBarrasSonLosValoresReales= true
+            elCinturonTieneCuatro= true laZonaTieneNombre= true cadaMitadSuHUD= false cumple= true
+
+  - **memoria del HUD**: 22.848 B vivos (7 piezas: 2 globos, cinturon, 4 pociones) + 13 glifos de la
+    fuente. Con las tapas y el panel serian 49.448 B y no entra (4.1 b).
+  - **ms por cuadro**: 10-12 ms el cuadro con HUD; 4 ms cuando las barras ya casi no pintan. El cuadro
+    del POC sin HUD es de ~2,8 s (componer el mapa), asi que el HUD no es el costo: es el 0,4 %.
+  - **pixeles pintados por el HUD**: 15.840 en un lienzo de 640x480 = el 5,2 % de la pantalla.
+  - semiespacio despues del HUD: 1.779.128 de 1.835.008 B (96 %) y baja a 1.738.704 (94 %) al soltar
+    el renderer. Es el numero que explica todo el capitulo 4.1.
+
+4.3 LO QUE SE VE (capturas en /tmp/run125h/, recortadas a la ventana del emulador)
+
+  - globo de la IZQUIERDA rojo con la vida (lleno, 50/50) y globo de la DERECHA azul con el mana
+    (15/15): `hlthmana.DC6` cuadro 0 y cuadro 1, 80x80 cada uno, pegados al borde inferior.
+  - el cinturon (`ctrlpnl_popbelt.DC6`, 125x32) con CUATRO frascos: dos rojos (`invhp1.dc6`) y dos
+    azules (`invmp1.dc6`), 28x28, paso 31x32.
+  - `ROGUE ENCAMPMENT` centrado arriba en 141 px, con la paleta de unidades.
+  - las barras BAJAN con el valor: el instrumento (`HUD_INSTRUMENTO=si`) le saca un punto por cuadro y el
+    relleno pasa de 80 a 78 px de 80. No es una barra decorativa: sigue al numero.
+  - El recorte de la ventana (2560x1080 -> 640x480) queda en /tmp/hud-125-c05.png.
+
+4.4 UN BUG DEL POC QUE SALIO A LA LUZ ACA: LA PALETA SE LEIA AL REVES
+
+El globo de vida se veia AZUL. La causa no era el HUD: `d2common/d2fileformats/d2dat/dat.go` lee la
+paleta como **B,G,R** (`b=data[i*3+0]`, `g=..1`, `r=..2`) y el POC la leia R,G,B. Se corrigio
+`PaletaDelJugador` (jugador.go, y su copia compartida `console/dc/medidas/render-294/jugador.go`,
+`cmp` = iguales), `paletaDelHUD` y el volcado PNG de la sonda. Afecta a TODO lo que se pinta con paleta
+del juego: el heroe y el monstruo. El mapa no, que va por el renderer del motor.
+
+========================================================================
+5. EL MINIMAPA: NO ENTRA EN ESTA TARJETA, Y ESTE ES EL NUMERO
+========================================================================
+
+Lo medido con el modelo de `d2automap` sobre el pueblo:
+
+  celda del modelo            32 B (x, y, cuadro, capa)
+  AutoMap.txt                122.022 B en d2data.mpq, 2603 filas, PARSEA
+  automap.bin                0 B (el parche no lo trae: el layout se calcula, no se lee)
+  DS1 del pueblo             57x41 tiles; capas con grafico: 2337 pisos y 346 paredes
+  REVEAL del pueblo entero   680 celdas (514 piso + 166 pared) = 21.760 B de celdas
+  la caja en 320x240          clip (39,57)-(318,282): caen adentro 626 de las 680 celdas
+  arte                      `maximaps.DC6` 234.458 B, 1260 cuadros de 16x32 = 645.120 indices
+                            (el "minimapa" de 8x16 que pide el motor NO esta en ningun MPQ)
+
+Por que NO entra ahora, con numeros:
+
+  1. **El arte son 645.120 indices = 645 KB.** El semiespacio ya queda al 96 % con el HUD puesto, asi
+     que el arte del minimapa tendria que ir tambien al monton de C, donde quedan 1,33 MB: entra, pero
+     es la mitad del monton de C para una sola pieza.
+  2. **El costo por cuadro no esta medido.** Con el HUD el cuadro es de 4-12 ms porque son 7 piezas
+     fijas; el minimapa son 626 celdas que hay que proyectar y pegar en cada cuadro y no hay ninguna
+     medicion de eso todavia. Poner un numero aca sin medirlo seria inventarlo.
+  3. Lo que SI esta listo es el modelo: `d2automap` es portable (seccion 1), `AutoMap.txt` parsea, el
+     DS1 del pueblo da sus capas y el reveal son 21.760 B. Es la tarjeta siguiente.
+
+========================================================================
+6. EL SPLIT: CADA MITAD CON SU HUD (medido, y su costo)
+========================================================================
+
+Build: SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 HUD=si -> /tmp/dcbuild/juego125split
+Corrida: /tmp/run125split
+
+  SPLIT PRIMER-CUADRO cuadro=1 lienzos= 2 tamano= 320 480
+  HUD MITAD cuadro= 1 mitad= 0 jugador= P1 pixeles= 15840 ms= 9 lienzo= 320 x 480
+  HUD MITAD cuadro= 1 mitad= 1 jugador= P2 pixeles= 15840 ms= 9 lienzo= 320 x 480
+  HUD cuadro= 3 jugador= 2 ... vida= 50 / 52 rellenoVida= 76 de 80 mana= 14 / 16 rellenoMana= 70
+  HUD MITAD cuadro= 3 mitad= 1 jugador= P2 pixeles= 15384 ms= 10
+
+O sea: **cada mitad dibuja SU HUD con SUS valores** (P1 con 50 de vida, P2 con 52 de maximo y 50
+actual: vida= 50 / 52). 9-10 ms por mitad.
+
+Y el limite, medido y con CONTROL: la corrida del split con HUD llega al cuadro 4 y muere con
+`fatal error: GC to-space overflow - your live data doesn't fit in the heap` (vivo 1.650.000 de
+1.835.008 B) y `Fatal: SH4 exception when blocked`.
+
+  CONTROL, el MISMO build con HUD=no (SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 -> /tmp/run125ctl):
+  SPLIT RESUMEN lienzos= 2 tamano= 320 480 bytesPorLienzo= 614400 bytesDeLienzos= 1228800
+               origen= vram cuadrosPintados= 27 msMapaTotal= 55417 msMapaPorCuadro= 2052.48
+               msJugadorPorCuadro= 1 msPresentarPorCuadro= 35.4815
+
+  O sea: sin HUD el split hace 27 cuadros y cierra limpio; con los 22.848 B del HUD muere en el cuadro 4.
+  **El HUD es la diferencia, no el split.** (Los dos lienzos del split ya ocupan 1.228.800 B de VRAM y el
+  semiespacio queda al filo; el HUD le suma sus 22.848 B y sus glifos.)
+
+  -> El HUD del split esta DIBUJADO y medido (3 cuadros completos, las dos mitades, 9-10 ms con SUS
+     valores: P1 50/50 y P2 50/52), pero la corrida de split no dura con el HUD puesto: falta semiespacio
+     en ese camino. No es arte duplicado -- las piezas son las mismas para las dos mitades -- es el
+     semiespacio del recolector. Queda como tarjeta aparte con estos numeros.
+
+========================================================================
+7. COMO SE REPRODUCE
+========================================================================
+
+  # 1) la sonda de host (no necesita emulador): presupuesto, graficos, valores, minimapa
+  go run ./console/dc/sonda-hud-125 -png /tmp/png125
+  #    salida: el bloque de arriba; los DC6 y la fuente, volcados a PNG con su paleta
+
+  # 2) el POC en la consola
+  FASE=apagado CUADROS=40 bash scripts/console/build-juego-125.sh /tmp/dcbuild/juego125
+  CAPTURAS=45 INTERVALO=1.5 bash scripts/console/run-flycast-125.sh \
+      /tmp/dcbuild/juego125/disc.gdi /tmp/run125h 1400 120
+
+  # 3) el split
+  SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 bash scripts/console/build-juego-125.sh \
+      /tmp/dcbuild/juego125split
+  CAPTURAS=30 INTERVALO=1.5 bash scripts/console/run-flycast-125.sh \
+      /tmp/dcbuild/juego125split/disc.gdi /tmp/run125split 1400 120
+
+  En el log se buscan: `JUEGO125: HUD LISTO`, `HUD PIEZA`, `HUD PALETA`, `HUD FUENTE`, `HUD VALORES`,
+  `HUD cuadro=`, `HUD MITAD`, `HUD RESUMEN`, `HUD JUGADOR`, `HUD CRITERIO`.
+
+========================================================================
+8. LO QUE ESTA TARJETA DEJA HECHO Y LO QUE DEJA MEDIDO PARA LA SIGUIENTE
+========================================================================
+
+HECHO
+  - El HUD se dibuja sobre el pueblo con los valores reales de charstats: 2 globos, cinturon de 4
+    pociones, nombre de la zona. 43 cuadros medidos, 4-12 ms, 22.848 B.
+  - La paleta B,G,R corregida en el POC (afectaba heroe y monstruo).
+  - Sonda de host `sonda-hud-125` que contesta el presupuesto, los graficos, los valores y el minimapa.
+  - El HUD por mitad en el split, dibujado y medido; el limite del split queda dicho con su numero.
+
+MEDIDO PARA LA SIGUIENTE (minimapa, E5)
+  - d2automap es portable (65 paquetes, sin ebiten ni d2asset); d2ui no (173, con ebiten).
+  - Arte del minimapa: `maximaps.DC6` 234.458 B / 1260 cuadros de 16x32 / 645.120 indices.
+  - Celdas del pueblo: 680 (21.760 B); en 320x240 entran 626.
+  - Falta medir el costo POR CUADRO de dibujar esas 626 celdas: no es un numero que se pueda suponer.
+  - El split de dos lienzos necesita ~23 KB mas de semiespacio antes de poder durar.
+========================================================================

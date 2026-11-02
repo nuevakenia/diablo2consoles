@@ -208,9 +208,14 @@ type capaDelCiclo struct {
 	cuadros                        [][]byte
 }
 
-// PaletaDelJugador: los 768 B de `Units/pal.dat` (R,G,B por indice, como los guarda el juego) a la paleta
-// RGBA que pide el pincel. Todos los colores van OPACOS: en Diablo II el unico transparente es el indice 0,
-// y el pincel lo saltea sin mirar la paleta.
+// PaletaDelJugador: los 768 B de `Units/pal.dat` a la paleta RGBA que pide el pincel.
+//
+// EL ORDEN DE LOS BYTES ES B, G, R, NO R, G, B. Lo dice el lector del MOTOR: `d2dat.Load` arma cada color con
+// `b: data[i*3+0], g: data[i*3+1], r: data[i*3+2]` (d2common/d2fileformats/d2dat/dat.go, las constantes b=0,g=1,r=2).
+// Hasta DC-002.125 esta funcion copiaba los tres bytes tal cual, y entonces el rojo y el azul del heroe y de los
+// bichos salian cambiados. El MAPA no, porque lo pinta el renderer del motor con SU lector: por eso el crc32 del
+// mapa coincidia con el del host y los personajes no. La prueba del cambio es el globo de la vida: leido como
+// B,G,R el cuadro 0 de `hlthmana.DC6` da rojo (el de la vida, como en el juego); leido como R,G,B daba azul.
 func PaletaDelJugador(datos []byte) ([256][4]uint8, bool) {
 	var pal [256][4]uint8
 
@@ -219,7 +224,7 @@ func PaletaDelJugador(datos []byte) ([256][4]uint8, bool) {
 	}
 
 	for i := 0; i < 256; i++ {
-		pal[i][0], pal[i][1], pal[i][2], pal[i][3] = datos[i*3+0], datos[i*3+1], datos[i*3+2], 255
+		pal[i][0], pal[i][1], pal[i][2], pal[i][3] = datos[i*3+2], datos[i*3+1], datos[i*3+0], 255
 	}
 
 	return pal, true
