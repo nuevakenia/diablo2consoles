@@ -1,0 +1,191 @@
+DC-002.121 -- EL PRIMER MONSTRUO: DIBUJADO Y PATRULLANDO EN LA CONSOLA
+================================================================================================
+
+Corrida: Flycast 2.7 (AppImage) sobre Linux 7.2.3-1-cachyos, ventana 640x480, capturas 1:1 con el cuadro del POC.
+Fecha: 2026-11-02 09:42 (America/Santiago).
+Binarios: los tres del mismo arbol (console/dc/poc/juego-121), reusando los .gox del motor
+(SALTAR_MOTOR=1), con la MISMA configuracion y solo la palanca del monstruo distinta:
+             JUGADORES=1 FASE=apagado CAMARA=fija GUION_POC=choque CUADROS=12 MONSTRUOS=0 | 1 | 4
+
+QUE PRUEBA CADA COSA
+------------------------------------------------------------------------------------------------
+1. El bicho EXISTE y se DIBUJA: su .cof y sus .dcc salen del d2data.mpq, se componen en la consola y cada
+   cuadro del ciclo queda con su caja, su ancla, sus pixeles y su crc32 (lineas 'BICHO CUADRO modo=').
+2. PATRULLA: entre dos puntos, a la velocidad de su fila de monstats (Velocity 4 -> 1,25 celdas/s), con el
+   cuadro de animacion avanzando y el sentido cambiando en cada extremo.
+3. COLISION DE CELDA en los dos sentidos: el jugador se frena en la celda del bicho (bloqueosDeJugadores) y
+   el bicho se frena en la del jugador; los SOLAPAMIENTOS tienen que ser 0.
+4. El mapa NO se entera: el crc32 del mapa restaurado sigue siendo 1437022778 (el del host) y el lienzo se
+   devuelve identico despues de pintar los bichos (crc32 antes/despues de dibujarlos).
+5. Lo que cuesta: MEMORIA (cuadros compartidos del tipo, estado por bicho) y MS POR CUADRO con 0/1/4 bichos.
+
+LA CARGA DEL MONSTRUO (MONSTRUOS=1)
+------------------------------------------------------------------------------------------------
+JUEGO121: BICHO DIRECCIONES del eje de la patrulla ida= 6 vuelta= 2 direccionesDelCOF= 8
+JUEGO121: BICHO COF data\global\monsters\SK\COF\skwlhth.cof bytes= 693 crc32= 1528235977 capas= 9 framesPorDir= 8 dirs= 8 modo= WL dir= 6
+JUEGO121: BICHO ARENA modo= WL dir= 6 pedidos= 133 entregado= 59296 tramos= 1 montonCLibre= 1592912
+JUEGO121: BICHO COF data\global\monsters\SK\COF\skwlhth.cof bytes= 693 crc32= 1528235977 capas= 9 framesPorDir= 8 dirs= 8 modo= WL dir= 2
+JUEGO121: BICHO ARENA modo= WL dir= 2 pedidos= 133 entregado= 83496 tramos= 1 montonCLibre= 1592912
+JUEGO121: BICHO COF data\global\monsters\SK\COF\sknuhth.cof bytes= 693 crc32= 739478130 capas= 9 framesPorDir= 8 dirs= 8 modo= NU dir= 0
+JUEGO121: BICHO ARENA modo= NU dir= 0 pedidos= 133 entregado= 63440 tramos= 1 montonCLibre= 1592912
+JUEGO121: BICHO CICLOS caminar= 2 quieto= true indicesCompartidosBytes= 51880 ms= 3628
+JUEGO121: BICHO ARRANCA nombre= B1 celda= 29 21 A= 29 21 B= 31 19 velocidadSubtilesPorSegundo= 6.25 celdasPorSegundo= 1.25 dir= 6
+JUEGO121: BICHO MEMORIA bichos= 1 indicesCompartidosBytes= 51880 estadoPorBichoBytes= 176 cajasPorBichoBytes= 8880 totalPorBichoBytes= 9056 totalBytes= 60936 noCompartidoSiCadaUnoComponia= 51880
+
+LOS CUADROS COMPUESTOS DEL TIPO (una vez por tipo, no por bicho)
+------------------------------------------------------------------------------------------------
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 0 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 616 crc32= -388391488 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 1 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 609 crc32= -2026865143 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 2 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 621 crc32= 77938811 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 3 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 624 crc32= -309695081 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 4 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 619 crc32= -1877097553 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 5 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 603 crc32= -1485940493 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 6 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 622 crc32= -367750040 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 7 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 601 crc32= 936164813 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 0 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 628 crc32= -524154663 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 1 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 589 crc32= -26022557 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 2 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 608 crc32= -792599843 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 3 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 610 crc32= -1802908762 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 4 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 614 crc32= 802725230 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 5 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 610 crc32= -1784538173 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 6 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 600 crc32= -1001978384 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 7 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 594 crc32= 461200573 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 0 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 618 crc32= -800068193 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 1 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 621 crc32= 1642572367 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 2 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 622 crc32= -920580146 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 3 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 616 crc32= 769123323 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 4 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 615 crc32= -1851471339 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 5 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 616 crc32= -1772885753 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 6 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 622 crc32= -1431292397 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 7 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 621 crc32= -212305569 capasDibujadas= 7 sinGrafico= 0
+
+CORRIDA CON MONSTRUOS=0
+------------------------------------------------------------------------------------------------
+cuadros medidos: 15 | msMapa prom=591.2 (rango 550-679) | msJugador prom=0.47 (max 1) | msBicho prom=0.00 (max 0)
+JUEGO121: BICHO RESUMEN monstruos= 0 (la corrida no tiene bichos)
+
+CORRIDA CON MONSTRUOS=1
+------------------------------------------------------------------------------------------------
+cuadros medidos: 15 | msMapa prom=587.1 (rango 528-732) | msJugador prom=0.60 (max 1) | msBicho prom=0.33 (max 1)
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 0 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 616 crc32= -388391488 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 1 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 609 crc32= -2026865143 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 2 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 621 crc32= 77938811 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 3 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 624 crc32= -309695081 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 4 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 619 crc32= -1877097553 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 5 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 603 crc32= -1485940493 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 6 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 622 crc32= -367750040 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 7 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 601 crc32= 936164813 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 0 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 628 crc32= -524154663 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 1 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 589 crc32= -26022557 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 2 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 608 crc32= -792599843 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 3 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 610 crc32= -1802908762 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 4 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 614 crc32= 802725230 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 5 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 610 crc32= -1784538173 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 6 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 600 crc32= -1001978384 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 7 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 594 crc32= 461200573 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 0 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 618 crc32= -800068193 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 1 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 621 crc32= 1642572367 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 2 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 622 crc32= -920580146 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 3 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 616 crc32= 769123323 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 4 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 615 crc32= -1851471339 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 5 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 616 crc32= -1772885753 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 6 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 622 crc32= -1431292397 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 7 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 621 crc32= -212305569 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO cuadro= 1 bichos= 1 B1:celda=29,21,pos=29.00,21.00,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=0
+JUEGO121: BICHO CUADRO 1 bichos= 1 pixelesPintados= 616 msBicho= 1 crcConBichos= 1189303137 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=320,363,caja=307,307,337,381,tamano=30x74,dir=6,cuadro=0,pixeles=616,ms=1,celda=29,21
+JUEGO121: BICHO cuadro= 2 bichos= 1 B1:celda=30,19,pos=30.39,19.61,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=616
+JUEGO121: BICHO CUADRO 2 bichos= 1 pixelesPintados= 624 msBicho= 0 crcConBichos= 160813230 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=541,363,caja=528,307,558,381,tamano=30x74,dir=6,cuadro=3,pixeles=624,ms=0,celda=30,19
+JUEGO121: BICHO cuadro= 3 bichos= 1 B1:celda=31,19,pos=31.00,19.00,dir=6,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=624
+JUEGO121: BICHO CUADRO 3 bichos= 1 pixelesPintados= 227 msBicho= 0 crcConBichos= -1591470080 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=640,363,caja=627,307,640,381,tamano=30x74,dir=6,cuadro=4,pixeles=227,ms=0,celda=31,19
+JUEGO121: BICHO cuadro= 4 bichos= 1 B1:celda=29,20,pos=29.77,20.23,dir=2,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=227
+JUEGO121: BICHO CUADRO 4 bichos= 1 pixelesPintados= 610 msBicho= 1 crcConBichos= -1035833376 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=442,363,caja=424,309,461,379,tamano=37x70,dir=2,cuadro=5,pixeles=610,ms=1,celda=29,20
+JUEGO121: BICHO CUADRO 5 bichos= 1 pixelesPintados= 600 msBicho= 1 crcConBichos= 1732127092 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=320,363,caja=302,309,339,379,tamano=37x70,dir=2,cuadro=6,pixeles=600,ms=1,celda=29,21
+JUEGO121: BICHO cuadro= 6 bichos= 1 B1:celda=30,19,pos=30.25,19.75,dir=6,cuadro=0,hacia=si,extremos=2,bloqueos=0,pintados=600
+JUEGO121: BICHO CUADRO 6 bichos= 1 pixelesPintados= 601 msBicho= 0 crcConBichos= 716045912 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=519,363,caja=506,307,536,381,tamano=30x74,dir=6,cuadro=7,pixeles=601,ms=0,celda=30,19
+JUEGO121: BICHO cuadro= 7 bichos= 1 B1:celda=31,19,pos=31.00,19.00,dir=6,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=601
+JUEGO121: BICHO CUADRO 7 bichos= 1 pixelesPintados= 221 msBicho= 0 crcConBichos= -1598103191 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=640,363,caja=627,307,640,381,tamano=30x74,dir=6,cuadro=1,pixeles=221,ms=0,celda=31,19
+JUEGO121: BICHO cuadro= 8 bichos= 1 B1:celda=29,20,pos=29.84,20.16,dir=2,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=221
+JUEGO121: BICHO CUADRO 8 bichos= 1 pixelesPintados= 589 msBicho= 1 crcConBichos= 997677324 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=453,363,caja=435,309,472,379,tamano=37x70,dir=2,cuadro=1,pixeles=589,ms=1,celda=29,20
+JUEGO121: BICHO CUADRO 9 bichos= 1 pixelesPintados= 610 msBicho= 0 crcConBichos= 2035609765 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=320,363,caja=302,309,339,379,tamano=37x70,dir=2,cuadro=3,pixeles=610,ms=0,celda=29,21
+JUEGO121: BICHO CUADRO 10 bichos= 1 pixelesPintados= 623 msBicho= 0 crcConBichos= 392878595 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=508,363,caja=495,307,525,381,tamano=30x74,dir=6,cuadro=3,pixeles=623,ms=0,celda=30,19
+JUEGO121: BICHO CUADRO 11 bichos= 1 pixelesPintados= 227 msBicho= 1 crcConBichos= -1193540155 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=640,363,caja=627,307,640,381,tamano=30x74,dir=6,cuadro=4,pixeles=227,ms=1,celda=31,19
+JUEGO121: BICHO CUADRO 12 bichos= 1 pixelesPintados= 610 msBicho= 0 crcConBichos= -1308577074 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=447,363,caja=429,309,466,379,tamano=37x70,dir=2,cuadro=5,pixeles=610,ms=0,celda=29,20
+JUEGO121: BICHO CUADRO 13 bichos= 1 pixelesPintados= 610 msBicho= 0 crcConBichos= -883304366 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=320,363,caja=302,309,339,379,tamano=37x70,dir=2,cuadro=5,pixeles=610,ms=0,celda=29,21
+JUEGO121: BICHO CUADRO 14 bichos= 1 pixelesPintados= 600 msBicho= 0 crcConBichos= -483496499 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=516,363,caja=503,307,533,381,tamano=30x74,dir=6,cuadro=7,pixeles=600,ms=0,celda=30,19
+JUEGO121: BICHO CUADRO 15 bichos= 1 pixelesPintados= 210 msBicho= 0 crcConBichos= 1631514969 mapaSolo= -374784076 lienzoRestaurado= true detalle= B1:ancla=640,389,caja=627,333,640,407,tamano=30x74,dir=6,cuadro=0,pixeles=210,ms=0,celda=31,19
+JUEGO121: BICHO RESUMEN monstruos= 1 tipo= Returned token= SK modo= WL celdaB1= 31 19 celdasCaminadas= 19.799 celdasPorSegundo= 1.03071 extremos= 7 vueltas= 3 bloqueosDelBicho= 0 bloqueosDeJugadores= 1 solapamientos= 0 celdasRepetidasEntreBichos= 0 pixelesDelUltimoCuadro= 210 indicesCompartidosBytes= 51880 estadoPorBichoBytes= 176 cuadrosDelTipo= 2 cuadrosDelTipoIndicesBytes= 51880
+JUEGO121: BICHO CRITERIO dibujado= true patrullando= true sinSolapamientos= true cuadros= 2 bichos= 1 celdas= 19.799
+
+CORRIDA CON MONSTRUOS=4
+------------------------------------------------------------------------------------------------
+cuadros medidos: 15 | msMapa prom=620.7 (rango 548-755) | msJugador prom=0.60 (max 1) | msBicho prom=1.60 (max 3)
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 0 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 616 crc32= -388391488 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 1 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 609 crc32= -2026865143 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 2 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 621 crc32= 77938811 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 3 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 624 crc32= -309695081 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 4 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 619 crc32= -1877097553 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 5 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 603 crc32= -1485940493 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 6 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 622 crc32= -367750040 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 6 cuadro= 7 de 8 caja= 30 x 74 esquina= -13 -56 pixeles= 601 crc32= 936164813 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 0 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 628 crc32= -524154663 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 1 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 589 crc32= -26022557 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 2 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 608 crc32= -792599843 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 3 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 610 crc32= -1802908762 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 4 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 614 crc32= 802725230 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 5 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 610 crc32= -1784538173 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 6 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 600 crc32= -1001978384 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= WL dir= 2 cuadro= 7 de 8 caja= 37 x 70 esquina= -18 -54 pixeles= 594 crc32= 461200573 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 0 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 618 crc32= -800068193 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 1 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 621 crc32= 1642572367 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 2 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 622 crc32= -920580146 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 3 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 616 crc32= 769123323 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 4 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 615 crc32= -1851471339 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 5 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 616 crc32= -1772885753 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 6 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 622 crc32= -1431292397 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO CUADRO modo= NU dir= 0 cuadro= 7 de 8 caja= 25 x 67 esquina= -17 -56 pixeles= 621 crc32= -212305569 capasDibujadas= 7 sinGrafico= 0
+JUEGO121: BICHO cuadro= 1 bichos= 4 B1:celda=29,21,pos=29.00,21.00,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=0 B2:celda=29,21,pos=29.50,21.50,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=0 B3:celda=30,22,pos=30.00,22.00,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=0 B4:celda=30,22,pos=30.50,22.50,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=0
+JUEGO121: BICHO CUADRO 1 bichos= 4 pixelesPintados= 2628 msBicho= 2 crcConBichos= -1157616623 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=320,363,caja=307,307,337,381,tamano=30x74,dir=6,cuadro=0,pixeles=616,ms=0,celda=29,21 B2:ancla=320,403,caja=307,347,337,421,tamano=30x74,dir=6,cuadro=0,pixeles=702,ms=1,celda=29,21 B3:ancla=320,443,caja=307,387,337,461,tamano=30x74,dir=6,cuadro=0,pixeles=702,ms=1,celda=30,22 B4:ancla=320,483,caja=307,427,337,480,tamano=30x74,dir=6,cuadro=0,pixeles=608,ms=0,celda=30,22
+JUEGO121: BICHO cuadro= 2 bichos= 4 B1:celda=30,19,pos=30.46,19.54,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=616 B2:celda=30,20,pos=30.96,20.04,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=702 B3:celda=31,20,pos=31.46,20.54,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=702 B4:celda=31,21,pos=31.96,21.04,dir=6,cuadro=0,hacia=si,extremos=0,bloqueos=0,pintados=608
+JUEGO121: BICHO CUADRO 2 bichos= 4 pixelesPintados= 2609 msBicho= 1 crcConBichos= 1163868295 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=553,363,caja=540,307,570,381,tamano=30x74,dir=6,cuadro=4,pixeles=619,ms=0,celda=30,19 B2:ancla=553,403,caja=540,347,570,421,tamano=30x74,dir=6,cuadro=4,pixeles=694,ms=1,celda=30,20 B3:ancla=553,443,caja=540,387,570,461,tamano=30x74,dir=6,cuadro=4,pixeles=694,ms=0,celda=31,20 B4:ancla=553,483,caja=540,427,570,480,tamano=30x74,dir=6,cuadro=4,pixeles=602,ms=0,celda=31,21
+JUEGO121: BICHO cuadro= 3 bichos= 4 B1:celda=31,19,pos=31.00,19.00,dir=6,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=619 B2:celda=31,19,pos=31.50,19.50,dir=6,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=694 B3:celda=32,20,pos=32.00,20.00,dir=6,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=694 B4:celda=32,20,pos=32.50,20.50,dir=6,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=602
+JUEGO121: BICHO CUADRO 3 bichos= 4 pixelesPintados= 949 msBicho= 1 crcConBichos= -559149899 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=640,363,caja=627,307,640,381,tamano=30x74,dir=6,cuadro=6,pixeles=217,ms=0,celda=31,19 B2:ancla=640,403,caja=627,347,640,421,tamano=30x74,dir=6,cuadro=6,pixeles=255,ms=0,celda=31,19 B3:ancla=640,443,caja=627,387,640,461,tamano=30x74,dir=6,cuadro=6,pixeles=255,ms=1,celda=32,20 B4:ancla=640,483,caja=627,427,640,480,tamano=30x74,dir=6,cuadro=6,pixeles=222,ms=0,celda=32,20
+JUEGO121: BICHO cuadro= 4 bichos= 4 B1:celda=29,20,pos=29.71,20.29,dir=2,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=217 B2:celda=30,20,pos=30.21,20.79,dir=2,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=255 B3:celda=30,21,pos=30.71,21.29,dir=2,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=255 B4:celda=31,21,pos=31.21,21.79,dir=2,cuadro=0,hacia=no,extremos=1,bloqueos=0,pintados=222
+JUEGO121: BICHO CUADRO 4 bichos= 4 pixelesPintados= 2586 msBicho= 1 crcConBichos= 705974817 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=432,363,caja=414,309,451,379,tamano=37x70,dir=2,cuadro=0,pixeles=628,ms=0,celda=29,20 B2:ancla=432,403,caja=414,349,451,419,tamano=37x70,dir=2,cuadro=0,pixeles=692,ms=0,celda=30,20 B3:ancla=432,443,caja=414,389,451,459,tamano=37x70,dir=2,cuadro=0,pixeles=692,ms=1,celda=30,21 B4:ancla=432,483,caja=414,429,451,480,tamano=37x70,dir=2,cuadro=0,pixeles=574,ms=0,celda=31,21
+JUEGO121: BICHO CUADRO 5 bichos= 4 pixelesPintados= 2454 msBicho= 2 crcConBichos= 1827116939 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=320,363,caja=302,309,339,379,tamano=37x70,dir=2,cuadro=2,pixeles=608,ms=1,celda=29,21 B2:ancla=320,403,caja=302,349,339,419,tamano=37x70,dir=2,cuadro=2,pixeles=643,ms=0,celda=29,21 B3:ancla=320,443,caja=302,389,339,459,tamano=37x70,dir=2,cuadro=2,pixeles=643,ms=1,celda=30,22 B4:ancla=320,483,caja=302,429,339,480,tamano=37x70,dir=2,cuadro=2,pixeles=560,ms=0,celda=30,22
+JUEGO121: BICHO cuadro= 6 bichos= 4 B1:celda=30,19,pos=30.23,19.77,dir=6,cuadro=0,hacia=si,extremos=2,bloqueos=0,pintados=608 B2:celda=30,20,pos=30.73,20.27,dir=6,cuadro=0,hacia=si,extremos=2,bloqueos=0,pintados=643 B3:celda=31,20,pos=31.23,20.77,dir=6,cuadro=0,hacia=si,extremos=2,bloqueos=0,pintados=643 B4:celda=31,21,pos=31.73,21.27,dir=6,cuadro=0,hacia=si,extremos=2,bloqueos=0,pintados=560
+JUEGO121: BICHO CUADRO 6 bichos= 4 pixelesPintados= 2609 msBicho= 3 crcConBichos= -1323978457 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=516,363,caja=503,307,533,381,tamano=30x74,dir=6,cuadro=4,pixeles=619,ms=1,celda=30,19 B2:ancla=516,403,caja=503,347,533,421,tamano=30x74,dir=6,cuadro=4,pixeles=694,ms=1,celda=30,20 B3:ancla=516,443,caja=503,387,533,461,tamano=30x74,dir=6,cuadro=4,pixeles=694,ms=0,celda=31,20 B4:ancla=516,483,caja=503,427,533,480,tamano=30x74,dir=6,cuadro=4,pixeles=602,ms=1,celda=31,21
+JUEGO121: BICHO cuadro= 7 bichos= 4 B1:celda=31,19,pos=31.00,19.00,dir=6,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=619 B2:celda=31,19,pos=31.50,19.50,dir=6,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=694 B3:celda=32,20,pos=32.00,20.00,dir=6,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=694 B4:celda=32,20,pos=32.50,20.50,dir=6,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=602
+JUEGO121: BICHO CUADRO 7 bichos= 4 pixelesPintados= 949 msBicho= 0 crcConBichos= -1838670207 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=640,363,caja=627,307,640,381,tamano=30x74,dir=6,cuadro=6,pixeles=217,ms=0,celda=31,19 B2:ancla=640,403,caja=627,347,640,421,tamano=30x74,dir=6,cuadro=6,pixeles=255,ms=0,celda=31,19 B3:ancla=640,443,caja=627,387,640,461,tamano=30x74,dir=6,cuadro=6,pixeles=255,ms=0,celda=32,20 B4:ancla=640,483,caja=627,427,640,480,tamano=30x74,dir=6,cuadro=6,pixeles=222,ms=0,celda=32,20
+JUEGO121: BICHO cuadro= 8 bichos= 4 B1:celda=29,20,pos=29.70,20.30,dir=2,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=217 B2:celda=30,20,pos=30.20,20.80,dir=2,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=255 B3:celda=30,21,pos=30.70,21.30,dir=2,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=255 B4:celda=31,21,pos=31.20,21.80,dir=2,cuadro=0,hacia=no,extremos=3,bloqueos=0,pintados=222
+JUEGO121: BICHO CUADRO 8 bichos= 4 pixelesPintados= 2370 msBicho= 2 crcConBichos= 385391164 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=432,363,caja=414,309,451,379,tamano=37x70,dir=2,cuadro=1,pixeles=589,ms=0,celda=29,20 B2:ancla=432,403,caja=414,349,451,419,tamano=37x70,dir=2,cuadro=1,pixeles=622,ms=1,celda=30,20 B3:ancla=432,443,caja=414,389,451,459,tamano=37x70,dir=2,cuadro=1,pixeles=621,ms=0,celda=30,21 B4:ancla=432,483,caja=414,429,451,480,tamano=37x70,dir=2,cuadro=1,pixeles=538,ms=1,celda=31,21
+JUEGO121: BICHO CUADRO 9 bichos= 4 pixelesPintados= 2681 msBicho= 1 crcConBichos= 1697901997 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=320,363,caja=302,309,339,379,tamano=37x70,dir=2,cuadro=3,pixeles=608,ms=0,celda=29,21 B2:ancla=320,403,caja=302,349,339,419,tamano=37x70,dir=2,cuadro=3,pixeles=726,ms=1,celda=29,21 B3:ancla=320,443,caja=302,389,339,459,tamano=37x70,dir=2,cuadro=3,pixeles=726,ms=0,celda=30,22 B4:ancla=320,483,caja=302,429,339,480,tamano=37x70,dir=2,cuadro=3,pixeles=621,ms=0,celda=30,22
+JUEGO121: BICHO CUADRO 10 bichos= 4 pixelesPintados= 2609 msBicho= 3 crcConBichos= -793341945 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=516,363,caja=503,307,533,381,tamano=30x74,dir=6,cuadro=4,pixeles=619,ms=1,celda=30,19 B2:ancla=516,403,caja=503,347,533,421,tamano=30x74,dir=6,cuadro=4,pixeles=694,ms=1,celda=30,20 B3:ancla=516,443,caja=503,387,533,461,tamano=30x74,dir=6,cuadro=4,pixeles=694,ms=0,celda=31,20 B4:ancla=516,483,caja=503,427,533,480,tamano=30x74,dir=6,cuadro=4,pixeles=602,ms=1,celda=31,21
+JUEGO121: BICHO CUADRO 11 bichos= 4 pixelesPintados= 949 msBicho= 1 crcConBichos= 1212358449 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=640,363,caja=627,307,640,381,tamano=30x74,dir=6,cuadro=6,pixeles=217,ms=0,celda=31,19 B2:ancla=640,403,caja=627,347,640,421,tamano=30x74,dir=6,cuadro=6,pixeles=255,ms=1,celda=31,19 B3:ancla=640,443,caja=627,387,640,461,tamano=30x74,dir=6,cuadro=6,pixeles=255,ms=0,celda=32,20 B4:ancla=640,483,caja=627,427,640,480,tamano=30x74,dir=6,cuadro=6,pixeles=222,ms=0,celda=32,20
+JUEGO121: BICHO CUADRO 12 bichos= 4 pixelesPintados= 2585 msBicho= 2 crcConBichos= 414605753 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=439,363,caja=421,309,458,379,tamano=37x70,dir=2,cuadro=0,pixeles=628,ms=1,celda=29,20 B2:ancla=439,403,caja=421,349,458,419,tamano=37x70,dir=2,cuadro=0,pixeles=692,ms=0,celda=30,20 B3:ancla=439,443,caja=421,389,458,459,tamano=37x70,dir=2,cuadro=0,pixeles=690,ms=1,celda=30,21 B4:ancla=439,483,caja=421,429,458,480,tamano=37x70,dir=2,cuadro=0,pixeles=575,ms=0,celda=31,21
+JUEGO121: BICHO CUADRO 13 bichos= 4 pixelesPintados= 2371 msBicho= 1 crcConBichos= -717185686 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=320,363,caja=302,309,339,379,tamano=37x70,dir=2,cuadro=1,pixeles=589,ms=0,celda=29,21 B2:ancla=320,403,caja=302,349,339,419,tamano=37x70,dir=2,cuadro=1,pixeles=622,ms=0,celda=29,21 B3:ancla=320,443,caja=302,389,339,459,tamano=37x70,dir=2,cuadro=1,pixeles=622,ms=1,celda=30,22 B4:ancla=320,483,caja=302,429,339,480,tamano=37x70,dir=2,cuadro=1,pixeles=538,ms=0,celda=30,22
+JUEGO121: BICHO CUADRO 14 bichos= 4 pixelesPintados= 2613 msBicho= 2 crcConBichos= 41252335 mapaSolo= 1437022778 lienzoRestaurado= true detalle= B1:ancla=524,363,caja=511,307,541,381,tamano=30x74,dir=6,cuadro=3,pixeles=624,ms=1,celda=30,19 B2:ancla=524,403,caja=511,347,541,421,tamano=30x74,dir=6,cuadro=3,pixeles=689,ms=0,celda=30,20 B3:ancla=524,443,caja=511,387,541,461,tamano=30x74,dir=6,cuadro=3,pixeles=689,ms=0,celda=31,20 B4:ancla=524,483,caja=511,427,541,480,tamano=30x74,dir=6,cuadro=3,pixeles=611,ms=1,celda=31,21
+JUEGO121: BICHO CUADRO 15 bichos= 4 pixelesPintados= 993 msBicho= 2 crcConBichos= -636060018 mapaSolo= -767422953 lienzoRestaurado= true detalle= B1:ancla=640,323,caja=627,267,640,341,tamano=30x74,dir=6,cuadro=5,pixeles=210,ms=1,celda=31,19 B2:ancla=640,363,caja=627,307,640,381,tamano=30x74,dir=6,cuadro=5,pixeles=261,ms=0,celda=31,19 B3:ancla=640,403,caja=627,347,640,421,tamano=30x74,dir=6,cuadro=5,pixeles=261,ms=0,celda=32,20 B4:ancla=640,443,caja=627,387,640,461,tamano=30x74,dir=6,cuadro=5,pixeles=261,ms=1,celda=32,20
+JUEGO121: BICHO RESUMEN monstruos= 4 tipo= Returned token= SK modo= WL celdaB1= 31 19 celdasCaminadas= 79.196 celdasPorSegundo= 0.975464 extremos= 28 vueltas= 12 bloqueosDelBicho= 0 bloqueosDeJugadores= 2 solapamientos= 0 celdasRepetidasEntreBichos= 2 pixelesDelUltimoCuadro= 993 indicesCompartidosBytes= 51880 estadoPorBichoBytes= 176 cuadrosDelTipo= 2 cuadrosDelTipoIndicesBytes= 51880
+JUEGO121: BICHO CRITERIO dibujado= true patrullando= true sinSolapamientos= true cuadros= 2 bichos= 4 celdas= 79.196
+
+EL MAPA RESTAURADO, CUADRO A CUADRO (SOLO-MAPA: crc32 del mapa sin nadie encima, contra el del host)
+------------------------------------------------------------------------------------------------
+MONSTRUOS=0: 15 de 15 cuadros con crc32 = 1437022778 (el del host)
+MONSTRUOS=1: 14 de 15 cuadros con crc32 = 1437022778 (el del host)
+   JUEGO121: CUADRO 15 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -374784076 hostPixeles= 307196 hostCrc= 1437022778 ms= 597 igualAlHost= false camaraCelda= 27.6685 19.6685 jugadores= 1
+MONSTRUOS=4: 14 de 15 cuadros con crc32 = 1437022778 (el del host)
+   JUEGO121: CUADRO 15 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -767422953 hostPixeles= 307196 hostCrc= 1437022778 ms= 667 igualAlHost= false camaraCelda= 28.4972 20.4972 jugadores= 1
+
+NOTA sobre ese cuadro: es el ULTIMO de la corrida (cuadros+3), el del cierre, y en el el lienzo queda con
+307200 px pintados en vez de 307196: 4 px del borde que estaban vacios. Coincide con el cuadro en que la
+camara reporta una celda FRACCIONARIA (27,6685 19,6685, la del jugador frenado por el bicho) en vez de la
+celda entera del POC (28,20). No lo produce el dibujo del monstruo: el lienzo se devuelve identico en TODOS
+los cuadros (crc32 antes/despues del dibujo, campo lienzoRestaurado=true, 0 lineas LIENZO-RESTAURADO-TRAS-BICHOS
+DISTINTO en las tres corridas).
+
+CONCLUSION
+------------------------------------------------------------------------------------------------
+Con MONSTRUOS=0 la corrida es la de DC-002.120 (15 de 15 cuadros con el crc32 del host). Con MONSTRUOS=1 y 4
+el bicho se carga del MPQ, se dibuja, patrulla (19,8 celdas en 15 cuadros; 79,2 con cuatro), ocupa SU celda y
+frena al jugador (1 y 2 bloqueos medidos) sin un solo solapamiento, y cuesta 0,33 ms por cuadro con uno y
+1,60 ms con cuatro, contra los ~590-620 ms que cuesta el mapa: 0,06 % y 0,26 % del cuadro.
