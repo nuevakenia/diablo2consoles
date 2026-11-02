@@ -1,0 +1,165 @@
+DC-002.118 -- EL SPLIT DE TRES Y CUATRO: CUATRO CUADRANTES, CUATRO CAMARAS
+============================================================================================
+
+QUE SE CONSTRUYO. El POC `console/dc/poc/juego-118/` (el de DC-002.120, o sea los cuatro jugadores uno por
+PUERTO del bus maple con el leash de grupo y el ciclo de niveles) con el SPLIT llevado de DOS a CUATRO: cada
+jugador tiene SU recuadro de la pantalla y SU camara. Lo que antes no existia:
+
+  - `prepararElSplit` rechazaba cualquier numero de jugadores que no fuera 2, y lo decia. Ahora acepta 1, 2, 3 y 4.
+  - El reparto por tabla (`repartirElSplit`): 640x480 | dos columnas de 320x480 | 1 grande + 2 chicas (o tres
+    tiras, con la palanca `REPARTO3`) | cuatro cuadrantes de 320x240.
+  - La presentacion por N recuadros: N conversiones RGBA->RGB565 (una por lienzo) y N quads.
+
+LO QUE HIZO FALTA EN EL MOTOR (dos piezas nuevas y ADITIVAS, el camino viejo no cambia una linea):
+  - `d2c_pvr_pantalla_convertir_en_bloque(rgba, w, h, x_dest, y_dest)` en `console/dc/std/csrc/pvr_pantalla.c`:
+    la conversion de DC-002.116 CON LA FILA DEL DESTINO. Cuatro cuadrantes son DOS filas; sin `y_dest` los de
+    abajo se escribian encima de los de arriba. Exige destino multiplo de 32 (los bloques de la textura son
+    32x32 y se suben con `pvr_txr_load`, uno entero por vez).
+  - `d2c_pvr_pantalla_pintar_bloque(x, y, w, h, tu, tv)` (C) y `pvr.PresentarEnBloque` / `pvr.PintarEnBloque` /
+    `pvr.SuperficieEnBloque` (Go, `d2core/d2render/pvr/presentar_118.go`): un lienzo a UNA REGION de la textura y
+    un quad de esa region a UN RECUADRO de la pantalla.
+
+POR QUE LA TEXTURA Y LA PANTALLA SE SEPARAN (esto es lo que hay que entender de la tarjeta). La textura del PVR
+es 1024x512 y sus bloques 32x32. La fila de abajo de los cuadrantes empieza en la 240 de la PANTALLA, que NO es
+multiplo de 32: sus pixeles viven en la 256 de la TEXTURA (multiplo de 32, sin pisar los bloques de la fila de
+arriba, que ocupa hasta la 239) y el quad los pinta en la 240. Se descarto la alternativa de escribir a mitad de
+bloque: la conversion escribe el bloque entero y dos lienzos que comparten bloque se borrarian parte uno al otro
+(o habria que leer la VRAM y reescribir el bloque del vecino, que es mas caro y mas fragil).
+
+LO QUE NO SE TOCA: el leash (sigue siendo el camino de `SPLIT=no`), la memoria del lienzo (los N recuadros suman
+SIEMPRE 640*480*4 = 1.228.800 B, los mismos del lienzo unico), el mapa y el jugador (`personaje.go` y `jugador.go`
+son byte a byte los del medidor del host) y el ciclo de niveles (`FASE=ciclo` sigue corriendo el de DC-002.120).
+
+
+COMO SE CORRE (medido en este host)
+-----------------------------------
+    JUGADORES=4   bash scripts/console/build-juego-118.sh /tmp/dcbuild/j118-cuatro
+    JUGADORES=3   bash scripts/console/build-juego-118.sh /tmp/dcbuild/j118-tres      # 1 grande + 2 chicas
+    JUGADORES=3 REPARTO3=tiras bash scripts/console/build-juego-118.sh /tmp/dcbuild/j118-tiras
+    JUGADORES=2   bash scripts/console/build-juego-118.sh /tmp/dcbuild/j118-dos
+    JUGADORES=1   bash scripts/console/build-juego-118.sh /tmp/dcbuild/j118-uno
+    CAPTURAS=10 INTERVALO=2 bash scripts/console/run-flycast-118.sh \
+        /tmp/dcbuild/j118-cuatro/disc.gdi /tmp/dc118-cuatro
+El A/B del split es la MISMA compilacion con otra palanca: `SPLIT=si` (la rejilla) | `SPLIT=no` (la pantalla
+entera de DC-002.115/117 con el leash). Los cuatro casos de la tabla salen de UN binario por caso, y entre uno y
+otro lo unico que cambia es `JUGADORES` (y `REPARTO3` para las dos formas del de tres).
+Los builds de despues del primero van con `SALTAR_MOTOR=1` (7 s): los `.gox` del motor ya tienen las dos piezas
+nuevas, que se compilan en el PRIMER build de la tarjeta.
+
+
+LOS NUMEROS DEL CRITERIO (cuatro jugadores en cuatro cuadrantes, cada uno con su camara)
+---------------------------------------------------------------------------------------
+  criterio de la tarjeta                                  medido
+  ------------------------------------------------------  ------------------------------------------------
+  cuatro jugadores en cuatro cuadrantes                    SI: 9 cuadros, 307.200 de 307.200 pixeles
+                                                           llenos (los cuatro recuadros llenos: 76.800 de
+                                                           76.800 cada uno)
+  cada uno con SU camara                                   camaraP1= 28,20  camaraP2= 31,20
+                                                           camaraP3= 28,23  camaraP4= 31,23 (celdas del
+                                                           mapa, cada una en la celda de SU jugador)
+  cada lienzo en SU region de la pantalla y de la textura  (0,0)->(0,0)   (320,0)->(320,0)
+                                                           (0,240)->(0,256) (320,240)->(320,256)
+  ninguno se sale de su recuadro                           cuadrosFueraDeSuRecuadro= 0 sobre 9 cuadros
+  el cuadro es estable (repetibilidad por recuadro)        igualesPorRecuadro= true
+                                                           igualesConJugador= true
+  la VRAM de los lienzos                                  4 x 307.200 = 1.228.800 B = EXACTAMENTE los del
+                                                           lienzo unico de 640x480 (mismosBytesQueUnLienzo
+                                                           Unico= true); el lienzo de la pantalla NO se
+                                                           reserva
+  VRAM que queda                                          29.960..378.152 B libres segun cuantos bloques de
+                                                           cache entraron (9 o 10 de 348.160 B)
+  la cache de tiles con CUATRO camaras                     97 imagenes, 3.072.000 B, 0 derrames
+  ms por cuadro (dibujar + presentar + espera del PVR)     1,59 s (cuadro 9); 1,48-1,66 en los del guion
+  ms del mapa por cuadro                                   1.036 (cuatro Render de 320x240)
+  ms de presentar por cuadro                               33 (cuatro conversiones + cuatro quads)
+
+LA TABLA (misma compilacion por caso, guion "cuatro" = 6 cuadros + los 3 del cierre; 9 cuadros en todos)
+-------------------------------------------------------------------------------------------------------
+  jugadores  reparto              lienzos (w x h)             VRAM    msMapa  msPres  msJugador  msCuadro  cache        derra  cuadros
+             (bytes totales)                                 libre   /cuadro /cuadro /cuadro    medio     imagenes     mes    fuera
+  ---------  -------------------  --------------------------  ------  ------  ------  ---------  --------  -----------  -----  -------
+      1      640x480              1 x 640x480                 30.056    590     32,8     0,67     1,02 s     107          0       0
+               1.228.800
+      2      2 columnas           2 x 320x480                 30.024    859     32,4     1,33     1,33 s     106          0       0
+               1.228.800
+      3      1 grande + 2 chicas  1 x 320x480 + 2 x 320x240   29.992    941     33,2     1,56     1,45 s     106          0       0
+               1.228.800
+      3      3 tiras              3 x 640x160                378.184    732     32,9     2,22     1,25 s      98          0       0
+               1.228.800
+      4      4 cuadrantes         4 x 320x240                378.152  1.036     33,0     2,44     1,59 s      97          0       0
+               1.228.800
+
+  LO QUE DICE LA TABLA, y es lo que no se sabia antes de medirla:
+  - LA VRAM ES LA MISMA EN LOS CINCO CASOS: 1.228.800 B de lienzos, porque los recuadros suman la pantalla
+    entera. Repartir no cuesta ni un byte de VRAM de lienzos: lo que cuesta es la CACHE, que tiene que tener N
+    zonas del mapa.
+  - LOS ms NO SON LOS MISMOS, y no siguen a los pixeles: el de cuatro (1.036 ms de mapa) cuesta 1,75x el de uno
+    (590) con los MISMOS 307.200 pixeles. Lo que se paga es el costo FIJO de cada `Render` (rango de tiles,
+    indexEntities, las cuatro pasadas), no el pixel. De ahi que "3 tiras" (732 ms) sea mas barata que "3 grande"
+    (941): tres lienzos del mismo tamano pagan tres veces el mismo costo fijo, pero un lienzo de 640x160 mira
+    menos tiles por fila que uno de 320x480.
+  - CON LOS CUATRO JUNTOS LA CACHE NO SUFRE: 97 imagenes, 0 derrames. Las cuatro camaras estan a menos de 7
+    celdas y comparten casi todos los tiles (el cuadro de un cuadrante es un cuarto del de 640x480).
+  - EL DE TRES ES UNA ELECCION, NO UNA CUENTA: las dos formas cuestan los mismos bytes y (mas o menos) los
+    mismos ms; lo que decide es lo que ve cada uno. `tiras` deja 640x160 = 4x1 celdas de alto, una franja donde
+    no se ve el piso de adelante ni el de atras; `grande` deja al jugador 1 el cuadro completo y a los otros dos
+    2x1,5 celdas con el piso alrededor. Queda `grande` por omision.
+
+
+EL LIMITE EXACTO: CUATRO CAMARAS LEJOS NO ENTRAN (y el numero es este)
+---------------------------------------------------------------------
+Corrida con los cuatro lejos (separacion 44,72 celdas): `CELDA_P2="24 -8"` (52,12), `CELDA_P3="-16 12"`
+(12,32), `CELDA_P4="20 -14"` (48,6) -- las cuatro camaras en cuatro zonas DISTINTAS del pueblo:
+
+    JUEGO118: SPLIT CUADRO 1 ... celdas= 44.7214 jugadores= 4
+    JUEGO118: SPLIT CUADRO 4 ... celdas= 44.7214       <- los cuatro cuadrantes se dibujan bien
+    fatal error: GC to-space overflow - your live data doesn't fit in the heap.
+    Fatal: SH4 exception when blocked                  <- y en el cuadro 5 el emulador se cae
+
+NO es la VRAM de los lienzos (los mismos 1.228.800 B de siempre): es la CACHE DE TILES. El tramo de la cache es
+de 3.481.600 B (10 bloques de 348.160 B) y con cuatro zonas separadas las imagenes que piden los cuatro mapas no
+entran; lo que no entra se DERRAMA al monton de Go, donde es vivo y tumba al recolector -- el mismo final que
+DC-002.113b midio para una sola camara caminando. La palanca que falta para este caso es la de ESA tarjeta
+(`d2maprenderer.ConDesalojoDeLaCache`), que existe en el motor pero que este POC no enciende: encenderla es la
+tarjeta siguiente, no esta ("QUE NO ENTRA: no tocar la cache"). Con los cuatro juntos (que es como juega el
+cooperativo local: el leash de DC-002.117 los tiene a menos de 5,25 celdas) el caso no se da: 0 derrames.
+
+
+LOS PITFALLS MEDIDOS (los tres cuestan una corrida cada uno)
+------------------------------------------------------------
+  1. LA CAMARA DEL CIERRE. `volverAlOrigen`/`volverAlFinal` mueven a los jugadores DENTRO del callback de
+     dibujado, y las camaras se ponian en `actualizar`, ANTES. Resultado medido en la primera corrida: cuadro 7
+     con la celda del origen y la camara del cuadro 6, los cuatro FUERA de su recuadro (cuadrosFuera= 4 en el 7
+     y 3 en el 9) y la repetibilidad en false. Se arregla poniendo las camaras de nuevo despues de la vuelta
+     (`ponerLasCamarasDelSplit`), y de ahi en adelante cuadrosFuera= 0 y repetibilidad= true.
+  2. EL GUION SIGUE EMPUJANDO EN EL CIERRE. Los tres cuadros del cierre son quietos a proposito (origen,
+     repetibilidad, vuelta al final) pero solo se congelaba el guion con el ciclo de DC-002.120 encendido. Con
+     el split y `FASE=apagado` el guion seguia: cuadro 7 en el origen y cuadro 8 ya 1,88 celdas mas alla, con
+     los crcs por recuadro distintos. Ahora se congela tambien con el split (`estaElSplitActivo()`), y la
+     repetibilidad da true.
+  3. LA FILA DE LA TEXTURA TIENE QUE SER MULTIPLO DE 32. La 240 de la pantalla no lo es y subir ahi un lienzo
+     deja los bloques de la textura a medias (ver arriba). Va a la 256 y el quad lo pinta en la 240.
+  4. LOS BLOQUES DE LA CACHE SON 9 O 10, NO SIEMPRE 10. Con 3,51 MB libres despues de los lienzos, el mismo
+     pedido de 3.481.600 B en bloques de 348.160 B dio 10 bloques (29.960 B libres) en unas corridas y 9
+     (378.152 B libres, 97 imagenes) en otras: lo que cambia es como quedo fragmentada la VRAM con los lienzos
+     de cada reparto. No afecta al criterio (0 derrames en los dos casos) pero el numero de imagenes de la
+     cache se mueve entre 97 y 107 segun eso.
+
+
+LAS CAPTURAS (640x480, la ventana del emulador en 1400,120, recortada)
+---------------------------------------------------------------------
+  dc-002.118-cuatro-cuadrantes.png         los cuatro de 320x240 en 2x2, un personaje centrado en cada uno y el
+                                           mapa de SU camara; sin costura negra (los cuatro recuadros llenos)
+  dc-002.118-tres-uno-grande-dos-chicas.png 320x480 a la izquierda, dos de 320x240 apiladas a la derecha
+  dc-002.118-tres-tiras.png                tres tiras de 640x160 (el reparto del A/B)
+  dc-002.118-un-lienzo.png                 el de siempre: 640x480, un lienzo (la referencia)
+
+
+LO QUE NO ENTRA (y por que)
+---------------------------
+  - Cuatro camaras LEJOS, sin desalojo de la cache: muere en el cuadro 5 (ver arriba). Necesita la palanca de
+    DC-002.113b encendida; es tarjeta aparte.
+  - El leash con el split: son los dos caminos del cooperativo, y `SPLIT=no` es el del leash.
+  - Nada del mapa ni del jugador cambia: los crcs por recuadro del cuadro 1 (57.892.852 / -319.638.778 /
+    204.390.416 / -1.577.909.200) son los del motor con la camara en la celda de cada jugador, y el cuadro de un
+    solo lienzo sigue dando crc32 1.363.871.674 (el de DC-002.112) con `JUGADORES=1`.

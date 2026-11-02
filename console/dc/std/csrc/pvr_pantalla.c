@@ -369,6 +369,80 @@ int d2c_pvr_pantalla_convertir_en(unsigned int rgba, int w, int h, int x_dest) {
     return convertir_a_columnas(src, w, h, x_dest);
 }
 
+/* DC-002.118: un lienzo de w x h a la COLUMNA Y LA FILA (x_dest, y_dest) de la textura de la pantalla.
+ *
+ * POR QUE HACE FALTA UN y_dest. DC-002.116 partio la pantalla en DOS COLUMNAS de 320x480: alcanzaba con la
+ * columna porque los dos lienzos empiezan en y=0. El split de TRES y CUATRO no: cuatro cuadrantes son dos
+ * FILAS (0 y 240) y dos columnas, y sin la fila de destino los de abajo se escribian ENCIMA de los de arriba.
+ *
+ * ES EL MISMO CAMINO que `convertir_a_columnas` -- misma tabla del twiddle, mismo bloque de 32x32, mismas
+ * Store Queues, mismo costo por pixel -- con la y del destino sumada al indice del bloque. Se deja como
+ * funcion aparte (y no se le pone un parametro mas a la de DC-002.116) porque el POC de aquella tarjeta y su
+ * evidencia tienen que seguir compilando y midiendo exactamente lo mismo.
+ *
+ * x_dest E y_dest TIENEN QUE SER MULTIPLOS DE 32: cada bloque de 32x32 de la textura es contiguo, y un lienzo
+ * que empiece a mitad de bloque no se puede subir por bloques enteros sin leer y reescribir el bloque del
+ * vecino. Los llamadores (el POC de DC-002.118) eligen las posiciones de la textura con esa regla: la
+ * pantalla y la textura NO tienen por que coincidir pixel a pixel, y el que pinta sabe las dos.
+ *
+ * Devuelve 0 si anduvo, -1 sin video, -2 tamano/fila/columna invalidos, -4 destino que no es multiplo de 32. */
+int d2c_pvr_pantalla_convertir_en_bloque(unsigned int rgba, int w, int h, int x_dest, int y_dest) {
+    const unsigned char *src = (const unsigned char *)rgba;
+
+    armar_twiddle();
+
+    if (src == NULL || pant_tex == NULL) {
+        return -1;
+    }
+    if (w <= 0 || h <= 0 || x_dest < 0 || y_dest < 0) {
+        return -2;
+    }
+    /* contra la TEXTURA (potencia de dos), no contra la pantalla: un lienzo de 320x240 en la fila 256 de una
+     * textura de 1024x512 entra, aunque 256+240 = 496 > 480 (la pantalla es mas chica que la textura). */
+    if (x_dest + w > PANT_PW || y_dest + h > PANT_PH) {
+        return -2;
+    }
+    if (((x_dest % LADO_TILE) != 0) || ((y_dest % LADO_TILE) != 0)) {
+        return -4;
+    }
+
+    for (int y0 = 0; y0 < h; y0 += LADO_TILE) {
+        int alto_tile = (h - y0 < LADO_TILE) ? (h - y0) : LADO_TILE;
+
+        for (int x0 = 0; x0 < w; x0 += LADO_TILE) {
+            int ancho_tile = (w - x0 < LADO_TILE) ? (w - x0) : LADO_TILE;
+
+            /* un bloque que NO esta completo (el ultimo de una fila de tiles, que pasa con h=240: 7 bloques
+             * enteros y uno de 16 filas) se rellena con cero para no dejar los pixeles de la vuelta anterior
+             * en la parte que este lienzo no escribe */
+            if (ancho_tile != LADO_TILE || alto_tile != LADO_TILE) {
+                memset(conv_tile, 0, sizeof(conv_tile));
+            }
+
+            for (int yy = 0; yy < alto_tile; yy++) {
+                const unsigned char *p = src + (size_t)(y0 + yy) * (size_t)w * 4 + (size_t)x0 * 4;
+                uint32_t fila = (uint32_t)twid_tabla[yy];
+
+                for (int xx = 0; xx < ancho_tile; xx++) {
+                    unsigned int r = p[0];
+                    unsigned int g = p[1];
+                    unsigned int b = p[2];
+
+                    conv_tile[(uint32_t)twid_tabla[xx] << 1 | fila] =
+                        (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+
+                    p += 4;
+                }
+            }
+
+            pvr_txr_load(conv_tile, (pvr_ptr_t)((uint16_t *)pant_tex + indice_tile(x_dest + x0, y_dest + y0)),
+                         LADO_TILE * LADO_TILE * 2);
+        }
+    }
+
+    return 0;
+}
+
 int d2c_pvr_pantalla_subir_vram(void) {
     if (pant_tex == NULL) {
         return -1;
@@ -413,6 +487,39 @@ void d2c_pvr_pantalla_pintar(void) {
 
     v.flags = PVR_CMD_VERTEX_EOL;
     v.u = u1;   v.v = v1;   v.x = (float)PANT_W; v.y = (float)PANT_H; pvr_prim(&v, sizeof(v));
+}
+
+/* DC-002.118: pinta UN RECUADRO de la textura en UN RECUADRO de la pantalla.
+ *
+ * El cuadro partido de DOS (DC-002.116) se pintaba con un solo quad que tomaba la region (0,0)-(640,480) de la
+ * textura y la ponia en toda la pantalla, porque los dos lienzos estaban donde mismo iban en la pantalla. Los
+ * cuatro cuadrantes NO: van en dos filas, y la fila de abajo tiene que vivir en la textura en una fila que sea
+ * MULTIPLO DE 32 (la 256, no la 240), asi que la textura ya no coincide con la pantalla y hay que decir,
+ * recuadro por recuadro, de donde se lee y donde se pinta.
+ *
+ * Cada llamada emite el header del contexto y los cuatro vertices del quad (nearest, ver `pvr_init`: con
+ * filtro los bordes del recuadro se mancharian con el vecino). El que llama abre la lista OPACA y cierra con
+ * `pvr_wait_ready`, que ya lo hace el ciclo. */
+void d2c_pvr_pantalla_pintar_bloque(int x, int y, int w, int h, int tu, int tv) {
+    float u0 = (float)tu / (float)PANT_PW;
+    float v0 = (float)tv / (float)PANT_PH;
+    float u1 = (float)(tu + w) / (float)PANT_PW;
+    float v1 = (float)(tv + h) / (float)PANT_PH;
+
+    pvr_vertex_t v;
+    pvr_prim(&pant_hdr, sizeof(pant_hdr));
+
+    v.flags = PVR_CMD_VERTEX;
+    v.argb = 0xffffffff;
+    v.oargb = 0;
+    v.z = 1.0f;
+
+    v.u = u0; v.v = v0; v.x = (float)x;       v.y = (float)y;       pvr_prim(&v, sizeof(v));
+    v.u = u1; v.v = v0; v.x = (float)(x + w); v.y = (float)y;       pvr_prim(&v, sizeof(v));
+    v.u = u0; v.v = v1; v.x = (float)x;       v.y = (float)(y + h); pvr_prim(&v, sizeof(v));
+
+    v.flags = PVR_CMD_VERTEX_EOL;
+    v.u = u1; v.v = v1; v.x = (float)(x + w); v.y = (float)(y + h); pvr_prim(&v, sizeof(v));
 }
 
 /* Cuantos bytes de VRAM se reservaron (para poder decir un numero en la evidencia). */
