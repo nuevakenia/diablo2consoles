@@ -1,0 +1,167 @@
+DC-002.127 -- LOS NPCs DEL PUEBLO Y EL DIALOGO
+==============================================
+
+Que se cerro: en el POC de la Dreamcast, el pueblo del Acto 1 tiene gente. Warriv, Charsi y
+Kashya se DIBUJAN en la celda que el `.ds1` les da (COF de quieto + sus `.dcc`, con el pincel
+del POC), el jugador se les acerca, aprieta el boton y sale el PANEL DE DIALOGO con el nombre,
+lo que dice el NPC (texto de `string.tbl`) y las filas del menu del exe (Talk / Trade / Cancel).
+
+Nada de esto es nuevo codigo de reglas: las reglas son las del motor (`d2common/d2npc`), que ya
+estaban portadas y no arrastran ebiten. Lo que se porto es el DIBUJO y el PANEL, con el pincel
+del POC (la leccion de DC-002.125 con el HUD).
+
+
+1. LA MEDICION PREVIA (lo que el plan exige ANTES de escribir el POC)
+---------------------------------------------------------------------
+Sonda: `console/dc/sonda-npc-127` (salida completa en /tmp/sonda-npc-127.txt al momento de
+correrla). Los numeros que decidieron el porte:
+
+  d2common/d2npc                5 archivos   1531 lineas    45732 B | cierre 1 paquete
+                                                                      ebiten=false d2asset=false
+  d2game/d2player              123 archivos  27174 lineas   813891 B | cierre 264 paquetes
+                                                                      ebiten=TRUE  d2asset=TRUE
+  d2game/d2gamescreen          107 archivos  28089 lineas   856044 B | ebiten=TRUE d2asset=TRUE
+  d2core/d2ui                   22 archivos   3713 lineas   100460 B | ebiten=TRUE d2asset=TRUE
+
+  => las REGLAS se portan tal cual (d2npc es un solo paquete, sin assets). El PANEL del motor
+     (`d2game/d2player/npc_menu.go`) NO se porta: su cierre arrastra ebiten y d2asset. Se redibuja.
+
+  ademas: `d2npc` arma en `init` 46 entradas de gossip y 241 claves de mensaje (map de ~8,7 KB en
+  el monton de Go). Se paga en el arranque: entra sin drama.
+
+  `string.tbl` 390.570 B (5.375 claves) en d2data.mpq; `patchstring.tbl` 53.008 B en el parche.
+  `MonPreset.txt` 3.594 B: vive en PATCH_D2.MPQ, NO en d2data (medido: sin el parche la tabla da
+  "no existe" y no se coloca ni un NPC).
+
+
+2. LOS NPCs (medido en la corrida, `JUEGO127: NPC COLOCADO`)
+------------------------------------------------------------
+Los NPCs del pueblo NO son objetos del `.ds1`: son MONSTRUOS (type = 1). El `.ds1` del pueblo que
+el POC compone es townN1 (Act1/Town/TownN1.ds1, 57.652 B) y trae 41 objetos, de los cuales 15 son
+monstruos. El `ID` del monstruo es el indice de `MonPreset.txt` del acto; el `Place` se busca en
+`monstats.txt` (734 filas leidas del parche) y de ahi salen el `Id` (la clase) y el `Code` (la
+carpeta del MPQ).
+
+  Charsi  clase=charsi   code=CI claseExe=154 celda=18.80,5.40  subtiles=  94,27
+  Warriv  clase=warriv1  code=WA claseExe=155 celda=25.20,9.00  subtiles= 126,45
+  Kashya  clase=kashya   code=RC claseExe=150 celda=30.60,9.20  subtiles= 153,46
+
+(akara y gheed tambien estan en el pueblo y entran con `NPC_LISTA`; rogue1/chicken/cow son del
+`.ds1` pero no son gente con la que se hable: no tienen entrada en `d2npc`.)
+
+Animacion de quieto y costo en RAM de video (los cuadros compuestos van a bloques del monton de C,
+igual que el HUD, porque el semiespacio del recolector esta al 91 %):
+
+  Charsi  data\global\monsters\CI\COF\cinuhth.cof     154 B  capas=1 framesPorDir=13 dirs=8
+          ciclo 13 cuadros, 21.840 B de indices, primer cuadro 24x70, 923 pixeles no vacios
+  Warriv  data\global\monsters\WA\COF\wanuhth.cof     181 B  capas=1 framesPorDir=16 dirs=8
+          ciclo 16 cuadros, 29.808 B de indices, primer cuadro 27x69, 1.128 pixeles no vacios
+  Kashya  data\global\monsters\RC\COF\rcnuhth.cof     145 B  capas=1 framesPorDir=12 dirs=8
+          ciclo 12 cuadros, 21.024 B de indices, primer cuadro 24x73, 1.159 pixeles no vacios
+
+  JUEGO127: NPC CARGADOS npcs= 3 bytesDeIndices= 72672 tablaDeStrings= 390570
+           lineasDelMotor= 7 ms= 4826
+
+
+3. EL DIBUJO (medido cuadro a cuadro, `JUEGO127: NPC CUADRO`)
+--------------------------------------------------------------
+El NPC se pinta con la MISMA proyeccion que el jugador y el bicho (`AnclaDelJugador`) y se mide
+igual que todo lo demas: se guarda lo que hay debajo de su caja, se pinta, se cuentan los pixeles
+cambiados y se devuelve el mapa (`lienzoRestaurado= true` en todos los cuadros).
+
+  Warriv (camara en 25,10):  ancla=416/131  caja=405/66..432/135  pixelesPintados=1158..1160
+  Charsi (camara en 19,6) :  ancla=352/131  caja=343/66..367/136  pixelesPintados= 923.. 932
+  Kashya (camara en 31,10):  ancla=352/115  caja=339/46..363/119  pixelesPintados=1156..1167
+
+  msNPCs = 0..1 ms por NPC y por cuadro (el pincel es el mismo del jugador: 3 NPCs no se notan).
+
+  OJO, ESTO HAY QUE SABERLO: la ventana del POC (640x480) NO alcanza para ver el pueblo entero.
+  El renderer dibuja a 80 px por celda en un eje y 40 en el otro (medido con `AnclaDelJugador`:
+  +1 celda en x mueve 80 px, +1 en y mueve 80 px al otro lado), asi que la ventana muestra un
+  rombo de ~8x12 celdas y los NPCs estan a 10-15 celdas del centro. Por eso `vistaX/vistaY` son
+  palancas: se apunta la camara a la celda de cada NPC y se mide su dibujo (las tres capturas de
+  esta evidencia son tres corridas, una por NPC).
+
+
+4. EL TEXTO Y EL PANEL (`JUEGO127: DIALOGO ...`)
+------------------------------------------------
+Camino del texto, el del motor, sin inventar nada:
+  d2npc.EntryFor(claseExe) -> Record.Eligible(clase del heroe = 0, amazona) -> d2npc.MessageKey
+  -> `string.tbl`.
+
+  Charsi  clave=CharsiIntroGossip1        "Hi there. I'm Charsi, the blacksmith here..."   10 renglones, 3 filas
+  Warriv  clave=WarrivAct1IntroGossip1    "Greetings, stranger. I'm not surprised..."    30 renglones, 2 filas
+  Kashya  clave=KashyaIntroGossip1        "Welcome, outlander, to our glorious..."        9 renglones, 2 filas
+
+El boton: `hablarAuto` (el instrumento que aprieta el boton X en el cuadro 2, porque el emulador de
+esta corrida no tiene teclado) entra por la MISMA puerta que el control (`elBotonDeHablar`), y el
+radio es 2,0 celdas (el del alijo, DC-002.124).
+
+  Warriv  DIALOGO ABRE jugador=25 10   distancia=1.0198 radio=2 panel=355x412 renglones=23 filas=2 bytes=146260
+          DIALOGO CUADRO 2 abierto=true  pixelesPintados=146672 msPanel=108 elCuadroNoCambio=false
+          DIALOGO CIERRA  cuadro=4
+          DIALOGO CUADRO 4 abierto=false pixelesPintados=0      msPanel=0   elCuadroNoCambio=true
+  Charsi  DIALOGO ABRE jugador=19 6    distancia=0.6325 radio=2 panel=341x231 renglones=10 filas=3 bytes= 78771
+  Kashya  DIALOGO ABRE jugador=31 10   distancia=0.8944 radio=2 panel=346x201 renglones= 9 filas=2 bytes= 69546
+
+Geometria del panel: la de `d2game/d2player/npc_menu.go` (ancho = el texto mas ancho + 20, alto =
+nombre 0x15 + 15 px por renglon + 15, recortado a 10 px de los bordes). El alto se recorta a la
+pantalla y el texto que NO entra no se pinta (el gossip de Warriv trae 30 renglones y entran 23:
+`renglonesQueSobran` en el log). El motor los muestra por paginas; este POC no tiene paginas.
+
+CRITERIO (lo que la tarjeta pide, con el nombre de la linea del log):
+  losNPCsSeDibujan        = true   (3 NPCs, pixeles medidos en cada uno)
+  seLeHablo               = true   (el panel se abre con el boton del instrumento)
+  elDialogoSaleEnPantalla = true   (146.672 / 78.771 / 69.546 pixeles del panel)
+  elPanelCambiaElLienzo   = true   (con el panel abierto el crc32 del lienzo cambia)
+  conElPanelCerradoNoCambia = true (con el panel cerrado la llamada no toca un pixel)
+  elDialogoSeCerro        = true
+
+Capturas (recortadas de la ventana del emulador, 640x480, 1:1 con la pantalla logica del POC):
+  console/dc/evidencia/dc-002.127-warriv-panel.png   el panel de Warriv: "WARRIV", linea, el
+                                                     saludo y las filas TALK / CANCEL
+  console/dc/evidencia/dc-002.127-charsi.png         Charsi en su celda
+  console/dc/evidencia/dc-002.127-kashya.png         Kashya en su celda
+
+
+5. LOS TROPIEZOS MEDIDOS (para que no se repitan)
+--------------------------------------------------
+1. LAS BARRAS DEL MPQ SON INVERTIDAS: `data\global\monsters\<code>\<capa>\<code><capa>LIT<modo><arma>.dcc`.
+   Con `/` el archivo "no existe" y las diez capas salen SIN GRAFICO.
+2. EL ARMA NO ES LA MISMA EN TODAS LAS CAPAS: la declara cada capa del COF (`CofLayer.WeaponClass`).
+   Con un arma fija en todas, el archivo no aparece. Los NPCs del pueblo son HTH (`<code>nuhth.cof`).
+3. `abrirTabla(...).porCadaFila(f)` SIGUE mientras `f` devuelva **false**. Devolviendo `true` se lee
+   UNA sola fila: monstats daba "filas= 1" y no se colocaba ningun NPC.
+4. `MonPreset.txt` esta en el PARCHE, no en d2data. Sin el parche, cero NPCs.
+5. `stamp.RegionPath()` NO es la ruta del MPQ: devuelve "Act1/Town/TownN1.ds1" y hay que anteponer
+   `data/global/tiles/`.
+6. COPIAR `string.tbl` (390.570 B) AL MONTON DE C SE COME EL ARRANQUE: `gc_external_alloc: OOM`.
+   Se lee el tramo PRESTADO de la fuente, se sacan los textos que hacen falta (que son copias de
+   Go) y se suelta en el acto. Cero bytes de mas.
+7. EL TEXTO DE LA ENTRADA NO LLEVA LARGO ADELANTE: en la tabla, la CLAVE esta en `indexString`
+   (terminada en cero) y el TEXTO en `nameString` con `nameLength-1` (asi lo lee `d2tbl`). Al reves
+   da "SIN TEXTO" para las tres clases.
+8. EL PANEL SE MIDE DESPUES DE CARGAR LOS GLIFOS: con la tabla de la fuente sin cargar, el ancho
+   se mide a 8 px por letra (promedio) y el panel sale mal de ancho.
+
+
+6. LO QUE NO ESTA (y es de las tarjetas siguientes)
+----------------------------------------------------
+  - Las QUESTS del dialogo (el arbol de opciones por quest y los flags) -> DC-002.128.
+  - Los MERCADERES (Trade / Repair / Gamble: el panel de comercio)            -> DC-002.129.
+  - Las paginas del gossip: aca entra lo que entra en el alto de la pantalla.
+  - Elegir una fila del menu: las filas se MUESTRAN; el boton solo abre y cierra.
+
+
+7. COMO SE REPITE
+------------------
+  bash scripts/console/build-juego-127.sh /tmp/dcbuild/juego127
+  CAPTURE=spectacle bash scripts/console/run-flycast-127.sh /tmp/dcbuild/juego127/disc.gdi 120 /tmp/capturas-127
+
+  y para medir cada NPC con la camara encima (el knob es de COMPILACION, hay que reconstruir):
+  VISTA_X=25.0 VISTA_Y=10.0 bash scripts/console/build-juego-127.sh /tmp/dcbuild/warriv   # Warriv
+  VISTA_X=19.0 VISTA_Y=6.0  NPC_LISTA=charsi bash scripts/console/build-juego-127.sh ...    # Charsi
+  VISTA_X=31.0 VISTA_Y=10.0 NPC_LISTA=kashya bash scripts/console/build-juego-127.sh ...    # Kashya
+
+  A/B del costo: `NPC=no` deja la corrida de DC-002.125 bit a bit (sin un solo NPC ni un pixel de
+  panel).

@@ -133,6 +133,15 @@ que se toca con las manos (matar, recoger, guardar), después lo narrativo (ques
 - Criterio: un NPC del pueblo (Warriv, Charsi) se dibuja, se puede hablar y su diálogo sale en pantalla.
 - Es el puente entre E5 y E7: las quests se dan hablando.
 
+**HECHO en DC-002.127.** Medido antes de portar (sonda `console/dc/sonda-npc-127`): `d2npc` son 1.531
+líneas y su cierre es **1 paquete** (ebiten=false, d2asset=false) ⇒ se porta tal cual; el panel del
+motor (`d2game/d2player/npc_menu.go`) cierra con **264 paquetes y ebiten=true** ⇒ se redibuja con el
+pincel del POC. POC: `console/dc/poc/juego-127` (`npc_127.go`). Warriv, Charsi y Kashya se dibujan en
+su celda del townN1 (15 monstruos en el `.ds1`, no objetos), con su COF de quieto y 72.672 B de
+índices; el panel sale con el nombre, el texto de `string.tbl` (30/10/9 renglones) y las filas del
+menú, a 108 ms por cuadro. Evidencia y capturas: `console/dc/evidencia/dc-002.127-*`.
+Quedan para E6-bis/E7: las quests del diálogo y los mercaderes (Trade/Repair/Gamble).
+
 ### E7 · Quests
 
 - `d2quest` (11.272), `d2level`, `d2drlg` para las zonas de quest.
