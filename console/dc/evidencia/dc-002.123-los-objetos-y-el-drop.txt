@@ -1,0 +1,220 @@
+DC-002.123 -- LOS OBJETOS Y EL DROP: EL MONSTRUO SUELTA Y EL JUGADOR RECOGE
+
+Rama DC-002, checkout unico /home/dgalli/Proyectos/diablo2consoles. Fecha: 2026-11-02.
+POC: console/dc/poc/juego-123 (copia de juego-122, sin tocar 122). Sonda del host: console/dc/sonda-items-123.
+Scripts: scripts/console/build-juego-123.sh y scripts/console/run-flycast-123.sh.
+
+El criterio de la tarjeta, contestado con numeros de la corrida final:
+
+  JUEGO123: ITEM CRITERIO elBichoSolto= si elObjetoSeDibujo= si elJugadorLoRecogio= si
+      desaparecioDelSuelo= si elObjetoNoDejaRastroEnElLienzo= si cuadrosConObjeto= 6
+      crc32DelCuadroSinObjeto= 1118687914 crc32DelCuadroConObjeto= 1118687914
+      crc32DelMapaSoloDeLaCorrida= 1437022778 crc32DelHost= 1437022778 codigo= aqv nombre= Arrows
+
+El bicho (Returned, SK) muere en el cuadro 6, suelta un objeto en el cuadro 7, el objeto se dibuja con su DC6 y su
+paleta (145 pixeles en su caja), el jugador 1 camina hasta el y lo recoge en el cuadro 8, el objeto deja el suelo, y
+el lienzo del mapa vuelve a su crc32 de siempre: 1437022778, el del host.
+
+===============================================================================
+1. LO QUE SE MIDIO ANTES DE ESCRIBIR (la sonda, en el host, sin emulador)
+===============================================================================
+
+`go run ./console/dc/sonda-items-123` -- abre SOLO los dos MPQ que abre la consola (d2data.mpq y patch_D2.mpq;
+d2exp.mpq no se abre en la consola y por lo tanto lo que solo exista ahi no es dato de esta tarjeta).
+
+  tabla                 mpq            bytes    crc32        filas  columnas
+  misc.txt              patch_D2.mpq     55821  1836025289     152       168
+  weapons.txt           patch_D2.mpq    118029  4283380650     307       166
+  armor.txt             patch_D2.mpq     76370   868784107     203       164
+  itemtypes.txt         patch_D2.mpq      8775   822389534     104        37
+  TreasureClassEx.txt   patch_D2.mpq     88253  2809408969     853        33
+  monstats.txt          patch_D2.mpq    432634  1265225776     735       255
+  ------------------------------------------------------------------------------
+  TOTAL                                                                779882 B
+
+El paquete `d2item`/`d2object` NO se porta: lo que la consola necesita del sistema de items son TRES cosas y cada
+una sale de una tabla que se lee a mano, columna por columna (ver punto 4). Las 6 tablas de arriba son 780 KB de
+datos, no de codigo: el binario no las lleva dentro, las pide al MPQ.
+
+LA FILA DEL BICHO, y por que es la del PARCHE y no la de d2data:
+
+  d2data.mpq  monstats.txt  238019 B  229 columnas  -- fila Code=SK, Class=Returned, Level=6, TreasureClass1= "1"
+  patch_D2.mpq monstats.txt 432634 B  255 columnas  -- fila Id=skeleton2, NameStr=Returned, Level=6,
+                                                       TreasureClass1= "Act 1 H2H B"
+
+En la tabla de d2data la columna `TreasureClass1` es un NUMERO (el nivel de la clase de tesoro, "1"), no el nombre
+de la clase: con esa fila NO se puede resolver el drop. El nombre ("Act 1 H2H B") solo esta en la tabla del parche,
+que es la misma que el motor registra primero. Medido, no elegido.
+
+Hay tres filas "Returned" en el juego (acto 1 nivel 6, acto 2 nivel 14 x2): el del POC es el de nivel 6, y eso se
+dice tambien en la identidad de la busqueda (`NameStr` + `Level`), no en un comentario.
+
+===============================================================================
+2. LA CADENA DEL DROP, TIRADA POR TIRADA (semilla 8)
+===============================================================================
+
+El dado es el del motor (`d2common/d2math/d2rand`), el mismo de la vida y del dano, con semilla fija para que la
+corrida sea reproducible. Cada nivel de la cadena imprime su tirada:
+
+  JUEGO123: DROP BICHO clase= Returned nivel= 6 id= skeleton2 code= SK treasureClass1= Act 1 H2H B monstatsBytes= 432634 crc32= 1265225776
+  JUEGO123: DROP TABLA data\global\excel\TreasureClassEx.txt bytes= 88253 crc32= -1485558327 columnas= 23
+  JUEGO123: DROP DADO oro-fuera(21)
+  JUEGO123: DROP DADO clase=Act 1 H2H B noDrop=100 total=139 tirada=134 -> Act 1 Junk (prob=21)
+  JUEGO123: DROP DADO clase=Act 1 Junk noDrop=0 total=16 tirada=13 -> Ammo (prob=4)
+  JUEGO123: DROP DADO clase=Ammo noDrop=0 total=2 tirada=0 -> aqv (prob=1)
+
+  * El oro ("gld", prob 21 de la clase de arranque) queda FUERA de esta tarjeta: es una pila con su propio sistema
+    y su propio dibujo. Cuando el dado lo saca, se anota en el log (linea `oro-fuera`) y se vuelve a tirar entre las
+    entradas que no son oro. No se esconde.
+  * La cadena se corta por PROFUNDIDAD (`maxProfundidadDrop`= 16), no por el campo `level` de la fila, que es lo
+    que hace el motor.
+  * El primer dado (134 de 139) cae en "Act 1 Junk"; de ahi "Ammo"; de ahi "aqv".
+
+===============================================================================
+3. EL OBJETO Y SU DIBUJO
+===============================================================================
+
+  JUEGO123: DROP OBJETO codigo= aqv nombre= Arrows tabla= misc.txt nivel= 0 tipo= bowq flippy= flpqvr clase= Act 1 H2H B nivelBicho= 6
+  JUEGO123: DROP DC6 ruta= data/global/items/flpqvr.dc6 bytes= 4282 crc32= -314964075 cuadros= 17
+  JUEGO123: DROP LISTO codigo= aqv nombre= Arrows cuadrosDelFlippy= 17 indicesBytes= 5542 cuadroQueSeDibuja= 16 tablasBytes= 771107 ms= 1986
+
+  * El archivo NO se elige: es la columna `flippyfile` de la fila `aqv` de misc.txt (`flpqvr`), leida igual que el
+    motor (`d2resource.ItemGraphics` = data/global/items/).
+  * 17 cuadros en 4.282 B de DC6; desarmados en indices son 5.542 B (1 B por pixel, el 0 transparente), que es lo
+    unico que queda vivo del drop. El cuadro que se dibuja es el ULTIMO (16), igual que el motor: el flippy se
+    reproduce una vez y queda el objeto quieto en el piso (`PlayForward` + `SetPlayLoop(false)`).
+  * `tablasBytes= 771107` es TODO lo que se leyo de los MPQ para resolver el drop: monstats del parche 432.634 +
+    TreasureClassEx 88.253 + weapons.txt 118.029 + armor.txt 76.370 + misc.txt 55.821. El numero lo cuenta el
+    propio lector (`abrirTabla`), no esta escrito a mano.
+  * Resolver el drop cuesta 1.986 ms de la carga: leer las 5 tablas, recorrerlas y decodificar los 17 cuadros.
+
+===============================================================================
+4. LA CORRIDA (el criterio, medido en Flycast)
+===============================================================================
+
+Binario: prog.elf 17.850.480 B, sha256 b0dc2ea277278756d33a1d4d7d911d77402877ac4bb8d6b3c04cda4171297d18.
+Palancas: CUADROS=12 JUGADORES=1 GUION_POC=quieto CAMARA=fija CELDA_P1="0 1" PATRULLA="1 0 0"
+          DIRS_ATAQUE_LISTA="14" MODOS_DIRS=1 DROP=si SEMILLA_DROP=8 RECOGER_AUTO=si
+Corrida: /tmp/dc123g (CAPTURAS=45 INTERVALO=2), log completo en /tmp/dc123g/flycast.log.
+
+  cuadro 6  JUEGO122: MUERTE vida= 0 golpes= 3 dano= 3 modo= DT ultimoJugador= P1 cuadro= 6
+  cuadro 7  JUEGO123: DROP SUELTA codigo= aqv nombre= Arrows celda= 29 21 bicho= B1 vida= 0 modo= DT
+                       cuadro= 7 montonCLibre= 3534256 suelo= 1
+  cuadro 7  JUEGO123: ITEM CUADRO 7 objetos= 1 dibujados= 1 pixelesPintados= 145 msItems= 0
+                       crcConItems= 690703379 mapaSolo= 1437022778 igualAlDelHost= true lienzoRestaurado= true
+                       detalle= aqv:celda=29.00,21.00,ancla=320,363,caja=310,367,330,383,pixeles=145,enElSuelo=si
+  cuadro 8  ITEM PASO celdaIni= 28 21 celdaFin= 28.8894 21.2965 objeto= 29 21
+                       distanciaAlPaso= 0.316425 distanciaAlFinal= 0.316425 radio= 0.9
+  cuadro 8  JUEGO123: ITEM RECOGIDO codigo= aqv celda= 29 21 jugador= P1 distancia= 0.316425 radio= 0.9
+                       cuadro= 8 suelo= 0 cayoEnElCuadro= 7 aDondeVa=DC-002.124
+  cuadro 12 JUEGO123: ITEM RESUMEN drop= aqv nombre= Arrows clase= Act 1 H2H B listo= true soltado= true
+                       objetosSoltados= 1 objetosDibujados= 1 objetosRecogidos= 1 enElSuelo= 0 loRecogio= P1
+                       distancia= 0.316425 indicesDelObjetoBytes= 5542 tablasBytes= 771107
+                       dc6Bytes= 4282 dc6crc32= -314964075
+
+  * EL OBJETO SE DIBUJA: 145 pixeles de su caja (310,367)-(330,383) son distintos de lo que habia debajo. El ancla
+    es la MISMA que la del jugador y la del bicho (`AnclaDelJugador`: WorldToScreenF + RenderOffset del motor).
+  * EL LIENZO VUELVE: despues de devolver el objeto, el cuadro tiene EXACTAMENTE el crc32 que tenia antes de
+    pintarlo (`lienzoRestaurado= true`, cuadro por cuadro). Y el mapa solo de la corrida es 1437022778, el mismo
+    numero del host: la tarjeta pide ese numero y ese numero da.
+  * LA RECOGIDA es la regla del motor, no una caja inventada: `d2gamescreen/ground_items.go`, `pickupRange` = 0,9
+    celdas. Pero se mide sobre el PASO del jugador y no solo sobre su posicion final: un cuadro de este POC son
+    ~1,8 celdas de caminata, asi que el jugador puede pasar POR ENCIMA del objeto y terminar del otro lado. La
+    distancia que se informa es la del segmento (inicio del paso, fin del paso) al objeto.
+
+===============================================================================
+5. LA REGLA DE LA RECOGIDA, CON SU A/B (la misma corrida con RECOGER_AUTO=no)
+===============================================================================
+
+Binario: prog.elf 17.850.152 B, sha256 70548980c68fc4900f9c30cef380a387d839c5a907875e1adb912d802e1dc514.
+Mismas palancas salvo RECOGER_AUTO=no (el jugador se queda quieto en su celda). Corrida: /tmp/dc123f.
+
+  JUEGO123: ITEM PASO jugador= P1 celdaIni= 28 21 celdaFin= 28 21 objeto= 29 21
+              distanciaAlPaso= 1 distanciaAlFinal= 1 radio= 0.9          (repetido cuadro a cuadro)
+  JUEGO123: ITEM RESUMEN ... objetosRecogidos= 0 enElSuelo= 1 loRecogio= -
+
+A 1,0 celdas NO recoge; a 0,316 recoge. El corte esta donde dice el motor (0,9), y las dos corridas lo muestran.
+
+===============================================================================
+6. LA MEMORIA (lo que la tarjeta pide medir)
+===============================================================================
+
+MONTON DE C, alrededor del drop (lineas `MEMORIA`/`SEMIESPACIO` del POC):
+
+  bicho-despues        usado= 8418232  libre= 1352616  arena= 9770848  pico= 8783600
+  drop-antes           usado= 8418232  libre= 1352616  arena= 9770848  pico= 8783600
+  drop-despues         usado= 8418232  libre= 1352616  arena= 9770848  pico= 8783600
+
+  * El drop NO deja nada en el monton de C: los 771.107 B de tablas y los 4.282 B del DC6 entran como TRAMO con
+    dueno (`Fuente.Pedir`) y se devuelven con `Tramo.Liberar` en el mismo acto. Despues de resolverlo, usado, libre,
+    arena y pico son los mismos numeros que antes de empezar.
+  * SEMIESPACIO: 1.418.016 B (77%) antes del drop; 1.343.096 B (73%) despues (baja por la recoleccion que dispara
+    la propia devolucion del tramo). No crece.
+  * Lo unico que queda vivo del objeto son sus 5.542 B de indices.
+
+A/B DEL BINARIO (mismo arbol, DROP=si contra DROP=no):
+
+  prog.elf con el drop     17.850.480 B   (sha256 b0dc2ea2...)
+  prog.elf sin el drop     17.827.116 B   (sha256 22ffb450..., MISMO arbol y MISMAS palancas, solo DROP=no)
+  ------------------------------------------------------------------
+  el codigo del drop       +23.364 B
+
+(de la corrida de control que atribuyo el OOM en el punto 7 no queda el ELF: el script de build rota las carpetas
+de /tmp/dcbuild y conserva solo las ultimas; queda su log, /tmp/dc123nodrop/flycast.log, con `DROP apagado`.)
+
+Y del lado de la RAM, la corrida de control (DROP=no) imprime `JUEGO123: DROP apagado` y NO lee ninguna tabla: el
+resto del POC corre igual (es el A/B de la tarjeta).
+
+===============================================================================
+7. EL TECHO DE ESTA CORRIDA: el cierre del ciclo se queda sin monton (NO es del drop)
+===============================================================================
+
+La corrida del drop muere al final, en la fase del ciclo, con
+
+  JUEGO121: CICLO cuadro= 14 COMPONE TRANSICION ds1=preset 1 archivo 1 orden= a jugadores= 1
+  Out of memory. Requested sbrk_base 0x8d038000, was 0x8cf42000, diff 1007616
+  fatal error: gc_external_alloc: OOM
+
+LA MISMA CAIDA PASA CON DROP=no, en el mismo cuadro relativo (CUADROS+2) y en la misma fase:
+
+  corrida con drop  (CUADROS=12): OOM en el cuadro 14
+  corrida sin drop  (CUADROS=16): OOM en el cuadro 18, con `JUEGO123: DROP apagado` en el log
+
+Es decir: el techo es del ciclo del mundo (compone el DS1 siguiente y pide ~1 MB mas), no de la tarjeta. Por eso el
+resumen de los objetos se imprime TAMBIEN en el ultimo cuadro de la corrida: cuando termina el ultimo cuadro el
+estado de los objetos ya es final (el bicho murio, el objeto cayo y se recogio), y el cierre del ciclo no es de esta
+tarjeta. Queda anotado como pendiente propio del ciclo, con los dos numeros.
+
+===============================================================================
+8. LO QUE NO ENTRA (y a donde va)
+===============================================================================
+
+  * Inventario y alijo: DC-002.124. Aca el objeto se recoge y se cuenta; no va a ninguna parte (`aDondeVa`).
+  * Oro: la entrada "gld" de las clases de tesoro se descarta y se anota (`oro-fuera`). Tiene su propio sistema.
+  * Magia, afinidades, rarezas: el objeto es la FILA BASE de la tabla, sin tirada de calidad (la tarjeta pide "un
+    objeto del tipo mas simple primero": salio `aqv`, flechas, la fila mas simple de misc.txt).
+  * El generador completo de clases de tipo (`weap3`, `armo3`...), `ITEMGEN_BuildItemTypeTreasureClasses`: si el
+    dado cae en una de esas clases, se resuelve por la fila mas simple del tipo con nivel en (N-3, N] y el log lo
+    dice (`DROP CLASE-DE-TIPO`). En esta corrida no hizo falta: el dado cayo en "Ammo", que tiene items concretos.
+  * Los objetos del .ds1 (los 41 que trae el pueblo): el POC los sigue leyendo pero no los dibuja; el drop de esta
+    tarjeta sale de la TABLA del bicho, no del mapa.
+
+===============================================================================
+9. PITFALLS MEDIDOS (para la proxima)
+===============================================================================
+
+  * La fila del Returned de d2data.mpq NO sirve para el drop: su `TreasureClass1` es un numero. El nombre de la
+    clase de tesoro solo esta en monstats.txt del parche (432.634 B). Y hay TRES "Returned": la identidad es
+    `NameStr` + `Level`, no `NameStr`.
+  * Con `PATRULLA` por omision (eje (1,-1)) el bicho se va de alcance y tarda ~7 cuadros por golpe: 2 golpes en 14
+    cuadros y no muere. Con `PATRULLA="1 0 0"` (el eje de DC-002.122) muere en el cuadro 6 con 3 golpes.
+  * La camara tiene que quedar FIJA (`CAMARA=fija`) para que el mapa solo de la corrida sea 1437022778: si sigue al
+    jugador (que pelea desde la celda de al lado, 28,21) el crc32 es otro. El numero que prueba que el objeto no
+    toca el mapa es `lienzoRestaurado`, que se mide dentro de la misma corrida.
+  * El sprite del objeto es de 20x16 px en un lienzo de 640x480: en una captura de pantalla completa hay que
+    RECORTAR y ampliar para verlo (dc-002.123-el-objeto-en-el-suelo.png es el zoom 7x de su caja).
+  * El objeto se pinta con la paleta de unidades con la que este POC pinta al heroe y al bicho (`palJugador`). En el
+    zoom el sprite sale en tonos claros/cian: queda anotado como observacion de color a revisar (no cambia nada del
+    criterio: se dibuja, se ve y se recoge).
+  * El relevo de los tramos: cada tabla se devuelve con `Liberar` ANTES de pedir la siguiente, y aun asi el pico del
+    monton de C no se mueve. Si algun dia hace falta mas aire, la palanca es el ciclo (punto 7), no el drop.

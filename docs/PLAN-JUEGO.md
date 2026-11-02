@@ -43,9 +43,12 @@ En la Dreamcast, medido y con captura:
 - 1 a 4 jugadores en la misma pantalla (DC-002.114, DC-002.117) y split de 2 y de 4 (DC-002.116, DC-002.118);
 - el leash medido en 5,25 celdas (DC-002.115);
 - monstruo y golpe: **el monstruo se dibuja, patrulla y muere** (DC-002.121, DC-002.122: el alcance lo decide la
-  tabla del exe, 5 sí / 8 diagonal no / 28 no, y con los cuatro dándole al mismo bicho).
+  tabla del exe, 5 sí / 8 diagonal no / 28 no, y con los cuatro dándole al mismo bicho);
+- drop y recogida: **el bicho suelta un objeto de su clase de tesoro, se dibuja en el suelo con su DC6 y el
+  jugador lo recoge** (DC-002.123: `aqv`/Arrows de `Act 1 H2H B`, 145 px pintados, recogido a 0,316 celdas con el
+  radio de 0,9 del motor, y el mapa solo sigue en `1437022778`).
 
-Lo que no existe todavía: objetos, inventario, alijo, mercaderes, NPCs, quests, habilidades, menús ni guardado.
+Lo que no existe todavía: inventario, alijo, mercaderes, NPCs, quests, habilidades, menús ni guardado.
 
 ## 2. Las etapas, en el orden propuesto
 
@@ -64,13 +67,22 @@ que se toca con las manos (matar, recoger, guardar), después lo narrativo (ques
 - Lo que falta para cerrarla del todo: IA (persecución y ataque del bicho al jugador), que es otra tarjeta, y
   que el cuadro DD del SK viene vacío (0 píxeles): el cadáver no se ve con esta animación.
 
-### E2 · Objetos y drop
+### E2 · Objetos y drop — HECHA EN LO BÁSICO
 
 - `d2object`, `d2item`, las tablas de `itemtype`/`weapons`/`armor`.
 - Criterio: al morir el monstruo, suelta un objeto del `.ds1`/tabla; el objeto se dibuja en el suelo y se
-  puede recoger.
+  puede recoger. **Cumplido** (DC-002.123: el drop sale de la tabla del bicho —`monstats` del parche ->
+  `TreasureClassEx` -> `weapons`/`armor`/`misc`—, el objeto se dibuja con su `flippyfile` y su paleta, y se
+  recoge con la regla del motor, `pickupRange` = 0,9 celdas).
 - Lo que hay que medir: el costo de las tablas de ítems (son de las gordas) y si el drop va por el camino de
-  tramos del ADR.
+  tramos del ADR. **Medido**: las 6 tablas de ítems son **779.882 B** en el parche (`misc` 55.821, `weapons`
+  118.029, `armor` 76.370, `itemtypes` 8.775, `TreasureClassEx` 88.253 y `monstats` 432.634), y el drop lee
+  771.107 B de ellas. Van por tramo con dueño (`Fuente.Pedir`/`Liberar`): el montón de C queda **idéntico**
+  antes y después (usado 8.418.232, libre 1.352.616, arena 9.770.848) y el semiespacio **no crece** (1.418.016 ->
+  1.343.096). El código del drop suma **+23.364 B** al binario (17.850.480 contra 17.827.116 con `DROP=no`).
+  Lo que queda vivo del objeto son 5.542 B de índices.
+- Lo que falta para cerrarla del todo: el objeto recogido no va a ninguna parte (inventario, E3), el oro de las
+  clases de tesoro se descarta, y la calidad/afinidades/rarezas no entran (el objeto es la fila base).
 
 ### E3 · Inventario y alijo
 
