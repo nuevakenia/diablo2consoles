@@ -1,0 +1,201 @@
+DC-002.119 -- EL SEMIESPACIO AL 93,5 % CON CUATRO: CENSO Y SALIDA A TRAMOS
+============================================================================================
+
+QUE SE CONSTRUYO. El POC `console/dc/poc/juego-119/` (el de DC-002.118, con el split de tres y cuatro) con dos
+cosas nuevas:
+
+  1. EL CENSO DEL SEMIESPACIO POR ORIGEN (`censo.go`): ocho etapas del arranque medidas con una recoleccion A
+     PEDIDO antes de leer, mas el pico de toda la corrida leido cuadro a cuadro sin recolectar, mas un censo
+     CONTADO de lo que el POC sabe contar sin adivinar.
+  2. LOS TRAMOS CON DUENO DEL POC (`tramos.go` + `csrc/shim.c` seccion 9): las dos categorias del POC que son
+     bytes y no punteros de Go salen del semiespacio a un bloque del monton de C, con nombre, dueno y devolucion
+     al cerrar. Es la decision 1b del ADR 0001 aplicada donde todavia quedaba algo chico.
+
+LA PALANCA ES UNA SOLA Y ES EL A/B: `tramosPropios` (`TRAMOS=si|no`, knobs.go). El binario es el MISMO; lo unico
+que cambia entre las dos corridas es de donde salen esos 205.504 B. `CENSO=si|no` apaga el instrumento.
+
+POR QUE EXISTE (DC-002.117, medido). Con cuatro jugadores el semiespacio quedaba al 93,5 % (1.716.240 de
+1.835.008 B) y ese era el techo del cooperativo: no lo ponen los jugadores (5.184 B los cuatro) sino lo que vive
+adentro. Esta tarjeta dice QUE es eso, y saca de ahi lo que se puede sacar sin tocar el motor ni el umbral del
+recolector.
+
+
+COMO SE CORRE (medido en este host, cuatro corridas de 80 s)
+------------------------------------------------------------
+    # el A/B, misma compilacion, solo cambia la palanca:
+    TRAMOS=no bash scripts/console/build-juego-119.sh /tmp/dcbuild/j119-no-4
+    TRAMOS=si bash scripts/console/build-juego-119.sh /tmp/dcbuild/j119-si-4
+    JUGADORES=4 SPLIT=no GUION_POC=cuatro CUADROS=6   (lo mismo con JUGADORES=1)
+    CAPTURAS=2 bash scripts/console/run-flycast-119.sh /tmp/dcbuild/j119-si-4/disc.gdi /tmp/dc119-si-4
+
+
+LOS NUMEROS DEL CRITERIO
+------------------------
+  criterio de la tarjeta                        medido
+  --------------------------------------------  ----------------------------------------------------------
+  censo por categoria                           SI: ocho etapas con recoleccion a pedido (tabla de abajo)
+  al menos una categoria FUERA del semiespacio  SI: dos. Los 72 cuadros compuestos del jugador
+                                                (165.152 B) y las cajas de guardado (40.128 B con cuatro)
+                                                piden UN tramo cada una al monton de C y se reparten ahi
+  semiespacio con 4 jugadores ANTES y DESPUES    1.207.528 B (65 %) -> 1.001.448 B (54 %): 206.080 B menos
+  semiespacio con 1 jugador ANTES y DESPUES      1.171.336 B (63 %) -> 995.376 B (54 %): 175.960 B menos
+  el cuadro sigue dando el crc32 de siempre     SI: 4 jugadores 2677050471 (-1617916825) en las dos; 1
+                                                jugador 1363871674 en las dos, que es el de DC-002.112
+  las capturas son la MISMA imagen              md5 0ec828246177c2567ce813d6e927f5fe en las dos corridas
+  el umbral del recolector NO se toco           95 en las cuatro corridas (DC-002.109), como manda la tarjeta
+
+
+EL CENSO POR ORIGEN (4 jugadores, TRAMOS=si; vivo despues de recolectar)
+-----------------------------------------------------------------------
+  etapa                                     vivo (B)   lo que agrega (B)   % del semiespacio
+  ---------------------------------------  ---------  ------------------  -----------------
+  00-arranque (runtime + video + VRAM)        149.128             149.128       8 %
+  10-fuentes (los tres MPQ en el loader)      173.696              24.568       9 %
+  20-tablas (filas parseadas)                 479.864             306.168      26 %
+  30-jugador-cuadros (NU + 8 de TW)           662.600             182.736      36 %
+  40-mapa-del-motor (casillas + entidades)  1.327.976             665.376      72 %
+  45-despues-de-soltar-lo-que-no-se-lee     1.146.896            -181.080      62 %
+  50-renderer-cache                         1.159.112              12.216      63 %
+  60-coop-cuatro (con los tramos)           1.001.448            -157.664      54 %
+  ---
+  70-fin (cierre, SIN recolectar)           1.151.896                           62 %
+
+  LO QUE DICE CADA RENGLON, con el contraste del censo contado:
+
+  - runtime + video: 149.128 B. Es el piso: lo que ya esta vivo antes de leer un archivo. No se mueve.
+  - fuentes MPQ: 24.568 B. Las tablas del MPQ ya van al monton de C desde DC-002.102; esto es lo que queda.
+  - TABLAS (filas parseadas del compositor, `d2records`): 306.168 B, la SEGUNDA categoria mas gorda. NO se muda:
+    son structs con `string` y punteros adentro y el recolector tiene que verlos (decision 1b: solo lo que no
+    necesita ser puntero de Go).
+  - CUADROS DEL JUGADOR: 182.736 B, de los cuales 165.152 son los 72 cuadros compuestos (NU + las 8 direcciones
+    de TW, contados por el POC: `CENSO CONTADO jugadorCuadrosBytes= 165152`). Los ~17.584 restantes son las
+    estructuras de los 72 cuadros y de los 9 ciclos. ESTA ES LA CATEGORIA QUE SE MUDA.
+  - MAPA DEL MOTOR: 665.376 B, la MAS gorda de todas. NO se muda: son las casillas del `.ds1` (que ya van a un
+    tramo desde DC-002.120) y las entidades de tile del motor, que son structs con punteros.
+  - soltado de las tablas y las fuentes que el cuadro no lee: -181.080 B (DC-002.105). Es la unica etapa que
+    resta y esta en el censo para que la diferencia del renderer no salga negativa sin explicacion.
+  - RENDERER: +12.216 B. La cache de tiles NO deja nada en el semiespacio: 98 imagenes, 3.092.480 B servidos del
+    tramo de la VRAM (`tramoOrigen= vram`, 0 derrames, 0 bytes derramados), y el censo lo imprime al lado.
+  - CUATRO JUGADORES: +48.320 B = 5.184 B de estado y estructura (`COOP MEMORIA`, 104 + 1.192 por jugador) mas
+    los 40.128 B de las cajas de guardado reservadas al arrancar. Los jugadores no son el problema, y ahora esta
+    medido en el mismo renglon del censo.
+
+  Y el orden de las etapas no es decorativo: 45 va antes que 50 para que el soltado no se lea como "el renderer
+  ocupa negativo", y 60 va DESPUES de la mudanza para que la tabla diga lo mismo que la corrida sin tramos.
+
+
+LO QUE SE MUDO (las dos categorias, con dueno)
+----------------------------------------------
+  1. jugador-cuadros -- 165.376 B de tramo, 165.152 utiles en 72 trozos alineados a 8. Dueno: la cache de
+     cuadros del jugador. Los `.dcc` decodificados y pegados son indices de 8 bits (1 B/pixel); cada cuadro pesa
+     ~2 KB, MUY por debajo de los 64 KB que libgodc manda al monton de C, y por eso hoy los paga el recolector en
+     cada copia. La mudanza COPIA los pixeles al tramo y repunta cada `Cuadro.Pixeles` adentro: `identicos= true`
+     (los 165.152 B copiados son los mismos bytes).
+  2. jugador-cajas -- 40.128 B de tramo, 4 trozos de 10.032 B (el peor cuadro de la amazona: 33x76x4). Dueno:
+     la caja de guardado de cada jugador. Guardar la caja es copiar lo que habia debajo (4 B/pixel) para
+     devolverlo; con cuatro son cuatro buffers que tampoco son punteros.
+
+  LO QUE VUELVE: `TRAMO DEVUELTO tramos= 2 bytes= 205504` al cerrar la corrida, y el monton de C lo confirma:
+  libre 1.997.416 B con los tramos vivos -> 2.202.936 B despues de devolverlos, contra 2.204.408 B de la corrida
+  sin tramos (1.472 B de diferencia son fragmentacion de dlmalloc, no bytes perdidos).
+
+  LAS TRES CRUZADAS QUE HACEN QUE EL NUMERO NO SEA UN RELATO:
+    - el semiespacio baja 206.080 B y el monton de C baja 205.504 B: son los mismos bytes, cambiados de lugar.
+    - los bytes contados por el POC (`CENSO CONTADO jugadorCuadrosEnTramo= 165152`, `jugadorCajasBytes= 40128`)
+      coinciden con lo que pide cada tramo.
+    - `enUnTramo()` compara direcciones: las 72 rebanadas caen adentro del bloque del monton de C, no del
+      recolector.
+
+
+EL SEMIESPACIO ANTES Y DESPUES (las cuatro corridas, mismo binario salvo la palanca)
+------------------------------------------------------------------------------------
+  J   donde se mide                              TRAMOS=no            TRAMOS=si           diferencia
+  --  ---------------------------------------    -------------------  ------------------  ----------
+   1  etapa 60 (vivo, tras recolectar)           1.171.336 (63 %)     995.376 (54 %)      -175.960
+   1  cierre 70 (SIN recolectar)                 1.480.624 (80 %)     1.404.432 (76 %)     -76.192
+   1  pico cuadro a cuadro (sin recolectar)      1.719.608 (93 %)     1.615.480 (88 %)    -104.128
+   4  etapa 60 (vivo, tras recolectar)           1.207.528 (65 %)     1.001.448 (54 %)    -206.080
+   4  cierre 70 (SIN recolectar)                 1.675.864 (91 %)     1.151.896 (62 %)    -523.968
+   4  pico cuadro a cuadro (sin recolectar)      1.732.280 (94 %)     1.728.544 (94 %)        -3.736
+
+  COMO SE LEE, y esto importa para no vender humo:
+  - EL NUMERO DURO ES LA ETAPA 60 (vivo, con recoleccion a pedido): -206.080 B con cuatro y -175.960 B con uno,
+    que es lo que se mudo (165.152 + 40.128 = 205.280 con cuatro; 165.152 + 10.032 = 175.184 con uno) mas el
+    ruido del recolector conservador, que en estas cuatro corridas es de +-800 B. El recolector tiene 206.080 B
+    mas de aire para el quinto jugador, que es lo que la tarjeta buscaba.
+  - EL PICO CON CUATRO CASI NO SE MUEVE (1.732.280 -> 1.728.544, 94 % las dos). NO es un error: el pico se lee
+    sin recolectar, o sea es el puntero de asignacion, y el recolector salta al 95 % del semiespacio. Con menos
+    vivo, salta MAS TARDE y deja juntar mas basura antes de barrer: el pico por umbral no es la medida del
+    techo. Con UN jugador si baja (93 % -> 88 %) porque ahi la basura no llega a llenar el hueco que dejo la
+    mudanza. Queda escrito para que nadie lea el pico de cuatro como "no sirvio".
+  - lo que NO cambia: el cuadro (msCuadro 1035 con tramos contra 1041 sin, dentro del +-80 ms de ruido medido en
+    DC-002.117) y las recolecciones (115 contra 118).
+
+
+EL CUADRO ES EL MISMO, PIXEL A PIXEL
+------------------------------------
+  crc32 del cuadro 1 (el de DC-002.112/117):
+    4 jugadores  TRAMOS=no -1617916825 (2677050471)   TRAMOS=si -1617916825 (2677050471)
+    1 jugador    TRAMOS=no  1363871674                TRAMOS=si  1363871674
+  pixelesNoVacios= 307197 de 307200 (cuatro) y 307196 (uno), iguales en las dos.
+  Y las capturas del mismo cuadro salen BYTE A BYTE iguales: md5 0ec828246177c2567ce813d6e927f5fe en las dos.
+  Que el dibujo no se rompio con los pixeles en el monton de C es lo primero que se verifico: `RenderIndicesTintado`
+  lee la rebanada por direccion y no le importa de que monton venga.
+
+
+LO QUE NO SE MUDO, Y POR QUE (esto es la otra mitad del censo)
+-------------------------------------------------------------
+  - LAS FILAS DE LAS TABLAS (306.168 B): structs con `string` y punteros. Mudarlas seria pedirle al recolector
+    que no vea lo que tiene que seguir. La decision 1b no las cubre.
+  - EL MAPA DEL MOTOR (665.376 B): las casillas ya estan en un tramo desde DC-002.120 (`arenaDelDS1`); lo que
+    queda son las entidades de tile, que son structs con punteros y ademas los recorre el motor.
+  - LA CACHE DE TILES: no queda nada en el semiespacio (3.092.480 B en el tramo de la VRAM, 0 derrames). La
+    tarjeta lo pide explicitamente: no se re-mide.
+  - EL UMBRAL DEL RECOLECTOR: se queda en 95 (DC-002.109). Subirlo seria trampa, y la tarjeta lo prohibe.
+
+  O sea: de las tres categorias mas gordas, DOS no se pueden sacar sin tocar el motor (que la decision 2a
+  prohibe) y una (los cuadros del jugador) si. La segunda que si (las cajas) es chica pero es del mismo tipo:
+  bytes, no punteros. Con eso, el conjunto vivo de cuatro jugadores queda al 54 %.
+
+
+PITFALLS MEDIDOS (para que no se repitan)
+-----------------------------------------
+  1. EL TRAMO HAY QUE PEDIRLO CON EL TOTAL ALINEADO. La primera corrida pedia 165.152 B (la suma de los pixeles)
+     y metia 71 de 72 cuadros: los trozos van alineados a 8, asi que las colas de 72 cuadros se comian justo el
+     ultimo (`identicos= false`, 162.932 de 165.152). Con `bytesAlineadosDeLosCuadros` entran los 72.
+  2. LA RECOLECCION A PEDIDO NO VA EN EL CICLO. El cierre de la corrida (`resumenDelCoop`) corre DENTRO del
+     callback del PVR: un `runtime.GC()` ahi CLAVA el ciclo (medido en DC-002.113). El censo del cierre usa
+     `censoActual`, que lee sin recolectar, y el censo con recoleccion se queda en las ocho etapas del arranque.
+  3. LO QUE SE ESCRIBE DESPUES DE `renderer.Run` NO CORRE: el ciclo no retorna nunca (medido en todas las
+     tarjetas anteriores). Por eso la devolucion de los tramos va en el ultimo cuadro y no despues del Run.
+  4. EL A/B TIENE QUE COMPARAR EL MISMO INSTANTE. El primer intento dejaba las cajas para el primer cuadro
+     dibujado (o sea despues del censo) y la comparacion se comia esa categoria: la tabla daba -165.968 B en las
+     dos corridas y las cajas no aparecian. Ahora, con `TRAMOS=no`, las cajas se reservan igual pero en el
+     semiespacio, y la diferencia sale completa (-206.080 con cuatro).
+  5. EL MONTON DE C TIENE QUE TENER LUGAR. Los tramos se piden al arrancar: con los cuatro jugadores quedaban
+     1.068.000-1.112.000 B libres y entran los 205.504. Si no entraran, `d2c_tramo_pedir` devuelve NULL, el POC
+     lo dice (`TRAMO SIN-LUGAR`) y sigue con el camino de siempre: no revienta.
+  6. `censo` YA ERA EL NOMBRE DE LA CUENTA DE LA GRILLA DEL PUEBLO (`censo(engine)` en main.go): la funcion del
+     semiespacio se llama `censoDelSemiespacio`. gccgo lo caza al compilar, pero se dice porque el log lleva las
+     dos.
+
+
+EVIDENCIA
+---------
+  dc-002.119-cuatro-con-tramos.png             el cuadro de 640x480 con los cuatro, corrida TRAMOS=si (recorte de
+                                               640x480 de la ventana del emulador).
+  dc-002.119-cuatro-sin-tramos.png             el MISMO cuadro de la corrida TRAMOS=no: md5 identico
+                                               (0ec828246177c2567ce813d6e927f5fe). Los pixeles mudados se dibujan
+                                               igual.
+  dc-002.119-cuatro-caminando-con-tramos.png   el tramo LOS-CUATRO-DERECHA con los tramos puestos (los cuatro
+                                               caminando, dir 12).
+  (los logs de las cuatro corridas quedan en /tmp/dc119-{si,no}-{1,4}/flycast.log)
+
+
+LO QUE ESTA TARJETA NO DICE
+---------------------------
+  - No toca el motor: ni `d2records`, ni `d2mapengine`, ni `d2maprenderer`. Lo unico nuevo del lado del motor es
+    nada; todo lo que se mudo es del POC y de sus dos tramos.
+  - No prueba un quinto jugador: el bus maple tiene cuatro puertos. Lo que deja medido es el AIRE: 833.560 B
+    libres en el semiespacio con cuatro (1.001.448 de 1.835.008) contra 627.480 antes.
+  - El pico de cuatro no baja (94 % las dos) y esta explicado arriba: es el puntero de asignacion, no el vivo.
