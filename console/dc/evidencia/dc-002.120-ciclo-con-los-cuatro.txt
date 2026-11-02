@@ -1,0 +1,179 @@
+DC-002.120 -- EL CICLO CON LOS CUATRO: EL MUNDO CAMBIANDO CON LA GENTE ADENTRO
+================================================================================
+
+POC:      console/dc/poc/juego-120  (juego-117 + fases_120.go)
+Build:    bash scripts/console/build-juego-120.sh /tmp/dcbuild/j120-e
+Correr:   CAPTURAS=50 INTERVALO=2 bash scripts/console/run-flycast-120.sh \
+              /tmp/dcbuild/j120-e/disc.gdi /tmp/dc120-e 1400 120
+Binario:  1ST_READ.BIN md5 79cf8c4e236069f297186c7df52ca7f0
+Corrida:  /tmp/dc120-e/flycast.log      capturas /tmp/dc120-e/c*.png
+Fecha:    2026-11-02
+
+    bash scripts/console/build-juego-120.sh /tmp/dcbuild/j120-e
+    CAPTURAS=50 INTERVALO=2 bash scripts/console/run-flycast-120.sh \
+        /tmp/dcbuild/j120-e/disc.gdi /tmp/dc120-e 1400 120
+
+
+1. EL CRITERIO, EN UNA LINEA (lo que dice el log al cerrar)
+----------------------------------------------------------
+
+JUEGO120: CICLO CRITERIO tresFasesConLosCuatro= true
+          entrar= 1437022778 transicion= 584380401 volver= 1437022778
+          esperado= 1437022778 picoDelCiclo= 10386184 jugadores= 4
+
+Las tres fases, en UNA sola corrida, con los cuatro dibujados encima y el leash puesto:
+
+  ENTRAR      cuadro 7   crc32 del mapa solo = 1437022778  (= host)   3584 px de los cuatro
+  TRANSICION  cuadros 8..10  crc32 = 584380401             (= host)   3584 px de los cuatro
+  VOLVER      cuadros 11..14 crc32 = 1437022778            (= host)   3584 px de los cuatro
+
+El crc32 se mide sobre el LIENZO COMPUESTO (640x480) con el mapa solo, la camara en la celda
+del host (28,20) y los cuatro ya dibujados encima; `pixelesDeLosCuatro` es la cuenta de pixeles
+que cambiaron los cuatro respecto del mapa solo. Los tres numeros son los del host: el mundo
+cambia de nivel y vuelve, y el cuadro de la VUELTA es OTRA VEZ el del pueblo.
+
+Ademas, la grilla compuesta de la VUELTA es identica a la del arranque:
+
+  MAPA tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041   (arranque, 23.009 ms)
+  FASE VOLVER MAPA tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041   (26.035 ms)
+  FASE TRANSICION MAPA tiles= 2337 pisos= 2333 paredes= 366 crcGrilla= 1349481406 (25.810 ms)
+
+Es decir: no solo el cuadro vuelve, la ESTRUCTURA del nivel vuelve identica casilla por casilla.
+
+
+2. EL PRECIO DE CADA FASE (el numero de la tarjeta)
+---------------------------------------------------
+
+  fase         cuadros  msCompose  msMapa medio   pico monton de C   pico semiespacio
+  ENTRAR            1        0          556          8.783.400 B       1.551.184 B (84 %)
+  TRANSICION        3    25.819        608         10.386.184 B       1.715.800 B (93 %)
+  VOLVER            4    26.043        887         10.386.184 B       1.676.592 B (91 %)
+
+El monton de C queda con 245.940 B libres en el peor momento (arena 10.632.124 B); el semiespacio
+del recolector (1.835.008 B) es el recurso que manda: la VUELTA entra con 158.416 B de aire.
+`msMapa` es el cuadro entero (mapa + los cuatro encima): 556-1.030 ms por cuadro.
+
+Sin los cuatro, la misma cosa (corrida de referencia `JUGADOR=apagado`, /tmp/dc120-singente):
+TRANSICION 1.589.656 B de pico y VOLVER 1.705.792 B (92 %). Los cuatro cuestan 212.760 B de
+semiespacio (165.152 B de cuadros compuestos + cajas + estructuras).
+
+
+3. COMO SE HIZO ENTRAR (y que se probo antes, con numeros)
+----------------------------------------------------------
+
+Se corrieron TRES variantes antes de que la VUELTA entrara. Todas estan en el log de la tarjeta;
+ninguna se tapa:
+
+  a) ciclo tal cual (DC-002.117 + fases): muere en la VUELTA.
+     `GC to-space overflow`: 1.760.000 B vivos de 1.835.008 (99 %) al componer el pueblo de vuelta,
+     despues de `TRANSICION-despues-de-recolectar` = 964.512 B y `VOLVER-antes-de-componer` = 1.240.400 B.
+
+  b) + soltar los 8 ciclos de caminar antes de las fases: NO sirve.
+     Se pedian 148.720 B y el semiespacio se movio 40 B: el recolector de libgodc es conservador con la
+     pila y las ranuras muertas siguen apuntando a los ciclos. La palanca queda (`SOLTAR_CAMINANDO=si`),
+     apagada, con el numero anotado.
+
+  c) + arena del `.ds1` encendida (ARENA_DS1=encendido, ahora el default de este POC): saca las celdas
+     del `.ds1` (186.960 B) del semiespacio y las lleva al monton de C. Sube el techo del monton a
+     10.199.216 B y la TRANSICION pasa; la VUELTA sigue muriendo (1.918.440 B vivos).
+
+  d) LO QUE LA HIZO ENTRAR: EL ARENA DE CASILLAS (DC-002.120, motor).
+     Cada casilla compuesta guarda cinco rebanadas (`Walls`, `Floors`, `Shadows`, `Substitutions`,
+     `Orientations`) de 1 a 3 elementos, y por chicas caen en el semiespacio: en el pueblo son
+     **9.348 tiles** (2.337 casillas x 4 capas) = ~374.000 B que el camino de `Stamp.Tile` tira y vuelve
+     a pedir en CADA cambio de nivel. Ahora salen de UN tramo del monton de C que se pide una vez y se
+     REUSA: el nivel nuevo escribe encima del que se deja.
+
+       JUEGO120: ARENA DE CASILLAS reserva= 9348 tiles= 9348 casillas= 2337 capasPorCasilla= 4
+       JUEGO120: FASE TRANSICION CASILLAS DEL ARENA tiles= 9348 usados= 9348 fallas= 0
+       JUEGO120: FASE VOLVER     CASILLAS DEL ARENA tiles= 9348 usados= 9348 fallas= 0
+
+     Lo que se toco del motor (todo ADITIVO y con la politica apagada por omision, o sea la PC y los
+     POC viejos no cambian):
+       d2core/d2map/d2mapstamp/stamp.go     CuantasCapasDeLaCasilla / CopiarCasillaEn / TileEn
+       d2core/d2map/d2mapengine/engine.go   ReservarArenaDeCasillas / EstadoDelArenaDeCasillas /
+                                            casillaEnElArena / limpiarLasCasillas / ReusarLasCasillas
+       d2core/d2map/d2mapengine/map_tile.go LimpiarEnSuLugar
+     `CASILLAS=no` deja el A/B con el `make` de siempre (es la corrida que muere).
+
+     Probado tambien y DESCARTADO: reusar en su lugar sin arena (las rebanadas viejas quedan vivas y el
+     piso sube a 1.500.000 B: no gana nada). Queda como `reusarLasCasillas` sin arena en el codigo.
+
+  e) Con el ciclo apagado (`FASE=apagado`) no se prende NADA de esto: no hay arena de casillas, no se
+     toca `soltarLoQueElCuadroNoLee` y el camino es el de DC-002.117 sin una linea cambiada.
+
+
+4. LOS CUATRO Y EL LEASH, EN LA MISMA CORRIDA
+---------------------------------------------
+
+  PUERTO jugador= P1 puerto= 0 aparato= 16777216 hayControl= true  inyecta= false
+  PUERTO jugador= P2 puerto= 1 aparato= 0        hayControl= false inyecta= true
+  PUERTO jugador= P3 puerto= 2 aparato= 0        hayControl= false inyecta= true
+  PUERTO jugador= P4 puerto= 3 aparato= 0        hayControl= false inyecta= true
+  (P1 va ademas FORZADO AL GUION: `inyectarJugador1=si`, para no depender de que la ventana tenga foco)
+
+  COOP MEMORIA jugadores= 4 cuadrosCompartidosBytes= 165152 estadoPorJugadorBytes= 104
+               estructuraPorJugadorBytes= 1192 memoriaPorJugadorBytes= 1296
+               noCompartidoBytes= 660608 direcciones= 8 jugadorOK= true
+
+  LEASH GRUPO jugadores= 4 deGrupo= true radioDelLeash= 2.625 separacionAlArrancar= 4.24264
+              centro= 29.5 21.5 parMasLejano= 28 20 31 23 entraAlArrancar= si
+  LEASH RESUMEN jugadores= 4 leashCeldas= 5.25 deGrupo= true maxCeldasDeLaCorrida= 4.24264
+              cuadrosVigilados= 14 cuadrosFuera= 0 recortes= 0 celdasRecortadas= 0 cajaPeor= 34 x 82
+
+Catorce cuadros vigilados (los del guion Y los de las tres fases), cero jugadores fuera del leash y
+cero recortes: el leash se mide tambien mientras el nivel se cambia.
+
+  FASE FORMACION jugadores= 4 camara= 28 20 celdas= 28 20 29 20 28 21 29 21
+       porQue= el crc32 del host (1437022778) es el de la camara en la celda del POC
+
+Los cuadros de fase son QUIETOS a proposito (los cuatro en el cuadrado de 2x2 de (28,20) y la camara en
+esa celda): es la unica camara con la que el mapa se compara contra el host. El guion de caminar corre
+antes (cuadros 1..6) y el `actualizar` no empuja nada a partir del cuadro 7 (se dice en el log).
+
+
+5. LO QUE SE VE (y lo que no)
+-----------------------------
+
+  console/dc/evidencia/dc-002.120/ventana-formacion-cuatro.png   la ventana del emulador, 640x480
+  console/dc/evidencia/dc-002.120/pantalla-completa.png          la pantalla entera (3584x1080)
+
+Se ve el pueblo compuesto (cesped, la valla de madera, la carreta) con los CUATRO personajes en la
+formacion 2x2 -- que en isometrico se ve como una diagonal -- y ese es exactamente el cuadro de ENTRAR
+y el de VOLVER (los dos dan el mismo crc32: -809981367 con los cuatro encima).
+
+HALLAZGO, y es un limite de la evidencia visual, no del POC: la ventana de Flycast se queda con el
+ULTIMO cuadro que se presento. Despues de la composicion de 26 s dentro del callback, la pantalla no
+vuelve a cambiar aunque el POC siga dibujando y midiendo (los cuadros 8..14 tienen crc32 distintos en el
+log y la ventana no se mueve: comparando las capturas c30 y c50, el unico pixel que cambia en toda la
+pantalla es el reloj de la barra de tareas). O sea: el cuadro de la TRANSICION se compone y se mide, pero
+en esta corrida no llega a presentarse. Por eso el criterio de la tarjeta son los crc32 del lienzo (el
+mismo instrumento de DC-002.109/111) y no la captura. Perseguir la presentacion post-composicion es una
+tarjeta aparte.
+
+
+6. COMO SE REPITE
+-----------------
+
+  bash scripts/console/build-juego-120.sh /tmp/dcbuild/j120
+  CAPTURAS=50 INTERVALO=2 bash scripts/console/run-flycast-120.sh \
+      /tmp/dcbuild/j120/disc.gdi /tmp/dc120 1400 120
+
+  Palancas de esta tarjeta: FASE=ciclo|apagado, CUADROS_POR_FASE=<n>, ORDEN_FASES=a|b,
+  TRANSICION="<preset> <archivo>", SOLTAR_EN_EL_CICLO=si|no, CASILLAS=si|no, SOLTAR_CAMINANDO=si|no,
+  ARENA_DS1=encendido|apagado. Las de las tarjetas anteriores siguen todas (JUGADORES, GRUPO, LEASH...).
+
+  A/B que ya estan corridos: JUGADOR=apagado (el ciclo sin gente), CASILLAS=no (muere en la VUELTA),
+  ARENA_DS1=apagado + CASILLAS=no (muere antes).
+
+
+7. LO QUE ESTA TARJETA DEJA ABIERTO
+-----------------------------------
+
+  1. La presentacion despues de una composicion larga (ver el hallazgo de arriba): el POC mide y dibuja,
+     Flycast no muestra. Es del emulador o del camino de presentacion del POC: hay que separarlo.
+  2. El semiespacio sigue siendo el recurso que manda: la VUELTA entra con 158.416 B de aire. El
+     siguiente vicio es el mismo de siempre -- las rebanadas chicas de las casillas -- y ya tiene su
+     respuesta (el arena de casillas).
+  3. El monton de C queda con 245.940 B libres en el peor momento: la proxima cosa que pida un bloque
+     grande (otro nivel mas grande, o un `.dt1` mas pesado) no entra.

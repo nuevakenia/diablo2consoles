@@ -8,6 +8,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2geom"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
@@ -115,6 +116,107 @@ func (m *MapEngine) ResetMap(levelType d2enum.RegionIdType, width, height int) {
 	}
 }
 
+// reusarLasCasillas (DC-002.120): politica de la consola, la prende el arranque del POC cuando el ciclo de niveles
+// esta encendido. Ver `ReusarLasCasillasEnSuLugar`.
+var reusarLasCasillas bool
+
+// ReusarLasCasillasEnSuLugar prende/apaga la politica de reusar las casillas en su lugar (DC-002.120).
+//
+// QUE CAMBIA CON LA POLITICA PRENDIDA. Limpiar una casilla no tira sus cinco rebanadas (`.Walls`, `.Floors`,
+// `.Shadows`, `.Substitutions`, `.Orientations`): las deja con `[:0]` y `PlaceStamp*` escribe encima con
+// `Stamp.TileEn`. Nada de lo que se dibuja cambia -- el contenido de las casillas es el mismo byte a byte, y los
+// crc32 del cuadro lo confirman (`1437022778` / `584380401`).
+//
+// POR QUE. Cada cambio de nivel pide ~650.000 B de semiespacio para las casillas del nivel nuevo y tira los del
+// anterior: con cuatro jugadores dibujados encima (212.760 B vivos) los dos pedidos no entran en los 1.835.008 B y
+// la VUELTA moria con `GC to-space overflow` (1.760.000 vivos, 99 %). Reusando, el nivel nuevo no pide nada.
+func ReusarLasCasillasEnSuLugar(v bool) { reusarLasCasillas = v }
+
+// ReusarLasCasillas dice si la politica esta prendida.
+func ReusarLasCasillas() bool { return reusarLasCasillas }
+
+// arenaDeCasillas (DC-002.120): UN bloque del monton externo del que salen las rebanadas de las casillas
+// compuestas. El que lo pide es el arranque del POC (`ReservarArenaDeCasillas`), con la cuenta que le da el
+// `.ds1`. Se reusa en cada cambio de nivel: el puntero vuelve a cero en `limpiarLasCasillas`.
+var (
+	arenaDeCasillas       []d2ds1.Tile
+	arenaDeCasillasUsados int
+	arenaDeCasillasFallas int
+)
+
+// ReservarArenaDeCasillas (DC-002.120): pide el tramo de casillas al monton externo y devuelve cuantos tiles
+// entraron. Con `cuantos` en cero el arena queda apagado.
+//
+// POR QUE. Las rebanadas de una casilla compuesta son de 1 a 3 elementos y por eso caen en el SEMIESPACIO del
+// recolector: en el pueblo son ~12.000 elementos (2.337 casillas x 5 capas x ~40 B = ~470.000 B) que el camino de
+// `Stamp.Tile` tira y vuelve a pedir en CADA cambio de nivel. Con el nivel cambiando dos veces y los cuatro
+// jugadores dibujados encima (212.760 B vivos) el semiespacio de 1.835.008 B no alcanza y la VUELTA moria con
+// `GC to-space overflow`. Del arena, las casillas salen del monton de C (que tiene lugar) y el tramo se REUSA: el
+// nivel nuevo escribe encima del anterior.
+func ReservarArenaDeCasillas(cuantos int) int {
+	if cuantos <= 0 {
+		arenaDeCasillas = nil
+		arenaDeCasillasUsados = 0
+
+		return 0
+	}
+
+	arenaDeCasillas = make([]d2ds1.Tile, cuantos)
+	arenaDeCasillasUsados = 0
+	arenaDeCasillasFallas = 0
+
+	return len(arenaDeCasillas)
+}
+
+// EstadoDelArenaDeCasillas: cuantos tiles entran, cuantos se usaron en el nivel que esta colgado y cuantas
+// casillas no entraron (esas cayeron al semiespacio, que es el camino de siempre).
+func EstadoDelArenaDeCasillas() (cuantos, usados, fallas int) {
+	return len(arenaDeCasillas), arenaDeCasillasUsados, arenaDeCasillasFallas
+}
+
+// casillaEnElArena recorta las cinco rebanadas del tramo y las llena con la casilla (x,y) del stamp. Devuelve
+// falso si el arena no alcanza (un nivel con mas capas que el reservado): el que llama usa el camino de siempre.
+func (m *MapEngine) casillaEnElArena(stamp *d2mapstamp.Stamp, x, y int, dest *d2mapstamp.Tile) bool {
+	nw, nf, ns, nsub := stamp.CuantasCapasDeLaCasilla()
+	cuantos := nw + nf + ns + nsub
+
+	if len(arenaDeCasillas) == 0 || arenaDeCasillasUsados+cuantos > len(arenaDeCasillas) {
+		arenaDeCasillasFallas++
+
+		return false
+	}
+
+	tramo := arenaDeCasillas[arenaDeCasillasUsados : arenaDeCasillasUsados+cuantos]
+	arenaDeCasillasUsados += cuantos
+
+	dest.Walls = tramo[0:nw:nw]
+	dest.Floors = tramo[nw : nw+nf : nw+nf]
+	dest.Shadows = tramo[nw+nf : nw+nf+ns : nw+nf+ns]
+	dest.Substitutions = tramo[nw+nf+ns:]
+	dest.Orientations = dest.Orientations[:0]
+
+	stamp.CopiarCasillaEn(x, y, dest.Walls, dest.Floors, dest.Shadows, dest.Substitutions)
+
+	return true
+}
+
+// limpiarLasCasillas deja el nivel vacio: con la politica prendida las casillas se limpian en su lugar (y el nivel
+// nuevo se escribe encima) y con la politica apagada se tiran, que es el camino de siempre.
+func (m *MapEngine) limpiarLasCasillas() {
+	// el tramo se reusa: el nivel nuevo empieza a escribir desde el principio
+	arenaDeCasillasUsados = 0
+
+	for i := range m.tiles {
+		if reusarLasCasillas {
+			m.tiles[i].LimpiarEnSuLugar()
+
+			continue
+		}
+
+		m.tiles[i] = MapTile{}
+	}
+}
+
 // SoltarLasCasillasDelNivelAnterior (DC-002.109): tira las casillas del nivel que se esta dejando ANTES de
 // parsear el nivel nuevo.
 //
@@ -133,9 +235,7 @@ func (m *MapEngine) SoltarLasCasillasDelNivelAnterior() {
 		return
 	}
 
-	for i := range m.tiles {
-		m.tiles[i] = MapTile{}
-	}
+	m.limpiarLasCasillas()
 
 	// las entidades del nivel (los objetos del `.ds1`) y lo que cuelga de ellas: el mapa de entidades es una
 	// raiz del recolector y `resetMapBase` lo tira recien DESPUES de parsear el nivel nuevo.
@@ -247,9 +347,7 @@ func (m *MapEngine) resetMapBase(levelType d2enum.RegionIdType, width, height in
 	if cap(m.tiles) >= cuantas {
 		m.tiles = m.tiles[:cuantas]
 
-		for i := range m.tiles {
-			m.tiles[i] = MapTile{}
-		}
+		m.limpiarLasCasillas()
 	} else {
 		m.tiles = make([]MapTile, cuantas)
 	}
@@ -373,9 +471,17 @@ func (m *MapEngine) PlaceStamp(stamp *d2mapstamp.Stamp, tileOffsetX, tileOffsetY
 	for y := 0; y < stampSize.Height; y++ {
 		for x := 0; x < stampSize.Width; x++ {
 			targetTileIndex := m.tileCoordinateToIndex(x+tileOffsetX, y+tileOffsetY)
-			stampTile := *stamp.Tile(x, y)
 			m.tiles[targetTileIndex].RegionType = stamp.RegionID()
-			m.tiles[targetTileIndex].Components = stampTile
+
+			// DC-002.120: la misma politica que en `PlaceStampClippedWhere`.
+			switch {
+			case reusarLasCasillas && m.casillaEnElArena(stamp, x, y, &m.tiles[targetTileIndex].Components):
+			case reusarLasCasillas:
+				stamp.TileEn(x, y, &m.tiles[targetTileIndex].Components)
+			default:
+				m.tiles[targetTileIndex].Components = *stamp.Tile(x, y)
+			}
+
 			m.tiles[targetTileIndex].PrepareTile(x, y, m)
 		}
 	}
@@ -422,7 +528,18 @@ func (m *MapEngine) PlaceStampClippedWhere(stamp *d2mapstamp.Stamp, tileOffsetX,
 
 			t := &m.tiles[m.tileCoordinateToIndex(mx, my)]
 			t.RegionType = stamp.RegionID()
-			t.Components = *stamp.Tile(x, y)
+
+			// DC-002.120: con la politica prendida el nivel nuevo se escribe ENCIMA del que se deja. Si hay
+			// arena de casillas, las rebanadas salen de ahi (monton de C, reusado en cada nivel); si no, se
+			// reusan las de la casilla; con la politica apagada, el `make` de siempre.
+			switch {
+			case reusarLasCasillas && m.casillaEnElArena(stamp, x, y, &t.Components):
+			case reusarLasCasillas:
+				stamp.TileEn(x, y, &t.Components)
+			default:
+				t.Components = *stamp.Tile(x, y)
+			}
+
 			t.PrepareTile(mx, my, m)
 		}
 	}

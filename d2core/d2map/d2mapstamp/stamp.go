@@ -78,6 +78,81 @@ type Tile struct {
 	Substitutions []d2ds1.Tile
 }
 
+// CuantasCapasDeLaCasilla (DC-002.120): cuantos tiles pide cada rebanada de una casilla compuesta. Es la cuenta
+// de las listas del `.ds1`: `Walls`, `Floors`, `Shadows` y `Substitutions`. Con eso el motor reserva el tramo que
+// necesita en el arena de casillas (`d2mapengine.ReservarArenaDeCasillas`).
+func (mr *Stamp) CuantasCapasDeLaCasilla() (walls, floors, shadows, subs int) {
+	return len(mr.ds1.Walls), len(mr.ds1.Floors), len(mr.ds1.Shadows), len(mr.ds1.Substitutions)
+}
+
+// CopiarCasillaEn (DC-002.120): como `Tile`, pero escribiendo en las cinco rebanadas que le da el motor -- que
+// pueden ser un tramo del monton de C (el arena de casillas). No pide memoria: solo copia.
+func (mr *Stamp) CopiarCasillaEn(x, y int, walls, floors, shadows, subs []d2ds1.Tile) {
+	for idx := range mr.ds1.Walls {
+		if idx < len(walls) {
+			walls[idx] = *mr.ds1.Walls[idx].Tile(x, y)
+		}
+	}
+
+	for idx := range mr.ds1.Floors {
+		if idx < len(floors) {
+			floors[idx] = *mr.ds1.Floors[idx].Tile(x, y)
+		}
+	}
+
+	for idx := range mr.ds1.Shadows {
+		if idx < len(shadows) {
+			shadows[idx] = *mr.ds1.Shadows[idx].Tile(x, y)
+		}
+	}
+
+	for idx := range mr.ds1.Substitutions {
+		if idx < len(subs) {
+			subs[idx] = *mr.ds1.Substitutions[idx].Tile(x, y)
+		}
+	}
+}
+
+// TileEn (DC-002.120) es `Tile` pero escribiendo en el `Tile` que le pasan y REUSANDO las rebanadas que ese ya
+// tiene.
+//
+// POR QUE, CON EL NUMERO. `Tile(x, y)` hace cinco `make` por casilla. En el pueblo son 2337 casillas y cada una
+// pide ~5 rebanadas de `d2ds1.Tile` (40 B): medido en Flycast, componer el pueblo cuesta ~650.000 B de SEMIESPACIO
+// del recolector -- el 35 % de los 1.835.008 B del semiespacio entero -- y se tiran a la basura en cuanto el nivel
+// se cambia. Un cambio de nivel con gente adentro pide las dos cosas a la vez (las casillas del nivel nuevo y lo
+// que la gente tiene vivo) y ahi no entra.
+//
+// Con `TileEn` el nivel nuevo se escribe ENCIMA del que se deja: las rebanadas son las mismas si alcanzan (mismo
+// tamano de casilla, mismo `.ds1` de un pueblo) y solo se pide memoria para lo que no entra. El contenido que
+// queda es identico byte a byte que el de `Tile`: el crc32 del cuadro no cambia.
+func (mr *Stamp) TileEn(x, y int, dest *Tile) {
+	if dest == nil {
+		return
+	}
+
+	dest.Walls = dest.Walls[:0]
+	dest.Orientations = dest.Orientations[:0]
+	dest.Floors = dest.Floors[:0]
+	dest.Shadows = dest.Shadows[:0]
+	dest.Substitutions = dest.Substitutions[:0]
+
+	for idx := range mr.ds1.Walls {
+		dest.Walls = append(dest.Walls, *mr.ds1.Walls[idx].Tile(x, y))
+	}
+
+	for idx := range mr.ds1.Floors {
+		dest.Floors = append(dest.Floors, *mr.ds1.Floors[idx].Tile(x, y))
+	}
+
+	for idx := range mr.ds1.Shadows {
+		dest.Shadows = append(dest.Shadows, *mr.ds1.Shadows[idx].Tile(x, y))
+	}
+
+	for idx := range mr.ds1.Substitutions {
+		dest.Substitutions = append(dest.Substitutions, *mr.ds1.Substitutions[idx].Tile(x, y))
+	}
+}
+
 // Tile returns the tile at the given x and y tile coordinates.
 func (mr *Stamp) Tile(x, y int) *Tile {
 	t := &Tile{

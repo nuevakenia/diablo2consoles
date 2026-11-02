@@ -17,6 +17,26 @@ type MapTile struct {
 	SubTiles   [25]d2dt1.SubTileFlags
 }
 
+// LimpiarEnSuLugar (DC-002.120): deja la casilla como nueva pero CONSERVANDO el lugar de sus rebanadas.
+//
+// `MapTile{}` suelta las cinco rebanadas de `Components` y el recolector se lleva su memoria, que en el pueblo son
+// ~650.000 B del semiespacio (el 35 % de los 1.835.008 B). Limpiar en su lugar deja la capacidad puesta y el nivel
+// nuevo escribe encima: ver `d2mapstamp.Stamp.TileEn`. En la PC, y en la consola con la politica apagada, las
+// casillas se siguen tirando con `MapTile{}` como siempre.
+func (t *MapTile) LimpiarEnSuLugar() {
+	t.Components.Walls = t.Components.Walls[:0]
+	t.Components.Orientations = t.Components.Orientations[:0]
+	t.Components.Floors = t.Components.Floors[:0]
+	t.Components.Shadows = t.Components.Shadows[:0]
+	t.Components.Substitutions = t.Components.Substitutions[:0]
+
+	t.RegionType = 0
+
+	for i := range t.SubTiles {
+		t.SubTiles[i] = d2dt1.SubTileFlags{}
+	}
+}
+
 // GetSubTileFlags returns the tile flags for the given subtile
 func (t *MapTile) GetSubTileFlags(x, y int) *d2dt1.SubTileFlags {
 	var subtileLookup = [5][5]int{
