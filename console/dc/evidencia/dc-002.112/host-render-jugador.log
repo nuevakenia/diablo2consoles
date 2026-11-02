@@ -1,0 +1,56 @@
+RENDER294: patch_d2.mpq = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/patch_D2.mpq
+RENDER294: d2data.mpq  = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2data.mpq
+RENDER294: ================ 1. LAS TABLAS ================
+RENDER294: TABLA /data/global/excel/LvlTypes.txt                            OK (types=36 presets=0)
+RENDER294: TABLA /data/global/excel/LvlPrest.txt                            OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlWarp.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/AutoMap.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/Levels.txt                              OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlMaze.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/LvlSub.txt                              OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/objtype.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/Objects.txt                             OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monpreset.txt                           OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monstats.txt                            OK (types=36 presets=1091)
+RENDER294: TABLA /data/global/excel/monstats2.txt                           OK (types=36 presets=1091)
+RENDER294: ================ 2. EL PUEBLO POR EL MOTOR ================
+RENDER294: LoadStamp OK ds1 w=57 h=41 dt1sDelDS1=8
+RENDER294: MAPA tiles=2337 pisos=2337 paredes=338 crcGrilla=2698186255 ms=31
+RENDER294: ================ 3. EL RENDERER DEL MAPA Y SU CACHE ================
+RENDER294: cache PEREZOSA (la de la consola: las imagenes se arman al dibujar)
+RENDER294: cache en INDICES (DC-002.101: 1 B por pixel en vez de 4)
+RENDER294: cache en TRAMO EN PEDAZOS techo=2723840 B pedazo=348160 B (DC-002.106: cada bloque se sirve de los huecos del monton de C)
+RENDER294: JUGADOR d2char.mpq = /home/dgalli/.wine-d2/drive_c/Games/Diablo II/d2char.mpq
+RENDER294: JUGADOR PALETA data/global/palette/Units/pal.dat bytes=768 primero=0,0,36
+RENDER294: JUGADOR COF data\global\CHARS\AM\COF\amnuhth.cof bytes=1132 crc32=2708601289 capas=8 framesPorDir=8 dirs=16 speed=128
+RENDER294: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITNU1ht.dcc bytes=10931 crc32=4009831868
+RENDER294: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITNU1ht.dcc bytes=12765 crc32=1313645261
+RENDER294: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITNU1ht.dcc bytes=37659 crc32=2352162040
+RENDER294: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITNUhth.dcc bytes=10986 crc32=261487157
+RENDER294: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITNU1ht.dcc bytes=3781 crc32=2779618826
+RENDER294: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITNU1ht.dcc bytes=4902 crc32=3830512632
+JUEGO112: CAPA SH SIN-GRAFICO modo= NU dir= 0
+RENDER294: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITNU1ht.dcc bytes=17401 crc32=320674826
+RENDER294: JUGADOR CUADRO 0 de 8 caja=26x79 esquina=-18,-65 pixeles=896 crc32=1857478036 capasDibujadas=7 sinGrafico=0 fueraDeCaja=0
+RENDER294: JUGADOR CUADRO 1 de 8 caja=26x79 esquina=-18,-65 pixeles=889 crc32=2138394951 capasDibujadas=7 sinGrafico=0 fueraDeCaja=0
+RENDER294: JUGADOR CUADRO 2 de 8 caja=26x79 esquina=-18,-65 pixeles=898 crc32=3790466078 capasDibujadas=7 sinGrafico=0 fueraDeCaja=0
+RENDER294: JUGADOR CUADRO 3 de 8 caja=26x79 esquina=-18,-65 pixeles=897 crc32=1891057005 capasDibujadas=7 sinGrafico=0 fueraDeCaja=0
+RENDER294: JUGADOR CUADRO 4 de 8 caja=26x79 esquina=-18,-65 pixeles=906 crc32=3705376215 capasDibujadas=7 sinGrafico=0 fueraDeCaja=0
+RENDER294: JUGADOR CUADRO 5 de 8 caja=26x79 esquina=-18,-65 pixeles=914 crc32=1415443346 capasDibujadas=7 sinGrafico=0 fueraDeCaja=0
+RENDER294: JUGADOR CUADRO 6 de 8 caja=26x79 esquina=-18,-65 pixeles=917 crc32=3716097957 capasDibujadas=7 sinGrafico=0 fueraDeCaja=0
+RENDER294: JUGADOR CUADRO 7 de 8 caja=26x79 esquina=-18,-65 pixeles=902 crc32=127741840 capasDibujadas=7 sinGrafico=0 fueraDeCaja=0
+RENDER294: JUGADOR CICLO modo=NU dir=0 cuadros=8 msPorCuadro=128 cicloMs=1024
+RENDER294: JUGADOR cargado (la misma escena que dibuja la consola)
+RENDER294: CACHE superficies=0 bytesRGBA=0 (0.00 MB) picoPorSuperficie=0x0
+RENDER294: CACHE101 enIndices=true superficies=0 bytes=0 (0.00 MB) pixeles=0
+RENDER294: ================ 4. EL CUADRO ================
+RENDER294: CUADRO 1 tamano=640x480 pixelesNoVacios=307196 de 307200 crc32=1437022778 crc32RGB=2507235743 ms=13
+RENDER294: CUADRO 1 superficiesNuevas=0 bytesNuevos=0 cacheSuperficies=1 cacheBytes=1228800
+RENDER294: CUADRO 1 cache101 nuevas=86 bytesNuevos=2723840 cacheSuperficies=86 cacheBytes=2723840 (2.60 MB)
+RENDER294: JUGADOR ancla=320,283 caja=302,218,328,297 tamano=26x79 compuesto=26x79 esquina=-18,-65 pixeles=896 crc32Compuesto=1857478036
+RENDER294: CUADRO CON-JUGADOR crc32=1363871674 crc32RGB=4050989882 pixelesDelJugador=896 delArea=2054 (mapaSolo=1437022778)
+RENDER294: CUADRO MAPA-RESTAURADO crc32=1437022778 igualAlMapaSolo=true
+RENDER294: CUADRO total ms=13 (promedio 13.0)
+RENDER294: TRAMO104 activa=true bytes=2723840 usado=2652160 libre=71680 imagenes=84 derrames=2 bytesDerramados=71680 enPedazos=true pedazos=8 techo=2723840
+RENDER294: PNG de referencia = console/dc/evidencia/dc-002.112/host-cuadro-con-jugador.png
+RENDER294: FIN

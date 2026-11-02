@@ -1,0 +1,51 @@
+DC-002.112 -- las lineas del criterio, sacadas de consola-criterio-jugador.log
+
+== el jugador: la arena del decodificador, las recolecciones y el ciclo compuesto
+JUEGO112: JUGADOR PALETA data/global/palette/Units/pal.dat bytes= 768 ok= true primero= 0 0 36
+JUEGO112: JUGADOR MPQ-ABRIR OK /cd/JUEGO/D2CHAR.MPQ montonLibre= 136824
+JUEGO112: JUGADOR COF data\global\CHARS\AM\COF\amnuhth.cof bytes= 1132 crc32= -1586366007 capas= 8 framesPorDir= 8 dirs= 16 speed= 128
+JUEGO112: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITNU1ht.dcc bytes= 10931 crc32= -285135428
+JUEGO112: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITNU1ht.dcc bytes= 12765 crc32= 1313645261
+JUEGO112: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITNU1ht.dcc bytes= 37659 crc32= -1942805256
+JUEGO112: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITNUhth.dcc bytes= 10986 crc32= 261487157
+JUEGO112: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITNU1ht.dcc bytes= 3781 crc32= -1515348470
+JUEGO112: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITNU1ht.dcc bytes= 4902 crc32= -464454664
+JUEGO112: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITNU1ht.dcc bytes= 17401 crc32= 320674826
+JUEGO112: JUGADOR ARENA pedidos= 133 entregado= 86208 tramos= 1 capacidad= 0 montonCLibre= 136824 recoleccionesEnElCiclo= 7 pedidasPorMi= 7 automaticas= 0 sinArena= false
+JUEGO112: JUGADOR CUADRO 0 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 896 crc32= 1857478036 capasDibujadas= 7
+JUEGO112: JUGADOR CUADRO 1 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 889 crc32= 2138394951 capasDibujadas= 7
+JUEGO112: JUGADOR CUADRO 2 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 898 crc32= -504501218 capasDibujadas= 7
+JUEGO112: JUGADOR CUADRO 3 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 897 crc32= 1891057005 capasDibujadas= 7
+JUEGO112: JUGADOR CUADRO 4 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 906 crc32= -589591081 capasDibujadas= 7
+JUEGO112: JUGADOR CUADRO 5 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 914 crc32= 1415443346 capasDibujadas= 7
+JUEGO112: JUGADOR CUADRO 6 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 917 crc32= -578869339 capasDibujadas= 7
+JUEGO112: JUGADOR CUADRO 7 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 902 crc32= 127741840 capasDibujadas= 7
+JUEGO112: JUGADOR CICLO modo= NU dir= 0 cuadros= 8 msPorCuadro= 128 cicloMs= 1024
+JUEGO112: JUGADOR FUENTE SOLTADA /cd/JUEGO/D2CHAR.MPQ tablas= 322432 bytesTablas= 320320 bytesTrabajo= 0 bytes= 320320 yaSoltada= false montonLibre= 138000
+JUEGO112: JUGADOR ancla= 320 283 caja= 302 218 328 297 tamano= 26 x 79 compuesto= 26 x 79 esquina= -18 -65 pixeles= 896 crc32= 1857478036 capaDibujadas= 7 sinGrafico= 0 fueraDeCaja= 0
+
+== el cuadro: mapa solo / con el jugador / mapa restaurado (3 cuadros)
+JUEGO112: CUADRO 1 ARRANCA libre= 1090840
+JUEGO112: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 crc32RGB= -1787731553 hostPixeles= 307196 hostCrc= 1437022778 ms= 746
+JUEGO112: CUADRO 1 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 crc32RGB= -243977414 pixelesDelJugador= 896 delArea= 2054 msJugador= 0
+JUEGO112: CUADRO 1 MAPA-RESTAURADO crc32= 1437022778 igualAlMapaSolo= true mapaSolo= 1437022778 host= 1437022778
+JUEGO112: CUADRO 1 PRESENTADO con el jugador crc32= 1363871674 igualAlDeLaMedida= true
+JUEGO112: CUADRO 1 cacheSuperficies= 86 cacheBytes= 2723840 cacheEnIndices= true msMapa= 746 msJugador= 0
+JUEGO112: CUADRO 2 ARRANCA libre= 2016576
+JUEGO112: CUADRO 2 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 crc32RGB= -1787731553 hostPixeles= 307196 hostCrc= 1437022778 ms= 708
+JUEGO112: CUADRO 2 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 crc32RGB= -243977414 pixelesDelJugador= 896 delArea= 2054 msJugador= 1
+JUEGO112: CUADRO 2 MAPA-RESTAURADO crc32= 1437022778 igualAlMapaSolo= true mapaSolo= 1437022778 host= 1437022778
+JUEGO112: CUADRO 2 cacheSuperficies= 86 cacheBytes= 2723840 cacheEnIndices= true msMapa= 708 msJugador= 2
+JUEGO112: CUADRO 3 ARRANCA libre= 2016576
+JUEGO112: CUADRO 3 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 crc32RGB= -1787731553 hostPixeles= 307196 hostCrc= 1437022778 ms= 704
+JUEGO112: CUADRO 3 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 crc32RGB= -243977414 pixelesDelJugador= 896 delArea= 2054 msJugador= 1
+JUEGO112: CUADRO 3 MAPA-RESTAURADO crc32= 1437022778 igualAlMapaSolo= true mapaSolo= 1437022778 host= 1437022778
+JUEGO112: CUADRO 3 cacheSuperficies= 86 cacheBytes= 2723840 cacheEnIndices= true msMapa= 704 msJugador= 2
+
+== la memoria alrededor del jugador
+JUEGO112: MEMORIA jugador-antes usado= 4509488 libre= 138000 arena= 4647488 sbrk= -1935900672 techo= -1929445376 pico= 4644432
+JUEGO112: SEMIESPACIO jugador-antes usado= 1225896 total= 1835008 pct= 66 colecciones= 1
+JUEGO112: MEMORIA jugador-despues usado= 4509488 libre= 138000 arena= 4647488 sbrk= -1935900672 techo= -1929445376 pico= 4644432
+JUEGO112: SEMIESPACIO jugador-despues usado= 511480 total= 1835008 pct= 27 colecciones= 10
+JUEGO112: MEMORIA jugador-despues-de-recolectar usado= 4509488 libre= 138000 arena= 4647488 sbrk= -1935900672 techo= -1929445376 pico= 4644432
+JUEGO112: SEMIESPACIO jugador-despues-de-recolectar usado= 502656 total= 1835008 pct= 27 colecciones= 11

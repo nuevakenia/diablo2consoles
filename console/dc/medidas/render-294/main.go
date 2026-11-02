@@ -71,6 +71,11 @@ var pedazoDelTramo int
 var cambioDeNivel bool
 var cambioPreset, cambioArchivo int
 
+// conJugador (DC-002.112): despues de cada cuadro del mapa, compone el ciclo de la amazona (con el compositor
+// compartido) y lo pega encima con el ancla del motor, midiendo el antes/despues del crc32. Es la escena que
+// dibuja el POC de la consola (`console/dc/poc/juego-112`), aca en el host y con las mismas cuentas.
+var conJugador bool
+
 func main() {
 	dir := flag.String("dir", "", "carpeta con d2data.mpq y patch_d2.mpq (por defecto la instalacion del juego)")
 	preset := flag.Int("preset", 1, "preset del nivel en LvlPrest (1 = Act 1 - Town 1)")
@@ -92,11 +97,15 @@ func main() {
 		"cache + componer -cambio-preset/-cambio-archivo + SetMapEngine) y dibuja un cuadro mas")
 	presetDelCambio := flag.Int("cambio-preset", 1, "DC-002.109: preset del nivel del cambio")
 	archivoDelCambio := flag.Int("cambio-archivo", 1, "DC-002.109: archivo del preset del cambio")
+	jugador := flag.Bool("jugador", false, "DC-002.112: compone el ciclo de la amazona (NU, dir 0) y lo pega "+
+		"ENCIMA del cuadro del pueblo con el ancla del motor; imprime el crc32 del mapa solo, con el jugador y "+
+		"del mapa restaurado. Es la escena del POC de la consola (console/dc/poc/juego-112)")
 	flag.Parse()
 
 	pedazoDelTramo = *pedazo
 	cambioDeNivel = *cambio
 	cambioPreset, cambioArchivo = *presetDelCambio, *archivoDelCambio
+	conJugador = *jugador
 
 	if err := correr(*dir, *preset, *archivo, *ancho, *alto, *cx, *cy, *salida, *perezoso, *indices, *tramo,
 		*cuadros, *histograma); err != nil {
@@ -205,6 +214,20 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 
 	mr := d2maprenderer.CreateMapRenderer(am, r, engine, term, d2util.LogLevelError, cx, cy, opciones...)
 
+	// DC-002.112: el jugador se carga ACA y no antes: necesita el renderer del mapa (`WorldToScreenF`, que es
+	// la conversion mundo->pantalla del motor) para calcular su ancla, y en la consola tambien se compone con
+	// el video ya andando.
+	var jugadorDelCuadro *elJugadorDelHost
+
+	if conJugador {
+		jugadorDelCuadro, err = cargarJugadorHost(dir, datos)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("RENDER294: JUGADOR cargado (la misma escena que dibuja la consola)")
+	}
+
 	supCache := r.Estadisticas()
 	fmt.Printf("RENDER294: CACHE superficies=%d bytesRGBA=%d (%.2f MB) picoPorSuperficie=%dx%d\n",
 		supCache.Superficies, supCache.Bytes, float64(supCache.Bytes)/(1024*1024),
@@ -256,6 +279,10 @@ func correr(dir string, preset, archivo, ancho, alto int, cx, cy float64, salida
 		fmt.Printf("RENDER294: CUADRO %d cache101 nuevas=%d bytesNuevos=%d cacheSuperficies=%d cacheBytes=%d (%.2f MB)\n",
 			cuadro, despues101.Superficies-antes101.Superficies, despues101.Bytes-antes101.Bytes,
 			despues101.Superficies, despues101.Bytes, float64(despues101.Bytes)/(1024*1024))
+
+		// DC-002.112: el jugador ENCIMA del cuadro del pueblo, con las mismas tres medidas del POC de la consola
+		// (mapa solo / con el jugador / mapa restaurado). Deja el cuadro con el jugador pintado: es el del PNG.
+		medirElJugadorEnElCuadro(mr, c, jugadorDelCuadro, 0, cx, cy)
 	}
 
 	fmt.Printf("RENDER294: CUADRO total ms=%d (promedio %.1f)\n", msTotal, float64(msTotal)/float64(cuadros))

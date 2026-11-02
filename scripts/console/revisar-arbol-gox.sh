@@ -149,8 +149,16 @@ while IFS=$'\t' read -r tipo clave tg ts ruta; do
         "$PREFIJO"/*)
             p="${clave#"$PREFIJO/"}"
             if [ "$tipo" = "FALTA" ]; then
-                FILAS_FALTA+=("$(printf '   %-38s %-13s %-13s %s' "$p" "(no existe)" "-" "d2*/$p/*.go")")
-                ABORTA=1
+                # DC-002.112: un paquete que este build RECOMPILA no necesita existir antes -- lo crea el
+                # mismo (medido: `d2core/d2map/d2maprenderer.gox` no estaba en el arbol y este POC lo compila
+                # en su primer paso; el recuadro abortaba por un objeto que ya se iba a hacer).
+                if case " $RECOMPILA " in *" $p "*) true ;; *) false ;; esac; then
+                    FILAS_RECOMP+=("$(printf '   %-38s %-13s %s' "$p" "(no existe)" \
+                        "lo crea este build (la fuente mas nueva es ${ruta#"$REPO/"})")")
+                else
+                    FILAS_FALTA+=("$(printf '   %-38s %-13s %-13s %s' "$p" "(no existe)" "-" "d2*/$p/*.go")")
+                    ABORTA=1
+                fi
             elif case " $RECOMPILA " in *" $p "*) true ;; *) false ;; esac; then
                 # este build lo recompila solo: no hay nada que rehacer en el arbol
                 FILAS_RECOMP+=("$(printf '   %-38s %-13s %s' "$p" "$(fecha "$tg")" \

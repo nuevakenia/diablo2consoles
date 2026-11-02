@@ -1,0 +1,25 @@
+DC-002.112 -- pruebas del host (2026-11-02 00:20)
+
+== go vet ./console/dc/medidas/render-294
+exit=0
+
+== go vet ./d2core/d2map/... ./d2core/d2asset/ ./d2core/d2render/pvr/
+package github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr: build constraints exclude all Go files in /home/dgalli/Proyectos/diablo2consoles/d2core/d2render/pvr
+exit=1
+   (esperado: `pvr` es el backend de la consola, lleva `//go:build dreamcast` y en el host no tiene ni un
+    archivo. Se valida con el build de Dreamcast, no con go vet. Los otros dos paquetes dan exit=0.)
+
+== go test -count=1 ./d2core/d2map/... ./d2core/d2asset/
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2lightmap	0.002s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine	0.672s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity	0.010s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapgen	0.021s
+?   	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapgen/d2wilderness	[no test files]
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer	0.016s
+?   	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapstamp	[no test files]
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2objspawn	0.014s
+ok  	github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset	0.016s
+
+== los dos archivos compartidos: el POC y el medidor tienen que ser byte por byte los mismos
+  personaje.go  IGUAL  a41eae3d25006ba4
+  jugador.go  IGUAL  5f9d3c3a6979cffb
