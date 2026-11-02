@@ -1,0 +1,189 @@
+DC-002.117 -- TRES Y CUATRO JUGADORES: LA TABLA DE MEMORIA Y MS POR CUADRO
+============================================================================================
+
+QUE SE CONSTRUYO. El POC `console/dc/poc/juego-117/` (el de DC-002.116, que ya tenia dos jugadores uno por PUERTO
+del bus maple) con la palanca `JUGADORES` llevada hasta CUATRO: los cuatro puertos del bus, cada jugador con su
+control, su estado y su reloj de animacion, y los cuatro DIBUJADOS EN EL MISMO CUADRO de 640x480. NO HAY SPLIT PARA
+TRES NI CUATRO (`prepararElSplit` rechaza cualquier numero que no sea 2 y lo dice): el split de 3 y 4 es otra
+tarjeta, y lo que esta mide es si el cuadro y el semiespacio de UNA pantalla aguantan cuatro.
+
+LO QUE HIZO FALTA EN EL MOTOR: NADA. Lo unico nuevo es del POC:
+  - `coop.go`: los N jugadores (arreglos de `maxJugadoresCoop`), el guion de los cuatro, `ordenarPorProfundidad`
+    (insercion manual: `sort.Slice` mete reflection sobre interfaces justo en el camino que se mide) y el resumen
+    por jugador.
+  - `leash.go`: el LEASH DE GRUPO. El de a pares de DC-002.115 no alcanza para cuatro, y eso aca se MIDIO (ver el
+    A/B abajo), no se supuso.
+  - `knobs.go`: `jugadoresKnob` 1..4, las celdas de arranque P3/P4, `guionPoc=cuatro` y `leashDeGrupo`.
+
+COMO SE CORRE (medido en este host). UN binario por caso; entre una corrida y otra lo UNICO que cambia es la palanca:
+    JUGADORES=1 bash scripts/console/build-juego-117.sh /tmp/dcbuild/j117-uno
+    JUGADORES=2 bash scripts/console/build-juego-117.sh /tmp/dcbuild/j117-dos
+    JUGADORES=3 bash scripts/console/build-juego-117.sh /tmp/dcbuild/j117-tres
+    JUGADORES=4 bash scripts/console/build-juego-117.sh /tmp/dcbuild/j117-cuatro
+    CAPTURAS=9 INTERVALO=1 bash scripts/console/run-flycast-117.sh /tmp/dcbuild/j117-cuatro/disc.gdi /tmp/dc117
+El A/B del leash es la MISMA compilacion con otra palanca: `GRUPO=si` (grupo) | `GRUPO=no` (a pares, DC-002.115).
+Y `SPLIT=si` con `JUGADORES=2` reproduce DC-002.116 sin tocar una linea.
+
+
+LOS NUMEROS DEL CRITERIO
+------------------------
+  criterio de la tarjeta                          medido
+  ----------------------------------------------  --------------------------------------------------------
+  cuatro jugadores en el mismo cuadro              SI: 17 cuadros, 307.197 de 307.200 pixeles llenos
+  los cuatro MOVIENDOSE                           tramo LOS-CUATRO-DERECHA: 3,75 celdas cada uno en
+                                                  2,411 s (1,55537 celdas/s), ticks= 50 los cuatro
+  cada uno con SU input, en su puerto             P1 puerto 0, P2 puerto 1, P3 puerto 2, P4 puerto 3
+                                                  (A/B/C/D); en el tramo CADA-UNO-SU-DIRECCION cada uno
+                                                  camina con SU direccion (P1 dir 12, P2 dir 4, P3 dir 8,
+                                                  P4 dir 0) y los cuatro avanzan
+  ninguno se sale del lienzo                      cuadrosFuera= 0 sobre 17 cuadros, con el LEASH DE GRUPO
+  el leash de a pares NO alcanza para cuatro      A/B medido: con GRUPO=no, 10 de 17 cuadros con 1 o 2
+                                                  jugadores FUERA, separacion 6,59671 celdas = 717 px
+  el cuadro de 1 jugador no cambio                con JUGADORES=1 el cuadro 1 da crc32 1363871674,
+                                                  896 px del jugador y ancla 320,283 = EXACTAMENTE el de
+                                                  DC-002.112: generalizar a cuatro no movio ese camino
+
+
+LA TABLA (los cuatro casos, misma compilacion, mismo guion "cuatro", 17 cuadros cada uno)
+------------------------------------------------------------------------------------------
+  J   estado     estructura   memoria de     si NO se        semiespacio del GC     colecc.   msMapa  msJug  msCuadro
+      (B)        (B)          los jugadores  compartiera (B)  usado / total                    (B)
+  --  ---------  -----------  -------------  --------------  ---------------------  --------  ------  -----  --------
+   1      104       1.192          1.296          165.152     1.414.584 / 1.835.008     144      645      0     1.066
+   2      208       2.384          2.592          330.304     1.427.608 / 1.835.008     134      534      2       994
+   3      312       3.576          3.888          495.456     1.182.824 / 1.835.008     134      636      1     1.135
+   4      416       4.768          5.184          660.608     1.716.240 / 1.835.008     133      604      2     1.141
+
+  estado            = 104 B por jugador (posicion, ticks, animacion, camino): 104, 208, 312, 416.
+  estructura        = 1.192 B por jugador (el `participante` con su paleta de 1.024 B y los punteros al servicio
+                      maple). Es memoria del POC, no del motor: con 4 son 4.768 B.
+  memoria de los    = estructura + estado: 1.296 B por jugador, 5.184 B los cuatro.
+  jugadores
+  si NO se          = lo que costaria tener los cuadros decodificados POR jugador (165.152 B x J). Se COMPARTEN:
+  compartiera         con los cuatro se paga 165.152 UNA vez. Es el numero que dice cuanto ahorra compartir.
+  semiespacio       = lo que el recolector tiene tomado al cerrar, sobre los 1.835.008 B del semiespacio. NO crece
+                      con los jugadores y NO es estable entre corridas iguales: la misma configuracion de 4 dio
+                      1.716.240 en la corrida de la tabla y 1.164.728 en el A/B del leash (depende de cuando corrio
+                      el recolector). Lo que se puede afirmar: con cuatro queda entre el 63 % y el 94 %, o sea que
+                      AGUANTA, y el numero alto es el techo de esta pantalla, no el de los jugadores.
+  msMapa           = una pasada del mapa compuesto (1982 pisos + 330 paredes), promedio de los 17 cuadros.
+  msJug                = lo que cuesta dibujar a TODOS los jugadores, por cuadro (medido cuadro a cuadro): 0,41 (1),
+                     1,35 (2), 1,59 (3) y 2,24 (4) ms. O sea ~+0,65 ms por jugador: los cuadros se comparten, los
+                     colores y los puntos de dibujo no.
+  msCuadro          = cuadro de punta a punta, promedio de los 17: 1.066 (1), 994 (2), 1.135 (3) y 1.141 (4). La
+                     serie NO es monotona (el de 2 salio mas rapido que el de 1) porque el ruido entre corridas
+                     iguales es de +-80 ms: lo unico que se puede afirmar es que CUATRO no duplican el cuadro --
+                     de uno a cuatro son +75 ms, +7 %.
+
+
+MS POR CUADRO, FRAME A FRAME (de los propios cuadros, no del promedio)
+---------------------------------------------------------------------
+  J   cuadros   msMapa med/p90/max   msJugadores med/max   cuadro de reloj med/mediana/max
+  --  -------   ------------------   -------------------   ---------------------------------
+   1       17    594 / 649 / 723       0,41 / 1            1.456 / 1.173 / 2.055 ms
+   2       17    563 / 632 / 772       1,35 / 2            1.516 / 1.305 / 2.156 ms
+   3       17    595 / 670 / 798       1,59 / 2            1.467 / 1.129 / 2.332 ms
+   4       17    618 / 681 / 809       2,24 / 4            1.802 / 1.857 / 2.431 ms
+El "cuadro de reloj" es el reloj del POC entre cuadro y cuadro (incluye la espera del flip y el trabajo del
+emulador): es mas alto y mas ruidoso que el msCuadro del POC, y por eso la tabla de arriba usa el del POC.
+
+
+LA CACHE: LOS ASSETS NO CRECEN CON LOS JUGADORES
+------------------------------------------------
+  J   imagenes en la cache   derrames   bytes derramados
+  --  ---------------------  ---------  ----------------
+   1            113              11          245.760
+   2            102               0                0
+   3            106               0                0
+   4             98               0                0
+Los cuadros (`.dcc`/.`dc6` decodificados) se componen UNA vez y los cuatro leen de ahi: por eso con cuatro la cache
+tiene MENOS imagenes que con uno (98 contra 113) -- no es que cuatro cueste menos, es que cada corrida camina por
+una franja distinta del pueblo. Lo que cambia con los jugadores es el estado (104 B) y la estructura (1.192 B), no
+los assets. El tramo de la cache son 3.481.600 B = 10 bloques de 348.160 (`pedazos= 10`), que es lo que la arena del
+PVR entrega de verdad: pedir 12 bloques (4.177.920 B, la cuenta que prometia el no-split) NO los da.
+Sobre medido de la cache: ~111 imagenes. Con 18 cuadros la corrida de 1 jugador llego a 113, derramo 25 imagenes
+(558.080 B) al monton de Go y a los dos cuadros el emulador se cayo con "Fatal: SH4 exception when blocked". Por eso
+el guion de esta tarjeta camina 7 s y no 14 (ver knobs.go, cuadros y tramoDeLaCache). La corrida de 1 jugador de la
+tabla derramo 11 imagenes y CERRO igual (semiespacio al 77 %): el derrame no es gratis, pero no siempre mata.
+
+
+EL LEASH DE GRUPO (lo que hizo falta para que entren cuatro)
+------------------------------------------------------------
+El leash de DC-002.115 limita la distancia entre UN PAR y se aplica a cada par con su vecino. Con cuatro eso no
+alcanza: la forma del grupo puede tener todos los pares a 5,25 celdas y aun asi no entrar en 640 px, porque el
+lienzo tiene borde. La cuenta: un triangulo equilatero de lado 5,25 tiene circunradio 3,03 celdas, y un jugador a
+3,03 celdas del centro se proyecta a 342 px en la peor direccion -- fuera de la mitad del lienzo.
+El leash de grupo limita UNA cosa: la distancia de CADA jugador al CENTRO del grupo, a `leashCeldas/2` = 2,625
+celdas, que es la misma medida de DC-002.115 leida al reves (alli los dos se ponian a +-d/2 de la camara y se
+barria d hasta que las dos cajas entraban).
+  - Se mide con las posiciones YA MOVIDAS y su centro. Con el centro CONGELADO el grupo que camina junto se recorta
+    todos los cuadros (medido: 22 recortes en 19 cuadros con los cuatro caminando para el mismo lado, que es el caso
+    que NO hay que tocar).
+  - Si el radio se paso, se encoge a TODOS hacia ese centro en la misma proporcion: el centro no se corre, asi que
+    el grupo no viaja por el mapa. El que camino contra el leash camina 0 celdas/s y el paso que se le comio se le
+    devuelve a la cuenta del movimiento (`descontarElPaso`), asi la velocidad del log es la de verdad.
+
+EL A/B QUE JUSTIFICA EL LEASH DE GRUPO (mismos cuatro, misma compilacion, GRUPO=si | GRUPO=no)
+  ------------------------------------------------------------------------------------------------
+                                          GRUPO=si (grupo)     GRUPO=no (a pares, DC-002.115)
+  separacion maxima entre anclas            4,24264 celdas        6,59671 celdas
+  proyeccion maxima (entre anclas)          481 px                717 px
+  cuadros con alguien FUERA del lienzo      0 de 17               10 de 17 (1 o 2 jugadores)
+  recortes / celdas recortadas              4 / 2,26005           8 / 4,88353
+  cierra con                                "cuadrosFuera= 0"     "el leash NO alcanzo: 717 px"
+Con el leash de a pares dos de los cuatro se van del lienzo en 10 de los 17 cuadros: el de DC-002.115 no sirve para
+cuatro, y ahora esta medido.
+
+LOS CUATRO EN EL CUADRO, UNO POR UNO (arranque, cuadro 1 = QUIETO)
+  jugador  puerto  aparato en el bus  ancla (px)   caja (px)              px pintados  celda
+  -------  ------  -----------------  ----------   ---------------------  -----------  -----
+    P1        0     16777216 (si)      320 163      302  98 328 177 (26x79)      896     28 20
+    P2        1     0 (no, va guion)   560 283      542 218 568 297 (26x79)      896     31 20
+    P3        2     0 (no, va guion)    80 283       62 218  88 297 (26x79)      896     28 23
+    P4        3     0 (no, va guion)   320 403      302 338 328 417 (26x79)      896     31 23
+Los cuatro dibujan 896 pixeles y el crc32DelCiclo es EL MISMO (1857478036) en los cuatro: leen el MISMO cuadro
+composado de la cache. Eso es exactamente lo que dice la tabla de memoria -- sumar jugadores no duplica assets.
+Los cuatro entran: el borde derecho queda en 568 de 640, el izquierdo en 62 y el de abajo en 417 de 480.
+El emulador tiene UN control (en el puerto 0): P2, P3 y P4 los pone el GUION del shim, puerto por puerto, y el log
+lo dice (`JUEGO117: PUERTO`). El input POR PUERTO queda probado igual: en el tramo CADA-UNO-SU-DIRECCION cada uno
+camina con la direccion que se le inyecto a SU puerto y ninguno se mueve con la del otro.
+Grupo de arranque: cuadrado de 3x3 celdas alrededor de (29,5;21,5), separacion entre vecinos 3 celdas, diagonal
+4,24264 celdas (dentro de las 5,25 del leash), y el grupo entero cae en la MISMA ventana de tiles (una sola zona
+del mapa, que es lo que la cache necesita).
+
+
+EL GUION (palanca GUION_POC=cuatro), 4 tramos
+---------------------------------------------
+  QUIETO                  1 s    el cuadro 1: con JUGADORES=1 es el cuadro de DC-002.112 (crc32 1363871674).
+  LOS-CUATRO-DERECHA      2 s    los cuatro al mismo lado: 3,75 celdas cada uno, la separacion no cambia.
+  CADA-UNO-SU-DIRECCION   2 s    cada uno en SU direccion: P1 1,43 / P2 1,875 / P3 1,43 / P4 0,504 celdas. La
+                                 diferencia es el leash de grupo: al que empuja para afuera se lo frena.
+  LOS-CUATRO-IZQUIERDA    2 s    los cuatro de vuelta: 3,75 celdas cada uno.
+
+EL CAMINO DEL SPLIT, VUELTO A CORRER CON LAS PALANCAS DE DC-002.116
+---------------------------------------------------------------
+`SPLIT=si JUGADORES=2 CELDA_P2="24 -8" GUION_POC=split` (medido): los DOS lienzos de 320x480 (1.228.800 B en VRAM,
+el de 640x480 no se reserva), las dos camaras (28 20 y 52 12), ancla 160,283 en las dos mitades y la separacion de
+116: 25,2982 celdas, los 17 cuadros por encima de 20. La geometria del split quedo igual.
+LO QUE NO QUEDO IGUAL, y se dice porque se midio: en los cuadros del CIERRE (los que van despues del guion) la
+camara de cada mitad se queda con la posicion del ultimo cuadro del guion, asi que P1 y P2 salen dibujados fuera de
+su caja (ancla -53) en esos cuadros: cuadrosFueraDeSuMitad= 4 contra 0 en juego-116 con los mismos 17 cuadros. Es
+del cierre del camino del split -- que esta tarjeta no mide ni usa -- y queda anotado para su tarjeta; la corrida
+del criterio de 116 se sigue sacando con `juego-116`, que no se toco.
+
+EVIDENCIA
+---------
+  dc-002.117-los-cuatro-en-el-cuadro.png           las cuatro amazonas en el cuadro de 640x480 (tramo
+                                                 LOS-CUATRO-DERECHA, las cuatro caminando para el mismo lado).
+  dc-002.117-los-cuatro-cada-uno-su-direccion.png  el tramo CADA-UNO-SU-DIRECCION: las cuatro mirando para
+                                                 lados distintos (dir 12, 4, 8 y 0), dentro del lienzo.
+Las capturas son 640x480 recortados de la ventana del emulador (2560x1080 es la pantalla del host).
+
+
+LO QUE ESTA TARJETA NO DICE
+---------------------------
+  - No hay split para 3 y 4. `prepararElSplit` lo rechaza con un aviso y sigue con el cuadro unico.
+  - Con cuatro el semiespacio queda al 93,5 %: aguanta, pero no hay margen para un quinto jugador en esta pantalla
+    con esta cache. Eso es una tarjeta aparte (y el bus maple tiene cuatro puertos, asi que un quinto tampoco tiene
+    puerto fisico).
+  - Los derrames de la cache (11 imagenes con 1 jugador) son el sobre del mapa, no de los jugadores.
