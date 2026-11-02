@@ -135,4 +135,21 @@ const (
 	// `runtime.GC()` al recolector desde el callback del ciclo del PVR CLAVA el ciclo (dos corridas quedaron
 	// en el cuadro 7 sin volver a presentar). El recolector entra solo por umbral, que es como funciona.
 	gcCadaCuadros = 0
+
+	// ============================== LAS DE DC-002.113b ==============================
+	//
+	// desalojoEnCuadros: la politica cuando el tramo de la cache se llena. Una imagen que no se uso en N cuadros
+	// se SUELTA y sus bytes vuelven al tramo (se reusan). 0 = apagada, y entonces la cache es de solo agregar
+	// como en DC-002.113 (27 derrames, 732.160 B y el `GC to-space overflow` de la corrida larga).
+	// N=2 = un cuadro entero de margen sobre lo que el cuadro esta pintando.
+	desalojoEnCuadros = 2
+
+	// componerAlVuelo: la OTRA politica (se mide contra el desalojo). Con el tramo lleno, la imagen se compone
+	// sobre un buffer de trabajo y se pinta SIN cachearse: no crece nada, pero el tile se decodifica en cada
+	// cuadro que lo pida. Las dos juntas no tienen sentido: con desalojo casi siempre hay lugar.
+	componerAlVuelo = false
+
+	// bufferDelVuelo: el tamano del buffer de trabajo de la composicion al vuelo. La imagen mas grande de la
+	// cache del pueblo son 71.680 B (160x448 a 1 B/pixel), asi que 80 KB con aire.
+	bufferDelVuelo = 81920
 )

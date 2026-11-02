@@ -204,6 +204,24 @@ for n in $(seq -w 1 "$CAPTURAS"); do
 done
 
 if [ "${TECLAS:-1}" = "1" ]; then wait "${TECLAS_PID:-0}" 2>/dev/null; fi
+
+# DC-002.113b -- EL CIERRE NO SE ADIVINA POR RELOJ. El POC pinta `cuadros+3` cuadros y recien entonces imprime el
+# RESUMEN y los cuadros de la repetibilidad; con el guion largo (5 s por direccion, 80 cuadros) las capturas se
+# terminan mucho antes que el POC. Se espera LA MARCA, no un tiempo: si el emulador se cayo antes, se dice.
+ESPERA_CIERRE="${ESPERA_CIERRE:-180}"
+T=0
+while [ "$T" -lt "$ESPERA_CIERRE" ]; do
+    grep -qa 'JUEGO113: RESUMEN' "$OUT/flycast.log" 2>/dev/null && break
+    vivo || break
+    sleep 1
+    T=$(( T + 1 ))
+done
+if grep -qa 'JUEGO113: RESUMEN' "$OUT/flycast.log" 2>/dev/null; then
+    echo "  cierre: el POC llego al RESUMEN a los ${T}s"
+else
+    echo "  cierre: el POC NO llego al RESUMEN en ${ESPERA_CIERRE}s (ultimo cuadro: $(grep -a 'JUEGO113: CUADRO [0-9]* ARRANCA' "$OUT/flycast.log" | tail -1 | tr -d '\r'))"
+fi
+
 vivo && capturar "c99-final"
 sleep 1
 

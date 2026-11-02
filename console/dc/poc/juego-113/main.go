@@ -581,12 +581,35 @@ func main() {
 		println("JUEGO113: TRAMO DE LA CACHE pedido TARDE (en el renderer) bytes=", tramoDeLaCache)
 	}
 
+	// DC-002.113b -- LA POLITICA CUANDO EL TRAMO SE LLENA. Las dos son ADITIVAS y se eligen con las palancas de
+	// esta tarjeta: con `desalojoEnCuadros > 0` el tramo suelta lo que no se uso en N cuadros y reusa esos bytes;
+	// con `componerAlVuelo` lo que no entra se compone sobre un buffer de trabajo y NO se cachea. Con las dos
+	// apagadas el POC es el de DC-002.113 (la cache de solo agregar y los derrames al monton de Go).
+	if desalojoEnCuadros > 0 {
+		opciones = append(opciones, d2maprenderer.ConDesalojoDeLaCache(desalojoEnCuadros))
+		println("JUEGO113: DESALOJO DE LA CACHE encendido: una imagen que no se uso en", desalojoEnCuadros,
+			"cuadros se suelta y sus bytes vuelven al tramo")
+	}
+
+	if componerAlVuelo {
+		opciones = append(opciones, d2maprenderer.ConComposicionAlVuelo(bufferDelVuelo))
+		println("JUEGO113: COMPOSICION AL VUELO encendida: lo que no entra en el tramo se compone en un buffer de",
+			bufferDelVuelo, "B y NO se cachea")
+	}
+
+	if desalojoEnCuadros == 0 && !componerAlVuelo {
+		println("JUEGO113: la cache de tiles es de SOLO AGREGAR (sin desalojo y sin composicion al vuelo):",
+			"lo que no entra en el tramo se derrama al monton de Go, como en DC-002.113")
+	}
+
 	rendererDelMapa = d2maprenderer.CreateMapRenderer(am, renderer, engine, term, d2util.LogLevelError,
 		celdaX, celdaY, opciones...)
 
 	espacio := rendererDelMapa.TamanoDelCuadro()
 	println("JUEGO113: renderer listo; cuadro=", espacio.W, espacio.H,
-		"cachePerezosa=", rendererDelMapa.CachePerezosa(), "cacheEnIndices=", rendererDelMapa.CacheDeIndices())
+		"cachePerezosa=", rendererDelMapa.CachePerezosa(), "cacheEnIndices=", rendererDelMapa.CacheDeIndices(),
+		"desalojoEnCuadros=", rendererDelMapa.DesalojoEnCuadros(),
+		"composicionAlVuelo=", rendererDelMapa.ComposicionAlVuelo())
 	censoDelTramo("despues-del-renderer")
 	memoria("despues-del-renderer")
 	semiespacio("despues-del-renderer")
@@ -750,7 +773,11 @@ func censoDelTramo(etapa string) {
 	println("JUEGO113: TRAMO", etapa, "activa=", e.Activa, "origen=", e.Origen, "bytes=", e.Bytes, "usado=", e.Usado,
 		"libre=", e.Libre, "imagenes=", e.Imagenes, "derrames=", e.Derrames, "bytesDerramados=", e.BytesDerramados,
 		"enPedazos=", e.EnPedazos, "pedazos=", e.Pedazos, "pedazoMenor=", e.PedazoMenor,
-		"pedazoMayor=", e.PedazoMayor, "techo=", e.Techo)
+		"pedazoMayor=", e.PedazoMayor, "techo=", e.Techo,
+		// DC-002.113b: el desalojo y la composicion al vuelo, que es lo que esta tarjeta mide
+		"desalojos=", e.Desalojos, "bytesDesalojados=", e.BytesDesalojados, "huecos=", e.Huecos,
+		"alVuelo=", e.AlVuelo, "bytesAlVuelo=", e.BytesAlVuelo, "agrandados=", e.Agrandados,
+		"cuadroDeLaCache=", rendererDelMapa.CuadroDeLaCache())
 }
 
 // instrumentoDeLasFuentes: el censo de la fuente (pedidos, liberados, vivos, prestamo) para el log.

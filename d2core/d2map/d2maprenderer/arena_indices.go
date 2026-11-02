@@ -102,11 +102,48 @@ type TramoDeLaCache struct {
 	pedazoMenor int
 	pedazoMayor int
 
+	// ============================== EL DESALOJO (DC-002.113b) ==============================
+	//
+	// LA CACHE ES DE SOLO AGREGAR Y ESO LA MATA (medido en DC-002.113). Con la camara siguiendo, cada celda nueva
+	// pide imagenes que no estaban (~26 KB cada una) y no hay nada que las devuelva: cuando el tramo se llena, el
+	// resto DERRAMA al monton de Go, donde el recolector no lo puede liberar. Medido en la corrida larga: 27
+	// derrames, 732.160 B y `fatal error: GC to-space overflow`.
+	//
+	// QUE ES UN HUECO. Una imagen de la cache ocupa un pedazo CONTIGUO de un bloque (`contenedor`, `desde`), y
+	// soltarla es devolver ESE pedazo: por eso el tramo se maneja como un monton de bloques con lista de huecos
+	// (y no "se tira el bloque entero"). Con bloques de 348.160 B y bloques de imagen de 20.480 a 71.680 B, tirar
+	// el bloque entero se llevaria por delante 10 imagenes vivas para hacer lugar a una.
+	//
+	// LOS HUECOS SE COSEN: dos pedazos vecinos del mismo bloque que vuelven se juntan en uno, si no el tramo se
+	// llena de agujeros de 8 B que no sirven para nada (la imagen mas chica de la cache son 20.480 B).
+	huecos []hueco
+
+	// los numeros del desalojo, para el censo y el log: cuantas imagenes se soltaron, cuantos bytes volvieron y
+	// cuantas se compusieron AL VUELO (sin cachear) cuando el tramo no tenia lugar.
+	desalojos        int
+	bytesDesalojados int
+	agrandamientos   int // huecos que se agrandaron soltando al vecino (la segunda pasada del desalojo)
+	alVuelo          int
+	bytesAlVuelo     int
+
 	usado           int
 	imagenes        int
 	derrames        int
 	bytesDerramados int
 }
+
+// hueco (DC-002.113b): un tramo de bytes del tramo que VOLVIO al monton cuando se desalojo una imagen de la cache.
+//
+// `contenedor` es el indice del bloque (0..len(pedazos)-1) o 0 en el tramo de UN GOLPE, donde hay un solo buffer:
+// el desalojo es el mismo en los dos modos, que es lo que evita tener dos caminos que se puedan separar.
+type hueco struct {
+	contenedor int
+	desde      int
+	hasta      int // exclusivo, como el corte de un slice
+}
+
+// Tamano: cuantos bytes se pueden repartir de este hueco.
+func (h hueco) Tamano() int { return h.hasta - h.desde }
 
 // Bytes: el tamano del tramo (lo que se pidio de una sola vez, o lo que lleva pedido el modo en pedazos).
 func (t *TramoDeLaCache) Bytes() int {
@@ -184,6 +221,14 @@ type CensoDelTramo struct {
 	Imagenes        int // imagenes servidas del tramo
 	Derrames        int // imagenes que no entraron y se pidieron por `make` (como siempre)
 	BytesDerramados int
+
+	// el desalojo (DC-002.113b)
+	Desalojos        int // imagenes que se soltaron para hacer lugar
+	BytesDesalojados int // bytes que volvieron al tramo
+	Huecos           int // pedazos devueltos esperando que los re-use una imagen
+	AlVuelo          int // imagenes compuestas al vuelo (sin cachear) porque el tramo no tenia lugar
+	BytesAlVuelo     int
+	Agrandados       int // huecos que hubo que agrandar soltando al vecino (segunda pasada del desalojo)
 }
 
 // ReservarTramoDeLaCache: UN buffer de `bytes` B para los pixeles de la cache en indices (DC-002.104, ADR 0001).
@@ -392,19 +437,25 @@ func (mr *MapRenderer) CensoDelTramo() CensoDelTramo {
 	}
 
 	return CensoDelTramo{
-		Activa:          true,
-		EnPedazos:       mr.tramo.EnPedazos(),
-		Origen:          mr.tramo.origenDeLosBloques(),
-		Pedazos:         mr.tramo.Pedazos(),
-		PedazoMenor:     mr.tramo.pedazoMenor,
-		PedazoMayor:     mr.tramo.pedazoMayor,
-		Techo:           mr.tramo.Techo(),
-		Bytes:           mr.tramo.Bytes(),
-		Usado:           mr.tramo.usado,
-		Libre:           mr.tramo.Bytes() - mr.tramo.usado,
-		Imagenes:        mr.tramo.imagenes,
-		Derrames:        mr.tramo.derrames,
-		BytesDerramados: mr.tramo.bytesDerramados,
+		Activa:           true,
+		EnPedazos:        mr.tramo.EnPedazos(),
+		Origen:           mr.tramo.origenDeLosBloques(),
+		Pedazos:          mr.tramo.Pedazos(),
+		PedazoMenor:      mr.tramo.pedazoMenor,
+		PedazoMayor:      mr.tramo.pedazoMayor,
+		Techo:            mr.tramo.Techo(),
+		Bytes:            mr.tramo.Bytes(),
+		Usado:            mr.tramo.usado,
+		Libre:            mr.tramo.Bytes() - mr.tramo.usado,
+		Imagenes:         mr.tramo.imagenes,
+		Derrames:         mr.tramo.derrames,
+		BytesDerramados:  mr.tramo.bytesDerramados,
+		Desalojos:        mr.tramo.desalojos,
+		BytesDesalojados: mr.tramo.bytesDesalojados,
+		Huecos:           len(mr.tramo.huecos),
+		AlVuelo:          mr.tramo.alVuelo,
+		BytesAlVuelo:     mr.tramo.bytesAlVuelo,
+		Agrandados:       mr.tramo.agrandamientos,
 	}
 }
 
@@ -413,61 +464,198 @@ func (mr *MapRenderer) CensoDelTramo() CensoDelTramo {
 // Con el tramo prendido, los pixeles son un pedazo del tramo (misma len, misma cap: nadie puede crecerlo, que
 // es lo que hace que dos imagenes no se pisen) y el decodificador del `.dt1` escribe adentro, igual que sobre
 // un `make`. Sin tramo -- o si no entra -- se pide un `make` de siempre.
+//
+// Es la forma corta de `pedirTrozoDeIndices` para el que no necesita saber DONDE quedo la imagen (el
+// decodificador del host y las pruebas del tramo).
 func (mr *MapRenderer) pedirIndicesDelTile(n int) []byte {
-	if n <= 0 {
-		return nil
-	}
-
-	if mr.tramo != nil {
-		// modo en pedazos (DC-002.106): el bloque lo elige `pedirDelTramoEnPedazos`, que devuelve nil si derrama
-		if mr.tramo.EnPedazos() {
-			if p := mr.pedirDelTramoEnPedazos(n); p != nil {
-				return p
-			}
-
-			return make([]byte, n)
-		}
-
-		if mr.tramo.usado+n <= len(mr.tramo.bytes) {
-			desde := mr.tramo.usado
-			mr.tramo.usado += n
-			mr.tramo.imagenes++
-
-			return mr.tramo.bytes[desde : desde+n : desde+n]
-		}
-
-		mr.tramo.derrames++
-		mr.tramo.bytesDerramados += n
-	}
-
-	return make([]byte, n)
+	return mr.pedirTrozoDeIndices(n, true).indices
 }
 
-// pedirDelTramoEnPedazos: busca el bloque donde entra la imagen de `n` B y devuelve su pedazo; si no hay
-// ninguno con lugar, PIDE un bloque nuevo (hasta el techo); si ya no hay techo, devuelve nil y la imagen se
-// pide con `make` como siempre.
+// trozoDeIndices: los bytes de una imagen de la cache y DONDE quedaron, que es lo que hace falta para poder
+// soltarla despues (DC-002.113b).
+type trozoDeIndices struct {
+	indices []byte
+
+	// contenedor: -1 = fuera del tramo (un `make`, o sea un derrame), -2 = el buffer AL VUELO (se pinta y no se
+	// cachea), >= 0 = el bloque del tramo donde vive la imagen. `desde` es el byte del bloque donde arranca.
+	contenedor int
+	desde      int
+}
+
+// pedirTrozoDeIndices: los `n` bytes de UNA imagen de la cache, con el tramo como monton de bloques y desalojo.
 //
-// POR QUE EL BLOQUE MAS JUSTO (best fit) Y NO EL DE EN CURSO. La cola de un bloque que no se llena se pierde,
-// y los tamanos de las imagenes de la cache son MUY distintos (20.480 B las comunes, hasta 71.680 las cuatro
-// grandes del pueblo): llenando el bloque en curso, una imagen que no entra en la cola abre otro bloque y deja
-// la cola muerta. Con el bloque mas justo, la imagen chica cae en la cola que le sirve y el desperdicio total
-// baja a la mitad, que es lo que decide si el tramo entra en el monton (DC-002.106: medido en el host, 61.440 B
-// de cola contra 148.480 del camino en curso para 11 bloques de 250 KB).
-func (mr *MapRenderer) pedirDelTramoEnPedazos(n int) []byte {
+// `cacheable` dice si la imagen PUEDE quedar en la cache: cuando no (una pieza de una secuencia animada que se
+// arma en la misma llamada que sus hermanas), el paso 4 no se usa y la imagen se derrama como siempre. Es la
+// unica excepcion, y existe porque el buffer al vuelo es UNO SOLO: dos imagenes armadas antes de pintar se
+// pisarian y el cuadro mostraria la ultima en las dos.
+//
+// EL ORDEN DE LAS SALIDAS ES LA POLITICA y esta escrito aca, en un solo lugar:
+//
+//  1. el tramo tiene lugar (hueco devuelto por un desalojo anterior, o lugar libre de un bloque) -> de ahi;
+//  2. no tiene: se pide un bloque nuevo, si el techo y el que reserva dan;
+//  3. no da: se DESALOJA (si la palanca esta puesta) las imagenes que no se usaron en los ultimos N cuadros y se
+//     vuelve a intentar -- es lo que convierte "solo agregar" en una cache que se queda quieta de tamano;
+//  4. sigue sin lugar: se compone AL VUELO sobre un buffer de trabajo, sin cachearla (si esa palanca esta
+//     puesta): cuesta decodificar el tile otra vez pero no crece nada;
+//  5. si no, se derrama al `make` de siempre y se cuenta (`Derrames`), que es el numero que dice cuanto falto.
+func (mr *MapRenderer) pedirTrozoDeIndices(n int, cacheable bool) trozoDeIndices {
+	if n <= 0 {
+		return trozoDeIndices{contenedor: -1}
+	}
+
+	t := mr.tramo
+	if t == nil {
+		// el camino de la PC y el de la consola sin tramo: una asignacion por imagen, como siempre
+		return trozoDeIndices{indices: make([]byte, n), contenedor: -1}
+	}
+
+	if b, cont, desde, ok := mr.pedirTrozoDelTramo(n); ok {
+		t.imagenes++
+
+		return trozoDeIndices{indices: b, contenedor: cont, desde: desde}
+	}
+
+	// 3. EL DESALOJO. Se sueltan las imagenes que no se usaron en los ultimos `desalojoEnCuadros` cuadros, de la
+	// mas vieja a la mas nueva, hasta que la imagen nueva entre. Si con todo lo viejo suelto no entra, sigue.
+	if mr.desalojoEnCuadros > 0 && mr.desalojarDeLaCache(n) {
+		if b, cont, desde, ok := mr.pedirTrozoDelTramo(n); ok {
+			t.imagenes++
+
+			return trozoDeIndices{indices: b, contenedor: cont, desde: desde}
+		}
+	}
+
+	// 4. AL VUELO: el buffer de trabajo del renderer, sin cachear. El que llama tiene que decir que esta imagen no
+	// va a la cache (`contenedor == -2`), si no el mapa se queda con un puntero a un buffer que se reusa.
+	if mr.componerAlVuelo && cacheable {
+		if b := mr.bufferAlVuelo(n); b != nil {
+			t.alVuelo++
+			t.bytesAlVuelo += n
+
+			return trozoDeIndices{indices: b, contenedor: contenedorAlVuelo}
+		}
+	}
+
+	// 5. el derrame de siempre: el numero que dice cuanto habria que agrandar el tramo
+	t.derrames++
+	t.bytesDerramados += n
+
+	return trozoDeIndices{indices: make([]byte, n), contenedor: -1}
+}
+
+// contenedorAlVuelo: el `contenedor` de un trozo que salio del buffer de trabajo y NO va a la cache.
+const contenedorAlVuelo = -2
+
+// pedirTrozoDelTramo: un pedazo de `n` B del tramo, sin desalojo. Primero de lo que ya esta pedido (huecos
+// devueltos y lugar libre de los bloques) y despues de un bloque NUEVO, si el techo y el que reserva dan.
+func (mr *MapRenderer) pedirTrozoDelTramo(n int) (trozo []byte, contenedor, desde int, ok bool) {
 	t := mr.tramo
 
-	if !t.EnPedazos() {
+	if t == nil || n <= 0 {
+		return nil, -1, 0, false
+	}
+
+	if b, cont, desde, ok := t.darTrozo(n); ok {
+		return b, cont, desde, true
+	}
+
+	if !t.pedirBloqueNuevo(n) {
+		return nil, -1, 0, false
+	}
+
+	return t.darTrozo(n)
+}
+
+// darTrozo: reparte `n` B de lo que el tramo YA tiene: un hueco devuelto (best fit) o el lugar libre del bloque
+// mas justo (en el tramo de un solo golpe, el final del buffer).
+//
+// POR QUE BEST FIT SOBRE LOS HUECOS Y TAMBIEN SOBRE LOS BLOQUES. Los tamanos de las imagenes son MUY distintos
+// (20.480 B las comunes, hasta 71.680 las cuatro grandes del pueblo): la imagen chica tiene que caer en el hueco
+// chico, si no el hueco grande se parte y las grandes se quedan sin lugar (medido en DC-002.106: el best fit
+// sobre los bloques bajo el desperdicio a la mitad).
+func (t *TramoDeLaCache) darTrozo(n int) (trozo []byte, contenedor, desde int, ok bool) {
+	if t == nil || n <= 0 {
+		return nil, -1, 0, false
+	}
+
+	if h := t.huecoQueEntra(n); h >= 0 {
+		hu := t.huecos[h]
+		desde := hu.desde
+
+		if hu.Tamano() == n {
+			t.huecos = append(t.huecos[:h], t.huecos[h+1:]...)
+		} else {
+			t.huecos[h].desde += n
+		}
+
+		bloque := t.contenedor(hu.contenedor)
+		t.usado += n
+
+		return bloque[desde : desde+n : desde+n], hu.contenedor, desde, true
+	}
+
+	if t.pedazo > 0 {
+		if i := t.bloqueQueEntra(n); i >= 0 {
+			desde = t.usadoEn[i]
+			t.usadoEn[i] += n
+			t.usado += n
+
+			return t.pedazos[i][desde : desde+n : desde+n], i, desde, true
+		}
+
+		return nil, -1, 0, false
+	}
+
+	if t.usado+n <= len(t.bytes) {
+		desde = t.usado
+		t.usado += n
+
+		return t.bytes[desde : desde+n : desde+n], 0, desde, true
+	}
+
+	return nil, -1, 0, false
+}
+
+// contenedor: el buffer `i` del tramo -- el unico (modo de un golpe) o el bloque `i` (modo en pedazos).
+func (t *TramoDeLaCache) contenedor(i int) []byte {
+	if t == nil || i < 0 {
 		return nil
 	}
 
-	// una imagen sola mas grande que un bloque no cabe con este plan: se pide como siempre y se cuenta
-	if n > t.pedazo {
-		t.derrames++
-		t.bytesDerramados += n
+	if t.pedazo > 0 {
+		if i >= len(t.pedazos) {
+			return nil
+		}
 
-		return nil
+		return t.pedazos[i]
 	}
 
+	if i == 0 {
+		return t.bytes
+	}
+
+	return nil
+}
+
+// huecoQueEntra: el hueco MAS JUSTO donde entra una imagen de `n` B (-1 si no hay ninguno).
+func (t *TramoDeLaCache) huecoQueEntra(n int) int {
+	mejor := -1
+
+	for i := range t.huecos {
+		if t.huecos[i].Tamano() < n {
+			continue
+		}
+
+		if mejor < 0 || t.huecos[i].Tamano() < t.huecos[mejor].Tamano() {
+			mejor = i
+		}
+	}
+
+	return mejor
+}
+
+// bloqueQueEntra: el bloque con lugar de sobra MAS JUSTO para una imagen de `n` B (-1 si no hay ninguno).
+func (t *TramoDeLaCache) bloqueQueEntra(n int) int {
 	mejor := -1
 
 	for i := range t.pedazos {
@@ -481,65 +669,125 @@ func (mr *MapRenderer) pedirDelTramoEnPedazos(n int) []byte {
 		}
 	}
 
-	if mejor < 0 {
-		restante := t.total - t.pedido
-		if restante <= UmbralDelObjetoGrande {
-			// no se pide un bloque que iria al semiespacio del recolector: seria un derrame disfrazado
-			t.derrames++
-			t.bytesDerramados += n
+	return mejor
+}
 
-			return nil
+// hayLugarPara: si una imagen de `n` B entraria en lo que el tramo YA tiene (sin pedir un bloque nuevo). Es lo
+// que consulta el desalojo para saber si puede parar de soltar imagenes.
+func (t *TramoDeLaCache) hayLugarPara(n int) bool {
+	if t == nil || n <= 0 {
+		return false
+	}
+
+	if t.huecoQueEntra(n) >= 0 {
+		return true
+	}
+
+	if t.pedazo > 0 {
+		return t.bloqueQueEntra(n) >= 0
+	}
+
+	return t.usado+n <= len(t.bytes)
+}
+
+// pedirBloqueNuevo: pide un bloque NUEVO (al que reserva, o un `make`) y lo deja listo para repartir. Devuelve
+// false si la imagen no entra en un bloque (`n > pedazo`), si el techo ya no da o si el que reserva no tenia
+// lugar: en los tres casos el que llama desaloja, compone al vuelo, o derrama.
+func (t *TramoDeLaCache) pedirBloqueNuevo(n int) bool {
+	if t == nil || t.pedazo <= 0 || n <= 0 || n > t.pedazo {
+		return false
+	}
+
+	restante := t.total - t.pedido
+	if restante <= UmbralDelObjetoGrande {
+		// no se pide un bloque que iria al semiespacio del recolector: seria un derrame disfrazado
+		return false
+	}
+
+	tam := t.pedazo
+	if restante < tam {
+		tam = restante
+	}
+
+	// DC-002.106: el tamano lo dice el monton. Se pide el mayor bloque servible de hasta `tam`; si ni el mas
+	// chico que sirve entra la imagen, se derrama (`make` como siempre) en vez de tirar el runtime.
+	if t.servible != nil {
+		s := t.servible(tam)
+		if s < n || s <= UmbralDelObjetoGrande {
+			return false
 		}
 
-		tam := t.pedazo
-		if restante < tam {
-			tam = restante
+		tam = s
+	}
+
+	// DC-002.108: el bloque lo da el reservador si hay uno (la VRAM del PVR, en la consola). Si el reservador no
+	// tenia lugar, la imagen se derrama al `make` de siempre: no se tira el runtime.
+	bloque := t.nuevoBloque(tam)
+	if bloque == nil {
+		return false
+	}
+
+	t.pedazos = append(t.pedazos, bloque)
+	t.usadoEn = append(t.usadoEn, 0)
+	t.pedido += len(bloque)
+
+	if t.pedazoMenor == 0 || len(bloque) < t.pedazoMenor {
+		t.pedazoMenor = len(bloque)
+	}
+
+	if len(bloque) > t.pedazoMayor {
+		t.pedazoMayor = len(bloque)
+	}
+
+	return true
+}
+
+// devolverHueco (DC-002.113b): devuelve al tramo el pedazo `[desde, hasta)` del bloque `contenedor` y lo COSE con
+// los huecos vecinos del mismo bloque, para que el tramo no se llene de agujeros que no sirven para una imagen.
+//
+// POR QUE SE COSE. Las imagenes de la cache son de 20.480 a 71.680 B y se soltan de a una; sin coser, un bloque
+// que tuvo 12 imagenes y solto 6 queda con 6 huecos del tamano de cada una (y la imagen que viene puede pedir el
+// doble). Cosiendo, dos vecinas sueltas son un solo hueco del tamano de las dos, que es como se rearma el bloque
+// mientras la camara se aleja.
+func (t *TramoDeLaCache) devolverHueco(contenedor, desde, hasta int) {
+	if t == nil || contenedor < 0 || hasta <= desde {
+		return
+	}
+
+	nuevo := hueco{contenedor: contenedor, desde: desde, hasta: hasta}
+
+	// se cose con el hueco que TERMINA justo donde arranca este y con el que ARRANCA justo donde termina
+	for i := 0; i < len(t.huecos); i++ {
+		h := t.huecos[i]
+		if h.contenedor != contenedor {
+			continue
 		}
 
-		// DC-002.106: el tamano lo dice el monton. Se pide el mayor bloque servible de hasta `tam`; si ni el
-		// mas chico que sirve entra la imagen, se derrama (`make` como siempre) en vez de tirar el runtime.
-		if t.servible != nil {
-			s := t.servible(tam)
-			if s < n || s <= UmbralDelObjetoGrande {
-				t.derrames++
-				t.bytesDerramados += n
+		if h.hasta == nuevo.desde {
+			nuevo.desde = h.desde
+			t.huecos = append(t.huecos[:i], t.huecos[i+1:]...)
+			i = -1 // vuelve a empezar: el que se acaba de coser puede tener otro vecino
 
-				return nil
-			}
-
-			tam = s
+			continue
 		}
 
-		// DC-002.108: el bloque lo da el reservador si hay uno (la VRAM del PVR, en la consola). Si el
-		// reservador no tenia lugar, la imagen se derrama al `make` de siempre: no se tira el runtime.
-		bloque := t.nuevoBloque(tam)
-		if bloque == nil {
-			t.derrames++
-			t.bytesDerramados += n
-
-			return nil
-		}
-
-		t.pedazos = append(t.pedazos, bloque)
-		t.usadoEn = append(t.usadoEn, 0)
-		t.pedido += len(bloque)
-		mejor = len(t.pedazos) - 1
-
-		if t.pedazoMenor == 0 || len(bloque) < t.pedazoMenor {
-			t.pedazoMenor = len(bloque)
-		}
-
-		if len(bloque) > t.pedazoMayor {
-			t.pedazoMayor = len(bloque)
+		if h.desde == nuevo.hasta {
+			nuevo.hasta = h.hasta
+			t.huecos = append(t.huecos[:i], t.huecos[i+1:]...)
+			i = -1
 		}
 	}
 
-	desde := t.usadoEn[mejor]
-	t.usadoEn[mejor] += n
-	t.usado += n
-	t.imagenes++
+	t.huecos = append(t.huecos, nuevo)
+}
 
-	return t.pedazos[mejor][desde : desde+n : desde+n]
+// Desalojos: cuantas imagenes se soltaron de la cache para hacer lugar (0 si la palanca esta apagada).
+func (t *TramoDeLaCache) Desalojos() int {
+	if t == nil {
+		return 0
+	}
+
+	return t.desalojos
 }
 
 // limpiarLosBloquesDelTramo (DC-002.109): deja en cero cada bloque vivo del tramo, por el camino que el que
@@ -589,6 +837,14 @@ func (mr *MapRenderer) reiniciarTramo() {
 	for i := range mr.tramo.usadoEn {
 		mr.tramo.usadoEn[i] = 0
 	}
+
+	// DC-002.113b: los huecos y los numeros del desalojo son del nivel que se fue
+	mr.tramo.huecos = mr.tramo.huecos[:0]
+	mr.tramo.desalojos = 0
+	mr.tramo.bytesDesalojados = 0
+	mr.tramo.alVuelo = 0
+	mr.tramo.bytesAlVuelo = 0
+	mr.tramo.agrandamientos = 0
 
 	mr.tramo.usado = 0
 	mr.tramo.imagenes = 0

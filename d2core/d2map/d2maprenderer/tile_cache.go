@@ -31,6 +31,8 @@ func (mr *MapRenderer) resetLevelCaches() {
 	// DC-002.101: la cache de indices y la paleta expandida son del mismo nivel (la paleta cambia por acto).
 	mr.indicesCacheRecords = nil
 	mr.paletaDeIndices = nil
+	// DC-002.113b: el slot de la imagen compuesta al vuelo es de un cuadro, y el cuadro se fue con el nivel
+	mr.recogidaAlVuelo = nil
 	// DC-002.104: el tramo de la cache tampoco se libera (en la consola el monton externo no se devuelve): se
 	// reusa desde el byte 0, que es lo mismo que decir que el nivel nuevo pide sus imagenes de nuevo.
 	mr.reiniciarTramo()
@@ -165,12 +167,17 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 		tileYOffset := d2math.AbsInt32(tileYMinimum)
 		tileHeight := d2math.AbsInt32(tileData[i].Height)
 
-		indexData := mr.pedirIndicesDelTile(int(tileData[i].Width * tileHeight))
+		// DC-002.113b: el trozo dice DONDE quedo la imagen, que es lo que despues permite desalojarla.
+		// `cacheable` es falso para las animadas: arman varias imagenes en la MISMA llamada y el buffer al
+		// vuelo es uno solo (se pisarian entre ellas antes de pintarse).
+		trozo := mr.pedirTrozoDeIndices(int(tileData[i].Width*tileHeight), len(tileData) == 1)
+		indexData := trozo.indices
 		d2dt1.DecodeTileGfxData(tileData[i].Blocks, &indexData, tileYOffset, tileData[i].Width)
 
 		if mr.cacheEnIndices {
 			mr.setCacheDeIndices(tile.Style, tile.Sequence, 0, tileIndex, &imagenDeIndices{
 				indices: indexData, ancho: int(tileData[i].Width), alto: int(tileHeight), paleta: mr.paletaEnRGBA(),
+				contenedor: trozo.contenedor, desde: trozo.desde,
 			})
 
 			continue
@@ -224,12 +231,14 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 		return
 	}
 
-	indexData := mr.pedirIndicesDelTile(int(tileData.Width) * tileHeight)
+	trozo := mr.pedirTrozoDeIndices(int(tileData.Width)*tileHeight, true)
+	indexData := trozo.indices
 	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileData.Width)
 
 	if mr.cacheEnIndices {
 		mr.setCacheDeIndices(tile.Style, tile.Sequence, int(d2enum.TileShadow), tile.RandomIndex, &imagenDeIndices{
 			indices: indexData, ancho: int(tileData.Width), alto: tileHeight, paleta: mr.paletaEnRGBA(),
+			contenedor: trozo.contenedor, desde: trozo.desde,
 		})
 
 		return
@@ -320,7 +329,9 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 		return
 	}
 
-	indexData := mr.pedirIndicesDelTile(int(tileSurfaceWidth * realHeight))
+	trozo := mr.pedirTrozoDeIndices(int(tileSurfaceWidth*realHeight), true)
+
+	indexData := trozo.indices
 
 	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileSurfaceWidth)
 
@@ -331,6 +342,7 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 	if mr.cacheEnIndices {
 		mr.setCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex, &imagenDeIndices{
 			indices: indexData, ancho: tileSurfaceWidth, alto: int(realHeight), paleta: mr.paletaEnRGBA(),
+			contenedor: trozo.contenedor, desde: trozo.desde,
 		})
 
 		return

@@ -216,6 +216,11 @@ pisa_bool() {  # $1 = nombre, $2 = lo que vino del entorno (0/1/true/false) -> p
 [ -n "${INYECTAR:-}" ] && pisa_bool inyectarGuion "$INYECTAR"
 [ -n "${UMBRAL_GC:-}" ] && pisa_knob umbralDelRecolector "$UMBRAL_GC"
 
+# LAS DE DC-002.113b (el desalojo de la cache y la otra politica)
+[ -n "${DESALOJO:-}" ] && pisa_knob desalojoEnCuadros "$DESALOJO"
+[ -n "${AL_VUELO:-}" ] && pisa_bool componerAlVuelo "$AL_VUELO"
+[ -n "${BUFFER_VUELO:-}" ] && pisa_knob bufferDelVuelo "$BUFFER_VUELO"
+
 echo "   soltarDespuesDeComponer=$(leer_knob soltarDespuesDeComponer) cacheEnVram=$(leer_knob cacheEnVram) tramoDeLaCache=$(leer_knob tramoDeLaCache) tramoEnPedazos=$(leer_knob tramoEnPedazos) pedazoLoDiceElMonton=$(leer_knob pedazoLoDiceElMonton) tramoAlArranque=$(leer_knob tramoAlArranque)"
 echo "   JUGADOR=$(leer_knob jugadorKnob) modoQuieto=$(leer_knob modoQuieto) modoCaminando=$(leer_knob modoCaminando) dirsCaminando=$(leer_knob dirsCaminando) camara=$(leer_knob camara) inyectarGuion=$(leer_knob inyectarGuion) cuadros=$(leer_knob cuadros) arenaDelDS1=$(leer_knob arenaDelDS1)"
 

@@ -1,0 +1,1318 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:048 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:293 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:395 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:395 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:399 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:403 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:417 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fba94520000 RAM(16 MB) 0x7fbaa0520000 VRAM64(8 MB) 0x7fba98520000 ARAM(2 MB) 0x7fbab4520000
+00:00:423 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:430 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fba94520000 RAM(16 MB) 0x7fbaa0520000 VRAM64(8 MB) 0x7fba98520000 ARAM(2 MB) 0x7fbab4520000
+00:00:434 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:437 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:438 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:522 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:522 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:522 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac565320
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+Rom disk image at 0x0 is not a ROMFS image
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2354556928
+ARQ-MARCA   gc_init-semiespacio0 v=2354553664
+ARQ-MARCA   gc_init-semiespacio1 v=2356388704
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=1888 cused=3828992 gsemi=196072/1835008 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+JUEGO113: arranca DC-002.113 -- el control mueve al jugador y la camara lo sigue
+JUEGO113: cuadros= 46 jugador= encendido camara= siguiendo modoCaminando= TW msCaminando= 40 dirsCaminando= 8 inyectarGuion= false tramoDeLaCache= 4526080 cacheEnVram= true orden= prestamo
+JUEGO113: MEMORIA al-arrancar usado= 3830024 libre= 856 arena= 3830880 sbrk= -1936674816 techo= -1929445376 pico= 3830024
+JUEGO113: SEMIESPACIO al-arrancar usado= 202992 total= 1835008 pct= 11 colecciones= 0
+JUEGO113: VRAM al-arrancar total= 8388608 disponible= 0 pedida= 0 pedidos= 0 pedidoMayor= 0 lienzo= 0
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+JUEGO113: PVR andando; vram de la textura del cuadro= 1048576
+JUEGO113: MEMORIA despues-del-video usado= 3830048 libre= 832 arena= 3830880 sbrk= -1936674816 techo= -1929445376 pico= 3830048
+JUEGO113: VRAM despues-del-video total= 8388608 disponible= 4740808 pedida= 0 pedidos= 0 pedidoMayor= 0 lienzo= 0
+JUEGO113: PRUEBA VRAM bytes= 348160 malos= 0 primeroMal= -1 leido= 3 esperado= 3
+JUEGO113: el tramo de la cache se pide EN PEDAZOS (techo= 4526080 pedazo= 348160 ): no se reserva nada al arranque (DC-002.106)
+JUEGO113: MEMORIA despues-del-tramo-de-la-cache usado= 3830048 libre= 832 arena= 3830880 sbrk= -1936674816 techo= -1929445376 pico= 3830048
+JUEGO113: ARENA DEL DS1 palanca= apagado encendida= false conLiberador= false bytesPorCelda= 20
+JUEGO113: SCRATCH DE LECTURA porArchivo= true liberador= true
+JUEGO113: TRAMO DEL ARENA DE BLOQUES porElMonton= true sondaInstalada= true
+JUEGO113: TRAMOS AL CAMBIAR DE NIVEL seDevuelven= true
+JUEGO113: tablasPorLaFuente= true liberadorDeExternos= true
+JUEGO113: MEMORIA despues-de-arrancar-como-consola usado= 3830048 libre= 832 arena= 3830880 sbrk= -1936674816 techo= -1929445376 pico= 3830048
+JUEGO113: assetmanager listo
+JUEGO113: MEMORIA despues-del-assetmanager usado= 3830048 libre= 832 arena= 3830880 sbrk= -1936674816 techo= -1929445376 pico= 3830048
+fs_iso9660: disc change detected
+JUEGO113: fuente registrada /cd/JUEGO/D2DATA.MPQ
+JUEGO113: fuente registrada /cd/JUEGO/PATCH_D2.MPQ
+JUEGO113: fuentes en el loader= 2
+JUEGO113: MEMORIA despues-de-las-fuentes usado= 4185376 libre= 1856 arena= 4187232 sbrk= -1936318464 techo= -1929445376 pico= 4185376
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=1856 cused=4185376 gsemi=375080/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=1856 cused=4185376 gsemi=450304/1835008 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=1856 cused=4185376 gsemi=460656/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=1856 cused=4185376 gsemi=554648/1835008 gc=0
+JUEGO113: TABLA fuente /data/global/excel/LvlTypes.txt bytes= 10719 montonDelta= 0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=2080 cused=4320320 gsemi=556640/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=2080 cused=4320320 gsemi=693344/1835008 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=2080 cused=4320320 gsemi=701152/1835008 gc=0
+ARQ-MARCA gc-externo-con-punteros v=108032
+ARQ-MARCA gc-por-umbral-bytes-usados v=1376272
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=422376
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=1552 cused=4644432 gsemi=1234184/1835008 gc=1
+JUEGO113: TABLA fuente /data/global/excel/LvlPrest.txt bytes= 134937 montonDelta= 459056
+JUEGO113: tablas cargadas= 2 de 2
+JUEGO113: FUENTE despues-de-las-tablas /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 0 pedidos= 0 liberados= 0 vivos= 0 prestamos= 0 prestamosLib= 0 prestamoReservado= 0
+JUEGO113: FUENTE despues-de-las-tablas /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 134937 prestamos= 2 prestamosLib= 1 prestamoReservado= 12560
+JUEGO113: MEMORIA despues-de-las-tablas usado= 4644432 libre= 1552 arena= 4645984 sbrk= -1935859712 techo= -1929445376 pico= 4644432
+JUEGO113: LECTURAS soltadas; tramoAntes= 134937 pedidos= 2 reusos= 0 liberados= 2
+JUEGO113: MEMORIA despues-de-soltar-las-lecturas-de-las-tablas usado= 4509488 libre= 136496 arena= 4645984 sbrk= -1935859712 techo= -1929445376 pico= 4644432
+JUEGO113: MEMORIA jugador-antes usado= 4509488 libre= 136496 arena= 4645984 sbrk= -1935859712 techo= -1929445376 pico= 4644432
+JUEGO113: SEMIESPACIO jugador-antes usado= 1234208 total= 1835008 pct= 67 colecciones= 1
+JUEGO113: JUGADOR PALETA data/global/palette/Units/pal.dat bytes= 768 ok= true primero= 0 0 36
+JUEGO113: JUGADOR MPQ-ABRIR OK /cd/JUEGO/D2CHAR.MPQ montonLibre= 135320
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amnuhth.cof bytes= 1132 crc32= -1586366007 capas= 8 framesPorDir= 8 dirs= 16 speed= 128 modo= NU
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITNU1ht.dcc bytes= 10931 crc32= -285135428
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=529384
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITNU1ht.dcc bytes= 12765 crc32= 1313645261
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=532504
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITNU1ht.dcc bytes= 37659 crc32= -1942805256
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=557552
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITNUhth.dcc bytes= 10986 crc32= 261487157
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=530984
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITNU1ht.dcc bytes= 3781 crc32= -1515348470
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=523880
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITNU1ht.dcc bytes= 4902 crc32= -464454664
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=525104
+JUEGO112: CAPA SH SIN-GRAFICO modo= NU dir= 0
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITNU1ht.dcc bytes= 17401 crc32= 320674826
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=537712
+JUEGO113: JUGADOR ARENA modo= NU dir= 0 pedidos= 133 entregado= 86208 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= NU dir= 0 cuadro= 0 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 896 crc32= 1857478036 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= NU dir= 0 cuadro= 1 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 889 crc32= 2138394951 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= NU dir= 0 cuadro= 2 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 898 crc32= -504501218 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= NU dir= 0 cuadro= 3 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 897 crc32= 1891057005 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= NU dir= 0 cuadro= 4 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 906 crc32= -589591081 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= NU dir= 0 cuadro= 5 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 914 crc32= 1415443346 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= NU dir= 0 cuadro= 6 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 917 crc32= -578869339 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= NU dir= 0 cuadro= 7 de 8 caja= 26 x 79 esquina= -18 -65 pixeles= 902 crc32= 127741840 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=533192
+JUEGO113: JUGADOR DIRECCIONES de la cruceta 8 compuestas 8
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amtwhth.cof bytes= 1132 crc32= 1525369398 capas= 8 framesPorDir= 8 dirs= 16 speed= 0 modo= TW
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITTW1ht.dcc bytes= 11519 crc32= 1704162016
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=547216
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITTW1ht.dcc bytes= 13303 crc32= -1332173323
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=550272
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITTW1ht.dcc bytes= 41867 crc32= 1320539230
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=578944
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITTWhth.dcc bytes= 11999 crc32= -269866101
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=549176
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITTW1ht.dcc bytes= 4035 crc32= -98874654
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=541320
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITTW1ht.dcc bytes= 5190 crc32= -962682388
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=542576
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITTW1ht.dcc bytes= 18467 crc32= -7738502
+ARQ-MARCA gc_collect v=16
+ARQ-MARCA gc-vivo v=555960
+JUEGO112: CAPA SH SIN-GRAFICO modo= TW dir= 7
+JUEGO113: JUGADOR ARENA modo= TW dir= 7 pedidos= 133 entregado= 97744 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= TW dir= 7 cuadro= 0 de 8 caja= 34 x 73 esquina= -15 -64 pixeles= 959 crc32= -326218328 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 7 cuadro= 1 de 8 caja= 34 x 73 esquina= -15 -64 pixeles= 924 crc32= -1923120840 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 7 cuadro= 2 de 8 caja= 34 x 73 esquina= -15 -64 pixeles= 803 crc32= -1753757831 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 7 cuadro= 3 de 8 caja= 34 x 73 esquina= -15 -64 pixeles= 928 crc32= -586829995 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 7 cuadro= 4 de 8 caja= 34 x 73 esquina= -15 -64 pixeles= 963 crc32= 73285519 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 7 cuadro= 5 de 8 caja= 34 x 73 esquina= -15 -64 pixeles= 937 crc32= -267677382 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 7 cuadro= 6 de 8 caja= 34 x 73 esquina= -15 -64 pixeles= 815 crc32= 2096301092 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 7 cuadro= 7 de 8 caja= 34 x 73 esquina= -15 -64 pixeles= 917 crc32= -757361542 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=17
+ARQ-MARCA gc-vivo v=553832
+JUEGO113: JUGADOR DIR 7 cuadros= 8 caja= 34 x 73 indices= 19856
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amtwhth.cof bytes= 1132 crc32= 1525369398 capas= 8 framesPorDir= 8 dirs= 16 speed= 0 modo= TW
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITTW1ht.dcc bytes= 11519 crc32= 1704162016
+ARQ-MARCA gc_collect v=18
+ARQ-MARCA gc-vivo v=567632
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITTW1ht.dcc bytes= 13303 crc32= -1332173323
+ARQ-MARCA gc_collect v=19
+ARQ-MARCA gc-vivo v=570688
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITTW1ht.dcc bytes= 41867 crc32= 1320539230
+ARQ-MARCA gc_collect v=20
+ARQ-MARCA gc-vivo v=599360
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITTWhth.dcc bytes= 11999 crc32= -269866101
+ARQ-MARCA gc_collect v=21
+ARQ-MARCA gc-vivo v=569592
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITTW1ht.dcc bytes= 4035 crc32= -98874654
+ARQ-MARCA gc_collect v=22
+ARQ-MARCA gc-vivo v=561736
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITTW1ht.dcc bytes= 5190 crc32= -962682388
+ARQ-MARCA gc_collect v=23
+ARQ-MARCA gc-vivo v=562992
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITTW1ht.dcc bytes= 18467 crc32= -7738502
+ARQ-MARCA gc_collect v=24
+ARQ-MARCA gc-vivo v=576376
+JUEGO112: CAPA SH SIN-GRAFICO modo= TW dir= 4
+JUEGO113: JUGADOR ARENA modo= TW dir= 4 pedidos= 133 entregado= 70560 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= TW dir= 4 cuadro= 0 de 8 caja= 27 x 82 esquina= -15 -69 pixeles= 1094 crc32= 229714959 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 4 cuadro= 1 de 8 caja= 27 x 82 esquina= -15 -69 pixeles= 1095 crc32= -122050520 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 4 cuadro= 2 de 8 caja= 27 x 82 esquina= -15 -69 pixeles= 1104 crc32= 1373239381 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 4 cuadro= 3 de 8 caja= 27 x 82 esquina= -15 -69 pixeles= 1110 crc32= 425699367 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 4 cuadro= 4 de 8 caja= 27 x 82 esquina= -15 -69 pixeles= 1112 crc32= -1707467459 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 4 cuadro= 5 de 8 caja= 27 x 82 esquina= -15 -69 pixeles= 1115 crc32= 280023817 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 4 cuadro= 6 de 8 caja= 27 x 82 esquina= -15 -69 pixeles= 1114 crc32= -894758974 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 4 cuadro= 7 de 8 caja= 27 x 82 esquina= -15 -69 pixeles= 1096 crc32= 1675856798 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=25
+ARQ-MARCA gc-vivo v=572072
+JUEGO113: JUGADOR DIR 4 cuadros= 8 caja= 27 x 82 indices= 17712
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amtwhth.cof bytes= 1132 crc32= 1525369398 capas= 8 framesPorDir= 8 dirs= 16 speed= 0 modo= TW
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITTW1ht.dcc bytes= 11519 crc32= 1704162016
+ARQ-MARCA gc_collect v=26
+ARQ-MARCA gc-vivo v=585896
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITTW1ht.dcc bytes= 13303 crc32= -1332173323
+ARQ-MARCA gc_collect v=27
+ARQ-MARCA gc-vivo v=588952
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITTW1ht.dcc bytes= 41867 crc32= 1320539230
+ARQ-MARCA gc_collect v=28
+ARQ-MARCA gc-vivo v=617624
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITTWhth.dcc bytes= 11999 crc32= -269866101
+ARQ-MARCA gc_collect v=29
+ARQ-MARCA gc-vivo v=587856
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITTW1ht.dcc bytes= 4035 crc32= -98874654
+ARQ-MARCA gc_collect v=30
+ARQ-MARCA gc-vivo v=580000
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITTW1ht.dcc bytes= 5190 crc32= -962682388
+ARQ-MARCA gc_collect v=31
+ARQ-MARCA gc-vivo v=581256
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITTW1ht.dcc bytes= 18467 crc32= -7738502
+ARQ-MARCA gc_collect v=32
+ARQ-MARCA gc-vivo v=594640
+JUEGO112: CAPA SH SIN-GRAFICO modo= TW dir= 1
+JUEGO113: JUGADOR ARENA modo= TW dir= 1 pedidos= 133 entregado= 89448 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= TW dir= 1 cuadro= 0 de 8 caja= 30 x 74 esquina= -15 -64 pixeles= 971 crc32= 2027281168 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 1 cuadro= 1 de 8 caja= 30 x 74 esquina= -15 -64 pixeles= 983 crc32= -1480576782 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 1 cuadro= 2 de 8 caja= 30 x 74 esquina= -15 -64 pixeles= 1048 crc32= -440868162 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 1 cuadro= 3 de 8 caja= 30 x 74 esquina= -15 -64 pixeles= 976 crc32= -1649650334 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 1 cuadro= 4 de 8 caja= 30 x 74 esquina= -15 -64 pixeles= 1017 crc32= -1703726953 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 1 cuadro= 5 de 8 caja= 30 x 74 esquina= -15 -64 pixeles= 990 crc32= -585974601 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 1 cuadro= 6 de 8 caja= 30 x 74 esquina= -15 -64 pixeles= 1007 crc32= -1408012386 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 1 cuadro= 7 de 8 caja= 30 x 74 esquina= -15 -64 pixeles= 1000 crc32= -1535251332 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=33
+ARQ-MARCA gc-vivo v=590360
+JUEGO113: JUGADOR DIR 1 cuadros= 8 caja= 30 x 74 indices= 17760
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amtwhth.cof bytes= 1132 crc32= 1525369398 capas= 8 framesPorDir= 8 dirs= 16 speed= 0 modo= TW
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITTW1ht.dcc bytes= 11519 crc32= 1704162016
+ARQ-MARCA gc_collect v=34
+ARQ-MARCA gc-vivo v=604152
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITTW1ht.dcc bytes= 13303 crc32= -1332173323
+ARQ-MARCA gc_collect v=35
+ARQ-MARCA gc-vivo v=607208
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITTW1ht.dcc bytes= 41867 crc32= 1320539230
+ARQ-MARCA gc_collect v=36
+ARQ-MARCA gc-vivo v=635880
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITTWhth.dcc bytes= 11999 crc32= -269866101
+ARQ-MARCA gc_collect v=37
+ARQ-MARCA gc-vivo v=606112
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITTW1ht.dcc bytes= 4035 crc32= -98874654
+ARQ-MARCA gc_collect v=38
+ARQ-MARCA gc-vivo v=598256
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITTW1ht.dcc bytes= 5190 crc32= -962682388
+ARQ-MARCA gc_collect v=39
+ARQ-MARCA gc-vivo v=599512
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITTW1ht.dcc bytes= 18467 crc32= -7738502
+ARQ-MARCA gc_collect v=40
+ARQ-MARCA gc-vivo v=612896
+JUEGO112: CAPA SH SIN-GRAFICO modo= TW dir= 8
+JUEGO113: JUGADOR ARENA modo= TW dir= 8 pedidos= 133 entregado= 84144 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= TW dir= 8 cuadro= 0 de 8 caja= 28 x 82 esquina= -15 -69 pixeles= 1055 crc32= -931740599 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 8 cuadro= 1 de 8 caja= 28 x 82 esquina= -15 -69 pixeles= 1068 crc32= 1858539620 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 8 cuadro= 2 de 8 caja= 28 x 82 esquina= -15 -69 pixeles= 1108 crc32= 1272082601 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 8 cuadro= 3 de 8 caja= 28 x 82 esquina= -15 -69 pixeles= 1102 crc32= -356611079 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 8 cuadro= 4 de 8 caja= 28 x 82 esquina= -15 -69 pixeles= 1095 crc32= -1558677315 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 8 cuadro= 5 de 8 caja= 28 x 82 esquina= -15 -69 pixeles= 1108 crc32= 2129677988 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 8 cuadro= 6 de 8 caja= 28 x 82 esquina= -15 -69 pixeles= 1113 crc32= 1462797868 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 8 cuadro= 7 de 8 caja= 28 x 82 esquina= -15 -69 pixeles= 1077 crc32= 1898360863 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=41
+ARQ-MARCA gc-vivo v=609232
+JUEGO113: JUGADOR DIR 8 cuadros= 8 caja= 28 x 82 indices= 18368
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amtwhth.cof bytes= 1132 crc32= 1525369398 capas= 8 framesPorDir= 8 dirs= 16 speed= 0 modo= TW
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITTW1ht.dcc bytes= 11519 crc32= 1704162016
+ARQ-MARCA gc_collect v=42
+ARQ-MARCA gc-vivo v=623016
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITTW1ht.dcc bytes= 13303 crc32= -1332173323
+ARQ-MARCA gc_collect v=43
+ARQ-MARCA gc-vivo v=626072
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITTW1ht.dcc bytes= 41867 crc32= 1320539230
+ARQ-MARCA gc_collect v=44
+ARQ-MARCA gc-vivo v=654744
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITTWhth.dcc bytes= 11999 crc32= -269866101
+ARQ-MARCA gc_collect v=45
+ARQ-MARCA gc-vivo v=624976
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITTW1ht.dcc bytes= 4035 crc32= -98874654
+ARQ-MARCA gc_collect v=46
+ARQ-MARCA gc-vivo v=617120
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITTW1ht.dcc bytes= 5190 crc32= -962682388
+ARQ-MARCA gc_collect v=47
+ARQ-MARCA gc-vivo v=618376
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITTW1ht.dcc bytes= 18467 crc32= -7738502
+ARQ-MARCA gc_collect v=48
+ARQ-MARCA gc-vivo v=631760
+JUEGO112: CAPA SH SIN-GRAFICO modo= TW dir= 0
+JUEGO113: JUGADOR ARENA modo= TW dir= 0 pedidos= 133 entregado= 90912 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= TW dir= 0 cuadro= 0 de 8 caja= 31 x 79 esquina= -18 -68 pixeles= 1057 crc32= 715008237 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 0 cuadro= 1 de 8 caja= 31 x 79 esquina= -18 -68 pixeles= 1041 crc32= 677434002 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 0 cuadro= 2 de 8 caja= 31 x 79 esquina= -18 -68 pixeles= 1000 crc32= 578427765 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 0 cuadro= 3 de 8 caja= 31 x 79 esquina= -18 -68 pixeles= 1028 crc32= -387311861 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 0 cuadro= 4 de 8 caja= 31 x 79 esquina= -18 -68 pixeles= 1035 crc32= 1260383679 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 0 cuadro= 5 de 8 caja= 31 x 79 esquina= -18 -68 pixeles= 1044 crc32= -141415203 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 0 cuadro= 6 de 8 caja= 31 x 79 esquina= -18 -68 pixeles= 1031 crc32= -1522476270 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 0 cuadro= 7 de 8 caja= 31 x 79 esquina= -18 -68 pixeles= 985 crc32= 655307532 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=49
+ARQ-MARCA gc-vivo v=629376
+JUEGO113: JUGADOR DIR 0 cuadros= 8 caja= 31 x 79 indices= 19592
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amtwhth.cof bytes= 1132 crc32= 1525369398 capas= 8 framesPorDir= 8 dirs= 16 speed= 0 modo= TW
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITTW1ht.dcc bytes= 11519 crc32= 1704162016
+ARQ-MARCA gc_collect v=50
+ARQ-MARCA gc-vivo v=643176
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITTW1ht.dcc bytes= 13303 crc32= -1332173323
+ARQ-MARCA gc_collect v=51
+ARQ-MARCA gc-vivo v=646232
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITTW1ht.dcc bytes= 41867 crc32= 1320539230
+ARQ-MARCA gc_collect v=52
+ARQ-MARCA gc-vivo v=674904
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITTWhth.dcc bytes= 11999 crc32= -269866101
+ARQ-MARCA gc_collect v=53
+ARQ-MARCA gc-vivo v=645136
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITTW1ht.dcc bytes= 4035 crc32= -98874654
+ARQ-MARCA gc_collect v=54
+ARQ-MARCA gc-vivo v=637280
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITTW1ht.dcc bytes= 5190 crc32= -962682388
+ARQ-MARCA gc_collect v=55
+ARQ-MARCA gc-vivo v=638536
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITTW1ht.dcc bytes= 18467 crc32= -7738502
+ARQ-MARCA gc_collect v=56
+ARQ-MARCA gc-vivo v=651920
+JUEGO112: CAPA SH SIN-GRAFICO modo= TW dir= 9
+JUEGO113: JUGADOR ARENA modo= TW dir= 9 pedidos= 133 entregado= 97680 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= TW dir= 9 cuadro= 0 de 8 caja= 33 x 76 esquina= -20 -67 pixeles= 1028 crc32= 133890985 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 9 cuadro= 1 de 8 caja= 33 x 76 esquina= -20 -67 pixeles= 988 crc32= -2089465441 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 9 cuadro= 2 de 8 caja= 33 x 76 esquina= -20 -67 pixeles= 847 crc32= -275583311 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 9 cuadro= 3 de 8 caja= 33 x 76 esquina= -20 -67 pixeles= 961 crc32= 1465163881 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 9 cuadro= 4 de 8 caja= 33 x 76 esquina= -20 -67 pixeles= 962 crc32= 2064581792 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 9 cuadro= 5 de 8 caja= 33 x 76 esquina= -20 -67 pixeles= 978 crc32= -1407737358 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 9 cuadro= 6 de 8 caja= 33 x 76 esquina= -20 -67 pixeles= 888 crc32= 1158515643 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 9 cuadro= 7 de 8 caja= 33 x 76 esquina= -20 -67 pixeles= 961 crc32= 630520703 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=57
+ARQ-MARCA gc-vivo v=649984
+JUEGO113: JUGADOR DIR 9 cuadros= 8 caja= 33 x 76 indices= 20064
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amtwhth.cof bytes= 1132 crc32= 1525369398 capas= 8 framesPorDir= 8 dirs= 16 speed= 0 modo= TW
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITTW1ht.dcc bytes= 11519 crc32= 1704162016
+ARQ-MARCA gc_collect v=58
+ARQ-MARCA gc-vivo v=663768
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITTW1ht.dcc bytes= 13303 crc32= -1332173323
+ARQ-MARCA gc_collect v=59
+ARQ-MARCA gc-vivo v=666824
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITTW1ht.dcc bytes= 41867 crc32= 1320539230
+ARQ-MARCA gc_collect v=60
+ARQ-MARCA gc-vivo v=695496
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITTWhth.dcc bytes= 11999 crc32= -269866101
+ARQ-MARCA gc_collect v=61
+ARQ-MARCA gc-vivo v=665728
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITTW1ht.dcc bytes= 4035 crc32= -98874654
+ARQ-MARCA gc_collect v=62
+ARQ-MARCA gc-vivo v=657872
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITTW1ht.dcc bytes= 5190 crc32= -962682388
+ARQ-MARCA gc_collect v=63
+ARQ-MARCA gc-vivo v=659128
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITTW1ht.dcc bytes= 18467 crc32= -7738502
+ARQ-MARCA gc_collect v=64
+ARQ-MARCA gc-vivo v=672512
+JUEGO112: CAPA SH SIN-GRAFICO modo= TW dir= 12
+JUEGO113: JUGADOR ARENA modo= TW dir= 12 pedidos= 133 entregado= 79488 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= TW dir= 12 cuadro= 0 de 8 caja= 28 x 74 esquina= -13 -62 pixeles= 998 crc32= 498581712 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 12 cuadro= 1 de 8 caja= 28 x 74 esquina= -13 -62 pixeles= 1020 crc32= -769670840 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 12 cuadro= 2 de 8 caja= 28 x 74 esquina= -13 -62 pixeles= 1059 crc32= 190366337 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 12 cuadro= 3 de 8 caja= 28 x 74 esquina= -13 -62 pixeles= 1028 crc32= 195859019 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 12 cuadro= 4 de 8 caja= 28 x 74 esquina= -13 -62 pixeles= 995 crc32= -26931780 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 12 cuadro= 5 de 8 caja= 28 x 74 esquina= -13 -62 pixeles= 1021 crc32= 855925022 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 12 cuadro= 6 de 8 caja= 28 x 74 esquina= -13 -62 pixeles= 1072 crc32= 618281377 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 12 cuadro= 7 de 8 caja= 28 x 74 esquina= -13 -62 pixeles= 1049 crc32= 214607022 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=65
+ARQ-MARCA gc-vivo v=667056
+JUEGO113: JUGADOR DIR 12 cuadros= 8 caja= 28 x 74 indices= 16576
+JUEGO113: JUGADOR COF data\global\CHARS\AM\COF\amtwhth.cof bytes= 1132 crc32= 1525369398 capas= 8 framesPorDir= 8 dirs= 16 speed= 0 modo= TW
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/HD/AMHDLITTW1ht.dcc bytes= 11519 crc32= 1704162016
+ARQ-MARCA gc_collect v=66
+ARQ-MARCA gc-vivo v=680880
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LA/AMLALITTW1ht.dcc bytes= 13303 crc32= -1332173323
+ARQ-MARCA gc_collect v=67
+ARQ-MARCA gc-vivo v=683936
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/LG/AMLGLITTW1ht.dcc bytes= 41867 crc32= 1320539230
+ARQ-MARCA gc_collect v=68
+ARQ-MARCA gc-vivo v=712608
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/RA/AMRALITTWhth.dcc bytes= 11999 crc32= -269866101
+ARQ-MARCA gc_collect v=69
+ARQ-MARCA gc-vivo v=682840
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S1/AMS1LITTW1ht.dcc bytes= 4035 crc32= -98874654
+ARQ-MARCA gc_collect v=70
+ARQ-MARCA gc-vivo v=674984
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/S2/AMS2LITTW1ht.dcc bytes= 5190 crc32= -962682388
+ARQ-MARCA gc_collect v=71
+ARQ-MARCA gc-vivo v=676240
+JUEGO113: JUGADOR ARCHIVO data/global/chars/AM/TR/AMTRLITTW1ht.dcc bytes= 18467 crc32= -7738502
+ARQ-MARCA gc_collect v=72
+ARQ-MARCA gc-vivo v=689624
+JUEGO112: CAPA SH SIN-GRAFICO modo= TW dir= 15
+JUEGO113: JUGADOR ARENA modo= TW dir= 15 pedidos= 133 entregado= 83288 tramos= 1 montonCLibre= 135320 recolecciones= 7 sinArena= false
+JUEGO113: JUGADOR CUADRO modo= TW dir= 15 cuadro= 0 de 8 caja= 29 x 81 esquina= -16 -68 pixeles= 1098 crc32= -1810378339 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 15 cuadro= 1 de 8 caja= 29 x 81 esquina= -16 -68 pixeles= 1103 crc32= 1515670276 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 15 cuadro= 2 de 8 caja= 29 x 81 esquina= -16 -68 pixeles= 1120 crc32= 1119951941 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 15 cuadro= 3 de 8 caja= 29 x 81 esquina= -16 -68 pixeles= 1081 crc32= -1605572530 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 15 cuadro= 4 de 8 caja= 29 x 81 esquina= -16 -68 pixeles= 1046 crc32= 1231002247 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 15 cuadro= 5 de 8 caja= 29 x 81 esquina= -16 -68 pixeles= 1043 crc32= 1689723612 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 15 cuadro= 6 de 8 caja= 29 x 81 esquina= -16 -68 pixeles= 1114 crc32= 563685953 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: JUGADOR CUADRO modo= TW dir= 15 cuadro= 7 de 8 caja= 29 x 81 esquina= -16 -68 pixeles= 1096 crc32= -1940303519 capasDibujadas= 7 sinGrafico= 0
+ARQ-MARCA gc_collect v=73
+ARQ-MARCA gc-vivo v=686368
+JUEGO113: JUGADOR DIR 15 cuadros= 8 caja= 29 x 81 indices= 18792
+JUEGO113: JUGADOR CICLOS quieto= NU quietoDir= 0 quietoCuadros= 8 caminando= 8 direcciones= 8 indicesTotales= 165152 jugadorOK= true
+JUEGO113: JUGADOR FUENTE SOLTADA /cd/JUEGO/D2CHAR.MPQ tablas= 322432 bytesTablas= 320320 bytesTrabajo= 0 bytes= 320320 yaSoltada= false montonLibre= 136496
+ARQ-MARCA gc_collect v=74
+ARQ-MARCA gc-vivo v=662704
+JUEGO113: MEMORIA jugador-despues usado= 4509488 libre= 136496 arena= 4645984 sbrk= -1935859712 techo= -1929445376 pico= 4644432
+JUEGO113: SEMIESPACIO jugador-despues usado= 662704 total= 1835008 pct= 36 colecciones= 74
+ARQ-MARCA gc_collect v=75
+ARQ-MARCA gc-vivo v=662512
+JUEGO113: MEMORIA jugador-despues-de-recolectar usado= 4509488 libre= 136496 arena= 4645984 sbrk= -1935859712 techo= -1929445376 pico= 4644432
+JUEGO113: SEMIESPACIO jugador-despues-de-recolectar usado= 662512 total= 1835008 pct= 36 colecciones= 75
+JUEGO113: UMBRAL DEL RECOLECTOR antes= 100 ahora= 95 semiespacio= 1835008 umbralBytes= 1743257 usado= 662512 colecciones= 75
+ARQ-MARCA gc_collect v=76
+ARQ-MARCA gc-vivo v=662512
+JUEGO113: RECOLECCION A PEDIDO usado= 662512 colecciones= 76
+JUEGO113: MEMORIA despues-de-recolectar-a-pedido usado= 4509488 libre= 136496 arena= 4645984 sbrk= -1935859712 techo= -1929445376 pico= 4644432
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=136496 cused=4509488 gsemi=725808/1835008 gc=76
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=136496 cused=4509488 gsemi=729024/1835008 gc=76
+ARQ-MARCA gc_collect v=77
+ARQ-MARCA gc-vivo v=915088
+ARQ-MARCA gc-externo-con-punteros v=616968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743264
+ARQ-MARCA gc_collect v=78
+ARQ-MARCA gc-vivo v=1272024
+ARQ-MARCA gc-externo-con-punteros v=72352
+ARQ-MARCA gc-externo-con-punteros v=81328
+ARQ-MARCA gc-externo-con-punteros v=91392
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744096
+ARQ-MARCA gc_collect v=79
+ARQ-MARCA gc-vivo v=1269464
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743760
+ARQ-MARCA gc_collect v=80
+ARQ-MARCA gc-vivo v=1276216
+ARQ-MARCA gc-por-umbral-bytes-usados v=1747440
+ARQ-MARCA gc_collect v=81
+ARQ-MARCA gc-vivo v=1292984
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744096
+ARQ-MARCA gc_collect v=82
+ARQ-MARCA gc-vivo v=1302768
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743776
+ARQ-MARCA gc_collect v=83
+ARQ-MARCA gc-vivo v=1314104
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743344
+ARQ-MARCA gc_collect v=84
+ARQ-MARCA gc-vivo v=1321656
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744208
+ARQ-MARCA gc_collect v=85
+ARQ-MARCA gc-vivo v=1336552
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745208
+ARQ-MARCA gc_collect v=86
+ARQ-MARCA gc-vivo v=1345352
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743384
+ARQ-MARCA gc_collect v=87
+ARQ-MARCA gc-vivo v=1353464
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744064
+ARQ-MARCA gc_collect v=88
+ARQ-MARCA gc-vivo v=1362520
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743952
+ARQ-MARCA gc_collect v=89
+ARQ-MARCA gc-vivo v=1372728
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743496
+ARQ-MARCA gc_collect v=90
+ARQ-MARCA gc-vivo v=1380648
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744320
+ARQ-MARCA gc_collect v=91
+ARQ-MARCA gc-vivo v=1392656
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743576
+ARQ-MARCA gc_collect v=92
+ARQ-MARCA gc-vivo v=1402840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743496
+ARQ-MARCA gc_collect v=93
+ARQ-MARCA gc-vivo v=1411744
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743776
+ARQ-MARCA gc_collect v=94
+ARQ-MARCA gc-vivo v=1422952
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745200
+ARQ-MARCA gc_collect v=95
+ARQ-MARCA gc-vivo v=1431912
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744128
+ARQ-MARCA gc_collect v=96
+ARQ-MARCA gc-vivo v=1441432
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743568
+ARQ-MARCA gc_collect v=97
+ARQ-MARCA gc-vivo v=1448968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743576
+ARQ-MARCA gc_collect v=98
+ARQ-MARCA gc-vivo v=1460648
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744232
+ARQ-MARCA gc_collect v=99
+ARQ-MARCA gc-vivo v=1467304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743888
+ARQ-MARCA gc_collect v=100
+ARQ-MARCA gc-vivo v=1475256
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744344
+ARQ-MARCA gc_collect v=101
+ARQ-MARCA gc-vivo v=1484128
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744696
+ARQ-MARCA gc_collect v=102
+ARQ-MARCA gc-vivo v=1490424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743952
+ARQ-MARCA gc_collect v=103
+ARQ-MARCA gc-vivo v=1497704
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743592
+ARQ-MARCA gc_collect v=104
+ARQ-MARCA gc-vivo v=1504848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744408
+ARQ-MARCA gc_collect v=105
+ARQ-MARCA gc-vivo v=1510456
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743456
+ARQ-MARCA gc_collect v=106
+ARQ-MARCA gc-vivo v=1514984
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743768
+ARQ-MARCA gc_collect v=107
+ARQ-MARCA gc-vivo v=1521560
+JUEGO113: MAPA tiles= 2337 pisos= 2337 paredes= 338 crcGrilla= -1596781041 ms= 24438 ds1enArena= false bloque= 0 ds1Soltado= 0 w= 57 h= 41
+ARQ-MARCA gc_collect v=108
+ARQ-MARCA gc-vivo v=1328224
+JUEGO113: SEMIESPACIO despues-de-componer-y-recolectar usado= 1328224 total= 1835008 pct= 72 colecciones= 108
+JUEGO113: ARENA DE BLOQUES usados= true bytes= 2586489 tramos= 5 capacidad= 2621440 tramoMenor= 524288 scratch= 0 scratchPorArchivo= true scratchSoltados= 8 scratchBytes= 4350665 picoDelMonton= 8409464 tramosDevueltos= 0 tramosBytes= 0
+JUEGO113: FUENTE despues-de-componer /cd/JUEGO/D2DATA.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 10 pedidos= 1 liberados= 1 vivos= 57652 prestamos= 1 prestamosLib= 0 prestamoReservado= 12416
+JUEGO113: FUENTE despues-de-componer /cd/JUEGO/PATCH_D2.MPQ abiertos= 0 enBuffer= 0 conPrestamo= 2 pedidos= 0 liberados= 0 vivos= 0 prestamos= 2 prestamosLib= 2 prestamoReservado= 12560
+JUEGO113: MEMORIA despues-de-componer usado= 7993040 libre= 1404304 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8409464
+JUEGO113: SEMIESPACIO despues-de-componer usado= 1328224 total= 1835008 pct= 72 colecciones= 108
+JUEGO113: LECTURAS soltadas despues de componer; tramo= 57652 lecturas= 3 bytes= 203308
+JUEGO113: MEMORIA despues-de-soltar-las-lecturas-del-mapa usado= 7993040 libre= 1404304 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8409464
+ARQ-CARGA lee-entra /data/global/palette/act1/pal.dat cfree=1404304 cused=7993040 gsemi=1332960/1835008 gc=108
+ARQ-CARGA lee-volvio /data/global/palette/act1/pal.dat cfree=1404304 cused=7993040 gsemi=1335072/1835008 gc=108
+ARQ-CARGA lee-entra /data/global/palette/act1/pal.pl2 cfree=961120 cused=8436224 gsemi=1344256/1835008 gc=108
+ARQ-CARGA lee-volvio /data/global/palette/act1/pal.pl2 cfree=961120 cused=8436224 gsemi=1347240/1835008 gc=108
+JUEGO113: PRECARGADO lo que el cuadro lee del MPQ /data/global/palette/act1/pal.dat /data/global/palette/act1/pal.pl2 delta= 886368
+JUEGO113: MEMORIA antes-de-soltar-las-tablas usado= 8879408 libre= 517936 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8879408
+JUEGO113: TABLAS SOLTADAS tablas= 2 tramos= 1 bytes= 216064 vacias= 0 noSoportadas= 0
+JUEGO113: MEMORIA despues-de-soltar-las-tablas usado= 8663336 libre= 734008 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8879408
+JUEGO113: FUENTE SOLTADA /cd/JUEGO/D2DATA.MPQ tablas= 363104 enElMontonDeC= 354656 bytesTablas= 354656 bytesTrabajo= 0 bytes= 354656 cedido= false yaSoltada= false
+JUEGO113: FUENTE SOLTADA /cd/JUEGO/PATCH_D2.MPQ tablas= 9072 enElMontonDeC= 0 bytesTablas= 0 bytesTrabajo= 0 bytes= 0 cedido= false yaSoltada= false
+JUEGO113: MEMORIA despues-de-soltar-las-fuentes usado= 8308008 libre= 1089336 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8879408
+JUEGO113: SOLTADO despues de componer bytes= 570720 libre= 1089336 sbrk= -1931108352 techo= -1929445376
+JUEGO113: ORDEN prestamo -- se suelta SOLO el buffer prestado de lectura (el arena de bloques queda)
+JUEGO113: PRESTAMO DE LECTURA SOLTADO bytes= 0
+JUEGO113: MEMORIA despues-de-soltar-el-prestamo usado= 8308008 libre= 1089336 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8879408
+JUEGO113: MEMORIA antes-del-renderer usado= 8308008 libre= 1089336 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8879408
+JUEGO113: VRAM antes-del-renderer total= 8388608 disponible= 4740808 pedida= 0 pedidos= 1 pedidoMayor= 348160 lienzo= 0
+JUEGO113: TRAMO DE LA CACHE EN BLOQUES DE VRAM techo= 4526080 pedazo= 348160 pedazoLoDiceLaVram= true vramDisponible= 4740808 vramServiriaDeUnGolpe= 4526080
+JUEGO113: DESALOJO DE LA CACHE encendido: una imagen que no se uso en 2 cuadros se suelta y sus bytes vuelven al tramo
+JUEGO113: renderer listo; cuadro= 640 480 cachePerezosa= true cacheEnIndices= true desalojoEnCuadros= 2 composicionAlVuelo= false
+JUEGO113: TRAMO despues-del-renderer activa= true origen= vram bytes= 0 usado= 0 libre= 0 imagenes= 0 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 0 pedazoMenor= 0 pedazoMayor= 0 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 0
+JUEGO113: MEMORIA despues-del-renderer usado= 8308008 libre= 1089336 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8879408
+JUEGO113: SEMIESPACIO despues-del-renderer usado= 1361984 total= 1835008 pct= 74 colecciones= 108
+JUEGO113: MOTOR velocidad=subtilesPorSegundo= 9.375 celdasPorSegundo= 1.875 ticksPorSegundo= 25 segundosPorTick= 0.04
+JUEGO113: DIRECCIONES de la cruceta 8 lista= 8
+JUEGO113: DIRECCION de la cruceta dir= 7
+JUEGO113: DIRECCION de la cruceta dir= 4
+JUEGO113: DIRECCION de la cruceta dir= 1
+JUEGO113: DIRECCION de la cruceta dir= 8
+JUEGO113: DIRECCION de la cruceta dir= 0
+JUEGO113: DIRECCION de la cruceta dir= 9
+JUEGO113: DIRECCION de la cruceta dir= 12
+JUEGO113: DIRECCION de la cruceta dir= 15
+JUEGO113: CONTROL hay= true servicio= true inyectarGuion= false guionTramos= 8 guionSegundos= 48
+PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes
+JUEGO113: CONTROL cuadro= 1 lectura= true botones= 0 ejes= 0 0 dir= 0 caminando= false celda= 28 20 ticks= 0 subtiles= 0 camara= 640 1920 reloj= 0 guionBotones= 128
+JUEGO113: CUADRO 1 ARRANCA libre= 1089136
+JUEGO113: PRIMER-CUADRO cuadro=1 celda= 28 20 camara= siguiendo
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745696
+ARQ-MARCA gc_collect v=109
+ARQ-MARCA gc-vivo v=1168472
+JUEGO113: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostPixeles= 307196 hostCrc= 1437022778 ms= 677 igualAlHost= true
+JUEGO113: JUGADOR ancla= 320 283 caja= 302 218 328 297 tamano= 26 x 79 compuesto= 26 x 79 esquina= -18 -65 pixeles= 896 crc32= 1857478036 modo= NU dir= 0 cuadroDelCiclo= 0 capasDibujadas= 7 sinGrafico= 0
+JUEGO113: CUADRO 1 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 pixelesDelJugador= 896 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= NU msMapa= 677 msJugador= 1 celda= 28 20
+JUEGO113: CUADRO 1 REFERENCIA igualAlDeDC002112= true crc32= 1363871674 esperado= 1363871674 ancla= 320 283
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 2785280 usado= 2723840 libre= 61440 imagenes= 86 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 8 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 1
+JUEGO113: MEMORIA despues-del-cuadro usado= 8308208 libre= 1089136 arena= 9397344 sbrk= -1931108352 techo= -1929445376 pico= 8879408
+JUEGO113: ARENA DE BLOQUES SOLTADA (despues de la cache) tramos= 5 bytes= 2621440 libre= 2018968
+JUEGO113: MEMORIA despues-de-soltar-el-arena usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 2 lectura= true botones= 0 ejes= 0 0 dir= 0 caminando= false celda= 28 20 ticks= 0 subtiles= 0 camara= 640 1920 reloj= 1.123 guionBotones= 128
+JUEGO113: CUADRO 2 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746728
+ARQ-MARCA gc_collect v=110
+ARQ-MARCA gc-vivo v=1123512
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743384
+ARQ-MARCA gc_collect v=111
+ARQ-MARCA gc-vivo v=1122736
+JUEGO113: CUADRO 2 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostPixeles= 307196 hostCrc= 1437022778 ms= 629 igualAlHost= true
+JUEGO113: CUADRO 2 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 pixelesDelJugador= 896 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= NU msMapa= 629 msJugador= 1 celda= 28 20
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 2785280 usado= 2723840 libre= 61440 imagenes= 86 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 8 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 2
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CUADRO 3 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744168
+ARQ-MARCA gc_collect v=112
+ARQ-MARCA gc-vivo v=1125744
+JUEGO113: CUADRO 3 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostPixeles= 307196 hostCrc= 1437022778 ms= 549 igualAlHost= true
+JUEGO113: CUADRO 3 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 pixelesDelJugador= 896 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= NU msMapa= 549 msJugador= 1 celda= 28 20
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 2785280 usado= 2723840 libre= 61440 imagenes= 86 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 8 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 3
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CUADRO 4 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743592
+ARQ-MARCA gc_collect v=113
+ARQ-MARCA gc-vivo v=1116488
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743848
+ARQ-MARCA gc_collect v=114
+ARQ-MARCA gc-vivo v=1119208
+JUEGO113: CUADRO 4 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostPixeles= 307196 hostCrc= 1437022778 ms= 620 igualAlHost= true
+JUEGO113: CUADRO 4 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 pixelesDelJugador= 896 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= NU msMapa= 620 msJugador= 1 celda= 28 20
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 2785280 usado= 2723840 libre= 61440 imagenes= 86 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 8 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 4
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CUADRO 5 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1747496
+ARQ-MARCA gc_collect v=115
+ARQ-MARCA gc-vivo v=1125744
+JUEGO113: CUADRO 5 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostPixeles= 307196 hostCrc= 1437022778 ms= 551 igualAlHost= true
+JUEGO113: CUADRO 5 CON-JUGADOR pixelesNoVacios= 307196 de 307200 crc32= 1363871674 pixelesDelJugador= 896 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= NU msMapa= 551 msJugador= 1 celda= 28 20
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 2785280 usado= 2723840 libre= 61440 imagenes= 86 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 8 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 5
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 6 lectura= true botones= 128 ejes= 1 0 dir= 12 caminando= true celda= 29.2198 18.7802 ticks= 23 subtiles= 8.625 camara= 835.161 1920 reloj= 4.996 guionBotones= 128
+JUEGO113: CUADRO 6 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744176
+ARQ-MARCA gc_collect v=116
+ARQ-MARCA gc-vivo v=1120024
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743424
+ARQ-MARCA gc_collect v=117
+ARQ-MARCA gc-vivo v=1116104
+JUEGO113: CUADRO 6 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 56147163 hostPixeles= 307196 hostCrc= 1437022778 ms= 594 igualAlHost= false
+JUEGO113: CUADRO 6 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 340028494 pixelesDelJugador= 1049 ancla= 320 283 dir= 12 cuadroDelCiclo= 7 modo= TW msMapa= 594 msJugador= 0 celda= 29.2198 18.7802
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3133440 usado= 3010560 libre= 122880 imagenes= 96 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 9 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 6
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 7 lectura= true botones= 128 ejes= 1 0 dir= 12 caminando= true celda= 30.4926 17.5074 ticks= 24 subtiles= 9 camara= 1038.81 1920 reloj= 5.986 guionBotones= 0
+JUEGO113: CUADRO 7 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744288
+ARQ-MARCA gc_collect v=118
+ARQ-MARCA gc-vivo v=1121520
+JUEGO113: CUADRO 7 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -489947 hostPixeles= 307196 hostCrc= 1437022778 ms= 472 igualAlHost= false
+JUEGO113: CUADRO 7 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1477313137 pixelesDelJugador= 1049 ancla= 320 283 dir= 12 cuadroDelCiclo= 7 modo= TW msMapa= 472 msJugador= 1 celda= 30.4926 17.5074
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3194880 libre= 286720 imagenes= 103 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 7
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 8 lectura= true botones= 128 ejes= 1 0 dir= 12 caminando= true celda= 31.6593 16.3407 ticks= 22 subtiles= 8.25 camara= 1225.48 1920 reloj= 6.853 guionBotones= 160
+JUEGO113: CUADRO 8 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743344
+ARQ-MARCA gc_collect v=119
+ARQ-MARCA gc-vivo v=1125488
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744040
+ARQ-MARCA gc_collect v=120
+ARQ-MARCA gc-vivo v=1123456
+JUEGO113: CUADRO 8 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -1500550810 hostPixeles= 307196 hostCrc= 1437022778 ms= 524 igualAlHost= false
+JUEGO113: CUADRO 8 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 78198227 pixelesDelJugador= 1021 ancla= 320 283 dir= 12 cuadroDelCiclo= 5 modo= TW msMapa= 524 msJugador= 1 celda= 31.6593 16.3407
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3399680 libre= 81920 imagenes= 112 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 0 bytesDesalojados= 0 huecos= 0 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 8
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 9 lectura= true botones= 128 ejes= 1 0 dir= 12 caminando= true celda= 32.879 15.121 ticks= 23 subtiles= 8.625 camara= 1420.65 1920 reloj= 7.773 guionBotones= 160
+JUEGO113: CUADRO 9 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743992
+ARQ-MARCA gc_collect v=121
+ARQ-MARCA gc-vivo v=1127712
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 9 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -555628827 hostPixeles= 307196 hostCrc= 1437022778 ms= 560 igualAlHost= false
+JUEGO113: CUADRO 9 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -627611152 pixelesDelJugador= 995 ancla= 320 283 dir= 12 cuadroDelCiclo= 4 modo= TW msMapa= 560 msJugador= 0 celda= 32.879 15.121
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3404800 libre= 76800 imagenes= 121 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 5 bytesDesalojados= 209920 huecos= 1 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 9
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: TRAMO DERECHA dir= 12 cuadros= 4 desdeElCuadro= 5 segundos= 3.706 subtiles= 34.5 celdas= 6.9 celdasPorSegundo= 1.86185 subtilesPorSegundo= 9.30923 teoricoSubtilesPorSegundo= 9.375 celdaIni= 28 20 celdaFin= 34.5867 15.6902
+JUEGO113: CONTROL cuadro= 10 lectura= true botones= 160 ejes= 1 1 dir= 15 caminando= true celda= 34.5867 15.6902 ticks= 24 subtiles= 9 camara= 1511.72 2011.07 reloj= 8.727 guionBotones= 160
+JUEGO113: CUADRO 10 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743328
+ARQ-MARCA gc_collect v=122
+ARQ-MARCA gc-vivo v=1123480
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745480
+ARQ-MARCA gc_collect v=123
+ARQ-MARCA gc-vivo v=1124680
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 10 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 556665345 hostPixeles= 307196 hostCrc= 1437022778 ms= 623 igualAlHost= false
+JUEGO113: CUADRO 10 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 94002638 pixelesDelJugador= 1046 ancla= 320 283 dir= 15 cuadroDelCiclo= 4 modo= TW msMapa= 623 msJugador= 1 celda= 34.5867 15.6902
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3374080 libre= 107520 imagenes= 131 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 10 bytesDesalojados= 491520 huecos= 3 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 10
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 11 lectura= true botones= 160 ejes= 1 1 dir= 15 caminando= true celda= 36.3654 16.2831 ticks= 25 subtiles= 9.375 camara= 1606.59 2105.94 reloj= 9.77 guionBotones= 160
+JUEGO113: CUADRO 11 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744384
+ARQ-MARCA gc_collect v=124
+ARQ-MARCA gc-vivo v=1126448
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 11 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 2118748652 hostPixeles= 307196 hostCrc= 1437022778 ms= 734 igualAlHost= false
+JUEGO113: CUADRO 11 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 834736331 pixelesDelJugador= 1114 ancla= 320 283 dir= 15 cuadroDelCiclo= 6 modo= TW msMapa= 734 msJugador= 1 celda= 36.3654 16.2831
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3292160 libre= 189440 imagenes= 149 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 24 bytesDesalojados= 1049600 huecos= 7 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 11
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 12 lectura= true botones= 160 ejes= 1 1 dir= 15 caminando= true celda= 38.1442 16.876 ticks= 25 subtiles= 9.375 camara= 1701.46 2200.81 reloj= 10.901 guionBotones= 160
+JUEGO113: CUADRO 12 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745056
+ARQ-MARCA gc_collect v=125
+ARQ-MARCA gc-vivo v=1123416
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744184
+ARQ-MARCA gc_collect v=126
+ARQ-MARCA gc-vivo v=1124272
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 12 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1331514171 hostPixeles= 307196 hostCrc= 1437022778 ms= 833 igualAlHost= false
+JUEGO113: CUADRO 12 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1045809119 pixelesDelJugador= 1120 ancla= 320 283 dir= 15 cuadroDelCiclo= 2 modo= TW msMapa= 833 msJugador= 0 celda= 38.1442 16.876
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3092480 libre= 389120 imagenes= 167 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 46 bytesDesalojados= 1699840 huecos= 17 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 12
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 13 lectura= true botones= 160 ejes= 1 1 dir= 15 caminando= true celda= 39.923 17.469 ticks= 25 subtiles= 9.375 camara= 1796.32 2295.68 reloj= 12.129 guionBotones= 32
+JUEGO113: CUADRO 13 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1747296
+ARQ-MARCA gc_collect v=127
+ARQ-MARCA gc-vivo v=1129136
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 13 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -34243193 hostPixeles= 307196 hostCrc= 1437022778 ms= 522 igualAlHost= false
+JUEGO113: CUADRO 13 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 883535729 pixelesDelJugador= 1100 ancla= 320 283 dir= 15 cuadroDelCiclo= 1 modo= TW msMapa= 522 msJugador= 1 celda= 39.923 17.469
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3010560 libre= 471040 imagenes= 172 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 55 bytesDesalojados= 1955840 huecos= 17 alVuelo= 0 bytesAlVuelo= 0 agrandados= 0 cuadroDeLaCache= 13
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: TRAMO ABAJO+DERECHA dir= 15 cuadros= 4 desdeElCuadro= 9 segundos= 4.356 subtiles= 37.125 celdas= 7.425 celdasPorSegundo= 1.70455 subtilesPorSegundo= 8.52273 teoricoSubtilesPorSegundo= 9.375 celdaIni= 32.879 15.121 celdaFin= 41.0897 18.6357
+JUEGO113: CONTROL cuadro= 14 lectura= true botones= 32 ejes= 0 1 dir= 0 caminando= true celda= 41.0897 18.6357 ticks= 22 subtiles= 8.25 camara= 1796.32 2389.02 reloj= 13.048 guionBotones= 32
+JUEGO113: CUADRO 14 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744728
+ARQ-MARCA gc_collect v=128
+ARQ-MARCA gc-vivo v=1128720
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 14 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -1132199222 hostPixeles= 307196 hostCrc= 1437022778 ms= 534 igualAlHost= false
+JUEGO113: CUADRO 14 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 140684982 pixelesDelJugador= 1057 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= TW msMapa= 534 msJugador= 1 celda= 41.0897 18.6357
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2923520 libre= 558080 imagenes= 174 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 62 bytesDesalojados= 2176000 huecos= 20 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 14
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 15 lectura= true botones= 32 ejes= 0 1 dir= 0 caminando= true celda= 42.3625 19.9085 ticks= 24 subtiles= 9 camara= 1796.32 2490.84 reloj= 14.001 guionBotones= 32
+JUEGO113: CUADRO 15 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743640
+ARQ-MARCA gc_collect v=129
+ARQ-MARCA gc-vivo v=1123080
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 15 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1277349135 hostPixeles= 307196 hostCrc= 1437022778 ms= 598 igualAlHost= false
+JUEGO113: CUADRO 15 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1690646455 pixelesDelJugador= 1057 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= TW msMapa= 598 msJugador= 0 celda= 42.3625 19.9085
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3015680 libre= 465920 imagenes= 184 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 70 bytesDesalojados= 2365440 huecos= 20 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 15
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 16 lectura= true botones= 32 ejes= 0 1 dir= 0 caminando= true celda= 43.6884 21.2343 ticks= 25 subtiles= 9.375 camara= 1796.32 2596.91 reloj= 14.996 guionBotones= 32
+JUEGO113: CUADRO 16 ARRANCA libre= 2018968
+JUEGO113: CUADRO 16 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1037478343 hostPixeles= 307196 hostCrc= 1437022778 ms= 466 igualAlHost= false
+JUEGO113: CUADRO 16 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -19089729 pixelesDelJugador= 1041 ancla= 320 283 dir= 0 cuadroDelCiclo= 1 modo= TW msMapa= 466 msJugador= 1 celda= 43.6884 21.2343
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3200000 libre= 281600 imagenes= 193 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 70 bytesDesalojados= 2365440 huecos= 15 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 16
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 17 lectura= true botones= 32 ejes= 0 1 dir= 0 caminando= true celda= 44.8551 22.401 ticks= 22 subtiles= 8.25 camara= 1796.32 2690.24 reloj= 15.86 guionBotones= 32
+JUEGO113: CUADRO 17 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743920
+ARQ-MARCA gc_collect v=130
+ARQ-MARCA gc-vivo v=1122064
+JUEGO113: CUADRO 17 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 990680721 hostPixeles= 307196 hostCrc= 1437022778 ms= 531 igualAlHost= false
+JUEGO113: CUADRO 17 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -983292049 pixelesDelJugador= 1030 ancla= 320 283 dir= 0 cuadroDelCiclo= 6 modo= TW msMapa= 531 msJugador= 1 celda= 44.8551 22.401
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3200000 libre= 281600 imagenes= 193 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 70 bytesDesalojados= 2365440 huecos= 15 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 17
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 18 lectura= true botones= 32 ejes= 0 1 dir= 0 caminando= true celda= 46.0748 23.6208 ticks= 23 subtiles= 8.625 camara= 1796.32 2787.82 reloj= 16.788 guionBotones= 32
+JUEGO113: CUADRO 18 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743472
+ARQ-MARCA gc_collect v=131
+ARQ-MARCA gc-vivo v=1124272
+JUEGO113: CUADRO 18 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 568446132 hostPixeles= 307196 hostCrc= 1437022778 ms= 496 igualAlHost= false
+JUEGO113: CUADRO 18 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 66719120 pixelesDelJugador= 1030 ancla= 320 283 dir= 0 cuadroDelCiclo= 6 modo= TW msMapa= 496 msJugador= 1 celda= 46.0748 23.6208
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3200000 libre= 281600 imagenes= 193 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 70 bytesDesalojados= 2365440 huecos= 15 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 18
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: TRAMO ABAJO dir= 0 cuadros= 5 desdeElCuadro= 13 segundos= 4.659 subtiles= 43.5 celdas= 8.7 celdasPorSegundo= 1.86735 subtilesPorSegundo= 9.33677 teoricoSubtilesPorSegundo= 9.375 celdaIni= 39.923 17.469 celdaFin= 46.5966 25.1861
+JUEGO113: CONTROL cuadro= 19 lectura= true botones= 96 ejes= -1 1 dir= 1 caminando= true celda= 46.5966 25.1861 ticks= 22 subtiles= 8.25 camara= 1712.84 2871.31 reloj= 17.678 guionBotones= 0
+JUEGO113: CUADRO 19 ARRANCA libre= 2018968
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 19 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -460520133 hostPixeles= 307196 hostCrc= 1437022778 ms= 419 igualAlHost= false
+JUEGO113: CUADRO 19 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -317730972 pixelesDelJugador= 1016 ancla= 320 283 dir= 1 cuadroDelCiclo= 4 modo= TW msMapa= 419 msJugador= 0 celda= 46.5966 25.1861
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3025920 libre= 455680 imagenes= 194 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 19
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 20 lectura= true botones= 96 ejes= -1 1 dir= 1 caminando= true celda= 47.0947 26.6803 ticks= 21 subtiles= 7.875 camara= 1633.15 2951 reloj= 18.513 guionBotones= 96
+JUEGO113: CUADRO 20 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743528
+ARQ-MARCA gc_collect v=132
+ARQ-MARCA gc-vivo v=1122200
+JUEGO113: CUADRO 20 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -1434474106 hostPixeles= 307196 hostCrc= 1437022778 ms= 449 igualAlHost= false
+JUEGO113: CUADRO 20 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1703088736 pixelesDelJugador= 980 ancla= 320 283 dir= 1 cuadroDelCiclo= 1 modo= TW msMapa= 449 msJugador= 1 celda= 47.0947 26.6803
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 20
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 21 lectura= true botones= 96 ejes= -1 1 dir= 1 caminando= true celda= 47.5927 28.1745 ticks= 21 subtiles= 7.875 camara= 1553.46 3030.69 reloj= 19.357 guionBotones= 96
+JUEGO113: CUADRO 21 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744656
+ARQ-MARCA gc_collect v=133
+ARQ-MARCA gc-vivo v=1124680
+JUEGO113: CUADRO 21 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -1093595023 hostPixeles= 307196 hostCrc= 1437022778 ms= 426 igualAlHost= false
+JUEGO113: CUADRO 21 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1739560475 pixelesDelJugador= 1006 ancla= 320 283 dir= 1 cuadroDelCiclo= 6 modo= TW msMapa= 426 msJugador= 1 celda= 47.5927 28.1745
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 21
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 22 lectura= true botones= 96 ejes= -1 1 dir= 1 caminando= true celda= 48.0908 29.6686 ticks= 21 subtiles= 7.875 camara= 1473.77 3110.38 reloj= 20.178 guionBotones= 96
+JUEGO113: CUADRO 22 ARRANCA libre= 2018968
+JUEGO113: CUADRO 22 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -444096058 hostPixeles= 307196 hostCrc= 1437022778 ms= 333 igualAlHost= false
+JUEGO113: CUADRO 22 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1919247935 pixelesDelJugador= 1043 ancla= 320 283 dir= 1 cuadroDelCiclo= 2 modo= TW msMapa= 333 msJugador= 1 celda= 48.0908 29.6686
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 22
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 23 lectura= true botones= 96 ejes= -1 1 dir= 1 caminando= true celda= 48.5177 30.9494 ticks= 18 subtiles= 6.75 camara= 1405.47 3178.68 reloj= 20.91 guionBotones= 96
+JUEGO113: CUADRO 23 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744456
+ARQ-MARCA gc_collect v=134
+ARQ-MARCA gc-vivo v=1124680
+JUEGO113: CUADRO 23 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 543443215 hostPixeles= 307196 hostCrc= 1437022778 ms= 417 igualAlHost= false
+JUEGO113: CUADRO 23 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1050033898 pixelesDelJugador= 989 ancla= 320 283 dir= 1 cuadroDelCiclo= 5 modo= TW msMapa= 417 msJugador= 1 celda= 48.5177 30.9494
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 23
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: TRAMO ABAJO+IZQUIERDA dir= 1 cuadros= 5 desdeElCuadro= 18 segundos= 4.122 subtiles= 38.625 celdas= 7.725 celdasPorSegundo= 1.87409 subtilesPorSegundo= 9.37045 teoricoSubtilesPorSegundo= 9.375 celdaIni= 46.0748 23.6208 celdaFin= 48.5177 30.9494
+JUEGO113: CUADRO 24 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743880
+ARQ-MARCA gc_collect v=135
+ARQ-MARCA gc-vivo v=1127088
+JUEGO113: CUADRO 24 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 543443215 hostPixeles= 307196 hostCrc= 1437022778 ms= 417 igualAlHost= false
+JUEGO113: CUADRO 24 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1656516002 pixelesDelJugador= 896 ancla= 320 283 dir= 1 cuadroDelCiclo= 0 modo= NU msMapa= 417 msJugador= 0 celda= 48.5177 30.9494
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 24
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 25 lectura= true botones= 64 ejes= -1 0 dir= 4 caminando= true celda= 47.457 32.01 ticks= 20 subtiles= 7.5 camara= 1235.76 3178.68 reloj= 22.542 guionBotones= 96
+JUEGO113: CUADRO 25 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745320
+ARQ-MARCA gc_collect v=136
+ARQ-MARCA gc-vivo v=1124680
+JUEGO113: CUADRO 25 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -504276428 hostPixeles= 307196 hostCrc= 1437022778 ms= 443 igualAlHost= false
+JUEGO113: CUADRO 25 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -622952517 pixelesDelJugador= 1112 ancla= 320 283 dir= 4 cuadroDelCiclo= 4 modo= TW msMapa= 443 msJugador= 1 celda= 47.457 32.01
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 25
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 26 lectura= true botones= 64 ejes= -1 0 dir= 4 caminando= true celda= 46.3433 33.1237 ticks= 21 subtiles= 7.875 camara= 1057.57 3178.68 reloj= 23.38 guionBotones= 0
+JUEGO113: CUADRO 26 ARRANCA libre= 2018968
+JUEGO113: CUADRO 26 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 489915842 hostPixeles= 307196 hostCrc= 1437022778 ms= 365 igualAlHost= false
+JUEGO113: CUADRO 26 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1107264847 pixelesDelJugador= 1093 ancla= 320 283 dir= 4 cuadroDelCiclo= 1 modo= TW msMapa= 365 msJugador= 1 celda= 46.3433 33.1237
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 26
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 27 lectura= true botones= 64 ejes= -1 0 dir= 4 caminando= true celda= 45.3357 34.1313 ticks= 19 subtiles= 7.125 camara= 896.35 3178.68 reloj= 24.141 guionBotones= 64
+JUEGO113: CUADRO 27 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743472
+ARQ-MARCA gc_collect v=137
+ARQ-MARCA gc-vivo v=1125496
+JUEGO113: CUADRO 27 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -1416173526 hostPixeles= 307196 hostCrc= 1437022778 ms= 432 igualAlHost= false
+JUEGO113: CUADRO 27 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 874492960 pixelesDelJugador= 1112 ancla= 320 283 dir= 4 cuadroDelCiclo= 4 modo= TW msMapa= 432 msJugador= 1 celda= 45.3357 34.1313
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 27
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 28 lectura= true botones= 64 ejes= -1 0 dir= 4 caminando= true celda= 44.222 35.245 ticks= 21 subtiles= 7.875 camara= 718.159 3178.68 reloj= 24.972 guionBotones= 64
+JUEGO113: CUADRO 28 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745024
+ARQ-MARCA gc_collect v=138
+ARQ-MARCA gc-vivo v=1124648
+JUEGO113: CUADRO 28 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 506244794 hostPixeles= 307196 hostCrc= 1437022778 ms= 406 igualAlHost= false
+JUEGO113: CUADRO 28 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1631235872 pixelesDelJugador= 1095 ancla= 320 283 dir= 4 cuadroDelCiclo= 1 modo= TW msMapa= 406 msJugador= 0 celda= 44.222 35.245
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 28
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 29 lectura= true botones= 64 ejes= -1 0 dir= 4 caminando= true celda= 43.1614 36.3057 ticks= 20 subtiles= 7.5 camara= 548.454 3178.68 reloj= 25.776 guionBotones= 64
+JUEGO113: CUADRO 29 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743920
+ARQ-MARCA gc_collect v=139
+ARQ-MARCA gc-vivo v=1126024
+JUEGO113: CUADRO 29 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -2017300997 hostPixeles= 307196 hostCrc= 1437022778 ms= 374 igualAlHost= false
+JUEGO113: CUADRO 29 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1518661922 pixelesDelJugador= 1115 ancla= 320 283 dir= 4 cuadroDelCiclo= 5 modo= TW msMapa= 374 msJugador= 1 celda= 43.1614 36.3057
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 29
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: TRAMO IZQUIERDA dir= 4 cuadros= 5 desdeElCuadro= 24 segundos= 4.054 subtiles= 37.875 celdas= 7.575 celdasPorSegundo= 1.86852 subtilesPorSegundo= 9.34262 teoricoSubtilesPorSegundo= 9.375 celdaIni= 48.5177 30.9494 celdaFin= 41.8095 35.8551
+JUEGO113: CONTROL cuadro= 30 lectura= true botones= 80 ejes= -1 -1 dir= 7 caminando= true celda= 41.8095 35.8551 ticks= 19 subtiles= 7.125 camara= 476.354 3106.58 reloj= 26.546 guionBotones= 64
+JUEGO113: CUADRO 30 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743720
+ARQ-MARCA gc_collect v=140
+ARQ-MARCA gc-vivo v=1128248
+JUEGO113: CUADRO 30 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 990828466 hostPixeles= 307196 hostCrc= 1437022778 ms= 373 igualAlHost= false
+JUEGO113: CUADRO 30 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 864651827 pixelesDelJugador= 959 ancla= 320 283 dir= 7 cuadroDelCiclo= 0 modo= TW msMapa= 373 msJugador= 1 celda= 41.8095 35.8551
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3077120 libre= 404480 imagenes= 195 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 80 bytesDesalojados= 2611200 huecos= 21 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 30
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 31 lectura= true botones= 80 ejes= -1 -1 dir= 7 caminando= true celda= 40.3865 35.3807 ticks= 20 subtiles= 7.5 camara= 400.459 3030.69 reloj= 27.335 guionBotones= 64
+JUEGO113: CUADRO 31 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744360
+ARQ-MARCA gc_collect v=141
+ARQ-MARCA gc-vivo v=1124784
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 31 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -421487544 hostPixeles= 307196 hostCrc= 1437022778 ms= 407 igualAlHost= false
+JUEGO113: CUADRO 31 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1073462349 pixelesDelJugador= 963 ancla= 320 283 dir= 7 cuadroDelCiclo= 4 modo= TW msMapa= 407 msJugador= 0 celda= 40.3865 35.3807
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2949120 libre= 532480 imagenes= 196 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 88 bytesDesalojados= 2800640 huecos= 24 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 31
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 32 lectura= true botones= 80 ejes= -1 -1 dir= 7 caminando= true celda= 38.9634 34.9064 ticks= 20 subtiles= 7.5 camara= 324.564 2954.79 reloj= 28.137 guionBotones= 64
+JUEGO113: CUADRO 32 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743552
+ARQ-MARCA gc_collect v=142
+ARQ-MARCA gc-vivo v=1124392
+JUEGO113: CUADRO 32 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 713444213 hostPixeles= 307196 hostCrc= 1437022778 ms= 379 igualAlHost= false
+JUEGO113: CUADRO 32 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -97826313 pixelesDelJugador= 959 ancla= 320 283 dir= 7 cuadroDelCiclo= 0 modo= TW msMapa= 379 msJugador= 1 celda= 38.9634 34.9064
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2949120 libre= 532480 imagenes= 196 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 88 bytesDesalojados= 2800640 huecos= 24 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 32
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 33 lectura= true botones= 80 ejes= -1 -1 dir= 7 caminando= true celda= 37.6116 34.4558 ticks= 19 subtiles= 7.125 camara= 252.464 2882.69 reloj= 28.913 guionBotones= 64
+JUEGO113: CUADRO 33 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743472
+ARQ-MARCA gc_collect v=143
+ARQ-MARCA gc-vivo v=1125784
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 33 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 94209170 hostPixeles= 307196 hostCrc= 1437022778 ms= 435 igualAlHost= false
+JUEGO113: CUADRO 33 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 159133658 pixelesDelJugador= 928 ancla= 320 283 dir= 7 cuadroDelCiclo= 3 modo= TW msMapa= 435 msJugador= 0 celda= 37.6116 34.4558
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2728960 libre= 752640 imagenes= 198 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 103 bytesDesalojados= 3159040 huecos= 33 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 33
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 34 lectura= true botones= 80 ejes= -1 -1 dir= 7 caminando= true celda= 36.1174 33.9577 ticks= 21 subtiles= 7.875 camara= 172.775 2803 reloj= 29.746 guionBotones= 0
+JUEGO113: CUADRO 34 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743784
+ARQ-MARCA gc_collect v=144
+ARQ-MARCA gc-vivo v=1124064
+JUEGO113: CUADRO 34 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -666183268 hostPixeles= 307196 hostCrc= 1437022778 ms= 381 igualAlHost= false
+JUEGO113: CUADRO 34 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1326137326 pixelesDelJugador= 959 ancla= 320 283 dir= 7 cuadroDelCiclo= 0 modo= TW msMapa= 381 msJugador= 0 celda= 36.1174 33.9577
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2728960 libre= 752640 imagenes= 198 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 103 bytesDesalojados= 3159040 huecos= 33 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 34
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: TRAMO ARRIBA+IZQUIERDA dir= 7 cuadros= 5 desdeElCuadro= 29 segundos= 3.97 subtiles= 37.125 celdas= 7.425 celdasPorSegundo= 1.87028 subtilesPorSegundo= 9.35139 teoricoSubtilesPorSegundo= 9.375 celdaIni= 43.1614 36.3057 celdaFin= 35.1098 32.9501
+JUEGO113: CONTROL cuadro= 35 lectura= true botones= 16 ejes= 0 -1 dir= 8 caminando= true celda= 35.1098 32.9501 ticks= 19 subtiles= 7.125 camara= 172.775 2722.39 reloj= 30.522 guionBotones= 80
+JUEGO113: CUADRO 35 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743656
+ARQ-MARCA gc_collect v=145
+ARQ-MARCA gc-vivo v=1125408
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 35 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1983046974 hostPixeles= 307196 hostCrc= 1437022778 ms= 417 igualAlHost= false
+JUEGO113: CUADRO 35 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1102785372 pixelesDelJugador= 1095 ancla= 320 283 dir= 8 cuadroDelCiclo= 4 modo= TW msMapa= 417 msJugador= 0 celda= 35.1098 32.9501
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2611200 libre= 870400 imagenes= 199 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 110 bytesDesalojados= 3348480 huecos= 34 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 35
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 36 lectura= true botones= 16 ejes= 0 -1 dir= 8 caminando= true celda= 33.9961 31.8364 ticks= 21 subtiles= 7.875 camara= 172.775 2633.3 reloj= 31.356 guionBotones= 80
+JUEGO113: CUADRO 36 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744000
+ARQ-MARCA gc_collect v=146
+ARQ-MARCA gc-vivo v=1123712
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 36 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 2044853131 hostPixeles= 307196 hostCrc= 1437022778 ms= 425 igualAlHost= false
+JUEGO113: CUADRO 36 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1562195647 pixelesDelJugador= 1055 ancla= 320 283 dir= 8 cuadroDelCiclo= 0 modo= TW msMapa= 425 msJugador= 0 celda= 33.9961 31.8364
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2590720 libre= 890880 imagenes= 201 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 114 bytesDesalojados= 3496960 huecos= 35 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 36
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 37 lectura= true botones= 16 ejes= 0 -1 dir= 8 caminando= true celda= 32.8824 30.7227 ticks= 21 subtiles= 7.875 camara= 172.775 2544.2 reloj= 32.176 guionBotones= 80
+JUEGO113: CUADRO 37 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744176
+ARQ-MARCA gc_collect v=147
+ARQ-MARCA gc-vivo v=1123576
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 37 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1111645877 hostPixeles= 307196 hostCrc= 1437022778 ms= 467 igualAlHost= false
+JUEGO113: CUADRO 37 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -243836796 pixelesDelJugador= 1108 ancla= 320 283 dir= 8 cuadroDelCiclo= 5 modo= TW msMapa= 467 msJugador= 1 celda= 32.8824 30.7227
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2641920 libre= 839680 imagenes= 204 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 120 bytesDesalojados= 3635200 huecos= 33 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 37
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 38 lectura= true botones= 16 ejes= 0 -1 dir= 8 caminando= true celda= 31.7687 29.609 ticks= 21 subtiles= 7.875 camara= 172.775 2455.11 reloj= 33.04 guionBotones= 80
+JUEGO113: CUADRO 38 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744216
+ARQ-MARCA gc_collect v=148
+ARQ-MARCA gc-vivo v=1123384
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744624
+ARQ-MARCA gc_collect v=149
+ARQ-MARCA gc-vivo v=1124504
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 38 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1748313143 hostPixeles= 307196 hostCrc= 1437022778 ms= 573 igualAlHost= false
+JUEGO113: CUADRO 38 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 960686205 pixelesDelJugador= 1108 ancla= 320 283 dir= 8 cuadroDelCiclo= 2 modo= TW msMapa= 573 msJugador= 1 celda= 31.7687 29.609
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2616320 libre= 865280 imagenes= 206 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 126 bytesDesalojados= 3783680 huecos= 32 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 38
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 39 lectura= true botones= 16 ejes= 0 -1 dir= 8 caminando= true celda= 30.4429 28.2832 ticks= 25 subtiles= 9.375 camara= 172.775 2349.04 reloj= 34.011 guionBotones= 80
+JUEGO113: CUADRO 39 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744600
+ARQ-MARCA gc_collect v=150
+ARQ-MARCA gc-vivo v=1123264
+JUEGO113: CUADRO 39 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1927415188 hostPixeles= 307196 hostCrc= 1437022778 ms= 534 igualAlHost= false
+JUEGO113: CUADRO 39 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1608086759 pixelesDelJugador= 1101 ancla= 320 283 dir= 8 cuadroDelCiclo= 3 modo= TW msMapa= 534 msJugador= 0 celda= 30.4429 28.2832
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 2984960 libre= 496640 imagenes= 215 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 126 bytesDesalojados= 3783680 huecos= 24 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 39
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: TRAMO ARRIBA dir= 8 cuadros= 5 desdeElCuadro= 34 segundos= 4.265 subtiles= 40.125 celdas= 8.025 celdasPorSegundo= 1.88159 subtilesPorSegundo= 9.40797 teoricoSubtilesPorSegundo= 9.375 celdaIni= 36.1174 33.9577 celdaFin= 29.8974 26.6467
+JUEGO113: CONTROL cuadro= 40 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 29.8974 26.6467 ticks= 23 subtiles= 8.625 camara= 260.054 2261.76 reloj= 34.942 guionBotones= 80
+JUEGO113: CUADRO 40 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743848
+ARQ-MARCA gc_collect v=151
+ARQ-MARCA gc-vivo v=1123448
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 40 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -359111024 hostPixeles= 307196 hostCrc= 1437022778 ms= 644 igualAlHost= false
+JUEGO113: CUADRO 40 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 289623273 pixelesDelJugador= 847 ancla= 320 283 dir= 9 cuadroDelCiclo= 2 modo= TW msMapa= 644 msJugador= 0 celda= 29.8974 26.6467
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3066880 libre= 414720 imagenes= 225 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 130 bytesDesalojados= 3932160 huecos= 19 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 40
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 41 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 29.3044 24.8679 ticks= 25 subtiles= 9.375 camara= 354.922 2166.89 reloj= 36.005 guionBotones= 16
+JUEGO113: CUADRO 41 ARRANCA libre= 2018968
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744032
+ARQ-MARCA gc_collect v=152
+ARQ-MARCA gc-vivo v=1125080
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 41 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 881639283 hostPixeles= 307196 hostCrc= 1437022778 ms= 791 igualAlHost= false
+JUEGO113: CUADRO 41 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1395138818 pixelesDelJugador= 978 ancla= 320 283 dir= 9 cuadroDelCiclo= 5 modo= TW msMapa= 791 msJugador= 0 celda= 29.3044 24.8679
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3138560 libre= 343040 imagenes= 239 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 137 bytesDesalojados= 4193280 huecos= 19 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 41
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 42 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 28.7115 23.0891 ticks= 25 subtiles= 9.375 camara= 449.79 2072.03 reloj= 37.192 guionBotones= 16
+JUEGO113: CUADRO 42 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745104
+ARQ-MARCA gc_collect v=153
+ARQ-MARCA gc-vivo v=1128344
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743760
+ARQ-MARCA gc_collect v=154
+ARQ-MARCA gc-vivo v=1125248
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 42 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1644215050 hostPixeles= 307196 hostCrc= 1437022778 ms= 908 igualAlHost= false
+JUEGO113: CUADRO 42 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 1170926121 pixelesDelJugador= 847 ancla= 320 283 dir= 9 cuadroDelCiclo= 2 modo= TW msMapa= 908 msJugador= 0 celda= 28.7115 23.0891
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3261440 libre= 220160 imagenes= 249 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 140 bytesDesalojados= 4305920 huecos= 15 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 42
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CONTROL cuadro= 43 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 28.1186 21.3104 ticks= 25 subtiles= 9.375 camara= 544.659 1977.16 reloj= 38.495 guionBotones= 16
+JUEGO113: CUADRO 43 ARRANCA libre= 2018968
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743440
+ARQ-MARCA gc_collect v=155
+ARQ-MARCA gc-vivo v=1125304
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 43 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1369560466 hostPixeles= 307196 hostCrc= 1437022778 ms= 952 igualAlHost= false
+JUEGO113: CUADRO 43 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 442409023 pixelesDelJugador= 961 ancla= 320 283 dir= 9 cuadroDelCiclo= 3 modo= TW msMapa= 952 msJugador= 1 celda= 28.1186 21.3104
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3169280 libre= 312320 imagenes= 263 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 161 bytesDesalojados= 4736000 huecos= 18 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 43
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: TRAMO ARRIBA+DERECHA dir= 9 cuadros= 4 desdeElCuadro= 39 segundos= 4.484 subtiles= 36.75 celdas= 7.35 celdasPorSegundo= 1.63916 subtilesPorSegundo= 8.19581 teoricoSubtilesPorSegundo= 9.375 celdaIni= 30.4429 28.2832 celdaFin= 28.1186 21.3104
+JUEGO113: CUADRO 44 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745096
+ARQ-MARCA gc_collect v=156
+ARQ-MARCA gc-vivo v=1128856
+JUEGO113: CUADRO 44 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1369560466 hostPixeles= 307196 hostCrc= 1437022778 ms= 729 igualAlHost= false
+JUEGO113: CUADRO 44 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1673527959 pixelesDelJugador= 896 ancla= 320 283 dir= 9 cuadroDelCiclo= 0 modo= NU msMapa= 729 msJugador= 1 celda= 28.1186 21.3104
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3169280 libre= 312320 imagenes= 263 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 161 bytesDesalojados= 4736000 huecos= 18 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 44
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CUADRO 45 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744376
+ARQ-MARCA gc_collect v=157
+ARQ-MARCA gc-vivo v=1128056
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743576
+ARQ-MARCA gc_collect v=158
+ARQ-MARCA gc-vivo v=1124504
+JUEGO113: CUADRO 45 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1369560466 hostPixeles= 307196 hostCrc= 1437022778 ms= 806 igualAlHost= false
+JUEGO113: CUADRO 45 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1673527959 pixelesDelJugador= 896 ancla= 320 283 dir= 9 cuadroDelCiclo= 0 modo= NU msMapa= 806 msJugador= 1 celda= 28.1186 21.3104
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3169280 libre= 312320 imagenes= 263 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 161 bytesDesalojados= 4736000 huecos= 18 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 45
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CUADRO 46 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743352
+ARQ-MARCA gc_collect v=159
+ARQ-MARCA gc-vivo v=1124504
+JUEGO113: CUADRO 46 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1369560466 hostPixeles= 307196 hostCrc= 1437022778 ms= 730 igualAlHost= false
+JUEGO113: CUADRO 46 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1673527959 pixelesDelJugador= 896 ancla= 320 283 dir= 9 cuadroDelCiclo= 0 modo= NU msMapa= 730 msJugador= 0 celda= 28.1186 21.3104
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3169280 libre= 312320 imagenes= 263 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 161 bytesDesalojados= 4736000 huecos= 18 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 46
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: VUELTA AL ORIGEN celda= 28 20 dir= 0 camara= siguiendo
+JUEGO113: CUADRO 47 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743856
+ARQ-MARCA gc_collect v=160
+ARQ-MARCA gc-vivo v=1125448
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+pvr_mem: ERROR -- out of PVR memory; texture heap probably corrupted
+JUEGO113: CUADRO 47 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -10498321 hostPixeles= 307196 hostCrc= 1437022778 ms= 747 igualAlHost= false
+JUEGO113: CUADRO 47 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 129936599 pixelesDelJugador= 896 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= NU msMapa= 747 msJugador= 0 celda= 28 20
+JUEGO113: CUADRO 47 cacheSuperficies= 101 cacheBytes= 3164160 cacheEnIndices= true msMapa= 747 msJugador= 0
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3164160 libre= 317440 imagenes= 269 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 168 bytesDesalojados= 4879360 huecos= 18 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 47
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: CUADRO 48 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744016
+ARQ-MARCA gc_collect v=161
+ARQ-MARCA gc-vivo v=1128000
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744304
+ARQ-MARCA gc_collect v=162
+ARQ-MARCA gc-vivo v=1125824
+JUEGO113: CUADRO 48 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= -10498321 hostPixeles= 307196 hostCrc= 1437022778 ms= 772 igualAlHost= false
+JUEGO113: CUADRO 48 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= 129936599 pixelesDelJugador= 896 ancla= 320 283 dir= 0 cuadroDelCiclo= 0 modo= NU msMapa= 772 msJugador= 0 celda= 28 20
+JUEGO113: REPETIBILIDAD cuadro= 48 camara= siguiendo crcMapa= -10498321 crcMapaDelCuadroAnterior= -10498321 igualAlCuadroAnterior= true crcConJugador= 129936599 crcConJugadorDelCuadroAnterior= 129936599 igualConJugador= true ancla= 320 283 celda= 28 20 llenos= 307200 llenosDelCuadroAnterior= 307200 crcMapaDelCuadro1= 1437022778 igualAlCuadro1= false llenosDelCuadro1= 307196 cachePerezosa= true
+JUEGO113: CUADRO 48 cacheSuperficies= 101 cacheBytes= 3164160 cacheEnIndices= true msMapa= 772 msJugador= 0
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3164160 libre= 317440 imagenes= 269 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 168 bytesDesalojados= 4879360 huecos= 18 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 48
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: VUELTA AL FINAL celda= 28.1186 21.3104 dir= 9 caminando= false
+JUEGO113: CUADRO 49 ARRANCA libre= 2018968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743272
+ARQ-MARCA gc_collect v=163
+ARQ-MARCA gc-vivo v=1122248
+JUEGO113: CUADRO 49 SOLO-MAPA pixelesNoVacios= 307200 de 307200 crc32= 1369560466 hostPixeles= 307196 hostCrc= 1437022778 ms= 730 igualAlHost= false
+JUEGO113: CUADRO 49 CON-JUGADOR pixelesNoVacios= 307200 de 307200 crc32= -1673527959 pixelesDelJugador= 896 ancla= 320 283 dir= 9 cuadroDelCiclo= 0 modo= NU msMapa= 730 msJugador= 1 celda= 28.1186 21.3104
+JUEGO113: CUADRO 49 cacheSuperficies= 101 cacheBytes= 3164160 cacheEnIndices= true msMapa= 730 msJugador= 1
+JUEGO113: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3481600 usado= 3164160 libre= 317440 imagenes= 269 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 10 pedazoMenor= 348160 pedazoMayor= 348160 techo= 4526080 desalojos= 168 bytesDesalojados= 4879360 huecos= 18 alVuelo= 0 bytesAlVuelo= 0 agrandados= 1 cuadroDeLaCache= 49
+JUEGO113: MEMORIA despues-del-cuadro usado= 5686728 libre= 2018968 arena= 7705696 sbrk= -1932800000 techo= -1929445376 pico= 8879408
+JUEGO113: RESUMEN cuadrosPintados= 49 tramos= 8 tramosReportados= 8 segundosCaminados= 32.6 subtiles= 305.625 celdas= 61.125 celdasPorSegundo= 1.875 teoricoCeldasPorSegundo= 1.875 ticks= 815 recortes= 6 pasoMayor= 1 celdasFinales= 28.1186 21.3104 direcciones= 8 camara= siguiendo inyectarGuion= false reloj= 45.628

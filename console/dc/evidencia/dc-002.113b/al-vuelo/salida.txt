@@ -1,0 +1,98 @@
+== Flycast: /tmp/dcbuild/113b-alvuelo-c/dc113.gdi (ventana 640x480 en 1400,120 + keepAbove; consola serie si)
+pid=733330
+  primer cuadro a los 59s
+-- las marcas del POC que ya salieron:
+JUEGO113: JUGADOR CICLOS quieto= NU quietoDir= 0 quietoCuadros= 8 caminando= 8 direcciones= 8 indicesTotales= 165152 jugadorOK= true
+JUEGO113: MOTOR velocidad=subtilesPorSegundo= 9.375 celdasPorSegundo= 1.875 ticksPorSegundo= 25 segundosPorTick= 0.04
+JUEGO113: DIRECCIONES de la cruceta 8 lista= 8
+JUEGO113: DIRECCION de la cruceta dir= 7
+JUEGO113: DIRECCION de la cruceta dir= 4
+JUEGO113: DIRECCION de la cruceta dir= 1
+JUEGO113: DIRECCION de la cruceta dir= 8
+JUEGO113: DIRECCION de la cruceta dir= 0
+JUEGO113: DIRECCION de la cruceta dir= 9
+JUEGO113: DIRECCION de la cruceta dir= 12
+JUEGO113: DIRECCION de la cruceta dir= 15
+JUEGO113: CONTROL hay= true servicio= true inyectarGuion= false guionTramos= 8 guionSegundos= 48
+  ventana del emulador: ventana: Flycast - dc113|flycast|pid=733330|geo=1400,92,640,508|cli=1400,120,640,480
+== capturas: una QUIETO y despues una cada 5s mientras corre el guion
+  c00-quieto.png md5=ecff3982 crc32=1363871674 pixeles=896 ancla=320x283 dir=0 cuadro=0 modo=NU celda=28,20 ticks=0 subtiles=0
+GEO captura=c00-quieto cliente=1400,120,640,480 crc32=1363871674 pixeles=896 ancla=320x283 dir=0 cuadro=0 modo=NU celda=28,20 ticks=0 subtiles=0 ms=1793610916234
+  guion de la cruceta: derecha 4 abajo+derecha 4 abajo 4 abajo+izquierda 4 izquierda 4 arriba+izquierda 4 arriba 4 arriba+derecha 4
+  c01.png md5=cb112791 crc32=1363871674 pixeles=896 ancla=320x283 dir=0 cuadro=0 modo=NU celda=29.2198,18.7802 ticks=23 subtiles=8.625
+GEO captura=c01 cliente=1400,120,640,480 crc32=1363871674 pixeles=896 ancla=320x283 dir=0 cuadro=0 modo=NU celda=29.2198,18.7802 ticks=23 subtiles=8.625 ms=1793610917965
+  c02.png md5=eaf46e90 crc32=-1843572645 pixeles=1098 ancla=320x283 dir=15 cuadro=0 modo=TW celda=38.2154,16.8997 ticks=25 subtiles=9.375
+GEO captura=c02 cliente=1400,120,640,480 crc32=-1843572645 pixeles=1098 ancla=320x283 dir=15 cuadro=0 modo=TW celda=38.2154,16.8997 ticks=25 subtiles=9.375 ms=1793610924706
+  c03.png md5=4ce565f9 crc32=-1165209054 pixeles=1044 ancla=320x283 dir=0 cuadro=5 modo=TW celda=39.5412,18.2256 ticks=25 subtiles=9.375
+GEO captura=c03 cliente=1400,120,640,480 crc32=-1165209054 pixeles=1044 ancla=320x283 dir=0 cuadro=5 modo=TW celda=39.5412,18.2256 ticks=25 subtiles=9.375 ms=1793610931461
+  c04.png md5=3c0a8747 crc32=1891997911 pixeles=1094 ancla=320x283 dir=4 cuadro=0 modo=TW celda=37.4825,22.656 ticks=25 subtiles=9.375
+GEO captura=c04 cliente=1400,120,640,480 crc32=1891997911 pixeles=1094 ancla=320x283 dir=4 cuadro=0 modo=TW celda=37.4825,22.656 ticks=25 subtiles=9.375 ms=1793610938207
+  c05.png md5=3f8de3e5 crc32=-102623486 pixeles=1113 ancla=320x283 dir=8 cuadro=6 modo=TW celda=30.0005,17.5457 ticks=24 subtiles=9
+GEO captura=c05 cliente=1400,120,640,480 crc32=-102623486 pixeles=1113 ancla=320x283 dir=8 cuadro=6 modo=TW celda=30.0005,17.5457 ticks=24 subtiles=9 ms=1793610944965
+  c06.png md5=ff768409 crc32=1396000891 pixeles=961 ancla=320x283 dir=9 cuadro=7 modo=TW celda=25.7291,9.71681 ticks=25 subtiles=9.375
+GEO captura=c06 cliente=1400,120,640,480 crc32=1396000891 pixeles=961 ancla=320x283 dir=9 cuadro=7 modo=TW celda=25.7291,9.71681 ticks=25 subtiles=9.375 ms=1793610951705
+  c07.png md5=79bd2ba6 crc32=-1921929078 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375
+GEO captura=c07 cliente=1400,120,640,480 crc32=-1921929078 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375 ms=1793610958452
+  c08.png md5=5b6e9031 crc32=-1921929078 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375
+GEO captura=c08 cliente=1400,120,640,480 crc32=-1921929078 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375 ms=1793610965200
+  c09.png md5=5c6ca356 crc32=-1921929078 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375
+GEO captura=c09 cliente=1400,120,640,480 crc32=-1921929078 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375 ms=1793610971964
+  c10.png md5=b17a9cd2 crc32=1632778105 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375
+GEO captura=c10 cliente=1400,120,640,480 crc32=1632778105 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375 ms=1793610978737
+  c11.png md5=77cb518d crc32=1632778105 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375
+GEO captura=c11 cliente=1400,120,640,480 crc32=1632778105 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375 ms=1793610985463
+  cierre: el POC llego al RESUMEN a los 0s
+  c99-final.png md5=cfdb6eed crc32=1632778105 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375
+GEO captura=c99-final cliente=1400,120,640,480 crc32=1632778105 pixeles=896 ancla=320x283 dir=9 cuadro=0 modo=NU celda=25.7291,9.71681 ticks=25 subtiles=9.375 ms=1793610992196
+scripts/console/run-flycast-113.sh: línea 231: 733330 Error del bus              (`core' generado) setsid env DISPLAY="$DISP" "$FLY" -config "window:fullscreen=no" -config "window:width=$VW" -config "window:height=$VH" -config "window:left=$PX" -config "window:top=$PY" -config "Debug:SerialConsoleEnabled=true" "$GDI" > "$OUT/flycast.log" 2>&1
+
+== las direcciones que el POC compuso (la cruceta: 8)
+JUEGO113: DIRECCIONES de la cruceta 8 lista= 8
+JUEGO113: DIRECCION de la cruceta dir= 7
+JUEGO113: DIRECCION de la cruceta dir= 4
+JUEGO113: DIRECCION de la cruceta dir= 1
+JUEGO113: DIRECCION de la cruceta dir= 8
+JUEGO113: DIRECCION de la cruceta dir= 0
+JUEGO113: DIRECCION de la cruceta dir= 9
+JUEGO113: DIRECCION de la cruceta dir= 12
+JUEGO113: DIRECCION de la cruceta dir= 15
+== los tramos caminados (el numero del criterio: celdas por segundo)
+JUEGO113: TRAMO DERECHA dir= 12 cuadros= 4 desdeElCuadro= 5 segundos= 3.707 subtiles= 34.5 celdas= 6.9 celdasPorSegundo= 1.86134 subtilesPorSegundo= 9.30672 teoricoSubtilesPorSegundo= 9.375 celdaIni= 28 20 celdaFin= 34.6578 15.7139
+JUEGO113: TRAMO ABAJO+DERECHA dir= 15 cuadros= 3 desdeElCuadro= 9 segundos= 4.399 subtiles= 28.125 celdas= 5.625 celdasPorSegundo= 1.2787 subtilesPorSegundo= 6.3935 teoricoSubtilesPorSegundo= 9.375 celdaIni= 32.879 15.121 celdaFin= 39.5412 18.2256
+JUEGO113: TRAMO ABAJO dir= 0 cuadros= 1 desdeElCuadro= 12 segundos= 2.358 subtiles= 9.375 celdas= 1.875 celdasPorSegundo= 0.795165 subtilesPorSegundo= 3.97583 teoricoSubtilesPorSegundo= 9.375 celdaIni= 38.2154 16.8997 celdaFin= 39.5412 18.2256
+JUEGO113: TRAMO ABAJO+IZQUIERDA dir= 1 cuadros= 1 desdeElCuadro= 14 segundos= 2.653 subtiles= 9.375 celdas= 1.875 celdasPorSegundo= 0.706747 subtilesPorSegundo= 3.53374 teoricoSubtilesPorSegundo= 9.375 celdaIni= 39.5412 18.2256 celdaFin= 38.8083 21.3302
+JUEGO113: TRAMO IZQUIERDA dir= 4 cuadros= 2 desdeElCuadro= 15 segundos= 5.434 subtiles= 18.75 celdas= 3.75 celdasPorSegundo= 0.690099 subtilesPorSegundo= 3.4505 teoricoSubtilesPorSegundo= 9.375 celdaIni= 40.1341 20.0044 celdaFin= 35.7037 22.0631
+JUEGO113: TRAMO ARRIBA+IZQUIERDA dir= 7 cuadros= 2 desdeElCuadro= 17 segundos= 3.986 subtiles= 18.75 celdas= 3.75 celdasPorSegundo= 0.940793 subtilesPorSegundo= 4.70396 teoricoSubtilesPorSegundo= 9.375 celdaIni= 37.4825 22.656 celdaFin= 32.5991 20.1443
+JUEGO113: TRAMO ARRIBA dir= 8 cuadros= 5 desdeElCuadro= 19 segundos= 5.083 subtiles= 45.375 celdas= 9.075 celdasPorSegundo= 1.78536 subtilesPorSegundo= 8.92681 teoricoSubtilesPorSegundo= 9.375 celdaIni= 33.9249 21.4701 celdaFin= 26.915 13.2744
+JUEGO113: TRAMO ARRIBA+DERECHA dir= 9 cuadros= 3 desdeElCuadro= 24 segundos= 3.306 subtiles= 28.125 celdas= 5.625 celdasPorSegundo= 1.70145 subtilesPorSegundo= 8.50726 teoricoSubtilesPorSegundo= 9.375 celdaIni= 27.5079 15.0532 celdaFin= 25.7291 9.71681
+== el cuadro 1 contra DC-002.112
+JUEGO113: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostPixeles= 307196 hostCrc= 1437022778 ms= 676 igualAlHost= true
+JUEGO113: CUADRO 1 REFERENCIA igualAlDeDC002112= true crc32= 1363871674 esperado= 1363871674 ancla= 320 283
+JUEGO113: REPETIBILIDAD cuadro= 48 camara= siguiendo crcMapa= -1153166116 crcMapaDelCuadroAnterior= -1153166116 igualAlCuadroAnterior= true crcConJugador= -1079498404 crcConJugadorDelCuadroAnterior= -1079498404 igualConJugador= true ancla= 320 283 celda= 28 20 llenos= 307200 llenosDelCuadroAnterior= 307200 crcMapaDelCuadro1= 1437022778 igualAlCuadro1= false llenosDelCuadro1= 307196 cachePerezosa= true
+== el resumen
+JUEGO113: RESUMEN cuadrosPintados= 49 tramos= 8 tramosReportados= 8 segundosCaminados= 20.52 subtiles= 192.375 celdas= 38.475 celdasPorSegundo= 1.875 teoricoCeldasPorSegundo= 1.875 ticks= 513 recortes= 11 pasoMayor= 1 celdasFinales= 25.7291 9.71681 direcciones= 8 camara= siguiendo inyectarGuion= false reloj= 65.061
+== memoria
+JUEGO113: SEMIESPACIO despues-de-componer-y-recolectar usado= 1328224 total= 1835008 pct= 72 colecciones= 108
+JUEGO113: MEMORIA despues-de-componer usado= 7993040 libre= 1404208 arena= 9397248 sbrk= -1931108352 techo= -1929445376 pico= 8409464
+JUEGO113: SEMIESPACIO despues-de-componer usado= 1328224 total= 1835008 pct= 72 colecciones= 108
+== capturas
+   1867621 bytes  /tmp/corrida-113b-alvuelo-c/c00-quieto.png
+   1867626 bytes  /tmp/corrida-113b-alvuelo-c/c01.png
+   1834920 bytes  /tmp/corrida-113b-alvuelo-c/c02.png
+   1829445 bytes  /tmp/corrida-113b-alvuelo-c/c03.png
+   1879122 bytes  /tmp/corrida-113b-alvuelo-c/c04.png
+   1863600 bytes  /tmp/corrida-113b-alvuelo-c/c05.png
+   1831661 bytes  /tmp/corrida-113b-alvuelo-c/c06.png
+   1832889 bytes  /tmp/corrida-113b-alvuelo-c/c07.png
+   1832656 bytes  /tmp/corrida-113b-alvuelo-c/c08.png
+   1832759 bytes  /tmp/corrida-113b-alvuelo-c/c09.png
+   1867417 bytes  /tmp/corrida-113b-alvuelo-c/c10.png
+   1832995 bytes  /tmp/corrida-113b-alvuelo-c/c11.png
+   1833080 bytes  /tmp/corrida-113b-alvuelo-c/c99-final.png
+== teclas
+  sostengo abajo+izquierda 4.00 s
+  sostengo izquierda 4.00 s
+  sostengo arriba+izquierda 4.00 s
+  sostengo arriba 4.00 s
+  sostengo arriba+derecha 4.00 s
+listo

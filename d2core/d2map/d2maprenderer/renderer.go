@@ -107,8 +107,68 @@ type MapRenderer struct {
 	// cache pide sus pixeles con `make` como siempre, que es el camino de la PC.
 	tramo *TramoDeLaCache
 
+	// ============================== EL DESALOJO (DC-002.113b) ==============================
+	//
+	// desalojoEnCuadros: cuantos cuadros tiene que llevar una imagen SIN pedirse para que el desalojo la pueda
+	// soltar cuando el tramo se llena. 0 = APAGADO, y entonces la cache es de solo agregar como en DC-002.113
+	// (que es lo que la dejo crecer hasta tumbar al recolector). Es la palanca que separa esta tarjeta de la
+	// anterior en el A/B: mismo binario, misma corrida, solo cambia este numero.
+	desalojoEnCuadros int
+
+	// componerAlVuelo: la otra salida cuando el tramo esta lleno -- en vez de derramar al monton de Go, la imagen
+	// se compone sobre `bufferDelVuelo`, se pinta y NO se guarda. Cuesta decodificar el tile en cada cuadro que
+	// lo pida, y eso es lo que se mide contra el desalojo (ms por cuadro).
+	componerAlVuelo       bool
+	bufferDelVuelo        []byte
+	crecimientosDelBuffer int
+
+	// cuadroDeLaCache: el numero de cuadro del dibujado (lo cuenta `Render`), que es la unidad con la que se
+	// mide "esta imagen no se usa hace N cuadros".
+	cuadroDeLaCache int
+
+	// recogidaAlVuelo: la ultima imagen compuesta al vuelo, valida SOLO en el cuadro en que se compuso. Es el
+	// unico puntero a `bufferDelVuelo`, y por eso no hay dos al vuelo a la vez.
+	recogidaAlVuelo *imagenDeIndices
+
 	*d2util.Logger
 }
+
+// ActivarDesalojoDeLaCache (DC-002.113b): cuando el tramo se llena, suelta las imagenes que no se usaron en los
+// ultimos `cuadros` cuadros y reusa esos bytes. ADITIVA: sin llamarla, la cache es de solo agregar.
+//
+// POR QUE N CUADROS Y NO UN TAMANO. El tramo no se puede agrandar en la consola (la VRAM servible son ~4,7 MB y
+// ya esta pedida) y lo que hay que acotar es CUANTO VIVE una imagen, no cuanta memoria hay: con N cuadros de
+// gracia, lo que se fue de pantalla se puede soltar y lo que el cuadro esta pintando no. N=1 ya es seguro (la
+// pintura copia los pixeles en el acto) y N=2 deja un cuadro entero de margen.
+func (mr *MapRenderer) ActivarDesalojoDeLaCache(cuadros int) {
+	if cuadros < 1 {
+		mr.desalojoEnCuadros = 0
+
+		return
+	}
+
+	mr.desalojoEnCuadros = cuadros
+}
+
+// DesalojoEnCuadros: cuantos cuadros de gracia tiene una imagen antes de que el desalojo la pueda soltar (0 =
+// apagado).
+func (mr *MapRenderer) DesalojoEnCuadros() int { return mr.desalojoEnCuadros }
+
+// ActivarComposicionAlVuelo (DC-002.113b): cuando el tramo esta lleno, la imagen se compone sobre un buffer de
+// trabajo de hasta `maxBytes` B y se pinta sin cachearse. ADITIVA: sin llamarla, lo que no entra se derrama.
+func (mr *MapRenderer) ActivarComposicionAlVuelo(maxBytes int) {
+	mr.componerAlVuelo = true
+
+	if maxBytes > 0 && len(mr.bufferDelVuelo) < maxBytes {
+		mr.bufferDelVuelo = make([]byte, maxBytes)
+	}
+}
+
+// ComposicionAlVuelo: si el tramo lleno compone al vuelo en vez de derramar.
+func (mr *MapRenderer) ComposicionAlVuelo() bool { return mr.componerAlVuelo }
+
+// CuadroDeLaCache: cuantos cuadros se dibujaron desde que existe este renderer (lo que mide el desalojo).
+func (mr *MapRenderer) CuadroDeLaCache() int { return mr.cuadroDeLaCache }
 
 // ActivarCachePerezoso: la cache de tiles se arma al dibujar (DC-002.94).
 //
@@ -180,6 +240,19 @@ func CacheDeTilesEnIndices() Opcion {
 // Es aditiva y va con `CacheDeTilesEnIndices`: sin ella, una `make` por imagen, que es el camino de la PC.
 func CacheDeTilesEnUnTramo(bytes int) Opcion {
 	return func(mr *MapRenderer) { mr.ActivarTramoDeLaCache(bytes) }
+}
+
+// ConDesalojoDeLaCache (DC-002.113b): cuando el tramo de la cache se llena, suelta las imagenes que no se usaron
+// en los ultimos `cuadros` cuadros y reusa esos bytes. Es ADITIVA: sin ella, la cache es de solo agregar y lo que
+// no entra se derrama al monton (que es lo que tumbaba al recolector en la consola).
+func ConDesalojoDeLaCache(cuadros int) Opcion {
+	return func(mr *MapRenderer) { mr.ActivarDesalojoDeLaCache(cuadros) }
+}
+
+// ConComposicionAlVuelo (DC-002.113b): cuando el tramo de la cache se llena, la imagen se compone sobre un buffer
+// de trabajo de hasta `maxBytes` B y se pinta sin cachearse. Es la otra salida, la que se mide contra el desalojo.
+func ConComposicionAlVuelo(maxBytes int) Opcion {
+	return func(mr *MapRenderer) { mr.ActivarComposicionAlVuelo(maxBytes) }
 }
 
 // CacheDeTilesEnTramo: igual que `CacheDeTilesEnUnTramo`, pero con el tramo YA reservado
@@ -324,6 +397,11 @@ func (mr *MapRenderer) Render(target d2interface.Surface) {
 	if mr.mapEngine.IsLoading {
 		return
 	}
+
+	// DC-002.113b: el cuadro es la unidad con la que el desalojo mide si una imagen esta fria ("no se uso en N
+	// cuadros"), asi que se cuenta aca, que es el unico lugar por donde pasa un cuadro dibujado.
+	mr.cuadroDeLaCache++
+	mr.recogidaAlVuelo = nil
 
 	mapSize := mr.mapEngine.Size()
 
