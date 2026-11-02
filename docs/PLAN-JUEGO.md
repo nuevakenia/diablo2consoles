@@ -42,7 +42,8 @@ En la Dreamcast, medido y con captura:
 - el jugador se compone desde el `.dcc` con 0 recolecciones (DC-002.98) y camina con el control (DC-002.113);
 - 1 a 4 jugadores en la misma pantalla (DC-002.114, DC-002.117) y split de 2 y de 4 (DC-002.116, DC-002.118);
 - el leash medido en 5,25 celdas (DC-002.115);
-- monstruo y golpe: **en curso** (DC-002.121, DC-002.122).
+- monstruo y golpe: **el monstruo se dibuja, patrulla y muere** (DC-002.121, DC-002.122: el alcance lo decide la
+  tabla del exe, 5 sí / 8 diagonal no / 28 no, y con los cuatro dándole al mismo bicho).
 
 Lo que no existe todavía: objetos, inventario, alijo, mercaderes, NPCs, quests, habilidades, menús ni guardado.
 
@@ -51,11 +52,17 @@ Lo que no existe todavía: objetos, inventario, alijo, mercaderes, NPCs, quests,
 El orden no es el del juego original: es el de **lo que hace jugable al juego con menos memoria**. Primero lo
 que se toca con las manos (matar, recoger, guardar), después lo narrativo (quests, diálogos, mercaderes).
 
-### E1 · Monstruos y combate — EN CURSO
+### E1 · Monstruos y combate — HECHA EN LO BÁSICO
 
 - `d2monster`, `d2monstats`, `d2path`, `d2combat` (parte).
-- Criterio: un monstruo se dibuja, patrulla y muere con su animación cuando el jugador le pega.
-- Riesgo: el `.dcc` de monstruo es más grande que el del jugador; medir cuántos caben en el tramo.
+- Criterio: un monstruo se dibuja, patrulla y muere con su animación cuando el jugador le pega. **Cumplido**
+  (DC-002.121 el bicho dibujado y patrullando; DC-002.122 el golpe, el alcance del exe, la vida, la muerte y
+  los cuatro contra el mismo bicho).
+- Riesgo: el `.dcc` de monstruo es más grande que el del jugador; medir cuántos caben en el tramo. **Medido**: el
+  DT del Returned son 171.304 B por dirección y el A1 del héroe 74.971 B: con 8 direcciones del A1 y 2 del golpe
+  el semiespacio (1.835.008 B fijos) muere al 96 %. Entra 1 dirección del A1 y 1 de los modos (91 %).
+- Lo que falta para cerrarla del todo: IA (persecución y ataque del bicho al jugador), que es otra tarjeta, y
+  que el cuadro DD del SK viene vacío (0 píxeles): el cadáver no se ve con esta animación.
 
 ### E2 · Objetos y drop
 
