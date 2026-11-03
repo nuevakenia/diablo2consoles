@@ -20,11 +20,15 @@ MEDIR_CUADRO=no MEDIR_VIVO=no bash scripts/console/build-demo-140.sh /tmp/dcbuil
 ## Correr
 
 ```bash
-# 110 s de juego con capturas cada 3 s. El guion de teclas va en GUION.
-SEGUNDOS=110 INTERVALO=3 GUION='nada 6 derecha 1.2 nada 0.5 s 0.4 nada 2 abajo+izquierda 1.0 nada 0.5
-  d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 1 arriba+derecha 1.2 s 0.4 nada 1' \
+# 72 s de juego con capturas cada 2 s, con el guion del criterio de DC-002.141 (ver abajo).
+SEGUNDOS=72 INTERVALO=2 \
   bash scripts/console/run-demo-140.sh /tmp/dcbuild/demo140/disc.gdi /tmp/capturas-demo140
 ```
+
+El guion por omisión del runner es **el del criterio de DC-002.141**: a Akara con X (`s`), a la calle del
+primer bicho con `abajo+izquierda`, cuatro golpes con Y (`d`), a la calle del segundo bicho con `abajo`,
+once golpes, y de vuelta a Akara con `arriba+derecha` a cobrar con X (`s`). Las teclas `x` e `y` **no
+producen botón**: el guion viejo (que las usaba) no movía nada.
 
 El emulador tarda **80 s** desde el disco hasta `JUEGO121: PRIMER-CUADRO`; el runner espera esa marca
 antes de mandar la primera tecla.
@@ -49,6 +53,11 @@ antes de mandar la primera tecla.
 - `demoMoor` (`DEMO_MOOR=si|no`): si cruzar el borde del campamento compone el **Blood Moor** como
   nivel nuevo (el orden de DC-002.109: soltar la caché y las casillas del nivel que se deja antes de
   componer el siguiente). Por omisión `no`: no se probó todavía.
+- `combateCercaKnob` (`COMBATE_CERCA=si|no`, **DC-002.141**): con `si` el botón Y le pega al **bicho vivo
+  más cercano** de cada jugador y los relojes del modo (GH/DT/DD) y de la muerte corren para **todos** los
+  bichos. Con `no` (el defecto, la corrida de DC-002.126 bit a bit) el bicho de pelea es siempre
+  `bichos[0]`: **en cuanto el primero muere no arranca ni un golpe más** y el segundo bicho de la demo no
+  se puede matar de ninguna manera. El build de la demo (`build-demo-140.sh`) lo enciende.
 
 Además, con `demoKnob = "si"` el build de la demo apaga todo lo que aprieta solo: `GUION_POC=nada`,
 `INYECTAR_P1=0`, `GOLPE_AUTO=no`, `HABLAR_AUTO=no`, `RECOGER_AUTO=no`, `INVENTARIO_AUTO=no`,
@@ -77,12 +86,15 @@ DEMO140: CIERRE ...             el resumen: cuadros, segundos, fps medio/min/max
   (`antes= 0 despues= 4`, `estado= aceptada`, página 1 de la Den of Evil).
 - Tres golpes con Y bajan la vida del bicho **3 → 2 → 1 → muerto**, y el contador del motor avanza
   (`bajas= 1 de 2`, `LogUpdate(4)`, página 4).
+- **DC-002.141**: con `COMBATE_CERCA=si` la corrida del criterio mata **los dos bichos** (3 golpes cada
+  uno, `quedaSegunElMotor= 2 → 1 → 0`), la Den queda limpia (`estado= cueva-limpia`, página 5,
+  `recompensaPendiente= true`) y el cobro en Akara paga **`SkillPoint(1)`** (`bits 8198 → 8193`,
+  `estado= cobrada`, `log= COMPLETADA`). Cierre: `bajas= 2 limpias= true cobrada= true puntoDeHabilidad= 1`.
+  Ver `console/dc/evidencia/dc-002.141-den-limpia-y-cobro.txt`.
 
 ## Lo que NO (y por eso hay tarjetas aparte)
 
-- El **segundo bicho** quedó vivo (1 de 2 bajas): la Den no quedó limpia y el camino
-  COBRAR → punto de habilidad no se recorrió con un jugador.
-- El **texto del panel** de Akara no se pinta: el panel abre (356x396 y 500x81, con el texto del motor
-  en el log) y en pantalla queda el recuadro negro con el borde.
+- El **texto del panel** de Akara no se pinta: el panel abre (356x396 y 500x81, más las páginas del log
+  de 276x81 y 252x81, con el texto del motor en el log) y en pantalla queda el recuadro negro con el borde.
 - **8 fps no son los 18-20** del criterio: el cuadro jugable es de 124-131 ms.
 - La **salida al Blood Moor** (`DEMO_MOOR=si`) no se probó.

@@ -63,6 +63,10 @@ export QUEST=si
 export HUD=si
 export MINIMAPA=si
 export COMBATE=si
+# DC-002.141: el golpe va al bicho VIVO MAS CERCANO. Sin esto la demo con MONSTRUOS=2 solo puede matar el primero
+# (`bichoDePelea` devuelve siempre bichos[0]) y la Den no queda limpia: medido en la corrida de DC-002.140.
+# Se enciende por omision y se puede apagar con `COMBATE_CERCA=no ... build-demo-140.sh` para el A/B de la tarjeta.
+export COMBATE_CERCA="${COMBATE_CERCA:-si}"
 export DROP=si
 export INVENTARIO=si
 export ALIJO=si

@@ -1,0 +1,127 @@
+DC-002.141 -- LA DEN LIMPIA Y EL COBRO CON UN JUGADOR: EL SEGUNDO BICHO Y EL PUNTO DE HABILIDAD
+
+Build A (la demo, criterio):        /tmp/dcbuild/demo141c  (DEMO=si COMBATE_CERCA=si MEDIR_CUADRO=no, el resto las
+                                    palancas de build-demo-140.sh)
+Build B (el A/B de la palanca):     /tmp/dcbuild/demo141-no (igual, COMBATE_CERCA=no)
+Emulador: Flycast 2.7 sobre el .gdi del build; teclado virtual del kernel (/dev/uinput -> teclado del emulador ->
+bus maple -> servicio -> POC). Capturas con spectacle, ventana 640x480 en 900,120, keepAbove.
+Corridas: A 2026-11-03T17:09 (log /tmp/capturas-den141c/flycast.log), B 2026-11-03T17:16
+          (/tmp/capturas-den141-no/flycast.log). Primer cuadro a los 82 s en las dos.
+
+0. LO QUE FALTABA NO ERA SOLO EL GUION: EL GOLPE TENIA UNA SOLA VICTIMA POSIBLE
+   La tarjeta decia "nada de codigo nuevo en el motor: es el guion de teclas". No alcanza, y esta medido:
+   `combate_122.go: bichoDePelea()` devolvia SIEMPRE `bichos[0]` y el flanco del boton Y exige `b.vida.HP > 0`.
+   Con el primer bicho muerto no arranca NI UN ataque mas, asi que el segundo bicho no se puede matar de
+   ninguna manera y la Den no puede quedar limpia. La corrida del guion nuevo contra el binario de DC-002.140
+   (antes de la palanca) lo deja escrito: diez pulsaciones de Y sin un solo GOLPE-EMPIEZA.
+
+   DEMO140: MATA bicho= 0 bajas= 1 de 2 vivos= 1 quedaSegunElMotor= 1 pagina= 4 cuadro= 97
+   DEMO140: BOTON cuadro= 103 botones= 512 celda= 39.0541 6.22271     <- 10 pulsaciones de Y (512) en la calle
+   DEMO140: BOTON cuadro= 116 botones= 512 celda= 39.0541 6.22271        del segundo bicho, a 0,2 celdas de su
+   DEMO140: BOTON cuadro= 151 botones= 512 celda= 39.5314 6.7            calle (x+y=46) y con el bicho pasando a
+   DEMO140: BOTON cuadro= 245 botones= 512 celda= 39.5314 6.7            2-7 subtiles: NINGUN golpe arranco
+   (log /tmp/capturas-den141/flycast.log: hay DEMO140: BOTON 512 y NO hay ni un JUEGO122: GOLPE-EMPIEZA despues
+   del cuadro 97)
+
+   LA PALANCA QUE LO CIERRA: `combateCercaKnob` (`COMBATE_CERCA=si|no`, por omision `no`, la corrida de
+   DC-002.126 bit a bit). Con "si": cada jugador pega al bicho VIVO MAS CERCANO (`bichoDePeleaDe`, la victima se
+   fija en el flanco y no cambia hasta que la animacion termina) y los relojes del modo (GH/DT/DD) y de la muerte
+   corren para TODOS los bichos, para que el segundo cadaver tambien se anime y expire. El build de la demo lo
+   enciende; `COMBATE_CERCA=no bash build-demo-140.sh` lo apaga para el A/B. El log dice con que regla se jugo:
+   JUEGO122: COMBATE VICTIMA regla= elVivoMasCercano bichos= 2      (build A)
+   JUEGO122: COMBATE VICTIMA regla= elPrimero bichos= 2             (build B)
+
+1. EL RECORRIDO, CELDA POR CELDA (la cruceta mueve 1,84-1,87 celdas/s; alcance del golpe 7 subtiles = 1,4 celdas)
+   DEMO140: ESCENARIO jugador= 37 6 bichos= 2 npcs= 4 quest= si nivel= TownN1 ...
+   DEMO140: AKARA celda= 38.4 3.2 distancia= 3.1305 radioDeHabla= 2
+   DEMO140: BICHO 0 celda= 38 7 vida= 3 patrulla= 38 7 -> 40 5             (calle x+y=45)
+   DEMO140: BICHO 1 celda= 38.5 7.5 vida= 3 patrulla= 38.5 7.5 -> 40.5 5.5 (calle x+y=46)
+
+   tecla          desde -> hasta                     lo que hace
+   derecha 1.2    (37,6) -> (38.4849,4.51508)       a Akara, a 1,18 del radio de habla 2
+   s 0.4          quieto                            boton X: toma la Den of Evil (pagina 1)
+   abajo+izq 1    (38.4849,4.51508)->(39.0541,6.22271)  a la calle x+y=45 (x+y=45.28)
+   d 0.4 x4       quieto                            3 golpes matan al bicho de 3 HP
+   abajo 0.35     (39.0541,6.22271)->(39.5314,6.7)  cruza a la calle x+y=46 (x+y=46.23), a 0,16 celdas de ella
+   d 0.4 x11      quieto                            martilla: el bicho patrulla la calle y queda en el medio
+   arriba+der 2   (39.5314,6.7) -> (38.3456,3.14244) vuelve a Akara (direccion (-0.32,-0.95) por celda)
+   s 0.4          quieto                            boton X: COBRA
+
+   JUEGO121: TRAMO DERECHA dir= 12 cuadros= 9 desdeElCuadro= 17 segundos= 1.141 subtiles= 10.5 celdas= 2.1
+             celdasPorSegundo= 1.84049 subtilesPorSegundo= 9.20245 teoricoSubtilesPorSegundo= 9.375
+             celdaIni= 37 6 celdaFin= 38.4849 4.51508
+   JUEGO121: TRAMO ABAJO+IZQUIERDA dir= 1 cuadros= 6 desdeElCuadro= 57 segundos= 0.973 subtiles= 9 celdas= 1.8
+             celdasPorSegundo= 1.84995 celdaIni= 38.4849 4.51508 celdaFin= 39.0541 6.22271
+   JUEGO121: TRAMO ABAJO dir= 0 cuadros= 3 desdeElCuadro= 117 segundos= 0.363 subtiles= 3.375 celdas= 0.675
+             celdasPorSegundo= 1.8595 celdaIni= 39.0541 6.22271 celdaFin= 39.5314 6.7
+   JUEGO121: TRAMO ARRIBA+DERECHA dir= 9 cuadros= 15 desdeElCuadro= 243 segundos= 2.005 subtiles= 18.75
+             celdas= 3.75 celdasPorSegundo= 1.87032 celdaIni= 39.5314 6.7 celdaFin= 38.3456 3.14244
+
+2. LAS DOS BAJAS, CONTADAS POR EL MOTOR (6 golpes, 6 danos, 0 fuera de alcance, 3 y 3)
+   JUEGO122: GOLPE ataque= 1 ... dano= 1 vidaAntes= 3 vidaDespues= 2 ... dx= 0  dy= -2 distancia= 0 alcance= 7
+   JUEGO122: GOLPE ataque= 2 ... dano= 1 vidaAntes= 3 vidaDespues= 2 ... dx= 5  dy= -2 distancia= 6 alcance= 7
+   JUEGO122: GOLPE ataque= 3 ... dano= 1 vidaAntes= 2 vidaDespues= 1 ... dx= 2  dy= -4 distancia= 4 alcance= 7
+   JUEGO122: GOLPE ataque= 4 ... dano= 1 vidaAntes= 2 vidaDespues= 1 ... dx= 5  dy= -2 distancia= 6 alcance= 7
+   JUEGO122: GOLPE ataque= 5 ... dano= 1 vidaAntes= 1 vidaDespues= 0 muerto= true dx= 3  dy= -4 distancia= 5
+   JUEGO122: GOLPE ataque= 6 ... dano= 1 vidaAntes= 1 vidaDespues= 0 muerto= true dx= -1 dy= -5 distancia= 5
+   DEMO140: MATA bicho= 1 bajas= 1 de 2 vivos= 1 quedaSegunElMotor= 1 pagina= 4 cuadro= 131
+   DEMO140: MATA bicho= 0 bajas= 2 de 2 vivos= 0 quedaSegunElMotor= 0 pagina= 4 cuadro= 140
+      (el segundo que muere es el BICHO 0 y el primero el BICHO 1: el jugador se para en el medio de la calle del
+       segundo y desde ahi el mas cercano es ese; lo que importa es que mueren los DOS y `quedaSegunElMotor`
+       llega a 0, que es la cuenta del motor, no la del POC)
+
+3. LA DEN LIMPIA (el reloj del motor pasa la pagina a "volve con Akara")
+   JUEGO128: QUEST BIT paso= DEMO-MATA slot= 1 antes= 4 despues= 8196 motivo= Den of Evil cleared estado= 4
+   JUEGO128: QUEST BIT paso= DEMO-MATA slot= 1 antes= 8196 despues= 8198 motivo= Den of Evil cleared estado= 4
+   JUEGO128: QUEST EFECTOS paso= DEMO-MATA efectos= 1 Sound(35)
+   DEMO140: QUEST LIMPIA bajas= 2 estado= cueva-limpia pagina= 5 recompensaPendiente= true marcador= true
+            cuadro= 140
+   JUEGO128: QUEST PANEL cuadro= 140 npc= AKARA pagina= 5 renglones= 3 panel= 276 x 81 bytes= 22356
+             texto= Return to Akara for a reward.
+
+4. EL COBRO: EL PUNTO DE HABILIDAD (Hear 76, el nodo A1Q1)
+   DEMO140: COBRA con Akara (boton X) jugador= 38.3456 3.14244 cuadro= 270
+   JUEGO128: QUEST BIT paso= DEMO-COBRA slot= 1 antes= 8198 despues= 8199 motivo= Akara reward claimed estado= 5
+   JUEGO128: QUEST BIT paso= DEMO-COBRA slot= 1 antes= 8199 despues= 8197 motivo= reward taken estado= 5
+   JUEGO128: QUEST BIT paso= DEMO-COBRA slot= 1 antes= 8197 despues= 8193 motivo= quest complete estado= 5
+   JUEGO128: QUEST EFECTOS paso= DEMO-COBRA efectos= 3 SkillPoint(1) Respec(0) LogUpdate(13)
+   DEMO140: QUEST COBRADA cumple= true puntoDeHabilidad= 1 estado= cobrada log= COMPLETADA cuadro= 270
+   JUEGO128: QUEST PANEL cuadro= 270 npc= AKARA pagina= 13 renglones= 3 panel= 252 x 81 bytes= 20412
+
+5. EL CIERRE DE LA CORRIDA (dos informes, el mismo numero)
+   DEMO140: CIERRE cuadros= 300 segundos= 50 fpsMedio= 6 fpsMinimo= 3 fpsMaximo= 8 informes= 10
+   DEMO140: CIERRE QUEST aceptada= true bajas= 2 limpias= true cobrada= true puntoDeHabilidad= 1
+   DEMO140: CIERRE cuadros= 600 segundos= 88 fpsMedio= 7 fpsMinimo= 3 fpsMaximo= 8 informes= 20
+   DEMO140: CIERRE QUEST aceptada= true bajas= 2 limpias= true cobrada= true puntoDeHabilidad= 1
+   DEMO140: CIERRE MUNDO nivel= TownN1 salio= false recorrido= 0 celda= 38.3456 3.14244
+
+6. LAS CAPTURAS (recortadas a la ventana del emulador, 640x480, de la corrida A)
+   dc-002.141-panel-recompensa.png  la pagina 5 del log en el panel (276x81), el cuadro 140: el texto del motor es
+                                    "Return to Akara for a reward."  (el panel se dibuja; el TEXTO no se pinta,
+                                    defecto abierto de DC-002.127 -- en la captura queda el recuadro y el borde)
+   dc-002.141-panel-cobrada.png     el panel ya cobrado (252x81), pagina 13, con el jugador al lado de Akara
+   El panel se distingue por su ancho: 498-500 px = pagina 1 (aceptada), 274-276 = pagina 5 (por cobrar),
+   250-252 = pagina 13 (cobrada); medido en las capturas c05..c17..c18 con /tmp/medir-panel-141.py.
+
+7. EL A/B DE LA PALANCA: MISMO BINARIO, MISMO GUION, COMBATE_CERCA=no -> 1 DE 2
+   JUEGO122: COMBATE VICTIMA regla= elPrimero bichos= 2
+   JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 1 bicho= B1 ... vida= 3 cuadro= 81
+   JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 2 bicho= B1 ... vida= 2 cuadro= 94
+   JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 3 bicho= B1 ... vida= 1 cuadro= 107
+   (y ni uno mas: las otras pulsaciones de Y del guion no arrancan ataque)
+   DEMO140: MATA bicho= 0 bajas= 1 de 2 vivos= 1 quedaSegunElMotor= 1 pagina= 4 cuadro= 110
+   DEMO140: BOTON cuadro= 329 botones= 1024 celda= 38.139 2.84104      <- el jugador APRETO X al lado de Akara
+   DEMO140: CIERRE QUEST aceptada= true bajas= 1 limpias= false cobrada= false puntoDeHabilidad= 0
+   La palanca es la unica diferencia: A mata 2 y cobra, B mata 1 y no puede cobrar (la quest no esta limpia).
+
+8. LO QUE NO CAMBIA (la regresion de las otras tarjetas)
+   Con `combateCercaKnob = "no"` el camino es el de DC-002.126: `bichoDePelea()` -> `bichos[0]`, un solo reloj de
+   modo y de muerte, y el A/B de arriba lo corre igual. Los unicos cambios fuera de la palanca son de LOG (el
+   "bicho=" del GOLPE-EMPIEZA y la linea COMBATE VICTIMA) y una guarda `b != nil` en el flanco (el bicho de pelea
+   nunca es nil en el camino viejo). El guion de teclas por omision de run-demo-140.sh pasa a ser el del criterio.
+
+9. SIGUE ABIERTO (tarjetas aparte)
+   - El TEXTO del panel no se pinta: el panel abre con el texto del motor en el log (500x81, 276x81, 252x81) y en
+     pantalla queda el recuadro negro con el borde (DC-002.127).
+   - 8 fps contra los 18-20 del criterio: el cuadro jugable es de 124-131 ms (DC-002.139 /.142).
+   - El Blood Moor (`DEMO_MOOR=si`) no se ejecuto.

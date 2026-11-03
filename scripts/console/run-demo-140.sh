@@ -15,16 +15,24 @@
 #
 # Uso:
 #   run-demo-140.sh <disc.gdi> [dir_salida] [x y]
-#   GUION='nada 8 derecha 2 nada 1 x 0.3 ...' CAPTURAS=40 bash scripts/console/run-demo-140.sh ...
+#   GUION='nada 6 derecha 1.2 nada 0.5 s 0.4 ...' SEGUNDOS=72 INTERVALO=2 bash scripts/console/run-demo-140.sh ...
 #
-# EL GUION DE TECLAS (por omision, el recorrido del criterio):
-#   nada 8          dejar que cargue el mundo (el POC tarda ~60 s desde el disco hasta el primer cuadro)
-#   derecha 2.2     caminar hacia Akara (la proyeccion iso: derecha = +x -y en celdas)
-#   x 0.3           HABLAR con Akara: abre el panel y toma la Den of Evil
-#   nada 1.2
-#   abajo 1   ...   alejarse de Akara y buscar el bicho (aparece a +1 +1 de la celda de arranque)
-#   y 0.25 (x5)     GOLPEAR: el boton Y, un pulso corto por golpe
-#   x 0.3           volver a Akara y COBRAR
+# EL GUION DE TECLAS (por omision, el recorrido del CRITERIO de DC-002.141: la Den limpia y el cobro).
+# OJO CON LAS TECLAS: `s` = boton X y `d` = boton Y. Las teclas `x` e `y` NO producen boton en el emulador (medido en
+# dc-002.71 y re-medido en DC-002.140): con `x`/`y` el guion no hace nada y la corrida no se mueve.
+#   nada 6            dejar que cargue el mundo y se asiente el primer cuadro
+#   derecha 1.2       caminar a Akara: derecha = +x -y en celdas; de (37,6) a (38.64,4.36), radio de habla 2
+#   s 0.4             HABLAR con Akara (boton X): toma la Den of Evil y abre el panel de la quest (pagina 1)
+#   nada 2
+#   abajo+izquierda 1 a la CALLE DEL PRIMER BICHO: (38.64,4.36) -> (39.05,6.22), x+y=45 = la calle (38,7)->(40,5)
+#   d 0.4 (x4)        GOLPEAR con Y: 3 golpes de 1 de dano matan al bicho de 3 HP (el 4o sobra)
+#   abajo 0.35        cruzar a la CALLE DEL SEGUNDO BICHO: (39.05,6.22) -> (39.53,6.7), x+y=46 = (38.5,7.5)->(40.5,5.5)
+#   d 0.4 (x10)       GOLPEAR: el bicho patrulla la calle, asi que se martilla; 3 golpes lo matan
+#   arriba+derecha 2  volver a Akara: (-0.32,-0.95) por celda lleva de (39.53,6.7) a (38.43,2.77), a 0.43 de Akara
+#   s 0.4             COBRAR: Hear(76), el punto de habilidad y el panel con la quest cerrada
+#
+# La duracion de cada tramo NO es la del teclado fisico: la cruceta mueve 1,82-1,87 celdas/s (medido), asi que los
+# numeros de arriba son los que dejan al jugador dentro del alcance de 7 subtiles de cada bicho.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -46,8 +54,9 @@ PYTHON="${DC_PYTHON:-python3}"
 ESPERA_ARRANQUE="${ESPERA_ARRANQUE:-420}"
 INTERVALO="${INTERVALO:-2}"
 PAUSA="${PAUSA:-0.35}"
-SEGUNDOS="${SEGUNDOS:-120}"
-GUION="${GUION:-nada 8 derecha 2.2 nada 0.6 x 0.3 nada 1.2 abajo 1.6 nada 0.6 y 0.25 nada 0.5 y 0.25 nada 0.5 y 0.25 nada 0.5 y 0.25 nada 0.5 y 0.25 nada 0.5 y 0.25 nada 1.0 arriba 2.0 x 0.3 nada 1.0 y 0.25 nada 0.5 y 0.25}"
+SEGUNDOS="${SEGUNDOS:-72}"
+# EL GUION DEL CRITERIO DE DC-002.141 (ver el comentario de arriba). Las teclas que cuentan: `s` = X, `d` = Y.
+GUION="${GUION:-nada 6 derecha 1.2 nada 0.5 s 0.4 nada 2 abajo+izquierda 1 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 abajo 0.35 nada 0.6 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 d 0.4 nada 0.5 arriba+derecha 2 nada 0.6 s 0.4 nada 3}"
 
 mkdir -p "$OUT"
 rm -f "$OUT"/c*.png 2>/dev/null

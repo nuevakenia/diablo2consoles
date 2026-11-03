@@ -400,6 +400,13 @@ const (
 	// bit (el bicho patrulla y no hay vida ni golpe). Es el A/B de la tarjeta.
 	combateKnob = "si"
 
+	// combateCercaKnob (DC-002.141): "si" = el boton Y le pega al bicho VIVO MAS CERCANO de cada jugador y los
+	// relojes del modo (GH/DT/DD) y de la muerte corren para TODOS los bichos. Es lo que hace falta para matar el
+	// segundo bicho de la demo (`MONSTRUOS=2`): con "no" (el defecto) el bicho de pelea es SIEMPRE el primero de la
+	// corrida (`bichoDePelea`), que es la corrida de DC-002.126 bit a bit -- y con el primer bicho muerto no arranca
+	// ni un golpe mas.
+	combateCercaKnob = "no"
+
 	// alcanceGolpe: la distancia de borde, EN LAS UNIDADES DE LA TABLA DEL EXE, a la que llega el golpe del heroe
 	// desarmado. El 7 es `meleeInRange`, el valor VERIFICADO del exe (`d2core/d2monsters/director.go`); con la
 	// tabla de `UNIT_GetTableDistance` (`d2common/d2skill`, que es la que se usa en `alcance_122.go`) eso deja

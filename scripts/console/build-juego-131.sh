@@ -278,6 +278,8 @@ echo "   BICHO monstruos=$(leer_knob monstruosKnob) patrulla=$(leer_knob patrull
 
 # LAS DE ESTA TARJETA (DC-002.122): EL GOLPE. COMBATE=no apaga la vida y el golpe (la corrida es la de DC-002.121).
 [ -n "${COMBATE:-}" ] && pisa_knob combateKnob "$COMBATE" 1
+# DC-002.141: COMBATE_CERCA=si le pega al bicho vivo mas cercano (y los relojes del modo corren para todos).
+[ -n "${COMBATE_CERCA:-}" ] && pisa_knob combateCercaKnob "$COMBATE_CERCA" 1
 [ -n "${GOLPE_AUTO:-}" ] && pisa_knob golpeAuto "$GOLPE_AUTO" 1
 [ -n "${ALCANCE:-}" ] && pisa_knob alcanceGolpe "$ALCANCE"
 [ -n "${DIRS_ATAQUE:-}" ] && pisa_knob dirsAtaque "$DIRS_ATAQUE"

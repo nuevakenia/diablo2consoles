@@ -292,6 +292,14 @@ func demoCierraLaCueva() {
 		"pagina=", questJuego.LogPage(q),
 		"recompensaPendiente=", q != nil && questJuego.Rec.Get(q.Slot, d2quest.FlagRewardPending),
 		"marcador=", questJuego.Marker(d2quest.NPCAkara), "cuadro=", cuadro+1)
+
+	// EL PANEL DE LA RECOMPENSA (DC-002.141): la misma pagina del log que muestra el camino de DC-002.128 cuando la
+	// cueva queda limpia (`questAbreElPanel`, el panel de DC-002.127 con el texto del `string.tbl`). Es lo que hace
+	// que la captura de la corrida sea la del PANEL de la quest y no solo un numero en el log; el texto del panel
+	// todavia no se pinta (defecto abierto de DC-002.127), pero la geometria y la pagina son las del motor.
+	if demoLimpia && q != nil {
+		questAbreElPanel("AKARA", questJuego.LogPage(q))
+	}
 }
 
 // demoCobraLaRecompensa: Akara paga. `Hear(76)` es el mensaje del nodo A1Q1 que cierra la quest y emite el punto
@@ -325,6 +333,12 @@ func demoCobraLaRecompensa() {
 
 	println("DEMO140: QUEST COBRADA cumple=", demoCobrada, "puntoDeHabilidad=", demoPunto,
 		"estado=", estadoDeLaQuest(q), "log=", estadoDelLogDeLaQuest(), "cuadro=", cuadro+1)
+
+	// EL PANEL DE LA RECOMPENSA ya cobrada: la pagina del log que dejo el motor (`UPDATE_LOG_ADD 13`, la de
+	// "COMPLETADA"), por el mismo camino de DC-002.128. La captura de este cuadro es el panel con la quest cerrada.
+	if demoCobrada && q != nil {
+		questAbreElPanel("AKARA", questJuego.LogPage(q))
+	}
 }
 
 // ============================== LA SALIDA DEL PUEBLO (EL BLOOD MOOR) ==============================

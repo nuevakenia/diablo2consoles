@@ -327,6 +327,10 @@ func cargarBichos() {
 	// dado) y ANTES de soltar el d2data (los COF de GH/DT/DD salen de ahi, igual que los de caminar).
 	if combateKnob == "si" {
 		cargarCombateDelBicho(datos, ida, vuelta)
+
+		// DC-002.141: se dice con que regla se elige la victima del golpe (el primero de la corrida o el vivo mas
+		// cercano), para que el log de la corrida no haya que adivinarlo.
+		println("JUEGO122: COMBATE VICTIMA regla=", reglaDeLaVictima(), "bichos=", len(bichos))
 	} else {
 		println("JUEGO122: COMBATE apagado (combate=", combateKnob, "): el bicho patrulla y no pelea")
 	}

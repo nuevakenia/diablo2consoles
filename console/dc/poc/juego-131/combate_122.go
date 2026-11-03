@@ -67,6 +67,10 @@ type ataqueDeJugador struct {
 	Apretado bool
 	Antes    bool
 
+	// la victima de ESTE ataque (DC-002.141): el bicho al que se le empezo a pegar. Se fija en el flanco y no
+	// cambia hasta que la animacion termina, asi el dano de la mitad del golpe cae sobre el mismo bicho.
+	Bicho *bicho
+
 	// el ataque en curso
 	Golpeando bool
 	Dado      bool  // el dano de ESTE ataque ya se aplico (cae a la mitad de la animacion)
@@ -241,6 +245,15 @@ func cicloDeAtaque(dir int) *CicloDelJugador {
 // cae el golpe: si el bicho esta en alcance le baja la vida (y si llega a 0, muere); si no, se cuenta y no pasa
 // nada. Despues corre el reloj del modo del bicho (GH -> caminar, DT -> DD).
 func combateDelCuadro(ahora int64) {
+	// DC-002.141: con `combateCercaKnob = "si"` el golpe va al bicho VIVO mas cercano de cada jugador y los relojes
+	// del modo corren para TODOS los bichos (la demo con MONSTRUOS=2 tiene que poder matar los dos). Con "no", la
+	// corrida es la de DC-002.126 bit a bit: un solo bicho de pelea, el primero de la corrida (`bichoDePelea`).
+	if combateCercaKnob == "si" {
+		combateConTodosLosBichos(ahora)
+
+		return
+	}
+
 	b := bichoDePelea()
 
 	if b == nil || b.Vida == nil || b.Combate == nil {
@@ -262,6 +275,56 @@ func combateDelCuadro(ahora int64) {
 	pasoDelModoDelBicho(b, ahora)
 }
 
+// combateConTodosLosBichos: el cuadro de pelea con MAS DE UN bicho (DC-002.141).
+//
+// EL DEFECTO QUE ARREGLA, medido en la corrida de DC-002.140: `bichoDePelea` devuelve SIEMPRE `bichos[0]`, asi que
+// en cuanto el primer bicho muere no arranca ni un ataque mas (`b.Vida.HP > 0` lo impide en el flanco) y el segundo
+// bicho de la demo no se puede matar de ninguna manera: la Den no queda limpia y la quest no se puede cobrar. Aca
+// cada jugador pega al bicho vivo mas cercano (`bichoDePeleaDe`) y los relojes del modo (GH/DT/DD) y de la muerte
+// corren para todos, que es lo que hacia falta para que el segundo cadaver tambien se anime y expire.
+func combateConTodosLosBichos(ahora int64) {
+	for i, p := range jugadores {
+		if i >= len(ataques) {
+			continue
+		}
+
+		pasoDeUnAtaque(p, ataques[i], bichoDePeleaDe(p, ataques[i]), ahora)
+	}
+
+	for _, b := range bichos {
+		pasoDeLaMuerte(b, ahora)
+		pasoDelModoDelBicho(b, ahora)
+	}
+}
+
+// bichoDePeleaDe: el bicho que ESTE jugador esta peleando. Mientras la animacion del golpe corre es el que se
+// eligio al empezar (el golpe que ya esta en el aire no cambia de victima); con el boton levantado, el bicho vivo
+// mas cercano al jugador. nil si no queda ninguno con vida: `pasoDeUnAtaque` no arranca nada sin victima.
+func bichoDePeleaDe(p *participante, a *ataqueDeJugador) *bicho {
+	if a != nil && a.Golpeando && a.Bicho != nil {
+		return a.Bicho
+	}
+
+	var mejor *bicho
+
+	mejorD := 0
+
+	for _, b := range bichos {
+		if b == nil || b.Vida == nil || b.Combate == nil || b.Vida.HP <= 0 {
+			continue
+		}
+
+		dx, dy := separacionDelBicho(p, b)
+		d := dx*dx + dy*dy
+
+		if mejor == nil || d < mejorD {
+			mejor, mejorD = b, d
+		}
+	}
+
+	return mejor
+}
+
 // bichoDePelea: el bicho al que se le pega. Es el PRIMERO de la corrida: la tarjeta pide que los cuatro puedan
 // pegarle AL MISMO monstruo.
 func bichoDePelea() *bicho {
@@ -270,6 +333,15 @@ func bichoDePelea() *bicho {
 	}
 
 	return bichos[0]
+}
+
+// reglaDeLaVictima: con que regla se elige el bicho del golpe, para el log (DC-002.141).
+func reglaDeLaVictima() string {
+	if combateCercaKnob == "si" {
+		return "elVivoMasCercano"
+	}
+
+	return "elPrimero"
 }
 
 // pasoDeUnAtaque: un cuadro del golpe de un jugador.
@@ -281,9 +353,11 @@ func pasoDeUnAtaque(p *participante, a *ataqueDeJugador, b *bicho, ahora int64) 
 	apretado := p.Entrada.IsKeyPressed(d2enum.KeyY)
 
 	// EL FLANCO: una pulsacion es un ataque. No se encadenan golpes con el boton apretado, y no se arranca otro
-	// golpe en medio de uno (el POC rechaza el ataque, igual que en el juego).
-	if apretado && !a.Antes && !a.Golpeando && b.Vida.HP > 0 {
+	// golpe en medio de uno (el POC rechaza el ataque, igual que en el juego). DC-002.141: sin victima (todos los
+	// bichos muertos) tampoco arranca: `b` puede venir nil de `bichoDePeleaDe`.
+	if apretado && !a.Antes && !a.Golpeando && b != nil && b.Vida != nil && b.Vida.HP > 0 {
 		a.Golpeando = true
+		a.Bicho = b
 		a.Dado = false
 		a.MsInicio = ahora
 		a.Ataques++
@@ -303,8 +377,8 @@ func pasoDeUnAtaque(p *participante, a *ataqueDeJugador, b *bicho, ahora int64) 
 			}
 		}
 
-		println("JUEGO122: GOLPE-EMPIEZA jugador=", a.Nombre, "ataque=", a.Ataques, "dir=", a.Direccion,
-			"dirDibujada=", dibujada, "dirPropia=", ciclosAtaque[a.Direccion] != nil, "vida=", b.Vida.HP,
+		println("JUEGO122: GOLPE-EMPIEZA jugador=", a.Nombre, "ataque=", a.Ataques, "bicho=", b.Nombre, "dir=",
+			a.Direccion, "dirDibujada=", dibujada, "dirPropia=", ciclosAtaque[a.Direccion] != nil, "vida=", b.Vida.HP,
 			"cuadro=", cuadro)
 	}
 
