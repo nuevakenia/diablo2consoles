@@ -52,22 +52,35 @@ type Cell struct {
 	Kind Layer
 }
 
-type posKey struct {
-	layer Layer
-	x, y  int
+// DC-002.130: LAS CLAVES DE LOS MAPAS DEL MODELO VAN EMPAQUETADAS EN UN ENTERO, no en una estructura.
+//
+// POR QUE. Medido en la consola (Flycast, SH4): con clave de estructura (`posKey`, `tileKey`) la PRIMERA escritura
+// de mapa de la corrida -`m.seen[tk] = true`, el primer renglon del primer revelado- moria con `Illegal
+// instruction` en `runtime.mapassign` (gccgo 15 cruzado a sh-elf; el PC resuelve ahi y no hay linea). Con clave
+// entera los mismos mapas escriben y el revelado sigue. El rango de sobra para el modelo: la capa es 0..2, x e y
+// son celdas en escala 10 (el pueblo entero mide 570x410) y el indice de casilla es el de `Tiles` (menos de 64).
+const sesgoDeCelda = 1 << 19 // x e y se guardan en 20 bits con este sesgo, para que entren negativos
+
+// celKey empaqueta (capa, x, y) en un entero: capa en los 8 bits altos, x en 20, y en 20.
+func celKey(l Layer, x, y int) uint64 {
+	return uint64(l)<<56 | (uint64(x+sesgoDeCelda)&0xFFFFF)<<20 | (uint64(y+sesgoDeCelda) & 0xFFFFF)
 }
 
-type tileKey struct {
-	layer Layer
-	x, y  int
-	idx   int
+// celKeyPartes deshace celKey.
+func celKeyPartes(k uint64) (l Layer, x, y int) {
+	return Layer(k >> 56), int((k>>20)&0xFFFFF) - sesgoDeCelda, int(k&0xFFFFF) - sesgoDeCelda
+}
+
+// vistoKey empaqueta (capa, tx, ty, indice de casilla) en un entero: capa 4 bits, tx 16, ty 16, indice 12.
+func vistoKey(l Layer, x, y, i int) uint64 {
+	return uint64(l)<<60 | uint64(x&0xFFFF)<<44 | uint64(y&0xFFFF)<<28 | uint64(i&0xFFF)
 }
 
 // Model is the revealed part of one level's automap.
 type Model struct {
-	cells map[posKey][]int
+	cells map[uint64][]int
 	count [numLayers]int
-	seen  map[tileKey]bool // tiles already processed (the engine's flag 0x40000)
+	seen  map[uint64]bool // tiles already processed (the engine's flag 0x40000)
 
 	sorted  []Cell
 	isDirty bool
@@ -75,13 +88,13 @@ type Model struct {
 
 // NewModel returns an empty model.
 func NewModel() *Model {
-	return &Model{cells: map[posKey][]int{}, seen: map[tileKey]bool{}}
+	return &Model{cells: map[uint64][]int{}, seen: map[uint64]bool{}}
 }
 
 // Add inserts a cell. It returns false for a duplicate (same position and
 // layer where the new cel is ungrouped or shares the group of an existing one).
 func (m *Model) Add(l Layer, x, y, cel int) bool {
-	k := posKey{l, x, y}
+	k := celKey(l, x, y)
 	for _, e := range m.cells[k] {
 		if e == cel {
 			return false
@@ -121,8 +134,10 @@ func (m *Model) Cells() []Cell {
 	out := make([]Cell, 0, m.Count())
 
 	for k, cels := range m.cells {
+		l, x, y := celKeyPartes(k)
+
 		for _, c := range cels {
-			out = append(out, Cell{X: k.x, Y: k.y, Cel: c, Kind: k.layer})
+			out = append(out, Cell{X: x, Y: y, Cel: c, Kind: l})
 		}
 	}
 
@@ -221,7 +236,7 @@ func (m *Model) RevealTiles(t *Table, src TileSource, level int, seed uint32, he
 			}
 
 			for i, ref := range src.Tiles(tx, ty) {
-				tk := tileKey{ref.Layer, tx, ty, i}
+				tk := vistoKey(ref.Layer, tx, ty, i)
 				if m.seen[tk] {
 					continue
 				}

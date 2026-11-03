@@ -1,0 +1,145 @@
+DC-002.130 -- EL MINIMAPA: `d2automap` PORTADO Y MEDIDO EN LA CONSOLA
+========================================================================
+Tarjeta: t_28c91cdb (etapa E5 de docs/PLAN-JUEGO.md).
+Rama DC-002, checkout unico /home/dgalli/Proyectos/diablo2consoles.
+Corrida del criterio: Flycast, ventana 640x480 1:1, /tmp/capturas-130j (34 capturas).
+
+QUE SE ENTREGA
+--------------
+El POC de DC-002.128 con el MINIMAPA del pueblo dibujado en la caja del motor (359,57)-(638,282):
+el MODELO de `d2common/d2automap` portado tal cual (no un minimapa propio), el REVEAL siguiendo al
+jugador, el arte de `maximap.dc6` decimado a 8x16 en el MONTON DE C, y el costo por cuadro y la
+memoria medidos DENTRO de la misma corrida (crc32 del lienzo antes y despues de dibujar).
+
+    JUEGO130: MINIMAPA CRITERIO seDibujo= true pintoPixeles= true elRevealSigueAlJugador= true
+              celdasEnLaCaja= 62 msPorCuadro= 31 arteEnElMontonDeC= true decision= siempre
+
+1. EL PRESUPUESTO, RE-MEDIDO ANTES DE PORTAR (console/dc/sonda-automap-130)
+---------------------------------------------------------------------------
+   d2automap: 11 archivos, cierre de 65 paquetes SIN ebiten y SIN d2asset -> portable.
+   AutoMap.txt: 122.022 B, 2.603 filas, parsea con el lector del motor.
+   Tabla entera: 2.603 filas / 271.144 B de payload.  Del pueblo (nivel 1 "1 Town"): 83 filas / 6.176 B.
+   A/B de la tabla FILTRADA (`ParseTxtLevels`):  celdas=680 crc32=1625705642 en las dos, fila por fila
+   iguales -> filtrar NO cambia el modelo, y ahorra 265 KB.
+   REVEAL del pueblo entero: 680 celdas (514 piso + 166 pared) = 21.760 B de celdas de 32 B;
+   en mapas de Go eso son 126.480 B medidos con runtime.ReadMemStats.
+   Arte: `maximap.dc6` 234.458 B, 1.260 cuadros de 16x32; la tabla del pueblo pide 59 (46 distintos en
+   las 680 celdas).  El "minimapa" de 8x16 que pide el motor (`maximaps.dc6`) NO EXISTE en ningun MPQ
+   (medido): se decima 1 de cada 2 px y quedan 7.552 B (128 B por cuadro, 4 veces menos que 512).
+   Recorte: con la caja del POC (640x480) caen adentro 610 de las 680 celdas.
+
+2. QUE SE PORTO
+---------------
+   - El MODELO: `Model.Add`, `RevealTiles` con `ScreenArea(640,480)`, `MovedFar` como disparador del
+     revelado (el mismo del motor), `WorldCell`, `MiniBoxOffsets` + `ComputeLayoutOffsets(SizeMini...)`
+     para la proyeccion y el `Clip` de la caja, `Cells()` en el orden del motor (capa, y, x, cuadro).
+   - El MARCADOR del heroe: la polilinea del motor (12 puntos, cada coordenada duplicada) y su color.
+   - La TABLA filtrada al nivel 1 con `d2automap.ParseTxtLevels` (nuevo, en d2common/d2automap/table.go).
+   - El ARTE decodificado y decimado a 8x16, guardado en el MONTON DE C (128 B por cuadro).
+
+3. LAS CUATRO PAREDES QUE APARECIERON AL CARGARLO EN LA CONSOLA (las cuatro medidas)
+------------------------------------------------------------------------------------
+   (a) EL BUFFER DEL PARSER DEL MOTOR. `parseTxt` pedia `sc.Buffer(make([]byte, 1<<20), 1<<20)`, o sea
+       1 MB para leer un TSV cuyas lineas no pasan de ~200 B. En el host no se nota; en la consola el POC
+       llega a ese parseo con el semiespacio al 91 % y el `make` de 1 MB es OOM: la carga del minimapa
+       tardo 76.658 ms (setenta y seis segundos de recolecciones completas) y murio. Con 8 KB de buffer inicial y 64 KB
+       de tope la misma carga tarda 1.325 ms.
+   (b) `fuente.Pedir` PIDE EL ARCHIVO ENTERO AL HEAP (`make([]byte, 122022)`). Con el semiespacio al 91 %
+       eso es OOM. La tabla se lee POR EL FLUJO (`Fuente.Open` + el scanner del motor): 1 KB de buffer y
+       83 filas de salida.
+   (c) EL DC6 ENTERO NO ENTRA EN NINGUN LADO: ni en el heap (234.458 B) ni como bloque del monton de C
+       (la cuenta de externos del recolector revienta y tira `gc_external_alloc: OOM`). Se lee la
+       cabecera (24 B) y la tabla de punteros (5.040 B) por el flujo, y despues SOLO los 59 cuadros que
+       el pueblo pide: a cada uno se le arma un DC6 de un cuadro y lo decodifica el decodificador del
+       motor. Ojo: los punteros del archivo traen relleno entre cuadros; si no se recorta al `Length` de
+       la cabecera del cuadro, la consola tira `panic: slice bounds out of range` (medido).
+   (d) `d2c_soltar_bloque` SOBRE UN BLOQUE DE `d2c_pedir_bloque` DEJA EL RECOLECTOR MAL: devolver el
+       bloque de 122 KB y el de 234 KB funcionaba de memoria (el monton de C volvia a 1,34 MB) pero la
+       PRIMERA escritura de mapa de la corrida moria con `Illegal instruction` en `runtime.mapassign`.
+
+   Y LA PARED GRANDE, que no era memoria:
+   (e) CLAVE DE MAPA CON ESTRUCTURA = `Illegal instruction` (gccgo 15 cruzado a sh-elf). El primer
+       renglon del primer revelado es `m.seen[tk] = true`, con `tk` de tipo `tileKey{layer,x,y,idx}`.
+       El PC del cuelgue resuelve a `runtime.mapassign` y no hay linea. Con las claves EMPAQUETADAS EN UN
+       ENTERO (`celKey`/`vistoKey` en d2common/d2automap/model.go) el mismo modelo escribe, revela y
+       dibuja. Es el hallazgo que desbloqueo la tarjeta.
+
+4. LA CORRIDA DEL CRITERIO (Flycast, log completo en /tmp/capturas-130j/flycast.log)
+-----------------------------------------------------------------------------------
+   Palancas: MINIMAPA=si MINIMAPA_CUANDO=siempre MINIMAPA_TODO=no JUGADORES=1 FASE=apagado
+             NPC=no QUEST=no DROP=no INVENTARIO=no ALIJO=no HUD=si
+
+   CARGA:
+     MINIMAPA TABLA  bytes= 122022 filasDelPueblo= 83 nivel= 1 nombre= 1 Town      porElFlujo= si
+     MINIMAPA ARTE   pide 59 cuadros de 1260 del archivo de 234458 B               (caja 8 x 16)
+     MINIMAPA ARTE   decodificados= 59 faltan= 0 bytes= 7552  (monton de C libre= 1.344.840)
+     MINIMAPA LISTO  celdas= 0 (el modelo arranca vacio: se llena con el revelado) ms= 1325
+
+   MEMORIA (semiespacio del recolector, 1.835.008 B):
+     al-arrancar ......................  210.688 B  (11 %)
+     despues-del-minimapa ............. 1.644.160 B (89 %)  <- la tabla y el modelo
+     despues-del-hud .................. 1.690.640 B (92 %)  <- y el HUD de DC-002.125 entra detras
+     monton de C: 1.346.344 B libres con el arte del minimapa adentro (7.552 B)
+     heap de Go: 8.239.288 B usados de 9.585.632 (el arte NO esta ahi)
+
+   REVEAL SIGUIENDO AL JUGADOR (celdas que agrega cada revelado):
+     cuadro= 1 heroe= 28 20          agregadas= 42  celdas= 42  (piso 25, pared 17)
+     cuadro= 3 heroe= 29.3258 18.6742 agregadas=  9  celdas= 51
+     cuadro= 5 heroe= 30.6517 17.3483 agregadas= 11  celdas= 62
+     (6 revelados en 9 cuadros; el heroe se movio 2,98 celdas y el modelo crecio de 0 a 62 celdas)
+
+   EL DIBUJO, CUADRO A CUADRO (crc32 del lienzo antes/despues y costo):
+     cuadro= 1 celdas= 42 pixelesPintados= 489 ms= 31  enLaCaja= 509 159  caja= 359 57 638 282
+     cuadro= 3 celdas= 51 pixelesPintados= 518 ms= 34
+     cuadro= 5 celdas= 62 pixelesPintados= 613 ms= 31
+     los 9 cuadros: elCuadroCambio= true en todos (el minimapa PINTA: el crc del lienzo cambia)
+
+   EL CIERRE:
+     RESUMEN      celdasEnElModelo= 62 (piso 39, pared 23) celdasDibujadasMax= 62 pxPorCuadro= 613
+                  pxTotal= 5.079 sinArte= 0   <- ni una celda quedo sin su cuadro de arte
+     COSTO        cuadrosDibujados= 9 saltados= 0 msPromedio= 31 msMax= 34 msTotal= 282
+                  msDelCuadroDelMapa= 762 pctDelCuadro= 4
+     ARTE-RESUMEN cuadros= 59 bytesEnMontonDeC= 7.552 bytesDeLaTabla= 122.022
+                  bytesDeArteSiSeDecodificaraEntero= 645.120 bytesDecimadoAlPueblo= 7.552
+     REVEAL       revelados= 6 agregadasMax= 42 sigueAlJugador= true
+     DECISION     escogido= siempre msPromedio= 31 pctDelCuadro= 4 umbralPct= 10
+
+   LA DECISION, CON EL NUMERO: el minimapa cuesta 31 ms de los 762 ms del cuadro del mapa = 4 %.
+   Menos del 10 % -> se dibuja SIEMPRE, que es lo que hace el juego (el minimapa esta ahi; al mapa
+   grande se entra con una tecla, al minimapa no). La palanca `MINIMAPA_CUANDO=cambio` queda como A/B
+   para cuando el costo no sea de 4 %: se salta los cuadros en los que ni el heroe ni el modelo
+   cambiaron (contador `saltados`).
+
+   DE QUE SON LOS 31 ms: no son de las 62 celdas. Son del FONDO NEGRO de la caja (279x225 = 62.775 px
+   con `DrawRect`), que hace falta porque el arte del automapa son lineas finas pensadas para leerse
+   sobre negro y sobre el terreno se pierden (medido: sin fondo el lienzo cambiaba y en la captura no
+   se veia el mapa; las celdas solas costaban 1-2 ms).
+
+5. LO QUE NO ENTRA (y por que)
+------------------------------
+   - El PUEBLO ENTERO revelado de una (`MINIMAPA_TODO=si`, 680 celdas = 610 dentro de la caja) NO entra
+     en el semiespacio con el HUD puesto: el modelo del pueblo entero son 126.480 B medidos y despues del
+     HUD quedan ~144 KB en el recolector, con el revelado por cuadro encima. El numero del caso peor esta
+     medido en el host por la sonda (610 de 680 celdas en la caja), no en Flycast.
+   - `d2ui` sigue sin portarse (medido en DC-002.125: cierre de 173 paquetes con ebiten).
+
+6. ARCHIVOS
+-----------
+   console/dc/sonda-automap-130/main.go        la sonda del presupuesto (secciones 1 a 5)
+   console/dc/poc/juego-130/automap_130.go     el minimapa portado (634 lineas)
+   console/dc/poc/juego-130/knobs.go           MINIMAPA=, MINIMAPA_CUANDO=, MINIMAPA_TODO=
+   console/dc/poc/juego-130/main.go            carga (antes del HUD) y dibujo (antes del panel)
+   d2common/d2automap/table.go                 ParseTxtLevels + buffer del scanner de 8 KB
+   d2common/d2automap/model.go                 claves de mapa empaquetadas en un entero
+   scripts/console/build-juego-130.sh          build (JUGADORES/FASE/NPC/QUEST/DROP/INVENTARIO/ALIJO/MINIMAPA*)
+   scripts/console/run-flycast-130.sh          corrida en Flycast con capturas
+   console/dc/evidencia/dc-002.130-minimapa-en-el-pueblo.png    la captura completa
+   console/dc/evidencia/dc-002.130-la-caja-del-minimapa.png     la caja ampliada 3x
+
+   REPRODUCIR:
+     JUGADORES=1 FASE=apagado NPC=no QUEST=no DROP=no INVENTARIO=no ALIJO=no MINIMAPA_TODO=no \
+       bash scripts/console/build-juego-130.sh /tmp/dcbuild/juego130
+     CAPTURE=spectacle ESPERA_ARRANQUE=900 \
+       bash scripts/console/run-flycast-130.sh /tmp/dcbuild/juego130/disc.gdi /tmp/capturas-130
+
+   EL BINARIO: prog.elf 17.990.020 B, .text 2.475.792 B, data+bss 275.384 B.

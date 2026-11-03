@@ -208,8 +208,36 @@ func ParseBin(b []byte) (*Table, error) {
 // "Expansion" that separates the classic and the Lord of Destruction rows is
 // skipped, as the compiler of automap.bin does.
 func ParseTxt(r io.Reader) (*Table, error) {
+	return parseTxt(r, nil)
+}
+
+// ParseTxtLevels is ParseTxt keeping only the rows of the given levels (empty
+// keeps them all). It exists for the console port (DC-002.130): the whole table
+// is 2.603 rows and 271 KB of the collector's semispace, and with the HUD on the
+// semispace is at 96 %; one town level's rows (83) are ~10 KB. The parser is the
+// same one the engine uses -- the rows are the same bytes, just fewer -- so the
+// reveal of a level comes out identical (measured in console/dc/sonda-automap-130).
+func ParseTxtLevels(r io.Reader, levels ...int) (*Table, error) {
+	if len(levels) == 0 {
+		return parseTxt(r, nil)
+	}
+
+	keep := make(map[int]bool, len(levels))
+	for _, l := range levels {
+		keep[l] = true
+	}
+
+	return parseTxt(r, keep)
+}
+
+func parseTxt(r io.Reader, keep map[int]bool) (*Table, error) {
 	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 1<<20), 1<<20)
+	// DC-002.130: ACA HABIA `sc.Buffer(make([]byte, 1<<20), 1<<20)`, o sea 1 MB de buffer de linea para un archivo
+	// cuyas lineas no pasan de ~200 B. En el host no se nota; en la consola el POC llega a este parseo con el
+	// semiespacio del recolector al 91 % y ese `make` de 1 MB es OOM medido. Las lineas del AutoMap.txt real (2.603
+	// filas, la mas larga medida en la sonda) entran de sobra en 64 KB, y el buffer arranca en 1 KB: crece solo si
+	// alguna linea lo pide.
+	sc.Buffer(make([]byte, 8<<10), 64<<10)
 
 	var col map[string]int
 
@@ -256,6 +284,11 @@ func ParseTxt(r io.Reader) (*Table, error) {
 		lvl, tile := LevelIndex(get("LevelName")), TileIndex(get("TileName"))
 		if lvl < 0 || tile < 0 {
 			return nil, fmt.Errorf("AutoMap.txt line %d: unknown level %q or tile %q", line, get("LevelName"), get("TileName"))
+		}
+
+		// DC-002.130: con `keep` se descartan las filas de los niveles que no se piden (no se guardan: no ocupan)
+		if keep != nil && !keep[lvl] {
+			continue
 		}
 
 		row := Row{Level: lvl, Tile: tile, Style: numOrAny(get("Style")), Start: numOrAny(get("StartSequence")), End: numOrAny(get("EndSequence"))}
