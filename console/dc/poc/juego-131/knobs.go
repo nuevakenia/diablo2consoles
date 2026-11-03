@@ -748,4 +748,19 @@ const (
 	// como siempre. Se puede probar por separado de la conversion: son dos cuellos distintos (la CPU y las Store
 	// Queues).
 	presentarVramAgrupada = "si"
+
+	// ============================== LAS DE ESTA TARJETA (DC-002.136): EL ARRANQUE EN LOS 16 MB ==============================
+	//
+	// medirCarga: "si" = la TABLA DE CONSUMO DEL ARRANQUE (instrumento_136.go). Cada hito de la carga (los mismos de
+	// siempre: `memoria()`) deja una fila con el monton de C tomado, lo que queda libre, el delta contra el hito
+	// anterior y el semiespacio del recolector; el cierre imprime el pico con nombre, el margen mas bajo y las ocho
+	// etapas que mas pidieron. No reserva memoria de mas y no fuerza recolecciones: mide el arranque tal cual.
+	//
+	// Y en el shim de C (`csrc/shim.c`, seccion 12) el otro instrumento de la tarjeta: `malloc` interpuesto, que
+	// imprime cada pedido de 64 KB o mas con el monton que habia antes (`ARQ-MARCA ext-bloque`). Es el que dice
+	// QUIEN pide los bloques grandes; la tabla de aca dice CUANDO. Con los dos, el OOM deja de ser a ciegas.
+	//
+	// "no" = el binario es el de DC-002.135 otra vez (es el A/B del costo: la tabla son unas decenas de lineas por el
+	// puerto serie y nada mas).
+	medirCarga = "si"
 )

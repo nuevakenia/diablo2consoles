@@ -414,6 +414,23 @@ echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob bli
 
 echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
 echo "   PRESENTACION135 convRapida=$(leer_knob presentarConvRapida) vramAgrupada=$(leer_knob presentarVramAgrupada)"
+
+# LAS DE ESTA TARJETA (DC-002.136): EL ARRANQUE EN LOS 16 MB.
+#   MEDIR_CARGA=no   apaga la tabla de consumo del arranque (instrumento_136.go): el A/B del costo del instrumento.
+#   BLOQUES=si|no    el `malloc` interpuesto (`-Wl,--wrap=malloc`, csrc/shim.c seccion 12): imprime cada pedido de
+#                    64 KB o mas con el monton que habia antes. Es el que dice QUIEN pide los bloques grandes. Viene
+#                    PRENDIDO porque sin el la tabla de etapas dice cuando y no quien (y el costo es una linea por
+#                    pedido grande en todo el arranque).
+[ -n "${MEDIR_CARGA:-}" ] && pisa_knob medirCarga "$MEDIR_CARGA" 1
+if [ -n "${BLOQUES:-}" ]; then
+    case "$BLOQUES" in
+        si|1|true) export DC_WRAP_MALLOC=1 ;;
+        *)         export DC_WRAP_MALLOC=0 ;;
+    esac
+fi
+export DC_WRAP_MALLOC="${DC_WRAP_MALLOC:-1}"
+echo "   ARRANQUE136 medirCarga=$(leer_knob medirCarga) wrapMalloc=$DC_WRAP_MALLOC"
+
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }

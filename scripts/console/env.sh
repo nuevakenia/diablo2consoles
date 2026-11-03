@@ -39,7 +39,8 @@ fi
 # Los tres viajan por GODC_GOFLAGS a TODOS los caminos que compilan Go para la consola (la stdlib minima,
 # los terceros, los .gox del motor y el main del POC), que es lo que hace que el enlace sea homogeneo.
 # El enlace con --gc-sections esta en build-dc.sh (ahi se tira lo que no se alcanza).
-export GODC_GOFLAGS="-O2 -g0 -ffunction-sections -fdata-sections -ml -m4-single -fno-split-stack -mfsrra -mfsca -I$LIBGODC/kos -I$LIBGODC -I$KOS_BASE/include"
+export GODC_OPT="${GODC_OPT:--O2}"
+export GODC_GOFLAGS="$GODC_OPT -g0 -ffunction-sections -fdata-sections -ml -m4-single -fno-split-stack -mfsrra -mfsca -I$LIBGODC/kos -I$LIBGODC -I$KOS_BASE/include"
 
 # ---- enlace ----
 export DC_LDPATHS="-L$LIBGODC -L$LIBGODC/kos -L$KOS_PORTS/lib -L$KOS_BASE/lib/dreamcast -L$KOS_BASE/addons/lib/dreamcast"

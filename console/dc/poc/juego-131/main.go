@@ -312,6 +312,10 @@ func memoria(etapa string) {
 		picoMonton = picoDeLaCarga
 	}
 
+	// DC-002.136: la fila de la TABLA DE CONSUMO DEL ARRANQUE. Va ANTES del corte por `verboso` a proposito: la
+	// tabla es la evidencia de esta tarjeta y tiene que salir aunque las lineas por cuadro esten apagadas.
+	anotarLaCarga(etapa, usado)
+
 	// DC-002.134: el PICO se sigue tomando (es estado, no evidencia), pero la linea es evidencia POR CUADRO y
 	// son ~150 B por el puerto serie: con `VERBOSO=no` no se imprime.
 	if !verboso134() {
@@ -410,6 +414,10 @@ func main() {
 		"cuadrosPorInforme=", cuadrosDelInforme132)
 	println("JUEGO134: arranca -- etapas=", etapasKnob, "verboso=", verbosoEtapas, "blitPalabras=",
 		blitPalabras134)
+
+	// DC-002.136: LO QUE QUEDO APAGADO, DICHO EN EL ARRANQUE. Una feature que no entra no desaparece en silencio: la
+	// palanca que la apago queda en la consola serie con el nombre de lo que dejo de cargarse (ver instrumento_136.go).
+	avisarLoQueQuedaApagado()
 
 	memoria("al-arrancar")
 	semiespacio("al-arrancar")
@@ -743,12 +751,16 @@ func main() {
 	}
 
 	// ============================== 7. EL RENDERER (CACHE EN INDICES) ==============================
+	memoria("antes-del-term")
+
 	term, err := d2term.NewTerminal()
 	if err != nil {
 		println("JUEGO121: NewTerminal FALLO:", err.Error())
 
 		return
 	}
+
+	memoria("despues-del-term")
 
 	memoria("antes-del-renderer")
 	vram("antes-del-renderer")
@@ -842,6 +854,10 @@ func main() {
 	}
 
 	msAnterior = int64(d2cMs())
+
+	// DC-002.136: EL CIERRE DE LA TABLA DE CONSUMO, justo antes del primer cuadro: aca ya se cargo TODO (pueblo,
+	// jugador, bicho, drop, quest, NPCs, minimapa, HUD, term, renderer) y el monton de C esta en su punto mas alto.
+	tablaDeLaCarga()
 
 	// (el HUD ya se cargo en 4a, con las fuentes todavia abiertas)
 

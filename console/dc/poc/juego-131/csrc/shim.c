@@ -357,3 +357,56 @@ unsigned int d2c_gc_n(void) {
 unsigned int d2c_heap_libre(void) {
     return (unsigned int)mallinfo().fordblks;
 }
+
+/* ============================== 12) DC-002.136: QUIEN PIDE LOS BLOQUES GRANDES DEL MONTON DE C ==============================
+ *
+ * EL PROBLEMA QUE MIDE. El POC muere cargando con
+ *
+ *     Out of memory. Requested sbrk_base 0x8d018000, was 0x8cfac000, diff 442368
+ *     fatal error: gc_external_alloc: OOM
+ *
+ * o sea: un pedido de 432 KB que no entra ni en los huecos del monton ni en lo que le queda al break contra el techo
+ * de KOS. El log dice CUANDO, pero no QUIEN pidio ese bloque: `mallinfo` da el total tomado y nada mas.
+ *
+ * QUE HACE. Se INTERPONE `malloc` con `-Wl,--wrap=malloc` (el enlace lo pone `build-dc.sh` con DC_WRAP_MALLOC=1):
+ * `--wrap` manda TODAS las referencias a `malloc` a `__wrap_malloc`, sin chocar con la definicion que ya trae
+ * libkallisti (medido: definir `malloc` aca rompe el enlace con "multiple definition"). Pasan por aca los pedidos de
+ * Go (`make` de mas de 64 KB -> `gc_external_alloc`), los del arte en el monton de C (`d2c_pedir_bloque`) y los de
+ * las librerias. Los pedidos de 64 KB o mas se imprimen con su
+ * tamano, lo que quedaba libre ANTES y la direccion de retorno (que se resuelve con `sh-elf-addr2line` sobre
+ * prog.elf: el log queda con el nombre de la funcion que pidio). Abajo de 64 KB la funcion no hace NADA mas que
+ * llamar al `malloc` de verdad (el umbral es `GC_LARGE_OBJECT_THRESHOLD`, el mismo del recolector).
+ *
+ * El instrumento se apaga con `d2c_bloques_instrumento(0)` y por defecto esta PRENDIDO porque una linea por pedido
+ * grande son decenas de lineas en todo el arranque: es la tabla que pide la tarjeta.
+ */
+#include <reent.h>
+
+static int instrumentoDeBloques = 1;
+
+/* el que apaga el instrumento (queda para el A/B del costo del puerto serie) */
+void d2c_bloques_instrumento(int encendido) {
+    instrumentoDeBloques = encendido;
+}
+
+void *__real_malloc(size_t n);
+
+void *__wrap_malloc(size_t n) {
+    struct mallinfo antes;
+    void *p;
+
+    if (!instrumentoDeBloques || n < 65536) {
+        return __real_malloc(n);
+    }
+
+    /* los dos numeros, ANTES del pedido: es lo que dice si el bloque entraba o no */
+    antes = mallinfo();
+
+    p = __real_malloc(n);
+
+    dbgio_printf("ARQ-MARCA ext-bloque v=%d libreAntes=%d tomadoAntes=%d ra=%08x quedo=%08x\n",
+                 (int)n, (int)antes.fordblks, (int)antes.uordblks,
+                 (unsigned int)(uintptr_t)__builtin_return_address(0), (unsigned int)(uintptr_t)p);
+
+    return p;
+}

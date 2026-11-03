@@ -226,6 +226,18 @@ Evidencia: `console/dc/evidencia/dc-002.134-etapas-del-cuadro.txt` (líneas `JUE
 recorta lo que la etapa no usa (el camino de `--gc-sections` ya demostró que solo tira 448 KB: el 96 % de la
 imagen está vivo por los `init` de gccgo, así que recortar paquetes es la palanca real).
 
+**El arranque en los 16 MB (DC-002.136).** Con los knobs por defecto el POC moría cargando
+(`gc_external_alloc: OOM`: un pedido de 443 KB que no entraba ni en los huecos ni contra el techo de KOS,
+163.840 B por encima). La tabla de consumo del arranque (29 hitos) y el `malloc` interpuesto (69 pedidos de
+64 KB o más) dejaron el caso cerrado: **no faltaba memoria del montón, faltaba el DUEÑO de un bloque de
+390.570 B** — el lector de `string.tbl` guardaba la rebanada y tiraba el `*Tramo`, así que `Liberar()` no se
+llamaba nunca. Con el dueño guardado y devuelto, ese mismo hito pasa de 621.112 a 1.011.816 B libres y el
+arranque entra **5 de 5** con todo prendido (4 jugadores, HUD, minimapa, NPC, quest, inventario, drop).
+Dos números para no volver a buscar por ahí: `--gc-sections` **hoy tira 0 B de imagen** (el BIN es idéntico
+con y sin la bandera: el recorte ya está hecho) y `-Os` en todo el árbol ahorra **126.560 B** (2,2 %), o sea
+que el camino barato no alcanza. Evidencia: `console/dc/evidencia/dc-002.136-arranque-16mb.txt`.
+
+
 ## 4. Lo que no se hace
 
 - No se reescribe el motor: se porta, con palancas aditivas (`nil` por defecto) para que la PC siga igual.

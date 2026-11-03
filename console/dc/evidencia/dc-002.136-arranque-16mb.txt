@@ -1,0 +1,263 @@
+DC-002.136 -- EL ARRANQUE EN LOS 16 MB: LA TABLA DE CONSUMO Y EL DUENO QUE FALTABA
+================================================================================
+Fecha: 2026-11-03.  Maquina: CachyOS, RX 7900 XTX, Flycast 2.7 (sin KVM).
+POC: console/dc/poc/juego-131 (rama DC-002).  Logs crudos en /tmp/dc136-base1, /tmp/dc136-inst1 y
+/tmp/dc136-fix-1..5 (cada uno con su `flycast.log`, la consola serie entera).
+
+
+1. QUE SE MIDIO Y CON QUE
+-------------------------
+Dos instrumentos nuevos, los dos apagables y los dos sin tocar el camino del dibujo:
+
+  a) LA TABLA DE CONSUMO DEL ARRANQUE (instrumento_136.go, palanca MEDIR_CARGA=si|no).
+     Cada hito de la carga -- los mismos `memoria()` de siempre -- deja una fila:
+
+       JUEGO136: CARGA hito=<n> etapa=<nombre> cused=<monton de C tomado> libre=<lo que queda>
+                             delta=<lo que sumo esta etapa> vivo=<semiespacio asignado>
+
+     y el cierre, justo antes del primer cuadro, imprime el pico con nombre, el margen mas bajo y las
+     OCHO etapas que mas pidieron:
+
+       JUEGO136: TABLA-CARGA hitos=29 pico=9888440 en=despues-del-renderer menosLibre=2776 ...
+
+  b) EL `malloc` INTERPUESTO (csrc/shim.c seccion 12, `-Wl,--wrap=malloc`, palanca BLOQUES=si|no).
+     Cada pedido de 64 KB o mas -- el mismo umbral de `GC_LARGE_OBJECT_THRESHOLD` del recolector -- sale
+     con su tamano, el monton que habia ANTES y la direccion de retorno:
+
+       ARQ-MARCA ext-bloque v=<bytes> libreAntes=<n> tomadoAntes=<n> ra=<direccion> quedo=<direccion>
+
+     La `ra` se resuelve con `sh-elf-addr2line -e prog.elf <ra>`; en este binario los dos caminos son
+     `gc_alloc` de libgodc (un `make` de Go de mas de 64 KB) y `d2c_servible` (la sonda con la que el
+     arena de bloques pregunta cuanto le puede pedir al monton sin tumbarlo).
+
+     NOTA DE METODO: definir `malloc` en `shim.o` NO enlaza -- medido, KOS ya lo trae en libkallisti y el
+     enlace muere con "multiple definition of `malloc'". Por eso va por `--wrap`, que manda las
+     REFERENCIAS a `__wrap_malloc` sin chocar con la definicion.
+
+Ninguno de los dos recolecta basura ni reserva de mas: la leccion de DC-002.131 (un instrumento que fuerza
+`runtime.GC()` en cada hito BAJA el pico y salva la corrida) esta respetada. El A/B del costo del
+instrumento esta en el punto 6.
+
+
+2. LA TABLA DE CONSUMO DEL ARRANQUE (knobs por defecto, JUGADORES=4 y todo prendido)
+-----------------------------------------------------------------------------------
+29 hitos, del arranque al primer cuadro. `delta` es lo que la etapa le sumo al monton de C (negativo =
+devolvio); `libre` es lo que quedo DESPUES, que es el margen real contra el OOM:
+
+   #  etapa                                     cused     libre     delta
+   1  al-arrancar                             3830224      2800   3830224   <- los DOS semiespacios del GC (3.670.016 B) + 160 KB
+   2  despues-del-video                      3830248      2776        24
+   3  despues-del-tramo-de-la-cache          3830248      2776         0
+   4  despues-de-arrancar-como-consola       3830248      2776         0
+   5  despues-del-assetmanager               3830248      2776         0
+   6  despues-de-las-fuentes                 4185576      3800    355328
+   7  despues-de-las-tablas                  4644632      3496    459056
+   8  despues-de-soltar-las-lecturas         4509688    138440   -134944
+   9  jugador-antes                          4509688    138440         0
+  10  jugador-despues                       4750472    323640    240784
+  11  jugador-despues-de-recolectar         4750472    323640         0
+  12  despues-de-recolectar-a-pedido        4750472    323640         0
+  13  despues-de-componer                   8420992   1592896   3670520   <- EL PUEBLO: el arena de los .dt1
+  14  despues-de-soltar-las-lecturas-mapa   8420992   1592896         0
+  15  bicho-antes                           8420992   1592896         0
+  16  bicho-despues                        8711048   1302840    290056
+  17  drop-antes                           8711048   1302840         0
+  18  drop-despues                         8711048   1302840         0   (todo transitorio, se devuelve)
+  19  quest-antes                          8711048   1302840         0
+  20  quest-despues                        9101624    912264    390576   <- string.tbl (390.570 B)
+  21  npcs-antes                           9101624    912264         0
+  22  npcs-despues                         8971032   1042856   -130592   <- ¡devuelve 390.576 y suma 260 KB de arte!
+  23  minimapa-despues                    8979064   1034824      8032
+  24  (el HUD)                            9002072   1011816     23008
+  25  antes-del-term                       9002072   1011816         0
+  26  despues-del-term                    9002072   1011816         0
+  27  antes-del-renderer                   9002072   1011816         0
+  28  despues-del-renderer                9888440    567816    886368   <- LAS DOS PALETAS: 2 x 443.175 B
+  29  coop-jugadores-listas               9888440    567816         0
+
+Lo que se lee de la tabla:
+
+  - EL ARRANQUE YA EMPIEZA CON 3,83 MB TOMADOS y no es el POC: son los dos semiespacios del recolector
+    (`gc_heap.c` los pide con `memalign` del MISMO monton de C: 2 x 1.835.008 B). El POC no puede tocar ese
+    numero sin tocar el recolector.
+  - EL PUEBLO (componer el nivel) es la etapa que mas pide: +3.670.520 B, y en ese tramo el monton llega al
+    pico de trabajo (9.024.384 B). Son las tramos del arena de bloques de los `.dt1`.
+  - EL MARGEN MAS BAJO de la carga NO es el pico: con los bloques grandes del renderer el monton queda en
+    567.816 B libres, y antes del arreglo de esta tarjeta la misma altura dejaba 621.112 B y el pedido
+    siguiente (443.175 B) no entraba.
+  - LA FILA 20 ES LA QUE EXPLICA EL OOM (ver punto 4).
+
+
+3. QUIEN PIDE LOS BLOQUES GRANDES (69 pedidos de 64 KB o mas, por etapa)
+------------------------------------------------------------------------
+Del `malloc` interpuesto, agrupado por el hito en el que cae cada pedido. `distintos` cuenta direcciones
+DISTINTAS devueltas: cuando es 1 con muchos bloques, el mismo bloque se pidio y se devolvio (un
+transitorio, no memoria retenida).
+
+   etapa                                 bloques     suma    mayor   distintos
+   despues-del-assetmanager                    2   354656   177328          2   tablas de hash del MPQ (2 x 177.328)
+   despues-de-las-fuentes                     3   459033   216064          3
+   jugador-antes                             14  3279036   262144          6   el decodificador de .dcc: 256 KB que se reusan
+   despues-de-recolectar-a-pedido            24 10829505  1008003         12   EL PUEBLO (arena de los .dt1)
+   bicho-antes                               11  2835334   262144          5
+   drop-antes                                 4   715286   432634          2
+   drop-despues                               3   269429   118029          1
+   quest-antes                                1   390570   390570          1   string.tbl, UN bloque
+   npcs-antes                                 5  1406026   432634          5
+   antes-del-renderer                         2   886350   443175          2   las dos paletas, las dos RETENIDAS
+
+Total: 69 pedidos, 21.425.225 B pedidos a lo largo del arranque (no a la vez). El que importa para el OOM
+es el de la ultima fila: 443.175 B, dos veces, y las dos quedan vivas (las cachea el AssetManager).
+
+
+4. LO QUE NO ENTRA: EL DIAGNOSTICO, CON LOS NUMEROS
+---------------------------------------------------
+La corrida de partida (los knobs por defecto, binario de DC-002.135, log /tmp/dc136-base1) muere a los 78 s:
+
+   Out of memory. Requested sbrk_base 0x8d018000, was 0x8cfac000, diff 442368
+   fatal error: gc_external_alloc: OOM
+   Memory: arena=10456128 used=9835832 free=620296
+
+y el hito anterior del POC dice donde estaba parado:
+
+   antes-del-renderer  cused=9392648  libre=621112
+   (lee pal.pl2 -> +443.184 -> no entra el siguiente de 442.368)
+
+La cuenta del techo, que es la que cierra el caso (el techo lo imprime el propio POC, `techo=`):
+
+   techo del monton (KOS)      0x8CFF0000
+   break en la muerte          0x8CFA4000      -> margen 311.296 B
+   lo que el pedido necesitaba 0x8D018000      -> 163.840 B POR ENCIMA del techo
+
+O sea: con 621.112 B libres el pedido de 443.175 B no entraba porque lo libre estaba PARTIDO (ningun hueco de
+443 KB) y el break ya no podia crecer lo suficiente. No era "no hay memoria": era "no hay memoria DONDE se
+pide", otra vez.
+
+
+5. EL ARREGLO (medido, no elegido a ojo)
+----------------------------------------
+5.1 LO QUE NO SE CARGA / EL DUENO QUE FALTABA: `string.tbl` (390.570 B)
+    El lector de `string.tbl` de DC-002.127 guardaba la REBANADA del tramo y tiraba el `*Tramo`:
+
+        tablaDeStrings = tramo.Datos          <- la rebanada
+        (tramo se perdia: `Liberar()` no se llamaba nunca)
+
+    `soltarLaTablaDeStrings` ponia la rebanada en nil y nada mas, asi que los 390.570 B -- que pasan el
+    umbral externo y por eso viven en el monton de C -- se quedaban tomados hasta el final de la corrida.
+    La tabla de consumo lo muestra: la etapa `quest` suma +390.576 B y no los devuelve (fila 20).
+
+    EL ARREGLO ES EL DE LA TARJETA ("que el que se carga entre en tramos con dueno en vez de `make`"):
+    se guarda el `*Tramo` en `tramoDeLaTabla` y `soltarLaTablaDeStrings` llama `Tramo.Liberar()`, que es lo
+    unico que sabe devolver el bloque (`free` con el liberador inyectado en la fuente). Medido en la corrida
+    del arreglo:
+
+        JUEGO136: CARGA string.tbl devuelta al monton de C bytes= 390570 montonLibre= 1042856
+        npcs-despues  delta= -130592      (antes: +390.576 encima y para siempre)
+
+    Con eso, el mismo punto de la carga pasa de 621.112 B libres a 1.011.816 B -- y los dos pedidos de
+    443.175 B del renderer entran.
+
+5.2 `--gc-sections`: HOY TIRA CERO BYTES DE IMAGEN
+    La tarjeta pide medirlo (en su momento fueron 448 KB). A/B con el MISMO arbol y el MISMO .gox:
+
+        con --gc-sections      1ST_READ.BIN 5.679.464 B  md5 f91111dcc35fe31e72fbde9de70cf882
+        con DC_SIN_GC=1        1ST_READ.BIN 5.679.464 B  md5 f91111dcc35fe31e72fbde9de70cf882
+
+    El ELF difiere (18.153.380 vs 18.153.396 B) pero el BIN es byte a byte el mismo: lo que el enlazador
+    tira hoy son secciones que NO se cargan (depuracion, .group). **El recorte de 448 KB ya esta hecho**; no
+    queda nada que ganar por ahi.
+
+5.3 LOS PAQUETES "VIVOS SOLO POR LOS `init`" (la sospecha de la tarjeta, medida)
+    Con el mapa del enlazador (`DC_LDMAP`) el peso por objeto es:
+
+        .rodata 3.455.164 B / .text 3.088.104 B (mapeados)
+        d2records   307.637 + 183.820      d2monster  152.656 + 183.788      d2skill  162.128 + 147.472
+        d2mapentity 152.719 +  49.556      d2ui       142.506 +  58.804      d2mapengine 133.277 +  46.368
+        diablo2item 121.823 +  80.120      d2asset    119.524 +  73.532      d2hero   111.840 + 116.464
+        d2drop      109.225 +  82.888      d2quest    102.573 + 106.724
+
+    Todo eso es ALCANZABLE (si no, `--gc-sections` lo habria tirado): la cadena arranca en
+    `d2records.RecordManager.init()`, que engancha el cargador de CADA tabla del juego, y de ahi cuelgan
+    `d2monster`, `d2skill`, `d2missile`, `d2itemdesc`, `d2ui`... Que el POC no parsee una tabla no saca su
+    cargador de la imagen. Recortarlo es tocar el motor compartido con el host (los `init` de `d2records`),
+    o sea OTRA tarjeta: aca se mide y se deja anotado, no se hace.
+    Lo que si se midio es el camino barato: `-Os` en todo el arbol (palanca nueva `GODC_OPT`):
+
+        -O2 (referencia)  5.679.464 B      -Os  5.552.904 B     -> 126.560 B (-2,2 %)
+
+    Se descarta como arreglo: 126 KB no cubren el hueco de 163.840 B y encima encareceria el cuadro (el
+    `main.o` y el backend PVR son el 65 % del tiempo por cuadro). Queda la palanca para quien la necesite.
+
+
+6. EL CRITERIO: CINCO CORRIDAS SEGUIDAS, KNOBS POR DEFECTO, CERO OOM
+-------------------------------------------------------------------
+Binario: /tmp/dcbuild/oom136-final, 1ST_READ.BIN 5.683.496 B, md5 57c1a3f00762dd1f5e379281c11c37ae.
+Knobs: los del knobs.go, sin pisar NADA (JUGADORES=4, MONSTRUOS=1, COMBATE=si, DROP=si, INVENTARIO=si,
+ALIJO=si, QUEST=si, NPC=si, HUD=si, MINIMAPA=si, la quest y sus textos, el split apagado por omision).
+
+  (las cinco corridas van aca abajo, con su resultado.txt)
+
+        corrida 1  ARRANCO  ooms=0  sbrkFallidos=0  primerCuadro=1  mundo_crc32=-649857602  79 s
+        corrida 2  ARRANCO  ooms=0  sbrkFallidos=0  primerCuadro=1  mundo_crc32=-649857602  79 s
+        corrida 3  ARRANCO  ooms=0  sbrkFallidos=0  primerCuadro=1  mundo_crc32=-649857602  79 s
+        corrida 4  ARRANCO  ooms=0  sbrkFallidos=0  primerCuadro=1  mundo_crc32=-649857602  79 s
+        corrida 5  ARRANCO  ooms=0  sbrkFallidos=0  primerCuadro=1  mundo_crc32=-649857602  79 s
+
+  5 de 5, mismo binario (md5 arriba), mismo crc32 del mundo en las cinco (-649857602), cero
+  `gc_external_alloc: OOM` y cero `Out of memory. Requested sbrk_base`. Cada corrida se dejo viviendo
+  quince segundos despues del primer cuadro (`ESPERA_POST=15`) para que un OOM de los primeros cuadros
+  tambien se viera: no hubo.
+
+  EL INSTRUMENTO NO ES EL ARREGLO. La tentacion de DC-002.131 (el instrumento fuerza recolecciones y baja
+  el pico) aca no existe: el arreglo es un `free` que devuelve 390.570 B al monton de C, y se ve en el mismo
+  hito con el mismo binario:
+
+        antes del arreglo   antes-del-renderer  libre= 621112
+        con el arreglo      antes-del-renderer  libre= 1011752   (= 621.112 + 390.576 + 64)
+
+  y el A/B sin instrumento (MEDIR_CARGA=no BLOQUES=no, mismos knobs) esta en el punto 6.1.
+
+  OJO CON `igualAlHost= false` DE LA LINEA DEL CUADRO: no es una regresion de esta tarjeta. Con cuatro
+  jugadores la camara se pone en el CENTRO DEL GRUPO (29.5, 21.5) y no en la celda del host (28,20), asi que
+  el crc32 del cuadro no puede ser el de la referencia. Es lo mismo que ya esta medido y explicado en
+  DC-002.114 (2 jugadores, camara 29 20) y en DC-002.116: `pixelesNoVacios` da 307.197 de 307.200, o sea la
+  pantalla llena, y el crc32 es EL MISMO en las cinco corridas.
+
+
+6.1 EL A/B SIN INSTRUMENTO (que el arreglo no sea el instrumento)
+-----------------------------------------------------------------
+Mismo arbol, mismos knobs por defecto, `MEDIR_CARGA=no BLOQUES=no` (el A/B es anterior al ultimo retoque del
+TEXTO de la linea de features, que no toca memoria) (sin tabla de consumo y sin `malloc`
+interpuesto): 1ST_READ.BIN 5.681.672 B. Dos corridas, para no dejar la duda de DC-002.131 (alli el
+instrumento forzaba recolecciones y la corrida pasaba por el instrumento, no por el arreglo):
+
+        A/B 1  ARRANCO  ooms=0  sbrkFallidos=0  primerCuadro=1  mundo_crc32=-649857602  78 s
+        A/B 2  ARRANCO  ooms=0  sbrkFallidos=0  primerCuadro=1  mundo_crc32=-649857602  78 s
+
+Lo que sostiene el arranque son los 390.570 B devueltos, no las lineas de consola: el instrumento no reserva
+en el monton de C (el `malloc` interpuesto solo imprime; la tabla de carga son ~30 filas en el semiespacio del
+recolector) y el A/B arranca igual sin el.
+
+
+7. LO QUE QUEDO APAGADO, DICHO EN EL ARRANQUE
+---------------------------------------------
+La tarjeta lo pide con todas las letras: una feature que no entra no puede desaparecer en silencio. Al
+arrancar, el POC imprime una linea `ARQ-MARCA` por cada feature apagada, con la palanca y lo que deja de
+cargarse, y el total:
+
+   ARQ-MARCA feature-apagada v=1 nombre=split palanca= no noSeCarga=el segundo lienzo de 320x480 (la pantalla partida es SPLIT=si)
+   ARQ-MARCA features v= 11 encendidas= 10 apagadas= 1 por=palanca-del-build (el detalle, una linea arriba por cada apagada)
+
+Con los knobs por defecto la UNICA apagada es el split (por omision `splitKnob="no"`, y el split de 3 y 4
+jugadores es otra tarjeta): todo lo demas se carga y se dibuja. Con `NPC=no`, `QUEST=no`, etc. la linea
+correspondiente aparece con su motivo, asi que el A/B barato de DC-002.132 ya no es un silencio.
+
+
+8. LO QUE NO SE PROBO
+---------------------
+  - EL SPLIT CON LOS CUATRO (`SPLIT=si` no existe para 3 y 4 jugadores): la corrida del criterio es el
+    cuadro unico con los cuatro. El split de DC-002.131 corre con JUGADORES=2 y no se midio en esta tarjeta.
+  - LA CORRIDA REAL EN HARDWARE: todo esto es Flycast.
+  - LAS DOS PALETAS DE 443.175 B: se midieron y se dice cuanto pesan, pero NO se tocan. Son del
+    `AssetManager` (las cachea para todo el juego) y liberarlas es cambiar el motor, no el POC: queda como
+    el proximo KB grande si alguna vez hace falta margen.

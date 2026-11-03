@@ -139,6 +139,11 @@ fi
 # suman 1,57 MB de los 5,64 MB de la seccion, asi que la diferencia NO son simbolos).
 [ -n "${DC_LDMAP:-}" ] && DC_LDFLAGS_GC="$DC_LDFLAGS_GC -Wl,-Map=$DC_LDMAP"
 
+# DC-002.136: DC_WRAP_MALLOC=1 interpone `malloc` (`-Wl,--wrap=malloc` -> `__wrap_malloc` de csrc/shim.c). Es el
+# instrumento que dice QUIEN pide los bloques grandes del monton de C: sin el, el OOM del arranque se ve como un
+# numero en `mallinfo` y no como una llamada. NO se usa en el binario de la referencia si nadie lo pide.
+[ "${DC_WRAP_MALLOC:-0}" = "1" ] && DC_LDFLAGS_GC="$DC_LDFLAGS_GC -Wl,--wrap=malloc"
+
 # DC-002.68: EL `.eh_frame` FUERA DEL MAPA (palanca de DC-002.47, medida alla y re-medida aca).
 # En este binario el .eh_frame son 878.636 B de tablas de desenrollado. Sacarlo con `objcopy -R` NO alcanza:
 # el script de KOS lo pone EN MEDIO del mapa y el hueco se rellena. Lo que sirve es enlazar con un script

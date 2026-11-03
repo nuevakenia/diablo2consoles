@@ -630,11 +630,21 @@ func cargarLaTablaDeStrings() {
 
 	bytesDeLaTabla = len(tramo.Datos)
 	tablaDeStrings = tramo.Datos
+	tramoDeLaTabla = tramo
 	clavesDeLaTabla = int(leerU16(tablaDeStrings, 2))
 
 	println("JUEGO127: NPC TABLA string.tbl bytes=", bytesDeLaTabla,
 		"crc32=", int(crc32.ChecksumIEEE(tablaDeStrings)), "claves=", clavesDeLaTabla)
 }
+
+// tramoDeLaTabla (DC-002.136): EL DUENO del bloque de `string.tbl`, que antes se perdia.
+//
+// MEDIDO en DC-002.136: `tablaDeStrings = tramo.Datos` se quedaba con la rebanada y tiraba el `*Tramo`, que es lo
+// unico que sabe devolver el bloque (`Tramo.Liberar` -> `free` con el liberador inyectado, porque 390.570 B pasan el
+// umbral externo). `soltarLaTablaDeStrings` ponia la rebanada en nil y nada mas, asi que los 390.570 B se quedaban
+// en el monton de C hasta el final de la corrida: medido en la tabla de carga, la etapa `quest` suma +390.576 B y
+// NO los devuelve. Con el dueno guardado, esa etapa los suelta y el POC arranca con 390 KB mas de monton.
+var tramoDeLaTabla *fuenteconsola.Tramo
 
 var (
 	tablaDeStrings  []byte
@@ -701,8 +711,22 @@ func textoDeStringTbl(clave string) string {
 
 // soltarLaTablaDeStrings: la tabla prestada se devuelve en el acto: los textos que hacian falta ya son copias de
 // Go (n.Lineas y n.Filas salen de `string(...)`, que copia). Lo que queda es el numero para la evidencia.
+//
+// DC-002.136: SE DEVUELVE EL BLOQUE, no solo la rebanada. `Tramo.Liberar` es lo que hace `free` del bloque externo
+// (390.570 B > umbral) con el liberador inyectado en la fuente; sin esa llamada los bytes se quedaban tomados
+// hasta el final (medido: +390.576 B en la etapa `quest` que nunca bajaban). Es idempotente, asi que soltar dos
+// veces no rompe nada.
 func soltarLaTablaDeStrings() {
 	tablaDeStrings = nil
+
+	if tramoDeLaTabla != nil {
+		bytes := len(tramoDeLaTabla.Datos)
+		tramoDeLaTabla.Liberar()
+		tramoDeLaTabla = nil
+
+		println("JUEGO136: CARGA string.tbl devuelta al monton de C bytes=", bytes,
+			"montonLibre=", d2cMontonLibre())
+	}
 
 	runtime.GC()
 }
