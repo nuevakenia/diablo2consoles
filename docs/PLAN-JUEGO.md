@@ -163,6 +163,15 @@ su celda del townN1 (15 monstruos en el `.ds1`, no objetos), con su COF de quiet
 menú, a 108 ms por cuadro. Evidencia y capturas: `console/dc/evidencia/dc-002.127-*`.
 Quedan para E6-bis/E7: las quests del diálogo y los mercaderes (Trade/Repair/Gamble).
 
+**El texto del panel se pinta (DC-002.142).** En la demo jugable (DC-002.140) el panel de Akara abría y salía
+negro con el borde. La causa no era el pincel: los glifos de `font16` se pedían la primera vez que se abría el
+panel, y a esa altura el POC ya había soltado `D2DATA.MPQ` (DC-002.136), así que `Pedir` no encontraba ni
+`font16.tbl` (medido: `letrasPedidas= 729 glifosPintados= 0`). Ahora `cargarLosGlifosDelPanel` los pide en la
+carga, con la fuente abierta, para todo el texto del panel y los 95 imprimibles: **95 glifos, 21.280 B de índices
+(22.040 B en el montón de C)**, y el panel de Akara (371x396, 21 renglones) pinta **729 de 729 glifos, 0 sin
+glifo, 28.704 px de tinta sobre el lienzo**. La sonda `sonda-tinta-142` dejó dicho que la tinta del `font16` es
+de los índices 19-28, no del 0: el pincel nunca estuvo mal. Documento: `console/dc/poc/juego-131/README-142-panel.md`.
+
 ### E7 · Quests
 
 - `d2quest` (11.272), `d2level`, `d2drlg` para las zonas de quest.

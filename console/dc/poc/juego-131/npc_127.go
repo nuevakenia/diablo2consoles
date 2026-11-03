@@ -58,8 +58,8 @@ const (
 	rutaFuenteNPC         = `data\local\font\latin\font16`
 
 	// base y variante de capa de los monstruos (composite.go: monsterBasePath + "LIT" cuando no hay equipo)
-	valorCapaNPC = "LIT"
-	modoQuietoNPC = "NU"
+	valorCapaNPC   = "LIT"
+	modoQuietoNPC  = "NU"
 	msPorCuadroNPC = 200
 
 	// LA GEOMETRIA DEL PANEL, tal cual esta en `npc_menu.go` (UI_CreateDialog 0x4b47b0)
@@ -94,10 +94,10 @@ type npc struct {
 	CeldaX   float64 // en celdas (sub-tile / 5)
 	CeldaY   float64
 
-	Ciclo *CicloDelJugador // el COF NU dir 0, con sus cuadros
-	Linea string           // lo que dice (ya sin el id ni el salto de la primera linea)
-	Lineas []string        // el texto cortado en renglones que entran en el panel
-	Filas  []string        // las filas del menu del motor (Talk, Trade, ...)
+	Ciclo  *CicloDelJugador // el COF NU dir 0, con sus cuadros
+	Linea  string           // lo que dice (ya sin el id ni el salto de la primera linea)
+	Lineas []string         // el texto cortado en renglones que entran en el panel
+	Filas  []string         // las filas del menu del motor (Talk, Trade, ...)
 
 	// el dibujo del cuadro
 	AnclaX, AnclaY int
@@ -122,29 +122,30 @@ type panelDelDialogo struct {
 }
 
 var (
-	npcsDelPueblo []*npc
+	npcsDelPueblo  []*npc
 	bytesDeLosNPCs int
 
-	elDialogo        *panelDelDialogo
-	dialogoAbierto   bool
-	dialogoVeces     int
-	cuadrosConDialogo int
-	pxDelDialogo     int
-	msDelDialogo     int
-	crcConDialogo    uint32
+	elDialogo                 *panelDelDialogo
+	dialogoAbierto            bool
+	dialogoVeces              int
+	cuadrosConDialogo         int
+	pxDelDialogo              int
+	msDelDialogo              int
+	crcConDialogo             uint32
 	crcUltimoCuadroSinDialogo uint32
-	lienzoTrasCerrar uint32
-	distanciaAlNPC   float64
-	npcQueHablo      string
-	botonDelDialogo  bool
-	botonAntes       bool
-	elDialogoSeCerro bool
-	renglonesQueSobran int
-	cuadrosCerradosSinCambio int
-	cuadrosAbiertosConCambio int
-	glifosDelNPC     map[byte]*glifoDelHUD
-	lineasDeLaTabla  int
-	bytesDeLaTabla   int
+	lienzoTrasCerrar          uint32
+	distanciaAlNPC            float64
+	npcQueHablo               string
+	botonDelDialogo           bool
+	botonAntes                bool
+	elDialogoSeCerro          bool
+	renglonesQueSobran        int
+	cuadrosCerradosSinCambio  int
+	cuadrosAbiertosConCambio  int
+	crcDelCuadroCerradoTomado bool
+	glifosDelNPC              map[byte]*glifoDelHUD
+	lineasDeLaTabla           int
+	bytesDeLaTabla            int
 )
 
 // ============================== LA CARGA ==============================
@@ -260,6 +261,12 @@ func cargarLosNPCs() {
 	}
 
 	npcsDelPueblo = todos
+
+	// DC-002.142: LOS GLIFOS DEL PANEL, ACA. Es el ultimo momento en que la fuente tiene su MPQ: despues de
+	// componer el pueblo el POC suelta D2DATA (DC-002.136) y `Pedir` deja de encontrar `font16.tbl`. El panel se
+	// abre cuadros despues, en manos del jugador, y a esa altura los glifos ya tienen que estar en RAM. Es el
+	// mismo camino del HUD (DC-002.125), que por eso nunca tuvo el panel en negro.
+	cargarLosGlifosDelPanel()
 
 	soltarLaTablaDeStrings()
 
@@ -997,6 +1004,8 @@ func pasoDelNPC() {
 			dialogoAbierto = false
 			elDialogo = nil
 			elDialogoSeCerro = true
+			// el crc del lienzo se vuelve a tomar en el primer cuadro cerrado: ese es `lienzoTrasCerrar`
+			crcDelCuadroCerradoTomado = false
 
 			println("JUEGO127: DIALOGO CIERRA cuadro=", cuadro+1, "npc=", npcQueHablo,
 				"veces=", dialogoVeces)
@@ -1112,9 +1121,16 @@ func elNPCMasCercano() *npc {
 // es una imagen de indices: el indice oscuro de la paleta, con el borde claro y una linea del medio separando el
 // nombre del texto, los MISMOS tres indices que la grilla del inventario (DC-002.124).
 func armarElPanelDelDialogo(n *npc) {
-	// LOS GLIFOS PRIMERO: el ancho del panel se mide con el avance de cada letra de `font16`, asi que sin los
-	// glifos cargados la medida es el promedio de 8 px por letra y el panel sale del ancho equivocado (medido).
+	// LOS GLIFOS: ya vienen cargados de la fase de carga (`cargarLosGlifosDelPanel`). Esta llamada solo pide las
+	// letras que falten -- con la fuente ya soltada no puede traer ninguna, y entonces se dice en el log que
+	// letras del texto se van a quedar sin pintar (DC-002.142: asi se cazo el panel negro de DC-002.140).
 	cargarLosGlifosDelNPC(n)
+
+	faltan := letrasSinGlifoDelPanel(n)
+	if faltan != "" {
+		println("JUEGO142: PANEL FALTAN LETRAS nombre=", n.Nombre, "letras=", faltan,
+			"deGlifos=", len(glifosDelNPC))
+	}
 
 	println("JUEGO127: NPC PANEL-MEDIDA nombre=", n.Nombre, "anchoDelNombre=", anchoDeUnTexto(n.Nombre),
 		"anchoDelPrimerRenglon=", anchoDeUnTexto(n.Lineas[0]))
@@ -1190,18 +1206,39 @@ func armarElPanelDelDialogo(n *npc) {
 // dibujarElDialogo: el panel y su texto, con el mismo pincel del HUD. Con el panel CERRADO no se pinta un pixel:
 // el cuadro del pueblo queda intacto (es la mitad del criterio y se mide cuadro a cuadro).
 func dibujarElDialogo(malla *pvr.Surface, pixeles []byte) (pintados, ms int) {
-	crcUltimoCuadroSinDialogo = crc32De(pixeles)
-
 	if !dialogoAbierto || elDialogo == nil {
+		// EL PANEL CERRADO NO TOCA UN PIXEL: la funcion vuelve ANTES de pintar, asi que el lienzo del pueblo queda
+		// como estaba. Se cuenta el cuadro, y el crc del lienzo se toma UNA sola vez (el primer cuadro cerrado y de
+		// nuevo despues de cerrar el panel): un crc de 1,2 MB por cuadro costaba mas que el panel entero.
+		cuadrosCerradosSinCambio++
+
+		if !crcDelCuadroCerradoTomado {
+			crcUltimoCuadroSinDialogo = crc32De(pixeles)
+			crcDelCuadroCerradoTomado = true
+		}
+
 		return 0, 0
 	}
-
 
 	t0 := d2cMs()
 
 	malla.PushTranslation(elDialogo.X0, elDialogo.Y0)
 	malla.RenderIndicesTintado(elDialogo.Fondo, elDialogo.Ancho, elDialogo.Alto, palJugador[:])
 	malla.Pop()
+
+	// DC-002.142: LA MEDIDA DEL AREA DEL TEXTO. Se toma DESPUES del fondo (lo que ya esta en el lienzo es borde +
+	// linea + relleno) y otra vez despues de los glifos: la diferencia es la tinta que llego a la pantalla. Los
+	// contadores de glifos se reinician en cada cuadro; el barrido del area se paga solo en los panelesAMedir142
+	// primeros paneles distintos (el del dialogo y el de la quest).
+	letrasPedidas142, glifosPintados142, letrasSinGlifo142, pxTinta142 = 0, 0, 0, 0
+
+	midiendo := hayQueMedirEstePanel142(elDialogo.Ancho, elDialogo.Alto)
+
+	if midiendo {
+		pxNoVaciosAntes142 = contarNoVaciosDeUnArea(pixeles, elDialogo.X0, elDialogo.Y0, elDialogo.Ancho,
+			elDialogo.Alto)
+		crcDelAreaAntes142 = crcDeUnArea(pixeles, elDialogo.X0, elDialogo.Y0, elDialogo.Ancho, elDialogo.Alto)
+	}
 
 	oro := indiceDelOro()
 
@@ -1224,6 +1261,20 @@ func dibujarElDialogo(malla *pvr.Surface, pixeles []byte) (pintados, ms int) {
 
 	ms = int(d2cMs() - t0)
 
+	if midiendo {
+		despues := contarNoVaciosDeUnArea(pixeles, elDialogo.X0, elDialogo.Y0, elDialogo.Ancho, elDialogo.Alto)
+		crcDespues := crcDeUnArea(pixeles, elDialogo.X0, elDialogo.Y0, elDialogo.Ancho, elDialogo.Alto)
+
+		guardarElPanelMedido142(elDialogo.Nombre, elDialogo.Ancho, elDialogo.Alto, pxNoVaciosAntes142, despues,
+			crcDelAreaAntes142, crcDespues, ms)
+
+		// el criterio de DC-002.127, medido de verdad: el panel abierto CAMBIA el lienzo (el crc del area no es el
+		// mismo antes y despues de los glifos)
+		if crcDelAreaAntes142 != crcDespues {
+			cuadrosAbiertosConCambio++
+		}
+	}
+
 	pintados = elDialogo.Ancho * elDialogo.Alto
 	pxDelDialogo += pintados
 	msDelDialogo = ms
@@ -1234,14 +1285,29 @@ func dibujarElDialogo(malla *pvr.Surface, pixeles []byte) (pintados, ms int) {
 }
 
 // dibujarUnTexto: pinta un texto con los glifos de font16 (el avance es el de la letra, no el ancho de la caja).
+//
+// DC-002.142: cuenta lo que manda al pincel. `letrasPedidas` es todo lo que se recorre, `glifosPintados` las que
+// tenian glifo cargado (o sea las que de verdad se pintan) y `sinGlifo` las que se caen por no estar en el mapa:
+// con esos tres numeros se distingue "no hay glifos" de "hay glifos y el pincel no los pinta".
 func dibujarUnTexto(malla *pvr.Surface, s string, x, y int, indice uint8) {
 	avance := 0
 
 	for i := 0; i < len(s); i++ {
 		g := glifosDelNPC[s[i]]
+
+		letrasPedidas142++
+
 		if g == nil {
+			letrasSinGlifo142++
+
 			continue
 		}
+
+		glifosPintados142++
+
+		// la tinta del glifo: el recorrido de su mapa de indices (224 B en font16), el instrumento de "esto tiene
+		// algo que pintar"
+		pxTinta142 += contarNoVacios(g.Indices)
 
 		// el glifo es del color que le toque: si el texto va en el indice del oro, se copia con el color del HUD;
 		// si no, con la paleta de las unidades tal cual
@@ -1253,21 +1319,159 @@ func dibujarUnTexto(malla *pvr.Surface, s string, x, y int, indice uint8) {
 	}
 }
 
-// cargarLosGlifosDelNPC: los glifos de `font16` para TODO el texto del panel (nombre, renglones y filas). Se piden
-// una sola vez; el panel se arma cuando se abre.
-func cargarLosGlifosDelNPC(n *npc) {
-	if glifosDelNPC == nil {
-		glifosDelNPC = make(map[byte]*glifoDelHUD, 64)
+// ============================== LOS GLIFOS DEL PANEL ==============================
+//
+// DC-002.142 -- POR QUE EL PANEL SALIA NEGRO. El mapa de glifos se llenaba la PRIMERA vez que se abria el panel, o
+// sea en el cuadro 2 o 39, mucho despues del arranque. A esa altura el POC ya hizo `Fuente.Soltar` sobre
+// `D2DATA.MPQ` (DC-002.136: soltar las fuentes del arranque es lo que deja RAM para la fase del pueblo), y
+// `Soltar` deja la fuente SIN MPQ: `Pedir("data\local\font\latin\font16.tbl")` no encuentra el archivo. Medido en
+// Flycast: `JUEGO142: GLIFOS PANEL SIN TABLA ... err= true`, 729 letras pedidas y 0 glifos pintados. El panel se
+// pintaba (el fondo es un pedazo de indices que ya estaba armado en RAM) y no habia una sola letra.
+//
+// LA LECCION: lo que va a hacer falta para dibujar NO se puede pedir cuando se dibuja; se pide en la CARGA, que es
+// cuando la fuente esta abierta. El HUD ya lo hacia asi (sus 13 glifos se cargan antes de soltar la fuente) y por
+// eso el HUD nunca tuvo este defecto. El panel ahora carga sus glifos al final de `cargarLosNPCs`, con el texto de
+// los cuatro NPCs junto: los glifos son por LETRA y se comparten, asi que el costo no es el de los cuatro textos
+// sino el de las letras distintas.
+
+// resultadoDeLosGlifos142: que paso con una carga de glifos.
+type resultadoDeLosGlifos142 struct {
+	Pedidas   int  // letras de los textos recorridas
+	Cargadas  int  // letras que se decodificaron en esta llamada
+	Faltantes int  // letras que la fuente NO tiene (no hay glifo en la tabla)
+	Abierta   bool // la fuente tenia MPQ: si es false no se pudo leer nada (ya se solto)
+	Bytes     int  // bytes de indices copiados al monton de C
+}
+
+// cargarLosGlifosDelPanel: los glifos de TODO el texto de los NPCs, en la fase de carga. Se llama al final de
+// `cargarLosNPCs`, con la fuente abierta; el panel ya no depende de que el MPQ siga ahi cuando se abre.
+func cargarLosGlifosDelPanel() {
+	if len(npcsDelPueblo) == 0 {
+		return
 	}
+
+	textos := make([]string, 0, 16+len(npcsDelPueblo))
+
+	for _, n := range npcsDelPueblo {
+		textos = append(textos, n.Nombre)
+		textos = append(textos, n.Lineas...)
+		textos = append(textos, n.Filas...)
+	}
+
+	// EL PANEL DE LA QUEST VA POR EL MISMO CAMINO (`questAbreElPanel` -> `armarElPanelDelDialogo`), asi que sus
+	// textos tambien tienen que estar cubiertos: se piden sus paginas si la quest esta encendida.
+	if questKnob == "si" {
+		textos = append(textos, "QUEST: "+questNombre, "LOG PAGE: STATE: ",
+			"(sin pagina en string.tbl)")
+
+		for page := 1; page < len(questPaginas); page++ {
+			if questPaginas[page] != "" {
+				textos = append(textos, questPaginas[page])
+			}
+		}
+	}
+
+	// Y SIEMPRE LOS 95 IMPRIMIBLES: el panel puede mostrar numeros, dos puntos, parentesis y los estados de la
+	// quest, que no son texto de ningun NPC. Son 95 letras (21.280 B de indices) y con eso ningun texto del panel se
+	// queda sin letra, hoy ni cuando se agregue otro.
+	textos = append(textos, letrasImprimibles142())
+
+	// EL COSTO EN EL MONTON DE C: la diferencia de libre antes y despues es lo que se queda tomado el panel (los
+	// indices de las letras). La tarjeta pide medirlo antes de agrandar nada.
+	montonAntes := d2cMontonLibre()
+
+	r := cargarGlifosDeTextos(textos)
+
+	if !r.Abierta {
+		println("JUEGO142: GLIFOS DEL PANEL LA FUENTE YA ESTABA SOLTADA: el panel no va a tener letras")
+
+		return
+	}
+
+	montonDespues := d2cMontonLibre()
+
+	bytesDeLosGlifos142 += r.Bytes
+
+	// LA TINTA DEL MAPA: cuantos glifos traen indices y cuantos vinieron EN CERO. Es el numero que separa un
+	// problema de decodificacion del sprite (todos en cero) de un problema del pincel (hay tinta y no aparece).
+	glifosCargados142, glifosConTinta142, glifosVacios142 = len(glifosDelNPC), 0, 0
+
+	muestra := ""
+	muestraTinta := 0
+
+	for c, g := range glifosDelNPC {
+		nv := contarNoVacios(g.Indices)
+
+		if nv == 0 {
+			glifosVacios142++
+
+			continue
+		}
+
+		glifosConTinta142++
+
+		if muestraTinta < 3 {
+			muestra += string(c) + ":" + itoa(g.Ancho) + "x" + itoa(g.Alto) + "/" + itoa(nv) + " "
+			muestraTinta++
+		}
+	}
+
+	println("JUEGO142: GLIFOS DEL PANEL cargados=", glifosCargados142, "conTinta=", glifosConTinta142,
+		"vacios=", glifosVacios142, "textosDelPanel=", len(textos), "letrasPedidas=", r.Pedidas,
+		"letrasSinGlifo=", r.Faltantes, "bytes=", r.Bytes, "acumulado=", bytesDeLosGlifos142,
+		"spriteBytes=", bytesDelSprite142, "spriteCuadros=", cuadrosDelSprite142, "crcSprite=", crcDelSprite142,
+		"montonC_libre=", d2cMontonLibre(), "montonC_antes=", montonAntes, "montonC_despues=", montonDespues,
+		"costoEnElMonton=", montonAntes-montonDespues, "muestra=", muestra)
+}
+
+// cargarLosGlifosDelNPC: las letras que falten del texto de UN NPC. Con la carga de `cargarLosGlifosDelPanel` esto
+// no pide nada (todas las letras ya estan) y no toca la fuente: si faltara alguna y la fuente ya se solto, lo dice
+// el aviso de `armarElPanelDelDialogo` con las letras que se van a quedar sin pintar.
+func cargarLosGlifosDelNPC(n *npc) {
+	textos := append([]string{n.Nombre}, n.Lineas...)
+	textos = append(textos, n.Filas...)
+
+	// si no falta ninguna letra no se toca la fuente (que a esta altura ya no tiene MPQ y solo puede fallar)
+	if len(glifosDelNPC) > 0 && letrasSinGlifoDeTextos(textos) == "" {
+		return
+	}
+
+	r := cargarGlifosDeTextos(textos)
+
+	bytesDeLosGlifos142 += r.Bytes
+
+	println("JUEGO127: NPC GLIFOS del panel npc=", n.Nombre, "glifos=", len(glifosDelNPC), "cargadas=", r.Cargadas)
+
+	if !r.Abierta {
+		println("JUEGO142: GLIFOS DEL PANEL npc=", n.Nombre, "LA FUENTE YA ESTA SOLTADA: no se pueden cargar"+
+			" letras nuevas (pedidas=", r.Pedidas, "). Se dibuja con los glifos que ya esten en RAM.")
+	}
+}
+
+// cargarGlifosDeTextos: los glifos de `font16` para las letras de `textos` que todavia no esten en el mapa.
+//
+// LOS DOS ARCHIVOS SON DEL ARRANQUE Y SE DEVUELVEN EN EL ACTO: la tabla (3.596 B) se parsea a un `d2font.Font` y el
+// DC6 (35.214 B) se usa para decodificar SOLO los cuadros de las letras que hacen falta. Lo que queda vivo son los
+// indices de esas letras (224 B cada una: la caja de un glifo de font16 es 14x16), copiados al monton de C como
+// los cuadros de los NPCs y del HUD: el recolector de Go no los ve.
+func cargarGlifosDeTextos(textos []string) resultadoDeLosGlifos142 {
+	var r resultadoDeLosGlifos142
 
 	datos := fuenteDe(rutaDatos)
 	if datos == nil {
-		return
+		println("JUEGO142: GLIFOS PANEL SIN FUENTE DE DATOS ruta=", rutaDatos)
+
+		return r
 	}
+
+	r.Abierta = true
 
 	tramoTabla, err := datos.Pedir(rutaFuenteNPC + `.tbl`)
 	if err != nil || tramoTabla == nil {
-		return
+		println("JUEGO142: GLIFOS PANEL SIN TABLA ruta=", rutaFuenteNPC+`.tbl`, "err=", err != nil)
+		r.Abierta = err == nil
+
+		return r
 	}
 
 	f, err := d2font.Load(tramoTabla.Datos)
@@ -1275,41 +1479,61 @@ func cargarLosGlifosDelNPC(n *npc) {
 
 	if err != nil {
 		println("JUEGO127: NPC la tabla de la fuente no parsea:", err.Error())
+		r.Abierta = false
 
-		return
+		return r
 	}
 
 	tramoSprite, err := datos.Pedir(rutaFuenteNPC + `.DC6`)
 	if err != nil || tramoSprite == nil {
-		return
+		println("JUEGO142: GLIFOS PANEL SIN SPRITE ruta=", rutaFuenteNPC+`.DC6`, "err=", err != nil)
+		r.Abierta = false
+
+		return r
 	}
+
+	// EL CRC SE TOMA ANTES DE DEVOLVER EL TRAMO: es lo que dice si el `font16.DC6` de la consola es el mismo
+	// archivo que el del host (donde la sonda `sonda-tinta-142` lo decodifica: 256 cuadros, 57.344 B de indices y
+	// la letra "A" con 62 pixeles de tinta).
+	bytesDelSprite142 = len(tramoSprite.Datos)
+	crcDelSprite142 = int(crc32.ChecksumIEEE(tramoSprite.Datos))
 
 	dc, err := d2dc6.Load(tramoSprite.Datos)
 	tramoSprite.Liberar()
 
 	if err != nil {
 		println("JUEGO127: NPC el sprite de la fuente no parsea:", err.Error())
+		r.Abierta = false
 
-		return
+		return r
 	}
 
-	textos := append([]string{n.Nombre}, n.Lineas...)
-	textos = append(textos, n.Filas...)
+	cuadrosDelSprite142 = len(dc.Frames)
+
+	if glifosDelNPC == nil {
+		glifosDelNPC = make(map[byte]*glifoDelHUD, 64)
+	}
 
 	for _, t := range textos {
 		for i := 0; i < len(t); i++ {
 			c := t[i]
+			r.Pedidas++
+
 			if _, listo := glifosDelNPC[c]; listo {
 				continue
 			}
 
 			g, ok := f.Glyphs[rune(c)]
 			if !ok {
+				r.Faltantes++
+
 				continue
 			}
 
 			cuadro := g.FrameIndex()
 			if cuadro < 0 || cuadro >= len(dc.Frames) {
+				r.Faltantes++
+
 				continue
 			}
 
@@ -1319,10 +1543,68 @@ func cargarLosGlifosDelNPC(n *npc) {
 
 			glifosDelNPC[c] = &glifoDelHUD{Ancho: int(dc.Frames[cuadro].Width), Alto: int(dc.Frames[cuadro].Height),
 				Paso: g.Width(), Indices: indices}
+
+			r.Cargadas++
+			r.Bytes += len(indices)
 		}
 	}
 
-	println("JUEGO127: NPC GLIFOS del panel npc=", n.Nombre, "glifos=", len(glifosDelNPC))
+	return r
+}
+
+// letrasImprimibles142: los caracteres imprimibles ASCII (32..126) en un solo texto, para pedirlos de una vez.
+// Son 95 letras: 21.280 B de indices en el monton de C.
+func letrasImprimibles142() string {
+	b := make([]byte, 0, 95)
+
+	for c := byte(32); c < 127; c++ {
+		b = append(b, c)
+	}
+
+	return string(b)
+}
+
+// letrasSinGlifoDelPanel: las letras de un texto que NO estan en el mapa (no se van a pintar). Es el testigo de que
+// la carga cubrio el texto: con 0, el panel no pierde una letra.
+func letrasSinGlifoDelPanel(n *npc) string {
+	textos := append([]string{n.Nombre}, n.Lineas...)
+	textos = append(textos, n.Filas...)
+
+	return letrasSinGlifoDeTextos(textos)
+}
+
+// letrasSinGlifoDeTextos: las letras distintas de `textos` que no tienen glifo cargado, en una cadena (cada una una
+// sola vez). Vacia = el texto se puede pintar entero.
+func letrasSinGlifoDeTextos(textos []string) string {
+	faltan := ""
+
+	for _, t := range textos {
+		for i := 0; i < len(t); i++ {
+			c := t[i]
+			if glifosDelNPC[c] != nil {
+				continue
+			}
+
+			if enLaCadenaDeLetras(faltan, c) {
+				continue
+			}
+
+			faltan += string(c)
+		}
+	}
+
+	return faltan
+}
+
+// enLaCadenaDeLetras: si la letra ya esta contada en la cadena de faltantes (una sola vez por letra).
+func enLaCadenaDeLetras(s string, c byte) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == c {
+			return true
+		}
+	}
+
+	return false
 }
 
 // anchoDeUnTexto: el ancho con el AVANCE de cada letra (lo que suma `Font.GetTextMetrics`), no con el ancho de la
@@ -1408,6 +1690,9 @@ func resumenDeLosNPCs() {
 		"pixeles=", pxDelDialogo, "msUltimo=", msDelDialogo, "crcConPanel=", int(crcConDialogo),
 		"crcSinPanel=", int(crcUltimoCuadroSinDialogo), "seCerro=", elDialogoSeCerro,
 		"lienzoTrasCerrar=", int(lienzoTrasCerrar), "botonDelInstrumento=", botonDelDialogo)
+
+	// DC-002.142: el texto del panel, contado (glifos pintados y tinta que llego al lienzo).
+	resumenDelTexto142()
 
 	// EL CRITERIO. "El pueblo se restaura" NO se mide contra `crcMapa` (que es el mapa solo, sin jugador, sin
 	// bicho y sin HUD: no puede dar igual nunca). Se mide asi: en los cuadros CON el panel abierto el lienzo

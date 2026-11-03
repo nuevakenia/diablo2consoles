@@ -1,0 +1,123 @@
+== DC-002.142 -- EL TEXTO DEL PANEL DE LOS NPCs: el recuadro salia negro porque los glifos se pedian cuando
+   la fuente ya estaba soltada
+   Host: CachyOS /home/dgalli, Flycast (dl/flycast.AppImage), POC console/dc/poc/juego-131
+   Fecha: 2026-11-03
+
+== 1. LA CAUSA, MEDIDA SOBRE EL BINARIO CON EL DEFECTO ==
+   El mapa de glifos del panel se llenaba la PRIMERA vez que se abria el panel -- o sea con el boton del jugador,
+   cuadro 2 en la corrida del criterio y cuadro 39 en la demo. A esa altura el POC ya habia hecho `Fuente.Soltar`
+   sobre D2DATA.MPQ (DC-002.136, soltar las fuentes del arranque es lo que deja RAM para la fase del pueblo) y
+   `Soltar` deja la fuente SIN MPQ: `Pedir` ya no encuentra el archivo. Log del build con el defecto (t142b):
+
+     JUEGO142: GLIFOS PANEL SIN TABLA ruta= data\local\font\latin\font16.tbl err= true
+     JUEGO142: PANEL TEXTO nombre= Akara caja= 356 x 396 letrasPedidas= 729 glifosPintados= 0 sinGlifo= 729
+
+   729 letras pedidas, 0 glifos pintados, 729 sin glifo. El fondo del panel si estaba armado en RAM (sus indices se
+   copian al monton de C al componer el pueblo), y por eso el rectangulo salia y las letras no. El `pixeles= 140976`
+   del log viejo era `356 * 396`: el AREA DEL FONDO, no la del texto -- el contador no distinguia "el panel se pinto"
+   de "las letras se pintaron".
+
+== 2. LA HIPOTESIS QUE SE CAYO: la tinta NO es el indice 0 ==
+   Se sospechaba que la tinta del glifo fuera indice 0 y que `RenderIndicesTintado`, que salta el 0 como
+   transparente, se la comiera. La sonda `console/dc/sonda-tinta-142` lo desmiente con los indices del font16:
+
+     == font16: tabla= 3596 B  sprite= 35214 B
+        crc32 tabla= 266873495 sprite= 3088877326
+        cuadros del DC6= 256  glifos de la tabla= 256
+        fuente entera: 256 cuadros suman 57344 B de indices (ancho 14..14 alto max 16)
+        "A" cuadro=65 caja=14x16 paso=12 pixeles=224 vacios=162 llenos=62
+             indice   0 x162  color=(0,0,0)      <- el fondo (eso es lo que el pincel salta, y esta bien)
+             indice  19 x12   color=(44,44,44)   <- la tinta
+             indice  21 x5    color=(56,56,56)
+             indice  22 x7    color=(72,72,72)
+             indice  25 x1    color=(88,88,88)
+             indice  28 x1    color=(112,116,124)
+             ... 9 indices distintos
+        "k" cuadro=107 caja=14x16 paso=8 pixeles=224 vacios=180 llenos=44
+
+   La "A" tiene 62 pixeles de tinta en los indices 19, 21, 22, 25 y 28. El pincel estaba bien; lo que faltaba eran
+   los glifos. El font16.DC6 de la consola es el mismo del host: 35.214 B y crc32 3088877326 en los dos lados
+   (en el log del POC sale como int con signo: crcSprite= -1206089970 = 4294967296 - 1206089970).
+   El "vacios= 1" de la carga es el ESPACIO (no tiene tinta, es correcto).
+
+== 3. EL ARREGLO: lo que hace falta para dibujar se pide en la CARGA ==
+   - `cargarLosGlifosDelPanel()` (npc_127.go), nueva, se llama al final de `cargarLosNPCs`, que es el ultimo momento
+     con la fuente abierta (antes de `soltarLaTablaDeStrings`). Pide las letras de TODOS los textos del panel: los
+     cuatro NPCs (nombre + renglones + filas), los textos de la quest si esta encendida, y los 95 imprimibles ASCII
+     (para numeros, parentesis y estados de la quest, que no son texto de ningun NPC).
+   - `cargarLosGlifosDelNPC()` queda de red de seguridad: si no falta ninguna letra no toca la fuente; si falta
+     alguna, `armarElPanelDelDialogo` deja en el log `JUEGO142: PANEL FALTAN LETRAS ... letras=` con las letras
+     exactas que se van a quedar sin pintar.
+   - El ancho del panel se mide con el avance real de cada letra de font16: con los glifos cargados el panel de
+     Akara mide 371 (antes 356, con el promedio de 8 px por letra).
+
+== 4. LOS NUMEROS (Flycast, linea `JUEGO142: PANEL TEXTO`, medida sobre el LIENZO) ==
+   Cada panel se mide una vez: pixeles NO NEGROS dentro de su caja justo despues del fondo y otra vez despues de los
+   glifos. La diferencia es la tinta que llego a la pantalla.
+
+     panel               caja      letras  glifos  sinGlifo  tintaGlifos  tintaEnLienzo  noVacios (antes->despues)  ms
+     dialogo de Akara    371x396     729     729        0        28704         28704        1899 -> 30603          114
+     quest (al tomarla)  501x81      111     111        0         4627          4627        1659 ->  6286           25
+     quest (al volver)   288x81       84      84        0         3622          3622        1020 ->  4642           16
+
+   La tinta que el pincel debia poner y la que cambio el lienzo coinciden EXACTAMENTE en los tres paneles, y el
+   crc32 del area cambia en los tres (elAreaCambio= true), que es el segundo testigo.
+
+   EL PANEL DEL DIALOGO, ENTERO (corrida del binario de la demo, HABLAR_AUTO=si para que el instrumento apriete X):
+     JUEGO127: DIALOGO ABRE npc= Akara claseExe= 148 jugador= 38.4 4.4 distancia= 1.2 radio= 2 cuadro= 2
+               panel= 371 x 396 renglones= 21 filas= 3 bytes= 146916 boton= true
+     JUEGO142: PANEL TEXTO nombre= Akara medio= 1 caja= 371 x 396 pixeles= 146916 noVaciosAntes= 1899
+               noVaciosDespues= 30603 tintaEnPantalla= 28704 letrasPedidas= 729 glifosPintados= 729
+               sinGlifo= 0 pixelesDeTinta= 28704 crcAntes= -1055641742 crcDespues= 1739108980
+               elAreaCambio= true ms= 114
+
+== 5. LO QUE CUESTA ==
+     JUEGO142: GLIFOS DEL PANEL cargados= 95 conTinta= 94 vacios= 1 textosDelPanel= 92 letrasPedidas= 2694
+               letrasSinGlifo= 0 bytes= 21280 spriteBytes= 35214 spriteCuadros= 256 crcSprite= -1206089970
+               montonC_libre= 611784 montonC_antes= 633824 montonC_despues= 611784 costoEnElMonton= 22040
+
+   - glifos: 95 (94 con tinta; el vacio es el espacio). 95 * 224 B = 21.280 B de indices.
+   - monton de C: 22.040 B, tomados UNA vez y antes de soltar la fuente (el recolector de Go no los ve).
+   - el font16.DC6 (35.214 B) y la tabla (3.596 B) se leen y se devuelven en el acto: no quedan vivos.
+   - VRAM (el techo de DC-002.139 es 4.740.808 B): en la corrida del binario de la demo,
+     `vramDisponible= 4740808`, el tramo queda en `libre= 353280` con `derrames= 0 bytesDerramados= 0`.
+     Esta tarjeta no agrega VRAM: los indices del panel van al monton de C.
+   - el panel de Akara ocupa 146.916 B en el monton de Go (146.916 = 371 * 396; eran 140.976 con el ancho viejo de
+     356: +5.940 B porque el panel ahora mide lo que mide el del motor).
+
+== 6. EL CRITERIO ==
+   - Captura de la ventana del emulador con el renglon del panel de Akara: `dc-002.142-demo-panel-akara.png`
+     (binario de la demo, panel del dialogo: "AKARA / I am Akara, High Priestess of the / Sisterhood of the
+     Sightless Eye..." con TALK TRADE CANCEL) y `dc-002.142-panel-akara-con-texto.png` (build del criterio, el mismo
+     panel con los 21 renglones).
+   - Contador de glifos pintados en el log: `letrasPedidas= 729 glifosPintados= 729 sinGlifo= 0` (arriba, y en las
+     tres cajas de la tabla).
+   - El criterio propio de la tarjeta, en una linea (corrida t142g, con el panel que se abre y se cierra):
+
+       JUEGO142: PANEL TEXTO CRITERIO glifosConTinta= true seMidioUnPanel= true laTintaLlegoAlLienzo= true
+                elAreaCambio= true cumple= true
+       JUEGO127: NPC CRITERIO losNPCsSeDibujan= true seLeHablo= true elDialogoSaleEnPantalla= true
+                elPanelCambiaElLienzo= true conElPanelCerradoNoCambia= true elDialogoSeCerro= true cumple= true
+
+   (La segunda linea estaba en `cumple= false` SIEMPRE, antes de esta tarjeta: `cuadrosAbiertosConCambio` y
+   `cuadrosCerradosSinCambio` estaban declarados y leidos pero nadie los incrementaba -- verificado en HEAD. Ahora
+   los incrementa la medida del area: el panel abierto cambia el crc del area, y el cuadro con el panel cerrado se
+   cuenta sin pintar. De paso, el crc32 de 1,2 MB que se sacaba en CADA cuadro se saca una sola vez.)
+
+
+== 7. COMO SE REPRODUCE ==
+   # el build del criterio (sin quest, para que el panel de la quest no pise el del NPC)
+   DEMO=no HABLAR_AUTO=si CERRAR_DIALOGO=no QUEST=no NPC=si NPC_LISTA=akara \
+     VISTA_X=38.4 VISTA_Y=4.4 CUADROS=10 MEDIR_CUADRO=no MEDIR_VIVO=si \
+     bash scripts/console/build-juego-131.sh /tmp/dcbuild/t142e
+   CAPTURAS=10 INTERVALO=3 bash scripts/console/run-flycast-131.sh /tmp/dcbuild/t142e/disc.gdi /tmp/capturas-t142e
+   grep -a "JUEGO142" /tmp/capturas-t142e/flycast.log | tr -d '\r'
+
+   # el binario de la demo de DC-002.140, con el instrumento de hablar encendido (unico cambio)
+   DEMO=si ... HABLAR_AUTO=si VISTA_X=38.4 VISTA_Y=4.4 bash scripts/console/build-juego-131.sh /tmp/dcbuild/demo146
+   GUION="nada 20" SEGUNDOS=34 INTERVALO=2 CAPTURAS=18 \
+     bash scripts/console/run-demo-140.sh /tmp/dcbuild/demo146/disc.gdi /tmp/capturas-demo147 40 320
+   grep -a "JUEGO142: PANEL TEXTO" /tmp/capturas-demo147/flycast.log | tr -d '\r'
+
+   # la sonda de la tinta del font16 (no necesita la consola)
+   go run ./console/dc/sonda-tinta-142 -letras "Akara"
