@@ -44,36 +44,36 @@ instrumento esta en el punto 6.
 29 hitos, del arranque al primer cuadro. `delta` es lo que la etapa le sumo al monton de C (negativo =
 devolvio); `libre` es lo que quedo DESPUES, que es el margen real contra el OOM:
 
-   #  etapa                                     cused     libre     delta
-   1  al-arrancar                             3830224      2800   3830224   <- los DOS semiespacios del GC (3.670.016 B) + 160 KB
-   2  despues-del-video                      3830248      2776        24
-   3  despues-del-tramo-de-la-cache          3830248      2776         0
-   4  despues-de-arrancar-como-consola       3830248      2776         0
-   5  despues-del-assetmanager               3830248      2776         0
-   6  despues-de-las-fuentes                 4185576      3800    355328
-   7  despues-de-las-tablas                  4644632      3496    459056
-   8  despues-de-soltar-las-lecturas         4509688    138440   -134944
-   9  jugador-antes                          4509688    138440         0
-  10  jugador-despues                       4750472    323640    240784
-  11  jugador-despues-de-recolectar         4750472    323640         0
-  12  despues-de-recolectar-a-pedido        4750472    323640         0
-  13  despues-de-componer                   8420992   1592896   3670520   <- EL PUEBLO: el arena de los .dt1
-  14  despues-de-soltar-las-lecturas-mapa   8420992   1592896         0
-  15  bicho-antes                           8420992   1592896         0
-  16  bicho-despues                        8711048   1302840    290056
-  17  drop-antes                           8711048   1302840         0
-  18  drop-despues                         8711048   1302840         0   (todo transitorio, se devuelve)
-  19  quest-antes                          8711048   1302840         0
-  20  quest-despues                        9101624    912264    390576   <- string.tbl (390.570 B)
-  21  npcs-antes                           9101624    912264         0
-  22  npcs-despues                         8971032   1042856   -130592   <- ¡devuelve 390.576 y suma 260 KB de arte!
-  23  minimapa-despues                    8979064   1034824      8032
-  24  (el HUD)                            9002072   1011816     23008
-  25  antes-del-term                       9002072   1011816         0
-  26  despues-del-term                    9002072   1011816         0
-  27  antes-del-renderer                   9002072   1011816         0
-  28  despues-del-renderer                9888440    567816    886368   <- LAS DOS PALETAS: 2 x 443.175 B
-  29  coop-jugadores-listas               9888440    567816         0
+      #  etapa                                        cused     libre      delta      vivo
+   1  al-arrancar                                    3830224      2736   3830224    210808  <- los DOS semiespacios del GC (2 x 1.835.008) + 160 KB: no es el POC
+   2  despues-del-video                              3830248      2712        24    157576
+   3  despues-del-tramo-de-la-cache                  3830248      2712         0    157632
+   4  despues-de-arrancar-como-consola               3830248      2712         0    157752
+   5  despues-del-assetmanager                       3830248      2712         0    166936
+   6  despues-de-las-fuentes                         4185576      3736    355328    316800
+   7  despues-de-las-tablas                          4644632      3432    459056   1130200  <- las tablas del motor (.txt del MPQ) copiadas a Go
+   8  despues-de-soltar-las-lecturas-de-las-tablas   4509688    138376   -134944   1130200
+   9  jugador-antes                                  4509688    138376         0   1130200
+  10  jugador-despues                                4750472    323576    240784    500008
+  11  jugador-despues-de-recolectar                  4750472    323576         0    499736
+  12  despues-de-recolectar-a-pedido                 4750472    323576         0    499736
+  13  despues-de-componer                            8420992   1592832   3670520    903056  <- EL PUEBLO: el arena de bloques de los .dt1
+  14  despues-de-soltar-las-lecturas-del-mapa        8420992   1592832         0    903056
+  15  bicho-antes                                    8420992   1592832         0    903056
+  16  bicho-despues                                  8711048   1302776    290056   1040736
+  17  drop-antes                                     8711048   1302776         0   1035544
+  18  drop-despues                                   8711048   1302776         0   1051024
+  19  quest-antes                                    8711048   1302776         0   1125832
+  20  quest-despues                                  9101624    912200    390576   1151864  <- string.tbl (390.570 B), UN bloque
+  21  npcs-antes                                     9101624    912200         0   1146712
+  22  npcs-despues                                   8971032   1042792   -130592   1286080  <- ¡devuelve los 390.576 y suma 260 KB de arte!
+  23  minimapa-despues                               8979064   1034760      8032   1243048
+  24  despues-de-soltar-el-prestamo                  9002072   1011752     23008   1316704
+  25  antes-del-term                                 9002072   1011752         0   1316704
+  26  despues-del-term                               9002072   1011752         0   1318424
+  27  antes-del-renderer                             9002072   1011752         0   1318424
+  28  despues-del-renderer                           9888440    567752    886368   1348632  <- LAS DOS PALETAS: 2 x 443.175 B, retenidas
+  29  coop-jugadores-listas                          9888440    567752         0   1272496
 
 Lo que se lee de la tabla:
 
@@ -83,8 +83,11 @@ Lo que se lee de la tabla:
   - EL PUEBLO (componer el nivel) es la etapa que mas pide: +3.670.520 B, y en ese tramo el monton llega al
     pico de trabajo (9.024.384 B). Son las tramos del arena de bloques de los `.dt1`.
   - EL MARGEN MAS BAJO de la carga NO es el pico: con los bloques grandes del renderer el monton queda en
-    567.816 B libres, y antes del arreglo de esta tarjeta la misma altura dejaba 621.112 B y el pedido
+    567.752 B libres, y antes del arreglo de esta tarjeta la misma altura dejaba 621.112 B y el pedido
     siguiente (443.175 B) no entraba.
+  - EL PICO ES TRANSITORIO: pasado el primer cuadro el arena suelta 2.621.480 B de un golpe (hito
+    `despues-de-soltar-el-arena`, que cae fuera de esta tabla porque ya es el bucle) y el monton queda en
+    7.266.960 usados con 3.189.232 libres. La ventana peligrosa es la carga; en regimen sobra mas de 3 MB.
   - LA FILA 20 ES LA QUE EXPLICA EL OOM (ver punto 4).
 
 
