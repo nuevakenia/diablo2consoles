@@ -763,4 +763,45 @@ const (
 	// "no" = el binario es el de DC-002.135 otra vez (es el A/B del costo: la tabla son unas decenas de lineas por el
 	// puerto serie y nada mas).
 	medirCarga = "si"
+
+	// ============================== LAS DE ESTA TARJETA (DC-002.135, EL MAPA): EL TILE POR DENTRO ==============================
+	//
+	// tileCron: "si" = el cronometro por bloque DENTRO del renderer del mapa (`cronometro_135.go`): por cada tile
+	// se abren y cierran cuatro marcas (cache, vista, estado, pintado) y por cada pasada del renderer una mas, y
+	// cada 30 cuadros sale la linea `JUEGO135M: MAPA-POR-TILE` con el promedio por cuadro. Es el instrumento que
+	// contesta la pregunta de la tarjeta: de los 382 ms del mapa, cuanto se va FUERA del bucle de pixeles y en
+	// cual de los cuatro bloques. "no" = el reloj no se enchufa y el motor no cuenta nada (el binario es el de
+	// DC-002.134 otra vez).
+	//
+	// OJO CON LA LECTURA: el instrumento cuesta ocho llamadas al reloj por tile (~2 ms por cuadro de 242 tiles,
+	// medido al arrancar con `costo_de_1000_llamadas_us`), y la linea trae descontado ese costo en `instrumento=`.
+	// Sin descontarlo, el bloque del pintado se queda con el 0,5 % del instrumento encima.
+	tileCron = "no"
+
+	// bucle135: la corrida de DIAGNOSTICO del bucle de pixeles del mapa (`diagnostico_135.go`), para partir el
+	// costo por pixel en sus tres pedazos. Con "no" corre el camino del juego.
+	//
+	//   "lectura"   -- lee el indice y la tabla y NO escribe el pixel  (lo que cuesta leer)
+	//   "escritura" -- NO lee el indice: escribe una palabra fija en los mismos destinos  (lo que cuesta escribir)
+	//   "tabla2"    -- el bucle normal MAS una segunda armada de la tabla de 256 palabras  (lo que cuesta la tabla)
+	//
+	// "lectura" y "escritura" ROMPEN el dibujo a proposito: son corridas de medir, el `crc32` del cuadro 1 no se
+	// compara en ellas. "tabla2" pinta el cuadro identico (es el control: si cambia, el instrumento toca algo que
+	// no debe).
+	bucle135 = "no"
+
+	// cacheRapida135: "si" = con la imagen del tile YA armada, el renderer no le pide los datos del `.dt1` al
+	// motor (`mapEngine.GetTiles`) para nada: el `YAdjust` de paredes, sombras y techos va guardado con la
+	// imagen y se repone tal cual, y los pisos lo traen del `.ds1`. Medido en esta tarjeta: ese pedido, que se
+	// pagaba en CADA tile y CADA cuadro acertara o no la cache, era 185 de los 382 ms del mapa.
+	//
+	// "no" = el camino de DC-002.134 tal cual. La prueba es doble: el `crc32` del cuadro 1 contra el host
+	// (1437022778) con las dos, y la captura del pueblo comparada pixel a pixel.
+	cacheRapida135 = "si"
+
+	// plano135: "si" = el camino PLANO del blit de indices (estado neutro y paleta opaca): una rama por pixel
+	// en vez de tres y cuatro pixeles por palabra leida de los indices. Es el caso del mapa del nivel y escribe
+	// los MISMOS bytes que el camino general. "no" = el bucle general de DC-002.134 tal cual (el A/B, con la
+	// prueba de que el cuadro no cambia: mismo `crc32` 1437022778).
+	plano135 = "si"
 )

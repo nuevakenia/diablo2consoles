@@ -39,6 +39,13 @@ type imagenDeIndices struct {
 	contenedor   int
 	desde        int
 	ultimoCuadro int
+
+	// DC-002.135: EL YADJUST DE LA IMAGEN. Para las paredes, las sombras y los techos el `YAdjust` del tile NO
+	// viene del `.ds1`: lo CALCULA `generateWallCache`/`generateShadowCache` mirando los bloques del `.dt1`
+	// (`tileMinY`, `RoofHeight`). Como la imagen ya lo pago al armarse, se guarda aca y el camino de la cache
+	// rapida lo repone sin volver a pedir los datos del tile. Para los pisos queda en 0 y no se usa: ahi el
+	// `YAdjust` es del registro del `.ds1` y cambia de casilla a casilla.
+	yAjuste int
 }
 
 // lienzoDeIndices: lo que el destino del dibujado tiene que saber hacer para pintar una imagen de indices con
@@ -123,6 +130,11 @@ func (mr *MapRenderer) setCacheDeIndices(style, sequence byte, tileType int, ran
 	k := claveDeCache(style, sequence, tileType, randomIndex)
 	im.clave = k
 	im.ultimoCuadro = mr.cuadroDeLaCache
+
+	// DC-002.135: una imagen COMPUESTA es un fallo de cache. Si en un tramo de 30 cuadros hay 242 tiles por
+	// cuadro y las imagenes compuestas son decenas, la cache no se rearma por cuadro (hipotesis (a) de la
+	// tarjeta, medida).
+	contarImagen135()
 
 	// DC-002.113b: la imagen que se compuso AL VUELO no entra en la cache (el buffer de trabajo se reusa en el
 	// mismo cuadro): se deja en el slot del cuadro para que el dibujado la encuentre y no se guarda.

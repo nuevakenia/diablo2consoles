@@ -415,6 +415,19 @@ echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob bli
 echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
 echo "   PRESENTACION135 convRapida=$(leer_knob presentarConvRapida) vramAgrupada=$(leer_knob presentarVramAgrupada)"
 
+# LAS DE ESTA TARJETA (DC-002.135, EL MAPA): EL TILE POR DENTRO.
+#   TILE_CRON=si    el cronometro por bloque DENTRO del renderer del mapa (cache, vista, estado, pintado) y las
+#                   pasadas del renderer: la linea `JUEGO135M: MAPA-POR-TILE` cada 30 cuadros.
+#   BUCLE_135=no|lectura|escritura|tabla2
+#                   la corrida de DIAGNOSTICO del bucle de pixeles del mapa (parte el costo por pixel en leer,
+#                   escribir y armar la tabla). "lectura" y "escritura" rompen el dibujo a proposito: son de medir.
+[ -n "${TILE_CRON:-}" ] && pisa_knob tileCron "$TILE_CRON" 1
+[ -n "${BUCLE_135:-}" ] && pisa_knob bucle135 "$BUCLE_135" 1
+[ -n "${CACHE_RAPIDA:-}" ] && pisa_knob cacheRapida135 "$CACHE_RAPIDA" 1
+[ -n "${PLANO_135:-}" ] && pisa_knob plano135 "$PLANO_135" 1
+
+echo "   MAPA135 tileCron=$(leer_knob tileCron) bucle=$(leer_knob bucle135) cacheRapida=$(leer_knob cacheRapida135) plano=$(leer_knob plano135)"
+
 # LAS DE ESTA TARJETA (DC-002.136): EL ARRANQUE EN LOS 16 MB.
 #   MEDIR_CARGA=no   apaga la tabla de consumo del arranque (instrumento_136.go): el A/B del costo del instrumento.
 #   BLOQUES=si|no    el `malloc` interpuesto (`-Wl,--wrap=malloc`, csrc/shim.c seccion 12): imprime cada pedido de

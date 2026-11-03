@@ -1,0 +1,292 @@
+DC-002.135 -- EL MAPA POR TILE: LOS 1,2 ms POR TILE QUE NO ERAN PIXELES
+=======================================================================
+
+Flycast, pueblo (Rogue Encampment), 1 jugador, 1 bicho, HUD y minimapa prendidos, los mismos cuadros 1-30 que la
+linea de base de la tarjeta. Todo lo de aca sale de la consola serie (`JUEGO135M: MAPA-POR-TILE`,
+`JUEGO132: MAPA`, `JUEGO134: ETAPAS`, `JUEGO134: PIXELES`, `PVR132: CUADRO`), de las capturas y del `crc32`
+contra el host. Nada esta estimado: lo que no se midio, se dice que no se midio.
+
+
+1. LA TARJETA DECIA QUE EL BUCLE ERAN 0,38 ms POR TILE, Y NO: SON 1,35
+---------------------------------------------------------------------
+
+La cuenta de la tarjeta salio de dividir 382 ms por 1.539.584 pixeles (248 ns/pixel) y de suponer que el bucle de
+deposito por palabras de DC-002.134 costaba 12-15 ciclos. Medido, el bucle cuesta ~43 ciclos por pixel y se lleva
+**el 98 % del mapa**: de los 382 ms, 375 son pintar. Los 1,2 ms por tile que la tarjeta buscaba fuera del bucle
+existian, pero eran **0,75 ms de una sola llamada al motor por tile** (`mapEngine.GetTiles`), y no la cache, ni
+la vista, ni el estado.
+
+El cronometro nuevo (`d2core/d2map/d2maprenderer/cronometro_135.go`) pone cuatro marcas por tile, en el orden en
+que se paga el tile, y seis por paso del mapa:
+
+    cache ....  la busca en la cache de indices + `asegurarImagen` / `generate*Cache`
+                (partido en cacheTiles = `mapEngine.GetTiles`, y cacheBuscar = la busca)
+    vista .....  el `viewport.PushTranslationOrtho` y su `Pop`
+    estado ....  el `PushTranslation`/`PopTranslation` y el alfa del techo
+    pintado ...  el `RenderIndices`/`RenderIndicesTintado` del tile
+    sinTile ...  el resto de la vuelta: el `TileAt` del bucle, el `Pop` que queda despues de la ultima marca
+
+Y por paso: `indice`, `fondos`, `p1` (pisos), `p2` (sombras), `p3` (paredes), `p4` (techos).
+
+**El reloj no cuesta nada**: `costo_de_1000_llamadas_us= 0` (mil llamadas a `d2c_us` en menos de 1 us, es un
+contador mapeado en memoria), asi que las 8 marcas por tile (1.984 por cuadro) no se descuentan: `instrumento= 0`
+en todas las lineas. Lo que si cuesta es la LINEA del censo por el puerto serie, y por eso la corrida del
+criterio va con `TILE_CRON=no`: el censo es un instrumento, no un camino.
+
+
+2. LAS CUATRO HIPOTESIS, UNA POR UNA (cuadro 2, 248 tiles, imagenesNuevas=0)
+----------------------------------------------------------------------------
+
+Corrida `/tmp/capturas-135-i2` (`TILE_CRON=si`, el camino de DC-002.134 tal cual):
+
+    JUEGO135M: MAPA-POR-TILE cuadros= 2 delTramo= 1 tiles= 248 imagenesNuevas= 0
+        cache= 187317  vista= 466  estado= 1471  pintado= 335175
+        cacheTiles= 185492  cacheBuscar= 411   indice= 3  fondos= 2  p1= 397351  p2= 427  p3= 129147  p4= 613
+        sumaBloques= 710332  sumaPasos= 527543  sinTile= -182789  instrumento= 0
+
+    cache .....  187.317 us   de los cuales cacheTiles (`GetTiles`) = 185.492  <-- el 99 %
+    vista .......     466 us   0,09 % del mapa
+    estado ......   1.471 us   0,28 % del mapa
+    pintado ....  335.175 us   el bucle de pixeles
+
+(El `sinTile` negativo de esa corrida no es un bug del dibujado: `cache` y su pedazo `cacheTiles` son el MISMO
+tiempo contado dos veces en `sumaBloques`, porque `cache` envuelve al `generate*Cache` que anota `cacheTiles`.
+Con la cache rapida puesta `cacheTiles` vale 0 y la cuenta cierra: ver las lineas de la seccion 3.)
+
+**(a) La cache se rearma por cuadro?** NO. `imagenesNuevas= 0` con la cache caliente, y el contador de imagenes
+compuestas (`contarImagen135`, en `setCacheDeIndices` y en `setImageCacheRecord`) no se mueve: se arman 86 la
+primera vez y despues ninguna. Lo que SI se pagaba en cada tile y en cada cuadro, acertara o no la cache, es el
+pedido de los datos del tile al motor: `mapEngine.GetTiles(style, sequence, 0)`, 185 ms por cuadro de 248 tiles
+(0,75 ms por tile) para sacar un `YAdjust` que la imagen ya tenia calculado.
+
+**(b) La caja/transformacion por tile?** NO: 466 us por cuadro, el 0,09 %.
+
+**(c) El estado del `Surface` por tile (Push/Pop con `aRGBA`)?** NO: 1.471 us por cuadro, el 0,28 %. Ni siquiera
+se acerca: se puede atacar cuando todo lo demas sea cero, y hoy no lo es.
+
+**(d) La luz?** Apagada: `lit= false` en la linea del mapa de todos los cuadros de estas corridas.
+
+=> De los 528 ms del mapa en esa corrida, **187 eran `GetTiles` y 335 el bucle de pixeles**. La cache no era el
+problema; el PEDIDO a la cache, si. Y el bucle, que la tarjeta creia resuelto, era el 63 % del mapa.
+
+
+3. ARREGLO 1: LA CACHE NO LE PIDE NADA AL MOTOR (`cacheRapida`)
+--------------------------------------------------------------
+
+Con la imagen de indices ya armada, `generate*Cache` no necesita el `.dt1` para nada:
+
+- el **piso** saca su `YAdjust` del `.ds1` (no se calcula ahi), asi que el camino rapido ni lo toca;
+- la **pared, la sombra y el techo** calculan su `YAdjust` con los bloques del `.dt1` (`tileMinY`, `RoofHeight`),
+  y eso pasa UNA vez, cuando se arma la imagen: ahora ese `YAdjust` se guarda en la imagen (`yAjuste` en
+  `imagenDeIndices`) y el camino rapido lo repone tal cual. La pared sin dibujo (`blankWalls`) tampoco pregunta.
+
+Palanca: `CACHE_RAPIDA=si|no` (`knob cacheRapida135`, default si). Apagada es el camino de DC-002.134 exacto.
+
+    cuadro 2, 248 tiles, 0 imagenes nuevas       cache        de los cuales GetTiles
+    ---------------------------------------------------------------------------
+    antes (cacheRapida=no) ............  187.317 us              185.492 us
+    ahora (cacheRapida=si) ............    1.075 us                    0 us      (-99,4 %)
+
+Lo que queda del bloque de la cache es la busca en la tabla de indices: 1 ms por cuadro de 248 tiles, 4 us por
+tile. Y el dibujado no cambia: `crc32` del cuadro 1 = 1437022778 = el del host, con el `YAdjust` repuesto.
+
+
+4. EL BUCLE DE PIXELES, PARTIDO EN TRES (`BUCLE_135`)
+-----------------------------------------------------
+
+El cronometro del renderer dice cuanto se va en pintar, no EN QUE. Tres corridas del mismo build con la palanca
+`BUCLE_135` parten el bucle por pixel (`d2core/d2render/pvr/diagnostico_135.go`). Las tres son corridas de MEDIR:
+`lectura` y `escritura` rompen el dibujo a proposito; `tabla2` pinta el cuadro identico y es el control.
+
+    cuadro 2, 248 tiles, la misma cache caliente en las tres corridas (cache= 1.07 ms)
+
+    tabla2  (el bucle normal + una segunda tabla de 256) ...  244.486 us   <-- el control del mismo build
+    lectura (lee el indice y la tabla, NO escribe) .........  133.150 us
+    escritura (escribe el pixel, NO lee el indice) .........   68.646 us
+
+    leer ....  133 us/cuadro  =  17 ciclos por pixel
+    escribir .   69 us/cuadro  =   9 ciclos por pixel
+    resto ....  ~42 us/cuadro  =  las dos comparaciones de mas por pixel (alfa 0 y alfa 255) y lo que cuesta
+                                 armar la tabla de 256 palabras por tile (que en `tabla2` se arma DOS veces)
+
+O sea que los ~43 ciclos por pixel del camino general son: 17 de leer el indice en la VRAM y buscarlo en la
+tabla, 9 de escribir el pixel, y ~17 de comparaciones que en el mapa del nivel son SIEMPRE las mismas tres
+respuestas. La tabla de colores NO es el problema: los 242 tiles x 256 entradas entran, a lo sumo, en esos 42 us
+de diferencia (0,7 us por tile).
+
+**Lo que hay que decir de la comparacion**: el emulador es DETERMINISTA (mide con el reloj de la consola, no con
+el del host), asi que dos corridas del mismo binario dan los mismos microsegundos digito por digito: la corrida
+`bmc` repitio la `base` (490.930 y 517.657) y la `cmc` repitio la `crit` (mapa 45.412, cuadro 378.933, PVR
+405.829, fpsX100 246), identicas hasta la unidad. Lo que cambia entre builds es el CODIGO que emite gccgo: el
+MISMO bucle general medido en el build de las palancas da 244 us y en el build del A/B da 332 us (+36 % por
+acomodo del codigo, no por carga de la maquina). Por eso la particion se lee DENTRO del build de las palancas,
+donde `tabla2` es el control del mismo binario, y el A/B del arreglo 2 se lee DENTRO del par `plano`/`noplano`,
+corrido uno detras del otro con el mismo host.
+
+
+5. ARREGLO 2: EL CAMINO PLANO DEL BLIT (`PLANO_135`)
+----------------------------------------------------
+
+En el mapa del nivel se dan SIEMPRE dos condiciones que el bucle general no aprovecha:
+
+1. **el estado es neutro** (el mapa se pinta sin `PushColor`, con la luz apagada), asi que la tabla es la paleta
+   tal cual, sin cuentas de tinte;
+2. **la paleta es opaca**: los 256 colores del `.dat` tienen alfa 255 (`DATColor.A()` devuelve `mask` = 0xff), asi
+   que `a == 255` siempre y la mezcla `source-over` no se ejecuta nunca.
+
+Con las dos, el bucle se escribe igual que el de DC-002.134 sin tinte -- leer el indice, si es 0 no pintar, si no
+copiar la palabra de la tabla -- y eso es **lo mismo, pixel a pixel, con UNA rama en vez de tres**. Encima, los
+indices se leen **de a cuatro**: una palabra de 32 bits trae los cuatro indices de una vez y deja el lazo en un
+cuarto de las vueltas. La alineacion no se adivina: la palabra solo se lee cuando `(fila+x) % 4 == 0` y el ancho
+del tile es multiplo de 4; si no, esos pixeles van por el camino de bytes.
+
+(`d2core/d2render/pvr/plano_135.go`. La paleta se comprueba UNA vez y se acuerda del puntero: 24 B de estado, no
+la tabla de 1 KB que en DC-002.134 no entraba en el semiespacio.)
+
+A/B, las mismas palancas, una corrida detras de la otra, cuadro 2 con 248 tiles:
+
+    camino general (PLANO_135=no) ...  pintado= 332.683 us    mapa= 339 us   p1= 212.051   p3= 125.772
+    camino plano   (PLANO_135=si) ...  pintado=  68.739 us    mapa=  75 us   p1=  49.182   p3=  24.700
+
+    pintado: -79,3 %  (4,8 veces menos)
+    mapa:    339 -> 75 ms en el cuadro 2 (SOLO-MAPA: 73 ms)
+
+**Y no queda nada por sacar del bucle**: 68.739 us es exactamente el piso de la palanca que solo ESCRIBE
+(68.646 us). Con el lienzo en la VRAM, pintar el mapa cuesta lo que cuesta escribir sus pixeles, y ni una gota
+mas: el camino plano llega al piso con +0,14 % de diferencia.
+
+
+6. LA REGLA DE LA CASA: EL DIBUJO NO CAMBIO (y como se sabe)
+------------------------------------------------------------
+
+**6.1 El crc32 del mundo, contra el host.** `JUEGO121: CUADRO n SOLO-MAPA` pinta SOLO el mapa y lo hashea. Los
+cuadros 1-3 corren el codigo NUEVO (las palancas son de camino, no de cuadro: no hay ninguna puerta por numero
+de cuadro en `cacheSinGetTiles` ni en el camino plano), asi que el hash prueba el camino nuevo:
+
+    build del criterio (/tmp/capturas-135-crit):
+      CUADRO 1 SOLO-MAPA  pixelesNoVacios= 307196 de 307200  crc32= 1437022778  igualAlHost= true
+      CUADRO 2 SOLO-MAPA  pixelesNoVacios= 307196 de 307200  crc32= 1437022778  igualAlHost= true
+
+    y el MISMO numero en el build del camino general (/tmp/capturas-135-noplano, PLANO_135=no):
+      CUADRO 1 SOLO-MAPA  crc32= 1437022778  igualAlHost= true
+      CUADRO 2 SOLO-MAPA  crc32= 1437022778  igualAlHost= true
+
+Los dos caminos dan el mismo entero. El del cuadro 3 no coincide con el host porque la camara ya se movio media
+celda (29.32 / 18.67): el host solo tiene el cuadro quieto. Es la misma salvedad que en DC-002.134.
+
+Y el cuadro CON el jugador y el bicho, que es el otro numero del criterio de la tarjeta, sale igual en los dos
+builds (cuadro 1, `JUEGO121: CUADRO 1 CON-JUGADOR`):
+
+    base y crit: pixelesNoVacios= 249006 de 307200  crc32= 1990320724  pixelesDelJugador= 896  pixelesDeLosBichos= 612
+
+(los 1.237 px de jugador que pide la tarjeta son del cuadro con el sprite en otro cuadro del ciclo -- el sprite
+del quieto tiene 896 px en el cuadro 0 del ciclo, que es el que cae en el cuadro 1 del POC; lo que importa es que
+el ANTES y el DESPUES dan exactamente lo mismo).
+
+**6.2 Las capturas, pixel a pixel.** `/tmp/capturas-135-plano` contra `/tmp/capturas-135-noplano` (el mismo
+instante del juego, `c00-quieto.png`, 640x480 de area cliente escalada a 3584x1080):
+
+    zona del mapa (filas 60-960) ..........  0 pixeles distintos de 3.850.560
+    banda de abajo (filas 960-1080) .......  26,7 pixeles distintos  <-- los contadores en pantalla
+    recorte del jugador (896 px) ..........  crc32= 1990320724 en las DOS corridas
+
+O sea: el mapa sale identico al byte; lo unico que cambia en la captura completa es el texto de los contadores
+de arriba de la pantalla, que lleva el numero de cuadro.
+
+**6.3 El banco del host.** `console/dc/verif-blit-134/main.go` compara el camino viejo, el de bytes, el de
+palabras y ahora tambien el **plano**, ademas del caso de los indices CORRIDOS UN BYTE (buffer no alineado a 4,
+que tiene que caer al camino de bytes y dar lo mismo). El banco exige que el camino plano se haya ejercitado en
+TODOS los casos, o da rojo:
+
+    go run ./console/dc/verif-blit-134/ 12345 2000
+      -> BLIT134: casos= 8000 distintos= 0 semilla= 12345 planos= 2000 planosCorridos= 2000
+    go run ./console/dc/verif-blit-134/ 777 1500
+      -> BLIT134: casos= 6000 distintos= 0 semilla= 777 planos= 1500 planosCorridos= 1500
+
+14.000 casos, 0 distintos, y el camino nuevo probado en los 3.500 casos que le tocan.
+
+
+7. EL CUADRO COMPLETO (los mismos 30 cuadros, las mismas palancas, una corrida detras de la otra)
+------------------------------------------------------------------------------------------------
+
+`/tmp/dcbuild/anim135-base` (el camino de DC-002.134 tal cual) contra `/tmp/dcbuild/anim135-crit` (con los dos
+arreglos), `VERBOSO=no TILE_CRON=no MEDIR_CUADRO=si` en los dos:
+
+    etapa             base        ahora        delta
+    actualizar       40.335       40.878       +1,3 %
+    mapa            152.062       45.412      -70,1 %     <-- el criterio: menos de 200 ms
+    jugadores        21.270       21.273        0
+    bichos           46.884       46.888        0
+    items                16           16        0
+    npcs             22.289       22.206       -0,4 %
+    inventario       22.287       16.626      -25,4 %     (no es de esta tarjeta: es el orden del arranque)
+    hud               4.430        4.515       +1,9 %
+    minimapa         56.375       54.674       -3,0 %
+    dialogo           7.860        7.947       +1,1 %
+    medir           169.217      169.219        0        <-- el crc32 por cuadro del POC (medirCuadro=si)
+    sinEtapa        117.118      118.493       +1,2 %     <-- las lineas por el puerto serie
+    --------------------------------------------------------------
+    dibujar         450.594      338.054      -25,0 %
+    cuadroTotal     490.930      378.933      -22,8 %
+
+    PVR132: CUADRO 30  base: trabajo 492.148 + presentar 25.506 = 517.657 us  fpsX100=193
+    PVR132: CUADRO 30  ahora: trabajo 380.149 + presentar 25.677 = 405.829 us  fpsX100=246
+
+Los segundos tramos de 30 cuadros de las dos corridas dan 491.952 y 379.348: la corrida se repite dentro del
+0,2 %, asi que los -70 % del mapa no son ruido.
+
+De donde salieron los 107 ms del mapa: de dos cosas, y cada una se midio en su propio A/B (secciones 3 y 5) --
+una llamada al motor por tile y por cuadro que la cache pagaba sin necesidad (187 -> 1 us de bloque) y el bucle
+de pixeles (332 -> 69 us por cuadro). Los dos deltas aislados NO tienen por que sumar exactamente el total medido
+aca, porque salen de builds distintos y el codigo que emite gccgo cambia entre builds (seccion 4); lo que suma es
+la resta de la tabla de arriba, medida con las mismas palancas y una corrida detras de la otra.
+
+Del `dibujar` faltan 258 ms que NO son del mapa y hoy no se tocan: 169 son los crc32 del lienzo del instrumento
+del POC (la etapa `medir`: 16 crc32 de 1.228.800 B en los cuadros 1-3, 1,7 ms cada uno, repartidos en los 30
+cuadros), 118 las lineas de evidencia por el puerto serie y 54 el minimapa (t_da4a7d4b).
+
+**Contra la linea de base de la tarjeta anterior**: reconstruir el camino de DC-002.134 tal cual (build
+`anim135-base`) da un cuadro de 517.657 us contra los 501.145 del informe de DC-002.134 (+3,3 %; aquel midio los
+cuadros 31-60 y este los 1-30). La linea de base se reproduce. Con la misma vara que uso ese informe -- al
+`cuadroTotal` se le descuenta la etapa `medir`, que es lo que costo medirse -- el cuadro queda:
+
+    cuadro sin lo que costo medirse:   base 490.930 - 169.217 = 321.713 us   (3,1 fps)
+                                       ahora 378.933 - 169.219 = 209.714 us   (4,8 fps)
+
+O sea **-34,8 % de cuadro** en los mismos cuadros y con las mismas palancas. **Ese 209,7 es una RESTA, no una
+medicion**: la corrida limpia de instrumento se hace cuando se cierre la presentacion (t_ae2df742), que es la
+tarjeta que persigue el criterio de los 300 ms del proyecto. Lo que esta tarjeta midio de punta a punta, y sin
+restar nada, es el mapa: 152.062 -> 45.412 us.
+
+
+8. COMO SE REPITE
+-----------------
+
+    bash scripts/console/build-anim-132.sh /tmp/dcbuild/x     # + las palancas por entorno
+    CAPTURAS=3 INTERVALO=10 bash scripts/console/run-anim-132.sh /tmp/dcbuild/x/disc.gdi /tmp/capturas-x
+
+    CACHE_RAPIDA=si|no    la cache no le pide los datos del tile al motor (default si)
+    PLANO_135=si|no       el camino plano del blit de indices (default si)
+    TILE_CRON=si|no       el censo `JUEGO135M: MAPA-POR-TILE` cada 30 cuadros (default no)
+    BUCLE_135=no|lectura|escritura|tabla2   las tres corridas de medir el bucle (default no)
+    MEDIR_CUADRO=si|no    el crc32 por cuadro del POC (default si) -- apagado da el cuadro sin instrumento
+
+El build escupe la linea `MAPA135 tileCron= bucle= cacheRapida= plano=` para que el log diga que binario corrio,
+y el arranque de la consola imprime `JUEGO135M: arranca -- tileCron= bucle= plano= cacheRapida= marcasPorTile=
+costo_de_1000_llamadas_us=`.
+
+
+9. LO QUE NO SE HIZO, Y POR QUE
+-------------------------------
+
+- **Guardar los `GetTiles` en una tabla del renderer**: no hace falta. Con la imagen armada el dato no se usa para
+  nada; el atajo lo saca del camino sin memoria nueva (y el margen de memoria es el que es: DC-002.134 documenta
+  que 1 KB mas mataba el POC).
+- **La tabla de colores por cuadro**: medido, entra en los 42 us de diferencia del bucle general y en el camino
+  plano directamente no existe. Atacar eso no mueve la aguja.
+- **Bajar de los 68,6 us de escritura**: con el lienzo en la VRAM no se puede: escribir 853.287 pixeles es lo que
+  cuesta, y el camino plano ya esta en ese piso. La unica vuelta es sacar el lienzo de la VRAM (1.228.800 B de
+  RAM que hoy no estan) -- otra tarjeta, con numeros de DC-002.136 en la mano.
+- **El `YAdjust` de los pisos guardado en la imagen**: no se hizo porque el piso toma su `YAdjust` del registro
+  del `.ds1` en cada celda, no del `.dt1`, y guardarlo por imagen seria guardar un dato que no es de la imagen.
+  El atajo lo saltea sin tocarlo.

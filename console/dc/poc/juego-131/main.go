@@ -410,6 +410,10 @@ func main() {
 	// DC-002.135: el camino de la PRESENTACION (la conversion y la subida) y el costo del reloj del instrumento.
 	activarLaPresentacion135()
 
+	// DC-002.135 (el mapa): el cronometro por bloque DENTRO del renderer del mapa y, si se pide, la corrida de
+	// diagnostico del bucle de pixeles. Tambien antes del primer cuadro (el motor lo lee en cada tile).
+	activarElCronometroDeLosTiles()
+
 	println("JUEGO132: arranca -- medirCuadro=", medirCuadro, "blitRapido=", blitRapido,
 		"cuadrosPorInforme=", cuadrosDelInforme132)
 	println("JUEGO134: arranca -- etapas=", etapasKnob, "verboso=", verbosoEtapas, "blitPalabras=",
@@ -797,9 +801,14 @@ func main() {
 	rendererDelMapa = d2maprenderer.CreateMapRenderer(am, renderer, engine, term, d2util.LogLevelError,
 		celdaX, celdaY, opciones...)
 
+	// DC-002.135: el atajo de la cache del mapa: con la imagen ya armada no se le piden los datos del tile al
+	// motor. Es la palanca del A/B contra el camino de DC-002.134 (que pedia `GetTiles` en cada tile y cuadro).
+	rendererDelMapa.ActivarCacheSinGetTiles(cacheRapida135 == "si")
+
 	espacio := rendererDelMapa.TamanoDelCuadro()
 	println("JUEGO121: renderer listo; cuadro=", espacio.W, espacio.H,
-		"cachePerezosa=", rendererDelMapa.CachePerezosa(), "cacheEnIndices=", rendererDelMapa.CacheDeIndices())
+		"cachePerezosa=", rendererDelMapa.CachePerezosa(), "cacheEnIndices=", rendererDelMapa.CacheDeIndices(),
+		"cacheSinGetTiles=", rendererDelMapa.CacheSinGetTiles())
 	censoDelTramo("despues-del-renderer")
 	memoria("despues-del-renderer")
 	semiespacio("despues-del-renderer")
@@ -1426,6 +1435,10 @@ func dibujar(superficie d2interface.Surface) error {
 	if cuadro <= 3 || cuadro%cuadrosDelInforme132 == 0 {
 		println("JUEGO132: MAPA cuadro=", cuadro, "ms=", msMapa, "stats=", rendererDelMapa.DrawStats().String(),
 			"blitRapido=", blitRapido, "medirCuadro=", medirCuadro)
+
+		// DC-002.135: el censo por bloque DENTRO del renderer del mapa (cache, vista, estado, pintado y las
+		// pasadas). Va pegado a la linea del mapa a proposito: se lee como su desglose.
+		informeDeLosTiles135()
 	}
 
 	pixeles := malla.Imagen().Pixeles()

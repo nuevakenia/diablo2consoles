@@ -310,6 +310,126 @@ func palabraTintado(px []byte, ancho, alto int, dx, dy int, indices []byte, ia, 
 	}
 }
 
+// ============================== EL PLANO (DC-002.135) ==============================
+//
+// El camino PLANO del blit de indices, copiado TAL CUAL de d2core/d2render/pvr/plano_135.go: cuando el estado es
+// NEUTRO y la paleta es OPACA (los 256 alfas en 255, que es el caso del mapa del nivel y de cualquier paleta del
+// `.dat`), el bucle se escribe como el de DC-002.134 sin tinte -- una rama por pixel -- y los indices se leen de
+// a cuatro (una palabra de 32 bits) cuando el ancho es multiplo de 4 y el buffer esta alineado.
+//
+// Si las condiciones no se dan, delega en `palabraTintado` (el camino general, ya verificado mas arriba contra el
+// viejo): asi este banco puede llamarlo SIEMPRE y comparar, y a la vez contar cuantos casos fueron por el plano.
+
+func palabrasDeLosIndices(indices []byte, ia int) []uint32 {
+	if ia%4 != 0 || len(indices) < 4 {
+		return nil
+	}
+
+	p := unsafe.Pointer(&indices[0])
+	if uintptr(p)%4 != 0 {
+		return nil
+	}
+
+	n := len(indices) / 4
+
+	return (*[maximoDePalabras]uint32)(p)[:n:n]
+}
+
+func paletaOpaca(paleta [][4]uint8) bool {
+	if len(paleta) < 256 {
+		return false
+	}
+
+	for i := 0; i < 256; i++ {
+		if paleta[i][3] != 255 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// planoTintado devuelve true si el caso fue por el camino PLANO (o sea, si el banco ejercito lo que dice).
+func planoTintado(px []byte, ancho, alto int, dx, dy int, indices []byte, ia, al int, paleta [][4]uint8,
+	col []uint16) bool {
+	rojo, verde, azul, alfa := uint16(255), uint16(255), uint16(255), uint16(255)
+	if col != nil {
+		rojo, verde, azul, alfa = col[0], col[1], col[2], col[3]
+	}
+
+	if rojo != 255 || verde != 255 || azul != 255 || alfa != 255 || !paletaOpaca(paleta) {
+		palabraTintado(px, ancho, alto, dx, dy, indices, ia, al, paleta, col)
+
+		return false
+	}
+
+	lienzo := palabras(px)
+
+	var tabla [256]uint32
+	for i := 0; i < 256; i++ {
+		c := paleta[i]
+		tabla[i] = palabraDelColor(c[0], c[1], c[2], 255)
+	}
+
+	x0, x1, y0, y1, vale := recorteDelBlit(dx, dy, ia, al, ancho, alto)
+	if !vale {
+		return true
+	}
+
+	palabrasDe := palabrasDeLosIndices(indices, ia)
+
+	for y := y0; y < y1; y++ {
+		fila := y * ia
+		j := (dy+y)*ancho + dx + x0
+
+		x := x0
+
+		if palabrasDe != nil {
+			for x < x1 && (fila+x)%4 != 0 {
+				if idx := indices[fila+x]; idx != 0 {
+					lienzo[j] = tabla[idx]
+				}
+
+				x, j = x+1, j+1
+			}
+
+			for ; x+4 <= x1; x, j = x+4, j+4 {
+				w := palabrasDe[(fila+x)>>2]
+				if w == 0 {
+					continue
+				}
+
+				if b := byte(w); b != 0 {
+					lienzo[j] = tabla[b]
+				}
+
+				if b := byte(w >> 8); b != 0 {
+					lienzo[j+1] = tabla[b]
+				}
+
+				if b := byte(w >> 16); b != 0 {
+					lienzo[j+2] = tabla[b]
+				}
+
+				if b := byte(w >> 24); b != 0 {
+					lienzo[j+3] = tabla[b]
+				}
+			}
+		}
+
+		for ; x < x1; x, j = x+1, j+1 {
+			idx := indices[fila+x]
+			if idx == 0 {
+				continue
+			}
+
+			lienzo[j] = tabla[idx]
+		}
+	}
+
+	return true
+}
+
 // ============================== EL BANCO ==============================
 
 func main() {
@@ -328,6 +448,7 @@ func main() {
 
 	AN, AL := 64, 48
 	casos, distintos := 0, 0
+	planos, planosCorridos := 0, 0
 
 	for i := 0; i < casosPedidos; i++ {
 		ia := 1 + r.Intn(40)
@@ -360,6 +481,13 @@ func main() {
 
 			pal4[k] = [4]uint8{pal3[k][0], pal3[k][1], pal3[k][2], a}
 		}
+
+		pal4Opaca := make([][4]uint8, 256)
+		for k := 0; k < 256; k++ {
+			pal4Opaca[k] = [4]uint8{pal3[k][0], pal3[k][1], pal3[k][2], 255}
+		}
+
+		neutro := []uint16{255, 255, 255, 255}
 
 		base := make([]byte, AN*AL*4)
 		for k := range base {
@@ -402,9 +530,55 @@ func main() {
 			println("RenderIndicesTintado DISTINTO caso", i, "dx", dx, "dy", dy, "tile", ia, al,
 				"tinte", col[0], col[1], col[2], col[3], "bytes=", iguales(ref, b132), "palabra=", iguales(ref, b134))
 		}
+
+		// 3. EL CAMINO PLANO (DC-002.135) contra el viejo, con paleta OPACA y estado NEUTRO: el caso del mapa del
+		// nivel. Es el que el juego usa de verdad y el que la tarjeta mide en la consola.
+		ref = append([]byte(nil), base...)
+		pl := append([]byte(nil), base...)
+		viejoTintado(ref, AN, AL, dx, dy, indices, ia, al, pal4Opaca, neutro)
+
+		if planoTintado(pl, AN, AL, dx, dy, indices, ia, al, pal4Opaca, neutro) {
+			planos++
+		}
+
+		casos++
+		if !iguales(ref, pl) {
+			distintos++
+			println("PLANO DISTINTO caso", i, "dx", dx, "dy", dy, "tile", ia, al, "plano=", iguales(ref, pl))
+		}
+
+		// 4. EL PLANO con los indices CORRIDOS UN BYTE (buffer no alineado a 4): el atajo de la palabra no se puede
+		// usar y el bucle tiene que caer al camino de bytes y dar lo mismo. Es la mitad de la correccion del
+		// camino plano, y sin este caso nadie la probaria.
+		corridos := make([]byte, len(indices)+1)
+		copy(corridos[1:], indices)
+
+		corridos = corridos[1:]
+
+		ref = append([]byte(nil), base...)
+		pl = append([]byte(nil), base...)
+		viejoTintado(ref, AN, AL, dx, dy, corridos, ia, al, pal4Opaca, neutro)
+
+		if planoTintado(pl, AN, AL, dx, dy, corridos, ia, al, pal4Opaca, neutro) {
+			planosCorridos++
+		}
+
+		casos++
+		if !iguales(ref, pl) {
+			distintos++
+			println("PLANO CORRIDO DISTINTO caso", i, "dx", dx, "dy", dy, "tile", ia, al, "plano=", iguales(ref, pl))
+		}
 	}
 
-	println("BLIT134: casos=", casos, "distintos=", distintos, "semilla=", int(semilla))
+	println("BLIT134: casos=", casos, "distintos=", distintos, "semilla=", int(semilla),
+		"planos=", planos, "planosCorridos=", planosCorridos)
+
+	// El plano tiene que haberse ejercitado en TODOS los casos: si el conteo no cuadra, el banco estaria dando
+	// verde sin haber probado el camino nuevo.
+	if planos != casosPedidos || planosCorridos != casosPedidos {
+		println("BLIT134: EL CAMINO PLANO NO SE EJERCITO EN TODOS LOS CASOS", planos, planosCorridos, casosPedidos)
+		distintos++
+	}
 
 	if distintos != 0 {
 		os.Exit(1)

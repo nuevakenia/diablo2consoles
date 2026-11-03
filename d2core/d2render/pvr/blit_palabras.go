@@ -247,6 +247,23 @@ func (s *Surface) renderIndicesTintadoPalabras(indices []byte, ancho, alto int, 
 		return true
 	}
 
+	// DC-002.135 -- LAS PALANCAS DE DIAGNOSTICO DEL BUCLE (ver `diagnostico_135.go`).
+	//
+	// Son TRES corridas de MEDIR, no caminos del juego: ROMPEN el dibujo a proposito y existen para partir el
+	// tiempo por pixel en sus pedazos (leer el indice, escribir el pixel, armar la tabla). Vienen apagadas y la
+	// corrida del criterio las lleva apagadas: con las tres en "no" este `if` es una comparacion por tile.
+	if diagnostico135 != "" {
+		return s.bucleDeDiagnostico135(indices, ancho, alto, paleta, tabla, x0, x1, y0, y1)
+	}
+
+	// DC-002.135 -- EL CAMINO PLANO (ver `plano_135.go`): estado neutro y paleta opaca, o sea el mapa del nivel.
+	// Una rama por pixel y cuatro pixeles por palabra leida, con la MISMA tabla: el dibujo no cambia.
+	if CaminoPlanoDisponible135(neutro, paleta) {
+		if s.renderIndicesTintadoPlano135(indices, ancho, alto, &tabla, x0, x1, y0, y1) {
+			return true
+		}
+	}
+
 	for y := y0; y < y1; y++ {
 		fila := y * ancho
 		j := (dy+y)*anchoLienzo + dx + x0

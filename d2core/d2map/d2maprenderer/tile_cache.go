@@ -109,7 +109,26 @@ func (mr *MapRenderer) generateTileCache() {
 }
 
 func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
+	// DC-002.135 -- LA CACHE RAPIDA: SI LA IMAGEN YA ESTA, NO SE LE PIDE NADA AL MOTOR.
+	//
+	// MEDIDO (evidencia de la tarjeta): con la cache ya armada y CERO imagenes nuevas, este bloque era el que
+	// mas pesaba del mapa -- 187 ms de los 528 de la corrida del cronometro, 248 veces por cuadro -- y casi
+	// todo era el `mapEngine.GetTiles` de abajo, que se pedia SIEMPRE, acertara o no la cache. Con la imagen en
+	// la mano el `.dt1` no hace falta para nada: el `YAdjust` del piso viene del `.ds1` (no se calcula aca) y el
+	// resto de la funcion es la composicion que no hay que hacer. Las flojas (lava, `tile.Animated`) siguen por
+	// el camino de siempre: ahi la clave de la imagen sale de los datos del tile.
+	if mr.cacheSinGetTiles && mr.cacheEnIndices && !tile.Animated {
+		if mr.getCacheDeIndices(tile.Style, tile.Sequence, 0, tile.RandomIndex) != nil {
+			return
+		}
+	}
+
+	// DC-002.135: el pedazo `cacheTiles` del bloque de la cache (el `GetTiles` del motor).
+	tTiles := ahora135()
+
 	tileOptions := mr.mapEngine.GetTiles(int(tile.Style), int(tile.Sequence), 0)
+
+	anotar135(BloqueCacheTiles135, tTiles)
 
 	diagImagen("piso", tile, len(tileOptions))
 
@@ -193,7 +212,23 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 }
 
 func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
+	// DC-002.135: la cache rapida (ver `generateFloorCache`). Aca el `YAdjust` SI lo calcula esta funcion, asi
+	// que se repone el que quedo guardado con la imagen.
+	if mr.cacheSinGetTiles && mr.cacheEnIndices {
+		if im := mr.getCacheDeIndices(tile.Style, tile.Sequence, int(d2enum.TileShadow),
+			tile.RandomIndex); im != nil {
+			tile.YAdjust = im.yAjuste
+
+			return
+		}
+	}
+
+	// DC-002.135: el pedazo `cacheTiles` (ver `generateFloorCache`).
+	tTiles := ahora135()
+
 	tileOptions := mr.mapEngine.GetTiles(int(tile.Style), int(tile.Sequence), d2enum.TileShadow)
+
+	anotar135(BloqueCacheTiles135, tTiles)
 
 	diagImagen("sombra", tile, len(tileOptions))
 
@@ -238,7 +273,7 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 	if mr.cacheEnIndices {
 		mr.setCacheDeIndices(tile.Style, tile.Sequence, int(d2enum.TileShadow), tile.RandomIndex, &imagenDeIndices{
 			indices: indexData, ancho: int(tileData.Width), alto: tileHeight, paleta: mr.paletaEnRGBA(),
-			contenedor: trozo.contenedor, desde: trozo.desde,
+			contenedor: trozo.contenedor, desde: trozo.desde, yAjuste: tile.YAdjust,
 		})
 
 		return
@@ -253,7 +288,28 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 }
 
 func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
+	// DC-002.135: la cache rapida (ver `generateFloorCache`). El `YAdjust` de la pared/techo lo calcula esta
+	// funcion con los bloques del `.dt1`, asi que el camino rapido repone el que quedo guardado con la imagen:
+	// el dibujado sale en el mismo sitio. Las paredes sin grafico (colision sin dibujo) ya estan en
+	// `blankWalls`: esas tampoco necesitan el motor, porque el renderer las saltea antes de usar el `YAdjust`.
+	if mr.cacheSinGetTiles && mr.cacheEnIndices {
+		if im := mr.getCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex); im != nil {
+			tile.YAdjust = im.yAjuste
+
+			return
+		}
+
+		if mr.blankWalls != nil && mr.blankWalls[blankWallKey(tile)] {
+			return
+		}
+	}
+
+	// DC-002.135: el pedazo `cacheTiles` (ver `generateFloorCache`).
+	tTiles := ahora135()
+
 	tileOptions := mr.mapEngine.GetTiles(int(tile.Style), int(tile.Sequence), tile.Type)
+
+	anotar135(BloqueCacheTiles135, tTiles)
 
 	diagImagen("pared", tile, len(tileOptions))
 
@@ -342,7 +398,7 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 	if mr.cacheEnIndices {
 		mr.setCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex, &imagenDeIndices{
 			indices: indexData, ancho: tileSurfaceWidth, alto: int(realHeight), paleta: mr.paletaEnRGBA(),
-			contenedor: trozo.contenedor, desde: trozo.desde,
+			contenedor: trozo.contenedor, desde: trozo.desde, yAjuste: tile.YAdjust,
 		})
 
 		return

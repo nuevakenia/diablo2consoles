@@ -122,6 +122,12 @@ type MapRenderer struct {
 	bufferDelVuelo        []byte
 	crecimientosDelBuffer int
 
+	// cacheSinGetTiles (DC-002.135): con la cache en indices y la imagen YA armada, el tile no necesita los
+	// datos del `.dt1` para nada (ni para el `YAdjust`, que va guardado con la imagen), asi que se saltea el
+	// `mapEngine.GetTiles` que `generate*Cache` pedia SIEMPRE, acertara o no la cache. Es la palanca del A/B:
+	// apagada, el camino es el de DC-002.134 tal cual (y el cuadro tiene que salir identico con las dos).
+	cacheSinGetTiles bool
+
 	// cuadroDeLaCache: el numero de cuadro del dibujado (lo cuenta `Render`), que es la unidad con la que se
 	// mide "esta imagen no se usa hace N cuadros".
 	cuadroDeLaCache int
@@ -193,6 +199,15 @@ func (mr *MapRenderer) ActivarCacheDeIndices() {
 
 // CacheDeIndices: si la cache guarda indices en vez de RGBA.
 func (mr *MapRenderer) CacheDeIndices() bool { return mr.cacheEnIndices }
+
+// ActivarCacheSinGetTiles (DC-002.135): con la imagen ya armada, `generate*Cache` NO pide los datos del tile al
+// motor (`mapEngine.GetTiles`). El `YAdjust` que esas funciones calculaban se guarda con la imagen y se repone
+// tal cual, asi que el dibujado es el mismo; lo que se va es una llamada por tile y por cuadro que se pagaba
+// acertara o no la cache. Es la palanca del A/B: apagada, el camino es el de DC-002.134 tal cual.
+func (mr *MapRenderer) ActivarCacheSinGetTiles(si bool) { mr.cacheSinGetTiles = si }
+
+// CacheSinGetTiles: si el atajo esta puesto (para el log del arranque).
+func (mr *MapRenderer) CacheSinGetTiles() bool { return mr.cacheSinGetTiles }
 
 // FijarTamanoDelCuadro: el tamano del cuadro que este renderer compone, en pixeles, para la consola
 // (DC-002.94). Sin llamarla, el tamano sale de d2display como siempre.
@@ -420,25 +435,55 @@ func (mr *MapRenderer) Render(target d2interface.Surface) {
 		defer target.Pop()
 	}
 
+	// DC-002.135: el cronometro por PASADA, para cerrar la cuenta del mapa sin dejar nada afuera.
+	tPaso := ahora135()
+
 	mr.indexEntities()
+
+	anotarPaso135(PasoIndice135, tPaso)
 
 	// only the tiles that can be seen (the range is a rectangle around the isometric diamond of the screen)
 	rows := VisibleTileRows(mr.viewport, sz.W, sz.H, startX, startY, endX, endY)
 
+	tPaso = ahora135()
+
 	mr.renderBackdrops(target)
+
+	anotarPaso135(PasoFondos135, tPaso)
+
+	tPaso = ahora135()
+
 	mr.renderPass1(target, startY, endY, rows)
+
+	anotarPaso135(Paso1Plantas135, tPaso)
+
+	tPaso = ahora135()
+
 	mr.renderPass2(target, startY, endY, rows)
+
+	anotarPaso135(Paso2Sombras135, tPaso)
 
 	if mr.mapDebugVisLevel > 0 {
 		mr.renderMapDebug(mr.mapDebugVisLevel, target, startX, startY, endX, endY)
 	}
 
+	tPaso = ahora135()
+
 	mr.renderPass3(target, startY, endY, rows)
+
+	anotarPaso135(Paso3Paredes135, tPaso)
+
+	tPaso = ahora135()
+
 	mr.renderPass4(target, startY, endY, rows)
+
+	anotarPaso135(Paso4Techos135, tPaso)
 
 	if mr.entityDebugVisLevel > 0 {
 		mr.renderEntityDebug(target)
 	}
+
+	contarCuadro135()
 }
 
 // TileRange is the range of tiles [startX,endX) x [startY,endY) that covers a screen of width x height pixels
@@ -709,8 +754,14 @@ func (mr *MapRenderer) renderTilePass3(tile *d2mapengine.MapTile, target d2inter
 }
 
 func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, tileX, tileY int) {
+	// DC-002.135: el cronometro del bloque de la CACHE (hipotesis (a) de la tarjeta).
+	tCache := ahora135()
+
 	// DC-002.94: con la cache perezosa, la imagen se arma aca la primera vez
 	mr.asegurarImagen(&tile, 0)
+
+	// DC-002.135: el pedazo `cacheBuscar` (la busqueda en la cache, ya con la imagen armada o no).
+	tBuscar := ahora135()
 
 	var (
 		img    d2interface.Surface
@@ -728,6 +779,8 @@ func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, 
 		img = mr.getImageCacheRecord(tile.Style, tile.Sequence, 0, clave)
 	}
 
+	anotar135(BloqueCacheBuscar135, tBuscar)
+
 	if img == nil && indice == nil {
 		mr.Warningf("Render called on uncached floor {%v,%v}", tile.Style, tile.Sequence)
 		return
@@ -735,13 +788,31 @@ func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, 
 
 	mr.stats.Floors++
 
+	anotar135(BloqueCache135, tCache)
+
+	// DC-002.135: el bloque de la VISTA (la aritmetica de la posicion en pantalla, hipotesis (b)).
+	tVista := ahora135()
+
 	mr.viewport.PushTranslationOrtho(-80, float64(tile.YAdjust))
 	defer mr.viewport.PopTranslation()
+
+	anotar135(BloqueVista135, tVista)
+
+	// DC-002.135: el bloque del ESTADO del Surface (hipotesis (c)).
+	tEstado := ahora135()
 
 	target.PushTranslation(mr.viewport.GetTranslationScreen())
 	defer target.Pop()
 
+	anotar135(BloqueEstado135, tEstado)
+
+	// DC-002.135: el bloque del PINTADO (el `RenderIndicesTintado` y lo que lo rodea).
+	tPintado := ahora135()
+
 	if mr.light.active() {
+		contarTile135()
+		anotar135(BloquePintado135, tPintado)
+
 		if indice != nil {
 			mr.Warningf("la cache en indices no pinta con la luz prendida (DC-002.101)")
 
@@ -754,6 +825,9 @@ func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, 
 	}
 
 	mr.pintarTile(target, img, indice)
+
+	contarTile135()
+	anotar135(BloquePintado135, tPintado)
 }
 
 // pintarTile dibuja la imagen cacheada del tile: los indices por el camino de DC-002.101 o la superficie
@@ -770,8 +844,14 @@ func (mr *MapRenderer) pintarTile(target d2interface.Surface, img d2interface.Su
 
 func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2interface.Surface,
 	tileX, tileY, idx int, upper bool) {
-	// DC-002.94: con la cache perezosa, la imagen (y el YAdjust que esta funcion usa) se arman aca
+	// DC-002.135: el bloque de la CACHE (ver `cronometro_135.go`).
+	tCache := ahora135()
+
+	// DC-002.94: con la cache perezosa, la imagen (y el YAdjust que esta funcion usa) se arman aca la primera vez
 	mr.asegurarImagen(&tile, tile.Type)
+
+	// DC-002.135: el pedazo `cacheBuscar`.
+	tBuscar := ahora135()
 
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, tile.Type, tile.RandomIndex)
 	indice := (*imagenDeIndices)(nil)
@@ -779,6 +859,8 @@ func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2
 	if mr.cacheEnIndices {
 		indice = mr.getCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex)
 	}
+
+	anotar135(BloqueCacheBuscar135, tBuscar)
 
 	if img == nil && indice == nil {
 		if !mr.blankWalls[blankWallKey(&tile)] {
@@ -794,20 +876,40 @@ func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2
 		mr.stats.Walls++
 	}
 
+	anotar135(BloqueCache135, tCache)
+
+	// DC-002.135: el bloque de la VISTA.
+	tVista := ahora135()
+
 	viewport.PushTranslationOrtho(-80, float64(tile.YAdjust))
 	defer viewport.PopTranslation()
+
+	anotar135(BloqueVista135, tVista)
+
+	// DC-002.135: el bloque del ESTADO, con la cuenta de la luz/alfa adentro (es lo que se hacia entre el
+	// `PushTranslation` y el pintado).
+	tEstado := ahora135()
 
 	target.PushTranslation(viewport.GetTranslationScreen())
 	defer target.Pop()
 
 	if !mr.light.active() {
+		anotar135(BloqueEstado135, tEstado)
+
+		// DC-002.135: el bloque del PINTADO.
+		tPintado := ahora135()
+
 		mr.pintarTile(target, img, indice)
+
+		contarTile135()
+		anotar135(BloquePintado135, tPintado)
 
 		return
 	}
 
 	if indice != nil {
 		mr.Warningf("la cache en indices no pinta con la luz prendida (DC-002.101)")
+		anotar135(BloqueEstado135, tEstado)
 
 		return
 	}
@@ -821,15 +923,28 @@ func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2
 		}
 	}
 
+	anotar135(BloqueEstado135, tEstado)
+
+	tPintado := ahora135()
+
 	mr.renderShadedImage(target, img, wallShadeCols, wallShadeRows, alpha, shadeWall, tileX, tileY)
+
+	contarTile135()
+	anotar135(BloquePintado135, tPintado)
 }
 
 // renderRoof draws a roof tile with the flat frame ambient (roofs sample no
 // light map in the real game).
 func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2interface.Surface,
 	tileX, tileY, idx int) {
+	// DC-002.135: el bloque de la CACHE.
+	tCache := ahora135()
+
 	// DC-002.94: con la cache perezosa, la imagen se arma aca la primera vez
 	mr.asegurarImagen(&tile, tile.Type)
+
+	// DC-002.135: el pedazo `cacheBuscar`.
+	tBuscar := ahora135()
 
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, tile.Type, tile.RandomIndex)
 	indice := (*imagenDeIndices)(nil)
@@ -838,6 +953,8 @@ func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2
 		indice = mr.getCacheDeIndices(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex)
 	}
 
+	anotar135(BloqueCacheBuscar135, tBuscar)
+
 	if img == nil && indice == nil {
 		mr.Warningf("Render called on uncached wall {%v,%v,%v}", tile.Style, tile.Sequence, tile.Type)
 		return
@@ -845,8 +962,19 @@ func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2
 
 	mr.stats.Roofs++
 
+	anotar135(BloqueCache135, tCache)
+
+	// DC-002.135: el bloque de la VISTA.
+	tVista := ahora135()
+
 	viewport.PushTranslationOrtho(-80, float64(tile.YAdjust))
 	defer viewport.PopTranslation()
+
+	anotar135(BloqueVista135, tVista)
+
+	// DC-002.135: el bloque del ESTADO (con el alfa del techo adentro, que es lo que se paga entre el
+	// `PushTranslation` y el pintado).
+	tEstado := ahora135()
 
 	target.PushTranslation(viewport.GetTranslationScreen())
 	defer target.Pop()
@@ -854,6 +982,7 @@ func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2
 	if mr.light.active() {
 		if indice != nil {
 			mr.Warningf("la cache en indices no pinta con la luz prendida (DC-002.101)")
+			anotar135(BloqueEstado135, tEstado)
 
 			return
 		}
@@ -864,15 +993,34 @@ func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2
 			mr.stats.RoofsFading++
 		}
 
+		anotar135(BloqueEstado135, tEstado)
+
 		if alpha <= 0 {
 			return
 		}
 
+		tPintado := ahora135()
+
 		target.PushColor(withAlpha(mr.light.ambientTint(), alpha))
 		defer target.Pop()
+
+		mr.pintarTile(target, img, indice)
+
+		contarTile135()
+		anotar135(BloquePintado135, tPintado)
+
+		return
 	}
 
+	anotar135(BloqueEstado135, tEstado)
+
+	// DC-002.135: el bloque del PINTADO.
+	tPintado := ahora135()
+
 	mr.pintarTile(target, img, indice)
+
+	contarTile135()
+	anotar135(BloquePintado135, tPintado)
 }
 
 // updateRoofCover recomputes which roof tiles the hero is under (see roof_fade.go).
@@ -1278,4 +1426,7 @@ func (mr *MapRenderer) setImageCacheRecord(style, sequence byte, tileType d2enum
 	}
 
 	mr.imageCacheRecords[lookupIndex] = image
+
+	// DC-002.135: una imagen compuesta es un fallo de cache (ver `contarImagen135`).
+	contarImagen135()
 }
