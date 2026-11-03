@@ -464,6 +464,16 @@ echo "   ARRANQUE136 medirCarga=$(leer_knob medirCarga) wrapMalloc=$DC_WRAP_MALL
 
 echo "   MVP138 mvp=$(leer_knob mvpKnob) vista=$(leer_knob vistaX),$(leer_knob vistaY) monstruos=$(leer_knob monstruosKnob) npcLista=$(leer_knob npcLista)"
 
+# LAS DE ESTA TARJETA (DC-002.140): LA DEMO JUGABLE.
+#   DEMO=si       `demo_140.go`: el POC no se corta en cuadros+3, la quest avanza con lo que hace el jugador y
+#                 cada 30 cuadros deja el ritmo real. "no" (por omision) = nada de eso existe.
+#   DEMO_MOOR=si  cruzar el borde del campamento compone el BLOOD MOOR como nivel nuevo. Por omision "no": el
+#                 nivel de afuera pide RAM y ese numero se mide antes de dejarlo encendido.
+[ -n "${DEMO:-}" ] && pisa_knob demoKnob "$DEMO" 1
+[ -n "${DEMO_MOOR:-}" ] && pisa_knob demoMoor "$DEMO_MOOR" 1
+
+echo "   DEMO140 demo=$(leer_knob demoKnob) moor=$(leer_knob demoMoor)"
+
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }

@@ -881,9 +881,15 @@ func main() {
 	// (el HUD ya se cargo en 4a, con las fuentes todavia abiertas)
 
 	// ============================== 9. EL CUADRO EN PANTALLA ==============================
+	// DC-002.140: EL ESCENARIO DE LA DEMO Y EL CARTEL DE LAS TECLAS, con todo cargado y antes del primer cuadro.
+	arrancarLaDemo()
+
 	if err := renderer.Run(dibujar, actualizar, ancho, alto, "Diablo II (Dreamcast) DC-002.117"); err != nil {
 		println("JUEGO121: el ciclo de cuadros salio con error:", err.Error())
 	}
+
+	// el resumen de la demo, si el ciclo salio de buena forma (si lo matan, el periodico ya dejo los numeros)
+	resumenDeLaDemo()
 
 	println("JUEGO121: FIN pico del monton=", picoMonton, "de arena=", d2cMontonArena(),
 		"libre=", d2cMontonLibre(), "crcDelMapaSolo=", int(crcDelMapaSolo))
@@ -1208,7 +1214,21 @@ func actualizar() error {
 	// hablar es la de este cuadro. Y va ANTES DE LA CAMARA porque el guion de la quest pone al jugador en la celda
 	// de Akara o al lado del bicho (el instrumento que reemplaza al teclado) y la camara tiene que seguirlo en el
 	// mismo cuadro.
-	pasoDeLaQuest()
+	//
+	// DC-002.140: EN LA DEMO ESTE GUION NO CORRE. Su "boton" y sus cambios de area son numeros de cuadro (y
+	// ademas pone al jugador en la celda de Akara o al lado del bicho): con un jugador de verdad eso es un
+	// teletransporte en medio del camino. La demo tiene su propio camino (`pasoDeLaDemo`), con los mismos eventos
+	// del motor pero disparados por lo que el jugador hace.
+	if demoKnob != "si" {
+		pasoDeLaQuest()
+	}
+
+	// ============================== 2g. LA DEMO JUGABLE (DC-002.140) ==============================
+	// VA ULTIMO Y NO MUEVE A NADIE: mira el boton X del jugador, la vida de los bichos y la celda del heroe, y
+	// avisa al MOTOR lo que el jugador hizo (hablar con Akara, matar el bicho, volver). Con `demoKnob = "no"` no
+	// hace nada. Lo del guion de la quest de arriba sigue igual: los dos leen las mismas palancas y el que manda
+	// es el que tenga los cuadros puestos.
+	pasoDeLaDemo()
 
 	// ============================== 3. LA CAMARA ==============================
 	// DC-002.116: con el split hay UNA camara por jugador (la del grupo no sirve para dos pantallas). Se ponen
@@ -1399,16 +1419,22 @@ func dibujar(superficie d2interface.Surface) error {
 		return dibujarElCiclo(superficie)
 	}
 
-	if cuadro > cuadros+3 {
+	if cuadro > cuadros+3 && demoKnob != "si" {
 		return nil
 	}
 
-	// los cuadros del cierre se preparan ACA, que es donde ya se sabe que numero de cuadro es
+	// los cuadros del cierre se preparan ACA, que es donde ya se sabe que numero de cuadro es. EN LA DEMO NO:
+	// devolver al jugador a la celda de arranque es exactamente lo que no se puede hacer cuando el que juega es
+	// una persona (DC-002.140).
 	switch cuadro {
 	case cuadros + 1:
-		volverAlOrigen() // la camara y el jugador vuelven a la celda de arranque
+		if demoKnob != "si" {
+			volverAlOrigen() // la camara y el jugador vuelven a la celda de arranque
+		}
 	case cuadros + 3:
-		volverAlFinal() // y se devuelve el jugador a donde lo dejo el guion
+		if demoKnob != "si" {
+			volverAlFinal() // y se devuelve el jugador a donde lo dejo el guion
+		}
 	}
 
 	// DC-002.134: las lineas de evidencia POR CUADRO se apagan con `VERBOSO=no` (verboso134). Los tres
@@ -1835,7 +1861,10 @@ func dibujar(superficie d2interface.Surface) error {
 	}
 
 	// ============================== EL RESUMEN DEL MOVIMIENTO ==============================
-	if cuadro >= cuadros+1 {
+	// DC-002.140: en la DEMO este bloque imprime ~200 B por cuadro por el puerto serie (y a 115200 baudios eso son
+	// milisegundos de cuadro): con un jugador al mando el censo de la cache no dice nada, asi que va una vez cada
+	// `cuadrosDelResumenDemo` cuadros (que es cuando sale el resumen completo de la demo).
+	if cuadro >= cuadros+1 && (demoKnob != "si" || cuadro%cuadrosDelResumenDemo == 0) {
 		cache := rendererDelMapa.EstadoDeLaCache()
 		println("JUEGO121: CUADRO", cuadro, "cacheSuperficies=", cache.Superficies, "cacheBytes=", cache.Bytes,
 			"cacheEnIndices=", cache.EnIndices, "msMapa=", msMapa, "msJugador=", msJugador)

@@ -1,0 +1,76 @@
+DC-002.140 -- LA DEMO JUGABLE: EL DIJO QUE SI EL JUGADOR MUEVE EL CONTROL
+
+Build: /tmp/dcbuild/demo140 (DEMO=si DEMO_MOOR=no MEDIR_CUADRO=no MEDIR_VIVO=no), Flycast 2.7,
+teclado virtual del kernel (/dev/uinput -> teclado del emulador -> bus maple -> POC).
+Corrida: 2026-11-03T11:34:12
+
+0. EL MAPEO DE TECLAS QUE VALE (medido tecla por tecla en dc-002.71-maple-input.txt)
+   flechas = cruceta | s = X (hablar/accion) | d = Y (golpe) | x = A | c = B | enter = START
+   La corrida anterior de esta tarjeta mando x e y: no llego ningun boton. Por eso no se movia nada.
+
+1. EL RITMO: EL CUADRO EN MANOS DEL JUGADOR
+   DEMO140: FPS cuadros= 30 msPorCuadro= 369 fps= 3 celda= 38.644 4.35598 nivel= TownN1
+   DEMO140: FPS cuadros= 60 msPorCuadro= 128 fps= 8 celda= 38.644 4.35598 nivel= TownN1
+   DEMO140: FPS cuadros= 90 msPorCuadro= 128 fps= 8 celda= 39.2132 6.06361 nivel= TownN1
+   DEMO140: FPS cuadros= 120 msPorCuadro= 134 fps= 7 celda= 39.2132 6.06361 nivel= TownN1
+      ...
+   DEMO140: FPS cuadros= 1110 msPorCuadro= 127 fps= 8 celda= 39.5453 7.05972 nivel= TownN1
+   DEMO140: FPS cuadros= 1140 msPorCuadro= 124 fps= 8 celda= 39.5453 7.05972 nivel= TownN1
+   FRAME COMPLETO 124-131 ms = 7,8 fps: el numero de la tarjeta, medido SIN el instrumento por cuadro.
+   Con MEDIR_CUADRO=si el mismo cuadro costaba 2260 ms = 0,45 fps (el crc32 del lienzo se llevaba el 91%)
+   y el binario no se podia jugar: cada tecla caia en un solo cuadro.
+
+2. LA TABLA DE BOTONES: LO QUE EL JUGADOR APRETO, LEIDO DEL CONTROL (1024=X, 512=Y, 128/96 = cruceta)
+   DEMO140: BOTON cuadro= 17 botones= 128 celda= 37.1591 5.8409
+   DEMO140: BOTON cuadro= 27 botones= 0 celda= 38.644 4.35598
+   DEMO140: BOTON cuadro= 39 botones= 1024 celda= 38.644 4.35598
+   DEMO140: BOTON cuadro= 40 botones= 0 celda= 38.644 4.35598
+   DEMO140: BOTON cuadro= 65 botones= 96 celda= 38.6915 4.49828
+   DEMO140: BOTON cuadro= 73 botones= 0 celda= 39.2132 6.06361
+   DEMO140: BOTON cuadro= 85 botones= 512 celda= 39.2132 6.06361
+   DEMO140: BOTON cuadro= 88 botones= 0 celda= 39.2132 6.06361
+   DEMO140: BOTON cuadro= 99 botones= 512 celda= 39.2132 6.06361
+   DEMO140: BOTON cuadro= 102 botones= 0 celda= 39.2132 6.06361
+   DEMO140: BOTON cuadro= 114 botones= 512 celda= 39.2132 6.06361
+   DEMO140: BOTON cuadro= 117 botones= 0 celda= 39.2132 6.06361
+
+3. LA CRUCETA: TRES TRAMOS CAMINADOS, 1,82-1,87 celdas/s (el teorico del motor es 1,875)
+   JUEGO121: TRAMO DERECHA dir= 12 cuadros= 10 desdeElCuadro= 16 segundos= 1.268 subtiles= 11.625 celdas= 2.325 celdasPorSegundo= 1.8336 subtilesPorSegundo= 9.16798 teoricoSubtilesPorSegundo= 9.375 celdaIni= 37 6 celdaFin= 38.644 4.35598
+   JUEGO121: TRAMO ABAJO+IZQUIERDA dir= 1 cuadros= 8 desdeElCuadro= 64 segundos= 0.988 subtiles= 9 celdas= 1.8 celdasPorSegundo= 1.82186 subtilesPorSegundo= 9.10931 teoricoSubtilesPorSegundo= 9.375 celdaIni= 38.644 4.35598 celdaFin= 39.2132 6.06361
+   JUEGO121: TRAMO ABAJO+IZQUIERDA dir= 1 cuadros= 9 desdeElCuadro= 166 segundos= 1.182 subtiles= 10.875 celdas= 2.175 celdasPorSegundo= 1.8401 subtilesPorSegundo= 9.20051 teoricoSubtilesPorSegundo= 9.375 celdaIni= 39.2132 6.06361 celdaFin= 39.901 8.12699
+   JUEGO121: TRAMO ABAJO+IZQUIERDA dir= 1 cuadros= 10 desdeElCuadro= 277 segundos= 1.233 subtiles= 11.25 celdas= 2.25 celdasPorSegundo= 1.82482 subtilesPorSegundo= 9.12409 teoricoSubtilesPorSegundo= 9.375 celdaIni= 39.901 8.12699 celdaFin= 40.6125 10.2615
+   JUEGO121: TRAMO ARRIBA+DERECHA dir= 9 cuadros= 15 desdeElCuadro= 362 segundos= 1.83 subtiles= 16.875 celdas= 3.375 celdasPorSegundo= 1.84426 subtilesPorSegundo= 9.22131 teoricoSubtilesPorSegundo= 9.375 celdaIni= 40.6125 10.2615 celdaFin= 39.5453 7.05972
+
+4. EL PANEL DE AKARA CON EL BOTON X (DC-002.127 con entrada de verdad, no con el guion)
+   JUEGO127: DIALOGO ABRE npc= Akara claseExe= 148 jugador= 38.644 4.35598 distancia= 1.18145 radio= 2 cuadro= 39 panel= 356 x 396 renglones= 21 filas= 3 bytes= 140976 boton= false
+
+5. LA DEN OF EVIL ACEPTADA POR HABLAR: el slot lo marca el MOTOR (bits 4 = FlagStarted), no un cuadro
+   JUEGO128: QUEST HABLA npc= Akara claseExe= 148 jugador= 38.644 4.35598 distancia= 1.18145 radio= 2 cuadro= 39
+   JUEGO128: QUEST MARCADOR npc= Akara activa= true
+   JUEGO128: QUEST BIT paso= ACEPTA slot= 1 antes= 0 despues= 4 motivo= started estado= 2
+   JUEGO128: QUEST PASO paso= ACEPTA bits= 4 estado= aceptada log= sin-empezar
+   JUEGO128: QUEST PANEL cuadro= 39 npc= Akara pagina= 1 renglones= 3 panel= 500 x 81 bytes= 40500 texto= Look for the Den in the wilderness outside the Rogues' Camp.
+   DEMO140: HABLA CON AKARA (boton X) jugador= 38.644 4.35598 cuadro= 39
+   DEMO140: QUEST ACEPTADA la Den of Evil cuadro= 39 estado= aceptada pagina= 1 bichosVivos= 2 quedaSegunElMotor= 2
+
+6. LOS GOLPES CON EL BOTON Y: vida 3 -> 2 -> 1 -> muerto, y el contador del motor avanzando
+   JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 1 dir= 11 dirDibujada= 14 dirPropia= false vida= 3 cuadro= 84
+   JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 2 dir= 10 dirDibujada= 14 dirPropia= false vida= 2 cuadro= 98
+   JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 3 dir= 4 dirDibujada= 14 dirPropia= false vida= 1 cuadro= 113
+   DEMO140: MATA bicho= 0 bajas= 1 de 2 vivos= 1 quedaSegunElMotor= 1 pagina= 4 cuadro= 117
+   JUEGO128: QUEST EFECTOS paso= DEMO-MATA efectos= 1 LogUpdate(4)
+
+7. EL CIERRE: la demo NO se corta en cuadros+3, siguio hasta que se cerro el emulador
+   DEMO140: CIERRE cuadros= 900 segundos= 121 fpsMedio= 7 fpsMinimo= 3 fpsMaximo= 8 informes= 30
+   DEMO140: CIERRE QUEST aceptada= true bajas= 1 limpias= false cobrada= false puntoDeHabilidad= 0
+   DEMO140: CIERRE MUNDO nivel= TownN1 salio= false recorrido= 0 celda= 39.5453 7.05972 libre= 3595984 semiespacio= 1610624
+
+8. LO QUE NO (sin taparlo)
+   - El segundo bicho (el de la otra calle) quedo vivo: la corrida termino con 1 de 2 bajas, asi que la
+     Den no quedo LIMPIA y el camino COBRAR -> puntoDeHabilidad no se recorrio de punta a punta con un
+     jugador. Es punteria del guion de teclas, no del motor.
+   - El panel de Akara ABRE (356x396 y 500x81, con el texto del motor en el log) pero el TEXTO NO SE PINTA
+     en pantalla: el recuadro sale negro con el borde. Tarjeta aparte.
+   - DEMO_MOOR=no en esta corrida: la salida al Blood Moor no se probo. Tarjeta aparte.
+   - 8 fps no son los 18-20 que pide el criterio: el cuadro jugable esta en 124-131 ms. Tarjeta aparte.
+

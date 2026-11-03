@@ -854,4 +854,17 @@ var (
 	// que se pida con las otras palancas (nada de esto existe para ella: el guion del MVP, cuando esta apagado, no
 	// toca una sola palanca ni un solo cuadro).
 	mvpKnob = "no"
+
+	// demoKnob (DC-002.140): "si" = LA DEMO JUGABLE (`demo_140.go`). El POC deja de cortarse en `cuadros+3` (la
+	// demo corre hasta que se sale del emulador), la quest avanza con lo que el JUGADOR hace (hablar con Akara con
+	// el boton X, matar los bichos con Y, volver a Akara a cobrar) en vez de por numero de cuadro, y cada 30
+	// cuadros se imprime el ritmo real de la corrida (`DEMO140: FPS`). Con "no" (el defecto) este archivo no hace
+	// NADA y la corrida es la de la tarjeta que se pida, bit a bit.
+	demoKnob = "no"
+
+	// demoMoor (DC-002.140): "si" = cruzar el borde del campamento compone el BLOOD MOOR como nivel nuevo (el orden
+	// de DC-002.109: soltar la cache y las casillas del que se deja ANTES de componer el que sigue). Va aparte de
+	// `demoKnob` porque el nivel de afuera pide RAM y ese numero se mide antes de dejarlo encendido: con "no", la
+	// demo es la del campamento y la salida solo se informa.
+	demoMoor = "no"
 )
