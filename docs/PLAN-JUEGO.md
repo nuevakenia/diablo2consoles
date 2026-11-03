@@ -127,6 +127,27 @@ que se toca con las manos (matar, recoger, guardar), después lo narrativo (ques
   oro.
 - Depende de E3 (la grilla) y de E4 (el HUD con el oro).
 
+**HECHO en DC-002.129.** Medido antes de portar (sonda `console/dc/sonda-mercader-129`): `d2core/d2vendor` y
+`d2common/d2trade` ya están compilados en el árbol de `.gox`, así que **se enlazan tal cual** (no se portan a
+mano) y lo único que el POC les pone son los datos: `armor.txt` + `weapons.txt` + `misc.txt` + `itemtypes.txt`
+(250.220 B, un tramo por vez) y la fila de `npc.txt` del mercader con sus multiplicadores crudos
+(`sell mult` 1024, `buy mult` 512). POC: `console/dc/poc/juego-129` (`mercader_129.go`). **El stock que genera
+la consola es el mismo del host, bit a bit**: 42 bases de Charsi, 53 items, `crc32` **3628371977** con la
+semilla 129, y los precios de `d2trade` con la calidad y las pilas de cada fila (la rodela `buc`: 63 de compra,
+34 de venta). La ventana son 10x10 celdas de 28 px (82.944 B en el montón de C) con los 24 items de la página
+**compuestos en la imagen** (un pedido de dibujo por cuadro, 18-21 ms ≈ 4 % de un cuadro de 500 ms, contra 34
+ms si se pintan uno por uno), y el oro va por el motor: tope `d2inventory.InventoryGoldLimit` y setter
+`SetGold`. Con la ventana cerrada no se pinta un píxel (mismo `crc32` de lienzo, cuadro a cuadro). Costo:
++155.344 B de semiespacio, **+28.896 B de `.text`**, 4.205 ms de arranque.
+Dos cosas quedan dichas: el **ciclo de niveles de DC-002.120 no entra con el mercader cargado** (el cambio de
+nivel pide ~1 MB contiguo arriba del break y muere con `gc_external_alloc: OOM` ⇒ la corrida del mercader va
+con `FASE=apagado`), y con `MERCADER=no` bajo esas palancas el árbol de hoy **no llega a dibujar**
+(`panic: slice bounds out of range` tras `HUD PALETA acto 1`, reproducido con el POC de la tarjeta anterior sin
+una línea de esta ⇒ fallo previo que depende del layout). Evidencia y capturas:
+`console/dc/evidencia/dc-002.129-*`.
+Quedan para otra tarjeta: reparar e identificar (`ModeRepair`, `IdentifyCost`), el trueque entre jugadores
+(`d2playertrade`) y los afijos del ítem mágico en el precio (acá se cobra la fila base).
+
 ### E6 · NPCs y diálogos
 
 - `d2npc` (2.137), `d2ui` para el panel de diálogo.

@@ -1,0 +1,160 @@
+DC-002.129 -- EL MERCADER: EL STOCK DE CHARSI, LOS PRECIOS Y COMPRAR Y VENDER CON ORO EN LA DREAMCAST
+=======================================================================================================
+
+Tarjeta: t_b1a6a961 (etapa E5 de docs/PLAN-JUEGO.md). POC: console/dc/poc/juego-129 (mercader_129.go).
+Sonda previa (regla del plan: medir en el host ANTES de escribir el POC): console/dc/sonda-mercader-129.
+
+COMO SE CORRE (la corrida del criterio)
+
+  bash scripts/console/build-juego-129.sh /tmp/dcbuild/j129e          # con las palancas de abajo
+  CAPTURE=spectacle bash scripts/console/run-flycast-129.sh /tmp/dcbuild/j129e/disc.gdi /tmp/capturas-129e
+
+  FASE=apagado JUGADORES=1 MEDIR_VIVO=no ALIJO=no CERRAR_PANELES=no MERCADER=si
+
+  (FASE=apagado porque el ciclo de niveles pide ~1 MB contiguo arriba del break y con el mercader cargado ya
+  no entra: ver PITFALL 1. JUGADORES=1/MEDIR_VIVO=no/ALIJO=no son palancas de otras tarjetas que esta no
+  necesita; ALIJO=no ademas deja limpio el estado de la grilla del jugador, que es lo que la compra mueve.)
+
+1. EL STOCK ES EL MISMO QUE EL DEL HOST, BIT A BIT
+
+  El crc32 de la cadena `codigo/calidad/pagina/celda/huella` de los 53 items que genera la CONSOLA con
+  `d2vendor.GenerateSeeded(semilla=129)` es 3628371977, el mismo que midio la sonda en el host con la misma
+  semilla y el mismo nivel. Eso es lo que dice que el motor portado (TRADE_GenerateVendorStock 0x574780) hace
+  el mismo trabajo en el SH4 que en la PC: mismas tiradas de calidad, mismo nivel de item (ilvl 6 = nivel del
+  jugador 1 + 5, tope del acto 1), misma colocacion en la grilla de 10x10.
+
+  JUEGO129: MERCADER STOCK nombre= Charsi claseExe= 154 tier= 0 nivelDelJugador= 1 ilvl= 6 bases= 42 semilla= 129 items= 53 grilla= 10 x 10
+  JUEGO129: MERCADER TABLA data\global\excel\armor.txt bytes= 76370 filas= 203 conColumnas= 19 montonC_libre= 1299824
+  JUEGO129: MERCADER TABLA data\global\excel\weapons.txt bytes= 118029 filas= 307 conColumnas= 21 montonC_libre= 1299824
+  JUEGO129: MERCADER TABLA data\global\excel\misc.txt bytes= 55821 filas= 152 conColumnas= 2 montonC_libre= 1299824
+  JUEGO129: MERCADER STOCK-CRC crc32= 3628371977 items= 53 referenciaDelHost= 3628371977 igualAlHost= true
+
+  Las tres tablas de items suman 250.220 B y se leen UNA POR VEZ con el lector del POC (cada tramo se devuelve
+  al monton de C antes de pedir el siguiente). Los multiplicadores del mercader salen de npc.txt tal cual
+  (Charsi: `sell mult` 1024 = x1, `buy mult` 512 = x0,5; el loader del motor los divide por costDivisor = 1024
+  y d2vendor los vuelve a multiplicar, asi que a d2trade le llega el entero crudo):
+
+  JUEGO129: MERCADER NPC nombre= Charsi playerPays= 1024 vendorPays= 512 maxBuy= 0 0 0 multiplosDe= 1024
+
+  Dos items del stock, para ver que la tabla y las pilas entran (aqv es flechas: cantidad 350 y permanente):
+
+  JUEGO129: MERCADER ITEM codigo= aqv calidad= normal ilvl= 6 cant= 350 huella= 1 x 3 celda= 0 , 0 pagina= 3 compra= 81 venta= 43 permanente= true
+  JUEGO129: MERCADER ITEM codigo= buc calidad= normal ilvl= 6 cant= 0 huella= 2 x 2 celda= 0 , 0 pagina= 0 compra= 63 venta= 34 permanente= false
+
+2. LA VENTANA, LOS PRECIOS Y EL ORO
+
+  Panel de 288x288 (10x10 celdas de 28 px + margenes) en el MONTON DE C, con los 24 items de la pagina 0 ya
+  COMPUESTOS EN LA IMAGEN (un solo pedido de dibujo por cuadro: 24 pedidos costaban 34 ms y uno cuesta 18-21).
+  El oro es el del motor: tope `d2inventory.InventoryGoldLimit` = nivel*10.000 y setter `SetGold` (0x53dc10).
+
+  JUEGO129: MERCADER ORO jugador= 1000 topeDelNivel= 10000 topePorNivel= 10000 mercader= 5000 origenDelOro= instrumento (el drop de DC-002.123 descarta la entrada gld del tesoro)
+  JUEGO129: MERCADER PANEL ancho= 288 alto= 288 bytes= 82944 indices=fondo 225 celda 92 borde 255 enElMontonDeC= si
+  JUEGO129: MERCADER GRAFICOS codigosDistintos= 15 bytes= 48608 sinGrafico= 0
+  JUEGO129: MERCADER MOSTRADOR itemsCompuestos= 24 pagina= 0 bytesDelPanel= 82944
+  JUEGO129: MERCADER LISTO pagina= 0 itemsEnLaPagina= 24 bytesDeItems= 48608 sinGrafico= 0 bytesDelPanel= 82944 ms= 4205
+
+3. LA COMPRA Y LA VENTA (el criterio de la tarjeta)
+
+  Cuadro 4 abre, 6 compra, 12 vende, 14 cierra. El objeto comprado ENTRA A LA GRILLA DEL JUGADOR por la regla
+  del motor (`grilla.meter` de DC-002.124) y el oro lo cobra `SetGold`:
+
+  JUEGO129: MERCADER ABRE cuadro= 4 items= 53 pagina= 0 panel= 4 20 ancho= 288 alto= 288 oro= 1000
+  JUEGO129: MERCADER CUADRO 4 abierto=si pagina= 0 itemsEnLaPagina= 24 dibujados= 24 pixeles= 82944 msPanel= 18 oro= 1000 precio= sin item
+  JUEGO129: MERCADER CUADRO 6 abierto=si pagina= 0 itemsEnLaPagina= 24 dibujados= 23 pixeles= 86080 msPanel= 20 oro= 937 precio= buc compra 63 venta 34
+  JUEGO129: MERCADER COMPRA codigo= buc precio= 63 oroAntes= 1000 oroDespues= 937 tope= 10000 oroDelMercader= 5063 celda= 0 , 0 huella= 2 x 2 ocupadasAntes= 0 ocupadasDespues= 4 estaEnLaGrilla= true itemsEnElStock= 52
+  JUEGO129: MERCADER VENTA codigo= buc precio= 34 oroAntes= 937 oroDespues= 971 tope= 10000 sePasoDelTope= false oroDelMercader= 5029 sacoDeLaCelda= buc @ 0 , 0 ocupadas= 3
+  JUEGO129: MERCADER CIERRA cuadro= 14 oro= 971 vecesAbierto= 1
+  JUEGO129: MERCADER RESUMEN items= 53 itemsEnElStock= 52 bytesDeItems= 48608 bytesDelPanel= 82944 sinGrafico= 0 pixelesDelPanel= 86080 msDelPanel= 20 cuadrosConPanel= 6 cuadrosCerrado= 3 crcDelStock= 3628371977
+  JUEGO129: MERCADER ORO-RESUMEN jugador= 937 alPrincipio= 1000 alComprar= 937 mercader= 5063 elOroBajoAlComprar= true
+  JUEGO129: MERCADER CRITERIO elStockSalio= true seCompro= true codigo= buc precio= 63 entroALaGrillaDelJugador= true seVendio= false laGrillaLoTieneAhora= true codigoEnLaGrilla= buc elStockYaNoLoTiene= true stockIgualAlHost= true
+  JUEGO129: MERCADER CRITERIO-FINAL seCompro= true codigo= buc elStockYaNoLoTiene= true seVendio= true laGrillaLoTieneAhora= false oroDelJugador= 971 oroAlPrincipio= 1000 elOroBajoAlComprar= true laVentaDevolvioAlgo= true itemsEnElStock= 52
+
+  Lectura: la rodela (buc) cuesta 63 y Charsi la paga 34 (la mitad menos, que es el `buy mult` 512 de npc.txt);
+  el monedero baja 1000 -> 937 al comprar y sube a 971 al vender, o sea que la vuelta cuesta la diferencia. El
+  objeto entra en la celda (0,0) de la grilla del jugador (4 celdas por la huella 2x2), sale del stock (53 -> 52)
+  y a la venta sale de la grilla (`ocupadas` baja a 3, que son las flechas del drop de DC-002.123).
+
+  Las capturas (2560x1080, recortadas a la ventana de 640x480 en 1400,148):
+    console/dc/evidencia/dc-002.129-mercader-abierto.png   el panel con el stock entero y "Oro: 1000"
+    console/dc/evidencia/dc-002.129-mercader-compra.png    las DOS grillas: el stock (23 items) y la rodela
+                                                           comprada en la celda (0,0) del jugador, con el
+                                                           renglon "buc compra 63 venta 34"
+
+4. LO QUE CUESTA (lo que pide la tarjeta)
+
+  Memoria (semiespacio del recolector, medido con memoria()/semiespacio() alrededor de la carga):
+
+  JUEGO121: SEMIESPACIO mercader-antes usado= 1346096 total= 1835008 pct= 73 colecciones= 149
+  JUEGO121: SEMIESPACIO mercader-despues usado= 1501440 total= 1835008 pct= 81 colecciones= 166
+
+  +155.344 B del semiespacio, y en el monton de C (que el recolector no cuenta): 82.944 B del panel + 48.608 B
+  de los graficos de los items de la pagina = 131.552 B. La carga entera del mercader (las cuatro tablas, el
+  stock, los precios, los invfiles y los glifos) son 4.205 ms de los ~40 s del arranque.
+
+  Codigo: +28.896 B de .text (2.598.896 con el mercader contra 2.570.000 sin el, MISMO juego de palancas).
+
+  Por cuadro (lo mide el propio modulo, antes y despues de dibujar): 18-21 ms y 82.944 px (86.080 con el objeto
+  comprado en la grilla del jugador) sobre un cuadro de ~500 ms, o sea ~4 %. El A/B con el mismo binario y la
+  misma corrida (MERCADER_CUADRO_ABRE=99 = la ventana no se abre nunca) deja el resto del cuadro intacto:
+
+    cuadro   msMapa con la ventana   msMapa sin la ventana
+      1              660                      660
+      2              440                      440
+      3              438                      438
+      4              505                      505
+      5              467                      467
+      6              550                      547
+      7              445                      445
+      8              532                      533
+      9              563                      560
+
+  y el crc32 del lienzo de los cuadros 1..3 es IDENTICO en las dos corridas (4023039942, 672663083, 2750808374
+  con `elCuadroNoCambio= true` y `pixeles= 0`): con la ventana cerrada el mercader no toca el cuadro.
+
+GRAFICO 129 -- el cierre de dependencias
+
+  El cierre del POC con `-tags dreamcast` pasa de 80 a 81 paquetes del motor en el enlace (medido con
+  `go list -deps -e -tags dreamcast`: 80 en juego-131, 81 en juego-129). `d2core/d2vendor` y `d2common/d2trade`
+  ya estaban en el arbol de .gox y se ENLAZAN tal cual: no se portan a mano, que era la duda de la sonda. En el
+  host los dos paquetes pesan muy distinto (`go list -deps`: d2vendor 176 paquetes de cierre, 24 de ellos con
+  ebiten o d2asset; d2trade 1, o sea solo stdlib), pero eso NO se paga en la consola: el .gox ya compilado
+  entra igual porque el POC no usa el camino de dibujo del motor.
+
+
+PITFALL 1 -- EL CICLO DE NIVELES NO ENTRA CON EL MERCADER CARGADO (y se arregla apagandolo)
+
+  Con las palancas por omision (FASE=ciclo, 4 jugadores) la corrida muere en el cuadro 7, justo en la
+  transicion de nivel, con `fatal error: gc_external_alloc: OOM`: el cambio de nivel pide ~1 MB CONTIGUO arriba
+  del break y ya no hay (techo de KOS -1929445376, sbrk -1930317824):
+
+    Out of memory. Requested sbrk_base 0x8d0a8000, was 0x8cfb2000, diff 1007616
+    fatal error: gc_external_alloc: OOM
+    Memory: arena=10455360 used=9428992 free=1026368
+
+  Los 131.552 B del mercader en el monton de C son los que lo dejan en el borde. Con FASE=apagado la corrida
+  completa el guion entero (abre, compra, vende, cierra) sin tocar el mercader: la etapa E5 no necesita el
+  ciclo de niveles de DC-002.120.
+
+PITFALL 2 -- `MERCADER=no` CON ESAS PALANCAS NO LLEGA AL PRIMER CUADRO (fallo PREVIO, no de esta tarjeta)
+
+  Con MERCADER=no y el mismo juego de palancas el arranque muere con `panic: slice bounds out of range` justo
+  despues de `JUEGO125: HUD PALETA acto 1`, y lo MISMO le pasa al POC de la tarjeta anterior compilado tal cual
+  (`bash scripts/console/build-juego-131.sh`, sin una linea de esta tarjeta):
+
+    JUEGO125: HUD PALETA acto 1 bytes= 768 crc32= 3143792222
+    panic: slice bounds out of range
+    Memory: arena=9827136 used=8784064 free=1043072
+
+  O sea: no es el mercader; es un fallo que depende del juego de palancas y del layout del binario (ver la skill
+  `fallo-dependiente-del-layout`). Con `MERCADER=si` el mismo juego de palancas arranca y corre entero, porque
+  las tablas del mercader se devuelven al monton antes de que el HUD pida la fuente. Queda como hallazgo para
+  una tarjeta aparte: con `JUGADORES=1 ALIJO=no CERRAR_PANELES=no` el arbol de HOY no llega a dibujar.
+
+PITFALL 3 -- pisa_knob SE COMIA LAS PALANCAS ALINEADAS (arreglado en este script)
+
+  `pisa_knob` pisaba con `sed -i "s/^\t$1 = .*/..."`, y gofmt ALINEA las constantes contiguas
+  (`mercaderCuadroAbre   = 4`), asi que cualquier palanca declarada en un grupo alineado quedaba SIN pisar y el
+  build seguia como si nada. Medido aca: `MERCADER_CUADRO_ABRE=99` produjo un binario identico al de la
+  referencia (mismo .text, mismos crc32) y la ventana se abrio igual en el cuadro 4. En build-juego-129.sh el
+  patron acepta los espacios de gofmt y ademas COMPRUEBA la palanca despues de pisarla: si no quedo, el build se
+  para.
