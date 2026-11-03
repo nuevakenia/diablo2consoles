@@ -1,6 +1,6 @@
 # DC-002.141 — EL CUADRO CAMINANDO: el lienzo se corre y el mapa se repinta solo donde entra
 
-La mitad que faltaba de DC-002.139. La otra mitad (el cuadro **parado**) quedó en 30-43 fps porque el mapa
+La mitad que faltaba de DC-002.139. La otra mitad (el cuadro **parado**) quedó en 26-43 fps porque el mapa
 no se repinta si la cámara no se movió. **Caminando** el cuadro se iba en repintar los 248 tiles del mapa
 entero: 60,4 ms medidos, 77-92 ms por cuadro, **11-13 fps**.
 
@@ -18,7 +18,7 @@ Ventanas de 30 cuadros (`DEMO140: FPS`), A/B **en el mismo binario** con la pala
 | mapa por cuadro | **60,4 ms** (repintado entero, 248 tiles) | **15-26 ms** (la copia + los recortes) |
 | ventanas caminando medidas | 94 / 74 / 85 ms → **11 / 13 / 12 fps** | 72 / 45 / 52 / 32 / 70 ms |
 | fps de esas ventanas | 11-13 | **14 / 22 / 19 / 31 / 14** (mediana 19-22) |
-| ventanas paradas (no se tocan) | 23-33 ms → 30-42 fps | 23-33 ms → 30-42 fps |
+| ventanas paradas (no se tocan) | 23-38 ms → 26-42 fps | 23-36 ms → 27-42 fps |
 | `fpsMedio` de la corrida | 30 | 30 |
 | crc32 del cuadro 1 | −1654008076 | **−1654008076** (igual) |
 
@@ -151,15 +151,26 @@ SCROLL_141=si CONV_FILAS_141=si bash scripts/console/build-fps-139.sh /tmp/dcbui
 SEGUNDOS=80 bash scripts/console/run-demo-140.sh /tmp/dcbuild/fps141/disc.gdi /tmp/capturas-fps141
 ```
 
+(Los directorios de las corridas que sostienen los números de este README son `/tmp/dcbuild/fps141ok3`,
+`/tmp/dcbuild/fps141no` y `/tmp/dcbuild/fps141cmp`: los nombres con los que se midieron, no `fps141` pelado.)
+
 Palancas nuevas (todas en `knobs.go`, todas se pueden pisar por el build):
 - `SCROLL_141=si|no` — el cuadro caminando. `no` es el camino de DC-002.139, bit a bit (11-13 fps).
 - `CONV_FILAS_141=si|no` — la conversión por filas. `no` es el bucle de DC-002.135, en el mismo binario.
 - `COMPARAR_141=si|no` — la corrida de la prueba: compara el cuadro caminando contra el repintado entero y
   verifica la conversión bloque por bloque. Cuesta un repintado entero por cuadro comparado.
 
-Líneas de evidencia: `JUEGO141: LIENZO-CAMINA`, `JUEGO141: LIENZO-CAMINA PROMEDIO`, `JUEGO141: BLITS`,
-`JUEGO141: COMPARACION`, `JUEGO141: CONVERSION`, y las de siempre (`DEMO140: FPS`, `JUEGO134: ETAPAS`,
-`PVR132: CUADRO`, `PVR135: PRESENTAR`).
+Líneas de evidencia: `JUEGO141: LIENZO-CAMINA` (con `recortesIgnorados=`, que tiene que quedar en 0),
+`JUEGO141: LIENZO-CAMINA PROMEDIO`, `JUEGO141: BLITS`, `JUEGO141: COMPARACION`, `JUEGO141: COMPARACIONES`,
+`JUEGO141: CONVERSION`, y las de siempre (`DEMO140: FPS`, `JUEGO134: ETAPAS`, `PVR132: CUADRO`,
+`PVR135: PRESENTAR`).
+
+Cuando una comparación falla, el binario imprime además cuatro líneas de diagnóstico que localizan el defecto sin
+adivinar: `COMPARACION-DETALLE` (los entes cuya caja cruza el bloque que cambió), `COMPARACION-BLOQUES` (la suma de
+colores de cada bloque distinto en los dos cuadros: dice si es un píxel suelto o un pedazo), `COMPARACION-SONDAS`
+(la fila de bloques 8 —y 256..287— píxel por píxel: cuántos cambiaron por fila, desde dónde hasta dónde) y
+`COMPARACION-RECORTES` (la lista de rectángulos que se repintaron en ese cuadro, copiada antes de que la
+referencia la vacíe). Así se encontraron los tres defectos de arriba.
 
 ## Código
 
