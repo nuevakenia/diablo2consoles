@@ -260,6 +260,11 @@ func dibujarElSplit(superficie d2interface.Surface) error {
 		return nil
 	}
 
+	// DC-002.131: LA RECOLECCION DEL BORDE. Va ACA, antes de tocar los lienzos: es el unico momento del cuadro en
+	// que la pila no tiene buffers a medio armar, y por eso es la recoleccion que NO copia basura. Solo corre si el
+	// semiespacio esta apretado (ver gc_del_cuadro_131.go).
+	gcDelBordeDelCuadro()
+
 	// el cuadro de punta a punta: lo que duro el anterior (dibujar + presentar + la espera del PVR)
 	ahora := int64(d2cMs())
 	if primeroDelSplit {
@@ -343,14 +348,20 @@ func dibujarUnaMitad(i int) (int, int) {
 
 	ponerLaCamara(i)
 
+	vivoDeUnPaso(i, "antes-del-mapa")
+
 	t0 := d2cMs()
 	rendererDelMapa.Render(lienzos[i])
 	msMapa := int(d2cMs() - t0)
+
+	vivoDeUnPaso(i, "despues-del-mapa")
 
 	pixeles := lienzos[i].Imagen().Pixeles()
 
 	llenos := contarLlenos(pixeles)
 	crcMapa := crc32.ChecksumIEEE(pixeles)
+
+	vivoDeUnPaso(i, "despues-del-crc")
 
 	crcDeLaMitad[i] = crcMapa
 	llenosDeLaMitad[i] = llenos
@@ -686,6 +697,7 @@ func llenosDeLosDosLienzos() int { return llenosDeLaMitad[0] + llenosDeLaMitad[1
 func resumenDelSplit() {
 	memoria("split-fin")
 	semiespacio("split-fin")
+	resumenDelGcDeCuadro()
 
 	cache := rendererDelMapa.CensoDelTramo()
 

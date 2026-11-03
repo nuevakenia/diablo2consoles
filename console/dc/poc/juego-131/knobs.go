@@ -663,4 +663,19 @@ const (
 	// arreglo de esta tarjeta: 216.000 B de arte que dejan de ser 216.000 B de lo VIVO que el recolector tiene que
 	// copiar. "no" = el A/B: el mismo binario con el arte en el semiespacio, que es lo que moria.
 	arteEnMontonDeC = "si"
+
+	// cuadroDesdeElBorde / cuadroHastaElBorde: la ventana del instrumento fino (`vivoDeUnPaso`).
+	cuadroDesdeElBorde = 12
+	cuadroHastaElBorde = 16
+
+	// gcPorCuadro: "si" = el split hace UNA recoleccion en el borde del cuadro (antes de los lienzos) cuando el
+	// semiespacio esta apretado (ver gc_del_cuadro_131.go). Queda en "no": corre y salva la corrida, pero cuesta
+	// 86-92 ms por cuadro (el cuadro del mapa sube de 701 a 1.136 ms) y desde el cuadro 5 el ancho del texto de la
+	// zona sale corrupto (-2147483507) -- el A/B esta en la evidencia. El arreglo que se usa es el de arte_131.go.
+	gcPorCuadro = "no"
+
+	// umbralDelGcDeCuadro: el % de semiespacio usado a partir del cual la recoleccion del borde corre. 70 porque el
+	// vivo del split ronda el 76-85 % (medido): con menos, el recolector no llega con aire al cuadro siguiente y
+	// corta adentro del dibujado, que es justo lo que este arreglo evita.
+	umbralDelGcDeCuadro = 70
 )

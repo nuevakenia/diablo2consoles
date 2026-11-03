@@ -53,3 +53,25 @@ func vivoYAnotar(etapa string) {
 		picoVivo = v
 	}
 }
+
+// vivoDeUnPaso: el instrumento FINO de esta tarjeta. Un `vivo()` (recoleccion + lo copiado) en cada paso del
+// dibujado de una mitad, y SOLO en los cuadros del borde (`cuadroDesdeElBorde`..`cuadroHastaElBorde`), porque una
+// recoleccion completa cuesta ~1,7 MB de copia y en una corrida larga seria el cuadro entero.
+//
+// POR QUE ACOTADO A UNOS CUADROS Y NO A TODOS: lo que se busca es DONDE sube el pico, y el pico tiene cuadro. Con
+// esto el log dice, paso por paso del cuadro sospechoso, cuanto quedo vivo y como estaba la cache de tiles.
+func vivoDeUnPaso(i int, paso string) {
+	if medirVivo != "si" || cuadro < cuadroDesdeElBorde || cuadro > cuadroHastaElBorde {
+		return
+	}
+
+	vivo("paso-" + itoa(cuadro) + "-mitad-" + itoa(i) + "-" + paso)
+
+	cache := rendererDelMapa.CensoDelTramo()
+
+	println("JUEGO131: PICO PASO cuadro=", cuadro, "mitad=", i, "paso=", paso,
+		"vivo=", int(d2cGcUsado()), "montonLibre=", d2cMontonLibre(), "vramLibre=", pvr.VramDisponible(),
+		"cacheBytes=", cache.Bytes, "cacheUsado=", cache.Usado, "cacheImagenes=", cache.Imagenes,
+		"cacheDerrames=", cache.Derrames)
+}
+

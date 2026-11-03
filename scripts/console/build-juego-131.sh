@@ -371,6 +371,14 @@ echo "   VIVO medirVivo=$(leer_knob medirVivo)"
 [ -n "${ARTE_C:-}" ] && pisa_knob arteEnMontonDeC "$ARTE_C" 1
 
 echo "   VIVO arteEnMontonDeC=$(leer_knob arteEnMontonDeC)"
+
+# --- DC-002.131: la recoleccion del borde del cuadro y su ventana de medida ---
+[ -n "${GC_POR_CUADRO:-}" ] && pisa_knob gcPorCuadro "$GC_POR_CUADRO" 1
+[ -n "${UMBRAL_GC_CUADRO:-}" ] && pisa_knob umbralDelGcDeCuadro "$UMBRAL_GC_CUADRO"
+[ -n "${CUADRO_BORDE_DESDE:-}" ] && pisa_knob cuadroDesdeElBorde "$CUADRO_BORDE_DESDE"
+[ -n "${CUADRO_BORDE_HASTA:-}" ] && pisa_knob cuadroHastaElBorde "$CUADRO_BORDE_HASTA"
+
+echo "   VIVO gcPorCuadro=$(leer_knob gcPorCuadro) umbral=$(leer_knob umbralDelGcDeCuadro) ventana=$(leer_knob cuadroDesdeElBorde)..$(leer_knob cuadroHastaElBorde)"
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }

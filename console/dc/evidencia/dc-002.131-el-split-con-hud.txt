@@ -1,0 +1,204 @@
+========================================================================
+DC-002.131 -- EL SPLIT CON HUD: LOS 22.848 B QUE NO ENTRABAN EN CADA MITAD
+(Dreamcast / Flycast, Go + gox)
+========================================================================
+Fecha de las corridas: 2026-11-02
+POC: console/dc/poc/juego-131
+Build: bash scripts/console/build-juego-131.sh /tmp/dcbuild/s131ab
+       SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 HUD=si MEDIR_VIVO=no \
+       GC_POR_CUADRO=no CUADRO_BORDE_DESDE=99 CUADRO_BORDE_HASTA=1
+Corrida: CAPTURAS=2 INTERVALO=2 ESPERA_CIERRE=150 bash scripts/console/run-flycast-131.sh \
+             /tmp/dcbuild/s131ab/disc.gdi /tmp/runs131ab
+Salidas crudas: /tmp/runs131ab, /tmp/runs131ab2, /tmp/runs131i, /tmp/runs131f1, /tmp/runs131ctl
+
+QUE DICE LA TARJETA: el split con el HUD del split (cada mitad con SUS valores, DC-002.125) moria en
+el cuadro 4 mientras el mismo build con HUD=no hacia 27; medir donde se van los bytes, bajar el pico
+hasta que la corrida con HUD pase los 27 cuadros del control, y cerrar la corrida completa con
+`cadaMitadSuHUD= true`. Todo con numeros medidos.
+
+========================================================================
+0. LO QUE CAMBIO, EN UNA LINEA
+========================================================================
+
+El split con HUD hace 27 cuadros -- los mismos del control -- y cada mitad dibuja SUS valores, con el
+arte del jugador y del bicho FUERA del semiespacio del recolector (216.000 B al monton de C, arte_131.go).
+La hipotesis de la tarjeta (los lienzos duplicados en el monton de C ademas de la VRAM) esta REFUTADA con
+la medida de abajo: los dos lienzos no le cuestan al recolector mas que 288 B.
+
+========================================================================
+1. LOS LIENZOS: LA HIPOTESIS DE LA TARJETA, MEDIDA (refutada)
+========================================================================
+
+Corrida con el instrumento de lo vivo prendido (MEDIR_VIVO=si, /tmp/runs131i). `vivo()` fuerza una
+recoleccion completa y lee lo que el recolector tiene que COPIAR, que es el numero que decide si el
+semiespacio alcanza; `montonLibre` es el monton de C y `vramLibre` el pool de texturas del PVR.
+
+  etapa                       semiespacio  monton de C   VRAM libre
+  -------------------------   ----------   -----------   ----------
+  antes de los lienzos          1.394.600     1.191.128     4.740.808
+  despues del lienzo 0          1.394.736     1.191.128     4.126.376
+  despues del lienzo 1          1.394.888     1.191.128     3.511.944
+
+  => el lienzo 0 le cuesta al semiespacio 136 B y el 1 otros 152 B: son las dos `pvr.Surface` con su
+     cabecera, no los pixeles.
+  => el monton de C NO SE MUEVE: ni un byte.
+  => la VRAM baja 614.400 B por lienzo, exacto (320 x 480 x 4), que es donde viven los pixeles.
+
+  VEREDICTO: los 1.228.800 B de los dos lienzos NO estan en el monton de Go ni en el de C -- estan en la
+  VRAM (`origen= vram`, vramPedidaPorEstePoc= 4.710.400 = 3.481.600 del tramo de la cache + 1.228.800 de
+  los lienzos). La duplicacion que sospechaba la tarjeta no existe. Lo que no entraba en el semiespacio
+  era otra cosa, y esta en la seccion 2.
+
+========================================================================
+2. DONDE ESTA LO VIVO DEL SPLIT (antes de tocar nada mas)
+========================================================================
+
+Mismos hitos de la carga, con el arte del HUD y de los NPCs ya en el monton de C (DC-002.125/.127) y el
+jugador y el bicho TODAVIA en el semiespacio:
+
+  hito                                vivo (B)   lo que suma
+  ---------------------------------   --------   -----------
+  al-arrancar                            155.736         --
+  jugador-despues                        495.256     +339.520   (.cof/.dcc + los 9 cuadros compuestos)
+  despues-de-componer-y-recolectar     1.160.448     +665.192   (las casillas del pueblo + el nivel)
+  bicho-despues                        1.292.920     +130.568   (el .cof del Returned + sus cuadros)
+  drop-despues                         1.312.040      +19.120
+  quest-despues                        1.403.664      +22.512
+  despues-del-minimapa                 1.500.224      +96.560
+  despues-del-hud                      1.573.768      +73.544
+  despues-del-renderer                 1.390.488     -182.280   (crear el renderer recolecta)
+  coop-jugadores-listas                1.394.600       +4.112
+  ---- empieza el split ----
+  split-fin (27 cuadros despues)       1.494.712     +100.112
+
+  El pico MEDIDO en la corrida entera (lo copiado en una recoleccion): 1.602.032 B de los 1.835.008 del
+  semiespacio, o sea 87 %. Con el split con el HUD puesto y el arte del jugador y del bicho dentro del
+  semiespacio, ese mismo pico pasaba de 1.835.008 y la corrida moria en el cuadro 4 (DC-002.125) o en el
+  14 (esta tarjeta, primer intento).
+
+========================================================================
+3. EL ARREGLO: EL ARTE COMPUESTO AL MONTON DE C (216.000 B, arte_131.go)
+========================================================================
+
+Los cuadros YA COMPUESTOS del jugador (165.152 B: las 8 direcciones de TW + el quieto) y del bicho
+(51.880 B) no cambian en la corrida, no llevan un puntero adentro y se leen una vez por cuadro: son
+exactamente el caso del HUD (125) y de los NPCs (127), que ya viven en el monton de C. Se copian a un
+bloque de C y se repunta el slice (`bloqueDeC`), sin tocar una linea de `personaje.go`/`jugador.go` (el
+build lo verifica compilando LOS MISMOS bytes contra el medidor del host).
+
+  corrida                        cuadros   max vivo copiado   resultado
+  ----------------------------   -------   ----------------   ---------
+  125 baseline (SPLIT+HUD)             4             1.650.000  GC to-space overflow
+  esta, con el arte en el heap    (14)             1.797.040  GC to-space overflow (primer intento)
+  esta, con el arte en C               27             1.602.032  cierra limpio (87 % del semiespacio)
+
+========================================================================
+4. LAS CORRIDAS DEL CRITERIO (cada mitad con SUS valores)
+========================================================================
+
+Se corrio sobre una foto del arbol en un worktree desacoplado (/tmp/snap131, de39b992 + los cambios de
+esta tarjeta) porque la carpeta del POC la estaba editando a la vez la tarjeta DC-002.132: los numeros de
+abajo son atribuibles a esta tarjeta y al gox base del 31-oct (anterior a la 132).
+
+  corrida   build        HUD  MEDIR_VIVO  cuadros  max vivo   msMapa/cuadro  veredicto
+  -------   ----------   ---  ----------  -------  --------   ------------   ---------
+  A         s131ab       si   no               27   1.602.032       701,11   OK
+  A'        s131ab       si   no               27   1.602.032       701,11   OK (repetida: numeros identicos)
+  B         s131i        si   si               27   1.602.016       992,00   OK
+  C         s131ctl      no   no                -           -            -   panic (ver seccion 6)
+  D         125 baseline si   -                 4   1.650.000           -   murio
+  E         125 control  no   -                27           -     2052,48   OK (el control de la 125)
+
+  De la corrida A (/tmp/runs131ab):
+
+    JUEGO121: SPLIT RESUMEN lienzos= 2 tamano= 320 480 bytesPorLienzo= 614400
+              bytesDeLienzos= 1228800 origen= vram cuadrosPintados= 27
+              msMapaTotal= 18930 msJugadorTotal= 25 msPresentarTotal= 960
+              msMapaPorCuadro= 701.111 msJugadorPorCuadro= 0.925926 msPresentarPorCuadro= 35.5556
+
+    JUEGO121: SPLIT MEMORIA vramTotal= 8388608 vramDisponible= 30024 vramPedidaPorEstePoc= 4710400
+              cacheDelTramoBytes= 3481600 cacheUsado= 3374080 cacheImagenes= 106 cacheDerrames= 0
+              montonLibre= 1192760 semiespacioUsado= 1580344 semiespacioTotal= 1835008 colecciones= 297
+
+    JUEGO121: SPLIT FIN crcP1= -818657419 crcP2= 569030178
+              crcCuadro1P1= -2142277791 crcCuadro1P2= 569030178
+              crcConJugadorP1= -818657419 crcConJugadorP2= 569030178
+
+    JUEGO121: SPLIT CRITERIO separacionMinCeldas= 1.42058 separacionMaxCeldas= 36.5053 masDe20= si
+              cuadrosMasDe20= 16 cuadrosVigilados= 27 cuadrosFueraDeSuMitad= 4 lienzo= 320 480
+              dosMitades= true
+
+  EL CRITERIO DEL HUD, con cada mitad con SUS valores (cuadro 1 y cuadro 27):
+
+    JUEGO125: HUD MITAD cuadro= 1 mitad= 0 jugador= P1 pixeles= 15840 ms= 10 lienzo= 320 x 480
+    JUEGO125: HUD MITAD cuadro= 1 mitad= 1 jugador= P2 pixeles= 15840 ms= 10 lienzo= 320 x 480
+    JUEGO125: HUD cuadro= 27 jugador= 1 ... vida= 24 / 50 rellenoVida= 38 de 80 mana= 1 / 15
+              rellenoMana= 5 zona= Rogue Encampment anchoDelTexto= 141 pociones= 4
+    JUEGO125: HUD cuadro= 27 jugador= 2 ... vida= 26 / 52 rellenoVida= 40 de 80 mana= 1 / 16
+              rellenoMana= 5 zona= Rogue Encampment anchoDelTexto= 141 pociones= 4
+
+    JUEGO125: HUD CRITERIO elHUDSeDibujo= true pintoPixeles= true lasBarrasSonLosValoresReales= true
+              elCinturonTieneCuatro= true laZonaTieneNombre= true cadaMitadSuHUD= true cumple= true
+
+  Los dos jugadores tienen valores DISTINTOS (24/50 y 1/15 contra 26/52 y 1/16) y la mitad 0 pinta
+  8.373 px contra 8.545 de la mitad 1 el ultimo cuadro: no es una copia del primero.
+
+  NOTA DE HONESTIDAD: el control de la tarjeta (el MISMO build con HUD=no) hoy no se puede correr --
+  panickea en el minimapa (seccion 6). El control contra el que se compara es el de DC-002.125
+  (/tmp/run125ctl: 27 cuadros, msMapaPorCuadro 2052,48), que es el que la tarjeta nombra.
+
+========================================================================
+5. EL A/B DE UNA RECOLECCION EN EL BORDE DEL CUADRO (medida y RECHAZADA)
+========================================================================
+
+Con el arte ya en el monton de C, el primer intento de bajar el pico fue una `runtime.GC()` al principio
+de cada cuadro, cuando el semiespacio pasa del 70 % (`gc_del_cuadro_131.go`, palanca gcPorCuadro). La
+corrida pasa los 27 cuadros, pero cuesta y rompe algo, asi que la palanca queda en "no" por omision:
+
+  - CUESTA: 27 recolecciones, 86-92 ms cada una, 2.391 ms sobre 27 cuadros, y el cuadro del mapa sube de
+    701 a 1.136 ms de promedio (el 62 % mas).
+  - ROMPE: a partir del cuadro 5 el ancho del texto de la zona sale -2147483507 en las DOS mitades
+    (141 - 2^31), o sea que el mapa de glifos del HUD queda con un puntero a basura despues de una
+    recoleccion en ese punto de la pila. El A/B es limpio: mismo arbol, mismas palancas, solo gcPorCuadro
+    si/no -- con "si" el numero se corrompe desde el cuadro 5; con "no", 141 en los 107 renglones de la
+    corrida y en las tres corridas. La causa raiz (runtime del recolector contra el `map[byte]*glifo` del
+    HUD) NO queda aislada; queda el sintoma medido y el A/B.
+  - LO BUENO QUE DEJO: el numero de lo que libera cada cuadro (101-240 KB) confirma que el recolector
+    cortaba por umbral EN MEDIO del dibujado y copiaba basura como si fuera viva.
+
+  Por eso el arreglo que queda es el de la seccion 3 (sacar arte del semiespacio), no el de recolectar
+  mas seguido.
+
+========================================================================
+6. LO QUE NO ENTRA (y por que el control de esta tarjeta no corre hoy)
+========================================================================
+
+Con HUD=no el POC panickea en la carga del minimapa:
+
+  JUEGO125: HUD PALETA acto 1 bytes= 768 crc32= 3143792222
+  panic: slice bounds out of range
+
+  Es del camino del MINIMAPA (DC-002.130) con el HUD apagado: `paletaDelHUD` lo llama el minimapa y
+  despues el parseo de `AutoMap.txt` se va de rango. No es de esta tarjeta (con HUD=si el mismo codigo
+  corre en las tres corridas) y va como tarjeta aparte. El mismo sintoma de "memoria que se corrompe
+  segun el layout" que el ancho de texto de la seccion 5: las dos cosas apuntan a un bug de memoria del
+  POC que no se caza desde aca.
+
+========================================================================
+7. COMO SE REPRODUCE
+========================================================================
+
+  # la corrida del criterio (27 cuadros, cada mitad con SU HUD)
+  SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 HUD=si MEDIR_VIVO=no \
+    bash scripts/console/build-juego-131.sh /tmp/dcbuild/s131ab
+  CAPTURAS=2 INTERVALO=2 ESPERA_CIERRE=150 \
+    bash scripts/console/run-flycast-131.sh /tmp/dcbuild/s131ab/disc.gdi /tmp/runs131ab
+
+  # los numeros de la seccion 1 y 2 (semiespacio y monton de C por lienzo y por etapa)
+  SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 HUD=si MEDIR_VIVO=si \
+    bash scripts/console/build-juego-131.sh /tmp/dcbuild/s131i
+  grep 'JUEGO131: VIVO' /tmp/runs131i/flycast.log
+
+  # el A/B del arte (sin el arreglo: vuelve a morir)
+  SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 HUD=si MEDIR_VIVO=no ARTE_C=no \
+    bash scripts/console/build-juego-131.sh /tmp/dcbuild/s131sinarte
