@@ -78,6 +78,28 @@ binario de juego, la misma demo, el mismo cuadro 1:
 (`igualAlHost= false` NO es de esta tarjeta: la demo de DC-002.140 ya lo trae contra el host de 1437022778,
 que es el del POC anterior sin el pueblo: el crc32 de la demo es -1654008076 en las dos corridas.)
 
+## El cuadro CAMINANDO (la mitad que falta)
+
+La corrida de 80 s del A/B recorre los dos casos. Las lineas `DEMO140: FPS` de la corrida con las palancas
+prendidas (`/tmp/capturas-fps139d`):
+
+    parado   23-30 ms/cuadro = 30-43 fps   (cds. 60..120, 210..270, 330..420, 510..720, 810..900)
+    caminando 77-92 ms/cuadro = 11-13 fps  (cds. 150, 300, 780: la camara se movio y el mapa se repintio)
+
+Es lo que se esperaba: el salto del mapa solo aplica cuando la camara esta quieta. Caminando el mapa se
+repinta entero (60,4 ms) y la presentacion vuelve a convertir los 307.200 pixeles (25,5 ms). Las dos cosas
+son el mismo problema: el lienzo del cuadro esta en la VRAM y cada pixel escrito o leido ahi cuesta ~50 ns.
+
+**El atajo que NO funciona (medido en esta tarjeta)**: la cache de indices de los tiles vive en la VRAM (2,67 MB)
+y sus lecturas son las que mandan en el bucle del mapa. Ponerla en el monton de C (`ENVRAM=0`) NO ENTRA:
+la corrida muere con `ARQ-MARCA OOM-throw` (el heap libre son 3,7 MB y la cache pide 2,67 en pedazos de 348 KB
+al mismo tiempo que el resto). El mapa se queda sin cache en RAM, o sea que la palanca que falta es ESTRUCTURAL.
+
+**El proximo candidato (la tarjeta que sigue)**: un lienzo de scroll en la VRAM — el mapa pintado UNA vez en
+una textura RGB565 de 1024x1024 (2 MB de VRAM) y la camara moviendolo con las UV del quad; se repintan solo
+las franjas que entran (37x640 px = ~1 ms) y los paneles como quads opacos (son opacos: la caja del minimapa y
+el HUD no dejan ver el mapa). Con eso el cuadro caminando queda en mapa ~2 + presentacion ~3 + UI ~10 = ~15 ms.
+
 ## Que queda (el proximo candidato, medido y no adivinado)
 
 Con el cuadro en 28-32 ms, lo que manda ahora es:
