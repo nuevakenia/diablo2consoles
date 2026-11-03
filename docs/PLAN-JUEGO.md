@@ -178,6 +178,21 @@ Números medidos hoy que cualquier etapa nueva tiene que respetar:
 - todo bloque de más de **64 KB** que se pida con `make` va a `gc_external_alloc` y no vuelve nunca: va por
   la `Source` de consola o por un tramo con dueño.
 
+**El cuadro, medido por dentro (DC-002.132, pueblo con 1 jugador, HUD y minimapa prendidos):** **1.150 ms**
+por cuadro = **0,86 cuadros por segundo**, y el desglose dice dónde está:
+
+- **presentar 37 ms** (convertir los 307.200 píxeles a RGB565, subirlos a VRAM y pintar el quad) — constante
+  con el blit viejo y con el nuevo ⇒ **el techo del POC es 27 cuadros por segundo aunque el mapa se dibuje
+  gratis**; bajar el dibujo sin bajar la presentación no se ve en los cuadros por segundo;
+- **trabajo 1.113 ms**: de eso **367 ms es el mapa** (bajó de 582 ms con el recorte por tile y el camino sin
+  tinte: *-37 %*, y el crc32 del cuadro 1 sigue igual al host, `1437022778`) y **746 ms es el resto del POC**
+  dibujando jugador, bicho, HUD y minimapa sobre el lienzo, cuadro a cuadro. **El próximo blanco no es el
+  tile: es ese 65 % del cuadro.**
+- **espera 3 µs**: Flycast no sincroniza, así que en la consola real el vsync sí va a costar.
+
+Evidencia: `console/dc/evidencia/dc-002.132-cuadro-barato.txt` (A/B dentro del mismo binario con la palanca
+`BLIT_RAPIDO`, y `console/dc/verif-blit-132` para la equivalencia byte a byte de los dos bucles).
+
 **Antes de portar cada etapa:** medir cuánto suma al binario y cuánto pide al arrancar. Si no entra, se
 recorta lo que la etapa no usa (el camino de `--gc-sections` ya demostró que solo tira 448 KB: el 96 % de la
 imagen está vivo por los `init` de gccgo, así que recortar paquetes es la palanca real).

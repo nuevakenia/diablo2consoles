@@ -252,3 +252,11 @@ func (v *Viewport) resetAlign() {
 	v.screenRect.Left = v.defaultScreenRect.Left
 	v.align = center
 }
+
+// OrigenEnPantalla (DC-002.132): donde cae el origen del mundo (0,0) en la pantalla de ESTE cuadro.
+//
+// POR QUE EXISTE. La posicion en pantalla de un tile es `OrthoToScreen(ortho del tile)`, y con el origen del
+// mundo todo lo que se dibuja se corre junto y por el MISMO entero: `floor(n - c)` con `n` entero es
+// `n - ceil(c)`, o sea que el corrimiento de la camara es UNO para todo el mapa. Ese numero (el origen)
+// permite saber si el cuadro se corrio, cuanto, y si el mapa se puede reusar en vez de recomponerlo.
+func (mr *MapRenderer) OrigenEnPantalla() (int, int) { return mr.viewport.OrthoToScreen(0, 0) }

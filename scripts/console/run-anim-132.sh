@@ -1,0 +1,249 @@
+#!/bin/bash
+# DC-002.132 -- correr EL CUADRO BARATO en Flycast: el pueblo con la amazona y el Returned animados, y los
+# cuadros por segundo medidos por dentro.
+#
+# POR QUE ES UN SCRIPT APARTE Y NO run-flycast-131.sh: este arranca el emulador con la marca de ventana `dc132`
+# y el .gdi se llama dc132.gdi. El de DC-002.131 usa `dc131` para las dos cosas, y su cierre hace
+# `pkill -f "dc131[.]gdi"`: dos corridas del MISMO script se matan entre si. Medido en esta tarjeta: mientras
+# otra sesion corria run-flycast-131.sh, el pkill de la otra corrida se llevo puesto este emulador. Con la
+# marca propia, las dos corridas conviven (cada una en su ventana) y ninguna mata a la otra.
+#
+# Es el mismo arranque de siempre (keepAbove, espera del primer cuadro, capturas cada INTERVALO): lo unico que
+# cambia es la marca de la ventana y que al final vuelca los numeros de ESTA tarjeta (PVR132 y JUEGO132).
+#
+# Uso:  bash scripts/console/run-anim-132.sh <disc.gdi> <dir_salida> [x y]
+#       CAPTURAS=4 INTERVALO=8 ESPERA_CIERRE=400 -> una corrida de evidencia
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IMG="${1:?uso: run-anim-132.sh <disc.gdi> <dir_salida> [x y]}"
+OUT="${2:-/tmp/dc132-run}"
+POS="${3:-1400 120}"
+[ -n "${4:-}" ] && POS="$3 $4"
+# DC-002.64: el tamano de la ventana del emulador NO es un detalle: la pantalla logica del POC es 640x480 y con la
+# ventana en 320x240 el personaje se reduce a la mitad. Con VENTANA=640x480 la captura es 1:1 con la pantalla
+# logica del POC, que es lo que hace comparables las capturas con el cuadro de 640x480.
+VENTANA="${VENTANA:-640x480}"
+VW="${VENTANA%x*}"
+VH="${VENTANA#*x}"
+FLY="${FLYCAST:-$HOME/dreamcast/dl/flycast.AppImage}"
+DISP="${DISPLAY:-:0}"
+TOKEN="dc132"
+BARRA_TITULO="${BARRA_TITULO:-28}"
+PX="${POS%% *}"; PY="${POS##* }"
+PYTHON="${DC_PYTHON:-python3}"
+ESPERA_ARRANQUE="${ESPERA_ARRANQUE:-300}"
+CAPTURAS="${CAPTURAS:-80}"
+INTERVALO="${INTERVALO:-2}"
+PAUSA="${PAUSA:-0.4}"
+# EL GUION DEL TECLADO VIRTUAL: en esta tarjeta el que mueve es el POC (guionPoc=leash) y el teclado NO se usa por
+# defecto. Si se pide TECLAS=1, este guion le llega al puerto A (jugador 1) y "nada" es la cruceta suelta.
+GUION="${GUION:-nada 8 nada 8 nada 8 nada 8}"
+# DC-002.121: la corrida del criterio es SIN teclado (los dos por el guion del POC, cada uno por su puerto).
+TECLAS="${TECLAS:-0}"
+
+mkdir -p "$OUT"
+rm -f "$OUT"/c*.png 2>/dev/null
+
+DISC_DIR="$(cd "$(dirname "$IMG")" && pwd)"
+GDI="$DISC_DIR/$TOKEN.gdi"
+cp -f "$IMG" "$GDI"
+
+REGLA_JS="${TMPDIR:-/tmp}/kwin-regla-$TOKEN-$$.js"
+cat > "$REGLA_JS" <<'JSFIN'
+var PX = __PX__, PY = __PY__, objetivo = null;
+function ubicar(w) {
+    var cap = "", cls = "";
+    try { cap = (w.caption || "").toString(); } catch (e) { cap = ""; }
+    try { cls = (w.resourceClass || "").toString(); } catch (e) { cls = ""; }
+    if (cls.toLowerCase().indexOf("flycast") < 0) { return; }
+    if (cap.toLowerCase().indexOf("dc132") >= 0) {
+        var g = w.frameGeometry;
+        if (g.x !== PX || g.y !== PY - 28) {
+            w.frameGeometry = { x: PX, y: PY - 28, width: g.width, height: g.height };
+        }
+        w.keepAbove = true;
+        objetivo = w;
+    }
+    print("DC113-CAP|" + cap + "|" + cls + "|pid=" + w.pid + "|geo=" + w.frameGeometry.x + "," +
+          w.frameGeometry.y + "," + w.frameGeometry.width + "," + w.frameGeometry.height + "|cli=" +
+          (function () {
+              try {
+                  var c = w.clientGeometry;
+                  if (c && c.width > 0) { return c.x + "," + c.y + "," + c.width + "," + c.height; }
+              } catch (e) { }
+              return "?";
+          })());
+}
+var pila = workspace.stackingOrder;
+for (var i = 0; i < pila.length; i++) { ubicar(pila[i]); }
+if (objetivo) {
+    try { workspace.activeWindow = objetivo; print("DC113-CAP|foco=" + objetivo.caption); } catch (e) { print("DC113-CAP|foco=no-pude " + e); }
+}
+if (objetivo) {
+    var gancho = setInterval(function () {
+        try { objetivo.keepAbove = true; workspace.activeWindow = objetivo; } catch (e) { }
+    }, 300);
+}
+print("DC113-CAP|fin");
+JSFIN
+sed -i "s/__PX__/$PX/; s/__PY__/$PY/" "$REGLA_JS"
+
+regla() {
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "regla-$TOKEN" >/dev/null 2>&1
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$REGLA_JS" "regla-$TOKEN" >/dev/null 2>&1
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1
+    sleep 1
+    journalctl --user --since "-6 s" 2>/dev/null | grep -a 'DC113-CAP|' | tr -d '\r' |
+        grep -i "flycast - $TOKEN" | grep 'geo=' | sed 's/.*DC113-CAP|/ventana: /' | tail -1
+}
+
+echo "== Flycast: $GDI (ventana $VENTANA en $PX,$PY + keepAbove; consola serie si)"
+setsid env DISPLAY="$DISP" "$FLY" -config "window:fullscreen=no" \
+    -config "window:width=$VW" -config "window:height=$VH" \
+    -config "window:left=$PX" -config "window:top=$PY" \
+    -config "Debug:SerialConsoleEnabled=true" "$GDI" >"$OUT/flycast.log" 2>&1 &
+PID=$!
+echo "pid=$PID"
+
+PATRON="$TOKEN[.]gdi"
+vivo() { pgrep -f "$PATRON" >/dev/null 2>&1; }
+
+sleep 5
+T=5
+MUERTO=0
+while [ "$T" -lt "$ESPERA_ARRANQUE" ]; do
+    grep -qa -e 'JUEGO121: PRIMER-CUADRO' -e 'JUEGO121: SPLIT PRIMER-CUADRO' "$OUT/flycast.log" 2>/dev/null && { echo "  primer cuadro a los ${T}s"; break; }
+    if vivo; then MUERTO=0; else
+        MUERTO=$(( MUERTO + 1 ))
+        if [ "$MUERTO" -ge 3 ]; then
+            echo "  el emulador se murio antes de dibujar"; tail -12 "$OUT/flycast.log"; exit 1
+        fi
+    fi
+    sleep 1
+    T=$(( T + 1 ))
+done
+
+if ! grep -qa -e 'JUEGO121: PRIMER-CUADRO' -e 'JUEGO121: SPLIT PRIMER-CUADRO' "$OUT/flycast.log" 2>/dev/null; then
+    echo "  NO llego al primer cuadro en ${ESPERA_ARRANQUE}s"
+    grep -aE 'JUEGO121|Fatal|EXCEPTION|fatal error' "$OUT/flycast.log" | tail -25
+    pkill -f "$PATRON" 2>/dev/null
+    exit 1
+fi
+
+echo "-- las marcas del POC que ya salieron:"
+grep -a 'JUEGO121: DIRECCION\|JUEGO121: CONTROL hay\|JUEGO121: MOTOR velocidad\|JUEGO121: JUGADOR CICLOS' \
+    "$OUT/flycast.log" | tr -d '\r' | head -14
+
+LIN="$(regla)"
+echo "  ventana del emulador: ${LIN:-NO la encuentro}"
+if ! echo "$LIN" | grep -qE 'cli=|geo='; then
+    echo "  NO encuentro la ventana: ni las capturas ni las teclas valdrian"
+    pkill -f "$PATRON" 2>/dev/null
+    exit 1
+fi
+sleep 1
+
+ultimo_md5=""
+esperar_quieto() {
+    local f="$1" a=-1 b=-1 i=0
+    while [ "$i" -lt 15 ]; do
+        b="$(stat -c %s "$f" 2>/dev/null || echo -1)"
+        if [ "$b" = "$a" ] && [ "$b" != "-1" ] && [ "$b" != "0" ]; then return 0; fi
+        a="$b"; sleep 0.2; i=$(( i + 1 ))
+    done
+    return 1
+}
+
+capturar() {
+    local nombre="$1" lin cli geo anim pos md5
+    lin="$(regla)"
+    cli="$(echo "$lin" | sed -n 's/.*cli=\([0-9-]*,[0-9-]*,[0-9]*,[0-9-]*\).*/\1/p')"
+    if [ -z "$cli" ]; then
+        geo="$(echo "$lin" | sed -n 's/.*geo=\([0-9-]*\),\([0-9-]*\),\([0-9]*\),\([0-9]*\).*/\1,\2,\3,\4/p')"
+        if [ -n "$geo" ]; then
+            local gx gy gw gh
+            IFS=, read -r gx gy gw gh <<<"$geo"
+            cli="$gx,$(( gy + BARRA_TITULO )),$gw,$(( gh - BARRA_TITULO ))"
+        fi
+    fi
+    for intento in 1 2 3; do
+        spectacle -b -n -f -o "$OUT/$nombre.png" >/dev/null 2>&1
+        esperar_quieto "$OUT/$nombre.png"
+        md5="$(md5sum "$OUT/$nombre.png" 2>/dev/null | cut -d' ' -f1)"
+        [ -z "$ultimo_md5" ] && break
+        [ "$md5" != "$ultimo_md5" ] && break
+        sleep 0.7
+    done
+    ultimo_md5="$md5"
+    anim="$(grep -a 'JUEGO121: CUADRO [0-9]* CON-JUGADOR' "$OUT/flycast.log" 2>/dev/null | tr -d '\r' | tail -1 |
+        sed -n 's/.*crc32= \([0-9-]*\) pixelesDelJugador= \([0-9]*\) ancla= \([0-9-]*\) \([0-9-]*\) dir= \([0-9-]*\) cuadroDelCiclo= \([0-9-]*\) modo= \([A-Z0-9]*\).*/crc32=\1 pixeles=\2 ancla=\3x\4 dir=\5 cuadro=\6 modo=\7/p')"
+    pos="$(grep -a 'JUEGO121: CONTROL cuadro' "$OUT/flycast.log" 2>/dev/null | tr -d '\r' | tail -1 |
+        sed -n 's/.*celda= \([0-9.-]*\) \([0-9.-]*\) ticks= \([0-9]*\) subtiles= \([0-9.-]*\).*/celda=\1,\2 ticks=\3 subtiles=\4/p')"
+    echo "  $nombre.png md5=${md5:0:8} ${anim:-anim=?} ${pos:-pos=?}"
+    [ -n "$cli" ] && echo "GEO captura=$nombre cliente=$cli ${anim:-} ${pos:-} ms=$(date +%s%3N)" | tee -a "$OUT/geo.txt"
+}
+
+echo "== capturas: una QUIETO y despues una cada ${INTERVALO}s mientras corre el guion"
+vivo && capturar "c00-quieto"
+
+if [ "${TECLAS:-1}" = "1" ]; then
+    ( PAUSA="$PAUSA" "$PYTHON" "$HERE/teclas-virtuales.py" guion $GUION ) > "$OUT/teclas.log" 2>&1 &
+    TECLAS_PID=$!
+    echo "  guion de la cruceta: $GUION"
+fi
+
+for n in $(seq -w 1 "$CAPTURAS"); do
+    vivo || { echo "  el emulador se murio antes de la captura $n"; break; }
+    capturar "c$n"
+    sleep "$INTERVALO"
+done
+
+if [ "${TECLAS:-1}" = "1" ]; then wait "${TECLAS_PID:-0}" 2>/dev/null; fi
+
+# DC-002.121: EL CIERRE DEL POC TARDA MAS QUE LAS CAPTURAS. El POC dibuja `cuadros+3` = 19 cuadros (~1,2-1,4 s cada
+# uno en Flycast) y recien en el ultimo imprime el LEASH RESUMEN y el COOP RESUMEN, que son los numeros del criterio.
+# Si el script matara el emulador al terminar las capturas, esos renglones no existirian. Se espera la marca, con
+# tope.
+ESPERA_CIERRE="${ESPERA_CIERRE:-600}"
+T=0
+while [ "$T" -lt "$ESPERA_CIERRE" ]; do
+    grep -qa -e 'JUEGO131: MINIMAPA CRITERIO' -e 'JUEGO125: HUD CRITERIO' -e 'JUEGO121: CICLO CRITERIO' -e 'JUEGO121: BICHO CRITERIO' -e 'JUEGO121: LEASH RESUMEN' "$OUT/flycast.log" 2>/dev/null && { echo "  el POC cerro a los ${T}s de esperar"; break; }
+    vivo || { echo "  el emulador se murio esperando el cierre"; break; }
+    sleep 3
+    T=$(( T + 3 ))
+done
+
+vivo && capturar "c99-final"
+sleep 1
+
+kill -TERM -"$PID" 2>/dev/null || kill -TERM "$PID" 2>/dev/null
+pkill -f "$PATRON" 2>/dev/null
+sleep 1
+kill -KILL -"$PID" 2>/dev/null
+pkill -9 -f "$PATRON" 2>/dev/null
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unregisterScript "regla-$TOKEN" >/dev/null 2>&1
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "regla-$TOKEN" >/dev/null 2>&1
+rm -f "$REGLA_JS"
+
+echo "== DC-002.132: LOS CUADROS POR SEGUNDO Y EL DESGLOSE DEL CUADRO (PVR)"
+grep -a 'PVR132: FPS\|PVR132: CUADRO' "$OUT/flycast.log" | tr -d '\r' | tail -20
+echo "== DC-002.132: EL MAPA CUADRO A CUADRO (lo que dibujo y cuanto costo)"
+grep -a 'JUEGO132: MAPA' "$OUT/flycast.log" | tr -d '\r' | tail -8
+echo "== DC-002.132: LOS CUADROS DE ANIMACION QUE LLEGARON AL LIENZO"
+grep -a 'JUEGO132: FPS' "$OUT/flycast.log" | tr -d '\r' | tail -12
+echo "== DC-002.130: LA CARGA (la tabla filtrada del pueblo y el arte decimado al monton de C)"
+grep -a 'JUEGO131: MINIMAPA TABLA\|JUEGO131: MINIMAPA ARTE\|JUEGO131: MINIMAPA LISTO\|JUEGO131: MINIMAPA REVEAL-TODO' "$OUT/flycast.log" | tr -d '\r'
+echo "== DC-002.130: EL REVEAL SIGUIENDO AL JUGADOR (celdas agregadas por revelado)"
+grep -a 'JUEGO131: MINIMAPA REVEAL ' "$OUT/flycast.log" | tr -d '\r'
+echo "== DC-002.130: EL DIBUJO CUADRO A CUADRO (celdas, pixeles y ms)"
+grep -a 'JUEGO131: MINIMAPA cuadro=\|JUEGO131: MINIMAPA CUADRO ' "$OUT/flycast.log" | tr -d '\r'
+echo "== DC-002.130: EL CIERRE (costo, arte, reveal, decision y criterio)"
+grep -a 'JUEGO131: MINIMAPA RESUMEN\|JUEGO131: MINIMAPA COSTO\|JUEGO131: MINIMAPA ARTE-RESUMEN\|JUEGO131: MINIMAPA REVEAL-RESUMEN\|JUEGO131: MINIMAPA DECISION\|JUEGO131: MINIMAPA CRITERIO' "$OUT/flycast.log" | tr -d '\r'
+echo "== DC-002.130: LA MEMORIA DEL MINIMAPA (semiespacio y monton de C)"
+grep -a 'JUEGO121: SEMIESPACIO despues-del-minimapa\|JUEGO121: MEMORIA minimapa-despues\|JUEGO121: SEMIESPACIO despues-del-hud' "$OUT/flycast.log" | tr -d '\r'
+echo "== el HUD y la quest de las tarjetas anteriores (que el camino siga igual)"
+grep -a 'JUEGO125: HUD CRITERIO\|JUEGO128: QUEST CRITERIO' "$OUT/flycast.log" | tr -d '\r'
+echo "== el ciclo de niveles (DC-002.120): las tres fases"
+grep -a 'JUEGO121: CICLO SOSTIENE\|JUEGO121: FASE .* CUADRO\|JUEGO121: CICLO CRITERIO' "$OUT/flycast.log" | tr -d '\r' | head -12
+echo "== capturas"; ls -la "$OUT"/c*.png 2>/dev/null | awk '{print "   "$5" bytes  "$9}'
+exit 0

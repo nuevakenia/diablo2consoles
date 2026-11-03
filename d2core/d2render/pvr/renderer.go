@@ -89,6 +89,20 @@ type Renderer struct {
 	bytesExpandidos     int
 	copiasDeBuffer      int
 	bytesCopiados       int
+
+	// DC-002.132 -- EL DESGLOSE DEL CUADRO, MEDIDO POR DENTRO.
+	//
+	// POR QUE. Los numeros del POC decian "el mapa cuesta 675-931 ms", pero el cuadro entero son ~1.000 ms
+	// y nadie sabia cuanto se llevaba la PRESENTACION (convertir RGBA->RGB565 los 307.200 pixeles y
+	// subirlos a la VRAM). Sin ese numero no se puede elegir que atacar: si la presentacion sola cuesta
+	// 60 ms, el techo esta en 16 cuadros por segundo aunque el mapa se dibuje gratis.
+	//
+	// Se mide en las tres etapas reales del ciclo y se promedia cada `cuadrosDelInforme` cuadros (un cuadro
+	// suelto miente: el primero compone el nivel y los siguientes calientan las caches).
+	msEspera    int // la espera al PVR (el vsync del chip)
+	msTrabajo   int // actualizar + dibujar
+	msPresentar int // convertir + subir a la VRAM + pintar el quad
+	msCuadro    int // de la espera al final del cuadro: el periodo real
 }
 
 // que el contrato se cumpla no es una suposicion: si d2interface.Renderer cambia, esto no compila.
@@ -107,6 +121,11 @@ func NuevoRenderer() *Renderer {
 const (
 	anchoDelCuadro = 640
 	altoDelCuadro  = 480
+
+	// cuadrosDelInforme (DC-002.132): cada cuantos cuadros el ciclo deja el desglose del cuadro en la consola
+	// serie. 30 cuadros son medio segundo a 60 cuadros/s y 30 s a 1 cuadro/s: el promedio dice el ritmo real
+	// sin inundar el log (a 60 cuadros/s una linea por cuadro son 60 lineas por segundo por el puerto serie).
+	cuadrosDelInforme = 30
 )
 
 // GetRendererName: el nombre que sale en la configuracion y en los logs del motor.
@@ -157,11 +176,15 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 
 	for {
 		// el cuadro lo marca el PVR: sin esto se dibujaria encima del que se esta mostrando
+		tEspera := d2cPvrUs()
+
 		kos.PvrWaitReady()
 		kos.PvrSceneBegin()
 
 		// la lista OPACA: el cuadro compuesto tapa todo, no hay nada detras
 		kos.PvrListBegin(kos.PVR_LIST_OP_POLY)
+
+		tTrabajo := d2cPvrUs()
 
 		if r.actualizar != nil {
 			if err := r.actualizar(); err != nil {
@@ -184,6 +207,8 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 				return err
 			}
 		}
+
+		tPresentar := d2cPvrUs()
 
 		if r.presentar != nil {
 			// DC-002.116: el cuadro partido en dos lienzos, cada uno a su mitad de la pantalla.
@@ -208,8 +233,47 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 		kos.PvrSceneFinish()
 
 		r.cuadros++
+		r.anotarElCuadro(tTrabajo-tEspera, tPresentar-tTrabajo, d2cPvrUs()-tEspera)
 		r.medirFPS()
 	}
+}
+
+// anotarElCuadro: acumula el desglose del cuadro y, cada `cuadrosDelInforme` cuadros, lo deja en la consola
+// serie como PROMEDIO (un cuadro suelto miente).
+//
+// LOS CUATRO NUMEROS, EN EL ORDEN EN QUE LOS PAGA EL CICLO:
+//
+//	esperar  -- la espera al PVR (el chip entrega a la frecuencia del video: si el cuadro es barato, esto
+//	            es lo que sobra hasta el proximo vsync);
+//	trabajo  -- actualizar + dibujar: lo que el juego compone (el mapa, los sprites, el HUD);
+//	presentar-- convertir el lienzo RGBA a RGB565, subirlo a la VRAM y pintar el quad de pantalla completa;
+//	cuadro   -- el periodo real, de la espera al final: 1.000.000/cuadro son los cuadros por segundo.
+func (r *Renderer) anotarElCuadro(usEspera, usTrabajo, usCuadro int) {
+	r.msEspera += usEspera
+	r.msTrabajo += usTrabajo
+	r.msCuadro += usCuadro
+
+	usPresentar := usCuadro - usEspera - usTrabajo
+	r.msPresentar += usPresentar
+
+	if r.cuadros%cuadrosDelInforme != 0 {
+		return
+	}
+
+	n := cuadrosDelInforme
+
+	usCuadroPromedio := r.msCuadro / n
+	fpsX100 := 0
+	if usCuadroPromedio > 0 {
+		fpsX100 = 100000000 / usCuadroPromedio // 1.000.000 us/s / us por cuadro, en centesimas
+	}
+
+	println("PVR132: CUADRO", r.cuadros,
+		"espera_us=", r.msEspera/n, "trabajo_us=", r.msTrabajo/n,
+		"presentar_us=", r.msPresentar/n, "cuadro_us=", usCuadroPromedio,
+		"fpsX100=", fpsX100, "desglose=", "espera+trabajo+presentar")
+
+	r.msEspera, r.msTrabajo, r.msPresentar, r.msCuadro = 0, 0, 0, 0
 }
 
 // medirFPS: los cuadros por segundo del ultimo segundo medido (ventana de 1 s, no un cuadro suelto).
@@ -225,6 +289,10 @@ func (r *Renderer) medirFPS() {
 	r.fps = float64(r.cuadrosVen) * 1000000.0 / float64(transcurrido)
 	r.cuadrosVen = 0
 	r.msAntes = ahora
+
+	// DC-002.132: los cuadros por segundo, en el log, en enteros (el println de la consola no imprime
+	// float64 de forma confiable y el numero que se compara es el entero de todos modos).
+	println("PVR132: FPS seg_fpsX100=", int(r.fps*100), "cuadros=", r.cuadros)
 }
 
 // IsDrawingSkipped: si el ultimo cuadro no se pudo componer (el motor lo usa para no contar un cuadro

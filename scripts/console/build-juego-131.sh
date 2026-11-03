@@ -44,6 +44,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REPO="$(cd "$HERE/../.." && pwd)"
 SRC="$REPO/console/dc/poc/juego-131"
+# DC-002.132: POC_SRC permite compilar una COPIA del POC (una foto del arbol: `git archive HEAD` + los archivos
+# de la tarjeta) sin tocar el directorio del repo, que puede estar siendo editado por otra corrida. Es el mismo
+# patron que POC_DIR en build-monstruo-250.sh, por el mismo motivo. Sin POC_SRC todo queda como estaba.
+SRC="${POC_SRC:-$SRC}"
 MEDIDOR="$REPO/console/dc/medidas/render-294"
 BASE_GOX="${BASE_GOX:-/tmp/gox-296}"
 OUT="${1:-/tmp/dcbuild/juego131}"
@@ -372,13 +376,29 @@ echo "   VIVO medirVivo=$(leer_knob medirVivo)"
 
 echo "   VIVO arteEnMontonDeC=$(leer_knob arteEnMontonDeC)"
 
-# --- DC-002.131: la recoleccion del borde del cuadro y su ventana de medida ---
-[ -n "${GC_POR_CUADRO:-}" ] && pisa_knob gcPorCuadro "$GC_POR_CUADRO" 1
-[ -n "${UMBRAL_GC_CUADRO:-}" ] && pisa_knob umbralDelGcDeCuadro "$UMBRAL_GC_CUADRO"
+# CUADRO_BORDE_DESDE / CUADRO_BORDE_HASTA: la ventana del instrumento fino por paso (vivoDeUnPaso). Con
+# CUADRO_BORDE_DESDE vacio se deja la ventana por omision; con DESDE mayor que HASTA el instrumento no corre.
 [ -n "${CUADRO_BORDE_DESDE:-}" ] && pisa_knob cuadroDesdeElBorde "$CUADRO_BORDE_DESDE"
 [ -n "${CUADRO_BORDE_HASTA:-}" ] && pisa_knob cuadroHastaElBorde "$CUADRO_BORDE_HASTA"
 
-echo "   VIVO gcPorCuadro=$(leer_knob gcPorCuadro) umbral=$(leer_knob umbralDelGcDeCuadro) ventana=$(leer_knob cuadroDesdeElBorde)..$(leer_knob cuadroHastaElBorde)"
+echo "   VIVO ventanaDelBorde=$(leer_knob cuadroDesdeElBorde)..$(leer_knob cuadroHastaElBorde)"
+
+# GC_POR_CUADRO=si es la recoleccion en el borde del cuadro (medida y RECHAZADA en esta tarjeta: cuesta 86-92 ms
+# por cuadro y corrompe el ancho del texto del HUD; queda para poder reproducir la medida). UMBRAL_GC_CUADRO es el
+# % de semiespacio a partir del cual corre.
+[ -n "${GC_POR_CUADRO:-}" ] && pisa_knob gcPorCuadro "$GC_POR_CUADRO" 1
+[ -n "${UMBRAL_GC_CUADRO:-}" ] && pisa_knob umbralDelGcDeCuadro "$UMBRAL_GC_CUADRO"
+
+echo "   VIVO gcPorCuadro=$(leer_knob gcPorCuadro) umbral=$(leer_knob umbralDelGcDeCuadro)"
+
+# LAS DE ESTA TARJETA (DC-002.132): LOS CUADROS POR SEGUNDO.
+#   MEDIR_CUADRO=no  apaga el instrumento POR CUADRO del POC (16 crc32 del lienzo de 1.228.800 B y el conteo de
+#                    pixeles). Los tres primeros cuadros se miden igual: ahi vive la comparacion contra el host.
+#   BLIT_RAPIDO=no   el bucle viejo del tile (el A/B del recorte y del tinte, en el mismo binario).
+[ -n "${MEDIR_CUADRO:-}" ] && pisa_knob medirCuadro "$MEDIR_CUADRO" 1
+[ -n "${BLIT_RAPIDO:-}" ] && pisa_knob blitRapido "$BLIT_RAPIDO" 1
+
+echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob blitRapido)"
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }

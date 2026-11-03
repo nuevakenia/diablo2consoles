@@ -1,0 +1,176 @@
+DC-002.132 -- LOS CUADROS POR SEGUNDO, EL DESGLOSE DEL CUADRO Y EL TILE BARATO
+================================================================================
+Fecha: 2026-11-02.  Maquina: CachyOS, RX 7900 XTX, Flycast 2.7 (sin KVM).
+POC: console/dc/poc/juego-131.  Evidencia cruda: /tmp/capturas-132-a2 y /tmp/capturas-132-b2
+(log `flycast.log` de cada corrida: consola serie del POC).
+
+
+1. QUE SE MIDIO Y CON QUE
+-------------------------
+Tres numeros nuevos, impresos por el POC y por el backend PVR, promediados cada 30 cuadros:
+
+  JUEGO132: MAPA  cuadro=<n> ms=<ms del render del mapa> stats=<lo que dibujo> blitRapido= medirCuadro=
+  JUEGO132: FPS   cuadros= delTramo= msPorCuadro= animsHeroe= animsBicho= composiciones= msMapaPorCuadro=
+  PVR132: CUADRO  espera_us= trabajo_us= presentar_us= cuadro_us= fpsX100=
+
+`PVR132` desglosa el cuadro DENTRO del ciclo de la capa PVR (d2core/d2render/pvr/renderer.go):
+
+  espera     = lo que se espera al PVR antes de empezar a encolar (PvrWaitReady)
+  trabajo    = actualizar() + dibujar(): el POC entero, mapa incluido
+  presentar  = convertir RGBA->RGB565 los 307.200 pixeles, subirlos a VRAM y pintar el quad
+  cuadro     = el periodo completo (1.000.000/us por cuadro = cuadros por segundo)
+
+El A/B vive en el MISMO binario: la palanca `BLIT_RAPIDO` elige el bucle nuevo o el viejo de
+DC-002.70 (renderIndicesLentas / renderIndicesTintadoLento, copiados tal cual). Dos corridas, mismo
+POC, mismo emulador, mismos knobs, misma camara:
+
+  a2 = /tmp/dcbuild/anim132-a2  BLIT_RAPIDO=no   (el bucle viejo)
+  b2 = /tmp/dcbuild/anim132-b2  BLIT_RAPIDO=si   (el recorte una vez por tile + camino sin tinte)
+
+Knobs de las dos corridas (iguales salvo BLIT_RAPIDO): CUADROS=60 JUGADORES=1 MONSTRUOS=1
+COMBATE=si GOLPE_AUTO=si HUD=si MINIMAPA=si NPC=no QUEST=no INVENTARIO=no DROP=no MEDIR_CUADRO=no.
+NPC/QUEST/INVENTARIO/DROP apagados para entrar en los 16 MB (ver punto 5).
+
+
+2. EL MAPA: 582 ms -> 367 ms  (-37 %, 1,59x)
+---------------------------------------------
+                            blit viejo (a2)      blit rapido (b2)
+  CUADRO 1 SOLO-MAPA  ms          690                  467
+  msMapa cuadro 2                662                  436
+  msMapa cuadro 3                545                  351
+  msMapa cuadro 30               619                  314
+  msMapa cuadro 60               535                  314
+  promedio del tramo (30)        582                  367
+  promedio del tramo (60)        575                  361
+
+(una segunda corrida buena de b2 dio 454/423/338/408/408 y tramos de 372 y 366: la medicion se
+repite dentro de +-8 %.)
+
+El mapa del pueblo (194 pisos, 50 paredes de arriba, 4 techos) baja de ~580 a ~365 ms. Lo que se
+toco para eso (d2core/d2render/pvr/surface.go):
+
+  - el recorte del tile se calcula UNA vez por tile (x0,x1,y0,y1) y no dos comparaciones por pixel:
+    un tile de 160x160 son 25.600 pixeles para 4 cuentas, y ademas los tiles que caen fuera del
+    lienzo ya no se recorren;
+  - con el estado neutro (rojo=verde=azul=alfa=255) no se hace la cuenta de tinte (3
+    multiplicaciones y 3 divisiones por 255 por pixel): se escribe la paleta directo. El camino con
+    color queda intacto, byte a byte.
+
+QUE EL DIBUJO NO CAMBIO (esto es lo que habilita todo lo anterior):
+
+  a2: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostCrc= 1437022778 igualAlHost= true
+  b2: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostCrc= 1437022778 igualAlHost= true
+
+Mismo crc32 que el host (1437022778), mismo conteo de pixeles, con el bucle viejo y con el nuevo.
+Y ademas, fuera de la consola: `console/dc/verif-blit-132` (verificador de host) corre los dos
+bucles -- viejo y nuevo -- sobre 800 casos aleatorios por semilla y compara byte a byte; 10 semillas
+(8.000 casos: tiles fuera del lienzo, tiles mas grandes que el lienzo, indices transparentes, alfa
+0/255/intermedio y tinte neutro y no neutro):
+
+  BLIT132: casos= 800 distintos= 0 semilla= 1   (idem 2..10)
+  go run ./console/dc/verif-blit-132/ <semilla>
+
+
+3. EL CUADRO ENTERO: DONDE SE VAN LOS 1.150 ms
+----------------------------------------------
+Con el blit rapido (PVR132: CUADRO, promedio de 30 cuadros):
+
+  espera        3 us       (0,0 %)   <- Flycast no sincroniza: no hay vsync que esperar
+  trabajo   1.112.882 us   (96,8 %)  <- el POC: mapa + jugador + bicho + HUD + minimapa
+  presentar    37.000 us   ( 3,2 %)  <- convertir a RGB565 + subir a VRAM + pintar el quad
+  cuadro    1.149.886 us   (100 %)   -> 0,86 cuadros por segundo
+
+y con el blit viejo:
+
+  espera        3 us
+  trabajo   1.330.501 us
+  presentar    36.759 us
+  cuadro    1.367.263 us   -> 0,73 cuadros por segundo
+
+Los tres numeros que importan de aca:
+
+  a) LA PRESENTACION CUESTA 36,8 ms Y NO SE MUEVE: 36.759 / 36.758 us (a2) y 37.000 / 36.840 us
+     (b2). Es constante con el blit viejo y con el nuevo. Con 36,8 ms fijos por cuadro, el techo del
+     POC es 27 cuadros por segundo AUNQUE EL MAPA SE DIBUJE GRATIS. Cualquier trabajo de dibujado que
+     baje de 36,8 ms el resto del cuadro no se va a ver en los cuadros por segundo: primero hay que
+     bajar la presentacion (o dejar de subir el lienzo entero cada cuadro).
+  b) EL MAPA NO ES EL CUADRO. trabajo - mapa = 1.112.882 - 367.000 = 745.882 us: 746 ms del cuadro
+     NO son el mapa (con el blit viejo eran 1.330.501 - 582.000 = 748.501 us: los mismos 746 ms).
+     O sea que el blit rapido se llevo los 215 ms del mapa, pero el otro 65 % del cuadro -- el POC
+     dibujando el jugador, el bicho, el HUD y el minimapa sobre el lienzo, cuadro a cuadro -- sigue
+     intacto y es DOS VECES el mapa. Ese es el proximo blanco, no el tile.
+  c) EL INSTRUMENTO MISMO COSTABA: con MEDIR_CUADRO=si (16 crc32 de 1.228.800 B + conteo de pixeles
+     por cuadro) el trabajo medido era 1,28 s contra 1,11 s con el instrumento apagado: ~170 ms por
+     cuadro de puro medirse. Por eso la palanca existe y por eso los primeros 3 cuadros se miden
+     siempre (ahi vive la comparacion contra el host).
+
+
+4. LAS ANIMACIONES: MAS CUADROS POR SEGUNDO EN EL LIENZO
+--------------------------------------------------------
+El reloj de la animacion (movimiento.go, CuadroDeLaAnimacion) es de pared: la fase del ciclo sale de
+`ms / MsPorCuadro` del modo (NU/TW/DD), asi que a mas cuadros por segundo, mas cuadros de animacion
+distintos llegan al lienzo. Contados por el instrumento (animsHeroe/animsBicho = veces que el cuadro
+del ciclo CAMBIO respecto del cuadro anterior, cada 30 cuadros):
+
+                              blit viejo (a2)      blit rapido (b2)
+  anims del bicho / 30             16  y  17            28  y  30
+  anims del heroe / 30              4  y   0             6-7  y   0
+
+El Returned (bicho) casi duplica los cuadros de animacion que llegan a la pantalla (16 -> 28). El
+heroe da 4-7 en el primer tramo y 0 en el segundo porque el guion lo deja quieto (parado), no porque
+el reloj se pare: su ciclo NU tampoco avanza si esta en la misma celda. La animacion no se toco: se
+midio.
+
+OJO con el 0 de heroe en el segundo tramo: el guion lo deja quieto y su ciclo NU no avanza. Y el
+"fps= 0 / fpsX100= 0" que se ve en estas corridas era un defecto del instrumento (calculaba
+1000/msPorCuadro en enteros: con 1.010-1.309 ms por cuadro daba 0, y no distinguia la corrida buena de
+la mala). Ya esta corregido en instrumento_132.go: la linea informa `fpsX100= 100000/msPorCuadro`, que
+con estas corridas habria dado 76 (a2, 1.309 ms) y 92 (b2, 1.089 ms) -- los mismos numeros que el
+fpsX100 de PVR132. Las corridas de esta evidencia son ANTERIORES al arreglo: los numeros de cuadros por
+segundo que valen son los de PVR132 (fpsX100= 73..94 -> 0,73 a 0,94 fps).
+
+
+5. LO QUE SE INTERPUSO: EL POC NO ENTRA EN LOS 16 MB
+----------------------------------------------------
+Las corridas de esta tarjeta NO arrancaron a la primera: el POC muere cargando, con
+
+  Out of memory. Requested sbrk_base 0x8d010000, was 0x8cfa4000, diff 442368
+  fatal error: gc_external_alloc: OOM
+
+en el monton de C (arena ~10,45 MB, usados 9,83 MB). Conteo por corrida: a2 = 1 OOM en 2 arranques,
+b2 = 2 OOM en 3 arranques: no es determinista, depende de como queden pegados los pedidos.
+
+Lo que hizo que entrara: apagar NPC, QUEST, INVENTARIO y DROP (arte que se carga al monton de C y no
+se usa en esta prueba). Con los knobs por defecto (JUGADORES=4 y todo prendido) OOM en 4 de 4
+intentos. No es un problema del blit ni del instrumento: es el techo de RAM del POC, que ya venia
+de DC-002.131 (el binario pesa 5,58 MB de los 16). Va como tarjeta aparte.
+
+Las capturas de la corrida buena estan en /tmp/capturas-132-b2 (c00-quieto.png, c1..c4.png;
+recorte = crop=640:480:900:120): el pueblo con pasto y camino de tierra, la amazona, el Returned,
+el minimapa del pueblo arriba a la derecha y el HUD abajo. No es pantalla negra: el POC dibuja.
+
+
+6. COMO SE REPITE
+-----------------
+  # build animado de la evidencia (foto del arbol + los archivos de la tarjeta; no toca el repo)
+  POC_SRC=<foto> CUADROS=60 JUGADORES=1 MONSTRUOS=1 COMBATE=si GOLPE_AUTO=si \
+  HUD=si MINIMAPA=si NPC=no QUEST=no INVENTARIO=no DROP=no \
+  BLIT_RAPIDO=si MEDIR_CUADRO=no bash scripts/console/build-anim-132.sh /tmp/dcbuild/anim132-b2
+
+  # la corrida (marca de ventana propia: no se mata con run-flycast-131.sh)
+  CAPTURAS=4 INTERVALO=10 bash scripts/console/run-anim-132.sh \
+      /tmp/dcbuild/anim132-b2/disc.gdi /tmp/capturas-132-b2 900 120
+
+  # y el A/B: lo mismo con BLIT_RAPIDO=no en otro directorio de build
+
+El build imprime al final `ANIM132 medirCuadro=... blitRapido=...` y la linea `JUEGO132: arranca --
+medirCuadro= no blitRapido= si` sale en la consola serie: con eso se sabe que binario corrio.
+
+
+7. LO QUE NO SE PROBO
+---------------------
+  - Un jugador. El split (2-4 jugadores, DC-002.131) no entra junto con el resto: con JUGADORES=4
+    el POC no arranca por RAM. El cuadro con split va a ser MAS caro que este, no menos.
+  - El pueblo con bichos multiples (MONSTRUOS=1).
+  - La presentacion optimizada: no se toco. Sigue costando 36,8 ms y sigue poniendo el techo en 27
+    cuadros por segundo.

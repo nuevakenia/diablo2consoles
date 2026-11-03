@@ -391,6 +391,11 @@ func main() {
 		modoCaminando, "msCaminando=", msCaminando, "dirsCaminando=", dirsCaminando, "inyectarGuion=",
 		inyectarGuion, "tramoDeLaCache=", tramoDeLaCache, "cacheEnVram=", cacheEnVram)
 
+	// DC-002.132: el camino rapido del tile (o el viejo, para el A/B) se elige ANTES de dibujar un cuadro.
+	activarElBlitRapido()
+	println("JUEGO132: arranca -- medirCuadro=", medirCuadro, "blitRapido=", blitRapido,
+		"cuadrosPorInforme=", cuadrosDelInforme132)
+
 	memoria("al-arrancar")
 	semiespacio("al-arrancar")
 	vram("al-arrancar")
@@ -1301,6 +1306,9 @@ func dibujar(superficie d2interface.Surface) error {
 
 	cuadro++
 
+	// DC-002.132: el reloj del cuadro para el informe de los cuadros por segundo (ver instrumento_132.go).
+	tInicio132 := int64(d2cMs())
+
 	// DC-002.120: con el ciclo encendido, los cuadros de DESPUES del guion son las tres fases del cambio de nivel
 	// (`fases_120.go`). El camino de siempre (los tres cuadros del cierre) queda intacto para `faseKnob=apagado`.
 	if faseEncendida() && cuadro > cuadros {
@@ -1335,11 +1343,20 @@ func dibujar(superficie d2interface.Surface) error {
 	t0 := d2cMs()
 	rendererDelMapa.Render(superficie)
 	msMapa := int(d2cMs() - t0)
+	anotarLaComposicion132(int64(msMapa))
+
+	// DC-002.132: lo que el mapa DIBUJO en este cuadro (pisos, paredes, paredes de arriba, techos, sombras y
+	// entidades). Es el otro numero que dice donde se va el cuadro: sin el, "el mapa cuesta 700 ms" no dice si
+	// son 200 tiles de 160x160 o 600 chicos.
+	if cuadro <= 3 || cuadro%cuadrosDelInforme132 == 0 {
+		println("JUEGO132: MAPA cuadro=", cuadro, "ms=", msMapa, "stats=", rendererDelMapa.DrawStats().String(),
+			"blitRapido=", blitRapido, "medirCuadro=", medirCuadro)
+	}
 
 	pixeles := malla.Imagen().Pixeles()
 
-	llenos := contarLlenos(pixeles)
-	crcMapa := crc32.ChecksumIEEE(pixeles)
+	llenos := llenosLienzo(pixeles)
+	crcMapa := crcLienzo(pixeles)
 
 	if cuadro == 1 {
 		crcDelMapaSolo = crcMapa
@@ -1370,7 +1387,7 @@ func dibujar(superficie d2interface.Surface) error {
 		msJugador = msDos
 
 		// el crc del mapa tiene que volver: si no vuelve, las cajas se pisaron mal y el numero de abajo no vale
-		crcRestaurado := crc32.ChecksumIEEE(pixeles)
+		crcRestaurado := crcLienzo(pixeles)
 
 		if crcRestaurado != crcMapa {
 			println("JUEGO121: CUADRO", cuadro, "MAPA-RESTAURADO DISTINTO crc32=", int(crcRestaurado),
@@ -1438,12 +1455,12 @@ func dibujar(superficie d2interface.Surface) error {
 
 		// el crc32 del lienzo ANTES de tocar los bichos: es contra el que se comprueba que las cajas se
 		// devolvieron bien (el mapa solo ya se midio arriba, en la linea SOLO-MAPA, y sigue siendo 1437022778).
-		crcAntesDeLosBichos := crc32.ChecksumIEEE(pixeles)
+		crcAntesDeLosBichos := crcLienzo(pixeles)
 
 		crcConBichos, ms, pxBicho = dibujarLosBichos(malla, pixeles)
 		msBicho = ms
 
-		crcDespues := crc32.ChecksumIEEE(pixeles)
+		crcDespues := crcLienzo(pixeles)
 		if crcDespues != crcAntesDeLosBichos {
 			println("JUEGO121: CUADRO", cuadro, "LIENZO-RESTAURADO-TRAS-BICHOS DISTINTO crc32=",
 				int(crcDespues), "antesDeLosBichos=", int(crcAntesDeLosBichos))
@@ -1467,14 +1484,14 @@ func dibujar(superficie d2interface.Surface) error {
 	crcConItems, msItems, pxItems, itemsDibujados := crcConBichos, 0, 0, 0
 
 	if dropKnob == "si" && len(suelo) > 0 {
-		crcAntesDeLosItems := crc32.ChecksumIEEE(pixeles)
+		crcAntesDeLosItems := crcLienzo(pixeles)
 
 		var ms int
 
 		crcConItems, ms, pxItems, itemsDibujados = dibujarLosItems(malla, pixeles)
 		msItems = ms
 
-		crcDespues := crc32.ChecksumIEEE(pixeles)
+		crcDespues := crcLienzo(pixeles)
 		if crcDespues != crcAntesDeLosItems {
 			println("JUEGO123: CUADRO", cuadro, "LIENZO-RESTAURADO-TRAS-ITEMS DISTINTO crc32=", int(crcDespues),
 				"antesDeLosItems=", int(crcAntesDeLosItems))
@@ -1496,14 +1513,14 @@ func dibujar(superficie d2interface.Surface) error {
 	crcConNPCs, msNPC, pxNPC := crcConItems, 0, 0
 
 	if npcKnob == "si" && len(npcsDelPueblo) > 0 {
-		crcAntesDeLosNPCs := crc32.ChecksumIEEE(pixeles)
+		crcAntesDeLosNPCs := crcLienzo(pixeles)
 
 		var ms int
 
 		crcConNPCs, ms, pxNPC = dibujarLosNPCs(malla, pixeles)
 		msNPC = ms
 
-		crcDespues := crc32.ChecksumIEEE(pixeles)
+		crcDespues := crcLienzo(pixeles)
 
 		println("JUEGO127: NPC CUADRO", cuadro, "npcs=", len(npcsDelPueblo), "dibujados=", pxNPC > 0,
 			"pixelesPintados=", pxNPC, "msNPCs=", msNPC, "crcConNPCs=", int(crcConNPCs),
@@ -1525,11 +1542,11 @@ func dibujar(superficie d2interface.Surface) error {
 		// llamar al inventario y justo despues. Si no se pinto nada, los dos numeros tienen que ser el mismo. Es la
 		// unica forma honesta de decirlo: dos corridas distintas del emulador no dan los mismos crc32 porque la
 		// animacion avanza por reloj (`d2cMs`), no por cuadro.
-		crcAntesDelPanel := crc32.ChecksumIEEE(pixeles)
+		crcAntesDelPanel := crcLienzo(pixeles)
 
 		pxPaneles, _ = dibujarElInventario(malla, pixeles)
 
-		crcDespuesDelPanel := crc32.ChecksumIEEE(pixeles)
+		crcDespuesDelPanel := crcLienzo(pixeles)
 
 		if pxPaneles == 0 {
 			println("JUEGO124: INV CUADRO", cuadro, "abierto=no pixelesPintados=0",
@@ -1549,15 +1566,15 @@ func dibujar(superficie d2interface.Surface) error {
 	pxHUD, msHUD := 0, 0
 
 	if hudKnob == "si" && elHUD != nil {
-		crcAntesDelHUD := crc32.ChecksumIEEE(pixeles)
+		crcAntesDelHUD := crcLienzo(pixeles)
 
 		pxHUD, msHUD = elHUD.dibujar(malla, 0, ancho, alto)
 
-		crcDespuesDelHUD := crc32.ChecksumIEEE(pixeles)
+		crcDespuesDelHUD := crcLienzo(pixeles)
 
 		println("JUEGO125: HUD CUADRO", cuadro, "elCuadroCambio=", crcAntesDelHUD != crcDespuesDelHUD,
 			"crcAntes=", int(crcAntesDelHUD), "crcDespues=", int(crcDespuesDelHUD),
-			"pixeles=", pxHUD, "ms=", msHUD, "lienzoLleno=", contarLlenos(pixeles), "de", ancho*alto)
+			"pixeles=", pxHUD, "ms=", msHUD, "lienzoLleno=", llenosLienzo(pixeles), "de", ancho*alto)
 	}
 
 	// ============================== EL MINIMAPA (DC-002.130) ==============================
@@ -1570,11 +1587,11 @@ func dibujar(superficie d2interface.Surface) error {
 	if minimapaKnob == "si" && elMinimapa != nil {
 		elMinimapa.revelarElMinimapa(0)
 
-		crcaAntesDelMinimapa := crc32.ChecksumIEEE(pixeles)
+		crcaAntesDelMinimapa := crcLienzo(pixeles)
 
 		pxMinimapa, msMinimapa = elMinimapa.dibujarElMinimapa(malla, 0, ancho, alto)
 
-		crcDespuesDelMinimapa := crc32.ChecksumIEEE(pixeles)
+		crcDespuesDelMinimapa := crcLienzo(pixeles)
 
 		elMinimapa.crcAntes, elMinimapa.crcDespues = crcaAntesDelMinimapa, crcDespuesDelMinimapa
 
@@ -1582,7 +1599,7 @@ func dibujar(superficie d2interface.Surface) error {
 
 		println("JUEGO130: MINIMAPA CUADRO", cuadro, "elCuadroCambio=", crcaAntesDelMinimapa != crcDespuesDelMinimapa,
 			"crcAntes=", int(crcaAntesDelMinimapa), "crcDespues=", int(crcDespuesDelMinimapa),
-			"pixeles=", pxMinimapa, "ms=", msMinimapa, "lienzoLleno=", contarLlenos(pixeles), "de", ancho*alto)
+			"pixeles=", pxMinimapa, "ms=", msMinimapa, "lienzoLleno=", llenosLienzo(pixeles), "de", ancho*alto)
 	}
 
 	// ============================== EL PANEL DE DIALOGO (DC-002.127) ==============================
@@ -1594,7 +1611,7 @@ func dibujar(superficie d2interface.Surface) error {
 	// DC-002.128: el panel del DIALOGO tambien es el de la QUEST (el de Akara), asi que el camino se abre con
 	// cualquiera de las dos palancas. Con `NPC=no` y `QUEST=si` el panel es solo el de la quest.
 	if npcKnob == "si" || questKnob == "si" {
-		crcAntesDelDialogo := crc32.ChecksumIEEE(pixeles)
+		crcAntesDelDialogo := crcLienzo(pixeles)
 
 		pxDialogo, msDialogo = dibujarElDialogo(malla, pixeles)
 
@@ -1604,7 +1621,7 @@ func dibujar(superficie d2interface.Surface) error {
 			questMsDelPanel = msDialogo
 		}
 
-		crcDespuesDelDialogo := crc32.ChecksumIEEE(pixeles)
+		crcDespuesDelDialogo := crcLienzo(pixeles)
 
 		if elDialogoSeCerro && lienzoTrasCerrar == 0 && !dialogoAbierto {
 			lienzoTrasCerrar = crcDespuesDelDialogo
@@ -1619,7 +1636,7 @@ func dibujar(superficie d2interface.Surface) error {
 			"elCuadroNoCambio=", crcAntesDelDialogo == crcDespuesDelDialogo)
 	}
 
-	println("JUEGO121: CUADRO", cuadro, "CON-JUGADOR pixelesNoVacios=", contarLlenos(pixeles), "de", ancho*alto,
+	println("JUEGO121: CUADRO", cuadro, "CON-JUGADOR pixelesNoVacios=", llenosLienzo(pixeles), "de", ancho*alto,
 		"crc32=", int(crcConJugador), "pixelesDelJugador=", cambiados, "ancla=", anclaX, anclaY,
 		"dir=", dirDibujada, "cuadroDelCiclo=", cuadroAnim, "modo=", modoDelCuadro(mov.Caminando),
 		"msMapa=", msMapa, "msJugador=", msJugador, "jugadores=", len(jugadores),
@@ -1645,7 +1662,7 @@ func dibujar(superficie d2interface.Surface) error {
 	if cuadro == cuadros+1 {
 		crcOrigenMapa = crcMapa
 		crcOrigenJugador = crcConJugador
-		llenosOrigen = contarLlenos(pixeles)
+		llenosOrigen = llenosLienzo(pixeles)
 	}
 
 	if cuadro == cuadros+2 {
@@ -1656,7 +1673,7 @@ func dibujar(superficie d2interface.Surface) error {
 			"crcMapaDelCuadroAnterior=", int(crcOrigenMapa), "igualAlCuadroAnterior=", igualOrigenMapa,
 			"crcConJugador=", int(crcConJugador), "crcConJugadorDelCuadroAnterior=", int(crcOrigenJugador),
 			"igualConJugador=", igualOrigenJugador, "ancla=", anclaX, anclaY, "celda=", celdaDelJugadorX(),
-			celdaDelJugadorY(), "llenos=", contarLlenos(pixeles), "llenosDelCuadroAnterior=", llenosOrigen,
+			celdaDelJugadorY(), "llenos=", llenosLienzo(pixeles), "llenosDelCuadroAnterior=", llenosOrigen,
 			"crcMapaDelCuadro1=", int(crcCuadro1Mapa), "igualAlCuadro1=", crcMapa == crcCuadro1Mapa,
 			"llenosDelCuadro1=", llenosCuadro1, "cachePerezosa=", rendererDelMapa.CachePerezosa())
 	}
@@ -1700,6 +1717,16 @@ func dibujar(superficie d2interface.Surface) error {
 		resumenDeLosNPCs()        // DC-002.127: los NPCs, su texto y el panel de dialogo
 		resumenDeLaQuest()        // DC-002.128: la Den of Evil, su contador, su cobro y la supervivencia
 		resumenDelMinimapa()      // DC-002.130: el minimapa, su costo por cuadro y la decision siempre/por tecla
+	}
+
+	// DC-002.132 -- EL CUADRO, CONTADO. Va al final para que el numero incluya TODO lo que costo el cuadro (el
+	// mapa, los sprites, el HUD, el minimapa y los instrumentos), que es lo que el jugador espera entre cuadro y
+	// cuadro. Cada 30 cuadros se deja el promedio: los cuadros por segundo y los cuadros de animacion que
+	// llegaron al lienzo.
+	anotarElCuadro132(int64(d2cMs())-tInicio132, cuadroAnimDelHeroe132(), cuadroAnimDelBicho132())
+
+	if cuadro%cuadrosDelInforme132 == 0 {
+		resumenDelCuadro132(cuadro)
 	}
 
 	return nil

@@ -115,32 +115,58 @@ func (s *Surface) RenderIndices(indices []byte, ancho, alto int, paleta [][3]uin
 		return
 	}
 
+	if !blitRapido {
+		s.renderIndicesLento(indices, ancho, alto, paleta)
+
+		return
+	}
+
 	dx, dy := s.actual.x, s.actual.y
 	anchoLienzo, altoLienzo := s.imagen.ancho, s.imagen.alto
 	pixeles := s.imagen.pixeles
 
-	for y := 0; y < alto; y++ {
-		cy := dy + y
-		if cy < 0 || cy >= altoLienzo {
-			continue
-		}
+	// DC-002.132 -- EL RECORTE, UNA VEZ POR TILE Y NO UNA VEZ POR PIXEL.
+	//
+	// MEDIDO ANTES DE ESTE CAMBIO: el mapa del pueblo costaba 675-931 ms por cuadro en Flycast, y el
+	// desglose lo dejaba claro: ~220 tiles de 160x160 se recorrian ENTEROS (5,6 M de pixeles) aunque solo
+	// 307.200 se ven en pantalla, y cada pixel pagaba DOS comparaciones de recorte y una escritura sin
+	// cache (los pixeles del lienzo viven en la VRAM). El rango que SI cae en el lienzo no depende del
+	// pixel: se calcula aca arriba y las dos condiciones del bucle se van.
+	x0, x1 := 0, ancho
+	if dx < 0 {
+		x0 = -dx
+	}
+	if dx+x1 > anchoLienzo {
+		x1 = anchoLienzo - dx
+	}
+	if x0 >= x1 {
+		return
+	}
 
-		base := cy * anchoLienzo * 4
+	y0, y1 := 0, alto
+	if dy < 0 {
+		y0 = -dy
+	}
+	if dy+y1 > altoLienzo {
+		y1 = altoLienzo - dy
+	}
+	if y0 >= y1 {
+		return
+	}
+
+	filaLienzo := anchoLienzo * 4
+
+	for y := y0; y < y1; y++ {
 		fila := y * ancho
+		j := (dy+y)*filaLienzo + (dx+x0)*4
 
-		for x := 0; x < ancho; x++ {
+		for x := x0; x < x1; x, j = x+1, j+4 {
 			idx := indices[fila+x]
 			if idx == 0 {
 				continue
 			}
 
-			cx := dx + x
-			if cx < 0 || cx >= anchoLienzo {
-				continue
-			}
-
 			c := paleta[idx]
-			j := base + cx*4
 
 			pixeles[j+0] = c[0]
 			pixeles[j+1] = c[1]
@@ -163,6 +189,12 @@ func (s *Surface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [
 		return
 	}
 
+	if !blitRapido {
+		s.renderIndicesTintadoLento(indices, ancho, alto, paleta)
+
+		return
+	}
+
 	dx, dy := s.actual.x, s.actual.y
 	anchoLienzo, altoLienzo := s.imagen.ancho, s.imagen.alto
 	pixeles := s.imagen.pixeles
@@ -174,27 +206,60 @@ func (s *Surface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [
 		rojo, verde, azul, alfa = uint16(c.R), uint16(c.G), uint16(c.B), uint16(c.A)
 	}
 
-	for y := 0; y < alto; y++ {
-		cy := dy + y
-		if cy < 0 || cy >= altoLienzo {
-			continue
-		}
+	// DC-002.132 -- EL RECORTE AFUERA DEL BUCLE Y EL CAMINO SIN TINTE.
+	//
+	// DOS COSAS QUE SE PAGABAN EN CADA PIXEL Y NO HACIA FALTA PAGAR:
+	//
+	//  1. el recorte (dos comparaciones por pixel, y el tile se recorria entero aunque estuviera medio
+	//     fuera del lienzo): el rango visible se calcula una vez, arriba;
+	//  2. la CUENTA DEL TINTE: tres multiplicaciones y tres divisiones por 255 por pixel, que es el caso
+	//     del mapa del nivel y de las paredes cuando NO hay color puesto (rojo=verde=azul=alfa=255). Con
+	//     el estado neutro la cuenta da siempre lo mismo (p * 255 / 255 = p), asi que se escribe la paleta
+	//     tal cual. El camino general queda intacto, byte a byte, para el que SI trae color.
+	neutro := rojo == 255 && verde == 255 && azul == 255 && alfa == 255
 
-		base := cy * anchoLienzo * 4
+	x0, x1 := 0, ancho
+	if dx < 0 {
+		x0 = -dx
+	}
+	if dx+x1 > anchoLienzo {
+		x1 = anchoLienzo - dx
+	}
+	if x0 >= x1 {
+		return
+	}
+
+	y0, y1 := 0, alto
+	if dy < 0 {
+		y0 = -dy
+	}
+	if dy+y1 > altoLienzo {
+		y1 = altoLienzo - dy
+	}
+	if y0 >= y1 {
+		return
+	}
+
+	filaLienzo := anchoLienzo * 4
+
+	for y := y0; y < y1; y++ {
 		fila := y * ancho
+		j := (dy+y)*filaLienzo + (dx+x0)*4
 
-		for x := 0; x < ancho; x++ {
+		for x := x0; x < x1; x, j = x+1, j+4 {
 			idx := indices[fila+x]
 			if idx == 0 {
 				continue
 			}
 
-			cx := dx + x
-			if cx < 0 || cx >= anchoLienzo {
+			p := paleta[idx]
+
+			if neutro && p[3] == 255 {
+				pixeles[j+0], pixeles[j+1], pixeles[j+2], pixeles[j+3] = p[0], p[1], p[2], 255
+
 				continue
 			}
 
-			p := paleta[idx]
 			r := uint8(uint16(p[0]) * rojo / 255)
 			g := uint8(uint16(p[1]) * verde / 255)
 			b := uint8(uint16(p[2]) * azul / 255)
@@ -203,8 +268,6 @@ func (s *Surface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [
 			if a == 0 {
 				continue
 			}
-
-			j := base + cx*4
 
 			if a == 255 {
 				pixeles[j+0], pixeles[j+1], pixeles[j+2], pixeles[j+3] = r, g, b, 255
@@ -446,4 +509,121 @@ func minInt(a, b int) int {
 	}
 
 	return b
+}
+
+// ================================================================ EL CAMINO RAPIDO DEL TILE (DC-002.132)
+
+// blitRapido: si el dibujado de un mapa de indices usa el camino nuevo (recorte calculado una vez por tile y
+// camino sin tinte). Arranca encendido: es la mejora de esta tarjeta.
+//
+// EXISTE PARA EL A/B DENTRO DE LA MISMA CORRIDA y del MISMO binario: con `FijarBlitRapido(false)` vuelve el
+// bucle viejo -- el que pagaba dos comparaciones de recorte por pixel y tres divisiones por pixel -- y el
+// numero de ms del mapa se puede comparar sin depender de compilar dos binarios distintos.
+var blitRapido = true
+
+// FijarBlitRapido: prende o apaga el camino rapido del tile (el A/B de la evidencia).
+func FijarBlitRapido(v bool) { blitRapido = v }
+
+// BlitRapido: en cual de los dos caminos esta el backend (para que el que mide lo diga en el log).
+func BlitRapido() bool { return blitRapido }
+
+// ================================================================ EL BUCLE VIEJO (EL A/B DE DC-002.132)
+
+// renderIndicesLento: el bucle de DC-002.70, TAL CUAL. No se llama salvo con `FijarBlitRapido(false)`, y
+// existe para que la comparacion antes/despues se haga con el MISMO binario y la MISMA corrida: el numero
+// viejo (675-931 ms por cuadro de mapa en Flycast) tiene que poder reproducirse desde aca.
+func (s *Surface) renderIndicesLento(indices []byte, ancho, alto int, paleta [][3]uint8) {
+	dx, dy := s.actual.x, s.actual.y
+	anchoLienzo, altoLienzo := s.imagen.ancho, s.imagen.alto
+	pixeles := s.imagen.pixeles
+
+	for y := 0; y < alto; y++ {
+		cy := dy + y
+		if cy < 0 || cy >= altoLienzo {
+			continue
+		}
+
+		base := cy * anchoLienzo * 4
+		fila := y * ancho
+
+		for x := 0; x < ancho; x++ {
+			idx := indices[fila+x]
+			if idx == 0 {
+				continue
+			}
+
+			cx := dx + x
+			if cx < 0 || cx >= anchoLienzo {
+				continue
+			}
+
+			c := paleta[idx]
+			j := base + cx*4
+
+			pixeles[j+0] = c[0]
+			pixeles[j+1] = c[1]
+			pixeles[j+2] = c[2]
+			pixeles[j+3] = 255
+		}
+	}
+}
+
+// renderIndicesTintadoLento: el bucle de DC-002.101, TAL CUAL (el A/B de arriba).
+func (s *Surface) renderIndicesTintadoLento(indices []byte, ancho, alto int, paleta [][4]uint8) {
+	dx, dy := s.actual.x, s.actual.y
+	anchoLienzo, altoLienzo := s.imagen.ancho, s.imagen.alto
+	pixeles := s.imagen.pixeles
+
+	rojo, verde, azul, alfa := uint16(255), uint16(255), uint16(255), uint16(255)
+
+	if s.actual.col != nil {
+		c := aRGBA(s.actual.col)
+		rojo, verde, azul, alfa = uint16(c.R), uint16(c.G), uint16(c.B), uint16(c.A)
+	}
+
+	for y := 0; y < alto; y++ {
+		cy := dy + y
+		if cy < 0 || cy >= altoLienzo {
+			continue
+		}
+
+		base := cy * anchoLienzo * 4
+		fila := y * ancho
+
+		for x := 0; x < ancho; x++ {
+			idx := indices[fila+x]
+			if idx == 0 {
+				continue
+			}
+
+			cx := dx + x
+			if cx < 0 || cx >= anchoLienzo {
+				continue
+			}
+
+			p := paleta[idx]
+			r := uint8(uint16(p[0]) * rojo / 255)
+			g := uint8(uint16(p[1]) * verde / 255)
+			b := uint8(uint16(p[2]) * azul / 255)
+			a := uint16(uint16(p[3]) * alfa / 255)
+
+			if a == 0 {
+				continue
+			}
+
+			j := base + cx*4
+
+			if a == 255 {
+				pixeles[j+0], pixeles[j+1], pixeles[j+2], pixeles[j+3] = r, g, b, 255
+
+				continue
+			}
+
+			resto := 255 - a
+			pixeles[j+0] = uint8((uint16(r)*a + uint16(pixeles[j+0])*resto) / 255)
+			pixeles[j+1] = uint8((uint16(g)*a + uint16(pixeles[j+1])*resto) / 255)
+			pixeles[j+2] = uint8((uint16(b)*a + uint16(pixeles[j+2])*resto) / 255)
+			pixeles[j+3] = uint8(a + uint16(pixeles[j+3])*resto/255)
+		}
+	}
 }

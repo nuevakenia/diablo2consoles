@@ -664,7 +664,10 @@ const (
 	// copiar. "no" = el A/B: el mismo binario con el arte en el semiespacio, que es lo que moria.
 	arteEnMontonDeC = "si"
 
-	// cuadroDesdeElBorde / cuadroHastaElBorde: la ventana del instrumento fino (`vivoDeUnPaso`).
+	// cuadroDesdeElBorde / cuadroHastaElBorde: la ventana de cuadros del instrumento fino (`vivoDeUnPaso`). El pico
+	// de esta tarjeta tiene cuadro -- el split con el HUD muere en el 4 con la 125 y hoy muere mas tarde -- y una
+	// recoleccion por paso en una corrida entera costaria el cuadro entero. Con la ventana vacia (desde > hasta)
+	// el instrumento no cuesta nada.
 	cuadroDesdeElBorde = 12
 	cuadroHastaElBorde = 16
 
@@ -676,6 +679,21 @@ const (
 
 	// umbralDelGcDeCuadro: el % de semiespacio usado a partir del cual la recoleccion del borde corre. 70 porque el
 	// vivo del split ronda el 76-85 % (medido): con menos, el recolector no llega con aire al cuadro siguiente y
-	// corta adentro del dibujado, que es justo lo que este arreglo evita.
+	// corta adentro del dibujado, que es justo lo que esta palanca evita (y con "si" lo paga caro).
 	umbralDelGcDeCuadro = 70
+
+	// ============================== LAS DE ESTA TARJETA (DC-002.132): LOS CUADROS POR SEGUNDO ==============================
+	//
+	// medirCuadro: "si" = el instrumento por cuadro del POC (el crc32 del lienzo 16 veces por cuadro y el conteo
+	// de pixeles, ~1,2 MB de lectura cada uno). "no" = se apaga DESPUES de los tres primeros cuadros, que se
+	// miden siempre porque ahi vive la comparacion del cuadro 1 contra el host (crc32 1437022778). Es la palanca
+	// que separa el costo de DIBUJAR del costo de MEDIRSE: con "si" el numero de cuadros por segundo es el de un
+	// POC instrumentado, con "no" es el del juego.
+	medirCuadro = "si"
+
+	// blitRapido: "si" = el camino nuevo de dibujado de tiles del backend PVR (DC-002.132): el recorte se calcula
+	// UNA vez por tile (no una vez por pixel) y con el estado neutro (sin color puesto) no se hace la cuenta del
+	// tinte (3 multiplicaciones y 3 divisiones por 255 por pixel). "no" = el bucle viejo, TAL CUAL, que es el que
+	// midio 675-931 ms por cuadro de mapa. Las dos ramas viven en el mismo binario: el A/B es una corrida.
+	blitRapido = "si"
 )
