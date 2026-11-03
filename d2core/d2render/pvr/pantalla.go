@@ -66,6 +66,9 @@ func d2cPvrPresBloques() int
 //extern d2c_pvr_pantalla_pres_subidas
 func d2cPvrPresSubidas() int
 
+//extern d2c_pvr_pantalla_pres_reiniciar
+func d2cPvrPresReiniciar()
+
 //extern d2c_pvr_pantalla_reloj_costo
 func d2cPvrRelojCosto() int
 

@@ -1,9 +1,12 @@
 DC-002.135 -- LA PRESENTACION PARTIDA EN TRES, Y LAS DOS PALANCAS
 ================================================================================
-Fecha: 2026-11-03.  Maquina: CachyOS, RX 7900 XTX, Flycast 2.7 (sin KVM).
-POC: console/dc/poc/juego-131.  Evidencia cruda: /tmp/dc135/cap-a3 y /tmp/dc135/cap-b3
-(log `flycast.log` de cada corrida: consola serie del POC), builds /tmp/dc135/a-no-no y
-/tmp/dc135/b-si-si, verificador `console/dc/verif-pres-135`.
+Fecha: 2026-11-03 (ronda 2: los tres arreglos del instrumento y las corridas nuevas).
+Maquina: CachyOS, RX 7900 XTX, Flycast 2.7 (sin KVM).
+POC: console/dc/poc/juego-131.
+Evidencia cruda de ESTA ronda: /tmp/dc135/cap-a5, /tmp/dc135/cap-b5 (log `flycast.log` de cada corrida =
+consola serie del POC) y /tmp/dc135/cap-c6 (la corrida del split); builds /tmp/dc135/a5, /tmp/dc135/b5,
+/tmp/dc135/c5; verificador `console/dc/verif-pres-135`.
+Las corridas de la ronda 1 (/tmp/dc135/cap-a3, cap-b3) siguen en disco y se citan donde toca.
 
 
 1. QUE SE MIDIO Y CON QUE
@@ -19,15 +22,20 @@ La linea nueva (renderer.go, sale al lado de PVR132, que queda intacta):
 
   conv    = convertir RGBA->RGB565 los 307.200 pixeles y dejarlos en orden de textura (CPU, SH-4)
   vram    = subirlos a la VRAM por Store Queues (pvr_txr_load): 300 copias de 2.048 B o 90 agrupadas
-  pintar  = pintar el quad y que el PVR lo rasterice (es lo que queda del total, medido aparte en Go)
+  pintar  = lo que queda del total despues de conv y vram (ver abajo: NO es solo el quad)
   total   = los tres, y tiene que dar igual que `presentar_us` de `PVR132: CUADRO`
 
 conv y vram se cronometran DENTRO del backend C con `timer_us_gettime64()`, muestreando uno de cada 8
 bloques (PRES_MUESTREO 8) y extrapolando: el reloj de KOS no es gratis y el instrumento no puede
 dominar la medida. El costo del propio reloj se mide y se publica: 325 us por 1.000 llamadas = 0,325 us
-por marca; con 38 bloques muestreados son 76 marcas = ~25 us, o sea 0,1 % del cuadro (JUEGO135: RELOJ).
-Por eso los tres pedazos NO suman exacto: son dos muestreados (con su error de muestreo) mas un
-residuo, y en las cuatro medidas la suma cae dentro del 1,3 % del total.
+por marca (linea `JUEGO135: RELOJ`).
+
+QUE ES `pintar`, DICHO DERECHO. `total_us` es la ventana del ciclo (de antes de presentar a DESPUES de
+`PvrSceneFinish`, que es donde el PVR termina de rasterizar). `pintar` es el resto que queda en esa
+ventana: el quad de pantalla completa (2 us medidos con una marca antes y otra despues de
+`PintarPantalla()`) MAS la cola del PVR y el trabajo de Go alrededor de la presentacion. En el cuadro
+unico son 2 us; en el split son ~130 us (dos `PresentarEnColumna` y la contabilidad). No es un pedazo
+"puro": es el residuo, y por eso se informa aparte del total.
 
 El A/B vive en el MISMO binario, con dos knobs (como BLIT_RAPIDO en DC-002.132):
 
@@ -35,45 +43,57 @@ El A/B vive en el MISMO binario, con dos knobs (como BLIT_RAPIDO en DC-002.132):
                              literal, con sus cronometros): es el control.
   PRES_VRAM_AGRUPADA=no|si   `no` sube bloque por bloque (300 copias de 2.048 B).
 
-  A = /tmp/dc135/a-no-no   convRapida=no  vramAgrupada=no   (el control: lo que midio DC-002.132)
-  B = /tmp/dc135/b-si-si   convRapida=si  vramAgrupada=si   (las dos palancas)
+  A = /tmp/dc135/a5   convRapida=no  vramAgrupada=no   (el control: lo que midio DC-002.132)
+  B = /tmp/dc135/b5   convRapida=si  vramAgrupada=si   (las dos palancas)
+  C = /tmp/dc135/c5   convRapida=si  vramAgrupada=si   JUGADORES=2 SPLIT=si  (el split de DC-002.116:
+                                                       dos lienzos de 320x480; sirve para el INSTRUMENTO,
+                                                       no para el criterio de la captura)
 
-Mismos knobs en las dos corridas: CUADROS=60 JUGADORES=1 MONSTRUOS=1 COMBATE=si GOLPE_AUTO=si HUD=si
+Mismos knobs en las corridas A y B: CUADROS=60 JUGADORES=1 MONSTRUOS=1 COMBATE=si GOLPE_AUTO=si HUD=si
 MINIMAPA=si NPC=no QUEST=no INVENTARIO=no DROP=no MEDIR_CUADRO=no BLIT_RAPIDO=si, ventana 640x480 en
-(900,120), capturas cada 10 s. Los dos binarios pesan lo mismo: 1ST_READ.BIN 5.589.064 B,
-.text 2.499.216 B, data+bss 288.120 B.
+(900,120), capturas cada 10 s. Los dos binarios pesan lo mismo: 1ST_READ.BIN 5.589.224 B.
 
 
 2. EL DESGLOSE: LOS 36,8 ms ERAN LA CONVERSION
 ----------------------------------------------
-Cuatro muestras, dos por corrida (cuadros 30 y 60 de cada tramo):
+Dos muestras por corrida (los tramos de 30 cuadros que imprime el ciclo del Renderer):
 
   A (clasico)     conv_us   vram_us  pintar_us   total_us   bloques  subidas
-    cuadro 30      34.406     2.463         2      36.746      300      300
-    cuadro 60      34.981     2.463         2      36.996      300      300
+    cuadro 30      34.430     2.473         2      36.743      300      300
+    cuadro 60      34.326     2.463         2      36.993      300      300
 
   B (rapido)      conv_us   vram_us  pintar_us   total_us   bloques  subidas
-    cuadro 30      23.916     1.815         2      25.512      300       90
-    cuadro 60      23.914     1.815         2      25.504      300       90
+    cuadro 30      23.584     1.785         2      25.512      300       90
+    cuadro 60      23.598     1.785         2      25.507      300       90
+
+  C (split, 2 jugadores)
+    cuadro 30      23.632     1.753       109      25.521      300       90
+    cuadro 60      23.666     1.749        73      25.513      300       90
+    cuadro 90      23.604     1.752       131      25.513      300       90
+    cuadro 120     23.592     1.755       224      25.598      300       90
 
 De donde venia el techo de 27 fps, en porcentaje del total (A):
 
-    conversion   34.406 / 36.746 = 93,6 %
-    subida VRAM   2.463 / 36.746 =  6,7 %
-    quad+Pintar       2 / 36.746 =  0,01 %
+    conversion   34.430 / 36.743 = 93,3 %
+    subida VRAM   2.473 / 36.743 =  6,7 %
+    quad+cola         2 / 36.743 =  0,005 %
 
   => LOS 36,8 ms NO ERAN LA VRAM NI EL PVR: eran la conversion, 9 de cada 10 partes. La subida por
      Store Queues (que era la sospechosa: 614.400 B por cuadro) cuesta 2,5 ms, y el pintado del quad
      practicamente no existe en la CPU (2 us: el PVR rasteriza por su cuenta, el quad es un solo
      primitivo de 640x480 y la capa no espera a que termine).
 
+  La suma de los tres pedazos cierra contra el total: A 36.848 vs 36.868 (+20 us), B 25.378 vs 25.510
+  (+132 us) y el split 25.510 vs 25.536 (+26 us), o sea 0,05 %, 0,52 % y 0,10 %. Lo que sobra es la
+  cola del `PvrSceneFinish`, que el ciclo mide dentro de la ventana de presentar.
+
   Y en el cuadro entero del POC, la presentacion es chica: 25,5 ms de los 800 ms de JUEGO134: ETAPAS
   (mapa 394 ms, jugadores 71, bichos 64, minimapa 82, hud 22). O sea: la presentacion es el 3,2 % del
   cuadro del POC de hoy. El techo de 27 fps es real pero es un techo de la capa PVR, no del juego.
 
 
-3. PALANCA 1: LA CONVERSION RAPIDA -- 34.406 -> 23.916 us  (-30,5 %)
---------------------------------------------------------------------
+3. PALANCA 1: LA CONVERSION RAPIDA -- 34.430 -> 23.584 us  (-31,4 %)
+---------------------------------------------------------------------
 Que cambia, y por que cada cosa:
 
   a) UNA carga de 32 bits por pixel en vez de tres de 8 bits contra la VRAM. La VRAM del POC es una
@@ -85,14 +105,14 @@ Que cambia, y por que cada cosa:
      armada una vez por ancho de lienzo: para cada posicion de la textura dice que byte del bloque hay
      que leer. Con eso no hay que calcular el twiddle por pixel: se lee y se deposita en orden.
 
-Numeros: 112,0 ns por pixel -> 77,9 ns por pixel (-30,5 %), 114,7 us por bloque -> 79,7 us.
-El limite fisico esta a la vista: 77,9 ns/px a 200 MHz son 15,6 ciclos SH-4 por pixel, y el bucle son
+Numeros: 111,91 ns por pixel -> 76,79 ns por pixel (-31,4 %), 114,8 us por bloque -> 78,6 us.
+El limite fisico esta a la vista: 76,8 ns/px a 200 MHz son 15,4 ciclos SH-4 por pixel, y el bucle son
 ~10-12 instrucciones mas una carga de memoria. Para bajar de 10 ms harian falta 6,5 ciclos por pixel:
 no entra ni con ensamblador a mano (detalle en el punto 6).
 
 
-4. PALANCA 2: LA SUBIDA AGRUPADA -- 2.463 -> 1.815 us  (-26,3 %, y 300 -> 90 copias)
-----------------------------------------------------------------------------------
+4. PALANCA 2: LA SUBIDA AGRUPADA -- 2.468 -> 1.785 us  (-27,7 %, y 300 -> 90 copias)
+-----------------------------------------------------------------------------------
 La textura twiddleada NO guarda los bloques en orden de pantalla: guarda los cuatro bloques de un grupo
 de 2x2 (64x64 px, 8.192 B) SEGUIDOS, y tambien un par VERTICAL (32x64). Un par HORIZONTAL no: entre
 (x,y) y (x+32,y) esta el bloque (x,y+32), que es de otro grupo (el orden es de Morton).
@@ -101,14 +121,26 @@ Medido antes en /tmp/dc135/twiddle.py y comprobado en el propio backend con `ind
 supone: se verifica en el momento), 640x480 queda asi:
 
    70 grupos de 2x2      -> 70 copias de 8.192 B   = 280 bloques
-   20 bloques sueltos    -> 20 copias de 2.048 B   =  20 bloques (la franja de abajo, 32 filas: no
-                                                      hay par vertical ni horizontal que agrupar)
+   20 bloques sueltos    -> 20 copias de 2.048 B   =  20 bloques (la franja de abajo: 480 = 7x64 + 32,
+                                                     32 filas; ahi no hay par vertical ni horizontal que
+                                                     agrupar, asi que van de a uno)
    ------------------------------------------------------------------
    90 copias (antes 300), los mismos 614.400 B
 
-Costo: 8,21 us por copia de 2.048 B -> 20,17 us por copia de 8.192 B. Ajustando recta, cada llamada a
-pvr_txr_load tiene un costo fijo de ~3 us y despues ~2,5 ns por byte: agrupar es sacarse de encima 210
-llamadas. La subida queda en 2.951 ns por KiB contra 4.010 (-26 %), y el pedazo ya no pesa (1,8 ms).
+Costo por copia: 2.468/300 = 8,23 us la de 2.048 B en A, y 1.785/90 = 19,83 us la MEDIA POR COPIA en B
+(que NO es el costo de una copia de 8.192 B: en esa media entran tambien las 20 copias chicas). Con el
+modelo de abajo, una copia de 8.192 B cuesta 23,48 us y una de 2.048 B 8,12 us:
+
+   modelo: cada llamada a pvr_txr_load tiene ~3 us fijos y despues ~2,5 ns por byte
+     8.192 B -> 3 + 8.192 x 2,5 ns = 23,48 us      2.048 B -> 3 + 2.048 x 2,5 ns = 8,12 us
+     90 copias (70 grandes + 20 chicas) = 70 x 23,48 + 20 x 8,12 = 1.806 us   (medido: 1.785 us, -1,2 %)
+     300 copias de 2.048 B             = 300 x 8,12             = 2.436 us   (medido: 2.468 us, +1,3 %)
+
+La subida queda en 2.975 ns por KiB contra 4.113 (-27,7 %), y el pedazo ya no pesa (1,8 ms).
+OJO CON LA CUENTA: los 614.400 B son 600 KiB, no 615. En la ronda 1 este parrafo decia "20,17 us por
+copia de 8.192 B" (era la media por copia, no el costo de la copia grande) y "2.951 / 4.010 ns por
+KiB" (estaba dividido por 615 KiB): con los us de la ronda 1 y la cuenta bien hecha eran 3.025 / 4.105,
+y con las corridas de esta ronda son los 2.975 / 4.113 de arriba.
 
 
 5. LA IMAGEN ES LA MISMA, BYTE A BYTE (la prueba, no la promesa)
@@ -127,21 +159,30 @@ tres maneras, de la mas barata a la mas cara:
      en vez de en corridas de 4 minutos (y encontro dos bugs que la captura sola no habria explicado:
      ver punto 7).
 
-  b) crc32 DEL LIENZO, dentro del POC y contra el host: cuadro 1 y cuadro 2 dan
-     crc32=1437022778 igualAlHost=true en las DOS corridas (el valor de referencia de DC-002.132).
+  b) crc32 DEL LIENZO, dentro del POC y contra el host: los cuadros 1, 2, 3 y 61 dan
+     crc32=1437022778 igualAlHost=true en las DOS corridas del cuadro unico (a5 y b5). Ese es el valor de
+     referencia de DC-002.132. (La corrida del split, cap-c6, NO da ese crc y no tiene por que: son dos
+     lienzos de 320x480 con dos camaras, DC-002.118.)
 
-  c) CAPTURA PIXEL A PIXEL contra la de DC-002.132 y entre A y B (recorte 640x480 en (900,120)):
-
-       132 vs A            19 pixeles distintos de 307.200  (el ruido de siempre: cursor/borde)
-       132 vs B            19 pixeles distintos (fuera de la caja del bicho)
-       A vs B             799 pixeles distintos, TODOS dentro de la caja del bicho:
-                          A lo pinta en caja=583,307,613,381 (ancla 596,363)
-                          B lo pinta en caja=581,307,611,381 (ancla 594,363)
-                          fuera de esa caja: 0 pixeles distintos
-
-     El bicho camina a distinto cuadro de animacion en las dos corridas (B hace mas fps y el guion del
-     POC avanza por cuadro): 799 pixeles de sprite, cero del camino de la presentacion. En la captura
-     c1 de las dos corridas: 0 pixeles distintos.
+  c) CAPTURA PIXEL A PIXEL contra la de DC-002.132 y entre A y B (recorte 640x480 en (900,120)).
+     DE QUE CAPTURA SALE CADA NUMERO (esto faltaba y se pedia en la revision):
+     - `c00-quieto.png`, la captura del cuadro quieto, es la unica comparable entre corridas:
+         132 vs A            19 pixeles distintos de 307.200
+         132 vs B            818 pixeles distintos
+         A vs B              799 pixeles distintos, TODOS dentro de la caja del bicho
+                             A lo pinta en caja=583,307,613,381  (ancla 596,363)
+                             B lo pinta en caja=581,307,611,381  (ancla 594,363)
+                             fuera de esa caja: 0 pixeles distintos
+       Los 19 de "132 vs A" son las filas 475-479, columnas 0-4 y 635-639 (borde y cursor), y son LOS
+       MISMOS 19 pixeles en "132 vs B": por eso 818 = 799 + 19. No vienen de las palancas, vienen de antes.
+     - `c1.png` (la segunda captura): A vs B da 0 pixeles distintos; 132 vs A y 132 vs B dan 20 (los
+       mismos de borde/cursor).
+     - `c2` a `c4`: NO se comparan. El guion del POC avanza por cuadro y B hace mas fps que A, asi que a
+       partir de la tercera captura las dos corridas estan en cuadros distintos del guion y divergen
+       236.000-238.000 pixeles (medido). No es una diferencia del camino de la presentacion: es otro
+       momento del guion. Las tres cifras de `c00-quieto` mas el 0 de `c1` son las que valen.
+     El bicho camina a distinto cuadro de animacion en las dos corridas: 799 pixeles de sprite, cero del
+     camino de la presentacion.
 
   OJO CON EL ALCANCE: el camino rapido solo sabe de bloques completos. Un lienzo que no sea multiplo de
   32 (las mitades de 240 de DC-002.118) cae al bucle clasico, asi que ahi la palanca no aplica ni se
@@ -150,11 +191,11 @@ tres maneras, de la mas barata a la mas cara:
 
 6. EL CRITERIO DE LA TARJETA: "presentar_us POR DEBAJO DE 10 ms" -- NO SE CUMPLE, Y ESTO ES POR QUE
 ---------------------------------------------------------------------------------------------------
-Medido: 25.512 / 25.504 us. Baja 30,6 % y el techo de la capa pasa de 27,2 a 39,2 fps, pero 10 ms no
+Medido: 25.512 / 25.507 us. Baja 30,8 % y el techo de la capa pasa de 27,1 a 39,2 fps, pero 10 ms no
 se alcanzan, y no es por falta de pulido: es la aritmetica de la consola.
 
   307.200 pixeles x 1 carga + ~10-12 instrucciones por pixel
-  15,6 ciclos SH-4 por pixel SOLO la conversion hoy (77,9 ns a 200 MHz), 16,6 contando la subida
+  15,4 ciclos SH-4 por pixel SOLO la conversion hoy (76,8 ns a 200 MHz), 16,6 contando la subida
   10 ms = 2,0 M de ciclos = 6,5 ciclos por pixel
 
 Un pixel son 4 bytes en VRAM y 2 bytes en la textura: aun con `fmov` de 64 bits (un acceso por cada DOS
@@ -213,19 +254,70 @@ compila gccgo/KOS), asi que no reemplaza a la captura: la reemplaza como primera
      palanca grande (con el verificador de esta tarjeta como red de seguridad: compara textura entera).
   3) El camino rapido se apaga solo con lienzos que no son multiplo de 32. Si aparece un split de 240, o
      se lleva al camino rapido con cuenta de borde, o se queda en el clasico (que es correcto, solo lento).
-  4) Para medir mejor el pedazo `pintar` habria que esperar al PVR (PvrWaitReady) al final del cuadro y
+  4) Para medir mejor el pedazo `pintar` habria que esperar al PVR (`PvrWaitReady`) al final del cuadro y
      volver a medir: hoy el numero dice que el quad no cuesta CPU, no cuanto tarda el PVR en rasterizarlo.
 
 
 10. COMO SE REPRODUCE
 ---------------------
-  bash scripts/console/build-pres-135.sh /tmp/dc135/a-no-no   con PRES_CONV_RAPIDA=no  PRES_VRAM_AGRUPADA=no
-  bash scripts/console/build-pres-135.sh /tmp/dc135/b-si-si   con PRES_CONV_RAPIDA=si  PRES_VRAM_AGRUPADA=si
-  CAPTURAS=4 INTERVALO=10 bash scripts/console/run-anim-132.sh /tmp/dc135/a-no-no/disc.gdi /tmp/dc135/cap-a3 900 120
-  CAPTURAS=4 INTERVALO=10 bash scripts/console/run-anim-132.sh /tmp/dc135/b-si-si/disc.gdi /tmp/dc135/cap-b3 900 120
-  grep -a "PVR135\|PVR132: CUADRO" /tmp/dc135/cap-a3/flycast.log
+  PRES_CONV_RAPIDA=no PRES_VRAM_AGRUPADA=no bash scripts/console/build-pres-135.sh /tmp/dc135/a5
+  PRES_CONV_RAPIDA=si PRES_VRAM_AGRUPADA=si bash scripts/console/build-pres-135.sh /tmp/dc135/b5
+  PRES_CONV_RAPIDA=si PRES_VRAM_AGRUPADA=si JUGADORES=2 SPLIT=si bash scripts/console/build-pres-135.sh /tmp/dc135/c5
+  CAPTURAS=4 INTERVALO=10 bash scripts/console/run-anim-132.sh /tmp/dc135/a5/disc.gdi /tmp/dc135/cap-a5 900 120
+  CAPTURAS=4 INTERVALO=10 bash scripts/console/run-anim-132.sh /tmp/dc135/b5/disc.gdi /tmp/dc135/cap-b5 900 120
+  CAPTURAS=3 INTERVALO=10 bash scripts/console/run-anim-132.sh /tmp/dc135/c5/disc.gdi /tmp/dc135/cap-c6 900 120
+  grep -a "PVR135\|PVR132: CUADRO" /tmp/dc135/cap-a5/flycast.log
   go run ./console/dc/verif-pres-135/ 1     (y 2..8; sale "distintos=0")
 
-El build imprime con que palancas quedo el binario (`PRESENTACION135 convRapida= vramAgrupada=`), y el
-POC lo repite al arrancar (`JUEGO135: arranca -- convRapida= si vramAgrupada= si`) y en cada tramo. Sin
-esas dos lineas un numero de estos no se puede leer.
+El build imprime con que palancas quedo el binario (`PRESENTACION135 convRapida= vramAgrupada=`) y el
+POC lo repite al arrancar (`JUEGO135: arranca -- convRapida= si vramAgrupada= si`). Sin esas lineas un
+numero de estos no se puede leer.
+
+
+11. RONDA 2: LOS TRES ARREGLOS DEL INSTRUMENTO (y lo que midio cada uno)
+-----------------------------------------------------------------------
+Los cinco pedidos de la revision de la ronda 1. Los dos de texto estan corregidos EN SU LUGAR: el punto 4
+de este archivo y los comentarios de `renderer.go`, `presentar_135.go`, `pvr_pantalla.c`, `knobs.go`,
+`instrumento_135.go` y `build-pres-135.sh` dicen las 90 copias y de donde salen (70 grupos de 2x2 = 280
+bloques + 20 sueltos de la franja de abajo, 480 = 7x64 + 32, que no tiene par vertical ni horizontal que
+agrupar). El punto 5 (de que captura sale cada numero) esta en el 5.c. Los tres arreglos de codigo:
+
+  a) EL INSTRUMENTO MENTIA EN EL SPLIT (lo pedido en 3). `convertir_a_columnas` reiniciaba
+     pres_bloques / pres_subidas / pres_conv_us / pres_vram_us en CADA llamada, y el split llama a la
+     conversion una vez por lienzo: en un cuadro de dos jugadores la linea PVR135 informaba SOLO la
+     ultima mitad (conv de 150 bloques, subidas de 45) y el resto se veia como un `pintar` inflado. Ahora
+     los contadores SUMAN y el que reinicia es el ciclo del cuadro, con
+     `d2c_pvr_pantalla_pres_reiniciar()` (Go la llama en `ReiniciarLaPresentacion()`, al empezar la
+     presentacion de cada cuadro en renderer.go). Medido en la corrida C (split, 2 jugadores): la linea
+     dice bloques= 300 y subidas= 90, que es el cuadro entero.
+  b) Y AL ARREGLARLO APARECIO UN SEGUNDO ERROR, MAS DE FONDO: EL ESCALADO. La extrapolacion del muestreo
+     se hacia por ITERACION, y una iteracion no siempre convierte lo mismo (4 bloques si el grupo de 2x2
+     se puede agrupar, 2 si es un par vertical, 1 o 2 si va suelto). En 640x480 son 70 iteraciones de 4
+     bloques mas 10 de 2 (la franja de abajo), y si el muestreo cae en grupos completos el numero sale
+     alto. En el split se veia sin lugar a dudas: con los contadores ya sumando, la conversion informaba
+     25.201 us contra un total de 25.521 medido por el ciclo, o sea un `pintar` NEGATIVO de -1.586 us.
+     Ahora se escala por la unidad del trabajo: los BLOQUES en la conversion y los BYTES en la subida
+     (los dos caminos). Efecto medido en el cuadro unico: la conversion de B pasa de 23.916 a 23.584 us
+     (-1,4 %, que es lo que le tocaba al bloque suelto de la muestra) y el `pintar` del split queda en
+     +73..224 us en vez de negativo. La conversion del camino clasico no se mueve (cada iteracion es un
+     bloque): 34.406 -> 34.430 us, que es ruido de corrida.
+  c) EL DIAGNOSTICO `PRES135: DISTINTO` MENTIA EN LA ETIQUETA (lo pedido en 4). Comparaba
+     `&par[1] == &b` con el par copiado por el `range`, asi que `agrupada=` salia SIEMPRE false. Ahora
+     los pares llevan su etiqueta y su bandera en la estructura:
+       PRES135: DISTINTO lienzo=640x480 xDest=0 par=clasico-vs-rapido-agrupada agrupada=true ...
+     Probado con una mutacion a proposito en una copia (/tmp/mut-verif, un `tex[i0] ^= 0xffff` solo en
+     el camino agrupado): salen las lineas con `par=clasico-vs-rapido-agrupada agrupada=true` y el par
+     sin agrupacion sigue en cero, que es exactamente lo que se pedia que dijera.
+
+Con todo eso, los numeros de esta ronda y los de la ronda 1 coinciden dentro del 1,4 % (el total de B es
+25.512 us en las dos) y la suma de los tres pedazos ahora cierra contra el total en el 0,5 % o menos.
+
+PROCEDENCIA DE ESTA RONDA (para que el binario medido no sea una suposicion): builds a5 01:39:50 /
+b5 01:40:32 / c5 01:41:21, corridas 01:43:55 / 01:46:32 / 01:49:26, todos posteriores a la ultima
+edicion de `pvr_pantalla.c`. Y la prueba fuerte, que no depende de los tiempos de archivo: RECOMPILADOS
+los tres desde el arbol final (`/tmp/dc135/a5-rebuild`, `b5-rebuild`, `c5-rebuild`) dan el MISMO md5 que
+los medidos — b8cee439f7e568c16c849e5b8f8a68bb (A), d69cbe04f19b3e0d4e15377a23db0639 (B) y
+845351818f289a784aa19510032e56fc (C). Pesan 5.589.224 B los dos del cuadro unico y 5.593.320 B el del
+split, y cada log arranca con su `PRESENTACION135 convRapida= vramAgrupada=` y su `JUEGO135: arranca --`.
+Que los binarios llevan el escalado nuevo no es fe: sin el, el split informa `pintar_us` negativo y B
+informa 23.916 en vez de 23.584.

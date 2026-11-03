@@ -81,7 +81,8 @@ static uint16_t conv_tile[LADO_TILE * LADO_TILE] __attribute__((aligned(32)));
  *      reparte en orden de Morton. Lo que si es contiguo es el GRUPO DE 2x2 BLOQUES (64x64 pixeles =
  *      8.192 B): verificado contra la formula, los cuatro bloques de un grupo caen en cuatro bloques
  *      SEGUIDOS de la textura. Asi que el camino rapido convierte el grupo entero en un buffer de 8 KiB
- *      y lo sube con UNA copia: 80 subidas por cuadro en vez de 300.
+ *      y lo sube con UNA copia: 90 subidas por cuadro en vez de 300 (70 grupos de 2x2 = 280 bloques +
+ *      los 20 bloques sueltos de la franja de abajo, 480 = 7x64 + 32).
  *
  * LAS DOS PALANCAS SE PUEDEN PROBAR POR SEPARADO (`presentarConvRapida` y `presentarVramAgrupada` del
  * POC, que llegan aca por `d2c_pvr_pantalla_pres_conv_rapida` y ..._vram_agrupada): con las dos en 0 el
@@ -95,11 +96,18 @@ static uint16_t conv_tile[LADO_TILE * LADO_TILE] __attribute__((aligned(32)));
 static int pres_conv_rapida = 0;
 static int pres_vram_agrupada = 0;
 
-/* Lo que costo la ULTIMA conversion presentada, ya escalado a los bloques reales del cuadro. */
+/* Lo que costo la ULTIMA presentacion, ya escalado a los bloques reales del cuadro.
+ *
+ * SE ACUMULA POR LLAMADAS, NO SE PISA. Un cuadro puede presentarse en MAS DE UNA llamada: el split de
+ * DC-002.116/118 llama a `d2c_pvr_pantalla_convertir_en` una vez por lienzo (dos en un cuadro de 2
+ * jugadores, cuatro en el de 4). Si estas cuatro variables se reiniciaran en cada llamada, la linea
+ * `PVR135: PRESENTAR` informaria SOLO LA ULTIMA MITAD del cuadro (conv de 150 bloques en vez de 300) y el
+ * resto se veria como un `pintar` inflado. Por eso SUMAN, y el que reinicia es el ciclo del cuadro, con
+ * `d2c_pvr_pantalla_pres_reiniciar()` (Go lo llama al empezar la presentacion del cuadro). */
 static unsigned int pres_conv_us = 0;
 static unsigned int pres_vram_us = 0;
 static unsigned int pres_bloques = 0;  /* bloques de 32x32 convertidos */
-static unsigned int pres_subidas = 0;  /* llamadas a pvr_txr_load (con la agrupada bajan de 300 a 80) */
+static unsigned int pres_subidas = 0;  /* llamadas a pvr_txr_load (con la agrupada bajan de 300 a 90) */
 
 /* Uno de cada PRES_MUESTREO bloques se cronometra: ver la cabecera (el reloj de KOS no es gratis). */
 #define PRES_MUESTREO 8
@@ -496,9 +504,14 @@ static int convertir_clasico(const unsigned char *src, int w, int h, int x_dest)
         }
     }
 
-    pres_bloques = (unsigned int)bloque;
-    pres_conv_us = (muestras > 0) ? (unsigned int)((unsigned long long)reloj_conv * (unsigned int)bloque / (unsigned int)muestras) : 0;
-    pres_vram_us = (muestras > 0) ? (unsigned int)((unsigned long long)reloj_vram * (unsigned int)bloque / (unsigned int)muestras) : 0;
+    /* Aca la unidad es la misma que la del camino rapido: cada iteracion convierte UN bloque y sube 2.048 B,
+     * asi que escalar por bloque (esto) o por iteracion da lo mismo. Se deja escrito como bloque para que
+     * los dos caminos se lean con la misma vara (ver el escalado de `convertir_rapido`).
+     * Y SUMAN, no pisan: un cuadro puede venir en varias llamadas (el split); el reinicio lo hace el ciclo del
+     * cuadro con `d2c_pvr_pantalla_pres_reiniciar()`. */
+    pres_bloques += (unsigned int)bloque;
+    pres_conv_us += (muestras > 0) ? (unsigned int)((unsigned long long)reloj_conv * (unsigned int)bloque / (unsigned int)muestras) : 0;
+    pres_vram_us += (muestras > 0) ? (unsigned int)((unsigned long long)reloj_vram * (unsigned int)bloque / (unsigned int)muestras) : 0;
 
     return 0;
 }
@@ -513,6 +526,10 @@ static int convertir_clasico(const unsigned char *src, int w, int h, int x_dest)
  * la de DC-002.132 y el crc32 del lienzo siga en 1437022778. */
 static int convertir_rapido(const unsigned char *src, int w, int h, int x_dest) {
     unsigned int reloj_conv = 0, reloj_vram = 0;
+    unsigned int bloques_inicio = pres_bloques;  /* para saber cuantos bloques convirtio ESTA llamada */
+    unsigned int bloques_llamada = 0;
+    unsigned int bloques_muestra = 0;  /* bloques convertidos en las iteraciones MUESTREADAS */
+    unsigned int bytes_muestra = 0;    /* bytes subidos a la VRAM en las iteraciones MUESTREADAS */
     int iteraciones = 0, muestras = 0;
 
     /* el camino rapido solo sabe de bloques COMPLETOS (el bucle nuevo no tiene la cuenta del borde): un
@@ -532,6 +549,7 @@ static int convertir_rapido(const unsigned char *src, int w, int h, int x_dest) 
             int medir = ((iteraciones++ % PRES_MUESTREO) == 0);
             int cuantos = 1;   /* bloques que van en UNA copia: 4 (2x2), 2 (2x1) o 1 */
             unsigned int t0 = 0, t1 = 0, t2 = 0;
+            unsigned int bloques_antes = pres_bloques;  /* cuantos bloques lleva esta iteracion */
             uint32_t i0;
 
             /* CUANTOS BLOQUES VAN EN UNA COPIA. La textura twiddleada guarda seguidos los cuatro bloques de
@@ -616,24 +634,54 @@ static int convertir_rapido(const unsigned char *src, int w, int h, int x_dest) 
                 reloj_conv += t1 - t0;
                 reloj_vram += t2 - t1;
                 muestras++;
+
+                /* LA UNIDAD DEL ESCALADO, que no es la iteracion (ver el comentario del final): */
+                bloques_muestra += pres_bloques - bloques_antes;
+                bytes_muestra += (pres_bloques - bloques_antes) * LADO_TILE * LADO_TILE * 2;
             }
         }
     }
 
-    pres_conv_us = (muestras > 0) ? (unsigned int)((unsigned long long)reloj_conv * (unsigned int)iteraciones / (unsigned int)muestras) : 0;
-    pres_vram_us = (muestras > 0) ? (unsigned int)((unsigned long long)reloj_vram * (unsigned int)iteraciones / (unsigned int)muestras) : 0;
+    bloques_llamada = pres_bloques - bloques_inicio;
+
+    /* EL ESCALADO, Y POR QUE NO ES POR ITERACION (ronda 2 de la revision de DC-002.135).
+     *
+     * Una iteracion NO siempre convierte lo mismo: convierte 4 bloques cuando el grupo de 2x2 se puede
+     * agrupar, 2 cuando es un par vertical y 2 cuando va suelto en la franja de abajo (64 de ancho x 32 de
+     * alto). Si se escala por ITERACION (lo que media la primera version) y el muestreo -- uno de cada 8 --
+     * cae siempre en grupos completos, el numero sale ALTO: en 640x480, 70 iteraciones de 4 bloques + 10 de
+     * 2 dan 300 bloques, y extrapolar 80 iteraciones del costo de un grupo completo da 320 (6,7 % de mas en
+     * el peor caso; en estas corridas la muestra si toco la franja y el error fue 1,4 %). En el lienzo de
+     * 320x480 del split el error se veia en el acto: la conversion se informaba 25.201 us contra un total de
+     * 25.521 medido por el ciclo, o sea un `pintar` NEGATIVO.
+     *
+     * Asi que se escala por la unidad del trabajo: los BLOQUES para la conversion (cada bloque son los
+     * mismos 1.024 pixeles) y los BYTES para la subida (cada byte cuesta lo mismo en la copia; el costo
+     * fijo por llamada hace que esto subestime un pelo cuando hay copias chicas, ~3 % en el peor caso). El
+     * resultado se SUMA a lo que ya costo el cuadro: un cuadro puede venir en varias llamadas (el split). */
+    pres_conv_us += (muestras > 0 && bloques_muestra > 0) ? (unsigned int)((unsigned long long)reloj_conv * (unsigned int)bloques_llamada / (unsigned int)bloques_muestra) : 0;
+    pres_vram_us += (muestras > 0 && bytes_muestra > 0) ? (unsigned int)((unsigned long long)reloj_vram * (unsigned int)(bloques_llamada * LADO_TILE * LADO_TILE * 2) / (unsigned int)bytes_muestra) : 0;
 
     return 0;
 }
 
-/* El que llaman las tres entradas de la conversion: elige camino, reinicia los contadores del cuadro y
- * deja los numeros de este cuadro en las variables que lee Go. */
-static int convertir_a_columnas(const unsigned char *src, int w, int h, int x_dest) {
+/* Los contadores de la presentacion a cero: lo llama GO al empezar la presentacion del cuadro.
+ *
+ * POR QUE LO LLAMA GO Y NO ESTA ACA. Un cuadro puede llegar en varias llamadas (dos lienzos de 320x480 en
+ * el split de 2 jugadores, cuatro en el de 4): si la conversion reiniciara los contadores, el desglose
+ * informaria solo el ULTIMO lienzo. Tampoco se pueden reiniciar en la primera conversion del cuadro sin
+ * que el backend sepa cuando empieza un cuadro, y eso lo sabe el ciclo del Renderer: por eso es una funcion
+ * aparte y explicita (ronda 2 de la revision de DC-002.135). */
+void d2c_pvr_pantalla_pres_reiniciar(void) {
     pres_bloques = 0;
     pres_subidas = 0;
     pres_conv_us = 0;
     pres_vram_us = 0;
+}
 
+/* El que llaman las tres entradas de la conversion: elige camino y DEJA LOS NUMEROS DEL CUADRO EN LAS
+ * VARIABLES QUE LEE GO, sumando lo que costo esta llamada a lo que ya costo el cuadro. */
+static int convertir_a_columnas(const unsigned char *src, int w, int h, int x_dest) {
     if (pres_conv_rapida) {
         return convertir_rapido(src, w, h, x_dest);
     }

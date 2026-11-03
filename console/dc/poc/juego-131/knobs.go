@@ -742,8 +742,10 @@ const (
 	presentarConvRapida = "si"
 
 	// presentarVramAgrupada: "si" = los bloques de 32x32 se suben a la VRAM en GRUPOS de 2x2 (64x64 px = 8.192 B
-	// de una sola copia) porque en la textura twiddleada esos cuatro bloques son CONTIGUOS: 80 copias por cuadro
-	// en vez de 300. "no" = una copia de 2.048 B por bloque, como siempre. Se puede probar por separado de la
-	// conversion: son dos cuellos distintos (la CPU y las Store Queues).
+	// de una sola copia) porque en la textura twiddleada esos cuatro bloques son CONTIGUOS: 90 copias por cuadro
+	// en vez de 300 (70 grupos de 2x2 = 280 bloques + los 20 bloques sueltos de la franja de abajo, que con
+	// 480 = 7x64 + 32 no tienen par vertical ni horizontal que agrupar). "no" = una copia de 2.048 B por bloque,
+	// como siempre. Se puede probar por separado de la conversion: son dos cuellos distintos (la CPU y las Store
+	// Queues).
 	presentarVramAgrupada = "si"
 )

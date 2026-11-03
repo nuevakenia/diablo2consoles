@@ -78,14 +78,23 @@ func UsDeLaConversion() int { return d2cPvrPresConvUs() }
 // (las llamadas a pvr_txr_load, sin la conversion).
 func UsDeLaSubida() int { return d2cPvrPresVramUs() }
 
-// BloquesPresentados: cuantos bloques de 32x32 se convirtieron en la ultima presentacion (300 para un
-// cuadro de 640x480: 20 x 15). Es el control de que el camino midio lo que dice medir.
+// BloquesPresentados: cuantos bloques de 32x32 se convirtieron en la ULTIMA presentacion (300 para un
+// cuadro de 640x480: 20 x 15; tambien 300 en el split de 2 jugadores, porque son dos lienzos de 150). Es el
+// control de que el camino midio lo que dice medir.
 func BloquesPresentados() int { return d2cPvrPresBloques() }
 
 // SubidasPresentadas: cuantas copias a la VRAM se hicieron en la ultima presentacion. Con la subida
-// agrupada son 80 (los 300 bloques en grupos de 4); sin ella, 300. Es el numero que dice si la palanca
-// hizo lo que dice.
+// agrupada son 90 (70 grupos de 2x2 = 280 bloques en 70 copias de 8.192 B, mas los 20 bloques sueltos de la
+// franja de abajo en 20 copias de 2.048 B: 480 = 7x64 + 32, y esa franja no tiene par vertical ni
+// horizontal que agrupar); sin ella, 300. Es el numero que dice si la palanca hizo lo que dice.
 func SubidasPresentadas() int { return d2cPvrPresSubidas() }
+
+// ReiniciarLaPresentacion: los contadores de la presentacion a cero. Lo llama el ciclo del cuadro (renderer.go)
+// JUSTO ANTES de presentar, y no lo hace la conversion sola a proposito: un cuadro puede presentarse en VARIAS
+// llamadas (el split de DC-002.116/118 manda dos lienzos de 320x480, uno por jugador, y el de 4 manda cuatro), y
+// si cada llamada reiniciara los contadores, `PVR135: PRESENTAR` informaria solo el ultimo lienzo: conv de 150
+// bloques, subidas de 45 y un `pintar` que se come la diferencia. Con esto, la linea informa el cuadro entero.
+func ReiniciarLaPresentacion() { d2cPvrPresReiniciar() }
 
 // CostoDelRelojUs1000: cuanto cuesta llamar al reloj 1.000 veces, medido en la consola. La presentacion
 // se parte en tres con dos marcas por bloque muestreado, asi que este numero es el que hay que descontar

@@ -372,38 +372,53 @@ func main() {
 					}
 				}
 
-				for _, par := range [][2][]uint16{{a, b}, {a, c}} {
-					d, primero := compara(par[0], par[1])
+				// los dos pares que hay que comparar: el clasico contra el rapido CON la agrupada y contra el
+				// rapido SIN ella. La etiqueta y la bandera van en la ESTRUCTURA y no se deducen del puntero
+				// del slice: `range` copia el par, asi que comparar `&par[1] == &b` daba siempre false (ronda 2
+				// de la revision: es justo la linea que uno lee cuando algo falla, y mentia).
+				pares := []struct {
+					etiqueta string
+					agrupada bool
+					x, y     []uint16
+				}{
+					{"clasico-vs-rapido-agrupada", true, a, b},
+					{"clasico-vs-rapido-suelta", false, a, c},
+				}
+
+				for _, par := range pares {
+					d, primero := compara(par.x, par.y)
 					casos++
-					if d != 0 {
-						distintosTotal += d
-						if casosMalos < 12 {
-							casosMalos++
+					if d == 0 {
+						continue
+					}
 
-							mitad1, mitad2, rapidoCero, clasicoCero, maxIdx := 0, 0, 0, 0, 0
-							for i := range par[0] {
-								if par[0][i] == par[1][i] {
-									continue
-								}
-								if i < 262144 {
-									mitad1++
-								} else {
-									mitad2++
-								}
-								if par[1][i] == 0 {
-									rapidoCero++
-								}
-								if par[0][i] == 0 {
-									clasicoCero++
-								}
-								if i > maxIdx {
-									maxIdx = i
-								}
+					distintosTotal += d
+					if casosMalos < 12 {
+						casosMalos++
+
+						mitad1, mitad2, rapidoCero, clasicoCero, maxIdx := 0, 0, 0, 0, 0
+						for i := range par.x {
+							if par.x[i] == par.y[i] {
+								continue
 							}
-
-							fmt.Printf("PRES135: DISTINTO lienzo=%dx%d xDest=%d agrupada=%v distintos=%d primero=%d [<262144:%d >=262144:%d rapidoCero:%d clasicoCero:%d max:%d]\n",
-								w, h, xDest, &par[1] == &b, d, primero, mitad1, mitad2, rapidoCero, clasicoCero, maxIdx)
+							if i < 262144 {
+								mitad1++
+							} else {
+								mitad2++
+							}
+							if par.y[i] == 0 {
+								rapidoCero++
+							}
+							if par.x[i] == 0 {
+								clasicoCero++
+							}
+							if i > maxIdx {
+								maxIdx = i
+							}
 						}
+
+						fmt.Printf("PRES135: DISTINTO lienzo=%dx%d xDest=%d par=%s agrupada=%v distintos=%d primero=%d [<262144:%d >=262144:%d rapidoCero:%d clasicoCero:%d max:%d]\n",
+							w, h, xDest, par.etiqueta, par.agrupada, d, primero, mitad1, mitad2, rapidoCero, clasicoCero, maxIdx)
 					}
 				}
 

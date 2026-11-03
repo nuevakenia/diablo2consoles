@@ -12,8 +12,10 @@
 #                              "no" es el bucle de DC-002.132 TAL CUAL, en el mismo binario: ese es el A/B.
 #
 #   PRES_VRAM_AGRUPADA=si|no   las copias a la VRAM: los cuatro bloques de un grupo de 2x2 (64x64 px = 8.192 B)
-#                              son CONTIGUOS en la textura twiddleada, asi que van en UNA copia. 80 copias por
-#                              cuadro en vez de 300. "no" es una copia de 2.048 B por bloque, como siempre.
+#                              son CONTIGUOS en la textura twiddleada, asi que van en UNA copia. 90 copias por
+#                              cuadro en vez de 300 (70 grupos de 2x2 = 280 bloques + los 20 bloques sueltos de la
+#                              franja de abajo: 480 = 7x64 + 32, sin par vertical ni horizontal que agrupar).
+#                              "no" es una copia de 2.048 B por bloque, como siempre.
 #
 # LOS NUMEROS QUE ESTE BUILD DEJA EN EL LOG DE LA CORRIDA (y que son el criterio):
 #

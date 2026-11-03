@@ -16,9 +16,9 @@ package main
 //	                                              poder descontarlo del desglose (la presentacion se parte
 //	                                              con dos marcas por bloque muestreado);
 //	la carga por cuadro                          cuantos bloques de 32x32 y cuantas copias a la VRAM
-//	                                              entran en un cuadro (300 y 300 sin palancas; 300 y 80
-//	                                              con las dos): es el control de que se midio lo que se
-//	                                              cree que se midio.
+//	                                              entran en un cuadro (300 y 300 sin palancas; 300 y 90
+//	                                              con las dos: 70 grupos de 2x2 + 20 sueltos): es el
+//	                                              control de que se midio lo que se cree que se midio.
 
 import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"

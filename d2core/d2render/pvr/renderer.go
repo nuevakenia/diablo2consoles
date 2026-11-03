@@ -218,6 +218,14 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 		// DC-002.135: los tres pedazos de la presentacion. La conversion y la subida las cronometra el
 		// backend de C por dentro (con una muestra de bloques, ver `pvr_pantalla.c`); el PINTADO del quad
 		// se cronometra aca, con una marca antes y otra despues de `PintarPantalla()`.
+		//
+		// LOS CONTADORES SE REINICIAN ACA, al empezar la presentacion de ESTE cuadro, y la conversion solo
+		// SUMA. Es a proposito: con el split de DC-002.116/118 un cuadro son dos llamadas a la conversion
+		// (dos lienzos de 320x480, uno por jugador) o cuatro, y si cada llamada reiniciara, la linea
+		// PVR135 informaria solo el ultimo lienzo (bloques=150 en vez de 300). Con el reinicio aca, el
+		// numero es el del cuadro entero, sea cual sea el camino que lo presente.
+		ReiniciarLaPresentacion()
+
 		usConv, usVram, usPintar := 0, 0, 0
 
 		if r.presentar != nil {
@@ -305,8 +313,10 @@ func (r *Renderer) anotarElCuadro(usEspera, usTrabajo, usCuadro, usConv, usVram,
 
 	// DC-002.135: la presentacion en sus tres pedazos. `total_us` es el mismo numero que el presentar_us de
 	// arriba (medido por el ciclo) y la suma de los tres tiene que dar eso: si no da, el desglose miente y el
-	// que lee lo ve en el acto. `subidas` es el control de la palanca: 300 copias de 2.048 B sin agrupar, 80
-	// (o 75) con los grupos de 2x2 bloques.
+	// que lee lo ve en el acto. `subidas` es el control de la palanca: 300 copias de 2.048 B sin agrupar, 90
+	// con la agrupada (70 grupos de 2x2 = 280 bloques en 70 copias de 8.192 B + los 20 bloques sueltos de la
+	// franja de abajo en 20 copias de 2.048 B: 480 = 7x64 + 32). `bloques` es 300 en los dos caminos, y
+	// tambien en el split (dos lienzos de 150): lo que cambia con la palanca son las copias, no los bloques.
 	println("PVR135: PRESENTAR conv_us=", r.usConv/n, "vram_us=", r.usVram/n,
 		"pintar_us=", r.usPintar/n, "total_us=", r.msPresentar/n,
 		"bloques=", BloquesPresentados(), "subidas=", SubidasPresentadas(),
