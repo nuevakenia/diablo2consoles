@@ -202,3 +202,59 @@ Con HUD=no el POC panickea en la carga del minimapa:
   # el A/B del arte (sin el arreglo: vuelve a morir)
   SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 HUD=si MEDIR_VIVO=no ARTE_C=no \
     bash scripts/console/build-juego-131.sh /tmp/dcbuild/s131sinarte
+
+========================================================================
+8. RE-CORRIDA EN EL ARBOL DE HOY (2026-11-03): EL ARREGLO SIGUE VALIENDO
+========================================================================
+
+Las corridas de la seccion 4 salieron de una foto desacoplada (/tmp/snap131, de39b992) porque la carpeta del
+POC la estaba editando la DC-002.132. Despues de esta tarjeta entraron al arbol la 132, la 133, la 134, la
+135 y la 136, asi que se volvio a correr EL MISMO criterio sobre el arbol de hoy (HEAD 0f84ac3e) para no
+cerrar con un numero de otro arbol. Sin tocar una linea del POC: el build compila su copia en /tmp y pisa
+las palancas ahi.
+
+  build:  BASE_GOX=/tmp/gox-v131 SPLIT=si JUGADORES=2 FASE=apagado CUADROS=24 HUD=si MEDIR_VIVO=no \
+            bash scripts/console/build-juego-131.sh /tmp/dcbuild/v131
+          (/tmp/gox-v131 es una COPIA del gox-296 del 31-oct: el build recompila ~30 paquetes del motor y
+           no se ensucia el arbol compartido con otras tarjetas)
+          palancas efectivas del build: hud=si split=si jugadores=2 fase=apagado cuadros=24
+          arteEnMontonDeC=si gcPorCuadro=no medirVivo=no
+  corrida: CAPTURAS=2 INTERVALO=2 ESPERA_CIERRE=150 \
+             bash scripts/console/run-flycast-131.sh /tmp/dcbuild/v131/disc.gdi /tmp/run-v131
+  salidas: /tmp/run-v131 (criterio) y /tmp/run-v131ctl (control)
+
+Y HAY NOTICIA BUENA: el control del MISMO arbol con HUD=no HOY SI CORRE. El panic del minimapa de la
+seccion 6 ya no aparece en el arbol de hoy, asi que el A/B es limpio y no hay que comparar contra el
+control de la 125:
+
+  corrida                HUD  cuadros  msMapa/cuadro  semiespacioUsado  max gc-vivo  montonLibre  vramPedida
+  ---------------------  ---  -------  -------------  ----------------  -----------  -----------  ----------
+  v131 (el criterio)     si        27          715,59          1.549.584    1.606.872    1.138.408   4.710.400
+  v131ctl (el control)   no        27          712,26          1.543.616    1.606.872    1.163.176   4.710.400
+
+  => LOS MISMOS 27 CUADROS con el HUD puesto que sin el HUD, en el mismo arbol y el mismo dia.
+  => el HUD cuesta 3,3 ms por cuadro (715,59 contra 712,26) y +5.968 B de vivo al final del split
+     (1.549.584 contra 1.543.616): el arte del HUD NO vuelve al semiespacio, sigue en el monton de C.
+  => el pico de la corrida entera es el mismo con HUD y sin HUD (1.606.872 B de 1.835.008 = 87,6 %): el
+     pico es de la CARGA, no del cuadro del split. El umbral del recolector llego a 1.766.768 B (96 %) y
+     ninguna recoleccion se paso del semiespacio.
+
+  Lineas textuales de la corrida del criterio (/tmp/run-v131/flycast.log):
+
+    JUEGO121: SPLIT RESUMEN lienzos= 2 tamano= 320 480 bytesPorLienzo= 614400 bytesDeLienzos= 1228800
+              origen= vram cuadrosPintados= 27 msMapaTotal= 19321 msJugadorTotal= 15 msPresentarTotal= 667
+              msMapaPorCuadro= 715.593 msJugadorPorCuadro= 0.555556 msPresentarPorCuadro= 24.7037
+    JUEGO121: SPLIT MEMORIA vramTotal= 8388608 vramDisponible= 30024 vramPedidaPorEstePoc= 4710400
+              cacheUsado= 3225600 cacheImagenes= 99 cacheDerrames= 0 montonLibre= 1138408
+              semiespacioUsado= 1549584 semiespacioTotal= 1835008 colecciones= 305
+    JUEGO125: HUD MITAD cuadro= 1 mitad= 0 jugador= P1 pixeles= 15840 ms= 6 lienzo= 320 x 480
+    JUEGO125: HUD MITAD cuadro= 1 mitad= 1 jugador= P2 pixeles= 15840 ms= 6 lienzo= 320 x 480
+    JUEGO125: HUD cuadro= 27 jugador= 1 ... pixelesPintados= 8273 ms= 4 vida= 24 / 50 ... mana= 1 / 15
+              zona= Rogue Encampment anchoDelTexto= 141 pociones= 4
+    JUEGO125: HUD cuadro= 27 jugador= 2 ... pixelesPintados= 8433 ms= 4 vida= 26 / 52 ... mana= 1 / 16
+              zona= Rogue Encampment anchoDelTexto= 141 pociones= 4
+    JUEGO125: HUD CRITERIO elHUDSeDibujo= true pintoPixeles= true lasBarrasSonLosValoresReales= true
+              elCinturonTieneCuatro= true laZonaTieneNombre= true cadaMitadSuHUD= true cumple= true
+
+  Sin un solo `fatal error` ni `panic:` en el log (0 coincidencias), 27 cuadros, y las dos mitades con
+  valores distintos (24/50 y 1/15 contra 26/52 y 1/16; 8.273 px contra 8.433).
