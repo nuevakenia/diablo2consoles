@@ -413,6 +413,18 @@ echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob bli
 [ -n "${PRES_VRAM_AGRUPADA:-}" ] && pisa_knob presentarVramAgrupada "$PRES_VRAM_AGRUPADA" 1
 
 echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
+
+# LAS DE ESTA TARJETA (DC-002.137): EL MINIMAPA.
+#   MINIMAPA_RAPIDO=si|no   una tabla de 256 palabras armada UNA vez por cuadro y sin Push/Pop por celda (si), o
+#                           el camino de siempre, una tabla por celda (no). El A/B es una corrida y los pixeles
+#                           son los mismos: lo dice el `crcDeLaCaja` de la linea del minimapa.
+#   MINIMAPA_DIAG=no|caja|celdas|tabla610
+#                           las corridas de medir por dentro. `caja` y `celdas` rompen el dibujo a proposito;
+#                           `tabla610` deja el cuadro IDENTICO (control del instrumento).
+[ -n "${MINIMAPA_RAPIDO:-}" ] && pisa_knob minimapaRapido "$MINIMAPA_RAPIDO" 1
+[ -n "${MINIMAPA_DIAG:-}" ] && pisa_knob minimapaDiag "$MINIMAPA_DIAG" 1
+
+echo "   MINIMAPA137 rapido=$(leer_knob minimapaRapido) diag=$(leer_knob minimapaDiag)"
 echo "   PRESENTACION135 convRapida=$(leer_knob presentarConvRapida) vramAgrupada=$(leer_knob presentarVramAgrupada)"
 
 # LAS DE ESTA TARJETA (DC-002.135, EL MAPA): EL TILE POR DENTRO.

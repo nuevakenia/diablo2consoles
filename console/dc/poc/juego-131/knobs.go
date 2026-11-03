@@ -646,6 +646,27 @@ const (
 	// pueblo entero. "no" = solo el reveal que sigue al jugador (se ve crecer el mapa cuadro a cuadro).
 	minimapaTodo = "si"
 
+	// ============================== LAS DE ESTA TARJETA (DC-002.137): EL MINIMAPA POR DENTRO ==============================
+	//
+	// minimapaRapido: TRES caminos, y el A/B es una corrida (los pixeles son los mismos en los tres).
+	//	"no"    el de DC-002.130: una tabla de 256 palabras por celda, dentro de `RenderIndicesTintado`, y un
+	//	        `PushTranslation`/`Pop` por celda (610 tablas por cuadro, 156.160 entradas)
+	//	"tabla" la tabla armada UNA vez por cuadro (`pvr.TablaDelBlit`, del POC) y los indices leidos de a cuatro
+	//	"si"    ademas la lista COMPACTA de los pixeles que pintan (tercetos x,y,indice armados al cargar el arte):
+	//	        ~8 vueltas por celda en vez de los 128 indices del tile
+	minimapaRapido = "si"
+
+	// minimapaDiag: las corridas de MEDIR del minimapa, por dentro (parten el costo entre la caja, las celdas y
+	// la tabla). "no" = el camino del juego.
+	//
+	//	"caja"     pinta la caja negra y NADA mas: mide la caja sola (ROMPE el dibujo a proposito: es de medir)
+	//	"celdas"   pinta las celdas y el marcador SIN la caja negra (ROMPE el dibujo: mide las celdas solas)
+	//	"sinarte"  el bucle de las celdas SIN la busqueda del cuadro en el mapa (dibuja otro arte: ROMPE el dibujo)
+	//	"sinblit"  el bucle entero (busqueda, proyeccion, recorte) SIN pegar la celda (ROMPE el dibujo)
+	//	"tabla610" pinta el cuadro IDENTICO y ademas arma la tabla 610 veces mas: es lo que costaba la tabla por
+	//	           celda del camino viejo, medido sin cambiar un pixel (es el control del instrumento)
+	minimapaDiag = "no"
+
 	// ============================== LAS DE ESTA TARJETA (DC-002.131): LO QUE NO ENTRA EN EL SPLIT ==============================
 	//
 	// medirVivo: "si" = el instrumento de esta tarjeta. En cada hito de la carga se fuerza una recoleccion

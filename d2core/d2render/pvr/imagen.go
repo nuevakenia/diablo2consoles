@@ -111,9 +111,57 @@ func (i *Imagen) Tomar(x, y int) color.RGBA {
 }
 
 // Rectangulo pinta un rectangulo lleno, con la esquina en (x, y).
+//
+// DC-002.137 -- POR FILAS Y POR PALABRAS, no pixel a pixel. Antes era `Poner` en el doble bucle: cuatro
+// comparaciones de recorte y CUATRO depositos de 8 bits por pixel, y el recorte se recalculaba en cada uno. La
+// caja negra del minimapa son 279x225 = 62.775 pixeles por cuadro. Ahora el recorte se hace UNA vez y el relleno
+// va por palabras de 32 bits (el color ya empaquetado, como en `palabraDelColor`): los mismos bytes en el mismo
+// orden, un deposito por pixel en vez de cuatro. Si el buffer no se puede ver como palabras (desalineado) se
+// queda el camino de bytes de siempre, que es identico pixel a pixel.
 func (i *Imagen) Rectangulo(x, y, ancho, alto int, c color.RGBA) {
-	for fy := y; fy < y+alto; fy++ {
-		for fx := x; fx < x+ancho; fx++ {
+	if ancho <= 0 || alto <= 0 {
+		return
+	}
+
+	// el recorte, UNA vez (es el mismo que hacia `Poner` pixel por pixel)
+	x0, x1 := x, x+ancho
+	if x0 < 0 {
+		x0 = 0
+	}
+
+	if x1 > i.ancho {
+		x1 = i.ancho
+	}
+
+	y0, y1 := y, y+alto
+	if y0 < 0 {
+		y0 = 0
+	}
+
+	if y1 > i.alto {
+		y1 = i.alto
+	}
+
+	if x0 >= x1 || y0 >= y1 {
+		return
+	}
+
+	if lienzo := palabrasDelLienzo(i.pixeles); lienzo != nil {
+		palabra := palabraDelColor(c.R, c.G, c.B, c.A)
+
+		for fy := y0; fy < y1; fy++ {
+			base := fy * i.ancho
+
+			for fx := x0; fx < x1; fx++ {
+				lienzo[base+fx] = palabra
+			}
+		}
+
+		return
+	}
+
+	for fy := y0; fy < y1; fy++ {
+		for fx := x0; fx < x1; fx++ {
 			i.Poner(fx, fy, c)
 		}
 	}

@@ -1,0 +1,223 @@
+DC-002.137 -- EL MINIMAPA POR DENTRO: LA CAJA, LOS 128 INDICES DE CADA CELDA Y LA TABLA
+=========================================================================================
+
+Flycast, pueblo (Rogue Encampment), 1 jugador, 1 bicho, HUD y minimapa prendidos, 60 cuadros, dos tramos de 30.
+Todo lo de aca sale de la consola serie (`JUEGO137: MINIMAPA-POR-DENTRO`, `JUEGO134: ETAPAS`, `PVR132: CUADRO`) y
+del `crc32` contra el host. Los numeros que no se midieron van dichos como estimados.
+
+
+1. EL CRITERIO: 61,6 ms -> 7,1 ms (el piso era la caja, no las celdas)
+-----------------------------------------------------------------------
+
+    minimapa por cuadro   antes       ahora      delta
+    ETAPAS (tramo 31-60)  61.588 us   7.109 us   -88,5 %
+    ETAPAS (segunda vez)  61.591      7.192      -88,3 %
+    por dentro (suma)     ~59.600     6.454      -89,2 %
+
+Las dos corridas de la evidencia, medidas en el MISMO arbol y con las mismas palancas (`ETAPAS=si VERBOSO=no
+MEDIR_CUADRO=no`):
+
+    antes  /tmp/dcbuild/anim137-base   (HEAD aec6f57e, sin tocar)  minimapa= 61.588 us
+    ahora  /tmp/dcbuild/anim137-u4     (MINIMAPA_RAPIDO=si)        minimapa=  7.109 us
+
+El criterio de la tarjeta pedia **menos de 10 ms**: se cumple con 7,1 ms medidos, y el mundo es el mismo (ver 5):
+crc32 del cuadro 1 = 1437022778, `igualAlHost= true`, la caja del motor (359,57)-(638,282) y las 610 celdas del
+pueblo en su sitio.
+
+El cuadro entero tambien baja, por arrastre: PVR 178.998 -> 128.038 us (fpsX100 558 -> 781).
+
+
+2. LO QUE SE MIDIO POR DENTRO (plan de la tarjeta, paso 1)
+-----------------------------------------------------------
+
+El cronometro nuevo (`minimapa_137.go`, `d2c_us` por tramo, promedio cada 30 cuadros) parte el minimapa en cuatro
+pedazos. Los tres caminos del dibujado, en el mismo cuadro y el mismo pueblo:
+
+    etapa       camino viejo     tabla+palabras    tabla+compacta
+                (rapido=no)       (rapido=tabla)    (rapido=si)
+    caja           2.218 us          2.228            2.223
+    celdas        33.193              8.879            4.116
+    tabla              0                 28               28
+    marcador          76                 76               75
+    ------------------------------------------------
+    total         35.487             11.211            6.442
+    ETAPAS         (61,6: ver 1)     11.968            7.109
+
+OJO CON LA CAJA EN EL CAMINO VIEJO: los 2.218 us de la columna `rapido=no` son los de la caja NUEVA (el arreglo del
+rectangulo esta en el backend, no en el camino): el camino viejo completo, con su caja pixel a pixel, es el build de
+ANTES de esta tarjeta, que mide 61,6 ms (ver 1). Restando: 61.588 - 33.193 (celdas, el mismo codigo) - 76 (marcador)
+= 28.319 us eran la caja pixel a pixel. Esa cuenta esta hecha por resta y se dice: la corrida de antes es anterior al
+cronometro por dentro, asi que su caja no tiene medida propia.
+
+Y los dos diagnosticos que parten el bucle de las celdas (palanca `MINIMAPA_DIAG`, cada uno su corrida):
+
+    diag=no        celdas= 9.115 us   (tabla+palabras: el camino del medio)
+    diag=sinblit   celdas= 1.130 us   -> el pegado de la celda son 8,0 ms y el resto del bucle 1,1
+    diag=sinarte   celdas=11.218 us   -> la busqueda del cuadro en el mapa NO es el costo (pinta 13.067 px en vez
+                                         de 5.218, o sea pinta mas y sale mas caro: la busqueda esta dentro del ruido)
+
+Y el control del instrumento (`MINIMAPA_DIAG=tabla610`: el cuadro IDENTICO mas 632 tablas armadas de mas):
+
+    extra= 18.116 us   (632 armados de 256 entradas = 28,7 us cada uno)
+    ETAPAS: 25.202 us  = 7.109 del camino nuevo + 18.093 del extra (cuadra con los 18.116 del cronometro)
+
+Ese numero es lo que costaba la tabla por celda del camino viejo, medido de la otra punta: ~18 de los 33,2 ms de
+celdas. Los otros ~15 son el bucle general por pixel y los `PushTranslation`/`Pop` de cada celda.
+
+O sea: de los 61,6 ms originales, **28 ms eran la caja negra** (por resta: 61,6 del arbol de antes menos 33,2 de
+celdas medidos hoy), 33 ms las celdas (la tabla por celda + el recorrido de los indices) y practicamente nada el
+marcador. El plan de la tarjeta apuntaba a la tabla; la mitad del problema era el rectangulo.
+
+
+3. LOS TRES ARREGLOS
+--------------------
+
+3.1 LA CAJA: `Imagen.Rectangulo` POR FILAS Y POR PALABRAS (28,3 ms -> 2,2 ms).
+    La caja son 279x225 = 62.775 px y se pintaban con `Poner` uno por uno: cuatro comparaciones de recorte y
+    CUATRO depositos de 8 bits por pixel. Ahora el recorte se hace una vez y el relleno va por palabras de 32
+    bits (el color ya empaquetado). Los mismos bytes en el mismo orden. Es el arreglo mas grande de la tarjeta y
+    el que menos se esperaba (la cuenta de la tarjeta le echaba la culpa a la tabla).
+    2.223 us / 62.775 px = 35 ns por pixel: eso es el piso de la VRAM, no hay mas que sacar de ahi sin cachear
+    los pixeles (y cachearlos son 251.100 B que este monton no tiene, ver 6).
+
+3.2 LA TABLA: UNA VEZ POR CUADRO (33 ms -> 9 ms con 3.1 ya puesto).
+    Las 610 celdas comparten paleta y estado (el minimapa no pone color), y el camino viejo armaba la tabla de 256
+    palabras DENTRO de cada `RenderIndicesTintado`: 610 tablas por cuadro, 156.160 entradas, treinta veces los
+    4.968 pixeles que se pintan. Ahora la arma el POC (`pvr.TablaDelBlit` + `ArmarTablaDelBlit`) una vez por
+    cuadro y se pasa; el backend no guarda estado (la leccion de DC-002.134 se respeta: ver 6).
+    Ademas `RenderIndicesConTabla` recibe la posicion por parametro: se van los 610 `PushTranslation`/`Pop`, y los
+    indices se leen de a cuatro (la palabra en cero se salta entera, el patron de DC-002.135).
+
+3.3 LA LISTA COMPACTA: 128 INDICES PARA PINTAR 8 (9 ms -> 4,1 ms).
+    El arte del automapa son lineas finas: de los 128 indices de una celda de 8x16 hay **~8 que pintan**. Recorrer
+    128 para pintar 8 es tirar quince de cada dieciseis vueltas. El arte es FIJO (59 cuadros, se decodifican una
+    vez al arranque), asi que la lista de los pixeles que pintan se arma UNA vez, al cargar, en tercetos
+    (x, y, indice) y en el MONTON DE C (4.338 B en total, 24 B por cuadro de arte). El cuadro recorre esa lista:
+    ~8 vueltas por celda en vez de 128 indices (`pvr.RenderCompactoConTabla`).
+    Medido: celdas 9.115 -> 4.116 us. Los contadores del backend dicen que el atajo se uso en TODAS las celdas
+    (`tilesCompactos= 19.385` en 30 cuadros = 646 por cuadro, `tilesPorPalabras= 0`, `tilesPorBytes= 0`).
+
+
+4. LA RAMA QUE NO SE HIZO, Y POR QUE (el paso 2 del plan)
+---------------------------------------------------------
+
+El plan pedia, como primera opcion, componer la caja UNA vez y dejarla mientras el pueblo no cambie. No se hizo, y
+la razon es medida, no de gusto: la caja son 279x225x4 = **251.100 B** que habria que guardar (en el monton de Go
+son datos VIVOS que el recolector copia; DC-002.134 murio por 1 KB, ver 6). Y ademas la premisa no se cumple: el
+heroe SI se mueve dentro de la caja en esta corrida (cuadro 4: celdas 610 -> 632, cuadro 6: 659, y el `crc32` de la
+caja cambia de 725772361 a -922459433 a 1286718922), asi que la cache se invalidaria sola y habria que pagar el
+guardado y la comparacion por cuadro para ahorrar 2,2 ms. Con la caja en 2,2 ms y el total en 7,1 ms, no entra.
+La cache de la tabla tampoco hizo falta: armarla cuesta 28 us por cuadro (medido).
+
+
+5. LA REGLA DE LA CASA: EL DIBUJO NO CAMBIO (y como se sabe)
+------------------------------------------------------------
+
+5.1 EL MISMO CRC32 DE LA CAJA, CUADRO POR CUADRO. La linea del minimapa lleva ahora `crcDeLaCaja=` (el crc32 de
+    los 251.100 B de la caja de 279x225 DESPUES de dibujarla). Dos corridas del MISMO binario, una con
+    `MINIMAPA_RAPIDO=no` (camino viejo) y otra con `si` (camino nuevo):
+
+        60 cuadros comparados (celdas, pixeles pintados, crc32 de la caja): 60 iguales, 0 distintos.
+        cuadro 1-3   celdas=610 pixeles=4968 crcDeLaCaja= 725772361 en los dos
+        cuadro 4-5   celdas=632 pixeles=5136 crcDeLaCaja= -922459433 en los dos
+        cuadro 6     celdas=659 pixeles=5309 crcDeLaCaja= 1286718922 en los dos
+
+5.2 LA CAPTURA. Recortada al area cliente (640x480) y comparada pixel a pixel contra la del arbol de antes, en el
+    mismo estado de juego:
+
+        c00-quieto  base vs ahora: crc de la caja 2620115282 en los dos -> 0 pixeles distintos
+        c2          base vs ahora: crc de la caja 3747314762 en los dos -> 0 pixeles distintos de 62.775
+        (c1 no se compara: las dos corridas la toman en momentos distintos del guion, y ahi el sprite cambia)
+
+5.3 EL VERIFICADOR DEL HOST (`console/dc/verif-blit-137`, no necesita consola). Pinta los mismos casos con el
+    camino de BYTES de DC-002.132 y con los dos caminos nuevos (tabla con indices de a cuatro, y lista compacta) y
+    compara byte a byte. Cubre lo que la consola no puede: tiles de 1x1 a 44x44, recortes por los cuatro bordes
+    (ventanas que NO empiezan en multiplo de 4, que es donde el atajo necesita los bordes pixel a pixel), indices
+    0, paletas con alfa 0 / intermedio / 255, tinte neutro y no neutro, arte ralo (el del minimapa) / medio /
+    lleno, y el mismo banco con el buffer de indices CORRIDO UN BYTE (no alineado: ahi el atajo se cae al camino de
+    bytes y tiene que dar lo mismo).
+
+        semillas 1, 7, 99, 2024, 555  ->  15.000 comparaciones, 0 distintas
+        (porPalabras 669/665/687/662/698, porBytes 669/665/687/662/698, compactos 991/994/992/991/997:
+         los tres caminos se ejercitaron en todos los casos en que el tile cae en el lienzo)
+
+
+6. LA RESTRICCION DE MEMORIA, RESPETADA (y medida)
+--------------------------------------------------
+
+DC-002.134 dejo medido que el backend PVR NO puede guardar estado del dibujado: 1 KB por superficie o 1 KB global
+matan el POC con `GC to-space overflow`. Esta tarjeta no guarda nada en el backend:
+
+    - la tabla (1 KB) es una variable del POC, en el `.bss` del binario: no la toca el recolector y se arma cada
+      cuadro (28 us), asi que no hay ni un byte cacheado entre cuadros;
+    - la lista compacta (4.338 B) va al MONTON DE C, como el arte del HUD y del minimapa.
+
+Lo medido en la corrida:
+
+    SEMIESPACIO despues-del-minimapa   antes 1.495.816 B   ahora 1.495.056 B  (81 % del semiespacio, igual)
+    MEMORIA arena/pico                 9.024.384 B en las dos (el techo de 10 MB no se movio)
+    monton de C del arte                7.552 B -> 11.890 B (+4.338 de las listas), libre 1.287.872 B
+
+O sea: la tarjeta baja el minimapa 54 ms por cuadro SIN pedirle un byte al semiespacio.
+
+
+7. LO QUE QUEDA (y no es de esta tarjeta)
+------------------------------------------
+
+1. La caja son 2,2 ms y son el piso de la VRAM (35 ns por pixel escrito). Bajarla pide una cache de 251 KB que
+   este monton no tiene, o no pintar la caja entera (que cambiaria el cuadro).
+2. Las celdas son 4,1 ms con ~8 escrituras por celda: 6,4 us por celda. El 60 % de eso es el bucle (busqueda del
+   cuadro en el mapa + proyeccion + recorte) y no el pegado. Una tabla por indice de cuadro (`[]*celdaDelMinimapa`
+   de 1.260 entradas) ahorraria la busqueda en el mapa, pero son ~5 KB de datos vivos: no entra sin sacarlos de
+   otro lado.
+3. El mapa sigue siendo 68-75 ms de los 128 del cuadro: es la tarjeta del mapa (t_fc7d96d6, hecha) y lo que quede
+   de la presentacion (t_ae2df742).
+
+
+8. COMO REPRODUCIRLO
+--------------------
+
+    cd /home/dgalli/Proyectos/diablo2consoles
+
+    # el build de la evidencia (el de antes y el de ahora son la misma receta, cambia MINIMAPA_RAPIDO)
+    bash scripts/console/corridas-137-minimapa.sh evidencia:si:no:no viejo:no:no:no tabla:tabla:no:no
+
+    # a mano, el de la evidencia:
+    CUADROS=60 JUGADORES=1 MONSTRUOS=1 COMBATE=si GOLPE_AUTO=si HUD=si MINIMAPA=si \
+      NPC=no QUEST=no INVENTARIO=no DROP=no BLIT_RAPIDO=si MEDIR_CUADRO=no \
+      ETAPAS=si VERBOSO=no BLIT_PALABRAS=si PINTAR_UNA_VEZ=si MINIMAPA_RAPIDO=si \
+      bash scripts/console/build-anim-132.sh /tmp/dcbuild/anim137-u4
+
+    CAPTURAS=2 INTERVALO=10 ESPERA_CIERRE=300 \
+      bash scripts/console/run-anim-132.sh /tmp/dcbuild/anim137-u4/disc.gdi /tmp/capturas-137-u4 900 120
+
+    grep -a "JUEGO137: MINIMAPA-POR-DENTRO\|JUEGO134: ETAPAS\|PVR132: CUADRO" /tmp/capturas-137-u4/flycast.log
+
+    # el verificador del host (no necesita consola)
+    go run ./console/dc/verif-blit-137/ 7 1000     -> 3.000 casos, 0 distintos
+
+Palancas, todas por variable de entorno del build (el A/B es una corrida, no un arbol distinto):
+
+    MINIMAPA_RAPIDO=si|tabla|no    el camino del dibujado de las celdas (compacta / tabla+indices / el viejo)
+    MINIMAPA_DIAG=no|caja|celdas|sinarte|sinblit|tabla610
+                                   las corridas de medir por dentro. `caja`, `celdas`, `sinarte` y `sinblit`
+                                   ROMPEN el dibujo a proposito (son de medir, no del juego); `tabla610` deja el
+                                   cuadro identico y es el control del instrumento.
+
+
+9. ARCHIVOS
+-----------
+
+    d2core/d2render/pvr/blit_tabla_137.go   NUEVO  TablaDelBlit + ArmarTablaDelBlit + RenderIndicesConTabla
+                                                   + RenderCompactoConTabla + contadores del camino
+    d2core/d2render/pvr/imagen.go                  Imagen.Rectangulo por filas y por palabras (la caja)
+    console/dc/poc/juego-131/minimapa_137.go NUEVO el cronometro por dentro, la lista compacta, la tabla del POC,
+                                                   el crc32 de la caja, las corridas de diagnostico
+    console/dc/poc/juego-131/automap_130.go        dibujarElMinimapa con los tres caminos y los cronometros;
+                                                   `pintarLasCeldasDeSiempre` (el viejo, intacto) y el resumen
+    console/dc/poc/juego-131/knobs.go              minimapaRapido (si|tabla|no), minimapaDiag
+    console/dc/poc/juego-131/main.go               la linea `JUEGO137: arranca`
+    console/dc/verif-blit-137/main.go       NUEVO  la equivalencia de los tres caminos en el host (15.000 casos)
+    console/dc/poc/juego-131/recortar-137.py NUEVO recorta el area cliente y la caja de una captura
+    scripts/console/build-juego-131.sh             MINIMAPA_RAPIDO, MINIMAPA_DIAG
+    scripts/console/corridas-137-minimapa.sh NUEVO build + corrida por combinacion (las de esta evidencia)

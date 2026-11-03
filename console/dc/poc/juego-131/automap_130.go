@@ -93,6 +93,10 @@ type celdaDelMinimapa struct {
 	Alto    int
 	Indices []byte // en el monton de C: no lo toca el recolector
 	Pixeles int    // los indices != 0
+
+	// DC-002.137: los MISMOS pixeles en tercetos (x, y, indice), solo los que pintan, en el monton de C. Es lo que
+	// recorre el cuadro: el arte del automapa es ralo y de 128 indices hay ~8 que pintan.
+	Compacto []byte
 }
 
 // fuenteDelMotor: el adaptador del motor (`d2game/d2player/automap.go`, `tileSource`) sobre el MapEngine que el
@@ -157,10 +161,11 @@ type minimapaDelJuego struct {
 	Pal    [256][4]uint8
 
 	// lo que ocupa, medido
-	BytesArte   int
-	BytesTabla  int
-	CuadrosArte int
-	SinArte     int // celdas del modelo que caen en el dibujo y NO tienen cuadro decodificado
+	BytesArte     int
+	BytesCompacto int
+	BytesTabla    int
+	CuadrosArte   int
+	SinArte       int // celdas del modelo que caen en el dibujo y NO tienen cuadro decodificado
 
 	// el reveal
 	ultimaX, ultimaY float64
@@ -444,12 +449,18 @@ func (m *minimapaDelJuego) cargarElArte(fuente *fuenteconsola.Fuente) int {
 			}
 		}
 
+		// DC-002.137: la lista COMPACTA de los pixeles que pintan, en tercetos (x, y, indice). Se arma UNA vez aca,
+		// con el arte, y el cuadro la recorre en vez de los 128 indices del tile (el del automapa es ralo: ~8 de 128).
+		// Va al monton de C, como el arte: el recolector no la cuenta ni la copia.
+		compacto := m.compactarElArte(indices)
+
 		m.Arte[c] = &celdaDelMinimapa{
-			Cel: c, Ancho: anchoCeldaMini, Alto: altoCeldaMini, Indices: indices,
+			Cel: c, Ancho: anchoCeldaMini, Alto: altoCeldaMini, Indices: indices, Compacto: compacto,
 			Pixeles: contarNoVacios(indices),
 		}
 
-		m.BytesArte += len(indices)
+		m.BytesArte += len(indices) + len(compacto)
+		m.BytesCompacto += len(compacto)
 		m.CuadrosArte++
 	}
 
@@ -567,13 +578,118 @@ func (m *minimapaDelJuego) dibujarElMinimapa(sup *pvr.Surface, jugador, anchoLie
 
 	pintados, celdas := 0, 0
 
+	// DC-002.137 -- LA TABLA, UNA VEZ POR CUADRO (no una vez por celda). Las 610 celdas que caen en la caja
+	// comparten la paleta y el estado (el minimapa no pone color), asi que la tabla de 256 palabras se arma aca
+	// una sola vez y se pasa (`pvr.TablaDelBlit`, del POC: el backend no guarda estado del dibujado, que es la
+	// leccion de DC-002.134). El camino viejo la armaba DENTRO de cada `RenderIndicesTintado` -- 610 tablas por
+	// cuadro, 156.160 entradas, treinta veces los 4.968 pixeles que se pintan de verdad.
+	// TRES CAMINOS (DC-002.137), y el A/B es una corrida:
+	//	"no"    el de DC-002.130: una tabla por celda, un Push/Pop por celda (el camino viejo, intacto)
+	//	"tabla" la tabla UNA vez por cuadro y los indices leidos de a cuatro
+	//	"si"    ademas la lista COMPACTA de los pixeles que pintan (~8 por celda en vez de 128 indices)
+	rapido := minimapaRapido == "si" || minimapaRapido == "tabla"
+	compacto := minimapaRapido == "si"
+
+	if rapido {
+		tTabla := cronometro134()
+
+		rapido = sup.ArmarTablaDelBlit(m.Pal[:], &tablaDelMinimapa)
+		anotarLaTabla137(tTabla)
+	}
+
 	// EL FONDO NEGRO DE LA CAJA, ANTES DE LAS CELDAS. El arte del automapa (`maximap.dc6`) son lineas FINAS pensadas
 	// para leerse sobre negro: el juego las dibuja sobre la pantalla del mapa, que va en negro. Sobre el terreno del
 	// POC se pierden (medido en Flycast: el lienzo cambiaba y el mapa no se veia). Con la caja en negro, las celdas
 	// se leen.
-	sup.PushTranslation(lay.Clip.X0, lay.Clip.Y0)
-	sup.DrawRect(lay.Clip.X1-lay.Clip.X0, lay.Clip.Y1-lay.Clip.Y0, fondoDelMinimapa)
-	sup.Pop()
+	//
+	// DC-002.137: la caja son 62.775 px y `DrawRect` los pintaba uno por uno con `Poner` (cuatro comparaciones de
+	// recorte y cuatro depositos de 8 bits por pixel). Ahora `Imagen.Rectangulo` recorta una vez y rellena por
+	// palabras de 32 bits: los mismos bytes, un deposito por pixel.
+	tCaja := cronometro134()
+
+	if minimapaDiag != "celdas" {
+		sup.PushTranslation(lay.Clip.X0, lay.Clip.Y0)
+		sup.DrawRect(lay.Clip.X1-lay.Clip.X0, lay.Clip.Y1-lay.Clip.Y0, fondoDelMinimapa)
+		sup.Pop()
+	}
+
+	anotarLaCaja137(tCaja)
+
+	if minimapaDiag != "caja" {
+		tCeldas := cronometro134()
+
+		if rapido {
+			pintados, celdas = m.pintarLasCeldasConLaTabla(sup, lay, compacto)
+		} else {
+			pintados, celdas = m.pintarLasCeldasDeSiempre(sup, lay)
+		}
+
+		anotarLasCeldas137(tCeldas)
+
+		// ---- EL MARCADOR DEL HEROE: la polilinea del motor, en su sitio de la caja
+		tMarcador := cronometro134()
+
+		m.dibujarElMarcador(sup, mx-8, my+8, lay)
+		anotarElMarcador137(tMarcador)
+	}
+
+	// DC-002.137: la corrida de medir `MINIMAPA_DIAG=tabla610` (arma la tabla 610 veces mas, el cuadro queda
+	// identico: es el costo de la tabla por celda del camino viejo, medido desde el otro lado).
+	if minimapaDiag == "tabla610" {
+		tExtra := cronometro134()
+
+		armarLaTablaDeMas137(sup, m, celdas)
+		anotarLaTablaDeMas137(tExtra)
+	}
+
+	ms := int(d2cMs() - t0)
+
+	m.hayDibujo, m.ultimoHeroeX, m.ultimoHeroeY, m.ultimasCeldasDib = true, mx, my, m.Modelo.Count()
+	m.cuadrosDibujados++
+	m.celdasUltimas = celdas
+	m.pxUltimos = pintados
+	m.pxTotal += pintados
+	m.msUltimo = ms
+	m.msTotal += ms
+
+	if celdas > m.celdasMax {
+		m.celdasMax = celdas
+	}
+
+	if ms > m.msMax {
+		m.msMax = ms
+	}
+
+	// DC-002.137: el crc32 de la caja (279x225) DESPUES de dibujarla, y FUERA del cronometro del minimapa (es
+	// evidencia, no dibujo). Es la prueba de que el camino rapido y el camino de siempre dejan la MISMA caja: los
+	// dos numeros se comparan entre dos corridas del mismo binario (`MINIMAPA_RAPIDO=si` y `=no`). Con
+	// `VERBOSO=no` no se mide: son 251.100 B de lectura por cuadro.
+	crcCaja := uint32(0)
+
+	if verboso134() {
+		crcCaja = crcDeLaCaja137(sup, lay)
+	}
+
+	// DC-002.134: la linea del minimapa es evidencia por cuadro: con `VERBOSO=no` se calla.
+	if verboso134() {
+		println("JUEGO130: MINIMAPA cuadro=", cuadro, "jugador=", jugador+1, "celdas=", celdas, "de", m.Modelo.Count(),
+			"pixelesPintados=", pintados, "ms=", ms, "heroe=", hx, hy, "enLaCaja=", mx, my,
+			"caja=", lay.Clip.X0, lay.Clip.Y0, lay.Clip.X1, lay.Clip.Y1, "sinArte=", m.SinArte,
+			"crcDeLaCaja=", int(crcCaja), "rapido=", minimapaRapido, "diag=", minimapaDiag)
+	}
+
+	// DC-002.137: el promedio por cuadro de la caja, las celdas, el marcador y la tabla (cada 30 cuadros).
+	informeDelMini137(pintados, celdas, m.Modelo.Count())
+
+	return pintados, ms
+}
+
+// pintarLasCeldasDeSiempre: EL CAMINO DE DC-002.130, TAL CUAL (una tabla de 256 palabras por celda, dentro de
+// `RenderIndicesTintado`, y un `PushTranslation`/`Pop` por celda). Es el A/B de `MINIMAPA_RAPIDO=no`: vive en el
+// mismo binario que `pintarLasCeldasConUnaTabla` y tiene que dejar los MISMOS pixeles (lo prueba el crc32 de la
+// caja). No se toca: si se "mejora" deja de ser el A/B.
+func (m *minimapaDelJuego) pintarLasCeldasDeSiempre(sup *pvr.Surface, lay d2automap.Layout) (int, int) {
+	pintados, celdas := 0, 0
 
 	for _, c := range m.Modelo.Cells() {
 		arte := m.Arte[c.Cel]
@@ -598,35 +714,7 @@ func (m *minimapaDelJuego) dibujarElMinimapa(sup *pvr.Surface, jugador, anchoLie
 		celdas++
 	}
 
-	// ---- EL MARCADOR DEL HEROE: la polilinea del motor, en su sitio de la caja
-	m.dibujarElMarcador(sup, mx-8, my+8, lay)
-
-	ms := int(d2cMs() - t0)
-
-	m.hayDibujo, m.ultimoHeroeX, m.ultimoHeroeY, m.ultimasCeldasDib = true, mx, my, m.Modelo.Count()
-	m.cuadrosDibujados++
-	m.celdasUltimas = celdas
-	m.pxUltimos = pintados
-	m.pxTotal += pintados
-	m.msUltimo = ms
-	m.msTotal += ms
-
-	if celdas > m.celdasMax {
-		m.celdasMax = celdas
-	}
-
-	if ms > m.msMax {
-		m.msMax = ms
-	}
-
-	// DC-002.134: la linea del minimapa es evidencia por cuadro: con `VERBOSO=no` se calla.
-	if verboso134() {
-		println("JUEGO130: MINIMAPA cuadro=", cuadro, "jugador=", jugador+1, "celdas=", celdas, "de", m.Modelo.Count(),
-			"pixelesPintados=", pintados, "ms=", ms, "heroe=", hx, hy, "enLaCaja=", mx, my,
-			"caja=", lay.Clip.X0, lay.Clip.Y0, lay.Clip.X1, lay.Clip.Y1, "sinArte=", m.SinArte)
-	}
-
-	return pintados, ms
+	return pintados, celdas
 }
 
 // dibujarElMarcador: la cruz del heroe en el minimapa, con la polilinea del motor (cada coordenada DUPLICADA) y su
@@ -691,7 +779,8 @@ func resumenDelMinimapa() {
 		"msPromedio=", promedio, "msMax=", m.msMax, "msTotal=", m.msTotal, "msDelCuadroDelMapa=", msCuadro,
 		"pctDelCuadro=", pct)
 
-	println("JUEGO130: MINIMAPA ARTE-RESUMEN cuadros=", m.CuadrosArte, "bytesEnMontonDeC=", m.BytesArte,
+	println("JUEGO130: MINIMAPA ARTE-RESUMEN cuadros=", m.CuadrosArte, "bytesDeLaListaCompacta=", m.BytesCompacto,
+		"bytesEnMontonDeC=", m.BytesArte,
 		"bytesDeLaTabla=", m.BytesTabla, "bytesDeArteSiSeDecodificaraEntero=", 645120,
 		"bytesDecimadoAlPueblo=", m.BytesArte, "montonC_libre=", d2cMontonLibre())
 

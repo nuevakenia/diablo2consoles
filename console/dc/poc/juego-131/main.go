@@ -417,7 +417,12 @@ func main() {
 	println("JUEGO132: arranca -- medirCuadro=", medirCuadro, "blitRapido=", blitRapido,
 		"cuadrosPorInforme=", cuadrosDelInforme132)
 	println("JUEGO134: arranca -- etapas=", etapasKnob, "verboso=", verbosoEtapas, "blitPalabras=",
-		blitPalabras134)
+		blitPalabras134, "pintarUnaVez=", pintarUnaVez)
+
+	// DC-002.137: las palancas del minimapa, en el arranque (una palanca que no se ve en el log no se puede
+	// discutir: el numero de la corrida hay que poder atribuirlo a un camino).
+	println("JUEGO137: arranca -- minimapa=", minimapaKnob, "cuando=", minimapaCuando, "todo=", minimapaTodo,
+		"rapido=", minimapaRapido, "diag=", minimapaDiag)
 
 	// DC-002.136: LO QUE QUEDO APAGADO, DICHO EN EL ARRANQUE. Una feature que no entra no desaparece en silencio: la
 	// palanca que la apago queda en la consola serie con el nombre de lo que dejo de cargarse (ver instrumento_136.go).
