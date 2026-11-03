@@ -426,6 +426,16 @@ echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob bli
 [ -n "${COMPARAR_141:-}" ] && pisa_knob comparar141 "$COMPARAR_141" 1
 [ -n "${CONV_FILAS_141:-}" ] && pisa_knob convFilas141 "$CONV_FILAS_141" 1
 
+# DC-002.142 -- LA PRESENTACION DEL CUADRO QUE CAMINA: la subida en grupos de 2x2 y el informe por cuadro.
+#   PRES_GRUPO_142=si|no  si = el camino por bloques sucios sube los cuatro bloques de un grupo de 2x2 en UNA
+#                         copia de 8 KiB (contiguos en la textura twiddleada); no = una copia de 2 KiB por
+#                         bloque, el camino de DC-002.139 (el A/B en el mismo binario).
+#   PRESENTAR_142=si|no   si = el informe por cuadro `JUEGO142: PRESENTAR-CAMINANDO` (los 30 promedios de
+#                         `PVR135: PRESENTAR` diluyen el cuadro que camina entre los que estan quietos).
+[ -n "${PRES_GRUPO_142:-}" ] && pisa_knob presentarGrupo142 "$PRES_GRUPO_142" 1
+[ -n "${PRESENTAR_142:-}" ] && pisa_knob presentar142 "$PRESENTAR_142" 1
+[ -n "${PRUEBA_CONV_142:-}" ] && pisa_knob pruebaConv142 "$PRUEBA_CONV_142" 1
+
 echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
 
 # LAS DE ESTA TARJETA (DC-002.137): EL MINIMAPA.

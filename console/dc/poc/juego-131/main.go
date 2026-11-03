@@ -1469,11 +1469,21 @@ func dibujar(superficie d2interface.Surface) error {
 		pvr.FijarTamanoDeLaGrilla(ancho, alto)
 		pvr.FijarConversionPorBloques(convBloques139 == "si")
 
+		// DC-002.142: la subida agrupada en el camino por bloques sucios (PRES_GRUPO_142=no la apaga y vuelve al
+		// bucle de a un bloque de DC-002.139, en el mismo binario).
+		pvr.FijarPresentacionEnGrupos142(presentarGrupo142 == "si")
+
 		// DC-002.141: la conversion del lienzo por filas (lecturas seguidas contra la VRAM) y, si la corrida es
 		// la de la prueba, el verificador que la compara contra el camino de DC-002.135 bloque por bloque.
 		pvr.FijarLaConversionPorFilas141(convFilas141 == "si")
 		pvr.VerificarLaConversion141(comparar141 == "si")
 	}
+
+	// DC-002.142: lo que costo presentar el cuadro ANTERIOR, si ese cuadro camino (los contadores de la
+	// presentacion todavia son los suyos: el ciclo los reinicia despues de dibujar). Va antes de dibujar el mapa
+	// a proposito: asi la linea del informe y el censo de la presentacion se leen pegados al cuadro que los causo.
+	informePresentar142()
+	caminoElCuadroAnterior142 = false
 
 	pvr.ReiniciarBloquesSucios()
 
@@ -1499,6 +1509,20 @@ func dibujar(superficie d2interface.Surface) error {
 		}
 
 	case mapa141Quieto:
+		// DC-002.142: la misma prueba en un cuadro QUIETO (es el control: el mismo bucle, los mismos bloques).
+		if pruebaConv142 == "si" {
+			// la curva: 1, 5, 20 y 40 bloques. Si el costo es FIJO (no escala con los bloques) el que se mide no
+			// es el bucle; si escala, el precio por bloque es el que hay que atacar.
+			us1 := pvr.PruebaDeLaConversion142(malla.Imagen(), 1)
+			us5 := pvr.PruebaDeLaConversion142(malla.Imagen(), 5)
+			us20 := pvr.PruebaDeLaConversion142(malla.Imagen(), 20)
+			us40 := pvr.PruebaDeLaConversion142(malla.Imagen(), 40)
+
+			println("JUEGO142: PRUEBA-CONV-QUIETO cuadro=", cuadro,
+				"us1=", us1, "us5=", us5, "us20=", us20, "us40=", us40,
+				"porBloque20=", us20/20, "porBloque40=", us40/40)
+		}
+
 		restaurarElMundo139(malla.Imagen().Pixeles())
 		mapa139Saltados++
 		mapa139PintadoEsteCuadro = false

@@ -172,6 +172,14 @@ func dibujarElCuadroQueCamina141(malla *pvr.Surface, superficie d2interface.Surf
 
 	malla.SinRecortes()
 
+	// DC-002.142: la prueba de la conversion, ANTES del corrimiento (ver `informe_142.go` y
+	// `d2c_pvr_pantalla_prueba_conv142`): el mismo bucle cuesta 9 us por bloque en un cuadro quieto y 80 en uno
+	// que camina, y hay que saber si el que cambia es el bucle o la memoria despues de la copia.
+	usConvAntes142 := 0
+	if pruebaConv142 == "si" {
+		usConvAntes142 = pvr.PruebaDeLaConversion142(malla.Imagen(), bloquesDeLaPrueba142)
+	}
+
 	tMover := d2cUs()
 
 	if r := pvr.MoverLienzo(sx, sy); r != 0 {
@@ -187,6 +195,11 @@ func dibujarElCuadroQueCamina141(malla *pvr.Surface, superficie d2interface.Surf
 	scroll141Caminando = true
 	scroll141UltimoFueCopia = true
 
+	// DC-002.142: este cuadro camino; el informe por cuadro lo va a leer en el cuadro siguiente (los contadores
+	// de la presentacion de ESTE cuadro no estan puestos todavia: se presentan despues de dibujar).
+	caminoElCuadroAnterior142 = true
+	sxDelCuadroAnterior142, syDelCuadroAnterior142 = sx, sy
+
 	tFranjas := d2cUs()
 
 	pxFranjas, pxCajas, pxPaneles, recortes := armarLosRecortes141(malla, sx, sy)
@@ -194,6 +207,16 @@ func dibujarElCuadroQueCamina141(malla *pvr.Surface, superficie d2interface.Surf
 	rendererDelMapa.Render(superficie)
 
 	usFranjas := int(d2cUs() - tFranjas)
+
+	// y la misma prueba DESPUES del corrimiento y del repintado: si el numero sube, el que encarece la
+	// conversion no es el bucle sino el estado de la VRAM que deja la copia.
+	if pruebaConv142 == "si" {
+		usConvDespues := pvr.PruebaDeLaConversion142(malla.Imagen(), bloquesDeLaPrueba142)
+
+		println("JUEGO142: PRUEBA-CONV cuadro=", cuadro, "sx=", sx, "sy=", sy,
+			"bloques=", bloquesDeLaPrueba142, "usAntes=", usConvAntes142, "usDespues=", usConvDespues,
+			"usMover=", int(d2cUs()-tMover))
+	}
 
 	scroll141UsFranjas += usFranjas
 
@@ -1131,6 +1154,13 @@ func informeDelCuadroQueCamina141() {
 		"pxFranjas=", scroll141PxFranjas, "pxCajas=", scroll141PxCajas, "pxPaneles=", scroll141PxPaneles,
 		"recortes=", scroll141Recortes, "maxSX=", scroll141MaxSX, "maxSY=", scroll141MaxSY,
 		"recortesIgnorados=", scroll141RecortesIgnorados)
+
+	// DC-002.142: la presentacion de esos mismos cuadros caminando, por dentro (convertir / subir / pintar) y
+	// con cuantas copias a la VRAM costo. Es el numero que dice si el anillo de textura hace falta.
+	println("JUEGO142: PRESENTACION-CAMINANDO tramo=", cuadro, "grupo=", grupoDelBinario142(),
+		promedioPresentar142())
+
+	reiniciarPresentar142()
 
 	// el promedio por cuadro caminando: es el numero que se compara contra los 60,4 ms del repintado entero
 	if desp > 0 {

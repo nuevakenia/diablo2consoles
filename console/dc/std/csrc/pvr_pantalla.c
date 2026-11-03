@@ -761,6 +761,46 @@ static int convertir_rapido(const unsigned char *src, int w, int h, int x_dest) 
     return 0;
 }
 
+/* ====================================================================================================
+ * DC-002.142 -- LA PRUEBA DE LA CONVERSION (cuanto cuesta convertir N bloques, ahora)
+ * ====================================================================================================
+ *
+ * POR QUE EXISTE. Medido con el cronometro de la presentacion: convertir 190 bloques sucios en un cuadro
+ * QUIETO cuesta ~1,7 ms (9 us por bloque) y convertir 300 en un cuadro que CAMINA cuesta ~24 ms (80 us por
+ * bloque). Es el mismo bucle, el mismo buffer y el mismo twiddle: lo unico distinto es que el cuadro que camina
+ * viene de un `memmove` de 1,2 MB en la VRAM. Esta prueba convierte N bloques cuando el POC se lo pide, para
+ * poder medir ANTES y DESPUES del corrimiento en el mismo cuadro y separar "es el bucle" de "es el estado de la
+ * memoria despues de la copia".
+ *
+ * Convierte a `conv_grupo` (el buffer de 8 KiB que ya existe) y NO sube nada: lo unico que mide es la conversion.
+ */
+unsigned int d2c_pvr_pantalla_prueba_conv142(unsigned int rgba, int lienzo_w, int n) {
+    const unsigned char *src = (const unsigned char *)rgba;
+    unsigned int t0, t1;
+    int k;
+
+    if (src == NULL || n <= 0 || lienzo_w <= 0) {
+        return 0;
+    }
+
+    armar_twiddle();
+    armar_ofs_tile(lienzo_w);
+
+    t0 = d2c_pvr_pantalla_us();
+
+    for (k = 0; k < n; k++) {
+        int x0 = (k % 20) * LADO_TILE;
+        int y0 = (k / 20) * LADO_TILE;
+
+        convertir_bloque141(src + ((size_t)y0 * (size_t)lienzo_w + (size_t)x0) * 4,
+                            conv_grupo + (k % 4) * (LADO_TILE * LADO_TILE));
+    }
+
+    t1 = d2c_pvr_pantalla_us();
+
+    return t1 - t0;
+}
+
 /* Los contadores de la presentacion a cero: lo llama GO al empezar la presentacion del cuadro.
  *
  * POR QUE LO LLAMA GO Y NO ESTA ACA. Un cuadro puede llegar en varias llamadas (dos lienzos de 320x480 en
@@ -920,8 +960,15 @@ int d2c_pvr_pantalla_convertir_en_bloque(unsigned int rgba, int w, int h, int x_
  * truncado), mismo twiddle, mismo `pvr_txr_load`. La prueba es el crc32 del mundo (1437022778) y que el cuadro
  * se vea igual.
  */
+/* Cuantos bloques se convirtieron por el camino POR BLOQUES, para el muestreo del cronometro: el camino por
+ * bloques no informaba conv_us ni vram_us (salían 0), así que la presentación de un cuadro caminando se veía
+ * entera como `pintar` y no se sabía si el costo era convertir o subir. Medido en DC-002.142. */
+static unsigned int conv_bloques142 = 0;
+
 int d2c_pvr_pantalla_bloque(unsigned int rgba, int lienzo_w, int x0, int y0) {
     const unsigned char *src = (const unsigned char *)rgba;
+    int medir;
+    unsigned int t0 = 0, t1 = 0, t2 = 0;
 
     if (pant_tex == NULL || src == NULL) {
         return -1;
@@ -934,11 +981,186 @@ int d2c_pvr_pantalla_bloque(unsigned int rgba, int lienzo_w, int x0, int y0) {
     /* el destino SIEMPRE es un bloque entero (el que llama pasa x0/y0 multiplos de 32), asi que el bloque se
      * arma con el mismo `bloque_rapido` del cuadro entero: cuatro pixeles por vuelta y dos por deposito. */
     armar_ofs_tile(lienzo_w);
+
+    /* DOS MARCAS POR BLOQUE MUESTREADO (uno de cada PRES_MUESTREO, ver la cabecera de DC-002.135): el reloj de
+     * KOS no es gratis y aca hay una llamada por bloque. La muestra se escala por PRES_MUESTREO antes de
+     * sumarla, asi que el numero es comparable con el del camino del cuadro entero. */
+    medir = ((conv_bloques142++ % PRES_MUESTREO) == 0);
+
+    if (medir) {
+        t0 = d2c_pvr_pantalla_us();
+    }
+
     convertir_bloque141(src + ((size_t)y0 * (size_t)lienzo_w + (size_t)x0) * 4, conv_tile);
+
+    if (medir) {
+        t1 = d2c_pvr_pantalla_us();
+    }
 
     pvr_txr_load(conv_tile, (pvr_ptr_t)((uint16_t *)pant_tex + indice_tile(x0, y0)),
                  LADO_TILE * LADO_TILE * 2);
+    pres_subidas++;
     pres_bloques++;
+
+    if (medir) {
+        t2 = d2c_pvr_pantalla_us();
+        pres_conv_us += (t1 - t0) * PRES_MUESTREO;
+        pres_vram_us += (t2 - t1) * PRES_MUESTREO;
+    }
+
+    return 0;
+}
+
+/* ====================================================================================================
+ * DC-002.142 -- LOS BLOQUES SUCIOS, SUBIDOS EN GRUPOS DE 2x2
+ * ====================================================================================================
+ *
+ * EL NUMERO QUE MANDA (DC-002.141, Flycast): un cuadro que camina presenta en 16-26 ms y uno parado en 1,5-2,2
+ * ms, con casi los mismos bloques sucios (~190). La diferencia es que caminando se marca TODO el lienzo (300
+ * bloques) y la presentacion hace UNA copia de 2 KiB por bloque: 300 viajes de Store Queue. El camino del
+ * cuadro entero (DC-002.135) sube los cuatro bloques de un grupo de 2x2 (64x64 px = 8.192 B, CONTIGUOS en la
+ * textura twiddleada) en UNA copia: 90 viajes.
+ *
+ * QUE HACE ESTA FUNCION. Es el camino por bloques sucios con la subida agrupada: recorre la grilla de a grupos
+ * de 2x2, y el grupo cuyos CUATRO bloques estan sucios se convierte en `conv_grupo` y se sube con una sola
+ * copia (con la misma comprobacion de contiguidad que `convertir_rapido`, porque un grupo que cruza la columna
+ * 512 del twiddle cae en dos superbloques y ahi los indices saltan). Los grupos a medias y los sueltos se
+ * convierten y suben de a un bloque, como siempre.
+ *
+ * LOS BYTES QUE LLEGAN A LA VRAM SON LOS MISMOS: misma cuenta de color (`COLOR565`), misma tabla de twiddle,
+ * mismo `pvr_txr_load`. Lo unico que cambia es cuantos viajes cuesta.
+ */
+int d2c_pvr_pantalla_bloques142(unsigned int rgba, int lienzo_w,
+                                const unsigned char *sucios, int columnas, int filas) {
+    const unsigned char *src = (const unsigned char *)rgba;
+    int bx, by;
+    int medir;
+    unsigned int t0 = 0, t1 = 0, t2 = 0;
+
+    if (pant_tex == NULL || src == NULL || sucios == NULL) {
+        return -1;
+    }
+    if (lienzo_w <= 0 || columnas <= 0 || filas <= 0) {
+        return -2;
+    }
+    if ((lienzo_w % LADO_TILE) != 0) {
+        /* el camino rapido solo sabe de bloques enteros: el que llama usa el bucle de a un bloque */
+        return -2;
+    }
+
+    armar_twiddle();
+    armar_ofs_tile(lienzo_w);
+
+    for (by = 0; by < filas; by += 2) {
+        int nby = ((by + 1) < filas) ? 2 : 1;
+
+        for (bx = 0; bx < columnas; bx += 2) {
+            int nbx = ((bx + 1) < columnas) ? 2 : 1;
+            int cuantos = 0, j, i;
+            int x0, y0;
+            uint32_t i0;
+            int grupo;
+
+            for (j = 0; j < nby; j++) {
+                for (i = 0; i < nbx; i++) {
+                    if (sucios[(by + j) * columnas + (bx + i)]) {
+                        cuantos++;
+                    }
+                }
+            }
+
+            if (cuantos == 0) {
+                continue;
+            }
+
+            x0 = bx * LADO_TILE;
+            y0 = by * LADO_TILE;
+            i0 = indice_tile(x0, y0);
+
+            grupo = (cuantos == 4) &&
+                    (indice_tile(x0 + LADO_TILE, y0) == i0 + 2 * 1024) &&
+                    (indice_tile(x0, y0 + LADO_TILE) == i0 + 1024) &&
+                    (indice_tile(x0 + LADO_TILE, y0 + LADO_TILE) == i0 + 3 * 1024);
+
+            medir = ((conv_bloques142++ % PRES_MUESTREO) == 0);
+
+            if (medir) {
+                t0 = d2c_pvr_pantalla_us();
+            }
+
+            if (grupo) {
+                /* el orden de los bloques dentro del grupo es el de la TEXTURA: k par = mismo y, k impar = y+32;
+                 * la columna de la derecha a partir de k = 2 (ver `convertir_rapido`). */
+                for (j = 0; j < 4; j++) {
+                    int gx = (j & 2) ? LADO_TILE : 0;
+                    int gy = (j & 1) ? LADO_TILE : 0;
+
+                    convertir_bloque141(src + (size_t)(y0 + gy) * (size_t)lienzo_w * 4 +
+                                            (size_t)(x0 + gx) * 4,
+                                        conv_grupo + j * (LADO_TILE * LADO_TILE));
+                }
+
+                if (medir) {
+                    t1 = d2c_pvr_pantalla_us();
+                }
+
+                pvr_txr_load(conv_grupo, (pvr_ptr_t)((uint16_t *)pant_tex + i0),
+                             4 * LADO_TILE * LADO_TILE * 2);
+                pres_subidas++;
+                pres_bloques += 4;
+
+                if (medir) {
+                    t2 = d2c_pvr_pantalla_us();
+                    pres_conv_us += (t1 - t0) * PRES_MUESTREO;
+                    pres_vram_us += (t2 - t1) * PRES_MUESTREO;
+                }
+            } else {
+                /* los grupos a medias: cada bloque se convierte y se sube como siempre, y el cronometro se
+                 * acumula aca adentro (no se puede partir en dos bucles: `conv_tile` es UN bloque). */
+                unsigned int reloj_conv = 0, reloj_vram = 0;
+
+                for (j = 0; j < nby; j++) {
+                    for (i = 0; i < nbx; i++) {
+                        if (!sucios[(by + j) * columnas + (bx + i)]) {
+                            continue;
+                        }
+
+                        if (medir) {
+                            t0 = d2c_pvr_pantalla_us();
+                        }
+
+                        convertir_bloque141(src + (size_t)(y0 + j * LADO_TILE) * (size_t)lienzo_w * 4 +
+                                                (size_t)(x0 + i * LADO_TILE) * 4,
+                                            conv_tile);
+
+                        if (medir) {
+                            t1 = d2c_pvr_pantalla_us();
+                        }
+
+                        pvr_txr_load(conv_tile,
+                                     (pvr_ptr_t)((uint16_t *)pant_tex +
+                                                 indice_tile(x0 + i * LADO_TILE, y0 + j * LADO_TILE)),
+                                     LADO_TILE * LADO_TILE * 2);
+                        pres_subidas++;
+                        pres_bloques++;
+
+                        if (medir) {
+                            t2 = d2c_pvr_pantalla_us();
+                            reloj_conv += t1 - t0;
+                            reloj_vram += t2 - t1;
+                        }
+                    }
+                }
+
+                if (medir && cuantos > 0) {
+                    /* la muestra es `cuantos` bloques de este grupo: se escala a los bloques que se
+                     * muestrearon (uno de cada PRES_MUESTREO) igual que el camino agrupado. */
+                    pres_conv_us += reloj_conv * PRES_MUESTREO;
+                    pres_vram_us += reloj_vram * PRES_MUESTREO;
+                }
+            }
+        }
+    }
 
     return 0;
 }

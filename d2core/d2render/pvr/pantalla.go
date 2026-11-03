@@ -145,6 +145,17 @@ func Presentar(img *Imagen) error {
 		img.ancho%ladoDelBloque139 == 0 && img.alto%ladoDelBloque139 == 0 {
 		base := uintptr(unsafe.Pointer(&img.pixeles[0]))
 
+		// DC-002.142: LA SUBIDA AGRUPADA (ver `presentar_142.go`). El camino de DC-002.139 hace UNA copia de
+		// 2 KiB por bloque, y caminando se marcan los 300: 300 viajes de Store Queue son los 16-26 ms medidos.
+		// Aca se recorren de a grupos de 2x2 y el grupo completo va en UNA copia de 8 KiB (los mismos bytes).
+		if presentarEnGrupos142 {
+			if r := presentarLosBloquesSucios142(base, img.ancho); r != 0 {
+				return errorPantalla("no se pudo convertir los bloques sucios en grupos (codigo " + itoa(r) + ")")
+			}
+
+			return nil
+		}
+
 		for by := 0; by < filas139; by++ {
 			for bx := 0; bx < columnas139; bx++ {
 				i := by*columnas139 + bx
@@ -170,6 +181,23 @@ func Presentar(img *Imagen) error {
 	}
 
 	return nil
+}
+
+// DC-002.142: la prueba de la conversion (convierte N bloques y devuelve los microsegundos). Ver
+// `d2c_pvr_pantalla_prueba_conv142`: sirve para medir la conversion ANTES y DESPUES del corrimiento del lienzo
+// en el mismo cuadro. No sube nada a la VRAM.
+//
+//extern d2c_pvr_pantalla_prueba_conv142
+func d2cPvrPantallaPruebaConv142(rgba uintptr, lienzoW, n int) int
+
+// PruebaDeLaConversion142: convierte `bloques` bloques de 32x32 (desde la esquina de arriba a la izquierda del
+// lienzo) y devuelve los microsegundos que costo. SOLO mide: el resultado va a un buffer de trabajo.
+func PruebaDeLaConversion142(img *Imagen, bloques int) int {
+	if img == nil || len(img.pixeles) == 0 {
+		return 0
+	}
+
+	return d2cPvrPantallaPruebaConv142(uintptr(unsafe.Pointer(&img.pixeles[0])), img.ancho, bloques)
 }
 
 // PintarPantalla pinta el cuadro en toda la pantalla. El que llama tiene que tener abierta la lista OPACA

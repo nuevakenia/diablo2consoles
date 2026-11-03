@@ -283,6 +283,13 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 // pintado del quad), en su propia linea `PVR135: PRESENTAR`: la de PVR132 queda igual, con el total, para
 // que las corridas de la tarjeta anterior se sigan pudiendo comparar renglon a renglon.
 func (r *Renderer) anotarElCuadro(usEspera, usTrabajo, usCuadro, usConv, usVram, usPintar int) {
+	// DC-002.142: el ultimo cuadro, para poder leerlo por cuadro desde el POC (el informe de `PVR135` es un
+	// promedio de 30 y el cuadro que camina se pierde adentro del promedio).
+	usPintarDelCuadro142 = usPintar
+	convDelCuadro142 = usConv
+	vramDelCuadro142 = usVram
+	presentarDelCuadro142 = usCuadro - usEspera - usTrabajo
+
 	r.msEspera += usEspera
 	r.msTrabajo += usTrabajo
 	r.msCuadro += usCuadro
@@ -320,7 +327,8 @@ func (r *Renderer) anotarElCuadro(usEspera, usTrabajo, usCuadro, usConv, usVram,
 	println("PVR135: PRESENTAR conv_us=", r.usConv/n, "vram_us=", r.usVram/n,
 		"pintar_us=", r.usPintar/n, "total_us=", r.msPresentar/n,
 		"bloques=", BloquesPresentados(), "subidas=", SubidasPresentadas(),
-		"convRapida=", convRapidaSiNo(), "vramAgrupada=", vramAgrupadaSiNo())
+		"convRapida=", convRapidaSiNo(), "vramAgrupada=", vramAgrupadaSiNo(),
+		"grupo142=", grupos142SiNo())
 
 	r.msEspera, r.msTrabajo, r.msPresentar, r.msCuadro = 0, 0, 0, 0
 	r.usConv, r.usVram, r.usPintar = 0, 0, 0
@@ -338,6 +346,15 @@ func convRapidaSiNo() string {
 
 func vramAgrupadaSiNo() string {
 	if vramAgrupada {
+		return "si"
+	}
+
+	return "no"
+}
+
+// grupos142SiNo: si el camino por bloques sucios sube en grupos de 2x2 (DC-002.142) o de a un bloque (DC-002.139).
+func grupos142SiNo() string {
+	if presentarEnGrupos142 {
 		return "si"
 	}
 

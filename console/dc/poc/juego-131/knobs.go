@@ -751,6 +751,23 @@ const (
 	// "no" vuelve al camino viejo en el mismo binario (es el A/B). La cabecera de `conversion_141.go` lo cuenta.
 	convFilas141 = "si"
 
+	// presentarGrupo142: "si" = EL CAMINO POR BLOQUES SUCIOS SUBE EN GRUPOS DE 2x2 (DC-002.142). Los cuatro
+	// bloques de un grupo (64x64 px = 8.192 B) son contiguos en la textura twiddleada, asi que van en UNA copia;
+	// con "no" el camino es el de DC-002.139, una copia de 2 KiB por bloque (300 viajes cuando camina), en el
+	// MISMO binario. La cabecera de `presentar_142.go` tiene los numeros.
+	presentarGrupo142 = "si"
+
+	// presentar142: "si" = el informe POR CUADRO de la presentacion del cuadro que camina (`JUEGO142:
+	// PRESENTAR-CAMINANDO`). La linea `PVR135: PRESENTAR` es un promedio de 30 cuadros y ahi el cuadro caro se
+	// diluye entre los baratos; este informe dice cuadro por cuadro cuanto costo presentar el que camino.
+	presentar142 = "si"
+
+	// pruebaConv142: "si" = la PRUEBA de la conversion (DC-002.142): convierte 20 bloques ANTES y DESPUES del
+	// corrimiento del lienzo, en el mismo cuadro, y los dos numeros salen en `JUEGO142: PRUEBA-CONV`. Existe
+	// porque el mismo bucle cuesta 9 us por bloque en un cuadro quieto y 80 en un cuadro que camina, y hay que
+	// saber si es el bucle o el estado de la memoria despues de la copia. Cuesta ~2 ms por cuadro: va apagada.
+	pruebaConv142 = "no"
+
 	// blitRapido: "si" = el camino nuevo de dibujado de tiles del backend PVR (DC-002.132): el recorte se calcula
 	// UNA vez por tile (no una vez por pixel) y con el estado neutro (sin color puesto) no se hace la cuenta del
 	// tinte (3 multiplicaciones y 3 divisiones por 255 por pixel). "no" = el bucle viejo, TAL CUAL, que es el que
