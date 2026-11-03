@@ -1,0 +1,334 @@
+DC-002.133 -- EL SEGUNDO MVP: LOS DOS PERSONAJES ANIMADOS Y LOS CONTROLES ANDANDO BIEN
+================================================================================
+Fecha: 2026-11-03.
+Maquina: CachyOS, RX 7900 XTX, Flycast 2.7 (sin KVM).
+POC: console/dc/poc/juego-131 (rama DC-002).
+Evidencia cruda de esta tarjeta: /tmp/dc133/cap-e1 (corrida del guion de las ocho direcciones) y
+/tmp/dc133/cap-e2 (corrida del ataque, guion `quieto`); el `flycast.log` de cada una es la consola serie del POC.
+Builds: /tmp/dc133/e1, /tmp/dc133/e2, /tmp/dc133/e3. Capturas: /tmp/dc133/cap-e1/c00-quieto.png ... c6.png
+(2560x1080, la ventana del emulador esta en 900,120 y mide 640x480: `ffmpeg -vf crop=640:480:900:120`). Dos van en
+este repo, recortadas: `dc-002.133-amazona-caminando.png` (cuadro 2 de e1) y `dc-002.133-amazona-y-returned.png`
+(cuadro 4 de e1: la amazona quieta y el Returned patrullando al lado, los dos dibujados sobre el pueblo).
+Las corridas anteriores de la tarjeta siguen en disco y se citan donde toca: /tmp/dc133/cap-a2 (la primera que
+cargo entera), /tmp/dc133/cap-d1, /tmp/dc133/cap-d2, y las que no cargaron (/tmp/dc133/cap-b1b, cap-c1).
+
+
+1. QUE SE MIDIO Y CON QUE
+-------------------------
+La tarjeta pide cuatro cosas: que la cruceta elija la animacion (8 direcciones), que soltar vuelva al quieto (NU),
+que el boton de ataque dispare el golpe, que el Returned tambien se mueva y responda, que el cambio de direccion NO
+corte ni reinicie la animacion, que la velocidad siga siendo la del motor (1,875 celdas/s), y los fps con los dos
+animados. Todo eso se mide en UN archivo nuevo, `animacion_133.go`, que NO toca ningun reloj ni ninguna tabla del
+motor: se ENGANCHE donde el POC ya decide el cuadro que se pinta y anota, por personaje y por cuadro del POC:
+
+  JUEGO133: ANIM cuadro= quien= modo= dir= cuadroDelCiclo= de= fase= celda= cambiosDeDireccion= saltos=
+
+  modo   el nombre que trae el ciclo (`CicloDelJugador.Modo` = el nombre del COF: NU quieto, TW caminar, A1 el
+         golpe de la amazona; WL caminar y GH/DT/DD del Returned). No es una etiqueta del instrumento: si el POC
+         dibuja otra animacion, la linea lo dice.
+  dir    la direccion del COF (0..15), la que eligio la cadena del motor a partir de los bits de la cruceta.
+  fase   cuantos cuadros de animacion pasaron desde que empezo el MODO (`relojDelModo / msPorCuadro`). Es el
+         numero con el que se prueba que un cambio de direccion no reinicia nada: la fase solo crece mientras el
+         modo sea el mismo.
+  celda  la celda del motor donde esta el personaje en ese cuadro (para atar la animacion al movimiento).
+
+Los enganches son tres y son los tres caminos por los que el POC elige un cuadro de personaje:
+  - `cicloYCuadroDelJugador` (combate_122.go) para la amazona: caminando/quieto y el A1 del golpe;
+  - `cuadroDelBicho` (monstruo_121.go) para la patrulla del Returned;
+  - `cuadroDelModoDelGolpe` (monstruo_121.go) para GH (recibe), DT (cae) y DD (cadaver).
+El medidor no se inventa el estado: lo LEE del ciclo que el POC ya compuso con los COF y las DCC del MPQ.
+
+Al cerrar, dos resumenes por personaje:
+
+  JUEGO133: ANIM PERSONAJE quien= modos= modoFinal= cambiosDeModo= cambiosDeDireccion= saltosDeFase= volteos=
+                            cuadrosDibujados= segundos= cuadrosDelPOCPorSegundoX100= direcciones=
+                            cuadrosDistintosPorModo= girosPerdidos=
+  JUEGO133: ANIM DIRECCIONES quien= delCOF= cuantas=
+  JUEGO133: ANIM GIRO quien= giro= de= a= faseAntes= faseDespues= msDelModo= salto=
+
+  cuadrosDistintosPorModo  cuantos cuadros DISTINTOS de cada animacion llegaron al lienzo (p.ej. `TW:6/8`): es el
+                           numero que dice si una animacion se vio de verdad o si el cuadro del POC se la salto.
+  saltosDeFase             giros en los que la fase RETROCEDIO. Tiene que quedar en 0: seria el corte que la
+                           tarjeta prohibe.
+  cuadrosDelPOCPorSegundoX100  el cuadro del POC por segundo en centesimas, la misma unidad que `fpsX100` de
+                           PVR132. Cada cuadro dibujado es UNA pose de la animacion, asi que este numero es a la
+                           vez el fps y las poses por segundo que se ven.
+
+Las tres corridas de evidencia (el mismo binario salvo las palancas del guion y del pulso del golpe):
+
+  e3  GUION_POC=ocho, GOLPE_AUTO=no   la amazona camina las ocho direcciones, 1,6 s cada una con 0,1 s de pausa,
+                                      sin el pulso del golpe: es LA corrida de la animacion de caminar (las ocho
+                                      direcciones y los giros sin que el A1 se lleve los cuadros).
+  e1  GUION_POC=ocho, GOLPE_AUTO=si   la misma caminata con el golpe automatico pulsando el boton Y cada 2,4 s (el
+                                      emulador corre sin teclado: el ataque se pulsa solo, ver combate_122.go). Es
+                                      la corrida del ataque caminando y de la respuesta del Returned.
+  e2  GUION_POC=quieto, GOLPE_AUTO=si la amazona se queda en su celda y solo ataca: es la corrida del A1, del boton
+                                      y del reposo animado.
+
+Las tres con VIDA_X=8 (la vida del Returned x8) para que no se muera y siga respondiendo todo el guion, 1 jugador,
+CUADROS=34 (e1 y e3) y 14 (e2), y el resto de las palancas como las deja DC-002.135.
+
+
+2. LO QUE SE ARREGLO EN ESTA TARJETA (y por que)
+------------------------------------------------
+2.1 EL QUIETO NO ESTABA ANIMADO. `movimiento.go` tenia un solo reloj de animacion (`MsAnim`) y solo corria
+    caminando: quieto, el personaje se dibujaba SIEMPRE en el cuadro 0 de NU. El ciclo NU de la amazona no es un
+    cuadro tieso -- son 8 cuadros a 128,00 ms (ciclo 1.024 ms, `msQuieto`) -- y en la Dreamcast se veia congelada.
+    Ahora hay un reloj del quieto (`MsQuieto`) que corre mientras la cruceta no pide nada y se pone en cero al
+    empezar a caminar (la regla del motor: la animacion nueva arranca en su cuadro 0). El cuadro 1 sigue siendo el
+    de siempre porque el reloj arranca en 0 (abajo, 4.2: el crc32 lo confirma).
+
+2.2 EL GUION DE LAS OCHO DIRECCIONES. `guionOcho` en coop.go: QUIETO 1 s (para que el cuadro 1 sea la referencia de
+    DC-002.112) y despues DERECHA, IZQUIERDA, ABAJO, ARRIBA, ABAJO+DERECHA, ARRIBA+IZQUIERDA, ABAJO+IZQUIERDA,
+    ARRIBA+DERECHA, 1,6 s cada uno. Los tramos van de ida y vuelta a proposito: 1,6 s son 3 celdas y asi el
+    personaje no se aleja mas de ~3 celdas del origen (mas lejos, la cache de tiles se derrama y el cuadro del POC
+    pasa de 650 ms a minutos: medido en la primera corrida de esta tarjeta, que se alejo 9 celdas).
+    La pausa entre tramos (`pausaCoop`) dejo de ser constante y este guion la baja a 0,1 s: con 1 s de pausa cada
+    cambio de direccion llega precedido de un cuadro QUIETO, o sea que el personaje ENTRA al caminar desde el NU y
+    el cambio de direccion que hay que medir nunca ocurre.
+
+2.3 EL RESUMEN SALE ANTES DEL CICLO DE NIVELES. Con `faseKnob=ciclo` (lo que trae el POC de DC-002.120), los
+    cuadros de despues del guion son las tres fases del cambio de nivel y el cierre de siempre
+    (`cuadro == cuadros+3`, donde imprimian los resumenes de las otras tarjetas) no llega nunca: la primera corrida
+    de esta tarjeta lo demostro, el resumen no salio. Ahora se imprime UNA vez al entrar al ciclo
+    (`resumenDeLaAnimacionHecho`, main.go).
+
+2.4 `animacion_133.go` (nuevo) y `scripts/console/build-anim-133.sh` (nuevo): el medidor y el build con las
+    palancas de la tarjeta.
+
+
+3. LAS CUATRO COSAS DE LA TARJETA, MEDIDAS
+------------------------------------------
+3.1 LA CRUCETA ELIGE LA ANIMACION: LAS OCHO DIRECCIONES SE DIBUJARON.
+    Corrida e3 (el guion de las ocho direcciones sin el pulso del golpe, para que el A1 no se lleve los cuadros),
+    amazona (P1), al cierre:
+
+      JUEGO133: ANIM PERSONAJE quien= P1 modos= 2 modoFinal= NU cambiosDeModo= 6 cambiosDeDireccion= 5
+                saltosDeFase= 0 volteos= 10 cuadrosDibujados= 34 segundos= 20.187
+                cuadrosDelPOCPorSegundoX100= 168 direcciones= 8 cuadrosDistintosPorModo= NU:7/8 TW:7/8
+                girosPerdidos= 0
+      JUEGO133: ANIM DIRECCIONES quien= P1 delCOF= 0 1 4 7 8 9 12 15 cuantas= 8
+
+    Ocho direcciones del COF -- 0 1 4 7 8 9 12 15 -- que son exactamente las ocho de la cruceta: 0/1/4/7 las cuatro
+    cardinales del COF de 16 direcciones y 8/9/12/15 las cuatro diagonales. Cada tramo del guion cae en la direccion
+    que le toca (el POC lo deja escrito: `JUEGO121: TRAMO ... dir=`):
+
+      TRAMO DERECHA            dir= 12    TRAMO ARRIBA            dir= 8
+      TRAMO IZQUIERDA          dir=  4    TRAMO ABAJO+DERECHA     dir= 15
+      TRAMO ABAJO              dir=  0    TRAMO ARRIBA+IZQUIERDA  dir= 7
+      TRAMO ARRIBA+DERECHA     dir=  9    TRAMO ABAJO+IZQUIERDA   dir= 1
+
+    Y los cuadros de cada animacion que llegaron al lienzo: TW 7 de 8 (caminar) y NU 7 de 8 (quieto). No son 8 de 8
+    porque el guion camina 20,2 s en 34 cuadros: cada cuadro del POC se lleva ~12 cuadros de animacion de 40 ms, o
+    sea que 7 cuadros distintos en 34 cuadros del POC es lo que la cuenta da.
+
+    En la corrida e1 (la misma pero con el pulso del golpe encendido) se dibujaron 7 de las 8 direcciones de caminar
+    y la octava (ARRIBA+DERECHA, dir 9) cayo entera dentro de un A1 -- y en su lugar aparece la direccion 14, que es
+    la que dibuja el golpe (5.1). Por eso la corrida limpia de las ocho direcciones es e3.
+
+3.2 SOLTAR LA TECLA VUELVE AL QUIETO (NU), Y EL QUIETO SE MUEVE.
+    En e2 -- la corrida en la que la amazona se queda quieta -- el reposo recorre su ciclo:
+
+      JUEGO133: ANIM cuadro= 2  quien= P1 modo= NU dir= 0 cuadroDelCiclo= 7 de= 8 fase= 15 celda= 28 20
+      JUEGO133: ANIM cuadro= 9  quien= P1 modo= NU dir= 0 cuadroDelCiclo= 6 de= 8 fase= 62 celda= 28 20
+      JUEGO133: ANIM cuadro= 10 quien= P1 modo= NU dir= 0 cuadroDelCiclo= 2 de= 8 fase= 66 celda= 28 20
+      JUEGO133: ANIM cuadro= 12 quien= P1 modo= NU dir= 0 cuadroDelCiclo= 2 de= 8 fase= 74 celda= 28 20
+
+    `cuadroDelCiclo` recorre 7, 6, 2 dentro del mismo NU y `fase` sube 15, 62, 66, 74: el reposo se anima. En e1
+    (que camina casi todo el guion) las apariciones del quieto son cortas, pero dicen lo mismo: cuadro 7 con
+    fase 15, cuadro 4 con fase 4, cuadro 7 con fase 23 y con fase 39. Antes de esta tarjeta esa linea decia siempre
+    `cuadroDelCiclo= 0 fase= 0`.
+
+3.3 EL BOTON DE ATAQUE DISPARA EL GOLPE (corrida e2, guion quieto):
+
+      JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 1 dir= 0  dirDibujada= 14 dirPropia= false vida= 24 cuadro= 0
+      JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 2 dir= 0  dirDibujada= 14 dirPropia= false vida= 24 cuadro= 6
+      JUEGO133: ANIM cuadro= 7 quien= P1 modo= A1 dir= 14 cuadroDelCiclo= 0 de= 13 fase= 0 celda= 28 20
+      JUEGO133: ANIM PERSONAJE quien= P1 modos= 2 modoFinal= NU cambiosDeModo= 5 cuadrosDistintosPorModo=
+                A1:2/13 NU:4/8
+
+    El A1 entra (modo A1, 13 cuadros) y despues vuelve solo al quieto: 5 cambios de modo en 14 cuadros del POC.
+
+3.4 EL RETURNED SE MUEVE Y RESPONDE.
+    e3, la patrulla (el guion de la tarjeta, sin ataques encima):
+
+      JUEGO133: ANIM PERSONAJE quien= BICHO modos= 1 modoFinal= WL cambiosDeModo= 0 cambiosDeDireccion= 7
+                saltosDeFase= 0 volteos= 16 cuadrosDibujados= 34 segundos= 19.742
+                cuadrosDelPOCPorSegundoX100= 172 direcciones= 2 cuadrosDistintosPorModo= WL:8/8
+      JUEGO133: ANIM DIRECCIONES quien= BICHO delCOF= 2 6 cuantas= 2
+
+    WL 8 de 8: la caminata completa de la patrulla se vio entera, en sus dos direcciones (2 y 6) yendo y viniendo,
+    con 16 vueltas del ciclo y los 7 giros de los extremos (4.1).
+
+    e1, con el golpe encendido (la vida bajo de 24 a 23: le entro un golpe):
+
+      JUEGO133: ANIM PERSONAJE quien= BICHO modos= 2 modoFinal= WL cambiosDeModo= 2 cambiosDeDireccion= 7
+                saltosDeFase= 0 volteos= 14 cuadrosDibujados= 34 segundos= 20.4
+                cuadrosDelPOCPorSegundoX100= 166 direcciones= 2 cuadrosDistintosPorModo= WL:8/8 GH:1/4
+      JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 3 dir= 14 dirDibujada= 14 dirPropia= true vida= 24 cuadro= 10
+      JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 4 dir= 0  dirDibujada= 14 dirPropia= false vida= 23 cuadro= 15
+
+    GH 1 de 4: el unico cuadro del golpe recibido que llego al lienzo (el bicho patrulla, asi que muchas veces esta a
+    mas de los 7 subtiles de alcance: `GOLPE-AFUERA distancia= 8..32 alcance= 7`). Responde: la vida baja y entra al
+    modo GH.
+
+3.5 LA VELOCIDAD SIGUE SIENDO LA DEL MOTOR: 1,875 celdas/s.
+    Los tramos del guion, medidos por el propio POC (`JUEGO121: TRAMO`, celdasPorSegundo), corrida e3:
+
+      ARRIBA            2,775 celdas -> 1,82806     ABAJO+DERECHA       2,850 -> 1,9179
+      ARRIBA+IZQUIERDA  2,925 celdas -> 1,84659     ABAJO+IZQUIERDA     2,775 -> 1,84877
+      ARRIBA+DERECHA    3,075 celdas -> 1,86477     ABAJO               1,125 -> 1,78288
+      DERECHA           1,875 celdas -> 1,03022     IZQUIERDA           1,875 -> 1,05101
+
+    Los seis tramos que caen en 2-3 cuadros del POC dan 1,78-1,92: el 1,875 de DC-002.113 dentro de la cuantizacion
+    del cuadro (±2,3 %, sin corregir por el tope del paso). Los dos que caen en UN SOLO cuadro del POC (DERECHA,
+    IZQUIERDA) dan 1,03 y 1,05 porque el paso esta topado a 25 ticks = 1 s (`topeDeTicks`): el personaje anda 1,875
+    celdas -- las que entran en 1 s -- y el tramo duro 1,85 s de reloj. Es el tope del paso, no la velocidad; el mismo
+    tope deja al ABAJO en 1,78 (0,632 s de reloj para 1,125 celdas, menos de un tick entero).
+
+
+4. LAS TRANSICIONES LIMPIAS (el corazon de la tarjeta)
+------------------------------------------------------
+4.1 CADA GIRO CON SUS DOS FASES, Y NINGUNO CON LA FASE REINICIADA.
+    e3, la amazona (los cinco giros del guion, todos caminando: de una direccion a la otra sin soltar la cruceta):
+
+      JUEGO133: ANIM GIRO quien= P1 giro= 1 de= 12 a= 4  faseAntes= 45 faseDespues= 90  msDelModo= 3566
+                salto= false
+      JUEGO133: ANIM GIRO quien= P1 giro= 2 de= 4  a= 0  faseAntes= 90 faseDespues= 105 msDelModo= 4103
+                salto= false
+      JUEGO133: ANIM GIRO quien= P1 giro= 3 de= 8  a= 15 faseAntes= 37 faseDespues= 50  msDelModo= 1973
+                salto= false
+      JUEGO133: ANIM GIRO quien= P1 giro= 4 de= 15 a= 7  faseAntes= 75 faseDespues= 88  msDelModo= 3495
+                salto= false
+      JUEGO133: ANIM GIRO quien= P1 giro= 5 de= 1  a= 9  faseAntes= 37 faseDespues= 51  msDelModo= 2137
+                salto= false
+
+    e3, el Returned (los siete extremos de la patrulla):
+
+      JUEGO133: ANIM GIRO quien= BICHO giro= 1 de= 6 a= 2 faseAntes= 46  faseDespues= 69  msDelModo= 4966
+                salto= false
+      JUEGO133: ANIM GIRO quien= BICHO giro= 2 de= 2 a= 6 faseAntes= 77  faseDespues= 83  msDelModo= 6034
+                salto= false
+      JUEGO133: ANIM GIRO quien= BICHO giro= 3 de= 6 a= 2 faseAntes= 109 faseDespues= 115 msDelModo= 8512
+                salto= false
+      JUEGO133: ANIM GIRO quien= BICHO giro= 4 de= 2 a= 6 faseAntes= 140 faseDespues= 146 msDelModo= 11086
+                salto= false
+      JUEGO133: ANIM GIRO quien= BICHO giro= 5 de= 6 a= 2 faseAntes= 172 faseDespues= 178 msDelModo= 13663
+                salto= false
+      JUEGO133: ANIM GIRO quien= BICHO giro= 6 de= 2 a= 6 faseAntes= 203 faseDespues= 208 msDelModo= 16005
+                salto= false
+      JUEGO133: ANIM GIRO quien= BICHO giro= 7 de= 6 a= 2 faseAntes= 231 faseDespues= 238 msDelModo= 18398
+                salto= false
+
+    Doce giros medidos, doce con la fase SIGUIENDO (faseDespues > faseAntes) y `salto= false`: el reloj del modo
+    no se toca al girar, que es lo que el motor hace (la direccion elige otro ciclo del mismo modo; el reloj es del
+    modo). `saltosDeFase= 0` en los dos personajes, y en e1 tambien. El contraste esta en el mismo instrumento:
+    cuando el modo CAMBIA (entrar a caminar desde el quieto, entrar al golpe) la fase arranca de cero y eso se
+    cuenta aparte (`cambiosDeModo`), no como corte.
+
+4.2 EL CUADRO 1 NO CAMBIO (la prueba de que el reloj del quieto no rompio nada):
+
+      JUEGO121: CUADRO 1 SOLO-MAPA pixelesNoVacios= 307196 de 307200 crc32= 1437022778 hostCrc= 1437022778
+                igualAlHost= true camaraCelda= 28 20 jugadores= 1
+      JUEGO121: CUADRO 1 REFERENCIA igualAlDeDC002112= false crc32= 990461734 esperado= 1363871674 ancla= 320 283
+
+    El mundo solo (sin personajes) es el del host, bit a bit: 1437022778, igual en e1, e2 y e3. Y el cuadro 1 CON
+    personaje da 990461734 en e1 y en e2, el MISMO numero que dio en las corridas de DC-002.134 y DC-002.135: la
+    linea `REFERENCIA` compara contra el crc32 de DC-002.112 (una corrida sin HUD, sin minimapa y sin bicho) y por
+    eso sigue diciendo `false`, como ya decia en esas dos tarjetas; lo que importa es que el numero es identico al
+    de ellas, o sea que el quieto animado no movio un pixel en el primer cuadro (su reloj arranca en 0).
+
+    En e3 ese mismo cuadro da 1990320724. No es la animacion del personaje ni del bicho: el cuadro compuesto del
+    personaje (NU dir 0 cuadro 0) es `crc32= 1857478036` en las tres corridas y el del Returned (WL dir 6 cuadro 0)
+    es `crc32= -388391488` tambien en las tres. Lo que cambia es DONDE estaba el Returned en ese cuadro: su patrulla
+    avanza con el reloj de la consola y el arranque de e3 tardo unos milisegundos distinto. Con el bicho en pantalla
+    el cuadro 1 solo es comparable entre corridas del mismo arranque; la prueba del mundo (`SOLO-MAPA`) no depende de
+    eso y da igual en las tres.
+
+
+5. LO QUE NO CIERRA (medido, sin tapar)
+--------------------------------------
+5.1 EL A1 SE DIBUJA SIEMPRE EN LA DIRECCION 14 Y SIEMPRE EN SU CUADRO 0.
+    En las dos corridas, todos los `GOLPE-EMPIEZA` salen con `dirDibujada= 14` y `dirPropia= false` (5 de 6 en e1
+    y los 3 de e2): el heroe gira hacia el bicho para pegar (regla de DC-002.122) y el POC solo tiene compuesto el
+    A1 de UNA direccion. No es un descuido de esta tarjeta: el A1 cuesta 74.971 B por direccion y el monton de C
+    llega al pico con ~800.000 B libres de 10.453.728 al cargar (medido: `pico= 9628464`), asi que ocho direcciones
+    de A1 son 600 KB que no entran. La tarjeta que lo habilitaria es una de RAM, no de animacion.
+    El cuadro del A1 que se ve es el 0 (`A1:2/13` y `A1:3/13`): el A1 dura 13 x 40 = 520 ms y el cuadro del POC
+    tarda 652 ms (`PVR132: CUADRO trabajo_us= 626451 presentar_us= 25592 cuadro_us= 652047`), asi que el cuadro
+    del POC se salta el resto del golpe. Con el cuadro a 650 ms ninguna animacion de menos de 650 ms se ve entera;
+    la de caminar (8 x 40 = 320 ms) la salva que el reloj del modo sigue.
+
+5.2 EL PULSO DEL GOLPE SE COME LOS CAMBIOS DE DIRECCION (por eso la corrida limpia es e3).
+    Con el golpe cada 2,4 s y tramos de 1,6 s, casi todos los cambios de direccion del guion quedan precedidos por
+    un A1 (o por el cuadro de pausa en NU) y se cuentan como cambio de MODO, no como giro: en e1 la amazona tiene 18
+    cambios de modo y solo 3 giros medidos, y ademas se dibujaron 7 de las 8 direcciones de caminar (la octava se la
+    llevo un golpe). En e3, con el pulso apagado, la misma caminata da 6 cambios de modo, 5 giros y las 8
+    direcciones. Los dos numeros son correctos y dicen cosas distintas: e1 es "caminar y pelear al mismo tiempo" (que
+    es lo que el MVP pide), e3 es "la animacion de caminar, medida sin interferencia". Los 5 giros de e3 y los 3 de
+    e1 dan `salto= false` los ocho.
+
+5.3 LA CAPA SH DE LA AMAZONA Y LA S4 DEL RETURNED NO EXISTEN EN EL MPQ.
+    Nueve lineas `JUEGO112: CAPA SH SIN-GRAFICO modo= ... dir= ...` por arranque al componer la amazona (la capa del
+    escudo: NU dir 0, los siete TW y el A1) y una `JUEGO121: BICHO CAPA S4 SIN-GRAFICO modo= WL dir= 6`. Ya pasaba
+    antes de esta tarjeta; el POC sigue y dibuja las otras capas (`capasDibujadas= 7 sinGrafico= 0` en los cuadros
+    del COF del personaje). Se reporta, no se tapa.
+
+5.4 EL CICLO DE NIVELES NO ENTRA EN ESTA CORRIDA.
+    Con `faseKnob=ciclo` (el que trae el POC), despues del guion la transicion compone TownE1.ds1 y se queda sin
+    monton: `Out of memory. Requested sbrk_base ... diff 1007616` y `fatal error: gc_external_alloc: OOM`, y
+    Flycast reinicia el juego. Pasa DESPUES del resumen de la animacion (por eso el resumen se imprime antes, 2.3)
+    y el ciclo de niveles no es de esta tarjeta. Con `FASE=no` -- y con `FASE=si`, que NO es lo mismo: la palanca
+    tiene tres valores y solo `ciclo` enciende el ciclo -- el POC ni siquiera compone el pueblo: la politica de
+    reusar las casillas queda apagada y se queda en `ARQ-CARGA lee-volvio TownN1.ds1` para siempre (medido: 8
+    minutos, 15 % de CPU, sin primer cuadro). Esa combinacion no se usa.
+
+
+6. LOS FPS CON LOS DOS ANIMADOS
+-------------------------------
+    Corrida e3 (la de la caminata limpia):
+
+    PVR132: FPS seg_fpsX100= 185 cuadros= 7      PVR132: FPS seg_fpsX100= 192 cuadros= 14
+    PVR132: FPS seg_fpsX100= 204 cuadros= 10     PVR132: FPS seg_fpsX100= 206 cuadros= 17
+    PVR132: FPS seg_fpsX100= 199 cuadros= 12     PVR132: FPS seg_fpsX100= 191 cuadros= 19
+    PVR132: CUADRO 30 espera_us= 3 trabajo_us= 607426 presentar_us= 25509 cuadro_us= 632938 fpsX100= 157
+                 desglose= espera+trabajo+presentar
+
+    Corrida e1 (la misma con el golpe encendido):
+
+    PVR132: CUADRO 30 espera_us= 3 trabajo_us= 626451 presentar_us= 25592 cuadro_us= 652047 fpsX100= 153
+
+    1,57-2,06 cuadros por segundo con los dos personajes animados, el HUD y el minimapa (Flycast sin KVM; el mismo
+    orden que en DC-002.132/134/135, o sea que la animacion no le costo nada al cuadro: el pulso del golpe agrega
+    ~19 ms de trabajo y ~30 ms de reloj). El cuadro se lo lleva el `trabajo` del POC (607-626 ms: recomponer el piso
+    cada cuadro), no la presentacion (25,5 ms) ni el instrumento.
+    El medidor cierra el mismo numero por su cuenta: `cuadrosDelPOCPorSegundoX100= 168` para P1 y 172 para el bicho
+    en e3 (los dos dibujan un cuadro por cuadro del POC).
+
+    Dicho derecho: la animacion es la del motor, con su reloj y sus cuadros, y el POC la muestrea a 1,6 cuadros por
+    segundo. Con 633-652 ms por cuadro, cada cuadro que se ve es una pose ~12 cuadros de animacion mas adelante que
+    la anterior: la animacion es correcta y el muestreo es pobre. Lo que la tarjeta pide medir es el muestreo, y ese
+    numero -- 633 ms de los cuales 607 son recomponer el piso -- ya esta en DC-002.132/134/135; la animacion no le
+    agrega ni un milisegundo.
+
+
+7. COMO SE REPRODUCE
+--------------------
+    cd ~/Proyectos/diablo2consoles
+    # e3: la caminata de las ocho direcciones, sin el pulso del golpe
+    GOLPE_AUTO=no CUADROS=34 bash scripts/console/build-anim-133.sh /tmp/dc133/e3
+    CAPTURAS=6 INTERVALO=5 ESPERA_CIERRE=70 bash scripts/console/run-anim-132.sh \
+        /tmp/dc133/e3/disc.gdi /tmp/dc133/cap-e3 900 120
+    # e1: la misma caminata con el golpe automatico
+    CUADROS=34 bash scripts/console/build-anim-133.sh /tmp/dc133/e1
+    CAPTURAS=6 INTERVALO=5 ESPERA_CIERRE=70 bash scripts/console/run-anim-132.sh \
+        /tmp/dc133/e1/disc.gdi /tmp/dc133/cap-e1 900 120
+    # e2: la corrida del ataque, con el guion quieto
+    GUION_POC=quieto CUADROS=14 bash scripts/console/build-anim-133.sh /tmp/dc133/e2
+    CAPTURAS=4 INTERVALO=4 ESPERA_CIERRE=70 bash scripts/console/run-anim-132.sh \
+        /tmp/dc133/e2/disc.gdi /tmp/dc133/cap-e2 900 120
+
+    El arranque son 71 s (los MPQ, el pueblo y las animaciones) y no menos: con ESPERA_ARRANQUE por debajo de eso la
+    corrida se corta antes del primer cuadro. ESPERA_CIERRE=70 alcanza porque el resumen se imprime en el primer
+    cuadro del ciclo de niveles (2.3); despues de eso el POC sigue con la transicion, que en esta corrida no entra
+    (5.4).

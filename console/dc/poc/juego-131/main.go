@@ -1347,6 +1347,14 @@ func dibujar(superficie d2interface.Surface) error {
 	// DC-002.120: con el ciclo encendido, los cuadros de DESPUES del guion son las tres fases del cambio de nivel
 	// (`fases_120.go`). El camino de siempre (los tres cuadros del cierre) queda intacto para `faseKnob=apagado`.
 	if faseEncendida() && cuadro > cuadros {
+		// DC-002.133: EL RESUMEN DE LA ANIMACION SALE ANTES DEL CICLO. Con el ciclo de niveles encendido, el cuadro
+		// de despues del guion se lo lleva la transicion y el cierre de siempre (`cuadro == cuadros+3`, donde estaban
+		// los resumenes de las otras tarjetas) no llega nunca. El guion ya termino: los numeros estan completos.
+		if !resumenDeLaAnimacionHecho {
+			resumenDeLaAnimacionHecho = true
+			resumenDeLaAnimacion133()
+		}
+
 		return dibujarElCiclo(superficie)
 	}
 
@@ -1820,7 +1828,16 @@ func dibujar(superficie d2interface.Surface) error {
 		resumenDeLosNPCs()        // DC-002.127: los NPCs, su texto y el panel de dialogo
 		resumenDeLaQuest()        // DC-002.128: la Den of Evil, su contador, su cobro y la supervivencia
 		resumenDelMinimapa()      // DC-002.130: el minimapa, su costo por cuadro y la decision siempre/por tecla
+
+		if !resumenDeLaAnimacionHecho {
+			resumenDeLaAnimacionHecho = true
+			resumenDeLaAnimacion133() // DC-002.133: el control manejando la animacion (modos, giros, fases, saltos)
+		}
 	}
+
+	// DC-002.133 -- EL ESTADO DE LA ANIMACION, POR PERSONAJE. Va aca, cuando el cuadro ya se dibujo: lo que la linea
+	// dice es el modo, la direccion y el cuadro del ciclo que LLEGARON AL LIENZO, no lo que el reloj pidio.
+	estadoDeLaAnimacion(cuadro, cuadrosDelInforme133)
 
 	// DC-002.132 -- EL CUADRO, CONTADO. Va al final para que el numero incluya TODO lo que costo el cuadro (el
 	// mapa, los sprites, el HUD, el minimapa y los instrumentos), que es lo que el jugador espera entre cuadro y

@@ -118,7 +118,14 @@ type movimiento struct {
 	Direccion int     // la direccion del COF que mira (0..15)
 	Caminando bool    // si este cuadro la cruceta pedia algo
 	Resto     float64 // segundos que todavia no llegaron a un tick de 25 Hz
-	MsAnim    float64 // el reloj de la animacion (corre solo caminando)
+	MsAnim    float64 // el reloj de la animacion de CAMINAR (TW)
+
+	// DC-002.133: EL RELOJ DEL QUIETO. El ciclo NU del motor no es un cuadro tieso -- la amazona respira, 8 cuadros
+	// a 128,00 ms (ciclo 1.024 ms, `msQuieto`) -- y hasta esta tarjeta el POC se quedaba en el cuadro 0 del NU para
+	// siempre: el unico "personaje animado" que no se movia era el que estaba quieto. Corre mientras la cruceta no
+	// pide nada y se pone en cero al empezar a caminar (la animacion nueva arranca en su cuadro 0, la regla del
+	// motor). Con eso el cuadro 1 sigue siendo el de siempre (el reloj arranca en 0) y despues el NU se ve.
+	MsQuieto float64
 
 	Ticks     int     // ticks de 25 Hz cobrados
 	Recortes  int     // cuadros en los que el paso se recorto (paso > topeDeTicks)
@@ -147,8 +154,14 @@ func (m *movimiento) Paso(ejeX, ejeY, segundos float64) (ticks int, caminado flo
 		m.Resto = 0
 		m.MsAnim = 0
 
+		// DC-002.133: quieto, el reloj del NU corre (asi el reposo se ve animado); caminando se pone en cero, que
+		// es lo que hace el motor al entrar a una animacion (empieza en su cuadro 0).
+		m.MsQuieto += segundos * 1000.0
+
 		return 0, 0
 	}
+
+	m.MsQuieto = 0
 
 	m.Direccion = DireccionDelControl(ejeX, ejeY)
 
@@ -190,19 +203,39 @@ func (m *movimiento) Paso(ejeX, ejeY, segundos float64) (ticks int, caminado flo
 	return ticks, caminado
 }
 
+// MsDelModo: el reloj de animacion que le toca al ciclo por su MODO. El de caminar (TW) es `MsAnim` y solo corre
+// caminando; el del quieto (NU) es `MsQuieto` y corre quieto (DC-002.133). El A1 no pasa por aca: su reloj es el del
+// golpe (`ataqueDeJugador.MsInicio`).
+func (m *movimiento) MsDelModo(ciclo *CicloDelJugador) float64 {
+	if ciclo != nil && ciclo.Modo == modoQuieto {
+		return m.MsQuieto
+	}
+
+	return m.MsAnim
+}
+
+// CuadroYFase: el cuadro del ciclo que toca y la FASE (cuantos cuadros de animacion pasaron desde que empezo el
+// modo). La fase es el numero con el que se prueba que un cambio de direccion NO reinicia la animacion: si el reloj
+// se reiniciara, la fase retrocederia.
+func (m *movimiento) CuadroYFase(ciclo *CicloDelJugador) (*CuadroDelJugador, int64) {
+	if ciclo == nil || len(ciclo.Cuadros) == 0 {
+		return nil, 0
+	}
+
+	fase := int64(m.MsDelModo(ciclo))
+	if ciclo.MsPorCuadro > 0 {
+		fase = fase / int64(ciclo.MsPorCuadro)
+	}
+
+	return &ciclo.Cuadros[int(fase)%len(ciclo.Cuadros)], fase
+}
+
 // CuadroDeLaAnimacion: cual de los cuadros del ciclo toca, por el reloj del movimiento. Es la cuenta del motor:
 // el cuadro avanza cada `msPorCuadro` y da la vuelta (el `Animation.Advance` de `d2core/d2asset`).
 func (m *movimiento) CuadroDeLaAnimacion(ciclo *CicloDelJugador) *CuadroDelJugador {
-	if ciclo == nil || len(ciclo.Cuadros) == 0 {
-		return nil
-	}
+	cu, _ := m.CuadroYFase(ciclo)
 
-	ms := int(m.MsAnim)
-	if ciclo.MsPorCuadro > 0 {
-		ms = ms / ciclo.MsPorCuadro
-	}
-
-	return &ciclo.Cuadros[ms%len(ciclo.Cuadros)]
+	return cu
 }
 
 // ============================== EL GUION DEL SHIM (SIN MANDO FISICO) ==============================

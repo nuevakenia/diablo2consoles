@@ -280,7 +280,13 @@ type tramoCoop struct {
 }
 
 // pausaCoop: lo que se suelta TODO entre tramo y tramo, para que los tramos no se mezclen en la medida.
-const pausaCoop = 1.0
+//
+// DC-002.133: dejo de ser una constante. El guion de las ocho direcciones (`guionOcho`) la baja a 0,1 s a proposito:
+// con 1 s de pausa, cada cambio de direccion del guion llega precedido de un cuadro QUIETO, o sea que el personaje
+// ENTRA a la animacion de caminar nueva desde el NU y el cambio de direccion -- que es lo que la tarjeta pide medir
+// sin corte -- nunca ocurre. Con 0,1 s la cruceta no se suelta entre tramos: el cambio es TW direccion A -> TW
+// direccion B, y `animacion_133.go` mide si la fase del modo siguio o se reinicio. Los otros guiones no cambian.
+var pausaCoop = 1.0
 
 // TRAMOS DE 4 S Y NO DE 6 (medido en la primera corrida de esta tarjeta): en 6 s cada jugador camina 11 celdas y, con
 // los tramos mandandolos en sentidos contrarios, al llegar a LOS-DOS quedaban a 20 celdas uno del otro: la camara va
@@ -323,6 +329,36 @@ var guionLeash = []tramoCoop{
 	{"SEPARAR-ARRIBA+IZQUIERDA", [maxJugadoresCoop]uint32{bitArriba | bitIzquierda, bitAbajo | bitDerecha}, 7.0},
 	{"SEPARAR-ARRIBA", [maxJugadoresCoop]uint32{bitArriba, bitAbajo}, 7.0},
 	{"SEPARAR-ARRIBA+DERECHA", [maxJugadoresCoop]uint32{bitArriba | bitDerecha, bitAbajo | bitIzquierda}, 7.0},
+}
+
+// ============================== EL GUION DE ESTA TARJETA (DC-002.133): LAS OCHO DIRECCIONES ==============================
+//
+// El guion del MVP de los controles: el jugador 1 aprieta las OCHO direcciones de la cruceta, una detras de otra, y
+// entre tramo y tramo SUELTA todo (la pausa de `pausaCoop`). Es lo que la tarjeta pide ver:
+//
+//	cada direccion tiene que elegir SU animacion de caminar (TW del COF, una por direccion: la direccion del COF que
+//	sale de la cadena del motor, [0 1 4 7 8 9 12 15]), soltar la tecla tiene que volver al quieto (NU), y el cambio
+//	de direccion NO tiene que reiniciar la animacion (la fase del modo sigue: lo mide `animacion_133.go`).
+//
+// LOS TRAMOS SON CORTOS (1,6 s) Y VAN DE IDA Y VUELTA. 1,6 s a 1,875 celdas/s son 3 celdas por tramo, y como cada
+// tramo va seguido del CONTRARIO (DERECHA / IZQUIERDA, ABAJO / ARRIBA, y las dos diagonales con su contraria) el
+// personaje no se aleja mas de ~3 celdas del origen: la cache de tiles de la consola no aguanta una caminata larga
+// (medido en DC-002.117, y en la primera corrida de esta tarjeta: a 9 celdas del origen el recolector entra en
+// tormenta y el cuadro pasa de 500 ms a minutos). Lo que se quiere ver son las OCHO animaciones, no el paseo.
+//
+// EL QUIETO DEL ARRANQUE ES EL CUADRO 1: con la cruceta suelta la camara queda en la celda del POC y el cuadro 1 es
+// el de la referencia de DC-002.112 (crc32 1363871674). Sin ese tramo el guion arranca caminando y el cuadro 1 deja
+// de ser comparable.
+var guionOcho = []tramoCoop{
+	{"QUIETO", [maxJugadoresCoop]uint32{}, 1.0},
+	{"DERECHA", [maxJugadoresCoop]uint32{bitDerecha}, 1.6},
+	{"IZQUIERDA", [maxJugadoresCoop]uint32{bitIzquierda}, 1.6},
+	{"ABAJO", [maxJugadoresCoop]uint32{bitAbajo}, 1.6},
+	{"ARRIBA", [maxJugadoresCoop]uint32{bitArriba}, 1.6},
+	{"ABAJO+DERECHA", [maxJugadoresCoop]uint32{bitAbajo | bitDerecha}, 1.6},
+	{"ARRIBA+IZQUIERDA", [maxJugadoresCoop]uint32{bitArriba | bitIzquierda}, 1.6},
+	{"ABAJO+IZQUIERDA", [maxJugadoresCoop]uint32{bitAbajo | bitIzquierda}, 1.6},
+	{"ARRIBA+DERECHA", [maxJugadoresCoop]uint32{bitArriba | bitDerecha}, 1.6},
 }
 
 // guionDeLaCorrida: el guion que se usa. Lo elige la palanca `guionPoc` de knobs.go al arrancar ("coop" = los
@@ -423,6 +459,13 @@ func elegirGuion() {
 	case "choque":
 		guionDeLaCorrida = guionChoque
 		guionEnUso = "choque"
+	case "ocho":
+		// DC-002.133: las ocho direcciones de la cruceta, que es el guion de la prueba de los controles manejando
+		// las animaciones. La pausa entre tramos baja a 0,1 s: los cambios de direccion tienen que ocurrir
+		// CAMINANDO (si no, serian entradas desde el NU y no habria transicion que medir).
+		guionDeLaCorrida = guionOcho
+		guionEnUso = "ocho"
+		pausaCoop = 0.1
 	case "quieto":
 		// DC-002.122: nadie se mueve. Es el guion de la corrida de los cuatro contra el mismo bicho: los cuatro
 		// tienen que quedarse en las celdas de al lado, que son las unicas desde donde el golpe alcanza.
@@ -1020,6 +1063,7 @@ type estadoGuardado struct {
 	X, Y      float64
 	Dir       int
 	MsAnim    float64
+	MsQuieto  float64 // DC-002.133: el reloj del NU tambien se devuelve (si no, el cuadro repetido no repite)
 	Caminando bool
 }
 
@@ -1044,7 +1088,8 @@ func guardarElFinalDeLosJugadores() {
 		x, y := p.Mov.Est.Celda()
 
 		finalDeLosJugadores[i] = estadoGuardado{
-			X: x, Y: y, Dir: p.Mov.Direccion, MsAnim: p.Mov.MsAnim, Caminando: p.Mov.Caminando,
+			X: x, Y: y, Dir: p.Mov.Direccion, MsAnim: p.Mov.MsAnim, MsQuieto: p.Mov.MsQuieto,
+			Caminando: p.Mov.Caminando,
 		}
 	}
 }
@@ -1059,6 +1104,7 @@ func volverAlOrigenLosJugadores() {
 		p.Mov.Direccion = dirQuieto
 		p.Mov.Caminando = false
 		p.Mov.MsAnim = 0
+		p.Mov.MsQuieto = 0
 		p.Mov.Resto = 0
 	}
 
@@ -1074,6 +1120,7 @@ func volverAlFinalLosJugadores() {
 		p.Mov.Est = NuevoEstado(s.X, s.Y, false)
 		p.Mov.Direccion = s.Dir
 		p.Mov.MsAnim = s.MsAnim
+		p.Mov.MsQuieto = s.MsQuieto
 		p.Mov.Caminando = s.Caminando
 	}
 

@@ -771,6 +771,15 @@ func (b *bicho) cuadroDelBicho() *CuadroDelJugador {
 	f := ms % len(ciclo.Cuadros)
 	b.CuadroCiclo = f
 
+	// DC-002.133: el Returned entra al mismo medidor que la amazona: modo (WL caminando / NU quieto), direccion del
+	// COF, cuadro del ciclo y FASE (cuantos cuadros de animacion pasaron desde que empezo el modo). Es lo que dice
+	// si su patrulla se ve animada y si girar en un extremo le corta la animacion.
+	if m := medidorDelBicho(); m != nil {
+		m.CeldaX, m.CeldaY = b.Est.Celda()
+
+		m.Anotar(cuadro, ciclo.Modo, b.Direccion, f, len(ciclo.Cuadros), int64(ms), int64(d2cMs()))
+	}
+
 	return &ciclo.Cuadros[f]
 }
 
@@ -805,10 +814,16 @@ func (b *bicho) cuadroDelModoDelGolpe() *CuadroDelJugador {
 
 	b.CuadroCiclo = f
 
+	// DC-002.133: los modos del golpe tambien entran al medidor (GH al recibir, DT la caida, DD el cadaver). Su fase
+	// es el cuadro del modo: son de un solo tiro y no dan la vuelta.
+	if m := medidorDelBicho(); m != nil {
+		m.CeldaX, m.CeldaY = b.Est.Celda()
+
+		m.Anotar(cuadro, ciclo.Modo, b.Direccion, f, len(ciclo.Cuadros), int64(ms), int64(d2cMs()))
+	}
+
 	return &ciclo.Cuadros[f]
 }
-
-// ============================== EL DIBUJO ==============================
 
 // prepararElCuadroDeUnBicho: el cuadro, el ancla y la caja del bicho, y la copia de lo que hay DEBAJO de su caja.
 func prepararElCuadroDeUnBicho(b *bicho, pixeles []byte) bool {

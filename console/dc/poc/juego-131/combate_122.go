@@ -709,6 +709,15 @@ func cicloYCuadroDelJugador(p *participante, i int) (*CicloDelJugador, *CuadroDe
 	if c, cu := cicloYCuadroDeAtaque(p, i); c != nil && cu != nil {
 		contarCuadroDeAtaque(i, ataques[i].Cuadro)
 
+		// DC-002.133: el A1 es de UN SOLO TIRO: su fase ES su cuadro (0..12), contada desde que empezo el golpe.
+		// Anotarlo es lo que dice si el golpe se vio o si el cuadro del POC se lo salto entero.
+		if m := medidorDelJugador(i); m != nil {
+			m.CeldaX, m.CeldaY = p.Mov.Est.Celda()
+
+			m.Anotar(cuadro, c.Modo, c.Dir, ataques[i].Cuadro, len(c.Cuadros), int64(ataques[i].Cuadro),
+				int64(d2cMs()))
+		}
+
 		return c, cu
 	}
 
@@ -717,7 +726,16 @@ func cicloYCuadroDelJugador(p *participante, i int) (*CicloDelJugador, *CuadroDe
 		return nil, nil
 	}
 
-	return ciclo, p.Mov.CuadroDeLaAnimacion(ciclo)
+	// DC-002.133: el cuadro y su FASE, del reloj del modo (quieto el NU que respira, caminando el TW del motor).
+	cu, fase := p.Mov.CuadroYFase(ciclo)
+
+	if m := medidorDelJugador(i); m != nil {
+		m.CeldaX, m.CeldaY = p.Mov.Est.Celda()
+
+		m.Anotar(cuadro, ciclo.Modo, ciclo.Dir, indiceDelCuadro(ciclo, cu), len(ciclo.Cuadros), fase, int64(d2cMs()))
+	}
+
+	return ciclo, cu
 }
 
 // contarCuadroDeAtaque: lleva la cuenta de cuantos cuadros DISTINTOS del A1 se dibujaron (el numero que dice si la
