@@ -51,6 +51,17 @@ func d2cPvrUs() int
 //extern d2c_pvr_pantalla_mem_libre
 func d2cPvrPantallaMemLibre() int
 
+// DC-002.141: EL LIENZO QUE CAMINA (ver `MoverLienzo` y el comentario largo en pvr_pantalla.c).
+//
+//extern d2c_pvr_pantalla_mover
+func d2cPvrPantallaMover(sx, sy int) int
+
+//extern d2c_pvr_pantalla_mover_us
+func d2cPvrPantallaMoverUs() int
+
+//extern d2c_pvr_pantalla_mover_reiniciar
+func d2cPvrPantallaMoverReiniciar()
+
 // DC-002.135: las palancas y los cronometros de la presentacion.
 //
 //extern d2c_pvr_pantalla_pres_conv_rapida
@@ -334,6 +345,24 @@ func SuperficieDeLaPantalla(ancho, alto int) *Surface {
 
 // VramDelLienzo: cuantos bytes del lienzo del cuadro estan en la VRAM (0 = en el monton).
 func VramDelLienzo() int { return lienzoEnVram }
+
+// ============================================================ DC-002.141: el lienzo que camina
+
+// MoverLienzo corre el CONTENIDO del lienzo del cuadro (sx, sy) pixeles, EN EL LUGAR.
+//
+// Es la palanca de la tarjeta: caminando, el cuadro se iba 60,4 ms en repintar los 248 tiles del mapa, y lo que
+// cambia entre dos cuadros que caminan es casi todo el MISMO cuadro CORRIDO unos pixeles. Mover 1,2 MB de
+// VRAM de una vez y repintar solo las franjas que entran por el borde cuesta una fraccion de eso.
+//
+// El borde que queda libre NO se rellena aca (lo pinta el mapa con el recorte puesto, ver `RecortarA`).
+// Devuelve 0 si anduvo, -1 sin lienzo y -2 si el corrimiento no deja nada que copiar (el que llama repinta).
+func MoverLienzo(sx, sy int) int { return d2cPvrPantallaMover(sx, sy) }
+
+// MoverLienzoUs: lo que costaron los corrimientos del cuadro (se reinicia con ReiniciarMoverLienzo).
+func MoverLienzoUs() int { return d2cPvrPantallaMoverUs() }
+
+// ReiniciarMoverLienzo: el cronometro del corrimiento a cero (el POC lo hace al empezar el cuadro).
+func ReiniciarMoverLienzo() { d2cPvrPantallaMoverReiniciar() }
 
 // MemLibreDelMonton: los bytes libres del monton de C en este momento (para la evidencia: es el techo con
 // el que hay que negociar la memoria del cuadro).

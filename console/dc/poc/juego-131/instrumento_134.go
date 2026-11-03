@@ -206,5 +206,13 @@ func activarElBlitDePalabras() {
 // OJO CON LA REGLA DE LA CASA: apagar el instrumento NO cambia el dibujo. El sprite se pinta en el mismo orden
 // y en el mismo sitio; lo que se va es el guardar/medir/devolver que existia para el numero, no para el cuadro.
 func midiendoElCuadro134() bool {
+	// DC-002.141: en un cuadro que CAMINA no se guardan las cajas de los entes. No es un ahorro cosmético: la
+	// copia del lienzo se lleva esos pixeles y el mapa se repinta ahi mismo (la caja corrida, ver
+	// `armarLosRecortes141`), asi que la copia que se tomaria ya nace pisada. Se ahorra lo que DC-002.139 pagaba
+	// por cuadro caminando: 2,7 ms de los jugadores + 4-6 de los bichos + 1,7 de los NPCs.
+	if scroll141Caminando {
+		return false
+	}
+
 	return medirCuadro == "si" || cuadro <= 3 || pintarUnaVez != "si" || cajas139 == "si"
 }

@@ -419,6 +419,13 @@ echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob bli
 [ -n "${CAJAS_139:-}" ] && pisa_knob cajas139 "$CAJAS_139" 1
 [ -n "${CONV_BLOQUES:-}" ] && pisa_knob convBloques139 "$CONV_BLOQUES" 1
 
+# DC-002.141 -- EL CUADRO CAMINANDO (el lienzo que se corre y las franjas que entran).
+#   SCROLL_141=si|no  si = caminando se CORRE el lienzo con una copia y el mapa se repinta solo en los
+#                     recortes (franjas, cajas de los entes y bandas de los paneles); no = DC-002.139 igual.
+[ -n "${SCROLL_141:-}" ] && pisa_knob scroll141 "$SCROLL_141" 1
+[ -n "${COMPARAR_141:-}" ] && pisa_knob comparar141 "$COMPARAR_141" 1
+[ -n "${CONV_FILAS_141:-}" ] && pisa_knob convFilas141 "$CONV_FILAS_141" 1
+
 echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
 
 # LAS DE ESTA TARJETA (DC-002.137): EL MINIMAPA.

@@ -124,6 +124,10 @@ static uint16_t conv_grupo[LADO_GRUPO * LADO_GRUPO] __attribute__((aligned(32)))
  * van a las posiciones IMPARES y los de y a las PARES, asi que para la posicion `i` de la textura,
  * x es `i` con los bits pares sacados e y es `i` con los impares sacados. */
 static uint32_t ofs_tile[LADO_TILE * LADO_TILE];
+/* idx_tile[j]: al reves que `ofs_tile` -- para el pixel j = y*32+x del bloque, la posicion que le toca en la
+ * textura twiddleada. Es la tabla que necesita el camino de DC-002.141, que recorre el LIENZO en orden
+ * (lecturas seguidas) y escribe en la textura (depositos a un buffer en RAM, o sea baratos). */
+static uint16_t idx_tile[LADO_TILE * LADO_TILE];
 static int ofs_tile_w = -1;
 
 static void armar_ofs_tile(int w) {
@@ -140,6 +144,7 @@ static void armar_ofs_tile(int w) {
                 ((i & 0x040) >> 3) | ((i & 0x100) >> 4);
 
         ofs_tile[i] = (uint32_t)(y * w * 4 + x * 4);
+        idx_tile[y * LADO_TILE + x] = (uint16_t)i;
     }
 
     ofs_tile_w = w;
@@ -164,6 +169,97 @@ static void bloque_rapido(const unsigned char *base, uint16_t *conv) {
 
         dst[i >> 1] = COLOR565(a) | (COLOR565(b) << 16);
         dst[(i >> 1) + 1] = COLOR565(c) | (COLOR565(d) << 16);
+    }
+}
+
+/* ====================================================================================================
+ * DC-002.141 -- LA CONVERSION POR FILAS DEL LIENZO (el cuadro caminando no puede pagar 23,6 ms)
+ * ====================================================================================================
+ *
+ * EL PROBLEMA. `bloque_rapido` recorre la textura en orden y, para cada posicion, LEE el pixel que le toca del
+ * lienzo por `ofs_tile`: son lecturas SALTEADAS contra la VRAM (area P2, sin cache). Con las cuatro lecturas
+ * de una vuelta el procesador las tiene en vuelo, pero cada una sigue siendo un viaje al chip: medido, la
+ * conversion del cuadro entero son 23,6 ms para 307.200 pixeles (~77 ns por pixel, o sea tres viajes).
+ *
+ * LA VUELTA. El lienzo SI se puede leer seguido: fila por fila, 32 pixeles de la misma fila. Asi que el bucle
+ * va al reves -- recorre el LIENZO en orden (una lectura de 32 bits por pixel, con la fila entera seguida y a
+ * favor) y escribe cada resultado en su posicion twiddleada del buffer de 2 KiB que ya se usaba, que esta en
+ * RAM y por lo tanto se escribe sin viaje (los depositos de 16 bits al buffer son baratos; el twiddle se paga
+ * con `idx_tile`, la tabla inversa de `ofs_tile`).
+ *
+ * POR QUE NO CAMBIA EL RESULTADO. Es la MISMA cuenta de color (`COLOR565`) y la MISMA tabla de twiddle, solo
+ * cambia el orden en que se recorre. Y no se cree: el A/B esta en el binario (`conv_filas141`, que el POC
+ * prende con la palanca) y ademas hay un verificador (`conv_verificar141`) que, con la palanca de la
+ * verificacion puesta, convierte cada bloque por los DOS caminos y cuenta las palabras distintas. Cero es el
+ * unico resultado aceptable, y sale en la linea `JUEGO141: CONVERSION`.
+ */
+static void bloque_por_filas141(const unsigned char *base, uint16_t *conv) {
+    int y, x;
+    int paso = ofs_tile_w; /* pixeles por fila del lienzo */
+
+    for (y = 0; y < LADO_TILE; y++) {
+        const uint32_t *fila = (const uint32_t *)(base + (size_t)y * (size_t)paso * 4);
+        const uint16_t *idx = idx_tile + y * LADO_TILE;
+
+        /* CUATRO LECTURAS ANTES DE LOS CUATRO DEPOSITOS. Es lo mismo que hace `bloque_rapido` y no es un
+         * detalle: el lienzo esta en la VRAM (area P2, sin cache) y cada lectura cuesta un viaje; si el
+         * deposito depende del dato que acaba de llegar, el procesador espera el viaje entero. Con cuatro en
+         * vuelo, el lazo va a la velocidad del bus y no de la latencia. (Medido: sin desenrollar, la
+         * conversion del cuadro entero subia de 3,1 a 33 ms -- diez veces peor que el camino de siempre.) */
+        for (x = 0; x + 4 <= LADO_TILE; x += 4) {
+            uint32_t a = fila[x];
+            uint32_t b = fila[x + 1];
+            uint32_t c = fila[x + 2];
+            uint32_t d = fila[x + 3];
+
+            conv[idx[x]] = (uint16_t)COLOR565(a);
+            conv[idx[x + 1]] = (uint16_t)COLOR565(b);
+            conv[idx[x + 2]] = (uint16_t)COLOR565(c);
+            conv[idx[x + 3]] = (uint16_t)COLOR565(d);
+        }
+    }
+}
+
+/* Las palancas y el verificador de la conversion por filas. */
+static int conv_filas141 = 0;
+static int conv_verificar141 = 0;
+static unsigned int conv_bloques141 = 0;
+static unsigned int conv_fallos141 = 0;
+static uint16_t conv_espejo141[LADO_TILE * LADO_TILE] __attribute__((aligned(32)));
+
+void d2c_pvr_pantalla_conv_filas141(int v) { conv_filas141 = (v != 0); }
+void d2c_pvr_pantalla_conv_verificar141(int v) { conv_verificar141 = (v != 0); }
+unsigned int d2c_pvr_pantalla_conv_fallos141(void) { return conv_fallos141; }
+unsigned int d2c_pvr_pantalla_conv_bloques141(void) { return conv_bloques141; }
+void d2c_pvr_pantalla_conv_reiniciar141(void) { conv_fallos141 = 0; conv_bloques141 = 0; }
+
+/* convertir_bloque141: el bloque por el camino que diga la palanca, y si la verificacion esta puesta, por los
+ * dos a la vez y contando las palabras que no coinciden. */
+static void convertir_bloque141(const unsigned char *base, uint16_t *conv) {
+    int i;
+
+    if (conv_filas141) {
+        bloque_por_filas141(base, conv);
+    } else {
+        bloque_rapido(base, conv);
+    }
+
+    if (!conv_verificar141) {
+        return;
+    }
+
+    if (conv_filas141) {
+        bloque_rapido(base, conv_espejo141);
+    } else {
+        bloque_por_filas141(base, conv_espejo141);
+    }
+
+    conv_bloques141++;
+
+    for (i = 0; i < LADO_TILE * LADO_TILE; i++) {
+        if (conv[i] != conv_espejo141[i]) {
+            conv_fallos141++;
+        }
     }
 }
 
@@ -586,7 +682,7 @@ static int convertir_rapido(const unsigned char *src, int w, int h, int x_dest) 
                     int bx = ((cuantos == 4) && (k & 2)) ? LADO_TILE : 0;
                     int by = (k & 1) ? LADO_TILE : 0;
 
-                    bloque_rapido(src + (size_t)(y0 + by) * (size_t)w * 4 + (size_t)(x0 + bx) * 4,
+                    convertir_bloque141(src + (size_t)(y0 + by) * (size_t)w * 4 + (size_t)(x0 + bx) * 4,
                                   conv_grupo + k * (LADO_TILE * LADO_TILE));
                 }
             } else {
@@ -597,7 +693,7 @@ static int convertir_rapido(const unsigned char *src, int w, int h, int x_dest) 
                     for (int bx = 0; bx < ancho_grupo; bx += LADO_TILE) {
                         int k = (by / LADO_TILE) * nbx + (bx / LADO_TILE);
 
-                        bloque_rapido(src + (size_t)(y0 + by) * (size_t)w * 4 + (size_t)(x0 + bx) * 4,
+                        convertir_bloque141(src + (size_t)(y0 + by) * (size_t)w * 4 + (size_t)(x0 + bx) * 4,
                                       conv_grupo + k * (LADO_TILE * LADO_TILE));
                     }
                 }
@@ -838,7 +934,7 @@ int d2c_pvr_pantalla_bloque(unsigned int rgba, int lienzo_w, int x0, int y0) {
     /* el destino SIEMPRE es un bloque entero (el que llama pasa x0/y0 multiplos de 32), asi que el bloque se
      * arma con el mismo `bloque_rapido` del cuadro entero: cuatro pixeles por vuelta y dos por deposito. */
     armar_ofs_tile(lienzo_w);
-    bloque_rapido(src + ((size_t)y0 * (size_t)lienzo_w + (size_t)x0) * 4, conv_tile);
+    convertir_bloque141(src + ((size_t)y0 * (size_t)lienzo_w + (size_t)x0) * 4, conv_tile);
 
     pvr_txr_load(conv_tile, (pvr_ptr_t)((uint16_t *)pant_tex + indice_tile(x0, y0)),
                  LADO_TILE * LADO_TILE * 2);
@@ -1014,8 +1110,148 @@ int d2c_pvr_pantalla_mem_libre(void) {
     return mi.fordblks;
 }
 
-/* El reloj, en microsegundos. No es parte del dibujado: es para poder DECIR cuanto tarda cada etapa en vez
- * de suponerlo. Un cuadro de 640x480 en un SH-4 tiene tres partes que pueden ser la lenta (dibujar en
+/* El reloj, en microsegundos. No es parte del dibujado: es para poder DECIR cuanto tarda cada etapa en vez de
+ * suponerlo. Un cuadro de 640x480 en un SH-4 tiene tres partes que pueden ser la lenta (dibujar en
  * memoria, convertir y subir a la VRAM, y el PVR pintando) y adivinar cual de las tres es la que no da los
  * cuadros por segundo es justo lo que no se puede hacer. */
 unsigned int d2c_pvr_pantalla_us(void) { return (unsigned int)timer_us_gettime64(); }
+
+/* ============================== DC-002.141: EL LIENZO QUE CAMINA ==============================
+ *
+ * QUE HACE. Mueve el CONTENIDO del lienzo del cuadro (sx, sy) pixeles, EN EL LUGAR (el mismo bloque de VRAM),
+ * con semantica de memmove: el pixel que estaba en (x, y) queda en (x+sx, y+sy) y el borde que queda libre
+ * (|sx| columnas y/o |sy| filas) conserva lo viejo hasta que el mapa lo repinta.
+ *
+ * POR QUE ESTO ES LA PALANCA (medido, DC-002.139). Caminando, el cuadro se va 60,4 ms en REPINTAR el mapa
+ * entero: 248 tiles, 1.359.235 lecturas de indices contra la VRAM y 307.200 escrituras de pixel, tambien
+ * contra la VRAM (~50 ns por pixel). Lo que cambia entre dos cuadros que caminan es, casi todo, el MISMO
+ * cuadro CORRIDO unos pixeles: pagar 60 ms por volver a escribir lo mismo dos veces no tiene sentido si
+ * mover 1,2 MB de una vez cuesta una fraccion.
+ *
+ * POR QUE EN C Y NO EN GO. Es el patron de siempre en este repo: la copia con solape es un bucle de palabras
+ * de 64 bits sobre memoria que se toca sin cache (area P2), y gccgo no tiene `memmove` con esa garantia de
+ * 8 bytes alineados ni un tipo de 64 bits que el compilador de la consola use bien. Ademas asi el bucle se
+ * escribe una vez, con su direccion elegida (ver abajo), y no hay forma de equivocarse con el solape.
+ *
+ * EL SOLAPE ES LO UNICO DELICADO. El origen y el destino son el MISMO buffer y se pisan: si el contenido baja
+ * (sy > 0) las filas se copian de ABAJO para arriba, y si el contenido se corre a la derecha (sx > 0) cada
+ * fila se copia de atras para adelante. Con las dos cosas elegidas por el signo, cada lectura se hace ANTES
+ * de que la escritura la pise -- que es exactamente lo que garantiza memmove. Copiar al reves "porque si"
+ * llena el lienzo del pixel que acaba de leer y el mapa sale estirado (es el defecto clasico de esta copia).
+ *
+ * LO QUE NO HACE: no rellena el borde, no toca la textura de la pantalla y no decide nada. El borde lo pinta
+ * el mapa (las franjas que entran) y la conversion la hace la presentacion, igual que siempre.
+ */
+static unsigned int mover_us = 0;   /* lo que costaron los corrimientos de este cuadro, en microsegundos */
+
+/* Los microsegundos del cuadro (el POC lo reinicia al empezar cada cuadro). */
+unsigned int d2c_pvr_pantalla_mover_us(void) { return mover_us; }
+
+void d2c_pvr_pantalla_mover_reiniciar(void) { mover_us = 0; }
+
+/* copiar_bloque: copia n bytes de src a dst, con el solape resuelto por la direccion (`adelante` = de la
+ * primera palabra a la ultima). Usa 64 bits si la direccion y el largo lo permiten (siempre pasa en el
+ * lienzo: la VRAM se reparte alineada a 32 y el paso de fila es 2560 = 320 palabras de 8 bytes), 32 si no,
+ * y bytes como ultimo recurso. El resultado es el mismo por los tres caminos. */
+static void copiar_bloque(unsigned char *dst, const unsigned char *src, size_t n, int adelante) {
+    if ((((uintptr_t)dst | (uintptr_t)src | (uintptr_t)n) & 7) == 0) {
+        uint64_t *d = (uint64_t *)dst;
+        const uint64_t *s = (const uint64_t *)src;
+        size_t i, m = n >> 3;
+
+        /* DESENROLLADO DE A CUATRO. El lazo simple (leer una palabra y escribirla) se queda esperando cada
+         * lectura contra la VRAM -- que es lo que manda: ~50 ns por viaje -- porque el deposito depende del dato
+         * que acaba de llegar. Con cuatro lecturas juntas el SH-4 las tiene en vuelo al mismo tiempo y el lazo
+         * baja a la mitad o menos. Medido en el cuadro caminando de esta tarjeta. */
+        if (adelante) {
+            for (i = 0; i + 4 <= m; i += 4) {
+                uint64_t a = s[i], b = s[i + 1], c = s[i + 2], e = s[i + 3];
+
+                d[i] = a;
+                d[i + 1] = b;
+                d[i + 2] = c;
+                d[i + 3] = e;
+            }
+
+            for (; i < m; i++) d[i] = s[i];
+        } else {
+            for (i = m; i >= 4; i -= 4) {
+                uint64_t a = s[i - 1], b = s[i - 2], c = s[i - 3], e = s[i - 4];
+
+                d[i - 1] = a;
+                d[i - 2] = b;
+                d[i - 3] = c;
+                d[i - 4] = e;
+            }
+
+            for (; i > 0; i--) d[i - 1] = s[i - 1];
+        }
+
+        return;
+    }
+
+    if ((((uintptr_t)dst | (uintptr_t)src | (uintptr_t)n) & 3) == 0) {
+        uint32_t *d = (uint32_t *)dst;
+        const uint32_t *s = (const uint32_t *)src;
+        size_t i, m = n >> 2;
+
+        if (adelante) {
+            for (i = 0; i < m; i++) d[i] = s[i];
+        } else {
+            for (i = m; i > 0; i--) d[i - 1] = s[i - 1];
+        }
+
+        return;
+    }
+
+    if (adelante) {
+        size_t i;
+
+        for (i = 0; i < n; i++) dst[i] = src[i];
+    } else {
+        size_t i;
+
+        for (i = n; i > 0; i--) dst[i - 1] = src[i - 1];
+    }
+}
+
+/* Mueve el contenido del lienzo (sx, sy) pixeles. Devuelve 0 si anduvo, -1 sin lienzo y -2 si el corrimiento
+ * es tan grande que no quedaria nada que copiar (el que llama repinta entero en ese caso). */
+int d2c_pvr_pantalla_mover(int sx, int sy) {
+    unsigned int t0;
+    unsigned char *base;
+    size_t fila;
+    int ancho, alto, y;
+
+    if (pant_fb == NULL) {
+        return -1;
+    }
+    if (sx == 0 && sy == 0) {
+        return 0;
+    }
+    if (sx <= -PANT_W || sx >= PANT_W || sy <= -PANT_H || sy >= PANT_H) {
+        return -2;
+    }
+
+    t0 = (unsigned int)timer_us_gettime64();
+
+    base = (unsigned char *)pant_fb;
+    fila = (size_t)PANT_W * 4;
+    ancho = PANT_W - (sx < 0 ? -sx : sx);   /* columnas que se copian */
+    alto = PANT_H - (sy < 0 ? -sy : sy);    /* filas que se copian */
+
+    for (y = 0; y < alto; y++) {
+        /* el contenido baja (sy > 0): de abajo para arriba. Sube: de arriba para abajo. */
+        int yd = (sy > 0) ? (alto - 1 - y) : y;
+        size_t xs = (size_t)((sx > 0) ? 0 : -sx) * 4;
+        size_t xd = (size_t)((sx > 0) ? sx : 0) * 4;
+
+        copiar_bloque(base + (size_t)(yd + sy) * fila + xd,
+                      base + (size_t)yd * fila + xs,
+                      (size_t)ancho * 4, sx < 0);
+    }
+
+    mover_us += (unsigned int)timer_us_gettime64() - t0;
+
+    return 0;
+}

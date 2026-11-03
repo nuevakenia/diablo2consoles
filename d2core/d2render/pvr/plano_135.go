@@ -117,6 +117,10 @@ func vecesQueSeComproboLaPaleta135() int { return paletaOpacaVeces }
 
 // renderIndicesTintadoPlano135: el bucle del camino plano (una rama por pixel, cuatro pixeles por palabra).
 // Devuelve false solo si el lienzo no esta alineado a 4 (el que llama sigue por el camino de bytes).
+//
+// DC-002.141: con la lista de recortes puesta (el cuadro que camina), el rango del tile se interseca con cada
+// rectangulo y se pinta por pedazos con EL MISMO bucle (`plano135Rango`). Sin recortes se llama una sola vez
+// con el rango entero: el camino de siempre, sin una cuenta de mas.
 func (s *Surface) renderIndicesTintadoPlano135(indices []byte, ancho, alto int, tabla *[256]uint32,
 	x0, x1, y0, y1 int) bool {
 	lienzo := palabrasDelLienzo(s.imagen.pixeles)
@@ -128,10 +132,37 @@ func (s *Surface) renderIndicesTintadoPlano135(indices []byte, ancho, alto int, 
 
 	CaminoPlanoUsado135++
 
+	palabras := palabraDelIndice135(indices, ancho)
+
+	if n := s.imagen.clipN; n > 0 {
+		dx, dy := s.actual.x, s.actual.y
+
+		for k := 0; k < n; k++ {
+			lx0, lx1, ly0, ly1 := s.imagen.rangoEnRecorte141(k, dx, dy, x0, x1, y0, y1)
+			if lx0 >= lx1 || ly0 >= ly1 {
+				continue
+			}
+
+			s.plano135Rango(lienzo, indices, palabras, tabla, ancho, lx0, lx1, ly0, ly1)
+		}
+
+		return true
+	}
+
+	s.plano135Rango(lienzo, indices, palabras, tabla, ancho, x0, x1, y0, y1)
+
+	return true
+}
+
+// plano135Rango: el bucle de pixeles del camino plano, para el rango local [x0,x1) x [y0,y1) del tile.
+func (s *Surface) plano135Rango(lienzo []uint32, indices []byte, palabras []uint32, tabla *[256]uint32,
+	ancho, x0, x1, y0, y1 int) {
+	if s.imagen.clipN > 0 {
+		pixelesPintados141 += (x1 - x0) * (y1 - y0)
+	}
+
 	dx, dy := s.actual.x, s.actual.y
 	anchoLienzo := s.imagen.ancho
-
-	palabras := palabraDelIndice135(indices, ancho)
 
 	for y := y0; y < y1; y++ {
 		fila := y * ancho
@@ -184,6 +215,4 @@ func (s *Surface) renderIndicesTintadoPlano135(indices []byte, ancho, alto int, 
 	}
 
 	pxDeIndices += uint64((x1 - x0) * (y1 - y0))
-
-	return true
 }

@@ -164,6 +164,20 @@ func (s *Surface) renderIndicesPalabras(indices []byte, ancho, alto int, paleta 
 		return true
 	}
 
+	// DC-002.141: el tile que no toca ningun recorte vuelve antes de armar la tabla (ver el comentario largo en
+	// `renderIndicesTintadoPalabras`).
+	if s.imagen.clipN > 0 {
+		blitsPedidos141++
+
+		if !s.imagen.tocaAlRecorte141(dx, dy, ancho, alto) {
+			blitsSaltados141++
+
+			return true
+		}
+
+		blitsPintados141++
+	}
+
 	// LA TABLA, EN LA PILA Y SIN CACHE. Se probo cachearla (una global de 1 KB, clave = paleta + tinte) para que
 	// el minimapa, que repite paleta en sus 680 celdas, no armara la tabla 680 veces: el POC se murio en el primer
 	// cuadro con "GC to-space overflow - your live data doesn't fit in the heap", con o sin la tabla por
@@ -176,6 +190,30 @@ func (s *Surface) renderIndicesPalabras(indices []byte, ancho, alto int, paleta 
 		tabla[i] = palabraDelColor(c[0], c[1], c[2], 255)
 	}
 
+	// DC-002.141: con la lista de recortes puesta se pinta el pedazo que cae en cada rectangulo (ver
+	// recortes_141.go); sin recortes, el rango entero de siempre.
+	if n := s.imagen.clipN; n > 0 {
+		for k := 0; k < n; k++ {
+			lx0, lx1, ly0, ly1 := s.imagen.rangoEnRecorte141(k, dx, dy, x0, x1, y0, y1)
+			if lx0 >= lx1 || ly0 >= ly1 {
+				continue
+			}
+
+			s.palabrasRango(lienzo, indices, &tabla, ancho, anchoLienzo, dx, dy, lx0, lx1, ly0, ly1)
+		}
+
+		return true
+	}
+
+	s.palabrasRango(lienzo, indices, &tabla, ancho, anchoLienzo, dx, dy, x0, x1, y0, y1)
+
+	return true
+}
+
+// palabrasRango: el bucle de pixeles del camino de palabras (un deposito de 32 bits por pixel), para el rango
+// local [x0,x1) x [y0,y1) del tile. Lo comparten el `RenderIndices` y el `RenderIndicesTintado` sin tinte.
+func (s *Surface) palabrasRango(lienzo []uint32, indices []byte, tabla *[256]uint32,
+	ancho, anchoLienzo, dx, dy, x0, x1, y0, y1 int) {
 	for y := y0; y < y1; y++ {
 		fila := y * ancho
 		j := (dy+y)*anchoLienzo + dx + x0
@@ -191,8 +229,6 @@ func (s *Surface) renderIndicesPalabras(indices []byte, ancho, alto int, paleta 
 	}
 
 	pxDeIndices += uint64((x1 - x0) * (y1 - y0))
-
-	return true
 }
 
 // renderIndicesTintadoPalabras: el `RenderIndicesTintado` por palabras (traslacion, color y alfa del estado).
@@ -216,6 +252,21 @@ func (s *Surface) renderIndicesTintadoPalabras(indices []byte, ancho, alto int, 
 
 	dx, dy := s.actual.x, s.actual.y
 	anchoLienzo, altoLienzo := s.imagen.ancho, s.imagen.alto
+
+	// DC-002.141: si el recorte esta puesto y este tile no toca ningun rectangulo, se vuelve ANTES de armar la
+	// tabla de 256 palabras -- que es lo caro del blit. Sin esto, un cuadro que camina paga el costo fijo de los
+	// 241 tiles para pintar 25.000 pixeles (medido: 22-28 ms en vez de 1-2).
+	if s.imagen.clipN > 0 {
+		blitsPedidos141++
+
+		if !s.imagen.tocaAlRecorte141(dx, dy, ancho, alto) {
+			blitsSaltados141++
+
+			return true
+		}
+
+		blitsPintados141++
+	}
 
 	rojo, verde, azul, alfa := uint16(255), uint16(255), uint16(255), uint16(255)
 
@@ -264,6 +315,33 @@ func (s *Surface) renderIndicesTintadoPalabras(indices []byte, ancho, alto int, 
 		}
 	}
 
+	// DC-002.141: la lista de recortes (ver recortes_141.go). Se pinta el pedazo de cada rectangulo con el
+	// MISMO bucle; sin recortes, el rango entero de siempre.
+	if n := s.imagen.clipN; n > 0 {
+		for k := 0; k < n; k++ {
+			lx0, lx1, ly0, ly1 := s.imagen.rangoEnRecorte141(k, dx, dy, x0, x1, y0, y1)
+			if lx0 >= lx1 || ly0 >= ly1 {
+				continue
+			}
+
+			s.tintadoPalabrasRango(lienzo, indices, &tabla, ancho, anchoLienzo, dx, dy, lx0, lx1, ly0, ly1)
+		}
+
+		return true
+	}
+
+	s.tintadoPalabrasRango(lienzo, indices, &tabla, ancho, anchoLienzo, dx, dy, x0, x1, y0, y1)
+
+	return true
+}
+
+// tintadoPalabrasRango: el bucle de pixeles con color y alfa del estado, para el rango local pedido.
+func (s *Surface) tintadoPalabrasRango(lienzo []uint32, indices []byte, tabla *[256]uint32,
+	ancho, anchoLienzo, dx, dy, x0, x1, y0, y1 int) {
+	if s.imagen.clipN > 0 {
+		pixelesPintados141 += (x1 - x0) * (y1 - y0)
+	}
+
 	for y := y0; y < y1; y++ {
 		fila := y * ancho
 		j := (dy+y)*anchoLienzo + dx + x0
@@ -301,6 +379,4 @@ func (s *Surface) renderIndicesTintadoPalabras(indices []byte, ancho, alto int, 
 	}
 
 	pxDeIndices += uint64((x1 - x0) * (y1 - y0))
-
-	return true
 }

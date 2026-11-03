@@ -82,6 +82,13 @@ export MEDIR_VIVO="${MEDIR_VIVO:-si}"
 export MAPA_ESTATICO="${MAPA_ESTATICO:-si}"
 export CAJAS_139="${CAJAS_139:-si}"
 export CONV_BLOQUES="${CONV_BLOQUES:-si}"
+# DC-002.141: el cuadro caminando (el lienzo que se corre y las franjas que entran). Con SCROLL_141=no el
+# camino de caminar es el de DC-002.139 otra vez (11-13 fps).
+export SCROLL_141="${SCROLL_141:-si}"
+export COMPARAR_141="${COMPARAR_141:-no}"
+# DC-002.141: la conversion del lienzo por filas (lecturas seguidas contra la VRAM). CONV_FILAS_141=no vuelve
+# al bucle de DC-002.135 en el mismo binario.
+export CONV_FILAS_141="${CONV_FILAS_141:-si}"
 export MEDIR_CARGA="${MEDIR_CARGA:-no}"
 export VERBOSO="${VERBOSO:-no}"
 

@@ -164,6 +164,11 @@ func (s *Surface) RenderIndices(indices []byte, ancho, alto int, paleta [][3]uin
 
 	filaLienzo := anchoLienzo * 4
 
+	// DC-002.141: con la lista de recortes puesta este camino (el de bytes, que corre solo si el lienzo no
+	// esta alineado a 4) comprueba el pixel contra los rectangulos. Es una comprobacion por pixel, y es el
+	// motivo por el que los caminos rapidos de arriba la resuelven una vez por tile.
+	conRecorte := s.imagen.clipN > 0
+
 	for y := y0; y < y1; y++ {
 		fila := y * ancho
 		j := (dy+y)*filaLienzo + (dx+x0)*4
@@ -171,6 +176,10 @@ func (s *Surface) RenderIndices(indices []byte, ancho, alto int, paleta [][3]uin
 		for x := x0; x < x1; x, j = x+1, j+4 {
 			idx := indices[fila+x]
 			if idx == 0 {
+				continue
+			}
+
+			if conRecorte && !s.imagen.dentroDeRecortes141(dx+x, dy+y) {
 				continue
 			}
 
@@ -258,6 +267,9 @@ func (s *Surface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [
 
 	filaLienzo := anchoLienzo * 4
 
+	// DC-002.141: la comprobacion por pixel de la lista de recortes (ver el comentario en `RenderIndices`).
+	conRecorte := s.imagen.clipN > 0
+
 	for y := y0; y < y1; y++ {
 		fila := y * ancho
 		j := (dy+y)*filaLienzo + (dx+x0)*4
@@ -265,6 +277,10 @@ func (s *Surface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [
 		for x := x0; x < x1; x, j = x+1, j+4 {
 			idx := indices[fila+x]
 			if idx == 0 {
+				continue
+			}
+
+			if conRecorte && !s.imagen.dentroDeRecortes141(dx+x, dy+y) {
 				continue
 			}
 

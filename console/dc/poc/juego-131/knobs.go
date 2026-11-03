@@ -733,6 +733,24 @@ const (
 	// mapa repintandose entero no hay nada que ahorrar (se marca todo).
 	convBloques139 = "si"
 
+	// scroll141: "si" = EL CUADRO CAMINANDO (DC-002.141). Cuando la camara se movio unos pixeles, el lienzo se
+	// CORRE con una copia en el lugar (`pvr.MoverLienzo`) y el mapa se repinta SOLO en las franjas que entran
+	// por el borde, en las cajas de los entes del cuadro anterior y en las bandas de los paneles -- todo con
+	// la lista de recortes del backend. "no" = el camino de DC-002.139, bit a bit (caminando repinta los 248
+	// tiles: 11-13 fps medidos). La cabecera de `mapa_141.go` tiene el porque y los numeros.
+	scroll141 = "si"
+
+	// comparar141: "si" = en los primeros cuadros que caminan se pinta ADEMAS el mapa entero y se comparan los
+	// dos crc32 del lienzo (la prueba de que el corrimiento y las franjas dan el mismo cuadro). Cuesta un
+	// repintado entero por cuadro comparado: va apagada salvo en la corrida de la prueba.
+	comparar141 = "no"
+
+	// convFilas141: "si" = la presentacion convierte el lienzo recorriendo el LIENZO en orden (lecturas
+	// seguidas contra la VRAM, el twiddle se paga escribiendo al buffer de 2 KiB en RAM) en vez de recorrer la
+	// textura y leer el lienzo salteado, que es lo que hacia DC-002.135. Misma cuenta de color, mismos bytes:
+	// "no" vuelve al camino viejo en el mismo binario (es el A/B). La cabecera de `conversion_141.go` lo cuenta.
+	convFilas141 = "si"
+
 	// blitRapido: "si" = el camino nuevo de dibujado de tiles del backend PVR (DC-002.132): el recorte se calcula
 	// UNA vez por tile (no una vez por pixel) y con el estado neutro (sin color puesto) no se hace la cuenta del
 	// tinte (3 multiplicaciones y 3 divisiones por 255 por pixel). "no" = el bucle viejo, TAL CUAL, que es el que

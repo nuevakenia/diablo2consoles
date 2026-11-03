@@ -24,6 +24,18 @@ type Imagen struct {
 	// vram: si los pixeles viven en la VRAM del PVR (el lienzo del cuadro, ver SuperficieDeLaPantalla).
 	// Importa para la evidencia: dice DONDE esta el cuadro, y para no confundir una copia con el original.
 	vram bool
+
+	// DC-002.141: LA LISTA DE RECORTES (ver recortes_141.go). Vacia (clipN = 0) es el caso normal: el lienzo
+	// recibe todo lo que caiga adentro y los blits no pagan nada. Con la lista puesta, solo se escribe lo que
+	// cae en alguno de los rectangulos -- es lo que permite repintar del mapa SOLO las franjas que entran
+	// cuando el cuadro camina.
+	//
+	// Va en la Imagen y no en la Surface porque el que recorta es el DESTINO (una Surface puede ser origen de
+	// otra cosa y no tiene por que recortar), y es un arreglo fijo para no pedir memoria por cuadro en un
+	// monton que ya se sabe apretado.
+	clipN        int
+	clipIgnorados int
+	clip         [recortesMax141][4]int32
 }
 
 // NuevaImagen: un lienzo negro del tamano pedido.

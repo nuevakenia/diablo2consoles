@@ -1468,18 +1468,49 @@ func dibujar(superficie d2interface.Surface) error {
 	if cuadro == 1 {
 		pvr.FijarTamanoDeLaGrilla(ancho, alto)
 		pvr.FijarConversionPorBloques(convBloques139 == "si")
+
+		// DC-002.141: la conversion del lienzo por filas (lecturas seguidas contra la VRAM) y, si la corrida es
+		// la de la prueba, el verificador que la compara contra el camino de DC-002.135 bloque por bloque.
+		pvr.FijarLaConversionPorFilas141(convFilas141 == "si")
+		pvr.VerificarLaConversion141(comparar141 == "si")
 	}
 
 	pvr.ReiniciarBloquesSucios()
 
-	if mapaSeRepinta139() {
-		rendererDelMapa.Render(superficie)
-		mapa139Repintados++
-		mapa139PintadoEsteCuadro = true
-	} else {
+	// DC-002.141: el cronometro del corrimiento del lienzo y el estado del cuadro que camina. `scroll141Caminando`
+	// lo prende el camino de la copia: dice que este cuadro NO guarda las cajas de los entes (la copia las pisa y
+	// el mundo se repinta ahi mismo, ver `midiendoElCuadro134`).
+	pvr.ReiniciarMoverLienzo()
+	scroll141Caminando = false
+
+	// DC-002.141: TRES CAMINOS. El entero y el quieto son los de DC-002.139, bit a bit; el de la copia es el
+	// cuadro caminando: se corre el lienzo y se repinta del mapa solo lo que la copia no trajo (`mapa_141.go`).
+	switch comoSeDibujaElMapa141() {
+	case mapa141Desplazado:
+		if dibujarElCuadroQueCamina141(malla, superficie) {
+			mapa139PintadoEsteCuadro = true
+		} else {
+			// la copia no se pudo (el lienzo no estaba): se repinta entero, como DC-002.139
+			rendererDelMapa.Render(superficie)
+			mapa139Repintados++
+			mapa139PintadoEsteCuadro = true
+			scroll141Caminando = false
+			scroll141UltimoFueCopia = false
+		}
+
+	case mapa141Quieto:
 		restaurarElMundo139(malla.Imagen().Pixeles())
 		mapa139Saltados++
 		mapa139PintadoEsteCuadro = false
+		scroll141Quietos++
+		scroll141UltimoFueCopia = false
+
+	default:
+		rendererDelMapa.Render(superficie)
+		mapa139Repintados++
+		mapa139PintadoEsteCuadro = true
+		scroll141Enteros++
+		scroll141UltimoFueCopia = false
 	}
 
 	anotarElMapaPintado139()
@@ -1947,6 +1978,10 @@ func dibujar(superficie d2interface.Surface) error {
 
 	// DC-002.139: el censo del mapa estatico (cuantos cuadros se salto el repintado).
 	informeDelMapaEstatico139()
+
+	// DC-002.141: el censo del cuadro que camina (cuantos cuadros se corrieron, cuanto costo la copia y cuanto
+	// las franjas, y cuantos pixeles hubo que repintar del mapa).
+	informeDelCuadroQueCamina141()
 
 	// DC-002.134: el cuadro al cronometro por etapas (ver instrumento_134.go). Va al final para que la resta
 	// `dibujar - suma de etapas` sea exactamente lo que el cuadro paga en lineas de evidencia.
