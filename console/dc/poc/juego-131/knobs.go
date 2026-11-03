@@ -934,4 +934,19 @@ var (
 	// pared (68,4 %). Los numeros y el porque, en `README-140.md` y en
 	// `console/dc/evidencia/dc-002.144-el-blood-moor.txt`.
 	demoMoor = "no"
+
+	// moorScratchPrimero (DC-002.144b): EL ORDEN DE LOS DOS PEDIDOS GRANDES AL CRUZAR. "si" = el buffer de
+	// lectura del `.dt1` MAS GRANDE del nivel de afuera se pide ANTES de los tramos del arena de bloques
+	// (`scratchPorArchivo = false`, el camino de DC-002.101 que DC-002.111 dejo como A/B); "no" = el camino de
+	// DC-002.111 (un buffer por archivo, del tamano de ESE archivo, devuelto en cuanto sus bloques estan
+	// copiados).
+	//
+	// POR QUE ES UNA PALANCA Y NO UN DEFECTO. DC-002.144 midio el muro del cruce: 2.995.872 B libres y
+	// `Out of memory. Requested sbrk_base ... diff 1007616` cuando el nivel de afuera fue a pedir el buffer de
+	// 1.008.003 B. Lo libre estaba en trozos, y los trozos los armo el propio cruce: los tramos del arena
+	// (2 x 524.288) y los buffers chicos (318.414, 505.504, 439.569) entraron DENTRO del hueco fresco que dejo
+	// el arena de bloques del pueblo (2.621.440 B, cinco tramos devueltos juntos). Pidiendo el buffer grande
+	// PRIMERO, cae en ese hueco entero y los tramos crecen detras. Solo aplica con `demoMoor = "si"`: el camino
+	// del pueblo (la demo de DC-002.141) no cambia ni un byte.
+	moorScratchPrimero = "si"
 )

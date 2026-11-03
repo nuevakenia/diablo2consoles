@@ -37,6 +37,8 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"
 )
 
 // cuadrosDelInformeDemo: cada cuantos cuadros se imprime el ritmo de la corrida (30 = los mismos del informe
@@ -437,10 +439,50 @@ func demoCruzaAlMoor() bool {
 	println("DEMO140: CRUZA DS1 del moor=", ruta, "ancho=", tamano.Width, "alto=", tamano.Height,
 		"preset=", preset, "nombre=", presetRec.Name, "levelID=", presetRec.LevelID, "outdoors=", presetRec.Outdoors)
 
+	// ---- LO QUE DECIDE ESTE CRUCE: EL ORDEN DE LOS PEDIDOS (DC-002.144b) ----
+	//
+	// EL NUMERO QUE DEJO DC-002.144: al cruzar quedaban 2.995.872 B libres y el nivel de afuera murio pidiendo
+	// el buffer de lectura de un `.dt1` de 1.008.003 B (`act1/town/floor.dt1`, el mas grande de la pieza de
+	// afuera) con `Out of memory. Requested sbrk_base ... diff 1007616`: el monton NO podia crecer mas y lo
+	// libre estaba en trozos. El hueco GRANDE existe -- es el arena de bloques del pueblo que se acaba de
+	// devolver (2.621.440 B, cinco tramos pedidos uno detras del otro) -- pero el camino de DC-002.111 pide el
+	// buffer de cada `.dt1` DESPUES de los tramos del arena del nivel nuevo, asi que los tramos (2 x 524.288) y
+	// los buffers chicos (318.414, 505.504, 439.569) se meten DENTRO de ese hueco y lo parten: cuando llega el
+	// pedido de 1.008.003 B no queda un tramo libre de ese tamano.
+	//
+	// LA PALANCA (`moorScratchPrimero`): pedir el buffer del `.dt1` MAS GRANDE del nivel ANTES de los tramos
+	// del arena, que es lo que hace `scratchPorArchivo = false` (el camino de DC-002.101, que DC-002.111 dejo
+	// como A/B). El buffer cae en el hueco fresco y los tramos crecen detras. Se mide: el tamano del buffer, lo
+	// que el monton puede servir EN ESE MOMENTO y la VRAM libre (el numero que necesita la palanca 2).
+	buffer := d2asset.TamanoDelDT1MasGrande(gestorDeAssets.Loader, stamp.TilesDelDS1())
+
+	if moorScratchPrimero == "si" {
+		d2asset.UsarScratchPorArchivo(false)
+	} else {
+		d2asset.UsarScratchPorArchivo(true)
+	}
+
+	println("DEMO140: CRUZA BUFFER primero=", moorScratchPrimero == "si", "delDT1MasGrande=", buffer,
+		"libre=", d2cMontonLibre(), "servible=", int(d2cServible(uint(buffer))), "vramLibre=", pvr.VramDisponible())
+
 	motorDelMapa.ResetMapParaStamp(d2enum.RegionAct1Wilderness, tamano.Width, tamano.Height, stamp)
 	motorDelMapa.PlaceStampClippedWhere(stamp, 0, 0, tamano.Width, tamano.Height, func(int) bool { return false }, false)
 
 	stamp.SoltarLosTilesDelDS1()
+
+	// ---- LO QUE PIDIO EL NIVEL DE AFUERA, Y EL BUFFER DE VUELTA ----
+	//
+	// Los tramos del arena de bloques del afuera SON del nivel (los `EncodedData` de cada tile apuntan ahi
+	// hasta que la cache de imagenes esta armada), asi que no se tocan. El buffer de lectura, en cambio, ya no
+	// lo mira nadie: los bloques que el nivel usa estan COPIADOS. Con `moorScratchPrimero` ese buffer es el del
+	// `.dt1` mas grande del nivel (1.008.003 B), y devolverlo ACA es lo que deja monton para la cache de tiles
+	// del nivel nuevo y para jugar.
+	arena := d2asset.EstadoDeLosTiles()
+	bufferSoltado := d2asset.SoltarPrestamoDeLecturaDeTiles()
+
+	println("DEMO140: CRUZA ARENA DEL MOOR copiado=", arena.BloquesBytes, "tramos=", arena.BloquesTramos,
+		"capacidad=", arena.BloquesCapacidad, "buffer=", arena.Scratch, "bufferSoltado=", bufferSoltado,
+		"libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()))
 
 	rendererDelMapa.SetMapEngine(motorDelMapa)
 
@@ -475,7 +517,8 @@ func demoCruzaAlMoor() bool {
 	runtime.GC()
 
 	println("DEMO140: CRUZA OK nivel=BloodMoor tiles=", len(*motorDelMapa.Tiles()), "jugador=", cx, cy,
-		"ms=", int64(d2cMs())-t0, "libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()))
+		"ms=", int64(d2cMs())-t0, "libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()),
+		"vramLibre=", pvr.VramDisponible())
 
 	return true
 }

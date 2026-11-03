@@ -495,10 +495,13 @@ echo "   MVP138 mvp=$(leer_knob mvpKnob) vista=$(leer_knob vistaX),$(leer_knob v
 #                 cada 30 cuadros deja el ritmo real. "no" (por omision) = nada de eso existe.
 #   DEMO_MOOR=si  cruzar el borde del campamento compone el BLOOD MOOR como nivel nuevo. Por omision "no": el
 #                 nivel de afuera pide RAM y ese numero se mide antes de dejarlo encendido.
+#   DEMO_MOOR_SCRATCH=no  el buffer de lectura del `.dt1` mas grande del afuera se pide DESPUES de los tramos del
+#                 arena (el camino de DC-002.111). Por omision "si" (el buffer grande primero, DC-002.144b).
 [ -n "${DEMO:-}" ] && pisa_knob demoKnob "$DEMO" 1
 [ -n "${DEMO_MOOR:-}" ] && pisa_knob demoMoor "$DEMO_MOOR" 1
+[ -n "${DEMO_MOOR_SCRATCH:-}" ] && pisa_knob moorScratchPrimero "$DEMO_MOOR_SCRATCH" 1
 
-echo "   DEMO140 demo=$(leer_knob demoKnob) moor=$(leer_knob demoMoor)"
+echo "   DEMO140 demo=$(leer_knob demoKnob) moor=$(leer_knob demoMoor) scratchPrimero=$(leer_knob moorScratchPrimero)"
 
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {

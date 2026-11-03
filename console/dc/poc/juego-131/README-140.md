@@ -52,9 +52,16 @@ antes de mandar la primera tecla.
   el guion de la quest por cuadro corre, etc.). Por omisión `no`.
 - `demoMoor` (`DEMO_MOOR=si|no`): si cruzar el borde del campamento compone el **nivel de afuera** como
   nivel nuevo (el orden de DC-002.109: soltar la caché y las casillas del nivel que se deja antes de
-  componer el siguiente). Por omisión `no`, y **así queda**: la corrida de DC-002.144 lo corrió y el nivel
-  nuevo **no entra por RAM** — ver la sección "El Blood Moor (`DEMO_MOOR`)" al final y
-  `console/dc/evidencia/dc-002.144-el-blood-moor.txt`.
+  componer el siguiente). Por omisión `no`. **DC-002.144b: con `si` YA ENTRA** (`CRUZA OK nivel=BloodMoor
+  tiles= 289 libre= 1.946.320`) — ver la sección "El Blood Moor (`DEMO_MOOR`)" al final y
+  `console/dc/evidencia/dc-002.144b-el-orden-de-los-pedidos.txt`. Lo que entra es la pieza de afuera de 17x17
+  y el minimapa/HUD siguen siendo los del pueblo, por eso el defecto sigue en `no`.
+- `moorScratchPrimero` (`DEMO_MOOR_SCRATCH=si|no`, **DC-002.144b**): el orden de los dos pedidos grandes al
+  cruzar. Con `si` (el defecto) el buffer de lectura del `.dt1` **más grande** del nivel (1.008.003 B) se pide
+  antes de los tramos del arena de bloques —`UsarScratchPorArchivo(false)`, el camino de DC-002.101— y cae en el
+  hueco entero que deja el arena del pueblo (2.621.440 B). Con `no` (el camino de DC-002.111) cada `.dt1` pide su
+  propio buffer después de los tramos, el hueco se parte y el pedido de 1.008.003 B muere en
+  `gc_external_alloc: OOM`. Solo actúa con `demoMoor = "si"`.
 - `combateCercaKnob` (`COMBATE_CERCA=si|no`, **DC-002.141**): con `si` el botón Y le pega al **bicho vivo
   más cercano** de cada jugador y los relojes del modo (GH/DT/DD) y de la muerte corren para **todos** los
   bichos. Con `no` (el defecto, la corrida de DC-002.126 bit a bit) el bicho de pelea es siempre
@@ -99,15 +106,21 @@ DEMO140: CIERRE ...             el resumen: cuadros, segundos, fps medio/min/max
 - El **texto del panel** de Akara no se pinta: el panel abre (356x396 y 500x81, más las páginas del log
   de 276x81 y 252x81, con el texto del motor en el log) y en pantalla queda el recuadro negro con el borde.
 - **8 fps no son los 18-20** del criterio: el cuadro jugable es de 124-131 ms.
-- La **salida al Blood Moor** (`DEMO_MOOR=si`) **no entra por RAM**: se corre (cruza, suelta el pueblo, lee el
-  `.ds1` del afuera y empieza a componer) y se muere en la arena de bloques de los `.dt1` del afuera. El número
-  y el detalle están abajo.
+- La **salida al Blood Moor** (`DEMO_MOOR=si`) **ya entra por RAM** (DC-002.144b: `CRUZA OK nivel=BloodMoor
+  tiles= 289 libre= 1.946.320 semiespacio= 1.485.976`, 6 fps), pero el nivel que entra es la pieza de afuera de
+  17x17 y **el minimapa y el HUD siguen siendo los del pueblo** (el minimapa suma las celdas nuevas a las del
+  pueblo: 701 = 680 + 21). El detalle, abajo.
 
-## El Blood Moor (`DEMO_MOOR`) — DC-002.144: medido y apagado
+## El Blood Moor (`DEMO_MOOR`) — DC-002.144: el muro, y DC-002.144b: cómo se rompió
 
-`demoMoor = "no"` y **así se queda** (el build de la demo también lo deja en `no`). Lo que se midió corriéndolo
-en Flycast con el teclado virtual (`/tmp/dcbuild/demo140-moor`, 19:06, evidencia completa en
-`console/dc/evidencia/dc-002.144-el-blood-moor.txt`):
+`demoMoor = "no"` **sigue siendo el defecto** (el build de la demo también lo deja en `no`): cruzar ya anda, pero
+lo que entra es la pieza de afuera de 17x17 con el minimapa y el HUD del pueblo. Encenderla es un build:
+`DEMO_MOOR=si bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo140-moor`.
+
+### DC-002.144 — el muro (medido, 19:06)
+
+Lo que se midió corriéndolo en Flycast con el teclado virtual (`/tmp/dcbuild/demo140-moor`, 19:06, evidencia
+completa en `console/dc/evidencia/dc-002.144-el-blood-moor.txt`):
 
 1. **El camino no llegaba ni a intentarlo.** Tres defectos, los tres arreglados dentro de la palanca:
    las tablas (`LvlPrest`/`LvlTypes`) ya estaban **soltadas** por la carga (`TABLAS SOLTADAS ... bytes= 216064`)
@@ -125,7 +138,26 @@ en Flycast con el teclado virtual (`/tmp/dcbuild/demo140-moor`, 19:06, evidencia
 4. **La palanca apagada no cambia la demo**: con `DEMO_MOOR=no` la corrida es la de DC-002.141 (tablas y
    fuentes soltadas, cero líneas de cruce, la quest se acepta con X, 145-149 ms por cuadro).
 
-Lo que haría falta para que entre (tarjeta aparte): soltar el pueblo **entero** antes de componer el afuera
-(hoy se recicla el mismo mapa), mudar la arena de bloques del nivel a la VRAM como ya se hizo con la caché, o
-componer el afuera por regiones con el DRLG (lo que hace el motor de la PC). Un `LoadStamp` del Blood Moor de
-verdad no existe: no hay preset.
+### DC-002.144b — lo que entró, y por qué era el ORDEN (medido, 19:31 y 19:38)
+
+**El afuera entra.** `DEMO140: CRUZA OK nivel=BloodMoor tiles= 289 jugador= 8.5 8.5 ms= 15117 libre= 1946320
+semiespacio= 1485976 vramLibre= 3511976`, la quest queda **en curso** por `EvAreaChanged`
+(`DEMO140: AREA pueblo->exterior`), el cruce tarda 15,1 s y después el nivel corre a 6 fps (164 ms por cuadro)
+con el descampado dibujado en pantalla. Evidencia completa en
+`console/dc/evidencia/dc-002.144b-el-orden-de-los-pedidos.txt` (logs y captura incluidos).
+
+Lo que cambió, y es **una sola palanca** (`moorScratchPrimero`, `DEMO_MOOR_SCRATCH=si|no`): el buffer de lectura
+del `.dt1` más grande del nivel (1.008.003 B) se pide **antes** de los tramos del arena de bloques
+(`d2asset.UsarScratchPorArchivo(false)`), no después. La pared no era falta de bytes —el montón podía servir ese
+bloque (`servible= 1008003`)— sino que los tramos del arena del afuera (2 x 524.288) y los buffers chicos
+(318.414, 505.504, 439.569) se metían dentro del hueco fresco que deja el arena del pueblo (2.621.440 B) y lo
+partían. Con la palanca encendida el bloque grande cae en el hueco entero; con la palanca apagada, el mismo
+código y el mismo guion mueren en `gc_external_alloc: OOM` (A/B corrido: las dos corridas terminan con
+`free= 1.946.320`).
+
+Lo que todavía falta para tener **el Blood Moor de verdad**: el nivel que entra es `Wild1.ds1` (17x17, "Act 1 -
+Fence Fill 1"), no el afuera de 56x96, porque el Blood Moor no tiene preset y hay que componerlo por regiones con
+el DRLG; y el **minimapa y el HUD no siguen el nivel nuevo** (el minimapa mezcla 680 celdas del pueblo con 21 del
+afuera y el HUD sigue diciendo «Rogue Encampment»). Las tres palancas de memoria de la tarjeta quedaron con su
+número: la 1 (soltar el pueblo entero) no hizo falta —el pico del cruce es 2.056.579 B contra 2.994.912 B
+libres—, la 2 (VRAM) no hizo falta y tiene `vramLibre= 3.511.976` B de hueco, y la 3 (DRLG) sigue pendiente.

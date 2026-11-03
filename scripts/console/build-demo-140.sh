@@ -41,6 +41,8 @@ OUT="${1:-/tmp/dcbuild/demo140}"
 # ---- LA DEMO ----
 export DEMO=si
 export DEMO_MOOR="${DEMO_MOOR:-no}"
+# DC-002.144b: el orden de los dos pedidos grandes al cruzar (el buffer del `.dt1` mas grande primero, "si").
+export DEMO_MOOR_SCRATCH="${DEMO_MOOR_SCRATCH:-si}"
 
 # ---- SIN GUIONES: todo lo que aprieta solo, apagado ----
 export MVP=no

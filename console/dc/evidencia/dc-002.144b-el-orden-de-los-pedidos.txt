@@ -1,0 +1,173 @@
+DC-002.144b -- EL AFUERA ENTRA EN LA CONSOLA: NO ERA FALTA DE BYTES, ERA EL ORDEN DE LOS PEDIDOS
+
+Build: /tmp/dcbuild/demo144b (DEMO=si DEMO_MOOR=si DEMO_MOOR_SCRATCH=si MEDIR_CUADRO=no MEDIR_VIVO=no,
+monstruos=2, vista=37,6). A/B: /tmp/dcbuild/demo144b-no (MISMO codigo, DEMO_MOOR_SCRATCH=no).
+Flycast 2.7, teclado virtual del kernel (/dev/uinput -> teclado del emulador -> bus maple -> POC).
+Corridas: 2026-11-03 19:28 (moor=si, teclas de mas: no cruzo), 19:31 (moor=si, LA DEL CRITERIO, con la quest
+aceptada), 19:38 (moor=si + DEMO_MOOR_SCRATCH=no, el A/B que muere).
+
+0. QUE PEDIA LA TARJETA. Tres palancas de memoria para que el nivel de AFUERA entre en el monton de C, una por
+   corrida, con su numero antes/despues: (1) soltar el pueblo entero antes de componer, (2) mudar el arena de
+   bloques a la VRAM, (3) componer el afuera por regiones con el DRLG.
+
+   RESULTADO, en una linea: **EL AFUERA ENTRA** (`DEMO140: CRUZA OK nivel=BloodMoor tiles= 289 libre=
+   1.946.320 semiespacio= 1.485.976`) y ninguna de las tres palancas hizo falta: la pared de DC-002.144 no era
+   falta de bytes sino el ORDEN en que se piden los dos bloques grandes del cruce. Se midio, se convirtio en una
+   palanca con A/B en el mismo codigo (`moorScratchPrimero`, `DEMO_MOOR_SCRATCH=si|no`) y se corrieron las dos.
+
+1. EL NUMERO DE PARTIDA (el de DC-002.144, re-medido: es el mismo)
+   Al cruzar el borde, con las tablas y las fuentes vivas (sin ellas el `.ds1` del nivel nuevo no se puede leer):
+     DEMO140: CRUZA al Blood Moor desde celda= 42.6745 8.28042 libre= 2994912 semiespacio= 1609152
+     DEMO140: CRUZA cache del pueblo soltada bytes= 3481600 libre= 2994912
+     DEMO140: CRUZA casillas del pueblo soltadas libre= 2994912 semiespacio= 1255080
+   O sea: 2.994.912 B libres en el monton de C (DC-002.144 midio 2.995.872: la misma corrida, 960 B de
+   diferencia por la cache del pueblo, que esta vez devolvio 3.481.600 B a la VRAM) y el semiespacio al 68,4 %.
+   El monton de C NO es la pared del recolector, y el recolector no es la pared del monton de C.
+
+2. LO QUE PIDE EL NIVEL DE AFUERA (medido en el host, no deducido)
+   `go run ./console/dc/medidas/bloques` sobre el `.ds1` que la palanca compone (`Act1/Outdoors/Wild1.ds1`,
+   17 x 17, preset 32 "Act 1 - Fence Fill 1"): 4 archivos y 2.271.490 B crudos.
+
+     act1\outdoors\stones.dt1     318.414 B
+     act1\outdoors\treegroups.dt1 505.504 B
+     act1\outdoors\stonewall.dt1  439.569 B
+     act1\town\floor.dt1        1.008.003 B   <- el mas grande del acto 1
+
+   El arena de bloques NO guarda los crudos: copia solo los bloques de los tiles que el `.ds1` referencia
+   (DC-002.88). Medido en la corrida del criterio:
+     DEMO140: CRUZA ARENA DEL MOOR copiado= 990269 tramos= 2 capacidad= 1048576
+   o sea 990.269 B copiados en 2 tramos de 512 KB (94,4 % de la capacidad: el redondeo del tramo es lo que
+   sobra). El crudo se lee en UN buffer prestado, del tamano del archivo mas grande: 1.008.003 B.
+
+3. LA PARED, MEDIDA: EL ORDEN PARTE EL HUECO
+   Al cruzar, el hueco GRANDE ya existe: es el arena de bloques del pueblo que se acaba de devolver, cinco
+   tramos pedidos uno detras del otro:
+     JUEGO121: ARENA DE BLOQUES SOLTADA (despues de la cache) tramos= 5 bytes= 2621440 libre= 3141832
+   El pedido del buffer de 1.008.003 B entra en ese hueco SIN PROBLEMA... si se pide primero. Medido con la
+   palanca encendida, en el mismo instante:
+     DEMO140: CRUZA BUFFER primero= true delDT1MasGrande= 1008003 libre= 2994912 servible= 1008003 vramLibre= 3511976
+   `d2cServible(1008003)` = 1.008.003: el monton PUEDE servir ese bloque en ese momento (hace el malloc y el free
+   de verdad y lo dice). Con el camino de DC-002.111 (`scratchPorArchivo`, un buffer por archivo del tamano de
+   ESE archivo) el pedido grande llega ULTIMO y el hueco ya no esta entero:
+
+   EL A/B, bloque por bloque (mismo codigo, mismo guion, mismo libre de partida). `v=` es lo que se pide,
+   `libreAntes=` lo que habia en el monton en ese momento:
+
+     PALANCA APAGADA (DEMO_MOOR_SCRATCH=no)                PALANCA ENCENDIDA (DEMO_MOOR_SCRATCH=si)
+     --------------------------------------------------    --------------------------------------------------
+     sonda 1.008.003           libre 2.994.912             sonda 1.008.003           libre 2.994.912
+     buffer  318.414 (stones)  libre 2.994.912             BUFFER 1.008.003          libre 2.994.912  <- entra
+     sonda     524.288                                    sonda     524.288
+     tramo     524.288         libre 2.676.488             tramo     524.288         libre 1.986.904
+     buffer  505.504 (trees)   libre 2.470.616             sonda     524.288
+     buffer  439.569 (stonew.) libre 2.470.616             tramo     524.288         libre 1.462.608
+     sonda     524.288                                    (los 4 .dt1 se leen del buffer grande, sin pedir
+     tramo     524.288         libre 2.031.040              mas memoria: los bloques se COPIAN al arena)
+     buffer 1.008.003 (floor)  libre 1.946.320  -> OOM     ARENA copiado 990.269   libre 1.946.320
+     Out of memory. Requested sbrk_base 0x8d088000,        JUEGO121: el motor devuelve el buffer
+       was 0x8cf92000, diff 1007616                        DEMO140: CRUZA OK libre= 1.946.320
+     fatal error: gc_external_alloc: OOM
+     Memory: arena=10267072 used=8320752 free=1946320
+
+   LOS DOS ACABAN CON free= 1.946.320. La diferencia no es CUANTO hay libre: es QUE el bloque de 1.008.003 B
+   se pida cuando el hueco esta entero (los 2.621.440 B del arena del pueblo, devueltos de una) o despues de
+   que los tramos del arena del nivel nuevo (2 x 524.288 B) y los buffers chicos (318.414, 505.504, 439.569) se
+   metan adentro y lo partan en trozos de a lo sumo ~944 KB (`dlmalloc` no puede servir 1.008.003 con eso, y el
+   `sbrk` esta en el techo de KOS: por eso muere en vez de devolver NULL).
+
+   POR QUE EL A/B VALE: el binario de la corrida que muere es el MISMO codigo con una sola constante distinta
+   (`moorScratchPrimero = "no"`), el mismo guion de teclas y el mismo libre inicial (2.994.912 B). Lo unico
+   que cambia es el orden de los dos pedidos grandes.
+
+4. LA PALANCA (lo que se toco)
+   - `knobs.go`: `moorScratchPrimero = "si"` (se pisa con `DEMO_MOOR_SCRATCH=si|no` en
+     `scripts/console/build-juego-131.sh`, y `build-demo-140.sh` lo pasa con "si" por omision).
+   - `demo_140.go`, dentro de `demoCruzaAlMoor` y SOLO con `demoMoor == "si"`: antes de
+     `ResetMapParaStamp` se fija `d2asset.UsarScratchPorArchivo(false)` (el camino de DC-002.101 que
+     DC-002.111 dejo como A/B), de modo que `PrepararArenaDeBloquesUsados` pide el buffer del `.dt1` mas grande
+     del nivel ANTES de los tramos del arena. Se imprime el tamano del buffer, lo que el monton puede servir en
+     ese momento y la VRAM libre.
+   - Se suman dos lineas de evidencia: el censo del arena del nivel nuevo (`copiado`, `tramos`, `capacidad`,
+     `bufferSoltado`) y `vramLibre` en el `CRUZA OK`.
+   - CON `demoMoor = "no"` NO CAMBIA NADA: la palanca y las dos lineas viven adentro del camino del cruce, que
+     con la palanca apagada no se ejecuta. El defecto del build de la demo sigue en `demoMoor = "no"`.
+
+5. LA CORRIDA DEL CRITERIO (19:31) -- LOS NUMEROS ANTES Y DESPUES
+   Guion de teclas del kernel: `nada 8 derecha 1.2 nada 0.5 s 0.4 nada 2 s 0.4 nada 1 abajo 3.8 nada 45`
+   (`s` = boton X: hablar con Akara y cerrar el panel del dialogo; la segunda `s` es la que deja caminar).
+
+   ANTES (cruzando el borde):
+     DEMO140: QUEST ACEPTADA la Den of Evil cuadro= 51 estado= aceptada pagina= 1 bichosVivos= 2
+     DEMO140: CRUZA al Blood Moor desde celda= 42.6745 8.28042 libre= 2994912 semiespacio= 1609152
+     DEMO140: CRUZA cache del pueblo soltada bytes= 3481600 libre= 2994912
+     DEMO140: CRUZA casillas del pueblo soltadas libre= 2994912 semiespacio= 1255080
+     DEMO140: CRUZA DS1 del moor= Act1/Outdoors/Wild1.ds1 ancho= 17 alto= 17 preset= 32
+              nombre= Act 1 - Fence Fill 1 levelID= 0 outdoors= true
+     DEMO140: CRUZA BUFFER primero= true delDT1MasGrande= 1008003 libre= 2994912 servible= 1008003 vramLibre= 3511976
+
+   DESPUES:
+     DEMO140: CRUZA ARENA DEL MOOR copiado= 990269 tramos= 2 capacidad= 1048576 buffer= 0 bufferSoltado= 0
+              libre= 1946320 semiespacio= 1610088
+     DEMO140: AREA pueblo->exterior (el motor ya cuenta las bajas de la Den) bichosVivos= 2
+     DEMO140: CRUZA OK nivel=BloodMoor tiles= 289 jugador= 8.5 8.5 ms= 15117 libre= 1946320
+              semiespacio= 1485976 vramLibre= 3511976
+     DEMO140: SALIDA DEL PUEBLO jugador= 8.5 8.5 recorrido= 6.11561 nivel= Afueras:Wild1.ds1 bichos= 2 cuadro= 112
+
+   - `bufferSoltado= 0` NO es un fallo: el motor ya devuelve el buffer prestado al terminar de cargar los
+     `.dt1` (`d2mapengine/engine.go:312`), asi que el `SoltarPrestamoDeLecturaDeTiles` de la demo lo encuentra
+     en 0. Lo que el censo dice es que el buffer NO quedo tomado.
+   - El semiespacio queda en 1.485.976 de 1.835.008 = 81,0 %: el cruce NO es un problema del recolector (y no
+     lo fue nunca: el limite de esta tarjeta es el monton de C).
+   - 15.117 ms para componer el nivel nuevo (en Flycast, con el puerto serie imprimiendo).
+
+6. LA CORRIDA SIGUE VIVA EN EL NIVEL NUEVO (lo que prueba que el nivel es de verdad)
+     DEMO140: FPS cuadros= 120 msPorCuadro= 164 fps= 6 celda= 8.5 8.5 nivel= Afueras:Wild1.ds1
+     DEMO140: FPS cuadros= 180 msPorCuadro= 166 fps= 6 celda= 8.5 8.5 nivel= Afueras:Wild1.ds1
+     ... (30 informes, hasta el cuadro 600)
+     DEMO140: CIERRE cuadros= 600 segundos= 124 fpsMedio= 5 fpsMinimo= 2 fpsMaximo= 7
+     DEMO140: CIERRE QUEST aceptada= true bajas= 0 limpias= false cobrada= false puntoDeHabilidad= 0
+     DEMO140: CIERRE MUNDO nivel= Afueras:Wild1.ds1 salio= true recorrido= 6.11561 celda= 8.5 8.5
+              libre= 1946320 semiespacio= 1638576
+   La quest queda EN CURSO en el nivel nuevo (`aceptada= true`, `EvAreaChanged` disparado, 2 bichos vivos): el
+   motor no la cerro al cambiar de area, que es lo que la tarjeta pide (`AREA pueblo->exterior`).
+   El cuadro del afuera esta dibujado: `console/dc/evidencia/dc-002.144b-el-moor-en-pantalla.png` (captura de la
+   ventana del emulador: descampado con arboles, rocas y pasto, el heroe en el centro, un bicho a la derecha, el
+   minimapa arriba a la derecha, el cinturon abajo y el panel de la Den of Evil aceptada).
+   164 ms por cuadro contra los 145-149 ms del pueblo (DC-002.144): el afuera cuesta ~15 ms mas por cuadro (289
+   casillas en vez de 2337, pero el nivel se compone con 2 tramos de arena nuevos y la cache se rearma).
+
+7. LO QUE NO (sin taparlo)
+   - EL MINIMAPA NO SE REINICIA con el nivel nuevo: sigue con las 680 celdas del pueblo y le SUMA las que revela
+     del afuera, o sea que dibuja los dos niveles mezclados:
+       JUEGO130: MINIMAPA REVEAL cuadro= 112 jugador= 1 heroe= 8.5 8.5 agregadas= 21 celdas= 701 piso= 514 pared= 187
+     (680 del pueblo + 21 del afuera). Su tabla es la del nivel 1 (`ParseTxtLevels(..., nivelDelPueblo)`) y su
+     semilla la del nivel 1: no hay un "recargar el minimapa del nivel nuevo".
+   - EL HUD NO CAMBIA EL NOMBRE DE LA ZONA: su unica linea de carga es la del pueblo
+     (`JUEGO125: HUD LISTO ... zona= Rogue Encampment`) y no se vuelve a armar en el afuera. El nombre sale del
+     fallback del motor (`d2level.DefaultLevelNames[1]`), que es una constante de la carga.
+   - EL NIVEL QUE ENTRA ES LA PIEZA DE AFUERA (`Wild1.ds1`, 17 x 17, "Act 1 - Fence Fill 1"), NO el Blood Moor
+     de 56 x 96: el Blood Moor no tiene fila de preset (medido en el host, DC-002.144) y armarlo es la palanca 3
+     de la tarjeta (el DRLG por regiones), que NO se toco.
+   - LA PALANCA `demoMoor` SIGUE EN "no" EN EL BUILD DE LA DEMO: cruzar anda, pero el nivel es una pieza de
+     cerca de 17 x 17 con el minimapa y el HUD del pueblo. Encenderla es decision de Daniel
+     (`DEMO_MOOR=si bash scripts/console/build-demo-140.sh ...`).
+
+8. LAS TRES PALANCAS DE LA TARJETA, CON SU NUMERO
+   1. SOLTAR EL PUEBLO ENTERO antes de componer: NO HIZO FALTA y no se implemento. El cruce necesita, en su
+      pico, 1.048.576 B de arena + 1.008.003 B de buffer = 2.056.579 B contra 2.994.912 B libres: sobra
+      938.333 B con el pueblo entero vivo (NPCs, bichos, drop, alijo, HUD y minimapa). Lo que decide no es el
+      total: es la contiguidad. (Su numero queda medido de arriba: el afuera necesita 2,06 MB de monton de C en
+      el pico.)
+   2. MUDAR EL ARENA DE BLOQUES A LA VRAM: NO HIZO FALTA. Números para la tarjeta que la quiera: al cruzar,
+      con la cache del pueblo ya devuelta, `vramLibre= 3.511.976` B y el techo medido al arranque es
+      `vramDisponible= 4.740.808` B (`JUEGO121: TRAMO DE LA CACHE EN BLOQUES DE VRAM ... vramDisponible= 4740808`).
+      Los 1.048.576 B del arena del afuera entran de sobra ahi; lo que NO se midio es el costo de decodificar
+      tiles leyendo desde la VRAM (el CPU del SH-4 lee la VRAM por el bus de 64 bits, mas lento que la RAM).
+   3. COMPONER EL AFUERA POR REGIONES CON EL DRLG: SIGUE PENDIENTE y es la unica forma de tener el Blood Moor DE
+      VERDAD (56 x 96). Con la memoria resuelta, el Blood Moor deja de ser un problema de RAM y pasa a ser el
+      trabajo de composicion que la tarjeta 3 pide.
+
+9. LOS LOGS
+   - `console/dc/evidencia/dc-002.144b-cruce-ok-flycast.log` -- la corrida del criterio completa (19:31).
+   - `console/dc/evidencia/dc-002.144b-ab-palanca-apagada-flycast.log` -- el A/B que muere (19:38).
+   - `console/dc/evidencia/dc-002.144b-el-moor-en-pantalla.png` -- la ventana del emulador en el afuera.
