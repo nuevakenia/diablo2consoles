@@ -412,6 +412,13 @@ echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob bli
 [ -n "${PRES_CONV_RAPIDA:-}" ] && pisa_knob presentarConvRapida "$PRES_CONV_RAPIDA" 1
 [ -n "${PRES_VRAM_AGRUPADA:-}" ] && pisa_knob presentarVramAgrupada "$PRES_VRAM_AGRUPADA" 1
 
+# DC-002.139 -- EL MAPA ESTATICO Y LA CAJA DE LOS ENTES.
+#   MAPA_ESTATICO=si  el mapa no se repinta si la camara no se movio (y se devuelve el mapa debajo de cada ente)
+#   CAJAS_139=si      deja encendido el guardar/devolver la caja de cada ente (lo que hace posible el salto)
+[ -n "${MAPA_ESTATICO:-}" ] && pisa_knob mapaEstatico "$MAPA_ESTATICO" 1
+[ -n "${CAJAS_139:-}" ] && pisa_knob cajas139 "$CAJAS_139" 1
+[ -n "${CONV_BLOQUES:-}" ] && pisa_knob convBloques139 "$CONV_BLOQUES" 1
+
 echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
 
 # LAS DE ESTA TARJETA (DC-002.137): EL MINIMAPA.

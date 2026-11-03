@@ -25,6 +25,11 @@ func d2cPvrPantallaInit(w, h int) int
 //extern d2c_pvr_pantalla_convertir
 func d2cPvrPantallaConvertir(rgba uintptr, w, h int) int
 
+// DC-002.139: UN bloque de 32x32 del lienzo a la textura (ver sucios_139.go y pvr_pantalla.c).
+//
+//extern d2c_pvr_pantalla_bloque
+func d2cPvrPantallaBloque(rgba uintptr, lienzoW, x0, y0 int) int
+
 //extern d2c_pvr_pantalla_pintar
 func d2cPvrPantallaPintar()
 
@@ -119,6 +124,34 @@ func VramDeLaPantalla() int { return d2cPvrPantallaVram() }
 func Presentar(img *Imagen) error {
 	if img == nil || len(img.pixeles) == 0 {
 		return errorPantalla("el cuadro esta vacio")
+	}
+
+	// DC-002.139: LA PRESENTACION POR BLOQUES SUCIOS. Si el que dibujo marco los bloques que toco (y el lienzo
+	// es multiplo de 32, que lo es: 640x480), se convierten SOLO esos: el resto quedo igual en la textura del
+	// cuadro anterior y no hay nada que subir. Es el mismo camino rapido y los mismos bytes que el cuadro
+	// entero (ver `d2c_pvr_pantalla_bloque`); lo que se ahorra son las lecturas del lienzo contra la VRAM.
+	if converPorBloques139 && suciosMarcados139 > 0 &&
+		img.ancho%ladoDelBloque139 == 0 && img.alto%ladoDelBloque139 == 0 {
+		base := uintptr(unsafe.Pointer(&img.pixeles[0]))
+
+		for by := 0; by < filas139; by++ {
+			for bx := 0; bx < columnas139; bx++ {
+				i := by*columnas139 + bx
+				if i < 0 || i >= len(sucios139) || !sucios139[i] {
+					bloquesSaltados139++
+
+					continue
+				}
+
+				if r := d2cPvrPantallaBloque(base, img.ancho, bx*ladoDelBloque139, by*ladoDelBloque139); r != 0 {
+					return errorPantalla("no se pudo convertir el bloque (codigo " + itoa(r) + ")")
+				}
+
+				bloquesConvertidos139++
+			}
+		}
+
+		return nil
 	}
 
 	if r := d2cPvrPantallaConvertir(uintptr(unsafe.Pointer(&img.pixeles[0])), img.ancho, img.alto); r != 0 {

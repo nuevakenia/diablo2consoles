@@ -206,5 +206,5 @@ func activarElBlitDePalabras() {
 // OJO CON LA REGLA DE LA CASA: apagar el instrumento NO cambia el dibujo. El sprite se pinta en el mismo orden
 // y en el mismo sitio; lo que se va es el guardar/medir/devolver que existia para el numero, no para el cuadro.
 func midiendoElCuadro134() bool {
-	return medirCuadro == "si" || cuadro <= 3 || pintarUnaVez != "si"
+	return medirCuadro == "si" || cuadro <= 3 || pintarUnaVez != "si" || cajas139 == "si"
 }

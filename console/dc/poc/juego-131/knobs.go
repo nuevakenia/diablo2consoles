@@ -714,6 +714,25 @@ const (
 	// POC instrumentado, con "no" es el del juego.
 	medirCuadro = "si"
 
+	// ============================== LAS DE ESTA TARJETA (DC-002.139): LOS FPS DEL MVP ==============================
+	//
+	// mapaEstatico: "si" = el mapa es ESTATICO y no se repinta cuando la camara esta en el mismo pixel que el
+	// cuadro anterior: se devuelve el mapa debajo de la caja de cada ente (lo que guarda `cajas139`) y el cuadro
+	// sigue igual. "no" = el mapa se pinta entero cada cuadro, que es el camino de DC-002.140, bit a bit.
+	//
+	// cajas139: "si" = dejar encendido el guardar/devolver la caja de cada ente cuando el instrumento por
+	// cuadro esta apagado. El salto del mapa lo necesita (es lo que devuelve el mapa debajo de los sprites) y
+	// NO toca el dibujo: el sprite se pinta en el mismo orden y en el mismo sitio; lo que se paga son las
+	// copias de la caja.
+	mapaEstatico = "no"
+
+	cajas139 = "no"
+
+	// convBloques139: "si" = la presentacion convierte SOLO los bloques de 32x32 que el cuadro toco (las cajas
+	// de los sprites y los paneles) en vez de los 307.200 pixeles del lienzo. Depende de `mapaEstatico`: con el
+	// mapa repintandose entero no hay nada que ahorrar (se marca todo).
+	convBloques139 = "si"
+
 	// blitRapido: "si" = el camino nuevo de dibujado de tiles del backend PVR (DC-002.132): el recorte se calcula
 	// UNA vez por tile (no una vez por pixel) y con el estado neutro (sin color puesto) no se hace la cuenta del
 	// tinte (3 multiplicaciones y 3 divisiones por 255 por pixel). "no" = el bucle viejo, TAL CUAL, que es el que

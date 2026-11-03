@@ -1460,7 +1460,29 @@ func dibujar(superficie d2interface.Surface) error {
 	// DC-002.134: cuantos pixeles de este cuadro van por cada camino del backend (ver `anotarLosPixeles134`).
 	pvr.ReiniciarContadoresDePixeles()
 
-	rendererDelMapa.Render(superficie)
+	// DC-002.139: EL MAPA ES ESTATICO. Si la camara esta en el mismo pixel que el cuadro anterior no se
+	// repintan los 248 tiles (68,3 ms medidos): se devuelve el mapa debajo de la caja de cada ente y el cuadro
+	// sigue igual. `mapaSeRepinta139` contesta con la camara, el nivel, el panel y los tiles animados.
+	// DC-002.139: los bloques de la presentacion: se arranca el cuadro sin nada marcado y, si el mapa se
+	// repinta, se marca todo (lo hace `marcarLoQueCambio139` al final del cuadro).
+	if cuadro == 1 {
+		pvr.FijarTamanoDeLaGrilla(ancho, alto)
+		pvr.FijarConversionPorBloques(convBloques139 == "si")
+	}
+
+	pvr.ReiniciarBloquesSucios()
+
+	if mapaSeRepinta139() {
+		rendererDelMapa.Render(superficie)
+		mapa139Repintados++
+		mapa139PintadoEsteCuadro = true
+	} else {
+		restaurarElMundo139(malla.Imagen().Pixeles())
+		mapa139Saltados++
+		mapa139PintadoEsteCuadro = false
+	}
+
+	anotarElMapaPintado139()
 
 	pxDeIndices, pxDeCopiar, pxDeSombras := pvr.ContadoresDePixeles()
 
@@ -1923,6 +1945,9 @@ func dibujar(superficie d2interface.Surface) error {
 		resumenDelCuadro132(cuadro)
 	}
 
+	// DC-002.139: el censo del mapa estatico (cuantos cuadros se salto el repintado).
+	informeDelMapaEstatico139()
+
 	// DC-002.134: el cuadro al cronometro por etapas (ver instrumento_134.go). Va al final para que la resta
 	// `dibujar - suma de etapas` sea exactamente lo que el cuadro paga en lineas de evidencia.
 	//
@@ -1931,6 +1956,9 @@ func dibujar(superficie d2interface.Surface) error {
 	// todo lo que se pinta (paneles, HUD y minimapa incluidos): si fuera antes, el crc de la marca no seria el del
 	// cuadro que el ojo ve.
 	anotarElCuadroDelMVP(pixeles, crcLienzo(pixeles), crcMapa, pxHUD, pxMinimapa, pxDialogo, llenosLienzo(pixeles))
+
+	// DC-002.139: lo que hay que convertir en la presentacion (los bloques que este cuadro toco).
+	marcarLoQueCambio139()
 
 	anotarCuadro134(cronometro134() - tInicio134)
 

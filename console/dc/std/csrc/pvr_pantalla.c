@@ -807,6 +807,46 @@ int d2c_pvr_pantalla_convertir_en_bloque(unsigned int rgba, int w, int h, int x_
     return 0;
 }
 
+/* ============================== DC-002.139: LA PRESENTACION POR BLOQUES SUCIOS ==============================
+ *
+ * EL NUMERO QUE MANDA (DC-002.140, Flycast): la presentacion cuesta 25,5 ms por cuadro y 23,6 de esos son la
+ * CONVERSION de los 307.200 pixeles (RGBA -> RGB565): el bucle lee el lienzo contra la VRAM (area P2, sin
+ * cache) una palabra de 32 bits por pixel y esa lectura es la que manda. La subida a la VRAM son 1,8 ms.
+ *
+ * POR QUE SE PUEDE CONVERTIR MENOS. Con el mapa estatico (DC-002.139) el lienzo NO cambia entero entre dos
+ * cuadros: cambian las cajas de los sprites y los paneles. Convertir un bloque de 32x32 cuesta lo mismo que
+ * convertir cualquiera; lo que no cuesta nada es NO convertir el que quedo igual. El POC marca los bloques que
+ * toco (jugador, bichos, NPCs, HUD, minimapa, panel) y aca se convierten solo esos, con el MISMO camino rapido
+ * del bloque (`bloque_rapido` no se puede usar tal cual porque la fila del destino cambia: la tabla `ofs_tile`
+ * esta pensada para un bloque entero desde su esquina).
+ *
+ * LOS BYTES QUE LLEGAN A LA VRAM SON LOS MISMOS que los del cuadro entero: misma cuenta del color (5-6-5
+ * truncado), mismo twiddle, mismo `pvr_txr_load`. La prueba es el crc32 del mundo (1437022778) y que el cuadro
+ * se vea igual.
+ */
+int d2c_pvr_pantalla_bloque(unsigned int rgba, int lienzo_w, int x0, int y0) {
+    const unsigned char *src = (const unsigned char *)rgba;
+
+    if (pant_tex == NULL || src == NULL) {
+        return -1;
+    }
+    if (lienzo_w <= 0 || x0 < 0 || y0 < 0) {
+        return -2;
+    }
+
+    armar_twiddle();
+    /* el destino SIEMPRE es un bloque entero (el que llama pasa x0/y0 multiplos de 32), asi que el bloque se
+     * arma con el mismo `bloque_rapido` del cuadro entero: cuatro pixeles por vuelta y dos por deposito. */
+    armar_ofs_tile(lienzo_w);
+    bloque_rapido(src + ((size_t)y0 * (size_t)lienzo_w + (size_t)x0) * 4, conv_tile);
+
+    pvr_txr_load(conv_tile, (pvr_ptr_t)((uint16_t *)pant_tex + indice_tile(x0, y0)),
+                 LADO_TILE * LADO_TILE * 2);
+    pres_bloques++;
+
+    return 0;
+}
+
 int d2c_pvr_pantalla_subir_vram(void) {
     if (pant_tex == NULL) {
         return -1;

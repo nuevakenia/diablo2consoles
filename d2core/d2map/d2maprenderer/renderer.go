@@ -418,6 +418,9 @@ func (mr *MapRenderer) Render(target d2interface.Surface) {
 	mr.cuadroDeLaCache++
 	mr.recogidaAlVuelo = nil
 
+	// DC-002.139: el censo de tiles animados es de ESTE cuadro (el POC no puede saltarse el mapa si hay alguno).
+	reiniciarTilesAnimados139()
+
 	mapSize := mr.mapEngine.Size()
 
 	sz := mr.TamanoDelCuadro()
@@ -770,6 +773,9 @@ func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, 
 
 	clave := tile.RandomIndex
 	if tile.Animated {
+		// DC-002.139: un tile animado se pinta con el reloj, no con la camara: el POC no puede saltarse el mapa.
+		contarTileAnimado139()
+
 		clave = byte(tileAnimFrame(mr.animTicks, 0, mr.animFrames[uint16(tile.Style)<<8|uint16(tile.Sequence)]))
 	}
 
