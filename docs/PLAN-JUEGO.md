@@ -193,6 +193,35 @@ por cuadro = **0,86 cuadros por segundo**, y el desglose dice dónde está:
 Evidencia: `console/dc/evidencia/dc-002.132-cuadro-barato.txt` (A/B dentro del mismo binario con la palanca
 `BLIT_RAPIDO`, y `console/dc/verif-blit-132` para la equivalencia byte a byte de los dos bucles).
 
+**El cuadro, medido POR ETAPA (DC-002.134, mismo pueblo y mismo escenario):** esos 746 ms **no eran píxeles**:
+eran el baile de medir (guardar ~100 KB de la caja del sprite, hashear la caja, devolver el mapa y volver a
+pintar el sprite) y las líneas de evidencia por el puerto serie. Con el instrumento apagado y sin líneas:
+
+| etapa | DC-002.132 | DC-002.134 | |
+|---|---|---|---|
+| actualizar | 8.531 µs | 6.581 | -23 % |
+| mapa | 389.181 | 382.115 | -1,8 % |
+| jugadores | 59.551 | **555** | -99,1 % |
+| bichos | 23.144 | **411** | -98,2 % |
+| HUD | 20.501 | 3.152 | -84,6 % |
+| minimapa | 55.210 | 66.517 | +20,5 % |
+| líneas por cuadro (`sinEtapa`) | 95.321 | **1.377** | -98,6 % |
+| **dibujar** | 642.911 | 454.129 | -29,4 % |
+| **cuadro (PVR)** | **688.941** | **501.145** | **-27 %** |
+
+Con la ficha de DC-002.132: **1.150 → 501 ms** (-56 %) y **0,86 → 1,99 cuadros por segundo**, con el `crc32` del
+mundo igual al host (`1437022778`), el jugador en 1.237 px y el bicho en 612 px.
+
+**El criterio de 300 ms no se alcanza y no depende de este trabajo:** el mapa solo pesa **382 ms** (83 % del
+cuadro) y la presentación 37 ms fijos ⇒ piso de **419 ms** con todo el resto del POC en cero. Y el mapa **no**
+está limitado por el depósito de píxeles: pinta **1.539.584 px por cuadro** (248 ns/px ≈ 50 ciclos, cuando un
+bucle de depósito son 12-15) en 242 tiles ⇒ **~1,2 ms por tile se van FUERA del bucle de píxeles**. El próximo
+blanco es el trabajo por tile del renderer del mapa, no el bucle.
+
+Evidencia: `console/dc/evidencia/dc-002.134-etapas-del-cuadro.txt` (líneas `JUEGO134: ETAPAS` y
+`JUEGO134: PIXELES`, palancas `ETAPAS`/`VERBOSO`/`BLIT_PALABRAS`/`PINTAR_UNA_VEZ` y
+`console/dc/verif-blit-134` con 10.000 casos de equivalencia de los tres caminos del blit).
+
 **Antes de portar cada etapa:** medir cuánto suma al binario y cuánto pide al arrancar. Si no entra, se
 recorta lo que la etapa no usa (el camino de `--gc-sections` ya demostró que solo tira 448 KB: el 96 % de la
 imagen está vivo por los `init` de gccgo, así que recortar paquetes es la palanca real).

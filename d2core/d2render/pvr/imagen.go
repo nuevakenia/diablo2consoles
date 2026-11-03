@@ -530,6 +530,8 @@ func copiarEn(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla) {
 				origen.pixeles[j+0], origen.pixeles[j+1], origen.pixeles[j+2], origen.pixeles[j+3], modo, aj)
 		}
 	}
+
+	pxDeCopiar += uint64((x1 - x0) * (y1 - y0))
 }
 
 // ajusteNeutro: el ajuste que no toca el pixel. OJO: el valor CERO de ajuste NO sirve -- `efecto` cero es
@@ -580,6 +582,8 @@ func copiarMovida(dst, origen *Imagen, dx, dy int, modo modoMezcla) {
 			d += 4
 		}
 	}
+
+	pxDeCopiar += uint64((x1 - x0) * (y1 - y0))
 }
 
 // mezclar escribe el pixel de origen ya ajustado en la posicion `d` del destino.

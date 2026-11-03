@@ -399,6 +399,17 @@ echo "   VIVO gcPorCuadro=$(leer_knob gcPorCuadro) umbral=$(leer_knob umbralDelG
 [ -n "${BLIT_RAPIDO:-}" ] && pisa_knob blitRapido "$BLIT_RAPIDO" 1
 
 echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob blitRapido)"
+
+# LAS DE ESTA TARJETA (DC-002.134): LAS ETAPAS DEL CUADRO.
+#   ETAPAS=no   apaga el cronometro por etapa (el binario es el de DC-002.132 otra vez).
+#   VERBOSO=no  apaga las lineas de evidencia POR CUADRO (solo quedan los tres primeros cuadros y los resumenes
+#               del cierre): es el A/B de cuanto del cuadro es el puerto serie.
+[ -n "${ETAPAS:-}" ] && pisa_knob etapasKnob "$ETAPAS" 1
+[ -n "${VERBOSO:-}" ] && pisa_knob verbosoEtapas "$VERBOSO" 1
+[ -n "${BLIT_PALABRAS:-}" ] && pisa_knob blitPalabras134 "$BLIT_PALABRAS" 1
+[ -n "${PINTAR_UNA_VEZ:-}" ] && pisa_knob pintarUnaVez "$PINTAR_UNA_VEZ" 1
+
+echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }

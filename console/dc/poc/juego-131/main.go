@@ -312,6 +312,12 @@ func memoria(etapa string) {
 		picoMonton = picoDeLaCarga
 	}
 
+	// DC-002.134: el PICO se sigue tomando (es estado, no evidencia), pero la linea es evidencia POR CUADRO y
+	// son ~150 B por el puerto serie: con `VERBOSO=no` no se imprime.
+	if !verboso134() {
+		return
+	}
+
 	println("JUEGO121: MEMORIA", etapa, "usado=", usado, "libre=", d2cMontonLibre(),
 		"arena=", d2cMontonArena(), "sbrk=", int(d2cSbrkActual()), "techo=", int(d2cMontonTecho()),
 		"pico=", picoMonton)
@@ -393,8 +399,14 @@ func main() {
 
 	// DC-002.132: el camino rapido del tile (o el viejo, para el A/B) se elige ANTES de dibujar un cuadro.
 	activarElBlitRapido()
+
+	// DC-002.134: y el camino de la PALABRA (un deposito de 32 bits por pixel), tambien antes del primer cuadro.
+	activarElBlitDePalabras()
+
 	println("JUEGO132: arranca -- medirCuadro=", medirCuadro, "blitRapido=", blitRapido,
 		"cuadrosPorInforme=", cuadrosDelInforme132)
+	println("JUEGO134: arranca -- etapas=", etapasKnob, "verboso=", verbosoEtapas, "blitPalabras=",
+		blitPalabras134)
 
 	memoria("al-arrancar")
 	semiespacio("al-arrancar")
@@ -965,6 +977,12 @@ func censoDelTramo(etapa string) {
 		return
 	}
 
+	// DC-002.134: la linea del tramo es evidencia POR CUADRO y son ~200 B por el puerto serie: con `VERBOSO=no`
+	// se calla (los tres primeros cuadros y los del cierre la siguen teniendo).
+	if !verboso134() {
+		return
+	}
+
 	e := rendererDelMapa.CensoDelTramo()
 	println("JUEGO121: TRAMO", etapa, "activa=", e.Activa, "origen=", e.Origen, "bytes=", e.Bytes, "usado=", e.Usado,
 		"libre=", e.Libre, "imagenes=", e.Imagenes, "derrames=", e.Derrames, "bytesDerramados=", e.BytesDerramados,
@@ -1031,6 +1049,12 @@ func actualizar() error {
 	if rendererDelMapa == nil || mov == nil {
 		return nil
 	}
+
+	// DC-002.134: lo que cuesta ACTUALIZAR (control, movimiento, camara y sus lineas de evidencia). Es la otra
+	// mitad del "trabajo" del PVR: `trabajo = actualizar + dibujar`.
+	tInicio134 := cronometro134()
+
+	defer func() { anotarActualizar134(cronometro134() - tInicio134) }()
 
 	ahora := int64(d2cMs())
 	paso := float64(ahora-msAnterior) / 1000.0
@@ -1168,19 +1192,23 @@ func actualizar() error {
 
 		cx, cy := mov.Est.Celda()
 
-		println("JUEGO121: CONTROL cuadro=", cuadro+1, "lectura=", jugadores[0].Servicio.HayLectura(),
-			"botones=", int(jugadores[0].Botones),
-			"ejes=", int(jugadores[0].EjeX), int(jugadores[0].EjeY), "dir=", mov.Direccion,
-			"caminando=", mov.Caminando, "celda=", cx, cy, "ticks=", jugadores[0].Ticks,
-			"subtiles=", jugadores[0].Caminado, "camara=", camX, camY, "reloj=", reloj,
-			"guionBotones=", int(BotonesDelGuion(reloj, pausaEntreTramos)))
+		// DC-002.134: estas tres lineas son ~600 B por cuadro en los cuadros que el guion se mueve, que son la
+		// mayoria. Con `VERBOSO=no` se callan (los tres primeros cuadros las siguen teniendo).
+		if verboso134() {
+			println("JUEGO121: CONTROL cuadro=", cuadro+1, "lectura=", jugadores[0].Servicio.HayLectura(),
+				"botones=", int(jugadores[0].Botones),
+				"ejes=", int(jugadores[0].EjeX), int(jugadores[0].EjeY), "dir=", mov.Direccion,
+				"caminando=", mov.Caminando, "celda=", cx, cy, "ticks=", jugadores[0].Ticks,
+				"subtiles=", jugadores[0].Caminado, "camara=", camX, camY, "reloj=", reloj,
+				"guionBotones=", int(BotonesDelGuion(reloj, pausaEntreTramos)))
 
-		println("JUEGO121: COOP CONTROL cuadro=", cuadro+1, "jugadores=", len(jugadores),
-			leerElControlDeLosDos())
+			println("JUEGO121: COOP CONTROL cuadro=", cuadro+1, "jugadores=", len(jugadores),
+				leerElControlDeLosDos())
 
-		// DC-002.121: lo que hizo cada bicho en este cuadro (celda, direccion, cuadro del ciclo, extremos).
-		if len(bichos) > 0 {
-			println("JUEGO121: BICHO cuadro=", cuadro+1, "bichos=", len(bichos), resumenDeLosBichos())
+			// DC-002.121: lo que hizo cada bicho en este cuadro (celda, direccion, cuadro del ciclo, extremos).
+			if len(bichos) > 0 {
+				println("JUEGO121: BICHO cuadro=", cuadro+1, "bichos=", len(bichos), resumenDeLosBichos())
+			}
 		}
 	}
 
@@ -1309,6 +1337,10 @@ func dibujar(superficie d2interface.Surface) error {
 	// DC-002.132: el reloj del cuadro para el informe de los cuadros por segundo (ver instrumento_132.go).
 	tInicio132 := int64(d2cMs())
 
+	// DC-002.134: el mismo cuadro en microsegundos, para el cronometro por etapa (ver instrumento_134.go). La
+	// resta de `dibujar` menos la suma de las etapas es lo que el cuadro paga en lineas de evidencia.
+	tInicio134 := cronometro134()
+
 	// DC-002.120: con el ciclo encendido, los cuadros de DESPUES del guion son las tres fases del cambio de nivel
 	// (`fases_120.go`). El camino de siempre (los tres cuadros del cierre) queda intacto para `faseKnob=apagado`.
 	if faseEncendida() && cuadro > cuadros {
@@ -1327,7 +1359,11 @@ func dibujar(superficie d2interface.Surface) error {
 		volverAlFinal() // y se devuelve el jugador a donde lo dejo el guion
 	}
 
-	println("JUEGO121: CUADRO", cuadro, "ARRANCA libre=", d2cMontonLibre())
+	// DC-002.134: las lineas de evidencia POR CUADRO se apagan con `VERBOSO=no` (verboso134). Los tres
+	// primeros cuadros las llevan siempre: ahi vive la comparacion del mundo contra el host.
+	if verboso134() {
+		println("JUEGO121: CUADRO", cuadro, "ARRANCA libre=", d2cMontonLibre())
+	}
 
 	malla, esPvr := superficie.(*pvr.Surface)
 	if !esPvr {
@@ -1341,7 +1377,19 @@ func dibujar(superficie d2interface.Surface) error {
 	}
 
 	t0 := d2cMs()
+	tEtapa134 := cronometro134()
+
+	// DC-002.134: cuantos pixeles de este cuadro van por cada camino del backend (ver `anotarLosPixeles134`).
+	pvr.ReiniciarContadoresDePixeles()
+
 	rendererDelMapa.Render(superficie)
+
+	pxDeIndices, pxDeCopiar, pxDeSombras := pvr.ContadoresDePixeles()
+
+	anotarLosPixeles134(pxDeIndices, pxDeCopiar, pxDeSombras)
+
+	anotarEtapa134(e134Mapa, tEtapa134)
+
 	msMapa := int(d2cMs() - t0)
 	anotarLaComposicion132(int64(msMapa))
 
@@ -1364,10 +1412,12 @@ func dibujar(superficie d2interface.Surface) error {
 		llenosCuadro1 = llenos
 	}
 
-	println("JUEGO121: CUADRO", cuadro, "SOLO-MAPA pixelesNoVacios=", llenos, "de", ancho*alto,
-		"crc32=", int(crcMapa), "hostPixeles=", pixelesHost, "hostCrc=", int(crcHost), "ms=", msMapa,
-		"igualAlHost=", crcMapa == crcHost, "camaraCelda=", celdaDeLaCamaraX(), celdaDeLaCamaraY(),
-		"jugadores=", len(jugadores))
+	if verboso134() {
+		println("JUEGO121: CUADRO", cuadro, "SOLO-MAPA pixelesNoVacios=", llenos, "de", ancho*alto,
+			"crc32=", int(crcMapa), "hostPixeles=", pixelesHost, "hostCrc=", int(crcHost), "ms=", msMapa,
+			"igualAlHost=", crcMapa == crcHost, "camaraCelda=", celdaDeLaCamaraX(), celdaDeLaCamaraY(),
+			"jugadores=", len(jugadores))
+	}
 
 	msJugador := 0
 	crcConJugador := crcMapa
@@ -1382,6 +1432,8 @@ func dibujar(superficie d2interface.Surface) error {
 	// mapa solo. Con `JUGADORES=1` esto es el camino de DC-002.113 con un solo participante.
 	if jugadorOK && len(jugadores) > 0 {
 		var msDos int
+
+		tEtapa134 = cronometro134()
 
 		crcConJugador, msDos = dibujarAJugadores(malla, pixeles)
 		msJugador = msDos
@@ -1417,22 +1469,24 @@ func dibujar(superficie d2interface.Surface) error {
 		}
 
 		// la evidencia POR JUGADOR: donde cayo cada uno, con que cuadro del ciclo y cuantos pixeles pinto
-		for i, p := range jugadores {
-			cx, cy := p.Mov.Est.Celda()
+		if verboso134() {
+			for i, p := range jugadores {
+				cx, cy := p.Mov.Est.Celda()
 
-			ciclo, cuadroP := cicloYCuadroDelJugador(p, i)
-			crudelCiclo := uint32(0)
+				ciclo, cuadroP := cicloYCuadroDelJugador(p, i)
+				crudelCiclo := uint32(0)
 
-			if ciclo != nil && cuadroP != nil {
-				crudelCiclo = cuadroP.CRC
+				if ciclo != nil && cuadroP != nil {
+					crudelCiclo = cuadroP.CRC
+				}
+
+				println("JUEGO121: CUADRO", cuadro, "JUGADOR nombre=", p.Nombre, "puerto=", p.Puerto,
+					"inyecta=", p.Inyecta, "ancla=", p.AnclaX, p.AnclaY,
+					"caja=", p.Caja.X0, p.Caja.Y0, p.Caja.X1, p.Caja.Y1,
+					"tamano=", p.Caja.Ancho(), "x", p.Caja.Alto(), "pixelesPintados=", p.Cambiados,
+					"crc32DelCiclo=", int(crudelCiclo), "dir=", p.Mov.Direccion, "caminando=", p.Mov.Caminando,
+					"cuadroDelCiclo=", p.CuadroDelCiclo, "ms=", p.MsDibujo, "celda=", cx, cy)
 			}
-
-			println("JUEGO121: CUADRO", cuadro, "JUGADOR nombre=", p.Nombre, "puerto=", p.Puerto,
-				"inyecta=", p.Inyecta, "ancla=", p.AnclaX, p.AnclaY,
-				"caja=", p.Caja.X0, p.Caja.Y0, p.Caja.X1, p.Caja.Y1,
-				"tamano=", p.Caja.Ancho(), "x", p.Caja.Alto(), "pixelesPintados=", p.Cambiados,
-				"crc32DelCiclo=", int(crudelCiclo), "dir=", p.Mov.Direccion, "caminando=", p.Mov.Caminando,
-				"cuadroDelCiclo=", p.CuadroDelCiclo, "ms=", p.MsDibujo, "celda=", cx, cy)
 		}
 
 		// DC-002.115: LA VIGILANCIA DEL LIENZO. Va aca, con las anclas y las cajas que se acaban de calcular con
@@ -1441,6 +1495,8 @@ func dibujar(superficie d2interface.Surface) error {
 
 		// y se vuelven a pintar los dos: es el cuadro que queda en pantalla
 		volverAPintarAJugadores(malla)
+
+		anotarEtapa134(e134Jugadores, tEtapa134)
 	}
 
 	// ============================== LOS MONSTRUOS (DC-002.121) ==============================
@@ -1452,6 +1508,8 @@ func dibujar(superficie d2interface.Surface) error {
 
 	if len(bichos) > 0 {
 		var ms int
+
+		tEtapa134 = cronometro134()
 
 		// el crc32 del lienzo ANTES de tocar los bichos: es contra el que se comprueba que las cajas se
 		// devolvieron bien (el mapa solo ya se midio arriba, en la linea SOLO-MAPA, y sigue siendo 1437022778).
@@ -1466,14 +1524,18 @@ func dibujar(superficie d2interface.Surface) error {
 				int(crcDespues), "antesDeLosBichos=", int(crcAntesDeLosBichos))
 		}
 
-		println("JUEGO121: BICHO CUADRO", cuadro, "bichos=", len(bichos), "pixelesPintados=", pxBicho,
-			"msBicho=", msBicho, "crcConBichos=", int(crcConBichos), "mapaSolo=", int(crcMapa),
-			"lienzoRestaurado=", crcDespues == crcAntesDeLosBichos,
-			"detalle=", detalleDelDibujoDeLosBichos())
+		if verboso134() {
+			println("JUEGO121: BICHO CUADRO", cuadro, "bichos=", len(bichos), "pixelesPintados=", pxBicho,
+				"msBicho=", msBicho, "crcConBichos=", int(crcConBichos), "mapaSolo=", int(crcMapa),
+				"lienzoRestaurado=", crcDespues == crcAntesDeLosBichos,
+				"detalle=", detalleDelDibujoDeLosBichos())
+		}
 
 		// EL CUADRO QUE QUEDA EN PANTALLA: los bichos se pintan al final. Con la colision de celda un jugador y
 		// un bicho nunca comparten celda, asi que el sprite de un bicho solo puede tapar el borde del vecino.
 		volverAPintarLosBichos(malla)
+
+		anotarEtapa134(e134Bichos, tEtapa134)
 	}
 
 	// ============================== LOS OBJETOS DEL SUELO (DC-002.123) ==============================
@@ -1488,6 +1550,8 @@ func dibujar(superficie d2interface.Surface) error {
 
 		var ms int
 
+		tEtapa134 = cronometro134()
+
 		crcConItems, ms, pxItems, itemsDibujados = dibujarLosItems(malla, pixeles)
 		msItems = ms
 
@@ -1497,10 +1561,14 @@ func dibujar(superficie d2interface.Surface) error {
 				"antesDeLosItems=", int(crcAntesDeLosItems))
 		}
 
-		println("JUEGO123: ITEM CUADRO", cuadro, "objetos=", len(suelo), "dibujados=", itemsDibujados,
-			"pixelesPintados=", pxItems, "msItems=", msItems, "crcConItems=", int(crcConItems),
-			"mapaSolo=", int(crcMapa), "igualAlDelHost=", crcMapa == crcHost,
-			"lienzoRestaurado=", crcDespues == crcAntesDeLosItems, "detalle=", detalleDelDibujoDeLosItems())
+		anotarEtapa134(e134Items, tEtapa134)
+
+		if verboso134() {
+			println("JUEGO123: ITEM CUADRO", cuadro, "objetos=", len(suelo), "dibujados=", itemsDibujados,
+				"pixelesPintados=", pxItems, "msItems=", msItems, "crcConItems=", int(crcConItems),
+				"mapaSolo=", int(crcMapa), "igualAlDelHost=", crcMapa == crcHost,
+				"lienzoRestaurado=", crcDespues == crcAntesDeLosItems, "detalle=", detalleDelDibujoDeLosItems())
+		}
 
 		// el cuadro que queda en pantalla: los objetos se pintan al final, con los bichos
 		volverAPintarLosItems(malla)
@@ -1517,15 +1585,21 @@ func dibujar(superficie d2interface.Surface) error {
 
 		var ms int
 
+		tEtapa134 = cronometro134()
+
 		crcConNPCs, ms, pxNPC = dibujarLosNPCs(malla, pixeles)
 		msNPC = ms
 
 		crcDespues := crcLienzo(pixeles)
 
-		println("JUEGO127: NPC CUADRO", cuadro, "npcs=", len(npcsDelPueblo), "dibujados=", pxNPC > 0,
-			"pixelesPintados=", pxNPC, "msNPCs=", msNPC, "crcConNPCs=", int(crcConNPCs),
-			"mapaSolo=", int(crcMapa), "igualAlDelHost=", crcMapa == crcHost,
-			"lienzoRestaurado=", crcDespues == crcAntesDeLosNPCs, "detalle=", detalleDelDibujoDeLosNPCs())
+		anotarEtapa134(e134NPCs, tEtapa134)
+
+		if verboso134() {
+			println("JUEGO127: NPC CUADRO", cuadro, "npcs=", len(npcsDelPueblo), "dibujados=", pxNPC > 0,
+				"pixelesPintados=", pxNPC, "msNPCs=", msNPC, "crcConNPCs=", int(crcConNPCs),
+				"mapaSolo=", int(crcMapa), "igualAlDelHost=", crcMapa == crcHost,
+				"lienzoRestaurado=", crcDespues == crcAntesDeLosNPCs, "detalle=", detalleDelDibujoDeLosNPCs())
+		}
 
 		// el cuadro que queda en pantalla: los NPCs, como los bichos y los objetos
 		volverAPintarLosNPCs(malla)
@@ -1544,16 +1618,22 @@ func dibujar(superficie d2interface.Surface) error {
 		// animacion avanza por reloj (`d2cMs`), no por cuadro.
 		crcAntesDelPanel := crcLienzo(pixeles)
 
+		tEtapa134 = cronometro134()
+
 		pxPaneles, _ = dibujarElInventario(malla, pixeles)
+
+		anotarEtapa134(e134Inventario, tEtapa134)
 
 		crcDespuesDelPanel := crcLienzo(pixeles)
 
-		if pxPaneles == 0 {
-			println("JUEGO124: INV CUADRO", cuadro, "abierto=no pixelesPintados=0",
-				"crcAntes=", int(crcAntesDelPanel), "crcDespues=", int(crcDespuesDelPanel),
-				"elCuadroNoCambio=", crcAntesDelPanel == crcDespuesDelPanel)
-		} else {
-			println("JUEGO124: INV CUADRO", cuadro, "elCuadroCambio=", crcAntesDelPanel != crcDespuesDelPanel)
+		if verboso134() {
+			if pxPaneles == 0 {
+				println("JUEGO124: INV CUADRO", cuadro, "abierto=no pixelesPintados=0",
+					"crcAntes=", int(crcAntesDelPanel), "crcDespues=", int(crcDespuesDelPanel),
+					"elCuadroNoCambio=", crcAntesDelPanel == crcDespuesDelPanel)
+			} else {
+				println("JUEGO124: INV CUADRO", cuadro, "elCuadroCambio=", crcAntesDelPanel != crcDespuesDelPanel)
+			}
 		}
 	}
 
@@ -1568,13 +1648,19 @@ func dibujar(superficie d2interface.Surface) error {
 	if hudKnob == "si" && elHUD != nil {
 		crcAntesDelHUD := crcLienzo(pixeles)
 
+		tEtapa134 = cronometro134()
+
 		pxHUD, msHUD = elHUD.dibujar(malla, 0, ancho, alto)
+
+		anotarEtapa134(e134HUD, tEtapa134)
 
 		crcDespuesDelHUD := crcLienzo(pixeles)
 
-		println("JUEGO125: HUD CUADRO", cuadro, "elCuadroCambio=", crcAntesDelHUD != crcDespuesDelHUD,
-			"crcAntes=", int(crcAntesDelHUD), "crcDespues=", int(crcDespuesDelHUD),
-			"pixeles=", pxHUD, "ms=", msHUD, "lienzoLleno=", llenosLienzo(pixeles), "de", ancho*alto)
+		if verboso134() {
+			println("JUEGO125: HUD CUADRO", cuadro, "elCuadroCambio=", crcAntesDelHUD != crcDespuesDelHUD,
+				"crcAntes=", int(crcAntesDelHUD), "crcDespues=", int(crcDespuesDelHUD),
+				"pixeles=", pxHUD, "ms=", msHUD, "lienzoLleno=", llenosLienzo(pixeles), "de", ancho*alto)
+		}
 	}
 
 	// ============================== EL MINIMAPA (DC-002.130) ==============================
@@ -1589,7 +1675,11 @@ func dibujar(superficie d2interface.Surface) error {
 
 		crcaAntesDelMinimapa := crcLienzo(pixeles)
 
+		tEtapa134 = cronometro134()
+
 		pxMinimapa, msMinimapa = elMinimapa.dibujarElMinimapa(malla, 0, ancho, alto)
+
+		anotarEtapa134(e134Minimapa, tEtapa134)
 
 		crcDespuesDelMinimapa := crcLienzo(pixeles)
 
@@ -1597,9 +1687,11 @@ func dibujar(superficie d2interface.Surface) error {
 
 		msDelCuadroDelMapa = msMapa
 
-		println("JUEGO130: MINIMAPA CUADRO", cuadro, "elCuadroCambio=", crcaAntesDelMinimapa != crcDespuesDelMinimapa,
-			"crcAntes=", int(crcaAntesDelMinimapa), "crcDespues=", int(crcDespuesDelMinimapa),
-			"pixeles=", pxMinimapa, "ms=", msMinimapa, "lienzoLleno=", llenosLienzo(pixeles), "de", ancho*alto)
+		if verboso134() {
+			println("JUEGO130: MINIMAPA CUADRO", cuadro, "elCuadroCambio=", crcaAntesDelMinimapa != crcDespuesDelMinimapa,
+				"crcAntes=", int(crcaAntesDelMinimapa), "crcDespues=", int(crcDespuesDelMinimapa),
+				"pixeles=", pxMinimapa, "ms=", msMinimapa, "lienzoLleno=", llenosLienzo(pixeles), "de", ancho*alto)
+		}
 	}
 
 	// ============================== EL PANEL DE DIALOGO (DC-002.127) ==============================
@@ -1613,7 +1705,11 @@ func dibujar(superficie d2interface.Surface) error {
 	if npcKnob == "si" || questKnob == "si" {
 		crcAntesDelDialogo := crcLienzo(pixeles)
 
+		tEtapa134 = cronometro134()
+
 		pxDialogo, msDialogo = dibujarElDialogo(malla, pixeles)
+
+		anotarEtapa134(e134Dialogo, tEtapa134)
 
 		// el costo del panel de la QUEST, que se pinta por este mismo camino
 		if questKnob == "si" && pxDialogo > 0 {
@@ -1630,18 +1726,22 @@ func dibujar(superficie d2interface.Surface) error {
 				"mapaSolo=", int(crcMapa), "igualAlMapaSolo=", lienzoTrasCerrar == crcMapa)
 		}
 
-		println("JUEGO127: DIALOGO CUADRO", cuadro, "abierto=", dialogoAbierto, "pixelesPintados=", pxDialogo,
-			"msPanel=", msDialogo, "crcAntes=", int(crcAntesDelDialogo),
-			"crcDespues=", int(crcDespuesDelDialogo),
-			"elCuadroNoCambio=", crcAntesDelDialogo == crcDespuesDelDialogo)
+		if verboso134() {
+			println("JUEGO127: DIALOGO CUADRO", cuadro, "abierto=", dialogoAbierto, "pixelesPintados=", pxDialogo,
+				"msPanel=", msDialogo, "crcAntes=", int(crcAntesDelDialogo),
+				"crcDespues=", int(crcDespuesDelDialogo),
+				"elCuadroNoCambio=", crcAntesDelDialogo == crcDespuesDelDialogo)
+		}
 	}
 
-	println("JUEGO121: CUADRO", cuadro, "CON-JUGADOR pixelesNoVacios=", llenosLienzo(pixeles), "de", ancho*alto,
-		"crc32=", int(crcConJugador), "pixelesDelJugador=", cambiados, "ancla=", anclaX, anclaY,
-		"dir=", dirDibujada, "cuadroDelCiclo=", cuadroAnim, "modo=", modoDelCuadro(mov.Caminando),
-		"msMapa=", msMapa, "msJugador=", msJugador, "jugadores=", len(jugadores),
-		"celda=", celdaDelJugadorX(), celdaDelJugadorY(),
-		"bichos=", len(bichos), "pixelesDeLosBichos=", pxBicho, "msBicho=", msBicho)
+	if verboso134() {
+		println("JUEGO121: CUADRO", cuadro, "CON-JUGADOR pixelesNoVacios=", llenosLienzo(pixeles), "de", ancho*alto,
+			"crc32=", int(crcConJugador), "pixelesDelJugador=", cambiados, "ancla=", anclaX, anclaY,
+			"dir=", dirDibujada, "cuadroDelCiclo=", cuadroAnim, "modo=", modoDelCuadro(mov.Caminando),
+			"msMapa=", msMapa, "msJugador=", msJugador, "jugadores=", len(jugadores),
+			"celda=", celdaDelJugadorX(), celdaDelJugadorY(),
+			"bichos=", len(bichos), "pixelesDeLosBichos=", pxBicho, "msBicho=", msBicho)
+	}
 
 	if cuadro == 1 {
 		crcCuadro1Jugador = crcConJugador
@@ -1728,6 +1828,10 @@ func dibujar(superficie d2interface.Surface) error {
 	if cuadro%cuadrosDelInforme132 == 0 {
 		resumenDelCuadro132(cuadro)
 	}
+
+	// DC-002.134: el cuadro al cronometro por etapas (ver instrumento_134.go). Va al final para que la resta
+	// `dibujar - suma de etapas` sea exactamente lo que el cuadro paga en lineas de evidencia.
+	anotarCuadro134(cronometro134() - tInicio134)
 
 	return nil
 }

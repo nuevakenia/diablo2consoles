@@ -661,11 +661,14 @@ func (h *hudDelJuego) dibujar(sup *pvr.Surface, jugador, anchoLienzo, altoLienzo
 		}
 	}
 
-	println("JUEGO125: HUD cuadro=", cuadro, "jugador=", jugador+1, "lienzo=", anchoLienzo, "x", altoLienzo,
-		"pixelesPintados=", pintados, "ms=", ms,
-		"vida=", vida, "/", vidaMax, "rellenoVida=", rellenoVida, "de", altoDelGlobo,
-		"mana=", mana, "/", manaMax, "rellenoMana=", rellenoMana,
-		"zona=", h.Zona, "anchoDelTexto=", anchoTexto, "pociones=", h.pocionesPintadas())
+	// DC-002.134: la linea del HUD es evidencia por cuadro (~200 B por el puerto serie): con `VERBOSO=no` se calla.
+	if verboso134() {
+		println("JUEGO125: HUD cuadro=", cuadro, "jugador=", jugador+1, "lienzo=", anchoLienzo, "x", altoLienzo,
+			"pixelesPintados=", pintados, "ms=", ms,
+			"vida=", vida, "/", vidaMax, "rellenoVida=", rellenoVida, "de", altoDelGlobo,
+			"mana=", mana, "/", manaMax, "rellenoMana=", rellenoMana,
+			"zona=", h.Zona, "anchoDelTexto=", anchoTexto, "pociones=", h.pocionesPintadas())
+	}
 
 	return pintados, ms
 }

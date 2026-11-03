@@ -619,9 +619,12 @@ func (m *minimapaDelJuego) dibujarElMinimapa(sup *pvr.Surface, jugador, anchoLie
 		m.msMax = ms
 	}
 
-	println("JUEGO130: MINIMAPA cuadro=", cuadro, "jugador=", jugador+1, "celdas=", celdas, "de", m.Modelo.Count(),
-		"pixelesPintados=", pintados, "ms=", ms, "heroe=", hx, hy, "enLaCaja=", mx, my,
-		"caja=", lay.Clip.X0, lay.Clip.Y0, lay.Clip.X1, lay.Clip.Y1, "sinArte=", m.SinArte)
+	// DC-002.134: la linea del minimapa es evidencia por cuadro: con `VERBOSO=no` se calla.
+	if verboso134() {
+		println("JUEGO130: MINIMAPA cuadro=", cuadro, "jugador=", jugador+1, "celdas=", celdas, "de", m.Modelo.Count(),
+			"pixelesPintados=", pintados, "ms=", ms, "heroe=", hx, hy, "enLaCaja=", mx, my,
+			"caja=", lay.Clip.X0, lay.Clip.Y0, lay.Clip.X1, lay.Clip.Y1, "sinArte=", m.SinArte)
+	}
 
 	return pintados, ms
 }

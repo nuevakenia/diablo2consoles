@@ -55,7 +55,14 @@ func crcLienzo(pixeles []byte) uint32 {
 		return 0
 	}
 
-	return crc32.ChecksumIEEE(pixeles)
+	// DC-002.134: el crc32 del lienzo entero (1.228.800 B) se mide aparte y se acumula en la etapa
+	// `medir`, que es la que dice cuanto del cuadro es MEDIRSE. Va incluido en las etapas que lo llaman
+	// (el mapa, el jugador, los bichos): la linea de las etapas lo dice.
+	t134 := cronometro134()
+	crc := crc32.ChecksumIEEE(pixeles)
+	anotarEtapa134(e134Instrumento, t134)
+
+	return crc
 }
 
 // llenosLienzo: los pixeles no vacios del lienzo, o 0 si el instrumento por cuadro esta apagado.
@@ -68,7 +75,12 @@ func llenosLienzo(pixeles []byte) int {
 		return 0
 	}
 
-	return contarLlenos(pixeles)
+	// DC-002.134: el conteo de pixeles tambien es medirse (recorre los 307.200 pixeles): va a la misma etapa.
+	t134 := cronometro134()
+	llenos := contarLlenos(pixeles)
+	anotarEtapa134(e134Instrumento, t134)
+
+	return llenos
 }
 
 // cuadroAnimDelHeroe132: el cuadro del ciclo de la amazona que esta en pantalla (para contar la fluidez por lo

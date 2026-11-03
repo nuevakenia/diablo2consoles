@@ -1,0 +1,256 @@
+DC-002.134 -- EL CUADRO FUERA DEL MAPA: LOS 746 ms QUE QUEDAN
+==============================================================
+
+Flycast, pueblo (Rogue Encampment), 1 jugador, 1 bicho, HUD y minimapa prendidos, 60 cuadros, dos tramos de 30.
+Todo lo de aca sale de la consola serie (`JUEGO134: ETAPAS`, `JUEGO134: PIXELES`, `PVR132: CUADRO`,
+`JUEGO132: MAPA`) y del `crc32` contra el host. Nada esta estimado: si un numero no se midio, se dice.
+
+
+1. EL DESGLOSE QUE FALTABA (la tarjeta arranca aca)
+---------------------------------------------------
+
+DC-002.132 dejo el cuadro medido por fuera: esperar 3 us + trabajo 1.113 ms + presentar 36,7 ms = 1.150 ms
+(0,86 fps), y el trabajo partido en mapa 367 ms + **746 ms "del resto"**. El resto era una caja negra.
+
+La linea nueva (`instrumento_134.go`, cada 30 cuadros) parte el dibujado del POC en etapas, en microsegundos,
+con el mismo reloj que la presentacion del PVR (`timer_us_gettime64`, `d2c_us` en `csrc/shim.c`):
+
+    JUEGO134: ETAPAS cuadros= delTramo= actualizar= mapa= jugadores= bichos= items= npcs= inventario=
+                       hud= minimapa= dialogo= medir= sinEtapa= dibujar= cuadroTotal=
+
+`sinEtapa` es lo que del `dibujar` no tiene cronometro propio: las LINEAS DE EVIDENCIA por el puerto serie, los
+resumenes y el camino de siempre. `medir` (los crc32 y los conteos de pixeles) se cronometra ADENTRO de las
+etapas, asi que se descuenta de la suma antes de restar (si no, `sinEtapa` sale negativo, que es lo que paso en
+la primera corrida).
+
+
+2. LA PRIMERA CORRIDA: DONDE ESTABAN LOS 746 ms
+-----------------------------------------------
+
+Build `ETAPAS=si VERBOSO=si MEDIR_CUADRO=no BLIT_RAPIDO=si` (/tmp/dcbuild/anim134-base), tramo 31-60:
+
+    actualizar .......   8.531 us
+    mapa ............. 389.181
+    jugadores ........  59.551     <-- el jugador
+    bichos ...........  23.144     <-- el bicho
+    hud ..............  20.501
+    minimapa .........  55.210
+    medir ............       0
+    sinEtapa .........  95.321     <-- las lineas por el puerto serie
+    --------------------------
+    dibujar .......... 642.911
+    cuadroTotal ...... 651.443     (PVR: 688.941 con los 36,7 de presentar = 1,45 fps)
+
+Y el detalle por pieza de lo que costaba cada una, con el instrumento prendido:
+
+    jugador 59,5 ms  con 1.237 pixeles de recorte     -> 48 us por pixel
+    bicho   23,1 ms  con   612 pixeles de recorte     -> 38 us por pixel
+    HUD     20,5 ms  con 2.848 pixeles de piezas      ->  7 us por pixel
+
+48 microsegundos por pixel no es dibujar: es OTRA COSA. Lo que habia por pixel era:
+
+    1. guardar ~100 KB de la caja del sprite (copia del lienzo a un buffer),
+    2. pintar el sprite,
+    3. hashear la caja y contar los pixeles que cambiaron (la evidencia),
+    4. devolver el mapa bajo la caja (segunda copia de ~100 KB),
+    5. al final del cuadro, VOLVER A PINTAR el sprite sobre el mapa devuelto.
+
+Los cinco pasos existen para MEDIR, no para dibujar. Con `MEDIR_CUADRO=no` el instrumento ya corria solo en los
+tres primeros cuadros (ahi vive el crc32 del mundo contra el host), pero el baile seguia haciendoce en todos los
+cuadros: la palanca `PINTAR_UNA_VEZ` (nueva) corta los pasos 1, 3, 4 y 5 cuando no hay nada que medir. El paso 2
+queda igual, en el mismo orden de profundidad y con el mismo ancla: el lienzo no cambia.
+
+
+3. LO MISMO CON LAS TRES PALANCAS NUEVAS
+---------------------------------------
+
+Build `PINTAR_UNA_VEZ=si BLIT_PALABRAS=si VERBOSO=no ETAPAS=si MEDIR_CUADRO=no BLIT_RAPIDO=si`
+(/tmp/dcbuild/anim134-u), tramo 31-60 (dos corridas, se toma la primera):
+
+    etapa            base        ahora        delta
+    actualizar      8.531        6.581        -23 %
+    mapa          389.181      382.115         -1,8 %      <-- el camino de la palabra NO lo mueve
+    jugadores      59.551          555        -99,1 %
+    bichos         23.144          411        -98,2 %
+    hud            20.501        3.152        -84,6 %
+    minimapa       55.210       66.517        +20,5 %      <-- subio: ver 6.2
+    medir               0            0
+    sinEtapa       95.321        1.377        -98,6 %      <-- las lineas del puerto serie
+    -------------------------------------------------
+    dibujar       642.911      454.129        -29,4 %
+    cuadroTotal   651.443      460.711        -29,3 %
+
+Y por fuera del POC (el cuadro que ve el PVR):
+
+    PVR132: CUADRO   base: trabajo 652.185 + presentar 36.752 = 688.941 us  fpsX100=145  (1,45 fps)
+    PVR132: CUADRO  ahora: trabajo 464.465 + presentar 36.677 = 501.145 us  fpsX100=199  (1,99 fps)
+
+O sea: **el cuadro baja de 689 a 501 ms medidos por el PVR (-27 %) y de 1.150 ms de la ficha de DC-002.132 a
+501 ms (-56 %)**, con el mundo IDENTICO (ver 4).
+
+De donde salieron esos 191 ms, etapa por etapa:
+
+    jugadores  -58.996 us   el baile de medir + la segunda pintada (la palanca PINTAR_UNA_VEZ)
+    bichos     -22.733 us   lo mismo
+    hud        -17.349 us   lo mismo
+    sinEtapa   -93.944 us   las lineas de evidencia por el puerto serie (VERBOSO=no)
+    mapa        -7.066 us   el camino de la palabra (dentro del ruido: ver 6.1)
+    actualizar  -1.950 us
+    minimapa   +11.307 us   la tabla por celda (ver 6.2)
+
+Los 746 ms "del resto" de DC-002.132 quedan, medidos, en **72 ms = dibujar - mapa**, y de esos 72 ms el
+minimapa son 67 y el jugador + bicho + HUD + todo lo demas son 1,4 ms.
+
+
+4. LA REGLA DE LA CASA: EL DIBUJO NO CAMBIO (y como se sabe)
+------------------------------------------------------------
+
+Corrida de la evidencia (/tmp/capturas-134-u), cuadro por cuadro contra el host:
+
+    JUEGO121: CUADRO 1 SOLO-MAPA  pixelesNoVacios= 307.196 de 307.200  crc32= 1437022778
+                                  hostPixeles= 307.196  hostCrc= 1437022778  igualAlHost= true
+    JUEGO121: CUADRO 1 CON-JUGADOR  pixelesDelJugador= 1237  pixelesDeLosBichos= 612
+    JUEGO121: CUADRO 2 CON-JUGADOR  pixelesDelJugador= 896   pixelesDeLosBichos= 616
+
+Los mismos numeros que DC-002.132: el crc32 del mundo es el del host y los pixeles del jugador y del bicho son
+los de siempre. La captura (`/tmp/capturas-134-u/c2.png`) sale igual: pueblo isometrico, la amazona, el bicho,
+el HUD con los globos y el minimapa en su caja.
+
+Y el camino nuevo del backend tiene su propio verificador en el host, porque `d2core/d2render/pvr` no compila
+fuera de la consola (importa `kos`): `console/dc/verif-blit-134` pinta los mismos 1.000 casos por caso con los
+TRES caminos (el viejo de DC-002.70, el de bytes de DC-002.132 y el de palabras de esta tarjeta) y compara byte a
+byte:
+
+    go run ./console/dc/verif-blit-134/ <semilla> 1000
+    semillas 1, 7, 99, 2024, 555  ->  10.000 casos, 0 distintos
+
+Cubre lo que la consola no puede cubrir sola: recortes por los cuatro bordes, tiles de 1x1 a 40x40, indices 0
+(transparentes), alfa 0 / intermedio / 255 y tinte neutro y no neutro.
+
+
+5. EL CAMINO DE LA PALABRA (lo que se hizo y lo que NO sirvio)
+--------------------------------------------------------------
+
+`d2core/d2render/pvr/blit_palabras.go`: el pixel del lienzo se escribe con UN deposito de 32 bits en vez de
+cuatro de 8, y la paleta (con su tinte, si lo hay) se empaqueta en una tabla de 256 entradas UNA vez por
+llamada, en vez de hacer 3 multiplicaciones y 3 divisiones por pixel. La palanca es `BLIT_PALABRAS=si|no` y el
+camino viejo queda en el mismo binario (el A/B es una corrida). Si el buffer del lienzo no esta alineado a 4 se
+vuelve al camino de bytes y se cuenta el aviso (`avisosDeAlineacion= 0` en todas las corridas: el lienzo esta
+alineado).
+
+Medido: **el mapa baja de 389,2 a 382,1 ms (-1,8 %)**, dentro del ruido entre corridas. El camino de la palabra
+NO es la palanca del mapa (ver 6.1). Donde si se noto es en las piezas chicas, pero ahi el merito es de
+`PINTAR_UNA_VEZ`.
+
+
+6. LO QUE SE MIDIO Y NO ERA LO QUE PARECIA
+------------------------------------------
+
+6.1 EL MAPA NO ESTA LIMITADO POR EL DEPOSITO DE PIXELES.
+    El contador nuevo (`JUEGO134: PIXELES`) dice que el mapa pinta **1.539.584 pixeles por cuadro** por el
+    camino de indices (y CERO por el camino de copiar superficies: en este cuadro no hay sombras ni techos con
+    desvanecido). No son 6,3 M: el recorte por tile de DC-002.132 ya corta el 75 % de cada tile.
+
+        382 ms / 1.539.584 px = 248 ns por pixel  =  ~50 ciclos del SH4 (a 200 MHz)
+
+    50 ciclos por pixel NO es un bucle de deposito (12-15 es lo normal). Y con 242 tiles (188 pisos + 50 paredes
+    de arriba + 4 techos), 1,54 M px son 6.360 px por tile: el bucle de pixeles de cada tile son ~0,38 ms, o sea
+    **~1,2 ms POR TILE se van FUERA del bucle de pixeles** (posicion, cache del tile, luz, estado). Ese es el
+    proximo trabajo, y no se arregla escribiendo mas rapido: hay que ver que hace el renderer del mapa por tile.
+    Con ese numero el proximo recorte del mapa es grande (si el trabajo por tile baja a 0,1 ms, el mapa cae de
+    382 a ~120 ms y el cuadro a ~200).
+
+6.2 EL MINIMAPA SUBIO (55,2 -> 66,5 ms) Y SE SABE POR QUE.
+    Son 680 celdas de 8x16 = 87.040 px mas la caja de 279x225 = 62.775 px. La tabla empaquetada de 256 entradas
+    se arma por llamada: 680 x 256 = 174.080 entradas por cuadro, mas que los pixeles que se pintan. Se probo
+    cachearla y no entra (6.3). Queda como esta, y su cache es la primera linea del proximo trabajo: 680 celdas
+    con la MISMA paleta y el MISMO color piden una tabla armada una vez.
+
+6.3 LA CACHE DE LA TABLA NO ENTRA EN ESTE MONTON (experimento fallido, documentado).
+    Dos intentos, los dos con el POC muriendo en el primer cuadro al componer el HUD:
+
+        fatal error: GC to-space overflow - your live data doesn't fit in the heap.
+
+    - tabla [256]uint32 como CAMPO de `Surface` (1 KB por superficie): el POC tiene cientos de superficies vivas
+      (una por variante de tile del mapa) y son cientos de KB de datos VIVOS.
+    - la misma tabla como UNA global del paquete, con clave = paleta + tinte: murio igual, en el mismo punto. No
+      se investigo mas: el margen no existe. Antes de componer el HUD el POC esta en **1.130.000 B vivos de un
+      semiespacio de 1.835.008 B (62 %)** y el pico del monton C es **9,02 MB de los 10 del arena**.
+
+    Conclusion para el que venga: en esta consola el dibujado NO puede guardar estado propio (ni 1 KB por
+    superficie ni 1 KB global). La cache del minimapa tiene que ser del POC y chica, o no ser.
+
+
+7. EL CRITERIO DE LA TARJETA: NO SE ALCANZA, Y NO POR ESTA TARJETA
+------------------------------------------------------------------
+
+El criterio pedia menos de 300 ms por cuadro. Medido: **460 ms** (501 con la presentacion). La cuenta que lo
+cierra:
+
+    mapa ......................... 382 ms      (83 % del cuadro)
+    presentar ....................  37 ms      (techo fijo, es la tarjeta t_ae2df742)
+    ------------------------------------
+    piso con TODO el resto en cero  419 ms     >  300 ms
+
+O sea: aunque el jugador, el bicho, el HUD, el minimapa y las lineas costaran CERO, el cuadro no baja de 419 ms.
+La premisa de la tarjeta ("el mapa ya no es el problema") era falsa, y esta medicion lo deja claro: el mapa es
+el problema otra vez, pero por otra razon que en DC-002.132 (no es el deposito de pixeles: es el trabajo por
+tile del renderer del mapa). Eso es una tarjeta nueva, no un parche de esta.
+
+
+8. COMO REPRODUCIRLO
+--------------------
+
+    cd /home/dgalli/Proyectos/diablo2consoles
+
+    # el build de la evidencia
+    CUADROS=60 JUGADORES=1 MONSTRUOS=1 COMBATE=si GOLPE_AUTO=si HUD=si MINIMAPA=si \
+      NPC=no QUEST=no INVENTARIO=no DROP=no BLIT_RAPIDO=si MEDIR_CUADRO=no \
+      ETAPAS=si VERBOSO=no BLIT_PALABRAS=si PINTAR_UNA_VEZ=si \
+      bash scripts/console/build-anim-132.sh /tmp/dcbuild/anim134-u
+
+    # la corrida
+    CAPTURAS=2 INTERVALO=10 ESPERA_CIERRE=300 \
+      bash scripts/console/run-anim-132.sh /tmp/dcbuild/anim134-u/disc.gdi /tmp/capturas-134-u 900 120
+
+    # las lineas
+    grep -a "JUEGO134: ETAPAS\|JUEGO134: PIXELES\|PVR132: CUADRO" /tmp/capturas-134-u/flycast.log
+
+    # el verificador del host (no necesita consola)
+    go run ./console/dc/verif-blit-134/ 7 1000        -> 2.000 casos, 0 distintos
+
+Palancas nuevas, todas por variable de entorno del build (el A/B es una corrida, no un arbol distinto):
+
+    ETAPAS=si|no          el cronometro por etapa y la linea cada 30 cuadros (default si)
+    VERBOSO=si|no         las lineas de evidencia por cuadro (default si; los 3 primeros cuadros van siempre)
+    BLIT_PALABRAS=si|no   el camino de 32 bits por pixel del backend PVR (default si)
+    PINTAR_UNA_VEZ=si|no  el sprite se pinta una vez cuando no hay nada que medir (default si)
+
+
+9. ARCHIVOS
+-----------
+
+    console/dc/poc/juego-131/instrumento_134.go     NUEVO  cronometro por etapa, contadores, palancas
+    console/dc/poc/juego-131/csrc/shim.c                   d2c_us (timer_us_gettime64)
+    console/dc/poc/juego-131/coop.go                       pintarAJugadoresUnaVez + crc32De -> crcLienzo
+    console/dc/poc/juego-131/monstruo_121.go               pintarLosBichosUnaVez
+    console/dc/poc/juego-131/main.go                       etapas, gating verboso, pixeles por camino
+    console/dc/poc/juego-131/knobs.go                      etapasKnob, verbosoEtapas, blitPalabras134,
+                                                           pintarUnaVez
+    console/dc/poc/juego-131/instrumento_132.go            crcLienzo/llenosLienzo a la etapa `medir`
+    console/dc/poc/juego-131/leash.go, hud_125.go, automap_130.go   lineas por cuadro gateadas
+    d2core/d2render/pvr/blit_palabras.go            NUEVO  el camino de la palabra + contadores de pixeles
+    d2core/d2render/pvr/surface.go                         enganche del camino nuevo
+    d2core/d2render/pvr/imagen.go                          contadores del camino de copiar
+    console/dc/verif-blit-134/main.go               NUEVO  equivalencia de los tres caminos (10.000 casos)
+    scripts/console/build-juego-131.sh                     ETAPAS, VERBOSO, BLIT_PALABRAS, PINTAR_UNA_VEZ
+
+
+10. LO QUE QUEDA (para las tarjetas hijas)
+-------------------------------------------
+
+  1. EL MAPA POR TILE (382 ms, 1,2 ms por tile fuera del bucle de pixeles): medir que hace el renderer del mapa
+     por los 242 tiles (posicion, cache, luz, estado) y bajarlo. Es el unico camino al criterio de 300 ms.
+  2. EL MINIMAPA (66,5 ms): una tabla empaquetada por cuadro y no por celda, o componer la caja una vez y
+     dejarla mientras el pueblo no cambie -- con la restriccion de 6.3 (nada de estado en el backend).
+  3. LA PRESENTACION (36,7 ms fijos): ya es la tarjeta t_ae2df742.

@@ -40,6 +40,15 @@ unsigned int d2c_ms(void) {
     return (unsigned int)(timer_ms_gettime64() & 0xffffffffu);
 }
 
+/* DC-002.134: MICROSEGUNDOS desde el arranque. El reloj de milisegundos no distingue una etapa de 3 ms de
+ * una de 3,9, y las etapas del cuadro que esta tarjeta mide (jugador, bicho, HUD, minimapa) se esperan de
+ * decenas de ms o menos: sin microsegundos el desglose no sirve para ordenar por costo. Es el mismo reloj
+ * que usa la presentacion del PVR (`d2c_pvr_pantalla_us`, console/dc/std/csrc/pvr_pantalla.c:617), asi que
+ * los dos numeros son comparables. El timer de KOS lo enciende `d2c_ms`, que corre al arranque. */
+unsigned int d2c_us(void) {
+    return (unsigned int)(timer_us_gettime64() & 0xffffffffu);
+}
+
 /* El break actual del monton (0 si el sistema no lo sabe). */
 unsigned int d2c_sbrk_actual(void) {
     return (unsigned int)(uintptr_t)sbrk(0);

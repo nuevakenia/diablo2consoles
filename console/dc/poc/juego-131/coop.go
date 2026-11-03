@@ -37,7 +37,6 @@
 package main
 
 import (
-	"hash/crc32"
 	"math"
 	"unsafe"
 
@@ -61,7 +60,13 @@ var (
 )
 
 // crc32De: el hash del lienzo (el mismo criterio de todas las tarjetas anteriores).
-func crc32De(pixeles []byte) uint32 { return crc32.ChecksumIEEE(pixeles) }
+//
+// DC-002.134: es el MISMO camino que `crcLienzo`, y por dos motivos medidos: (a) `crcLienzo` respeta la
+// palanca `MEDIR_CUADRO` (con "no" deja de hashear los 1.228.800 B a partir del cuarto cuadro, cuando la
+// comparacion contra el host ya se hizo) y esta funcion NO la respetaba -- el camino del cooperativo
+// hasheaba el lienzo cinco veces por cuadro aunque el instrumento estuviera apagado, y (b) el tiempo del
+// hash tiene que caer en la etapa `medir` del cronometro, que es la que dice cuanto del cuadro es medirse.
+func crc32De(pixeles []byte) uint32 { return crcLienzo(pixeles) }
 
 // itoa: un entero a texto. La consola no lleva el paquete `strconv` completo para dos digitos, y `println` ya separa
 // los argumentos con espacios, asi que esto es solo para armar las etiquetas del log.
@@ -701,9 +706,48 @@ func prepararElCuadroDelJugador(p *participante, i int, pixeles []byte) bool {
 		return false
 	}
 
-	guardarCajaDe(p, pixeles)
+	// DC-002.134: la copia de lo que hay debajo de la caja existe para DEVOLVER el mapa despues de medir. Con el
+	// instrumento apagado no se mide, asi que no se copia (son ~100 KB de VRAM por cuadro y por jugador).
+	if midiendoElCuadro134() {
+		guardarCajaDe(p, pixeles)
+	}
 
 	return true
+}
+
+// pintarAJugadoresUnaVez: EL CUADRO QUE QUEDA EN PANTALLA, sin el baile de medir (DC-002.134).
+//
+// Es el mismo trabajo que `dibujarAJugadores` menos las tres cosas que solo existen para el numero: la copia de
+// lo que hay debajo de la caja, la cuenta de pixeles cambiados y la devolucion del mapa. El orden de profundidad
+// es el mismo, el ancla es la misma y el pincel es el mismo: el lienzo queda identico.
+func pintarAJugadoresUnaVez(malla *pvr.Surface, pixeles []byte) (crcConJugadores uint32, msTotal int) {
+	listos := make([]*participante, 0, len(jugadores))
+
+	for i, p := range jugadores {
+		if prepararElCuadroDelJugador(p, i, pixeles) {
+			listos = append(listos, p)
+		}
+	}
+
+	ordenarPorProfundidad(listos)
+
+	for _, p := range listos {
+		_, cu := cicloYCuadroDelJugador(p, indiceDelParticipante(p))
+		if cu == nil {
+			continue
+		}
+
+		t1 := int64(d2cUs())
+
+		PintarJugador(malla, cu, p.AnclaX, p.AnclaY, p.Pal[:])
+
+		p.MsDibujo = int((int64(d2cUs()) - t1) / 1000)
+		p.Cambiados = 0
+
+		msTotal += p.MsDibujo
+	}
+
+	return 0, msTotal
 }
 
 // dibujarAJugadores: pega los dos jugadores en el lienzo del PVR, EN ORDEN DE PROFUNDIDAD (el que esta mas arriba en
@@ -711,6 +755,13 @@ func prepararElCuadroDelJugador(p *participante, i int, pixeles []byte) bool {
 // debajo de su caja; despues se devuelve el mapa en orden INVERSO, que es lo que deja el mapa intacto aunque las dos
 // cajas se toquen (la copia del jugador de atras es mapa limpio).
 func dibujarAJugadores(malla *pvr.Surface, pixeles []byte) (crcConJugadores uint32, msTotal int) {
+	// DC-002.134: con el instrumento por cuadro APAGADO (ver `midiendoElCuadro134`) no hay nada que medir y si
+	// dos cosas que pagar: los ~100 KB de la caja copiados a y desde la VRAM y el SEGUNDO pintado. El cuadro que
+	// queda en pantalla es el mismo: se pinta en el mismo orden de profundidad y en la misma ancla.
+	if !midiendoElCuadro134() {
+		return pintarAJugadoresUnaVez(malla, pixeles)
+	}
+
 	listos := make([]*participante, 0, len(jugadores))
 
 	// DC-002.122: el ataque en curso muestra el A1 en el cuadro 7 y luego vuelve al caminar/quieto. La funcion
@@ -752,6 +803,11 @@ func dibujarAJugadores(malla *pvr.Surface, pixeles []byte) (crcConJugadores uint
 
 // volverAPintarAJugadores: el cuadro que se presenta: los dos otra vez, en el mismo orden de profundidad.
 func volverAPintarAJugadores(malla *pvr.Surface) {
+	// DC-002.134: el que ya pinto una vez (ver `pintarAJugadoresUnaVez`) no vuelve a pintar aca.
+	if !midiendoElCuadro134() {
+		return
+	}
+
 	listos := make([]*participante, 0, len(jugadores))
 
 	for _, p := range jugadores {

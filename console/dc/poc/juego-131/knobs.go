@@ -696,4 +696,35 @@ const (
 	// tinte (3 multiplicaciones y 3 divisiones por 255 por pixel). "no" = el bucle viejo, TAL CUAL, que es el que
 	// midio 675-931 ms por cuadro de mapa. Las dos ramas viven en el mismo binario: el A/B es una corrida.
 	blitRapido = "si"
+
+	// ============================== LAS DE ESTA TARJETA (DC-002.134): LAS ETAPAS DEL CUADRO ==============================
+	//
+	// etapas: "si" = el cronometro por etapa del dibujado del POC (jugador, bichos, HUD, minimapa, actualizar) y
+	// la linea `JUEGO134: ETAPAS` cada 30 cuadros. Cuesta dos llamadas a d2c_us por etapa: nada al lado del
+	// cuadro que mide. "no" = el instrumento no suma nada (el binario es el de DC-002.132 otra vez).
+	etapasKnob = "si"
+
+	// verbosoEtapas: "si" = las lineas de evidencia POR CUADRO del POC (la de comparacion contra el host, la de
+	// cada jugador, la del bicho con su detalle, la del HUD, la del minimapa). Son ~1,5 KB por cuadro por el
+	// puerto serie y en la consola real no las va a leer nadie: "no" deja solo los TRES primeros cuadros (donde
+	// vive el crc32 del mundo contra el host) y los resumenes del cierre. Es el A/B de cuanto del cuadro es el
+	// instrumento impreso.
+	verbosoEtapas = "si"
+
+	// blitPalabras134: "si" = el backend PVR escribe el pixel con UN deposito de 32 bits y arma la paleta (con
+	// su tinte) en una tabla de 256 palabras UNA vez por tile, en vez de cuatro depositos de 8 bits y tres
+	// multiplicaciones mas tres divisiones por pixel (DC-002.134, d2core/d2render/pvr/blit_palabras.go). "no" =
+	// el bucle de bytes de DC-002.132, tal cual: es el A/B dentro del mismo binario.
+	//
+	// LAS DOS REGLAS DEL CAMINO DE BYTES SE RESPETAN: el indice 0 no pinta y el alfa intermedio hace el mismo
+	// source-over con el mismo cociente por 255. La prueba es el crc32 del cuadro 1 contra el host
+	// (1437022778) mas el verificador `console/dc/verif-blit-134` con los tres caminos sobre 1.000 casos.
+	blitPalabras134 = "si"
+
+	// pintarUnaVez: "si" = con el instrumento POR CUADRO apagado (`medirCuadro=no` y cuadro > 3) el jugador y el
+	// bicho se pintan UNA sola vez y sin el baile de guardar la caja, medir los pixeles y devolver el mapa: ese
+	// baile existe para MEDIR (el crc32 del cuadro con los sprites y la prueba de que el mapa se restaura), no
+	// para dibujar. El cuadro que queda en pantalla es el MISMO (mismo orden de pintado, mismos pixeles); lo que
+	// se va son las copias de la caja a y desde la VRAM y el segundo pintado.
+	pintarUnaVez = "si"
 )

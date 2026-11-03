@@ -840,7 +840,10 @@ func prepararElCuadroDeUnBicho(b *bicho, pixeles []byte) bool {
 		return false
 	}
 
-	guardarCajaDelBicho(b, pixeles)
+	// DC-002.134: la copia de la caja, solo cuando se mide (ver `midiendoElCuadro134`).
+	if midiendoElCuadro134() {
+		guardarCajaDelBicho(b, pixeles)
+	}
 
 	return true
 }
@@ -904,6 +907,12 @@ func pixelesCambiadosDelBicho(b *bicho, pixeles []byte) int {
 // primero), mide cuantos pixeles pinto cada uno y devuelve el crc32 del cuadro con los bichos encima. Despues de
 // medir devuelve el mapa, en orden inverso, para que el numero del mapa solo siga siendo el del host.
 func dibujarLosBichos(malla *pvr.Surface, pixeles []byte) (crcConBichos uint32, msTotal, pintados int) {
+	// DC-002.134: con el instrumento apagado, el bicho se pinta UNA vez y sin copiar su caja (ver
+	// `midiendoElCuadro134`). El lienzo queda igual: mismo orden de profundidad, mismo ancla, mismo pincel.
+	if !midiendoElCuadro134() {
+		return pintarLosBichosUnaVez(malla, pixeles)
+	}
+
 	crcConBichos = crc32De(pixeles)
 
 	if len(bichos) == 0 {
@@ -974,8 +983,64 @@ func dibujarLosBichos(malla *pvr.Surface, pixeles []byte) (crcConBichos uint32, 
 	return crcConBichos, msTotal, pintados
 }
 
+// pintarLosBichosUnaVez: EL CUADRO QUE QUEDA EN PANTALLA, sin el baile de medir (DC-002.134).
+//
+// Es `dibujarLosBichos` sin las tres cosas que solo existen para el numero: el crc32 del lienzo, la copia de la
+// caja y la cuenta de pixeles pintados (y, con ellos, la anotacion de la muerte cuadro a cuadro, que es
+// evidencia: con `medirCuadro=no` la corrida de la evidencia usa `medirCuadro=si`). El orden de profundidad, el
+// ancla y el pincel son los mismos, asi que el lienzo queda identico.
+func pintarLosBichosUnaVez(malla *pvr.Surface, pixeles []byte) (crcConBichos uint32, msTotal, pintados int) {
+	if len(bichos) == 0 {
+		return 0, 0, 0
+	}
+
+	listos := make([]*bicho, 0, len(bichos))
+
+	for _, b := range bichos {
+		if prepararElCuadroDeUnBicho(b, pixeles) {
+			listos = append(listos, b)
+		}
+	}
+
+	for i := 1; i < len(listos); i++ {
+		for j := i; j > 0; j-- {
+			xj, yj := listos[j].Est.Celda()
+			xp, yp := listos[j-1].Est.Celda()
+
+			if xj+yj >= xp+yp {
+				break
+			}
+
+			listos[j], listos[j-1] = listos[j-1], listos[j]
+		}
+	}
+
+	for _, b := range listos {
+		cu := b.cuadroDelBicho()
+		if cu == nil {
+			continue
+		}
+
+		t1 := int64(d2cUs())
+
+		PintarJugador(malla, cu, b.AnclaX, b.AnclaY, palJugador[:])
+
+		b.MsDibujo = int((int64(d2cUs()) - t1) / 1000)
+		b.Pintados = 0
+
+		msTotal += b.MsDibujo
+	}
+
+	return 0, msTotal, 0
+}
+
 // volverAPintarLosBichos: el cuadro que queda en pantalla (despues de devolver el mapa).
 func volverAPintarLosBichos(malla *pvr.Surface) {
+	// DC-002.134: el que ya pinto una vez (ver `pintarLosBichosUnaVez`) no vuelve a pintar aca.
+	if !midiendoElCuadro134() {
+		return
+	}
+
 	for _, b := range bichos {
 		if b.Caja.Ancho() <= 0 || b.Caja.Alto() <= 0 {
 			continue

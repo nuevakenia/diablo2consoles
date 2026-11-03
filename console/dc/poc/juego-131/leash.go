@@ -628,10 +628,14 @@ func leashDelCuadro(cuadro int) {
 
 		pcx, pcy := p.Mov.Est.Celda()
 
-		println("JUEGO121: LEASH cuadro=", cuadro, "jugador=", p.Nombre, "ancla=", p.AnclaX, p.AnclaY,
-			"caja=", p.CajaCruda.X0, p.CajaCruda.Y0, p.CajaCruda.X1, p.CajaCruda.Y1,
-			"dentroDelLienzo=", siNo(dentro), "celda=", pcx, pcy,
-			"leashCeldas=", leashEnCeldas, "recortes=", p.LeashRecortes, "celdasRecortadas=", p.LeashCeldas)
+		// DC-002.134: la vigilancia se sigue midiendo (es estado), pero la linea es evidencia por cuadro: con
+		// `VERBOSO=no` se calla.
+		if verboso134() {
+			println("JUEGO121: LEASH cuadro=", cuadro, "jugador=", p.Nombre, "ancla=", p.AnclaX, p.AnclaY,
+				"caja=", p.CajaCruda.X0, p.CajaCruda.Y0, p.CajaCruda.X1, p.CajaCruda.Y1,
+				"dentroDelLienzo=", siNo(dentro), "celda=", pcx, pcy,
+				"leashCeldas=", leashEnCeldas, "recortes=", p.LeashRecortes, "celdasRecortadas=", p.LeashCeldas)
+		}
 	}
 
 	if fuera > 0 {
@@ -639,6 +643,10 @@ func leashDelCuadro(cuadro int) {
 
 		println("JUEGO121: LEASH FUERA cuadro=", cuadro, "jugadoresFuera=", fuera,
 			"el leash NO alcanzo: la separacion es de", celdas, "celdas /", px, "px")
+	}
+
+	if !verboso134() {
+		return
 	}
 
 	println("JUEGO121: LEASH SEPARACION cuadro=", cuadro, "jugadores=", len(jugadores), "celdas=", celdas,

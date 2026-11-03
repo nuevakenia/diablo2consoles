@@ -46,6 +46,8 @@ type Surface struct {
 	// textos: cuantos DrawTextf se pidieron (para la evidencia: el motor llama, aunque la fuente sea la
 	// provisional).
 	textos int
+	// DC-002.134: la tabla de la paleta empaquetada NO vive aca: es UNA global en blit_palabras.go (1 KB por
+	// superficie viva era demasiado para el monton de la consola: ver el comentario de alla).
 }
 
 // que el contrato se cumpla no es una suposicion: si d2interface.Surface cambia, esto no compila.
@@ -121,6 +123,12 @@ func (s *Surface) RenderIndices(indices []byte, ancho, alto int, paleta [][3]uin
 		return
 	}
 
+	// DC-002.134: el camino de la palabra (un deposito de 32 bits por pixel, la paleta empaquetada una vez).
+	// Si el buffer no esta alineado devuelve false y se sigue por el de bytes de aca abajo, tal cual.
+	if blitPalabras && s.renderIndicesPalabras(indices, ancho, alto, paleta) {
+		return
+	}
+
 	dx, dy := s.actual.x, s.actual.y
 	anchoLienzo, altoLienzo := s.imagen.ancho, s.imagen.alto
 	pixeles := s.imagen.pixeles
@@ -174,6 +182,8 @@ func (s *Surface) RenderIndices(indices []byte, ancho, alto int, paleta [][3]uin
 			pixeles[j+3] = 255
 		}
 	}
+
+	pxDeIndices += uint64((x1 - x0) * (y1 - y0))
 }
 
 // RenderIndicesTintado dibuja un mapa de INDICES de 8 bits aplicando el ESTADO actual: la traslacion, el color
@@ -192,6 +202,12 @@ func (s *Surface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [
 	if !blitRapido {
 		s.renderIndicesTintadoLento(indices, ancho, alto, paleta)
 
+		return
+	}
+
+	// DC-002.134: el camino de la palabra (ver blit_palabras.go). Misma cuenta de tinte, misma mezcla, un
+	// deposito por pixel. Si el buffer no esta alineado devuelve false y se sigue por el de bytes de abajo.
+	if blitPalabras && s.renderIndicesTintadoPalabras(indices, ancho, alto, paleta) {
 		return
 	}
 
@@ -282,6 +298,8 @@ func (s *Surface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [
 			pixeles[j+3] = uint8(a + uint16(pixeles[j+3])*resto/255)
 		}
 	}
+
+	pxDeIndices += uint64((x1 - x0) * (y1 - y0))
 }
 
 // ExpandirIndices expande indices de 8 bits con su paleta DIRECTAMENTE en el lienzo de esta superficie, sin
