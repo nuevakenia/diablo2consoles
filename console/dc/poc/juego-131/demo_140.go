@@ -35,6 +35,7 @@ package main
 import (
 	"runtime"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2automap"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2quest"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
@@ -501,6 +502,13 @@ func demoCruzaAlMoor() bool {
 
 	demoMueveLosBichos(cx, cy)
 
+	// ---- DC-002.144c: LA INTERFAZ SIGUE AL NIVEL NUEVO ----
+	// El minimapa y el HUD son del pueblo hasta aca: el minimapa porque su nivel era una constante de paquete
+	// (`nivelDelPueblo`) y el HUD porque su unica carga es la del pueblo. Al cruzar se rearman los dos para el
+	// nivel que entro. Va DESPUES de mudar al jugador (el reveal y el marcador se calculan sobre SU celda nueva) y
+	// ANTES del cierre del cruce, para que los numeros queden en el log entre las lineas del cruce.
+	demoRearmaLaInterfaz()
+
 	// EL MOTOR VE EL CAMBIO DE AREA: salir del campamento es, para la Den of Evil, entrar al exterior (el nivel
 	// del motor que la quest espera). Es el mismo evento de DC-002.128 (`EvAreaChanged`), disparado por el paso
 	// del jugador y no por un cuadro del guion.
@@ -521,6 +529,51 @@ func demoCruzaAlMoor() bool {
 		"vramLibre=", pvr.VramDisponible())
 
 	return true
+}
+
+// demoRearmaLaInterfaz: el MINIMAPA y el HUD del nivel que acaba de entrar (DC-002.144c).
+//
+// QUE SE ARREGLA. Las dos piezas de la interfaz nacian con el pueblo y no tenian forma de cambiar de nivel:
+//
+//   - el MINIMAPA tenia el nivel en una CONSTANTE de paquete (`nivelDelPueblo` = 1) metida en la tabla, en el
+//     arte, en la semilla y en el filtro de las filas, y ninguna funcion recargaba el mapa para otro nivel. Al
+//     cruzar, el modelo solo SUMABA las celdas nuevas sobre las 680 del pueblo (`celdas= 701`). Ahora
+//     `recargarElMinimapaDelNivel` suelta el arte y el modelo del que se deja y arma los del que llega.
+//   - el HUD ponia el nombre de la zona UNA vez, en la carga (`JUEGO125: HUD LISTO ... zona= Rogue Encampment`), con
+//     el fallback del motor para el nivel 1. Ahora `rearmarLaZona` le pone el nombre del nivel nuevo y le pide al
+//     font16 -que ya esta en el monton de C- los glifos que le falten.
+//
+// EL ID DEL NIVEL. Los dos se piden por el id del nivel de AFUERA del acto 1: `d2enum.RegionAct1Wilderness` es el
+// tipo de nivel (LvlTypes) con el que se compuso el mapa y es tambien el id de las filas de `AutoMap.txt` ("1
+// Wilderness", 142 filas / 75 cuadros de arte medidos en `console/dc/medidas/automap-moor`); el nombre del HUD sale
+// de `levels.txt` para `nivelDelBloodMoor` (2), porque el fallback `DefaultLevelNames` no tiene esa fila.
+func demoRearmaLaInterfaz() {
+	tipoDelNivel := int(d2enum.RegionAct1Wilderness)
+
+	minimapaOk := false
+	celdasDelNivel := 0
+
+	if elMinimapa != nil {
+		minimapaOk = elMinimapa.recargarElMinimapaDelNivel(tipoDelNivel, 0)
+		celdasDelNivel = elMinimapa.Modelo.Count()
+	} else {
+		println("DEMO140: REARME sin minimapa en la corrida (MINIMAPA=no): no hay nada que recargar")
+	}
+
+	nombre, deDonde := nombreDeLaZonaDelNivel(nivelDelBloodMoor)
+
+	hudOk := false
+
+	if elHUD != nil {
+		hudOk = elHUD.rearmarLaZona(nombre, deDonde)
+	} else {
+		println("DEMO140: REARME sin HUD en la corrida (HUD=no): no hay zona que rearmar")
+	}
+
+	println("DEMO140: REARME INTERFAZ nivel=", tipoDelNivel, d2automap.LevelName(tipoDelNivel),
+		"minimapaOk=", minimapaOk, "celdasDelNivel=", celdasDelNivel,
+		"hudOk=", hudOk, "zona=", nombre, "zonaDe=", deDonde,
+		"libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()))
 }
 
 // demoMueveLosBichos: los bichos del pueblo no existen en el `.ds1` del moor, asi que los de la corrida se mudan

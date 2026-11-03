@@ -143,13 +143,13 @@ type piezaDelHUD struct {
 
 // valoresDelHeroe: LA VIDA Y EL MANA DEL JUGADOR, con la tabla y la cuenta del motor.
 type valoresDelHeroe struct {
-	Clase                        string
-	Nivel                        int
-	Vida, VidaMax                int
-	Mana, ManaMax                int
-	Aguante, AguanteMax          int
-	Vitalidad, Energia           int
-	HpAdd                        int
+	Clase               string
+	Nivel               int
+	Vida, VidaMax       int
+	Mana, ManaMax       int
+	Aguante, AguanteMax int
+	Vitalidad, Energia  int
+	HpAdd               int
 }
 
 // hudDelJuego: todo el HUD armado. Vive una sola vez (los graficos son los mismos para los cuatro jugadores) y
@@ -169,8 +169,8 @@ type hudDelJuego struct {
 	Bytes    int // lo que ocupa el HUD en RAM (indices + glifos), medido
 
 	// lo que se pinta y lo que cuesta, por cuadro
-	pxPintados int
-	msDibujo   int
+	pxPintados    int
+	msDibujo      int
 	cuadrosConHUD int
 }
 
@@ -435,20 +435,34 @@ func paletaDelHUD(ruta, nombre string) [256][4]uint8 {
 // cargarLosGlifos: la tabla `.tbl` de la fuente 16 (3.596 B) y los cuadros del DC6 que usan las letras del
 // nombre de la zona. La tabla entera de la fuente no se queda: quedan los glifos del texto (16 letras, ~3,6 KB).
 func cargarLosGlifos(h *hudDelJuego) {
+	pedirLosGlifosDe(h, h.Zona)
+}
+
+// pedirLosGlifosDe: pide al font16 (que vive en el MPQ) los glifos que FALTAN para escribir `texto` y los deja en
+// el monton de C. Devuelve cuantos glifos NUEVOS se decodificaron (los que ya estaban no se vuelven a pedir).
+//
+// POR QUE SE SEPARA DE `cargarLosGlifos` (DC-002.144c). El HUD nace con el nombre del pueblo; al cruzar al afuera
+// el nombre cambia y hay letras que el pueblo no usaba ("Blood Moor": la B, la M y la d). El font16 COMPLETO ya
+// esta pedido en la carga de este mismo camino (`spriteBytes= 35214 spriteCuadros= 256`), asi que no hace falta
+// pedirle nada nuevo al MPQ mas que el `.tbl` y el DC6 otra vez por el flujo de la fuente, que sigue abierta con
+// `demoMoor == "si"`.
+func pedirLosGlifosDe(h *hudDelJuego, texto string) int {
 	t0 := d2cMs()
+
+	antes := len(h.Glifos)
 
 	fuente := fuenteDe(rutaDatos)
 	if fuente == nil {
 		println("JUEGO125: HUD SIN FUENTE DE DATOS para la fuente 16")
 
-		return
+		return 0
 	}
 
 	tramoTabla, err := fuente.Pedir(rutaFuenteZona + ".tbl")
 	if err != nil || tramoTabla == nil || len(tramoTabla.Datos) == 0 {
 		println("JUEGO125: HUD SIN TABLA DE FUENTE", rutaFuenteZona+".tbl")
 
-		return
+		return 0
 	}
 
 	tabla := tramoTabla.Datos
@@ -459,14 +473,14 @@ func cargarLosGlifos(h *hudDelJuego) {
 	if err != nil {
 		println("JUEGO125: HUD LA TABLA DE LA FUENTE NO PARSEA:", err.Error())
 
-		return
+		return 0
 	}
 
 	tramoSprite, err := fuente.Pedir(rutaFuenteZona + ".DC6")
 	if err != nil || tramoSprite == nil || len(tramoSprite.Datos) == 0 {
 		println("JUEGO125: HUD SIN SPRITE DE FUENTE", rutaFuenteZona+".DC6")
 
-		return
+		return 0
 	}
 
 	sprite := tramoSprite.Datos
@@ -477,13 +491,16 @@ func cargarLosGlifos(h *hudDelJuego) {
 	if err != nil {
 		println("JUEGO125: HUD EL SPRITE DE LA FUENTE NO PARSEA:", err.Error())
 
-		return
+		return 0
 	}
 
-	anchoTexto, _ := f.GetTextMetrics(h.Zona)
+	anchoTexto, _ := f.GetTextMetrics(texto)
 
-	for i := 0; i < len(h.Zona); i++ {
-		c := h.Zona[i]
+	tramoDelTexto := make([]byte, len(texto))
+	copy(tramoDelTexto, texto)
+
+	for i := 0; i < len(tramoDelTexto); i++ {
+		c := tramoDelTexto[i]
 		if _, listo := h.Glifos[c]; listo {
 			continue
 		}
@@ -512,10 +529,304 @@ func cargarLosGlifos(h *hudDelJuego) {
 	}
 
 	println("JUEGO125: HUD FUENTE tabla=", len(tabla), "sprite=", len(sprite), "cuadros=", len(dc.Frames),
-		"glifosDeLaZona=", len(h.Glifos), "texto=", h.Zona, "anchoDelTexto=", anchoTexto,
-		"ms=", int64(d2cMs()-t0))
+		"glifosDeLaZona=", len(h.Glifos), "nuevos=", len(h.Glifos)-antes, "texto=", texto,
+		"anchoDelTexto=", anchoTexto, "ms=", int64(d2cMs()-t0))
 
 	tabla, sprite, dc = nil, nil, nil
+
+	return len(h.Glifos) - antes
+}
+
+// rearmarLaZona: le pone al HUD el nombre de la zona del nivel NUEVO y pide los glifos que falten (DC-002.144c).
+//
+// `fuente` es de donde salio el nombre, para que el log diga con que se armo (el fallback del motor o la tabla
+// `levels.txt`). Devuelve si el HUD quedo con un nombre y con TODAS las letras de ese nombre decodificadas.
+func (h *hudDelJuego) rearmarLaZona(nombre, fuente string) bool {
+	if h == nil || nombre == "" {
+		println("JUEGO125: HUD REARME sin nombre de zona: el HUD se queda con", h.Zona)
+
+		return false
+	}
+
+	zonaAntes := h.Zona
+	glifosAntes := len(h.Glifos)
+	bytesAntes := h.Bytes
+
+	h.Zona = nombre
+
+	nuevos := pedirLosGlifosDe(h, nombre)
+
+	h.Bytes = h.bytesEnRAM()
+
+	faltan := 0
+
+	for i := 0; i < len(h.Zona); i++ {
+		if _, hay := h.Glifos[h.Zona[i]]; !hay {
+			faltan++
+		}
+	}
+
+	anchoTexto := 0
+
+	for i := 0; i < len(h.Zona); i++ {
+		if g := h.Glifos[h.Zona[i]]; g != nil {
+			anchoTexto += g.Paso
+		}
+	}
+
+	println("JUEGO125: HUD REARME zonaAntes=", zonaAntes, "zonaAhora=", h.Zona, "fuenteDelNombre=", fuente,
+		"glifos=", glifosAntes, "->", len(h.Glifos), "glifosNuevos=", nuevos, "letrasSinGlifo=", faltan,
+		"anchoDelTexto=", anchoTexto, "bytesEnRAM=", bytesAntes, "->", h.Bytes,
+		"montonC_libre=", d2cMontonLibre())
+
+	return faltan == 0
+}
+
+// nombreDeLaZonaDelNivel: el nombre de la zona de un nivel, y de donde salio (para el log).
+//
+// EL ORDEN ES EL DEL MOTOR (`d2game/d2gamescreen/zone_text.go` usa `LevelDisplayName` de `levels.txt`, que en esta
+// instalacion es el nombre que el juego muestra; la tabla de strings NO entra en la consola, DC-002.125). Aca:
+//
+//  1. el fallback del motor (`d2level.DefaultLevelNames`), que es el que puso "Rogue Encampment" en el pueblo y da
+//     el MISMO texto que el juego. Es gratis y no lee nada del MPQ: el pueblo sigue por este camino, sin cambios.
+//  2. si el nivel no esta en ese mapa -el Blood Moor NO esta: `DefaultLevelNames[2]` es vacio, medido en
+//     `console/dc/medidas/automap-moor`-, la FILA de `levels.txt` del nivel, que es la tabla que el motor tiene
+//     cargada para los `.ds1` y la que dice "Blood Moor". Se lee por la fuente (un `.txt` de 66.615 B al monton de
+//     C, como las piezas del HUD) y se saca UNA fila: el POC no carga `levels.txt` como tabla del motor porque son
+//     140 columnas por nivel y no entra con el HUD puesto (`tablasQueSeCargan = 2`: LvlTypes y LvlPrest).
+//  3. nada: se devuelve vacio y el que llama NO toca el HUD (un nombre inventado seria peor que el viejo).
+func nombreDeLaZonaDelNivel(id int) (string, string) {
+	if nombre := d2level.DefaultLevelNames[id]; nombre != "" {
+		return nombre, "DefaultLevelNames"
+	}
+
+	nombre, clave, bytes := nombreEnLaTablaDeNiveles(id)
+
+	println("JUEGO125: HUD NOMBRE nivel=", id, "levels.txt bytes=", bytes, "Name=", nombre, "LevelName=", clave)
+
+	if clave != "" {
+		return clave, "levels.txt LevelName"
+	}
+
+	if nombre != "" {
+		return nombre, "levels.txt Name"
+	}
+
+	return "", "levels.txt sin-nombre"
+}
+
+// rutaTablaNiveles: la tabla de los niveles. El parche la trae (66.615 B medidos), y si no, la trae d2data.
+const rutaTablaNiveles = `data\global\excel\levels.txt`
+
+// nombreEnLaTablaDeNiveles: la fila de `levels.txt` del nivel `id`, con sus columnas `Name` y `LevelName`.
+//
+// SE PARSEA A MANO, POR BYTES, Y UNA SOLA FILA. El lector de tablas del motor (`d2records`) arma una estructura de
+// 140 campos por nivel: no entra en el semiespacio del recolector en este punto de la corrida y no hace falta. Aca
+// se buscan los indices de las tres columnas en la cabecera y se compara el `Id` digito por digito: no se copia el
+// archivo a una `string` de Go ni se arma una lista de lineas.
+func nombreEnLaTablaDeNiveles(id int) (nombre, clave string, bytesLeidos int) {
+	for _, ruta := range []string{rutaParche, rutaDatos} {
+		fuente := fuenteDe(ruta)
+		if fuente == nil {
+			continue
+		}
+
+		if _, hay := fuente.Tamano(rutaTablaNiveles); !hay {
+			continue
+		}
+
+		tramo, err := fuente.Pedir(rutaTablaNiveles)
+		if err != nil || tramo == nil || len(tramo.Datos) < 2 {
+			continue
+		}
+
+		bytesLeidos = len(tramo.Datos)
+		nombre, clave = laFilaDelNivel(tramo.Datos, id)
+		tramo.Liberar()
+
+		if nombre != "" || clave != "" {
+			return nombre, clave, bytesLeidos
+		}
+	}
+
+	return "", "", bytesLeidos
+}
+
+// laFilaDelNivel: los campos `Name` y `LevelName` de la fila del nivel `id` en el TSV de `levels.txt`.
+func laFilaDelNivel(datos []byte, id int) (nombre, clave string) {
+	cabecera, resto, hay := laLinea(datos, 0)
+	if !hay {
+		return "", ""
+	}
+
+	iID, iNombre, iClave := -1, -1, -1
+
+	for i := 0; i < cuentaDeCampos(cabecera); i++ {
+		c := recortar(campoDeLaLinea(cabecera, i))
+
+		switch {
+		case igualTexto(c, "Id"):
+			iID = i
+		case igualTexto(c, "Name"):
+			iNombre = i
+		case igualTexto(c, "LevelName"):
+			iClave = i
+		}
+	}
+
+	if iID < 0 {
+		return "", ""
+	}
+
+	for {
+		linea, siguiente, hay := laLinea(resto, 0)
+		if !hay {
+			return "", ""
+		}
+
+		if esElEntero(recortar(campoDeLaLinea(linea, iID)), id) {
+			if iNombre >= 0 {
+				nombre = string(recortar(campoDeLaLinea(linea, iNombre)))
+			}
+
+			if iClave >= 0 {
+				clave = string(recortar(campoDeLaLinea(linea, iClave)))
+			}
+
+			return nombre, clave
+		}
+
+		if len(siguiente) == 0 {
+			return "", ""
+		}
+
+		resto = siguiente
+	}
+}
+
+// laLinea: la linea n de `datos` y lo que queda despues (sin el `\r` final).
+func laLinea(datos []byte, n int) (linea, resto []byte, hay bool) {
+	ini := 0
+
+	for i := 0; i <= len(datos); i++ {
+		if i == len(datos) || datos[i] == '\n' {
+			if n == 0 {
+				return datos[ini:i], datos[finDeLaLinea(datos, i):], i <= len(datos) && ini <= len(datos)
+			}
+
+			n--
+			ini = i + 1
+		}
+	}
+
+	return nil, nil, false
+}
+
+// finDeLaLinea: donde empieza la linea siguiente (el byte despues del `\n`, o el final).
+func finDeLaLinea(datos []byte, i int) int {
+	if i < len(datos) && datos[i] == '\n' {
+		return i + 1
+	}
+
+	return len(datos)
+}
+
+// campoDeLaLinea: el campo n de una linea TSV (vacio si la linea no llega).
+func campoDeLaLinea(linea []byte, n int) []byte {
+	if n < 0 {
+		return nil
+	}
+
+	ini, actual := 0, 0
+
+	for i := 0; i <= len(linea); i++ {
+		if i == len(linea) || linea[i] == '	' {
+			if actual == n {
+				return linea[ini:i]
+			}
+
+			actual++
+			ini = i + 1
+		}
+	}
+
+	return nil
+}
+
+// cuentaDeCampos: cuantos campos tiene una linea TSV.
+func cuentaDeCampos(linea []byte) int {
+	n := 1
+
+	for _, b := range linea {
+		if b == '	' {
+			n++
+		}
+	}
+
+	return n
+}
+
+// recortar: la cadena sin espacios ni `\r` en los bordes.
+func recortar(b []byte) []byte {
+	ini, fin := 0, len(b)
+
+	for ini < fin && (b[ini] == ' ' || b[ini] == '\r' || b[ini] == '	') {
+		ini++
+	}
+
+	for fin > ini && (b[fin-1] == ' ' || b[fin-1] == '\r' || b[fin-1] == '	') {
+		fin--
+	}
+
+	return b[ini:fin]
+}
+
+// igualTexto: si los bytes son el texto, sin distinguir mayusculas.
+func igualTexto(b []byte, texto string) bool {
+	if len(b) != len(texto) {
+		return false
+	}
+
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+
+		d := texto[i]
+		if d >= 'A' && d <= 'Z' {
+			d += 'a' - 'A'
+		}
+
+		if c != d {
+			return false
+		}
+	}
+
+	return true
+}
+
+// esElEntero: si los bytes son el numero `v` en decimal (sin signo, sin ceros de mas).
+func esElEntero(b []byte, v int) bool {
+	if len(b) == 0 || v < 0 {
+		return false
+	}
+
+	if len(b) > 1 && b[0] == '0' {
+		return false
+	}
+
+	n := 0
+
+	for _, c := range b {
+		if c < '0' || c > '9' {
+			return false
+		}
+
+		n = n*10 + int(c-'0')
+	}
+
+	return n == v
 }
 
 // ============================== LOS VALORES REALES ==============================

@@ -1,0 +1,178 @@
+DC-002.144c -- EL MINIMAPA Y EL HUD SIGUEN AL NIVEL NUEVO (dejan de dibujar el pueblo mezclado con el afuera)
+=========================================================================================================
+Tarjeta: t_cc6c1002 (hija de DC-002.144b). Rama DC-002, checkout unico /home/dgalli/Proyectos/diablo2consoles.
+Build del criterio: /tmp/dcbuild/demo144c (DEMO=si DEMO_MOOR=si DEMO_MOOR_SCRATCH=si MEDIR_CUADRO=no
+MEDIR_VIVO=no, monstruos=2, vista=37,6). Regresion: /tmp/dcbuild/demo144c-nomoor (MISMO codigo, DEMO_MOOR=no).
+Flycast 2.7, teclado virtual del kernel (/dev/uinput -> teclado del emulador -> bus maple -> POC).
+Corridas del 2026-11-03: 19:57 (el criterio, guion de la tarjeta), 20:12 (mismo build, guion sin las dos `s`,
+para que el panel de Akara no tape el nombre de la zona), 20:19 (regresion sin moor).
+
+0. QUE PEDIA LA TARJETA
+-----------------------
+Dos piezas de la interfaz seguian siendo las del pueblo despues del cruce:
+  1. el MINIMAPA no se reiniciaba: seguia con las 680 celdas del pueblo y le SUMABA las del afuera
+     (`JUEGO130: MINIMAPA REVEAL cuadro= 112 ... agregadas= 21 celdas= 701`, o sea 680 + 21). La causa:
+     `nivelDelPueblo` era una constante de paquete usada por `cargarElMinimapa`, `revelarElMinimapa`,
+     `revelarTodoElPueblo` y `semillaDelAutomap`, y no habia ninguna funcion que recargara el minimapa para
+     OTRO nivel;
+  2. el HUD no cambiaba el nombre de la zona: su unica linea de carga es la del pueblo
+     (`JUEGO125: HUD LISTO ... zona= Rogue Encampment`).
+
+RESULTADO EN UNA LINEA: las dos piezas siguen al nivel nuevo y la corrida lo deja medido.
+  JUEGO130: MINIMAPA REARME nivelAntes= 1 nivelAhora= 2 nombre= 1 Wilderness filasDeLaTabla= 83 -> 142
+            celdasAntes= 680 celdasAhora= 75 piso= 13 pared= 62 cuadrosDeArte= 59 -> 75 cuadrosSoltados= 59
+            faltan= 0 bytesDeArte= 11890 -> 11580 liberados= 11890 libreAntes= 1947120 libreDespues= 1947312
+            semiespacioAntes= 1619648 semiespacioDespues= 1415408 ms= 1060
+  JUEGO125: HUD REARME zonaAntes= Rogue Encampment zonaAhora= Blood Moor fuenteDelNombre= levels.txt LevelName
+            glifos= 13 -> 18 glifosNuevos= 5 letrasSinGlifo= 0 anchoDelTexto= 91 bytesEnRAM= 22848 -> 23968
+  DEMO140: REARME INTERFAZ nivel= 2 1 Wilderness minimapaOk= true celdasDelNivel= 75 hudOk= true
+            zona= Blood Moor zonaDe= levels.txt LevelName libre= 1946152 semiespacio= 1560208
+y el cruce de DC-002.144b sigue igual: `DEMO140: CRUZA OK nivel=BloodMoor tiles= 289 jugador= 8.5 8.5
+ms= 16574 libre= 1946152 semiespacio= 1409216 vramLibre= 3511976`, 6 fps en el descampado.
+
+1. LO QUE SE MIDIO ANTES DE TOCAR LA CONSOLA (console/dc/medidas/automap-moor, nuevo)
+-----------------------------------------------------------------------------------
+El id del nivel que se le pasa al automapa NO es el id de `levels.txt` (2 = Blood Moor): es el id de LvlTypes
+(`d2automap.LevelName`), o sea el TIPO de nivel. El POC compone el afuera con `d2enum.RegionAct1Wilderness`
+= 2 = "1 Wilderness". Medido en el host, con la tabla del MPQ:
+
+   AutoMap.txt (122.022 B)
+     nivel= 1 (1 Town      ) filas= 83   cuadrosDeArte= 59
+     nivel= 2 (1 Wilderness) filas= 142  cuadrosDeArte= 75   <- el afuera tiene tabla propia y 75 cuadros
+   levels.txt (66.615 B, 140 columnas)
+     nivel= 1  Name= "Act 1 - Town"           LevelName= "Rogue Encampment"
+     nivel= 2  Name= "Act 1 - Wilderness 1"   LevelName= "Blood Moor"
+   d2level.DefaultLevelNames (el fallback del motor)
+     [1]= "Rogue Encampment"
+     [2]= ""     <- la tarjeta suponia que decia "Blood Moor"; NO esta. De ahi el orden del punto 2.
+
+Sin esa medicion el rearme habria quedado en un mapa vacio (si el afuera no tuviera filas) o con un nombre
+inventado (si se hubiera escrito "Blood Moor" a mano en vez de leerlo de la tabla).
+
+2. QUE SE CAMBIO (una cosa por pieza, todo adentro del camino del cruce)
+-----------------------------------------------------------------------
+MINIMAPA -- `console/dc/poc/juego-131/automap_130.go`
+  - `nivelDelPueblo` deja de usarse dentro del minimapa: el nivel pasa a ser un CAMPO (`minimapaDelJuego.Nivel`,
+    que nace en el pueblo) y lo usan `cargarElArte` (filtro de las filas), `revelarElMinimapa`,
+    `revelarTodoElNivel` y `semillaDelAutomap(nivel)`.
+  - El parseo de la tabla se extrajo a `leerLaTablaDelNivel(fuente, id)` (misma lectura POR EL FLUJO de siempre:
+    `Open` + `ParseTxtLevels`, sin tirar 122 KB al heap ni al monton de C).
+  - `recargarElMinimapaDelNivel(id, jugador)` -- NUEVA, el corazon de la tarjeta: lee la tabla del nivel nuevo
+    ANTES de soltar nada (si el nivel no tiene filas, el minimapa que hay se queda y el log lo dice), devuelve el
+    arte del nivel que se deja al monton de C (`soltarElArteDelNivel`), rehace la tabla, tira el modelo
+    (`d2automap.NewModel()`, que es lo que hace el motor al cambiar de nivel), resiembra el automap, decodifica
+    el arte del nivel nuevo y revela.
+  - `soltarElArteDelNivel`: los cuadros son bloques de `d2c_pedir_bloque` (malloc del monton de C, 128 B de
+    indices + la lista compacta). `d2c_soltar_bloque` NO los toca (su guarda solo deja pasar lo que supera el
+    umbral de objeto grande, 64 KB), asi que se devuelven con el `free` pelado (`d2cLibre`, el mismo que usa el
+    liberador de los tramos del MPQ) y el mapa de cuadros se reemplaza ENTERO por uno vacio en vez de borrar
+    entrada por entrada (borrar durante el recorrido es una escritura de mapa, y en este POC la primera escritura
+    de mapa de una corrida ya mato a la consola con `Illegal instruction` -- ver la cabecera de `cargarElMinimapa`).
+  - `revelarTodoElPueblo` pasa a `revelarTodoElNivel` (mismo `RevealTiles` con el mapa entero, pero el nivel sale
+    del campo): la CARGA del pueblo ya revelaba todo con `MINIMAPA_TODO=si` y el rearme hace lo mismo, para que el
+    minimapa del afuera se vea completo y no solo el rombo alrededor del heroe.
+
+HUD -- `console/dc/poc/juego-131/hud_125.go`
+  - `cargarLosGlifos` se parte en `pedirLosGlifosDe(h, texto)`, que pide al font16 SOLO los glifos que faltan y
+    devuelve cuantos decodifico. Sigue leyendo el `.tbl` (3.596 B) y el `.DC6` (35.214 B, 256 cuadros) de la
+    fuente de consola, que con `demoMoor == "si"` sigue abierta.
+  - `rearmarLaZona(nombre, fuente)` -- NUEVA: le pone el nombre al HUD, pide los glifos que falten, recalcula los
+    bytes del HUD y deja la linea `JUEGO125: HUD REARME` con el antes/despues. Devuelve si quedo con todas las
+    letras del nombre.
+  - `nombreDeLaZonaDelNivel(id)` -- NUEVA, en este orden: (1) el fallback del motor `d2level.DefaultLevelNames`
+    (el camino del pueblo, sin leer nada del MPQ, asi que el pueblo no cambia), (2) la fila de `levels.txt` del
+    nivel -`Name` y `LevelName`- que es la tabla que el motor tiene cargada para los `.ds1` y la que dice
+    "Blood Moor", (3) vacio, y entonces el HUD NO se toca. `levels.txt` se lee con `fuente.Pedir` (66.615 B al
+    monton de C, como las piezas del HUD) y se parsea A MANO POR BYTES, buscando los indices de las tres columnas
+    en la cabecera y comparando el `Id` digito por digito: el POC no carga `levels.txt` como tabla del motor
+    (`tablasQueSeCargan = 2`: LvlTypes y LvlPrest), y la estructura de `d2records` son 140 campos por nivel.
+
+ENGANCHE -- `console/dc/poc/juego-131/demo_140.go`
+  - `demoRearmaLaInterfaz()` se llama UNA vez, adentro de `demoCruzaAlMoor`, DESPUES de mudar al jugador al centro
+    del nivel nuevo (el reveal y el marcador se calculan sobre su celda) y ANTES del cierre del cruce, asi que sus
+    numeros quedan entre las lineas del cruce. Con `demoMoor = "no"` (el defecto) esta funcion no se ejecuta.
+
+3. EL MINIMAPA, MEDIDO: EL MODELO PASA DE 680 CELDAS DEL PUEBLO A 75 DEL AFUERA
+------------------------------------------------------------------------------
+Los dos revelados de la misma corrida, con el nivel en la linea:
+
+  ANTES (la carga, pueblo)   JUEGO130: MINIMAPA REVEAL-TODO nivel= 1 1 Town casillas= 57 x 41 agregadas= 680
+                             celdas= 680 piso= 514 pared= 166
+  DESPUES (el rearme, afuera) JUEGO130: MINIMAPA REVEAL-TODO nivel= 2 1 Wilderness casillas= 17 x 17
+                             agregadas= 75 celdas= 75 piso= 13 pared= 62
+
+Y lo que se PINTA en la caja del minimapa, por ventana de 30 cuadros (`JUEGO137: MINIMAPA-POR-DENTRO`, mismo
+binario, misma corrida; `celdasDelModelo` es el modelo y `pixelesPintados` lo que se pego en la caja):
+
+  cuadros= 30   celdasPintadas= 679  pixelesPintados= 5423  celdasDelModelo= 680   <- pueblo
+  cuadros= 60   celdasPintadas= 674  pixelesPintados= 5382  celdasDelModelo= 680
+  cuadros= 90   celdasPintadas= 673  pixelesPintados= 5365  celdasDelModelo= 680
+  cuadros= 120  celdasPintadas= 573  pixelesPintados= 4606  celdasDelModelo= 75     <- EL CRUCE
+  cuadros= 150  celdasPintadas= 75   pixelesPintados= 811   celdasDelModelo= 75     <- afuera solo
+  cuadros= 300  celdasPintadas= 75   pixelesPintados= 811   celdasDelModelo= 75
+  cuadros= 450  celdasPintadas= 75   pixelesPintados= 811   celdasDelModelo= 75
+
+O sea: 75 celdas dibujadas de 75 en el modelo (todas las del afuera) y CERO del pueblo. Antes de esta tarjeta el
+mismo cuadro seguia dibujando 679 celdas con el modelo en 701 (680 del pueblo + 21 del afuera).
+
+EL ARTE, CON SU ANTES/DESPUES Y EL MONTON DE C:
+  cuadrosDeArte= 59 -> 75   (faltan= 0: los 75 cuadros del afuera se decodifican enteros)
+  bytesDeArte= 11890 -> 11580   liberados= 11890
+  libreAntes= 1947120  libreDespues= 1947312     (el monton de C queda 192 B ARRIBA: lo que se devuelve alcanza)
+  semiespacioAntes= 1619648  semiespacioDespues= 1415408   (-204.240 B: el modelo del pueblo se tira)
+  ms= 1060   (la recarga entera: releer la tabla, 75 cuadros decodificados y el revelado)
+
+4. EL HUD, MEDIDO: "Rogue Encampment" -> "Blood Moor", CON LOS GLIFOS QUE FALTABAN
+---------------------------------------------------------------------------------
+  JUEGO125: HUD NOMBRE nivel= 2 levels.txt bytes= 66615 Name= Act 1 - Wilderness 1 LevelName= Blood Moor
+  JUEGO125: HUD FUENTE tabla= 3596 sprite= 35214 cuadros= 256 glifosDeLaZona= 18 nuevos= 5
+            texto= Blood Moor anchoDelTexto= 91 ms= 143
+  JUEGO125: HUD REARME zonaAntes= Rogue Encampment zonaAhora= Blood Moor fuenteDelNombre= levels.txt LevelName
+            glifos= 13 -> 18 glifosNuevos= 5 letrasSinGlifo= 0 anchoDelTexto= 91
+            bytesEnRAM= 22848 -> 23968 montonC_libre= 1946152
+
+Los 5 glifos nuevos son las letras que el pueblo no usaba (B, d, M y las que faltaban del juego "Blood Moor"); no
+se le pidio al MPQ nada que no estuviera ya pedido: la fuente es la misma (font16, 256 cuadros) y los glifos van
+al monton de C, como los del pueblo (+1.120 B de HUD, 13 -> 18 glifos).
+
+EN PANTALLA (corrida de las 20:12, mismo build, guion SIN las dos `s` para que el panel de Akara -501x81, que se
+dibuja ENCIMA del HUD- no tape el nombre):
+  antes del cruce   dc-002.144c-zona-antes-rogue-encampment.png   ->  "Rogue Encampment"
+  despues del cruce dc-002.144c-zona-despues-blood-moor.png       ->  "Blood Moor"
+El minimapa, en la misma pareja de cuadros (caja del motor, 279x225 en (359,57)):
+  dc-002.144c-minimapa-del-pueblo.png   trazado denso, muchos bloques, marcador azul
+  dc-002.144c-minimapa-del-afuera.png   el rombo del Wild1.ds1 con el marcador azul, sin nada del pueblo
+
+5. LA REGRESION: `DEMO_MOOR=no` NO CAMBIA (mismo codigo, palanca apagada)
+------------------------------------------------------------------------
+Build /tmp/dcbuild/demo144c-nomoor, corrida de 33 s, mismas teclas:
+  JUEGO130: MINIMAPA LISTO celdas= 680 piso= 514 pared= 166 palanca= si cuando= siempre todo= si ms= 1034
+  JUEGO125: HUD LISTO piezas= 7 glifos= 13 zona= Rogue Encampment bytesEnRAM= 22848 montonC_libre= 965152
+  DEMO140: FPS cuadros= 60 msPorCuadro= 144 fps= 7 celda= 38.538 4.46204 nivel= TownN1
+  DEMO140: FPS cuadros= 90 msPorCuadro= 142 fps= 7 celda= 38.538 4.46204 nivel= TownN1
+Cero lineas `REARME`, cero lineas `CRUZA`: con la palanca apagada el camino del cruce no se ejecuta. Los numeros
+del pueblo son los de siempre (680 celdas / 514 piso / 166 pared, 13 glifos, 7 fps).
+
+6. LO QUE ESTA TARJETA NO HACE (y es tarjeta aparte)
+---------------------------------------------------
+El nivel que entra sigue siendo `Act1/Outdoors/Wild1.ds1` (17x17, preset 32 "Act 1 - Fence Fill 1"), no el Blood
+Moor de 56x96: eso es DC-002.145 (componer el afuera por regiones con el DRLG). El minimapa y el HUD ya siguen al
+nivel que entre, sea el que sea: la recarga pide la tabla por el id de LvlTypes y el nombre por el id de nivel de
+`levels.txt`, asi que cuando el que entre sea el Blood Moor de verdad los dos van a decir 56x96 y "Blood Moor" sin
+tocar una linea mas.
+
+7. ARCHIVOS
+-----------
+  console/dc/poc/juego-131/automap_130.go        el nivel como campo, leerLaTablaDelNivel,
+                                                 soltarElArteDelNivel, recargarElMinimapaDelNivel,
+                                                 revelarTodoElNivel, semillaDelAutomap(nivel)
+  console/dc/poc/juego-131/hud_125.go            pedirLosGlifosDe, rearmarLaZona, nombreDeLaZonaDelNivel y el
+                                                 lector de una fila de levels.txt por bytes
+  console/dc/poc/juego-131/demo_140.go           demoRearmaLaInterfaz, llamado desde demoCruzaAlMoor
+  console/dc/poc/juego-131/README-140.md         la seccion de DC-002.144c
+  console/dc/medidas/automap-moor/main.go        la medicion previa (host): filas y cuadros del afuera, y el
+                                                 nombre en levels.txt
+  console/dc/evidencia/dc-002.144c-cruce-minimapa-y-hud-flycast.log   el log del criterio (19:57)
+  console/dc/evidencia/dc-002.144c-zona-en-pantalla-flycast.log       el de la corrida sin panel (20:12)
+  console/dc/evidencia/dc-002.144c-regresion-sin-moor-flycast.log     el de la regresion (20:19)
+  console/dc/evidencia/dc-002.144c-*.png                              las cinco capturas

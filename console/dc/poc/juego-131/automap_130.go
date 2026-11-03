@@ -49,8 +49,11 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"image/color"
 	"io"
+	"runtime"
+	"unsafe"
 
 	"github.com/OpenDiablo2/OpenDiablo2/console/dc/fuenteconsola"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2automap"
@@ -160,6 +163,11 @@ type minimapaDelJuego struct {
 	Arte   map[int]*celdaDelMinimapa
 	Pal    [256][4]uint8
 
+	// Nivel es el id de LvlTypes del nivel que el minimapa esta dibujando (DC-002.144c). Nace en el pueblo
+	// (`nivelDelPueblo`) y CAMBIA con `recargarElMinimapaDelNivel`: antes era la constante de paquete, y por eso
+	// al cruzar al afuera el mapa seguia sumando celdas del pueblo sobre el nivel nuevo (680 + 21 = 701).
+	Nivel int
+
 	// lo que ocupa, medido
 	BytesArte     int
 	BytesCompacto int
@@ -215,6 +223,7 @@ func cargarElMinimapa() {
 	t0 := d2cMs()
 
 	m := &minimapaDelJuego{
+		Nivel:  nivelDelPueblo,
 		Modelo: d2automap.NewModel(),
 		Arte:   map[int]*celdaDelMinimapa{},
 		Pal:    paletaDelHUD(paletaDelActo1, "acto 1"),
@@ -234,25 +243,9 @@ func cargarElMinimapa() {
 		return
 	}
 
-	tamano, hay := fuente.Tamano(rutaTablaAutomap)
-	if !hay || tamano == 0 {
-		println("JUEGO130: MINIMAPA SIN TABLA ruta=", rutaTablaAutomap)
-
-		return
-	}
-
-	flujo, err := fuente.Open(rutaTablaAutomap)
+	tabla, bytesTabla, err := leerLaTablaDelNivel(fuente, m.Nivel)
 	if err != nil {
-		println("JUEGO130: MINIMAPA SIN TABLA ruta=", rutaTablaAutomap)
-
-		return
-	}
-
-	bytesTabla := tamano
-
-	tabla, err := d2automap.ParseTxtLevels(flujo, nivelDelPueblo)
-	if err != nil {
-		println("JUEGO130: MINIMAPA la tabla NO PARSEA:", err.Error())
+		println("JUEGO130: MINIMAPA SIN TABLA ruta=", rutaTablaAutomap, "motivo=", err.Error())
 
 		return
 	}
@@ -261,8 +254,8 @@ func cargarElMinimapa() {
 	m.BytesTabla = bytesTabla
 
 	println("JUEGO130: MINIMAPA TABLA archivo=", rutaTablaAutomap, "bytes=", bytesTabla,
-		"filasDelPueblo=", len(tabla.LevelRows(nivelDelPueblo)), "nivel=", nivelDelPueblo,
-		"nombre=", d2automap.LevelName(nivelDelPueblo), "porElFlujo= si")
+		"filasDelPueblo=", len(tabla.LevelRows(m.Nivel)), "nivel=", m.Nivel,
+		"nombre=", d2automap.LevelName(m.Nivel), "porElFlujo= si")
 
 	// ---- 2. EL ARTE: los cuadros que piden las filas del pueblo, decodificados y decimados a 8x16
 	faltan := m.cargarElArte(fuente)
@@ -272,7 +265,7 @@ func cargarElMinimapa() {
 
 	// ---- 3. EL MODELO: vacio (el reveal lo llena cuadro a cuadro, siguiendo al jugador) o el pueblo entero
 	if minimapaTodo == "si" {
-		m.revelarTodoElPueblo()
+		m.revelarTodoElNivel()
 	}
 
 	elMinimapa = m
@@ -283,6 +276,28 @@ func cargarElMinimapa() {
 
 	semiespacio("despues-del-minimapa")
 	memoria("minimapa-despues")
+}
+
+// leerLaTablaDelNivel: lee `AutoMap.txt` POR EL FLUJO y devuelve SOLO las filas del nivel `id` (LvlTypes), con
+// los bytes del archivo. Se usa en la carga y en la RECARGA al cambiar de nivel (DC-002.144c): el `.txt` se puede
+// volver a leer porque con `demoMoor == "si"` las fuentes de consola siguen abiertas (son la guarda del cruce).
+func leerLaTablaDelNivel(fuente *fuenteconsola.Fuente, id int) (*d2automap.Table, int, error) {
+	tamano, hay := fuente.Tamano(rutaTablaAutomap)
+	if !hay || tamano == 0 {
+		return nil, 0, fmt.Errorf("no hay %s (%d B)", rutaTablaAutomap, tamano)
+	}
+
+	flujo, err := fuente.Open(rutaTablaAutomap)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	tabla, err := d2automap.ParseTxtLevels(flujo, id)
+	if err != nil {
+		return nil, tamano, err
+	}
+
+	return tabla, tamano, nil
 }
 
 // cargarElArte: decodifica del DC6 los cuadros que las filas del nivel piden y los deja DECIMADOS en el monton de C.
@@ -341,7 +356,7 @@ func (m *minimapaDelJuego) cargarElArte(fuente *fuenteconsola.Fuente) int {
 
 	visto := map[int]bool{}
 
-	for _, fila := range m.Tabla.LevelRows(nivelDelPueblo) {
+	for _, fila := range m.Tabla.LevelRows(m.Nivel) {
 		for _, c := range fila.Cels {
 			if !visto[c] {
 				visto[c] = true
@@ -470,20 +485,22 @@ func (m *minimapaDelJuego) cargarElArte(fuente *fuenteconsola.Fuente) int {
 	return faltan
 }
 
-// revelarTodoElPueblo: el caso peor (lo que mide la tarjeta). Se revela el pueblo entero de una: el area es el
-// pueblo completo, que es lo mismo que revelarlo caminando pero sin caminar.
-func (m *minimapaDelJuego) revelarTodoElPueblo() {
+// revelarTodoElNivel: el caso peor (lo que mide la tarjeta). Se revela el nivel entero de una: el area es el mapa
+// completo, que es lo mismo que revelarlo caminando pero sin caminar. Sirve para el pueblo y para el afuera
+// (DC-002.144c: el nivel sale de `m.Nivel`, no de una constante).
+func (m *minimapaDelJuego) revelarTodoElNivel() {
 	w, h := fuenteDelMotor{}.Size()
 	if w == 0 || h == 0 {
-		println("JUEGO130: MINIMAPA sin motor del mapa: no se puede revelar el pueblo")
+		println("JUEGO130: MINIMAPA sin motor del mapa: no se puede revelar el nivel entero")
 
 		return
 	}
 
-	agregadas := m.Modelo.RevealTiles(m.Tabla, fuenteDelMotor{}, nivelDelPueblo, semillaDelAutomap(),
+	agregadas := m.Modelo.RevealTiles(m.Tabla, fuenteDelMotor{}, m.Nivel, semillaDelAutomap(m.Nivel),
 		float64(w/2), float64(h/2), d2automap.Area{HalfW: w * 8, HalfH: h * 4})
 
-	println("JUEGO130: MINIMAPA REVEAL-TODO casillas=", w, "x", h, "agregadas=", agregadas, "celdas=", m.Modelo.Count(),
+	println("JUEGO130: MINIMAPA REVEAL-TODO nivel=", m.Nivel, d2automap.LevelName(m.Nivel), "casillas=", w, "x", h,
+		"agregadas=", agregadas, "celdas=", m.Modelo.Count(),
 		"piso=", m.Modelo.CountLayer(d2automap.LayerFloor), "pared=", m.Modelo.CountLayer(d2automap.LayerWall))
 }
 
@@ -492,8 +509,8 @@ func (m *minimapaDelJuego) revelarTodoElPueblo() {
 // cuenta del motor la hace en 32 bits, que es lo que hace la variable).
 var multiplicadorDeLaSemilla uint32 = 2654435761
 
-func semillaDelAutomap() uint32 {
-	return uint32(nivelDelPueblo+1) * multiplicadorDeLaSemilla
+func semillaDelAutomap(nivel int) uint32 {
+	return uint32(nivel+1) * multiplicadorDeLaSemilla
 }
 
 // revelarElMinimapa: el reveal SIGUIENDO AL JUGADOR. Se llama una vez por cuadro, antes de dibujar: si el heroe se
@@ -514,7 +531,7 @@ func (m *minimapaDelJuego) revelarElMinimapa(jugador int) {
 
 	antes := m.Modelo.Count()
 
-	m.Modelo.RevealTiles(m.Tabla, fuenteDelMotor{}, nivelDelPueblo, semillaDelAutomap(), hx, hy,
+	m.Modelo.RevealTiles(m.Tabla, fuenteDelMotor{}, m.Nivel, semillaDelAutomap(m.Nivel), hx, hy,
 		d2automap.ScreenArea(ancho, alto))
 
 	m.revelados++
@@ -541,6 +558,143 @@ func celdaDelJugadorDe(jugador int) (x, y float64) {
 	}
 
 	return jugadores[jugador].Mov.Est.Celda()
+}
+
+// ============================== EL CAMBIO DE NIVEL (DC-002.144c) ==============================
+
+// soltarElArteDelNivel: devuelve al MONTON DE C el arte del nivel que se deja y vacia la tabla de cuadros.
+//
+// QUE BLOQUES SON. Cada cuadro decodificado vive en un `d2c_pedir_bloque` (un `malloc` del monton de C, 128 B de
+// indices + la lista compacta): NO son del recolector y `d2c_soltar_bloque` no los toca (su guarda devuelve 0 para
+// todo lo que no pase el umbral de objeto grande, 64 KB). El `free` que corresponde es el pelado (`d2cLibre`, el
+// mismo que usa el liberador de los tramos del MPQ), y es seguro porque el recolector de libgodc no sigue punteros
+// que caen fuera del semiespacio.
+//
+// Se devuelve el mapa NUEVO de una y no se borra cuadro por cuadro: borrar durante el recorrido es una escritura de
+// mapa (`runtime.mapdelete`), y en este POC la primera escritura de mapa de la corrida ya mato a la consola una vez
+// con `Illegal instruction` (ver la cabecera de cargarElMinimapa). Un mapa vacio nuevo no toca el viejo.
+func (m *minimapaDelJuego) soltarElArteDelNivel() (bytes, cuadros int) {
+	viejo := m.Arte
+
+	for _, arte := range viejo {
+		if arte == nil {
+			continue
+		}
+
+		if n := len(arte.Indices); n > 0 {
+			d2cLibre(uintptr(unsafe.Pointer(&arte.Indices[0])))
+			bytes += n
+		}
+
+		if n := len(arte.Compacto); n > 0 {
+			d2cLibre(uintptr(unsafe.Pointer(&arte.Compacto[0])))
+			bytes += n
+		}
+
+		cuadros++
+	}
+
+	m.Arte = map[int]*celdaDelMinimapa{}
+
+	return bytes, cuadros
+}
+
+// recargarElMinimapaDelNivel: REARMA el minimapa para OTRO nivel (DC-002.144c).
+//
+// EL DEFECTO QUE CIERRA. Hasta DC-002.144b el nivel del minimapa era la constante `nivelDelPueblo`: al cruzar al
+// afuera la tabla, el arte y la semilla seguian siendo los del pueblo y el modelo solo SUMABA las celdas nuevas
+// encima (`cuadro= 112 agregadas= 21 celdas= 701`: 680 del pueblo + 21 del afuera). El minimapa dibujaba los dos
+// niveles mezclados. Aca se hace lo que hace el motor cuando cambia de nivel: se sueltan el arte y el modelo del
+// que se deja, se vuelve a leer la tabla para el que llega (`AutoMap.txt` por el flujo, el `.txt` se puede releer
+// porque con `demoMoor == "si"` las fuentes de consola siguen abiertas), se decodifica SU arte al monton de C, se
+// resiembra el automap y se revela alrededor del heroe.
+//
+// `id` es el id de LvlTypes del nivel (`d2automap.LevelName` lo dice): 1 = "1 Town", 2 = "1 Wilderness".
+func (m *minimapaDelJuego) recargarElMinimapaDelNivel(id, jugador int) bool {
+	if m == nil {
+		return false
+	}
+
+	t0 := d2cMs()
+
+	nivelAntes := m.Nivel
+	celdasAntes := m.Modelo.Count()
+	cuadrosAntes := m.CuadrosArte
+	bytesArteAntes := m.BytesArte
+	filasAntes := 0
+
+	if m.Tabla != nil {
+		filasAntes = len(m.Tabla.LevelRows(nivelAntes))
+	}
+
+	libreAntes := d2cMontonLibre()
+	semiespacioAntes := int(d2cGcUsado())
+
+	// ---- 1. LA TABLA DEL NIVEL NUEVO, ANTES DE SOLTAR NADA: si el nivel no tiene filas, el minimapa que hay se
+	// queda como esta (un mapa vacio es peor que el viejo, y el log lo dice).
+	fuente := fuenteDe(rutaDatos)
+	if fuente == nil {
+		println("JUEGO130: MINIMAPA REARME SIN FUENTE DE DATOS nivel=", id, ": no se toca el minimapa")
+
+		return false
+	}
+
+	tabla, bytesTabla, err := leerLaTablaDelNivel(fuente, id)
+	if err != nil {
+		println("JUEGO130: MINIMAPA REARME SIN TABLA nivel=", id, "motivo=", err.Error(), ": no se toca el minimapa")
+
+		return false
+	}
+
+	filasNuevas := len(tabla.LevelRows(id))
+	if filasNuevas == 0 {
+		println("JUEGO130: MINIMAPA REARME el nivel", id, d2automap.LevelName(id),
+			"NO TIENE FILAS en la tabla del automapa: no se toca el minimapa")
+
+		return false
+	}
+
+	// ---- 2. EL ARTE DEL NIVEL QUE SE DEJA, DE VUELTA AL MONTON DE C
+	liberados, cuadrosSoltados := m.soltarElArteDelNivel()
+
+	// ---- 3. EL NIVEL NUEVO
+	m.Nivel = id
+	m.Tabla = tabla
+	m.BytesTabla = bytesTabla
+	m.BytesArte, m.BytesCompacto, m.CuadrosArte, m.SinArte = 0, 0, 0, 0
+
+	// el modelo del nivel que se deja NO se vacia: se tira (`NewModel`), que es lo que hace el motor al cambiar de
+	// nivel (cada nivel tiene su automapa). Los contadores del revelado si quedan: son de la corrida.
+	m.Modelo = d2automap.NewModel()
+
+	// el reveal tiene que volver a disparar con la primera celda del nivel nuevo
+	m.hayUltima, m.hayDibujo = false, false
+	m.ultimaX, m.ultimaY = 0, 0
+	m.ultimasCeldasDib, m.celdasUltimas, m.celdasMax, m.pxUltimos = 0, 0, 0, 0
+
+	faltan := m.cargarElArte(fuente)
+
+	// ---- 4. EL REVEAL DEL NIVEL NUEVO: entero si la palanca lo pide (que es lo que hace la CARGA del pueblo con
+	// `MINIMAPA_TODO=si`, y por eso el minimapa del pueblo se ve completo en pantalla) o alrededor del heroe.
+	if minimapaTodo == "si" {
+		m.revelarTodoElNivel()
+	} else {
+		m.revelarElMinimapa(jugador) // la primera celda siempre entra: `hayUltima` = false
+	}
+
+	runtime.GC()
+
+	println("JUEGO130: MINIMAPA REARME nivelAntes=", nivelAntes, "nivelAhora=", m.Nivel,
+		"nombre=", d2automap.LevelName(m.Nivel), "filasDeLaTabla=", filasAntes, "->", filasNuevas,
+		"celdasAntes=", celdasAntes, "celdasAhora=", m.Modelo.Count(),
+		"piso=", m.Modelo.CountLayer(d2automap.LayerFloor), "pared=", m.Modelo.CountLayer(d2automap.LayerWall),
+		"cuadrosDeArte=", cuadrosAntes, "->", m.CuadrosArte, "cuadrosSoltados=", cuadrosSoltados, "faltan=", faltan,
+		"bytesDeArte=", bytesArteAntes, "->", m.BytesArte, "liberados=", liberados,
+		"libreAntes=", libreAntes, "libreDespues=", d2cMontonLibre(),
+		"semiespacioAntes=", semiespacioAntes, "semiespacioDespues=", int(d2cGcUsado()),
+		"ms=", int(d2cMs()-t0))
+
+	return true
 }
 
 // ============================== EL DIBUJO ==============================

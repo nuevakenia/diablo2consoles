@@ -108,13 +108,14 @@ DEMO140: CIERRE ...             el resumen: cuadros, segundos, fps medio/min/max
 - **8 fps no son los 18-20** del criterio: el cuadro jugable es de 124-131 ms.
 - La **salida al Blood Moor** (`DEMO_MOOR=si`) **ya entra por RAM** (DC-002.144b: `CRUZA OK nivel=BloodMoor
   tiles= 289 libre= 1.946.320 semiespacio= 1.485.976`, 6 fps), pero el nivel que entra es la pieza de afuera de
-  17x17 y **el minimapa y el HUD siguen siendo los del pueblo** (el minimapa suma las celdas nuevas a las del
-  pueblo: 701 = 680 + 21). El detalle, abajo.
+  17x17. Desde **DC-002.144c** el minimapa y el HUD sí siguen al nivel nuevo (75 celdas del afuera solas, zona
+  «Blood Moor»). El detalle, abajo.
 
 ## El Blood Moor (`DEMO_MOOR`) — DC-002.144: el muro, y DC-002.144b: cómo se rompió
 
-`demoMoor = "no"` **sigue siendo el defecto** (el build de la demo también lo deja en `no`): cruzar ya anda, pero
-lo que entra es la pieza de afuera de 17x17 con el minimapa y el HUD del pueblo. Encenderla es un build:
+`demoMoor = "no"` **sigue siendo el defecto** (el build de la demo también lo deja en `no`): cruzar ya anda (y desde
+DC-002.144c la interfaz sigue al nivel nuevo), pero lo que entra es la pieza de afuera de 17x17. Encenderla es un
+build:
 `DEMO_MOOR=si bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo140-moor`.
 
 ### DC-002.144 — el muro (medido, 19:06)
@@ -157,7 +158,49 @@ código y el mismo guion mueren en `gc_external_alloc: OOM` (A/B corrido: las do
 
 Lo que todavía falta para tener **el Blood Moor de verdad**: el nivel que entra es `Wild1.ds1` (17x17, "Act 1 -
 Fence Fill 1"), no el afuera de 56x96, porque el Blood Moor no tiene preset y hay que componerlo por regiones con
-el DRLG; y el **minimapa y el HUD no siguen el nivel nuevo** (el minimapa mezcla 680 celdas del pueblo con 21 del
-afuera y el HUD sigue diciendo «Rogue Encampment»). Las tres palancas de memoria de la tarjeta quedaron con su
+el DRLG. Las tres palancas de memoria de la tarjeta quedaron con su
 número: la 1 (soltar el pueblo entero) no hizo falta —el pico del cruce es 2.056.579 B contra 2.994.912 B
 libres—, la 2 (VRAM) no hizo falta y tiene `vramLibre= 3.511.976` B de hueco, y la 3 (DRLG) sigue pendiente.
+
+### DC-002.144c — el minimapa y el HUD siguen al nivel nuevo (medido, 19:57)
+
+Hasta DC-002.144b las dos piezas de la interfaz eran las del pueblo: el minimapa tenía el nivel en una **constante
+de paquete** (`nivelDelPueblo`) metida en la tabla, en el arte, en la semilla y en el filtro de las filas, así que
+al cruzar **sumaba** las celdas nuevas sobre las 680 del pueblo (`celdas= 701` = 680 + 21) y dibujaba los dos
+niveles mezclados; y el HUD ponía el nombre **una sola vez**, en la carga.
+
+Lo que cambió, una cosa por pieza:
+
+1. **El nivel es un campo** (`minimapaDelJuego.Nivel`) y hay `recargarElMinimapaDelNivel(id, jugador)`: lee la
+   tabla del nivel nuevo por el flujo (`AutoMap.txt`, que se puede releer porque con `demoMoor= "si"` las fuentes
+   siguen abiertas), devuelve al montón de C el arte del que se deja (`d2cLibre` por bloque: `d2c_soltar_bloque`
+   no los toca, su guarda solo deja pasar lo que supera 64 KB), tira el modelo (`NewModel()`), resiembra el
+   automap y decodifica el arte del que llega. El mapa de cuadros se reemplaza entero en vez de borrar entrada por
+   entrada (borrar durante el recorrido es una escritura de mapa).
+2. **El HUD rearma la zona** con `rearmarLaZona`: el nombre sale del fallback del motor para el pueblo
+   (`DefaultLevelNames`, sin leer nada) y, para el afuera —que **no está** en ese mapa: `DefaultLevelNames[2]` es
+   vacío, medido en `console/dc/medidas/automap-moor`—, de la fila de `levels.txt` (`LevelName` = «Blood Moor»),
+   parseada a mano por bytes (el POC carga solo 2 tablas del motor). Los glifos que falten los pide al font16 que
+   ya está en el montón de C.
+
+Los números de la corrida del criterio (`/tmp/dcbuild/demo144c`, guion de la tarjeta, 19:57):
+
+```
+JUEGO130: MINIMAPA REARME nivelAntes= 1 nivelAhora= 2 nombre= 1 Wilderness filasDeLaTabla= 83 -> 142
+          celdasAntes= 680 celdasAhora= 75 piso= 13 pared= 62 cuadrosDeArte= 59 -> 75
+          cuadrosSoltados= 59 faltan= 0 bytesDeArte= 11890 -> 11580 liberados= 11890
+          libreAntes= 1947120 libreDespues= 1947312 semiespacioAntes= 1619648 semiespacioDespues= 1415408
+          ms= 1060
+JUEGO125: HUD REARME zonaAntes= Rogue Encampment zonaAhora= Blood Moor fuenteDelNombre= levels.txt LevelName
+          glifos= 13 -> 18 glifosNuevos= 5 letrasSinGlifo= 0 anchoDelTexto= 91 bytesEnRAM= 22848 -> 23968
+DEMO140: REARME INTERFAZ nivel= 2 1 Wilderness minimapaOk= true celdasDelNivel= 75 hudOk= true
+          zona= Blood Moor zonaDe= levels.txt LevelName
+```
+
+y en el dibujo (`JUEGO137: MINIMAPA-POR-DENTRO`, mismo binario): `celdasPintadas` 679 / 674 / 673 con
+`celdasDelModelo= 680` antes del cruce y **75 / 75 con `pixelesPintados= 811`** después — las 75 del afuera, cero
+del pueblo. El cruce de 144b sigue igual (`CRUZA OK ... ms= 16574`, 6 fps) y con `DEMO_MOOR=no` la corrida es la de
+siempre (680 celdas, 13 glifos, «Rogue Encampment», cero líneas `REARME`). En pantalla: «Rogue Encampment» antes y
+«Blood Moor» después (`dc-002.144c-zona-antes-rogue-encampment.png` / `-despues-blood-moor.png`), y los dos
+minimapas (`dc-002.144c-minimapa-del-pueblo.png` / `-del-afuera.png`). Evidencia completa en
+`console/dc/evidencia/dc-002.144c-el-minimapa-y-el-hud-siguen-el-nivel.txt`.
