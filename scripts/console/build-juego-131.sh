@@ -456,6 +456,14 @@ fi
 export DC_WRAP_MALLOC="${DC_WRAP_MALLOC:-1}"
 echo "   ARRANQUE136 medirCarga=$(leer_knob medirCarga) wrapMalloc=$DC_WRAP_MALLOC"
 
+# LAS DE ESTA TARJETA (DC-002.138): EL MVP JUGABLE.
+#   MVP=si|no        el guion de la partida completa (`mvp_138.go`): las nueve acciones en UNA corrida, cada una
+#                    con su linea de log y su crc32. "no" (por omision) = la corrida de la tarjeta que se pida con
+#                    las otras palancas, sin una linea del guion del MVP.
+[ -n "${MVP:-}" ] && pisa_knob mvpKnob "$MVP" 1
+
+echo "   MVP138 mvp=$(leer_knob mvpKnob) vista=$(leer_knob vistaX),$(leer_knob vistaY) monstruos=$(leer_knob monstruosKnob) npcLista=$(leer_knob npcLista)"
+
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }

@@ -855,6 +855,11 @@ func main() {
 
 	prepararJugadores()
 
+	// DC-002.138: EL ESCENARIO DEL MVP JUGABLE. Va aca: despues de que el pueblo, el bicho, el drop, el inventario,
+	// el alijo, la quest y los NPCs estan cargados (necesita sus celdas) y antes de que el ciclo del PVR pida el
+	// primer cuadro (las palancas de las otras tarjetas tienen que estar armadas antes). Con `MVP=no` no hace nada.
+	arrancarElMVP()
+
 	// DC-002.115: la medida del leash, con los cuadros ya compuestos y los dos jugadores armados (necesita la caja
 	// peor de los ciclos, que recien existe aca).
 	//
@@ -1113,6 +1118,12 @@ func actualizar() error {
 	}
 
 	// ============================== 1. EL CONTROL ==============================
+	// DC-002.138: EL GUION DEL MVP JUGABLE, ANTES DE TODO. Lo que arme esta etapa tiene que valer en ESTE cuadro:
+	// las palancas de las otras tarjetas las leen sus pasos (`pasoDelInventario`, `pasoDelAlijo`, `pasoDeLaQuest`)
+	// unas lineas mas abajo, y los bits de la cruceta los lee `leerYAvanzarJugadores`. Con la palanca apagada no
+	// hace nada.
+	pasoDelMVP()
+
 	// La corrida del criterio lee el control DEL EMULADOR (el teclado virtual del host aprieta la cruceta y Flycast
 	// arma el estado del maple). Con `inyectarGuion` el estado lo pone el shim, y se dice.
 	if inyectarGuion {
@@ -1885,6 +1896,13 @@ func dibujar(superficie d2interface.Surface) error {
 
 	// DC-002.134: el cuadro al cronometro por etapas (ver instrumento_134.go). Va al final para que la resta
 	// `dibujar - suma de etapas` sea exactamente lo que el cuadro paga en lineas de evidencia.
+	//
+	// DC-002.138: y el MVP JUGABLE anota aca lo que necesita de ESTE cuadro -- el crc32 del lienzo completo y del
+	// mundo, los pixeles del HUD y del minimapa y, si la etapa se cerro, la evidencia de su marca. Va DESPUES de
+	// todo lo que se pinta (paneles, HUD y minimapa incluidos): si fuera antes, el crc de la marca no seria el del
+	// cuadro que el ojo ve.
+	anotarElCuadroDelMVP(pixeles, crcLienzo(pixeles), crcMapa, pxHUD, pxMinimapa, pxDialogo, llenosLienzo(pixeles))
+
 	anotarCuadro134(cronometro134() - tInicio134)
 
 	return nil

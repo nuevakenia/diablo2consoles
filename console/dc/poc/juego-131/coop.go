@@ -558,6 +558,16 @@ func leerYAvanzarJugadores(segundos float64) (movidoP1 bool, caminando int) {
 			// DC-002.123: EL INSTRUMENTO DE LA RECOGIDA. Mientras haya un objeto en el piso, el jugador 1 recibe
 			// los bits que lo llevan hacia el (el resto del camino es el real: el maple, el servicio, `Paso` y la
 			// regla de recogida del motor). Sin objeto, manda el guion como siempre.
+			//
+			// DC-002.138: EL GUION DEL MVP JUGABLE va DELANTE de la recogida y solo cuando SU etapa pide caminar
+			// (al bicho, a Akara, de vuelta): en las etapas que no son de caminar devuelve `false` y manda el
+			// camino de siempre. Sus bits entran por la misma puerta (maple -> servicio -> `Paso`).
+			if i == 0 && mvpKnob == "si" {
+				if bits, hay := bitsDelMVP(p); hay {
+					botones = bits
+				}
+			}
+
 			if i == 0 && recogerAuto == "si" {
 				if bits, hay := bitsHaciaElObjeto(p); hay {
 					botones = bits

@@ -1,0 +1,247 @@
+================================================================================
+DC-002.138 -- EL MVP JUGABLE: las nueve acciones en UNA corrida
+================================================================================
+
+El POC juego-131 tiene las piezas de las tarjetas 121-137 medidas POR SEPARADO, cada una con su guion de
+cuadros FIJOS. Esta tarjeta pide lo que no existia: UNA corrida que las use TODAS JUNTAS, en el orden en que
+se juega, sin que una pise a la otra. La pieza nueva es un guion de ETAPAS (mvp_138.go): cada etapa se cierra
+con lo que MIDIO la anterior y recien entonces arma el cuadro de la siguiente en las palancas de las otras
+tarjetas (cuadroAbreElInventario, cuadroAbreElAlijo, guionDeLaQuest). El camino de cada pieza es EL SUYO, sin
+una linea cambiada.
+
+Corrida: bash scripts/console/build-mvp-138.sh /tmp/dcbuild/mvp138
+         CAPTURE=spectacle bash scripts/console/run-mvp-138.sh /tmp/dcbuild/mvp138/disc.gdi 120 /tmp/capturas-mvp138i
+
+================================================================================
+1. EL ESCENARIO (donde corrio el MVP y por que ahi)
+================================================================================
+  JUEGO138: MVP ARRANCA -- el MVP jugable: nueve acciones en UNA corrida
+  JUEGO138: MVP ESCENARIO jugador= 37 3 bicho= 38 7 alijo= 39 7 akara= 38.4 3.2 distanciaJugadorAkara= 1.41421 distanciaJugadorBicho= 4.12311 ventana= la de Akara (la cache de la 3.481.600 B no aguanta dos zonas: DC-002.116) bichos= 2 vidaDelBicho1= 3 npcs= 4 cuadrosDelGuion= 120 fase= apagado
+  JUEGO138: MVP ESCENARIO-2 monstruos= 2 (1 = el del combate del MVP; el resto, la cueva de la quest) npcLista= akara+... jugadores= 1 radios= habla 2 recogida 0,9 alijo 2
+
+  La ventana del pueblo es la de AKARA (VISTA_X=37 VISTA_Y=6) porque la cache de tiles del renderer tiene UN
+  tramo de 3.481.600 B y la ventana del centro del pueblo ya son 2.600.960 B: no entran dos zonas (medido en
+  DC-002.116 y .131). Akara esta a 19,8 celdas del centro del POC, asi que el MVP corre ENTERO en su esquina.
+
+================================================================================
+2. LAS ETAPAS (el guion: cada cambio con su motivo medido)
+================================================================================
+  JUEGO138: MVP ETAPA de= arranca a= camina-al-bicho cuadro= 1 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 1 porque= camina al bicho: bits de la cruceta hacia el medio de su camino (maple -> servicio -> Paso)
+  JUEGO138: MVP ETAPA de= camina-al-bicho a= golpea cuadro= 4 celdasDeLaEtapa= 3.75 cuadrosDeLaEtapa= 3 porque= el heroe llega al camino del bicho: se le pega con el boton Y (pulsoDeGolpe)
+  JUEGO138: MVP ETAPA de= golpea a= cae cuadro= 41 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 37 porque= la vida del Returned llego a 0: la animacion de muerte (DT, 19 cuadros)
+  JUEGO138: MVP ETAPA de= cae a= recoge cuadro= 60 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 19 porque= el cadaver quedo en el piso (DD): el objeto esta en el suelo y se camina hasta el
+  JUEGO138: MVP ETAPA de= recoge a= inventario cuadro= 61 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 1 porque= el objeto esta en el inventario: se abre el panel en el cuadro siguiente
+  JUEGO138: MVP ARMA el panel del inventario en el cuadro 63 (lo abre `pasoDelInventario`, el camino de DC-002.124)
+  JUEGO138: MVP ETAPA de= inventario a= alijo cuadro= 67 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 6 porque= el panel del inventario mostro el objeto en su celda y se cerro: el alijo del pueblo
+  JUEGO138: MVP ARMA el alijo en el cuadro 69 jugador= 39.4541 6.17872 alijo= 39.0255 5.97448 distancia= 0.474746 radio= 2
+  JUEGO138: MVP 5 COFRE-CON-EL-OBJETO cuadro= 71 alijo= 3/48/aqv@0,0 celdaDelCofre= 39.0255 5.97448
+  JUEGO138: MVP ETAPA de= alijo a= camina-a-akara cuadro= 72 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 5 porque= el objeto estuvo en el cofre y volvio: el heroe camina hasta Akara
+  JUEGO138: MVP ETAPA de= camina-a-akara a= acepta cuadro= 73 celdasDeLaEtapa= 1.875 cuadrosDeLaEtapa= 1 porque= el heroe esta dentro del radio de Akara: `Hear(64)` le entrega la Den of Evil
+  JUEGO138: MVP ARMA el aceptar de la Den of Evil en el cuadro 75 y el cierre del panel en el 77 (el camino de DC-002.128: Activate + Hear(64))
+  JUEGO138: MVP ETAPA de= acepta a= cierra-el-aceptar cuadro= 76 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 3 porque= la Den of Evil esta ACEPTADA; el panel se cierra dos cuadros despues
+  JUEGO138: MVP ETAPA de= cierra-el-aceptar a= cueva cuadro= 80 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 4 porque= a la cueva: el evento de area del motor (pueblo 1 -> Den of Evil 8)
+  JUEGO138: MVP ARMA la cueva en el cuadro 82 las bajas desde el 83 y la cueva limpia en el 86 vivosEnLaCueva= 1 bichos= 2 (el bicho 1 murio en el pueblo para el combate del MVP; el 2 muere en la cueva)
+  JUEGO138: MVP ETAPA de= cueva a= limpia cuadro= 87 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 7 porque= la cueva queda limpia: `Tick(8)` pasa la quest a "volve con Akara"
+  JUEGO138: MVP ETAPA de= limpia a= camina-de-vuelta cuadro= 88 celdasDeLaEtapa= 0 cuadrosDeLaEtapa= 1 porque= la Den of Evil avanzo y la recompensa quedo pendiente: el heroe camina otra vez
+  JUEGO138: MVP ETAPA de= camina-de-vuelta a= terminado cuadro= 92 celdasDeLaEtapa= 7.5 cuadrosDeLaEtapa= 4 porque= las nueve acciones corrieron: los tres cuadros del cierre son la prueba del mundo
+  JUEGO138: MVP GUION-TERMINADO cuadro= 92 marcasHastaAca= 8 de 9 la 9 se mide en los cuadros del cierre ( 121 .. 123 )
+  JUEGO138: MVP CIERRA la corrida en el cuadro 92 de 120 : los tres cuadros del cierre (origen, repetibilidad y vuelta) van ahora
+
+================================================================================
+3. LAS NUEVE MARCAS DEL CRITERIO
+================================================================================
+  JUEGO138: MVP 1 CAMINA cumple= si cuadro= 4 celdas= 3.75 cuadrosCaminando= 2 direccionesDelCOF= 2 crc= 532146971
+  JUEGO138: MVP 1 DETALLE el heroe camino 3.75 celdas hasta el bicho con los bits de la cruceta (maple -> servicio -> Paso, 1,875 celdas/cuadro); modo= TW
+  JUEGO138: MVP 2 MATA cumple= si cuadro= 60 vidaDelBicho= 0 modo= DD cuadrosDT= 19 crc= -2471591
+  JUEGO138: MVP 2 DETALLE el Returned (vida de la tabla 3) quedo en 0 y el cadaver en DD: 19 de 19 cuadros del DT
+  JUEGO138: MVP 3 RECOGE cumple= si cuadro= 42 objeto= aqv (Arrows) celdaDelPiso= 39.03,5.97 enElSuelo= 0 crc= -1824905824
+  JUEGO138: MVP 3 DETALLE el objeto aqv (Arrows) que cayo en 39.03,5.97 esta en el inventario del jugador (suelo=0)
+  JUEGO138: MVP 4 INVENTARIO cumple= si cuadro= 67 grilla= 3/40/aqv@0,0 ocupadas= 3 pxDelPanelMax= 0 crc= 1273184054
+  JUEGO138: MVP 4 DETALLE el panel del inventario abrio 1 vez/veces y mostro el objeto en su celda (3/40/aqv@0,0); los pixeles que pinto el panel los mide DC-002.124 en `JUEGO124: INV CUADRO` del mismo cuadro; despues se cerro y dejo el mundo como estaba
+  JUEGO138: MVP 5 COFRE-CON-EL-OBJETO cuadro= 71 alijo= 3/48/aqv@0,0 celdaDelCofre= 39.0255 5.97448
+  JUEGO138: MVP 5 ALIJO cumple= si cuadro= 72 guardo= si devolvio= si ocupadasAlijo= 0 crc= -1438455918
+  JUEGO138: MVP 5 DETALLE el objeto entro al cofre del pueblo (alijo= 3/48/aqv@0,0) y volvio al inventario: el cofre queda vacio y el objeto, en la grilla del jugador; los pixeles de cada panel (34.560 el del inventario y 40.832 el del cofre) los mide DC-002.124 en sus `JUEGO124: INV CUADRO`
+  JUEGO138: MVP 6 LLEGA-A-AKARA jugador= 38.8612 4.39994 akara= 38.4 3.2 distancia= 1.28551 radio= 2 dentroDelRadio= si celdasCaminadas= 1.875 cuadros= 1
+  JUEGO138: MVP 6 HABLA cumple= si cuadro= 76 distancia= 1.28551 pagina= 1 pxDelPanel= 40500 crc= 1243499863
+  JUEGO138: MVP 6 DETALLE el heroe hablo con Akara a 1.29 celdas (radio 2.00): el panel abrio la pagina 1 del log de la quest
+  JUEGO138: MVP 7 ACEPTA cumple= si cuadro= 76 estado= aceptada crc= 1243499863
+  JUEGO138: MVP 7 DETALLE `Hear(64)` del nodo A1Q1: la Den of Evil quedo aceptada en el registro (aceptada)
+  JUEGO138: MVP 8 AVANZA cumple= si cuadro= 88 completada= si pagina= 5 pendiente= si marcador= si vivosEnLaCuevaAlEntrar= 1 muertes= 1 crc= -750546538
+  JUEGO138: MVP 8 DETALLE la Den of Evil avanzo: cueva (area 8), bajas de la cueva, pagina 5 del log, recompensa pendiente=si y el marcador de Akara=si; estado=cueva-limpia
+  JUEGO138: MVP 9 VUELVE-A-CAMINAR cumple= si cuadro= 122 celdasDeLaVuelta= 7.5 pxHUD= 5933 pxMinimapa= 5365 mapaCrcCierre1= 861671277 mapaCrcCierre2= 861671277 repite= si lienzoCrc1= -458973250 lienzoCrc2= -1227904786 mapaCrcAlArrancar= 1385243383 llenos= 249429
+  JUEGO138: MVP 9 DETALLE despues de las nueve acciones el heroe camino 7.50 celdas mas; el HUD pinto 5933 px y el minimapa 5365 px; y el cuadro del mapa se repite identico en dos cuadros seguidos (crc 861671277 dos veces, con 249429 px no vacios)
+
+================================================================================
+4. LA TABLA
+================================================================================
+  JUEGO138: MVP TABLA 1 CAMINA si cuadro= 4 crc= 532146971 medido= celdas=3.75 cuadrosCaminando=2 direccionesDelCOF=2
+  JUEGO138: MVP TABLA 2 MATA si cuadro= 60 crc= -2471591 medido= vida=0 modo=DD cuadrosDT=19 dtDibujados=19
+  JUEGO138: MVP TABLA 3 RECOGE si cuadro= 42 crc= -1824905824 medido= objeto=aqv (Arrows) celdaDelPiso=39.03,5.97 enElSuelo=0
+  JUEGO138: MVP TABLA 4 INVENTARIO si cuadro= 67 crc= 1273184054 medido= grilla=3/40/aqv@0,0 ocupadas=3 abierta=no
+  JUEGO138: MVP TABLA 5 ALIJO si cuadro= 72 crc= -1438455918 medido= guardo=si devolvio=si ocupadasInventario=3 ocupadasAlijo=0
+  JUEGO138: MVP TABLA 6 HABLA si cuadro= 76 crc= 1243499863 medido= distancia=1.29 paginaDelLog=1
+  JUEGO138: MVP TABLA 7 ACEPTA si cuadro= 76 crc= 1243499863 medido= aceptada=si estado=aceptada
+  JUEGO138: MVP TABLA 8 AVANZA si cuadro= 88 crc= -750546538 medido= completada=si pagina=5 pendiente=si
+  JUEGO138: MVP TABLA 9 VUELVE-A-CAMINAR si cuadro= 122 crc= -1227904786 medido= celdasDeLaVuelta=7.50 pxHUD=5933 pxMinimapa=5365 elMapaSeRepite=si
+  JUEGO138: MVP TABLA TOTAL marcas= 9 cumplidas= 9 mvpCompleto= si cuadrosDeLaCorrida= 94 cuadrosDelGuion= 120 celdasCaminadas= 13.125 direccionesDelCOF= 3 objeto= aqv (Arrows) paginaDeLaQuest= 5
+  JUEGO138: MVP CRITERIO unaCorrida= si nueveAcciones= si de 9 mundoYHUDDespuesDeTodo= si mvp= si
+
+================================================================================
+5. LA EVIDENCIA DE CADA PIEZA, EN LA MISMA CORRIDA (los instrumentos de cada tarjeta)
+================================================================================
+
+-- 5.1 EL CAMINO: los tramos de la cruceta (DC-002.113)
+  JUEGO121: TRAMO DEL ARENA DE BLOQUES porElMonton= true sondaInstalada= true
+  JUEGO121: TRAMO DE LA CACHE EN BLOQUES DE VRAM techo= 3481600 pedazo= 348160 pedazoLoDiceLaVram= true vramDisponible= 4740808 vramServiriaDeUnGolpe= 3481600
+  JUEGO121: TRAMO ABAJO+IZQUIERDA dir= 1 cuadros= 1 desdeElCuadro= 1 segundos= 2.479 subtiles= 9.375 celdas= 1.875 celdasPorSegundo= 0.756353 subtilesPorSegundo= 3.78177 teoricoSubtilesPorSegundo= 9.375 celdaIni= 37 3 celdaFin= 39.3717 5.37171
+  JUEGO121: TRAMO ABAJO+DERECHA dir= 15 cuadros= 1 desdeElCuadro= 2 segundos= 2.304 subtiles= 9.375 celdas= 1.875 celdasPorSegundo= 0.813802 subtilesPorSegundo= 4.06901 teoricoSubtilesPorSegundo= 9.375 celdaIni= 37.5929 4.77878 celdaFin= 39.3717 5.37171
+  JUEGO121: TRAMO IZQUIERDA dir= 4 cuadros= 1 desdeElCuadro= 5 segundos= 2.205 subtiles= 9.375 celdas= 1.875 celdasPorSegundo= 0.85034 subtilesPorSegundo= 4.2517 teoricoSubtilesPorSegundo= 9.375 celdaIni= 39.3717 5.37171 celdaFin= 38.0459 6.69753
+  JUEGO121: TRAMO ABAJO+DERECHA dir= 15 cuadros= 1 desdeElCuadro= 40 segundos= 2.991 subtiles= 9.375 celdas= 1.875 celdasPorSegundo= 0.626881 subtilesPorSegundo= 3.1344 teoricoSubtilesPorSegundo= 9.375 celdaIni= 38.0459 6.69753 celdaFin= 39.4541 6.17872
+  JUEGO121: TRAMO ARRIBA+DERECHA dir= 9 cuadros= 1 desdeElCuadro= 41 segundos= 2.722 subtiles= 5.85937 celdas= 1.17187 celdasPorSegundo= 0.43052 subtilesPorSegundo= 2.1526 teoricoSubtilesPorSegundo= 9.375 celdaIni= 39.8247 7.29046 celdaFin= 39.4541 6.17872
+  JUEGO121: TRAMO ARRIBA+DERECHA dir= 9 cuadros= 1 desdeElCuadro= 71 segundos= 2.628 subtiles= 9.375 celdas= 1.875 celdasPorSegundo= 0.71347 subtilesPorSegundo= 3.56735 teoricoSubtilesPorSegundo= 9.375 celdaIni= 39.4541 6.17872 celdaFin= 38.8612 4.39994
+  JUEGO121: TRAMO ARRIBA+DERECHA dir= 9 cuadros= 3 desdeElCuadro= 87 segundos= 8.129 subtiles= 28.125 celdas= 5.625 celdasPorSegundo= 0.691967 subtilesPorSegundo= 3.45984 teoricoSubtilesPorSegundo= 9.375 celdaIni= 37.5 7.5 celdaFin= 37.5 2.75658
+  JUEGO121: TRAMO ABAJO+DERECHA dir= 15 cuadros= 1 desdeElCuadro= 90 segundos= 2.785 subtiles= 9.375 celdas= 1.875 celdasPorSegundo= 0.67325 subtilesPorSegundo= 3.36625 teoricoSubtilesPorSegundo= 9.375 celdaIni= 35.7212 2.16366 celdaFin= 37.5 2.75658
+
+-- 5.2 EL CONTROL (la lectura del bus maple, cuadro por cuadro, hasta donde anduvo el heroe)
+  JUEGO121: CONTROL cuadro= 1 lectura= true botones= 96 ejes= -1 1 dir= 0 caminando= true celda= 37 3 ticks= 0 subtiles= 0 camara= 2720 1600 reloj= 0 guionBotones= 128
+  JUEGO121: CONTROL cuadro= 2 lectura= true botones= 96 ejes= -1 1 dir= 1 caminando= true celda= 37.5929 4.77878 ticks= 25 subtiles= 9.375 camara= 2625.13 1694.87 reloj= 2.479 guionBotones= 128
+  JUEGO121: CONTROL cuadro= 3 lectura= true botones= 160 ejes= 1 1 dir= 15 caminando= true celda= 39.3717 5.37171 ticks= 25 subtiles= 9.375 camara= 2720 1789.74 reloj= 4.783 guionBotones= 128
+  JUEGO121: CONTROL cuadro= 6 lectura= true botones= 64 ejes= -1 0 dir= 4 caminando= true celda= 38.0459 6.69753 ticks= 25 subtiles= 9.375 camara= 2507.87 1789.74 reloj= 11.625 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 41 lectura= true botones= 160 ejes= 1 1 dir= 15 caminando= true celda= 39.8247 7.29046 ticks= 25 subtiles= 9.375 camara= 2602.74 1884.6 reloj= 90.408 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 42 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 39.4541 6.17872 ticks= 25 subtiles= 5.85937 camara= 2662.03 1825.31 reloj= 93.13 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 72 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 38.8612 4.39994 ticks= 25 subtiles= 9.375 camara= 2756.9 1730.44 reloj= 173.073 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 88 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 36.9071 5.72122 ticks= 25 subtiles= 9.375 camara= 2494.87 1705.13 reloj= 215.726 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 89 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 36.3141 3.94244 ticks= 25 subtiles= 9.375 camara= 2589.74 1610.26 reloj= 218.471 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 90 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 35.7212 2.16366 ticks= 25 subtiles= 9.375 camara= 2684.6 1515.4 reloj= 221.142 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 91 lectura= true botones= 160 ejes= 1 1 dir= 15 caminando= true celda= 37.5 2.75658 ticks= 25 subtiles= 9.375 camara= 2779.47 1610.26 reloj= 223.927 guionBotones= 0
+  ...
+  JUEGO121: CONTROL cuadro= 42 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 39.4541 6.17872 ticks= 25 subtiles= 5.85937 camara= 2662.03 1825.31 reloj= 93.13 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 72 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 38.8612 4.39994 ticks= 25 subtiles= 9.375 camara= 2756.9 1730.44 reloj= 173.073 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 88 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 36.9071 5.72122 ticks= 25 subtiles= 9.375 camara= 2494.87 1705.13 reloj= 215.726 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 89 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 36.3141 3.94244 ticks= 25 subtiles= 9.375 camara= 2589.74 1610.26 reloj= 218.471 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 90 lectura= true botones= 144 ejes= 1 -1 dir= 9 caminando= true celda= 35.7212 2.16366 ticks= 25 subtiles= 9.375 camara= 2684.6 1515.4 reloj= 221.142 guionBotones= 0
+  JUEGO121: CONTROL cuadro= 91 lectura= true botones= 160 ejes= 1 1 dir= 15 caminando= true celda= 37.5 2.75658 ticks= 25 subtiles= 9.375 camara= 2779.47 1610.26 reloj= 223.927 guionBotones= 0
+
+-- 5.3 EL COMBATE Y LA MUERTE (DC-002.122 / .126)
+  JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 1 dir= 12 dirDibujada= 14 dirPropia= false vida= 3 cuadro= 11
+  JUEGO122: GOLPE jugador= P1 ataque= 1 cuadroDelHeroe= 55 de 13 dano= 1 vidaAntes= 3 vidaDespues= 2 muerto= false dx= 5 dy= -4 distancia= 7 alcance= 7 danoAcumulado= 1
+  JUEGO122: GOLPE-FIN jugador= P1 ataque= 1 vida= 2 cuadrosDelGolpe= 13 msDelCiclo= 520 ultimaPoseDibujada= 12
+  JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 2 dir= 12 dirDibujada= 14 dirPropia= false vida= 2 cuadro= 24
+  JUEGO122: GOLPE jugador= P1 ataque= 2 cuadroDelHeroe= 55 de 13 dano= 1 vidaAntes= 2 vidaDespues= 1 muerto= false dx= 5 dy= -4 distancia= 7 alcance= 7 danoAcumulado= 2
+  JUEGO122: GOLPE-FIN jugador= P1 ataque= 2 vida= 1 cuadrosDelGolpe= 13 msDelCiclo= 520 ultimaPoseDibujada= 12
+  JUEGO122: GOLPE-EMPIEZA jugador= P1 ataque= 3 dir= 12 dirDibujada= 14 dirPropia= false vida= 1 cuadro= 38
+  JUEGO122: GOLPE jugador= P1 ataque= 3 cuadroDelHeroe= 55 de 13 dano= 1 vidaAntes= 1 vidaDespues= 0 muerto= true dx= 5 dy= -4 distancia= 7 alcance= 7 danoAcumulado= 3
+  JUEGO126: MUERTE EMPIEZA bicho= B1 modo= DT cuadrosDT= 19 msPorCuadro= 49 cicloDelMotorMs= 931 reloj= un cuadro por cuadro del POC (INSTRUMENTO: la consola no dibuja a 20 fps) cadaverMs= 12000 cadaver= si vida= 0 cuadro= 39
+  JUEGO122: GOLPE-FIN jugador= P1 ataque= 3 vida= 0 cuadrosDelGolpe= 13 msDelCiclo= 520 ultimaPoseDibujada= 12
+  JUEGO126: MUERTE EMPIEZA bicho= B2 modo= DT cuadrosDT= 19 msPorCuadro= 49 cicloDelMotorMs= 931 reloj= un cuadro por cuadro del POC (INSTRUMENTO: la consola no dibuja a 20 fps) cadaverMs= 12000 cadaver= si vida= 0 cuadro= 83
+  JUEGO126: MUERTE CUADRO modo= DT cuadro= 0 de 19 caja= 92 x 98 pixelesCompuestos= 618 pixelesPintados= 613 crc32= 1454087487 ms= 0 lienzoRestaurado= true cuadro= 40
+  JUEGO126: MUERTE CUADRO modo= DT cuadro= 1 de 19 caja= 92 x 98 pixelesCompuestos= 792 pixelesPintados= 788 crc32= -887701509 ms= 0 lienzoRestaurado= true cuadro= 41
+  JUEGO126: MUERTE CUADRO modo= DT cuadro= 2 de 19 caja= 92 x 98 pixelesCompuestos= 822 pixelesPintados= 820 crc32= -1178463961 ms= 0 lienzoRestaurado= true cuadro= 42
+  ...
+  JUEGO126: MUERTE CUADRO modo= DT cuadro= 0 de 19 caja= 92 x 98 pixelesCompuestos= 618 pixelesPintados= 32 crc32= 1454087487 ms= 0 lienzoRestaurado= true cuadro= 121
+  JUEGO126: MUERTE CUADRO modo= DT cuadro= 0 de 19 caja= 92 x 98 pixelesCompuestos= 618 pixelesPintados= 32 crc32= 1454087487 ms= 1 lienzoRestaurado= true cuadro= 122
+  JUEGO126: MUERTE CUADRO modo= DT cuadro= 0 de 19 caja= 92 x 98 pixelesCompuestos= 618 pixelesPintados= 207 crc32= 1454087487 ms= 0 lienzoRestaurado= true cuadro= 123
+  JUEGO126: CADAVER EXPIRA bicho= B1 ms= 13526 cuadrosDelCadaver= 5 cuadrosDelPOC= 24 vida= 0 cuadro= 63
+
+-- 5.4 EL DROP Y LA RECOGIDA (DC-002.123)
+  JUEGO123: DROP SUELTA codigo= aqv nombre= Arrows celda= 39.0255 5.97448 bicho= B1 vida= 0 modo= DT cuadro= 40 montonCLibre= 3736520 suelo= 1
+  JUEGO123: ITEM PASO jugador= P1 celdaIni= 38.0459 6.69753 celdaFin= 38.0459 6.69753 objeto= 39.0255 5.97448 distanciaAlPaso= 1.21758 distanciaAlFinal= 1.21758 radio= 0.9
+  JUEGO123: ITEM PASO jugador= P1 celdaIni= 38.0459 6.69753 celdaFin= 39.8247 7.29046 objeto= 39.0255 5.97448 distanciaAlPaso= 0.995735 distanciaAlFinal= 1.53962 radio= 0.9
+  JUEGO123: ITEM PASO jugador= P1 celdaIni= 39.8247 7.29046 celdaFin= 39.4541 6.17872 objeto= 39.0255 5.97448 distanciaAlPaso= 0.474746 distanciaAlFinal= 0.474746 radio= 0.9
+  JUEGO123: ITEM RECOGIDO codigo= aqv nombre= Arrows celda= 39.0255 5.97448 jugador= P1 distancia= 0.474746 radio= 0.9 cuadro= 42 suelo= 0 cayoEnElCuadro= 40 aDondeVa=DC-002.124
+
+-- 5.5 EL INVENTARIO Y EL ALIJO (DC-002.124)
+  JUEGO124: INV ENTRA elObjetoRecogido=true cuadro= 42 jugador= P1
+  JUEGO124: INV ABRE cuadro= 63 grilla= 10 x 4 panel= 176 344 ancho= 288 alto= 120 objeto= 3/40/aqv@0,0
+  JUEGO124: INV CIERRA cuadro= 66 objeto= 3/40/aqv@0,0 vecesAbierto= 1
+  JUEGO124: INV CUADRO 63 abierto=si paneles= 1 pixelesPintados= 34560 msPanel= 77 crcConPanel= 131342779 mapaSolo= 1437022778 jugador= 3/40/aqv@0,0 alijo= 0.00/48/vacia
+  JUEGO124: INV CUADRO 63 elCuadroCambio= true
+  JUEGO124: INV CUADRO 64 abierto=si paneles= 1 pixelesPintados= 34560 msPanel= 77 crcConPanel= 1007982791 mapaSolo= 1437022778 jugador= 3/40/aqv@0,0 alijo= 0.00/48/vacia
+  JUEGO124: INV CUADRO 64 elCuadroCambio= true
+  JUEGO124: INV CUADRO 65 abierto=si paneles= 1 pixelesPintados= 34560 msPanel= 77 crcConPanel= -1985801412 mapaSolo= 1437022778 jugador= 3/40/aqv@0,0 alijo= 0.00/48/vacia
+  JUEGO124: INV CUADRO 65 elCuadroCambio= true
+  JUEGO124: INV CUADRO 69 abierto=si paneles= 1 pixelesPintados= 40832 msPanel= 77 crcConPanel= 1568564743 mapaSolo= 1437022778 jugador= 3/40/aqv@0,0 alijo= 0.00/48/vacia
+  JUEGO124: INV CUADRO 69 elCuadroCambio= true
+  JUEGO124: INV CUADRO 70 abierto=si paneles= 1 pixelesPintados= 40832 msPanel= 77 crcConPanel= -1960630831 mapaSolo= 1437022778 jugador= 0.00/40/vacia alijo= 3/48/aqv@0,0
+  JUEGO124: INV CUADRO 70 elCuadroCambio= true
+  JUEGO124: ALIJO ABRE jugador= P1 celda= 39.4541 6.17872 alijo= 39.0255 , 5.97448 distancia= 0.474746 radio= 2 cuadro= 69 panel= 232 96 grilla= 6 x 8
+  JUEGO124: ALIJO GUARDA codigo= aqv delInventario= 0 , 0 alAlijo= 0 , 0 ocupadasInventario= 0 ocupadasAlijo= 3 cuadro= 70
+  JUEGO124: ALIJO DEVUELVE codigo= aqv delAlijo= 0 , 0 alInventario= 0 , 0 ocupadasInventario= 3 ocupadasAlijo= 0 cuadro= 71
+  JUEGO124: ALIJO CIERRA cuadro= 71 jugador= 3/40/aqv@0,0 alijo= 0.00/48/vacia volvio= true
+
+-- 5.6 LOS NPCs Y LA QUEST (DC-002.127 / .128)
+  JUEGO127: NPC COLOCADO nombre= Akara clase= akara code= PS claseExe= 148 celda= 38.4 3.2 subtiles= 192 16
+  JUEGO127: NPC COLOCADO nombre= Charsi clase= charsi code= CI claseExe= 154 celda= 18.8 5.4 subtiles= 94 27
+  JUEGO127: NPC COLOCADO nombre= Warriv clase= warriv1 code= WA claseExe= 155 celda= 25.2 9 subtiles= 126 45
+  JUEGO127: NPC COLOCADO nombre= Kashya clase= kashya code= RC claseExe= 150 celda= 30.6 9.2 subtiles= 153 46
+  JUEGO128: QUEST HABLA npc= Akara claseExe= 148 jugador= 38.8612 4.39994 distancia= 1.28551 radio= 2 cuadro= 75
+  JUEGO128: QUEST AREA de= 1 a= 8 (Den of Evil) cuadro= 82
+  JUEGO128: QUEST CUEVA BICHOS vivos= 1 clase= 6 quedanSegunElMotor= 1
+  JUEGO128: QUEST MATA bicho= B1 ya estaba muerto: no cuenta
+  JUEGO128: QUEST MATA bicho= B2 golpes= 3 dano= 3 vida= 0 vivosEnLaCueva= 0 quedaSegunElMotor= 0 estado= cueva-limpia pagina= 2 cuadro= 84
+  JUEGO128: QUEST LIMPIA cuadro= 86 vivos= 0 estado= cueva-limpia pagina= 5 recompensaPendiente= true marcador= true
+  JUEGO128: QUEST CRITERIO seAcepto= true elContadorAvanzo= true seCompleto= true seCobro= false cobroPuntoDeHabilidad= 0 sobreviveAlCambioDeNivel= no-medido sobreviveAlCargarLaPartida= false
+
+-- 5.7 EL HUD Y EL MINIMAPA (DC-002.125 / .130 / .131 / .137)
+  JUEGO125: HUD CRITERIO elHUDSeDibujo= true pintoPixeles= true lasBarrasSonLosValoresReales= true elCinturonTieneCuatro= true laZonaTieneNombre= true cadaMitadSuHUD= true cumple= true
+
+-- 5.8 EL MUNDO AL FINAL: el cierre del POC (la repetibilidad del cuadro)
+  JUEGO121: CUADRO 91 SOLO-MAPA pixelesNoVacios= 306547 de 307200 crc32= 1119509365 hostPixeles= 307196 hostCrc= 1437022778 ms= 65 igualAlHost= false camaraCelda= 37.5 2.75658 jugadores= 1
+  JUEGO121: CUADRO 120 SOLO-MAPA pixelesNoVacios= 306547 de 307200 crc32= 1119509365 hostPixeles= 307196 hostCrc= 1437022778 ms= 65 igualAlHost= false camaraCelda= 37.5 2.75658 jugadores= 1
+  JUEGO121: VUELTA AL ORIGEN celda= 37 6 dir= 0 camara= siguiendo jugadores= 1
+  JUEGO121: CUADRO 121 SOLO-MAPA pixelesNoVacios= 306692 de 307200 crc32= 861671277 hostPixeles= 307196 hostCrc= 1437022778 ms= 66 igualAlHost= false camaraCelda= 37 3 jugadores= 1
+  JUEGO121: CUADRO 122 SOLO-MAPA pixelesNoVacios= 306692 de 307200 crc32= 861671277 hostPixeles= 307196 hostCrc= 1437022778 ms= 66 igualAlHost= false camaraCelda= 37 3 jugadores= 1
+  JUEGO121: REPETIBILIDAD cuadro= 122 camara= siguiendo crcMapa= 861671277 crcMapaDelCuadroAnterior= 861671277 igualAlCuadroAnterior= true crcConJugador= 1831502004 crcConJugadorDelCuadroAnterior= 1061271524 igualConJugador= false ancla= 320 283 celda= 37 3 llenos= 249429 llenosDelCuadroAnterior= 249429 crcMapaDelCuadro1= 1385243383 igualAlCuadro1= false llenosDelCuadro1= 305232 cachePerezosa= true
+  JUEGO121: VUELTA AL FINAL p1Celda= 37.5 2.75658 dir= 15 caminando= false jugadores= 1
+  JUEGO121: CUADRO 123 SOLO-MAPA pixelesNoVacios= 306547 de 307200 crc32= 783363478 hostPixeles= 307196 hostCrc= 1437022778 ms= 65 igualAlHost= false camaraCelda= 37.5 2.75658 jugadores= 1
+
+-- 5.9 LA MEMORIA (los tramos de la cache de tiles en toda la corrida: sin derrames)
+  JUEGO121: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3133440 usado= 3056640 libre= 76800 imagenes= 129 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 9 pedazoMenor= 348160 pedazoMayor= 348160 techo= 3481600
+  JUEGO121: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3133440 usado= 3056640 libre= 76800 imagenes= 129 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 9 pedazoMenor= 348160 pedazoMayor= 348160 techo= 3481600
+  JUEGO121: TRAMO despues-del-cuadro activa= true origen= vram bytes= 3133440 usado= 3056640 libre= 76800 imagenes= 129 derrames= 0 bytesDerramados= 0 enPedazos= true pedazos= 9 pedazoMenor= 348160 pedazoMayor= 348160 techo= 3481600
+
+-- 5.11 LA NO-REGRESION: el mismo binario con MVP=no da el MISMO cuadro 1 que la corrida base de DC-002.137
+  Las palancas que el guion del MVP necesita armar en runtime pasaron de const a VAR con los valores
+  viejos como default (cuadroAbreElInventario=8, cuadroAbreElAlijo=10, cuadroAbreElDialogo=2,
+  celdaDelAlijo=28,20) y todo lo nuevo esta detras de mvpKnob=="si". La prueba: JUGADORES=1 sin MVP,
+  ventana del centro del pueblo (la de DC-002.137):
+    base DC-002.137  cuadro 1: pixelesNoVacios= 249006 crc32= 1990320724 jugador= 896 ancla= 320 283 celda= 28 20
+    esta tarjeta     cuadro 1: pixelesNoVacios= 249006 crc32= 1990320724 jugador= 896 ancla= 320 283 celda= 28 20
+  Los cuadros 2 y 3 no se comparan uno a uno con la base: el guion cooperativo del POC mueve al jugador por
+  cuadro y la animacion corre por reloj real, asi que dos corridas no coinciden cuadro a cuadro. El cuadro 1
+  es la composicion entera del mundo quieto y ese es identico.
+
+-- 5.10 LO QUE SE ROMPIO, SI SE ROMPIO (o lo que el POC avisa que no tiene)
+  JUEGO121: BICHO CAPA S4 SIN-GRAFICO modo= GH dir= 6 ruta= data/global/monsters/SK/S4/SKS4LITGHhth.dcc
+  JUEGO121: BICHO CAPA S4 SIN-GRAFICO modo= NU dir= 0 ruta= data/global/monsters/SK/S4/SKS4LITNUhth.dcc
+  JUEGO121: BICHO CAPA S4 SIN-GRAFICO modo= WL dir= 2 ruta= data/global/monsters/SK/S4/SKS4LITWLhth.dcc
+  JUEGO121: BICHO CAPA S4 SIN-GRAFICO modo= WL dir= 6 ruta= data/global/monsters/SK/S4/SKS4LITWLhth.dcc
+  JUEGO121: BICHO CAPA S5 SIN-GRAFICO modo= GH dir= 6 ruta= data/global/monsters/SK/S5/SKS5LITGHhth.dcc
+  JUEGO121: BICHO CAPA S5 SIN-GRAFICO modo= NU dir= 0 ruta= data/global/monsters/SK/S5/SKS5LITNUhth.dcc
+  JUEGO121: BICHO CAPA S5 SIN-GRAFICO modo= WL dir= 2 ruta= data/global/monsters/SK/S5/SKS5LITWLhth.dcc
+  JUEGO121: BICHO CAPA S5 SIN-GRAFICO modo= WL dir= 6 ruta= data/global/monsters/SK/S5/SKS5LITWLhth.dcc
+  (los SIN-GRAFICO de S4/S5 son las capas de CAMINAR del Returned que no estan en el MPQ de este disco: el
+   bicho camina igual, pero esa capa no se pinta. Es la misma limitacion medida en DC-002.121, no es nueva.)
+
+================================================================================
+6. LAS CAPTURAS (cada una atada a SU cuadro por el crc32 del lienzo)
+================================================================================
+  Las capturas de la corrida estan en /tmp/capturas-mvp138i (una cada segundo) y en console/dc/evidencia/ quedan las siete
+  que importan (ocho), recortadas al area cliente del emulador (640x480 en 900,120 de la pantalla):
+
+    dc-002.138-mvp-1-camina.png       el heroe caminando con la cruceta (cuadro 2-3)
+    dc-002.138-mvp-2-golpea.png       el golpe sobre el Returned (cuadro 4-5)
+    dc-002.138-mvp-3-recoge.png       el objeto en el piso, al lado del cadaver (cuadro 41-42)
+    dc-002.138-mvp-4-inventario.png   el panel del inventario con el objeto EN SU CELDA (cuadro 63-65)
+    dc-002.138-mvp-5-alijo.png        el cofre del pueblo abierto (cuadro 69)
+    dc-002.138-mvp-5-alijo-con-el-objeto.png
+                                      el cofre CON el objeto adentro (cuadro 70, de la corrida anterior con el
+                                      mismo guion: en esta corrida la captura cayo un cuadro antes y el cofre
+                                      sale vacio; el objeto adentro lo mide el propio POC en JUEGO124: INV
+                                      CUADRO 70 -> alijo= 3/48/aqv@0,0)
+    dc-002.138-mvp-6-akara.png        el panel de Akara abierto (cuadro 75-76, 40.500 px de panel)
+    dc-002.138-mvp-9-cierre.png       el mundo y el HUD DESPUES de todo (el cuadro de la vuelta)
+
+  El nombre y el cuadro de cada captura estan en /tmp/capturas-mvp138i/geo.txt (una linea por captura, con la etapa del MVP,
+  la celda del heroe y el crc32 del lienzo de ese cuadro).
+

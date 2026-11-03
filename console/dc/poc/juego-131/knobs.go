@@ -480,14 +480,16 @@ const (
 	// cuadroAbreElInventario: en que cuadro del guion se abre el panel del jugador. 8 = DESPUES de la recogida de
 	// DC-002.123 (medido: el bicho muere en el cuadro 6, el objeto cae en el 7 y el jugador lo recoge cuando el
 	// instrumento de la cruceta lo lleva hasta el).
-	cuadroAbreElInventario = 8
+	//
+	// DC-002.138: paso a VAR (`var` al final del archivo) porque el MVP JUGABLE no puede tener un cuadro fijo: lo
+	// arma su guion, cuando la etapa anterior ya cerro. El valor de aca es el de la corrida de DC-002.124.
 
 	// alijoAuto: EL INSTRUMENTO del alijo (mismo motivo). Abre el cofre en el cuadro `cuadroAbreElAlijo`, guarda el
 	// objeto del inventario, lo devuelve al inventario en el cuadro siguiente y cierra.
 	alijoAuto = "si"
 
-	// cuadroAbreElAlijo: el alijo abre DESPUES de que el inventario mostro el objeto en su celda.
-	cuadroAbreElAlijo = 10
+	// cuadroAbreElAlijo: el alijo abre DESPUES de que el inventario mostro el objeto en su celda. DC-002.138: VAR
+	// (ver el final del archivo), por el mismo motivo que `cuadroAbreElInventario`.
 
 	// cerrarLosPaneles: "si" = el panel del jugador se cierra tres cuadros despues de abrirse y el alijo dos
 	// despues del devolver (el A/B de "el cuadro del pueblo intacto con el panel cerrado DESPUES de haberlo
@@ -577,8 +579,8 @@ const (
 
 	// cuadroAbreElDialogo: en que cuadro del POC se aprieta el boton. El POC nace en la celda (28,20) y Warriv
 	// esta en la (29,15) del townE1 (subtiles 146,75 del .ds1): 5 celdas al norte, asi que el jugador camina antes
-	// (el guion del POC) o el POC arranca pegado a el con `CELDA_P1="29 16"`.
-	cuadroAbreElDialogo = 2
+	// (el guion del POC) o el POC arranca pegado a el con `CELDA_P1="29 16"`. DC-002.138: VAR (ver el final del
+	// archivo), por el mismo motivo que `cuadroAbreElInventario`.
 
 	// vistaX / vistaY: LA CELDA DEL PUEBLO DONDE ARRANCA EL JUGADOR 1 Y DONDE SE PONE LA CAMARA. Era la constante
 	// (28,20) del centro del townN1 hasta esta tarjeta. La ventana del POC mide 640x480 y el renderer dibuja a 80 px
@@ -825,4 +827,31 @@ const (
 	// los MISMOS bytes que el camino general. "no" = el bucle general de DC-002.134 tal cual (el A/B, con la
 	// prueba de que el cuadro no cambia: mismo `crc32` 1437022778).
 	plano135 = "si"
+)
+
+// ============================== LAS PALANCAS QUE SON `var` (DC-002.138, EL MVP JUGABLE) ==============================
+//
+// POR QUE DEJARON DE SER `const`. Las tres las lee SU tarjeta en el cuadro `n`: `pasoDelInventario` abre el panel
+// cuando `cuadro+1 == cuadroAbreElInventario`, `pasoDelAlijo` cuando `cuadro+1 == cuadroAbreElAlijo` y
+// `pasoDelNPC` cuando `cuadro+1 == cuadroAbreElDialogo`. Eso funciona cuando la corrida ES de esa tarjeta, porque
+// el cuadro se sabe de antemano. El MVP JUGABLE encadena nueve acciones y no puede saberlo: el panel del
+// inventario se abre CUANDO EL JUGADOR YA RECOGIO EL OBJETO, y eso depende de cuantos golpes aguanto el bicho y de
+// cuanto tardo en caer (19 cuadros de DT). Asi que el guion del MVP las ARMA un cuadro antes de usarlas
+// (`mvp_138.go`) y con eso el camino de la tarjeta original no cambia una linea: sin MVP valen lo que dice aca,
+// que es lo que valian cuando eran `const`.
+var (
+	// el panel del jugador, en el cuadro que el guion del MVP arma (8 en la corrida de DC-002.124)
+	cuadroAbreElInventario = 8
+
+	// el cofre del alijo, un cuadro despues de que el inventario mostro el objeto (10 en la de DC-002.124)
+	cuadroAbreElAlijo = 10
+
+	// el boton de hablar con el NPC mas cercano (2 en la de DC-002.127)
+	cuadroAbreElDialogo = 2
+
+	// mvpKnob: "si" = corre EL GUION DEL MVP JUGABLE (`mvp_138.go`): las nueve acciones de una partida, en UNA
+	// corrida y en el orden del juego, con su linea de log y su crc32 por etapa. "no" = la corrida de la tarjeta
+	// que se pida con las otras palancas (nada de esto existe para ella: el guion del MVP, cuando esta apagado, no
+	// toca una sola palanca ni un solo cuadro).
+	mvpKnob = "no"
 )

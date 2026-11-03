@@ -36,19 +36,27 @@ const (
 
 	// celdaDelAlijoX/Y: donde esta el cofre. La celda de arranque del jugador en el pueblo (la misma de todas las
 	// corridas del POC: `celdaP1X`/`celdaP1Y` en knobs.go valen 0,0 = la celda del POC, (28,20)).
-	celdaDelAlijoX = 28
-	celdaDelAlijoY = 20
+	//
+	// DC-002.138: paso a VAR (abajo, con el resto de lo del MVP) y la razon es la misma que la de los cuadros del
+	// guion: el MVP JUGABLE corre en OTRA ventana del pueblo (la de Akara, ver `mvp_138.go`) y el cofre tiene que
+	// estar donde el jugador queda despues de recoger el objeto, que ahi no es (28,20). Sin MVP valen 28 y 20, que
+	// es lo que valian cuando eran `const`.
 
 	// idDelAlijo: la fila de objects.txt que el juego llama "stash" en el acto 1 (medido en la sonda).
 	idDelAlijo = 187
 )
 
 var (
+	// DC-002.138: la celda del cofre, que ahora es palanca (ver el comentario de arriba). Sin MVP son (28,20), la
+	// celda de arranque de todas las corridas del POC.
+	celdaDelAlijoX float64 = 28
+	celdaDelAlijoY float64 = 20
+
 	abiertoElAlijo  bool
 	guardoElAlijo   bool
 	devolvioElAlijo bool
 
-	distanciaAlAlijo float64
+	distanciaAlAlijo       float64
 	celdaDelJugadorAlAbrir float64
 )
 
