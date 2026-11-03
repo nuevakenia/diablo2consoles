@@ -239,6 +239,26 @@ en el monton de C (el `malloc` interpuesto solo imprime; la tabla de carga son ~
 recolector) y el A/B arranca igual sin el.
 
 
+6.2 LAS CINCO DEL SPLIT (el "y el split" del objetivo de la tarjeta)
+--------------------------------------------------------------------
+La tarjeta pide "los 4 jugadores + el split + HUD + minimapa + NPC + quests + inventario ARRANCANDO 5 DE 5".
+Son DOS configuraciones, no una: con tres y cuatro jugadores el split NO EXISTE (knobs.go: "con tres y cuatro
+jugadores NO HAY SPLIT, es otra tarjeta") -- el split son los dos lienzos de 320x480 con dos jugadores. Asi
+que el criterio se corrio tambien asi, con todo lo demas por defecto:
+
+    binario  /tmp/dcbuild/oom136-split   SPLIT=si JUGADORES=2   1ST_READ.BIN 5.686.792 B md5 28f60f4dee2e247ddb5a77f687e7b1b1
+
+        corrida 1  ARRANCO  ooms=0  sbrkFallidos=0  SPLIT PRIMER-CUADRO si  lienzos=2  crc32_cuadro1=1924439277  79 s
+        corrida 2  ARRANCO  ooms=0  sbrkFallidos=0  SPLIT PRIMER-CUADRO si  lienzos=2  crc32_cuadro1=1924439277  79 s
+        corrida 3  ARRANCO  ooms=0  sbrkFallidos=0  SPLIT PRIMER-CUADRO si  lienzos=2  crc32_cuadro1=1924439277  79 s
+        corrida 4  ARRANCO  ooms=0  sbrkFallidos=0  SPLIT PRIMER-CUADRO si  lienzos=2  crc32_cuadro1=1924439277  79 s
+        corrida 5  ARRANCO  ooms=0  sbrkFallidos=0  SPLIT PRIMER-CUADRO si  lienzos=2  crc32_cuadro1=1924439277  79 s
+
+  5 de 5 tambien, con los dos lienzos llenos (`pixelesNoVacios= 307197 de 307200` en el cuadro 1 de cada
+  corrida) y el mismo crc32 en las cinco. El split no toca el monton de C (los lienzos son VRAM), asi que lo
+  que lo hacia entrar es lo mismo: el dueno de `string.tbl`.
+
+
 7. LO QUE QUEDO APAGADO, DICHO EN EL ARRANQUE
 ---------------------------------------------
 La tarjeta lo pide con todas las letras: una feature que no entra no puede desaparecer en silencio. Al
@@ -255,8 +275,8 @@ correspondiente aparece con su motivo, asi que el A/B barato de DC-002.132 ya no
 
 8. LO QUE NO SE PROBO
 ---------------------
-  - EL SPLIT CON LOS CUATRO (`SPLIT=si` no existe para 3 y 4 jugadores): la corrida del criterio es el
-    cuadro unico con los cuatro. El split de DC-002.131 corre con JUGADORES=2 y no se midio en esta tarjeta.
+  - EL SPLIT CON TRES Y CUATRO JUGADORES: no existe (son dos lienzos y dos jugadores, por diseno). Lo que si
+    esta medido es el split como lo usa DC-002.131 -- `SPLIT=si JUGADORES=2`, cinco corridas, 5 de 5 (6.2).
   - LA CORRIDA REAL EN HARDWARE: todo esto es Flycast.
   - LAS DOS PALETAS DE 443.175 B: se midieron y se dice cuanto pesan, pero NO se tocan. Son del
     `AssetManager` (las cachea para todo el juego) y liberarlas es cambiar el motor, no el POC: queda como

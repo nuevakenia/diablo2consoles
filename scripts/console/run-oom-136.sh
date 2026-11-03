@@ -78,8 +78,11 @@ LOG="$OUT/flycast.log"
 OOMS="$(tr -d '\r' < "$LOG" | grep -ac 'gc_external_alloc: OOM')"
 SBRK="$(tr -d '\r' < "$LOG" | grep -ac 'Out of memory. Requested sbrk_base')"
 ULTIMO="$(tr -d '\r' < "$LOG" | grep -a 'JUEGO121: MEMORIA\|ARQ-CARGA lee-volvio' | tail -1 | cut -c1-160)"
-CUADROS="$(tr -d '\r' < "$LOG" | grep -ac 'JUEGO121: PRIMER-CUADRO')"
+CUADROS="$(tr -d '\r' < "$LOG" | grep -acE 'JUEGO121: PRIMER-CUADRO|JUEGO121: SPLIT PRIMER-CUADRO')"
+# el crc del cuadro 1: el del mapa solo (cuadro unico) o el de los dos lienzos (split)
 MUNDO="$(tr -d '\r' < "$LOG" | grep -a 'SOLO-MAPA' | head -1 | sed 's/.*crc32= \([0-9-]*\).*/\1/')"
+[ -n "$MUNDO" ] || MUNDO="$(tr -d '\r' < "$LOG" | grep -a 'JUEGO121: SPLIT CUADRO 1 ' | head -1 \
+    | sed 's/.*crc32= \([0-9-]*\).*/\1/')"
 TABLA="$(tr -d '\r' < "$LOG" | grep -a 'JUEGO136: TABLA-CARGA hitos' | head -1 | cut -c1-200)"
 
 {
