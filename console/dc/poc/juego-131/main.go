@@ -943,7 +943,14 @@ func soltarLoQueElCuadroNoLee(am *d2asset.AssetManager) int {
 		precargarLoQueElCuadroLee(am)
 	}
 
-	if soltarDespuesDeComponer == "tablas" || soltarDespuesDeComponer == "todo" {
+	// DC-002.144: CON `DEMO_MOOR=si` LAS TABLAS SE QUEDAN. Cruzar el borde del campamento compone un nivel nuevo y
+	// para eso `LoadStamp` necesita las DOS tablas que se sueltan aca (LvlPrest para los `.ds1` del preset y
+	// LvlTypes para los `.dt1` del tipo de nivel). Medido en la corrida de esta tarjeta con las tablas ya
+	// soltadas: `DEMO140: CRUZA SIN PRESET del Blood Moor en las tablas del motor` y el cruce no ocurre nunca.
+	// El precio es el que la propia corrida mide (216.064 B de monton de C, con ~3,5 MB libres).
+	if (soltarDespuesDeComponer == "tablas" || soltarDespuesDeComponer == "todo") && demoMoor == "si" {
+		println("DEMO140: TABLAS SE QUEDAN (demoMoor=si: cruzar el borde necesita LvlPrest y LvlTypes)")
+	} else if soltarDespuesDeComponer == "tablas" || soltarDespuesDeComponer == "todo" {
 		memoria("antes-de-soltar-las-tablas")
 
 		res := am.SoltarFilasDeLasTablas(tablasCargadas)
@@ -956,7 +963,15 @@ func soltarLoQueElCuadroNoLee(am *d2asset.AssetManager) int {
 		memoria("despues-de-soltar-las-tablas")
 	}
 
-	if soltarDespuesDeComponer == "fuentes" || soltarDespuesDeComponer == "todo" {
+	// DC-002.144: y por la misma razon las FUENTES tambien se quedan: soltar una fuente devuelve las tablas del
+	// MPQ (`Fuente.Soltar`, DC-002.105) y sin ellas `Exists`/`Contains` contestan que no hay NINGUN archivo, asi
+	// que el `.ds1` del nivel nuevo no se puede leer. Medido en la corrida de esta tarjeta: con las tablas del
+	// motor vivas pero las fuentes soltadas, el cruce muere en
+	// `ARQ-CARGA entra /data/global/tiles/Act1/Outdoors/Wild1.ds1` + `file not found` + `panic` (el `panic(err)`
+	// de `StampFactory.LoadStampPath` cuando el `.ds1` no se puede leer).
+	if (soltarDespuesDeComponer == "fuentes" || soltarDespuesDeComponer == "todo") && demoMoor == "si" {
+		println("DEMO140: FUENTES SE QUEDAN (demoMoor=si: el .ds1 del nivel nuevo se lee del MPQ al cruzar)")
+	} else if soltarDespuesDeComponer == "fuentes" || soltarDespuesDeComponer == "todo" {
 		for _, f := range fuentesDeConsola {
 			r := f.Soltar(func(tramo uintptr, bytes int) int { return d2cSoltarTramo(tramo, bytes) })
 

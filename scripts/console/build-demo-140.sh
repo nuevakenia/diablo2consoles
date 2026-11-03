@@ -8,8 +8,11 @@
 #   DEMO=si            `demo_140.go`: el POC no se corta en cuadros+3 (corre hasta que se sale del emulador), la
 #                      Den of Evil avanza con lo que hace el jugador (X cerca de Akara para tomarla, Y para
 #                      matar, X otra vez para cobrar) y cada 30 cuadros deja el ritmo real (`DEMO140: FPS`).
-#   DEMO_MOOR=si|no    si cruzar el borde del campamento compone el BLOOD MOOR (nivel nuevo, el orden de
-#                      DC-002.109). Por omision NO: el nivel de afuera pide RAM y ese numero se mide antes.
+#   DEMO_MOOR=si|no    si cruzar el borde del campamento compone el nivel de AFUERA (nivel nuevo, el orden de
+#                      DC-002.109). Por omision NO, y asi queda: DC-002.144 lo corrio y no entra por RAM (los
+#                      `.dt1` del afuera piden 4.368.642 B de arenas de bloques contra 2.995.872 B libres ->
+#                      `fatal error: gc_external_alloc: OOM`). Ver README-140.md y
+#                      console/dc/evidencia/dc-002.144-el-blood-moor.txt.
 #
 # Y LO QUE SE APAGA, que es la mitad de la tarjeta (todo esto aprieta solo y hace que el binario no se pueda
 # jugar):

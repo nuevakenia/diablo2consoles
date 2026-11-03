@@ -1,0 +1,127 @@
+DC-002.144 -- EL BLOOD MOOR: DEMO_MOOR=si CORRIDO (Y EL NUMERO QUE DICE QUE NO ENTRA)
+
+Build: /tmp/dcbuild/demo140-moor (DEMO=si DEMO_MOOR=si MEDIR_CUADRO=no MEDIR_VIVO=no, 12 monstruos=2,
+vista=37,6). Flycast 2.7, teclado virtual del kernel (/dev/uinput -> teclado del emulador -> bus maple -> POC).
+Corridas: 2026-11-03 18:45 (moor=si, primera: no habia preset), 18:53 (moor=si, la del muro),
+19:06 (moor=no, la de la regresion).
+
+0. QUE PEDIA LA TARJETA. `demoMoor` (`DEMO_MOOR=si`) quedo escrito y compilando en `demo_140.go` y nunca se
+   ejecuto: la corrida de DC-002.140 fue con `DEMO_MOOR=no`. Habia que correrlo (cruce + nivel nuevo + minimapa
+   y HUD siguiendo el nivel + quest `en-curso` por `EvAreaChanged`) o sacarlo con el numero medido.
+
+   RESULTADO: el camino YA SE CORRE hasta componer el nivel nuevo, y NO ENTRA por RAM. El numero esta abajo
+   (§4). La palanca queda APAGADA (`demoMoor = "no"`, y el build de la demo la deja en "no" por omision).
+
+1. LO PRIMERO QUE SALIO: EL CAMINO NO LLEGABA NI A INTENTARLO (medido, 18:45)
+   Caminando al borde (radio 6,0 celdas desde el arranque) el cruce se disparo **268 veces** y las 268
+   contestaron lo mismo:
+     DEMO140: CRUZA al Blood Moor desde celda= 40.3678 11.0122 libre= 3569128 semiespacio= 1633224
+     DEMO140: CRUZA cache del pueblo soltada bytes= 3133440 libre= 3569128
+     DEMO140: CRUZA casillas del pueblo soltadas libre= 3569128 semiespacio= 1122680
+     DEMO140: CRUZA SIN PRESET del Blood Moor en las tablas del motor: no se cruza
+   O sea: el codigo no estaba "sin probar", estaba SIN PODER ANDAR. Tres defectos, los tres medidos:
+
+   a) LAS TABLAS YA NO EXISTIAN. La carga suelta LvlTypes + LvlPrest despues de componer el pueblo (DC-002.136):
+        JUEGO121: TABLAS SOLTADAS tablas= 2 tramos= 1 bytes= 216064
+      y `presetDelMoor` busca el preset en `Records.Level.Presets`, que quedo vacio. `LoadStamp` necesita las
+      DOS tablas (LvlPrest para los `.ds1`, LvlTypes para los `.dt1` del tipo de nivel).
+
+   b) EL PRESET DEL BLOOD MOOR NO EXISTE, y no puede existir. Medido en el host con el lector del motor
+      (`go run ./console/dc/medidas/presets-scratch "<carpeta de los MPQ>"`, LvlPrest.txt del patch, 1.091
+      presets): **el unico preset con LevelID > 0 es el del pueblo** (preset 1, levelID 1,
+      TownN1/TownE1/TownS1/TownW1). El Blood Moor no tiene fila de preset porque en el juego no es un preset:
+      es un nivel de DRLG (56 x 96) armado con las piezas de afuera (`Act1/Outdoors/Bord*.ds1`, `Wild*.ds1`,
+      `StnClf*.ds1`). Los dos criterios escritos (LevelID == 2 && Outdoors, y "el nombre trae moor") no podian
+      acertar nunca.
+
+   c) LAS FUENTES TAMBIEN SE SOLTABAN, y sin las tablas del MPQ no hay `.ds1` que leer (medido en la corrida de
+      las 18:53, con (a) ya arreglado):
+        ARQ-CARGA entra /data/global/tiles/Act1/Outdoors/Wild1.ds1 cfree=2995872 ...
+        [Asset Manager][ERROR] could not load file stream /data/global/tiles/Act1/Outdoors/Wild1.ds1 (file not found)
+        panic: (value of kind 22 at 0x8c8c4de0)
+      `Fuente.Soltar` (DC-002.105) devuelve las tablas del MPQ y entonces `Exists`/`Contains` contestan que no
+      hay NINGUN archivo; `StampFactory.LoadStampPath` hace `panic(err)` cuando el `.ds1` no se puede leer.
+      (El archivo SI esta: `d2data.mpq`, `data\global\tiles\act1\outdoors\wild1.ds1`, 7.186 B, medido con
+      `mpq.ReadFile` en el host.)
+
+   LO QUE SE CAMBIO PARA PODER MEDIR (todo dentro de `DEMO_MOOR=si`, con el defecto apagado no cambia nada):
+   - `main.go`: con `demoMoor == "si"` NO se sueltan las tablas ni las fuentes (dos guardas con su linea de
+     log). Precio medido: 217.736 B + 355.520 B de monton de C.
+   - `demo_140.go`: `presetDelMoor` agrega el tercer criterio -- el preset mas bajo cuyo `.ds1` vive en
+     `Act1/Outdoors/Wild*.ds1`, que es la pieza de wilderness del acto 1 (preset 32 "Act 1 - Fence Fill 1",
+     `Wild1.ds1`, 17 x 17, `outdoors= true`). El nivel que queda se nombra con el `.ds1` que se compuso
+     (`nivel= Afueras:Wild1.ds1`), no con una constante: decir "BloodMoor" cuando el archivo es `Wild1.ds1`
+     seria mentir en el log.
+   - `demo_140.go`: UN SOLO INTENTO de cruce (`demoSalidaFallo`). Antes, al fallar, reintentaba en CADA cuadro
+     sobre un nivel ya soltado (268 intentos en la primera corrida) y cada intento volvia a soltar la cache.
+
+2. LA CORRIDA DEL MURO (18:53) -- EL ORDEN DE DC-002.109 SE RESPETA Y EL NIVEL NUEVO SE LEE
+   DEMO140: TABLAS SE QUEDAN (demoMoor=si: cruzar el borde necesita LvlPrest y LvlTypes)
+   DEMO140: FUENTES SE QUEDAN (demoMoor=si: el .ds1 del nivel nuevo se lee del MPQ al cruzar)
+   DEMO140: CRUZA al Blood Moor desde celda= 40.5957 10.8475 libre= 2995872 semiespacio= 1607720
+   DEMO140: CRUZA cache del pueblo soltada bytes= 3133440 libre= 2995872
+   ARQ-MARCA gc_collect v=175     ARQ-MARCA gc-vivo v=1254376
+   DEMO140: CRUZA casillas del pueblo soltadas libre= 2995872 semiespacio= 1254376
+   ARQ-CARGA lee-entra /data/global/tiles/Act1/Outdoors/Wild1.ds1 cfree=2995872 cused=7272160 gsemi=1257880/1835008
+   DEMO140: CRUZA DS1 del moor= Act1/Outdoors/Wild1.ds1 ancho= 17 alto= 17 preset= 32 nombre= Act 1 - Fence Fill 1
+            levelID= 0 outdoors= true
+   O sea: cache del pueblo a la VRAM devuelta (3.133.440 B), casillas del pueblo soltadas (semiespacio
+   87,6 % -> 68,4 %), `.ds1` del afuera leido del MPQ (7.186 B) y el motor ya esta componiendo el nivel nuevo.
+
+3. DONDE SE MUERE: LA ARENA DE BLOQUES DEL AFUERA
+   Los `.dt1` del tipo de nivel de afuera (arboles, bordes, rocas) piden tramos de arena de bloques, uno por
+   archivo, y el monton de C no los tiene:
+     ARQ-MARCA ext-bloque v=318414 libreAntes=2995872
+     ARQ-MARCA ext-bloque v=524288 libreAntes=2677448
+     ARQ-MARCA ext-bloque v=524288 libreAntes=2677448
+     ARQ-MARCA ext-bloque v=505504 libreAntes=2471576
+     ARQ-MARCA ext-bloque v=439569 libreAntes=2471576
+     ARQ-MARCA ext-bloque v=524288 libreAntes=2032000
+     ARQ-MARCA ext-bloque v=524288 libreAntes=2032000
+     Out of memory. Requested sbrk_base 0x8d088000, was 0x8cf92000, diff 1007616
+     ARQ-MARCA ext-bloque v=1008003 libreAntes=1947280 quedo=00000000
+     fatal error: gc_external_alloc: OOM
+     Memory: arena=10268032 used=8320752 free=1947280
+
+4. EL NUMERO (lo que pide el criterio de la tarjeta)
+   - Monton de C al cruzar (con las tablas y las fuentes vivas, que es el precio de poder leer el `.ds1`):
+     usado 7.272.160 B, libre 2.995.872 B (arena 10.268.032 B).
+   - Lo que pide el nivel de afuera en arenas de bloques, medido tramo por tramo:
+     318.414 + 524.288 + 524.288 + 505.504 + 439.569 + 524.288 + 524.288 = 3.360.639 B que entraron, mas el
+     tramo que fallo (1.008.003 B) = **4.368.642 B**. Faltan **1.372.770 B** sobre lo libre.
+   - El sbrk pedia crecer 1.007.616 B y el techo del monton no lo dio: el OOM cae con 1.947.280 B "libres"
+     pero sin un tramo contiguo arriba del tope.
+   - El semiespacio NO es la pared en este cruce: 1.254.376 de 1.835.008 = **68,4 %** despues de soltar las
+     casillas del pueblo (con 1.607.720 = 87,6 % antes). El limite de esta tarjeta es el monton de C (los
+     bloques de los `.dt1` del afuera), no el recolector.
+   - Ni soltando las tablas ni las fuentes antes de componer alcanza: 217.736 + 355.520 = 573.256 B, y ademas
+     las fuentes NO se pueden soltar antes de componer porque los `.dt1` se leen del MPQ justo ahi.
+
+5. LA REGRESION CON LA PALANCA APAGADA (19:06, `DEMO_MOOR=no`, mismo codigo)
+   La corrida de siempre no se movio: las tablas y las fuentes se sueltan igual que antes y no hay una sola
+   linea de cruce en el log.
+     JUEGO121: TABLAS SOLTADAS tablas= 2 tramos= 1 bytes= 216064
+     JUEGO121: FUENTE SOLTADA /cd/JUEGO/D2DATA.MPQ ... bytes= 354656
+     JUEGO121: SOLTADO despues de componer bytes= 570720 libre= 1092712
+     DEMO140: HABLA CON AKARA (boton X) jugador= 38.4849 4.51508 cuadro= 41
+     DEMO140: QUEST ACEPTADA la Den of Evil cuadro= 41 estado= aceptada pagina= 1 bichosVivos= 2 quedaSegunElMotor= 2
+     DEMO140: FPS cuadros= 90 msPorCuadro= 147 fps= 7 ...  (145-149 ms por cuadro, el mismo cuadro de DC-002.141)
+     (cero lineas `DEMO140: CRUZA`)
+
+6. QUE HARIA FALTA PARA QUE ENTRE (para la tarjeta que siga; no se hizo)
+   - El afuera no necesita el juego COMPLETO de `.dt1` del acto 1: se piden las piezas que el `.ds1` referencia
+     (DC-002.88), pero la pieza sola ya arrastra arboles y bordes (~4,37 MB de bloques). Con ~3,0 MB libres en
+     el monton de C, el nivel de afuera no convive con el pueblo compuesto + NPCs + HUD + minimapa + bichos.
+   - Caminos, en orden de baratez: (1) componer el afuera DESPUES de soltar el pueblo entero (no solo la cache
+     y las casillas: tambien los NPCs, el drop y el alijo, que son 4 MB de lo que hoy queda vivo) en vez de
+     reciclar el mismo mapa; (2) mudar la arena de bloques del nivel a la VRAM, como ya se hizo con la cache
+     (3,1 MB devueltos ahi); (3) bajar el nivel de afuera al camino de DRLG por regiones, que compone de a
+     pedazos (lo que hace el motor de la PC) en vez de un `.ds1` entero de una vez.
+   - El Blood Moor de verdad (56 x 96) no es un preset: sin (3) no hay forma de componerlo por `LoadStamp`.
+
+7. LO QUE NO (sin taparlo)
+   - No hay `DEMO140: CRUZA OK`: el nivel nuevo no se compone, se muere en la arena de bloques (arriba).
+   - Por lo mismo no se pudo ver el minimapa/HUD siguiendo el nivel nuevo ni el `EvAreaChanged` de la quest en
+     esa corrida: ese camino queda escrito y con su numero, pero NO verificado.
+   - El nombre del nivel nuevo es la pieza de afuera (`Wild1.ds1`, 17 x 17), no el Blood Moor: es lo unico que
+     existe como preset. Esta dicho en el log para no vender gato por liebre.

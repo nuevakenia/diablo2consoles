@@ -50,9 +50,11 @@ antes de mandar la primera tecla.
 
 - `demoKnob` (`DEMO=si|no`): la demo. Con `no` el POC se comporta como siempre (se corta en `cuadros+3`,
   el guion de la quest por cuadro corre, etc.). Por omisión `no`.
-- `demoMoor` (`DEMO_MOOR=si|no`): si cruzar el borde del campamento compone el **Blood Moor** como
+- `demoMoor` (`DEMO_MOOR=si|no`): si cruzar el borde del campamento compone el **nivel de afuera** como
   nivel nuevo (el orden de DC-002.109: soltar la caché y las casillas del nivel que se deja antes de
-  componer el siguiente). Por omisión `no`: no se probó todavía.
+  componer el siguiente). Por omisión `no`, y **así queda**: la corrida de DC-002.144 lo corrió y el nivel
+  nuevo **no entra por RAM** — ver la sección "El Blood Moor (`DEMO_MOOR`)" al final y
+  `console/dc/evidencia/dc-002.144-el-blood-moor.txt`.
 - `combateCercaKnob` (`COMBATE_CERCA=si|no`, **DC-002.141**): con `si` el botón Y le pega al **bicho vivo
   más cercano** de cada jugador y los relojes del modo (GH/DT/DD) y de la muerte corren para **todos** los
   bichos. Con `no` (el defecto, la corrida de DC-002.126 bit a bit) el bicho de pelea es siempre
@@ -97,4 +99,33 @@ DEMO140: CIERRE ...             el resumen: cuadros, segundos, fps medio/min/max
 - El **texto del panel** de Akara no se pinta: el panel abre (356x396 y 500x81, más las páginas del log
   de 276x81 y 252x81, con el texto del motor en el log) y en pantalla queda el recuadro negro con el borde.
 - **8 fps no son los 18-20** del criterio: el cuadro jugable es de 124-131 ms.
-- La **salida al Blood Moor** (`DEMO_MOOR=si`) no se probó.
+- La **salida al Blood Moor** (`DEMO_MOOR=si`) **no entra por RAM**: se corre (cruza, suelta el pueblo, lee el
+  `.ds1` del afuera y empieza a componer) y se muere en la arena de bloques de los `.dt1` del afuera. El número
+  y el detalle están abajo.
+
+## El Blood Moor (`DEMO_MOOR`) — DC-002.144: medido y apagado
+
+`demoMoor = "no"` y **así se queda** (el build de la demo también lo deja en `no`). Lo que se midió corriéndolo
+en Flycast con el teclado virtual (`/tmp/dcbuild/demo140-moor`, 19:06, evidencia completa en
+`console/dc/evidencia/dc-002.144-el-blood-moor.txt`):
+
+1. **El camino no llegaba ni a intentarlo.** Tres defectos, los tres arreglados dentro de la palanca:
+   las tablas (`LvlPrest`/`LvlTypes`) ya estaban **soltadas** por la carga (`TABLAS SOLTADAS ... bytes= 216064`)
+   y `presetDelMoor` buscaba el preset en una tabla vacía; **el Blood Moor no tiene preset** (medido en el host:
+   el único preset con `LevelID > 0` es el del pueblo — el afuera es DRLG de 56x96 armado con piezas, no un
+   preset); y las **fuentes** también estaban soltadas, así que el `.ds1` del nivel nuevo contestaba
+   `file not found` (sin tablas de MPQ no hay archivo que buscar) y `LoadStampPath` hacía `panic`.
+2. **Con eso arreglado, el nivel nuevo se lee y se empieza a componer**: caché del pueblo devuelta a la VRAM
+   (3.133.440 B), casillas soltadas (semiespacio 87,6 % → 68,4 %), `Act1/Outdoors/Wild1.ds1` (17x17, preset 32
+   «Act 1 - Fence Fill 1», `outdoors= true`) leído del MPQ.
+3. **Y ahí se muere**: los `.dt1` del afuera piden **4.368.642 B** de arenas de bloques (7 tramos de
+   318.414 a 524.288, más el de 1.008.003 que falla) contra **2.995.872 B** libres en el montón de C.
+   `Out of memory. Requested sbrk_base 0x8d088000, was 0x8cf92000, diff 1007616` →
+   `fatal error: gc_external_alloc: OOM`. El semiespacio **no** es la pared (68,4 % usado).
+4. **La palanca apagada no cambia la demo**: con `DEMO_MOOR=no` la corrida es la de DC-002.141 (tablas y
+   fuentes soltadas, cero líneas de cruce, la quest se acepta con X, 145-149 ms por cuadro).
+
+Lo que haría falta para que entre (tarjeta aparte): soltar el pueblo **entero** antes de componer el afuera
+(hoy se recicla el mismo mapa), mudar la arena de bloques del nivel a la VRAM como ya se hizo con la caché, o
+componer el afuera por regiones con el DRLG (lo que hace el motor de la PC). Un `LoadStamp` del Blood Moor de
+verdad no existe: no hay preset.

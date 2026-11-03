@@ -923,9 +923,15 @@ var (
 	// NADA y la corrida es la de la tarjeta que se pida, bit a bit.
 	demoKnob = "no"
 
-	// demoMoor (DC-002.140): "si" = cruzar el borde del campamento compone el BLOOD MOOR como nivel nuevo (el orden
-	// de DC-002.109: soltar la cache y las casillas del que se deja ANTES de componer el que sigue). Va aparte de
-	// `demoKnob` porque el nivel de afuera pide RAM y ese numero se mide antes de dejarlo encendido: con "no", la
-	// demo es la del campamento y la salida solo se informa.
+	// demoMoor (DC-002.140): "si" = cruzar el borde del campamento compone el nivel de AFUERA como nivel nuevo (el
+	// orden de DC-002.109: soltar la cache y las casillas del que se deja ANTES de componer el que sigue). Va
+	// aparte de `demoKnob` porque el nivel de afuera pide RAM y ese numero se mide antes de dejarlo encendido.
+	//
+	// DC-002.144: SE MIDIO Y NO ENTRA, asi que queda en "no" para siempre hasta que haya otra palanca de memoria.
+	// Corrido en Flycast: con las tablas y las fuentes vivas (sin ellas el `.ds1` del nivel nuevo no se puede ni
+	// leer) el cruce llega a componer y se muere en la arena de bloques de los `.dt1` del afuera -- pide
+	// 4.368.642 B contra 2.995.872 B libres (`fatal error: gc_external_alloc: OOM`). El semiespacio no es la
+	// pared (68,4 %). Los numeros y el porque, en `README-140.md` y en
+	// `console/dc/evidencia/dc-002.144-el-blood-moor.txt`.
 	demoMoor = "no"
 )

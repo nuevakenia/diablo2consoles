@@ -69,6 +69,7 @@ var (
 
 	// la salida del pueblo
 	demoYaSalio      bool
+	demoSalidaFallo  bool
 	demoMsDeLaSalida int64
 	demoCeldasSalida float64
 	demoNivelActual  = "TownN1"
@@ -189,7 +190,7 @@ func pasoDeLaDemo() {
 	}
 
 	// ---- 4. LA SALIDA DEL PUEBLO ----
-	if demoMoor == "si" && !demoYaSalio {
+	if demoMoor == "si" && !demoYaSalio && !demoSalidaFallo {
 		demoMiraLaSalida()
 	}
 
@@ -353,7 +354,9 @@ const radioDeLaSalidaDemo = 6.0
 // demoSalidaX/Y: el punto desde el que se mide la salida (el arranque del jugador).
 var demoSalidaX, demoSalidaY float64
 
-// demoMiraLaSalida: si el jugador se alejo lo suficiente, se cruza al Blood Moor. El viaje lo hace `demoCruza`.
+// demoMiraLaSalida: si el jugador se alejo lo suficiente, se cruza al nivel de afuera. El viaje lo hace
+// `demoCruza`. UN SOLO INTENTO: si el cruce falla, el nivel que se dejo ya no esta (la cache y las casillas
+// estan soltadas), asi que reintentarlo cada cuadro no puede terminar bien; se anota y se deja de intentar.
 func demoMiraLaSalida() {
 	if demoSalidaX == 0 && demoSalidaY == 0 {
 		demoSalidaX, demoSalidaY = celdaDelJugadorX(), celdaDelJugadorY()
@@ -371,10 +374,15 @@ func demoMiraLaSalida() {
 		demoYaSalio = true
 		demoMsDeLaSalida = int64(d2cMs())
 		demoCeldasSalida = d
-		demoNivelActual = "BloodMoor"
 
 		println("DEMO140: SALIDA DEL PUEBLO jugador=", celdaDelJugadorX(), celdaDelJugadorY(), "recorrido=", d,
 			"nivel=", demoNivelActual, "bichos=", len(bichos), "cuadro=", cuadro+1)
+	} else {
+		demoSalidaFallo = true
+
+		println("DEMO140: SALIDA FALLIDA no se cruzo; no se reintenta (el nivel soltado ya no esta) recorrido=", d,
+			"nivel=", demoNivelActual, "libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()),
+			"cuadro=", cuadro+1)
 	}
 }
 
@@ -422,9 +430,12 @@ func demoCruzaAlMoor() bool {
 	}
 
 	tamano := stamp.Size()
+	ruta := stamp.RegionPath()
 
-	println("DEMO140: CRUZA DS1 del moor=", stamp.RegionPath(), "ancho=", tamano.Width, "alto=", tamano.Height,
-		"preset=", preset)
+	presetRec := gestorDeAssets.Records.Level.Presets[preset]
+
+	println("DEMO140: CRUZA DS1 del moor=", ruta, "ancho=", tamano.Width, "alto=", tamano.Height,
+		"preset=", preset, "nombre=", presetRec.Name, "levelID=", presetRec.LevelID, "outdoors=", presetRec.Outdoors)
 
 	motorDelMapa.ResetMapParaStamp(d2enum.RegionAct1Wilderness, tamano.Width, tamano.Height, stamp)
 	motorDelMapa.PlaceStampClippedWhere(stamp, 0, 0, tamano.Width, tamano.Height, func(int) bool { return false }, false)
@@ -432,6 +443,10 @@ func demoCruzaAlMoor() bool {
 	stamp.SoltarLosTilesDelDS1()
 
 	rendererDelMapa.SetMapEngine(motorDelMapa)
+
+	// EL NIVEL QUE QUEDO: el nombre sale del `.ds1` que se compuso, no de una constante (decir "BloodMoor"
+	// cuando el archivo es `Wild1.ds1` seria otra fuente de verdad y una mentira en el log).
+	demoNivelActual = "Afueras:" + nombreBaseDeLaRuta(ruta)
 
 	// ---- el jugador y los bichos, al nivel nuevo ----
 	cx, cy := float64(tamano.Width)/2, float64(tamano.Height)/2
@@ -485,10 +500,16 @@ func demoMueveLosBichos(cx, cy float64) {
 	}
 }
 
-// presetDelMoor: el indice de preset (fila de lvlprest) del BLOOD MOOR, buscado en las tablas que el motor ya tiene
-// cargadas. Se busca por el NIVEL del motor (`LevelID` 2 = Blood Moor, el mismo numero que usa el generador del
-// acto 1) y, si esa tabla no lo trae, por NOMBRE: el numero de fila depende de la instalacion y un numero fijo
-// escrito a mano seria otra fuente de verdad.
+// presetDelMoor: el indice de preset (fila de lvlprest) del nivel de AFUERA con el que se cruza el borde. Se
+// busca en las tablas que el motor tiene cargadas, en tres pasos, y se devuelve -1 si ninguno acierta.
+//
+// MEDIDO EN EL HOST (`go run ./console/dc/medidas/presets-scratch "<carpeta de los MPQ>"`, LvlPrest.txt de
+// patch_d2.mpq, 1.091 presets): el UNICO preset con `LevelID > 0` es el del pueblo (preset 1, LevelID 1, con
+// TownN1/TownE1/TownS1/TownW1). El Blood Moor NO tiene fila de preset y no puede tenerla: en el juego no es un
+// preset, es un nivel de DRLG (56 x 96) armado con las piezas de afuera (`Act1/Outdoors/Bord*.ds1`,
+// `Wild*.ds1`, `StnClf*.ds1`). O sea que los dos primeros criterios de esta funcion no pueden acertar nunca:
+// lo que la corrida de esta tarjeta midio fue `DEMO140: CRUZA SIN PRESET del Blood Moor en las tablas del
+// motor` en cada intento. El tercero es el que existe de verdad.
 func presetDelMoor() int {
 	if gestorDeAssets == nil || gestorDeAssets.Records == nil {
 		return -1
@@ -496,7 +517,7 @@ func presetDelMoor() int {
 
 	presets := gestorDeAssets.Records.Level.Presets
 
-	// 1. por el id del nivel del Blood Moor, y que sea un nivel de AFUERA (el pueblo tambien es del acto 1)
+	// 1. por el id del nivel del Blood Moor, y que sea un nivel de AFUERA (si algun dia la tabla lo trae)
 	for i, p := range presets {
 		if p.LevelID == nivelDelBloodMoor && p.Outdoors {
 			return i
@@ -510,7 +531,20 @@ func presetDelMoor() int {
 		}
 	}
 
-	return -1
+	// 3. LA PIEZA DE AFUERA DEL ACTO 1 (el que existe): el preset mas bajo cuyo `.ds1` vive en
+	// `Act1/Outdoors/Wild*.ds1`, que es la pieza de wilderness con la que el generador arma el afuera. Se
+	// compone con `RegionAct1Wilderness`, o sea con el tipo de nivel de afuera y sus `.dt1`.
+	menor := -1
+
+	for i, p := range presets {
+		for _, ruta := range p.Files {
+			if contieneTexto(ruta, "outdoors/wild") && (menor < 0 || i < menor) {
+				menor = i
+			}
+		}
+	}
+
+	return menor
 }
 
 // nivelDelBloodMoor: el id del nivel del Blood Moor en levels.txt (el mismo que usa el generador del acto 1 para
@@ -519,7 +553,13 @@ const nivelDelBloodMoor = 2
 
 // contieneElMoor: si el nombre de un `.ds1` del preset es el del Blood Moor (la carpeta de afuera del acto 1).
 func contieneElMoor(ruta string) bool {
-	buscado := "moor"
+	return contieneTexto(ruta, "moor")
+}
+
+// contieneTexto: si `ruta` trae `buscado` (que va en minusculas), sin distinguir mayusculas. Se escribe a mano
+// porque el paquete usa `strings` solo en los archivos que ya lo importaban (el de la demo tiene que compilar
+// con el mismo toolchain de la consola y no se le agregan imports por un `Contains`).
+func contieneTexto(ruta, buscado string) bool {
 	n := 0
 
 	for i := 0; i+len(buscado) <= len(ruta); i++ {
@@ -544,6 +584,19 @@ func contieneElMoor(ruta string) bool {
 	}
 
 	return n > 0
+}
+
+// nombreBaseDeLaRuta: el nombre del archivo de una ruta con barras (`Act1/Outdoors/Wild1.ds1` -> `Wild1.ds1`).
+func nombreBaseDeLaRuta(ruta string) string {
+	ini := 0
+
+	for i := 0; i < len(ruta); i++ {
+		if ruta[i] == '/' || ruta[i] == '\\' {
+			ini = i + 1
+		}
+	}
+
+	return ruta[ini:]
 }
 
 // resumenDeLaDemo: los numeros del cierre, una linea por cosa del criterio. Se imprime cuando el jugador sale del
