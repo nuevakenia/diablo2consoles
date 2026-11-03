@@ -1785,6 +1785,10 @@ func dibujar(superficie d2interface.Surface) error {
 
 		tEtapa134 = cronometro134()
 
+		// DC-002.141: las barras con las que se pinta ESTE cuadro, para que el cuadro de referencia de la
+		// comparacion pinte el HUD con los mismos valores (el instrumento las baja adentro de `dibujar`).
+		guardarLasBarrasDelCuadro141()
+
 		pxHUD, msHUD = elHUD.dibujar(malla, 0, ancho, alto)
 
 		anotarEtapa134(e134HUD, tEtapa134)
@@ -1994,6 +1998,12 @@ func dibujar(superficie d2interface.Surface) error {
 
 	// DC-002.139: lo que hay que convertir en la presentacion (los bloques que este cuadro toco).
 	marcarLoQueCambio139()
+
+	// DC-002.141: LA PRUEBA DEL CUADRO CAMINANDO, sobre el cuadro TERMINADO (mapa + entes + HUD + minimapa).
+	// Va ULTIMA, cuando ya se anoto todo lo que el cuadro hizo, porque arma una referencia repintando el cuadro
+	// entero en el mismo lienzo: si el corrimiento esta bien, el lienzo queda igual y la pantalla no cambia.
+	// Solo corre con `COMPARAR_141=si` y solo en los cuadros que caminan (`mapa_141.go`).
+	compararElCuadroTerminado141(malla, superficie)
 
 	anotarCuadro134(cronometro134() - tInicio134)
 

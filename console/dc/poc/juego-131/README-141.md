@@ -46,13 +46,18 @@ cuadro CAMINANDO-> MoverLienzo(sx, sy) + Render CON RECORTES
    renderer del mapa corre **una sola vez** con una **lista de rectángulos** (`RecortarA`, ver
    `d2core/d2render/pvr/recortes_141.go`): un solo rectángulo obligaría a llamar a `Render` una vez por
    pedazo y cada llamada recorre los 248 tiles con sus cuatro pasadas.
-   - **las franjas que entran** por el borde (`|sx|` columnas y/o `|sy|` filas), recortadas además contra las
-     cajas **opacas** de los paneles, que se vuelven a pintar enteras en el mismo sitio: en la práctica eso
-     borra media franja;
+   - **las franjas que entran** por el borde (`|sx|` columnas y/o `|sy|` filas), recortadas además contra el
+     pie del HUD (abajo), el HUD de arriba y la caja medida del minimapa: lo que el panel tapa de verdad no se
+     repinta;
    - **las cajas de los entes del cuadro anterior** (jugador, bichos, NPCs, objetos) corridas con la copia, si
      no queda el fantasma del sprite viejo;
-   - **las bandas de los paneles** (HUD, pie, minimapa): el panel de este cuadro es opaco y se pinta encima,
-     pero el del cuadro anterior quedó corrido y su borde asomaría.
+   - **las cajas de los paneles ENTERAS** (HUD de arriba, pie del HUD, minimapa) más la banda que asoma del
+     panel del cuadro anterior corrido. Enteras y no sólo la banda, porque **los paneles no son opacos**: con
+     `hudPiezas=esenciales` no se carga el panel de fondo, así que de la banda del pie lo único que se pinta son
+     los globos (5.024 de 6.400 píxeles: 1.376 agujeros), el cinturón (4.000 de 4.000, ése sí) y el texto de la
+     zona; el resto de la banda es **mundo a la vista**. Con el corrimiento, los agujeros de un globo dejan ver
+     el globo del cuadro anterior unos píxeles más allá y el texto deja su fantasma. Medido: comparando el
+     cuadro terminado, esos agujeros eran **74 de 300 bloques distintos**; repintando el mapa debajo, 0.
 3. **Los píxeles que no se pintan.** El renderer recorre igual los ~198 tiles del cuadro y le pide el blit a
    cada uno; el que no toca ningún recorte vuelve **antes** de armar la tabla de 256 palabras (que es lo caro
    del blit). Medido en la primera corrida de esta tarjeta, sin esa comprobación: 22-28 ms de "franjas" para
@@ -76,18 +81,37 @@ JUEGO141: CONVERSION cuadros= 120 bloques= 2519 palabrasDistintas= 0 porFilas= s
 ... 69 líneas, 55.896 bloques verificados, 0 palabras distintas ...
 ```
 
-Y la prueba de que el **cuadro** es el mismo, en la corrida de la prueba (`COMPARAR_141=si`): después del
-cuadro caminando se pinta el mapa ENTERO en el mismo sitio y se comparan los dos lienzos bloque por bloque de
-32x32, **fuera de las cajas de los paneles** (ahí los dos caminos son distintos por construcción: el fantasma
-del panel lo tapa el panel de este cuadro, que todavía no se dibujó):
+Y la prueba de que el **cuadro** es el mismo, en la corrida de la prueba (`COMPARAR_141=si`): al final del
+cuadro, con el mapa, los entes, el HUD y el minimapa ya puestos, se pinta el cuadro ENTERO de nuevo (mapa
+entero) y se comparan los dos lienzos **bloque por bloque de 32x32, los 300 bloques sin excepción**:
 
 ```
-JUEGO141: COMPARACION cuadro= 116 sx= -93 sy= 0 bloquesDistintos= 0 deComparables= 120
-JUEGO141: COMPARACION cuadro= 241 sx= 0 sy= -21 bloquesDistintos= 0 deComparables= 120
+JUEGO141: COMPARACION cuadro= 6 sx= -213 sy= 0 cuadrante= 2 ... igual= true bloquesDistintos= 0 deComparables= 300
+JUEGO141: COMPARACION cuadro= 9 sx= 212 sy= 0 cuadrante= 1 ... igual= true bloquesDistintos= 0 deComparables= 300
+JUEGO141: COMPARACION cuadro= 10 sx= 0 sy= 106 cuadrante= 4 ... igual= true bloquesDistintos= 0 deComparables= 300
+JUEGO141: COMPARACION cuadro= 13 sx= 0 sy= -107 cuadrante= 8 ... igual= true bloquesDistintos= 0 deComparables= 300
+JUEGO141: COMPARACION cuadro= 15 sx= 95 sy= 95 cuadrante= 5 ... igual= true bloquesDistintos= 0 deComparables= 300
+JUEGO141: COMPARACION cuadro= 17 sx= -95 sy= -95 cuadrante= 10 ... igual= true bloquesDistintos= 0 deComparables= 300
+JUEGO141: COMPARACIONES cuadros= 30 hechas= 8 cuadrantes= 1334 saltadasPorPanel= 0 porCuadrante= 2
 ```
 
-O sea: **el cuadro caminando pinta exactamente los mismos píxeles que un repintado entero**, en los dos ejes y
-con el jugador en movimiento.
+O sea: **el cuadro caminando pinta exactamente los mismos píxeles que un repintado entero**, los 300 bloques,
+con el jugador y los bichos en movimiento, en los **cuatro cuadrantes** del corrimiento (los dos signos de cada
+eje, y las dos diagonales: la copia, las franjas verticales y las bandas horizontales tienen ramas distintas
+según el signo, así que un tramo recto no prueba nada).
+
+La comparación va sobre el cuadro **terminado** y no sobre el mapa pelado a propósito: antes se salteaban los
+bloques que tocaban las cajas de los paneles (120 de 300 comparables, el 60 % del lienzo sin prueba) porque
+"los paneles son opacos". No lo son, y esa excusa tapaba tres defectos que esta revisión encontró y arregló:
+
+1. **La copia del lienzo con `sy < 0` estaba mal** (`d2c_pvr_pantalla_mover`, en `pvr_pantalla.c`): el bucle
+   usaba el mismo índice como origen y como base del destino, así que escribía en las filas `-|sy|..-1` —**antes
+   del framebuffer**, memoria fuera de rango— y dejaba sin copiar las últimas `|sy|` filas. Con `|sy|` chico el
+   error quedaba tapado por los recortes; con `|sy| = 106` se veía como una banda de 10 filas con el cuadro de
+   ayer. Ahora el origen es `y - sy` y el destino `y`.
+2. **La banda del pie no cubría los globos**: se pegan con `globoVidaDY = -13`, así que su caja arranca en 387 y
+   sobresale 13 px por encima de los 400. `altoDelPie141` pasó de 80 a 96 (arranca en 384).
+3. **Los paneles no son opacos**: el mapa se repinta debajo de las tres cajas (ver el punto 2 de arriba).
 
 ## Lo que falta (y por qué no está acá)
 
@@ -99,6 +123,26 @@ corriendo **la textura** (anillo + UV en el quad): con el lienzo corriendo, el c
 bloques y no hay forma de convertir solo la franja. Eso es la tarjeta siguiente (t_ pendiente de crear por el
 dueño del tablero): **anillo de textura con UV**, que necesita ~1,5 MB de VRAM para 1024x768 y toca la
 presentación de DC-002.140, no el mapa.
+
+### Los números de la revisión (con `MEDIR_CUADRO=no`, mismo guion, mismo binario salvo la palanca)
+
+| | `SCROLL_141=si` | `SCROLL_141=no` |
+|---|---|---|
+| `ETAPAS mapa` (µs por cuadro, promedio de 7 tramos) | **2.065** | 2.549 |
+| `ETAPAS cuadroTotal` (µs por cuadro) | **3.050** | 3.420 |
+| `DEMO140: FPS` | 7-8 | 7-8 |
+
+O sea: el mapa baja ~19 % (0,48 ms de 2,55) y el cuadro del POC ~11 % (0,37 ms de 3,42), pero **el fps del
+emulador no se mueve**. La razón está en el mismo registro: de los ~120 ms por cuadro que canta `DEMO140: FPS`,
+sólo ~3 ms son del POC (`cuadroTotal`); los otros ~117 ms son de Flycast presentando (subida de textura, blit,
+vsync). **El criterio de "20 fps caminando" no se puede medir así**: en el emulador está tapado por su propia
+presentación, y con 117 ms fijos por cuadro no lo alcanza ninguna optimización del mapa. Queda para la tarjeta
+del anillo de textura, y conviene medirlo con el tiempo del POC (`cuadroTotal`), no con el fps del emulador.
+
+El repintado de las cajas de los paneles cuesta caro y se ve en el censo: `pxPaneles` pasó de ~2.600 a ~178.000
+por cuadro caminando (el 58 % del lienzo). Es el precio de la corrección: sin él, los agujeros de los paneles
+mostraban el fantasma. Se puede bajar repintando sólo el arte NO opaco de cada pieza (globos y texto de la zona:
+~15.000 px, y el minimapa es opaco entero), y ésa es la optimización obvia que queda pendiente.
 
 ## Cómo se corre
 
@@ -139,5 +183,9 @@ Líneas de evidencia: `JUEGO141: LIENZO-CAMINA`, `JUEGO141: LIENZO-CAMINA PROMED
 
 - `SCROLL_141=si CONV_FILAS_141=si` (criterio): `/tmp/capturas-fps141ok3`.
 - `SCROLL_141=no` (A/B contra DC-002.139): `/tmp/capturas-fps141-no`.
-- La prueba (comparación del cuadro + verificación de la conversión): `/tmp/capturas-fps141cmp7`.
+- La prueba (comparación del cuadro + verificación de la conversión), **revisión con los 300 bloques y los cuatro
+  cuadrantes**: `/tmp/capturas-fps141cmp18` (0 bloques distintos en las 8 comparaciones; las corridas del
+  diagnóstico fueron `cmp8..cmp17`).
+- A/B del ritmo real de la revisión (`MEDIR_CUADRO=no`): `/tmp/capturas-fps141conA` (141 encendido) y
+  `/tmp/capturas-fps141conB` (141 apagado).
 - Corridas intermedias del camino: `cmp2..cmp6`, `ok`, `ok2`.

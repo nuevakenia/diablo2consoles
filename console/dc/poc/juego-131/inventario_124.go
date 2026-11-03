@@ -104,6 +104,21 @@ var (
 	cuadrosSinElPanel  int
 )
 
+// elInventarioEstaAbierto124: si hay un panel del inventario o del alijo pintado en el cuadro. Lo mira la prueba del
+// cuadro caminando (DC-002.141): con la grilla abierta el panel se pinta por su cuenta y el cuadro de referencia
+// tendria que pintarlo tambien, asi que esos cuadros no se comparan (se cuentan).
+func elInventarioEstaAbierto124() bool {
+	if grillaJugador != nil && grillaJugador.Abierta {
+		return true
+	}
+
+	if grillaAlijo != nil && grillaAlijo.Abierta {
+		return true
+	}
+
+	return false
+}
+
 // cargarElInventario: la grilla del jugador (y la del alijo, si la palanca lo pide) y el grafico del objeto en la
 // grilla. VA CON LAS FUENTES ABIERTAS, igual que `cargarElDrop` (main, paso 4d): el `invfile` sale del MPQ.
 func cargarElInventario() {

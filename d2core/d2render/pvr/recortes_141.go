@@ -11,8 +11,10 @@ package pvr
 //   - las FRANJAS que entran por el borde (una columna de |sx| pixeles y/o una fila de |sy|);
 //   - las CAJAS de los entes del cuadro anterior, corridas con la copia (donde quedaron los pixeles del
 //     jugador, los bichos, los NPCs y los objetos): sin eso queda el fantasma del sprite viejo;
-//   - las BANDAS de los paneles (HUD, minimapa), que son opacos y se vuelven a pintar en el mismo sitio pero
-//     cuyo cuadro anterior quedo corrido unos pixeles al costado.
+//   - las CAJAS de los paneles (HUD, minimapa) ENTERAS, no solo la banda: los paneles NO son opacos (el arte
+//     del globo tiene 1.376 píxeles transparentes de 6.400, y con `hudPiezas=esenciales` no hay panel de fondo),
+//     asi que por sus agujeros se ve el mundo y el mundo tiene que estar limpio; y ademas la banda que asoma del
+//     panel del cuadro anterior, corrido con la copia, que si no deja su fantasma al costado.
 //
 // CON UN SOLO RECORTE HABRIA QUE LLAMAR A `Render` UNA VEZ POR PEDAZO, y cada llamada recorre los 248 tiles
 // con sus cuatro pasadas: se pagaria el arranque del renderer seis o diez veces por cuadro. Con la lista, el
@@ -26,12 +28,14 @@ package pvr
 //
 // LOS BYTES QUE LLEGAN AL LIENZO SON LOS MISMOS que los de un repintado entero: el recorte no cambia la cuenta
 // de ningun pixel, solo decide cuales se escriben. La prueba es el crc32 del cuadro 1 (que se pinta entero,
-// como siempre) y que un cuadro caminando, comparado con el mismo cuadro repintado entero, de el mismo
-// crc32.
+// como siempre) y la comparacion del cuadro TERMINADO -- mapa, entes, HUD y minimapa -- contra el mismo cuadro
+// repintado entero: el mismo crc32 y los 300 bloques de 32x32 iguales (`COMPARAR_141=si`,
+// `compararElCuadroTerminado141` en el POC).
 
-// recortesMax141: cuantos rectangulos se soportan por lienzo. Los de un cuadro caminando son las dos franjas,
-// las seis bandas de los tres paneles y las cajas de los entes (un jugador, dos bichos, cuatro NPCs y los
-// objetos del suelo): 20 alcanzaba, 32 deja aire y no cuesta nada (32 x 4 enteros = 512 B por lienzo).
+// recortesMax141: cuantos rectangulos se soportan por lienzo. Los de un cuadro caminando son las dos franjas
+// (hasta 3 pedazos), las cajas de los paneles con su banda (hasta 5 pedazos) y las cajas de los entes (un
+// jugador, dos bichos, cuatro NPCs y los objetos del suelo): 20 alcanzaba, 32 deja aire y no cuesta nada
+// (32 x 4 enteros = 512 B por lienzo). El censo lo vigila: `recortesIgnorados=` tiene que quedar en 0.
 const recortesMax141 = 32
 
 // RecortarA agrega un rectangulo a la lista de recortes de ESTA superficie (el destino).
@@ -77,6 +81,18 @@ func (s *Surface) SinRecortes() {
 	}
 
 	s.imagen.clipN = 0
+}
+
+// RecorteCargado141: el rectangulo k de la lista de recortes. Es SOLO para el diagnostico de la comparacion
+// (`COMPARAR_141`): cuando un bloque no coincide hay que saber que pedazos del lienzo se volvieron a pintar.
+func (s *Surface) RecorteCargado141(k int) (int, int, int, int) {
+	if s == nil || s.imagen == nil || k < 0 || k >= s.imagen.clipN {
+		return 0, 0, 0, 0
+	}
+
+	r := s.imagen.clip[k]
+
+	return int(r[0]), int(r[1]), int(r[2]), int(r[3])
 }
 
 // RecortesPuestos: cuantos rectangulos tiene la lista (0 = sin recorte).

@@ -1241,13 +1241,23 @@ int d2c_pvr_pantalla_mover(int sx, int sy) {
     alto = PANT_H - (sy < 0 ? -sy : sy);    /* filas que se copian */
 
     for (y = 0; y < alto; y++) {
-        /* el contenido baja (sy > 0): de abajo para arriba. Sube: de arriba para abajo. */
-        int yd = (sy > 0) ? (alto - 1 - y) : y;
+        /* El contenido se corre (sx, sy): la fila DESTINO d viene de la fila ORIGEN d + sy.
+         *
+         * EL ORDEN IMPORTA: con sy > 0 el contenido baja, asi que se copia de abajo para arriba; con sy < 0
+         * sube, y se copia de arriba para abajo. Si se copia al reves se pisa lo que falta leer.
+         *
+         * OJO CON EL SIGNO (esto estaba mal y lo cazo la comparacion del cuadro terminado de DC-002.141): con
+         * sy < 0 el bucle usaba `yd` como origen Y como base del destino (`yd + sy`), asi que escribia en las
+         * filas -|sy|..-1 -- ANTES del framebuffer, memoria fuera de rango -- y dejaba sin copiar las ultimas
+         * |sy| filas, que quedaban con el contenido viejo SIN correr. Con |sy| chico el error quedaba tapado por
+         * los recortes del mapa; con |sy| grande se veia como una banda de 10 filas con el cuadro de ayer. */
+        int origen = (sy > 0) ? (alto - 1 - y) : (y - sy);
+        int destino = (sy > 0) ? (origen + sy) : y;
         size_t xs = (size_t)((sx > 0) ? 0 : -sx) * 4;
         size_t xd = (size_t)((sx > 0) ? sx : 0) * 4;
 
-        copiar_bloque(base + (size_t)(yd + sy) * fila + xd,
-                      base + (size_t)yd * fila + xs,
+        copiar_bloque(base + (size_t)destino * fila + xd,
+                      base + (size_t)origen * fila + xs,
                       (size_t)ancho * 4, sx < 0);
     }
 
