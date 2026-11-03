@@ -5,8 +5,11 @@ Build A (la demo, criterio):        /tmp/dcbuild/demo141c  (DEMO=si COMBATE_CERC
 Build B (el A/B de la palanca):     /tmp/dcbuild/demo141-no (igual, COMBATE_CERCA=no)
 Emulador: Flycast 2.7 sobre el .gdi del build; teclado virtual del kernel (/dev/uinput -> teclado del emulador ->
 bus maple -> servicio -> POC). Capturas con spectacle, ventana 640x480 en 900,120, keepAbove.
-Corridas: A 2026-11-03T17:09 (log /tmp/capturas-den141c/flycast.log), B 2026-11-03T17:16
-          (/tmp/capturas-den141-no/flycast.log). Primer cuadro a los 82 s en las dos.
+Corridas: A 2026-11-03T17:09 (log /tmp/capturas-den141c/flycast.log, copia en el repo:
+          console/dc/evidencia/dc-002.141-den-limpia-y-cobro-flycast.log), B 2026-11-03T17:16
+          (/tmp/capturas-den141-no/flycast.log, copia en el repo:
+          console/dc/evidencia/dc-002.141-den-limpia-y-cobro-flycast-ab-no.log). Primer cuadro a los 82 s en
+          las dos. Capturas: /tmp/capturas-den141c/ (c01..c36, una cada 2 s) y /tmp/capturas-den141-no/.
 
 0. LO QUE FALTABA NO ERA SOLO EL GUION: EL GOLPE TENIA UNA SOLA VICTIMA POSIBLE
    La tarjeta decia "nada de codigo nuevo en el motor: es el guion de teclas". No alcanza, y esta medido:
