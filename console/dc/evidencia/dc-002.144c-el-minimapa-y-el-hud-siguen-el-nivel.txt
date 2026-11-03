@@ -126,14 +126,15 @@ EL ARTE, CON SU ANTES/DESPUES Y EL MONTON DE C:
 ---------------------------------------------------------------------------------
   JUEGO125: HUD NOMBRE nivel= 2 levels.txt bytes= 66615 Name= Act 1 - Wilderness 1 LevelName= Blood Moor
   JUEGO125: HUD FUENTE tabla= 3596 sprite= 35214 cuadros= 256 glifosDeLaZona= 18 nuevos= 5
-            texto= Blood Moor anchoDelTexto= 91 ms= 143
+            texto= Blood Moor anchoDelTexto= 91 ms= 147
   JUEGO125: HUD REARME zonaAntes= Rogue Encampment zonaAhora= Blood Moor fuenteDelNombre= levels.txt LevelName
             glifos= 13 -> 18 glifosNuevos= 5 letrasSinGlifo= 0 anchoDelTexto= 91
             bytesEnRAM= 22848 -> 23968 montonC_libre= 1946152
 
-Los 5 glifos nuevos son las letras que el pueblo no usaba (B, d, M y las que faltaban del juego "Blood Moor"); no
-se le pidio al MPQ nada que no estuviera ya pedido: la fuente es la misma (font16, 256 cuadros) y los glifos van
-al monton de C, como los del pueblo (+1.120 B de HUD, 13 -> 18 glifos).
+Los 5 glifos nuevos son exactamente las letras que el nombre del pueblo («Rogue Encampment»: R,o,g,u,e,space,E,n,
+c,a,m,p,t) no tenia y «Blood Moor» si necesita: **B, l, d, M, r**. No se le pidio al MPQ nada que no estuviera ya
+pedido: la fuente es la misma (font16, 256 cuadros, 35.214 B) y los glifos van al monton de C como los del pueblo
+(+1.120 B de HUD, 13 -> 18 glifos).
 
 EN PANTALLA (corrida de las 20:12, mismo build, guion SIN las dos `s` para que el panel de Akara -501x81, que se
 dibuja ENCIMA del HUD- no tape el nombre):
