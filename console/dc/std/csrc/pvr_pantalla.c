@@ -28,6 +28,9 @@
  * dos, y estan definidas mas abajo). */
 int d2c_pvr_pantalla_convertir(unsigned int rgba, int w, int h);
 int d2c_pvr_pantalla_subir_vram(void);
+/* DC-002.135: el reloj del backend, que ahora lo usan tambien las funciones de arriba (los cronometros de la
+ * presentacion). Declarado aca porque su definicion esta al final del archivo. */
+unsigned int d2c_pvr_pantalla_us(void);
 
 static pvr_ptr_t pant_tex = NULL;
 static pvr_poly_hdr_t pant_hdr;
@@ -43,6 +46,149 @@ static int pvr_listo = 0;
  * por Store Queues (sq_cpy) y eso exige origen y destino alineados a 32 y un largo multiplo de 32. */
 #define LADO_TILE 32
 static uint16_t conv_tile[LADO_TILE * LADO_TILE] __attribute__((aligned(32)));
+
+/* ====================================================================================================
+ * DC-002.135 -- LOS TRES PEDAZOS DE LA PRESENTACION, MEDIDOS POR DENTRO (y el camino rapido)
+ * ====================================================================================================
+ *
+ * EL NUMERO QUE MANDA (DC-002.132): la presentacion cuesta 36.759 / 36.758 / 37.000 / 36.840 us en
+ * cuatro tramos de dos corridas distintas, con el blit de tiles viejo y con el nuevo. Es CONSTANTE, o
+ * sea que el techo del POC son 27 cuadros por segundo aunque el dibujado sea gratis. Y la linea
+ * `PVR132: CUADRO` decia el total de la presentacion, pero NO de que estaba hecho: convertir 307.200
+ * pixeles de RGBA a RGB565 (CPU), subirlos a la VRAM (Store Queues) y pintar el quad (PVR) son tres
+ * cosas MUY distintas y sin partirlas no se sabe cual atacar. Estos tres cronometros las parten.
+ *
+ * COMO SE MIDE, Y POR QUE ASI. Cada bloque de 32x32 se cronometra con dos marcas: la del bucle de
+ * pixeles (conversion) y la del `pvr_txr_load` (subida a la VRAM). Cronometrar LOS 300 BLOQUES de un
+ * cuadro son 600 llamadas al reloj por cuadro, y el reloj de KOS no es gratis (se mide y se informa en
+ * `d2c_pvr_pantalla_reloj_costo`): por eso se cronometra UNO DE CADA `PRES_MUESTREO` bloques y se
+ * escala por la cuenta real de bloques. El trabajo por bloque es uniforme (misma cuenta de pixeles,
+ * misma copia de 2048 B), asi que la muestra dice la proporcion de los tres pedazos sin ensuciar la
+ * medida con el instrumento.
+ *
+ * EL CAMINO RAPIDO. Los dos cuellos que se atacan aca, y por que:
+ *
+ *   1. LA CONVERSION, pixel a pixel. El bucle de siempre lee el lienzo con TRES cargas de 8 bits
+ *      (`p[0]`, `p[1]`, `p[2]`) contra la VRAM (area P2: sin cache, cada acceso es un viaje al chip),
+ *      calcula el indice del twiddle con DOS lecturas de tabla y escribe de a 16 bits. El camino rapido
+ *      hace UNA carga de 32 bits por pixel, arma el RGB565 con mascaras y corrimientos (7 cuentas, sin
+ *      tablas de color) y escribe de a 32 bits (dos pixeles por deposito), recorriendo la textura en
+ *      ORDEN para que los depositos sean seguidos: para eso hay una tabla de desplazamientos
+ *      (`ofs_tile`, se arma una vez por ancho de lienzo) que dice, para cada posicion de la textura
+ *      twiddleada, que pixel del bloque le toca. El resultado es BYTE A BYTE el mismo de siempre.
+ *   2. LA SUBIDA. `pvr_txr_load` sube 2048 B por bloque (300 copias por cuadro). En la textura
+ *      twiddleada un bloque de 32x32 SI es contiguo, pero los bloques vecinos NO: el twiddle los
+ *      reparte en orden de Morton. Lo que si es contiguo es el GRUPO DE 2x2 BLOQUES (64x64 pixeles =
+ *      8.192 B): verificado contra la formula, los cuatro bloques de un grupo caen en cuatro bloques
+ *      SEGUIDOS de la textura. Asi que el camino rapido convierte el grupo entero en un buffer de 8 KiB
+ *      y lo sube con UNA copia: 80 subidas por cuadro en vez de 300.
+ *
+ * LAS DOS PALANCAS SE PUEDEN PROBAR POR SEPARADO (`presentarConvRapida` y `presentarVramAgrupada` del
+ * POC, que llegan aca por `d2c_pvr_pantalla_pres_conv_rapida` y ..._vram_agrupada): con las dos en 0 el
+ * camino es EXACTAMENTE el de DC-002.132, en el MISMO binario. Eso es el A/B.
+ *
+ * LO QUE NO SE TOCA: el formato de la textura (RGB565 twiddleada), la formula del twiddle, el quad de
+ * pantalla y los bytes que llegan a la VRAM. Si los bytes cambian, la captura cambia: la prueba es que
+ * la captura del pueblo salga identica pixel a pixel a la de DC-002.132 y el crc32 del mundo siga en
+ * 1437022778.
+ */
+static int pres_conv_rapida = 0;
+static int pres_vram_agrupada = 0;
+
+/* Lo que costo la ULTIMA conversion presentada, ya escalado a los bloques reales del cuadro. */
+static unsigned int pres_conv_us = 0;
+static unsigned int pres_vram_us = 0;
+static unsigned int pres_bloques = 0;  /* bloques de 32x32 convertidos */
+static unsigned int pres_subidas = 0;  /* llamadas a pvr_txr_load (con la agrupada bajan de 300 a 80) */
+
+/* Uno de cada PRES_MUESTREO bloques se cronometra: ver la cabecera (el reloj de KOS no es gratis). */
+#define PRES_MUESTREO 8
+
+/* LADO_GRUPO: el lado del grupo de bloques que se sube de una sola vez (2x2 bloques = 64x64 px).
+ * El grupo es lo mas grande que la textura twiddleada guarda SEGUIDO: 4 bloques de 1.024 pixeles. */
+#define LADO_GRUPO 64
+static uint16_t conv_grupo[LADO_GRUPO * LADO_GRUPO] __attribute__((aligned(32)));
+
+/* ofs_tile[i]: el byte del bloque (32x32) que va a la posicion i de la textura twiddleada.
+ *
+ * NO DEPENDE DEL BLOQUE, solo del ancho del lienzo (el paso de fila), asi que se arma una vez. La
+ * cuenta sale de la MISMA formula del twiddle de `indice_tile`, despejada: en el indice, los bits de x
+ * van a las posiciones IMPARES y los de y a las PARES, asi que para la posicion `i` de la textura,
+ * x es `i` con los bits pares sacados e y es `i` con los impares sacados. */
+static uint32_t ofs_tile[LADO_TILE * LADO_TILE];
+static int ofs_tile_w = -1;
+
+static void armar_ofs_tile(int w) {
+    int i;
+
+    if (ofs_tile_w == w) {
+        return;
+    }
+
+    for (i = 0; i < LADO_TILE * LADO_TILE; i++) {
+        int x = ((i & 0x002) >> 1) | ((i & 0x008) >> 2) | ((i & 0x020) >> 3) |
+                ((i & 0x080) >> 4) | ((i & 0x200) >> 5);
+        int y = (i & 0x001) | ((i & 0x004) >> 1) | ((i & 0x010) >> 2) |
+                ((i & 0x040) >> 3) | ((i & 0x100) >> 4);
+
+        ofs_tile[i] = (uint32_t)(y * w * 4 + x * 4);
+    }
+
+    ofs_tile_w = w;
+}
+
+/* El RGB565 de un pixel RGBA leido como una palabra de 32 bits (R en el byte 0, A en el 3): 5 bits de
+ * rojo, 6 de verde y 5 de azul, igual que el bucle de siempre (no se redondea: se trunca). */
+#define COLOR565(p) (uint32_t)((((p) & 0x000000F8u) << 8) | (((p) & 0x0000FC00u) >> 5) | \
+                               (((p) & 0x00F80000u) >> 19))
+
+/* Un bloque de 32x32 COMPLETO, del lienzo a `conv` en orden de textura, de a dos pixeles por deposito. */
+static void bloque_rapido(const unsigned char *base, uint16_t *conv) {
+    uint32_t *dst = (uint32_t *)conv;
+    const uint32_t *ofs = ofs_tile;
+    int i;
+
+    for (i = 0; i < LADO_TILE * LADO_TILE; i += 4) {
+        uint32_t a = *(const uint32_t *)(base + ofs[i]);
+        uint32_t b = *(const uint32_t *)(base + ofs[i + 1]);
+        uint32_t c = *(const uint32_t *)(base + ofs[i + 2]);
+        uint32_t d = *(const uint32_t *)(base + ofs[i + 3]);
+
+        dst[i >> 1] = COLOR565(a) | (COLOR565(b) << 16);
+        dst[(i >> 1) + 1] = COLOR565(c) | (COLOR565(d) << 16);
+    }
+}
+
+/* Las palancas y los numeros de la presentacion, para Go (cruzan como enteros: el comentario largo de
+ * `pantalla.go` explica por que nada de punteros ni slices en una funcion //extern). */
+void d2c_pvr_pantalla_pres_conv_rapida(int v) { pres_conv_rapida = (v != 0); }
+void d2c_pvr_pantalla_pres_vram_agrupada(int v) { pres_vram_agrupada = (v != 0); }
+int d2c_pvr_pantalla_pres_conv_rapida_on(void) { return pres_conv_rapida; }
+int d2c_pvr_pantalla_pres_vram_agrupada_on(void) { return pres_vram_agrupada; }
+unsigned int d2c_pvr_pantalla_pres_conv_us(void) { return pres_conv_us; }
+unsigned int d2c_pvr_pantalla_pres_vram_us(void) { return pres_vram_us; }
+unsigned int d2c_pvr_pantalla_pres_bloques(void) { return pres_bloques; }
+unsigned int d2c_pvr_pantalla_pres_subidas(void) { return pres_subidas; }
+
+/* Cuanto cuesta UNA llamada al reloj, medido aca mismo: 1.000 llamadas y el total en microsegundos.
+ *
+ * VA EN LA EVIDENCIA Y NO ES UN ADORNO: la presentacion se parte en tres con dos marcas por bloque
+ * muestreado, asi que el que lee el desglose tiene que poder descontar el instrumento (si 1.000
+ * llamadas cuestan, por ejemplo, 2.000 us, cada marca cuesta 2 us y el desglose trae ese ruido). */
+unsigned int d2c_pvr_pantalla_reloj_costo(void) {
+    unsigned int t0, t1;
+    volatile unsigned int i, sumidero = 0;
+
+    t0 = (unsigned int)timer_us_gettime64();
+    for (i = 0; i < 1000; i++) {
+        sumidero += (unsigned int)timer_us_gettime64();
+    }
+    t1 = (unsigned int)timer_us_gettime64();
+
+    (void)sumidero;
+
+    return t1 - t0;
+}
 
 /* La tabla del twiddle y sus constantes: ver el comentario largo mas abajo (seccion "el twiddle del
  * PVR"). Estan declaradas ACA arriba, y no mas abajo con el resto, porque el relleno del arranque
@@ -271,25 +417,41 @@ int d2c_pvr_pantalla_subir(unsigned int rgba, int w, int h) {
  * (x, y) dan el indice (twid_tabla[x] << 1 | twid_tabla[y]), y el bloque arranca en indice_tile(x0, y0).
  */
 
-/* El cuerpo de la conversion, con una COLUMNA DE DESTINO (DC-002.116).
+/* ============================== DC-002.116: la COLUMNA DE DESTINO ==============================
  *
- * POR QUE TIENE UN `x_dest` Y NO ES SIEMPRE 0. Hasta DC-002.115 el motor tenia UN lienzo de 640x480 y se subia
- * entero a la textura de la pantalla, asi que el destino siempre empezaba en la columna 0. El split vertical de
- * DC-002.116 tiene DOS lienzos de 320x480 (uno por jugador) y cada uno va a SU mitad de la pantalla: el de la
- * izquierda a la columna 0 y el de la derecha a la 320. La cuenta del pixel es la misma de siempre; lo unico que
- * cambia es de donde se lee (`src` tiene ancho propio, w) y donde se escribe (`x_dest + x0` en la textura).
+ * Las tres funciones de conversion de abajo comparten la misma forma: `src` es un lienzo de w x h y el
+ * resultado va a la textura de la pantalla a partir de la COLUMNA `x_dest` (y, en la de DC-002.118, de la
+ * FILA `y_dest`). Hasta DC-002.115 el motor tenia UN lienzo de 640x480 y se subia entero a la textura, asi
+ * que el destino siempre empezaba en la columna 0. El split vertical de DC-002.116 tiene DOS lienzos de
+ * 320x480 (uno por jugador) y cada uno va a SU mitad: el de la izquierda a la columna 0 y el de la derecha
+ * a la 320. La cuenta del pixel es la misma de siempre; lo unico que cambia es de donde se lee (`src` tiene
+ * ancho propio, w) y donde se escribe (`x_dest + x0` en la textura).
  *
- * OJO CON EL STRIDE: `src` se recorre con SU ancho (w), no con PANT_W. Leer un lienzo de 320 con el paso de 640
- * da una imagen cortada en diagonal, y es el defecto que este comentario evita.
+ * OJO CON EL STRIDE: `src` se recorre con SU ancho (w), no con PANT_W. Leer un lienzo de 320 con el paso de
+ * 640 da una imagen cortada en diagonal.
  *
- * `x_dest` TIENE QUE SER MULTIPLO DE 32: cada bloque de 32x32 de la textura es contiguo (ver `indice_tile`), y
- * 320 lo es, asi que las dos mitades caen en bloques enteros. El que llama lo comprueba y devuelve -4 si no. */
-static int convertir_a_columnas(const unsigned char *src, int w, int h, int x_dest) {
+ * `x_dest` TIENE QUE SER MULTIPLO DE 32: cada bloque de 32x32 de la textura es contiguo (ver `indice_tile`),
+ * y 320 lo es, asi que las dos mitades caen en bloques enteros. El que llama lo comprueba y devuelve -4. */
+/* La conversion de siempre (el bucle de DC-002.132, copiado tal cual), con los cronometros de DC-002.135.
+ *
+ * ES EL CONTROL DEL A/B: con `pres_conv_rapida = 0` y `pres_vram_agrupada = 0` este es el camino que
+ * midio 36,8 ms en DC-002.132, en el MISMO binario que el camino nuevo. Si se toca este bucle, el A/B
+ * deja de decir la verdad. */
+static int convertir_clasico(const unsigned char *src, int w, int h, int x_dest) {
+    unsigned int reloj_conv = 0, reloj_vram = 0;
+    int bloque = 0, muestras = 0;
+
     for (int y0 = 0; y0 < h; y0 += LADO_TILE) {
         int alto_tile = (h - y0 < LADO_TILE) ? (h - y0) : LADO_TILE;
 
         for (int x0 = 0; x0 < w; x0 += LADO_TILE) {
             int ancho_tile = (w - x0 < LADO_TILE) ? (w - x0) : LADO_TILE;
+            int medir = ((bloque++ % PRES_MUESTREO) == 0);
+            unsigned int t0 = 0, t1 = 0, t2 = 0;
+
+            if (medir) {
+                t0 = d2c_pvr_pantalla_us();
+            }
 
             /* un bloque que NO esta completo (solo pasa si la pantalla no es multiplo de 32: 640x480 SI lo
              * es, asi que hoy nunca entra) se rellena con cero para no dejar pixeles de la vuelta
@@ -316,13 +478,167 @@ static int convertir_a_columnas(const unsigned char *src, int w, int h, int x_de
                 }
             }
 
+            if (medir) {
+                t1 = d2c_pvr_pantalla_us();
+            }
+
             /* y el bloque a la VRAM. 1.024 pixeles = 2.048 bytes, de una sola copia por Store Queues. */
             pvr_txr_load(conv_tile, (pvr_ptr_t)((uint16_t *)pant_tex + indice_tile(x_dest + x0, y0)),
                          LADO_TILE * LADO_TILE * 2);
+            pres_subidas++;
+
+            if (medir) {
+                t2 = d2c_pvr_pantalla_us();
+                reloj_conv += t1 - t0;
+                reloj_vram += t2 - t1;
+                muestras++;
+            }
         }
     }
 
+    pres_bloques = (unsigned int)bloque;
+    pres_conv_us = (muestras > 0) ? (unsigned int)((unsigned long long)reloj_conv * (unsigned int)bloque / (unsigned int)muestras) : 0;
+    pres_vram_us = (muestras > 0) ? (unsigned int)((unsigned long long)reloj_vram * (unsigned int)bloque / (unsigned int)muestras) : 0;
+
     return 0;
+}
+
+/* El camino RAPIDO de DC-002.135: una carga de 32 bits por pixel, dos pixeles por deposito, y la subida
+ * en grupos de 2x2 bloques (8.192 B de una sola copia). La cabecera del bloque de DC-002.135, arriba,
+ * dice por que cada cosa.
+ *
+ * LOS BYTES QUE LLEGAN A LA VRAM SON LOS MISMOS: la cuenta del color es la de siempre (truncar a
+ * 5-6-5) y el orden del twiddle tambien. Lo unico que cambia es cuantas instrucciones y cuantos viajes
+ * cuesta. La prueba no es este comentario: es que la captura del pueblo salga identica pixel a pixel a
+ * la de DC-002.132 y el crc32 del lienzo siga en 1437022778. */
+static int convertir_rapido(const unsigned char *src, int w, int h, int x_dest) {
+    unsigned int reloj_conv = 0, reloj_vram = 0;
+    int iteraciones = 0, muestras = 0;
+
+    /* el camino rapido solo sabe de bloques COMPLETOS (el bucle nuevo no tiene la cuenta del borde): un
+     * lienzo que no sea multiplo de 32 -- las mitades de 240 de DC-002.118, por ejemplo -- se convierte
+     * con el de siempre, que rellena el borde con cero. */
+    if (((w % LADO_TILE) != 0) || ((h % LADO_TILE) != 0)) {
+        return convertir_clasico(src, w, h, x_dest);
+    }
+
+    armar_ofs_tile(w);
+
+    for (int y0 = 0; y0 < h; y0 += LADO_GRUPO) {
+        int alto_grupo = (h - y0 < LADO_GRUPO) ? (h - y0) : LADO_GRUPO;
+
+        for (int x0 = 0; x0 < w; x0 += LADO_GRUPO) {
+            int ancho_grupo = (w - x0 < LADO_GRUPO) ? (w - x0) : LADO_GRUPO;
+            int medir = ((iteraciones++ % PRES_MUESTREO) == 0);
+            int cuantos = 1;   /* bloques que van en UNA copia: 4 (2x2), 2 (2x1) o 1 */
+            unsigned int t0 = 0, t1 = 0, t2 = 0;
+            uint32_t i0;
+
+            /* CUANTOS BLOQUES VAN EN UNA COPIA. La textura twiddleada guarda seguidos los cuatro bloques de
+             * un grupo de 2x2 (64x64 px) y tambien un par VERTICAL (32x64), pero NO un par horizontal: entre
+             * (x0,y0) y (x0+32,y0) esta el bloque (x0,y0+32), que es de otro grupo (el orden es de Morton).
+             * Medido en esta tarjeta, subir un par horizontal como si fuera contiguo pisaba el bloque de al
+             * lado y dejaba 1.024 palabras de la franja de abajo mal. Y un grupo que cruza la columna 512 cae
+             * en dos superbloques y ahi los indices saltan: por eso se comprueba con `indice_tile` en vez de
+             * suponerlo. Con la palanca apagada `cuantos` queda en 1 y cada bloque se sube a SU indice: la
+             * conversion es la misma en los dos casos (los cuatro bloques del grupo se convierten SIEMPRE),
+             * lo unico que cambia es cuantas copias se piden. */
+            i0 = indice_tile(x_dest + x0, y0);
+            cuantos = 1;
+
+            if (pres_vram_agrupada && ancho_grupo == LADO_GRUPO && alto_grupo == LADO_GRUPO &&
+                indice_tile(x_dest + x0 + LADO_TILE, y0) == i0 + 2 * 1024 &&
+                indice_tile(x_dest + x0, y0 + LADO_TILE) == i0 + 1024 &&
+                indice_tile(x_dest + x0 + LADO_TILE, y0 + LADO_TILE) == i0 + 3 * 1024) {
+                cuantos = 4;
+            } else if (pres_vram_agrupada && ancho_grupo == LADO_TILE && alto_grupo == LADO_GRUPO &&
+                       indice_tile(x_dest + x0, y0 + LADO_TILE) == i0 + 1024) {
+                cuantos = 2;
+            }
+
+            if (medir) {
+                t0 = d2c_pvr_pantalla_us();
+            }
+
+            if (cuantos > 1) {
+                /* el orden de los bloques dentro del grupo es el de la TEXTURA: primero la fila de abajo
+                 * (k par: mismo y; k impar: y+32) y, en el grupo de 2x2, la columna de la derecha a partir
+                 * de k=2. Con cuantos=2 (par vertical) solo se mueve la y. */
+                for (int k = 0; k < cuantos; k++) {
+                    int bx = ((cuantos == 4) && (k & 2)) ? LADO_TILE : 0;
+                    int by = (k & 1) ? LADO_TILE : 0;
+
+                    bloque_rapido(src + (size_t)(y0 + by) * (size_t)w * 4 + (size_t)(x0 + bx) * 4,
+                                  conv_grupo + k * (LADO_TILE * LADO_TILE));
+                }
+            } else {
+                /* los bloques del grupo, uno por uno, en orden de pantalla (fila de bloques) */
+                int nbx = ancho_grupo / LADO_TILE;
+
+                for (int by = 0; by < alto_grupo; by += LADO_TILE) {
+                    for (int bx = 0; bx < ancho_grupo; bx += LADO_TILE) {
+                        int k = (by / LADO_TILE) * nbx + (bx / LADO_TILE);
+
+                        bloque_rapido(src + (size_t)(y0 + by) * (size_t)w * 4 + (size_t)(x0 + bx) * 4,
+                                      conv_grupo + k * (LADO_TILE * LADO_TILE));
+                    }
+                }
+            }
+
+            if (medir) {
+                t1 = d2c_pvr_pantalla_us();
+            }
+
+            if (cuantos > 1) {
+                pvr_txr_load(conv_grupo, (pvr_ptr_t)((uint16_t *)pant_tex + i0),
+                             cuantos * LADO_TILE * LADO_TILE * 2);
+                pres_subidas++;
+                pres_bloques += (unsigned int)cuantos;
+            } else {
+                int nbx = ancho_grupo / LADO_TILE;
+
+                for (int by = 0; by < alto_grupo; by += LADO_TILE) {
+                    for (int bx = 0; bx < ancho_grupo; bx += LADO_TILE) {
+                        int k = (by / LADO_TILE) * nbx + (bx / LADO_TILE);
+
+                        pvr_txr_load(conv_grupo + k * (LADO_TILE * LADO_TILE),
+                                     (pvr_ptr_t)((uint16_t *)pant_tex +
+                                                 indice_tile(x_dest + x0 + bx, y0 + by)),
+                                     LADO_TILE * LADO_TILE * 2);
+                        pres_subidas++;
+                        pres_bloques++;
+                    }
+                }
+            }
+
+            if (medir) {
+                t2 = d2c_pvr_pantalla_us();
+                reloj_conv += t1 - t0;
+                reloj_vram += t2 - t1;
+                muestras++;
+            }
+        }
+    }
+
+    pres_conv_us = (muestras > 0) ? (unsigned int)((unsigned long long)reloj_conv * (unsigned int)iteraciones / (unsigned int)muestras) : 0;
+    pres_vram_us = (muestras > 0) ? (unsigned int)((unsigned long long)reloj_vram * (unsigned int)iteraciones / (unsigned int)muestras) : 0;
+
+    return 0;
+}
+
+/* El que llaman las tres entradas de la conversion: elige camino, reinicia los contadores del cuadro y
+ * deja los numeros de este cuadro en las variables que lee Go. */
+static int convertir_a_columnas(const unsigned char *src, int w, int h, int x_dest) {
+    pres_bloques = 0;
+    pres_subidas = 0;
+    pres_conv_us = 0;
+    pres_vram_us = 0;
+
+    if (pres_conv_rapida) {
+        return convertir_rapido(src, w, h, x_dest);
+    }
+
+    return convertir_clasico(src, w, h, x_dest);
 }
 
 int d2c_pvr_pantalla_convertir(unsigned int rgba, int w, int h) {

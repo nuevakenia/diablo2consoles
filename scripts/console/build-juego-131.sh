@@ -409,7 +409,11 @@ echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob bli
 [ -n "${BLIT_PALABRAS:-}" ] && pisa_knob blitPalabras134 "$BLIT_PALABRAS" 1
 [ -n "${PINTAR_UNA_VEZ:-}" ] && pisa_knob pintarUnaVez "$PINTAR_UNA_VEZ" 1
 
+[ -n "${PRES_CONV_RAPIDA:-}" ] && pisa_knob presentarConvRapida "$PRES_CONV_RAPIDA" 1
+[ -n "${PRES_VRAM_AGRUPADA:-}" ] && pisa_knob presentarVramAgrupada "$PRES_VRAM_AGRUPADA" 1
+
 echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
+echo "   PRESENTACION135 convRapida=$(leer_knob presentarConvRapida) vramAgrupada=$(leer_knob presentarVramAgrupada)"
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {
     echo "   FALLO el build (ver $OUT/build.log)"; tail -25 "$OUT/build.log"; exit 1; }

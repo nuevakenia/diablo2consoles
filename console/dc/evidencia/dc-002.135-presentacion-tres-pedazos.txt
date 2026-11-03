@@ -1,0 +1,231 @@
+DC-002.135 -- LA PRESENTACION PARTIDA EN TRES, Y LAS DOS PALANCAS
+================================================================================
+Fecha: 2026-11-03.  Maquina: CachyOS, RX 7900 XTX, Flycast 2.7 (sin KVM).
+POC: console/dc/poc/juego-131.  Evidencia cruda: /tmp/dc135/cap-a3 y /tmp/dc135/cap-b3
+(log `flycast.log` de cada corrida: consola serie del POC), builds /tmp/dc135/a-no-no y
+/tmp/dc135/b-si-si, verificador `console/dc/verif-pres-135`.
+
+
+1. QUE SE MIDIO Y CON QUE
+-------------------------
+DC-002.132 dejo un numero unico: la presentacion cuesta 36,8 ms por cuadro y con eso el POC no pasa
+de 27 fps aunque el dibujado sea gratis. No decia DONDE se iban esos milisegundos, y sin eso cualquier
+optimizacion es apostar. Esta tarjeta los parte en los tres pedazos que son de naturaleza distinta y
+mide dos palancas por separado.
+
+La linea nueva (renderer.go, sale al lado de PVR132, que queda intacta):
+
+  PVR135: PRESENTAR conv_us= vram_us= pintar_us= total_us= bloques= subidas= convRapida= vramAgrupada=
+
+  conv    = convertir RGBA->RGB565 los 307.200 pixeles y dejarlos en orden de textura (CPU, SH-4)
+  vram    = subirlos a la VRAM por Store Queues (pvr_txr_load): 300 copias de 2.048 B o 90 agrupadas
+  pintar  = pintar el quad y que el PVR lo rasterice (es lo que queda del total, medido aparte en Go)
+  total   = los tres, y tiene que dar igual que `presentar_us` de `PVR132: CUADRO`
+
+conv y vram se cronometran DENTRO del backend C con `timer_us_gettime64()`, muestreando uno de cada 8
+bloques (PRES_MUESTREO 8) y extrapolando: el reloj de KOS no es gratis y el instrumento no puede
+dominar la medida. El costo del propio reloj se mide y se publica: 325 us por 1.000 llamadas = 0,325 us
+por marca; con 38 bloques muestreados son 76 marcas = ~25 us, o sea 0,1 % del cuadro (JUEGO135: RELOJ).
+Por eso los tres pedazos NO suman exacto: son dos muestreados (con su error de muestreo) mas un
+residuo, y en las cuatro medidas la suma cae dentro del 1,3 % del total.
+
+El A/B vive en el MISMO binario, con dos knobs (como BLIT_RAPIDO en DC-002.132):
+
+  PRES_CONV_RAPIDA=no|si     `no` deja el bucle de DC-002.132 TAL CUAL (convertir_clasico es copia
+                             literal, con sus cronometros): es el control.
+  PRES_VRAM_AGRUPADA=no|si   `no` sube bloque por bloque (300 copias de 2.048 B).
+
+  A = /tmp/dc135/a-no-no   convRapida=no  vramAgrupada=no   (el control: lo que midio DC-002.132)
+  B = /tmp/dc135/b-si-si   convRapida=si  vramAgrupada=si   (las dos palancas)
+
+Mismos knobs en las dos corridas: CUADROS=60 JUGADORES=1 MONSTRUOS=1 COMBATE=si GOLPE_AUTO=si HUD=si
+MINIMAPA=si NPC=no QUEST=no INVENTARIO=no DROP=no MEDIR_CUADRO=no BLIT_RAPIDO=si, ventana 640x480 en
+(900,120), capturas cada 10 s. Los dos binarios pesan lo mismo: 1ST_READ.BIN 5.589.064 B,
+.text 2.499.216 B, data+bss 288.120 B.
+
+
+2. EL DESGLOSE: LOS 36,8 ms ERAN LA CONVERSION
+----------------------------------------------
+Cuatro muestras, dos por corrida (cuadros 30 y 60 de cada tramo):
+
+  A (clasico)     conv_us   vram_us  pintar_us   total_us   bloques  subidas
+    cuadro 30      34.406     2.463         2      36.746      300      300
+    cuadro 60      34.981     2.463         2      36.996      300      300
+
+  B (rapido)      conv_us   vram_us  pintar_us   total_us   bloques  subidas
+    cuadro 30      23.916     1.815         2      25.512      300       90
+    cuadro 60      23.914     1.815         2      25.504      300       90
+
+De donde venia el techo de 27 fps, en porcentaje del total (A):
+
+    conversion   34.406 / 36.746 = 93,6 %
+    subida VRAM   2.463 / 36.746 =  6,7 %
+    quad+Pintar       2 / 36.746 =  0,01 %
+
+  => LOS 36,8 ms NO ERAN LA VRAM NI EL PVR: eran la conversion, 9 de cada 10 partes. La subida por
+     Store Queues (que era la sospechosa: 614.400 B por cuadro) cuesta 2,5 ms, y el pintado del quad
+     practicamente no existe en la CPU (2 us: el PVR rasteriza por su cuenta, el quad es un solo
+     primitivo de 640x480 y la capa no espera a que termine).
+
+  Y en el cuadro entero del POC, la presentacion es chica: 25,5 ms de los 800 ms de JUEGO134: ETAPAS
+  (mapa 394 ms, jugadores 71, bichos 64, minimapa 82, hud 22). O sea: la presentacion es el 3,2 % del
+  cuadro del POC de hoy. El techo de 27 fps es real pero es un techo de la capa PVR, no del juego.
+
+
+3. PALANCA 1: LA CONVERSION RAPIDA -- 34.406 -> 23.916 us  (-30,5 %)
+--------------------------------------------------------------------
+Que cambia, y por que cada cosa:
+
+  a) UNA carga de 32 bits por pixel en vez de tres de 8 bits contra la VRAM. La VRAM del POC es una
+     region aparte del SH-4: cada acceso lo resuelve el bus con su espera; tres accesos por pixel son
+     tres esperas. Leer la palabra entera es una.
+  b) El color con mascaras y corrimientos, sin las dos lecturas de la tabla del twiddle por pixel.
+  c) DOS pixeles por deposito de 32 bits (la textura es de 16 bits: dos pixeles entran en una palabra).
+  d) Se recorre la textura EN SU ORDEN con una tabla de desplazamientos (`ofs_tile`, 1.024 entradas)
+     armada una vez por ancho de lienzo: para cada posicion de la textura dice que byte del bloque hay
+     que leer. Con eso no hay que calcular el twiddle por pixel: se lee y se deposita en orden.
+
+Numeros: 112,0 ns por pixel -> 77,9 ns por pixel (-30,5 %), 114,7 us por bloque -> 79,7 us.
+El limite fisico esta a la vista: 77,9 ns/px a 200 MHz son 15,6 ciclos SH-4 por pixel, y el bucle son
+~10-12 instrucciones mas una carga de memoria. Para bajar de 10 ms harian falta 6,5 ciclos por pixel:
+no entra ni con ensamblador a mano (detalle en el punto 6).
+
+
+4. PALANCA 2: LA SUBIDA AGRUPADA -- 2.463 -> 1.815 us  (-26,3 %, y 300 -> 90 copias)
+----------------------------------------------------------------------------------
+La textura twiddleada NO guarda los bloques en orden de pantalla: guarda los cuatro bloques de un grupo
+de 2x2 (64x64 px, 8.192 B) SEGUIDOS, y tambien un par VERTICAL (32x64). Un par HORIZONTAL no: entre
+(x,y) y (x+32,y) esta el bloque (x,y+32), que es de otro grupo (el orden es de Morton).
+
+Medido antes en /tmp/dc135/twiddle.py y comprobado en el propio backend con `indice_tile` (no se
+supone: se verifica en el momento), 640x480 queda asi:
+
+   70 grupos de 2x2      -> 70 copias de 8.192 B   = 280 bloques
+   20 bloques sueltos    -> 20 copias de 2.048 B   =  20 bloques (la franja de abajo, 32 filas: no
+                                                      hay par vertical ni horizontal que agrupar)
+   ------------------------------------------------------------------
+   90 copias (antes 300), los mismos 614.400 B
+
+Costo: 8,21 us por copia de 2.048 B -> 20,17 us por copia de 8.192 B. Ajustando recta, cada llamada a
+pvr_txr_load tiene un costo fijo de ~3 us y despues ~2,5 ns por byte: agrupar es sacarse de encima 210
+llamadas. La subida queda en 2.951 ns por KiB contra 4.010 (-26 %), y el pedazo ya no pesa (1,8 ms).
+
+
+5. LA IMAGEN ES LA MISMA, BYTE A BYTE (la prueba, no la promesa)
+----------------------------------------------------------------
+La cuenta del color y el twiddle no se tocaron: cambia COMO se llega a los mismos bytes. Se probo de
+tres maneras, de la mas barata a la mas cara:
+
+  a) VERIFICADOR EN EL HOST (`console/dc/verif-pres-135`, `go run ./console/dc/verif-pres-135/ <semilla>`):
+     transcribe el bucle clasico y el rapido y compara la textura ENTERA (524.288 palabras), camino por
+     camino, con lienzos al azar. Ocho semillas x 132 casos (640x480, 320x480 en las dos columnas del
+     split, 320x240, 96x480, 640x32, 64x64, 640x448; con y sin la palanca):
+
+       PRES135: casos=132 distintos=0 gruposDe4=1356 gruposDe2=84 sueltos=204 semilla=1..8
+
+     1.056 comparaciones de textura completa, 0 palabras distintas. Es lo que permite iterar en segundos
+     en vez de en corridas de 4 minutos (y encontro dos bugs que la captura sola no habria explicado:
+     ver punto 7).
+
+  b) crc32 DEL LIENZO, dentro del POC y contra el host: cuadro 1 y cuadro 2 dan
+     crc32=1437022778 igualAlHost=true en las DOS corridas (el valor de referencia de DC-002.132).
+
+  c) CAPTURA PIXEL A PIXEL contra la de DC-002.132 y entre A y B (recorte 640x480 en (900,120)):
+
+       132 vs A            19 pixeles distintos de 307.200  (el ruido de siempre: cursor/borde)
+       132 vs B            19 pixeles distintos (fuera de la caja del bicho)
+       A vs B             799 pixeles distintos, TODOS dentro de la caja del bicho:
+                          A lo pinta en caja=583,307,613,381 (ancla 596,363)
+                          B lo pinta en caja=581,307,611,381 (ancla 594,363)
+                          fuera de esa caja: 0 pixeles distintos
+
+     El bicho camina a distinto cuadro de animacion en las dos corridas (B hace mas fps y el guion del
+     POC avanza por cuadro): 799 pixeles de sprite, cero del camino de la presentacion. En la captura
+     c1 de las dos corridas: 0 pixeles distintos.
+
+  OJO CON EL ALCANCE: el camino rapido solo sabe de bloques completos. Un lienzo que no sea multiplo de
+  32 (las mitades de 240 de DC-002.118) cae al bucle clasico, asi que ahi la palanca no aplica ni se
+  mide; el cuadro del criterio del POC es 640x480 y si aplica.
+
+
+6. EL CRITERIO DE LA TARJETA: "presentar_us POR DEBAJO DE 10 ms" -- NO SE CUMPLE, Y ESTO ES POR QUE
+---------------------------------------------------------------------------------------------------
+Medido: 25.512 / 25.504 us. Baja 30,6 % y el techo de la capa pasa de 27,2 a 39,2 fps, pero 10 ms no
+se alcanzan, y no es por falta de pulido: es la aritmetica de la consola.
+
+  307.200 pixeles x 1 carga + ~10-12 instrucciones por pixel
+  15,6 ciclos SH-4 por pixel SOLO la conversion hoy (77,9 ns a 200 MHz), 16,6 contando la subida
+  10 ms = 2,0 M de ciclos = 6,5 ciclos por pixel
+
+Un pixel son 4 bytes en VRAM y 2 bytes en la textura: aun con `fmov` de 64 bits (un acceso por cada DOS
+pixeles) y el color en 8-9 instrucciones de ensamblador, el piso realista es 8-10 ciclos por pixel, o
+sea 12-15 ms. Ni el ensamblador a mano llega a 10 ms convirtiendo los 307.200 pixeles todos los cuadros.
+Para bajar de 10 ms hay que NO convertirlos, y eso es otra cosa (punto 8).
+
+
+7. TRES BUGS QUE COSTARON CORRIDAS (y como se cazan)
+----------------------------------------------------
+  a) EL PAR HORIZONTAL NO ES CONTIGUO. La primera version agrupaba tambien de a dos bloques en
+     horizontal (las ultimas 32 filas). Subir 4.096 B desde el indice del primero pisaba el bloque de
+     al lado y dejaba 1.024 palabras de la franja de abajo con basura: 11.036 pixeles distintos en la
+     captura (10 bloques de la fila 448). La cuenta tiene que ser la de la TEXTURA (Morton), no la de
+     la pantalla.
+  b) CON LA PALANCA APAGADA SE SALTEABA TRES DE CADA CUATRO BLOQUES. El bucle nuevo recorre grupos de
+     64x64; si el grupo no se puede agrupar, hay que convertir y subir igual los CUATRO bloques, cada
+     uno a su indice. Lo cazo el verificador en la primera corrida (10.050.714 palabras distintas).
+  c) `uint16` EN VEZ DE `uint32` EN EL VERIFICADOR. El deposito son DOS pixeles en una palabra de 32
+     bits; truncarlo a 16 en la transcripcion de Go comprime el bloque a la mitad y corre todo lo de
+     atras (214.335 palabras distintas). En el backend C estaba bien (`uint32_t *dst`): el bug era del
+     verificador, y ensenar eso es justamente para lo que esta.
+
+Los tres los habria encontrado igual la captura, pero a 4 minutos por corrida y sin decir donde. Con el
+verificador: 0,3 s y la palabra exacta. El verificador es una TRANSCRIPCION (el codigo de consola lo
+compila gccgo/KOS), asi que no reemplaza a la captura: la reemplaza como primera linea de defensa.
+
+
+8. LAS OTRAS DOS IDEAS DE LA TARJETA: MEDIDAS Y RECHAZADAS
+----------------------------------------------------------
+  a) RECTANGULOS SUCIOS (subir solo lo que cambio). Hoy no da nada: el mapa del POC REPINTA EL LIENZO
+     ENTERO cada cuadro (DC-002.132: 194 pisos de 160x160 = 4,97 M de escrituras para 307.200 pixeles
+     finales; 394 ms de mapa). Si todos los pixeles se escriben, todos los bloques estan sucios todos
+     los cuadros y el rectangulo sucio es el cuadro entero. Para que rinda hay que ensuciar de verdad
+     (no repintar el mapa), que es la linea de DC-002.132/134, no la de esta tarjeta. Ademas hay que
+     instrumentar TODOS los caminos de escritura del lienzo (Poner, Rectangulo, Linea, Rellenar,
+     copiarEn, mezclar, renderIndices, RenderIndicesTintado, ReplacePixels): sin eso el rectangulo miente
+     y el error se ve como basura en pantalla.
+  b) LIENZO DE 8 BITS CON PALETA (una carga por pixel de la tabla de color, 256 colores en 512 B). El
+     problema no es la conversion: es que el compositor MEZCLA con alfa (source-over) en 8 bits por
+     canal contra el destino, y contra un lienzo de 8 bits con paleta eso no existe: habria que leer la
+     paleta por pixel de origen Y de destino, o cuantizar cada cuadro (un cuadro del POC tiene miles de
+     colores por tintes y alfas). Sale mas caro que lo que hace hoy y el resultado no es identico byte a
+     byte, que es la unica razon por la que este trabajo se puede medir.
+  c) UN QUAD POR REGION en vez de uno solo (item 4 del pedido): no aplica mientras la textura se suba
+     entera; y como `pintar` cuesta 2 us, un display list mas largo solo agrega trabajo de TA. Descartado
+     por la medicion, no por opinion.
+
+
+9. LO QUE QUEDA (y no es de esta tarjeta)
+-----------------------------------------
+  1) El cuadro del POC son 800 ms: mapa 394, minimapa 82, jugadores 71, bichos 64, hud 22, presentacion
+     25. Optimizar la presentacion por debajo de 25 ms mueve el cuadro un 1,4 %: el que manda es el mapa
+     (DC-002.132: "el mapa sigue repintandose entero").
+  2) Si algun dia el mapa deja de repintar todo, el rectangulo sucio de la presentacion se vuelve la
+     palanca grande (con el verificador de esta tarjeta como red de seguridad: compara textura entera).
+  3) El camino rapido se apaga solo con lienzos que no son multiplo de 32. Si aparece un split de 240, o
+     se lleva al camino rapido con cuenta de borde, o se queda en el clasico (que es correcto, solo lento).
+  4) Para medir mejor el pedazo `pintar` habria que esperar al PVR (PvrWaitReady) al final del cuadro y
+     volver a medir: hoy el numero dice que el quad no cuesta CPU, no cuanto tarda el PVR en rasterizarlo.
+
+
+10. COMO SE REPRODUCE
+---------------------
+  bash scripts/console/build-pres-135.sh /tmp/dc135/a-no-no   con PRES_CONV_RAPIDA=no  PRES_VRAM_AGRUPADA=no
+  bash scripts/console/build-pres-135.sh /tmp/dc135/b-si-si   con PRES_CONV_RAPIDA=si  PRES_VRAM_AGRUPADA=si
+  CAPTURAS=4 INTERVALO=10 bash scripts/console/run-anim-132.sh /tmp/dc135/a-no-no/disc.gdi /tmp/dc135/cap-a3 900 120
+  CAPTURAS=4 INTERVALO=10 bash scripts/console/run-anim-132.sh /tmp/dc135/b-si-si/disc.gdi /tmp/dc135/cap-b3 900 120
+  grep -a "PVR135\|PVR132: CUADRO" /tmp/dc135/cap-a3/flycast.log
+  go run ./console/dc/verif-pres-135/ 1     (y 2..8; sale "distintos=0")
+
+El build imprime con que palancas quedo el binario (`PRESENTACION135 convRapida= vramAgrupada=`), y el
+POC lo repite al arrancar (`JUEGO135: arranca -- convRapida= si vramAgrupada= si`) y en cada tramo. Sin
+esas dos lineas un numero de estos no se puede leer.

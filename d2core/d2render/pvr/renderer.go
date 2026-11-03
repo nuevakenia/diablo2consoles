@@ -103,6 +103,11 @@ type Renderer struct {
 	msTrabajo   int // actualizar + dibujar
 	msPresentar int // convertir + subir a la VRAM + pintar el quad
 	msCuadro    int // de la espera al final del cuadro: el periodo real
+
+	// DC-002.135 -- LOS TRES PEDAZOS DE LA PRESENTACION, acumulados para el promedio del tramo.
+	usConv   int // el bucle que convierte RGBA -> RGB565 (medido en C, muestreado por bloques)
+	usVram   int // las copias a la VRAM por Store Queues (medido en C)
+	usPintar int // el quad de pantalla completa (medido aca: una marca antes y otra despues)
 }
 
 // que el contrato se cumpla no es una suposicion: si d2interface.Renderer cambia, esto no compila.
@@ -210,6 +215,11 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 
 		tPresentar := d2cPvrUs()
 
+		// DC-002.135: los tres pedazos de la presentacion. La conversion y la subida las cronometra el
+		// backend de C por dentro (con una muestra de bloques, ver `pvr_pantalla.c`); el PINTADO del quad
+		// se cronometra aca, con una marca antes y otra despues de `PintarPantalla()`.
+		usConv, usVram, usPintar := 0, 0, 0
+
 		if r.presentar != nil {
 			// DC-002.116: el cuadro partido en dos lienzos, cada uno a su mitad de la pantalla.
 			if err := r.presentar(); err != nil {
@@ -220,20 +230,32 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 
 				return err
 			}
-		} else if err := PresentarEnPantalla(r.superficie.Imagen()); err != nil {
+
+			// el split pinta por dentro del presentador: el cuadro es lo que sobra
+			usConv = d2cPvrPresConvUs()
+			usVram = d2cPvrPresVramUs()
+			usPintar = int(d2cPvrUs()-tPresentar) - usConv - usVram
+		} else if err := Presentar(r.superficie.Imagen()); err != nil {
 			r.ultimoError = err
 
 			kos.PvrListFinish()
 			kos.PvrSceneFinish()
 
 			return err
+		} else {
+			usConv = d2cPvrPresConvUs()
+			usVram = d2cPvrPresVramUs()
+
+			tPintar := d2cPvrUs()
+			PintarPantalla()
+			usPintar = int(d2cPvrUs() - tPintar)
 		}
 
 		kos.PvrListFinish()
 		kos.PvrSceneFinish()
 
 		r.cuadros++
-		r.anotarElCuadro(tTrabajo-tEspera, tPresentar-tTrabajo, d2cPvrUs()-tEspera)
+		r.anotarElCuadro(tTrabajo-tEspera, tPresentar-tTrabajo, d2cPvrUs()-tEspera, usConv, usVram, usPintar)
 		r.medirFPS()
 	}
 }
@@ -248,13 +270,21 @@ func (r *Renderer) Run(dibujar renderCallback, actualizar updateCallback, ancho,
 //	trabajo  -- actualizar + dibujar: lo que el juego compone (el mapa, los sprites, el HUD);
 //	presentar-- convertir el lienzo RGBA a RGB565, subirlo a la VRAM y pintar el quad de pantalla completa;
 //	cuadro   -- el periodo real, de la espera al final: 1.000.000/cuadro son los cuadros por segundo.
-func (r *Renderer) anotarElCuadro(usEspera, usTrabajo, usCuadro int) {
+//
+// Y DC-002.135 agrega el desglose DE LA PRESENTACION en sus tres pedazos (conversion / subida a la VRAM /
+// pintado del quad), en su propia linea `PVR135: PRESENTAR`: la de PVR132 queda igual, con el total, para
+// que las corridas de la tarjeta anterior se sigan pudiendo comparar renglon a renglon.
+func (r *Renderer) anotarElCuadro(usEspera, usTrabajo, usCuadro, usConv, usVram, usPintar int) {
 	r.msEspera += usEspera
 	r.msTrabajo += usTrabajo
 	r.msCuadro += usCuadro
 
 	usPresentar := usCuadro - usEspera - usTrabajo
 	r.msPresentar += usPresentar
+
+	r.usConv += usConv
+	r.usVram += usVram
+	r.usPintar += usPintar
 
 	if r.cuadros%cuadrosDelInforme != 0 {
 		return
@@ -273,7 +303,35 @@ func (r *Renderer) anotarElCuadro(usEspera, usTrabajo, usCuadro int) {
 		"presentar_us=", r.msPresentar/n, "cuadro_us=", usCuadroPromedio,
 		"fpsX100=", fpsX100, "desglose=", "espera+trabajo+presentar")
 
+	// DC-002.135: la presentacion en sus tres pedazos. `total_us` es el mismo numero que el presentar_us de
+	// arriba (medido por el ciclo) y la suma de los tres tiene que dar eso: si no da, el desglose miente y el
+	// que lee lo ve en el acto. `subidas` es el control de la palanca: 300 copias de 2.048 B sin agrupar, 80
+	// (o 75) con los grupos de 2x2 bloques.
+	println("PVR135: PRESENTAR conv_us=", r.usConv/n, "vram_us=", r.usVram/n,
+		"pintar_us=", r.usPintar/n, "total_us=", r.msPresentar/n,
+		"bloques=", BloquesPresentados(), "subidas=", SubidasPresentadas(),
+		"convRapida=", convRapidaSiNo(), "vramAgrupada=", vramAgrupadaSiNo())
+
 	r.msEspera, r.msTrabajo, r.msPresentar, r.msCuadro = 0, 0, 0, 0
+	r.usConv, r.usVram, r.usPintar = 0, 0, 0
+}
+
+// convRapidaSiNo / vramAgrupadaSiNo: con que palancas corrio ESTE binario, para que la linea del desglose
+// diga con que camino se midio (una linea sin eso no se puede comparar con otra).
+func convRapidaSiNo() string {
+	if convRapida {
+		return "si"
+	}
+
+	return "no"
+}
+
+func vramAgrupadaSiNo() string {
+	if vramAgrupada {
+		return "si"
+	}
+
+	return "no"
 }
 
 // medirFPS: los cuadros por segundo del ultimo segundo medido (ventana de 1 s, no un cuadro suelto).

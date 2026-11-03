@@ -403,6 +403,9 @@ func main() {
 	// DC-002.134: y el camino de la PALABRA (un deposito de 32 bits por pixel), tambien antes del primer cuadro.
 	activarElBlitDePalabras()
 
+	// DC-002.135: el camino de la PRESENTACION (la conversion y la subida) y el costo del reloj del instrumento.
+	activarLaPresentacion135()
+
 	println("JUEGO132: arranca -- medirCuadro=", medirCuadro, "blitRapido=", blitRapido,
 		"cuadrosPorInforme=", cuadrosDelInforme132)
 	println("JUEGO134: arranca -- etapas=", etapasKnob, "verboso=", verbosoEtapas, "blitPalabras=",

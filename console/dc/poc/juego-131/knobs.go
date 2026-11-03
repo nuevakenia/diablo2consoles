@@ -727,4 +727,23 @@ const (
 	// para dibujar. El cuadro que queda en pantalla es el MISMO (mismo orden de pintado, mismos pixeles); lo que
 	// se va son las copias de la caja a y desde la VRAM y el segundo pintado.
 	pintarUnaVez = "si"
+
+	// ============================== LAS DE ESTA TARJETA (DC-002.135): LA PRESENTACION ==============================
+	//
+	// presentarConvRapida: "si" = el bucle de conversion RGBA -> RGB565 del backend PVR es el nuevo (DC-002.135):
+	// UNA carga de 32 bits por pixel en vez de tres cargas de 8 bits contra la VRAM, el color con mascaras y
+	// corrimientos (sin tablas de color) y DOS pixeles por deposito de 32 bits, recorriendo la textura en orden
+	// con una tabla de desplazamientos armada una vez. "no" = el bucle de DC-002.132, TAL CUAL: es el A/B dentro
+	// del mismo binario.
+	//
+	// EL RESULTADO TIENE QUE SER EL MISMO BYTE A BYTE: la cuenta del color (5-6-5 truncado) y el orden del
+	// twiddle no cambian. La prueba es el crc32 del cuadro 1 contra el host (1437022778) y la captura del pueblo
+	// comparada pixel a pixel con la de DC-002.132.
+	presentarConvRapida = "si"
+
+	// presentarVramAgrupada: "si" = los bloques de 32x32 se suben a la VRAM en GRUPOS de 2x2 (64x64 px = 8.192 B
+	// de una sola copia) porque en la textura twiddleada esos cuatro bloques son CONTIGUOS: 80 copias por cuadro
+	// en vez de 300. "no" = una copia de 2.048 B por bloque, como siempre. Se puede probar por separado de la
+	// conversion: son dos cuellos distintos (la CPU y las Store Queues).
+	presentarVramAgrupada = "si"
 )

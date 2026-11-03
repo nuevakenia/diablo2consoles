@@ -46,6 +46,29 @@ func d2cPvrUs() int
 //extern d2c_pvr_pantalla_mem_libre
 func d2cPvrPantallaMemLibre() int
 
+// DC-002.135: las palancas y los cronometros de la presentacion.
+//
+//extern d2c_pvr_pantalla_pres_conv_rapida
+func d2cPvrPresConvRapida(v int)
+
+//extern d2c_pvr_pantalla_pres_vram_agrupada
+func d2cPvrPresVramAgrupada(v int)
+
+//extern d2c_pvr_pantalla_pres_conv_us
+func d2cPvrPresConvUs() int
+
+//extern d2c_pvr_pantalla_pres_vram_us
+func d2cPvrPresVramUs() int
+
+//extern d2c_pvr_pantalla_pres_bloques
+func d2cPvrPresBloques() int
+
+//extern d2c_pvr_pantalla_pres_subidas
+func d2cPvrPresSubidas() int
+
+//extern d2c_pvr_pantalla_reloj_costo
+func d2cPvrRelojCosto() int
+
 //extern d2c_pvr_sprite_subir
 func d2cPvrSpriteSubir(idx, pal uintptr, w, h, pw, ph int) int
 
