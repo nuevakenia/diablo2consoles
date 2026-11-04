@@ -89,6 +89,24 @@ var colorDelMarcador = color.RGBA{36, 96, 216, 255}
 // fondoDelMinimapa: el negro sobre el que se leen las lineas del automapa (el juego dibuja el mapa asi).
 var fondoDelMinimapa = color.RGBA{0, 0, 0, 255}
 
+// ============================== LOS PUENTES DEL BLINDAJE DEL REARME (DC-002.146) ==============================
+
+// d2cGcFrena / d2cGcSuelta: el freno del recolector (`gc_inhibit_collection` / `gc_allow_collection` de
+// libgodc, las mismas que el runtime se pone en sus secciones criticas). Ver `csrc/shim.c` y la cabecera de
+// `recargarElMinimapaDelNivel`.
+//
+//extern d2c_gc_frena
+func d2cGcFrena()
+
+//extern d2c_gc_suelta
+func d2cGcSuelta()
+
+// OJO CON EL `recover` DE LIBGODC (medido en esta tarjeta, ver la cabecera de `rearmarElMinimapaDelNivel`): su
+// `runtime_checkpoint()` hace `setjmp` DENTRO de una funcion de C que despues RETORNA, asi que el `longjmp` del
+// `recover` cae en un marco de pila muerto y el SH-4 muere con `kernel panic: unhandled IRQ/Exception`. Por eso aca
+// NO hay checkpoint: el `defer` con `recover` solo deja el AVISO (el paso y el estado del minimapa) y la consola
+// muere igual. El blindaje de verdad es no llegar al panic (ver el freno y la lectura sin memoria).
+
 // celdaDelMinimapa: un cuadro de arte ya decodificado y DECIMADO a la caja del minimapa (8x16).
 type celdaDelMinimapa struct {
 	Cel     int
@@ -278,15 +296,55 @@ func cargarElMinimapa() {
 	memoria("minimapa-despues")
 }
 
-// leerLaTablaDelNivel: lee `AutoMap.txt` POR EL FLUJO y devuelve SOLO las filas del nivel `id` (LvlTypes), con
-// los bytes del archivo. Se usa en la carga y en la RECARGA al cambiar de nivel (DC-002.144c): el `.txt` se puede
-// volver a leer porque con `demoMoor == "si"` las fuentes de consola siguen abiertas (son la guarda del cruce).
+// leerLaTablaDelNivel: lee `AutoMap.txt` y devuelve SOLO las filas del nivel `id` (LvlTypes), con los bytes del
+// archivo. Se usa en la carga y en la RECARGA al cambiar de nivel (DC-002.144c): el `.txt` se puede volver a leer
+// porque con `demoMoor == "si"` las fuentes de consola siguen abiertas (son la guarda del cruce).
+//
+// DC-002.146 -- LA LECTURA NO PIDE MEMORIA AL SEMIESPACIO, Y EL RECOLECTOR NO CORRE ADENTRO.
+//
+// EL DEFECTO QUE CIERRA (medido, no supuesto). Hasta DC-002.145 esto leia por `fuente.Open`, el flujo del MPQ, que
+// es el UNICO camino de la fuente que pide memoria POR SECTOR (`mpq_stream.go`: un `make` del bloque comprimido,
+// otro del descomprimido y la zlib adentro). El rearme llega con el semiespacio al 73-83 % y la relectura son ~30
+// sectores: el recolector salta por umbral EN MEDIO DEL PARSEO. Medido en la corrida `/tmp/capturas-146b` (16 x 16):
+// entre `DEMO140: REARME paso=1` y la linea del rearme hay CUATRO recolecciones (174..177, tres por umbral de bytes
+// usados). En esa ventana el barrido conservador de la pila de libgodc (`gc_copy.c`) deja un puntero sin actualizar y
+// la siguiente rebanada que se toca muere con `slice bounds out of range` -- o el PC salta a una direccion de monton,
+// el defecto que DC-002.78 ya midio y freno con `gc_inhibit_collection` (`csrc/shim.c`, `d2c_gc_frena`). Por eso el
+// panic NO seguia al contenido del `.txt` ni a la entrada de la funcion: seguia al LAYOUT del monton (con tres
+// `println` de traza adentro desaparecia, y con el build de 32 x 32 no salio en tres cruces).
+//
+// AHORA. El `.txt` (122.022 B) se lee en un bloque del MONTON DE C -- que el recolector no cuenta, no barre y no
+// copia -- con la memoria de trabajo PRESTADA de la fuente (la misma de todas las cargas: cero reservas por sector,
+// `d2mpq.ReadFileInto`), y se parsea de un `bytes.Reader` sobre ese bloque. Lo unico que pide al recolector son las
+// filas del nivel (142 filas, ~6 KB). El camino viejo queda como RESPALDO y el log dice cual corrio
+// (`MINIMAPA_DIAG=flujo` lo fuerza: es el A/B en el mismo binario).
 func leerLaTablaDelNivel(fuente *fuenteconsola.Fuente, id int) (*d2automap.Table, int, error) {
 	tamano, hay := fuente.Tamano(rutaTablaAutomap)
 	if !hay || tamano == 0 {
 		return nil, 0, fmt.Errorf("no hay %s (%d B)", rutaTablaAutomap, tamano)
 	}
 
+	t0 := d2cMs()
+	coleccionesAntes := int(d2cGcColecciones())
+	semiespacioAntes := int(d2cGcUsado())
+
+	// ---- 1. EL CAMINO SIN MEMORIA (el de esta tarjeta)
+	if !laTablaSeLeePorElFlujo() {
+		tabla, leidos, err := leerLaTablaDeUnBloqueDeC(fuente, id, tamano)
+		if err == nil {
+			println("JUEGO130: MINIMAPA TABLA-LECTURA camino= montonDeC+prestamo bytes=", leidos,
+				"filasDelNivel=", len(tabla.LevelRows(id)),
+				"recolecciones=", coleccionesAntes, "->", int(d2cGcColecciones()),
+				"semiespacio=", semiespacioAntes, "->", int(d2cGcUsado()), "ms=", int(d2cMs()-t0))
+
+			return tabla, tamano, nil
+		}
+
+		println("JUEGO130: MINIMAPA TABLA-LECTURA el camino sin memoria fallo:", err.Error(),
+			": se lee por el flujo del MPQ (el camino viejo)")
+	}
+
+	// ---- 2. EL CAMINO VIEJO: el flujo del MPQ, sector por sector (el respaldo y el A/B)
 	flujo, err := fuente.Open(rutaTablaAutomap)
 	if err != nil {
 		return nil, 0, err
@@ -297,7 +355,203 @@ func leerLaTablaDelNivel(fuente *fuenteconsola.Fuente, id int) (*d2automap.Table
 		return nil, tamano, err
 	}
 
+	println("JUEGO130: MINIMAPA TABLA-LECTURA camino= flujoDelMPQ bytes=", tamano,
+		"filasDelNivel=", len(tabla.LevelRows(id)),
+		"recolecciones=", coleccionesAntes, "->", int(d2cGcColecciones()),
+		"semiespacio=", semiespacioAntes, "->", int(d2cGcUsado()), "ms=", int(d2cMs()-t0))
+
 	return tabla, tamano, nil
+}
+
+// leerLaTablaDeUnBloqueDeC: lee `AutoMap.txt` ENTERO en un bloque del monton de C, con la memoria de trabajo
+// prestada de la fuente, y lo parsea de ahi. Ver la cabecera de `leerLaTablaDelNivel`.
+//
+// POR QUE EL BLOQUE ES DEL MONTON DE C. `bloqueDeC` (hud_125.go) es la misma puerta del HUD y del arte del minimapa:
+// 122 KB en el semiespacio, con el semiespacio al 83 %, son una recoleccion completa por cada pedido (medido en
+// DC-002.125); en el monton de C hay 2 MB libres y el recolector ni lo ve. El bloque se DEVUELVE al final.
+//
+// POR QUE SE FILTRA ANTES DEL PARSER (medido). El parser del motor lee las 2.603 lineas del archivo para quedarse
+// con las del nivel: `strings.TrimRight` + `strings.Split` + `strings.TrimSpace` por linea son ~420 B de basura por
+// linea, o sea ~1,1 MB por relectura. Con el semiespacio al 83 % eso es una recoleccion cada pocos cientos de bytes
+// -- las cuatro que se miden adentro del rearme -- y con el recolector frenado es un `fatal error: out of memory`
+// (medido en /tmp/capturas-146g: el parseo no entra en los 340 KB que quedaban). Asi que el filtro por nivel se
+// hace ANTES, sobre los bytes del bloque y sin pedir memoria (`filtroDeUnNivel`): al parser le llegan la cabecera
+// y las 142 lineas del nivel, y la basura baja a ~60 KB. Las filas son LAS MISMAS (mismo parser, mismos bytes).
+//
+// Y SE VERIFICA ANTES DE USARLO: que se hayan leido los bytes que declara el MPQ y que el nivel tenga filas. Una
+// tabla a medias es peor que no rearmar el minimapa.
+func leerLaTablaDeUnBloqueDeC(fuente *fuenteconsola.Fuente, id, tamano int) (*d2automap.Table, int, error) {
+	p := d2cPedirBloque(uint(tamano))
+	if p == nil {
+		return nil, 0, fmt.Errorf("el monton de C no dio %d B", tamano)
+	}
+
+	buf := (*[1 << 24]byte)(p)[:tamano:tamano]
+
+	trabajo := fuente.Prestamo()
+	crecidasAntes := trabajo.Crecidas()
+
+	leidos, err := fuente.LeerEnteroEnConPrestamo(rutaTablaAutomap, buf, trabajo)
+	if err != nil {
+		d2cLibre(uintptr(p))
+
+		return nil, leidos, err
+	}
+
+	if leidos != tamano {
+		d2cLibre(uintptr(p))
+
+		return nil, leidos, fmt.Errorf("se leyeron %d de %d B", leidos, tamano)
+	}
+
+	filtro := nuevoFiltroDeUnNivel(buf, id)
+
+	tabla, err := d2automap.ParseTxtLevels(filtro, id)
+
+	println("JUEGO130: MINIMAPA TABLA-LECTURA prestamo= recargasDelPrestamo=", crecidasAntes, "->", trabajo.Crecidas(),
+		"lineasDelNivel=", filtro.entregadas, "lineasLeidas=", filtro.lineas, "libreDelMontonDeC=", d2cMontonLibre())
+
+	// el bloque se devuelve DESPUES de parsear: las filas ya son copias (el scanner y `strings.Split` copian)
+	d2cLibre(uintptr(p))
+
+	if err != nil {
+		return nil, leidos, err
+	}
+
+	if len(tabla.LevelRows(id)) == 0 {
+		return nil, leidos, fmt.Errorf("el nivel %d no tiene filas en %s", id, rutaTablaAutomap)
+	}
+
+	return tabla, leidos, nil
+}
+
+// ============================== EL FILTRO QUE NO PIDE MEMORIA (DC-002.146) ==============================
+
+// filtroDeUnNivel: un `io.Reader` que entrega, del `.txt` que ya esta en el bloque del monton de C, SOLO la
+// cabecera y las lineas cuyo primer campo (LevelName) es el del nivel pedido. Es lo que hace que el parseo del
+// motor no deje ~1,1 MB de basura por las 2.603 lineas que se descartan (ver `leerLaTablaDeUnBloqueDeC`).
+//
+// LA COMPARACION ES LA DEL PARSER: el campo se recorta (espacios, tabulador, CR) y se compara sin distinguir
+// mayusculas contra `d2automap.LevelName(id)`, que es el MISMO nombre que `LevelIndex` mapea al id. Las lineas
+// que se entregan son las mismas que el parser guardaria con `keep`, asi que las filas salen iguales.
+type filtroDeUnNivel struct {
+	datos  []byte // el archivo entero, en el bloque del monton de C
+	nombre []byte // el LevelName del nivel pedido
+	cabeza bool   // la cabecera todavia no se entrego
+	linea  []byte // el tramo que se esta entregando
+	leido  int    // lo ya entregado de `linea`
+	desde  int    // desde donde se busca la proxima linea en `datos`
+
+	// el instrumento: cuantas lineas se leyeron del archivo y cuantas se entregaron (el filtro, medido)
+	lineas     int
+	entregadas int
+}
+
+func nuevoFiltroDeUnNivel(datos []byte, id int) *filtroDeUnNivel {
+	return &filtroDeUnNivel{datos: datos, nombre: []byte(d2automap.LevelName(id))}
+}
+
+// Read cumple `io.Reader`: entrega los tramos elegidos, de a lo que pida el scanner.
+func (f *filtroDeUnNivel) Read(p []byte) (int, error) {
+	total := 0
+
+	for total < len(p) {
+		if f.leido >= len(f.linea) && !f.buscarLaProxima() {
+			if total > 0 {
+				return total, nil
+			}
+
+			return 0, io.EOF
+		}
+
+		n := copy(p[total:], f.linea[f.leido:])
+
+		total += n
+		f.leido += n
+	}
+
+	return total, nil
+}
+
+// buscarLaProxima: deja en `linea` la proxima linea que se entrega (con su salto incluido).
+func (f *filtroDeUnNivel) buscarLaProxima() bool {
+	for f.desde < len(f.datos) {
+		ini := f.desde
+		fin := ini
+
+		for fin < len(f.datos) && f.datos[fin] != '\n' {
+			fin++
+		}
+
+		if fin < len(f.datos) {
+			fin++ // el salto de linea va adentro
+		}
+
+		f.desde = fin
+		f.linea = f.datos[ini:fin]
+		f.leido = 0
+		f.lineas++
+
+		if !f.cabeza {
+			f.cabeza = true
+			f.entregadas++
+
+			return true // la cabecera siempre va: de ahi salen las columnas
+		}
+
+		if primerCampoEsElNivel(f.linea, f.nombre) {
+			f.entregadas++
+
+			return true
+		}
+	}
+
+	return false
+}
+
+// primerCampoEsElNivel: si el primer campo de la linea (hasta el tabulador), recortado de espacios y sin
+// distinguir mayusculas, es `nombre`.
+func primerCampoEsElNivel(linea, nombre []byte) bool {
+	fin := 0
+
+	for fin < len(linea) && linea[fin] != '	' && linea[fin] != '\n' && linea[fin] != '\r' {
+		fin++
+	}
+
+	campo := recortarEspacios(linea[:fin])
+	if len(campo) != len(nombre) {
+		return false
+	}
+
+	for i := range nombre {
+		a, b := campo[i], nombre[i]
+		if a >= 'A' && a <= 'Z' {
+			a += 'a' - 'A'
+		}
+
+		if b >= 'A' && b <= 'Z' {
+			b += 'a' - 'A'
+		}
+
+		if a != b {
+			return false
+		}
+	}
+
+	return true
+}
+
+// recortarEspacios: el `strings.TrimSpace` del parser, pero sobre bytes y sin copiar.
+func recortarEspacios(b []byte) []byte {
+	for len(b) > 0 && (b[0] == ' ' || b[0] == '	' || b[0] == '\r') {
+		b = b[1:]
+	}
+
+	for len(b) > 0 && (b[len(b)-1] == ' ' || b[len(b)-1] == '	' || b[len(b)-1] == '\r') {
+		b = b[:len(b)-1]
+	}
+
+	return b
 }
 
 // cargarElArte: decodifica del DC6 los cuadros que las filas del nivel piden y los deja DECIMADOS en el monton de C.
@@ -599,6 +853,47 @@ func (m *minimapaDelJuego) soltarElArteDelNivel() (bytes, cuadros int) {
 	return bytes, cuadros
 }
 
+// ============================== LAS DOS PREGUNTAS DE LA PALANCA (DC-002.146) ==============================
+
+// elRearmeVaFrenado: si el rearme corre con el recolector FRENADO (el camino del juego). Las tres corridas de
+// medir de esta tarjeta lo apagan a proposito: `flujo` y `carga` (el camino viejo de la lectura: es el A/B contra
+// el defecto) y `sololectura` (la lectura nueva SIN el freno: mide cuanto pide la lectura sola).
+func elRearmeVaFrenado() bool {
+	switch minimapaDiag {
+	case "flujo", "carga", "sololectura":
+		return false
+	}
+
+	return true
+}
+
+// laTablaSeLeePorElFlujo: si la relectura de `AutoMap.txt` va por el flujo del MPQ (el camino viejo, el que pide
+// memoria por sector y hace saltar el recolector en medio del parseo) en vez de por el bloque del monton de C.
+func laTablaSeLeePorElFlujo() bool {
+	return minimapaDiag == "flujo" || minimapaDiag == "carga"
+}
+
+// hayLugarParaElFreno: si el semiespacio tiene lugar para lo que el rearme pide CON EL RECOLECTOR FRENADO.
+//
+// EL NUMERO ES MEDIDO, NO ELEGIDO (y sono tres veces). Con el recolector frenado nada se recicla hasta el
+// `runtime.GC()` del final del rearme, asi que TODO lo que el rearme pide tiene que entrar en lo que queda:
+//   - el parseo ya filtrado (143 lineas de 2.604): ~78 KB (medido: semiespacio +78 KB en la lectura),
+//   - el modelo del nivel, el arte y el revelado: entre 197 y 267 KB (medido: con 267 KB libres despues del parseo
+//     el rearme de 16 x 16 paso -- /tmp/capturas-146k -- y con 197 KB el de 32 x 32 murio con `fatal error: out of
+//     memory` -- /tmp/capturas-146q).
+//
+// O sea el pico ronda los 330 KB. Se piden 400 KB y si no estan NO SE FRENA: el rearme va con el recolector suelto
+// (que es como corria antes de esta tarjeta) y el aviso queda en el log. En la corrida de 32 x 32 no se frena: su
+// nivel deja 1,56 MB vivos de 1,835 MB, asi que despues de recolectar solo quedan ~275 KB.
+func hayLugarParaElFreno() bool {
+	total := int(d2cGcTotal())
+	if total <= 0 {
+		return false
+	}
+
+	return total-int(d2cGcUsado()) >= 320<<10
+}
+
 // recargarElMinimapaDelNivel: REARMA el minimapa para OTRO nivel (DC-002.144c).
 //
 // EL DEFECTO QUE CIERRA. Hasta DC-002.144b el nivel del minimapa era la constante `nivelDelPueblo`: al cruzar al
@@ -610,9 +905,72 @@ func (m *minimapaDelJuego) soltarElArteDelNivel() (bytes, cuadros int) {
 // resiembra el automap y se revela alrededor del heroe.
 //
 // `id` es el id de LvlTypes del nivel (`d2automap.LevelName` lo dice): 1 = "1 Town", 2 = "1 Wilderness".
+//
+// DC-002.146 -- EL REARME NO SE PUEDE LLEVAR EL CRUCE POR DELANTE. Dos blindajes, los dos medidos:
+//
+//  1. EL FRENO DEL RECOLECTOR. Todo el rearme corre con `gc_inhibit_collection` (`d2cGcFrena`, la MISMA que el
+//     runtime de libgodc se pone en sus secciones criticas, ver `csrc/shim.c`). Es el freno que DC-002.78 midio
+//     para el parseo de los `.dt1`: el recolector de libgodc es de COPIA con barrido conservador de pila, y si
+//     salta en medio de un parseo deja punteros sin actualizar. El rearme pide poco (la tabla del nivel son ~6 KB
+//     de filas y el `.txt` va al monton de C, ver `leerLaTablaDelNivel`), asi que frenarlo un segundo no cuesta
+//     nada. `MINIMAPA_DIAG=flujo` lo apaga: es el A/B del camino viejo, el que se llevaba el cruce.
+//
+//  2. EL AVISO. Si igual se cae, un `defer` con `recover` deja en el log EL PASO en el que se cayo y el estado en
+//     que queda el minimapa. OJO, MEDIDO: ese `recover` NO salva el cruce en esta version de libgodc. Se probo con
+//     `MINIMAPA_DIAG=panico` (un panic de rebanada de verdad en el rearme): el log sale entero
+//     (`MINIMAPA REARME SE CAYO Y NO SE LLEVA EL CRUCE paso= ... nivelQueQueda= 1 ...`) y despues la consola muere
+//     con `kernel panic: unhandled IRQ/Exception` (/tmp/capturas-146p). La causa esta en el runtime: `recover()`
+//     no desenrolla la pila, hace `longjmp` al `runtime_checkpoint()`, y ese checkpoint hace `setjmp` dentro de una
+//     funcion de C que ya retorno -> el marco esta muerto. Sin checkpoint, el runtime mata la consola con
+//     `FATAL: recover without checkpoint`. O sea: el `recover` usable necesita un checkpoint con el marco VIVO, y
+//     eso es un arreglo del runtime vendorizado (tarjeta aparte), no de este archivo.
 func (m *minimapaDelJuego) recargarElMinimapaDelNivel(id, jugador int) bool {
 	if m == nil {
 		return false
+	}
+
+	return m.rearmarElMinimapaDelNivel(id, jugador)
+}
+
+// rearmarElMinimapaDelNivel: el cuerpo del rearme, con el punto de recuperacion y el `recover` del blindaje (ver
+// la cabecera de `recargarElMinimapaDelNivel`).
+//
+// EL `recover` ES UN AVISO, NO UN SALVAVIDA (medido). libgodc no desenrolla la pila: `recover()` hace `longjmp` a
+// un checkpoint y el que hay (`runtime_checkpoint`) hace `setjmp` en un marco que ya murio. Con checkpoint la consola
+// muere con `kernel panic: unhandled IRQ/Exception` justo despues del log; sin checkpoint, con `FATAL: recover
+// without checkpoint`. Se deja SIN checkpoint a proposito: el log sale entero y la muerte es ordenada.
+func (m *minimapaDelJuego) rearmarElMinimapaDelNivel(id, jugador int) (ok bool) {
+	paso := "empezar"
+
+	// EL AVISO (ver la cabecera: en esta version de libgodc el `recover` deja el log pero NO salva la corrida).
+	defer func() {
+		if r := recover(); r != nil {
+			ok = false
+
+			motivo := "<no es texto>"
+			if texto, esTexto := r.(string); esTexto {
+				motivo = texto
+			}
+
+			println("JUEGO130: MINIMAPA REARME SE CAYO Y NO SE LLEVA EL CRUCE paso=", paso,
+				"nivelPedido=", id, "nivelQueQueda=", m.Nivel, "nombre=", d2automap.LevelName(m.Nivel),
+				"celdas=", m.Modelo.Count(), "cuadrosDeArte=", m.CuadrosArte,
+				"montonC_libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()),
+				"panic=", motivo, ": EL MINIMAPA QUEDA COMO ESTABA")
+		}
+	}()
+
+	// MINIMAPA_DIAG=panico: LA PRUEBA EN CONTRA DEL BLINDAJE. Una rebanada fuera de rango DE VERDAD, en el paso en
+	// el que el defecto de DC-002.145 moria (la relectura de la tabla del automapa). Sirve para ver en UNA corrida
+	// lo que el defecto hacia intermitente: el panic, el log del blindaje y el cruce que cierra igual.
+	if minimapaDiag == "panico" {
+		var nada []byte
+
+		fuera := 2
+
+		paso = "la tabla del nivel nuevo (PRUEBA EN CONTRA)"
+
+		println("JUEGO130: MINIMAPA PRUEBA-EN-CONTRA panic deliberado en el rearme, indice=", len(nada[:fuera]))
 	}
 
 	t0 := d2cMs()
@@ -621,6 +979,7 @@ func (m *minimapaDelJuego) recargarElMinimapaDelNivel(id, jugador int) bool {
 	celdasAntes := m.Modelo.Count()
 	cuadrosAntes := m.CuadrosArte
 	bytesArteAntes := m.BytesArte
+	recoleccionesAntes := int(d2cGcColecciones())
 	filasAntes := 0
 
 	if m.Tabla != nil {
@@ -631,7 +990,10 @@ func (m *minimapaDelJuego) recargarElMinimapaDelNivel(id, jugador int) bool {
 	semiespacioAntes := int(d2cGcUsado())
 
 	// ---- 1. LA TABLA DEL NIVEL NUEVO, ANTES DE SOLTAR NADA: si el nivel no tiene filas, el minimapa que hay se
-	// queda como esta (un mapa vacio es peor que el viejo, y el log lo dice).
+	// queda como esta (un mapa vacio es peor que el viejo, y el log lo dice). Es tambien lo que hace que un panic
+	// en la lectura NO deje el minimapa a medias: todavia no se toco nada.
+	paso = "la tabla del nivel nuevo"
+
 	fuente := fuenteDe(rutaDatos)
 	if fuente == nil {
 		println("JUEGO130: MINIMAPA REARME SIN FUENTE DE DATOS nivel=", id, ": no se toca el minimapa")
@@ -639,7 +1001,67 @@ func (m *minimapaDelJuego) recargarElMinimapaDelNivel(id, jugador int) bool {
 		return false
 	}
 
+	// MINIMAPA_DIAG=carga: LA CARGA QUE REPRODUCE EL DEFECTO A VOLUNTAD. Doce relecturas de la tabla por el camino
+	// viejo (el flujo del MPQ, sin freno) ANTES de la de verdad: cada relectura son ~4 recolecciones adentro del
+	// parseo, o sea ~48 ventanas del defecto en UNA corrida, en vez de las 4 de un cruce normal. Es la corrida con
+	// la que se dice "reproducido" sin depender de la suerte del layout, y la misma palanca sirve de control con
+	// el arreglo puesto (`flujo`/`carga` son los unicos que van por el camino viejo).
+	if minimapaDiag == "carga" {
+		paso = "la carga de la prueba (12 relecturas por el flujo)"
+
+		for vuelta := 0; vuelta < 12; vuelta++ {
+			if _, _, errCarga := leerLaTablaDelNivel(fuente, id); errCarga != nil {
+				println("JUEGO130: MINIMAPA CARGA relectura", vuelta, "fallo:", errCarga.Error())
+
+				break
+			}
+		}
+
+		println("JUEGO130: MINIMAPA CARGA terminada vueltas= 12 recolecciones=", int(d2cGcColecciones()),
+			"semiespacio=", int(d2cGcUsado()))
+	}
+
+	// ---- 1b. EL FRENO DEL RECOLECTOR, SOLO SOBRE LA LECTURA (medido, y sono dos veces).
+	//
+	// Lo que se protege es la ventana del defecto de DC-002.145: el recolector de libgodc corriendo EN MEDIO del
+	// parseo. Se protege la LECTURA y no el rearme entero por dos razones medidas:
+	//   - el rearme entero frenado no entra en el semiespacio del nivel grande: en 32 x 32 el vivo deja 275 KB libres
+	//     y el rearme completo pide entre 197 y 345 KB -> `fatal error: out of memory` (/tmp/capturas-146q). La
+	//     lectura sola pide ~78 KB (las 143 lineas filtradas) y entra siempre.
+	//   - el resto del rearme (arte, modelo, revelado) no parsea texto: una recoleccion ahi no tiene la pila llena de
+	//     cadenas a medio armar, que es lo que mordia.
+	//
+	// PRIMERO UNA RECOLECCION PROVOCADA: es la que el umbral pide igual tres instrucciones despues (el rearme llega
+	// con el semiespacio al 81-88 %), pero aca corre con la pila en un punto simple, antes del parseo. Despues se
+	// frena si hay lugar para lo que la lectura pide; si no, se avisa y la lectura va con el recolector suelto (que
+	// es como corria antes de esta tarjeta).
+	paso = "la tabla del nivel nuevo"
+
+	frenado := elRearmeVaFrenado()
+
+	if frenado {
+		antes := int(d2cGcUsado())
+
+		runtime.GC()
+
+		println("JUEGO130: MINIMAPA REARME recolectar-antes-de-la-lectura semiespacio=", antes, "->",
+			int(d2cGcUsado()), "recolecciones=", int(d2cGcColecciones()))
+
+		if !hayLugarParaElFreno() {
+			frenado = false
+
+			println("JUEGO130: MINIMAPA REARME SIN LUGAR PARA EL FRENO libre=", int(d2cGcTotal())-int(d2cGcUsado()),
+				"de", int(d2cGcTotal()), ": la lectura va con el recolector suelto")
+		} else {
+			d2cGcFrena()
+		}
+	}
+
 	tabla, bytesTabla, err := leerLaTablaDelNivel(fuente, id)
+
+	if frenado {
+		d2cGcSuelta()
+	}
 	if err != nil {
 		println("JUEGO130: MINIMAPA REARME SIN TABLA nivel=", id, "motivo=", err.Error(), ": no se toca el minimapa")
 
@@ -655,9 +1077,13 @@ func (m *minimapaDelJuego) recargarElMinimapaDelNivel(id, jugador int) bool {
 	}
 
 	// ---- 2. EL ARTE DEL NIVEL QUE SE DEJA, DE VUELTA AL MONTON DE C
+	paso = "soltar el arte del nivel que se deja"
+
 	liberados, cuadrosSoltados := m.soltarElArteDelNivel()
 
 	// ---- 3. EL NIVEL NUEVO
+	paso = "el arte del nivel nuevo"
+
 	m.Nivel = id
 	m.Tabla = tabla
 	m.BytesTabla = bytesTabla
@@ -676,13 +1102,21 @@ func (m *minimapaDelJuego) recargarElMinimapaDelNivel(id, jugador int) bool {
 
 	// ---- 4. EL REVEAL DEL NIVEL NUEVO: entero si la palanca lo pide (que es lo que hace la CARGA del pueblo con
 	// `MINIMAPA_TODO=si`, y por eso el minimapa del pueblo se ve completo en pantalla) o alrededor del heroe.
+	paso = "el revelado del nivel nuevo"
+
 	if minimapaTodo == "si" {
 		m.revelarTodoElNivel()
 	} else {
 		m.revelarElMinimapa(jugador) // la primera celda siempre entra: `hayUltima` = false
 	}
 
+	// EL PICO ANTES DE SOLTAR: lo que el rearme pide con el recolector frenado es `pico - semiespacioAntes`, y es el
+	// numero con el que se decide si el freno entra (`hayLugarParaElFreno`). Se mide, no se estima.
+	pico := int(d2cGcUsado())
+
 	runtime.GC()
+
+	paso = "el resumen"
 
 	println("JUEGO130: MINIMAPA REARME nivelAntes=", nivelAntes, "nivelAhora=", m.Nivel,
 		"nombre=", d2automap.LevelName(m.Nivel), "filasDeLaTabla=", filasAntes, "->", filasNuevas,
@@ -691,7 +1125,10 @@ func (m *minimapaDelJuego) recargarElMinimapaDelNivel(id, jugador int) bool {
 		"cuadrosDeArte=", cuadrosAntes, "->", m.CuadrosArte, "cuadrosSoltados=", cuadrosSoltados, "faltan=", faltan,
 		"bytesDeArte=", bytesArteAntes, "->", m.BytesArte, "liberados=", liberados,
 		"libreAntes=", libreAntes, "libreDespues=", d2cMontonLibre(),
-		"semiespacioAntes=", semiespacioAntes, "semiespacioDespues=", int(d2cGcUsado()),
+		"recolecciones=", recoleccionesAntes, "->", int(d2cGcColecciones()),
+		"frenado=", frenado,
+		"semiespacioAntes=", semiespacioAntes, "pico=", pico, "pide=", pico-semiespacioAntes,
+		"semiespacioDespues=", int(d2cGcUsado()),
 		"ms=", int(d2cMs()-t0))
 
 	return true

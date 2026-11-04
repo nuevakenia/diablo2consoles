@@ -674,6 +674,18 @@ const (
 	//	"sinblit"  el bucle entero (busqueda, proyeccion, recorte) SIN pegar la celda (ROMPE el dibujo)
 	//	"tabla610" pinta el cuadro IDENTICO y ademas arma la tabla 610 veces mas: es lo que costaba la tabla por
 	//	           celda del camino viejo, medido sin cambiar un pixel (es el control del instrumento)
+	//	"flujo"    DC-002.146, el A/B del BLINDAJE DEL REARME: relee `AutoMap.txt` por el flujo del MPQ (el camino
+	//	           viejo, el que pedia memoria por sector) y NO frena el recolector. Es la corrida que reproduce el
+	//	           `slice bounds out of range` intermitente de DC-002.145 y la que mide lo que cuesta el camino
+	//	           viejo (recolecciones adentro del rearme). El dibujo es el mismo.
+	//	"panico"   DC-002.146, la PRUEBA EN CONTRA del blindaje: el rearme tira un panic de rebanada DE VERDAD en
+	//	           el paso de la relectura de la tabla. El cruce tiene que cerrar igual y el log tiene que decir que
+	//	           el minimapa se quedo en el nivel viejo. El dibujo no cambia (el rearme no se hace).
+	//	"sololectura" DC-002.146, la lectura NUEVA sin el freno del recolector: mide cuanto pide la lectura sola
+	//	           (tiene que dar 0 recolecciones adentro del rearme, contra las 4 del camino viejo).
+	//	"carga"    DC-002.146, LA CARGA: doce relecturas de la tabla por el camino viejo (sin freno) antes de la de
+	//	           verdad, para reproducir A VOLUNTAD el `slice bounds out of range` de DC-002.145 (~48 ventanas del
+	//	           defecto en una corrida). El dibujo es el mismo.
 	minimapaDiag = "no"
 
 	// ============================== LAS DE ESTA TARJETA (DC-002.131): LO QUE NO ENTRA EN EL SPLIT ==============================

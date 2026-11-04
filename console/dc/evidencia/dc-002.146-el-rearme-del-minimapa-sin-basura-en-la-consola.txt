@@ -1,0 +1,171 @@
+DC-002.146 -- EL REARME DEL MINIMAPA NO LE PIDE MEMORIA AL RECOLECTOR: EL `slice bounds out of range` DEL CRUCE
+
+QUE ENTRA Y QUE NO. En DC-002.145 el cruce de nivel (1 Town -> 1 Wilderness, la region de 32 x 32 del Blood Moor)
+traia un panic intermitente, `slice bounds out of range`, al REARMAR el minimapa. Esta tarjeta encuentra la causa y
+la cierra: el que se caia no era el `.txt` ni la tabla, era el RECOLECTOR DE LIBGDC corriendo EN MEDIO del parseo,
+y la relectura de `AutoMap.txt` era la que lo ponia ahi (1,1 MB de basura del parser con el semiespacio al 83 %).
+El arreglo saca la lectura del semiespacio y filtra el archivo ANTES del parser: el rearme paso de 4 recolecciones
+adentro a 0 (medido), de 954 ms a 747 ms, y las dos corridas de la consola -- 16 x 16 y 32 x 32 -- cruzan y cierran.
+
+LO QUE NO ENTRA, Y SE MIDIO: el `defer recover()` del rearme deja el aviso en el log pero NO salva el cruce. El
+`recover` de libgodc hace `longjmp` a un checkpoint cuyo `setjmp` vive en un marco de C que ya retorno: con
+checkpoint la consola muere con `kernel panic: unhandled IRQ/Exception`, sin checkpoint con `FATAL: recover without
+checkpoint`. Las dos cosas estan medidas abajo (/tmp/capturas-146p y 146w) y el arreglo del runtime va en tarjeta
+aparte. El cruce no se salva en el panic: NO SE LLEGA al panic.
+
+1. EL DEFECTO: LOS CUATRO PANICS DE DC-002.145 SON TODOS DEL REARME
+
+De las trece corridas de DC-002.145, cuatro se cayeron con `panic: slice bounds out of range`. No fue al azar: las
+cuatro caen DENTRO del rearme, y las cuatro inmediatamente despues de una recoleccion del recolector.
+
+  capturas  linea  ultima linea del juego antes del panic
+  145b      1527   DEMO140: REARME paso=1 minimapaDelNivel= 2      (antes: gc-gcdata-fuera-imagen, gc-vivo 1487512)
+  145c      1522   DEMO140: REARME paso=1 minimapaDelNivel= 2      (antes: gc_collect v=178, gc-vivo 1480984)
+  145e      --     DEMO140: REARME paso=1 minimapaDelNivel= 2      (antes: gc_collect v=178, gc-vivo 1480984)
+  145f      --     DEMO140: REARME-R2 fuente= true                 (antes: gc-gcdata-fuera-imagen, gc-vivo 1487512)
+
+O sea: la pista del panic no es el `.txt` (que se lee igual al arrancar, y al arrancar no se cae) sino el estado en
+que el rearme encuentra el semiespacio. Los marcadores `gc-gcdata-fuera-imagen v=906232840` de 145b y 145f son del
+recolector, no del parseo.
+
+2. LA CAUSA MEDIDA: CUATRO RECOLECCIONES ADENTRO DEL REARME
+
+Corrida de 16 x 16 con el camino viejo (`/tmp/capturas-146b`, y lo mismo en /tmp/capturas-146r1..r3): entre
+`DEMO140: REARME paso=1` y la linea del rearme hay CUATRO recolecciones completas.
+
+  recolecciones entre REARME paso=1 y el resumen del rearme
+  146a  0   (esa corrida no cruzo, no hay rearme)
+  146b  4
+  146r1 4
+  146r2 4
+  146r3 4
+
+De donde salen: la relectura de `AutoMap.txt` (122.022 B, 2.603 lineas) iba por el FLUJO del MPQ, que hace `make`
+por sector (bloque comprimido, descomprimido y zlib), y despues el parser del motor (`ParseTxtLevels`) lee las
+2.603 lineas con `strings.TrimRight` + `strings.Split` + `strings.TrimSpace` por linea: ~420 B de basura por linea,
+~1,1 MB por relectura. Con el semiespacio al 83 % (1,49 MB de 1,835 MB) eso es una recoleccion cada pocos cientos
+de bytes. El rearme tardaba 954 ms y la mitad era el recolector.
+
+La prueba de que la basura es del parseo y no de la lectura: con el recolector FRENADO, el parseo sin filtrar no
+entra en lo que queda libre y la consola muere con `fatal error: out of memory` (/tmp/capturas-146g: 340 KB libres
+contra ~1,1 MB de basura). Es decir: el recolector corria adentro del parseo PORQUE el parseo no tenia donde
+meterse.
+
+3. EL ARREGLO: LA RELECTURA NO PIDE MEMORIA Y EL FILTRO VA ANTES DEL PARSER
+
+Dos cambios, los dos medidos (`console/dc/poc/juego-131/automap_130.go`):
+
+a) La lectura no toca el semiespacio. El `.txt` entero se lee en un bloque del MONTON DE C (`d2cPedirBloque`, la
+   misma puerta del HUD y del arte del minimapa) con la memoria de trabajo PRESTADA de la fuente
+   (`fuente.Prestamo()`), y el bloque se devuelve al terminar. Medido en el arranque y en el rearme:
+
+     TABLA-LECTURA prestamo= recargasDelPrestamo= 10 -> 10  lineasDelNivel= 84  lineasLeidas= 2604  (arranque)
+     TABLA-LECTURA prestamo= recargasDelPrestamo= 12 -> 12  lineasDelNivel= 143 lineasLeidas= 2604  (rearme)
+
+   El prestamo no crece ni una vez: la lectura no pide memoria.
+
+b) El filtro por nivel va ANTES del parser y sobre los bytes del bloque (`filtroDeUnNivel`, un `io.Reader` que
+   entrega la cabecera Mas las lineas del nivel pedido). El parser del motor es el mismo y las filas son las mismas,
+   pero le llegan 143 lineas de 2.604 en vez de 2.604. La basura del parseo baja de ~1,1 MB a ~78 KB (medido:
+   semiespacio +77.968 B en la lectura).
+
+   La comparacion del filtro es la del parser: campo recortado de espacios y sin distinguir mayusculas contra
+   `d2automap.LevelName(id)`, que es el mismo nombre que `LevelIndex` mapea al id.
+
+Y ademas, como cinturon y no como causa: el recolector se FRENA mientras dura la lectura (`d2cGcFrena`, la misma
+palanca que libgodc usa en secciones criticas), con una recoleccion PROVOCADA antes (la misma que el umbral pide
+igual tres instrucciones despues, pero con la pila en un punto simple y no en medio del parseo) y con una guarda de
+lugar: si el semiespacio no tiene 320 KB libres despues de recolectar, NO se frena y el log lo dice. El freno cubre
+SOLO la lectura y no el rearme entero: el rearme completo frenado no entra en el semiespacio del nivel grande (en
+32 x 32 el vivo deja 275 KB y el rearme entero pide entre 197 y 345 KB: `fatal error: out of memory`,
+/tmp/capturas-146q), mientras que la lectura sola pide 78 KB.
+
+4. LAS DOS CORRIDAS VERDES (MISMO CODIGO, PLAN 32 x 32 Y PLAN 16 x 16)
+
+16 x 16 (/tmp/capturas-146u, binario demo146u) -- el freno ENTRA (423.736 B libres despues de recolectar):
+
+  TABLA-LECTURA prestamo= recargasDelPrestamo= 12 -> 12 lineasDelNivel= 143 lineasLeidas= 2604
+  TABLA-LECTURA camino= montonDeC+prestamo bytes= 122022 filasDelNivel= 142 recolecciones= 171 -> 171
+                semiespacio= 1411432 -> 1489400 ms= 248
+  REARME nivelAntes= 1 nivelAhora= 2 nombre= 1 Wilderness filasDeLaTabla= 83 -> 142
+         celdasAntes= 680 celdasAhora= 9 piso= 0 pared= 9 cuadrosDeArte= 59 -> 75 faltan= 0
+         recolecciones= 170 -> 172 frenado= true pico= 1710336 pide= 220512 ms= 747
+  CRUZA OK nivel= BloodMoor:region tiles= 256 jugador= 8.5 8.5 ms= 15271
+  CIERRE MUNDO nivel= BloodMoor:region salio= true recorrido= 6.06898 celda= 8.5 8.5
+
+32 x 32 (/tmp/capturas-146t, binario demo146t) -- el freno NO entra (275.184 B: el nivel deja 1,56 MB vivos) y
+cruza igual, con cero recolecciones en la lectura:
+
+  REARME recolectar-antes-de-la-lectura semiespacio= 1621928 -> 1559824 recolecciones= 172
+  REARME SIN LUGAR PARA EL FRENO libre= 275184 de 1835008 : la lectura va con el recolector suelto
+  TABLA-LECTURA prestamo= recargasDelPrestamo= 12 -> 12 lineasDelNivel= 143 lineasLeidas= 2604
+  TABLA-LECTURA camino= montonDeC+prestamo bytes= 122022 filasDelNivel= 142 recolecciones= 172 -> 172 ms= 248
+  REARME nivelAntes= 1 nivelAhora= 2 filasDeLaTabla= 83 -> 142 celdasAntes= 680 celdasAhora= 742
+         piso= 704 pared= 38 cuadrosDeArte= 59 -> 75 faltan= 0
+         recolecciones= 171 -> 174 frenado= false pico= 1736168 pide= 114240 ms= 906
+  CRUZA OK nivel= BloodMoor:region tiles= 1024 jugador= 16.5 16.5 ms= 25637
+
+La cuenta que decide, en una linea:
+
+  rearme 16 x 16     recolecciones adentro   ms
+  camino viejo (146b)        4               954
+  camino nuevo (146u)        0               747
+
+Las 742 celdas del nivel 32 x 32 son las mismas 742 que midio DC-002.145 el minimapa del afuera: el filtro no
+cambio el resultado, solo el camino.
+
+5. LA PRUEBA EN CONTRA, Y LO QUE SE MIDIO DEL `recover` DE LIBGODC
+
+`MINIMAPA_DIAG=panico` hace que el rearme tire un panic de rebanada DE VERDAD en el paso de la tabla, para probar el
+blindaje. Lo que pasa (dos corridas, /tmp/capturas-146w sin checkpoint y /tmp/capturas-146p con checkpoint):
+
+  JUEGO130: MINIMAPA REARME SE CAYO Y NO SE LLEVA EL CRUCE paso= la tabla del nivel nuevo (PRUEBA EN CONTRA)
+            nivelPedido= 2 nivelQueQueda= 1 nombre= 1 Town celdas= 680 cuadrosDeArte= 59
+            montonC_libre= 2094648 semiespacio= 1489904 panic= <no es texto> : EL MINIMAPA QUEDA COMO ESTABA
+  FATAL: recover without checkpoint
+
+  (con `runtime_checkpoint()` antes, que es lo que pide el runtime para recover: el mismo log y despues
+   `kernel panic: unhandled IRQ/Exception / arch: aborting the system`)
+
+O sea: el AVISO funciona (el log dice el paso, el nivel que queda y el estado del minimapa: es lo que hace falta
+para diagnosticar la proxima vez), pero el `recover` NO devuelve el control. La causa esta en el runtime vendorizado:
+`recover()` no desenrolla la pila, hace `longjmp` al `runtime_checkpoint()`, y ese checkpoint hace `setjmp` DENTRO de
+una funcion de C que despues RETORNA (`~/dreamcast/libgodc/runtime/defer_dreamcast.c`), asi que el marco al que se
+vuelve esta muerto. Un `recover` usable necesita un checkpoint con el marco VIVO (que el `setjmp` viva en una funcion
+que siga en la pila hasta que el cuerpo termine). Eso es un arreglo del runtime, no de este archivo, y va en tarjeta
+aparte: mientras tanto el blindaje del cruce es NO LLEGAR al panic, que es lo que hacen el punto 3 y las dos verdes
+del punto 4.
+
+Nota de honestidad sobre la reproduccion: el panic de DC-002.145 NO se reproduce en el arbol de hoy. Con el binario
+de antes de este arreglo (lectura nueva a medias, /tmp/dcbuild/demo146a) cruzaron 8 corridas de 16 x 16 sin panic
+(1 + 5 del bucle `buscar-panico-146.sh` + 2 mas), y con el binario final cruzaron 16 x 16 y 32 x 32. Lo que si esta
+medido es la VENTANA del defecto (las 4 recolecciones adentro del rearme, punto 2), que es lo que se cierra. La
+intermitencia de DC-002.145 (4 de 13) era la suerte del layout del semiespacio, no una condición fija.
+
+6. LAS TRES VECES QUE SONO EL FRENO (y por que la guarda es 320 KB)
+
+  capturas  que paso
+  146g      freno sobre el parseo SIN filtrar (~1,1 MB de basura) contra 340 KB libres -> `fatal error: out of memory`
+  146q      freno sobre el REARME ENTERO en 32 x 32 (275 KB libres, el rearme pide ~330 KB) -> `fatal error: out of memory`
+  146r      32 x 32 con recoleccion provocada antes: el vivo del nivel deja 62 KB de margen -> igual no entra
+
+Por eso el freno (a) cubre solo la lectura, (b) va despues de una recoleccion provocada y (c) tiene guarda de lugar
+con aviso. Un freno que no verifica el lugar no es un blindaje: es una forma nueva de morir.
+
+7. LO QUE QUEDA
+
+  - El `recover` de libgodc (punto 5): tarjeta aparte, es del runtime vendorizado y sirve a todo el proyecto.
+  - El defecto de fondo del recolector (barrido conservador de pila que deja un tipo sin arreglar:
+    `gc-ptrdata-recortado` / `gc-gcdata-fuera-imagen`) sigue ahi: esta tarjeta le saca al rearme la ventana donde
+    mordia, no lo arregla. Cualquier carga grande de texto en el semiespacio lo puede volver a despertar; el camino
+    sano es el de esta tarjeta (bloque de C + prestamo + filtro antes del parser).
+  - El minimapa del nivel nuevo revela 9 celdas en 16 x 16 y 742 en 32 x 32: la diferencia es del revelado por
+    region de DC-002.145, no de esta tarjeta.
+
+CAPTURAS
+  /tmp/capturas-146b  camino viejo 16 x 16 (4 recolecciones adentro del rearme, 954 ms)
+  /tmp/capturas-146u  16 x 16 verde, con freno (0 recolecciones en la lectura, 747 ms)
+  /tmp/capturas-146t  32 x 32 verde, sin freno (0 recolecciones en la lectura, 906 ms)
+  /tmp/capturas-146w  prueba en contra: aviso + `FATAL: recover without checkpoint`
+  /tmp/capturas-146p  prueba en contra con checkpoint: aviso + `kernel panic: unhandled IRQ/Exception`
+  /tmp/capturas-146g  146q  146r  los tres `fatal error: out of memory` del freno sin lugar
