@@ -442,6 +442,19 @@ echo "   ANIM132 medirCuadro=$(leer_knob medirCuadro) blitRapido=$(leer_knob bli
 [ -n "${PRESENTAR_142:-}" ] && pisa_knob presentar142 "$PRESENTAR_142" 1
 [ -n "${PRUEBA_CONV_142:-}" ] && pisa_knob pruebaConv142 "$PRUEBA_CONV_142" 1
 
+# DC-002.143 -- EL RITMO JUGABLE: donde vive el lienzo y el cronometro de lo que el cuadro paga fuera de las
+# etapas de DC-002.134.
+#   LIENZO_EN_RAM=si|no  si = el lienzo de 1.228.800 B se pide al MONTON DE C (RAM, con cache) en vez de a la
+#                        VRAM (que se escribe sin cache: ~250 ns por pixel del mapa). Si el monton no tiene el
+#                        bloque, el lienzo se queda en la VRAM y el log lo dice.
+#   ETAPAS_143=si|no     si = la linea `JUEGO143: CUADRO` con lo que el cuadro paga fuera de las etapas
+#                        (revelar, censos, animacion, informes, marcar, recortes, renderMapa).
+[ -n "${LIENZO_EN_RAM:-}" ] && pisa_knob lienzoEnRam143 "$LIENZO_EN_RAM" 1
+[ -n "${ETAPAS_143:-}" ] && pisa_knob etapas143 "$ETAPAS_143" 1
+[ -n "${MINIMAPA_CAMBIO_143:-}" ] && pisa_knob minimapaCambio143 "$MINIMAPA_CAMBIO_143" 1
+[ -n "${PANEL_QUIETO_143:-}" ] && pisa_knob panelQuieto143 "$PANEL_QUIETO_143" 1
+[ -n "${MINIMAPA_CADA_143:-}" ] && pisa_knob minimapaCada143 "$MINIMAPA_CADA_143" 1
+
 echo "   ETAPAS134 etapas=$(leer_knob etapasKnob) verboso=$(leer_knob verbosoEtapas) blitPalabras=$(leer_knob blitPalabras134) pintarUnaVez=$(leer_knob pintarUnaVez)"
 
 # LAS DE ESTA TARJETA (DC-002.137): EL MINIMAPA.

@@ -92,6 +92,20 @@ export MEDIR_CUADRO="${MEDIR_CUADRO:-si}"
 export MEDIR_VIVO="${MEDIR_VIVO:-si}"
 export VERBOSO="${VERBOSO:-no}"
 
+# ---- DC-002.143: EL RITMO JUGABLE ----
+#   ETAPAS_143=si      la linea `JUEGO143: CUADRO` (lo que el cuadro paga fuera de las etapas de DC-002.134:
+#                      el reveal del minimapa, los censos, los informes, los recortes y el Render recortado)
+#   MAPA_ESTATICO=si   el mapa no se repinta cuando la camara no se movio (DC-002.139)
+#   CAJAS_139=si       el guardar/devolver la caja de cada ente (lo que hace posible el salto del mapa)
+#   LIENZO_EN_RAM=si   el lienzo del cuadro (1.228.800 B) en el monton de C en vez de la VRAM sin cache
+export ETAPAS_143="${ETAPAS_143:-si}"
+export MAPA_ESTATICO="${MAPA_ESTATICO:-si}"
+export CAJAS_139="${CAJAS_139:-si}"
+export LIENZO_EN_RAM="${LIENZO_EN_RAM:-si}"
+export MINIMAPA_CAMBIO_143="${MINIMAPA_CAMBIO_143:-si}"
+export PANEL_QUIETO_143="${PANEL_QUIETO_143:-si}"
+export MINIMAPA_CADA_143="${MINIMAPA_CADA_143:-3}"
+
 echo "== DEMO DC-002.140: el build de la demo jugable (sin guion: el control es del jugador)"
 echo "   DEMO demo=$(echo si) moor=${DEMO_MOOR} drlg=${DEMO_MOOR_DRLG} stream=${DEMO_MOOR_STREAM} jugadores=${JUGADORES} monstruos=${MONSTRUOS} vista=${VISTA_X},${VISTA_Y}"
 echo "   DEMO guiones: mvp=no fase=apagado guionPoc=nada inyectarP1=0 golpeAuto=no hablarAuto=no recogerAuto=no"

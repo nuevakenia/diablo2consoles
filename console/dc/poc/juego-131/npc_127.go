@@ -1220,6 +1220,39 @@ func dibujarElDialogo(malla *pvr.Surface, pixeles []byte) (pintados, ms int) {
 		return 0, 0
 	}
 
+	// DC-002.143 -- contadores de por que el panel NO se pudo saltear (los que si se saltean van en el otro lado).
+	if panelQuieto143 == "si" && dialogoPintado143 == elDialogo {
+		switch {
+		case elMundoEnteroSePinto143():
+			panelSaltos143Mundo++
+		case algunEnteEnLaCajaDelPanel143():
+			panelSaltos143Ente++
+		}
+	}
+
+	// DC-002.143 -- EL PANEL QUIETO NO SE VUELVE A PINTAR.
+	//
+	// El panel se arma UNA vez (`armarElPanelDelDialogo`: fondo de indices + renglones) y mientras esta abierto no
+	// cambia un pixel. Medido en la corrida de esta tarjeta: repintarlo cuesta 7.527 us por cuadro, el 15 % de un
+	// cuadro de 48 ms, y el panel es OPACO: los pixeles de abajo no se ven, asi que volver a escribir los mismos
+	// pixeles no cambia el lienzo. Se salta salvo que el panel sea OTRO (se abrio, cambio de pagina o se cerro) o
+	// que el cuadro haya movido la camara o repintado el mapa, que son los casos en los que el fondo cambia.
+	if panelQuieto143 == "si" && dialogoPintado143 == elDialogo && !elMundoEnteroSePinto143() &&
+		!algunEnteEnLaCajaDelPanel143() {
+		panelSaltos143Quieto++
+		ultimoPanelQuieto143 = elDialogo
+		// ningun pixel: el panel ya esta en el lienzo y nadie lo tapo (si un ente se metio en su caja, la guarda
+		// de arriba no deja pasar y se repinta). El contador de pixeles del panel queda en 0 a proposito: lo que
+		// se cuenta es lo que se PINTO, no lo que se ahorro.
+		pintados = 0
+		ms = 0
+
+		return pintados, ms
+	}
+
+	dialogoPintado143 = elDialogo
+	panelPintados143++
+
 	t0 := d2cMs()
 
 	malla.PushTranslation(elDialogo.X0, elDialogo.Y0)

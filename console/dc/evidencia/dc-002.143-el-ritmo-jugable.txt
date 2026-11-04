@@ -1,0 +1,183 @@
+DC-002.143 -- EL RITMO JUGABLE: EL TRAMO QUE NO TENIA NOMBRE, Y EL CUADRO DE LA DEMO
+=====================================================================================
+
+Tarjeta:      DC-002.143 (kanban t_9dc148c9, board dreamcast)
+Fecha:        2026-11-04
+Maquina:      CachyOS, Flycast (emulador), demo de DC-002.140
+              build:   MEDIR_CUADRO=no VERBOSO=no bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo143k
+              corrida: SEGUNDOS=48 INTERVALO=8 bash scripts/console/run-demo-140.sh .../disc.gdi /tmp/capturas-143k
+              baseline: el mismo build con las palancas de 143 en "no" (/tmp/capturas-143a)
+
+EL PROBLEMA, EN UNA LINEA
+-------------------------
+El cuadro jugable media 149-154 ms (6,5 fps) y las etapas instrumentadas de DC-002.134 sumaban ~110 ms: el 43 %
+del cuadro que quedaba fuera de toda etapa (`sinEtapa`, 14-18 ms con el instrumento apagado) no tenia nombre, y
+nadie sabia que atacar despues del mapa.
+
+LO QUE SE MIDIO ANTES (linea `JUEGO134: ETAPAS`, cuadro 300 de la corrida de referencia 143a)
+--------------------------------------------------------------------------------------------
+actualizar= 5021  mapa= 70324  jugadores= 250  bichos= 3  items= 2  npcs= 1717  inventario= 0
+hud= 2068  minimapa= 18769  dialogo= 9180  medir= 0  sinEtapa= 16497  dibujar= 118816  cuadroTotal= 123837
+PVR132: CUADRO 300 trabajo_us= 125008 presentar_us= 25762 cuadro_us= 150773 fpsX100= 663   (6,6 fps)
+
+EL TRAMO QUE NO TENIA NOMBRE, YA TIENE NOMBRE (`instrumento_143.go`, linea `JUEGO143: CUADRO`)
+----------------------------------------------------------------------------------------------
+Cuadro 300 de la corrida instrumentada (143b, las palancas de 143 todavia en "no"):
+
+  JUEGO143: CUADRO cuadros= 300 delTramo= 30 revelar= 411 censos= 9161 anim= 2894 informes= 2937
+            mvp= 0 marcar= 20 recortes= 1 renderMapa= 6683
+
+  revelar      411 us   el `revelarElMinimapa` del cuadro. Corre ANTES del cronometro de la etapa `minimapa`,
+                        asi que su costo caia en el tramo sin nombre (no en el minimapa).
+  censos      9161 us   `censoDelTramo` + `memoria` del cierre del cuadro. El precio es `mallinfo().uordblks`,
+                        que recorre el monton de C ENTERO: 9,2 ms por cuadro de INSTRUMENTO, no de juego.
+  anim        2894 us   `estadoDeLaAnimacion` con su linea cada 10 cuadros (~250 B) por el puerto serie.
+  informes    2937 us   los tres informes del cierre (JUEGO132 FPS, JUEGO139, JUEGO141) y su puerto serie.
+  marcar        20 us   `marcarLoQueCambio139`.
+  recortes       1 us   `armarLosRecortes141` (solo el cuadro que camina).
+  renderMapa  6683 us   el `Render` recortado del cuadro que camina, promediado en la ventana.
+
+  Los 16.497 us de `sinEtapa` de la linea de DC-002.134 quedan explicados por esos siete tramos: 15.4 ms medidos
+  en esta misma ventana (el resto es `renderMapa`, que solo existe en los cuadros que caminan). Y de esos 15.4 ms,
+  15.0 son INSTRUMENTO (censos + animacion + informes): el juego no los paga.
+
+LAS CINCO PALANCAS DE ESTA TARJETA
+----------------------------------
+1. `LIENZO_EN_RAM=si` -- el lienzo del cuadro (640x480x4 = 1.228.800 B) se MUDA de la VRAM del PVR al monton de C.
+   La VRAM del PVR se escribe sin cache y cada pixel escrito ahi cuesta varias veces lo que el mismo pixel en RAM.
+   No entra al arrancar (el monton esta lleno: `libre= 1.592 B` y el `malloc` devuelve
+   `Out of memory. Requested sbrk_base ..., diff 1228800`), asi que la mudanza se hace en el cuadro 1, justo
+   despues de que el POC suelta el arena de bloques del mapa:
+
+     JUEGO143: LIENZO EN EL MONTON DE C -- 1228800 bytes mudados desde la VRAM, libre= 2145216
+     PVR-RENDERER: el monton no dio para el lienzo (codigo -2 ); se pide a la VRAM     <- el primer intento
+     PVR-RENDERER: el lienzo del cuadro vive en la VRAM: 1228800 bytes                 <- y el fallback se dice
+
+   Las dos lineas del fallback estan EN LA EVIDENCIA a proposito: es el camino que se ve cuando el monton no tiene
+   el bloque, y esta para que no haya caida silenciosa.
+
+2. `MAPA_ESTATICO=si` + `CAJAS_139=si` -- el mapa no se repinta si la camara no se movio, y las cajas de los entes
+   se guardan y se devuelven (la palanca de DC-002.139, que estaba construida y apagada en la demo).
+
+3. `MINIMAPA_CAMBIO_143=si` -- el minimapa no se repinta en un cuadro en el que no cambio nada. Guardas: (a) el
+   heroe no se movio en la caja y el modelo no crecio; (b) el mundo no se repinto entero ni el cuadro camino (el
+   repintado pisa la caja del panel con pixeles de mapa); (c) si un ente se metio en la caja del panel, se DEVUELVE
+   LA COPIA DEL PANEL en vez de repintarlo.
+
+   LA COPIA ES LA CLAVE, y el numero la justifica: medido con los contadores `JUEGO143: PANELES`, un NPC esta dentro
+   de la caja del automapa en 296 de 300 cuadros (Akara esta a tres celdas del heroe y la caja es de 279x225), asi
+   que la guarda (c) sola forzaba el repintado casi siempre: 18.700 us por cuadro para volver a poner los mismos
+   pixeles. Con la copia, ese cuadro cuesta ~2,2 ms (una copia por filas de 251.100 B) y el lienzo queda igual.
+
+4. `MINIMAPA_CADA_143=3` -- caminando, el automapa se refresca como maximo 1 de cada 3 cuadros (~20 Hz): esta
+   centrado en el PIXEL del heroe, asi que cada paso lo corre un pixel y repintarlo entero por un pixel es tirar
+   el cuadro. Con el heroe parado se repinta el cuadro en que se para (marcador exacto).
+
+5. `PANEL_QUIETO_143=si` -- el panel del dialogo/quest se arma una vez y no cambia: no se vuelve a pintar salvo
+   que sea otro panel, que el mundo se repinte o que un ente entre en su caja. Ademas, `marcarLoQueCambio139` ya no
+   marca el LIENZO ENTERO por tener un panel abierto: marca la caja del panel y solo cuando el panel cambia.
+
+   ESTE ERA EL COSTO MAS CARO DE LA PRESENTACION: con el panel de la quest abierto, `PVR135: PRESENTAR` convertia
+   los 300 bloques del lienzo (1,2 MB) por cuadro -- `bloques= 300 conv_us= 24734` -- para reconvertir pixeles que
+   no habian cambiado. Ahora marca 194 bloques y convierte lo suyo: `conv_us= 2486`.
+
+EL NUMERO, ANTES Y DESPUES
+--------------------------
+Misma maquina, mismo script, mismos parametros (`MEDIR_CUADRO=no`, 48 s, una captura cada 8 s). La mediana es de las
+ventanas de 30 cuadros de `DEMO140: FPS`, sin las transiciones de carga (las ventanas de >200 ms).
+
+  ANTES   143a  msPorCuadro mediana= 153   min= 149   ->  6,5 fps
+  DESPUES 143k  msPorCuadro mediana=  29   min=  20   -> 34,5 fps de mediana, 50 fps en el mejor cuadro
+
+  CRITERIO DE LA TARJETA (`DEMO140: CIERRE` con fpsMedio >= 18): CUMPLE.
+  DEL MISMO BINARIO FINAL (143k), el cierre a los 300, 600, 900 y 1200 cuadros:
+    CIERRE cuadros= 300  segundos= 17  fpsMedio= 17  fpsMinimo= 4  fpsMaximo= 48
+    CIERRE cuadros= 600  segundos= 31  fpsMedio= 19  fpsMinimo= 4  fpsMaximo= 48
+    CIERRE cuadros= 900  segundos= 41  fpsMedio= 22  fpsMinimo= 4  fpsMaximo= 48
+    CIERRE cuadros= 1200 segundos= 48  fpsMedio= 25  fpsMinimo= 4  fpsMaximo= 49
+  (El fpsMinimo=4 son los cuadros de CARGA del mundo, que se pagan una vez; el criterio se mide sobre el promedio
+  de la corrida, que es lo que dice `CIERRE`, y a los 600 cuadros ya pasa.)
+
+La ultima ventana del binario final (cuadro 1170, todo quieto):
+  JUEGO134: ETAPAS actualizar= 315 mapa= 4246 jugadores= 2903 bichos= 5 items= 2 npcs= 1707 inventario= 0
+            hud= 2065 minimapa= 11 dialogo= 3 medir= 0 sinEtapa= 1452 dibujar= 12399 cuadroTotal= 12714
+  PVR132: CUADRO 1170 trabajo_us= 14380 presentar_us= 2785 cuadro_us= 19835 fpsX100= 5041
+  Y los contadores de los paneles, en la ventana de los cuadros 600 a 900:
+  JUEGO143: PANELES cuadro= 900 minimapaPintados= 12 minimapaSaltosQuieto= 0 minimapaSaltosCadencia= 0
+            minimapaPintadoPorMundo= 12 minimapaPintadoPorEnte= 288 panelPintados= 12
+            panelSaltosQuieto= 288 panelPintadoPorMundo= 12 panelPintadoPorEnte= 0 cada= 3 quietos= si
+  (el automapa se pinto 12 cuadros de 300 y 288 veces se devolvio la copia; `JUEGO137` lo confirma desde el otro
+  lado: `cuadros= 900 delTramo= 39`)
+
+LO QUE SE AHORRO, POR ETAPA (cuadro 300 de 143a contra cuadro 1170 de 143k)
+--------------------------------------------------------------------------
+  mapa        70.324 -> 4.246     no se repinta si la camara no se movio (94 % menos)
+  minimapa    18.769 ->     11     de 300 cuadros se pinta 12; los otros 288 devuelven la copia
+  dialogo      9.180 ->      3     el panel quieto no se repinta
+  sinEtapa    16.497 ->  1.452     los censos y la animacion ya no van por cuadro en la demo
+  actualizar   5.021 ->    315
+  hud          2.068 ->  2.065     igual: el HUD se pinta siempre (esta en la lista de abajo)
+  npcs         1.717 ->  1.707     igual: son los NPCs del pueblo, se pintan siempre
+  jugadores      250 ->  2.903     SUBE: con `CAJAS_139=si` cada ente paga el guardado de su caja, que es el
+                                   precio de que el mapa se pueda saltear. Es la compra, no una regresion.
+  presentar   25.762 ->  2.785     la conversion por bloques sucios de verdad (300 -> 194 bloques, conv 24,7 -> 2,5 ms)
+
+LO QUE QUEDA (el proximo cuello, con numeros)
+---------------------------------------------
+  mapa          4,2 ms por repintado entero (los 7 que quedan son los cambios de nivel y los cuadros en que se
+                abre o cierra el panel).
+  jugadores     2,9 ms: el guardado de la caja de cada ente.
+  hud+npcs      3,8 ms: se pintan siempre (los globos y el pueblo).
+  minimapa      17,4 ms las pocas veces que se repinta entero (`JUEGO137`: caja= 2.222, celdas= 17.419, marcador=
+                76 para 1.880 celdas y 9.602 px, o sea 9,3 us por celda). Es el proximo trabajo: o el panel se
+                compone en una imagen aparte y se pega de una, o el bucle por celda se lleva a una lista de celdas
+                ya proyectadas. Con las palancas de hoy ya no manda el cuadro.
+  espera        2,7 ms de VSYNC en los cuadros de 20 ms: el PVR ya no es el que manda.
+
+LA MIRADA A LA PANTALLA (no solo los numeros)
+---------------------------------------------
+  /tmp/capturas-143k/c99-final.png          (recorte del cliente 640x480 en `c99-final-recorte.png`)
+  /tmp/capturas-143k/c2.png c4.png c6.png   (a mitad de la partida, `mini-c4.png` es la caja del automapa)
+  Se ve el pueblo entero, el automapa arriba a la derecha con sus celdas y sus marcadores rojos y azules, el panel
+  de la quest y el cinturon de pociones. No hay sprites asomando dentro de los paneles, ni bandas desplazadas, ni
+  zonas negras donde va el mapa. Esto no es adorno: la primera corrida con las guardas incompletas (`143e`) SI
+  perdio el minimapa (el repintado entero del mapa pisaba su caja y la guarda solo miraba el camino de la copia) y
+  es el motivo de `mapaSePintoEntero143` y de las guardas de la copia. Cada palanca se miro en pantalla, no solo en
+  el log.
+
+LAS PALANCAS, EN EL ARBOL
+-------------------------
+  `console/dc/poc/juego-131/knobs.go` -- `etapas143`, `lienzoEnRam143`, `minimapaCambio143`, `minimapaCada143`,
+  `panelQuieto143`, las cinco en "no" A PROPOSITO (con "no" el binario es el de DC-002.138/140, bit a bit). La demo
+  las prende: `scripts/console/build-demo-140.sh` las exporta y `scripts/console/build-juego-131.sh` las pisa con
+  `LIENZO_EN_RAM`, `ETAPAS_143`, `MINIMAPA_CAMBIO_143`, `MINIMAPA_CADA_143`, `PANEL_QUIETO_143`.
+
+  Archivos tocados:
+    console/dc/poc/juego-131/instrumento_143.go    NUEVO  el cronometro del tramo sin nombre y `JUEGO143: PANELES`
+    console/dc/poc/juego-131/juego_143.go          NUEVO  las guardas de los paneles, la copia y la cuenta de entes
+    console/dc/poc/juego-131/knobs.go                     las cinco palancas
+    console/dc/poc/juego-131/main.go                      los cronometros, la mudanza del lienzo, los censos y la
+                                                          animacion cada N con la demo encendida
+    console/dc/poc/juego-131/automap_130.go               el minimapa quieto, la cadencia y la copia del panel
+    console/dc/poc/juego-131/npc_127.go                   el panel quieto
+    console/dc/poc/juego-131/mapa_139.go                  el panel se marca por su caja, no el lienzo entero
+    console/dc/poc/juego-131/mapa_141.go                  los informes cada N con la demo encendida
+    console/dc/poc/juego-131/minimapa_137.go              idem
+    d2core/d2render/pvr/pantalla.go                       FijarLienzoEnRam143, MudarElLienzoAlMonton143
+    console/dc/std/csrc/pvr_pantalla.c                    fb_ram_init, fb_al_monton, fb_en_ram
+    scripts/console/build-demo-140.sh                     las cinco variables, "si"/"3" por defecto en la demo
+    scripts/console/build-juego-131.sh                    el paso de las cinco variables a los knobs
+
+LO QUE NO SE TOCO
+-----------------
+  El camino de presentacion es el de DC-002.139/142 (`presentar_142.go`). La palanca `presentarDobleBuffer143` quedo
+  RESERVADA y sin uso: no hay funcion con ese nombre en esta tarjeta.
+  La corrida de DC-002.138 (MVP) no cambia: las cinco palancas nuevas vienen en "no".
+  Los caminos de medir de DC-002.130/137 (`MINIMAPA_RAPIDO=no`, `MINIMAPA_DIAG=caja|celdas|sinarte|sinblit|tabla610`)
+  siguen intactos: la copia no se toma con `MINIMAPA_DIAG` encendido.
+
+LOG CRUDO
+---------
+  /tmp/capturas-143k/flycast.log        (el de Flycast, con \r)
+  /tmp/capturas-143k/limpio.log         (el mismo, sin \r: es el que se leyo)
+  Copia junto a esta evidencia: dc-002.143-el-ritmo-jugable-flycast.log

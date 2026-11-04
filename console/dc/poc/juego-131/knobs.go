@@ -803,6 +803,45 @@ const (
 	// midio 675-931 ms por cuadro de mapa. Las dos ramas viven en el mismo binario: el A/B es una corrida.
 	blitRapido = "si"
 
+	// ============================== LAS DE ESTA TARJETA (DC-002.143): EL RITMO JUGABLE ==============================
+	//
+	// LAS CUATRO VIENEN EN "no" A PROPOSITO: en "no" el binario es el de DC-002.138/140, bit a bit, sin una linea
+	// mas de log ni un pixel distinto. El build de la demo (`scripts/console/build-demo-140.sh`) las prende por
+	// variable de entorno (`ETAPAS_143`, `LIENZO_EN_RAM`, `MINIMAPA_CAMBIO_143`, `PANEL_QUIETO_143`), asi que la
+	// corrida de las tarjetas viejas no cambia por tener estas palancas en el arbol.
+	//
+	// etapas143: "si" = el cronometro de lo que el cuadro paga FUERA de las etapas de DC-002.134
+	// (instrumento_143.go): el reveal del minimapa, los censos del cierre, la animacion, los informes,
+	// `marcarLoQueCambio139` y, en el cuadro que camina, la lista de recortes y el `Render` recortado.
+	// Es el tramo que con el instrumento por cuadro apagado quedaba en `sinEtapa` (14-18 ms medidos).
+	etapas143 = "no"
+
+	// lienzoEnRam143: "si" = el lienzo del cuadro (640x480x4 = 1.228.800 B) se MUDA de la VRAM del PVR al MONTON
+	// DE C, en el cuadro 1, cuando el POC suelta el arena de bloques (antes no entra: el monton esta lleno, medido
+	// libre=1.592 B). Es lo que mide esta tarjeta: la VRAM se escribe sin cache y cada pixel escrito ahi cuesta
+	// varias veces lo que el mismo pixel en RAM. Si el monton no tiene el bloque, el lienzo se queda en la VRAM y
+	// el log lo dice con el codigo del `malloc` (no hay caida silenciosa).
+	lienzoEnRam143 = "no"
+
+	// minimapaCambio143: "si" = el minimapa NO se repinta en los cuadros en los que no cambio nada (el heroe no
+	// se movio en la caja, el modelo no crecio, el mundo no se repinto entero, el cuadro no camino y ningun ente
+	// entro en la caja del panel). Medido en esta tarjeta: el minimapa cuesta 18.700 us por cuadro (15 % de un
+	// cuadro de 120 ms) y en un cuadro quieto pinta los mismos 9.609 pixeles del anterior. "no" = lo que hacia
+	// DC-002.130/140: se pinta siempre.
+	minimapaCambio143 = "no"
+
+	// panelQuieto143: "si" = el panel del dialogo o de la quest NO se vuelve a pintar mientras sea el mismo panel
+	// (se arma una vez y no cambia), salvo que el mundo se repinte en ese cuadro o que un ente se haya metido en su
+	// caja. Medido: 7.527 us por cuadro de repintar los mismos pixeles, el 15 % de un cuadro de 48 ms.
+	panelQuieto143 = "no"
+
+	// minimapaCada143: cada cuantos cuadros se repinta el automapa MIENTRAS EL HEROE CAMINA (con el heroe parado se
+	// repinta el cuadro en que se para y despues no cambia nada). El automapa esta centrado en el pixel del heroe,
+	// asi que caminando se corre un pixel por cuadro y repintar 9.609 pixeles por un pixel cuesta 18,7 ms: con "3"
+	// el panel se refresca a ~20 Hz y el cuadro se queda en 20 ms. "no" = lo que hacia DC-002.130 (el automapa
+	// sigue el pixel del heroe, 18,7 ms por cuadro caminando).
+	minimapaCada143 = "no"
+
 	// ============================== LAS DE ESTA TARJETA (DC-002.134): LAS ETAPAS DEL CUADRO ==============================
 	//
 	// etapas: "si" = el cronometro por etapa del dibujado del POC (jugador, bichos, HUD, minimapa, actualizar) y

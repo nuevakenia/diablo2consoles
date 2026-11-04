@@ -407,6 +407,11 @@ func main() {
 	// DC-002.134: y el camino de la PALABRA (un deposito de 32 bits por pixel), tambien antes del primer cuadro.
 	activarElBlitDePalabras()
 
+	// DC-002.143: DONDE VIVE EL LIENZO. Con `LIENZO_EN_RAM=si` el bloque de 1.228.800 B se pide al monton de C
+	// (RAM, con cache) en vez de a la VRAM (que se escribe sin cache); el fallback lo decide el backend y lo
+	// dice en el log. Se fija antes de Run, que es cuando se reserva el lienzo.
+	pvr.FijarLienzoEnRam143(lienzoEnRam143 == "si")
+
 	// DC-002.135: el camino de la PRESENTACION (la conversion y la subida) y el costo del reloj del instrumento.
 	activarLaPresentacion135()
 
@@ -418,6 +423,11 @@ func main() {
 		"cuadrosPorInforme=", cuadrosDelInforme132)
 	println("JUEGO134: arranca -- etapas=", etapasKnob, "verboso=", verbosoEtapas, "blitPalabras=",
 		blitPalabras134, "pintarUnaVez=", pintarUnaVez)
+
+	// DC-002.143: las palancas del ritmo jugable, en el arranque (una palanca que no se ve en el log no se puede
+	// discutir).
+	println("JUEGO143: arranca -- lienzoEnRam=", lienzoEnRam143, "etapas143=", etapas143,
+		"mapaEstatico=", mapaEstatico, "cajas139=", cajas139, "scroll141=", scroll141)
 
 	// DC-002.137: las palancas del minimapa, en el arranque (una palanca que no se ve en el log no se puede
 	// discutir: el numero de la corrida hay que poder atribuirlo a un camino).
@@ -1507,6 +1517,7 @@ func dibujar(superficie d2interface.Surface) error {
 	// el mundo se repinta ahi mismo, ver `midiendoElCuadro134`).
 	pvr.ReiniciarMoverLienzo()
 	scroll141Caminando = false
+	mapaSePintoEntero143 = false
 
 	// DC-002.141: TRES CAMINOS. El entero y el quieto son los de DC-002.139, bit a bit; el de la copia es el
 	// cuadro caminando: se corre el lienzo y se repinta del mapa solo lo que la copia no trajo (`mapa_141.go`).
@@ -1519,6 +1530,7 @@ func dibujar(superficie d2interface.Surface) error {
 			rendererDelMapa.Render(superficie)
 			mapa139Repintados++
 			mapa139PintadoEsteCuadro = true
+			mapaSePintoEntero143 = true
 			scroll141Caminando = false
 			scroll141UltimoFueCopia = false
 		}
@@ -1548,6 +1560,7 @@ func dibujar(superficie d2interface.Surface) error {
 		rendererDelMapa.Render(superficie)
 		mapa139Repintados++
 		mapa139PintadoEsteCuadro = true
+		mapaSePintoEntero143 = true
 		scroll141Enteros++
 		scroll141UltimoFueCopia = false
 	}
@@ -1849,7 +1862,12 @@ func dibujar(superficie d2interface.Surface) error {
 	pxMinimapa, msMinimapa := 0, 0
 
 	if minimapaKnob == "si" && elMinimapa != nil {
+		// DC-002.143: el REVEAL del minimapa no estaba en el cronometro de la etapa `minimapa` (corre antes),
+		// asi que su costo caia en `sinEtapa`. Se mide aparte.
+		t143Revelar := cron143()
 		elMinimapa.revelarElMinimapa(0)
+
+		marca143(e143Revelar, t143Revelar)
 
 		crcaAntesDelMinimapa := crcLienzo(pixeles)
 
@@ -1966,14 +1984,42 @@ func dibujar(superficie d2interface.Surface) error {
 			"cacheEnIndices=", cache.EnIndices, "msMapa=", msMapa, "msJugador=", msJugador)
 	}
 
-	censoDelTramo("despues-del-cuadro")
-	memoria("despues-del-cuadro")
+	// DC-002.143: los censos del cierre del cuadro, con su cronometro (caian en `sinEtapa`).
+	//
+	// Y CON LA DEMO ENCENDIDA VAN CADA `cuadrosDelResumenDemo` CUADROS, no en todos: `memoria()` lee
+	// `mallinfo().uordblks`, que recorre el monton ENTERO, y medido en la corrida de esta tarjeta son 9.161 us
+	// por cuadro (el 7,6 % del cuadro de 120 ms) de INSTRUMENTO, no de juego. En la consola real esto no existe;
+	// en la demo solo hace falta para la tabla de consumo.
+	if demoKnob != "si" || cuadro%cuadrosDelResumenDemo == 0 {
+		t143Censos := cron143()
+		censoDelTramo("despues-del-cuadro")
+		memoria("despues-del-cuadro")
+
+		marca143(e143Censos, t143Censos)
+	}
 
 	if cuadro == 1 && orden != "tarjeta" {
 		tramosSoltados, bytes := d2asset.SoltarArenaDeBloques()
 		println("JUEGO121: ARENA DE BLOQUES SOLTADA (despues de la cache) tramos=", tramosSoltados, "bytes=", bytes,
 			"libre=", d2cMontonLibre())
 		memoria("despues-de-soltar-el-arena")
+
+		// DC-002.143 -- LA MUDANZA DEL LIENZO AL MONTON DE C.
+		//
+		// POR QUE ACA Y NO AL PRINCIPIO. El lienzo se pide en `Run` (antes del primer cuadro) y ahi el monton de C
+		// esta LLENO: medido en esta corrida, al arrancar libre=1.592 B y el bloque de 1.228.800 B no entra (medido:
+		// "Out of memory. Requested sbrk_base ..., diff 1228800"). El millon y pico aparece recien cuando se suelta
+		// el arena de bloques del mapa (arriba): el arena vive en el monton y la cache de tiles en la VRAM, asi que
+		// soltarlo deja el monton en ~3,4 MB libres. Es el mismo cuadro 1, y todavia no se presento nada.
+		if lienzoEnRam143 == "si" && !pvr.LienzoEnRam143() {
+			if pvr.MudarElLienzoAlMonton143(malla) {
+				println("JUEGO143: LIENZO EN EL MONTON DE C -- 1228800 bytes mudados desde la VRAM, libre=",
+					d2cMontonLibre())
+			} else {
+				println("JUEGO143: el monton no dio para el lienzo (libre=", d2cMontonLibre(),
+					"); se queda en la VRAM sin cache")
+			}
+		}
 	}
 
 	// el resumen va ULTIMO y una sola vez: el ciclo del PVR no vuelve nunca
@@ -2007,12 +2053,24 @@ func dibujar(superficie d2interface.Surface) error {
 
 	// DC-002.133 -- EL ESTADO DE LA ANIMACION, POR PERSONAJE. Va aca, cuando el cuadro ya se dibujo: lo que la linea
 	// dice es el modo, la direccion y el cuadro del ciclo que LLEGARON AL LIENZO, no lo que el reloj pidio.
-	estadoDeLaAnimacion(cuadro, cuadrosDelInforme133)
+	// DC-002.143: el anuncio de la animacion, con su cronometro. En la DEMO solo cuando cambia algo: la linea
+	// periodica (cada 10 cuadros, ~250 B) es puerto serie, y a 11.520 B/s son 2,5 ms por cuadro medidos.
+	t143Anim := cron143()
+	cada133 := cuadrosDelInforme133
+	if demoKnob == "si" {
+		cada133 = 0
+	}
+
+	estadoDeLaAnimacion(cuadro, cada133)
+
+	marca143(e143Anim, t143Anim)
 
 	// DC-002.132 -- EL CUADRO, CONTADO. Va al final para que el numero incluya TODO lo que costo el cuadro (el
 	// mapa, los sprites, el HUD, el minimapa y los instrumentos), que es lo que el jugador espera entre cuadro y
 	// cuadro. Cada 30 cuadros se deja el promedio: los cuadros por segundo y los cuadros de animacion que
 	// llegaron al lienzo.
+	// DC-002.143: los tres informes del cierre del cuadro, con su cronometro (caian en `sinEtapa`).
+	t143Informes := cron143()
 	anotarElCuadro132(int64(d2cMs())-tInicio132, cuadroAnimDelHeroe132(), cuadroAnimDelBicho132())
 
 	if cuadro%cuadrosDelInforme132 == 0 {
@@ -2026,6 +2084,8 @@ func dibujar(superficie d2interface.Surface) error {
 	// las franjas, y cuantos pixeles hubo que repintar del mapa).
 	informeDelCuadroQueCamina141()
 
+	marca143(e143Informes, t143Informes)
+
 	// DC-002.134: el cuadro al cronometro por etapas (ver instrumento_134.go). Va al final para que la resta
 	// `dibujar - suma de etapas` sea exactamente lo que el cuadro paga en lineas de evidencia.
 	//
@@ -2033,10 +2093,16 @@ func dibujar(superficie d2interface.Surface) error {
 	// mundo, los pixeles del HUD y del minimapa y, si la etapa se cerro, la evidencia de su marca. Va DESPUES de
 	// todo lo que se pinta (paneles, HUD y minimapa incluidos): si fuera antes, el crc de la marca no seria el del
 	// cuadro que el ojo ve.
+	t143Mvp := cron143()
 	anotarElCuadroDelMVP(pixeles, crcLienzo(pixeles), crcMapa, pxHUD, pxMinimapa, pxDialogo, llenosLienzo(pixeles))
 
+	marca143(e143Mvp, t143Mvp)
+
 	// DC-002.139: lo que hay que convertir en la presentacion (los bloques que este cuadro toco).
+	t143Marcar := cron143()
 	marcarLoQueCambio139()
+
+	marca143(e143Marcar, t143Marcar)
 
 	// DC-002.141: LA PRUEBA DEL CUADRO CAMINANDO, sobre el cuadro TERMINADO (mapa + entes + HUD + minimapa).
 	// Va ULTIMA, cuando ya se anoto todo lo que el cuadro hizo, porque arma una referencia repintando el cuadro
@@ -2045,6 +2111,7 @@ func dibujar(superficie d2interface.Surface) error {
 	compararElCuadroTerminado141(malla, superficie)
 
 	anotarCuadro134(cronometro134() - tInicio134)
+	anotarCuadro143(int64(d2cUs()) - tInicio134)
 
 	return nil
 }

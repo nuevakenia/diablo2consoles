@@ -1272,6 +1272,88 @@ func (m *minimapaDelJuego) dibujarElMinimapa(sup *pvr.Surface, jugador, anchoLie
 		return 0, 0
 	}
 
+	// DC-002.143 -- EL MINIMAPA NO SE REPINTA SI NO CAMBIO NADA (la palanca `MINIMAPA_CAMBIO_143=si`).
+	//
+	// POR QUE, CON EL NUMERO: medido en la corrida de esta tarjeta, el minimapa cuesta 18.700 us por cuadro
+	// (caja 2.223 + celdas 16.418 + marcador 76), o sea el 15 % de un cuadro de 120 ms, y pinta 1.884 celdas y
+	// 9.609 pixeles que en un cuadro quieto son LOS MISMOS del cuadro anterior. Es el mismo argumento del mapa
+	// estatico de DC-002.139, aplicado al panel.
+	//
+	// TRES GUARDAS, y las tres importan (la primera version de esta idea era solo "el heroe no se movio" y
+	// dejaba dos defectos):
+	//   1. el HEROE no se movio en la caja y el modelo no crecio (la condicion de "cambio" de DC-002.130);
+	//   2. el cuadro no CAMINO: en un cuadro con la copia del lienzo el interior de la caja del minimapa se
+	//      repinta con MAPA (`armarLosRecortes141`), asi que el panel tiene que volver a pintarse encima;
+	//   3. ningun ENTE se metio en la caja del minimapa: el minimapa se pinta DESPUES de los jugadores, los
+	//      bichos, los objetos y los NPCs, asi que si uno camina por ahi el panel tapa su sprite; saltearse el
+	//      panel en ese cuadro dejaria al ente asomando en medio del automapa.
+	if minimapaCambio143 == "si" && m.hayDibujo && mx == m.ultimoHeroeX && my == m.ultimoHeroeY &&
+		m.Modelo.Count() == m.ultimasCeldasDib && !elMundoEnteroSePinto143() &&
+		!algunEnteEnLaCajaDe(lay.Clip) {
+		minimapaSaltos143Quieto++
+		m.saltados++
+		m.celdasUltimas, m.pxUltimos, m.msUltimo = 0, 0, 0
+		minimapaPintoEsteCuadro143 = false
+
+		return 0, 0
+	}
+
+	// DC-002.143 -- SI LO UNICO QUE PASA ES QUE UN ENTE SE METIO EN LA CAJA, SE DEVUELVE LA COPIA DEL PANEL.
+	//
+	// Medido: un NPC esta dentro de la caja del automapa en 296 de 300 cuadros, asi que la guarda de arriba sola no
+	// alcanza y el panel se repintaba casi siempre (18.700 us por cuadro para volver a poner los mismos pixeles).
+	// Con la copia guardada al pintar, este cuadro cuesta lo que cuesta una copia por filas de 279x225 (~2,2 ms)
+	// en vez del repintado entero, y el lienzo queda igual: la copia se tomo con el panel y el marcador ya pintados
+	// y el marcador no se movio (si se hubiera movido, la guarda de arriba no pasa y se repinta).
+	if minimapaCambio143 == "si" && m.hayDibujo && mx == m.ultimoHeroeX && my == m.ultimoHeroeY &&
+		m.Modelo.Count() == m.ultimasCeldasDib && !elMundoEnteroSePinto143() &&
+		algunEnteEnLaCajaDe(lay.Clip) && devolverLaCopiaDelPanel143(sup, lay.Clip) {
+		minimapaSaltos143Ente++
+		m.saltados++
+		m.celdasUltimas, m.pxUltimos, m.msUltimo = 0, 0, 0
+		minimapaPintoEsteCuadro143 = false
+
+		return 0, 0
+	}
+
+	// DC-002.143 -- EL MARCADOR PUEDE ESPERAR UN CUADRO.
+	//
+	// Mientras el heroe CAMINA, el automapa se corre un pixel por cuadro (esta centrado en el y no en una celda), y
+	// repintar el panel ENTERO por un pixel de corrimiento cuesta lo mismo que repintarlo por un mapa nuevo: medido,
+	// 16.460 us de celdas + 2.231 de caja. Con el cuadro ya en 20 ms, eso es el cuadro entero otra vez.
+	//
+	// La regla: caminando, el panel se repinta como maximo cada `minimapaCada143` cuadros (3 por defecto: 20 Hz).
+	// Y NO SE SALTA NUNCA si el heroe no esta caminando (el cuadro en que se para pinta el marcador exacto), ni si
+	// el modelo crecio (hay celdas nuevas que mostrar), ni si el mundo se repinto o un ente entro en la caja (las
+	// otras dos guardas de arriba). Con `MINIMAPA_CADA_143=no` el automapa vuelve a seguir el pixel del heroe, que
+	// es lo que hacia DC-002.130.
+	if minimapaCada143 != "no" && minimapaCambio143 == "si" && m.hayDibujo &&
+		m.Modelo.Count() == m.ultimasCeldasDib && !elMundoEnteroSePinto143() && !algunEnteEnLaCajaDe(lay.Clip) &&
+		mov != nil && mov.Caminando && minimapaCuadrosSinPintar143 < cuadrosDelMinimapa143() {
+		minimapaSaltos143Cadencia++
+		minimapaCuadrosSinPintar143++
+		m.saltados++
+		m.celdasUltimas, m.pxUltimos, m.msUltimo = 0, 0, 0
+		minimapaPintoEsteCuadro143 = false
+
+		return 0, 0
+	}
+
+	// Y EL MOTIVO CUANDO SI SE PINTA (para la linea `JUEGO143: PANELES`: sin esto no se sabe si el panel se pinta
+	// porque cambio el mapa o porque un NPC se paro adentro de la caja).
+	switch {
+	case !m.hayDibujo:
+	case elMundoEnteroSePinto143():
+		minimapaSaltos143Mundo++
+	case algunEnteEnLaCajaDe(lay.Clip):
+		minimapaSaltos143Ente++
+	}
+
+	minimapaPintados143++
+	minimapaCuadrosSinPintar143 = 0
+
+	minimapaPintoEsteCuadro143 = true
+
 	pintados, celdas := 0, 0
 
 	// DC-002.137 -- LA TABLA, UNA VEZ POR CUADRO (no una vez por celda). Las 610 celdas que caen en la caja
@@ -1364,6 +1446,14 @@ func (m *minimapaDelJuego) dibujarElMinimapa(sup *pvr.Surface, jugador, anchoLie
 
 	if verboso134() {
 		crcCaja = crcDeLaCaja137(sup, lay)
+	}
+
+	// DC-002.143: la copia de la caja del panel, para poder DEVOLVERLA en el cuadro en que lo unico que cambia es
+	// que un ente se metio adentro (ver `devolverLaCopiaDelPanel143`). Se toma con el panel y el marcador ya
+	// pintados y FUERA del cronometro del minimapa cuando se mide: es una copia, no dibujo. Con `MINIMAPA_DIAG`
+	// encendido no se toma (las corridas de medir dibujan otra cosa y la copia seria basura).
+	if minimapaCambio143 == "si" && minimapaDiag == "no" {
+		guardarLaCopiaDelPanel143(sup, lay.Clip)
 	}
 
 	// DC-002.134: la linea del minimapa es evidencia por cuadro: con `VERBOSO=no` se calla.

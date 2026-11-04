@@ -91,7 +91,7 @@ func informeDelMini137(pixelesPintados, celdasPintadas, celdasDelModelo int) {
 	celdasMini137 += celdasPintadas
 	pixelesMini137 += pixelesPintados
 
-	if cuadro%cuadrosDelInforme132 != 0 || cuadrosMini137 == 0 {
+	if cuadro%cadaInforme143() != 0 || cuadrosMini137 == 0 {
 		return
 	}
 

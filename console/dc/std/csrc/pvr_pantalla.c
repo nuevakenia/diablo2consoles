@@ -1279,6 +1279,7 @@ int d2c_pvr_pantalla_vram(void) { return PANT_PW * PANT_PH * 2; }
  * estaba antes): el POC chico sigue andando y el que mide dice cual de los dos caminos tomo. */
 static void *pant_fb = NULL;
 static int pant_fb_bytes = 0;
+static int pant_fb_origen_ram = 0;
 
 int d2c_pvr_pantalla_fb_init(int w, int h) {
     size_t bytes;
@@ -1297,9 +1298,14 @@ int d2c_pvr_pantalla_fb_init(int w, int h) {
         return 0;
     }
     if (pant_fb != NULL) {
-        pvr_mem_free(pant_fb);
+        if (pant_fb_origen_ram) {
+            free(pant_fb);
+        } else {
+            pvr_mem_free(pant_fb);
+        }
         pant_fb = NULL;
         pant_fb_bytes = 0;
+        pant_fb_origen_ram = 0;
     }
 
     pant_fb = pvr_mem_malloc(bytes);
@@ -1310,9 +1316,99 @@ int d2c_pvr_pantalla_fb_init(int w, int h) {
     /* el cuadro arranca en negro: la pantalla se pinta entera una vez para no leer basura de la VRAM */
     memset(pant_fb, 0, bytes);
     pant_fb_bytes = (int)bytes;
+    pant_fb_origen_ram = 0;
 
     return 0;
 }
+
+/* DC-002.143 -- EL LIENZO EN EL MONTON DE C EN VEZ DE LA VRAM.
+ *
+ * POR QUE EXISTE. El lienzo del cuadro (640x480x4 = 1.228.800 B) vive en la VRAM desde DC-002.22 porque el
+ * monton de C de aquel binario no tenia el bloque (medido: arena=2.415.484 used=2.372.348 free=43.136 cuando
+ * llegaba el pedido). El precio de tenerlo ahi esta medido tambien: el area de VRAM se escribe sin cache, asi
+ * que pintar un tile del mapa contra el lienzo cuesta ~250 ns por pixel escrito, y el mismo pixel contra RAM
+ * cuesta una fraccion de eso.
+ *
+ * Y el millon de bytes ahora SI esta: el binario de la demo deja ~3,4 MB libres en el monton de C cuando el
+ * mundo ya esta cargado (medido: libre= 3.478.208 al cerrar la corrida de DC-002.140), porque la cache de
+ * tiles y el arena de bloques viven en la VRAM. Esta funcion pide el mismo bloque al monton: si el `malloc`
+ * falla, devuelve negativo y el que llama se queda con la VRAM (el camino de siempre, sin caida silenciosa).
+ *
+ * NO CAMBIA NADA MAS: el puntero que devuelve `d2c_pvr_pantalla_fb` es el mismo que usa el corrimiento del
+ * lienzo, y la conversion y la subida lo reciben por parametro desde Go. Lo unico que cambia es DONDE esta el
+ * bloque. */
+int d2c_pvr_pantalla_fb_ram_init(int w, int h) {
+    size_t bytes;
+
+    if (w <= 0 || h <= 0) {
+        return -1;
+    }
+
+    bytes = (size_t)w * (size_t)h * 4;
+
+    if (pant_fb != NULL && pant_fb_origen_ram && (size_t)pant_fb_bytes == bytes) {
+        return 0;
+    }
+    if (pant_fb != NULL) {
+        if (pant_fb_origen_ram) {
+            free(pant_fb);
+        } else {
+            pvr_mem_free(pant_fb);
+        }
+        pant_fb = NULL;
+        pant_fb_bytes = 0;
+        pant_fb_origen_ram = 0;
+    }
+
+    pant_fb = malloc(bytes);
+    if (pant_fb == NULL) {
+        return -2;
+    }
+
+    memset(pant_fb, 0, bytes);
+    pant_fb_bytes = (int)bytes;
+    pant_fb_origen_ram = 1;
+
+    return 0;
+}
+
+/* Si el lienzo esta en el monton de C (1) o en la VRAM (0). Lo que el log tiene que poder decir. */
+int d2c_pvr_pantalla_fb_en_ram(void) { return pant_fb_origen_ram; }
+
+/* DC-002.143 -- MUDAR EL LIENZO DE LA VRAM AL MONTON, EN CALIENTE.
+ *
+ * POR QUE EN CALIENTE Y NO AL PRINCIPIO. El bloque de 1.228.800 B no entra al arrancar: el monton de C esta lleno
+ * (medido en la corrida de esta tarjeta: libre=1.592 B al arrancar, y el `malloc` de arriba devuelve "Out of
+ * memory. Requested sbrk_base ..., diff 1228800"). El monton recien respira cuando el POC suelta el arena de
+ * bloques del mapa (cuadro 1), y ahi quedan ~3,4 MB libres. Esta funcion hace la mudanza en ese momento: pide el
+ * bloque, COPIA el lienzo (no se pierde el primer cuadro), devuelve la VRAM que ocupaba y devuelve el puntero
+ * nuevo. Si el `malloc` no da, devuelve 0 y no toca NADA (el lienzo sigue en la VRAM, sin caida silenciosa).
+ *
+ * El que llama tiene que reapuntar su vista del lienzo al puntero que devuelve esta funcion: el bloque se movio. */
+void *d2c_pvr_pantalla_fb_al_monton(void) {
+    void *nuevo;
+
+    if (pant_fb == NULL) {
+        return NULL;
+    }
+    if (pant_fb_origen_ram) {
+        return pant_fb;
+    }
+
+    nuevo = malloc((size_t)pant_fb_bytes);
+    if (nuevo == NULL) {
+        return NULL;
+    }
+
+    memcpy(nuevo, pant_fb, (size_t)pant_fb_bytes);
+    pvr_mem_free(pant_fb);
+
+    pant_fb = nuevo;
+    pant_fb_origen_ram = 1;
+
+    return pant_fb;
+}
+
 
 /* El puntero al framebuffer de la pantalla (0 si no hay). Cruza a Go como uintptr. */
 unsigned int d2c_pvr_pantalla_fb(void) { return (unsigned int)pant_fb; }

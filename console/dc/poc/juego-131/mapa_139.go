@@ -40,8 +40,8 @@ var (
 	// mapa139Nivel: el nivel que se pinto (un cambio de nivel obliga a repintar).
 	mapa139Nivel string
 	// el censo del tramo, para la evidencia
-	mapa139Saltados   int
-	mapa139Repintados int
+	mapa139Saltados    int
+	mapa139Repintados  int
 	mapa139Restaurados int
 )
 
@@ -158,7 +158,7 @@ func restaurarElMundo139(pixeles []byte) int {
 // informeDelMapaEstatico139: el censo del tramo (cada `cuadrosDelInforme132` cuadros), pegado a la linea de
 // las etapas para que se lea como su desglose.
 func informeDelMapaEstatico139() {
-	if cuadro%cuadrosDelInforme132 != 0 {
+	if cuadro%cadaInforme143() != 0 {
 		return
 	}
 
@@ -232,8 +232,26 @@ func marcarLoQueCambio139() {
 		pvr.MarcarSucio(ancho-290, 48, ancho, 290)
 	}
 
-	// el panel de dialogo, si esta abierto
-	if dialogoAbierto {
-		pvr.MarcarSucio(0, 0, ancho, alto)
+	// EL PANEL DEL DIALOGO O DE LA QUEST: se marca SU CAJA, y solo cuando el panel CAMBIA (se abre, cambia de
+	// pagina o se cierra). Antes se marcaba el lienzo ENTERO por tener un panel abierto, y eso cuesta la
+	// conversion completa: medido en esta tarjeta, conv_us=22.765 con bloques=300 por el panel de la quest abierto,
+	// el 47 % de un cuadro de 48 ms, para reconvertir 1,2 MB que no habian cambiado. El panel es opaco y se arma
+	// una vez, asi que su caja no cambia mientras sea el mismo panel. Al CERRARSE no hay que marcar nada: el mapa
+	// lo repinta el cuadro siguiente (`mapaSeRepinta139` compara `dialogoAbierto` y pide repintado entero).
+	if dialogoAbierto && elDialogo != nil {
+		if elDialogo != panelMarcado143 {
+			panelMarcado143 = elDialogo
+
+			pvr.MarcarSucio(elDialogo.X0, elDialogo.Y0, elDialogo.X0+elDialogo.Ancho, elDialogo.Y0+elDialogo.Alto)
+		}
+	} else {
+		panelMarcado143 = nil
+	}
+
+	// DC-002.143: el minimapa que se PINTO tiene que llegar a la pantalla aunque el heroe no haya cambiado de
+	// celda (un NPC que camino por su caja obliga a repintar el panel). El que se salteo no marca nada: sus
+	// pixeles son los del cuadro anterior.
+	if minimapaCambio143 == "si" && minimapaKnob == "si" && minimapaPintoEsteCuadro143 {
+		pvr.MarcarSucio(ancho-anchoDelMinimapa141, arribaDelMinimapa141, ancho, abajoDelMinimapa141)
 	}
 }

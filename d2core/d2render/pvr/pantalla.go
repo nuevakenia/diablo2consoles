@@ -39,6 +39,17 @@ func d2cPvrPantallaVram() int
 //extern d2c_pvr_pantalla_fb_init
 func d2cPvrPantallaFbInit(w, h int) int
 
+// DC-002.143: el mismo lienzo, pedido al MONTON DE C en vez de a la VRAM (ver el comentario en pvr_pantalla.c).
+//
+//extern d2c_pvr_pantalla_fb_ram_init
+func d2cPvrPantallaFbRamInit(w, h int) int
+
+//extern d2c_pvr_pantalla_fb_en_ram
+func d2cPvrPantallaFbEnRam() int
+
+//extern d2c_pvr_pantalla_fb_al_monton
+func d2cPvrPantallaFbAlMonton() uintptr
+
 //extern d2c_pvr_pantalla_fb
 func d2cPvrPantallaFb() uintptr
 
@@ -322,6 +333,45 @@ func VramDelSprite() int { return spriteEnVram }
 // lienzoEnVram: cuantos bytes del lienzo del cuadro viven en la VRAM (0 = el lienzo esta en el monton).
 var lienzoEnVram int
 
+// lienzoEnRam143: pedir el lienzo al MONTON DE C en vez de a la VRAM (DC-002.143). Lo pone el POC antes de Run
+// (`pvr.FijarLienzoEnRam143`), porque la palanca es de la corrida y no del backend.
+var lienzoEnRam143 bool
+
+// FijarLienzoEnRam143: prende (o apaga) el lienzo del cuadro en el monton de C. Con "false" el camino es el de
+// DC-002.22/139, bit a bit (el lienzo en la VRAM). Tiene que llamarse antes de `Run`.
+func FijarLienzoEnRam143(v bool) { lienzoEnRam143 = v }
+
+// LienzoEnRam143: donde quedo el lienzo (para la linea de la evidencia).
+func LienzoEnRam143() bool { return d2cPvrPantallaFbEnRam() != 0 }
+
+// MudarElLienzoAlMonton143 -- DC-002.143: mudar el lienzo del cuadro de la VRAM al MONTON DE C en caliente.
+//
+// POR QUE HACE FALTA. El bloque de 1.228.800 B no entra al arrancar (el monton de C esta lleno: libre=1.592 B
+// medidos al arrancar, `Out of memory ... diff 1228800`), pero si entra despues de que el POC suelta el arena de
+// bloques del mapa (~3,4 MB libres). Esta funcion es la mudanza en ese momento: C pide el bloque, copia el lienzo,
+// devuelve la VRAM y da el puntero nuevo; aca se reapunta la vista de pixeles de la Surface, que si no quedaria
+// escribiendo en el bloque que se acaba de devolver.
+//
+// Devuelve false si el monton no tiene el bloque: en ese caso no se toco NADA y el lienzo sigue en la VRAM.
+func MudarElLienzoAlMonton143(sup *Surface) bool {
+	if sup == nil || sup.imagen == nil {
+		return false
+	}
+
+	p := d2cPvrPantallaFbAlMonton()
+	if p == 0 {
+		return false
+	}
+
+	n := sup.imagen.ancho * sup.imagen.alto * 4
+	sup.imagen.pixeles = (*[1 << 30]byte)(unsafe.Pointer(p))[:n:n]
+	sup.imagen.vram = false
+
+	lienzoEnVram = 0
+
+	return true
+}
+
 // SuperficieDeLaPantalla: la superficie del CUADRO del motor, con sus pixeles en la VRAM del PVR.
 //
 // POR QUE (medido, ver la cabecera de renderer.go): el lienzo 640x480x4 = 1.228.800 B y el techo del
@@ -337,6 +387,27 @@ var lienzoEnVram int
 // SI LA VRAM NO DA: la superficie sale del monton (NuevaSurface) y el que mide lo sabe por
 // VramDelLienzo(), que devuelve 0. El aviso tambien va a la consola serie.
 func SuperficieDeLaPantalla(ancho, alto int) *Surface {
+	// DC-002.143: EL LIENZO EN EL MONTON DE C. La palanca `LIENZO_EN_RAM=si` pide el bloque de 1.228.800 B al
+	// monton en vez de a la VRAM: la VRAM se escribe sin cache y el mapa paga eso por pixel. Si el monton no
+	// tiene el bloque, se sigue por el camino de siempre (la VRAM) y el log lo dice con el codigo del `malloc`.
+	if lienzoEnRam143 {
+		if r := d2cPvrPantallaFbRamInit(ancho, alto); r == 0 {
+			n := ancho * alto * 4
+			pixeles := (*[1 << 30]byte)(unsafe.Pointer(d2cPvrPantallaFb()))[:n:n]
+
+			img := &Imagen{pixeles: pixeles, ancho: ancho, alto: alto, vram: false}
+			img.Rellenar(color.RGBA{R: 0, G: 0, B: 0, A: 0})
+
+			lienzoEnVram = 0
+
+			println("PVR-RENDERER: el lienzo del cuadro vive en el MONTON DE C:", n, "bytes")
+
+			return SurfaceDesdeImagen(img)
+		} else {
+			println("PVR-RENDERER: el monton no dio para el lienzo (codigo", r, "); se pide a la VRAM")
+		}
+	}
+
 	if r := d2cPvrPantallaFbInit(ancho, alto); r != 0 {
 		println("PVR-RENDERER: la VRAM no dio para el lienzo (codigo", r, "); el cuadro va al monton")
 

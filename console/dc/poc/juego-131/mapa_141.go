@@ -77,9 +77,9 @@ var (
 
 	// El censo del tramo, para la evidencia.
 	scroll141Desplazados, scroll141Enteros, scroll141Quietos, scroll141Fallos int
-	scroll141PxFranjas, scroll141PxCajas, scroll141PxPaneles                 int
-	scroll141UsMover, scroll141UsFranjas                                     int
-	scroll141Recortes, scroll141MaxSX, scroll141MaxSY                        int
+	scroll141PxFranjas, scroll141PxCajas, scroll141PxPaneles                  int
+	scroll141UsMover, scroll141UsFranjas                                      int
+	scroll141Recortes, scroll141MaxSX, scroll141MaxSY                         int
 
 	// scroll141RecortesIgnorados: cuantos rectangulos se descartaron por no entrar en la lista del lienzo
 	// (`recortesMax141` = 32). Es acumulado de la corrida y 0 es lo esperado: si algun dia deja de serlo, el
@@ -100,9 +100,9 @@ var (
 	// sx>0 y de sy>0. Comparar los primeros cuadros de un tramo recto gasta las comparaciones en UN cuadrante y
 	// deja los otros tres sin probar. Por eso la prueba compara hasta `comparacionesPorCuadrante141` cuadros de
 	// CADA cuadrante (mascara de signos) y no un total suelto.
-	scroll141Cuadrante    int // el codigo del ultimo cuadro caminando comparado (0 = ninguno todavia)
-	scroll141EnCuadrante  int // cuantas comparaciones se hicieron en ese cuadrante
-	scroll141Cuadrantes   int // mascara de los cuadrantes ya comparados (un bit por codigo)
+	scroll141Cuadrante   int // el codigo del ultimo cuadro caminando comparado (0 = ninguno todavia)
+	scroll141EnCuadrante int // cuantas comparaciones se hicieron en ese cuadrante
+	scroll141Cuadrantes  int // mascara de los cuadrantes ya comparados (un bit por codigo)
 
 	// pintandoLaReferencia141: mientras dura el cuadro de REFERENCIA de la comparacion. Los pintores que se
 	// saltean el trabajo cuando el instrumento por cuadro esta apagado (`volverAPintar*`, ver
@@ -202,9 +202,13 @@ func dibujarElCuadroQueCamina141(malla *pvr.Surface, superficie d2interface.Surf
 
 	tFranjas := d2cUs()
 
+	t143Recortes := cron143()
 	pxFranjas, pxCajas, pxPaneles, recortes := armarLosRecortes141(malla, sx, sy)
+	marca143(e143Recortes, t143Recortes)
 
+	t143Render := cron143()
 	rendererDelMapa.Render(superficie)
+	marca143(e143RenderMapa, t143Render)
 
 	usFranjas := int(d2cUs() - tFranjas)
 
@@ -778,10 +782,10 @@ func guardarLasBarrasDelCuadro141() {
 // promedios y los acumuladores del instrumento). Se guarda y se devuelve entero: la referencia no cuenta.
 type contadoresDelMinimapa141 struct {
 	cuadrosDibujados, celdasUltimas, celdasMax, pxUltimos, pxTotal int
-	msUltimo, msTotal, msMax, saltados, sinArte                  int
-	hayDibujo, ultimoHeroeX, ultimoHeroeY, ultimasCeldasDib       int
-	usTabla, usCaja, usCeldas, usMarcador, usExtra                int64
-	delTramo, celdasDelTramo, pixelesDelTramo                     int
+	msUltimo, msTotal, msMax, saltados, sinArte                    int
+	hayDibujo, ultimoHeroeX, ultimoHeroeY, ultimasCeldasDib        int
+	usTabla, usCaja, usCeldas, usMarcador, usExtra                 int64
+	delTramo, celdasDelTramo, pixelesDelTramo                      int
 }
 
 func copiaDeLosContadoresDelMinimapa141(m *minimapaDelJuego) contadoresDelMinimapa141 {
@@ -1122,9 +1126,9 @@ func cajaCruza141(c CajaDelJugador, x0, y0, x1, y1 int) bool {
 	return c.X0 < x1 && c.X1 > x0 && c.Y0 < y1 && c.Y1 > y0
 }
 
-// informeDelCuadroQueCamina141: el censo del tramo, pegado a la linea del mapa estatico (cada 30 cuadros).
+// informeDelCuadroQueCamina141: el censo del tramo, pegado a la linea del mapa estatico (cada `cadaInforme143`).
 func informeDelCuadroQueCamina141() {
-	if cuadro%cuadrosDelInforme132 != 0 {
+	if cuadro%cadaInforme143() != 0 {
 		return
 	}
 
