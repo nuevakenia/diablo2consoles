@@ -1,5 +1,20 @@
 # Auditoría 2 — ¿en qué estado está el proyecto de verdad? (2026-11-04)
 
+> **CORREGIDA EL MISMO DÍA.** La revisión adversarial
+> (`2026-11-04-revision-adversarial-auditoria-2.md`) demostró dos errores centrales de este documento, y la
+> síntesis corregida está en `2026-11-04-SINTESIS-y-PLAN.md`, que es el documento que manda:
+>
+> 1. **«Fase D no ha empezado» es falso.** Se intentó el 2026-10-31 y está medida en
+>    `console/dc/evidencia/dc-002.93-el-hueco-de-gc-init.md`: el motor arranca, carga config y tablas, y muere
+>    por RAM. El problema no es de imports: es de memoria.
+> 2. **«El POC importa 6 paquetes de formato» es falso.** El `juego-131` de hoy importa **32 paquetes** del
+>    motor, incluidos `d2mapengine`, `d2maprenderer` y `d2asset`. Esa descripción era del POC de 1.788 líneas
+>    del 29/10.
+>
+> Y la conclusión operativa también estaba mal: **el motor no cabe en 16 MB tal como está** (tablas 15-16,7 MB;
+> `MapTile` 328 B; superficies 4 B/píxel; contra 2,45 MB de montón). Se deja el texto original abajo como
+> registro, pero **no se use como plan**: el plan vigente es la síntesis.
+
 Continúa `2026-11-04-auditoria-demo.md`. Esa midió **por qué la demo se ve mal**. Esta mide **si el proyecto va
 hacia el juego** — y la respuesta corta es: **no, se desvió, y el desvío está documentado en nuestro propio
 repo desde hace seis días.**
