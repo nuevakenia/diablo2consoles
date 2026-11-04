@@ -6,7 +6,7 @@ estaba cableado: para ver la region vecina habia que regenerar el `.go` del plan
 que el cambio de region sea lo que el motor ya sabia hacer: soltar lo de la region que se deja, volver a llamar
 `ResetMapParaTilesExactos` con las claves de la vecina y reescribir sus casillas con `SetExactTiles`.
 
-LA CORRIDA QUE CIERRA LA TARJETA (Flycast, build `demo147`, una sola corrida):
+LA CORRIDA QUE CIERRA LA TARJETA (Flycast, build `demo147f` -- el del codigo que queda, una sola corrida):
 
   DEMO140: CRUZA OK nivel= BloodMoor:region region= 24 32 tiles= 1024 jugador= 16.5 16.5 ms= 26112
            libre= 1481128 libreAntes= 3054976 semiespacio= 1615200 semiespacioAntes= 1246160
@@ -61,7 +61,7 @@ Esta tarjeta emite el MISMO plan en forma plana: `Celdas` es un `[]uint16` con 8
 tres capas como (offset, largo) sobre `Tiles`) y `Tiles` es un `[]uint16` con 3 por registro (pieza, indice,
 flags). Las dos listas son DATO: ni una rebanada adentro, ni una reserva al arrancar.
 
-  regia del nivel entero en forma plana:   118.630 B   (5.056 casillas con algo + 6.289 registros)
+  el plan del nivel entero en forma plana:  118.630 B   (5.056 casillas con algo + 6.289 registros)
   la misma cosa en la forma de DC-002.145: ~222.000 B  (45.056 B x 5.056/1.024, extrapolado del `main.o`)
   lo que crecio el binario de verdad:      +68.352 B   (1ST_READ.BIN 5.839.624 -> 5.907.976)
 
@@ -194,7 +194,8 @@ las seis regiones se dibujarian una encima de la otra, porque todas empiezan en 
           sintoma: `Fatal: SH4 branch instruction in delay slot` (Flycast), siempre despues de una recoleccion
           (`ARQ-MARCA gc_collect`) y sin mensaje del runtime de Go
         build sin el corrimiento (`demo147`, 5.907.976 B):
-          tres corridas, tres veces las dos regiones y la corrida entera (780 cuadros), cero muertes
+          tres corridas, dos regiones en las TRES (una de ellas, con el guion corto, 780 cuadros seguidos),
+          cero muertes
 
       O sea: 32 B de codigo deciden si el binario vive, y el fallo se mueve de sitio entre corridas del MISMO
       binario -- es el defecto de layout/recolector que ya se declaro en DC-002.146 (alli el panic del rearme se
@@ -210,9 +211,9 @@ las seis regiones se dibujarian una encima de la otra, porque todas empiezan en 
   /tmp/moor-drlg -seed 1 -lado 32 -plan-regiones \
       console/dc/poc/juego-131/moor_regiones_147.go "<carpeta>"               # el plan del nivel entero (dato)
   DEMO_MOOR=si DEMO_MOOR_DRLG=si DEMO_MOOR_STREAM=si \
-      bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo147
-  GUION='nada 8 abajo+izquierda 45 nada 70' SEGUNDOS=135 \
-      bash scripts/console/run-demo-140.sh /tmp/dcbuild/demo147/disc.gdi /tmp/capturas
+      bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo147f
+  GUION='nada 8 abajo+izquierda 90 nada 40' SEGUNDOS=145 \
+      bash scripts/console/run-demo-140.sh /tmp/dcbuild/demo147f/disc.gdi /tmp/capturas
 
 ----------------------------------------------------------------------------------------------------------
 APENDICE -- la salida del host, tal cual (el nivel, los cuartos y la tabla de las seis regiones)
