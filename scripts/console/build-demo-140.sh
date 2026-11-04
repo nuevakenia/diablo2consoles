@@ -43,6 +43,9 @@ export DEMO=si
 export DEMO_MOOR="${DEMO_MOOR:-no}"
 # DC-002.144b: el orden de los dos pedidos grandes al cruzar (el buffer del `.dt1` mas grande primero, "si").
 export DEMO_MOOR_SCRATCH="${DEMO_MOOR_SCRATCH:-si}"
+# DC-002.145: DEMO_MOOR_DRLG=si = el afuera es una REGION del Blood Moor DE VERDAD (el plan del DRLG) y no la
+# pieza de 17 x 17. Por omision "no": el binario de la demo sigue siendo el de DC-002.144b.
+export DEMO_MOOR_DRLG="${DEMO_MOOR_DRLG:-no}"
 
 # ---- SIN GUIONES: todo lo que aprieta solo, apagado ----
 export MVP=no

@@ -949,4 +949,16 @@ var (
 	// PRIMERO, cae en ese hueco entero y los tramos crecen detras. Solo aplica con `demoMoor = "si"`: el camino
 	// del pueblo (la demo de DC-002.141) no cambia ni un byte.
 	moorScratchPrimero = "si"
+
+	// demoMoorDRLG (DC-002.145): QUE ENTRA AL CRUZAR. "si" = el afuera es una REGION del Blood Moor DE VERDAD
+	// (el nivel 2, 56 x 96 en total), compuesta con el plan que el DRLG calculo en el host
+	// (`moor_region_145.go`) y escrita casilla por casilla con `SetExactTiles`; "no" (el defecto) = el camino de
+	// DC-002.140b/.144b, la pieza de `.ds1` de 17 x 17 (`Act1/Outdoors/Wild1.ds1`).
+	//
+	// POR QUE EL PLAN VIENE DEL HOST Y NO SE GENERA EN LA CONSOLA. Medido: el nivel entero pide 3.047.626 B de
+	// arena de bloques + 1.141.544 B de buffer contra 2.994.912 B libres (no entra: faltan 1,2 MB), y la region
+	// de 32 x 32 que quedo pide 1.534.112 B + 1.051.532 B = 2.585.644 B, o sea entra con 409 KB de sobra.
+	// Correr el DRLG adentro de la SH-4 pediria mas RAM que el nivel (tablas, patrones de `.ds1` y los registros
+	// de `BuildTiles`), asi que la consola COMPONE lo que el host GENERO. Solo actua con `demoMoor = "si"`.
+	demoMoorDRLG = "no"
 )

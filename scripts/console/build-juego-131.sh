@@ -500,8 +500,11 @@ echo "   MVP138 mvp=$(leer_knob mvpKnob) vista=$(leer_knob vistaX),$(leer_knob v
 [ -n "${DEMO:-}" ] && pisa_knob demoKnob "$DEMO" 1
 [ -n "${DEMO_MOOR:-}" ] && pisa_knob demoMoor "$DEMO_MOOR" 1
 [ -n "${DEMO_MOOR_SCRATCH:-}" ] && pisa_knob moorScratchPrimero "$DEMO_MOOR_SCRATCH" 1
+# DC-002.145: DEMO_MOOR_DRLG=si compone una REGION del Blood Moor DE VERDAD (el plan del DRLG, `moor_region_145.go`)
+# en vez de la pieza de `.ds1` de 17 x 17. Por omision "no" (el camino de DC-002.144b, bit a bit).
+[ -n "${DEMO_MOOR_DRLG:-}" ] && pisa_knob demoMoorDRLG "$DEMO_MOOR_DRLG" 1
 
-echo "   DEMO140 demo=$(leer_knob demoKnob) moor=$(leer_knob demoMoor) scratchPrimero=$(leer_knob moorScratchPrimero)"
+echo "   DEMO140 demo=$(leer_knob demoKnob) moor=$(leer_knob demoMoor) scratchPrimero=$(leer_knob moorScratchPrimero) drlg=$(leer_knob demoMoorDRLG)"
 
 echo "== 4/6 compilando y enlazando contra los .gox del motor"
 GODC_GOX="$GEN" bash "$HERE/build-dc.sh" "$SRCB" "$OUT" > "$OUT/build.log" 2>&1 || {

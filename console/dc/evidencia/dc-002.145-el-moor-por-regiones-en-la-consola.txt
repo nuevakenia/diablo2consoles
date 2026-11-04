@@ -1,0 +1,156 @@
+DC-002.145 -- EL BLOOD MOOR DE VERDAD EN LA CONSOLA: UNA REGION DE 32 x 32 COMPUESTA CON EL DRLG
+
+QUE ENTRA Y QUE NO. Hasta DC-002.144c el "afuera" de la consola era UNA PIEZA de `.ds1`
+(`Act1/Outdoors/Wild1.ds1`, el preset 32 "Act 1 - Fence Fill 1", 17 x 17 = 289 casillas): un nivel de afuera de
+verdad, pero UN PRESET, no el Blood Moor. El Blood Moor es el nivel 2 de `Levels.txt`: 56 x 96 = 5.376 casillas,
+y no tiene fila de preset -- en el juego lo arma el DRLG, region por region, con las piezas de `LvlPrest.txt`.
+Esta tarjeta mete en la consola una REGION DE 32 x 32 (1.024 casillas) DE ESE NIVEL, compuesta con los registros
+que el DRLG genera, por el mismo camino que el motor de la PC (`SetExactTiles`). El nivel entero NO entra, y abajo
+estan los bytes.
+
+1. MEDIDO EN EL HOST ANTES DE TOCAR LA CONSOLA
+
+Herramienta nueva: `console/dc/medidas/moor-drlg` (corre el DRLG del acto 1 sobre los MPQ reales:
+`drlgworld.Generate` + `drlgoutdoor.Generate` + `Level.BuildTiles`, el MISMO camino que el motor de la PC; no es
+una reimplementacion paralela). Salida completa: `dc-002.145-el-moor-medido-en-el-host.txt`.
+
+  NIVEL id=2 nombre="Act 1 - Wilderness 1" levels.txt=80x80   mundo rect=1064,1096 56x96 casillas=5376
+  NIVEL conPiso=5058 registros=6291 (piso/pared/sombra 5062/1064/165)
+  NIVEL dt1s=11 crudo=5.912.240 mayorCrudo=1.141.544 (act1/outdoors/cottages.dt1) bloquesRef=2.898.362
+  NIVEL arenaDeBloques=3.047.626 claves=350
+
+  REGION 32x32 desde 24,32   casillas=1024 conPiso=1024 registros=1264 (piso/pared/sombra 1024/219/21)
+  REGION dt1s=7  crudo=4.007.549 mayorCrudo=1.051.532 (act1/outdoors/swamp.dt1) bloquesRef=1.455.383
+  REGION arenaDeBloques=1.534.112 claves=125
+  REGION piezas: act1/outdoors/{puddle,stones,stonewall,swamp,treegroups}.dt1 act1/town/{floor,trees}.dt1
+
+  REGION 16x16 desde 0,48    casillas=192 registros=261 dt1s=4 claves=35
+         arenaDeBloques=786.313  buffer=1.008.003 (act1/town/floor.dt1)
+
+La cuenta que decide (los dos pedidos grandes son el ARENA DE BLOQUES que pide el nivel --los bloques RLE de los
+tiles que referencia, filtrados por clave, `d2asset.PrepararArenaDeBloquesUsados`-- y el BUFFER DE LECTURA
+prestado, que es el `.dt1` mas grande):
+
+  nivel entero   3.047.626 + 1.141.544 = 4.189.170 B   contra 2.994.912 B libres  -> NO ENTRA (faltan 1.194.258)
+  region 32x32   1.534.112 + 1.051.532 = 2.585.644 B   contra 2.994.912 B libres  -> entra (409.268 de sobra)
+  region 16x16     786.313 + 1.008.003 = 1.794.316 B   contra 2.994.912 B libres  -> entra (1.200.596 de sobra)
+
+De ahi el tamano: 32 x 32 es la region mas grande que entra, y con 16 casillas para cada lado del jugador el
+terreno cubre la ventana entera (640 x 480 son ~20 x 15 casillas de 32 px).
+
+2. EL REPARTO DEL TRABAJO (y por que)
+
+El DRLG es un port grande (25 paquetes de tablas, patrones de `.ds1`, `BuildTiles`) y la SH-4 tiene 16 MB: correrlo
+adentro pediria mas RAM que el nivel, y ademas lo que la consola necesita por cuadro son los TILES, no el
+generador. Asi que:
+
+  - el plan de la region lo calcula el DRLG en el HOST y se trae en el binario como DATOS: `moor_region_145.go`,
+    generado por `moor-drlg -plan` (1024 casillas, 1264 registros, 7 piezas, 125 claves, 90 KB de fuente);
+  - la CONSOLA compone: pide el arena de bloques de su region, deja el mapa limpio y escribe cada casilla con
+    `SetExactTiles`, que es el mismo camino que el motor usa para los niveles generados.
+
+El plan se escribe YA pasado por `go/format` (el plan es un archivo de Go del repo). `-plan` es determinista: la
+semilla va en el plan y en el log (`semilla= 1`).
+
+3. LO QUE SE TUVO QUE AGREGAR AL MOTOR
+
+`d2mapengine.ResetMapParaTilesExactos(m, levelType, ancho, alto, claves, scratch)`: el `ResetMapParaStamp` de la
+PC pide la lista de `.dt1` del LEVEL TYPE (32 columnas en el afuera: no entran) y ademas un `.ds1`. El nuevo deja
+el mapa limpio con las claves de la region y el `.dt1` mas grande como `scratch`, y NO lista `.dt1`: los carga
+`exactComponent` cuando el primer tile de cada uno lo pide (7 en esta region, no 32).
+
+Es una FUNCION del paquete y no un metodo a proposito: gccgo 15.1 no resuelve desde `main` los METODOS recien
+agregados a un tipo de otro paquete ("reference to undefined identifier", medido en el primer build de esta
+tarjeta); las funciones del paquete si.
+
+4. LA CORRIDA (build y log)
+
+  build:  DEMO=si DEMO_MOOR=si DEMO_MOOR_DRLG=si MONSTRUOS=2 MEDIR_CUADRO=no MEDIR_VIVO=no \
+          bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo145
+  corrida: GUION='nada 8 derecha 2.5 abajo 2.5 nada 45' SEGUNDOS=100 \
+          bash scripts/console/run-demo-140.sh /tmp/dcbuild/demo145/dc140.gdi /tmp/capturas-145
+  emulador: Flycast, ventana 640x480. Log completo: `dc-002.145-el-moor-por-regiones-flycast.log`.
+
+  ANTES (el pueblo, y el momento del cruce)
+  DEMO140: TABLAS SE QUEDAN (demoMoor=si: cruzar el borde necesita LvlPrest y LvlTypes)
+  DEMO140: CRUZA al Blood Moor desde celda= 42.9927 5.31057 libre= 3145128 semiespacio= 1587664
+  DEMO140: CRUZA cache del pueblo soltada bytes= 3481600 libre= 3145128
+  DEMO140: CRUZA casillas del pueblo soltadas libre= 3145128 semiespacio= 1213040
+
+  EL PLAN QUE ENTRA
+  DEMO140: REGION PLAN delDRLG nivel= 2 semilla= 1 region= 32 x 32 desde= 24 32 delNivel= 56 x 96
+           casillas= 1024 registros= 1264 piezas= 7 claves= 125
+  DEMO140: REGION BUFFER primero= true delDT1MasGrande= 1051532 libre= 3145128 servible= 1051532
+           vramLibre= 3511976                             <- el buffer prestado de lectura
+  DEMO140: REGION ARENA copiado= 1534112 tramos= 3 capacidad= 1572864 bufferSoltado= 1051532
+           libre= 1572240 semiespacio= 1621464             <- el arena de la region, copiado y devuelto el buffer
+  DEMO140: REGION COMPUESTA casillas= 1024 conPiso= 1024 sinNada= 0 fallas= 0 tiles= 1024 ms= 24181
+           libre= 1572240 semiespacio= 1621544 vramLibre= 3511976
+
+  Los tres numeros que importan: 1024 de 1024 casillas con piso, `sinNada= 0`, y `fallas= 0` (ninguna casilla
+  quedo sin tile en el motor). El arena copiado en la consola (1.534.112 B) es EL MISMO que midio el host para
+  esa region: la cuenta de bloques de los dos lados coincide al byte.
+
+  LA INTERFAZ SIGUE AL NIVEL NUEVO (lo de DC-002.144c, ahora sobre este nivel)
+  JUEGO130: MINIMAPA REARME nivelAntes= 1 nivelAhora= 2 nombre= 1 Wilderness filasDeLaTabla= 83 -> 142
+            celdasAntes= 680 celdasAhora= 742 piso= 704 pared= 38 cuadrosDeArte= 59 -> 75
+            cuadrosSoltados= 59 faltan= 0 bytesDeArte= 11890 -> 11580 liberados= 11890
+            libreAntes= 1572240 libreDespues= 1572432 semiespacioAntes= 1621816
+            semiespacioDespues= 1537168 ms= 1328
+  JUEGO125: HUD REARME zonaAntes= Rogue Encampment zonaAhora= Blood Moor fuenteDelNombre= levels.txt LevelName
+            glifos= 13 -> 18 glifosNuevos= 5 letrasSinGlifo= 0
+  DEMO140: CRUZA OK nivel= BloodMoor:region tiles= 1024 jugador= 16.5 16.5 ms= 26046 libre= 1571272
+           semiespacio= 1530912 vramLibre= 3511976
+
+  Y SIGUE CORRIENDO (no es una foto): 10 fps con el mapa puesto (`msMapaPorCuadro` 53-56 en el tramo de 30
+  cuadros), 720 cuadros en la corrida, el jugador en 16.5 16.5 del nivel nuevo.
+
+  La MISMA tarjeta con region de 16 x 16 (desde 0,48) tambien cruzo, con sus numeros:
+  arena copiado= 786313 tramos= 2 bufferSoltado= 1008003 libre= 1949456, 256 tiles, 0 fallas, 11 fps, y el
+  minimapa rearmado con solo 9 celdas (ver el defecto 6.2).
+
+5. LO QUE SE VE
+
+  `dc-002.145-el-moor-region-32x32.png`   la region compuesta en pantalla: el terreno llena la ventana (pasto,
+                                          tierra, rocas, matorrales), el heroe en el centro, el minimapa con la
+                                          forma de la region (742 celdas del afuera) y la barra de la zona.
+  `dc-002.145-la-zona-blood-moor.png`     la franja de arriba: "BLOOD MOOR".
+  Antes/despues de la barra de zona: `dc-002.144c-zona-{antes-rogue-encampment,despues-blood-moor}.png` (144c),
+  que es la misma franja con el nombre del pueblo.
+
+6. LO QUE QUEDA DECLARADO (medido, no arreglado en esta tarjeta)
+
+  6.1 UN PANIC DEPENDIENTE DEL LAYOUT AL RELEER `AutoMap.txt`. En los builds de 16 x 16 anteriores al build
+      limpio, el rearme del minimapa murio con `panic: slice bounds out of range` dentro de
+      `leerLaTablaDelNivel`, entre la fuente y la tabla (log: `DEMO140: REARME paso=1` y, con mas traza,
+      `REARME-R2 fuente= true` seguido de `panic: slice bounds out of range`). El MISMO build, con tres
+      `println` de traza adentro de esa funcion, NO panicó: desaparecio al cambiar el layout del monton, con la
+      misma entrada. En el build limpio de 32 x 32 no se reprodujo: tres cruces completos (dos con la region
+      de 32 x 32, el ultimo con el fuente final, y uno de control con la de 16 x 16). Queda como defecto
+      declarado: el rearme del minimapa tiene que poder fallar sin matar el cruce (un `recover` en
+      `recargarElMinimapaDelNivel`) y la lectura tiene que ser la misma con cualquier layout.
+
+  6.2 EL AUTOMAPA DEL DRLG NO SIEMBRA TODAS LAS CELDAS. Con la region de 32 x 32 el modelo se llena (742 celdas
+      de 1024 casillas); con la de 16 x 16 desde 0,48 quedaron 9 (piso= 0, pared= 9). No es el minimapa (la
+      tabla, el arte y la semilla son los del nivel nuevo): es que las filas de `AutoMap.txt` del "1 Wilderness"
+      matchean por (tile, estilo, secuencia) y los tiles que el DRLG pone en esa region no caen en las filas.
+      Falta el mapeo estilo/secuencia del DRLG al automapa.
+
+7. LO QUE ESTA TARJETA NO ES
+
+  - NO es el nivel entero: son 1.024 de las 5.376 casillas del Blood Moor (una region declarada, con su origen
+    24,32 y su lado 32 en el plan y en el log).
+  - NO hay streaming: pedir la region vecina es generar otro plan (`moor-drlg -lado 32 -ox .. -oy ..`) y
+    recompilar. La demo ya toma la region como dato (`moorPlanoRegionX/Y`, `moorPlanoLado`), asi que el
+    streaming no empieza de cero.
+  - NO cambia el binario de la demo si no se pide: `demoMoorDRLG` arranca en "no" y el camino de DC-002.144b
+    (la pieza de `.ds1`) queda intacto, linea por linea.
+
+8. COMO SE REPITE
+
+  go build -o /tmp/moor-drlg ./console/dc/medidas/moor-drlg
+  /tmp/moor-drlg "<carpeta de Diablo II>"                      # el nivel entero y sus numeros
+  /tmp/moor-drlg -lado 32 -ox 24 -oy 32 "<carpeta>"            # la region que compone la consola
+  /tmp/moor-drlg -lado 32 -ox 24 -oy 32 -plan console/dc/poc/juego-131/moor_region_145.go "<carpeta>"
+  DEMO_MOOR=si DEMO_MOOR_DRLG=si bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo145
+  bash scripts/console/run-demo-140.sh /tmp/dcbuild/demo145/dc140.gdi /tmp/capturas

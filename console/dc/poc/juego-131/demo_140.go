@@ -417,6 +417,14 @@ func demoCruzaAlMoor() bool {
 
 	println("DEMO140: CRUZA casillas del pueblo soltadas libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()))
 
+	// ---- el nivel nuevo: EL BLOOD MOOR POR REGIONES CON EL DRLG (DC-002.145) ----
+	// Con `demoMoorDRLG = "si"` el afuera NO es un `.ds1`: es una region del nivel 2 compuesta con el plan que
+	// el DRLG calculo en el host (`moor_145.go`). El camino del preset (DC-002.140/.144b) queda intacto abajo,
+	// para que el A/B sea una constante.
+	if demoMoorDRLG == "si" {
+		return demoComponeLaRegionDelMoor(t0)
+	}
+
 	// ---- el nivel nuevo: el BLOOD MOOR, por su preset ----
 	preset := presetDelMoor()
 	if preset < 0 {
@@ -489,11 +497,19 @@ func demoCruzaAlMoor() bool {
 
 	// EL NIVEL QUE QUEDO: el nombre sale del `.ds1` que se compuso, no de una constante (decir "BloodMoor"
 	// cuando el archivo es `Wild1.ds1` seria otra fuente de verdad y una mentira en el log).
-	demoNivelActual = "Afueras:" + nombreBaseDeLaRuta(ruta)
+	demoAcomodaElCruce("Afueras:"+nombreBaseDeLaRuta(ruta), float64(tamano.Width)/2, float64(tamano.Height)/2, t0)
+
+	return true
+}
+
+// demoAcomodaElCruce (DC-002.145): lo que se hace IGUAL despues de componer el nivel nuevo, sea un `.ds1`
+// entero (el camino de DC-002.140b/.144b) o una region del afuera compuesta con el plan del DRLG (DC-002.145):
+// el jugador y los bichos al nivel nuevo, la interfaz rearmada, el motor avisado del cambio de area y el cierre
+// del cruce con los numeros. `nombre` es el del nivel que quedo y `cx, cy` la casilla donde arranca el jugador.
+func demoAcomodaElCruce(nombre string, cx, cy float64, t0 int64) {
+	demoNivelActual = nombre
 
 	// ---- el jugador y los bichos, al nivel nuevo ----
-	cx, cy := float64(tamano.Width)/2, float64(tamano.Height)/2
-
 	if len(jugadores) > 0 && jugadores[0].Mov != nil {
 		jugadores[0].Mov.Est = NuevoEstado(cx, cy, false)
 	}
@@ -524,11 +540,9 @@ func demoCruzaAlMoor() bool {
 
 	runtime.GC()
 
-	println("DEMO140: CRUZA OK nivel=BloodMoor tiles=", len(*motorDelMapa.Tiles()), "jugador=", cx, cy,
+	println("DEMO140: CRUZA OK nivel=", nombre, "tiles=", len(*motorDelMapa.Tiles()), "jugador=", cx, cy,
 		"ms=", int64(d2cMs())-t0, "libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()),
 		"vramLibre=", pvr.VramDisponible())
-
-	return true
 }
 
 // demoRearmaLaInterfaz: el MINIMAPA y el HUD del nivel que acaba de entrar (DC-002.144c).
@@ -554,8 +568,12 @@ func demoRearmaLaInterfaz() {
 	celdasDelNivel := 0
 
 	if elMinimapa != nil {
+		println("DEMO140: REARME paso=1 minimapaDelNivel=", tipoDelNivel, "libre=", d2cMontonLibre())
+
 		minimapaOk = elMinimapa.recargarElMinimapaDelNivel(tipoDelNivel, 0)
 		celdasDelNivel = elMinimapa.Modelo.Count()
+
+		println("DEMO140: REARME paso=2 minimapaListo=", minimapaOk, "libre=", d2cMontonLibre())
 	} else {
 		println("DEMO140: REARME sin minimapa en la corrida (MINIMAPA=no): no hay nada que recargar")
 	}
@@ -565,7 +583,11 @@ func demoRearmaLaInterfaz() {
 	hudOk := false
 
 	if elHUD != nil {
+		println("DEMO140: REARME paso=3 zona=", nombre, "de=", deDonde, "libre=", d2cMontonLibre())
+
 		hudOk = elHUD.rearmarLaZona(nombre, deDonde)
+
+		println("DEMO140: REARME paso=4 hudListo=", hudOk, "libre=", d2cMontonLibre())
 	} else {
 		println("DEMO140: REARME sin HUD en la corrida (HUD=no): no hay zona que rearmar")
 	}

@@ -314,6 +314,40 @@ func (m *MapEngine) ResetMapParaStamp(levelType d2enum.RegionIdType, width, heig
 	}
 }
 
+// ResetMapParaTilesExactos (DC-002.145): deja el mapa listo para que el que lo compone le escriba las casillas
+// una por una con `SetExactTiles` (un nivel que NO viene de un `.ds1`: el afuera que el DRLG arma por regiones).
+//
+// QUE HACE Y QUE NO. Es `ResetMap` SIN la lista de `.dt1` del level type (el afuera tiene 32 columnas de archivo
+// y cargarlas todas no entra en la consola): los `.dt1` los carga `exactComponent` cuando el primer tile de cada
+// uno lo pide, y solo los que la region referencia. El arena de bloques se dimensiona con lo que el que compone
+// sabe de su region: `claves` = las `(estilo, secuencia, tipo)` de sus tiles y `scratch` = el `.dt1` mas grande
+// de la region (el buffer prestado de lectura). Es el mismo contrato de `ResetMapParaStamp`.
+//
+// ES UNA FUNCION DEL PAQUETE Y NO UN METODO, a proposito: gccgo 15.1 no resuelve desde `main` los METODOS
+// recien agregados a un tipo de otro paquete ("reference to undefined identifier", medido en el build de
+// DC-002.145 con `m.ResetMapParaTilesExactos`), y si resuelve las funciones del paquete.
+func ResetMapParaTilesExactos(m *MapEngine, levelType d2enum.RegionIdType, width, height int, claves []int64,
+	scratch int) {
+	if m == nil {
+		return
+	}
+
+	if m.asset == nil {
+		m.resetMapBase(levelType, width, height)
+
+		return
+	}
+
+	am := m.asset
+	d2asset.PrepararArenaDeBloquesUsados(claves, scratch)
+
+	// el arena y el cache de `dt1s` son del nivel: los tiles cacheados del nivel anterior solo tienen los
+	// bloques que ESE nivel usaba.
+	am.ReiniciarArenaDeTiles()
+
+	m.resetMapBase(levelType, width, height)
+}
+
 // ReservarArenaParaEstosTiles: deja el arena de crudos dimensionado a la suma exacta de estos `.dt1`
 // (camino de DC-002.78, sin el empacado de bloques). Se usa cuando NO se prende el arena de bloques usados.
 func (m *MapEngine) ReservarArenaParaEstosTiles(rutas []string) int {

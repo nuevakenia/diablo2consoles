@@ -1,0 +1,180 @@
+DC-002.145 -- EL BLOOD MOOR MEDIDO EN EL HOST CON EL DRLG DE VERDAD (drlgworld.Generate +
+drlgoutdoor.Generate + Level.BuildTiles sobre los MPQ reales), ANTES de tocar la consola.
+
+herramienta: console/dc/medidas/moor-drlg  (mismo camino que el motor de la PC)
+comandos:
+  /tmp/moor-drlg "<carpeta de Diablo II>" -lado 16 -ox 0  -oy 48
+  /tmp/moor-drlg "<carpeta de Diablo II>" -lado 32 -ox 24 -oy 32
+nota: las regiones van en casillas RELATIVAS AL NIVEL; el nivel mide 56 x 96 (x 0..55, y 0..95).
+
+QUE CONTESTA CADA BLOQUE
+  NIVEL    el rectangulo, las casillas con piso, los registros del DRLG y lo que pide el nivel ENTERO.
+  REGION   lo mismo para la region pedida: es lo que la consola compone con `SetExactTiles`.
+  REGION dt1s   los `.dt1` que la region referencia (son los que hay que cargar, no los 32 del level type)
+                y la arena de bloques que piden sus claves (lo que copia `PrepararArenaDeBloquesUsados`).
+  REGION piezas la lista de `.dt1` de la region, que es la tabla de piezas del plan.
+
+======================== REGION 16 x 16 (desde 0,48) ========================
+NIVEL id=2 nombre="Act 1 - Wilderness 1" drlgType=3 levelType=2 levels.txt=80x80
+PARAMS mundo rect=1064,1096 56x96 casillas=5376 odFlags=0x0 baseSeed=0x6ac6935f vecinos=2
+PARAMS pueblo=1120,1144 56x40
+VECINO nivel=3 lado=1 rect=1080,1016 80x80
+VECINO nivel=1 lado=2 rect=1120,1144 56x40
+GENERADO rejilla=7x12 cuartos=79 casillas=56x96
+CUARTOS llanos=31 presets=48 piezasDistintas=24
+  pieza Act1/Caves/DenEnt2.ds1                   x1
+  pieza Act1/Outdoors/Arrow.ds1                  x1
+  pieza Act1/Outdoors/Bord1.ds1                  x3
+  pieza Act1/Outdoors/Bord10.ds1                 x3
+  pieza Act1/Outdoors/Bord11.ds1                 x3
+  pieza Act1/Outdoors/Bord12.ds1                 x3
+  pieza Act1/Outdoors/Bord1b.ds1                 x1
+  pieza Act1/Outdoors/Bord1c.ds1                 x1
+  pieza Act1/Outdoors/Bord2.ds1                  x5
+  pieza Act1/Outdoors/Bord2b.ds1                 x1
+  pieza Act1/Outdoors/Bord2c.ds1                 x1
+  pieza Act1/Outdoors/Bord3.ds1                  x3
+  pieza Act1/Outdoors/Bord3b.ds1                 x1
+  pieza Act1/Outdoors/Bord3o.ds1                 x1
+  pieza Act1/Outdoors/Bord4.ds1                  x2
+  pieza Act1/Outdoors/Bord4c.ds1                 x2
+  pieza Act1/Outdoors/Bord5.ds1                  x3
+  pieza Act1/Outdoors/Bord6.ds1                  x3
+  pieza Act1/Outdoors/Bord7.ds1                  x2
+  pieza Act1/Outdoors/Bord8.ds1                  x2
+  pieza Act1/Outdoors/Bord9.ds1                  x3
+  pieza Act1/Outdoors/Cott2.ds1                  x1
+  pieza Act1/Outdoors/Pond1.ds1                  x1
+  pieza Act1/Outdoors/XRock.ds1                  x1
+=== EL NIVEL ENTERO (56 x 96) ===
+NIVEL casillas=5058 conPiso=5058 sinPiso=0 registros=6291 piso/pared/sombra=5062/1064/165 rango=x 0..56 y 0..95
+NIVEL dt1s=11 crudo=5912240 mayorCrudo=1141544 (act1/outdoors/cottages.dt1) bloquesRef=2898362 arenaDeBloques=3047626 claves=350
+NIVEL piezas: act1/caves/cavedr.dt1 act1/outdoors/cottages.dt1 act1/outdoors/objects.dt1 act1/outdoors/pond.dt1 act1/outdoors/puddle.dt1 act1/outdoors/stones.dt1 act1/outdoors/stonewall.dt1 act1/outdoors/swamp.dt1 act1/outdoors/treegroups.dt1 act1/town/floor.dt1 act1/town/trees.dt1
+   act1/caves/cavedr.dt1                  tiles=24
+   act1/outdoors/cottages.dt1             tiles=39
+   act1/outdoors/objects.dt1              tiles=14
+   act1/outdoors/pond.dt1                 tiles=16
+   act1/outdoors/puddle.dt1               tiles=24
+   act1/outdoors/stones.dt1               tiles=35
+   act1/outdoors/stonewall.dt1            tiles=41
+   act1/outdoors/swamp.dt1                tiles=18
+   act1/outdoors/treegroups.dt1           tiles=21
+   act1/town/floor.dt1                    tiles=71
+   act1/town/trees.dt1                    tiles=117
+=== LAS REGIONES DE 32x32 ===
+REGION 0,0 casillas=1024 conPiso=896 sinPiso=128 registros=1119 piso/pared/sombra=900/177/42 rango=x 0..31 y 0..31
+REGION 0,0 dt1s=9 crudo=4657207 mayorCrudo=1051532 (act1/outdoors/swamp.dt1) bloquesRef=1760476 arenaDeBloques=1898169 claves=176
+REGION 0,0 piezas: act1/caves/cavedr.dt1 act1/outdoors/objects.dt1 act1/outdoors/puddle.dt1 act1/outdoors/stones.dt1 act1/outdoors/stonewall.dt1 act1/outdoors/swamp.dt1 act1/outdoors/treegroups.dt1 act1/town/floor.dt1 act1/town/trees.dt1
+   act1/caves/cavedr.dt1                  tiles=24
+   act1/outdoors/objects.dt1              tiles=13
+   act1/outdoors/puddle.dt1               tiles=24
+   act1/outdoors/stones.dt1               tiles=14
+   act1/outdoors/stonewall.dt1            tiles=27
+   act1/outdoors/swamp.dt1                tiles=4
+   act1/outdoors/treegroups.dt1           tiles=21
+   act1/town/floor.dt1                    tiles=52
+   act1/town/trees.dt1                    tiles=44
+REGION 0,32 casillas=1024 conPiso=960 sinPiso=64 registros=1218 piso/pared/sombra=960/244/14 rango=x 0..31 y 32..63
+REGION 0,32 dt1s=8 crudo=5149093 mayorCrudo=1141544 (act1/outdoors/cottages.dt1) bloquesRef=1703228 arenaDeBloques=1820357 claves=157
+REGION 0,32 piezas: act1/outdoors/cottages.dt1 act1/outdoors/puddle.dt1 act1/outdoors/stones.dt1 act1/outdoors/stonewall.dt1 act1/outdoors/swamp.dt1 act1/outdoors/treegroups.dt1 act1/town/floor.dt1 act1/town/trees.dt1
+   act1/outdoors/cottages.dt1             tiles=39
+   act1/outdoors/puddle.dt1               tiles=24
+   act1/outdoors/stones.dt1               tiles=20
+   act1/outdoors/stonewall.dt1            tiles=34
+   act1/outdoors/swamp.dt1                tiles=4
+   act1/outdoors/treegroups.dt1           tiles=21
+   act1/town/floor.dt1                    tiles=44
+   act1/town/trees.dt1                    tiles=18
+REGION 0,64 casillas=1024 conPiso=896 sinPiso=128 registros=1063 piso/pared/sombra=896/160/7 rango=x 0..31 y 64..95
+REGION 0,64 dt1s=7 crudo=4007549 mayorCrudo=1051532 (act1/outdoors/swamp.dt1) bloquesRef=1171825 arenaDeBloques=1314799 claves=88
+REGION 0,64 piezas: act1/outdoors/puddle.dt1 act1/outdoors/stones.dt1 act1/outdoors/stonewall.dt1 act1/outdoors/swamp.dt1 act1/outdoors/treegroups.dt1 act1/town/floor.dt1 act1/town/trees.dt1
+   act1/outdoors/puddle.dt1               tiles=20
+   act1/outdoors/stones.dt1               tiles=15
+   act1/outdoors/stonewall.dt1            tiles=28
+   act1/outdoors/swamp.dt1                tiles=4
+   act1/outdoors/treegroups.dt1           tiles=18
+   act1/town/floor.dt1                    tiles=37
+   act1/town/trees.dt1                    tiles=9
+
+
+======================== REGION 32 x 32 (desde 24,32) -- LA QUE QUEDO EN LA CONSOLA ========================
+NIVEL id=2 nombre="Act 1 - Wilderness 1" drlgType=3 levelType=2 levels.txt=80x80
+PARAMS mundo rect=1064,1096 56x96 casillas=5376 odFlags=0x0 baseSeed=0x6ac6935f vecinos=2
+PARAMS pueblo=1120,1144 56x40
+VECINO nivel=3 lado=1 rect=1080,1016 80x80
+VECINO nivel=1 lado=2 rect=1120,1144 56x40
+GENERADO rejilla=7x12 cuartos=79 casillas=56x96
+CUARTOS llanos=31 presets=48 piezasDistintas=24
+  pieza Act1/Caves/DenEnt2.ds1                   x1
+  pieza Act1/Outdoors/Arrow.ds1                  x1
+  pieza Act1/Outdoors/Bord1.ds1                  x3
+  pieza Act1/Outdoors/Bord10.ds1                 x3
+  pieza Act1/Outdoors/Bord11.ds1                 x3
+  pieza Act1/Outdoors/Bord12.ds1                 x3
+  pieza Act1/Outdoors/Bord1b.ds1                 x1
+  pieza Act1/Outdoors/Bord1c.ds1                 x1
+  pieza Act1/Outdoors/Bord2.ds1                  x5
+  pieza Act1/Outdoors/Bord2b.ds1                 x1
+  pieza Act1/Outdoors/Bord2c.ds1                 x1
+  pieza Act1/Outdoors/Bord3.ds1                  x3
+  pieza Act1/Outdoors/Bord3b.ds1                 x1
+  pieza Act1/Outdoors/Bord3o.ds1                 x1
+  pieza Act1/Outdoors/Bord4.ds1                  x2
+  pieza Act1/Outdoors/Bord4c.ds1                 x2
+  pieza Act1/Outdoors/Bord5.ds1                  x3
+  pieza Act1/Outdoors/Bord6.ds1                  x3
+  pieza Act1/Outdoors/Bord7.ds1                  x2
+  pieza Act1/Outdoors/Bord8.ds1                  x2
+  pieza Act1/Outdoors/Bord9.ds1                  x3
+  pieza Act1/Outdoors/Cott2.ds1                  x1
+  pieza Act1/Outdoors/Pond1.ds1                  x1
+  pieza Act1/Outdoors/XRock.ds1                  x1
+=== EL NIVEL ENTERO (56 x 96) ===
+NIVEL casillas=5058 conPiso=5058 sinPiso=0 registros=6291 piso/pared/sombra=5062/1064/165 rango=x 0..56 y 0..95
+NIVEL dt1s=11 crudo=5912240 mayorCrudo=1141544 (act1/outdoors/cottages.dt1) bloquesRef=2898362 arenaDeBloques=3047626 claves=350
+NIVEL piezas: act1/caves/cavedr.dt1 act1/outdoors/cottages.dt1 act1/outdoors/objects.dt1 act1/outdoors/pond.dt1 act1/outdoors/puddle.dt1 act1/outdoors/stones.dt1 act1/outdoors/stonewall.dt1 act1/outdoors/swamp.dt1 act1/outdoors/treegroups.dt1 act1/town/floor.dt1 act1/town/trees.dt1
+   act1/caves/cavedr.dt1                  tiles=24
+   act1/outdoors/cottages.dt1             tiles=39
+   act1/outdoors/objects.dt1              tiles=14
+   act1/outdoors/pond.dt1                 tiles=16
+   act1/outdoors/puddle.dt1               tiles=24
+   act1/outdoors/stones.dt1               tiles=35
+   act1/outdoors/stonewall.dt1            tiles=41
+   act1/outdoors/swamp.dt1                tiles=18
+   act1/outdoors/treegroups.dt1           tiles=21
+   act1/town/floor.dt1                    tiles=71
+   act1/town/trees.dt1                    tiles=117
+=== LAS REGIONES DE 32x32 ===
+REGION 0,0 casillas=1024 conPiso=896 sinPiso=128 registros=1119 piso/pared/sombra=900/177/42 rango=x 0..31 y 0..31
+REGION 0,0 dt1s=9 crudo=4657207 mayorCrudo=1051532 (act1/outdoors/swamp.dt1) bloquesRef=1760476 arenaDeBloques=1898169 claves=176
+REGION 0,0 piezas: act1/caves/cavedr.dt1 act1/outdoors/objects.dt1 act1/outdoors/puddle.dt1 act1/outdoors/stones.dt1 act1/outdoors/stonewall.dt1 act1/outdoors/swamp.dt1 act1/outdoors/treegroups.dt1 act1/town/floor.dt1 act1/town/trees.dt1
+   act1/caves/cavedr.dt1                  tiles=24
+   act1/outdoors/objects.dt1              tiles=13
+   act1/outdoors/puddle.dt1               tiles=24
+   act1/outdoors/stones.dt1               tiles=14
+   act1/outdoors/stonewall.dt1            tiles=27
+   act1/outdoors/swamp.dt1                tiles=4
+   act1/outdoors/treegroups.dt1           tiles=21
+   act1/town/floor.dt1                    tiles=52
+   act1/town/trees.dt1                    tiles=44
+REGION 0,32 casillas=1024 conPiso=960 sinPiso=64 registros=1218 piso/pared/sombra=960/244/14 rango=x 0..31 y 32..63
+REGION 0,32 dt1s=8 crudo=5149093 mayorCrudo=1141544 (act1/outdoors/cottages.dt1) bloquesRef=1703228 arenaDeBloques=1820357 claves=157
+REGION 0,32 piezas: act1/outdoors/cottages.dt1 act1/outdoors/puddle.dt1 act1/outdoors/stones.dt1 act1/outdoors/stonewall.dt1 act1/outdoors/swamp.dt1 act1/outdoors/treegroups.dt1 act1/town/floor.dt1 act1/town/trees.dt1
+   act1/outdoors/cottages.dt1             tiles=39
+   act1/outdoors/puddle.dt1               tiles=24
+   act1/outdoors/stones.dt1               tiles=20
+   act1/outdoors/stonewall.dt1            tiles=34
+   act1/outdoors/swamp.dt1                tiles=4
+   act1/outdoors/treegroups.dt1           tiles=21
+   act1/town/floor.dt1                    tiles=44
+   act1/town/trees.dt1                    tiles=18
+REGION 0,64 casillas=1024 conPiso=896 sinPiso=128 registros=1063 piso/pared/sombra=896/160/7 rango=x 0..31 y 64..95
+REGION 0,64 dt1s=7 crudo=4007549 mayorCrudo=1051532 (act1/outdoors/swamp.dt1) bloquesRef=1171825 arenaDeBloques=1314799 claves=88
+REGION 0,64 piezas: act1/outdoors/puddle.dt1 act1/outdoors/stones.dt1 act1/outdoors/stonewall.dt1 act1/outdoors/swamp.dt1 act1/outdoors/treegroups.dt1 act1/town/floor.dt1 act1/town/trees.dt1
+   act1/outdoors/puddle.dt1               tiles=20
+   act1/outdoors/stones.dt1               tiles=15
+   act1/outdoors/stonewall.dt1            tiles=28
+   act1/outdoors/swamp.dt1                tiles=4
+   act1/outdoors/treegroups.dt1           tiles=18
+   act1/town/floor.dt1                    tiles=37
+   act1/town/trees.dt1                    tiles=9
