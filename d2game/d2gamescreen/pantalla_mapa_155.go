@@ -41,6 +41,57 @@ const (
 	cuadrosQueSeInforman = 300
 )
 
+// ============================== EL PLAN DE LA CORRIDA (DC-002.157) ==============================
+//
+// La tarjeta pide "ms por cuadro medidos en Flycast ANTES y DESPUES de cada palanca, en la misma corrida".
+// Las cuatro palancas (el mapa estatico del renderer y las tres de la presentacion) se prenden y apagan EN
+// CALIENTE, asi que la corrida se parte en tramos y cada tramo es una ventana de medida: mismo binario,
+// mismo arranque, mismas condiciones. La escalera es acumulativa -- cada tramo tiene todo lo del anterior
+// mas UNA palanca -- y asi cada escalon dice cuanto paga esa palanca sola:
+//
+//	cuadros   1..20   NADA                  el cuadro de DC-002.156 (1,88 s medidos)
+//	cuadros  21..40   + mapa estatico       el mapa deja de repintarse (la camara no se movio)
+//	cuadros  41..60   + conversion rapida    el bucle de DC-002.135 en vez del de DC-002.132
+//	cuadros  61..80   + por filas            el orden de lectura de DC-002.141 (el lienzo seguido)
+//	cuadros  81..100  + conversion por zona  solo el recuadro visible: 640x480 de 800x600
+//	cuadros 101..120  + presentacion quieta  si el cuadro no cambio, no se convierte ni se sube
+//	cuadros 121..140  el mapa DE NUEVO, sin censo  el A/B del instrumento: el mapa se repinta (se apaga el
+//	                                        salto) y se apaga el cronometro por tile, asi el numero pelado
+//	                                        del mapa queda comparable con el de DC-002.156 (que no tenia
+//	                                        censo). Si el mapa cuesta lo mismo con y sin censo, el censo es
+//	                                        gratis; si no, la diferencia ES el costo de medir.
+//
+// LOS TRAMOS SON DE 20 CUADROS. El primero es el caro (20 x 1,8 s = 36 s) y el ultimo tambien (otros 36 s);
+// los del medio son decimas. Con el arranque del pueblo (50 s) la corrida entera entra en los 180 s del
+// script. El tramo se informa al CERRARSE (cuando entra la palanca siguiente), con el promedio del tramo y el
+// censo del renderer.
+const (
+	desdeMapaEstatico157       = 21
+	desdeConversionRapida157   = 41
+	desdeConversionPorFilas157 = 61
+	desdeConversionPorZona157  = 81
+	desdePresentacionQuieta157 = 101
+	desdeElMapaDeNuevo157      = 121
+)
+
+// palancasDePresentacion157: lo que la pantalla le puede pedir a la Surface del cuadro para la presentacion.
+//
+// POR QUE UNA INTERFAZ Y NO UN IMPORT. La Surface del motor es `d2interface.Surface` y abajo, en la consola,
+// es el shim del PVR (`console/dc/engine/ebiten/v2`); en la PC es Ebitengine de verdad. La pantalla no tiene
+// que saber cual de los dos es: pregunta por esta interfaz y, si la Surface no la implementa (la PC), no
+// pasa nada. Es el mismo patron de `lienzoDeIndices` (DC-002.101/155). La implementan
+// `d2core/d2render/ebiten/palancas_157.go` (solo consola: lleva `//go:build dreamcast`).
+type palancasDePresentacion157 interface {
+	ActivarConversionRapida157(si bool)
+	ActivarConversionPorFilas157(si bool)
+	ActivarConversionPorZona157(si bool)
+	ActivarPresentacionQuieta157(si bool)
+}
+
+// d2cRelojUs157: el reloj de microsegundos del backend del PVR. Lo engancha el arranque del POC
+// (`console/dc/poc/gate0-pueblo/main.go`, que es el que tiene los //extern) al cronometro por tile del
+// renderer con `d2maprenderer.FijarRelojDeLosTiles`. Aca solo se USA el censo, que es Go puro.
+
 // PantallaDelPueblo es la pantalla del Gate 0.
 type PantallaDelPueblo struct {
 	asset      *d2asset.AssetManager
@@ -68,6 +119,21 @@ type PantallaDelPueblo struct {
 	msTotal        int
 	pisos          int
 	paredes        int
+
+	// ============================== EL PLAN DE LA CORRIDA (DC-002.157) ==============================
+	// El estado de las palancas (para saber cuando CAMBIAN: el cambio es lo que cierra un tramo) y lo que se
+	// acumula del tramo abierto.
+	mapaEstatico157 bool
+	convRapida157   bool
+	convFilas157    bool
+	convZona157     bool
+	quieta157       bool
+
+	tramo157Cuadros    int
+	tramo157MapaUs     int
+	tramo157Saltos     int
+	tramo157Repintados int
+	tramo157Etiqueta   string
 
 	*d2util.Logger
 }
@@ -204,6 +270,9 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 		return
 	}
 
+	p.cuadros++
+	p.aplicarElPlan157(target)
+
 	t0 := d2util.Now()
 
 	// el mundo ocupa la pantalla entera: se compensa el origen de la columna (con AnchorBottom es 0,0)
@@ -213,7 +282,11 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 	target.Pop()
 
 	p.msDelCuadro = p.msDesde(t0)
-	p.cuadros++
+
+	// DC-002.157: el tramo abierto acumula los ms del mapa y lo que el renderer se salto / repintio. El
+	// tramo se informa cuando entra la palanca siguiente (`informeDelTramo157`).
+	p.tramo157Cuadros++
+	p.tramo157MapaUs += p.msDelCuadro
 
 	if p.cuadros == 1 {
 		p.msPrimerCuadro = p.msDelCuadro
@@ -224,6 +297,125 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 		p.Infof("CUADRO %d ms=%d (primer cuadro %d ms)", p.cuadros, p.msDelCuadro, p.msPrimerCuadro)
 		p.avisar("mapa:cuadro")
 	}
+}
+
+// aplicarElPlan157: prende las palancas que tocan en este cuadro (ver "EL PLAN DE LA CORRIDA"). Cada vez que
+// una palanca cambia de estado se cierra el tramo anterior, asi que cada tramo se mide solo.
+func (p *PantallaDelPueblo) aplicarElPlan157(target d2interface.Surface) {
+	// ---- 1. el mapa estatico (la palanca de DC-002.139, en el renderer del motor) ----
+	// Del cuadro 21 al 120 el mapa no se repinta; desde el 121 vuelve a pintarse (el A/B del censo, ver el
+	// plan). La condicion incluye el techo para que el ultimo tramo no lo vuelva a prender.
+	estatico := p.cuadros >= desdeMapaEstatico157 && p.cuadros < desdeElMapaDeNuevo157
+	if estatico != p.mapaEstatico157 {
+		p.mapRenderer.ActivarMapaEstatico(estatico)
+
+		if !estatico {
+			p.mapRenderer.OlvidarElMapa157()
+		}
+
+		p.mapaEstatico157 = estatico
+		p.cerrarElTramo157("mapa-estatico", estatico)
+	}
+
+	// ---- 1b. el ultimo tramo: el mapa de nuevo y sin censo (el A/B del instrumento) ----
+	if p.cuadros == desdeElMapaDeNuevo157 {
+		p.elMapaDeNuevo157()
+	}
+
+	// ---- 2. las tres de la presentacion (las pide a la Surface; en la PC no existen y no pasa nada) ----
+	palancas, hay := target.(palancasDePresentacion157)
+	if !hay {
+		return
+	}
+
+	if rapida := p.cuadros >= desdeConversionRapida157; rapida != p.convRapida157 {
+		palancas.ActivarConversionRapida157(rapida)
+		p.convRapida157 = rapida
+		p.cerrarElTramo157("conversion-rapida", rapida)
+	}
+
+	if filas := p.cuadros >= desdeConversionPorFilas157; filas != p.convFilas157 {
+		palancas.ActivarConversionPorFilas157(filas)
+		p.convFilas157 = filas
+		p.cerrarElTramo157("conversion-por-filas", filas)
+	}
+
+	if zona := p.cuadros >= desdeConversionPorZona157; zona != p.convZona157 {
+		palancas.ActivarConversionPorZona157(zona)
+		p.convZona157 = zona
+		p.cerrarElTramo157("conversion-por-zona", zona)
+	}
+
+	if quieta := p.cuadros >= desdePresentacionQuieta157; quieta != p.quieta157 {
+		palancas.ActivarPresentacionQuieta157(quieta)
+		p.quieta157 = quieta
+		p.cerrarElTramo157("presentacion-quieta", quieta)
+	}
+}
+
+// elMapaDeNuevo157: el ultimo tramo del plan. Apaga el cronometro por tile y vuelve a prender el repintado
+// del mapa, para medir el mapa PELADO (sin instrumento) y comparable con DC-002.156. Es tambien la prueba de
+// que apagar el salto vuelve a pintar: si el cuadro siguiente no repinta, `repintados` no sube.
+func (p *PantallaDelPueblo) elMapaDeNuevo157() {
+	d2maprenderer.FijarRelojDeLosTiles(nil)
+
+	p.mapRenderer.ActivarMapaEstatico(false)
+	p.mapRenderer.OlvidarElMapa157()
+	p.mapaEstatico157 = false
+
+	p.cerrarElTramo157("el-mapa-de-nuevo-sin-censo", true)
+}
+
+// cerrarElTramo157: informa el tramo que se cierra (promedio de ms del mapa, saltos/repintados del renderer
+// y el censo por tile del tramo) y abre el siguiente con la palanca `etiqueta` ya en `valor`.
+func (p *PantallaDelPueblo) cerrarElTramo157(etiqueta string, valor bool) {
+	estado := "off"
+	if valor {
+		estado = "on"
+	}
+
+	p.Infof("TRAMO157 cierra=%q cuadros=%d mapa_us_prom=%d mapa_us_total=%d saltos=%d repintados=%d",
+		p.tramo157Etiqueta, p.tramo157Cuadros, promedio157(p.tramo157MapaUs, p.tramo157Cuadros),
+		p.tramo157MapaUs, p.mapRenderer.SaltosDelMapa157(), p.mapRenderer.RepintadosDelMapa157())
+
+	p.informarElCenso157()
+
+	p.tramo157Etiqueta = etiqueta + "=" + estado
+	p.tramo157Cuadros = 0
+	p.tramo157MapaUs = 0
+
+	p.Infof("TRAMO157 abre=%q (desde el cuadro %d)", p.tramo157Etiqueta, p.cuadros)
+}
+
+// informarElCenso157: el censo por tile del renderer (`d2maprenderer.cronometro_135.go`), que parte el
+// costo de pintar el mapa en cache / vista / estado / pintado y en las cuatro pasadas. Es el numero con el
+// que se decide que atacar DENTRO del mapa cuando la camara se mueva (la tarjeta del jugador).
+func (p *PantallaDelPueblo) informarElCenso157() {
+	c := d2maprenderer.CensoDeLosTiles135()
+	if c.Cuadros == 0 {
+		return
+	}
+
+	p.Infof("CENSO157 cuadros=%d tiles=%d imagenes=%d cache_us=%d vista_us=%d estado_us=%d pintado_us=%d "+
+		"p1_us=%d p2_us=%d p3_us=%d p4_us=%d indice_us=%d fondos_us=%d suma_pasos_us=%d suma_bloques_us=%d",
+		c.Cuadros, c.Tiles, c.Imagenes,
+		c.Us[d2maprenderer.BloqueCache135], c.Us[d2maprenderer.BloqueVista135],
+		c.Us[d2maprenderer.BloqueEstado135], c.Us[d2maprenderer.BloquePintado135],
+		c.UsPaso[d2maprenderer.Paso1Plantas135], c.UsPaso[d2maprenderer.Paso2Sombras135],
+		c.UsPaso[d2maprenderer.Paso3Paredes135], c.UsPaso[d2maprenderer.Paso4Techos135],
+		c.UsPaso[d2maprenderer.PasoIndice135], c.UsPaso[d2maprenderer.PasoFondos135],
+		c.SumaPasos, c.SumaBloques)
+
+	d2maprenderer.ReiniciarCensoDeLosTiles135()
+}
+
+// promedio157: la division entera de toda la vida, con el cero cuidado.
+func promedio157(total, n int) int {
+	if n == 0 {
+		return 0
+	}
+
+	return total / n
 }
 
 // Advance avanza el motor: el mapa (animaciones de tiles) y el renderer (la cache).

@@ -31,6 +31,8 @@ func (i *Image) PintarIndicesTintado(indices []byte, ancho, alto int, paleta [][
 		return 0
 	}
 
+	contarEscritura157(i)
+
 	// el recorte AFUERA del bucle: el rango visible del tile se calcula una vez (DC-002.132 del POC)
 	x0, x1 := 0, ancho
 	if x < 0 {

@@ -32,6 +32,8 @@ func (i *Image) DrawImage(src *Image, op *DrawImageOptions) {
 		return
 	}
 
+	contarEscritura157(i)
+
 	var g GeoM
 	modo := CompositeModeSourceOver
 	usaColores := false

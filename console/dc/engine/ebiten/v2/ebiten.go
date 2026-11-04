@@ -81,6 +81,8 @@ func (i *Image) Fill(clr color.Color) {
 
 // LlenarDeRGBA: pinta todo de un color (la parte de adentro, sin la conversion).
 func (i *Image) LlenarDeRGBA(c color.RGBA) {
+	contarEscritura157(i)
+
 	for y := 0; y < i.alto; y++ {
 		for x := 0; x < i.ancho; x++ {
 			i.SetRGBA(x, y, c)
@@ -97,10 +99,15 @@ func (i *Image) ReplacePixels(pixeles []byte) {
 	if len(pixeles) != len(i.pixeles) {
 		return
 	}
+
+	contarEscritura157(i)
+
 	copy(i.pixeles, pixeles)
 }
 
 func (i *Image) Clear() {
+	contarEscritura157(i)
+
 	for j := range i.pixeles {
 		i.pixeles[j] = 0
 	}
@@ -123,6 +130,8 @@ func (i *Image) Set(x, y int, c Color) {
 	if x < 0 || y < 0 || x >= i.ancho || y >= i.alto {
 		return
 	}
+	contarEscritura157(i)
+
 	j := (y*i.ancho + x) * 4
 	i.pixeles[j+0] = uint8(c.R)
 	i.pixeles[j+1] = uint8(c.G)
@@ -455,11 +464,11 @@ func (c *ColorM) String() string {
 
 // DrawImageOptions: las opciones de dibujado (posicion, escala, color).
 type DrawImageOptions struct {
-	GeoM             GeoM
-	ColorM           ColorM
-	CompositeMode    CompositeMode
-	Filter           Filter
-	DisableMipmaps   bool
+	GeoM           GeoM
+	ColorM         ColorM
+	CompositeMode  CompositeMode
+	Filter         Filter
+	DisableMipmaps bool
 }
 
 // GeoM: la matriz de geometria (donde y como se dibuja una imagen: la posicion, el tamano, el giro y la
@@ -781,7 +790,9 @@ const (
 )
 
 // Las teclas que el motor nombra y NO estaban. Medido con:
-//   grep -oh "ebiten\.Key[A-Za-z0-9]*" d2core/d2input/ebiten/*.go | sed 's/ebiten\.//' | sort -u
+//
+//	grep -oh "ebiten\.Key[A-Za-z0-9]*" d2core/d2input/ebiten/*.go | sed 's/ebiten\.//' | sort -u
+//
 // y comparado contra las de arriba: 37 nombres (medido el 2026-10-16). Los cuatro KeyUp/KeyDown/
 // KeyLeft/KeyRight son ALIAS de los Arrow, exactamente como en Ebitengine (ahi siguen por
 // compatibilidad). El resto son valores nuevos.
@@ -905,6 +916,10 @@ func RunGame(g Game) error {
 	cuadros := 0
 
 	for {
+		// DC-002.157: LAS FASES DEL CUADRO. Seis marcas del reloj del PVR por cuadro (cada una cuesta menos
+		// de 1 us: medido en DC-002.135), para saber que parte del cuadro es la que manda.
+		tEspera0 := d2cPvrUs()
+
 		if cuadros < 3 {
 			println("EBITEN-LOOP cuadro", cuadros, "esperando el cuadro del PVR")
 		}
@@ -912,6 +927,8 @@ func RunGame(g Game) error {
 		// el cuadro lo marca el PVR: PvrWaitReady espera a que el anterior haya terminado (es la
 		// sincronizacion con la pantalla; sin esto se dibujaria encima del cuadro que se esta mostrando)
 		kos.PvrWaitReady()
+
+		tEspera1 := d2cPvrUs()
 
 		if cuadros < 3 {
 			println("EBITEN-LOOP cuadro", cuadros, "el PVR dio el cuadro, abro la lista")
@@ -930,32 +947,66 @@ func RunGame(g Game) error {
 		// nunca seria verdad. Y si se leyera despues de Update, el motor ya habria preguntado.
 		LeerControl()
 
+		tActualizar0 := d2cPvrUs()
+
 		if err := g.Update(); err != nil {
 			kos.PvrListFinish()
 			kos.PvrSceneFinish()
 			return err
 		}
 
+		tActualizar1 := d2cPvrUs()
+
 		t0 := d2cPvrUs()
+
+		escriturasAntes := escrituras157
+
 		g.Draw(pantalla)
 		t1 := d2cPvrUs()
+
+		// DC-002.157: si la pantalla cambio las palancas en su Draw, la ventana de fases se cierra aca mismo y
+		// asi cada tramo del plan se mide solo (el cuadro del cambio queda en la ventana nueva, que es la que
+		// mide lo que ese cuadro presento).
+		comprobarCambioDePalancas157()
 
 		if cuadros < 3 {
 			println("EBITEN-LOOP cuadro", cuadros, "dibujado, subo el cuadro a la VRAM")
 		}
 
-		// el cuadro del motor a la VRAM, y a la pantalla (los dos pasos, medidos por separado)
-		if err := ConvertirPantalla(pantalla); err != nil {
-			kos.PvrListFinish()
-			kos.PvrSceneFinish()
-			return err
+		// DC-002.157: LA PRESENTACION, CON SUS TRES PALANCAS.
+		//
+		// `quieto` es la palanca de DC-002.143 llevada al extremo: si NADIE escribio un pixel en el lienzo
+		// durante el Draw (el contador de escrituras no se movio), la textura del PVR YA tiene este mismo
+		// cuadro del cuadro anterior, asi que no hay nada que convertir ni subir.
+		quieto := presentacionQuieta157 && escrituras157 == escriturasAntes
+
+		if !quieto {
+			var err error
+
+			if conversionPorZona157 {
+				// solo el recuadro visible: el PVR pinta 640x480 y el lienzo es 800x600
+				err = ConvertirPantallaZona(pantalla, 0, 0, PantallaAncho, PantallaAlto)
+			} else {
+				err = ConvertirPantalla(pantalla)
+			}
+
+			if err != nil {
+				kos.PvrListFinish()
+				kos.PvrSceneFinish()
+				return err
+			}
 		}
+
 		t2 := d2cPvrUs()
-		if err := SubirVram(); err != nil {
-			kos.PvrListFinish()
-			kos.PvrSceneFinish()
-			return err
+
+		if !quieto {
+			if err := SubirVram(); err != nil {
+				kos.PvrListFinish()
+				kos.PvrSceneFinish()
+				return err
+			}
 		}
+
 		t3 := d2cPvrUs()
 		PintarPantalla()
 		t4 := d2cPvrUs()
@@ -967,6 +1018,16 @@ func RunGame(g Game) error {
 			println("EBITEN-PERFIL dibujar_us", int(t1-t0), "convertir_us", int(t2-t1),
 				"subir_us", int(t3-t2), "pintar_us", int(t4-t3), "cuadro_us", int(t4-t0))
 		}
+
+		// DC-002.157: la ventana de fases (promedios cada 10 cuadros, con las palancas que corrian).
+		anotarFase157(faseEspera157, uint64(tEspera1-tEspera0))
+		anotarFase157(faseActualizar157, uint64(tActualizar1-tActualizar0))
+		anotarFase157(faseDibujar157, uint64(t1-t0))
+		anotarFase157(faseConvertir157, uint64(t2-t1))
+		anotarFase157(faseSubir157, uint64(t3-t2))
+		anotarFase157(fasePintar157, uint64(t4-t3))
+		anotarFase157(faseTotal157, uint64(t4-tEspera0))
+		cerrarCuadro157()
 
 		if cuadros < 3 {
 			println("EBITEN-LOOP cuadro", cuadros, "listo")
@@ -991,16 +1052,16 @@ func SetScreenSize(w, h int) {}
 
 // SetFullscreen / SetVsyncEnabled / SetWindowTitle / SetWindowResizingMode: configuracion de PC; en la
 // consola no hay ventana.
-func SetFullscreen(v bool)      {}
-func SetVsyncEnabled(v bool)    {}
-func SetWindowTitle(s string)   {}
+func SetFullscreen(v bool)        {}
+func SetVsyncEnabled(v bool)      {}
+func SetWindowTitle(s string)     {}
 func SetWindowResizingMode(m int) {}
-func SetTPS(tps int)            {}
-func SetCursorMode(m CursorMode) { cursorModo = m }
+func SetTPS(tps int)              {}
+func SetCursorMode(m CursorMode)  { cursorModo = m }
 
 // IsFullscreen / WindowSize: para que el motor pueda preguntar.
-func IsFullscreen() bool       { return true }
-func WindowSize() (int, int)   { return 640, 480 }
+func IsFullscreen() bool     { return true }
+func WindowSize() (int, int) { return 640, 480 }
 
 // TPS: los cuadros por segundo objetivo.
 func TPS() int { return 60 }

@@ -44,6 +44,35 @@ func d2cPvrUs() uint
 //extern d2c_pvr_pantalla_convertir
 func d2cPvrPantallaConvertir(rgba uintptr, w, h int) int
 
+// DC-002.157: la conversion de un RECUADRO del lienzo (con su paso de fila) a la textura del PVR.
+//
+//extern d2c_pvr_pantalla_convertir_zona
+func d2cPvrPantallaConvertirZona(rgba uintptr, paso, x, y, w, h int) int
+
+// DC-002.157: las palancas del bucle de conversion (las de DC-002.135: el bucle rapido y la subida agrupada).
+//
+//extern d2c_pvr_pantalla_pres_conv_rapida
+func d2cPvrPantallaPresConvRapida(v int)
+
+//extern d2c_pvr_pantalla_pres_vram_agrupada
+func d2cPvrPantallaPresVramAgrupada(v int)
+
+//extern d2c_pvr_pantalla_pres_conv_us
+func d2cPvrPantallaPresConvUs() uint
+
+//extern d2c_pvr_pantalla_pres_vram_us
+func d2cPvrPantallaPresVramUs() uint
+
+//extern d2c_pvr_pantalla_pres_bloques
+func d2cPvrPantallaPresBloques() uint
+
+// DC-002.157: el orden en que el bucle rapido LEE el lienzo (DC-002.141): 0 = orden de textura (el bloque de
+// 32x32 se lee como se escribe), 1 = por filas (el lienzo se lee seguido y se escribe el bloque). Da el mismo
+// pixel; cambia lo que cuesta leer la VRAM sin cache.
+//
+//extern d2c_pvr_pantalla_conv_filas141
+func d2cPvrPantallaConvFilas141(v int)
+
 //extern d2c_pvr_pantalla_subir_vram
 func d2cPvrPantallaSubirVram() int
 
@@ -126,6 +155,25 @@ func ConvertirPantalla(img *Image) error {
 	}
 	if r := d2cPvrPantallaConvertir(uintptr(unsafe.Pointer(&img.pixeles[0])), img.ancho, img.alto); r != 0 {
 		return errorPantalla("no se pudo convertir el cuadro (codigo " + itoa(r) + ")")
+	}
+	return nil
+}
+
+// ConvertirPantallaZona (DC-002.157): convierte SOLO el recuadro (x, y, w, h) del lienzo a la textura del PVR.
+//
+// POR QUE EXISTE. El lienzo del motor son 800x600 (d2display no baja de ahi), pero el PVR pinta la textura en
+// una pantalla de 640x480: la esquina superior izquierda. Los 160x600 de la derecha y los 120 de abajo NO SE
+// VEN, y convertirlos cuesta un tercio de la conversion (medido en DC-002.156: convertir_us= 57634 para los
+// 480.000 pixeles del lienzo entero; el recuadro visible son 307.200).
+//
+// El recuadro y su origen tienen que ser multiplos de 32 (los bloques del twiddle), y `img.ancho` es el paso
+// de fila del lienzo: la conversion lee el recuadro de un lienzo MAS ANCHO sin copiarlo antes.
+func ConvertirPantallaZona(img *Image, x, y, w, h int) error {
+	if img == nil || len(img.pixeles) == 0 {
+		return errorPantalla("la pantalla esta vacia")
+	}
+	if r := d2cPvrPantallaConvertirZona(uintptr(unsafe.Pointer(&img.pixeles[0])), img.ancho, x, y, w, h); r != 0 {
+		return errorPantalla("no se pudo convertir el recuadro del cuadro (codigo " + itoa(r) + ")")
 	}
 	return nil
 }

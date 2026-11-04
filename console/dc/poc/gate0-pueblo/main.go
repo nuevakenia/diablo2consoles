@@ -75,6 +75,15 @@ func d2cGcTotal() int
 //extern d2c_libre
 func d2cLibre(p uintptr)
 
+//extern d2c_gc_colecciones
+func d2cGcColecciones() int
+
+// DC-002.157: el reloj de microsegundos del backend del PVR, para el cronometro por tile del renderer
+// (`d2maprenderer.FijarRelojDeLosTiles`). Es el mismo reloj con el que el shim mide las fases del cuadro.
+//
+//extern d2c_pvr_pantalla_us
+func d2cRelojUs() uint
+
 func init() { d2cSerialInit() }
 
 const (
@@ -127,6 +136,7 @@ func estado(etapa string) {
 		"montonUsado=", d2cMontonUsado(),
 		"gcVivo=", d2cGcUsado(),
 		"gcTotal=", d2cGcTotal(),
+		"gcColecciones=", d2cGcColecciones(),
 		"vramLibre=", censo.Disponible,
 		"vramPedida=", censo.Pedida)
 }
@@ -154,6 +164,17 @@ func main() {
 
 	println(frase, "PVR listo, VRAM de la textura del cuadro=", ebiten.VramDeLaPantalla())
 	estado("despues-del-video")
+
+	// DC-002.157: EL CRONOMETRO POR TILE DEL RENDERER. Prendido, el renderer anota cuanto cuesta cada bloque
+	// del mapa (cache / vista / estado / pintado) y cada una de sus cuatro pasadas, y la pantalla imprime el
+	// censo al cerrar cada tramo del plan. El reloj es el del PVR (el mismo de las fases del cuadro), que es
+	// un contador de 32 bits: da la vuelta cada 71 minutos, de sobra para una corrida.
+	//
+	// Va aca y no en el renderer porque en la PC el reloj lo pone el que mide; en la consola lo pone el
+	// arranque, que es el unico que tiene el //extern del timer.
+	d2maprenderer.FijarRelojDeLosTiles(func() uint { return d2cRelojUs() })
+
+	println(frase, "cronometroDeLosTiles=", d2maprenderer.CronometroDeLosTilesPrendido())
 
 	// ============================== 1. LAS PALANCAS DE LA CONSOLA ==============================
 	// El AssetManager del motor se arma DENTRO de `d2app.Create`, y los presupuestos de sus caches se congelan

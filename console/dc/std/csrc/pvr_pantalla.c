@@ -840,6 +840,70 @@ int d2c_pvr_pantalla_convertir(unsigned int rgba, int w, int h) {
     return convertir_a_columnas(src, w, h, 0);
 }
 
+/* ====================================================================================================
+ * DC-002.157 -- LA CONVERSION DE UN RECUADRO DEL LIENZO (el recuadro que se ve, y con el paso del lienzo)
+ * ====================================================================================================
+ *
+ * EL NUMERO QUE LA PIDE (DC-002.156, Gate 0): `convertir_us= 57634` por cuadro para convertir el lienzo
+ * ENTERO, que son 800x600 = 480.000 pixeles. Pero el PVR pinta la textura en una pantalla de 640x480 y la
+ * textura empieza en (0,0): los 160x600 de la derecha y los 120 de abajo NO SE VEN. Convertirlos son
+ * 172.800 pixeles tirados por cuadro (el 36 %).
+ *
+ * POR QUE NO ALCANZA CON `d2c_pvr_pantalla_convertir_en`: esa lee el lienzo con SU ancho como paso de fila.
+ * El recuadro visible es de 640 columnas pero vive en un lienzo de 800, asi que hay que leer con paso 800.
+ * Esta funcion recibe el paso aparte.
+ *
+ * EL RECUADRO Y SU ORIGEN TIENEN QUE SER MULTIPLOS DE 32: los bloques del twiddle son de 32x32 y la subida
+ * a la VRAM va bloque por bloque (`pvr_txr_load` de 2.048 B). El llamador (el shim) pide (0,0,640,480), que
+ * lo es.
+ *
+ * LA CONVERSION ES LA MISMA DE SIEMPRE, pixel por pixel (`convertir_bloque141`, la cuenta de color de
+ * DC-002.26/135). Lo unico que cambia es el bucle: se recorren los bloques del recuadro y cada uno se lee
+ * con el paso del lienzo. Aca se usa el camino POR FILAS de DC-002.141 (lecturas seguidas del lienzo, que
+ * es lo que hace barato leer la VRAM sin cache), que da byte por byte el mismo resultado que el de orden de
+ * textura (verificado en DC-002.141 con `conv_verificar141`: 0 palabras distintas).
+ *
+ * Devuelve 0 si anduvo, -1 sin video, -2 parametros invalidos, -4 recuadro no multiplo de 32. */
+int d2c_pvr_pantalla_convertir_zona(unsigned int rgba, int paso, int x, int y, int w, int h) {
+    const unsigned char *src = (const unsigned char *)rgba;
+
+    armar_twiddle();
+
+    if (src == NULL || pant_tex == NULL) {
+        return -1;
+    }
+    if (paso <= 0 || w <= 0 || h <= 0 || x < 0 || y < 0) {
+        return -2;
+    }
+    if (x + w > paso || x + w > PANT_W || y + h > PANT_H) {
+        return -2;
+    }
+    if (((x % LADO_TILE) != 0) || ((y % LADO_TILE) != 0) ||
+        ((w % LADO_TILE) != 0) || ((h % LADO_TILE) != 0)) {
+        return -4;
+    }
+
+    /* las tablas del twiddle (ofs_tile / idx_tile) dependen del PASO del lienzo, no del recuadro */
+    armar_ofs_tile(paso);
+
+    /* el camino por filas (DC-002.141): el lienzo se lee seguido y se escribe en el buffer de 32x32, que
+     * esta en RAM. Es el mismo resultado; ver la cabecera. */
+    conv_filas141 = 1;
+
+    for (int y0 = 0; y0 < h; y0 += LADO_TILE) {
+        for (int x0 = 0; x0 < w; x0 += LADO_TILE) {
+            convertir_bloque141(src + ((size_t)(y + y0) * (size_t)paso + (size_t)(x + x0)) * 4, conv_grupo);
+
+            pvr_txr_load(conv_grupo, (pvr_ptr_t)((uint16_t *)pant_tex + indice_tile(x + x0, y + y0)),
+                         LADO_TILE * LADO_TILE * 2);
+            pres_subidas++;
+            pres_bloques++;
+        }
+    }
+
+    return 0;
+}
+
 /* DC-002.116: un lienzo de w x h a la COLUMNA x_dest de la textura de la pantalla (el split vertical).
  *
  * Es el MISMO camino que `d2c_pvr_pantalla_convertir` -- misma tabla del twiddle, mismo bloque de 32x32, mismas

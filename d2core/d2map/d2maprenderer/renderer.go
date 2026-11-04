@@ -136,6 +136,16 @@ type MapRenderer struct {
 	// unico puntero a `bufferDelVuelo`, y por eso no hay dos al vuelo a la vez.
 	recogidaAlVuelo *imagenDeIndices
 
+	// ============================== EL MAPA ESTATICO (DC-002.157) ==============================
+	// Ver `mapa_estatico_157.go`: con la palanca puesta, el mapa NO se repinta si la vista no se movio y no
+	// hay nada (tiles animados, entes, luz, shake, debug) que cambie el cuadro. Es el salto de DC-002.139,
+	// que en el POC jugable dejo el mapa en 4,2 ms y en 0 los cuadros quietos.
+	mapaEstatico157    bool
+	mapa157Valido      bool
+	mapa157X, mapa157Y int
+	saltos157          int
+	repintados157      int
+
 	*d2util.Logger
 }
 
@@ -415,6 +425,17 @@ func (mr *MapRenderer) Render(target d2interface.Surface) {
 
 	// DC-002.113b: el cuadro es la unidad con la que el desalojo mide si una imagen esta fria ("no se uso en N
 	// cuadros"), asi que se cuenta aca, que es el unico lugar por donde pasa un cuadro dibujado.
+	// DC-002.157: OJO, EL SALTO VA ANTES DE ESTE CONTADOR. Si el mapa se salta, la cache no se toco: contar el
+	// cuadro igual haria que el desalojo fuera envejeciendo imagenes que nadie volvio a pedir y, cuando la
+	// camara se mueva, la cache se recomponga entera sin necesidad. El salto congela la cache con el mapa.
+	if mr.puedeSaltarseElMapa157() {
+		mr.recogidaAlVuelo = nil
+		mr.contarSalto157()
+		contarCuadro135()
+
+		return
+	}
+
 	mr.cuadroDeLaCache++
 	mr.recogidaAlVuelo = nil
 
@@ -487,6 +508,10 @@ func (mr *MapRenderer) Render(target d2interface.Surface) {
 	}
 
 	contarCuadro135()
+
+	// DC-002.157: el mapa quedo pintado en ESTE lienzo y en ESTA traslacion. El cuadro siguiente se lo puede
+	// saltar si nada de eso cambio.
+	mr.anotarElMapaPintado157()
 }
 
 // TileRange is the range of tiles [startX,endX) x [startY,endY) that covers a screen of width x height pixels
