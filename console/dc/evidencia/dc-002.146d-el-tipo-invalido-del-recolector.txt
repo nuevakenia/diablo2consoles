@@ -1,0 +1,192 @@
+DC-002.146d -- EL RECOLECTOR BARRE UN TIPO CON `__ptrdata` BASURA: LA TABLA DE LOS DESCRIPTORES REALES
+
+QUE ENTRA Y QUE NO. DC-002.145 dejo cuatro panics `slice bounds out of range` en el cruce, todos DENTRO del rearme
+del minimapa y todos inmediatamente despues de una recoleccion; DC-002.146 saco la lectura del semiespacio y esos
+panics dejaron de salir. Pero en el log del recolector quedaba la FIRMA del defecto de fondo: dos marcas con
+valores que son DIRECCIONES leidas como tamanos. Esta tarjeta la cierra: el recolector barria objetos fantasma con
+un `type` que no era un descriptor, y eso se arregla con la lista de los tipos REALES (la que el compilador le pasa
+al asignador en cada `gc_alloc`) y con una compuerta en `gc_validate_header`. Medido: la carga de la prueba
+(`MINIMAPA_DIAG=carga`, 12 relecturas del `AutoMap.txt` por el flujo del MPQ) pasa de MORIR en la primera vuelta
+-- 2 de 2 corridas, `FATAL: recover without checkpoint` -- a TERMINAR las 12 vueltas y cruzar (`CRUZA OK`) con CERO
+`gc-ptrdata-recortado`, tambien 2 de 2. Y en el caso minimo, el mutante da 6 barridos con `__ptrdata` basura y el
+arreglo da 0.
+
+LO QUE NO ENTRA, Y SE MIDIO: la palanca `MINIMAPA_DIAG=carga` NO cabe con la region de 32 x 32 del Blood Moor. Con
+el plano grande el rearme llega con 1.480.712 B libres y el semiespacio al 89 % (1.630.960 de 1.835.008) y la carga
+se cae antes de terminar (medido en /tmp/capturas-146dr). La medicion de esta tarjeta va entonces sobre el plano de
+17 x 17 (`.ds1` suelto, 289 tiles) y con el lienzo de vuelta en VRAM (`LIENZO_EN_RAM=no`, que devuelve 1,2 MB de
+RAM). Que la carga no quepa en 32 x 32 es una cuenta de RAM de la palanca, no del recolector.
+
+1. EL DEFECTO: DOS NUMEROS QUE SON DIRECCIONES
+
+La firma medida en DC-002.145 (/tmp/capturas-145b, 145f) y en DC-002.146:
+
+  ARQ-MARCA gc-ptrdata-recortado    v=2349166024   = 0x8C056DC8
+  ARQ-MARCA gc-gcdata-fuera-imagen  v= 906232840   = 0x36040408
+
+`0x8C056DC8` no es un tamano: cae dentro de `.rodata` del binario (medido en el ELF de DC-002.146c: `.text`
+0x8C010000..0x8C054F70, `.rodata` 0x8C054FD4..0x8C0607C8). Y `0x36040408` esta fuera de RAM: es basura. O sea que
+el recolector estaba leyendo un "descriptor de tipo" que no lo era. Donde se leyo esa basura:
+
+  runtime/gc_copy.c, gc_scan_object()
+    - el barrido conservador de la pila INVENTA encabezados: cualquier palabra que caiga en el from-space y que
+      tenga cuatro bytes de "tamano" razonables por delante es, para el recolector, el comienzo de un objeto;
+    - el campo `type` de ese encabezado es otra palabra cualquiera;
+    - DC-002.92 exigio que ese tipo CAIGA EN LA IMAGEN (`gc_tipo_en_imagen`) y acoto el barrido al tamano del
+      objeto, lo que impidio que el barrido se saliera de RAM... pero la imagen es texto+datos+bss: adentro
+      tambien hay codigo, cadenas y tablas. "Cae en la imagen" NO es "es un descriptor";
+    - con el tipo de basura aceptado, el objeto se barria con lo que dijera su `__ptrdata` (una direccion de
+      `.rodata` leida como tamano) y el objeto se llenaba de punteros fantasma.
+
+Y habia un segundo dano, mas grave, que no deja marca: `gc_copy_object()` COPIA el objeto fantasma y escribe el
+puntero de reenvio en su encabezado inventado, o sea ADENTRO del objeto vivo que lo contiene. Se pisa un campo de
+un objeto sano, y el codigo de Go revienta despues, lejos, con `slice bounds out of range`. Eso es el panic
+intermitente de DC-002.145, y es lo que explica que siga habiendo panics aunque no haya ninguna marca de
+`gc-ptrdata-recortado` (medido: los dos mutantes de abajo se caen con CERO marcas del defecto).
+
+2. EL ARREGLO: UNA TABLA, TRES VEREDICTOS, Y UNA COMPUERTA
+
+  A. LA TABLA. El compilador le pasa el descriptor al asignador en CADA `gc_alloc(size, type)`; por lo tanto el
+     asignador lo anota (`gc_tipo_registrar`, en runtime/gc_heap.c) y todo objeto del monton tiene su tipo en la
+     tabla antes de que el recolector lo pueda ver (el objeto no existe hasta que `gc_alloc` vuelve). 4096 ranuras
+     fijas (16 KB de .bss), sondeo lineal y cache del ultimo tipo; al 75 % deja de tomar tipos y lo avisa
+     (`gc-tipos-tabla-llena`). En la corrida grande: 139 tipos distintos, tabla de 4096.
+
+  B. LOS TRES VEREDICTOS (`gc_tipo_veredicto`), y que se hace con cada uno:
+       REAL        esta en la tabla -> barrido preciso, como siempre.
+       CON FORMA   no esta en la tabla pero su contenido tiene forma de descriptor -> barrido CONSERVADOR y
+                   acotado al objeto, con aviso `gc-tipo-sin-registrar`. Es la red de seguridad para un tipo
+                   compilado que nunca asigno (uno que solo vive en la pila): si aparece, la tabla tiene un hueco.
+       INVALIDO    ni en la tabla ni con forma -> el encabezado es FALSO: se avisa (`gc-tipo-invalido`) y NO SE
+                   BARRE. Ya no se lee su `__ptrdata`.
+
+  C. LA COMPUERTA, que es la que corta la cadena: `gc_validate_header()` (el mismo chequeo que usan `gc_copy_object`
+     y `gc_is_valid_object_start`) rechaza el encabezado cuyo tipo da INVALIDO. Asi el objeto fantasma no se copia,
+     no se barre y no se le pisa la memoria a nadie. Antes solo pedia "tipo en RAM y 4-alineado": un tipo en
+     `.rodata` pasaba (medido: 0x8C2DEA5C en el demo, dentro de `.rodata`, aceptado por el chequeo viejo).
+
+  D. LA FORMA, medida contra datos reales. El predicado es: `__size` <= 1 MB, `__ptrdata` <= `__size`,
+     `(__code & 0x1F)` <= 26, `__align` en {1,2,4,8} y `__gcdata` en la imagen. Dos cosas que se midieron y que
+     importan:
+       - `__code` NO es solo el Kind: gccgo prende ademas el bit 0x80 (y a veces 0x20/0x40). Con la mascara
+         `~(0x20|0x40)` se rechazaban **585 de los 1684** descriptores REALES del ELF del demo (`__code` 130, 145,
+         153); con `& 0x1F`, CERO (`/tmp/probe146d/descriptores_simbolos.py` sobre /tmp/dcbuild/demo146d16r).
+       - la forma sola NO alcanza para decidir (en el ELF de DC-002.146c hay 6 trozos de `.text`/`.data` que la
+         pasan sin ser descriptores): por eso el que manda es la tabla y la forma solo separa "hay que mirarlo" de
+         "esto es basura".
+
+3. LA PRUEBA MINIMA: 90 LINEAS DE GO QUE ARMAN EL CASO, SIN EL MOTOR
+
+`console/dc/poc/gc-tipo-invalido` (sonda de 90 lineas + 67 de C) arma exactamente el caso:
+
+  - un objeto vivo de verdad (`ancla`), alcanzable desde una raiz global;
+  - un descriptor FALSO que SI cae en la imagen: es un global de Go (.bss), asi que su direccion esta adentro del
+    rango que `gc_tipo_en_imagen` acepta. Sus campos son los del defecto: `__ptrdata` = una direccion de la imagen
+    (no un tamano) y `__gcdata` = 0x36040408 (fuera de RAM, el valor medido);
+  - el encabezado del `ancla` pasa a nombrar ese descriptor;
+  - un segundo objeto (`control`) SANO, con su tipo registrado: es la contra de que lo que anda siga andando;
+  - tres recolecciones y el veredicto.
+
+  comando:  scripts/console/checar-gc-tipo-invalido-146d.sh mutante|arreglo
+
+  MUTANTE (el arbol de DC-002.92: `fix-libgodc-tipos-reales.py --quitar`)
+    descriptor FALSO en 0x8C063C00  EN LA IMAGEN= true  size= 16  ptrdata=0x8C408000  gcdata=0x36040408
+    barridos con __ptrdata basura (gc-ptrdata-recortado): 6
+    gcdata fuera de la imagen (gc-gcdata-fuera-imagen):   3
+    tipos fuera de la imagen (gc-tipo-fuera-imagen):      0     <- el chequeo de DC-002.92 lo ACEPTA
+    tipos declarados invalidos:                           0
+    veredicto: ROJO
+
+  ARREGLO (la tabla + la compuerta)
+    descriptor FALSO en 0x8C063E00  EN LA IMAGEN= true  size= 16  ptrdata=0x8C42F000  gcdata=0x36040408
+    encabezado del ANCLA falsificado: tipo 0x8C063C5C -> 0x8C063E00
+    tipos declarados invalidos por el recolector (gc-tipo-invalido): 2
+    barridos con __ptrdata basura (gc-ptrdata-recortado): 0
+    gcdata fuera de la imagen (gc-gcdata-fuera-imagen):   0
+    tipos registrados por el asignador:                   2
+    objeto de CONTROL en la ronda 3: entero
+    veredicto: VERDE
+
+  El `ancla` queda abandonada a proposito (su encabezado dice un tipo que no es de nadie: `ancla_n` pasa de 12345 a
+  basura cuando esa memoria se reusa). En el motor eso no puede pasar con un objeto vivo -- todo objeto real tiene
+  su tipo en la tabla -- y la prueba de que lo sano no se toca es el CONTROL, que sale entero en las tres rondas.
+
+4. LA PRUEBA GRANDE: LA CARGA DE LA PRUEBA (12 RELECTURAS) EN LA CONSOLA
+
+Configuracion medida (build-demo-140.sh): `DEMO_MOOR=si DEMO_MOOR_DRLG=no LIENZO_EN_RAM=no MINIMAPA_DIAG=carga
+MEDIR_CUADRO=no MEDIR_VIVO=no`, guion `nada 8 derecha 2.5 abajo 2.5 nada 45` (el mismo de DC-002.146).
+
+  MUTANTE (runtime de DC-002.92) -- 2 de 2 corridas IGUAL
+    /tmp/capturas-146d16rm   y /tmp/capturas-146d16rmb
+    JUEGO130: MINIMAPA REARME SE CAYO Y NO SE LLEVA EL CRUCE paso= la carga de la prueba (12 relecturas por el
+              flujo) nivelPedido= 2 nivelQueQueda= 1 nombre= 1 Town celdas= 2485 ... semiespacio= 1513488
+              panic= <no es texto> : EL MINIMAPA QUEDA COMO ESTABA
+    FATAL: recover without checkpoint
+    vueltas de la carga terminadas: 0      gc-ptrdata-recortado: 0 (el dano fue la copia del fantasma)
+    NO CRUZA.
+
+  ARREGLO (tabla + compuerta) -- 2 de 2 corridas IGUAL
+    /tmp/capturas-146d16r2   y /tmp/capturas-146d16r2b
+    ARQ-MARCA gc-tipos-tabla v=4096      ARQ-MARCA gc-tipos-registrados v=139
+    JUEGO130: MINIMAPA CARGA terminada vueltas= 12 recolecciones= 223 semiespacio= 1738944
+    JUEGO130: MINIMAPA REARME nivelAntes= 1 nivelAhora= 2 nombre= 1 Wilderness filasDeLaTabla= 83 -> 142
+              celdasAntes= 2485 celdasAhora= 351 piso= 289 pared= 62 sembradas= 276 casillasConCelda= 289 de 289
+              pct= 100 recolecciones= 184 -> 229 semiespacioAntes= 1570072 semiespacioDespues= 1435888 ms= 8126
+    DEMO140: REARME paso= 2 minimapaListo= true / paso= 3 / paso= 4 hudListo= true
+    DEMO140: CRUZA OK nivel= Afueras:Wild1.ds1 region= -1 -1 tiles= 289 jugador= 8.5 8.5 ms= 23788
+    y sigue: DEMO140: CIERRE MUNDO ... salio= true
+    gc-tipo-invalido: 4 (corrida 1) / 6 (corrida 2)   gc-tipos-invalidos-total igual
+    gc-ptrdata-recortado: 0      gc-gcdata-fuera-imagen: 0      gc-tipo-sin-registrar: 0
+    CRUZA.
+
+  O sea: 12 relecturas de la carga de la prueba, cada una con sus 3-4 recolecciones adentro, y en ninguna el
+  recolector barrio un tipo de basura. Los tipos falsos que el barrido conservador invento (4 y 6) se reportaron y
+  se rechazaron en la compuerta.
+
+  La version intermedia de esta tarjeta (tabla SIN la compuerta y con la mascara de `__code` equivocada) se caia en
+  la carga igual que el mutante: `/tmp/capturas-146d16r` -- 1 tipo invalido reportado, 0 `gc-ptrdata-recortado`, y
+  el rearme se cae en la vuelta 1. Sirve de contra-prueba de que las dos piezas (la tabla y la compuerta) hacen
+  falta: sin la compuerta el fantasma se sigue copiando y lo sano se sigue pisando.
+
+5. LO QUE SE MIDIO, EN UNA TABLA
+
+  caso                                              marcas del defecto        resultado
+  sonda, mutante (DC-002.92)                        recortado 6, gcdata 3     ROJO
+  sonda, arreglo                                    recortado 0, gcdata 0     VERDE (CONTROL entero)
+  carga 17x17, mutante (2 corridas)                 0 (el dano es la copia)   SE CAE en la vuelta 0
+  carga 17x17, arreglo (2 corridas)                 0                         TERMINA 12, CRUZA OK
+  carga 32x32, arreglo                              0                         no cabe en RAM (libre 1.480.712)
+
+6. COMO SE REPITE
+
+  # la sonda: verde con el arreglo, rojo con el mutante
+  scripts/console/checar-gc-tipo-invalido-146d.sh arreglo
+  scripts/console/checar-gc-tipo-invalido-146d.sh mutante
+
+  # solo el veredicto de un log ya corrido
+  scripts/console/checar-gc-tipo-invalido-146d.sh veredicto /tmp/capturas-XXXX/flycast.log
+
+  # el arbol de libgodc, a mano
+  scripts/console/fix-libgodc-tipos-reales.py --estado
+  scripts/console/fix-libgodc-tipos-reales.py --build              # el arreglo
+  scripts/console/fix-libgodc-tipos-reales.py --quitar --build     # el mutante (vuelve a DC-002.92)
+
+  # la corrida grande
+  DEMO_MOOR=si DEMO_MOOR_DRLG=no LIENZO_EN_RAM=no MINIMAPA_DIAG=carga MEDIR_CUADRO=no MEDIR_VIVO=no \
+      scripts/console/build-demo-140.sh /tmp/dcbuild/demo146d16r2
+  GUION='nada 8 derecha 2.5 abajo 2.5 nada 45' SEGUNDOS=80 INTERVALO=27 \
+      scripts/console/run-demo-140.sh /tmp/dcbuild/demo146d16r2/disc.gdi /tmp/capturas-146d16r2
+
+7. LAS MARCAS NUEVAS (para leer el log del recolector)
+
+  ARQ-MARCA gc-tipos-tabla v=4096                 capacidad de la tabla (una vez por corrida)
+  ARQ-MARCA gc-tipos-registrados v=139            tipos distintos que el asignador anoto (una vez por corrida)
+  ARQ-MARCA gc-tipos-tabla-llena v=N              la tabla no tomo mas tipos: desde ahi no se acusa a nadie
+  ARQ-MARCA gc-tipo-invalido v=0x8C2DEA5C         un encabezado falso: se reporta y NO se barre
+  ARQ-MARCA gc-tipo-sin-registrar v=0x...         un tipo con forma que nunca paso por el asignador (hueco)
+  ARQ-MARCA gc-tipos-invalidos-total v=4          el total, al cerrar cada recoleccion (solo si hay algo)
+  ARQ-MARCA gc-tipos-sin-registrar-total v=0      idem
+
+  Las viejas siguen: `gc-ptrdata-recortado` y `gc-gcdata-fuera-imagen` ahora solo pueden salir de un tipo REAL
+  (uno de la tabla), o sea que significan algo distinto: si alguna vez aparecen, el objeto tiene tamano declarado
+  menor que su `__ptrdata`, y eso es un problema del tipo, no del barrido.
