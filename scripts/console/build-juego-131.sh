@@ -363,8 +363,12 @@ echo "   QUEST quest=$(leer_knob questKnob) bichos=$(leer_knob monstruosKnob) ac
 [ -n "${MINIMAPA:-}" ] && pisa_knob minimapaKnob "$MINIMAPA" 1
 [ -n "${MINIMAPA_CUANDO:-}" ] && pisa_knob minimapaCuando "$MINIMAPA_CUANDO" 1
 [ -n "${MINIMAPA_TODO:-}" ] && pisa_knob minimapaTodo "$MINIMAPA_TODO" 1
+# DC-002.146b: MINIMAPA_SIEMBRA=cercana|no. "no" = el camino del motor (un tile sin fila en AutoMap.txt no tiene
+# celda); "cercana" = la fila mas cercana del mismo tipo, que es lo que llena el automapa del afuera del DRLG. Es
+# el A/B de la siembra, y con el pueblo los dos caminos dan las mismas celdas.
+[ -n "${MINIMAPA_SIEMBRA:-}" ] && pisa_knob minimapaSiembra "$MINIMAPA_SIEMBRA" 1
 
-echo "   MINIMAPA minimapa=$(leer_knob minimapaKnob) cuando=$(leer_knob minimapaCuando) todo=$(leer_knob minimapaTodo)"
+echo "   MINIMAPA minimapa=$(leer_knob minimapaKnob) cuando=$(leer_knob minimapaCuando) todo=$(leer_knob minimapaTodo) siembra=$(leer_knob minimapaSiembra)"
 
 # LAS DE ESTA TARJETA (DC-002.131): EL INSTRUMENTO DE LO VIVO. MEDIR_VIVO=no lo apaga entero (recolecciones
 # incluidas), que es el A/B que separa el instrumento del arreglo: con el instrumento prendido, sus propias

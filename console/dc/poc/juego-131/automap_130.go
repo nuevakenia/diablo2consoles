@@ -200,6 +200,10 @@ type minimapaDelJuego struct {
 	reveladasUltimas int // celdas de las ultimas casillas reveladas
 	reveladasMax     int
 
+	// DC-002.146b: la siembra (las celdas que salieron de la fila mas cercana, no de una fila exacta)
+	sembradasUltimo int
+	sembradasTotal  int
+
 	// el dibujo, por cuadro
 	cuadrosDibujados int
 	celdasUltimas    int
@@ -750,12 +754,24 @@ func (m *minimapaDelJuego) revelarTodoElNivel() {
 		return
 	}
 
-	agregadas := m.Modelo.RevealTiles(m.Tabla, fuenteDelMotor{}, m.Nivel, semillaDelAutomap(m.Nivel),
-		float64(w/2), float64(h/2), d2automap.Area{HalfW: w * 8, HalfH: h * 4})
+	agregadas, sembradas := m.revelarConElModelo(float64(w/2), float64(h/2),
+		d2automap.Area{HalfW: w * 8, HalfH: h * 4})
+
+	conCelda, de := m.coberturaDelModelo()
 
 	println("JUEGO130: MINIMAPA REVEAL-TODO nivel=", m.Nivel, d2automap.LevelName(m.Nivel), "casillas=", w, "x", h,
-		"agregadas=", agregadas, "celdas=", m.Modelo.Count(),
+		"agregadas=", agregadas, "celdas=", m.Modelo.Count(), "sembradas=", sembradas, "siembra=", minimapaSiembra,
+		"casillasConCelda=", conCelda, "de", de, "pct=", conCelda*100/maxDe(de),
 		"piso=", m.Modelo.CountLayer(d2automap.LayerFloor), "pared=", m.Modelo.CountLayer(d2automap.LayerWall))
+}
+
+// maxDe: el denominador del porcentaje, sin partir por cero.
+func maxDe(v int) int {
+	if v <= 0 {
+		return 1
+	}
+
+	return v
 }
 
 // semillaDelAutomap: la del motor (`Automap.Advance`: uint32(nivel+1) * automapSeedMul). El multiplicador va en una
@@ -765,6 +781,70 @@ var multiplicadorDeLaSemilla uint32 = 2654435761
 
 func semillaDelAutomap(nivel int) uint32 {
 	return uint32(nivel+1) * multiplicadorDeLaSemilla
+}
+
+// ============================== LA SIEMBRA CON LA FILA MAS CERCANA (DC-002.146b) ==============================
+//
+// EL DEFECTO QUE CIERRA. El modelo se llenaba solo donde las filas de `AutoMap.txt` del nivel matcheaban
+// `(tile, estilo, secuencia)`, y los tiles que pone el DRLG en el afuera casi no caen en ellas: medido en el host
+// (`console/dc/medidas/automap-drlg`), en una region de 32 x 32 del Blood Moor los pisos son
+// `act1/town/floor.dt1` estilo 0 (482 registros) y estilo 5 (273) con secuencia 0, y las filas del "1 Wilderness"
+// cubren el estilo 0 para las secuencias 1..47 y no tienen ni una fila del estilo 5. Con los indices de tile
+// correctos el modelo quedaba en 204 celdas de 1.024 casillas (19,9 %), y con la region de 16 x 16 en CERO pisos.
+//
+// LA REGLA (`d2automap.Table.CelCercana`, que es la que corre aca). Un tile sin fila toma la celda de la fila MAS
+// CERCANA de su tipo: la del mismo estilo con la secuencia mas proxima, o si el estilo no tiene ninguna fila, la del
+// estilo mas proximo. Un tipo sin filas (los arboles, tipo 14) NO se siembra: no se inventa un grafico. El camino
+// del motor (`RevealTiles`) queda intacto: `MINIMAPA_SIEMBRA=no` es el A/B, y con el pueblo --cuyos tiles estan
+// todos en la tabla-- los dos caminos dan las mismas celdas.
+//
+// LOS NUMEROS DE LOS DOS CAMINOS (medidos en el host, `automap-drlg`, con el indice de tile ya arreglado):
+//
+//	region 32 x 32 (24,32):  sin siembra 204 celdas (111 piso / 93 pared)  19,9 % de las casillas
+//	                         con siembra 1.117 celdas (1.024 piso / 93 pared)  100 % de las casillas
+//	region 16 x 16 (0,48):   sin siembra  29 celdas (0 piso / 29 pared)   11,3 % de las casillas
+//	                         con siembra  221 celdas (192 piso / 29 pared)  75 % de las casillas (100 % de las
+//	                         que el DRLG poblo: la region tiene 192 casillas con tile de 256)
+func sembrandoElAutomapa() bool {
+	return minimapaSiembra != "no"
+}
+
+// revelarConElModelo: el revelado del nivel `id` alrededor de `hx, hy` con el area dada, con la siembra o sin
+// ella. Devuelve las celdas agregadas y cuantas vinieron de la siembra.
+func (m *minimapaDelJuego) revelarConElModelo(hx, hy float64, area d2automap.Area) (int, int) {
+	semilla := semillaDelAutomap(m.Nivel)
+	fuente := fuenteDelMotor{}
+
+	var agregadas, sembradas int
+
+	if sembrandoElAutomapa() {
+		agregadas, sembradas = m.Modelo.RevealTilesConRespaldo(m.Tabla, fuente, m.Nivel, semilla, hx, hy, area)
+	} else {
+		agregadas = m.Modelo.RevealTiles(m.Tabla, fuente, m.Nivel, semilla, hx, hy, area)
+	}
+
+	m.sembradasUltimo, m.sembradasTotal = sembradas, m.sembradasTotal+sembradas
+
+	return agregadas, sembradas
+}
+
+// coberturaDelModelo: cuantas casillas del mapa compuesto tienen alguna celda en el modelo (`de`), que es la
+// pregunta del criterio: "casillas de la region con celda en el modelo". Se cuenta con `Model.HasAt` (tres
+// busquedas de mapa por casilla, sin reservar nada) sobre las casillas del mapa que el POC tiene compuesto.
+func (m *minimapaDelJuego) coberturaDelModelo() (conCelda, de int) {
+	w, h := fuenteDelMotor{}.Size()
+
+	for ty := 0; ty < h; ty++ {
+		for tx := 0; tx < w; tx++ {
+			de++
+
+			if m.Modelo.HasAt(d2automap.TileCell(tx, ty)) {
+				conCelda++
+			}
+		}
+	}
+
+	return conCelda, de
 }
 
 // revelarElMinimapa: el reveal SIGUIENDO AL JUGADOR. Se llama una vez por cuadro, antes de dibujar: si el heroe se
@@ -785,8 +865,7 @@ func (m *minimapaDelJuego) revelarElMinimapa(jugador int) {
 
 	antes := m.Modelo.Count()
 
-	m.Modelo.RevealTiles(m.Tabla, fuenteDelMotor{}, m.Nivel, semillaDelAutomap(m.Nivel), hx, hy,
-		d2automap.ScreenArea(ancho, alto))
+	agregadas, sembradas := m.revelarConElModelo(hx, hy, d2automap.ScreenArea(ancho, alto))
 
 	m.revelados++
 	m.reveladasUltimas = m.Modelo.Count() - antes
@@ -796,7 +875,7 @@ func (m *minimapaDelJuego) revelarElMinimapa(jugador int) {
 	}
 
 	println("JUEGO130: MINIMAPA REVEAL cuadro=", cuadro, "jugador=", jugador+1, "heroe=", hx, hy,
-		"agregadas=", m.reveladasUltimas, "celdas=", m.Modelo.Count(),
+		"agregadas=", agregadas, "sembradas=", sembradas, "celdas=", m.Modelo.Count(),
 		"piso=", m.Modelo.CountLayer(d2automap.LayerFloor), "pared=", m.Modelo.CountLayer(d2automap.LayerWall))
 }
 
@@ -1118,10 +1197,16 @@ func (m *minimapaDelJuego) rearmarElMinimapaDelNivel(id, jugador int) (ok bool) 
 
 	paso = "el resumen"
 
+	// DC-002.146b: la cobertura del modelo, que es lo que el criterio pide ("casillas de la region con celda en el
+	// modelo"). Se cuenta ACA, antes de imprimir, y es lo que dice si la siembra lleno el nivel.
+	conCelda, de := m.coberturaDelModelo()
+
 	println("JUEGO130: MINIMAPA REARME nivelAntes=", nivelAntes, "nivelAhora=", m.Nivel,
 		"nombre=", d2automap.LevelName(m.Nivel), "filasDeLaTabla=", filasAntes, "->", filasNuevas,
 		"celdasAntes=", celdasAntes, "celdasAhora=", m.Modelo.Count(),
 		"piso=", m.Modelo.CountLayer(d2automap.LayerFloor), "pared=", m.Modelo.CountLayer(d2automap.LayerWall),
+		"sembradas=", m.sembradasUltimo, "siembra=", minimapaSiembra,
+		"casillasConCelda=", conCelda, "de", de, "pct=", conCelda*100/maxDe(de),
 		"cuadrosDeArte=", cuadrosAntes, "->", m.CuadrosArte, "cuadrosSoltados=", cuadrosSoltados, "faltan=", faltan,
 		"bytesDeArte=", bytesArteAntes, "->", m.BytesArte, "liberados=", liberados,
 		"libreAntes=", libreAntes, "libreDespues=", d2cMontonLibre(),

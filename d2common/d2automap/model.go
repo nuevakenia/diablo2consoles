@@ -199,6 +199,29 @@ func ScreenArea(w, h int) Area {
 // A tile is processed once. level is the LvlTypes id of the level; seed makes
 // the choice among the cels of a row stable (the engine uses the level seed).
 func (m *Model) RevealTiles(t *Table, src TileSource, level int, seed uint32, heroX, heroY float64, a Area) int {
+	added, _ := m.reveal(t, src, level, seed, heroX, heroY, a, false)
+
+	return added
+}
+
+// RevealTilesConRespaldo is RevealTiles with the console port's fill policy
+// (DC-002.146b): a tile whose (orientation, style, sequence) has no row in the
+// table still gets the cel of the NEAREST row of its orientation
+// (Table.CelCercana), instead of no cel at all. It returns the cells added and
+// how many of them came from that fallback.
+//
+// The engine's RevealTiles does not change: a level whose tiles are all in
+// AutoMap.txt (the town) gets exactly the same cells either way, which is what
+// the console measures (`MINIMAPA_SIEMBRA=no` is the A/B).
+func (m *Model) RevealTilesConRespaldo(t *Table, src TileSource, level int, seed uint32, heroX, heroY float64,
+	a Area) (added, sembradas int) {
+	return m.reveal(t, src, level, seed, heroX, heroY, a, true)
+}
+
+// reveal is the body of both reveal flavours; respaldo picks Table.CelCercana
+// over Table.Cel.
+func (m *Model) reveal(t *Table, src TileSource, level int, seed uint32, heroX, heroY float64, a Area,
+	respaldo bool) (added, sembradas int) {
 	w, h := src.Size()
 	hcx, hcy := WorldCell(heroX, heroY)
 
@@ -225,8 +248,6 @@ func (m *Model) RevealTiles(t *Table, src TileSource, level int, seed uint32, he
 		y1 = h - 1
 	}
 
-	added := 0
-
 	for ty := y0; ty <= y1; ty++ {
 		for tx := x0; tx <= x1; tx++ {
 			cx, cy := TileCell(tx, ty)
@@ -244,6 +265,13 @@ func (m *Model) RevealTiles(t *Table, src TileSource, level int, seed uint32, he
 				m.seen[tk] = true
 
 				cel, ok := t.Cel(level, ref.Type, ref.Style, ref.Sequence, tileHash(seed, tx, ty, i))
+				deRespaldo := false
+
+				if !ok && respaldo {
+					cel, ok = t.CelCercana(level, ref.Type, ref.Style, ref.Sequence, tileHash(seed, tx, ty, i))
+					deRespaldo = ok
+				}
+
 				if !ok {
 					continue
 				}
@@ -255,12 +283,29 @@ func (m *Model) RevealTiles(t *Table, src TileSource, level int, seed uint32, he
 
 				if m.Add(ref.Layer, cx, y, cel) {
 					added++
+
+					if deRespaldo {
+						sembradas++
+					}
 				}
 			}
 		}
 	}
 
-	return added
+	return added, sembradas
+}
+
+// HasAt says whether the model has any cell at that cell position (any layer).
+// It is the console's "this cell of the map is on the automap" question
+// (DC-002.146b), answered with three map lookups and no allocation.
+func (m *Model) HasAt(x, y int) bool {
+	for l := Layer(0); l < numLayers; l++ {
+		if len(m.cells[celKey(l, x, y)]) > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 // AddObject adds the cell of an object (objects.txt AutoMap column) at its

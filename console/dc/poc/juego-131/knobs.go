@@ -655,6 +655,16 @@ const (
 	// pueblo entero. "no" = solo el reveal que sigue al jugador (se ve crecer el mapa cuadro a cuadro).
 	minimapaTodo = "si"
 
+	// minimapaSiembra (DC-002.146b): que hace el revelado con un tile que NO tiene fila en `AutoMap.txt`.
+	//
+	//	"cercana"  le da la celda de la fila MAS CERCANA del mismo tipo (`d2automap.Table.CelCercana`: mismo
+	//	           estilo con la secuencia mas proxima, o el estilo mas proximo). Es lo que llena el automapa
+	//	           del afuera generado por el DRLG, cuyos pisos son `act1/town/floor.dt1` estilo 0 y 5 con
+	//	           secuencia 0 y las filas del "1 Wilderness" solo cubren el estilo 0 para las secuencias 1..47.
+	//	"no"       el camino del MOTOR: el tile sin fila no tiene celda (es el A/B de la siembra, y el numero
+	//	           que dice cuanto llena).
+	minimapaSiembra = "cercana"
+
 	// ============================== LAS DE ESTA TARJETA (DC-002.137): EL MINIMAPA POR DENTRO ==============================
 	//
 	// minimapaRapido: TRES caminos, y el A/B es una corrida (los pixeles son los mismos en los tres).

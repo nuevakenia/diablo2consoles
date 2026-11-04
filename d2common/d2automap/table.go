@@ -158,6 +158,92 @@ func (t *Table) Cel(level, tile, style, seq int, pick uint32) (cel int, ok bool)
 	return r.Cels[int(pick%uint32(len(r.Cels)))], true
 }
 
+// LookupCercana is the console port's fallback for tiles that no row matches
+// (DC-002.146b). The engine draws nothing for them (Lookup/Cel above, unchanged),
+// and that is why the automap of a DRLG-generated outdoor level stays almost
+// empty: the flat fill of the Blood Moor is `act1/town/floor.dt1` style 0/5 with
+// sequence 0, and the "1 Wilderness" rows of AutoMap.txt cover style 0 for
+// sequences 1..47 and have no row at all for style 5.
+//
+// The rule, in this order:
+//  1. the row of the same orientation (tile) and the same style: the nearest
+//     sequence range (distance 0 when the sequence is inside it). A row whose
+//     style is Any counts as a match of the style.
+//  2. otherwise the row of the same orientation whose style is nearest, and
+//     among those the nearest sequence range. Ties break towards the lower style
+//     so the choice does not depend on the file order.
+//
+// It returns nil when the level has no row for that orientation at all (a tree
+// wall, orientation 14, has none in "1 Wilderness": the fallback does not invent
+// a graphic for it).
+func (t *Table) LookupCercana(level, tile, style, seq int) *Row {
+	if r := t.Lookup(level, tile, style, seq); r != nil {
+		return r
+	}
+
+	rows := t.LevelRows(level)
+
+	var mejor *Row
+
+	mejorEstilo, mejorSeq := -1, -1
+
+	for i := range rows {
+		r := &rows[i]
+		if r.Tile != tile {
+			continue
+		}
+
+		estilo := 0
+		if r.Style != Any && r.Style != style {
+			estilo = absInt(r.Style - style)
+		}
+
+		dSeq := seqDistance(r, seq)
+
+		if mejor == nil || estilo < mejorEstilo || (estilo == mejorEstilo && dSeq < mejorSeq) ||
+			(estilo == mejorEstilo && dSeq == mejorSeq && r.Style != Any && r.Style < mejor.Style) {
+			mejor, mejorEstilo, mejorSeq = r, estilo, dSeq
+		}
+	}
+
+	return mejor
+}
+
+// CelCercana is Cel with the LookupCercana fallback (see above).
+func (t *Table) CelCercana(level, tile, style, seq int, pick uint32) (cel int, ok bool) {
+	r := t.LookupCercana(level, tile, style, seq)
+	if r == nil || len(r.Cels) == 0 {
+		return 0, false
+	}
+
+	return r.Cels[int(pick%uint32(len(r.Cels)))], true
+}
+
+// seqDistance is how far seq is from the row's sequence range, 0 when inside.
+func seqDistance(r *Row, seq int) int {
+	if r.Start == Any {
+		return 0
+	}
+
+	if seq < r.Start {
+		return r.Start - seq
+	}
+
+	if seq > r.End {
+		return seq - r.End
+	}
+
+	return 0
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+
+	return v
+}
+
 // ParseBin reads the compiled automap.bin.
 func ParseBin(b []byte) (*Table, error) {
 	const rowSize = 44

@@ -6,6 +6,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapstamp"
 )
 
@@ -42,8 +43,17 @@ func (m *MapEngine) exactComponent(t ExactTile) (c d2ds1.Tile, dt *d2dt1.Tile, o
 		end = m.dt1Starts[slot+1]
 	}
 
-	g := m.dt1Starts[slot] + t.Index
-	if t.Index < 0 || g >= end {
+	// DC-002.146b: EL INDICE SE TRADUCE. En la consola el `.dt1` se carga COMPACTADO al arena de bloques
+	// usados (los tiles cuya clave el nivel no usa se tiran y los demas se corren), y `t.Index` es el indice
+	// del `.dt1` original: sin traducirlo se resuelve otro tile o se pasa del final. En la PC la traduccion es
+	// la identidad (`d2asset.IndiceDeTileCargado`), asi que el camino del motor no cambia.
+	local, hay := d2asset.IndiceDeTileCargado(file, t.Index)
+	if !hay {
+		return c, nil, false
+	}
+
+	g := m.dt1Starts[slot] + local
+	if local < 0 || g >= end {
 		return c, nil, false
 	}
 

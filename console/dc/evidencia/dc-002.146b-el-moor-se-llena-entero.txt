@@ -1,0 +1,125 @@
+DC-002.146b -- EL AUTOMAPA DEL MOOR SE LLENABA SOLO EN PARTE: LA CADENA, LOS DOS DEFECTOS Y LOS NUMEROS
+=====================================================================================================
+
+LA PREGUNTA. En la consola, el automapa del Blood Moor generado por el DRLG (nivel 2, "1 Wilderness") salia
+casi vacio: de una region de 32 x 32 casillas solo se dibujaban 742 celdas, y una region de 16 x 16 daba 9. En
+la captura de DC-002.145 (evidencia dc-002.145-el-moor-region-32x32.png) el minimapa mostraba un rombo de
+puntos sueltos con la mayor parte del area en negro. Donde SI funcionaba era el pueblo (nivel 1, 680 celdas).
+
+Este documento cierra la pregunta con numeros medidos en el HOST (sin emulador, `console/dc/medidas/
+automap-drlg`) y en la CONSOLA (Flycast, dos builds), y declara los dos defectos que la causaban.
+
+MEDIR EN EL HOST, CON LOS NUMEROS DE LA CONSOLA COMO VERDAD
+-----------------------------------------------------------
+  go run ./console/dc/medidas/automap-drlg -seed 1 -regiones "24,32:32;0,48:16" "<D2_DIR>"
+
+La herramienta corre el mismo DRLG que la consola (`drlgworld.Generate` + `drlgoutdoor.Generate` +
+`Level.BuildTiles`), arma las mismas casillas y pasa la MISMA cadena del minimapa:
+`registro del DRLG -> .dt1 (estilo, secuencia, tipo) -> TileRef -> Table.Cel` -> `Model`. Con el `.dt1` tal como
+viene y el modelo del motor reproducia 742 (32 x 32) y 9 (16 x 16): los mismos numeros que la consola, que es
+lo que autoriza a usarla para el A/B.
+
+LOS DOS DEFECTOS
+----------------
+1. EL INDICE DEL TILE. `d2mapengine.ExactTile.Index` es el indice del tile en el `.dt1` ORIGINAL, pero en la
+   consola el `.dt1` se carga COMPACTADO (`d2asset.cargarDT1EnBloquesUsados`: tira los tiles cuya clave
+   `(estilo, secuencia, tipo)` el nivel no usa y CORRE a los que quedan, para que los bloques entren en el arena
+   de 100.800 bytes). Al resolver `dt1TileData[slot+indice]` con el indice original el motor caia en OTRO tile,
+   o mas alla del final y el registro se perdia. Medido en el Blood Moor: `act1/outdoors/swamp.dt1` pasa de 138
+   tiles a 5 y `act1/town/floor.dt1` de 144 a 56, y son los dos que el DRLG pone en el piso del afuera.
+   Los 742 de DC-002.145 no eran "el automapa a medias": eran 742 celdas dibujadas con tiles corridos (el
+   terreno del cuadro 3D tambien salia con los tiles corridos).
+2. LA TABLA NO TIENE FILA PARA ESOS TILES. Con el indice ya correcto el modelo se quedaba en 204 celdas de
+   1.024 (19,9 %) en la region de 32 x 32, y en CERO pisos en la de 16 x 16. La causa: el piso plano del moor es
+   `act1/town/floor.dt1` estilo 0 (482 registros) y estilo 5 (273) con secuencia 0, y las filas del "1
+   Wilderness" de `AutoMap.txt` cubren el estilo 0 para las secuencias 1..47 y no tienen NI UNA fila del estilo 5.
+   O sea: el DRLG pone tiles que la tabla del nivel no cataloga, y el motor (que solo busca fila exacta) no les
+   da celda.
+
+LOS DOS ARREGLOS
+----------------
+1. `d2asset.IndiceDeTileCargado(archivo, indice)` traduce el indice del `.dt1` original al de la lista cargada,
+   y `d2mapengine.exactComponent` lo usa (si el tile se tiro, el registro se descarta). La traduccion la llena
+   `cargarDT1EnBloquesUsados` y se tira junto con el arena (`reiniciarArenaDeTilesSinCandado`). En la PC nadie
+   compacta, asi que la traduccion es la identidad y el camino del motor no cambia.
+2. `d2automap.Table.CelCercana` + `Model.RevealTilesConRespaldo`: un tile sin fila toma la celda de la fila MAS
+   CERCANA de su tipo -- la del mismo estilo con la secuencia mas proxima, o si el estilo no tiene ninguna fila,
+   la del estilo mas proximo. Un tipo sin filas (los arboles, tipo 14) NO se siembra: no se inventa un grafico.
+   La regla NO toca `Lookup`/`Cel`/`RevealTiles`: el camino del motor queda igual, y el knob
+   `MINIMAPA_SIEMBRA=cercana|no` (`scripts/console/build-juego-131.sh`) elige cual corre. Con `no` el modelo da
+   exactamente los numeros de siempre.
+
+A/B MEDIDO EN EL HOST (misma corrida, misma semilla, mismo modelo)
+-----------------------------------------------------------------
+  region 32 x 32 (24,32)   A. .dt1 como viene, sin siembra ....  204 celdas (111 piso /  93 pared)  19,9 %
+                           B. .dt1 compactado (lo de hoy) ......  742 celdas (704 piso /  38 pared)  68,9 %
+                           C. indice correcto + siembra ........ 1117 celdas (1024 piso /  93 pared) 100 %
+                           D. compactado + siembra .............  890 celdas ( 852 piso /  38 pared)  83,4 %
+
+  region 16 x 16 (0,48)    A. ...................................  29 celdas (  0 piso /  29 pared)  11,3 %
+                           B. ...................................   9 celdas (  0 piso /   9 pared)   3,5 %
+                           C. ..................................  221 celdas (192 piso /  29 pared)  75 %
+                           D. ...................................  13 celdas (  4 piso /   9 pared)   5,1 %
+
+  La region de 16 x 16 tiene 192 casillas con tile de 256 (las otras 64 no las poblo el DRLG): el 75 % de
+  cobertura es el 100 % de las casillas que tienen tile.
+
+  D es la prueba en contra de que alcanza con UN solo arreglo: con la siembra sola (sin arreglar el indice) la
+  region chica queda en 5,1 %, y con el indice solo queda en 11,3 %. Hacen falta los dos.
+
+MEDIDO EN LA CONSOLA (Flycast, dos builds, evidencia en el mismo directorio)
+---------------------------------------------------------------------------
+  32 x 32 (`dc-002.146b-el-moor-32x32-flycast.log`, `-el-minimapa-32x32.png`, `-el-moor-32x32.png`)
+    build: DEMO=si DEMO_MOOR=si DEMO_MOOR_DRLG=si MONSTRUOS=2 MEDIR_CUADRO=no MEDIR_VIVO=no
+    guion: nada 8 / derecha 2.5 / abajo 2.5 / nada 45   (SEGUNDOS=100 INTERVALO=10)
+
+    DEMO140: REGION COMPUESTA casillas= 1024 conPiso= 1024 sinNada= 0 fallas= 0 tiles= 1024 ms= 24342
+              libre= 1480808 semiespacio= 1625624 vramLibre= 3511976
+    JUEGO130: MINIMAPA REARME nivelAntes= 1 nivelAhora= 2 nombre= 1 Wilderness filasDeLaTabla= 83 -> 142 celdasAntes= 2485 celdasAhora= 1117 piso= 1024 pared= 93 sembradas= 913 siembra= cercana casillasConCelda= 1024 de 1024 pct= 100 cuadrosDeArte= 59 -> 75 cuadrosSoltados= 59 faltan= 0 bytesDeArte= 11890 -> 11580 liberados= 11890 libreAntes= 1480808 libreDespues= 1481008 recolecciones= 174 -> 178 frenado= false semiespacioAntes= 1625896 pico= 1717544 pide= 91648 semiespacioDespues= 1619224 ms= 1081
+    JUEGO137: MINIMAPA-POR-DENTRO cuadros= 570 delTramo= 30 caja= 2220 celdas= 8024 marcador= 76 tabla= 28 extra= 0 celdasPintadas= 1117 pixelesPintados= 6269 celdasDelModelo= 1117 rapido= si diag= no tilesPorPalabras= 8550 tilesPorBytes= 0 tilesCompactos= 24960
+
+    Los 1117 del host y los 1117 de la consola son el mismo numero: 1.024 casillas de piso + 93 de pared.
+    De las 1117, 913 salieron de la siembra (las 204 restantes son las filas exactas de la tabla).
+
+  16 x 16 (`dc-002.146b-el-moor-16x16-flycast.log`, `-el-minimapa-16x16.png`, `-el-moor-16x16.png`)
+    mismo build pero con el plan regenerado:
+      go run ./console/dc/medidas/moor-drlg -plan console/dc/poc/juego-131/moor_region_145.go -seed 1 \
+             -lado 16 -ox 0 -oy 48 "<D2_DIR>"
+      -> region=16x16 desde 0,48 celdas=192 registros=261 piezas=4 claves=35 buffer=1008003 spawn=8,8
+
+    DEMO140: REGION COMPUESTA casillas= 192 conPiso= 192 sinNada= 64 fallas= 0 tiles= 256 ms= 14016 libre= 2006544 semiespacio= 1549992 vramLibre= 3511976
+    JUEGO130: MINIMAPA REARME nivelAntes= 1 nivelAhora= 2 nombre= 1 Wilderness filasDeLaTabla= 83 -> 142 celdasAntes= 2485 celdasAhora= 221 piso= 192 pared= 29 sembradas= 192 siembra= cercana casillasConCelda= 192 de 256 pct= 75 cuadrosDeArte= 59 -> 75 cuadrosSoltados= 59 faltan= 0 bytesDeArte= 11890 -> 11580 liberados= 11890 libreAntes= 2006544 libreDespues= 2006744 recolecciones= 172 -> 175 frenado= true semiespacioAntes= 1550264 pico= 1448792 pide= -101472 semiespacioDespues= 1410416 ms= 896
+    JUEGO137: MINIMAPA-POR-DENTRO cuadros= 690 delTramo= 30 caja= 2217 celdas= 1369 marcador= 76 tabla= 29 extra= 0 celdasPintadas= 167 pixelesPintados= 458 celdasDelModelo= 221 rapido= si diag= no tilesPorPalabras= 2640 tilesPorBytes= 0 tilesCompactos= 2370
+
+    (El plan de 16 x 16 se uso SOLO para esta medicion: el que queda en el repo es el de 32 x 32 de
+    DC-002.145. El de 16 x 16 se regenera con el comando de arriba.)
+
+EL PUEBLO, QUE ES EL CONTROL
+----------------------------
+  JUEGO130: MINIMAPA REVEAL-TODO nivel= 1 1 Town casillas= 57 x 41 agregadas= 2485 celdas= 2485
+            sembradas= 1805 siembra= cercana casillasConCelda= 2281 de 2337 pct= 97 piso= 2281 pared= 204
+
+  Las 2485 celdas incluyen 1805 sembradas: 680 son las filas EXACTAS, que es exactamente el numero de
+  DC-002.130 (el pueblo medido contra el motor). O sea: el camino del motor para el pueblo sigue dando 680, y la
+  siembra le agrega las 1805 casillas que la tabla tampoco cataloga (el pueblo tambien tenia el automapa a
+  medias: 680 de 2337 casillas = 29 %). Es un cambio VISIBLE del pueblo, y es el motivo por el que la siembra
+  esta detras de un knob: `MINIMAPA_SIEMBRA=no` deja el pueblo en 680 como siempre.
+
+VEREDICTO DEL CRITERIO
+----------------------
+  (a) region de 32 x 32 con >= 60 % de las casillas con celda en el modelo -> 100 %  (1024 de 1024)
+  (b) region de 16 x 16 con >= 60 % -> 75 % (192 de 256; el 100 % de las 192 casillas con tile)
+  (c) la captura muestra el minimapa dibujado -> celdasPintadas= 1117 / 167 y pixelesPintados= 6269 / 458
+  (d) sin huecos negros dentro de la region -> las dos regiones entran completas al modelo (100 % y 100 % de
+      las casillas con tile), asi que no queda casilla sin celda dentro del rombo
+
+  Comparacion con DC-002.145: 742 -> 1117 celdas y 68,9 % -> 100 % de cobertura (32 x 32), 9 -> 221 celdas y
+  3,5 % -> 75 % (16 x 16).
+
+PRUEBAS
+-------
+  d2common/d2automap/respaldo_146b_test.go   la regla de la fila mas cercana (fila exacta, mismo estilo con la
+                                             secuencia fuera del rango, estilo vecino, tipo sin filas que NO se
+                                             siembra) y que `RevealTiles` (el motor) NO siembra.
+  d2core/d2asset/indices_146b_test.go        la traduccion del indice: sin compactar es la identidad, compactado
+                                             mapea, un tile tirado devuelve ok=false, la ruta se normaliza.

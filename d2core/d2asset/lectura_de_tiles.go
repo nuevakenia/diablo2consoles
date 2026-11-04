@@ -55,6 +55,7 @@ package d2asset
 import (
 	"errors"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2datautils"
@@ -205,7 +206,57 @@ var (
 	// leer el archivo no pide memoria por archivo.
 	scratchDeLectura []byte
 	scratchDelNivel  int
+
+	// indicesDelArchivo (DC-002.146b): por archivo de tiles, el indice que le toca en la lista COMPACTADA a
+	// cada indice del `.dt1` original (-1 = el tile se tiro porque el nivel no usa su clave). Lo llena
+	// `cargarDT1EnBloquesUsados`, que es el unico camino que compacta; en la PC y con el arena de crudos el
+	// mapa esta vacio y el indice se usa tal cual. Ver `IndiceDeTileCargado`.
+	indicesDelArchivo map[string][]int
 )
+
+// IndiceDeTileCargado traduce el indice de un tile en el `.dt1` ORIGINAL al indice que tiene en la lista que
+// el motor cargo, que en la consola es la COMPACTADA del arena de bloques usados (DC-002.146b).
+//
+// POR QUE HACE FALTA. `d2mapengine.ExactTile.Index` es el indice del tile en el `.dt1` (lo que el DRLG guardo),
+// y `cargarDT1EnBloquesUsados` tira los tiles cuya clave el nivel no usa y CORRE a los que quedan. Sin esta
+// traduccion el motor resuelve otro tile (o se pasa del final y pierde el registro): medido en el Blood Moor,
+// 235 de 1.024 registros de una region de 32 x 32 caian fuera de la lista y el resto apuntaba a tiles
+// corridos. En la PC no compacta nadie, asi que devuelve el mismo indice.
+//
+// ok es false cuando ese indice no esta en la lista (sea porque el tile se tiro, sea porque el indice no
+// existe): el que llama tiene que descartar el registro, que es lo que hace `exactComponent`.
+func IndiceDeTileCargado(filePath string, indice int) (int, bool) {
+	if indice < 0 {
+		return 0, false
+	}
+
+	candadoDeTiles.Lock()
+	mapa, hay := indicesDelArchivo[normalizarRutaDeTiles(filePath)]
+	candadoDeTiles.Unlock()
+
+	if !hay {
+		// el archivo no paso por el camino que compacta (la PC, o el arena de crudos): el indice vale igual
+		return indice, true
+	}
+
+	if indice >= len(mapa) || mapa[indice] < 0 {
+		return 0, false
+	}
+
+	return mapa[indice], true
+}
+
+// normalizarRutaDeTiles: la misma forma para la ruta con la que se pide un `.dt1` en todos los caminos
+// (`/data/global/tiles/<archivo>`, en minusculas y con barras normales).
+func normalizarRutaDeTiles(filePath string) string {
+	ruta := strings.ToLower(strings.ReplaceAll(filePath, "\\", "/"))
+
+	if !strings.HasPrefix(ruta, "/") {
+		ruta = "/data/global/tiles/" + ruta
+	}
+
+	return ruta
+}
 
 // tramoDeBloques: lo que se le pide al monton cuando el tramo actual no alcanza. 512 KB entra en un pedido
 // externo (todo lo que pasa de 64 KB va a `gc_external_alloc`) y deja el monton con pedidos grandes y pocos:
@@ -345,6 +396,17 @@ func (am *AssetManager) cargarDT1EnBloquesUsados(filePath string) (*d2dt1.DT1, e
 	// los bloques de los tiles que el nivel usa se COPIAN al arena de bloques; los demas tiles se tiran
 	conservados := 0
 
+	// DC-002.146b: EL MAPA DE INDICES, porque tirar tiles CORRE a los que quedan. `dt1.Tiles[conservados] =
+	// dt1.Tiles[t]` deja la lista del archivo COMPACTADA, y el que pide un tile por su indice del `.dt1`
+	// (`d2mapengine.ExactTile.Index`, que es el que el DRLG guardo) cae entonces en OTRO tile -- o mas alla
+	// del final y el registro se pierde. Medido: en el Blood Moor `swamp.dt1` pasa de 138 tiles a 5 y
+	// `act1/town/floor.dt1` de 144 a 56, y esos dos son los que pone el DRLG en el piso del afuera. El mapa
+	// guarda, para cada indice ORIGINAL, el indice en la lista que queda (-1 = el tile se tiro).
+	mapa := make([]int, len(dt1.Tiles))
+	for t := range mapa {
+		mapa[t] = -1
+	}
+
 	for t := range dt1.Tiles {
 		clave := ClaveDeTile(int64(dt1.Tiles[t].Style), int64(dt1.Tiles[t].Sequence), int64(dt1.Tiles[t].Type))
 		if len(clavesDelNivel) > 0 && !HayClave(clavesDelNivel, clave) {
@@ -363,9 +425,17 @@ func (am *AssetManager) cargarDT1EnBloquesUsados(filePath string) (*d2dt1.DT1, e
 			dt1.Tiles[t].Blocks[b].EncodedData = destino
 		}
 
+		mapa[t] = conservados
+
 		dt1.Tiles[conservados] = dt1.Tiles[t]
 		conservados++
 	}
+
+	if indicesDelArchivo == nil {
+		indicesDelArchivo = map[string][]int{}
+	}
+
+	indicesDelArchivo[normalizarRutaDeTiles(filePath)] = mapa
 
 	dt1.Tiles = dt1.Tiles[:conservados]
 	archivosDeTiles++
@@ -656,6 +726,10 @@ func (am *AssetManager) reiniciarArenaDeTilesSinCandado() {
 	tramoActual = 0
 	cursorDelBloque = 0
 	bytesDeBloques = 0
+
+	// DC-002.146b: el mapa de indices es del nivel que se tira, como el cache de dt1s: si un nivel nuevo carga
+	// el mismo archivo con otras claves, la lista compactada es otra.
+	indicesDelArchivo = nil
 
 	if am != nil && am.dt1s != nil {
 		am.dt1s.Clear()
