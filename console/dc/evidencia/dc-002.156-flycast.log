@@ -1,0 +1,785 @@
+00:00:000 sdl/sdl.cpp:753 N[COMMON]: Using GNOME scale factor: 1.00
+00:00:049 sdl/sdl.cpp:899 N[RENDERER]: Monitor refresh rate: 144 Hz (2560 x 1080)
+00:00:300 ui/gui.cpp:245 N[RENDERER]: Screen DPI is 94, size 640 x 480. Scaling by 1.00
+00:00:402 rend/gles/gles.cpp:606 N[RENDERER]: OpenGL version 4.6
+00:00:402 rend/gles/gles.cpp:607 N[RENDERER]: Vendor 'AMD' Renderer 'AMD Radeon RX 7900 XTX (radeonsi, navi31, ACO, DRM 3.64, 7.2.3-1-cachyos)' Version '4.6 (Core Profile) Mesa 26.2.2-arch3.2'
+00:00:406 rend/gles/gles.cpp:618 N[RENDERER]: glBlitFramebuffer test successful
+00:00:410 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:424 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fd9bf500000 RAM(16 MB) 0x7fd9cb500000 VRAM64(8 MB) 0x7fd9c3500000 ARAM(2 MB) 0x7fd9df500000
+00:00:431 hw/mem/addrspace.cpp:425 N[VMEM]: Info: nvmem is enabled
+00:00:438 hw/mem/addrspace.cpp:457 N[VMEM]: BASE 0x7fd9bf500000 RAM(16 MB) 0x7fd9cb500000 VRAM64(8 MB) 0x7fd9c3500000 ARAM(2 MB) 0x7fd9df500000
+00:00:441 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:445 emulator.cpp:617 N[BOOT]: Did not load BIOS, using reios
+00:00:445 emulator.cpp:60 N[BOOT]: Game ID is [T-00000]
+00:00:515 reios/reios.cpp:639 N[REIOS]: -----------------
+00:00:515 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:00:515 reios/reios.cpp:641 N[REIOS]: -----------------
+
+--
+KallistiOS v2.2.1
+  dom 25 oct 2026 14:33:57 -03
+  dgalli@warmachine:/home/dgalli/dreamcast/kos
+  sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+    Dreameye (Camera): Camera
+    Sound Input Peripheral: Microphone
+    PuruPuru (Vibration) Pack: JumpPack
+    VMU Driver: Clock, LCD, MemoryCard
+    Mouse Driver: Mouse
+    Keyboard Driver: Keyboard
+    Controller Driver: Controller
+    Lightgun: LightGun
+  DMA Buffer at ac5b25e0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+fs_romdisk: mounting image at 0x8c272f48 at /rd
+maple: attached devices:
+  A0: Dreamcast Controller           (01000000: Controller)
+  A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+  A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2354872320
+ARQ-MARCA   gc_init-semiespacio0 v=2354870208
+ARQ-MARCA   gc_init-semiespacio1 v=2356705248
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=736 cused=3829440 gsemi=202112/1835008 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0
+GATE0: arranca DC-002.155 -- el pueblo del Gate 0 por el arranque del MOTOR (d2app)
+GATE0: palancas: cuadro= 640 x 480 bloquesDeLaCache= 4 bytesDelBloque= 348160 bytesDelScratch= 1051532 gcPercent= 95
+GATE0: ESTADO al-arrancar montonLibre= 3800 breakLibre= 6909952 montonUsado= 3830472 gcVivo= 210424 gcTotal= 1835008 vramLibre= 0 vramPedida= 0
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+GATE0: PVR listo, VRAM de la textura del cuadro= 2097152
+GATE0: ESTADO despues-del-video montonLibre= 3776 breakLibre= 6909952 montonUsado= 3830496 gcVivo= 210424 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+GATE0: gcPercent: antes= 100 ahora= 95 scratchDeFuera= true techoDelMonton= -1929445376
+[35m[App][32m[INFO][0m OpenDiablo2 - Open source Diablo 2 engine (arranque de consola, DC-002.156)
+GATE0: ESTADO despues-de-Create montonLibre= 3776 breakLibre= 6909952 montonUsado= 3830496 gcVivo= 221800 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+GATE0: llamando a Run(): initialize + el bucle del PVR
+[35m[File Loader][32m[INFO][0m Adding source: '/rd'
+[35m[File Loader][32m[INFO][0m Adding source: '/rd/OpenDiablo2'
+ARQ-CARGA entra config.json cfree=3776 cused=3830496 gsemi=227232/1835008 gc=0
+[35m[File Loader][32m[INFO][0m Loaded /rd/OpenDiablo2 -> config.json
+ARQ-CARGA volvio config.json cfree=3752 cused=3830520 gsemi=230096/1835008 gc=0
+[35m[App][32m[INFO][0m configuracion cargada de /rd/OpenDiablo2/config.json: MpqPath=/cd/juego, 2 MPQ
+GATE0: ESTADO app:config-leida montonLibre= 3752 breakLibre= 6909952 montonUsado= 3830520 gcVivo= 238768 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+fs_iso9660: disc change detected
+GATE0: PIDE 98304 libreAntes=712 tomadoAntes=3870424 ra=8c1e7d6c quedo=8c961d40
+GATE0: PIDE 98304 libreAntes=704 tomadoAntes=3968736 ra=8c1e7d6c quedo=8c979d48
+GATE0: PIDE 131072 libreAntes=696 tomadoAntes=4067048 ra=8c1e7d6c quedo=8c991d50
+GATE0: PIDE 131072 libreAntes=40592 tomadoAntes=4158224 ra=8c1e7d6c quedo=8c9b1d58
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/juego/patch_d2.mpq'
+GATE0: PIDE 177328 libreAntes=39928 tomadoAntes=4289960 ra=8c1e7d6c quedo=8c9d1d60
+GATE0: PIDE 177328 libreAntes=42816 tomadoAntes=4467296 ra=8c1e7d6c quedo=8c9fd218
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/juego/d2data.mpq'
+GATE0: ESTADO app:config montonLibre= 41608 breakLibre= 6057984 montonUsado= 4644632 gcVivo= 933192 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+ARQ-CARGA lee-entra /data/local/use cfree=41608 cused=4644632 gsemi=933912/1835008 gc=0
+[35m[Asset Manager][32m[INFO][0m Language: enUS (ENG), font dir LATIN
+GATE0: ESTADO app:idioma montonLibre= 41608 breakLibre= 6057984 montonUsado= 4644632 gcVivo= 941328 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO tabla:empieza:/data/global/excel/LvlTypes.txt montonLibre= 41608 breakLibre= 6057984 montonUsado= 4644632 gcVivo= 942232 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=41608 cused=4644632 gsemi=942496/1835008 gc=0
+[35m[File Loader][32m[INFO][0m Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=41608 cused=4644632 gsemi=947904/1835008 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=41608 cused=4644632 gsemi=1013768/1835008 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=41608 cused=4644632 gsemi=1116112/1835008 gc=0
+GATE0: ESTADO tabla:lista:/data/global/excel/LvlTypes.txt montonLibre= 41608 breakLibre= 6057984 montonUsado= 4644632 gcVivo= 1116168 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO tabla:empieza:/data/global/excel/LvlPrest.txt montonLibre= 41608 breakLibre= 6057984 montonUsado= 4644632 gcVivo= 1116224 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=41608 cused=4644632 gsemi=1116488/1835008 gc=0
+[35m[File Loader][32m[INFO][0m Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=41608 cused=4644632 gsemi=1122112/1835008 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=41608 cused=4644632 gsemi=1134896/1835008 gc=0
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743272
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=396240
+ARQ-MARCA gc-tipos-tabla v=4096
+ARQ-MARCA gc-tipos-registrados v=185
+GATE0: PIDE 108032 libreAntes=41608 tomadoAntes=4644632 ra=8c1e7bfa quedo=8ca286d0
+ARQ-MARCA gc-externo-con-punteros v=108032
+GATE0: PIDE 216064 libreAntes=40064 tomadoAntes=4752672 ra=8c1e7bfa quedo=8ca42cd8
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=41080 cused=4968744 gsemi=1424936/1835008 gc=1
+GATE0: ESTADO tabla:lista:/data/global/excel/LvlPrest.txt montonLibre= 41080 breakLibre= 5734400 montonUsado= 4968744 gcVivo= 1424992 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+[35m[App][32m[INFO][0m Gate0: animdata.d2 NO se carga (sin entidades no hay animacion)
+GATE0: ESTADO app:tablas montonLibre= 41080 breakLibre= 5734400 montonUsado= 4968744 gcVivo= 1426416 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO app:gui montonLibre= 41080 breakLibre= 5734400 montonUsado= 4968744 gcVivo= 1426632 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+[35m[App][32m[INFO][0m Gate0: las tablas de strings NO se cargan (el pueblo no dibuja texto)
+GATE0: ESTADO app:strings montonLibre= 41080 breakLibre= 5734400 montonUsado= 4968744 gcVivo= 1428184 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO app:ui montonLibre= 41080 breakLibre= 5734400 montonUsado= 4968744 gcVivo= 1428184 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO app:antes-de-la-pantalla montonLibre= 41080 breakLibre= 5734400 montonUsado= 4968744 gcVivo= 1428184 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO app:bucle montonLibre= 41080 breakLibre= 5734400 montonUsado= 4968744 gcVivo= 1428320 gcTotal= 1835008 vramLibre= 3692232 vramPedida= 0
+PVR-FRAMEBUFFER la pantalla vive en la VRAM: 1920000 bytes
+PVR-FRAMEBUFFER monton de C: libre 41080 bytes (el runtime lo imprime como free)
+PVR-FRAMEBUFFER escribiendo 65536 bytes en la VRAM...
+PVR-FRAMEBUFFER escritos, leyendo de vuelta...
+PVR-FRAMEBUFFER ida y vuelta: 65536 bytes, distintos: 0
+EBITEN-LOOP cuadro 0 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 0 el PVR dio el cuadro, abro la lista
+[35m[Gamepad][32m[INFO][0m GAMEPAD raw layout id=%!d(tipo no soportado=%!v(tipo no soportado=tipo no soportado)) name="Dreamcast Controller" guid=dreamcast-0 profile=xbox buttons=8 axes=4
+[35m[Gamepad][32m[INFO][0m GAMEPAD connected id=0 name="Dreamcast Controller"
+EBITEN-LOOP cuadro 0 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 0 listo
+EBITEN-LOOP cuadro 1 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 1 el PVR dio el cuadro, abro la lista
+GATE0: ESTADO mapa:empieza montonLibre= 40840 breakLibre= 5668864 montonUsado= 5034520 gcVivo= 1435896 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+GATE0: ESTADO mapa:tramo-de-las-tablas-soltado montonLibre= 40840 breakLibre= 5668864 montonUsado= 5034520 gcVivo= 1435896 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+GATE0: ESTADO mapa:engine-creado montonLibre= 40840 breakLibre= 5668864 montonUsado= 5034520 gcVivo= 1437040 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=40840 cused=5034520 gsemi=1497072/1835008 gc=1
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=40840 cused=5034520 gsemi=1560352/1835008 gc=1
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743928
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=697520
+GATE0: ESTADO mapa:stamp-leido montonLibre= 40840 breakLibre= 5668864 montonUsado= 5034520 gcVivo= 916240 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+EBITEN-LOOP cuadro 1 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 1 listo
+EBITEN-LOOP cuadro 2 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 2 el PVR dio el cuadro, abro la lista
+EBITEN-LOOP cuadro 2 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 2 listo
+[35m[Game Screen][32m[INFO][0m el pueblo: 57x41 casillas, preset 1, archivo 0
+GATE0: PIDE 616968 libreAntes=40840 tomadoAntes=5034520 ra=8c1e7bfa quedo=8ca878e8
+ARQ-MARCA gc-externo-con-punteros v=616968
+GATE0: PIDE 524288 libreAntes=42360 tomadoAntes=5651496 ra=8c010f5a quedo=8cb1e2f8
+GATE0: PIDE 524288 libreAntes=42360 tomadoAntes=5651496 ra=8c1e7d6c quedo=8cb1e2f8
+GATE0: PIDE 524288 libreAntes=42352 tomadoAntes=6175792 ra=8c010f5a quedo=8cb9e300
+GATE0: PIDE 524288 libreAntes=42352 tomadoAntes=6175792 ra=8c1e7d6c quedo=8cb9e300
+GATE0: PIDE 524288 libreAntes=42344 tomadoAntes=6700088 ra=8c010f5a quedo=8cc1e308
+GATE0: PIDE 524288 libreAntes=42344 tomadoAntes=6700088 ra=8c1e7d6c quedo=8cc1e308
+ARQ-MARCA gc-por-umbral-bytes-usados v=1750320
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=1055336
+GATE0: PIDE 524288 libreAntes=42336 tomadoAntes=7224384 ra=8c010f5a quedo=8cc9e310
+GATE0: PIDE 524288 libreAntes=42336 tomadoAntes=7224384 ra=8c1e7d6c quedo=8cc9e310
+GATE0: PIDE 524288 libreAntes=42328 tomadoAntes=7748680 ra=8c010f5a quedo=8cd1e318
+GATE0: PIDE 524288 libreAntes=42328 tomadoAntes=7748680 ra=8c1e7d6c quedo=8cd1e318
+GATE0: PIDE 72352 libreAntes=42320 tomadoAntes=8272976 ra=8c1e7bfa quedo=8cd9e320
+ARQ-MARCA gc-externo-con-punteros v=72352
+GATE0: PIDE 81328 libreAntes=39592 tomadoAntes=8345336 ra=8c1e7bfa quedo=8cdafdc8
+ARQ-MARCA gc-externo-con-punteros v=81328
+GATE0: PIDE 91392 libreAntes=40176 tomadoAntes=8426672 ra=8c1e7bfa quedo=8cdc3b80
+ARQ-MARCA gc-externo-con-punteros v=91392
+GATE0: ESTADO mapa:reset-hecho montonLibre= 42984 breakLibre= 2183168 montonUsado= 8518072 gcVivo= 1322632 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745424
+ARQ-MARCA gc_collect v=4
+ARQ-MARCA gc-vivo v=1024080
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 1 %!d(fmt.Stringer=shadow)]
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744240
+ARQ-MARCA gc_collect v=5
+ARQ-MARCA gc-vivo v=1042416
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744640
+ARQ-MARCA gc_collect v=6
+ARQ-MARCA gc-vivo v=1062496
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744648
+ARQ-MARCA gc_collect v=7
+ARQ-MARCA gc-vivo v=1077616
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743432
+ARQ-MARCA gc_collect v=8
+ARQ-MARCA gc-vivo v=1097912
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743280
+ARQ-MARCA gc_collect v=9
+ARQ-MARCA gc-vivo v=1110432
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743352
+ARQ-MARCA gc_collect v=10
+ARQ-MARCA gc-vivo v=1123648
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743272
+ARQ-MARCA gc_collect v=11
+ARQ-MARCA gc-vivo v=1141848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743624
+ARQ-MARCA gc_collect v=12
+ARQ-MARCA gc-vivo v=1156464
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 1 %!d(fmt.Stringer=shadow)]
+[35m[Map Engine][33m[WARNING][0m Unknown tile ID [0 0 %!d(fmt.Stringer=shadow)]
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743664
+ARQ-MARCA gc_collect v=13
+ARQ-MARCA gc-vivo v=1177232
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744776
+ARQ-MARCA gc_collect v=14
+ARQ-MARCA gc-vivo v=1193248
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743288
+ARQ-MARCA gc_collect v=15
+ARQ-MARCA gc-vivo v=1212288
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743688
+ARQ-MARCA gc_collect v=16
+ARQ-MARCA gc-vivo v=1227904
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745296
+ARQ-MARCA gc_collect v=17
+ARQ-MARCA gc-vivo v=1240624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743320
+ARQ-MARCA gc_collect v=18
+ARQ-MARCA gc-vivo v=1254400
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744144
+ARQ-MARCA gc_collect v=19
+ARQ-MARCA gc-vivo v=1267168
+GATE0: ESTADO mapa:casillas-puestas montonLibre= 42984 breakLibre= 2183168 montonUsado= 8518072 gcVivo= 1705360 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+GATE0: ESTADO mapa:prestamo-de-lectura-soltado montonLibre= 42984 breakLibre= 2183168 montonUsado= 8518072 gcVivo= 1705360 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+[35m[Game Screen][32m[INFO][0m pueblo compuesto en 49667 ms: pisos=2337 paredes=338
+GATE0: PIDE 81920 libreAntes=42984 tomadoAntes=8518072 ra=8c1e7d6c quedo=8cdda088
+GATE0: PIDE 443175 libreAntes=42976 tomadoAntes=8600000 ra=8c1e7d6c quedo=8cdee090
+ARQ-CARGA lee-entra /data/global/palette/act1/pal.pl2 cfree=42160 cused=9043184 gsemi=1730856/1835008 gc=19
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746896
+ARQ-MARCA gc_collect v=20
+ARQ-MARCA gc-vivo v=1102632
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743904
+ARQ-MARCA gc_collect v=21
+ARQ-MARCA gc-vivo v=1101720
+ARQ-CARGA lee-volvio /data/global/palette/act1/pal.pl2 cfree=42160 cused=9043184 gsemi=1158296/1835008 gc=21
+GATE0: PIDE 443175 libreAntes=42160 tomadoAntes=9043184 ra=8c1e7d6c quedo=8ce5a3c0
+ARQ-CARGA lee-entra /data/global/palette/act1/pal.dat cfree=41344 cused=9486368 gsemi=1162000/1835008 gc=21
+ARQ-CARGA lee-volvio /data/global/palette/act1/pal.dat cfree=41344 cused=9486368 gsemi=1164112/1835008 gc=21
+GATE0: ESTADO mapa:renderer-creado montonLibre= 41344 breakLibre= 1216512 montonUsado= 9486368 gcVivo= 1170424 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+[35m[Game Screen][32m[INFO][0m renderer del mapa listo: cuadro 800x600
+GATE0: ESTADO mapa:listo montonLibre= 41344 breakLibre= 1216512 montonUsado= 9486368 gcVivo= 1179640 gcTotal= 1835008 vramLibre= 1772200 vramPedida= 0
+GATE0: PIDE 348160 libreAntes=41344 tomadoAntes=9486368 ra=8c010f5a quedo=8cec66f0
+GATE0: PIDE 348160 libreAntes=41344 tomadoAntes=9486368 ra=8c010f5a quedo=8cec66f0
+GATE0: PIDE 348160 libreAntes=41344 tomadoAntes=9486368 ra=8c010f5a quedo=8cec66f0
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744936
+ARQ-MARCA gc_collect v=22
+ARQ-MARCA gc-vivo v=1115704
+GATE0: PIDE 348160 libreAntes=41344 tomadoAntes=9486368 ra=8c010f5a quedo=8cec66f0
+[35m[Game Screen][32m[INFO][0m CUADRO 1 ms=1869 (primer cuadro 1869 ms)
+GATE0: ESTADO mapa:cuadro montonLibre= 41344 breakLibre= 1216512 montonUsado= 9486368 gcVivo= 1442080 gcTotal= 1835008 vramLibre= 379432 vramPedida= 1392640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743392
+ARQ-MARCA gc_collect v=23
+ARQ-MARCA gc-vivo v=1118128
+[35m[Game Screen][32m[INFO][0m CUADRO 2 ms=1776 (primer cuadro 1869 ms)
+GATE0: ESTADO mapa:cuadro montonLibre= 41344 breakLibre= 1216512 montonUsado= 9486368 gcVivo= 1699080 gcTotal= 1835008 vramLibre= 379432 vramPedida= 1392640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743672
+ARQ-MARCA gc_collect v=24
+ARQ-MARCA gc-vivo v=1120992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744000
+ARQ-MARCA gc_collect v=25
+ARQ-MARCA gc-vivo v=1119360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743360
+ARQ-MARCA gc_collect v=26
+ARQ-MARCA gc-vivo v=1119608
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743888
+ARQ-MARCA gc_collect v=27
+ARQ-MARCA gc-vivo v=1119328
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743824
+ARQ-MARCA gc_collect v=28
+ARQ-MARCA gc-vivo v=1119896
+EBITEN-PERFIL dibujar_us 881404 convertir_us 57634 subir_us 1 pintar_us 2 cuadro_us 939041
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743480
+ARQ-MARCA gc_collect v=29
+ARQ-MARCA gc-vivo v=1115496
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743336
+ARQ-MARCA gc_collect v=30
+ARQ-MARCA gc-vivo v=1110904
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744176
+ARQ-MARCA gc_collect v=31
+ARQ-MARCA gc-vivo v=1118784
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744176
+ARQ-MARCA gc_collect v=32
+ARQ-MARCA gc-vivo v=1114432
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743624
+ARQ-MARCA gc_collect v=33
+ARQ-MARCA gc-vivo v=1117688
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743784
+ARQ-MARCA gc_collect v=34
+ARQ-MARCA gc-vivo v=1110072
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745440
+ARQ-MARCA gc_collect v=35
+ARQ-MARCA gc-vivo v=1113336
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743432
+ARQ-MARCA gc_collect v=36
+ARQ-MARCA gc-vivo v=1111992
+[35m[Game Screen][32m[INFO][0m CUADRO 11 ms=1781 (primer cuadro 1869 ms)
+GATE0: ESTADO mapa:cuadro montonLibre= 41344 breakLibre= 1216512 montonUsado= 9486368 gcVivo= 1446920 gcTotal= 1835008 vramLibre= 379432 vramPedida= 1392640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745568
+ARQ-MARCA gc_collect v=37
+ARQ-MARCA gc-vivo v=1113984
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746704
+ARQ-MARCA gc_collect v=38
+ARQ-MARCA gc-vivo v=1117776
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743280
+ARQ-MARCA gc_collect v=39
+ARQ-MARCA gc-vivo v=1115880
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743440
+ARQ-MARCA gc_collect v=40
+ARQ-MARCA gc-vivo v=1119456
+ARQ-MARCA gc-por-umbral-bytes-usados v=1747072
+ARQ-MARCA gc_collect v=41
+ARQ-MARCA gc-vivo v=1115064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743888
+ARQ-MARCA gc_collect v=42
+ARQ-MARCA gc-vivo v=1113432
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745392
+ARQ-MARCA gc_collect v=43
+ARQ-MARCA gc-vivo v=1113424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744200
+ARQ-MARCA gc_collect v=44
+ARQ-MARCA gc-vivo v=1115072
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743384
+ARQ-MARCA gc_collect v=45
+ARQ-MARCA gc-vivo v=1119264
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744544
+ARQ-MARCA gc_collect v=46
+ARQ-MARCA gc-vivo v=1117760
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743320
+ARQ-MARCA gc_collect v=47
+ARQ-MARCA gc-vivo v=1122112
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743392
+ARQ-MARCA gc_collect v=48
+ARQ-MARCA gc-vivo v=1109888
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743536
+ARQ-MARCA gc_collect v=49
+ARQ-MARCA gc-vivo v=1111792
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744848
+ARQ-MARCA gc_collect v=50
+ARQ-MARCA gc-vivo v=1113424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746800
+ARQ-MARCA gc_collect v=51
+ARQ-MARCA gc-vivo v=1117776
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743952
+ARQ-MARCA gc_collect v=52
+ARQ-MARCA gc-vivo v=1115792
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743616
+ARQ-MARCA gc_collect v=53
+ARQ-MARCA gc-vivo v=1113072
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744856
+ARQ-MARCA gc_collect v=54
+ARQ-MARCA gc-vivo v=1117552
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744064
+ARQ-MARCA gc_collect v=55
+ARQ-MARCA gc-vivo v=1122136
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745320
+ARQ-MARCA gc_collect v=56
+ARQ-MARCA gc-vivo v=1117784
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743408
+ARQ-MARCA gc_collect v=57
+ARQ-MARCA gc-vivo v=1113424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746800
+ARQ-MARCA gc_collect v=58
+ARQ-MARCA gc-vivo v=1117776
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743952
+ARQ-MARCA gc_collect v=59
+ARQ-MARCA gc-vivo v=1115072
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743992
+ARQ-MARCA gc_collect v=60
+ARQ-MARCA gc-vivo v=1117256
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743792
+ARQ-MARCA gc_collect v=61
+ARQ-MARCA gc-vivo v=1119960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744080
+ARQ-MARCA gc_collect v=62
+ARQ-MARCA gc-vivo v=1115072
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744800
+ARQ-MARCA gc_collect v=63
+ARQ-MARCA gc-vivo v=1113424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743520
+ARQ-MARCA gc_collect v=64
+ARQ-MARCA gc-vivo v=1112080
+[35m[Game Screen][32m[INFO][0m CUADRO 31 ms=1781 (primer cuadro 1869 ms)
+GATE0: ESTADO mapa:cuadro montonLibre= 41344 breakLibre= 1216512 montonUsado= 9486368 gcVivo= 1426248 gcTotal= 1835008 vramLibre= 379432 vramPedida= 1392640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743888
+ARQ-MARCA gc_collect v=65
+ARQ-MARCA gc-vivo v=1117408
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743800
+ARQ-MARCA gc_collect v=66
+ARQ-MARCA gc-vivo v=1122840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743664
+ARQ-MARCA gc_collect v=67
+ARQ-MARCA gc-vivo v=1117920
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743824
+ARQ-MARCA gc_collect v=68
+ARQ-MARCA gc-vivo v=1115208
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743352
+ARQ-MARCA gc_collect v=69
+ARQ-MARCA gc-vivo v=1114672
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743296
+ARQ-MARCA gc_collect v=70
+ARQ-MARCA gc-vivo v=1116576
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743848
+ARQ-MARCA gc_collect v=71
+ARQ-MARCA gc-vivo v=1119624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746464
+ARQ-MARCA gc_collect v=72
+ARQ-MARCA gc-vivo v=1120144
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744352
+ARQ-MARCA gc_collect v=73
+ARQ-MARCA gc-vivo v=1117960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743464
+ARQ-MARCA gc_collect v=74
+ARQ-MARCA gc-vivo v=1116064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743624
+ARQ-MARCA gc_collect v=75
+ARQ-MARCA gc-vivo v=1119624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1747240
+ARQ-MARCA gc_collect v=76
+ARQ-MARCA gc-vivo v=1114152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745160
+ARQ-MARCA gc_collect v=77
+ARQ-MARCA gc-vivo v=1113608
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743384
+ARQ-MARCA gc_collect v=78
+ARQ-MARCA gc-vivo v=1113608
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743288
+ARQ-MARCA gc_collect v=79
+ARQ-MARCA gc-vivo v=1114712
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746560
+ARQ-MARCA gc_collect v=80
+ARQ-MARCA gc-vivo v=1122320
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743464
+ARQ-MARCA gc_collect v=81
+ARQ-MARCA gc-vivo v=1116064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743832
+ARQ-MARCA gc_collect v=82
+ARQ-MARCA gc-vivo v=1116880
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745160
+ARQ-MARCA gc_collect v=83
+ARQ-MARCA gc-vivo v=1111976
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744080
+ARQ-MARCA gc_collect v=84
+ARQ-MARCA gc-vivo v=1112520
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744480
+ARQ-MARCA gc_collect v=85
+ARQ-MARCA gc-vivo v=1115792
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744808
+ARQ-MARCA gc_collect v=86
+ARQ-MARCA gc-vivo v=1117960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744136
+ARQ-MARCA gc_collect v=87
+ARQ-MARCA gc-vivo v=1119616
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743496
+ARQ-MARCA gc_collect v=88
+ARQ-MARCA gc-vivo v=1116896
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744112
+ARQ-MARCA gc_collect v=89
+ARQ-MARCA gc-vivo v=1122888
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743736
+ARQ-MARCA gc_collect v=90
+ARQ-MARCA gc-vivo v=1119624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744736
+ARQ-MARCA gc_collect v=91
+ARQ-MARCA gc-vivo v=1117968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743592
+ARQ-MARCA gc_collect v=92
+ARQ-MARCA gc-vivo v=1113608
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744176
+ARQ-MARCA gc_collect v=93
+ARQ-MARCA gc-vivo v=1115336
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746088
+ARQ-MARCA gc_collect v=94
+ARQ-MARCA gc-vivo v=1122320
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743352
+ARQ-MARCA gc_collect v=95
+ARQ-MARCA gc-vivo v=1117968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743328
+ARQ-MARCA gc_collect v=96
+ARQ-MARCA gc-vivo v=1114440
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744368
+ARQ-MARCA gc_collect v=97
+ARQ-MARCA gc-vivo v=1117568
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744632
+ARQ-MARCA gc_collect v=98
+ARQ-MARCA gc-vivo v=1117968
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743592
+ARQ-MARCA gc_collect v=99
+ARQ-MARCA gc-vivo v=1113608
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746360
+ARQ-MARCA gc_collect v=100
+ARQ-MARCA gc-vivo v=1114152
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746872
+ARQ-MARCA gc_collect v=101
+ARQ-MARCA gc-vivo v=1117960
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743464
+ARQ-MARCA gc_collect v=102
+ARQ-MARCA gc-vivo v=1111704
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743624
+ARQ-MARCA gc_collect v=103
+ARQ-MARCA gc-vivo v=1116880
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745160
+ARQ-MARCA gc_collect v=104
+ARQ-MARCA gc-vivo v=1111976
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744080
+ARQ-MARCA gc_collect v=105
+ARQ-MARCA gc-vivo v=1114704
+[35m[Game Screen][32m[INFO][0m CUADRO 60 ms=1885 (primer cuadro 1869 ms)
+GATE0: ESTADO mapa:cuadro montonLibre= 41344 breakLibre= 1216512 montonUsado= 9486368 gcVivo= 1190560 gcTotal= 1835008 vramLibre= 379432 vramPedida= 1392640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743656
+ARQ-MARCA gc_collect v=106
+ARQ-MARCA gc-vivo v=1113712
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746672
+ARQ-MARCA gc_collect v=107
+ARQ-MARCA gc-vivo v=1118048
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744224
+ARQ-MARCA gc_collect v=108
+ARQ-MARCA gc-vivo v=1119704
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743792
+ARQ-MARCA gc_collect v=109
+ARQ-MARCA gc-vivo v=1116984
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743992
+ARQ-MARCA gc_collect v=110
+ARQ-MARCA gc-vivo v=1119712
+ARQ-MARCA gc-por-umbral-bytes-usados v=1747328
+ARQ-MARCA gc_collect v=111
+ARQ-MARCA gc-vivo v=1115336
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744160
+ARQ-MARCA gc_collect v=112
+ARQ-MARCA gc-vivo v=1113704
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743480
+ARQ-MARCA gc_collect v=113
+ARQ-MARCA gc-vivo v=1113352
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744344
+ARQ-MARCA gc_collect v=114
+ARQ-MARCA gc-vivo v=1120232
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744440
+ARQ-MARCA gc_collect v=115
+ARQ-MARCA gc-vivo v=1118048
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743272
+ARQ-MARCA gc_collect v=116
+ARQ-MARCA gc-vivo v=1115872
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743712
+ARQ-MARCA gc_collect v=117
+ARQ-MARCA gc-vivo v=1117528
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745144
+ARQ-MARCA gc_collect v=118
+ARQ-MARCA gc-vivo v=1114240
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743520
+ARQ-MARCA gc_collect v=119
+ARQ-MARCA gc-vivo v=1113696
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743336
+ARQ-MARCA gc_collect v=120
+ARQ-MARCA gc-vivo v=1112352
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744120
+ARQ-MARCA gc_collect v=121
+ARQ-MARCA gc-vivo v=1118800
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745192
+ARQ-MARCA gc_collect v=122
+ARQ-MARCA gc-vivo v=1120992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743784
+ARQ-MARCA gc_collect v=123
+ARQ-MARCA gc-vivo v=1117728
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743848
+ARQ-MARCA gc_collect v=124
+ARQ-MARCA gc-vivo v=1118816
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743264
+ARQ-MARCA gc_collect v=125
+ARQ-MARCA gc-vivo v=1116200
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743832
+ARQ-MARCA gc_collect v=126
+ARQ-MARCA gc-vivo v=1117016
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744824
+ARQ-MARCA gc_collect v=127
+ARQ-MARCA gc-vivo v=1113744
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743424
+ARQ-MARCA gc_collect v=128
+ARQ-MARCA gc-vivo v=1114848
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746696
+ARQ-MARCA gc_collect v=129
+ARQ-MARCA gc-vivo v=1122456
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743280
+ARQ-MARCA gc_collect v=130
+ARQ-MARCA gc-vivo v=1118104
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746192
+ARQ-MARCA gc_collect v=131
+ARQ-MARCA gc-vivo v=1114832
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743432
+ARQ-MARCA gc_collect v=132
+ARQ-MARCA gc-vivo v=1111840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743624
+ARQ-MARCA gc_collect v=133
+ARQ-MARCA gc-vivo v=1112752
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744712
+ARQ-MARCA gc_collect v=134
+ARQ-MARCA gc-vivo v=1116024
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745040
+ARQ-MARCA gc_collect v=135
+ARQ-MARCA gc-vivo v=1118192
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743272
+ARQ-MARCA gc_collect v=136
+ARQ-MARCA gc-vivo v=1119304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743408
+ARQ-MARCA gc_collect v=137
+ARQ-MARCA gc-vivo v=1113840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746288
+ARQ-MARCA gc_collect v=138
+ARQ-MARCA gc-vivo v=1118192
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744496
+ARQ-MARCA gc_collect v=139
+ARQ-MARCA gc-vivo v=1112768
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744672
+ARQ-MARCA gc_collect v=140
+ARQ-MARCA gc-vivo v=1113840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743616
+ARQ-MARCA gc_collect v=141
+ARQ-MARCA gc-vivo v=1113840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1747216
+ARQ-MARCA gc_collect v=142
+ARQ-MARCA gc-vivo v=1118192
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743272
+ARQ-MARCA gc_collect v=143
+ARQ-MARCA gc-vivo v=1114944
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743312
+ARQ-MARCA gc_collect v=144
+ARQ-MARCA gc-vivo v=1116856
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745040
+ARQ-MARCA gc_collect v=145
+ARQ-MARCA gc-vivo v=1120376
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743400
+ARQ-MARCA gc_collect v=146
+ARQ-MARCA gc-vivo v=1114944
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743584
+ARQ-MARCA gc_collect v=147
+ARQ-MARCA gc-vivo v=1113312
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745272
+ARQ-MARCA gc_collect v=148
+ARQ-MARCA gc-vivo v=1116040
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745264
+ARQ-MARCA gc_collect v=149
+ARQ-MARCA gc-vivo v=1118192
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743272
+ARQ-MARCA gc_collect v=150
+ARQ-MARCA gc-vivo v=1119304
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743520
+ARQ-MARCA gc_collect v=151
+ARQ-MARCA gc-vivo v=1116856
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744832
+ARQ-MARCA gc_collect v=152
+ARQ-MARCA gc-vivo v=1123120
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745272
+ARQ-MARCA gc_collect v=153
+ARQ-MARCA gc-vivo v=1121488
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745088
+ARQ-MARCA gc_collect v=154
+ARQ-MARCA gc-vivo v=1118200
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743824
+ARQ-MARCA gc_collect v=155
+ARQ-MARCA gc-vivo v=1113840
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743520
+ARQ-MARCA gc_collect v=156
+ARQ-MARCA gc-vivo v=1114992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746840
+ARQ-MARCA gc_collect v=157
+ARQ-MARCA gc-vivo v=1122600
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743424
+ARQ-MARCA gc_collect v=158
+ARQ-MARCA gc-vivo v=1118248
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746336
+ARQ-MARCA gc_collect v=159
+ARQ-MARCA gc-vivo v=1114976
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743272
+ARQ-MARCA gc_collect v=160
+ARQ-MARCA gc-vivo v=1109504
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743776
+ARQ-MARCA gc_collect v=161
+ARQ-MARCA gc-vivo v=1113888
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743664
+ARQ-MARCA gc_collect v=162
+ARQ-MARCA gc-vivo v=1113888
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743776
+ARQ-MARCA gc_collect v=163
+ARQ-MARCA gc-vivo v=1114992
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746840
+ARQ-MARCA gc_collect v=164
+ARQ-MARCA gc-vivo v=1122600
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743536
+ARQ-MARCA gc_collect v=165
+ARQ-MARCA gc-vivo v=1116344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744320
+ARQ-MARCA gc_collect v=166
+ARQ-MARCA gc-vivo v=1120424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743448
+ARQ-MARCA gc_collect v=167
+ARQ-MARCA gc-vivo v=1111184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744184
+ARQ-MARCA gc_collect v=168
+ARQ-MARCA gc-vivo v=1113360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745320
+ARQ-MARCA gc_collect v=169
+ARQ-MARCA gc-vivo v=1116072
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745088
+ARQ-MARCA gc_collect v=170
+ARQ-MARCA gc-vivo v=1116624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745192
+ARQ-MARCA gc_collect v=171
+ARQ-MARCA gc-vivo v=1122600
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743536
+ARQ-MARCA gc_collect v=172
+ARQ-MARCA gc-vivo v=1116344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744320
+ARQ-MARCA gc_collect v=173
+ARQ-MARCA gc-vivo v=1120424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743448
+ARQ-MARCA gc_collect v=174
+ARQ-MARCA gc-vivo v=1111184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744184
+ARQ-MARCA gc_collect v=175
+ARQ-MARCA gc-vivo v=1113360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745320
+ARQ-MARCA gc_collect v=176
+ARQ-MARCA gc-vivo v=1116088
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745104
+ARQ-MARCA gc_collect v=177
+ARQ-MARCA gc-vivo v=1116624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745192
+ARQ-MARCA gc_collect v=178
+ARQ-MARCA gc-vivo v=1122600
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743536
+ARQ-MARCA gc_collect v=179
+ARQ-MARCA gc-vivo v=1116344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744320
+ARQ-MARCA gc_collect v=180
+ARQ-MARCA gc-vivo v=1120424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743448
+ARQ-MARCA gc_collect v=181
+ARQ-MARCA gc-vivo v=1111184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744184
+ARQ-MARCA gc_collect v=182
+ARQ-MARCA gc-vivo v=1113360
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745320
+ARQ-MARCA gc_collect v=183
+ARQ-MARCA gc-vivo v=1116072
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745088
+ARQ-MARCA gc_collect v=184
+ARQ-MARCA gc-vivo v=1116624
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745192
+ARQ-MARCA gc_collect v=185
+ARQ-MARCA gc-vivo v=1122600
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743536
+ARQ-MARCA gc_collect v=186
+ARQ-MARCA gc-vivo v=1116344
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744320
+ARQ-MARCA gc_collect v=187
+ARQ-MARCA gc-vivo v=1120424
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743448
+ARQ-MARCA gc_collect v=188
+ARQ-MARCA gc-vivo v=1111184
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744184
+ARQ-MARCA gc_collect v=189
+ARQ-MARCA gc-vivo v=1113360
+[35m[Game Screen][32m[INFO][0m CUADRO 120 ms=1883 (primer cuadro 1869 ms)
+GATE0: ESTADO mapa:cuadro montonLibre= 41344 breakLibre= 1216512 montonUsado= 9486368 gcVivo= 1185080 gcTotal= 1835008 vramLibre= 379432 vramPedida= 1392640
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744296
+ARQ-MARCA gc_collect v=190
+ARQ-MARCA gc-vivo v=1113464
+ARQ-MARCA gc-por-umbral-bytes-usados v=1744456
+ARQ-MARCA gc_collect v=191
+ARQ-MARCA gc-vivo v=1116712
+ARQ-MARCA gc-por-umbral-bytes-usados v=1745280
+ARQ-MARCA gc_collect v=192
+ARQ-MARCA gc-vivo v=1122688
+ARQ-MARCA gc-por-umbral-bytes-usados v=1743512
+ARQ-MARCA gc_collect v=193
+ARQ-MARCA gc-vivo v=1118336
+ARQ-MARCA gc-por-umbral-bytes-usados v=1746424
+ARQ-MARCA gc_collect v=194
+ARQ-MARCA gc-vivo v=1115064

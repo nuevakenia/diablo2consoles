@@ -60,8 +60,53 @@ PALANCA_LOOKUPS_SIMBOLO_BYTES=1672892
 # un simbolo de datos de 1 MB o mas en un binario de la consola es, hoy, la tabla (medido: en el .gox de
 # `d2records` con la exclusion el mayor simbolo no llega a 200 KB, y en `prog.elf` a 300 KB)
 PALANCA_UMBRAL_SIMBOLO=1000000
+# 5. EL ARRANQUE DE LA CONSOLA DEL GATE 0 (DC-002.156). Con `DC_GATE0=1` dos paquetes se compilan con su
+#    LISTA BLANCA de archivos (no con exclusiones): `d2app` y `d2game/d2gamescreen`. Es la unica forma de
+#    sacar de la imagen las 107 pantallas que no son el pueblo (1.213.247 B de text+data de los que el
+#    pueblo usa ~60 KB) y el arranque de la PC con el heroe, la red y el scripting adentro.
+#    Medido en DC-002.155: el binario con los 145 paquetes pesa 11.155.164 B cargados y el pueblo no entra
+#    (le faltan 2.188.360 B); la pantalla del pueblo y su arranque son ~60 KB + ~40 KB.
+#    OJO: la lista blanca es del BUILD DE LA CONSOLA. El binario de la PC (y los POC que no son el Gate 0)
+#    no la usan: sin `DC_GATE0=1` este archivo se comporta como siempre, byte por byte.
+PALANCA_GATE0_APP=(consola_gate0.go consola_156.go)
+PALANCA_GATE0_PANTALLAS=(pantalla_mapa_155.go prefijo_log_156.go)
 
 lookups_fuera_de_la_imagen() { [ "${DC_TABLA_LOOKUPS:-fuera}" = "fuera" ]; }
+
+# el build de la consola del Gate 0 (DC-002.156): dos paquetes con lista blanca
+arranque_gate0() { [ "${DC_GATE0:-0}" = "1" ]; }
+
+# las fuentes de UN paquete que van al build de la consola
+fuentes_del_paquete() {  # <repo> <paquete>
+    local repo="$1" paq="$2" patron f faltan=""
+
+    # DC-002.156: la lista blanca del arranque de consola. Un archivo que falte es un bloqueo, no una
+    # lista corta: se dice por stderr y el paquete sale sin fuentes (el que llama lo reporta).
+    if arranque_gate0; then
+        local -a lista=()
+        case "$paq" in
+            d2app)              lista=("${PALANCA_GATE0_APP[@]}") ;;
+            d2game/d2gamescreen) lista=("${PALANCA_GATE0_PANTALLAS[@]}") ;;
+        esac
+        if [ "${#lista[@]}" -gt 0 ]; then
+            for f in "${lista[@]}"; do
+                if [ -f "$repo/$paq/$f" ]; then
+                    printf '%s\n' "$repo/$paq/$f"
+                else
+                    faltan="$faltan $f"
+                fi
+            done
+            [ -z "$faltan" ] || printf 'FALLA: la lista blanca del Gate 0 pide y no existe:%s (%s)\n' "$faltan" "$paq" >&2
+            return 0
+        fi
+    fi
+
+    patron="$(exclusiones_del_build)"
+    # `ls` de un paquete que no existe no es un error del build: el llamador decide si la lista vacia
+    # es un bloqueo (`[ -n "$srcs" ] || continue` en build-motor-all.sh).
+    ls "$repo/$paq"/*.go 2>/dev/null | grep -v '_test\.go$' | grep -vE "$patron"
+    return 0
+}
 
 # el regex con las palancas que estan activas (las cuatro, o tres con el mutante puesto)
 exclusiones_del_build() {
@@ -70,16 +115,6 @@ exclusiones_del_build() {
         e="$e|$PALANCA_LOOKUPS"
     fi
     printf '%s\n' "$e"
-}
-
-# las fuentes de UN paquete que van al build de la consola
-fuentes_del_paquete() {  # <repo> <paquete>
-    local repo="$1" paq="$2" patron
-    patron="$(exclusiones_del_build)"
-    # `ls` de un paquete que no existe no es un error del build: el llamador decide si la lista vacia
-    # es un bloqueo (`[ -n "$srcs" ] || continue` en build-motor-all.sh).
-    ls "$repo/$paq"/*.go 2>/dev/null | grep -v '_test\.go$' | grep -vE "$patron"
-    return 0
 }
 
 # 0 (verdadero) si el binario lleva el volcado de la tabla: sirve de guardia DENTRO del build y como
@@ -95,7 +130,10 @@ lleva_la_tabla_de_lookups() {  # <archivo elf/gox>
 
 # la linea que cada build deja en su log: con cual palanca se compilo
 palancas_del_build() {
-    if lookups_fuera_de_la_imagen; then
+    if arranque_gate0; then
+        printf 'PALANCAS DEL BUILD: arranque de consola del Gate 0 (DC-002.156) -- d2app [%s] y d2game/d2gamescreen [%s]; objectLookups FUERA (-%d B)\n' \
+            "${PALANCA_GATE0_APP[*]}" "${PALANCA_GATE0_PANTALLAS[*]}" "$PALANCA_LOOKUPS_BYTES"
+    elif lookups_fuera_de_la_imagen; then
         printf 'PALANCAS DEL BUILD: objectLookups FUERA de la imagen (-%d B); marca de carga: la de la consola\n' \
             "$PALANCA_LOOKUPS_BYTES"
     else

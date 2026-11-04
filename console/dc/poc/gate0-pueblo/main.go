@@ -98,6 +98,13 @@ const (
 	// el umbral del recolector: 95 % (el mismo del POC del juego, medido en DC-002.109: mas bajo, el
 	// recolector se lleva el pueblo a pedazos; mas alto, el semiespacio se llena de basura)
 	umbralDelRecolector = 95
+
+	// LA POLITICA CUANDO LOS 4 BLOQUES SE LLENAN (DC-002.156), las mismas dos palancas del POC de DC-002.113b:
+	// una imagen que no se uso en 2 cuadros se suelta y sus bytes vuelven al tramo, y lo que no entra se compone
+	// sobre UN buffer de trabajo que se reusa en vez de pedirle un `make` al monton de Go por imagen. El buffer
+	// es el de 80 KB del 113: la imagen mas grande de la cache del pueblo mide 71.680 B.
+	desalojoEnCuadros = 2
+	bufferDelVuelo    = 81920
 )
 
 // frase: lo que se imprime antes de cada etapa. Todo el log de esta corrida empieza con GATE0 para poder
@@ -198,6 +205,15 @@ func main() {
 			d2maprenderer.CacheDeTilesEnIndices(),
 			d2maprenderer.CacheDeTilesEnBloquesDe(bloquesDeLaCache*bytesDelBloque, bytesDelBloque,
 				pvr.VramReservar, "vram", sondaDelMonton),
+
+			// DC-002.156: LA POLITICA CUANDO EL TRAMO SE LLENA. El primer cuadro del pueblo pide ~86 imagenes y en
+			// los 4 bloques de VRAM entran ~44: lo que sobra NO puede irse al monton de Go de a un `make` por
+			// imagen (medido en la corrida de esta tarjeta: 633.648 B en el primer cuadro y `out of memory` en el
+			// recolector con el monton de C lleno). Las dos palancas son las mismas del POC de DC-002.113b, que es
+			// el que dibuja este cuadro en el host: el desalojo devuelve los bytes de lo que no se uso en 2 cuadros
+			// y la composicion al vuelo arma lo que no entra en UN buffer de trabajo que se reusa.
+			d2maprenderer.ConDesalojoDeLaCache(desalojoEnCuadros),
+			d2maprenderer.ConComposicionAlVuelo(bufferDelVuelo),
 		},
 
 		Instrumento: instrumento,

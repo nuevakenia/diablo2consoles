@@ -91,7 +91,7 @@ func CreatePantallaDelPueblo(asset *d2asset.AssetManager, renderer d2interface.R
 	}
 
 	pantalla.Logger = d2util.NewLogger()
-	pantalla.Logger.SetPrefix(logPrefix)
+	pantalla.Logger.SetPrefix(prefijoDelLog)
 	pantalla.Logger.SetLevel(l)
 
 	return pantalla
@@ -155,6 +155,21 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 	}
 
 	p.avisar("mapa:casillas-puestas")
+
+	// DC-002.156: EL BUFFER PRESTADO DE LA LECTURA DE LOS `.dt1` YA HIZO SU TRABAJO.
+	//
+	// Los `.dt1` del pueblo estan leidos y sus bloques copiados al arena (`EncodedData` de cada tile apunta
+	// ahi). El crudo no lo mira nadie mas, y ese buffer es el que el arranque de la consola pide a la VRAM
+	// (DC-002.154): 1.051.532 B. Devolverlo AHORA, antes de crear el renderer, es lo que le deja lugar a la
+	// CACHE DE TILES en la VRAM.
+	//
+	// MEDIDO (corrida del Gate 0, DC-002.156): sin esto la cache pide sus 4 tramos de 348.160 B y la VRAM no
+	// los da -- estan la textura del cuadro (2.097.152) y el framebuffer del motor (1.920.000) mas este
+	// buffer --, asi que dos tramos caen al MONTON DE C: 633.648 B que el recolector despues no puede soltar
+	// porque la cache los tiene tomados, y el arranque muere con `out of memory` en el primer cuadro.
+	d2asset.SoltarPrestamoDeLecturaDeTiles()
+
+	p.avisar("mapa:prestamo-de-lectura-soltado")
 
 	p.pisos, p.paredes = censoDelPueblo(p.engine)
 
