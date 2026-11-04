@@ -1,0 +1,191 @@
+DC-002.146c -- EL `recover` DE LIBGODC QUE SI DEVUELVE EL CONTROL: `runtime_blindaje`
+
+QUE ENTRA. El `recover` de libgodc dejaba el log y despues NO devolvia el control: `runtime_checkpoint()` hace
+`setjmp` DENTRO de una funcion de C que despues RETORNA, asi que el `longjmp` del `recover` vuelve a un marco de
+pila que ya murio (abajo de el corrio todo el cuerpo). Entra `runtime_blindaje(cuerpo, arg)` en el runtime: el
+`setjmp` vive en un marco que SIGUE EN LA PILA hasta que el cuerpo termina, y el cuerpo se llama desde ese mismo
+marco. Con eso el `longjmp` cae en un marco vivo y el `recover` sirve.
+
+MEDIDO (criterio de la tarjeta): un programa de consola de 40 lineas de Go y 20 de C, con un panic de REBANADA
+adentro del cuerpo y tres vueltas, en Flycast. Dos corridas identicas:
+
+    lineas del POC 21   panicos recuperados 3/3   vueltas que volvieron 3/3   cierre OK si   `arch: exit return code 0`
+
+Y la contra-prueba, el MISMO codigo con el checkpoint viejo: el control no vuelve, la consola se va a basura y
+despues inunda la serie con 87.934 CR/LF. O sea: la causa, aislada en un binario de 40 lineas y sin nada del juego
+de por medio.
+
+LO QUE NO ENTRA. No se toca el rearme del minimapa de `juego-131` (su `defer recover` sigue siendo un aviso): eso
+es la tarjeta que sigue, con el mecanismo ya probado. Tampoco se toca el defecto de fondo del recolector
+(`gc-ptrdata-recortado` / `gcdata-fuera-imagen`, t_4b83d108).
+
+1. EL ARREGLO (libgodc, `runtime/defer_dreamcast.c` y `runtime/panic_dreamcast.h`)
+
+    int runtime_blindaje(int (*cuerpo)(void *), void *arg);
+        0 = el cuerpo volvio solo; 1 = se volvio por el `longjmp` de un panic recuperado.
+
+    int runtime_blindaje_go(void *caja_funcion, void *arg);
+        la puerta para Go (`//extern runtime_blindaje_go`): abre la caja del valor de funcion de gccgo y llama.
+
+El orden del arreglo es lo unico que cambia respecto de `runtime_checkpoint()`:
+
+    setjmp(cp.env)  EN EL MARCO DE runtime_blindaje
+    cp.link = gp->checkpoint;  gp->checkpoint = &cp          (se empuja en la cadena del G)
+    marcaDefer = gp->_defer                                  (la cabeza de los defers de ANTES del cuerpo)
+    estado = setjmp(cp.env);  if (estado) { ...; return estado; }
+    cuerpo(arg)                                              <-- el cuerpo corre con el checkpoint VIVO
+    if (gp->checkpoint == &cp) gp->checkpoint = cp.link;     (salida normal: se saca)
+    return 0;
+
+Tres decisiones que estan en el codigo y no son adorno:
+
+  a) El `Checkpoint` vive en la PILA del marco de `runtime_blindaje`, no en el monton: mientras el cuerpo corre el
+     marco no se mueve y no se le pide memoria al recolector. (El rearme del minimapa se cayo justo por pedirle
+     memoria al recolector a mitad del parseo: DC-002.146.)
+  b) `gp` y `marcaDefer` son `volatile`: se leen DESPUES del `longjmp`, que no devuelve la vida a un registro que
+     no este guardado en el `jmp_buf`.
+  c) Al volver por el `longjmp` se sacan de la cadena del G los defers que quedaron por encima de `marcaDefer`:
+     son de marcos que ya no existen (el huerfano del punto 3). Sin eso la cadena crece con marcos muertos.
+
+No se borra `runtime_checkpoint()` (esta declarada junto a `runtime_uncheckpoint()`, que la usa por el `frame`),
+pero su comentario dice ahora, con la medicion, que NO sirve para recuperar y manda a `runtime_blindaje()`.
+
+2. EL ABI DE PASARLE UNA FUNCION DE GO A C (lo que la tarjeta manda probar primero)
+
+gccgo NO le pasa el codigo de la funcion: le pasa un puntero a la CAJA del valor de funcion, cuyo PRIMER campo es
+el codigo. Medido en el `.s` del POC (no deducido), en la llamada de `main` a `runtime_blindaje_go`:
+
+      mov.l   .L98,r1        ; r1 = _runtime_blindaje_go
+      mov     r8,r5          ; r5 = arg
+      mov.l   .L99,r0        ; r0 = _main.caja
+      jsr     @r1
+      mov.l   @r0,r4         ; r4 = *caja  <- el puntero a la CAJA, en el slot de la llamada
+
+      .L98: .long _runtime_blindaje_go
+      .L99: .long _main.caja
+
+Para una funcion SIN capturas esa caja es un objeto de 4 bytes en `.rodata` cuyo contenido es la direccion del
+codigo (`.long _main.cuerpoBlindado`), y la funcion usa el ABI de C tal cual (`mov r4,r0; add #1,r0; rts`). Por eso
+`runtime_blindaje_go` hace un solo `*(void **)` y llama. Y por eso el POC guarda la funcion en una variable de
+PAQUETE (`caja`, `cajaHuerfana`): C no es raiz del recolector, asi que un cierre con capturas podria reciclarse
+mientras el cuerpo corre.
+
+Los simbolos salen con el prefijo de la convencion del objetivo (`_runtime_blindaje_go` en el ELF), que es lo que
+`//extern runtime_blindaje_go` referencia: el build lo verifica con `nm` antes de dar el binario por bueno.
+
+3. LAS DOS CORRIDAS DEL CRITERIO (Flycast, el mismo binario `/tmp/dcbuild/blindaje146c/prog.elf`)
+
+Vuelta 0 y 2: cuerpo pelado. Vuelta 1: cuerpo con un defer HUERFANO (registrado ANTES del que recupera), que no
+llega a correr porque el recover devuelve el control al blindaje. El `defer` de `main` que se ve al final es la otra
+mitad de la prueba: la cadena de defers quedo sana y un defer de verdad sigue corriendo.
+
+  /tmp/capturas-146c-r1/flycast.log   (identico en /tmp/capturas-146c-r2)
+
+    BLINDAJE146C: arranca modo= blindaje vueltas= 3
+    BLINDAJE146C: --- vuelta 0 antes del blindaje ---
+    BLINDAJE146C: dentro del cuerpo, vuelta= 0
+    BLINDAJE146C: leyendo la casilla 3 de una rebanada de 3
+    BLINDAJE146C: PANICO RECOGIDO en el defer, el valor es: (string,"index out of range")
+    BLINDAJE146C: el blindaje devolvio 1 (0 = el cuerpo volvio solo, 1 = se volvio por el panic)
+    BLINDAJE146C: SIGUE IMPRIMIENDO despues del panic, vuelta 0
+    BLINDAJE146C: --- vuelta 1 antes del blindaje ---
+    BLINDAJE146C: dentro del cuerpo con huerfano, vuelta= 1
+    BLINDAJE146C: leyendo la casilla 4 de una rebanada de 3
+    BLINDAJE146C: PANICO RECOGIDO (cuerpo con defer huerfano), el valor es: (string,"index out of range")
+    BLINDAJE146C: el blindaje devolvio 1 (0 = el cuerpo volvio solo, 1 = se volvio por el panic)
+    BLINDAJE146C: SIGUE IMPRIMIENDO despues del panic, vuelta 1
+    BLINDAJE146C: --- vuelta 2 antes del blindaje ---
+    BLINDAJE146C: dentro del cuerpo, vuelta= 2
+    BLINDAJE146C: leyendo la casilla 5 de una rebanada de 3
+    BLINDAJE146C: PANICO RECOGIDO en el defer, el valor es: (string,"index out of range")
+    BLINDAJE146C: el blindaje devolvio 1 (0 = el cuerpo volvio solo, 1 = se volvio por el panic)
+    BLINDAJE146C: SIGUE IMPRIMIENDO despues del panic, vuelta 2
+    BLINDAJE146C: CIERRE OK las 3 vueltas volvieron y la consola sigue viva
+    BLINDAJE146C: el defer de main corrio al final: la cadena de defers quedo sana
+    arch: exit return code 0
+
+El valor que imprime el recover es el panic de verdad, con su tipo (`runtime.printeface`): `index out of range` es
+el texto que pone `runtime_goPanicIndex` de libgodc. No hay ninguna linea `DEFECTO: corrio el defer huerfano`.
+
+  resumen medido de las dos corridas
+                     bytes   lineas del POC   panicos recuperados   vueltas que volvieron   cierre   defer de main   salida
+    r1                4316         21                 3/3                    3/3                si          si        exit 0
+    r2                4316         21                 3/3                    3/3                si          si        exit 0
+
+4. LA CONTRA-PRUEBA: EL MISMO CODIGO CON EL CHECKPOINT VIEJO (`BLINDAJE=viejo`)
+
+`/tmp/dcbuild/blindaje146c-viejo/prog.elf` (el mismo Go, con la const `modo` en "viejo" y `d2c_checkpoint_viejo()`
+llamando a `runtime_checkpoint()` en una funcion de C que RETORNA, que es exactamente lo que hacia el proyecto):
+
+  /tmp/capturas-146c-viejo/flycast.log
+
+    BLINDAJE146C: arranca modo= viejo vueltas= 3
+    BLINDAJE146C: --- vuelta 0 antes del blindaje ---
+    BLINDAJE146C: dentro del cuerpo, vuelta= 0
+    BLINDAJE146C: leyendo la casilla 3 de una rebanada de 3
+    BLINDAJE146C: PANICO RECOGIDO en el defer, el valor es: (string,"index out of range")
+    << y NADA MAS: 87.934 CR/LF, 178.813 bytes de log, sin "devolvio", sin CIERRE, sin `arch: exit` >>
+
+O sea: el recover corre (el defer se ejecuta y se lleva el panic) y el control NO vuelve. Este binario ni siquiera
+lleva `runtime_blindaje` adentro (el `nm` del build lo dice), asi que la unica diferencia con la corrida verde es
+cual checkpoint se usa.
+
+Que la muerte se vea aca como una inundacion de CR y en DC-002.146p como `kernel panic: unhandled IRQ/Exception` es
+el mismo defecto con otra basura en el mismo lugar: al volver, el epilogo del marco muerto saca la direccion de
+retorno de una pila que ya se reuso, asi que el SH-4 salta a donde diga ese valor. (La explicacion del porque cae
+en un bucle que escribe CR es hipotesis: lo medido es que no vuelve y que la serie se inunda.)
+
+5. CONTROL DE NO-REGRESION: EL PANIC NORMAL SIGUE IGUAL
+
+El `.a` se rehizo entero (no solo el objeto del `defer`), asi que se re-corrio el POC del panic de verdad
+(`console/dc/poc/sonda-panic-232`, `/tmp/capturas-146c-panic232`): el panic sigue imprimiendo su mensaje, la
+goroutine, la traza y la linea de memoria, y la consola muere ordenada. Sin recover, el camino no cambia.
+
+    panic: DC-002.32: un panic de verdad
+    goroutine 1 [running]:
+    Memory: arena=3830572 used=3829988 free=584
+
+6. LIMITES, DECLARADOS (no escondidos)
+
+  a) libgodc NO desenrolla la pila: el `recover` sigue siendo un `longjmp`. Con el blindaje, un panic recuperado
+     ADENTRO del cuerpo devuelve el control AL BLINDAJE (o sea al que llamo `runtime_blindaje`), no al punto donde
+     se registro el defer. Los marcos de Go de adentro del cuerpo quedan muertos (esta medido: despues de volver no
+     corre nada de adentro).
+  b) El que recupera tiene que estar en un `defer` registrado DENTRO del cuerpo (o mas abajo). El checkpoint que se
+     consume es el del blindaje (el primero de la cadena).
+  c) Un cierre con capturas que se le pase a `runtime_blindaje_go` tiene que seguir vivo: dejarlo en una variable de
+     paquete (C no es raiz del recolector).
+  d) `runtime_checkpoint()` sigue ahi pero NO sirve para recuperar. No hay que volver a usarlo.
+
+7. COMO SE REPRODUCE
+
+    python3 scripts/console/fix-libgodc-blindaje.py --build          # aplica el arreglo y rehace libgodc.a (~40 s)
+    bash scripts/console/build-blindaje-146c.sh /tmp/dcbuild/blindaje146c
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/blindaje146c/prog.elf 20 /tmp/capturas-146c-r1
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/blindaje146c/prog.elf 20 /tmp/capturas-146c-r2
+    BLINDAJE=viejo bash scripts/console/build-blindaje-146c.sh /tmp/dcbuild/blindaje146c-viejo
+    CAPTURE=none bash scripts/console/run-flycast.sh /tmp/dcbuild/blindaje146c-viejo/prog.elf 20 /tmp/capturas-146c-viejo
+
+El script del arreglo es idempotente (deja el arbol pristino con `git checkout` y reaplica): dos corridas dan el
+mismo `sha256` (`defer_dreamcast.c` d318928ea5f53dde, `panic_dreamcast.h` 229c712a192faac5). Los binarios:
+`prog.elf` 2.856.032 B (`.text` 282.480) el del criterio, 2.862.408 B (`.text` 287.184) la contra-prueba.
+
+8. TRES COSAS QUE COSTARON TIEMPO (medidas, para que no vuelvan a costarlo)
+
+  a) `undefined reference to 'runtime..types'`. Un POC que NO importa nada NO se puede compilar con el arbol de la
+     stdlib en el `-I` (que es el default de `build-dc.sh` cuando existe `$DC_ROOT/gox`): gccgo encuentra el
+     `runtime.gox` del arbol y emite `go..typelists` con una referencia a `runtime..types`, que libgodc no define.
+     Con un `-I` vacio no hay referencia. Medido tambien con `console/dc/poc/hello`: hoy ese POC no enlaza por esto,
+     no por su codigo. (Si un POC importa un paquete, hay que enlazar ademas el `runtime.gox` del arbol.)
+  b) `print` de una interface: `println("...", r)` con `r interface{}` usa `runtime.printeface` (existe en libgodc)
+     e imprime tipo y valor. Una asercion `r.(string)` NO: mete `runtime..types` en el enlace (punto a).
+  c) `nm prog.elf | grep -q patron` con `set -o pipefail` da FALSO NEGATIVO: `grep -q` corta la tuberia, `nm` muere
+     con SIGPIPE y el pipe queda en 141. La lista de simbolos va a un archivo y se grepea el archivo.
+
+9. PENDIENTE (tarjeta que sigue)
+
+El `defer func(){ if r := recover(); ... }()` del rearme del minimapa (`console/dc/poc/juego-131/automap_130.go`)
+sigue siendo un AVISO. Con `runtime_blindaje` ya tiene como devolver el control: hay que envolver el rearme en un
+blindaje (y sacar el `MINIMAPA_DIAG=panico` como prueba en contra del camino nuevo). Ojo con el limite 6a: lo que
+este adentro del cuerpo no sigue corriendo despues del recover, asi que el blindaje tiene que envolver el TRABAJO
+del rearme y devolver por su valor de retorno, no esperar que la ejecucion continue donde se cayo.
