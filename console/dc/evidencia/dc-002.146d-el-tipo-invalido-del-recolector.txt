@@ -70,14 +70,19 @@ intermitente de DC-002.145, y es lo que explica que siga habiendo panics aunque 
      importan:
        - `__code` NO es solo el Kind: gccgo prende ademas el bit 0x80 (y a veces 0x20/0x40). Con la mascara
          `~(0x20|0x40)` se rechazaban **585 de los 1684** descriptores REALES del ELF del demo (`__code` 130, 145,
-         153); con `& 0x1F`, CERO (`/tmp/probe146d/descriptores_simbolos.py` sobre /tmp/dcbuild/demo146d16r).
+         153); con `& 0x1F`, CERO. El medidor quedo en el repo: `scripts/console/validar-forma-tipos-146d.py`
+         (antes vivia solo en /tmp/probe146d y se perdia con el reboot). Remedido al cerrar sobre el build del
+         criterio (`/tmp/dcbuild/demo146d16r2/prog.elf`): `--mascara 0x1f` -> 0 de 1684; `--mascara 0xFFFFFF9F`
+         -> 585 de 1684. Con los `__code` del ELF a la vista: 25 x655, 153 x387, 20 x279, 130 x151, 53 x85,
+         51 x23, 23 x22, 24 x18, 57 x14, 136 x13, 145 x11, 138 x7 -- o sea que gccgo prende los bits altos.
        - la forma sola NO alcanza para decidir (en el ELF de DC-002.146c hay 6 trozos de `.text`/`.data` que la
          pasan sin ser descriptores): por eso el que manda es la tabla y la forma solo separa "hay que mirarlo" de
          "esto es basura".
 
-3. LA PRUEBA MINIMA: 90 LINEAS DE GO QUE ARMAN EL CASO, SIN EL MOTOR
+3. LA PRUEBA MINIMA: UNA SONDA DE GO QUE ARMA EL CASO, SIN EL MOTOR
 
-`console/dc/poc/gc-tipo-invalido` (sonda de 90 lineas + 67 de C) arma exactamente el caso:
+`console/dc/poc/gc-tipo-invalido` (174 lineas de Go -- 87 sin blancos ni comentarios -- + 66 de C) arma exactamente
+el caso:
 
   - un objeto vivo de verdad (`ancla`), alcanzable desde una raiz global;
   - un descriptor FALSO que SI cae en la imagen: es un global de Go (.bss), asi que su direccion esta adentro del
@@ -166,6 +171,10 @@ MEDIR_CUADRO=no MEDIR_VIVO=no`, guion `nada 8 derecha 2.5 abajo 2.5 nada 45` (el
   # solo el veredicto de un log ya corrido
   scripts/console/checar-gc-tipo-invalido-146d.sh veredicto /tmp/capturas-XXXX/flycast.log
 
+  # la forma del descriptor contra los descriptores REALES del ELF (el mutante de la mascara de __code)
+  scripts/console/validar-forma-tipos-146d.py /tmp/dcbuild/demo146d16r2/prog.elf                # -> 0 de 1684
+  scripts/console/validar-forma-tipos-146d.py /tmp/dcbuild/demo146d16r2/prog.elf --mascara 0xFFFFFF9F  # -> 585
+
   # el arbol de libgodc, a mano
   scripts/console/fix-libgodc-tipos-reales.py --estado
   scripts/console/fix-libgodc-tipos-reales.py --build              # el arreglo
@@ -190,3 +199,34 @@ MEDIR_CUADRO=no MEDIR_VIVO=no`, guion `nada 8 derecha 2.5 abajo 2.5 nada 45` (el
   Las viejas siguen: `gc-ptrdata-recortado` y `gc-gcdata-fuera-imagen` ahora solo pueden salir de un tipo REAL
   (uno de la tabla), o sea que significan algo distinto: si alguna vez aparecen, el objeto tiene tamano declarado
   menor que su `__ptrdata`, y eso es un problema del tipo, no del barrido.
+
+8. LO QUE SE REVERIFICO AL CERRAR (2026-11-04, 10:30)
+
+La tarjeta se cerro leyendo de nuevo los artefactos, no el relato de la corrida anterior. Todo lo medido arriba
+sigue en pie:
+
+  - la FIRMA original: los logs de DC-002.145 (`/tmp/capturas-145b`, `-145f`) tienen `gc-ptrdata-recortado
+    v=2349166024` (0x8C056DC8, dentro de .rodata) y `gc-gcdata-fuera-imagen v=906232840` (0x36040408, fuera de
+    RAM): los dos numeros de la tarjeta son direcciones, como decia el diagnostico;
+  - el ARBOL de libgodc: `fix-libgodc-tipos-reales.py --estado` -> PUESTO, `libgodc.a` sha256 8935b9f226b48ffa
+    (el mismo del cierre), `gc_tipo_registrar` en `gc_heap.c` (`gc_alloc`) y el veredicto aplicado en
+    `gc_copy.c` (`gc_scan_object`, `gc_copy_object` y `gc_validate_header`);
+  - el A/B de la carga, las CUATRO corridas releidas con el veredicto del script:
+      arreglo 146d16r2  `MINIMAPA CARGA terminada vueltas= 12 recolecciones= 223` + `CRUZA OK tiles= 289` +
+                        `CIERRE MUNDO salio= true`, gc-tipo-invalido 4, gc-tipos-registrados 139,
+                        gc-ptrdata-recortado 0, gc-gcdata-fuera-imagen 0;
+      arreglo 146d16r2b lo mismo con `vueltas= 12 recolecciones= 222` y 6 tipos invalidos;
+      mutante 146d16rm / 146d16rmb  `MINIMAPA REARME SE CAYO ... paso= la carga de la prueba` + `FATAL: recover
+                        without checkpoint`, sin llegar a main de la carga: 0 vueltas;
+  - la SONDA: el log de la corrida con el arreglo (`/tmp/dcbuild/gc146d-arreglo/run/flycast.log`) da VERDE con el
+    veredicto del script -- gc-tipo-invalido 2, gc-tipos-registrados 2, `CONTROL entero` en las tres rondas,
+    cero `gc-ptrdata-recortado` y cero `gc-gcdata-fuera-imagen`;
+  - el predicado de FORMA: remedido con `scripts/console/validar-forma-tipos-146d.py` sobre el build del criterio,
+    0 de 1684 rechazados con `& 0x1F` y 585 de 1684 con la mascara `~(0x20|0x40)`.
+
+  OJO, dos cosas que no se pudieron reverificar al cerrar y no cambian el veredicto: (a) el log de la sonda con el
+  MUTANTE se perdio con el directorio de build (`/tmp/dcbuild/gc146d-mutante/` ya no esta; queda el `.build.log`,
+  el `.run.log` y el `.toolchain.log`), y no se volvio a correr porque Papu tenia el emulador ocupado con la demo;
+  el lado ROJO esta cubierto por las dos corridas del mutante en la carga y por la firma de 145. (b) El build
+  `demo146d16r` (la version intermedia tabla-sin-compuerta) tambien se limpio; su medicion queda en este texto.
+  Para repetir cualquiera de las dos: los comandos de la seccion 6.
