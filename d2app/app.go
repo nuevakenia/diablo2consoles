@@ -86,6 +86,9 @@ type App struct {
 	tAllocSamples     *ring.Ring
 	guiManager        *d2gui.GuiManager
 	config            *d2config.Configuration
+	// gate0 (DC-002.155): el arranque de la consola, si el main lo pidio con `ArrancarEnGate0`. Nil = el
+	// camino de siempre (PC incluida).
+	gate0 *Gate0
 	*d2util.Logger
 	errorMessage error
 	*Options
@@ -356,7 +359,13 @@ func (a *App) Run() (err error) {
 		os.Exit(0)
 	}
 
-	if save := os.Getenv("OD2_AUTOGAME"); save != "" {
+	// DC-002.155: el arranque de la consola del Gate 0 va DERECHO al pueblo: sin menu, sin video, sin
+	// personaje. Es lo que pide el Gate 0 y lo que se mide; sin Gate0 esta rama no existe.
+	if a.gate0 != nil {
+		a.avisarEtapa("app:antes-de-la-pantalla")
+		a.ToPantallaDelPueblo(a.gate0.Region, a.gate0.Preset, a.gate0.ConEntidades,
+			a.gate0.Instrumento, a.gate0.OpcionesDelMapa...)
+	} else if save := os.Getenv("OD2_AUTOGAME"); save != "" {
 		if class := os.Getenv("OD2_AUTOCAST_CLASS"); class != "" {
 			// a fresh hero of that class replaces the save (skill scenarios)
 			fresh, err := a.freshHeroSave(class)

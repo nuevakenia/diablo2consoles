@@ -1,0 +1,165 @@
+GATE0: arranca DC-002.155 -- el pueblo del Gate 0 por el arranque del MOTOR (d2app)
+GATE0: palancas: cuadro= 640 x 480 bloquesDeLaCache= 4 bytesDelBloque= 348160 bytesDelScratch= 1051532 gcPercent= 95
+GATE0: ESTADO al-arrancar montonLibre= 1304 breakLibre= 2183168 montonUsado= 3306184 gcVivo= 285896 gcTotal= 1572864 vramLibre= 0 vramPedida= 0
+HITO250: PVR antes-de-pvr_init_defaults
+pvr: enabling vertical scaling for non-VGA
+HITO250: PVR despues-de-pvr_init_defaults
+HITO250: PVR textura-de-pantalla OK
+HITO250: PVR relleno OK
+HITO250: PVR contexto OK
+GATE0: PVR listo, VRAM de la textura del cuadro= 2097152
+GATE0: ESTADO despues-del-video montonLibre= 1280 breakLibre= 2183168 montonUsado= 3306208 gcVivo= 285896 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+GATE0: gcPercent: antes= 100 ahora= 95 scratchDeFuera= true techoDelMonton= -1929445376
+[35m[App][32m[INFO][0m OpenDiablo2 - Open source Diablo 2 engine
+GATE0: ESTADO despues-de-Create montonLibre= 1280 breakLibre= 2183168 montonUsado= 3306208 gcVivo= 297616 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+GATE0: llamando a Run(): initialize + el bucle del PVR
+[35m[File Loader][32m[INFO][0m Adding source: '/rd'
+[35m[File Loader][32m[INFO][0m Adding source: '/rd/OpenDiablo2'
+ARQ-CARGA entra config.json cfree=1280 cused=3306208 gsemi=302376/1572864 gc=0
+[35m[File Loader][32m[INFO][0m Loaded /rd/OpenDiablo2 -> config.json
+ARQ-CARGA volvio config.json cfree=1256 cused=3306232 gsemi=305240/1572864 gc=0
+[35m[App][32m[INFO][0m loaded configuration file from /rd/OpenDiablo2/config.json
+fs_iso9660: disc change detected
+OS-RAMFS manifiesto-de-la-ram: no se pudo armar para /cd/juego/Save codigo -100
+OS-RAMFS manifiesto-de-la-ram: no se pudo armar para /cd/juego/save codigo -100
+GATE0: PIDE 98304 libreAntes=2312 tomadoAntes=3346136 ra=8c42e5f0 quedo=8cde4700
+GATE0: PIDE 98304 libreAntes=2304 tomadoAntes=3444448 ra=8c42e5f0 quedo=8cdfc708
+GATE0: PIDE 131072 libreAntes=2296 tomadoAntes=3542760 ra=8c42e5f0 quedo=8ce14710
+GATE0: PIDE 131072 libreAntes=42192 tomadoAntes=3633936 ra=8c42e5f0 quedo=8ce34718
+[35m[Perf][32m[INFO][0m PERF mark renderer-created t_ms=445
+[35m[App][32m[INFO][0m display 800x600, ui scale 1
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/juego/patch_d2.mpq'
+GATE0: PIDE 177328 libreAntes=41528 tomadoAntes=3765672 ra=8c42e5f0 quedo=8ce54720
+GATE0: PIDE 177328 libreAntes=40320 tomadoAntes=3943008 ra=8c42e5f0 quedo=8ce7fbd8
+[35m[File Loader][32m[INFO][0m Adding source: '/cd/juego/d2data.mpq'
+GATE0: ESTADO app:config montonLibre= 43208 breakLibre= 1327104 montonUsado= 4120344 gcVivo= 1026392 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+ARQ-CARGA lee-entra /data/local/use cfree=43208 cused=4120344 gsemi=1027096/1572864 gc=0
+[35m[Asset Manager][32m[INFO][0m Language: enUS (ENG), font dir LATIN
+GATE0: ESTADO app:idioma montonLibre= 43208 breakLibre= 1327104 montonUsado= 4120344 gcVivo= 1034496 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+[35m[App][32m[INFO][0m Initializing asset manager
+GATE0: ESTADO tabla:empieza:/data/global/excel/LvlTypes.txt montonLibre= 43208 breakLibre= 1327104 montonUsado= 4120344 gcVivo= 1036456 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+ARQ-CARGA entra /data/global/excel/LvlTypes.txt cfree=43208 cused=4120344 gsemi=1036720/1572864 gc=0
+[35m[File Loader][32m[INFO][0m Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlTypes.txt
+ARQ-CARGA volvio /data/global/excel/LvlTypes.txt cfree=43208 cused=4120344 gsemi=1042128/1572864 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlTypes.txt cfree=43208 cused=4120344 gsemi=1107992/1572864 gc=0
+ARQ-CARGA lee-volvio /data/global/excel/LvlTypes.txt cfree=43208 cused=4120344 gsemi=1210336/1572864 gc=0
+GATE0: ESTADO tabla:lista:/data/global/excel/LvlTypes.txt montonLibre= 43208 breakLibre= 1327104 montonUsado= 4120344 gcVivo= 1210392 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO tabla:empieza:/data/global/excel/LvlPrest.txt montonLibre= 43208 breakLibre= 1327104 montonUsado= 4120344 gcVivo= 1210448 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+ARQ-CARGA entra /data/global/excel/LvlPrest.txt cfree=43208 cused=4120344 gsemi=1210712/1572864 gc=0
+[35m[File Loader][32m[INFO][0m Loaded /cd/juego/patch_d2.mpq -> /data/global/excel/LvlPrest.txt
+ARQ-CARGA volvio /data/global/excel/LvlPrest.txt cfree=43208 cused=4120344 gsemi=1216336/1572864 gc=0
+ARQ-CARGA lee-entra /data/global/excel/LvlPrest.txt cfree=43208 cused=4120344 gsemi=1229120/1572864 gc=0
+ARQ-MARCA gc-por-umbral-bytes-usados v=1494232
+ARQ-MARCA gc_collect v=1
+ARQ-MARCA gc-vivo v=400352
+ARQ-MARCA gc-tipos-tabla v=4096
+ARQ-MARCA gc-tipos-registrados v=233
+GATE0: PIDE 108032 libreAntes=43208 tomadoAntes=4120344 ra=8c42e47e quedo=8ceab090
+ARQ-MARCA gc-externo-con-punteros v=108032
+GATE0: PIDE 216064 libreAntes=41664 tomadoAntes=4228384 ra=8c42e47e quedo=8cec5698
+ARQ-MARCA gc-externo-con-punteros v=216064
+ARQ-MARCA gc-por-umbral-bytes-usados v=1494240
+ARQ-MARCA gc_collect v=2
+ARQ-MARCA gc-vivo v=517832
+ARQ-CARGA lee-volvio /data/global/excel/LvlPrest.txt cfree=42680 cused=4444456 gsemi=796760/1572864 gc=2
+GATE0: ESTADO tabla:lista:/data/global/excel/LvlPrest.txt montonLibre= 42680 breakLibre= 1003520 montonUsado= 4444456 gcVivo= 796816 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+[35m[App][32m[INFO][0m Gate0: animdata.d2 NO se carga (sin entidades no hay animacion)
+GATE0: ESTADO app:tablas montonLibre= 42680 breakLibre= 1003520 montonUsado= 4444456 gcVivo= 798240 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO app:gui montonLibre= 42680 breakLibre= 1003520 montonUsado= 4444456 gcVivo= 800432 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+[35m[App][32m[INFO][0m Gate0: las tablas de strings NO se cargan (el pueblo no dibuja texto)
+GATE0: ESTADO app:strings montonLibre= 42680 breakLibre= 1003520 montonUsado= 4444456 gcVivo= 1011568 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+GATE0: ESTADO app:ui montonLibre= 42680 breakLibre= 1003520 montonUsado= 4444456 gcVivo= 1011568 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+[35m[Perf][32m[INFO][0m PERF mark assets-ready t_ms=26615
+GATE0: ESTADO app:antes-de-la-pantalla montonLibre= 42680 breakLibre= 1003520 montonUsado= 4444456 gcVivo= 1013064 gcTotal= 1572864 vramLibre= 3692232 vramPedida= 0
+PVR-FRAMEBUFFER la pantalla vive en la VRAM: 1920000 bytes
+PVR-FRAMEBUFFER monton de C: libre 42680 bytes (el runtime lo imprime como free)
+PVR-FRAMEBUFFER escribiendo 65536 bytes en la VRAM...
+PVR-FRAMEBUFFER escritos, leyendo de vuelta...
+PVR-FRAMEBUFFER ida y vuelta: 65536 bytes, distintos: 0
+EBITEN-LOOP cuadro 0 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 0 el PVR dio el cuadro, abro la lista
+[35m[Gamepad][32m[INFO][0m GAMEPAD raw layout id=%!d(tipo no soportado=%!v(tipo no soportado=tipo no soportado)) name="Dreamcast Controller" guid=dreamcast-0 profile=xbox buttons=8 axes=4
+[35m[Gamepad][32m[INFO][0m GAMEPAD connected id=0 name="Dreamcast Controller"
+[35m[Perf][32m[INFO][0m PERF mark first-frame t_ms=27714
+EBITEN-LOOP cuadro 0 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 0 listo
+EBITEN-LOOP cuadro 1 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 1 el PVR dio el cuadro, abro la lista
+GATE0: ESTADO mapa:empieza montonLibre= 42440 breakLibre= 937984 montonUsado= 4510232 gcVivo= 1022072 gcTotal= 1572864 vramLibre= 1772200 vramPedida= 0
+GATE0: ESTADO mapa:tramo-de-las-tablas-soltado montonLibre= 42440 breakLibre= 937984 montonUsado= 4510232 gcVivo= 1022072 gcTotal= 1572864 vramLibre= 1772200 vramPedida= 0
+GATE0: ESTADO mapa:engine-creado montonLibre= 42440 breakLibre= 937984 montonUsado= 4510232 gcVivo= 1023216 gcTotal= 1572864 vramLibre= 1772200 vramPedida= 0
+ARQ-CARGA lee-entra /data/global/tiles/Act1/Town/TownN1.ds1 cfree=42440 cused=4510232 gsemi=1083248/1572864 gc=2
+ARQ-CARGA lee-volvio /data/global/tiles/Act1/Town/TownN1.ds1 cfree=42440 cused=4510232 gsemi=1146552/1572864 gc=2
+ARQ-MARCA gc-por-umbral-bytes-usados v=1495240
+ARQ-MARCA gc_collect v=3
+ARQ-MARCA gc-vivo v=887224
+GATE0: ESTADO mapa:stamp-leido montonLibre= 42440 breakLibre= 937984 montonUsado= 4510232 gcVivo= 940832 gcTotal= 1572864 vramLibre= 1772200 vramPedida= 0
+EBITEN-LOOP cuadro 1 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 1 listo
+EBITEN-LOOP cuadro 2 esperando el cuadro del PVR
+EBITEN-LOOP cuadro 2 el PVR dio el cuadro, abro la lista
+EBITEN-LOOP cuadro 2 dibujado, subo el cuadro a la VRAM
+EBITEN-LOOP cuadro 2 listo
+[35m[Game Screen][32m[INFO][0m el pueblo: 57x41 casillas, preset 1, archivo 0
+GATE0: PIDE 616968 libreAntes=42440 tomadoAntes=4510232 ra=8c42e47e quedo=8cf0a2a8
+ARQ-MARCA gc-externo-con-punteros v=616968
+Out of memory. Requested sbrk_base 0x8d021000, was 0x8cfa1000, diff 524288
+GATE0: PIDE 524288 libreAntes=39864 tomadoAntes=5127208 ra=8c0110ba quedo=00000000
+GATE0: PIDE 262144 libreAntes=39864 tomadoAntes=5127208 ra=8c0110ba quedo=8cfa0cb8
+GATE0: PIDE 262144 libreAntes=39864 tomadoAntes=5127208 ra=8c42e5f0 quedo=8cfa0cb8
+Out of memory. Requested sbrk_base 0x8d061000, was 0x8cfe1000, diff 524288
+GATE0: PIDE 524288 libreAntes=39856 tomadoAntes=5389360 ra=8c0110ba quedo=00000000
+Out of memory. Requested sbrk_base 0x8d021000, was 0x8cfe1000, diff 262144
+GATE0: PIDE 262144 libreAntes=39856 tomadoAntes=5389360 ra=8c0110ba quedo=00000000
+Out of memory. Requested sbrk_base 0x8d001000, was 0x8cfe1000, diff 131072
+GATE0: PIDE 131072 libreAntes=39856 tomadoAntes=5389360 ra=8c0110ba quedo=00000000
+Out of memory. Requested sbrk_base 0x8d061000, was 0x8cfe1000, diff 524288
+GATE0: PIDE 524288 libreAntes=39856 tomadoAntes=5389360 ra=8c42e5f0 quedo=00000000
+fatal error: gc_external_alloc: OOM
+Stack Trace: frame pointers not enabled!
+Memory: arena=5429216 used=5389360 free=39856
+00:22:043 reios/reios.cpp:639 N[REIOS]: -----------------
+00:22:043 reios/reios.cpp:640 N[REIOS]: REIOS: Booting up
+00:22:043 reios/reios.cpp:641 N[REIOS]: -----------------
+--
+KallistiOS v2.2.1
+dom 25 oct 2026 14:33:57 -03
+dgalli@warmachine:/home/dgalli/dreamcast/kos
+sh-elf-gcc (GCC) 15.1.0
+thd: pre-emption enabled, HZ=100
+maple: active drivers:
+Dreameye (Camera): Camera
+Sound Input Peripheral: Microphone
+PuruPuru (Vibration) Pack: JumpPack
+VMU Driver: Clock, LCD, MemoryCard
+Mouse Driver: Mouse
+Keyboard Driver: Keyboard
+Controller Driver: Controller
+Lightgun: LightGun
+DMA Buffer at acab4fa0
+vid_set_mode: 640x480IL NTSC with 1 framebuffers.
+fs_romdisk: mounting image at 0x8c4ba72c at /rd
+maple: attached devices:
+A0: Dreamcast Controller           (01000000: Controller)
+A1: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+A2: Visual Memory                  (0e000000: Clock, LCD, MemoryCard)
+ARQ-MARCA ctor-kos_startup v=0
+ARQ-MARCA main-entra v=0
+ARQ-MARCA runtime_init-entra v=0
+ARQ-MARCA   gc_init-entra v=0
+ARQ-MARCA   gc-imagen-hi v=2360127488
+ARQ-MARCA   gc_init-semiespacio0 v=2360123776
+ARQ-MARCA   gc_init-semiespacio1 v=2361696672
+ARQ-MARCA   gc_init_impl()-OK v=0
+ARQ-MARCA   map_init()-OK v=0
+ARQ-MARCA   sudog_pool_init()-OK v=0
+ARQ-MARCA   stack_pool_preallocate()-OK v=0
+ARQ-MARCA   proc_init()-OK v=0
+ARQ-MARCA   panic_init()-OK v=0
+ARQ-MARCA runtime_init-volvio v=0
+ARQ-MARCA go_go-volvio-goroutines v=2
+ARQ-MARCA scheduler-entra v=2
+ARQ-MARCA main_wrapper-entra v=0
+ARQ-CARGA instrumento instrumento-de-carga-puesto cfree=2336 cused=3305152 gsemi=238456/1572864 gc=0
+ARQ-MARCA inits-de-paquetes-OK v=0
+ARQ-MARCA main.main-entra v=0

@@ -22,11 +22,17 @@ func (a *App) initialize() error {
 		return err
 	}
 
+	a.avisarEtapa("app:config")
+
 	a.initLanguage()
+
+	a.avisarEtapa("app:idioma")
 
 	if err := a.initDataDictionaries(); err != nil {
 		return err
 	}
+
+	a.avisarEtapa("app:tablas")
 
 	a.timeScale = 1.0
 	a.lastTime = d2util.Now()
@@ -36,12 +42,18 @@ func (a *App) initialize() error {
 	a.terminal.BindLogger()
 	a.initTerminalCommands()
 
+	// DC-002.155: el GUI de la consola del Gate 0 no carga sus dos animaciones (3,15 MB de RGBA)
+	if a.sinGuiDeArranque() {
+		d2gui.SinAnimacionesDeConsola(true)
+	}
+
 	gui, err := d2gui.CreateGuiManager(a.asset, *a.Options.LogLevel, a.inputManager)
 	if err != nil {
 		return err
 	}
 
 	a.guiManager = gui
+	a.avisarEtapa("app:gui")
 
 	a.screen = d2screen.NewScreenManager(a.ui, *a.Options.LogLevel, a.guiManager)
 
@@ -56,7 +68,15 @@ func (a *App) initialize() error {
 		return err
 	}
 
-	a.ui.Initialize()
+	a.avisarEtapa("app:strings")
+
+	// DC-002.155: `ui.Initialize` carga el sonido del boton (vive en `d2sfx.mpq`, que no va al disco de la
+	// consola) y engancha los handlers de la UI. El pueblo no tiene UI: se saltea entero.
+	if !a.sinUiDeArranque() {
+		a.ui.Initialize()
+	}
+
+	a.avisarEtapa("app:ui")
 
 	return nil
 }
@@ -120,21 +140,35 @@ func (a *App) initLanguage() {
 }
 
 func (a *App) initDataDictionaries() error {
-	dictPaths := d2resource.DataDictionaries()
+	dictPaths := a.tablasDelArranque(d2resource.DataDictionaries())
 
 	a.Info("Initializing asset manager")
 
 	for _, path := range dictPaths {
+		a.avisarEtapa("tabla:empieza:" + path)
+
 		err := a.asset.LoadRecords(path)
 		if err != nil {
 			return err
 		}
+
+		a.avisarEtapa("tabla:lista:" + path)
+	}
+
+	// DC-002.155: sin entidades no hay animacion que consultar, y `animdata.d2` son 2,17 MB de registros
+	// (medido en el host, `medidas/arranque-app-155`). En la consola del Gate 0 se saltea.
+	if a.sinAnimDataDeArranque() {
+		a.Info("Gate0: animdata.d2 NO se carga (sin entidades no hay animacion)")
+
+		return nil
 	}
 
 	err := a.initAnimationData(d2resource.AnimationData)
 	if err != nil {
 		return err
 	}
+
+	a.avisarEtapa("app:animdata")
 
 	return nil
 }
@@ -164,6 +198,14 @@ func (a *App) initAnimationData(path string) error {
 }
 
 func (a *App) loadStrings() error {
+	// DC-002.155: el pueblo del Gate 0 no tiene ni un texto en pantalla, y las tres tablas son 2,67 MB de
+	// registros medidos en el host. Se saltean enteras.
+	if a.sinStringsDeArranque() {
+		a.Info("Gate0: las tablas de strings NO se cargan (el pueblo no dibuja texto)")
+
+		return nil
+	}
+
 	tablePaths := []string{
 		d2resource.PatchStringTable,
 		d2resource.ExpansionStringTable,

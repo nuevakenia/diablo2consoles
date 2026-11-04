@@ -15,6 +15,14 @@ const (
 	logPrefix = "GUI Manager"
 )
 
+// sinAnimaciones (DC-002.155): el arranque de la consola del Gate 0 no carga el cursor ni la pantalla de
+// carga. Se prende desde `d2app` (`d2app.Gate0`), nunca desde la PC.
+var sinAnimaciones bool
+
+// SinAnimacionesDeConsola prende/apaga las dos animaciones del GUI. Apagadas, `Render` y `renderLoadScreen`
+// no pintan nada (un nil chequeado) y el arranque se ahorra 3.143.016 B de RGBA medidos en el host.
+func SinAnimacionesDeConsola(v bool) { sinAnimaciones = v }
+
 // GuiManager is a GUI widget manager that handles dynamic layout/positioning of widgets
 type GuiManager struct {
 	asset         *d2asset.AssetManager
@@ -31,14 +39,25 @@ type GuiManager struct {
 
 // CreateGuiManager creates an instance of the GuiManager
 func CreateGuiManager(asset *d2asset.AssetManager, l d2util.LogLevel, inputManager d2interface.InputManager) (*GuiManager, error) {
-	cursorAnim, err := asset.LoadAnimation(d2resource.CursorDefault, d2resource.PaletteUnits)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		cursorAnim  d2interface.Animation
+		loadingAnim d2interface.Animation
+		err         error
+	)
 
-	loadingAnim, err := asset.LoadAnimation(d2resource.LoadingScreen, d2resource.PaletteLoading)
-	if err != nil {
-		return nil, err
+	// DC-002.155: en la consola del Gate 0 las dos animaciones se saltean (ver `SinAnimacionesDeConsola`).
+	// El cursor son 38 KB y la pantalla de carga 3.105.848 B de RGBA (medido en el host con
+	// `console/dc/medidas/arranque-app-155`): la segunda es mas grande que todo el monton de C de la consola.
+	if !sinAnimaciones {
+		cursorAnim, err = asset.LoadAnimation(d2resource.CursorDefault, d2resource.PaletteUnits)
+		if err != nil {
+			return nil, err
+		}
+
+		loadingAnim, err = asset.LoadAnimation(d2resource.LoadingScreen, d2resource.PaletteLoading)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	manager := &GuiManager{
@@ -122,6 +141,12 @@ func (m *GuiManager) Render(target d2interface.Surface) error {
 func (m *GuiManager) renderLoadScreen(target d2interface.Surface) {
 	target.Clear(color.Black)
 
+	// DC-002.155: sin la animacion (la consola del Gate 0) la pantalla de carga es el fondo negro y nada
+	// mas: el motor sigue cargando igual, y el bucle del PVR sigue presentando cuadros.
+	if m.loadingAnim == nil {
+		return
+	}
+
 	pushCount := 0
 
 	screenWidth, screenHeight := target.GetSize()
@@ -139,6 +164,11 @@ func (m *GuiManager) renderLoadScreen(target d2interface.Surface) {
 }
 
 func (m *GuiManager) renderCursor(target d2interface.Surface) {
+	// DC-002.155: sin animacion de cursor no hay nada que pintar (la consola del Gate 0 no la carga)
+	if m.cursorAnim == nil {
+		return
+	}
+
 	_, height := m.cursorAnim.GetCurrentFrameSize()
 	pushCount := 0
 
@@ -170,6 +200,14 @@ func (m *GuiManager) Advance(elapsed float64) error {
 func (m *GuiManager) ShowLoadScreen(progress float64) {
 	progress = math.Min(progress, 1.0)
 	progress = math.Max(progress, 0.0)
+
+	// DC-002.155: sin animacion de carga, el estado igual cambia (es lo que apaga el cursor y avisa que se
+	// esta cargando); lo que no hay es que pintar.
+	if m.loadingAnim == nil {
+		m.loading = true
+
+		return
+	}
 
 	animation := m.loadingAnim
 	frameCount := animation.GetFrameCount()
