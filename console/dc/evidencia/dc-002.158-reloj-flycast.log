@@ -1,0 +1,66 @@
+=== 1. EL POC DEL RELOJ CON EL DEFECTO (console/dc/std/time/time.go antes del arreglo) ===
+    corrida: /tmp/reloj158-antes (Flycast, 20 s) -- POC console/dc/poc/reloj-158
+RELOJ158: los dos relojes de la consola en el mismo lazo
+RELOJ158: crudo = timer_us_gettime64() (d2c_reloj_us); now = time.Now()/d2util.Now();
+RELOJ158: razon_mil = now_us * 1000 / crudo_us (1000 = sano, 2000 = adelanta 2x)
+RELOJ158: VUELTA 1 espera_ms= 1000 crudo_us= 1004359 now_us= 2004359 unixnano_us= 2004359 sub_ms= 2004 rtc_s= 1 razon_mil= 1995
+RELOJ158: VUELTA 2 espera_ms= 1000 crudo_us= 999524 now_us= 1999523 unixnano_us= 1999524 sub_ms= 1999 rtc_s= 1 razon_mil= 2000
+RELOJ158: VUELTA 3 espera_ms= 300 crudo_us= 308364 now_us= 308365 unixnano_us= 308364 sub_ms= 308 rtc_s= 0 razon_mil= 1000
+RELOJ158: VUELTA 4 espera_ms= 150 crudo_us= 158970 now_us= 158969 unixnano_us= 158970 sub_ms= 158 rtc_s= 0 razon_mil= 999
+RELOJ158: VUELTA 5 espera_ms= 700 crudo_us= 700573 now_us= 1700573 unixnano_us= 1700573 sub_ms= 1700 rtc_s= 1 razon_mil= 2427
+RELOJ158: VUELTA 6 espera_ms= 1000 crudo_us= 999698 now_us= 1999699 unixnano_us= 1999698 sub_ms= 1999 rtc_s= 1 razon_mil= 2000
+RELOJ158: VUELTA 7 espera_ms= 2000 crudo_us= 2000312 now_us= 4000311 unixnano_us= 4000312 sub_ms= 4000 rtc_s= 2 razon_mil= 1999
+RELOJ158: RESUMEN vueltas= 7 malas= 5 peor_desvio_mil= 1427
+RELOJ158: ROJO el reloj de la consola NO sigue al timer de KOS
+
+=== 2. EL POC DEL RELOJ CON EL ARREGLO (+ el reloj de pared del host, scripts/console/medir-pared-158.sh) ===
+    corrida: /tmp/reloj158-pared (Flycast, 25 s)
+RELOJ158: los dos relojes de la consola en el mismo lazo
+RELOJ158: crudo = timer_us_gettime64() (d2c_reloj_us); now = time.Now()/d2util.Now();
+RELOJ158: razon_mil = now_us * 1000 / crudo_us (1000 = sano, 2000 = adelanta 2x)
+RELOJ158: VUELTA 1 espera_ms= 1000 crudo_us= 1004362 now_us= 1004359 unixnano_us= 1004362 sub_ms= 1004 rtc_s= 1 razon_mil= 999
+RELOJ158: VUELTA 2 espera_ms= 1000 crudo_us= 999622 now_us= 999622 unixnano_us= 999622 sub_ms= 999 rtc_s= 1 razon_mil= 1000
+RELOJ158: VUELTA 3 espera_ms= 300 crudo_us= 308651 now_us= 308650 unixnano_us= 308651 sub_ms= 308 rtc_s= 0 razon_mil= 999
+RELOJ158: VUELTA 4 espera_ms= 150 crudo_us= 159066 now_us= 159065 unixnano_us= 159066 sub_ms= 159 rtc_s= 0 razon_mil= 999
+RELOJ158: VUELTA 5 espera_ms= 700 crudo_us= 700579 now_us= 700579 unixnano_us= 700579 sub_ms= 700 rtc_s= 1 razon_mil= 1000
+RELOJ158: VUELTA 6 espera_ms= 1000 crudo_us= 999952 now_us= 999951 unixnano_us= 999952 sub_ms= 999 rtc_s= 1 razon_mil= 999
+RELOJ158: VUELTA 7 espera_ms= 2000 crudo_us= 2000629 now_us= 2000628 unixnano_us= 2000629 sub_ms= 2000 rtc_s= 2 razon_mil= 999
+RELOJ158: RESUMEN vueltas= 7 malas= 0 peor_desvio_mil= 1
+RELOJ158: VERDE el reloj de la consola sigue al timer de KOS (dentro del 1 % = 10 por mil)
+
+=== 3. EL GATE 0 CON EL RELOJ ARREGLADO (corrida de 185 s, /tmp/capturas158) ===
+    binario: /tmp/dcbuild/gate0-pueblo-158 (5.910.020 B cargados, con _time.baseUnix adentro)
+    el reloj del PVR (EBITEN157) y el de la pantalla (CUADRO / TRAMO157) en la MISMA corrida:
+[35m[Game Screen][32m[INFO][0m pueblo compuesto en 24667 ms: pisos=2337 paredes=338
+[35m[Game Screen][32m[INFO][0m CUADRO 1 ms=868 (primer cuadro 868 ms)
+[35m[Game Screen][32m[INFO][0m CUADRO 2 ms=779 (primer cuadro 868 ms)
+EBITEN157: FASES cuadros= 10 espera_us= 1303 actualizar_us= 2622513 dibujar_us= 585107 convertir_us= 59143 subir_us= 0 pintar_us= 2 total_us= 3269623 rapida= no filas= no zona= no quieta= no
+EBITEN-PERFIL dibujar_us 878971 convertir_us 57634 subir_us 0 pintar_us 3 cuadro_us 936608
+[35m[Game Screen][32m[INFO][0m CUADRO 11 ms=783 (primer cuadro 868 ms)
+EBITEN157: FASES cuadros= 10 espera_us= 0 actualizar_us= 2304 dibujar_us= 823515 convertir_us= 57895 subir_us= 0 pintar_us= 2 total_us= 883760 rapida= no filas= no zona= no quieta= no
+[35m[Game Screen][32m[INFO][0m TRAMO157 cierra="" cuadros=20 mapa_us_prom=825 mapa_us_total=16500 saltos=0 repintados=20
+[35m[Game Screen][32m[INFO][0m TRAMO157 abre="mapa-estatico=on" (desde el cuadro 21)
+EBITEN157: FASES cuadros= 10 espera_us= 0 actualizar_us= 2304 dibujar_us= 581498 convertir_us= 57658 subir_us= 0 pintar_us= 2 total_us= 641505 rapida= no filas= no zona= no quieta= no
+[35m[Game Screen][32m[INFO][0m CUADRO 31 ms=0 (primer cuadro 868 ms)
+EBITEN157: FASES cuadros= 10 espera_us= 0 actualizar_us= 2310 dibujar_us= 2305 convertir_us= 57908 subir_us= 0 pintar_us= 2 total_us= 62568 rapida= no filas= no zona= no quieta= no
+[35m[Game Screen][32m[INFO][0m TRAMO157 cierra="mapa-estatico=on" cuadros=20 mapa_us_prom=0 mapa_us_total=0 saltos=20 repintados=20
+[35m[Game Screen][32m[INFO][0m TRAMO157 abre="conversion-rapida=on" (desde el cuadro 41)
+EBITEN157: FASES cuadros= 7 espera_us= 0 actualizar_us= 2320 dibujar_us= 95 convertir_us= 57645 subir_us= 0 pintar_us= 2 total_us= 60106 rapida= no filas= no zona= no quieta= no
+EBITEN157: FASES cuadros= 10 espera_us= 0 actualizar_us= 2312 dibujar_us= 4189 convertir_us= 59451 subir_us= 0 pintar_us= 2 total_us= 65996 rapida= si filas= no zona= no quieta= no
+[35m[Game Screen][32m[INFO][0m CUADRO 60 ms=0 (primer cuadro 868 ms)
+EBITEN157: FASES cuadros= 10 espera_us= 0 actualizar_us= 2312 dibujar_us= 2306 convertir_us= 57908 subir_us= 0 pintar_us= 2 total_us= 62571 rapida= si filas= no zona= no quieta= no
+[35m[Game Screen][32m[INFO][0m TRAMO157 cierra="conversion-rapida=on" cuadros=20 mapa_us_prom=0 mapa_us_total=0 saltos=40 repintados=20
+[35m[Game Screen][32m[INFO][0m TRAMO157 abre="conversion-por-filas=on" (desde el cuadro 61)
+EBITEN157: FASES cuadros= 1 espera_us= 0 actualizar_us= 2306 dibujar_us= 41659 convertir_us= 57677 subir_us= 1 pintar_us= 2 total_us= 101685 rapida= si filas= no zona= no quieta= no
+EBITEN157: FASES cuadros= 10 espera_us= 1 actualizar_us= 2313 dibujar_us= 96 convertir_us= 59237 subir_us= 0 pintar_us= 2 total_us= 61691 rapida= si filas= si zona= no quieta= no
+[35m[Game Screen][32m[INFO][0m TRAMO157 cierra="conversion-por-filas=on" cuadros=20 mapa_us_prom=0 mapa_us_total=0 saltos=60 repintados=20
+[35m[Game Screen][32m[INFO][0m TRAMO157 abre="conversion-por-zona=on" (desde el cuadro 81)
+EBITEN157: FASES cuadros= 9 espera_us= 0 actualizar_us= 2591 dibujar_us= 95 convertir_us= 57652 subir_us= 0 pintar_us= 2 total_us= 60383 rapida= si filas= si zona= no quieta= no
+EBITEN157: FASES cuadros= 10 espera_us= 0 actualizar_us= 2315 dibujar_us= 4272 convertir_us= 27667 subir_us= 0 pintar_us= 2 total_us= 34298 rapida= si filas= si zona= si quieta= no
+EBITEN157: FASES cuadros= 10 espera_us= 0 actualizar_us= 2311 dibujar_us= 96 convertir_us= 26346 subir_us= 0 pintar_us= 2 total_us= 28798 rapida= si filas= si zona= si quieta= no
+[35m[Game Screen][32m[INFO][0m TRAMO157 cierra="conversion-por-zona=on" cuadros=20 mapa_us_prom=0 mapa_us_total=0 saltos=80 repintados=20
+[35m[Game Screen][32m[INFO][0m TRAMO157 abre="presentacion-quieta=on" (desde el cuadro 101)
+EBITEN157: FASES cuadros= 1 espera_us= 1 actualizar_us= 2305 dibujar_us= 41845 convertir_us= 1 subir_us= 0 pintar_us= 3 total_us= 44195 rapida= si filas= si zona= si quieta= no
+EBITEN157: FASES cuadros= 10 espera_us= 11332 actualizar_us= 2315 dibujar_us= 95 convertir_us= 1542 subir_us= 0 pintar_us= 2 total_us= 15329 rapida= si filas= si zona= si quieta= si
+[35m[Game Screen][32m[INFO][0m CUADRO 120 ms=0 (primer cuadro 868 ms)
+    (...) las FASES siguen iguales hasta el final: son el reloj del PVR, que ya estaba bien.

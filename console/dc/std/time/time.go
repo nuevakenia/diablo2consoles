@@ -14,14 +14,35 @@
 //
 // El reloj, medido: rtc_unix_secs() da los segundos Unix que trae la RTC (el documento de KOS avisa que
 // puede fallar: si la RTC no esta seteada devuelve 0, y ese 0 es "1970") y timer_us_gettime64() da los
-// microsegundos desde que arranco la consola. Now los combina:
+// microsegundos desde que arranco la consola. Now combina las DOS COSAS UNA SOLA VEZ:
 //
-//     Now = rtc_unix_secs() + (timer_us_gettime64() - timer_del_arranque)
+//     Now = rtc_unix_secs() [leida en la primera llamada] + (timer_us_gettime64() - timer_del_arranque)
 //
 // Asi Now avanza con el timer (que no se puede desajustar) y arranca en la fecha de la RTC.
 //
+// DC-002.158 -- LO QUE ESTABA MAL Y COMO SE MIDIO. Hasta esta tarjeta la RTC se leia en CADA llamada y el
+// tiempo desde la primera llamada se le sumaba encima:
+//
+//     Now = rtc_unix_secs() + (timer_us_gettime64() - timer_del_arranque)      // MAL
+//
+// O sea que el reloj contaba DOS veces lo mismo: la RTC ya avanza sola, y el timer desde el arranque
+// tambien. Medido en Flycast con console/dc/poc/reloj-158 (los dos relojes en el mismo lazo): en una espera
+// de 1000 ms el timer crudo daba 1.004.359 us y Now daba 2.004.359 us -- el segundo de la RTC MAS el
+// segundo transcurrido. Y no se notaba en las ventanas cortas: si la RTC no llego a picar (una espera de
+// 150 ms, 300 ms) el reloj daba bien, porque la RTC todavia no habia pasado el borde del segundo. Cada
+// "tic" de la RTC son 1.000.000 us fantasma.
+//
+// La RTC de la consola va en segundos: no hay forma de leer una fraccion de segundo de ella, y por eso la
+// fecha solo puede leerse UNA vez (al arrancar) y el resto del tiempo lo tiene que llevar el timer. Ahora la
+// RTC no se toca mas despues de la primera llamada (que ademas es lo que pedia la tarjeta: no leer el
+// hardware en cada Now). Si la RTC viniera sin setear (0 = 1970), Now arranca en 1970 y avanza bien: el
+// error de la RTC es de fecha, no de cadencia.
+//
 // Este paquete NO se puede probar en el host (habla con KOS), asi que su prueba es el POC que corre en
-// Flycast (console/dc/poc/vfs) mas los mutadores de consola (scripts/console/mutar-os-consola.sh).
+// Flycast (console/dc/poc/reloj-158, que mide timer_us_gettime64 contra Now en el mismo lazo) mas los
+// mutadores de consola (scripts/console/mutar-reloj-158.sh para este reloj, mutar-os-consola.sh para el
+// resto del paquete).
+
 package time
 
 // ---------------------------------------------------------------- Duration
@@ -114,12 +135,12 @@ func fraccion(d Duration, prec int) string {
 	return "." + s
 }
 
-func (d Duration) Seconds() float64      { return float64(d) / float64(Second) }
-func (d Duration) Milliseconds() int64   { return int64(d / Millisecond) }
-func (d Duration) Microseconds() int64   { return int64(d / Microsecond) }
-func (d Duration) Nanoseconds() int64    { return int64(d) }
-func (d Duration) Hours() float64        { return float64(d) / float64(Hour) }
-func (d Duration) Minutes() float64      { return float64(d) / float64(Minute) }
+func (d Duration) Seconds() float64    { return float64(d) / float64(Second) }
+func (d Duration) Milliseconds() int64 { return int64(d / Millisecond) }
+func (d Duration) Microseconds() int64 { return int64(d / Microsecond) }
+func (d Duration) Nanoseconds() int64  { return int64(d) }
+func (d Duration) Hours() float64      { return float64(d) / float64(Hour) }
+func (d Duration) Minutes() float64    { return float64(d) / float64(Minute) }
 
 // ---------------------------------------------------------------- Time
 
@@ -140,23 +161,29 @@ func d2c_reloj_us() uint64
 //extern d2c_dormir
 func d2c_dormir(ms int)
 
-// arranque: los microsegundos del timer cuando se uso la RTC por primera vez. Se calcula en el primer
-// Now para que el tiempo de arranque de la consola (que ya paso) no se sume como si fuera de este
-// instante.
+// arranque: los microsegundos del timer y los segundos de la RTC de la PRIMERA llamada a Now. Las dos cosas
+// se leen UNA SOLA VEZ, juntas, y de ahi en adelante el reloj es el timer (ver la cabecera: leer la RTC en
+// cada llamada es lo que hacia que Now adelantara 2x, DC-002.158). Se toma en la primera llamada y no en el
+// arranque del programa para que el tiempo que la consola ya llevaba corriendo (el boot de KOS, la carga de
+// la imagen) no se sume como si fuera de este instante.
 var arranqueUs uint64
+var baseUnix int64
 var arranqueListo bool
 
-// Now: el instante actual, con la fecha de la RTC y los microsegundos del timer de la consola.
+// Now: el instante actual, con la fecha de la RTC (leida al arrancar) y los microsegundos del timer de la
+// consola. Tiene la misma resolucion que el timer (1 us) y no toca el hardware de la RTC despues de la
+// primera llamada.
 func Now() Time {
 	us := d2c_reloj_us()
 	if !arranqueListo {
 		arranqueUs = us
+		baseUnix = d2c_reloj_unix()
 		arranqueListo = true
 	}
-	base := d2c_reloj_unix()
-	transcurrido := int64(us-arranqueUs) / 1000000
-	nsec := int32((us - arranqueUs) % 1000000 * 1000)
-	return Time{sec: base + transcurrido, nsec: nsec}
+	// desde: los microsegundos que pasaron desde la primera llamada. UNA sola fuente (el timer), para que
+	// el reloj avance a la velocidad del timer y no a la suma de dos relojes.
+	desde := us - arranqueUs
+	return Time{sec: baseUnix + int64(desde/1000000), nsec: int32(desde%1000000) * 1000}
 }
 
 // Unix arma un Time desde segundos y nanosegundos Unix.
@@ -386,12 +413,12 @@ func civilDeDias(dias int64) (anio int, mes Month, dia int) {
 	if z < 0 && z%146097 != 0 {
 		era--
 	}
-	doe := z - era*146097                                          // [0, 146096]
-	yoe := (doe - doe/1460 + doe/36524 - doe/146096) / 365          // [0, 399]
+	doe := z - era*146097                                  // [0, 146096]
+	yoe := (doe - doe/1460 + doe/36524 - doe/146096) / 365 // [0, 399]
 	y := yoe + era*400
-	doy := doe - (365*yoe + yoe/4 - yoe/100)                        // [0, 365]
-	mp := (5*doy + 2) / 153                                         // [0, 11]
-	dd := doy - (153*mp+2)/5 + 1                                    // [1, 31]
+	doy := doe - (365*yoe + yoe/4 - yoe/100) // [0, 365]
+	mp := (5*doy + 2) / 153                  // [0, 11]
+	dd := doy - (153*mp+2)/5 + 1             // [1, 31]
 	mm := mp + 3
 	if mp >= 10 {
 		mm = mp - 9
