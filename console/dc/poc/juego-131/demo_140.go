@@ -197,6 +197,14 @@ func pasoDeLaDemo() {
 		demoMiraLaSalida()
 	}
 
+	// ---- 4b. EL BORDE DE LA REGION (DC-002.147) ----
+	// Con el moor por regiones compuesto, cada cuadro se mira si el jugador se salio de la caja de la region que
+	// esta puesta: si se salio, se compone la vecina sin volver a compilar. Va DESPUES del movimiento (la celda de
+	// este cuadro) y ANTES de la camara (que la pone el cuadro siguiente con la region ya cambiada).
+	if demoMoor == "si" && demoYaSalio && moorRegionActual != nil {
+		demoMiraElBordeDeLaRegion()
+	}
+
 	// ---- 5. EL RESUMEN PERIODICO: la corrida termina cuando el jugador cierra el emulador, asi que los numeros
 	// del cierre tienen que estar en el log ANTES de eso (cada 300 cuadros = entre 10 y 40 s de juego real).
 	if demoCuadros%cuadrosDelResumenDemo == 0 {
@@ -497,7 +505,7 @@ func demoCruzaAlMoor() bool {
 
 	// EL NIVEL QUE QUEDO: el nombre sale del `.ds1` que se compuso, no de una constante (decir "BloodMoor"
 	// cuando el archivo es `Wild1.ds1` seria otra fuente de verdad y una mentira en el log).
-	demoAcomodaElCruce("Afueras:"+nombreBaseDeLaRuta(ruta), float64(tamano.Width)/2, float64(tamano.Height)/2, t0)
+	demoAcomodaElCruce("Afueras:"+nombreBaseDeLaRuta(ruta), float64(tamano.Width)/2, float64(tamano.Height)/2, t0, true)
 
 	return true
 }
@@ -506,7 +514,12 @@ func demoCruzaAlMoor() bool {
 // entero (el camino de DC-002.140b/.144b) o una region del afuera compuesta con el plan del DRLG (DC-002.145):
 // el jugador y los bichos al nivel nuevo, la interfaz rearmada, el motor avisado del cambio de area y el cierre
 // del cruce con los numeros. `nombre` es el del nivel que quedo y `cx, cy` la casilla donde arranca el jugador.
-func demoAcomodaElCruce(nombre string, cx, cy float64, t0 int64) {
+//
+// `rearmarInterfaz` (DC-002.147) dice si el nivel que entra es OTRO nivel (el cruce del pueblo: el minimapa y el
+// HUD se rearman para el nivel que llega) o la region VECINA del mismo nivel (el cambio en caliente: la tabla y el
+// arte del minimapa son los mismos y el automapa es del nivel entero, asi que rearmarlos seria tirar las celdas
+// ya reveladas y pagar 1,3 s de recarga para volver a lo mismo).
+func demoAcomodaElCruce(nombre string, cx, cy float64, t0 int64, rearmarInterfaz bool) {
 	demoNivelActual = nombre
 
 	// ---- el jugador y los bichos, al nivel nuevo ----
@@ -523,12 +536,14 @@ func demoAcomodaElCruce(nombre string, cx, cy float64, t0 int64) {
 	// (`nivelDelPueblo`) y el HUD porque su unica carga es la del pueblo. Al cruzar se rearman los dos para el
 	// nivel que entro. Va DESPUES de mudar al jugador (el reveal y el marcador se calculan sobre SU celda nueva) y
 	// ANTES del cierre del cruce, para que los numeros queden en el log entre las lineas del cruce.
-	demoRearmaLaInterfaz()
+	if rearmarInterfaz {
+		demoRearmaLaInterfaz()
+	}
 
 	// EL MOTOR VE EL CAMBIO DE AREA: salir del campamento es, para la Den of Evil, entrar al exterior (el nivel
 	// del motor que la quest espera). Es el mismo evento de DC-002.128 (`EvAreaChanged`), disparado por el paso
-	// del jugador y no por un cuadro del guion.
-	if questKnob == "si" && questJuego != nil && demoAceptada {
+	// del jugador y no por un cuadro del guion. En un cambio de REGION el area no cambio: no se dispara.
+	if rearmarInterfaz && questKnob == "si" && questJuego != nil && demoAceptada {
 		questJuego.Dispatch(d2quest.Event{Kind: d2quest.EvAreaChanged,
 			OldLevel: nivelDelPuebloQuest, NewLevel: nivelDeLaCuevaQuest})
 
@@ -540,8 +555,11 @@ func demoAcomodaElCruce(nombre string, cx, cy float64, t0 int64) {
 
 	runtime.GC()
 
-	println("DEMO140: CRUZA OK nivel=", nombre, "tiles=", len(*motorDelMapa.Tiles()), "jugador=", cx, cy,
-		"ms=", int64(d2cMs())-t0, "libre=", d2cMontonLibre(), "semiespacio=", int(d2cGcUsado()),
+	rx, ry := regionDelLog()
+
+	println("DEMO140: CRUZA OK nivel=", nombre, "region=", rx, ry, "tiles=", len(*motorDelMapa.Tiles()),
+		"jugador=", cx, cy, "ms=", int64(d2cMs())-t0, "libre=", d2cMontonLibre(),
+		"libreAntes=", moorLibreAntes, "semiespacio=", int(d2cGcUsado()), "semiespacioAntes=", moorSemiAntes,
 		"vramLibre=", pvr.VramDisponible())
 }
 

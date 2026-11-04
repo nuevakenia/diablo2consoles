@@ -46,6 +46,9 @@ export DEMO_MOOR_SCRATCH="${DEMO_MOOR_SCRATCH:-si}"
 # DC-002.145: DEMO_MOOR_DRLG=si = el afuera es una REGION del Blood Moor DE VERDAD (el plan del DRLG) y no la
 # pieza de 17 x 17. Por omision "no": el binario de la demo sigue siendo el de DC-002.144b.
 export DEMO_MOOR_DRLG="${DEMO_MOOR_DRLG:-no}"
+# DC-002.147: DEMO_MOOR_STREAM=si = el afuera son las SEIS regiones del nivel y se CAMBIA DE REGION caminando,
+# en caliente y sin recompilar. Por omision "no": el binario es el de DC-002.145 (una region, sin borde).
+export DEMO_MOOR_STREAM="${DEMO_MOOR_STREAM:-no}"
 
 # ---- SIN GUIONES: todo lo que aprieta solo, apagado ----
 export MVP=no
@@ -90,7 +93,7 @@ export MEDIR_VIVO="${MEDIR_VIVO:-si}"
 export VERBOSO="${VERBOSO:-no}"
 
 echo "== DEMO DC-002.140: el build de la demo jugable (sin guion: el control es del jugador)"
-echo "   DEMO demo=$(echo si) moor=${DEMO_MOOR} jugadores=${JUGADORES} monstruos=${MONSTRUOS} vista=${VISTA_X},${VISTA_Y}"
+echo "   DEMO demo=$(echo si) moor=${DEMO_MOOR} drlg=${DEMO_MOOR_DRLG} stream=${DEMO_MOOR_STREAM} jugadores=${JUGADORES} monstruos=${MONSTRUOS} vista=${VISTA_X},${VISTA_Y}"
 echo "   DEMO guiones: mvp=no fase=apagado guionPoc=nada inyectarP1=0 golpeAuto=no hablarAuto=no recogerAuto=no"
 echo "   DEMO instrumentos: medirCuadro=${MEDIR_CUADRO} medirVivo=${MEDIR_VIVO} verboso=${VERBOSO}"
 

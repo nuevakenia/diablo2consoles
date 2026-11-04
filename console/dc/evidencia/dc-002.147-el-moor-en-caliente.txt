@@ -1,0 +1,235 @@
+DC-002.147 -- EL BLOOD MOOR POR REGIONES QUE SE CAMBIAN EN CALIENTE (SIN VOLVER A COMPILAR)
+
+QUE FALTABA. DC-002.145 dejo UNA region del Blood Moor de verdad en la consola (32 x 32 desde 24,32, 1.024
+casillas, arena de bloques de 1.534.112 B, 10 fps). El plan de la region viajaba en el binario como dato, pero
+estaba cableado: para ver la region vecina habia que regenerar el `.go` del plan y RECOMPILAR. Esta tarjeta hace
+que el cambio de region sea lo que el motor ya sabia hacer: soltar lo de la region que se deja, volver a llamar
+`ResetMapParaTilesExactos` con las claves de la vecina y reescribir sus casillas con `SetExactTiles`.
+
+LA CORRIDA QUE CIERRA LA TARJETA (Flycast, build `demo147`, una sola corrida):
+
+  DEMO140: CRUZA OK nivel= BloodMoor:region region= 24 32 tiles= 1024 jugador= 16.5 16.5 ms= 26112
+           libre= 1481128 libreAntes= 3054976 semiespacio= 1615200 semiespacioAntes= 1246160
+  DEMO140: REGION CAMBIO n= 1 de= 24 32 a= 24 64 jugadorEnElNivel= 45.694 64.0821 cuadro= 114
+           libreAntes= 1481128 semiespacioAntes= 1719392 vramLibre= 378248
+  DEMO140: REGION CAMBIO soltado cache= 3133440 libre= 3054016 semiespacio= 1427920 vramLibre= 3511976
+  DEMO140: CRUZA OK nivel= BloodMoor:region region= 24 64 tiles= 1024 jugador= 21.694 0.0821232 ms= 27038
+           libre= 1218968 libreAntes= 3054016 semiespacio= 1667904 semiespacioAntes= 1427920
+
+O sea: DOS regiones del Blood Moor en la misma corrida, la segunda compuesta EN CALIENTE porque el jugador
+camino hasta salirse de la caja de la primera (cuadro 114: celda del nivel 45,694 / 64,082, justo el borde sur).
+Las dos con 1.024 de 1.024 casillas con piso, `fallas= 0` y 10-11 fps.
+
+----------------------------------------------------------------------------------------------------------
+1. LO MEDIDO EN EL HOST ANTES DE TOCAR LA CONSOLA (la rejilla que cubre el nivel)
+
+Herramienta: `console/dc/medidas/moor-drlg` (el DRLG del acto 1 sobre los MPQ reales). Modo nuevo
+`-plan-regiones`, que arma la rejilla SIN SOLAPARSE: se avanza de a `-lado` y el ULTIMO origen de cada eje se pega
+al borde, asi que con 32 sobre 56 de ancho los origenes son 0 y 24 y la primera columna queda de 24 (0..23). El
+alto son 96 = 32 + 32 + 32. Seis regiones, y la cuarta es EXACTAMENTE la de DC-002.145 (32 x 32 desde 24,32).
+
+  NIVEL id=2 "Act 1 - Wilderness 1"  mundo rect=1064,1096  56 x 96 = 5.376 casillas
+        conPiso=5058 registros=6291 (piso/pared/sombra 5062/1064/165)
+        dt1s=11 crudo=5.912.240 mayorCrudo=1.141.544 (act1/outdoors/cottages.dt1)
+        arenaDeBloques=3.047.626 claves=350
+
+  REGION-TABLA (los dos pedidos grandes de cada region contra 2.994.912 B libres en el cruce)
+
+    region      casillas  registros   arena de bloques   buffer de lectura   total       sobra     entra
+    x=0  y=0    24 x 32     640          1.638.215          1.051.532       2.689.747   305.165     si
+    x=24 y=0    32 x 32   1.024          1.853.780          1.051.532       2.905.312    89.600     si
+    x=0  y=32   24 x 32     704          1.780.638          1.141.544       2.922.182    72.730     si   <- el buffer mas caro (cottages)
+    x=24 y=32   32 x 32   1.024          1.534.112          1.051.532       2.585.644   409.268     si   <- la de DC-002.145
+    x=0  y=64   24 x 32     640          1.096.653          1.051.532       2.148.185   846.727     si
+    x=24 y=64   32 x 32   1.024          1.893.741          1.051.532       2.945.273    49.639     si   <- la mas cara
+
+  Las seis ENTRAN, pero tres por poco: la vecina del sur entra con 49.639 B de sobra. Ese es el numero que
+  ordena el orden de las cosas: de a UNA region por vez (dos regiones residentes pedirian ~4,4 MB y no hay).
+
+  Y la consola COINCIDE con el host al byte en las dos que se compusieron:
+    region 24,32   host arena 1.534.112 / buffer 1.051.532   ->  consola arena 1.534.112 / buffer 1.051.532
+    region 24,64   host arena 1.893.741 / buffer 1.051.532   ->  consola arena 1.893.741 / buffer 1.051.532
+
+----------------------------------------------------------------------------------------------------------
+2. LA DECISION DE LA TARJETA (3): EL PLAN VA EMBEBIDO, Y EN FORMA PLANA
+
+Antes de decidir, la forma del dato. DC-002.145 emitia el plan como `[]moorCelda` con TRES REBANADAS por casilla.
+Medido en el `main.o` de ese build (`nm -S`): un solo bloque `_go..C` de 45.056 B de `.data` para UNA region de
+1.024 casillas, y `.data` va al `1ST_READ.BIN`, que se carga ENTERO en la RAM de la consola.
+
+Esta tarjeta emite el MISMO plan en forma plana: `Celdas` es un `[]uint16` con 8 valores por casilla (x, y y las
+tres capas como (offset, largo) sobre `Tiles`) y `Tiles` es un `[]uint16` con 3 por registro (pieza, indice,
+flags). Las dos listas son DATO: ni una rebanada adentro, ni una reserva al arrancar.
+
+  regia del nivel entero en forma plana:   118.630 B   (5.056 casillas con algo + 6.289 registros)
+  la misma cosa en la forma de DC-002.145: ~222.000 B  (45.056 B x 5.056/1.024, extrapolado del `main.o`)
+  lo que crecio el binario de verdad:      +68.352 B   (1ST_READ.BIN 5.839.624 -> 5.907.976)
+
+Por que EMBEBIDO y no VMU ni disco:
+  - el peso, contra lo que hay: 118.630 B son el 2 % del binario (5,9 MB) y el 0,74 % de los 16 MB de la
+    consola; despues de componer la region mas cara quedan 1.218.968 B libres, o sea que el plan entero entra
+    diez veces en lo que sobra;
+  - no hay donde leerlo: el POC no tiene sistema de archivos propio (lo que no esta en el MPQ o en el binario no
+    existe) y la VMU no esta cableada; leer 118 KB de la VMU seria, ademas, la unica pieza del mapa que depende
+    de un guardado;
+  - lo que NO entra no es el plan, es el ARENA DE BLOQUES (3,0 MB para el nivel entero): el streaming es de
+    bloques de tiles, no de datos de plano. Por eso el nivel entero de datos va adentro y lo que se cambia es la
+    region compuesta.
+
+----------------------------------------------------------------------------------------------------------
+3. COMO SE DISPARA EL CAMBIO (y que se suelta)
+
+ 1. Cada cuadro, DESPUES del movimiento y ANTES de la camara (`pasoDeLaDemo` -> 4b), `demoMiraElBordeDeLaRegion`
+    compara la celda del jugador con la caja de la region compuesta. Mientras este adentro no pasa nada.
+ 2. Si se salio, la celda del NIVEL (region + celda local) dice cual es la region destino: la rejilla no se
+    solapa, asi que la respuesta es UNA (`moorRegionQueContiene`).
+ 3. `demoCambiaDeRegion` suelta lo de la region que se deja en el orden de DC-002.109/DC-002.120: cache de tiles
+    del renderer (`SoltarLaCacheDelNivel`), arena de bloques (`ReiniciarArenaDeTiles`) y casillas del motor
+    (`SoltarLasCasillasDelNivelAnterior`), y recien despues compone.
+ 4. `demoComponeRegion` es la MISMA funcion que usa el cruce del pueblo: `ResetMapParaTilesExactos` con las claves
+    y el buffer de la region nueva y `SetExactTiles` casilla por casilla.
+ 5. El jugador NO salta: su celda del NIVEL se relee contra el origen de la region nueva (45,694 -> 21,694 en x;
+    64,082 -> 0,082 en y). La camara del cuadro siguiente ya lo dibuja en el terreno nuevo.
+ 6. En el borde del NIVEL (no hay region mas alla) se recorta la celda y se avisa una vez: no es un cambio.
+
+La interfaz no se rearma en un cambio de region (misma tabla, mismo arte, mismo nivel): lo que se toca es el
+automapa, que ahora se indexa en coordenadas DEL NIVEL (`fuenteDelAutomapa` + `enCoordenadasDelNivel`). Sin eso
+las seis regiones se dibujarian una encima de la otra, porque todas empiezan en la celda 0,0 de su mapa.
+
+----------------------------------------------------------------------------------------------------------
+4. LA CORRIDA (build y log)
+
+  build:  DEMO=si DEMO_MOOR=si DEMO_MOOR_DRLG=si DEMO_MOOR_STREAM=si MONSTRUOS=2 MEDIR_CUADRO=no MEDIR_VIVO=no \
+          bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo147f
+  corrida: GUION='nada 8 abajo+izquierda 90 nada 40' SEGUNDOS=145 INTERVALO=10 \
+          bash scripts/console/run-demo-140.sh /tmp/dcbuild/demo147f/disc.gdi /tmp/capturas-147f
+  emulador: Flycast, ventana 640x480. Log completo: `dc-002.147-el-moor-en-caliente-flycast.log` (esta corrida).
+  El `1ST_READ.BIN` de este build son 5.907.976 B (el de DC-002.145 eran 5.839.624: el nivel entero en forma plana
+  costo 68.352 B).
+
+  El guion camina `abajo+izquierda`, que en la proyeccion del juego es +y puro (sur del nivel): el jugador cruza
+  el borde del campamento a los ~3 s de caminar, la consola compone la region 24,32 (26 s), y lo que queda del
+  tramo lo lleva 16 casillas al sur hasta el borde de la region (cuadro 114).
+
+  ANTES / DESPUES, region por region (los dos pedidos grandes y lo que queda)
+
+    region 24,32   buffer 1.051.532 (prestado, devuelto: bufferSoltado= 1.051.532)
+                   arena   1.534.112 en 3 tramos (capacidad 1.572.864)
+                   libre   3.054.976 -> 1.482.088   semiespacio 1.246.160 -> 1.607.384
+                   composicion 24.334 ms   cruce completo 26.112 ms   fps 10-11 (93-98 ms/cuadro)
+    region 24,64   soltado de la anterior: cache 3.133.440 (VRAM) + arena + casillas -> libre 3.054.016
+                   buffer 1.051.532 (devuelto)   arena 1.893.741 en 5 tramos (capacidad 1.966.080)
+                   libre   3.054.016 -> 1.218.968   semiespacio 1.427.920 -> 1.695.352
+                   composicion 26.898 ms   cruce completo 27.038 ms   fps 10-11 (97 ms/cuadro)
+
+  LAS DOS REGIONES COMPUESTAS por el mismo camino, con el antes/despues en la misma linea:
+    DEMO140: REGION COMPUESTA region= 24 32 casillas= 1024 conPiso= 1024 sinNada= 0 fallas= 0 tiles= 1024
+             ms= 24334 libre= 1482088 semiespacio= 1607384 vramLibre= 3511976
+    DEMO140: REGION COMPUESTA region= 24 64 casillas= 1024 conPiso= 1024 sinNada= 0 fallas= 0 tiles= 1024
+             ms= 26898 libre= 1218968 semiespacio= 1695352 vramLibre= 3511976
+
+  EL MUNDO SIGUE CORRIENDO: en la corrida del criterio (guion corto, el jugador frena en el borde) fueron 780
+  cuadros, con los informes de 30 cuadros dando 10-11 fps en las DOS regiones (`msPorCuadro` 93-98). El unico
+  cuadro largo es el que contiene la composicion (1.021 ms medidos en el informe que la incluye): el cambio se paga
+  UNA vez, ~27 s, que es lo que tarda componer una region que entra por RAM (el mismo numero que el cruce de
+  DC-002.145).
+
+  LOS TRAMOS DEL ARENA, CON LA SONDA DEL MONTON TRABAJANDO: al componer la region 24,64 el monton no pudo dar
+  512 KB y la sonda bajo a 262 KB y despues a 131 KB (`Out of memory. Requested sbrk_base ... diff 524288` /
+  `diff 262144` en el log del emulador, y el arena termino en 5 tramos). No es un fallo: es el mismo camino de
+  DC-002.111 y el arena copio los 1.893.741 B que el host habia medido, con 1.218.968 B todavia libres.
+
+  LA MISMA CORRIDA SE REPITIO (segunda corrida, otro guion mas largo) y los numeros de la primera region salieron
+  IDENTICOS al cuadro: mismo `ms= 24334`, mismo `ms= 26112` de cruce, misma celda de disparo (cuadro 114, celda
+  del nivel 45,694 / 64,082). O sea que el camino no depende del reloj ni del layout: el plan es determinista y el
+  disparo es geometrico.
+
+  Y CON EL GUION LARGO (el de esta corrida, 145 s) EL JUGADOR SIGUIO CAMINANDO DENTRO DE LA REGION NUEVA hasta
+  27,58 / 17,76 locales, y ahi SI se ve el costo que el cambio NO paga: el automapa crece a 2.485 celdas en el
+  modelo y 1.955 dibujadas en la caja del minimapa, y el cuadro se va a 141-159 ms (6-7 fps) con el minimapa
+  costando 23 ms (28 % del cuadro, `MINIMAPA COSTO`). Con el automapa chico (recien cruzado) son los 10-11 fps del
+  criterio: la diferencia es el dibujo del minimapa, no el terreno de la region nueva.
+
+----------------------------------------------------------------------------------------------------------
+5. LO QUE SE VE
+
+  `dc-002.147-region-24-32.png`   la primera region: el terreno del Blood Moor llenando la ventana, el heroe en
+                                  16,5 / 16,5, la franja "BLOOD MOOR" y el minimapa con las celdas del nivel.
+  `dc-002.147-region-24-64.png`   la MISMA corrida despues del cambio: el jugador ya metido en la region nueva,
+                                  el terreno de la region 24,64 y el minimapa con las celdas de las DOS regiones
+                                  (el modelo del automapa acumula: 1.397 -> 1.451 celdas al cruzar, y llega a
+                                  2.485 caminando, sin repetir ninguna). OJO: en esta captura el dibujo del
+                                  minimapa sale CORRIDO por el origen de la region -- es el defecto 6.5, medido y
+                                  declarado, no un efecto del cambio de region.
+                                  Esta captura es de ESTA corrida (la del guion largo), con el jugador ya 18
+                                  casillas adentro de la region nueva y el automapa lleno (2.485 celdas).
+
+----------------------------------------------------------------------------------------------------------
+6. LO QUE QUEDA DECLARADO (medido, no arreglado en esta tarjeta)
+
+  6.1 LA COSTURA. Se compone UNA region por vez (dos no entran: ~4,4 MB contra 3,0 libres), asi que caminando
+      pegado al borde se ve el corte: la ventana son ~20 x 15 casillas y la region mide 24-32. Arreglarlo es la
+      tarjeta siguiente: dos regiones residentes con el arena compartido, o regiones mas chicas con una vecina
+      de respaldo en la VRAM (que tiene 3,5 MB libres).
+  6.2 EL BORDE DEL NIVEL. Fuera de las seis regiones no hay plan: la celda se recorta al borde de la region y se
+      avisa UNA vez (`REGION BORDE DEL NIVEL`). En la corrida del criterio no se llego; es el camino que se
+      ejercita caminando hasta el final del nivel.
+  6.3 EL AUTOMAPA ES DEL NIVEL ENTERO, no de una region: eso es lo correcto (el juego guarda el automapa del
+      nivel) pero hoy se revela por la siembra de la region y por lo que el jugador camina, asi que la parte no
+      visitada queda en negro. `MINIMAPA_SIEMBRA=si` (el defecto) es el que llena la region recien compuesta.
+  6.4 EL TIEMPO DEL CAMBIO ES EL MISMO QUE EL DEL CRUCE: ~27 s por region. No es la generacion (el plan viene
+      del host): es la COPIA de los bloques al arena (1,5-1,9 MB) y la composicion de las 1.024 casillas en la
+      SH-4 a 10 fps. La tarjeta siguiente puede bajarlo componiendo por CUARTOS de 8 x 8 (lo que hace el DRLG).
+  6.5 EL DIBUJO DEL MINIMAPA QUEDA CORRIDO POR EL ORIGEN DE LA REGION, y no es un olvido: es lo que hay que
+      arreglar y no se pudo dejar puesto. El modelo del automapa YA se indexa en coordenadas del nivel (si no, las
+      seis regiones se dibujarian una encima de la otra), pero la CAJA se sigue centrando en la celda LOCAL del
+      heroe. Con la region 24,32 (el origen 24,32 es grande) eso corre el dibujo justo el origen, y las celdas se
+      ven pegadas al borde de la caja en vez de alrededor del heroe -- se ve en la captura de la region 24,64.
+      El corrimiento son dos lineas (`hx, hy = enCoordenadasDelNivel(hx, hy)` en `dibujarElMinimapa`) y se probo:
+
+        build con el corrimiento (`demo147b`, +32 B de codigo, 5.908.008 B):
+          corrida 1  muere a los pocos cuadros de componer la 24,64 (cuadro 121)
+          corrida 2  muere despues de la 24,64 con el jugador en 24,2 / 7,8 (cuadro ~151, 02:44 de corrida)
+          corrida 3  muere antes del primer cuadro (arranque)
+          sintoma: `Fatal: SH4 branch instruction in delay slot` (Flycast), siempre despues de una recoleccion
+          (`ARQ-MARCA gc_collect`) y sin mensaje del runtime de Go
+        build sin el corrimiento (`demo147`, 5.907.976 B):
+          tres corridas, tres veces las dos regiones y la corrida entera (780 cuadros), cero muertes
+
+      O sea: 32 B de codigo deciden si el binario vive, y el fallo se mueve de sitio entre corridas del MISMO
+      binario -- es el defecto de layout/recolector que ya se declaro en DC-002.146 (alli el panic del rearme se
+      movia con tres `println`), no la logica del dibujo (que no puede matar el arranque). Por eso el corrimiento
+      NO quedo en el codigo: se dejo el comentario en `dibujarElMinimapa` con esta medicion y la tarjeta abierta.
+      Arreglar el dibujo destapa el defecto de fondo: primero hay que cerrar ese.
+
+----------------------------------------------------------------------------------------------------------
+7. COMO SE REPITE
+
+  go build -o /tmp/moor-drlg ./console/dc/medidas/moor-drlg
+  /tmp/moor-drlg -seed 1 -lado 32 "<carpeta de Diablo II>"                    # la tabla de las seis regiones
+  /tmp/moor-drlg -seed 1 -lado 32 -plan-regiones \
+      console/dc/poc/juego-131/moor_regiones_147.go "<carpeta>"               # el plan del nivel entero (dato)
+  DEMO_MOOR=si DEMO_MOOR_DRLG=si DEMO_MOOR_STREAM=si \
+      bash scripts/console/build-demo-140.sh /tmp/dcbuild/demo147
+  GUION='nada 8 abajo+izquierda 45 nada 70' SEGUNDOS=135 \
+      bash scripts/console/run-demo-140.sh /tmp/dcbuild/demo147/disc.gdi /tmp/capturas
+
+----------------------------------------------------------------------------------------------------------
+APENDICE -- la salida del host, tal cual (el nivel, los cuartos y la tabla de las seis regiones)
+
+  NIVEL id=2 nombre="Act 1 - Wilderness 1" drlgType=3 levelType=2 levels.txt=80x80
+  PARAMS mundo rect=1064,1096 56x96 casillas=5376 odFlags=0x0 baseSeed=0x6ac6935f vecinos=2
+  PARAMS pueblo=1120,1144 56x40
+  GENERADO rejilla=7x12 cuartos=79 casillas=56x96
+  CUARTOS llanos=31 presets=48 piezasDistintas=24
+  NIVEL casillas=5058 conPiso=5058 sinPiso=0 registros=6291 piso/pared/sombra=5062/1064/165 rango=x 0..56 y 0..95
+  NIVEL dt1s=11 crudo=5912240 mayorCrudo=1141544 (act1/outdoors/cottages.dt1) bloquesRef=2898362 arenaDeBloques=3047626 claves=350
+  LIBRE presupuesto=2994912 B (los que quedan libres en el cruce de la consola)
+  REGIONES rejilla=32 regiones=6 (sin solaparse; las del borde quedan mas angostas)
+  REGION-TABLA x=0 y=0 24x32 casillas=640 registros=804 arena=1638215 buffer=1051532 (act1/outdoors/swamp.dt1) total=2689747 sobra=305165 entra=si
+  REGION-TABLA x=24 y=0 32x32 casillas=1024 registros=1335 arena=1853780 buffer=1051532 (act1/outdoors/swamp.dt1) total=2905312 sobra=89600 entra=si
+  REGION-TABLA x=0 y=32 24x32 casillas=704 registros=892 arena=1780638 buffer=1141544 (act1/outdoors/cottages.dt1) total=2922182 sobra=72730 entra=si
+  REGION-TABLA x=24 y=32 32x32 casillas=1024 registros=1264 arena=1534112 buffer=1051532 (act1/outdoors/swamp.dt1) total=2585644 sobra=409268 entra=si
+  REGION-TABLA x=0 y=64 24x32 casillas=640 registros=788 arena=1096653 buffer=1051532 (act1/outdoors/swamp.dt1) total=2148185 sobra=846727 entra=si
+  REGION-TABLA x=24 y=64 32x32 casillas=1024 registros=1206 arena=1893741 buffer=1051532 (act1/outdoors/swamp.dt1) total=2945273 sobra=49639 entra=si
+  REGIONES archivo=console/dc/poc/juego-131/moor_regiones_147.go regiones=6 casillas=5056 registros=6289 datos=118630 B (forma plana, sin rebanadas)

@@ -983,4 +983,12 @@ var (
 	// Correr el DRLG adentro de la SH-4 pediria mas RAM que el nivel (tablas, patrones de `.ds1` y los registros
 	// de `BuildTiles`), asi que la consola COMPONE lo que el host GENERO. Solo actua con `demoMoor = "si"`.
 	demoMoorDRLG = "no"
+
+	// demoMoorStream (DC-002.147): EL MUNDO CAMBIA DE REGION SIN RECOMPILAR. Con "si", el afuera son las SEIS
+	// regiones que cubren el nivel (`moor_regiones_147.go`, generadas por `moor-drlg -plan-regiones`), la demo
+	// arranca en la de DC-002.145 (32 x 32 desde 24,32) y cada cuadro mira si el jugador se salio de esa caja: si
+	// se salio, compone la region que contiene su celda del nivel, con lo del anterior soltado antes. Con "no"
+	// (el defecto) el camino es el de DC-002.145: una sola region, sin borde, y el binario no cambia de conducta.
+	// Solo actua con `demoMoor = "si"` y `demoMoorDRLG = "si"`.
+	demoMoorStream = "no"
 )

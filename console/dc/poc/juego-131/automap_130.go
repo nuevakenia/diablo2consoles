@@ -813,7 +813,11 @@ func sembrandoElAutomapa() bool {
 // ella. Devuelve las celdas agregadas y cuantas vinieron de la siembra.
 func (m *minimapaDelJuego) revelarConElModelo(hx, hy float64, area d2automap.Area) (int, int) {
 	semilla := semillaDelAutomap(m.Nivel)
-	fuente := fuenteDelMotor{}
+
+	// DC-002.147: la fuente y la celda van en coordenadas del NIVEL cuando la region esta puesta (`fuenteDelAutomapa`
+	// y `enCoordenadasDelNivel` en `moor_147.go`); sin region son las del motor, bit a bit como antes.
+	fuente := fuenteDelAutomapa{}
+	hx, hy = enCoordenadasDelNivel(hx, hy)
 
 	var agregadas, sembradas int
 
@@ -834,11 +838,18 @@ func (m *minimapaDelJuego) revelarConElModelo(hx, hy float64, area d2automap.Are
 func (m *minimapaDelJuego) coberturaDelModelo() (conCelda, de int) {
 	w, h := fuenteDelMotor{}.Size()
 
+	// DC-002.147: las celdas del modelo son del NIVEL, asi que la casilla local del motor se corre al origen de la
+	// region (con el pueblo el origen es 0 y la cuenta es la de siempre).
+	ox, oy := 0, 0
+	if moorRegionActual != nil {
+		ox, oy = moorRegionActual.X, moorRegionActual.Y
+	}
+
 	for ty := 0; ty < h; ty++ {
 		for tx := 0; tx < w; tx++ {
 			de++
 
-			if m.Modelo.HasAt(d2automap.TileCell(tx, ty)) {
+			if m.Modelo.HasAt(d2automap.TileCell(tx+ox, ty+oy)) {
 				conCelda++
 			}
 		}
@@ -1231,6 +1242,15 @@ func (m *minimapaDelJuego) dibujarElMinimapa(sup *pvr.Surface, jugador, anchoLie
 		return 0, 0
 	}
 
+	// DC-002.147 -- ACA FALTA UN CORRIMIENTO, Y ES A PROPOSITO. Las celdas del modelo ya van en coordenadas del
+	// NIVEL (`enCoordenadasDelNivel` en el reveal), asi que la caja deberia centrarse en la celda del heroe TAMBIEN
+	// en coordenadas del nivel; sin eso, en una region que no arranca en 0,0 el dibujo sale corrido por el origen
+	// (medido: con la region 24,64 el `crc32` de la caja cambia y las celdas se ven en el borde). Se probo el
+	// corrimiento (`hx, hy = enCoordenadasDelNivel(hx, hy)` aca) y el binario crece 32 B y DESPUES muere 3 de 3
+	// con `Fatal: SH4 branch instruction in delay slot` (dos veces a los pocos cuadros de componer la segunda
+	// region, una al arrancar): es el mismo defecto de layout/runtime que se declaro en DC-002.146, y arreglar el
+	// dibujo lo destapa. Queda declarado en la tarjeta de DC-002.147 (y en su evidencia, 6.5) con los numeros del
+	// A/B; el corrimiento se pone cuando esa causa este cerrada.
 	hx, hy := celdaDelJugadorDe(jugador)
 	cx, cy := d2automap.WorldCell(hx, hy)
 

@@ -49,6 +49,7 @@ func main() {
 	oy := flag.Int("oy", -1, "origen y de la region (-1 = todas las regiones)")
 	diff := flag.Int("diff", 0, "dificultad (0 normal, 1 nightmare, 2 hell)")
 	rutaPlan := flag.String("plan", "", "escribe el plan de la region como fuente Go en esta ruta")
+	rutaRegiones := flag.String("plan-regiones", "", "escribe TODAS las regiones de la rejilla `-lado` como fuente Go plana en esta ruta")
 	flag.Parse()
 
 	dir := flag.Arg(0)
@@ -185,11 +186,57 @@ func main() {
 
 	fmt.Printf("=== LAS REGIONES DE %dx%d ===\n", *lado, *lado)
 
-	for fy := 0; fy+*lado <= alto; fy += *lado {
-		for fx := 0; fx+*lado <= ancho; fx += *lado {
-			medir(tiles, *lado, fx, fy, leer).imprimir(fmt.Sprintf("REGION %d,%d", fx, fy))
-		}
+	regiones := regionesDeLaRejilla(ancho, alto, *lado)
+	libre := 2994912 // los B libres medidos en el cruce (DC-002.144/.145), el presupuesto de la consola
+
+	fmt.Printf("LIBRE presupuesto=%d B (los que quedan libres en el cruce de la consola)\n", libre)
+	fmt.Printf("REGIONES rejilla=%d regiones=%d (sin solaparse; las del borde quedan mas angostas)\n", *lado, len(regiones))
+
+	planes := make([]*plan, 0, len(regiones))
+
+	for _, r := range regiones {
+		m := medirRect(tiles, r[2], r[3], r[0], r[1], leer)
+		total := m.arena + m.mayorCrudo
+
+		fmt.Printf("REGION-TABLA x=%d y=%d %dx%d casillas=%d registros=%d arena=%d buffer=%d (%s) total=%d sobra=%d entra=%s\n",
+			r[0], r[1], r[2], r[3], m.casillas, m.registros, m.arena, m.mayorCrudo, m.mayorNombre, total,
+			libre-total, siNo(total <= libre))
+
+		pl := planificarRect(tiles, r[2], r[3], r[0], r[1], uint32(*seed), leer)
+		pl.anchoNivel, pl.altoNivel = ancho, alto
+		pl.lado = *lado // el lado de la REJILLA (no el ancho de la region): va en el comentario de "regenerar"
+
+		planes = append(planes, pl)
 	}
+
+	if *rutaRegiones != "" {
+		if err := emitirRegiones(planes, *rutaRegiones); err != nil {
+			fmt.Println("no pude escribir las regiones:", err)
+			os.Exit(1)
+		}
+
+		var casillas, registros, planos int
+
+		for _, pl := range planes {
+			casillas += len(pl.celdas)
+			registros += pl.registros
+			planos += len(pl.celdas)*8*2 + pl.registros*3*2 // las dos listas `[]uint16` de la region
+		}
+
+		fmt.Printf("REGIONES archivo=%s regiones=%d casillas=%d registros=%d datos=%d B (forma plana, sin rebanadas)\n",
+			*rutaRegiones, len(planes), casillas, registros, planos)
+
+		return
+	}
+}
+
+// siNo: "si" o "no", para que la tabla se lea de un golpe.
+func siNo(v bool) string {
+	if v {
+		return "si"
+	}
+
+	return "no"
 }
 
 // abrirMPQs: el lector de los dos MPQ del juego (el parche tiene las tablas, d2data los .ds1 y los .dt1).
@@ -299,14 +346,21 @@ type medido struct {
 // medir: cuenta los registros que caen en el rectangulo [ox,ox+lado) x [oy,oy+lado) (lado == 0 = todo el
 // nivel), y despues calcula los bloques y el arena como los calcula la consola (por clave).
 func medir(tiles []*drlgoutdoor.RoomTiles, lado, ox, oy int, leer func(string) ([]byte, error)) *medido {
+	return medirRect(tiles, lado, lado, ox, oy, leer)
+}
+
+// medirRect: lo mismo para una region que no es cuadrada (la rejilla de DC-002.147 deja la primera columna de 24
+// en un nivel de 56). Con `ancho` y `alto` en 0 se mide el nivel entero.
+func medirRect(tiles []*drlgoutdoor.RoomTiles, ancho, alto, ox, oy int, leer func(string) ([]byte, error)) *medido {
 	m := &medido{porArchivo: map[string]int{}}
+	entero := ancho == 0 || alto == 0
 
 	dentro := func(x, y int) bool {
-		if lado == 0 {
+		if entero {
 			return true
 		}
 
-		return x-origenX >= ox && y-origenY >= oy && x-origenX < ox+lado && y-origenY < oy+lado
+		return x-origenX >= ox && y-origenY >= oy && x-origenX < ox+ancho && y-origenY < oy+alto
 	}
 
 	type ref struct {
@@ -387,8 +441,8 @@ func medir(tiles []*drlgoutdoor.RoomTiles, lado, ox, oy int, leer func(string) (
 		}
 	}
 
-	if lado > 0 {
-		m.sinPiso = lado*lado - m.casillas
+	if !entero {
+		m.sinPiso = ancho*alto - m.casillas
 	}
 
 	porArchivoRefs := map[string]map[int]bool{}
