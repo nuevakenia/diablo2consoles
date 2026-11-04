@@ -151,7 +151,29 @@ VRAM ≤ 8 MB · cuadro ≤ 33 ms. Lo que no entre, se recorta antes de escribir
 
 ---
 
-## 6. Las tres cosas que necesito de Papu (y no más)
+## 6. Las tres decisiones que Papu tomó (2026-11-04, 13:30)
+
+1. **Prioridad: PULIDO Y FIDELIDAD.** Que el pueblo se sienta como Diablo II — animaciones, combate, UI, feel —
+   antes que contenido o cooperativo. Los 5 actos y el cooperativo quedan para después del pueblo.
+2. **Control: CRUCETA con 8 direcciones**, como el POC (el personaje rota y avanza de frente; nada de mouse).
+   Eso fija el contrato de `d2interface.InputManager`: sintetizar mouse desde la cruceta, o adaptar
+   `GameControls` para que la cruceta sea el mando primario.
+3. **Validación: el GATE 0.** Cuando el motor pinte un cuadro real del pueblo en la consola, una mirada suya de
+   diez segundos. Nada más se le pide hasta entonces.
+
+Con esas tres, el camino queda cerrado: Gate 0 → Gate 1 (datos del pueblo) → Gate 2 (superficies) → Gate 3 (un
+solo directorio) → Gate 4 (cruceta) → y recién ahí, pulir el pueblo hasta que se sienta D2.
+
+### Hallazgo operativo del día
+
+`/tmp` llegó al **92 % (29 GB de 32)**: los árboles de build de las tarjetas viejas (`/tmp/dc133`, `/tmp/dc135`,
+`/tmp/dcl147`, `/tmp/rev135b`, …) sumaban 19 GB. Eso explica builds que fallaban sin razón y lentitud general.
+Se borraron: `/tmp` quedó en **9,9 GB (32 %)**, 22 GB libres. **Regla nueva: cada corrida borra su árbol al
+cerrar.**
+
+---
+
+## 7. Las tres cosas que necesito de Papu (y no más)
 
 1. **El Gate 0 y su captura**: cuando el motor pinte el pueblo en la consola, una mirada suya de 10 segundos
    dice si el camino va bien.
