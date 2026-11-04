@@ -44,6 +44,7 @@ import (
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2app/d2setup"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2display"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2animdata"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset/types"
@@ -338,6 +339,26 @@ func (a *App) cargarLasTablas() error {
 	animDataBytes, err := a.asset.LoadFile(d2resource.AnimationData)
 	if err != nil {
 		return err
+	}
+
+	// DC-002.159: con el heroe, el animdata se carga SOLO con las claves del personaje. El archivo entero
+	// son 2.569 registros que en el host ocupan 2,17 MB de mapas de eventos; el semiespacio del recolector
+	// de la consola son 2.097.152 B. El heroe del Gate 0 consulta ~60 claves (`AM*`: los modos de la
+	// amazona) y nada mas: se recorren los 411.104 B igual, y se guardan solo esas.
+	if a.gate0 != nil && a.gate0.Heroe {
+		prefijos := d2animdata.PrefijosDeUnPersonaje(d2enum.HeroAmazon.GetToken())
+
+		animData, dentro, fuera, err := d2animdata.LoadSelectivo(animDataBytes, prefijos)
+		if err != nil {
+			a.Errorf("no pude leer la animacion del heroe: %v", err)
+
+			return nil
+		}
+
+		a.Infof("animdata del heroe: %d registros (de %d; prefijos=%v)", dentro, dentro+fuera, prefijos)
+		a.asset.Records.Animation.Data = animData
+
+		return nil
 	}
 
 	animData, err := d2animdata.Load(animDataBytes)

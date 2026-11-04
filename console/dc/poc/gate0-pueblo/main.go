@@ -38,6 +38,8 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/maple"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"
 	ebiten "github.com/hajimehoshi/ebiten/v2"
@@ -87,6 +89,13 @@ func d2cRelojUs() uint
 func init() { d2cSerialInit() }
 
 const (
+	// heroeEnElPueblo (DC-002.159): la palanca del heroe en este POC. Queda APAGADA porque el heroe NO ENTRA en
+	// la memoria de la consola con el pueblo compuesto: su compuesto deja ~436.000 B vivos en el semiespacio del
+	// recolector y el pueblo ya deja 1.268.000 B de 1.835.008 B, asi que el recolector muere con
+	// `GC to-space overflow` (medido, ver console/dc/evidencia/dc-002.159-el-heroe-en-la-consola.md). Con la
+	// palanca apagada el binario es el del Gate 0 de DC-002.157 mas el codigo del heroe sin usar.
+	heroeEnElPueblo = false
+
 	// el cuadro que COMPONE el renderer: 640x480 (el de la consola; d2display no baja de 800x600 y ese es el
 	// tamano de la superficie del motor, pero la cache y la camara se calculan sobre este)
 	cuadroAncho = 640
@@ -176,6 +185,26 @@ func main() {
 
 	println(frase, "cronometroDeLosTiles=", d2maprenderer.CronometroDeLosTilesPrendido())
 
+	// ============================== 1b. LA CRUCETA (DC-002.159) ==============================
+	// El servicio de entrada de la consola: `d2core/d2input/maple` lee el bus maple y traduce los botones a
+	// lo que el motor pregunta (la cruceta son KeyUp/KeyDown/KeyLeft/KeyRight, y el cursor para los menus).
+	// El refresco va por un callback porque el que puede llamar al bus es este main (es el unico archivo del
+	// binario que lleva el //extern), y la pantalla lo llama al principio de cada cuadro, antes de preguntar
+	// las teclas.
+	// DC-002.159: las capas del heroe que entran en la consola. Medido: cada capa del compuesto son ~89 KB
+	// VIVOS en el semiespacio del recolector (16 direcciones del modo Neutral) y el pueblo compuesto ya deja
+	// 1,27 MB de 1,83 MB; con las cinco capas del equipamiento vacio el recolector muere con
+	// `GC to-space overflow`. Entran cabeza, torso y piernas: el heroe se ve entero de silueta y camina.
+	d2mapentity.CapasDelJugadorDeConsola = []d2enum.CompositeType{
+		d2enum.CompositeTypeHead,
+		d2enum.CompositeTypeTorso,
+		d2enum.CompositeTypeLegs,
+	}
+
+	entrada := maple.NuevoServicio(cuadroAncho, cuadroAlto)
+
+	println(frase, "cruceta: maple listo, hayControl=", maple.HayControl())
+
 	// ============================== 1. LAS PALANCAS DE LA CONSOLA ==============================
 	// El AssetManager del motor se arma DENTRO de `d2app.Create`, y los presupuestos de sus caches se congelan
 	// al armarlos: por eso esto va antes de Create y no despues.
@@ -208,13 +237,20 @@ func main() {
 
 	// las palancas del arranque y la pantalla del pueblo
 	app.ArrancarEnGate0(d2app.Gate0{
-		// las dos tablas del nivel (DC-002.86: LvlTypes trae los tipos de nivel y LvlPrest los presets)
-		Tablas: []string{d2resource.LevelType, d2resource.LevelPreset},
+		// las tablas del nivel (DC-002.86: LvlTypes trae los tipos de nivel y LvlPrest los presets) y, para
+		// el heroe (DC-002.159), `charstats.txt`: es la fila de la clase con la que se calculan la vida, el
+		// mana y la estamina de nivel 1 (y la que `Player.Advance` consulta para el drenaje de estamina).
+		Tablas: []string{d2resource.LevelType, d2resource.LevelPreset, d2resource.CharStats},
 
-		SinAnimData: true, // sin entidades no se consulta ni una animacion
-		SinStrings:  true, // el pueblo no dibuja texto
-		SinGui:      true, // sin cursor ni pantalla de carga (3,15 MB de RGBA)
-		SinUi:       true, // sin el sonido del boton (esta en d2sfx.mpq, que no va al disco)
+		SinAnimData: !heroeEnElPueblo, // con el heroe el animdata se carga solo con las claves de la amazona
+		SinStrings:  true,  // el pueblo no dibuja texto
+		SinGui:      true,  // sin cursor ni pantalla de carga (3,15 MB de RGBA)
+		SinUi:       true,  // sin el sonido del boton (esta en d2sfx.mpq, que no va al disco)
+
+		// DC-002.159: EL HEROE DEL MOTOR Y LA CRUCETA
+		Heroe:            heroeEnElPueblo,
+		Entrada:          entrada,
+		RefrescarEntrada: func() { entrada.ActualizarDesdeElControl() },
 
 		Region:       d2enum.RegionAct1Town,
 		Preset:       1,

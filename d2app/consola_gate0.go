@@ -27,6 +27,7 @@ package d2app
 
 import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2gamescreen"
 )
@@ -60,6 +61,20 @@ type Gate0 struct {
 
 	// OpcionesDelMapa: las palancas del `d2maprenderer` (cache perezosa, indices, tramos de VRAM...).
 	OpcionesDelMapa []d2maprenderer.Opcion
+
+	// ============================== EL HEROE (DC-002.159) ==============================
+	//
+	// Heroe: la pantalla del pueblo lleva EL HEROE DEL MOTOR (la amazona, `d2mapentity.NuevoJugadorDeConsola`)
+	// caminando con la cruceta. Pide dos cosas mas: `animdata.d2` (que con `SinAnimData` no se carga) y
+	// `charstats.txt` en la lista de tablas.
+	Heroe bool
+
+	// Entrada: el servicio de entrada de la consola (el maple, `d2core/d2input/maple`), que traduce la
+	// cruceta del control a las cuatro flechas del motor. `RefrescarEntrada`: el que lee el aparato antes de
+	// preguntarle las teclas (en la consola, `ActualizarDesdeElControl`; el main del POC lo pasa, porque es
+	// el unico que puede llamar al maple).
+	Entrada          d2interface.InputService
+	RefrescarEntrada func()
 
 	// Instrumento: se llama en cada etapa (etapa es un texto corto). Puede ser nil.
 	Instrumento func(etapa string)
@@ -116,6 +131,11 @@ func (a *App) ToPantallaDelPueblo(region d2enum.RegionIdType, preset int, conEnt
 	instrumento func(etapa string), opciones ...d2maprenderer.Opcion) {
 	pantalla := d2gamescreen.CreatePantallaDelPueblo(a.asset, a.renderer, a.terminal, *a.Options.LogLevel,
 		region, preset, conEntidades, instrumento, opciones...)
+
+	// DC-002.159: el heroe del motor con la cruceta, si el main lo pidio
+	if a.gate0 != nil && a.gate0.Heroe {
+		pantalla.ConHeroe(a.gate0.Entrada, a.gate0.RefrescarEntrada)
+	}
 
 	a.screen.SetNextScreen(pantalla)
 }

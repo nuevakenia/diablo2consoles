@@ -38,12 +38,58 @@ func NuevoJugadorDeConsola(
 	heroe d2enum.Hero,
 	stats *d2hero.HeroStatsState,
 ) (*Player, error) {
-	equipamiento := &d2inventory.CharacterEquipment{}
-
 	compuesto, err := am.LoadComposite(d2enum.ObjectTypePlayer, heroe.GetToken(), d2resource.PaletteUnits)
 	if err != nil {
 		return nil, err
 	}
+
+	resultado := jugadorDeConsola(compuesto, id, nombre, x, y, direccion, heroe, stats)
+
+	if err := compuesto.SetMode(d2enum.PlayerAnimationModeNeutral, resultado.Equipment.RightHand.GetWeaponClass()); err != nil {
+		return nil, err
+	}
+
+	return resultado, nil
+}
+
+// CapasDelJugadorDeConsola (DC-002.159): que capas del compuesto se cargan. nil = TODAS, que es lo que hacen la
+// PC y el POC del personaje. La consola pone una lista corta porque cada capa son ~89 KB VIVOS en el semiespacio
+// del recolector (16 direcciones x los cuadros del modo Neutral) y el pueblo compuesto ya deja 1,27 MB de los
+// 1,83 MB del semiespacio: con las cinco capas del equipamiento vacio (cabeza, torso, piernas, dos brazos) el
+// recolector muere con `GC to-space overflow`, que es lo que mide la tarjeta.
+var CapasDelJugadorDeConsola []d2enum.CompositeType
+
+// capasPedidas: las capas del equipamiento vacio, filtradas por `CapasDelJugadorDeConsola` cuando hay lista.
+func capasPedidas(equipamiento *d2inventory.CharacterEquipment) *[d2enum.CompositeTypeMax]string {
+	todas := equipmentLayers(equipamiento)
+
+	if len(CapasDelJugadorDeConsola) == 0 {
+		return todas
+	}
+
+	elegidas := &[d2enum.CompositeTypeMax]string{}
+
+	for _, capa := range CapasDelJugadorDeConsola {
+		if int(capa) < len(todas) {
+			elegidas[capa] = todas[capa]
+		}
+	}
+
+	return elegidas
+}
+
+// jugadorDeConsola (DC-002.159): el cuerpo comun de los dos constructores -- el de arriba, que carga el
+// compuesto, y `NuevoJugadorDeConsolaCon`, que lo recibe ya armado (el que puede armar el compuesto ANTES de
+// componer el mapa, que es donde hay memoria). Arma el ente, el equipamiento vacio, la velocidad de caminar y
+// el enganche de la rotacion; el modo de animacion lo pone cada constructor porque puede fallar.
+func jugadorDeConsola(
+	compuesto *d2asset.Composite,
+	id, nombre string,
+	x, y, direccion int,
+	heroe d2enum.Hero,
+	stats *d2hero.HeroStatsState,
+) *Player {
+	equipamiento := &d2inventory.CharacterEquipment{}
 
 	resultado := &Player{
 		mapEntity: newMapEntity(x, y),
@@ -61,18 +107,12 @@ func NuevoJugadorDeConsola(
 	resultado.SetSpeed(baseWalkSpeed)
 	resultado.mapEntity.directioner = resultado.rotate
 
-	arma := equipamiento.RightHand.GetWeaponClass()
-
-	if err := compuesto.SetMode(d2enum.PlayerAnimationModeNeutral, arma); err != nil {
-		return nil, err
-	}
-
 	compuesto.SetDirection(direccion)
 	compuesto.SetLayerEffects(equipmentEffects(equipamiento))
 
-	if err := compuesto.Equip(equipmentLayers(equipamiento)); err != nil {
-		return nil, err
+	if err := compuesto.Equip(capasPedidas(equipamiento)); err != nil {
+		return resultado
 	}
 
-	return resultado, nil
+	return resultado
 }

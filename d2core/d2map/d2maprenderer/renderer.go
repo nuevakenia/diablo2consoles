@@ -146,6 +146,13 @@ type MapRenderer struct {
 	saltos157          int
 	repintados157      int
 
+	// ============================== LOS ENTES APARTE (DC-002.159) ==============================
+	// Ver `entes_aparte_159.go`: con la palanca puesta, el renderer pinta SOLO el mapa y no indexa ni
+	// dibuja entes; el que llama los dibuja encima (y los borra con la memoria del lienzo). Es lo que
+	// deja que el mapa estatico siga valiendo con el heroe caminando: sin esto, un solo ente apaga el
+	// salto y el cuadro vuelve a los 818 ms de DC-002.157.
+	entesAparte159 bool
+
 	*d2util.Logger
 }
 
@@ -641,6 +648,12 @@ type entityBucket struct {
 // and their slices are reused between frames. Entities are visited in map order, as before, so
 // the order of entities that share a tile and a subtile is as unspecified as it always was.
 func (mr *MapRenderer) indexEntities() {
+	// DC-002.159: con los entes aparte el renderer no los indexa ni los dibuja (los pinta el que llama,
+	// encima del mapa): el indice por casilla se queda vacio y las pasadas 2 y 3 no dibujan ningun ente.
+	if mr.entesAparte159 {
+		return
+	}
+
 	if mr.entBuckets == nil {
 		mr.entBuckets = make(map[[2]int]*entityBucket)
 	}
@@ -681,7 +694,8 @@ func (mr *MapRenderer) indexEntities() {
 // before. The offsets are computed once per entity, without allocating (this used to cost 25 x 2
 // vector allocations per entity and tile).
 func (mr *MapRenderer) renderEntitiesBySubtile(target d2interface.Surface, ents []d2interface.MapEntity) {
-	if len(ents) == 0 {
+	// DC-002.159: con los entes aparte ninguno se dibuja en las pasadas (los pinta el que llama).
+	if mr.entesAparte159 || len(ents) == 0 {
 		return
 	}
 

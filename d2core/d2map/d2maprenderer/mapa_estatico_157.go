@@ -68,8 +68,10 @@ func (mr *MapRenderer) puedeSaltarseElMapa157() bool {
 		return false
 	}
 
-	// con entes el cuadro no es solo el mapa (van entre las paredes)
-	if len(mr.mapEngine.Entities()) > 0 {
+	// con entes el cuadro no es solo el mapa (van entre las paredes). DC-002.159: salvo que el que llama
+	// los dibuje aparte (`entesAparte159`), que es lo que hace la pantalla del Gate 0 con el heroe: ahi el
+	// mapa sigue siendo estatico y el ente se pinta (y se borra) encima.
+	if !mr.entesAparte159 && len(mr.mapEngine.Entities()) > 0 {
 		return false
 	}
 
