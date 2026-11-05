@@ -85,13 +85,14 @@ func TestPrepareTileSkipsEmptyAndBlankFloors(t *testing.T) {
 		t.Fatal("blank floor 30/0 should be hidden")
 	}
 
-	// a real floor that is missing from the DT1 files is still reported
+	// a real floor that is missing from the DT1 files is still reported. DC-002.159m: con el tipo de verdad
+	// (numero y nombre), que es lo que el formato roto no imprimia.
 	missing := d2ds1.Tile{}
 	missing.Prop1, missing.Style, missing.Sequence = 1, 5, 7
 	tile.Components.Floors = []d2ds1.Tile{missing}
 	tile.PrepareTile(0, 0, m)
 
-	if !strings.Contains(logs.String(), "Unknown tile ID [5 7 0]") {
+	if !strings.Contains(logs.String(), "Unknown tile ID [5 7 0 (floor)]") {
 		t.Fatalf("a missing floor tile should still warn, log:\n%s", logs)
 	}
 }

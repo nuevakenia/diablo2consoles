@@ -774,7 +774,34 @@ func (m *MapEngine) RemoveEntity(entity d2interface.MapEntity) {
 
 // GetTiles returns a slice of all tiles matching the given style,
 // sequence and tileType.
+//
+// DC-002.159m: el aviso dice el TIPO DE VERDAD. Estaba con `%d` sobre un `Stringer` (`d2enum.TileType`), asi
+// que el log imprimia `%!d(fmt.Stringer=Left Wall)` en vez del numero y el nombre: lo que hace falta para
+// saber QUE pedido quedo sin grafico.
 func (m *MapEngine) GetTiles(style, sequence int, tileType d2enum.TileType) []d2dt1.Tile {
+	tiles := m.tilesDeLaClave(style, sequence, tileType)
+
+	// special tiles (type 10: start position, warp and other markers) are logical markers that
+	// have no graphics in the area's dt1 files (they only exist in e.g. warp.dt1), so their
+	// absence is expected and not worth a warning
+	if len(tiles) == 0 {
+		if !tileType.Special() {
+			m.Warningf("Unknown tile ID [%d %d %d (%s)]", style, sequence, int(tileType), tileType)
+		}
+
+		return nil
+	}
+
+	return tiles
+}
+
+// tilesDeLaClave: la busqueda de `GetTiles` SIN el aviso.
+//
+// DC-002.159m: la usa el censo de las cuatro familias, que pregunta los cuatro tipos de CADA familia del nivel
+// a proposito (para medir, no para dibujar). Con el aviso adentro, el censo del pueblo imprimia ~160 lineas
+// `Unknown tile ID` en el log del Gate 0 y no se podia leer si el RENDERER se habia quedado sin un grafico: el
+// instrumento tapaba la medida (medido en la corrida de DC-002.159j, `/tmp/cap159j-final/flycast.log`).
+func (m *MapEngine) tilesDeLaClave(style, sequence int, tileType d2enum.TileType) []d2dt1.Tile {
 	tiles := make([]d2dt1.Tile, 0)
 
 	if len(m.dt1Rank) == len(m.dt1TileData) && m.dt1Index != nil {
@@ -791,18 +818,6 @@ func (m *MapEngine) GetTiles(style, sequence int, tileType d2enum.TileType) []d2
 
 			tiles = append(tiles, m.tileConLosBloquesVivos(idx))
 		}
-	}
-
-	// special tiles (type 10: start position, warp and other markers) are logical markers that
-	// have no graphics in the area's dt1 files (they only exist in e.g. warp.dt1), so their
-	// absence is expected and not worth a warning
-	if len(tiles) == 0 {
-		if tileType.Special() {
-			return nil
-		}
-
-		m.Warningf("Unknown tile ID [%d %d %d]", style, sequence, tileType)
-		return nil
 	}
 
 	return tiles

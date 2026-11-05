@@ -165,19 +165,35 @@ func normalizarRutaDT1(nombre string) string {
 // barraInvertida: el separador de path del MPQ, armado por su codigo (92) para no depender del escape.
 const barraInvertida = string(rune(92))
 
-// ClavesDeTiles (DC-002.88) devuelve las `(estilo, secuencia, tipo)` que este `.ds1` referencia de verdad, en
-// sus capas de piso y de pared, EMPAQUETADAS en un `int64` y ORDENADAS. Es lo que necesita el arena de bloques
-// usados: de los 507 tiles de los 8 `.dt1` que el pueblo lista, sus casillas solo referencian 311 (2.586.489 B
-// de bloque contra 4.360.271).
+// ClavesDeTiles (DC-002.88, ampliada en DC-002.159m) devuelve las `(estilo, secuencia, tipo)` que el renderer
+// PIDE con este `.ds1` en la mano, EMPAQUETADAS en un `int64` y ORDENADAS. Es lo que necesita el arena de
+// bloques usados: de los 507 tiles de los 8 `.dt1` que el pueblo lista, sus casillas solo referencian 311
+// (2.586.489 B de bloque contra 4.360.271) y esos 311 alcanzan para pintar el pueblo entero.
 //
-// POR QUE UNA LISTA ORDENADA Y NO UN `map[[3]int32]bool`. Medido en la consola de esta tarjeta: un mapa con
+// DC-002.159m: ADEMAS DE LA CLAVE QUE EL `.ds1` DECLARA, EL RENDERER PIDE OTRAS DOS, y sin ellas el nivel se
+// dibuja a medias aunque el `.dt1` tenga el grafico (medido en la corrida del Gate 0 de DC-002.159j: 6 claves
+// perdidas, 6 tiles, 49.341 B de bloque):
+//
+//   - LA OTRA MITAD DE LA ESQUINA NORTE. `generateWallCache` compone una pared `tipo=3` (mitad derecha de la
+//     esquina) pidiendo tambien la `tipo=4` (mitad izquierda) para quedarse con la mas baja de las dos. El
+//     pueblo declara `tipo=3` en 4 familias y NO declara la `tipo=4` de ninguna, asi que la esquina norte se
+//     dibujaba con una sola mitad y el log decia `Unknown tile ID [2 0 Left part of an Upper-Left corner]`.
+//   - LAS SOMBRAS. Los componentes de sombra salen de las capas de sombra del `.ds1`, y `PrepareTile` y
+//     `generateShadowCache` las piden SIEMPRE con `tipo=13` (`TileShadow`): las capas de sombra no llevan tipo
+//     (el `.ds1` guarda la sombra con el MISMO registro que el piso, que decodifica con `Type=0`). Leerlas con
+//     su `Type` daria `tipo=0` y la sombra no se compondria nunca.
+//
+// Lo que NO se mira, y por que: las capas de sustitucion (el renderer no compone sustituciones) y los tipos de
+// pared que el `.ds1` no declara (DC-002.159m midio las cuatro familias completas de las 56 familias del
+// pueblo: 6 tiles / 43.851 B de bloque en el arena para imagenes que nadie pide; el censo de las cuatro
+// familias cuenta 90 imagenes con esta lista y 96 con la tabla entera, y ese desvio esta explicado con sus
+// numeros en `console/dc/evidencia/dc-002.159m-*.md`).
+//
+// POR QUE UNA LISTA ORDENADA Y NO UN `map[[3]int32]bool`. Medido en la consola de DC-002.88: un mapa con
 // `make(map[[3]int32]bool, 57*41)` mata la SH-4 en `runtime.mapassign` (illegal instruction) al primer
 // `claves[k] = true`. Los mapas del resto del POC (los caches de d2asset, con hint 0) si funcionan: lo que
 // rompe es el mapa pedido de una vez con un hint grande. Una lista ordenada + busqueda binaria no toca el
 // recolector ni el `mapassign`.
-//
-// OJO: NO mira las capas de sombra ni las de sustitucion; el compositor del motor arma `MapTile.Components`
-// con piso y pared (ver `MapEngine.PlaceStampClippedWhere`), que es lo que se pinta.
 //
 // Devuelve `nil` si alguna clave no entra en 21 bits por campo (no pasa con los `.dt1` del juego: los estilos
 // llegan a unos miles y las secuencias a decenas): ahi el que llama tiene que dejar de filtrar, porque una
@@ -191,34 +207,77 @@ func (mr *Stamp) ClavesDeTiles() []int64 {
 	claves := make([]int64, 0, ancho*alto)
 	noEntra := false
 
-	agregar := func(t *d2ds1.Tile) {
-		if t == nil {
-			return
-		}
-
-		claves = append(claves, d2asset.ClaveDeTile(int64(t.Style), int64(t.Sequence), int64(t.Type)))
+	agregar := func(estilo, secuencia, tipo int) {
+		claves = append(claves, d2asset.ClaveDeTile(int64(estilo), int64(secuencia), int64(tipo)))
 	}
 
+	// LOS PISOS: el renderer los pide con `tipo=0` (`generateFloorCache`), que es el tipo que traen las capas
+	// de piso del `.ds1` (su registro no lleva tipo). Las celdas que el compositor no pinta (ocultas o con
+	// `Prop1=0`) no las pide nadie y no se anotan.
 	for capa := 0; capa < 2; capa++ {
-		if mr.ds1.GetFloor(capa) == nil {
+		layer := mr.ds1.GetFloor(capa)
+		if layer == nil {
 			continue
 		}
 
 		for y := 0; y < alto; y++ {
 			for x := 0; x < ancho; x++ {
-				agregar(mr.ds1.GetFloor(capa).Tile(x, y))
+				t := layer.Tile(x, y)
+				if t == nil || t.Hidden() || t.Prop1 == 0 {
+					continue
+				}
+
+				agregar(int(t.Style), int(t.Sequence), int(d2enum.TileFloor))
 			}
 		}
 	}
 
+	// LAS PAREDES: el tipo que declara la capa (es el que pide `PrepareTile` y `generateWallCache`) y, para la
+	// mitad derecha de la esquina norte, tambien la izquierda (ver la cabecera).
+	//
+	// DC-002.159m: no se anota una pared que el compositor no pinta -- oculta, vacia (`Prop1=0`) o de un tipo
+	// especial (los marcadores de warp/entrada, que `GetTiles` devuelve nil sin preguntar). Sus graficos no los
+	// pide nadie, y en el pueblo son justo los 3 tiles de `act1/barracks/warp.dt1` = 23.298 B de bloque
+	// (medido con `console/dc/medidas/pedidos-159m`): era el aire que faltaba para no cruzar al sexto tramo del
+	// arena, que cuesta 524.288 B de un monton de C que en el cuadro 1 esta en el techo.
 	for capa := 0; capa < 4; capa++ {
-		if mr.ds1.GetWall(capa) == nil {
+		layer := mr.ds1.GetWall(capa)
+		if layer == nil {
 			continue
 		}
 
 		for y := 0; y < alto; y++ {
 			for x := 0; x < ancho; x++ {
-				agregar(mr.ds1.GetWall(capa).Tile(x, y))
+				t := layer.Tile(x, y)
+				if t == nil || t.Hidden() || t.Prop1 == 0 || t.Type.Special() {
+					continue
+				}
+
+				agregar(int(t.Style), int(t.Sequence), int(t.Type))
+
+				if t.Type == d2enum.TileRightPartOfNorthCornerWall {
+					agregar(int(t.Style), int(t.Sequence), int(d2enum.TileLeftPartOfNorthCornerWall))
+				}
+			}
+		}
+	}
+
+	// LAS SOMBRAS: `tipo=13` siempre, no el `Type` del `.ds1` (que viene 0). Solo las que el compositor pinta
+	// (ni ocultas ni con `Prop1=0`: esas no las pide nadie).
+	for capa := range mr.ds1.Shadows {
+		layer := mr.ds1.Shadows[capa]
+		if layer == nil {
+			continue
+		}
+
+		for y := 0; y < alto; y++ {
+			for x := 0; x < ancho; x++ {
+				t := layer.Tile(x, y)
+				if t == nil || t.Hidden() || t.Prop1 == 0 {
+					continue
+				}
+
+				agregar(int(t.Style), int(t.Sequence), int(d2enum.TileShadow))
 			}
 		}
 	}

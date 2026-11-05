@@ -33,17 +33,19 @@ import (
 
 // la pared que delato el defecto, con los numeros del host (console/dc/medidas/paredes-159j).
 const (
-	estiloDeLaPared159j   = 0
+	estiloDeLaPared159j    = 0
 	secuenciaDeLaPared159j = 0
 	tipoDeLaPared159j      = 1
 
 	// 160 de ancho (tileSurfaceWidth) por 288 de alto: 46.080 B, el techo legitimo medido en el host
 	imagenDeLaPared159j = 46080
 
-	// el pueblo compone 311 tiles (los que el `.ds1` referencia) y 6.737 bloques: los mismos numeros que la
-	// corrida de la consola imprimio en `SELLOS159J`
-	tilesDelPueblo159j   = 311
-	bloquesDelPueblo159j = 6737
+	// el pueblo compone 311 tiles que el `.ds1` referencia, MAS los 6 que el renderer pide y el `.ds1` no
+	// declara (2 sombras y 4 mitades izquierdas de esquina norte) y MENOS los 3 marcadores especiales de
+	// `act1/barracks/warp.dt1`, que no se pintan nunca (DC-002.159m): 314 tiles. Los numeros salen de
+	// `SELLOS159J` en la corrida de la consola y de los mismos datos en `console/dc/medidas/pedidos-159m`.
+	tilesDelPueblo159j   = 314
+	bloquesDelPueblo159j = 6819
 )
 
 // puebloComoLaConsola159j: el pueblo compuesto por el camino de la consola (arena de bloques usados), que es el

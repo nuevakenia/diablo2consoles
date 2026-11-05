@@ -58,8 +58,8 @@ type CensoDeParedes159j struct {
 	// La pared que delato el defecto (DC-002.159i: `estilo=0 sec=0 tipo=1` pidiendo 8.394.240 B). Se mide
 	// SIEMPRE, aunque su familia no este entre las que el `.ds1` declara: es el criterio 1 de la tarjeta y no
 	// puede depender de que la camara la componga.
-	Testigo        string
-	TestigoImagen  int
+	Testigo         string
+	TestigoImagen   int
 	TestigoElegible bool
 }
 
@@ -88,8 +88,11 @@ func (m *MapEngine) CensoDeLasCuatroFamiliasDePared159j() CensoDeParedes159j {
 
 	censo.Familias = len(vistas)
 
-	// la pared testigo, medida aparte (ver el comentario del campo)
-	if opciones := m.GetTiles(0, 0, d2enum.TileLeftWall); len(opciones) > 0 {
+	// la pared testigo, medida aparte (ver el comentario del campo). DC-002.159m: la busqueda es la de
+	// `tilesDeLaClave`, sin el aviso del motor -- el censo pregunta los cuatro tipos de cada familia para
+	// MEDIR, y con el aviso adentro llenaba el log de `Unknown tile ID` que despues no se pueden distinguir de
+	// los del renderer.
+	if opciones := m.tilesDeLaClave(0, 0, d2enum.TileLeftWall); len(opciones) > 0 {
 		t := &opciones[0]
 		minY, maxY := bordesDeLosBloques159j(t)
 		alto := absDe159j(t.Height)
@@ -105,7 +108,7 @@ func (m *MapEngine) CensoDeLasCuatroFamiliasDePared159j() CensoDeParedes159j {
 
 	for familia := range vistas {
 		for _, tipo := range losCuatroTiposDePared159j {
-			opciones := m.GetTiles(familia[0], familia[1], tipo)
+			opciones := m.tilesDeLaClave(familia[0], familia[1], tipo)
 
 			for v := range opciones {
 				t := &opciones[v]
