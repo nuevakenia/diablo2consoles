@@ -78,11 +78,13 @@ func ArrancarComoConsola() {
 	// dcc_animation.go.
 	UsarDireccionesPerezosas(true)
 
-	// DC-002.159b: las sombras del compuesto se apagan. El camino de la sombra (escala + sesgo + brillo cero) en el
-	// renderer del PVR mata el SH-4 en el primer cuadro del heroe; medido y localizado en esta tarjeta (ver
-	// `sombrasDelCompuesto` en composite.go y la evidencia de DC-002.159b). El ente se dibuja igual, sin la mancha
-	// del piso. Cuando el camino de la sombra este arreglado, se saca esta linea.
-	UsarSombrasDelCompuesto(false)
+	// DC-002.159h: las sombras del compuesto se PRENDEN. DC-002.159b las habia apagado porque el camino de la
+	// sombra (escala + sesgo + brillo cero) mataba el SH-4 en el primer cuadro del heroe: el brillo cero pide la
+	// matriz HSV, y esa cache es un `map[[2]float64]ColorM`, o sea una clave cuyo hasher GENERA gccgo -- y
+	// libgodc lo llamaba sin resolver la FuncVal (medido: `runtime.mapassign` con el PC adentro de `.rodata`).
+	// El defecto de fondo esta arreglado en el runtime (`scripts/console/fix-libgodc-funcval-159h.py`), asi que la
+	// linea que las apagaba se va: en la consola queda el mismo valor que en la PC.
+	UsarSombrasDelCompuesto(true)
 
 	// DC-002.159c: y la animacion mantiene UNA superficie por capa (la del cuadro que se esta dibujando) en vez de
 	// armar las 8 de la direccion la primera vez que la dibuja. Medido en DC-002.159b: entrar en el modo `TW` y
