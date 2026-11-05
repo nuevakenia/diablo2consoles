@@ -260,6 +260,30 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 	tamano := stamp.Size()
 	p.Infof("el pueblo: %dx%d casillas, preset %d, archivo %d", tamano.Width, tamano.Height, p.preset, p.archivo)
 
+	// ============================== DC-002.159l: LAS CASILLAS FUERA DEL ALCANCE DEL RECOLECTOR ==============================
+	//
+	// `m.tiles` es UN pedido de 616.968 B, o sea un bloque EXTERNO del monton de C, y el recolector de libgodc
+	// NO recorre el interior de los bloques externos (`gc_heap.c:107` + `gc_copy.c`): las rebanadas de cada
+	// casilla viven en el semiespacio y quedaban SIN RAIZ, asi que la primera recoleccion que caia durante la
+	// composicion se las llevaba. Medido en DC-002.159k: la huella del pueblo cambiaba sola (803 -> 801 pisos)
+	// y las casillas leian basura (`prop1=88` donde el `.ds1` trae `194`).
+	//
+	// Con el arena de casillas (2.337 x 4 = 9.348 tiles = 186.960 B del monton de C, 20 B por celda en el SH-4)
+	// las rebanadas dejan de estar en el semiespacio: la casilla apunta a memoria que el recolector no mueve ni
+	// recorre. Se pide ANTES de `ResetMapParaStamp` porque `PlaceStamp*` escribe las casillas. El bloque de
+	// celdas del `.ds1` que se suelta un poco mas abajo mide lo mismo (9.348 celdas x 20 B), pero en el Gate 0
+	// NO se devuelve: medido en esta tarjeta, devolverlo no paga el arena y encima baja el tramo de la cache
+	// (el detalle esta en el comentario de `SoltarLosTilesDelDS1`).
+	if tiles, prendido := d2mapengine.PrepararLasCasillasEnElArena159l(tamano.Width, tamano.Height); prendido {
+		p.Infof("casillas del pueblo en el arena de C: %d tiles (%d casillas x %d capas)",
+			tiles, tamano.Width*tamano.Height, tiles/(tamano.Width*tamano.Height))
+		p.avisar("mapa:arena-de-casillas")
+	} else {
+		p.Errorf("DC-002.159l SIN-ARENA: las casillas del pueblo van a ir al semiespacio del recolector y el " +
+			"recolector NO recorre el interior del bloque externo que las referencia: el mapa compuesto se " +
+			"puede perder en la primera recoleccion")
+	}
+
 	// DC-002.88: los `.dt1` que el `.ds1` lista, no los 32 campos del level type
 	p.engine.ResetMapParaStamp(p.region, tamano.Width, tamano.Height, stamp)
 	p.avisar("mapa:reset-hecho")
@@ -276,13 +300,32 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 
 	p.avisar("mapa:casillas-puestas")
 
+	// DC-002.159l: la huella del pueblo YA COMPUESTO, con las casillas todavia puestas. Tiene que ser la del
+	// host (2.337 pisos / 338 paredes / FNV 2704422391, el numero que fija `go test` en `d2mapengine`) igual
+	// en las tres etapas de esta tarjeta: aca, despues de soltar el `.ds1` y despues del recolector.
+	p.huella159l("casillas-puestas")
+
 	// DC-002.159: EL STAMP DEL .ds1 YA HIZO SU TRABAJO.
 	// Las casillas del mapa son COPIAS de las celdas del `.ds1` (contrato de DC-002.110): soltar el bloque de
-	// celdas devuelve al monton 261.744 B del SH-4 justo antes del renderer y del ente del heroe, que es donde
-	// la arena va al limite. Un uso tardio del stamp se ve como un stamp vacio, no como memoria de otro.
+	// celdas devuelve al monton los 186.960 B del SH-4 (9.348 celdas x 20 B) justo antes del renderer y del
+	// ente del heroe, que es donde la arena va al limite. Un uso tardio del stamp se ve como un stamp vacio,
+	// no como memoria de otro.
+	//
+	// DC-002.159l: EN EL GATE 0 ESTO DEVUELVE 0, Y ES A PROPOSITO. Instalar el liberador
+	// (`d2ds1.UsarLiberadorDeLaArena`, que solo instalan los POC viejos) se probo y se midio: el `free` deja un
+	// hueco de 186.960 B en medio del monton -- no devuelve el break -- y son las paletas del acto (2 x 443.175 B)
+	// y el buffer al vuelo del cuadro (81.920 B), que se piden DESPUES, los que se comen ese hueco. Resultado
+	// medido: la cache de indices baja del tramo de 174.080 B al de 87.040 B y aparece una linea
+	// `Out of memory` mas. Moviendo el `free` al final de `OnLoad` (para que el hueco quede entero) la paleta
+	// del acto no entra y la corrida muere (`Fatal: SH4 exception when blocked`). Las dos corridas estan en
+	// `console/dc/evidencia/dc-002.159l-las-casillas-fuera-del-recolector.md`. Por eso el bloque del `.ds1` se
+	// queda donde estaba (en el semiespacio, como en 159h/159k) hasta que haya una tarjeta que devuelva esas
+	// paletas.
 	if liberados := stamp.SoltarLosTilesDelDS1(); liberados > 0 {
 		p.Infof("el .ds1 del pueblo devolvio %d B de celdas (arena de C)", liberados)
 	}
+
+	p.huella159l("tras-soltar-el-ds1")
 
 	// DC-002.159: LAS FILAS DE LAS TABLAS QUE EL CUADRO NO USA, tambien aca.
 	// El nivel ya esta compuesto: el renderer no lee LvlTypes ni LvlPrest (usa el levelType copiado en el
@@ -296,6 +339,8 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 	}
 
 	runtime.GC()
+
+	p.huella159l("tras-recolector")
 
 	// DC-002.156: EL BUFFER PRESTADO DE LA LECTURA DE LOS `.dt1` YA HIZO SU TRABAJO.
 	//
@@ -793,6 +838,16 @@ func (p *PantallaDelPueblo) Advance(elapsed float64) error {
 // msDesde: milisegundos entre `desde` y ahora (d2util.Now es el reloj en segundos del motor).
 func (p *PantallaDelPueblo) msDesde(desde float64) int {
 	return int((d2util.Now() - desde) * 1000.0)
+}
+
+// huella159l (DC-002.159l): imprime la huella del mapa compuesto en la etapa que se pida. Es el instrumento
+// con el que se compara la consola contra el host: el mismo numero (2.337 pisos / 338 paredes / FNV
+// 2704422391) en `casillas-puestas`, `tras-soltar-el-ds1` y `tras-recolector` es la prueba de que el recolector
+// no se llevo el contenido compuesto. La funcion vive en `d2mapengine` para que la prueba del host use
+// exactamente el mismo criterio.
+func (p *PantallaDelPueblo) huella159l(etapa string) {
+	pisos, paredes, fnv := p.engine.HuellaDelMapa159l()
+	p.Infof("HUELLA159L etapa=%s pisos=%d paredes=%d fnv=%d", etapa, pisos, paredes, int32(fnv))
 }
 
 // censoDelPueblo: cuantas casillas quedaron con piso y con pared. Es el numero que dice que el pueblo se

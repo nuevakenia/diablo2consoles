@@ -174,6 +174,39 @@ func EstadoDelArenaDeCasillas() (cuantos, usados, fallas int) {
 	return len(arenaDeCasillas), arenaDeCasillasUsados, arenaDeCasillasFallas
 }
 
+// rebanadasPorCasilla159l: las listas del `.ds1` que `Stamp.Tile` copia -- `Walls`, `Floors`, `Shadows` y
+// `Substitutions`. `Orientations` NO: se declara en `MapTile` y `Stamp.TileEn` solo la trunca, nunca se llena
+// (verificado en DC-002.159k). Por eso el pueblo son 2.337 x 4 = 9.348 registros y no 11.685.
+const rebanadasPorCasilla159l = 4
+
+// PrepararLasCasillasEnElArena159l (DC-002.159l) deja las casillas del nivel FUERA DEL ALCANCE DEL RECOLECTOR:
+// reserva el arena de casillas para `ancho`x`alto` casillas (las cuatro rebanadas de cada una) y prende la
+// politica de reusar en su lugar. Devuelve los tiles que entraron y si el arena quedo prendido.
+//
+// POR QUE, CON EL NUMERO. `m.tiles` es UN pedido de 616.968 B, o sea un bloque EXTERNO del monton de C; las
+// rebanadas de cada casilla son de 1 a 3 elementos y viven en el semiespacio. El recolector de libgodc NO
+// recorre el interior de los bloques externos, asi que esas rebanadas quedaban sin raiz y la primera
+// recoleccion que caia durante la composicion se las llevaba: la huella del pueblo compuesto cambiaba sola y
+// las casillas leian basura (medido en DC-002.159k; ver el comentario de `SoltarLasCasillasDelNivelAnterior`).
+//
+// Con las rebanadas adentro del arena, la casilla apunta a memoria del monton de C que no tiene punteros y que
+// el recolector no mueve NI recorre: el contenido compuesto es el mismo hasta que alguien lo cambie. El precio
+// son los 186.960 B del arena (9.348 tiles x 20 B en el SH-4 -- ojo: 20 B, no los 28 de la primera cuenta; el
+// `PIDE 186960` del monton lo confirma, ver DC-002.159l).
+//
+// En la PC es un no-op barato: el arena se pide igual y el recolector exacto no lo necesita, pero el contenido
+// compuesto es identico, que es lo que fija la prueba del host (`huella_159l_test.go`).
+func PrepararLasCasillasEnElArena159l(ancho, alto int) (tiles int, prendido bool) {
+	if ancho <= 0 || alto <= 0 {
+		return 0, false
+	}
+
+	tiles = ReservarArenaDeCasillas(ancho * alto * rebanadasPorCasilla159l)
+	ReusarLasCasillasEnSuLugar(tiles > 0)
+
+	return tiles, ReusarLasCasillas()
+}
+
 // casillaEnElArena recorta las cinco rebanadas del tramo y las llena con la casilla (x,y) del stamp. Devuelve
 // falso si el arena no alcanza (un nivel con mas capas que el reservado): el que llama usa el camino de siempre.
 func (m *MapEngine) casillaEnElArena(stamp *d2mapstamp.Stamp, x, y int, dest *d2mapstamp.Tile) bool {
@@ -220,13 +253,25 @@ func (m *MapEngine) limpiarLasCasillas() {
 // SoltarLasCasillasDelNivelAnterior (DC-002.109): tira las casillas del nivel que se esta dejando ANTES de
 // parsear el nivel nuevo.
 //
-// POR QUE, CON EL NUMERO. Cada casilla compuesta guarda tres rebanadas chicas (`Components.Floors/Walls/
-// Shadows`, de decenas de bytes cada una) que en libgodc viven en el SEMIESPACIO del recolector, porque no pasan
-// el corte de 64 KB. En el pueblo son 2337 casillas x 3 = ~280.000 B, y `m.tiles` -- que es un bloque EXTERNO de
-// 616.968 B y por eso el recolector lo recorre como raiz -- las mantiene vivas. `resetMapBase` las limpia, pero
-// lo hace DESPUES de `LoadStamp`, o sea con el `.ds1` nuevo ya parseado: medido en Flycast, la vuelta al pueblo
-// moria en el semiespacio (1.573.032 B vivos + 430.000 del `.ds1` contra 1.835.008) aunque las casillas del
-// nivel de la transicion ya no las usara nadie.
+// POR QUE, CON EL NUMERO. Cada casilla compuesta guarda cuatro rebanadas chicas (`Components.Walls`,
+// `Floors`, `Shadows` y `Substitutions`, de decenas de bytes cada una) que en libgodc viven en el SEMIESPACIO
+// del recolector, porque no pasan el corte de 64 KB. En el pueblo son 9.348 registros (2.337 casillas x 4
+// rebanadas) = 186.960 B en el SH-4 (20 B por celda; DC-002.159l midio el `PIDE` del monton).
+//
+// LO QUE ESTA MAL EN EL COMENTARIO QUE HABIA ACA (medido en DC-002.159k, no deducido): decia que `m.tiles`
+// -- un bloque EXTERNO de 616.968 B -- mantiene vivas esas rebanadas porque "el recolector lo recorre como
+// raiz". NO ES ASI. En libgodc todo pedido de mas de `GC_LARGE_OBJECT_THRESHOLD` va a `gc_external_alloc`
+// (`gc_heap.c:107`), que es `malloc` + `memset` y NO se registra en ninguna tabla de raices, y el Cheney de
+// `gc_copy.c` nunca escanea el interior de un bloque externo: las rebanadas del semiespacio que solo estan
+// referenciadas desde adentro de `m.tiles` quedan SIN RAIZ. La primera recoleccion que cae durante la
+// composicion se las lleva y la casilla queda apuntando a memoria reciclada. Medido en Flycast: la huella del
+// pueblo compuesto cambiaba sola (803 -> 801 pisos entre `casillas-puestas` y `tras-recolector`, con hashes y
+// valores distintos entre corridas del mismo binario) y las casillas leian basura (`prop1=88/0/32` donde el
+// `.ds1` trae `194`). Evidencia: `console/dc/evidencia/dc-002.159k-el-pueblo-que-no-llega-al-lienzo.md`.
+//
+// `resetMapBase` las limpia, pero lo hace DESPUES de `LoadStamp`, o sea con el `.ds1` nuevo ya parseado:
+// medido en Flycast, la vuelta al pueblo moria en el semiespacio (1.573.032 B vivos + 430.000 del `.ds1`
+// contra 1.835.008) aunque las casillas del nivel de la transicion ya no las usara nadie.
 //
 // Limpiarlas antes de parsear deja ese lugar libre justo cuando se necesita. `resetMapBase` las vuelve a limpiar
 // (no cuesta nada: ya estan en cero) y el nivel nuevo se compone igual.
