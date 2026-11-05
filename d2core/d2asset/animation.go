@@ -49,7 +49,8 @@ var _ d2interface.Animation = &Animation{}
 type Animation struct {
 	renderer         d2interface.Renderer
 	onBindRenderer   func(renderer d2interface.Renderer) error
-	ensureDirection  func(direction int) error // creates the images of one direction (DCC only)
+	ensureDirection  func(direction int) error        // creates the images of one direction (DCC only)
+	ensureFrame      func(direction, frame int) error // creates the image of ONE frame (console policy, DCC only)
 	directions       []animationDirection
 	effect           d2enum.DrawEffect
 	colorMod         color.Color
@@ -66,6 +67,24 @@ type Animation struct {
 	playLoop         bool
 	hasSubLoop       bool // runs after first animation ends
 	hasShadow        bool
+
+	// DC-002.159c: LA UNICA SUPERFICIE DEL CUADRO cuando el backend arma de a un cuadro (`ensureFrame`).
+	//
+	// Antes, la primera vez que se dibujaba una direccion se armaban las 8 (o 16) superficies de esa
+	// direccion de una vez -- y con eso, un modo del heroe costaba 7 capas x 8 cuadros de RGBA. Con el
+	// semiespacio de la consola en 1.835.008 B eso no entra ni de casualidad: medido en el Gate 0,
+	// cambiar de direccion caminando disparaba cinco recolecciones seguidas (1.744.224 -> 1.376.288 B)
+	// y a los dos segundos el SH-4 moria con `fatal error: stack_alloc: out of memory`.
+	//
+	// Con esto la animacion tiene UNA superficie viva y la vuelve a llenar con los pixeles del cuadro
+	// que toca: cero pedidos por cuadro, cero basura por cuadro, y el vivo de una capa pasa de
+	// ~8 x 18 KB a ~18 KB. El costo es expandir la paleta cuando el cuadro cambia (lo que antes se pagaba
+	// al armar la superficie), no un pedido de memoria.
+	superficieDelCuadro d2interface.Surface
+	superficieAncho     int
+	superficieAlto      int
+	superficieDireccion int
+	superficieCuadro    int
 }
 
 // SetSubLoop sets a sub loop for the animation
@@ -145,14 +164,58 @@ const (
 // ensureSurfaces creates the images of the current direction if the animation builds them lazily.
 // Creating all 8 or 16 directions of a monster mode at the first draw cost a visible hitch (hundreds of
 // ms for a pack of monsters coming into view); only the direction that is actually drawn is needed.
+//
+// DC-002.159c: cuando el backend arma de a UN cuadro (`ensureFrame`, la politica de la consola) se le pide
+// siempre el cuadro que se va a dibujar, y el es el que decide si hay que rellenar la superficie o ya esta.
+// Es idempotente y baratito: si el cuadro ya esta cargado vuelve sin tocar nada.
 func (a *Animation) ensureSurfaces() {
-	if a.ensureDirection == nil || a.directionIndex >= len(a.directions) || a.directions[a.directionIndex].surfaced {
+	if a.directionIndex >= len(a.directions) {
+		return
+	}
+
+	if a.ensureFrame != nil {
+		if err := a.ensureFrame(a.directionIndex, a.frameIndex); err != nil {
+			log.Println(err)
+		}
+
+		return
+	}
+
+	if a.ensureDirection == nil || a.directions[a.directionIndex].surfaced {
 		return
 	}
 
 	if err := a.ensureDirection(a.directionIndex); err != nil {
 		log.Println(err)
 	}
+}
+
+// RecuadroDelCuadro159: la caja que ocupa el cuadro actual de la animacion, en pixeles y RELATIVA AL ORIGEN
+// de la animacion (el punto que traslada `Render`), o sea (izq, arriba, ancho, alto).
+//
+// PARA QUE (DC-002.159c). El que dibuja un ente encima de un mapa que no se repinta tiene que guardar el
+// recuadro que el sprite tapa para poder borrarlo despues. Con una constante (160x160 en el Gate 0) el
+// recuadro cubria el cuadro de parado y NO el de caminar -- las capas de las piernas se dibujan con su
+// propio desplazamiento -- y quedaban piernas pegadas al lienzo. La caja la sabe la animacion: es el
+// desplazamiento del cuadro (`offsetX`, `offsetY`) mas su tamano, con la correccion de las animaciones que
+// se dibujan desde el pie (`originAtBottom`, los DC6).
+//
+// OJO CON LA SOMBRA: `RenderFromOrigin(.., shadow=true)` dibuja ademas la sombra del compuesto, que se corre
+// a los costados (medio alto de sesgo). Esta caja NO la incluye; en la consola las sombras del compuesto
+// estan apagadas (`UsarSombrasDelCompuesto`), y si algun dia se prenden, el recuadro tiene que agrandarse.
+func (a *Animation) recuadroDelCuadro159() (izq, arriba, ancho, alto int) {
+	if a.directionIndex >= len(a.directions) || a.frameIndex >= len(a.directions[a.directionIndex].frames) {
+		return 0, 0, 0, 0
+	}
+
+	frame := a.directions[a.directionIndex].frames[a.frameIndex]
+
+	izq, arriba = frame.offsetX, frame.offsetY
+	if a.originAtBottom {
+		arriba -= frame.height
+	}
+
+	return izq, arriba, frame.width, frame.height
 }
 
 func (a *Animation) renderShadow(target d2interface.Surface) {

@@ -26,6 +26,7 @@ import (
 	"image/color"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 )
 
 // static check: el renderer del mapa pide exactamente esta firma (`lienzoDeIndices`, DC-002.101)
@@ -76,6 +77,32 @@ func comoRGBA(c color.Color) color.RGBA {
 		A: uint8(a >> 8),
 	}
 }
+
+// ExpandirIndices expande los indices de 8 bits de un cuadro de animacion DIRECTAMENTE en el lienzo de esta
+// superficie. (`superficieConLienzo` de `d2core/d2asset/cuadro_paletizado.go`.)
+//
+// POR QUE EXISTE (DC-002.159c, medido). Cargar un cuadro pedia `d2util.ImgIndexToRGBA`: un buffer de 4 x pixeles
+// en el monton que se copiaba al lienzo con `ReplacePixels` y se tiraba. Con el compuesto del heroe son 7 capas
+// por cuadro, y caminando el cuadro cambia casi todos los cuadros de video: basura a 7 buffers por cuadro
+// justo cuando el recolector de la consola ya no tiene aire (semiespacio de 1.835.008 B, y el caminar del
+// DC-002.159b moria con `fatal error: stack_alloc: out of memory`).
+//
+// La cuenta es exactamente la de `d2util.ImgIndexToRGBAEn` (el indice 0 transparente, el resto RGBA de su
+// color), que es la MISMA que usaba `ImgIndexToRGBA`: aca el buffer que presta `d2util.ImgIndexToRGBA` es el
+// lienzo de la superficie. El shim, que es el dueno de los pixeles, solo presta el slice
+// (`(*ebiten.Image).LienzoDePixeles`, en `console/dc/engine/ebiten/v2/lienzo.go`).
+func (s *ebitenSurface) ExpandirIndices(indices []byte, paleta d2interface.Palette) {
+	if s == nil || s.image == nil || len(indices) == 0 {
+		return
+	}
+
+	d2util.ImgIndexToRGBAEn(s.image.LienzoDePixeles(), indices, paleta)
+}
+
+// static check: la superficie del motor cumple la parte de la consola que carga cuadros sin buffer intermedio.
+var _ interface {
+	ExpandirIndices(indices []byte, paleta d2interface.Palette)
+} = &ebitenSurface{}
 
 // la superficie sigue cumpliendo el contrato del motor
 var _ d2interface.Surface = &ebitenSurface{}

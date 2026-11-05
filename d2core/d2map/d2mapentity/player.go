@@ -22,13 +22,13 @@ type Player struct {
 	composite     *d2asset.Composite
 	// formToken / formHuman: while the hero is shapeshifted composite is the monster's and formHuman the hero's own
 	// (player_form.go); both are empty in human shape and never saved.
-	formToken string
-	formHuman *d2asset.Composite
-	Equipment     *d2inventory.CharacterEquipment
-	Stats         *d2hero.HeroStatsState
-	Skills        map[int]*d2hero.HeroSkill
-	LeftSkill     *d2hero.HeroSkill
-	RightSkill    *d2hero.HeroSkill
+	formToken  string
+	formHuman  *d2asset.Composite
+	Equipment  *d2inventory.CharacterEquipment
+	Stats      *d2hero.HeroStatsState
+	Skills     map[int]*d2hero.HeroSkill
+	LeftSkill  *d2hero.HeroSkill
+	RightSkill *d2hero.HeroSkill
 	// SkillBar holds the skill hotkeys and the weapon-swap skills; the active
 	// left/right skills live in LeftSkill/RightSkill and are copied into the
 	// bar by SyncSkillBar before a save.
@@ -274,17 +274,32 @@ func (p *Player) Advance(tickTime float64) {
 
 // Render renders the animated composite for this entity.
 func (p *Player) Render(target d2interface.Surface) {
-	renderOffset := p.Position.RenderOffset()
-	target.PushTranslation(
-		int((renderOffset.X()-renderOffset.Y())*subtileWidth),
-		int(((renderOffset.X()+renderOffset.Y())*subtileHeight)+subtileOffsetY),
-	)
+	dx, dy := p.DesplazamientoDeDibujo159()
+	target.PushTranslation(dx, dy)
 
 	defer target.Pop()
 
 	if err := p.composite.Render(target); err != nil {
 		fmt.Printf("failed to render the composite of player: %s, err: %v\n", p.ID(), err)
 	}
+}
+
+// DesplazamientoDeDibujo159 (DC-002.159c): el corrimiento en pixeles que `Render` le suma a la posicion del ente
+// antes de dibujar el compuesto. Es la parte FRACCIONARIA del subtile, que el motor pasa a pixeles para que el
+// caminar se vea suave: con `subtileWidth` 16 y `subtileHeight` 8 mueve hasta 16 px a los costados y deja al ente
+// 11 px abajo del origen del tile (`(1+1)*8 + subtileOffsetY` = 11).
+//
+// POR QUE ES UN METODO Y NO UNA CUENTA DE `Render` (DC-002.159c, medido). El que dibuja encima de un mapa que no
+// se repinta tiene que saber donde EMPIEZA el sprite para guardar lo de abajo, y ese lugar no es la posicion del
+// ente en pantalla (`pie=`): es el origen del tile MAS este corrimiento. Con el recuadro puesto en `pie` y el
+// sprite 16 px al costado y 11 px mas abajo, cada cuadro de caminar dejaba un borde del anterior fuera del
+// recuadro: medido en el Gate 0 (corrida `/tmp/cap159c-f5`), 19.342 pixeles cambiados en 4 s de caminar con el
+// heroe casi quieto en el mapa. Ahora `Render` y el que pregunta usan EL MISMO numero.
+func (p *Player) DesplazamientoDeDibujo159() (dx, dy int) {
+	renderOffset := p.Position.RenderOffset()
+
+	return int((renderOffset.X() - renderOffset.Y()) * subtileWidth),
+		int(((renderOffset.X() + renderOffset.Y()) * subtileHeight) + subtileOffsetY)
 }
 
 // GetAnimationMode returns the current animation mode based on what the player is doing and where they are.

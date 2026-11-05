@@ -53,9 +53,52 @@ func (mr *MapRenderer) DibujarEnte159(target d2interface.Surface, e d2interface.
 
 	pos := e.GetPosition()
 
+	// DC-002.159c (instrumento): el origen del COMPUESTO de este ente, que es el mismo numero que da
+	// `OrigenDelEnte159` y el que necesita el recuadro del borrado. Se anota antes de dibujar, sin tocar la pila.
+	mr.dibujoX159, mr.dibujoY159 = mr.OrigenDelEnte159(e)
+
 	mr.viewport.PushTranslationWorld(pos.X()/subtilesPerTile, pos.Y()/subtilesPerTile)
 	target.PushTranslation(mr.viewport.GetTranslationScreen())
+
 	e.Render(target)
 	target.Pop()
 	mr.viewport.PopTranslation()
 }
+
+// enteConDesplazamiento159: lo que un ente sabe de su propio dibujo. Es el corrimiento en pixeles que le suma a la
+// posicion del tile antes de pintar el compuesto (la parte fraccionaria del subtile, ver
+// `d2mapentity.Player.DesplazamientoDeDibujo159`). Es una interfaz OPCIONAL, igual que `superficieConLienzo`: el
+// renderer no importa nada del ente, solo pregunta.
+type enteConDesplazamiento159 interface {
+	DesplazamientoDeDibujo159() (dx, dy int)
+}
+
+// OrigenDelEnte159: donde va a caer el origen del compuesto de `e` si se dibuja AHORA, en pixeles del lienzo.
+//
+// SON DOS TRASLACIONES, NO UNA. La primera es la del tile (`PushTranslationWorld(pos)`); la segunda la pone el
+// propio ente al empezar a dibujar (la parte fraccionaria del subtile, que el motor pasa a pixeles para que el
+// caminar se vea suave). Guardar el recuadro en la primera y dibujar con las dos deja el sprite hasta 16 px al
+// costado y 11 px mas abajo que lo guardado, o sea un borde del cuadro anterior en cada cuadro de caminar.
+func (mr *MapRenderer) OrigenDelEnte159(e d2interface.MapEntity) (int, int) {
+	if e == nil {
+		return 0, 0
+	}
+
+	pos := e.GetPosition()
+
+	mr.viewport.PushTranslationWorld(pos.X()/subtilesPerTile, pos.Y()/subtilesPerTile)
+	x, y := mr.viewport.GetTranslationScreen()
+	mr.viewport.PopTranslation()
+
+	if conDesplazamiento, hay := e.(enteConDesplazamiento159); hay {
+		dx, dy := conDesplazamiento.DesplazamientoDeDibujo159()
+		x, y = x+dx, y+dy
+	}
+
+	return x, y
+}
+
+// UltimoDibujo159 (instrumento de DC-002.159c): donde quedo el origen del ultimo ente dibujado con
+// `DibujarEnte159`, en pixeles del lienzo. El que dibuja tiene que compararlo con su propio calculo del pie
+// (`PieDeLaPantalla`): si no son el mismo par, el recuadro del borrado no cae encima del sprite.
+func (mr *MapRenderer) UltimoDibujo159() (int, int) { return mr.dibujoX159, mr.dibujoY159 }

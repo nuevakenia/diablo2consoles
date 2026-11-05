@@ -153,6 +153,12 @@ type MapRenderer struct {
 	// salto y el cuadro vuelve a los 818 ms de DC-002.157.
 	entesAparte159 bool
 
+	// DC-002.159c (instrumento): donde quedo el origen del ultimo ente dibujado con `DibujarEnte159`, en pixeles
+	// del lienzo. Tiene que coincidir con `PieDeLaPantalla` del que lo dibujo; si no coincide, el borrado limpia
+	// un lugar y el sprite queda en otro (el rastro del caminar).
+	dibujoX159 int
+	dibujoY159 int
+
 	// ============================== EL MAPA SOLTADO (DC-002.159b) ==============================
 	// Ver `mapa_soltado_159.go`: cuando el que llama devuelve la memoria del mapa (las casillas del motor y
 	// el arena de bloques de los `.dt1`), el mapa del lienzo es el unico que hay: `puedeSaltarseElMapa157`

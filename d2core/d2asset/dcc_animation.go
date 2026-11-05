@@ -2,6 +2,7 @@ package d2asset
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 
@@ -35,6 +36,60 @@ func DireccionesPerezosas() bool {
 	return direccionesPerezosas
 }
 
+// superficiesPorCuadro (DC-002.159c): la OTRA politica de la consola, apagada en la PC.
+//
+// QUE CAMBIA. Con esto prendido, un `.dcc` no arma las superficies de toda la direccion (8 cuadros) la primera
+// vez que la dibuja: mantiene UNA sola superficie por animacion y la vuelve a llenar con los pixeles del cuadro
+// que se esta dibujando. Es lo que hace que el caminar dure: medido en el Gate 0 (DC-002.159b), entrar en el
+// modo `TW` y cambiar de direccion caminando costaba ~1 MB de superficies de golpe (7 capas x 8 cuadros) contra
+// un semiespacio de 1.835.008 B, el recolector corria cinco veces seguidas y el SH-4 moria con
+// `fatal error: stack_alloc: out of memory` a los dos segundos de arrancar a caminar.
+//
+// POR QUE NO EN LA PC. Ahi la memoria sobra, el recolector no corre en cada cuadro y el precio de tener todas
+// las superficies armadas es cero: no hay por que pagar la expansion de la paleta cada vez que cambia el cuadro.
+var superficiesPorCuadro bool
+
+// UsarSuperficiesPorCuadro prende o apaga la superficie unica por animacion (DC-002.159c). La prende el
+// arranque de la consola (`ArrancarComoConsola`); en la PC queda apagada.
+func UsarSuperficiesPorCuadro(prendida bool) {
+	superficiesPorCuadro = prendida
+}
+
+// soltarAlGirar (DC-002.159c): al cambiar de sentido, tirar los pixeles descomprimidos de las otras direcciones
+// (`soltarLasDireccionesQueNoSeVen`). Apagada por defecto porque DC-002.159b la midio y la descarto: guardar las
+// 16 direcciones de las 7 capas son ~442.601 B VIVOS, pero volver a decodificar cuesta una decodificacion entera
+// por capa. Queda como palanca para volver a medir si el vivo se come el semiespacio.
+var soltarAlGirar bool
+
+// UsarSoltarAlGirar159 prende o apaga la palanca `soltarAlGirar`.
+func UsarSoltarAlGirar159(si bool) { soltarAlGirar = si }
+
+// SuperficiesPorCuadro dice si esta prendida la politica de la consola (DC-002.159c).
+func SuperficiesPorCuadro() bool {
+	return superficiesPorCuadro
+}
+
+// contadorDeSuperficies159: cuantas superficies de cuadro se pidieron y cuantos bytes suman, desde que arranco
+// el proceso. Es el instrumento con el que se mide esta politica en la consola: con la superficie unica el
+// contador NO crece cuadro a cuadro (solo cuando cambia el tamano, o sea al girar a una direccion de otra caja).
+var contadorDeSuperficies159 struct {
+	creadas int
+	bytes   int
+}
+
+// SuperficiesDeCuadro159 devuelve cuantas superficies de cuadro se pidieron y cuantos bytes de RGBA suman.
+func SuperficiesDeCuadro159() (creadas, bytes int) {
+	return contadorDeSuperficies159.creadas, contadorDeSuperficies159.bytes
+}
+
+// decodificacionesDeDireccion159: cuantas veces se descomprimio una direccion de un `.dcc` desde que arranco el
+// proceso. Camina el ente, el motor recalcula la direccion en cada cuadro, y cada direccion nueva de una capa
+// cuesta su decodificacion; el contador lo dice sin adivinar (ver `DecodificacionesDeDireccion159`).
+var decodificacionesDeDireccion159 int
+
+// DecodificacionesDeDireccion159 devuelve cuantas direcciones de `.dcc` se descomprimieron.
+func DecodificacionesDeDireccion159() int { return decodificacionesDeDireccion159 }
+
 func newDCCAnimation(
 	dcc *d2dcc.DCC,
 	pal d2interface.Palette,
@@ -57,6 +112,10 @@ func newDCCAnimation(
 				for i := range DCC.directions {
 					DCC.directions[i].surfaced = false
 				}
+
+				// DC-002.159c: la superficie unica tambien es del renderer viejo
+				DCC.superficieDelCuadro = nil
+				DCC.superficieAncho, DCC.superficieAlto = 0, 0
 			}
 
 			return nil
@@ -68,6 +127,19 @@ func newDCCAnimation(
 
 			return DCC.createDirectionSurfaces(direction)
 		},
+		ensureFrame: func(direction, frame int) error {
+			if DCC.renderer == nil {
+				return nil
+			}
+
+			return DCC.armarLaSuperficieDelCuadro(direction, frame)
+		},
+	}
+
+	// DC-002.159c: en la consola la animacion tiene UNA superficie y la rellena cuadro a cuadro; en la PC se
+	// arma la direccion entera la primera vez, como siempre (ver `superficiesPorCuadro`).
+	if !superficiesPorCuadro {
+		anim.ensureFrame = nil
 	}
 
 	DCC.Animation = *anim
@@ -133,15 +205,14 @@ func (a *DCCAnimation) SetDirection(directionIndex int) error {
 	a.directionIndex = direction
 	a.frameIndex = 0
 
-	// DC-002.159b: NO se tiran las otras direcciones al girar. Se probo (ver `soltarLasDireccionesQueNoSeVen`)
-	// y el remedio salio peor que la enfermedad: una direccion de una capa son ~4 KB de pixeles (442.601 B entre
-	// las 16 direcciones de las 7 capas del modo), asi que soltarlas ahorra poco, pero volver a mirar una
-	// direccion ya soltada cuesta una decodificacion ENTERA de la capa (la `LG` son 202.352 B de pixeles de un
-	// archivo de 63.718 B). Con el ente girando aunque sea un poco -- el caminar recalcula la direccion en cada
-	// cuadro -- el POC pasaba de decodificar de vez en cuando a decodificar en cada cuadro: medido en el Gate 0,
-	// el recolector corria 4 veces cada 15 cuadros y a los ~2 s de caminar moria con `fatal error: stack_alloc:
-	// out of memory`. Las direcciones que no se ven quedan decodificadas: lo que se ahorra de verdad es el
-	// archivo crudo, que no se decodifica hasta que hace falta (`LoadPerezoso`).
+	// DC-002.159c: soltar las otras direcciones al girar quedo como PALANCA (`soltarAlGirar`), apagada. La
+	// tarjeta DC-002.159b ya la habia medido y descartado: soltar ahorra ~4 KB por capa y volver a decodificar
+	// cuesta una decodificacion entera; con 9 giros en 195 cuadros de caminar no compensa. Se deja el interruptor
+	// porque el numero que la justificaria (el vivo pegado al semiespacio) hay que volver a medirlo con cada modo.
+	if superficiesPorCuadro && soltarAlGirar {
+		a.soltarLasDireccionesQueNoSeVen(direction)
+	}
+
 	return nil
 }
 
@@ -182,11 +253,13 @@ func (a *DCCAnimation) decode() error {
 }
 
 func (a *DCCAnimation) decodeDirection(directionIndex int) error {
-	// DC-002.159b: la direccion puede estar sin decodificar en el `DCC` (carga perezosa, o porque se solto al
+	// DC-002.159c: la direccion puede estar sin decodificar en el `DCC` (carga perezosa, o porque se solto al
 	// cambiar de direccion). Se decodifica de los bytes del archivo, que el `DCC` conserva.
 	if err := a.dcc.DecodificarDireccion(directionIndex); err != nil {
 		return err
 	}
+
+	decodificacionesDeDireccion159++
 
 	dccDirection := a.dcc.Directions[directionIndex]
 
@@ -236,6 +309,77 @@ func (a *DCCAnimation) createDirectionSurfaces(directionIndex int) error {
 	}
 
 	a.directions[directionIndex].surfaced = true
+
+	return nil
+}
+
+// armarLaSuperficieDelCuadro (DC-002.159c): deja en la UNICA superficie de esta animacion los pixeles del cuadro
+// que se va a dibujar. Es la version de la consola de `createDirectionSurfaces`, que armaba las 8 superficies de
+// la direccion de una vez (~1 MB para un modo del heroe de 7 capas, contra 1.835.008 B de semiespacio).
+//
+// COMO. Si el cuadro pedido ya es el que esta cargado, no hace nada (esto se llama en cada dibujo). Si no, reusa
+// la superficie que ya tiene (mismo tamano) y la vuelve a llenar con `cargarCuadroEnSuperficie`, que es la misma
+// expansion de paleta que se pagaba al crearla. La direccion se decodifica si hace falta, igual que antes.
+//
+// LO QUE SE SUELTA. La referencia del cuadro anterior (`frames[dir].frames[cuadro].image`) se pone en nil antes de
+// reusar la superficie: si quedara apuntando a la superficie reusada, el cuadro viejo mostraria los pixeles del
+// nuevo.
+func (a *DCCAnimation) armarLaSuperficieDelCuadro(directionIndex, frameIndex int) error {
+	if directionIndex < 0 || directionIndex >= len(a.directions) {
+		return fmt.Errorf("dcc: direction %d out of range (the animation has %d)", directionIndex, len(a.directions))
+	}
+
+	if !a.directions[directionIndex].decoded {
+		if err := a.decodeDirection(directionIndex); err != nil {
+			return err
+		}
+	}
+
+	frames := a.directions[directionIndex].frames
+	if frameIndex < 0 || frameIndex >= len(frames) {
+		return fmt.Errorf("dcc: frame %d out of range (the direction has %d)", frameIndex, len(frames))
+	}
+
+	if frames[frameIndex].image != nil {
+		return nil
+	}
+
+	if err := a.dcc.DecodificarDireccion(directionIndex); err != nil {
+		return err
+	}
+
+	frame := frames[frameIndex]
+	dccFrame := a.dcc.Directions[directionIndex].Frames[frameIndex]
+
+	if len(dccFrame.PixelData) != (frame.width * frame.height) {
+		return errors.New("pixel data incorrect")
+	}
+
+	if a.renderer == nil {
+		return errors.New("no renderer")
+	}
+
+	// el cuadro anterior pierde la referencia ANTES de que la superficie cambie de contenido
+	if a.superficieDelCuadro != nil &&
+		a.superficieDireccion < len(a.directions) &&
+		a.superficieCuadro < len(a.directions[a.superficieDireccion].frames) {
+		a.directions[a.superficieDireccion].frames[a.superficieCuadro].image = nil
+	}
+
+	superficie := a.superficieDelCuadro
+	if superficie == nil || a.superficieAncho != frame.width || a.superficieAlto != frame.height {
+		superficie = a.renderer.NewSurface(frame.width, frame.height)
+		a.superficieDelCuadro = superficie
+		a.superficieAncho, a.superficieAlto = frame.width, frame.height
+
+		contadorDeSuperficies159.creadas++
+		contadorDeSuperficies159.bytes += frame.width * frame.height * 4
+	}
+
+	cargarCuadroEnSuperficie(superficie, dccFrame.PixelData, a.palette)
+
+	frames[frameIndex].image = superficie
+	a.superficieDireccion, a.superficieCuadro = directionIndex, frameIndex
 
 	return nil
 }

@@ -82,6 +82,13 @@ func ArrancarComoConsola() {
 	// `sombrasDelCompuesto` en composite.go y la evidencia de DC-002.159b). El ente se dibuja igual, sin la mancha
 	// del piso. Cuando el camino de la sombra este arreglado, se saca esta linea.
 	UsarSombrasDelCompuesto(false)
+
+	// DC-002.159c: y la animacion mantiene UNA superficie por capa (la del cuadro que se esta dibujando) en vez de
+	// armar las 8 de la direccion la primera vez que la dibuja. Medido en DC-002.159b: entrar en el modo `TW` y
+	// cambiar de direccion caminando costaba ~1 MB de superficies de golpe (7 capas x 8 cuadros) contra un
+	// semiespacio de 1.835.008 B -- el recolector corria cinco veces seguidas y el SH-4 moria a los dos segundos
+	// de arrancar a caminar con `fatal error: stack_alloc: out of memory`. Ver dcc_animation.go.
+	UsarSuperficiesPorCuadro(true)
 }
 
 // NuevoAssetManagerDeConsola arma el AssetManager de la consola: los ocho caches con los presupuestos

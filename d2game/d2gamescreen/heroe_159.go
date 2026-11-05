@@ -69,19 +69,12 @@ const (
 	// ~0,5 s, asi que 3 celdas dan margen de sobra y el objetivo se renueva cada cuadro igual).
 	celdasPorDelante159 = 1.0
 
-	// El recuadro de lienzo que se guarda debajo del heroe, en pixeles. La caja del compuesto de la amazona son
-	// 60x76 medidos (DC-002.38), pero el recuadro NO es la caja: tiene que cubrir donde el sprite CAE en el
-	// lienzo, y eso incluye el desplazamiento de cada capa (el pelo, el arma) y el cuadro de la animacion. Con
-	// 96x112 quedaba un fantasma de ~25 pixeles del cuadro anterior al caminar -- medido en el Gate 0: dos
-	// copias del heroe a un lado de la otra en la captura de los 54 s (DC-002.159b). 160x160 le deja 50 px de
-	// aire por lado; son 102.400 B de buffer, una sola vez.
-	anchoDeLaMemoria159 = 160
-	altoDeLaMemoria159  = 160
-
-	// donde queda el recuadro respecto de los PIES del heroe (el ancla del compuesto): centrado a lo
-	// ancho y con la caja para arriba (el personaje se dibuja desde los pies hacia arriba).
-	memoriaIzquierda159 = -anchoDeLaMemoria159 / 2
-	memoriaArriba159    = -altoDeLaMemoria159 + 24
+	// EL RECUADRO DEL BORRADO NO ES UNA CONSTANTE (DC-002.159c). Antes eran 160x160 fijos ("la caja del
+	// compuesto de la amazona son 60x76 medidos"): entraba el cuadro de parado, pero caminando las capas de las
+	// piernas se dibujan con su propio desplazamiento, el sprite se sale del recuadro y quedaban piernas del
+	// cuadro anterior pegadas al mapa. Ahora la caja la da el compuesto cuadro a cuadro
+	// (`Player.RecuadroDelCuadro159` -> `Composite.Recuadro159`), que es el unico que sabe que capas se dibujan
+	// y con que desplazamiento. El buffer de abajo (`h.memoria`) se pide con esa caja y crece cuando hace falta.
 )
 
 // lienzoConMemoria159: lo que la Surface del cuadro tiene que saber hacer para que el mapa se quede
@@ -105,16 +98,43 @@ type HeroeDelGate0 struct {
 	entrada   d2interface.InputService
 	refrescar func()
 
+	// compuesto: el compuesto del heroe tal como se armo (es el mismo que dibuja el ente). De aca sale la CAJA del
+	// cuadro que se esta dibujando, que es el recuadro del borrado (DC-002.159c): la caja no se puede adivinar
+	// desde afuera porque cada capa se dibuja con su propio desplazamiento (ver `Composite.Recuadro159`).
+	compuesto *d2asset.Composite
+
 	// lienzo: si la Surface sabe guardar y devolver un recuadro. nil = no se puede (la PC).
-	lienzo   lienzoConMemoria159
-	memoria  []byte
-	hayCopia bool
-	copiaX   int
-	copiaY   int
+	lienzo  lienzoConMemoria159
+	memoria []byte
+	// DC-002.159c: de que tamano es el buffer de arriba. La caja la da el compuesto y crece con el cuadro
+	// (un cuadro de caminar es mas alto que uno de parado), asi que el buffer se pide del tamano pedido y se
+	// vuelve a pedir SOLO si el nuevo no entra.
+	memoriaAncho int
+	memoriaAlto  int
+	hayCopia     bool
+	copiaX       int
+	copiaY       int
 	// DC-002.159b: el recuadro que de verdad se guardo (el recorte al lienzo cuando el heroe esta en el borde).
 	// Es el que se devuelve: devolver el recuadro entero moveria pixeles que no se copiaron.
 	copiaAncho int
 	copiaAlto  int
+
+	// DC-002.159c: la ultima caja que dio el compuesto (izq, arriba, ancho, alto) y cuantas veces no la dio.
+	// Van en la linea de estado: son la prueba de que el recuadro sale del compuesto y de que cubre el caminar.
+	ultimaCaja [4]int
+	sinCaja159 int
+
+	// DC-002.159c (instrumentos del borrado): `memoria2` es el buffer gemelo donde se relee el recuadro para
+	// comprobar que el lienzo devolvio lo que guardo; `borrados159` cuenta los borrados hechos, `noVolvieron159`
+	// los que NO volvieron iguales y `dibujos159` las veces que se dibujo el ente (si crece de a uno por cuadro,
+	// nadie mas lo esta dibujando).
+	memoria2       []byte
+	borrados159    int
+	noVolvieron159 int
+	dibujos159     int
+	// cuantos pixeles cambio el dibujo dentro del recuadro (y en cuantos cuadros cambio alguno)
+	pintados159        int
+	cuadrosPintados159 int
 
 	// la ultima direccion pedida y lo que se acumula para la evidencia
 	direccion  int
@@ -179,6 +199,7 @@ func NuevoHeroeDelGate0(
 		term:      term,
 		entrada:   entrada,
 		refrescar: refrescar,
+		compuesto: compuesto,
 		direccion: direccionDelHeroe159,
 		Logger:    logger,
 	}
@@ -221,16 +242,30 @@ func estadisticasDeNivelUno(am *d2asset.AssetManager, clase d2enum.Hero) (*d2her
 
 // ConMemoria: le pasa el lienzo que sabe guardar recuadros (la Surface del cuadro). Si es nil, el heroe se
 // dibuja igual pero sin borrado: sirve solo cuando el mapa se repinta entero cada cuadro (la PC).
+//
+// DC-002.159c: el buffer NO se pide aca. Su tamano sale de la caja del compuesto, que cambia con el cuadro de la
+// animacion; se pide en el primer dibujo y crece solo si el cuadro nuevo no entra (ver `asegurarMemoria`).
 func (h *HeroeDelGate0) ConMemoria(lienzo lienzoConMemoria159) {
 	h.lienzo = lienzo
+}
 
-	if lienzo == nil {
-		return
+// asegurarMemoria: deja `h.memoria` con lugar para un recuadro de ancho x alto (RGBA de 8 bits por canal). Se
+// pide una vez y se vuelve a pedir solo si el que hay no entra: el cuadro de caminar es mas alto que el de parado
+// y el de una diagonal cambia otra vez, pero despues de dos o tres cuadros la caja se queda quieta.
+func (h *HeroeDelGate0) asegurarMemoria(ancho, alto int) bool {
+	if ancho <= 0 || alto <= 0 {
+		return false
 	}
 
-	if h.memoria == nil {
-		h.memoria = make([]byte, anchoDeLaMemoria159*altoDeLaMemoria159*4)
+	if h.memoria != nil && h.memoriaAncho >= ancho && h.memoriaAlto >= alto {
+		return true
 	}
+
+	h.memoria = make([]byte, ancho*alto*4)
+	h.memoria2 = make([]byte, ancho*alto*4)
+	h.memoriaAncho, h.memoriaAlto = ancho, alto
+
+	return true
 }
 
 // ConMapa: la camara, que se pasa DESPUES de crear el ente (el heroe se arma antes que el renderer porque es
@@ -349,6 +384,18 @@ func (h *HeroeDelGate0) PieDeLaPantalla() (int, int) {
 	return int(px), int(py)
 }
 
+// cajaDelCuadro: la caja que ocupa el cuadro que se va a dibujar, relativa a los pies del heroe (el origen del
+// ente). Sale del compuesto, que es el unico que sabe que capas del COF se dibujan en este cuadro y con que
+// desplazamiento cada una (DC-002.159c). Si el compuesto todavia no tiene modo no hay caja, y el que llama no
+// dibuja: dibujar sin haber guardado lo de abajo deja un fantasma que despues no se puede borrar.
+func (h *HeroeDelGate0) cajaDelCuadro() (izq, arriba, ancho, alto int, ok bool) {
+	if h.compuesto == nil {
+		return 0, 0, 0, 0, false
+	}
+
+	return h.compuesto.Recuadro159()
+}
+
 // DibujarSobreElMapa: el cuadro del heroe cuando el mapa NO se repinta. `mapaRepintado` dice si el
 // renderer acaba de pintar el mapa entero en este cuadro: en ese caso no hay nada que borrar (los pixeles
 // viejos del heroe ya los tapo el mapa) y solo se guarda lo de abajo; si el mapa se salto, primero se
@@ -356,8 +403,13 @@ func (h *HeroeDelGate0) PieDeLaPantalla() (int, int) {
 //
 // Sin lienzo con memoria (la PC) no hace nada: ahi el mapa se pinta entero cada cuadro y el heroe lo dibuja
 // el renderer dentro de sus pasadas.
+//
+// DC-002.159c: el recuadro sale del COMPUESTO (`Player.RecuadroDelCuadro159`), no de una constante. Es lo que
+// cubre el cuadro de caminar (las capas de las piernas se dibujan con su propio desplazamiento) y lo que evita
+// que queden piernas pegadas al mapa. Si el compuesto todavia no tiene modo, no hay caja: no se dibuja (dibujar
+// sin haber guardado lo de abajo deja un fantasma que no se puede borrar).
 func (h *HeroeDelGate0) DibujarSobreElMapa(target d2interface.Surface, mapaRepintado bool) {
-	if h.lienzo == nil || h.memoria == nil {
+	if h.lienzo == nil {
 		return
 	}
 
@@ -366,16 +418,40 @@ func (h *HeroeDelGate0) DibujarSobreElMapa(target d2interface.Surface, mapaRepin
 	} else if h.hayCopia {
 		h.lienzo.PegarRect159(h.memoria, h.copiaX, h.copiaY, h.copiaAncho, h.copiaAlto)
 		h.hayCopia = false
+		h.borrados159++
+
+		// DC-002.159c (instrumento): se vuelve a leer el mismo recuadro y se compara con lo que se guardo. Si el
+		// borrado funciona, no puede diferir ni un byte; si difiere, el fantasma no es la caja sino el lienzo.
+		if !h.volvioElRecuadro() {
+			h.noVolvieron159++
+		}
 	}
 
-	px, py := h.PieDeLaPantalla()
-	x := px + memoriaIzquierda159
-	y := py + memoriaArriba159
+	izq, arriba, ancho, alto, hayCaja := h.cajaDelCuadro()
+	if !hayCaja || ancho <= 0 || alto <= 0 {
+		h.sinCaja159++
+
+		return
+	}
+
+	h.ultimaCaja = [4]int{izq, arriba, ancho, alto}
+
+	if !h.asegurarMemoria(ancho, alto) {
+		return
+	}
+
+	// DONDE EMPIEZA EL SPRITE (DC-002.159c): en el origen del COMPUESTO, que es la traslacion del tile mas el
+	// corrimiento propio del ente (`MapRenderer.OrigenDelEnte159`). No es `PieDeLaPantalla` (`pie=`): esa es la
+	// posicion exacta del ente en pantalla, y el sprite se dibuja hasta 16 px al costado y 11 px mas abajo que eso.
+	// Con el recuadro puesto en `pie` el borrado dejaba un borde del cuadro anterior en cada cuadro de caminar.
+	dibX, dibY := h.mapa.OrigenDelEnte159(h.jugador)
+	x := dibX + izq
+	y := dibY + arriba
 
 	// guardar lo de abajo ANTES de dibujar. DC-002.159b: el lienzo recorta el recuadro al borde de la pantalla
 	// y devuelve el recorte, asi que el borrado funciona con el heroe en el borde; si el recuadro no toca el
 	// lienzo (el heroe se fue de la vista) no hay copia y NO se dibuja: nada que borrar despues.
-	escritos, xc, yc, anchoC, altoC := h.lienzo.CopiarRect159(h.memoria, x, y, anchoDeLaMemoria159, altoDeLaMemoria159)
+	escritos, xc, yc, anchoC, altoC := h.lienzo.CopiarRect159(h.memoria, x, y, ancho, alto)
 	if escritos <= 0 || anchoC <= 0 || altoC <= 0 {
 		return
 	}
@@ -383,19 +459,82 @@ func (h *HeroeDelGate0) DibujarSobreElMapa(target d2interface.Surface, mapaRepin
 	h.hayCopia = true
 	h.copiaX, h.copiaY, h.copiaAncho, h.copiaAlto = xc, yc, anchoC, altoC
 
+	h.dibujos159++
 	h.mapa.DibujarEnte159(target, h.jugador)
+
+	// DC-002.159c (instrumento): cuantos pixeles del recuadro cambio el dibujo. Si esto es 0, el compuesto no
+	// pinto nada ahi (el sprite no esta donde dice el pie) y no hay fantasma que buscar.
+	if escritos2, _, _, _, _ := h.lienzo.CopiarRect159(h.memoria2, h.copiaX, h.copiaY, h.copiaAncho, h.copiaAlto); escritos2 > 0 {
+		pintados := 0
+
+		for i := 0; i < h.copiaAncho*h.copiaAlto*4; i += 4 {
+			if h.memoria[i] != h.memoria2[i] || h.memoria[i+1] != h.memoria2[i+1] ||
+				h.memoria[i+2] != h.memoria2[i+2] || h.memoria[i+3] != h.memoria2[i+3] {
+				pintados++
+			}
+		}
+
+		h.pintados159 += pintados
+
+		if pintados > 0 {
+			h.cuadrosPintados159++
+		}
+	}
 }
 
 // OlvidarCopia: el lienzo ya no tiene lo que se guardo (el mapa se repinto encima o cambio la pantalla).
 func (h *HeroeDelGate0) OlvidarCopia() { h.hayCopia = false }
 
-// Estado: una linea para el log de la corrida: donde esta, que direccion mira, si camina o esta quieto y
-// que modo de animacion usa el compuesto. Es lo que la evidencia imprime cada vez que algo cambia.
+// volvioElRecuadro (instrumento de DC-002.159c): vuelve a leer del lienzo el recuadro que se acaba de devolver y
+// lo compara con el que se habia guardado. `true` si no difiere ni un byte.
+//
+// POR QUE. El fantasma del caminar puede venir de dos lados muy distintos: la CAJA no cubre el sprite, o el
+// LIENZO no devuelve lo que guardo. Esta comparacion separa los dos casos sin mirar capturas: si esto da
+// `false`, el borrado no esta escribiendo lo que cree y el problema no es la caja.
+func (h *HeroeDelGate0) volvioElRecuadro() bool {
+	if h.memoria2 == nil || h.copiaAncho <= 0 || h.copiaAlto <= 0 {
+		return true
+	}
+
+	escritos, _, _, _, _ := h.lienzo.CopiarRect159(h.memoria2, h.copiaX, h.copiaY, h.copiaAncho, h.copiaAlto)
+	if escritos <= 0 {
+		return false
+	}
+
+	n := h.copiaAncho * h.copiaAlto * 4
+
+	for i := 0; i < n; i++ {
+		if h.memoria[i] != h.memoria2[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Estado: una linea para el log de la corrida: donde esta, que direccion mira, si camina o esta quieto, que
+// modo de animacion usa el compuesto y con que recuadro se borra. Es lo que la evidencia imprime cada vez que
+// algo cambia.
+//
+// DC-002.159c agrega dos cosas a la linea: la CAJA que dio el compuesto (`caja=izq,arriba,anchoxalto`, relativa a
+// los pies) y las SUPERFICIES DE CUADRO pedidas desde que arranco el proceso (`sup=cuantas/bytes`). La primera es
+// la prueba de que el recuadro del borrado cubre el cuadro de caminar; la segunda es la prueba de que la
+// superficie unica no se pide cuadro a cuadro.
 func (h *HeroeDelGate0) Estado() string {
 	pos := h.jugador.GetPosition()
 	px, py := h.PieDeLaPantalla()
+	superficies, bytes := d2asset.SuperficiesDeCuadro159()
+	dibX, dibY := h.mapa.UltimoDibujo159()
 
-	return fmt.Sprintf("celda=%.2f,%.2f pie=%d,%d dir=%d modo=%s camina=%v pasos=%d",
+	return fmt.Sprintf("celda=%.2f,%.2f pie=%d,%d dir=%d modo=%s camina=%v pasos=%d caja=%d,%d,%dx%d "+
+		"sup=%d/%dB sincaja=%d giros=%d decod=%d exp=%d/%dB borrados=%d noVolvieron=%d dibujos=%d dib=%d,%d "+
+		"pintados=%d cuadrosPintados=%d",
 		pos.X()/subtilesPorCelda159, pos.Y()/subtilesPorCelda159, px, py,
-		h.direccion, h.jugador.GetAnimationMode().String(), h.caminando, h.pasos)
+		h.direccion, h.jugador.GetAnimationMode().String(), h.caminando, h.pasos,
+		h.ultimaCaja[0], h.ultimaCaja[1], h.ultimaCaja[2], h.ultimaCaja[3],
+		superficies, bytes, h.sinCaja159,
+		d2asset.GirosDelCompuesto159(), d2asset.DecodificacionesDeDireccion159(),
+		d2util.PedidosDeExpansion, d2util.BytesDeExpansion,
+		h.borrados159, h.noVolvieron159, h.dibujos159, dibX, dibY,
+		h.pintados159, h.cuadrosPintados159)
 }

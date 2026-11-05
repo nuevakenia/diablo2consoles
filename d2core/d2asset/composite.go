@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2cof"
@@ -171,32 +170,42 @@ func (c *Composite) SetAnimSpeed(speed int) {
 }
 
 // SetDirection sets the direction of the composite and its layers
+//
+// DC-002.159c: EN SERIE, NO EN SIETE GOROUTINES. Antes cada capa se ponia en la direccion desde su propia
+// goroutine (`go func` + `sync.WaitGroup`). En la PC eso apenas se nota, pero en la consola es el gasto mas
+// caro del cuadro cuando el ente camina: cada giro son siete goroutines nuevas, con su pila pedida al
+// monton de C (`sbrk`), y las pilas NO vuelven al semiespacio del recolector. Medido en el Gate 0 con las
+// superficies ya arregladas (corrida `/tmp/cap159c-d1`): el vivo despues del recolector habia bajado a
+// 1.023.336 B (de 1.606.416 B) y el caminar igual moria a los pocos cuadros con
+// `Out of memory. Requested sbrk_base ... diff 65536` y `fatal error: stack_alloc: out of memory` -- o sea no
+// era el semiespacio, era la pila de goroutines pidiendo `sbrk`. El SH-4 tiene UN nucleo: siete goroutines no
+// adelantan nada, solo cuestan.
 func (c *Composite) SetDirection(direction int) {
 	if c.mode == nil {
 		return
 	}
 
-	wg := sync.WaitGroup{}
-
 	c.direction = direction
-	wg.Add(len(c.mode.layers))
+	girosDelCompuesto159++
 
 	for layerIdx := range c.mode.layers {
-		go func(idx int) {
-			defer wg.Done()
+		layer := c.mode.layers[layerIdx]
 
-			layer := c.mode.layers[idx]
-
-			if layer != nil {
-				if err := layer.SetDirection(c.direction); err != nil {
-					fmt.Printf("failed to set direction of layer: %d, err: %v\n", idx, err)
-				}
+		if layer != nil {
+			if err := layer.SetDirection(c.direction); err != nil {
+				fmt.Printf("failed to set direction of layer: %d, err: %v\n", layerIdx, err)
 			}
-		}(layerIdx)
+		}
 	}
-
-	wg.Wait()
 }
+
+// girosDelCompuesto159: cuantas veces se puso en una direccion el compuesto desde que arranco el proceso. Es el
+// instrumento de DC-002.159c: caminando, el motor recalcula la direccion en cada cuadro y este contador lo dice
+// (ver `GirosDelCompuesto159`).
+var girosDelCompuesto159 int
+
+// GirosDelCompuesto159 devuelve cuantas veces se puso en una direccion el compuesto.
+func GirosDelCompuesto159() int { return girosDelCompuesto159 }
 
 // GetDirection returns the current direction the composite is facing
 func (c *Composite) GetDirection() int {
@@ -367,6 +376,99 @@ func (c *Composite) loadCompositeLayer(layerKey, layerValue, animationMode, weap
 func (c *Composite) GetSize() (w, h int) {
 	c.updateSize()
 	return c.size.Width, c.size.Height
+}
+
+// animationConRecuadro159 es la parte de una animacion que sabe la caja de su cuadro actual (DC-002.159c). La
+// cumplen las animaciones del motor (`Animation`, que es lo que hay detras de un DCC y de un DC6); es una
+// interfaz OPCIONAL para no tocar `d2interface.Animation`, igual que `superficieConLienzo` en cuadro_paletizado.go.
+//
+// El metodo va SIN exportar a proposito: lo unico que lo necesita es este archivo, y un metodo nuevo y exportado
+// en `Animation` le regala un stub a cada animacion que la empotra (DCC y DC6), que es export data de mas para
+// nada.
+type animationConRecuadro159 interface {
+	recuadroDelCuadro159() (izq, arriba, ancho, alto int)
+}
+
+// Recuadro159: la caja que ocupa el cuadro actual del compuesto, en pixeles y RELATIVA AL ORIGEN del compuesto
+// (el punto donde se dibuja el ente, o sea los pies).
+//
+// PARA QUE (DC-002.159c). El heroe del Gate 0 se dibuja encima de un mapa que no se repinta: antes de pintarlo hay
+// que guardar el recuadro de lienzo que el sprite tapa, y devolverlo en el cuadro siguiente (el borrado). Ese
+// recuadro tiene que cubrir TODO lo que el compuesto dibuja, y eso no es una constante: cada capa (pelo, cuerpo,
+// piernas, arma) se dibuja con su propio desplazamiento, y los desplazamientos CAMBIAN con el cuadro de la
+// animacion. Medido en DC-002.159b: con 160x160 fijo el cuadro de parado entraba, pero caminando quedaban las
+// piernas del cuadro anterior pegadas al mapa.
+//
+// La caja es la union de las cajas de las capas que la prioridad del COF manda dibujar en ESTE cuadro (las mismas
+// capas que recorre `Render`), cada una con su desplazamiento. `ok` en false cuando todavia no hay modo ni capas:
+// ahi el que llama no tiene con que calcular nada y no debe dibujar (no habria forma de borrarlo despues).
+func (c *Composite) Recuadro159() (izq, arriba, ancho, alto int, ok bool) {
+	if c.mode == nil || c.mode.cof == nil {
+		return 0, 0, 0, 0, false
+	}
+
+	direction := d2cof.Dir64ToCof(c.direction, c.mode.cof.NumberOfDirections)
+	if direction < 0 || direction >= len(c.mode.cof.Priority) {
+		return 0, 0, 0, 0, false
+	}
+
+	prioridad := c.mode.cof.Priority[direction]
+	if c.mode.frameIndex < 0 || c.mode.frameIndex >= len(prioridad) {
+		return 0, 0, 0, 0, false
+	}
+
+	x0, y0, x1, y1 := 0, 0, 0, 0
+	hayCaja := false
+
+	for _, layerIndex := range prioridad[c.mode.frameIndex] {
+		if int(layerIndex) < 0 || int(layerIndex) >= len(c.mode.layers) {
+			continue
+		}
+
+		layer := c.mode.layers[layerIndex]
+		if layer == nil {
+			continue
+		}
+
+		conRecuadro, sabe := layer.(animationConRecuadro159)
+		if !sabe {
+			continue
+		}
+
+		layerIzq, layerArriba, layerAncho, layerAlto := conRecuadro.recuadroDelCuadro159()
+		if layerAncho <= 0 || layerAlto <= 0 {
+			continue
+		}
+
+		if !hayCaja {
+			x0, y0, x1, y1 = layerIzq, layerArriba, layerIzq+layerAncho, layerArriba+layerAlto
+			hayCaja = true
+
+			continue
+		}
+
+		if layerIzq < x0 {
+			x0 = layerIzq
+		}
+
+		if layerArriba < y0 {
+			y0 = layerArriba
+		}
+
+		if layerIzq+layerAncho > x1 {
+			x1 = layerIzq + layerAncho
+		}
+
+		if layerArriba+layerAlto > y1 {
+			y1 = layerArriba + layerAlto
+		}
+	}
+
+	if !hayCaja {
+		return 0, 0, 0, 0, false
+	}
+
+	return x0, y0, x1 - x0, y1 - y0, true
 }
 
 func (c *Composite) updateSize() {
