@@ -67,6 +67,13 @@ func nuevoPaseo159(base *maple.Servicio) *paseo159 {
 func (p *paseo159) ActualizarDesdeElControl() {
 	p.Servicio.ActualizarDesdeElControl()
 	p.cuadro++
+
+	// DC-002.159n: EL LATIDO DE LA SONDA DEL COLOR. Sin esta linea, una corrida con cero eventos de la sonda
+	// no distingue "no paso nada" de "la sonda no corrio": los numeros son la prueba de que el camino se
+	// ejercio (llamadas > 0, conColor > 0) y de cuantas veces cada clase se llevo el color por delante.
+	if p.cuadro%300 == 0 {
+		LatidoDeLaSonda159n(p.cuadro)
+	}
 }
 
 // sentidoDeAhora: el tramo del guion que toca. Despues del ultimo, quieto (asi la corrida termina con el heroe

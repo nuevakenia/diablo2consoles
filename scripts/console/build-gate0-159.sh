@@ -150,7 +150,10 @@ echo "== 2/4 la lista de enlace: solo lo que el pueblo ALCANZA"
         echo "FALLA el analisis de alcance (ver $SAL/alcance.txt)" >&2
         exit 1
     }
-sed 's/^/   /' "$SAL/alcance.txt" | head -14
+# DC-002.159n: `| head -14` con `pipefail` mata el build cuando `sed` recibe SIGPIPE (exit 141), y es
+# intermitente porque depende de cuanto tarde en cerrarse el tubo. El `|| true` corta ese falso fallo: el
+# alcance ya quedo escrito en el archivo.
+sed 's/^/   /' "$SAL/alcance.txt" | head -14 || true
 cp "$GEN/orden-motor.txt" "$SAL/orden-motor-completo.txt"
 mv "$GEN/orden-motor-gate0.txt" "$GEN/orden-motor.txt"
 echo "   enlace: $(wc -l < "$GEN/orden-motor.txt") paquetes (el motor completo son $(wc -l < "$SAL/orden-motor-completo.txt"))"

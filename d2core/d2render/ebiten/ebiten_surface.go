@@ -43,6 +43,13 @@ type ebitenSurface struct {
 	colorMCache    map[colorMCacheKey]*colorMCacheEntry
 	monotonicClock int64
 	scratchOpts    ebiten.DrawImageOptions
+
+	// marca159n (DC-002.159n): la marca de vida de la superficie. Vale siempre `marcaDeSuperficie159n`; se
+	// escribe al crearla y el recolector la copia junto con el resto del objeto. Sirve para UNA pregunta, la
+	// que hace la sonda del color: "lo que hay en esta direccion, ¿sigue siendo una superficie?". Si el
+	// recolector movio la superficie y alguien quedo con la direccion vieja, ahi ya no hay una superficie (o
+	// hay otra) y la marca lo dice sin preguntarle nada al recolector. En el camino normal nadie la mira.
+	marca159n uint32
 }
 
 func createEbitenSurface(r *Renderer, img *ebiten.Image, currentState ...surfaceState) *ebitenSurface {
@@ -64,6 +71,7 @@ func createEbitenSurface(r *Renderer, img *ebiten.Image, currentState ...surface
 		image:        img,
 		stateCurrent: state,
 		colorMCache:  make(map[colorMCacheKey]*colorMCacheEntry),
+		marca159n:    marcaDeSuperficie159n,
 	}
 }
 
@@ -109,6 +117,7 @@ func (s *ebitenSurface) PushFilter(filter d2enum.Filter) {
 func (s *ebitenSurface) PushColor(c color.Color) {
 	s.stateStack = append(s.stateStack, s.stateCurrent)
 	s.stateCurrent.color = c
+	sondaDeColor159n(s, true, &s.stateCurrent.color) // DC-002.159n: la sonda del color (apagada sin gancho)
 }
 
 // PushBrightness pushes a brightness value to the state stack
@@ -255,7 +264,7 @@ func (s *ebitenSurface) prepareColorM(opts *ebiten.DrawImageOptions, hsv bool) {
 		hsvMu.Unlock()
 	}
 
-	if st.color != nil {
+	if !sondaDeColor159n(s, false, &st.color) && st.color != nil {
 		k.r, k.g, k.b, k.a = st.color.RGBA()
 		k.hasColor = true
 	}
@@ -444,7 +453,11 @@ func (s *ebitenSurface) fillDrawImageOptions(opts *ebiten.DrawImageOptions) *ebi
 
 	opts.Filter = s.stateCurrent.filter
 
-	if s.stateCurrent.color != nil {
+	if sondaDeColor159n(s, false, &s.stateCurrent.color) {
+		// DC-002.159n: la sonda devuelve false cuando no hay nada que decir (sin color, o el color sano) y
+		// true cuando el color ya no es el que se empujo. En ese caso no se despacha por la tabla de metodos:
+		// el dibujo sale sin tinte y la corrida sigue, que es lo que se esta midiendo.
+	} else if s.stateCurrent.color != nil {
 		opts.ColorM = s.colorToColorM(s.stateCurrent.color)
 	}
 

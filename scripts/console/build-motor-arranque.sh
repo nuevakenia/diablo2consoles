@@ -119,7 +119,11 @@ EXTRA_OBJS=""
 for f in "$SRC"/*.c "$SRC"/csrc/*.c; do
     [ -f "$f" ] || continue
     o="$OUT/$(basename "${f%.c}").o"
-    kos-cc -O2 -ml -m4-single -I"$SRC" -I"$SRC/csrc" -c "$f" -o "$o"
+    # DC-002.159n: -I del runtime de libgodc, el mismo que ya lleva build-dc.sh (DC-002.105). Sin este camino
+    # el shim del POC no puede incluir `gc_semispace.h`, que es lo que describe donde esta el semiespacio vivo
+    # del recolector (la sonda del color de 159n lo necesita y repetir ese layout a mano es una fuente de
+    # verdad mas que se queda vieja).
+    kos-cc -O2 -ml -m4-single -I"$SRC" -I"$SRC/csrc" -I"$LIBGODC/runtime" -c "$f" -o "$o"
     EXTRA_OBJS="$EXTRA_OBJS $o"
 done
 

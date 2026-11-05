@@ -157,6 +157,38 @@ void d2c_bloques_instrumento(int encendido) {
     instrumentoDeBloques = encendido;
 }
 
+/* ============================== 8) DONDE ESTA EL SEMIESPACIO VIVO (DC-002.159n) ==============================
+ *
+ * El recolector de libgodc COPIA: despues de cada recoleccion, lo que sigue vivo esta en la OTRA mitad y la
+ * mitad vieja pasa a ser el area de reparto (o sea, se reusa). Un puntero que se quedo en la mitad vieja no
+ * da un error: lee basura. Eso es lo que mata a `colorToColorM` (la tabla de metodos del color sale de
+ * memoria prestada y el `jsr` se va a cualquier lado).
+ *
+ * Esta funcion le pasa a la sonda de Go los cinco numeros que hacen falta para decirlo: donde empieza la mitad
+ * VIVA, donde esta el puntero de reparto (lo vivo esta entre esos dos), donde termina, donde empieza la otra
+ * mitad (la que se reusa, para poder decir "esa direccion es de la mitad vieja") y el tope de la imagen.
+ *
+ * La estructura `gc_heap` la declara libgodc; `gc_imagen_hi` lo pone `gc_init()` (arriba de la imagen es
+ * monton). El build pasa -I"$LIBGODC/runtime" (build-dc.sh), asi que el include resuelve sin copiar nada.
+ */
+#include "gc_semispace.h"
+
+extern uintptr_t gc_imagen_hi;
+
+void d2c_semi_rango(unsigned int *v) {
+    if (v == NULL) {
+        return;
+    }
+
+    v[0] = (unsigned int)(uintptr_t)gc_heap.space[gc_heap.active_space];
+    v[1] = (unsigned int)(uintptr_t)gc_heap.alloc_ptr;
+    v[2] = (unsigned int)(uintptr_t)gc_heap.alloc_limit;
+    v[3] = (unsigned int)(uintptr_t)gc_heap.space[1 - gc_heap.active_space];
+    v[4] = (unsigned int)(uintptr_t)gc_imagen_hi;
+    v[5] = (unsigned int)gc_heap.gc_count;
+    v[6] = (unsigned int)gc_heap.space_size;
+}
+
 void *__real_malloc(size_t n);
 
 void *__wrap_malloc(size_t n) {
