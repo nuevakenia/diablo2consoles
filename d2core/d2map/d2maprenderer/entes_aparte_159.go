@@ -37,9 +37,15 @@ func (mr *MapRenderer) ActivarEntesAparte159(si bool) {
 // EntesAparte159: si la palanca esta puesta.
 func (mr *MapRenderer) EntesAparte159() bool { return mr.entesAparte159 }
 
-// DibujarEnte159: dibuja UN ente con la misma traslacion que usan las pasadas del renderer (la casilla
-// donde esta parado), que es la cuenta que hace que el ente caiga en el mismo pixel que caia dentro de la
-// pasada 2/3.
+// DibujarEnte159: dibuja UN ente con la misma traslacion que usan las pasadas del renderer: se apila la
+// posicion del ente en el mundo y despues la traslacion a PANTALLA que sale del viewport (la que ya lleva la
+// camara). Son las DOS las que hacen que el ente caiga en el mismo pixel que caia dentro de la pasada 2/3.
+//
+// DC-002.159b: FALTABA LA SEGUNDA. Con solo la traslacion del mundo el ente se dibujaba en el origen del
+// lienzo (arriba a la izquierda, cortado por el borde) mientras la camara lo miraba en el centro: medido en el
+// Gate 0 con el heroe naciendo en la celda 26.5,7.5 (`pie=320,232` segun `PieDeLaPantalla`, y el sprite pegado
+// al borde izquierdo en la captura). El renderer hace `target.PushTranslation(mr.viewport.GetTranslationScreen())`
+// antes de `renderLitEntity` (ver `renderPass2`), que es exactamente esta linea.
 func (mr *MapRenderer) DibujarEnte159(target d2interface.Surface, e d2interface.MapEntity) {
 	if e == nil {
 		return
@@ -48,6 +54,8 @@ func (mr *MapRenderer) DibujarEnte159(target d2interface.Surface, e d2interface.
 	pos := e.GetPosition()
 
 	mr.viewport.PushTranslationWorld(pos.X()/subtilesPerTile, pos.Y()/subtilesPerTile)
+	target.PushTranslation(mr.viewport.GetTranslationScreen())
 	e.Render(target)
+	target.Pop()
 	mr.viewport.PopTranslation()
 }

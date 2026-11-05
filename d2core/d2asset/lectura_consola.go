@@ -343,3 +343,40 @@ func (am *AssetManager) loadFileDeConsolaEn(filePath string, dst []byte, tamano 
 
 	return dst[:leidos], nil
 }
+
+// loadFileParaDCC (DC-002.159b): los bytes de un `.dcc` que el `DCC` se va a QUEDAR.
+//
+// POR QUE NO ALCANZA `LoadFile`. Con la politica de direcciones perezosas el `DCC` guarda los bytes del archivo y
+// decodifica de ahi cada direccion cuando se dibuja, asi que esos bytes tienen que vivir tanto como el. El camino
+// de la consola puede devolver un tramo PRESTADO que vale hasta la proxima lectura (DC-002.99): con eso, girar al
+// heroe decodificaria basura. Aca se pide un bloque propio.
+//
+// POR QUE DE MAS DE 64 KB. El bloque que se pide es `tamano+1` y nunca menor a 64 KB + 1: en libgodc un objeto de
+// mas de 64 KB va al monton de C, FUERA de los dos semiespacios (es el mismo camino que DC-002.110 uso con las
+// celdas del `.ds1`). El costo de pedir 64 KB para un `.dcc` de 10 KB es desperdicio en el monton de C, que
+// despues del suelte del mapa tiene 2,6 MB libres; el beneficio es que ningún `.dcc` de personaje toca el
+// semiespacio.
+//
+// Si la fuente no sabe el tamano del archivo se vuelve al camino de siempre (y el `DCC` se decodifica entero, como
+// en la PC): preferible a inventar un numero.
+func (am *AssetManager) loadFileParaDCC(dccPath string) ([]byte, error) {
+	const corteDelMontonDeC = 64 * 1024 // GC_LARGE_OBJECT_THRESHOLD_KB de libgodc
+
+	if !direccionesPerezosas {
+		return am.LoadFile(dccPath)
+	}
+
+	tamano, sabido := am.Loader.TamanoDeArchivo(dccPath)
+	if !sabido || tamano <= 0 {
+		lecturasSinTamano++
+
+		return am.LoadFile(dccPath)
+	}
+
+	bloque := tamano + 1
+	if bloque <= corteDelMontonDeC {
+		bloque = corteDelMontonDeC + 1
+	}
+
+	return am.LoadFileEn(dccPath, make([]byte, bloque))
+}

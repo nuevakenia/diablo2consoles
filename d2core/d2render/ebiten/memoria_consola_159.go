@@ -13,9 +13,13 @@ package ebiten
 // LA CUENTA LA HACE EL SHIM (`(*ebiten.Image).CopiarRect` / `PegarRect`), que es quien tiene los
 // pixeles. Aca solo se pasa el recuadro, en coordenadas del LIENZO (el motor dibuja el mundo en el
 // origen de la columna, que con `AnchorBottom` es 0,0).
+//
+// DC-002.159b: el recuadro se RECORTA al lienzo (ver el shim) y el recorte viaja de vuelta al que llamo, que es
+// el que tiene que devolver exactamente esos pixeles.
 
-// CopiarRect159: guarda el recuadro del lienzo en `destino` (RGBA de 8 bits, filas seguidas).
-func (s *ebitenSurface) CopiarRect159(destino []byte, x, y, ancho, alto int) int {
+// CopiarRect159: guarda el recuadro del lienzo en `destino` (RGBA de 8 bits, filas seguidas) y devuelve cuantos
+// bytes escribio mas el recorte que se copio de verdad (xc, yc, anchoC, altoC).
+func (s *ebitenSurface) CopiarRect159(destino []byte, x, y, ancho, alto int) (escritos, xc, yc, anchoC, altoC int) {
 	return s.image.CopiarRect(destino, x, y, ancho, alto)
 }
 

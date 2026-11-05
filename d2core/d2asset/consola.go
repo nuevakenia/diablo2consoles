@@ -70,6 +70,18 @@ func ArrancarComoConsola() {
 	// `SoltarLecturasDeConsola`. OJO CON EL CONTRATO: con esta palanca prendida, lo que devuelve `LoadFile`
 	// vale hasta la proxima lectura (es el precio de no pedir memoria; ver la cabecera de lectura_consola.go).
 	ActivarLecturasPorTramos()
+
+	// DC-002.159b: las direcciones de los `.dcc` de personaje se decodifican cuando se dibujan, no todas al cargar.
+	// Un modo del heroe son 7 capas y las 16 direcciones de la capa `LA` de la amazona son 419.184 B de pixeles
+	// descomprimidos (medido en el Gate 0): con el mapa compuesto no entran en el semiespacio. Ver
+	// dcc_animation.go.
+	UsarDireccionesPerezosas(true)
+
+	// DC-002.159b: las sombras del compuesto se apagan. El camino de la sombra (escala + sesgo + brillo cero) en el
+	// renderer del PVR mata el SH-4 en el primer cuadro del heroe; medido y localizado en esta tarjeta (ver
+	// `sombrasDelCompuesto` en composite.go y la evidencia de DC-002.159b). El ente se dibuja igual, sin la mancha
+	// del piso. Cuando el camino de la sombra este arreglado, se saca esta linea.
+	UsarSombrasDelCompuesto(false)
 }
 
 // NuevoAssetManagerDeConsola arma el AssetManager de la consola: los ocho caches con los presupuestos

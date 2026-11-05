@@ -89,12 +89,12 @@ func d2cRelojUs() uint
 func init() { d2cSerialInit() }
 
 const (
-	// heroeEnElPueblo (DC-002.159): la palanca del heroe en este POC. Queda APAGADA porque el heroe NO ENTRA en
-	// la memoria de la consola con el pueblo compuesto: su compuesto deja ~436.000 B vivos en el semiespacio del
-	// recolector y el pueblo ya deja 1.268.000 B de 1.835.008 B, asi que el recolector muere con
-	// `GC to-space overflow` (medido, ver console/dc/evidencia/dc-002.159-el-heroe-en-la-consola.md). Con la
-	// palanca apagada el binario es el del Gate 0 de DC-002.157 mas el codigo del heroe sin usar.
-	heroeEnElPueblo = false
+	// heroeEnElPueblo (DC-002.159): la palanca del heroe en este POC. DC-002.159b la deja PRENDIDA: el heroe
+	// entra porque el mapa le devuelve la memoria (las 2.312 casillas del motor y el arena de bloques de los
+	// `.dt1` se sueltan al cerrar el cuadro 1, cuando el mapa ya esta pintado y no se repinta; ver
+	// `PantallaDelPueblo.soltarElMapaYEntrarElHeroe`). El muro de DC-002.159 esta medido en
+	// console/dc/evidencia/dc-002.159-el-heroe-en-la-consola.md.
+	heroeEnElPueblo = true
 
 	// el cuadro que COMPONE el renderer: 640x480 (el de la consola; d2display no baja de 800x600 y ese es el
 	// tamano de la superficie del motor, pero la cache y la camara se calculan sobre este)
@@ -203,6 +203,10 @@ func main() {
 
 	entrada := maple.NuevoServicio(cuadroAncho, cuadroAlto)
 
+	// DC-002.159b: el paseo. Se envuelve el servicio del maple para que la cruceta tenga un guion (los ocho
+	// sentidos de la pantalla) cuando no hay nadie apretando; el mando real sigue sumando. Ver paseo_159.go.
+	paseo := nuevoPaseo159(entrada)
+
 	println(frase, "cruceta: maple listo, hayControl=", maple.HayControl())
 
 	// ============================== 1. LAS PALANCAS DE LA CONSOLA ==============================
@@ -249,8 +253,8 @@ func main() {
 
 		// DC-002.159: EL HEROE DEL MOTOR Y LA CRUCETA
 		Heroe:            heroeEnElPueblo,
-		Entrada:          entrada,
-		RefrescarEntrada: func() { entrada.ActualizarDesdeElControl() },
+		Entrada:          paseo,
+		RefrescarEntrada: func() { paseo.ActualizarDesdeElControl() },
 
 		Region:       d2enum.RegionAct1Town,
 		Preset:       1,

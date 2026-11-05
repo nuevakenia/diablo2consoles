@@ -115,15 +115,22 @@ func (d *DCC) decodeDirection(direction int) *DCCDirection {
 }
 
 // Clone creates a copy of the DCC
+//
+// DC-002.159b: las direcciones pueden estar SIN decodificar (nil) si el DCC se cargo con `LoadPerezoso`: una
+// direccion nil se clona como nil (se decodifica recien cuando se pide). Antes se desreferenciaban todas y un
+// `DCC` perezoso tiraba el programa.
 func (d *DCC) Clone() *DCC {
 	clone := *d
-	copy(clone.directionOffsets, d.directionOffsets)
-	copy(clone.fileData, d.fileData)
+	clone.directionOffsets = append([]int(nil), d.directionOffsets...)
 	clone.Directions = make([]*DCCDirection, len(d.Directions))
 
 	for i := range d.Directions {
+		if d.Directions[i] == nil {
+			continue
+		}
+
 		cloneDirection := *d.Directions[i]
-		clone.Directions = append(clone.Directions, &cloneDirection)
+		clone.Directions[i] = &cloneDirection
 	}
 
 	return &clone

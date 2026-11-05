@@ -690,12 +690,21 @@ func (am *AssetManager) LoadDCC(dccPath string) (*d2dcc.DCC, error) {
 		return dccValue.(*d2dcc.DCC), nil
 	}
 
-	fileData, err := am.LoadFile(dccPath)
+	fileData, err := am.loadFileParaDCC(dccPath)
 	if err != nil {
 		return nil, err
 	}
 
-	dcc, err := d2dcc.Load(fileData)
+	// DC-002.159b: en la consola el `DCC` se carga con la cabecera sola y las direcciones se decodifican cuando se
+	// dibujan (ver `direccionesPerezosas`); en la PC se sigue decodificando todo de una.
+	var dcc *d2dcc.DCC
+
+	if direccionesPerezosas {
+		dcc, err = d2dcc.LoadPerezoso(fileData)
+	} else {
+		dcc, err = d2dcc.Load(fileData)
+	}
+
 	if err != nil {
 		return nil, err
 	}

@@ -54,6 +54,12 @@ func (mr *MapRenderer) RepintadosDelMapa157() int { return mr.repintados157 }
 
 // puedeSaltarseElMapa157: si este cuadro el mapa YA ESTA pintado en el lienzo y nada lo cambio.
 func (mr *MapRenderer) puedeSaltarseElMapa157() bool {
+	// DC-002.159b: las casillas del motor ya no estan (las devolvio el que llama, ver `mapa_soltado_159.go`):
+	// repintar pintaria un mundo vacio. El mapa que esta en el lienzo es el unico que hay.
+	if mr.mapaSoltado159 {
+		return true
+	}
+
 	if !mr.mapaEstatico157 || !mr.mapa157Valido {
 		return false
 	}

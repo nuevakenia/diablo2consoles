@@ -58,10 +58,16 @@ ult=0
 # es ~26 s (el bucle rompe en t=40 > 30 DESPUES de dormir hasta t=25). La lista va hasta 600 s para que un
 # SECS largo sea de verdad largo (el motor completa un cuadro cada ~0,3 s: el heartbeat del loop recien
 # imprime a los 300 cuadros, o sea ~100 s de corrida).
-for t in 3 6 10 15 25 40 60 90 120 150 180 240 300 360 420 480 540 600; do
+# DC-002.159b: la lista de tiempos se puede cambiar desde afuera (`CAPTURAS="40 50 55 60"`), para mirar de
+# cerca una ventana corta de la corrida. Sin la variable queda la lista de siempre.
+for t in ${CAPTURAS:-3 6 10 15 25 40 60 90 120 150 180 240 300 360 420 480 540 600}; do
   [ "$t" -gt "$SECS" ] && break
   sleep $(( t - ult )); ult=$t
   if kill -0 "$PID" 2>/dev/null; then
+    # DC-002.159b: la ventana se trae adelante antes de cada captura. Sin esto, una corrida en la que el
+    # emulador se reinicia (o el escritorio se lleva el foco) deja capturas de otro escritorio: medido, la
+    # mitad de las capturas de una corrida salieron negras o con un navegador encima.
+    bash "$HERE/flycast-adelante.sh" arriba >/dev/null 2>&1
     shot "$OUT/f${t}s.png"; echo "  captura ${t}s"
   else
     echo "  el emulador se detuvo antes de los ${t}s"; break

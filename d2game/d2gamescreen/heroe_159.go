@@ -67,18 +67,21 @@ const (
 	// numero de velocidad: la velocidad la pone el motor. Es cuanto camino se le pide de una vez, para que
 	// el `Step` tenga a donde ir mientras la tecla siga apretada (una celda de 5 subtiles se camina en
 	// ~0,5 s, asi que 3 celdas dan margen de sobra y el objetivo se renueva cada cuadro igual).
-	celdasPorDelante159 = 3.0
+	celdasPorDelante159 = 1.0
 
-	// El recuadro de lienzo que se guarda debajo del heroe, en pixeles: 96x112 es la caja del compuesto
-	// de la amazona (60x76 medidos en DC-002.38) con margen para las capas que se mueven al caminar
-	// (el arma, el pelo) y para el redondeo de la proyeccion.
-	anchoDeLaMemoria159 = 96
-	altoDeLaMemoria159  = 112
+	// El recuadro de lienzo que se guarda debajo del heroe, en pixeles. La caja del compuesto de la amazona son
+	// 60x76 medidos (DC-002.38), pero el recuadro NO es la caja: tiene que cubrir donde el sprite CAE en el
+	// lienzo, y eso incluye el desplazamiento de cada capa (el pelo, el arma) y el cuadro de la animacion. Con
+	// 96x112 quedaba un fantasma de ~25 pixeles del cuadro anterior al caminar -- medido en el Gate 0: dos
+	// copias del heroe a un lado de la otra en la captura de los 54 s (DC-002.159b). 160x160 le deja 50 px de
+	// aire por lado; son 102.400 B de buffer, una sola vez.
+	anchoDeLaMemoria159 = 160
+	altoDeLaMemoria159  = 160
 
 	// donde queda el recuadro respecto de los PIES del heroe (el ancla del compuesto): centrado a lo
 	// ancho y con la caja para arriba (el personaje se dibuja desde los pies hacia arriba).
 	memoriaIzquierda159 = -anchoDeLaMemoria159 / 2
-	memoriaArriba159    = -altoDeLaMemoria159 + 16
+	memoriaArriba159    = -altoDeLaMemoria159 + 24
 )
 
 // lienzoConMemoria159: lo que la Surface del cuadro tiene que saber hacer para que el mapa se quede
@@ -86,7 +89,7 @@ const (
 // (d2core/d2render/ebiten/memoria_consola_159.go); en la PC no existe, y entonces el camino es el de
 // siempre: el mapa entero cada cuadro y el heroe dibujado por el renderer dentro de sus pasadas.
 type lienzoConMemoria159 interface {
-	CopiarRect159(destino []byte, x, y, ancho, alto int) int
+	CopiarRect159(destino []byte, x, y, ancho, alto int) (escritos, xc, yc, anchoC, altoC int)
 	PegarRect159(origen []byte, x, y, ancho, alto int) int
 }
 
@@ -99,7 +102,7 @@ type HeroeDelGate0 struct {
 
 	// entrada: de donde se lee la cruceta (el maple en la consola). refrescar: el que lee el control y
 	// deja el estado del cuadro (en la consola es una llamada al bus maple; en la PC no hay).
-	entrada  d2interface.InputService
+	entrada   d2interface.InputService
 	refrescar func()
 
 	// lienzo: si la Surface sabe guardar y devolver un recuadro. nil = no se puede (la PC).
@@ -108,12 +111,23 @@ type HeroeDelGate0 struct {
 	hayCopia bool
 	copiaX   int
 	copiaY   int
+	// DC-002.159b: el recuadro que de verdad se guardo (el recorte al lienzo cuando el heroe esta en el borde).
+	// Es el que se devuelve: devolver el recuadro entero moveria pixeles que no se copiaron.
+	copiaAncho int
+	copiaAlto  int
 
 	// la ultima direccion pedida y lo que se acumula para la evidencia
-	direccion int
-	pasos     int
-	caminando bool
+	direccion  int
+	pasos      int
+	caminando  bool
 	sinControl bool
+
+	// DC-002.159b: el sentido de la cruceta del cuadro anterior y el objetivo que se le puso al ente. Sirven
+	// para no mandar un camino nuevo en cada cuadro (ver `Avanzar`).
+	ultimoEjeX    float64
+	ultimoEjeY    float64
+	objetivo      d2vector.Position
+	tieneObjetivo bool
 
 	*d2util.Logger
 }
@@ -141,8 +155,14 @@ func NuevoHeroeDelGate0(
 
 	// DC-002.159: el compuesto viene armado de antes (se arma cuando la arena esta vacia: ver la pantalla del
 	// pueblo); aca solo se crea el ente, que es lo que necesita el mapa ya compuesto para saber donde nace.
-	jugador := d2mapentity.NuevoJugadorDeConsolaCon(compuesto, "heroe-gate0159", nombreDelHeroe159,
-		x, y, direccionDelHeroe159, claseDelHeroe159, stats)
+	//
+	// DC-002.159b: EL MODO INICIAL ES EL DEL PUEBLO, no el Neutral. `SetMode` carga las capas `.dcc` del modo
+	// (442.601 B medidos por modo) y el heroe del pueblo usa `TN` (parado) y `TW` (caminando): arrancando en
+	// Neutral se pagaba un modo que no se usa, con el mapa ya compuesto y el semiespacio al limite. El modo se
+	// pide aca, al crear el ente (con el mapa ya soltado y su memoria devuelta): el prime en `OnLoad` se probo
+	// y se revirtio, porque el modo se carga igual al primer `SetMode` y no habia con que pagarlo dos veces.
+	jugador := d2mapentity.NuevoJugadorDeConsolaConModo(compuesto, "heroe-gate0159", nombreDelHeroe159,
+		x, y, direccionDelHeroe159, claseDelHeroe159, stats, d2enum.PlayerAnimationModeTownNeutral)
 	if jugador == nil {
 		return nil, fmt.Errorf("el heroe del motor no se pudo crear con el compuesto del MPQ")
 	}
@@ -191,7 +211,7 @@ func estadisticasDeNivelUno(am *d2asset.AssetManager, clase d2enum.Hero) (*d2her
 	vida, mana, estamina := claseDelMotor.BaseMax(1, fila.InitVit, fila.InitEne)
 
 	return &d2hero.HeroStatsState{
-		Level: 1,
+		Level:    1,
 		Strength: fila.InitStr, Dexterity: fila.InitDex, Vitality: fila.InitVit, Energy: fila.InitEne,
 		Health: vida, MaxHealth: vida, BaseMaxHealth: vida,
 		Mana: mana, MaxMana: mana, BaseMaxMana: mana,
@@ -243,6 +263,17 @@ func (h *HeroeDelGate0) Avanzar() {
 		return
 	}
 
+	// DC-002.159b: NO se manda un camino nuevo en cada cuadro. Mientras la cruceta siga en el MISMO sentido y
+	// el objetivo no se haya alcanzado, el camino que el ente ya tiene sirve: mandarlo de nuevo cada cuadro
+	// tiraba basura a lo loco (medido: el recolector corria cada ~12 cuadros y a los 74 s el POC moria con
+	// `fatal error: stack_alloc: out of memory`, porque cada pasada del recolector nuevo se queda sin segmentos
+	// de pila). Mandar el camino al cambiar de sentido es ademas lo que hace el motor de verdad: se aprieta una
+	// direccion, el ente camina hasta el objetivo, y recien cuando llega se le pide otro.
+	if ejeX == h.ultimoEjeX && ejeY == h.ultimoEjeY && h.tieneObjetivo &&
+		!h.jugador.Position.EqualsApprox(&h.objetivo.Vector) {
+		return
+	}
+
 	// la direccion de la PANTALLA a la del MAPA: es la inversa exacta de la proyeccion del viewport
 	// (WorldToOrtho: x' = (x-y)*80, y' = (x+y)*40). Despejando, un paso de (dx,dy) pixeles es
 	// (dx/80 + dy/40)/2 en X y (dy/40 - dx/80)/2 en Y del mapa.
@@ -272,6 +303,9 @@ func (h *HeroeDelGate0) Avanzar() {
 	// `SetPath` es el camino del motor: al fijarlo, `setTarget` calcula la direccion y `Player.Advance`
 	// elige el modo de animacion y avanza el compuesto.
 	h.jugador.SetPath([]d2vector.Position{objetivo}, nil)
+	h.objetivo = objetivo
+	h.tieneObjetivo = true
+	h.ultimoEjeX, h.ultimoEjeY = ejeX, ejeY
 	h.caminando = true
 	h.pasos++
 }
@@ -330,7 +364,7 @@ func (h *HeroeDelGate0) DibujarSobreElMapa(target d2interface.Surface, mapaRepin
 	if mapaRepintado {
 		h.hayCopia = false
 	} else if h.hayCopia {
-		h.lienzo.PegarRect159(h.memoria, h.copiaX, h.copiaY, anchoDeLaMemoria159, altoDeLaMemoria159)
+		h.lienzo.PegarRect159(h.memoria, h.copiaX, h.copiaY, h.copiaAncho, h.copiaAlto)
 		h.hayCopia = false
 	}
 
@@ -338,12 +372,16 @@ func (h *HeroeDelGate0) DibujarSobreElMapa(target d2interface.Surface, mapaRepin
 	x := px + memoriaIzquierda159
 	y := py + memoriaArriba159
 
-	// guardar lo de abajo ANTES de dibujar (si el recuadro no entra en el lienzo no hay copia, y el que
-	// llama lo ve en `HayCopia` y vuelve a pintar el mapa el cuadro siguiente)
-	if h.lienzo.CopiarRect159(h.memoria, x, y, anchoDeLaMemoria159, altoDeLaMemoria159) > 0 {
-		h.hayCopia = true
-		h.copiaX, h.copiaY = x, y
+	// guardar lo de abajo ANTES de dibujar. DC-002.159b: el lienzo recorta el recuadro al borde de la pantalla
+	// y devuelve el recorte, asi que el borrado funciona con el heroe en el borde; si el recuadro no toca el
+	// lienzo (el heroe se fue de la vista) no hay copia y NO se dibuja: nada que borrar despues.
+	escritos, xc, yc, anchoC, altoC := h.lienzo.CopiarRect159(h.memoria, x, y, anchoDeLaMemoria159, altoDeLaMemoria159)
+	if escritos <= 0 || anchoC <= 0 || altoC <= 0 {
+		return
 	}
+
+	h.hayCopia = true
+	h.copiaX, h.copiaY, h.copiaAncho, h.copiaAlto = xc, yc, anchoC, altoC
 
 	h.mapa.DibujarEnte159(target, h.jugador)
 }

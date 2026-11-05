@@ -124,6 +124,11 @@ type PantallaDelPueblo struct {
 	refrescarEntrada func()
 	conHeroe         bool
 	plan159          bool
+	// soltado159: el cuadro 1 ya cerro (el mapa se pinto, se devolvio su memoria y el heroe entro).
+	soltado159 bool
+	// inicio159X/Y: la celda donde nace el heroe, en celdas del mapa (se anota en OnLoad, con las casillas
+	// puestas, y es lo que centra la camara: el centro del mapa deja al heroe FUERA del lienzo).
+	inicio159X, inicio159Y float64
 	// compuestoDelHeroe: el COF + las capas del heroe, cargados ANTES de componer el mapa (ver OnLoad)
 	compuestoDelHeroe *d2asset.Composite
 
@@ -235,6 +240,7 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 
 		p.compuestoDelHeroe = compuesto
 		p.avisar("heroe:compuesto-listo")
+
 	}
 
 	loading.Progress(0.10)
@@ -284,8 +290,7 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 	// soltar; `charstats.txt` NO se suelta porque el jugador la consulta en cada cuadro (estamina).
 	// El heroe necesita estos bytes: su compuesto deja ~435 KB vivos en el semiespacio y este es el ultimo
 	// lugar donde la arena tiene aire.
-	if soltadas := p.asset.SoltarFilasDeLasTablas([]string{d2resource.LevelType, d2resource.LevelPreset});
-		soltadas.Tablas > 0 {
+	if soltadas := p.asset.SoltarFilasDeLasTablas([]string{d2resource.LevelType, d2resource.LevelPreset}); soltadas.Tablas > 0 {
 		p.Infof("tablas soltadas (LvlTypes, LvlPrest): %d tablas, %d B devueltos al monton",
 			soltadas.Tablas, soltadas.Bytes)
 	}
@@ -313,28 +318,30 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 
 	loading.Progress(0.75)
 
-	// ============================== EL HEROE (DC-002.159) ==============================
-	// OJO CON EL LUGAR, MEDIDO: esto va ANTES del renderer y no despues. El mapa compuesto deja la arena de
-	// Go en 1.413.120 B libres, y el renderer se lleva ~970 KB de golpe (la primera cache): creando el heroe
-	// despues, el `LoadComposite` del MPQ pide un segmento de pila y el arranque muere con
-	// `stack_alloc: out of memory` (medido: arena usada 10.612.960 de 10.653.824, 40.864 libres, cinco
-	// reinicios del emulador). Con el heroe primero sobra arena y el renderer entra igual.
-	// La camara no hace falta para crearlo: el compuesto se arma igual, y `ConMapa` se la pasa despues.
+	// ============================== EL HEROE (DC-002.159b) ==============================
+	// EL HEROE YA NO SE CREA ACA, y el motivo esta medido. Crearlo cuesta ~436.000 B VIVOS en el semiespacio
+	// del recolector (la capa base del COF con los cuadros del modo Neutral en las 16 direcciones) mas un
+	// pedido de ~443 KB al monton externo, y con el pueblo compuesto no hay lugar: en DC-002.159 el recolector
+	// moria con `GC to-space overflow` (1.728.184 vivos de 1.835.008) y el monton con `gc_external_alloc: OOM`.
+	//
+	// El lugar esta DEL LADO DEL MAPA. Desde DC-002.157 el mapa se pinta UNA vez y los cuadros siguientes se
+	// saltan el renderer entero (`CUADRO 31 ms=0`), asi que ni las 2.312 casillas del motor ni el arena de
+	// bloques de los `.dt1` (2.621.440 B del monton de C) se vuelven a leer. Por eso el heroe entra en el
+	// CUADRO 1: primero se pinta el mapa, despues se devuelve esa memoria y recien ahi se arma el ente
+	// (`soltarElMapaYEntrarElHeroe`, en Render).
+	//
+	// LO UNICO QUE HAY QUE ANOTAR ACA es el punto de arranque, porque `GetStartPosition` recorre las casillas
+	// buscando el objeto de entrada del `.ds1` y despues de soltarlas ya no hay que recorrer: se pregunta con
+	// las casillas puestas y se deja fijado con `SetStartPosition` (la via del motor para eso).
 	if p.conHeroe {
-		p.avisar("heroe:empieza")
-
 		p.plan159 = true
 
-		heroe, err := NuevoHeroeDelGate0(p.asset, p.engine, nil, p.term, p.Logger,
-			p.entrada, p.refrescarEntrada, p.compuestoDelHeroe)
-		if err != nil {
-			p.Errorf("HEROE159 SIN-HEROE: %v", err)
-			p.avisar("heroe:error")
-		} else {
-			p.heroe = heroe
-			p.Infof("HEROE159 LISTO %s", p.heroe.Estado())
-			p.avisar("heroe:listo")
-		}
+		inicioX, inicioY := p.engine.GetStartPosition()
+		p.engine.SetStartPosition(inicioX, inicioY)
+
+		p.inicio159X, p.inicio159Y = inicioX, inicioY
+
+		p.Infof("HEROE159B el pueblo arranca en la celda %.1f,%.1f (anotado antes de soltar las casillas)", inicioX, inicioY)
 	}
 
 	// las opciones van ANTES de crear el renderer: la cache se arma (o no) en el constructor
@@ -344,26 +351,105 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 	p.avisar("mapa:renderer-creado")
 
 	// DC-002.159: el mapa se pinta una vez y el ente va aparte (sin esto un solo ente apaga el mapa estatico).
-	// El salto del mapa arranca APAGADO: los primeros cuadros son el A/B de la tarjeta (el cuadro con el heroe
-	// y el mapa repintandose, que es el "no puede volver a 800") y el plan lo prende en el cuadro 21.
+	// DC-002.159b: el mapa estatico NO se prende aca: el CUADRO 1 tiene que pintar el mapa de verdad (es el
+	// unico que lo pinta), y es el final de ese cuadro -- cuando se devuelve la memoria del mapa -- el momento
+	// en que el salto queda prendido para siempre. Ver `soltarElMapaYEntrarElHeroe`.
 	if p.conHeroe {
 		p.mapRenderer.ActivarEntesAparte159(true)
 		p.mapRenderer.ActivarMapaEstatico(false)
 		p.mapaEstatico157 = false
 	}
 
-	posicion := d2vector.NewPosition(p.mapRenderer.WorldToOrtho(p.engine.GetCenterPosition()))
+	// DC-002.159b: LA CAMARA VA DONDE NACE EL HEROE, no al centro del mapa. Centrada en el mapa el heroe cae
+	// FUERA del lienzo: el pueblo nace en la celda 26.5,7.5 (el objeto de entrada del `.ds1`) y el centro del
+	// mapa es 28.5,20.5, asi que los pies del heroe quedaban en y=-368, arriba de la pantalla, y no habia nada
+	// que dibujar (medido en la primera corrida de esta tarjeta).
+	camaraX, camaraY := p.engine.GetCenterPosition()
+	if p.conHeroe {
+		camaraX, camaraY = p.inicio159X, p.inicio159Y
+	}
+
+	posicion := d2vector.NewPosition(p.mapRenderer.WorldToOrtho(camaraX, camaraY))
 	p.mapRenderer.SetCameraPosition(&posicion)
 
 	loading.Progress(0.90)
 
 	p.Infof("renderer del mapa listo: cuadro %dx%d", d2display.W(), d2display.H())
 	p.avisar("mapa:listo")
+}
 
-	if p.heroe != nil {
-		// el heroe ya existe desde antes del renderer (ver el bloque de arriba): recien ahora hay camara
-		p.heroe.ConMapa(p.mapRenderer)
+// soltarElMapaYEntrarElHeroe (DC-002.159b): cierra el cuadro 1 devolviendo la memoria del mapa y creando el
+// heroe con el lugar que eso libera.
+//
+// EL ORDEN ES EL CONTENIDO DE LA TARJETA:
+//
+//  1. el mapa estatico queda prendido PARA SIEMPRE (`SoltarElMapaPintado159`): el mapa que esta en el lienzo es
+//     el unico que va a haber. Se exige que el cuadro 1 lo haya pintado; si no, no se suelta nada;
+//  2. se devuelve el arena de bloques de los `.dt1` (los 2.621.440 B del monton de C): los `EncodedData` de
+//     cada tile ya se decodificaron a la cache del renderer (`d2asset.SoltarArenaDeBloques`, DC-002.101);
+//  3. se devuelven las casillas compuestas del motor (~12.000 registros del semiespacio del recolector) y los
+//     metadatos de los `.dt1` (`d2mapengine.SoltarLasCasillasDelMapa` / `SoltarLasTablasDeTiles`);
+//  4. se le pide al recolector que se lleve lo que ya nadie apunta (`runtime.GC`), y se mide;
+//  5. recien ahi entra el heroe: el ente sobre el compuesto que se armo en `OnLoad` (cuando todavia habia
+//     lugar) y las estadisticas de `charstats.txt`.
+//
+// Si algo de esto falla, el log lo dice con el numero: un heroe que no entra no puede parecer un heroe que si.
+func (p *PantallaDelPueblo) soltarElMapaYEntrarElHeroe() {
+	p.soltado159 = true
+
+	p.avisar("heroe:empieza")
+
+	if !p.mapRenderer.SoltarElMapaPintado159() {
+		p.Errorf("HEROE159B NO-SE-SUELTA: el mapa no quedo pintado en el lienzo (sin mapa, soltar las casillas " +
+			"dejaria la pantalla en negro y sin vuelta)")
+
+		return
 	}
+
+	p.avisar("heroe:antes-de-soltar")
+
+	tramos, bytesArena := d2asset.SoltarArenaDeBloques()
+	casillas, bytesCasillas := p.engine.SoltarLasCasillasDelMapa()
+	tiles, bytesTablas := p.engine.SoltarLasTablasDeTiles()
+
+	p.avisar("heroe:mapa-soltado")
+
+	runtime.GC()
+
+	p.avisar("heroe:recolector-pasado")
+
+	p.Infof("HEROE159B SUELTO arena_tramos=%d arena_bytes=%d casillas=%d casillas_bytes=%d tiles_dt1=%d "+
+		"tiles_bytes=%d mapa_soltado=%v", tramos, bytesArena, casillas, bytesCasillas, tiles, bytesTablas,
+		p.mapRenderer.MapaSoltado159())
+
+	if p.compuestoDelHeroe == nil {
+		p.Errorf("HEROE159 SIN-HEROE: el compuesto del MPQ no se cargo al arrancar (no hay heroe que crear)")
+		p.avisar("heroe:error")
+
+		return
+	}
+
+	heroe, err := NuevoHeroeDelGate0(p.asset, p.engine, p.mapRenderer, p.term, p.Logger,
+		p.entrada, p.refrescarEntrada, p.compuestoDelHeroe)
+	if err != nil {
+		p.Errorf("HEROE159 SIN-HEROE: %v", err)
+		p.avisar("heroe:error")
+
+		return
+	}
+
+	p.heroe = heroe
+
+	p.Infof("HEROE159 LISTO %s", p.heroe.Estado())
+	p.avisar("heroe:listo")
+
+	// DC-002.159b: una recoleccion EXPLICITA con el heroe ya adentro, antes de que empiece a dibujarse. Si el
+	// recolector no puede con este conjunto vivo, tiene que morir ACA y no a mitad de un cuadro (es la misma
+	// informacion, pero con el punto exacto); si puede, el semiespacio queda compacto para las superficies del
+	// primer dibujo.
+	runtime.GC()
+
+	p.avisar("heroe:recolector-con-el-heroe")
 }
 
 // OnUnload no suelta nada: la pantalla vive hasta que el proceso termina (en la consola el unico final es
@@ -397,6 +483,14 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 	target.PushTranslation(-ox, -oy)
 	p.mapRenderer.Render(target)
 
+	// ============================== DC-002.159b: SOLTAR EL MAPA, ENTRAR EL HEROE ==============================
+	// El cuadro 1 es el unico que pinta el mapa (con las casillas del motor y los bloques de los `.dt1`
+	// todavia en memoria). Al cerrarlo se devuelve esa memoria y recien ahi se crea el heroe, que es el que
+	// la necesitaba: ~436.000 B vivos en el semiespacio y un pedido de ~443 KB al monton de C.
+	if p.conHeroe && !p.soltado159 {
+		p.soltarElMapaYEntrarElHeroe()
+	}
+
 	// ============================== EL HEROE (DC-002.159) ==============================
 	// El mapa ya esta en el lienzo (pintado o conservado del cuadro anterior): el heroe va encima. Si la
 	// Surface sabe guardar recuadros (la consola), el heroe se borra solo; si no (la PC), esto no hace nada
@@ -406,7 +500,15 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 			p.heroe.ConMemoria(lienzo)
 		}
 
+		if p.cuadros <= 3 {
+			p.avisar("heroe:dibujo-empieza")
+		}
+
 		p.heroe.DibujarSobreElMapa(target, p.mapRenderer.RepintadosDelMapa157() != repintadosAntes)
+
+		if p.cuadros <= 3 {
+			p.avisar("heroe:dibujo-hecho")
+		}
 	}
 
 	target.Pop()
@@ -423,7 +525,7 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 	}
 
 	if p.cuadros == 1 || p.cuadros == 2 || p.cuadros == 11 || p.cuadros == 31 || p.cuadros == 60 ||
-		p.cuadros == 120 || p.cuadros == cuadrosQueSeInforman {
+		p.cuadros == 120 || p.cuadros == cuadrosQueSeInforman || (p.conHeroe && p.cuadros <= 8) {
 		p.Infof("CUADRO %d ms=%d (primer cuadro %d ms)", p.cuadros, p.msDelCuadro, p.msPrimerCuadro)
 		p.avisar("mapa:cuadro")
 	}
@@ -436,14 +538,16 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 	}
 }
 
-// aplicarElPlan159: el plan de la corrida de ESTA tarjeta. Es corto a proposito -- la escalera de siete
-// tramos de DC-002.157 ya esta medida y sus tres palancas de presentacion se prenden de una:
+// aplicarElPlan159: el plan de la corrida de ESTA tarjeta (DC-002.159b). Es corto a proposito: la escalera de
+// siete tramos de DC-002.157 ya esta medida y sus tres palancas de presentacion se prenden de una.
 //
-//	cuadros  1..20   el mapa se repinta cada cuadro (el "sin palanca", con el heroe adentro)
-//	cuadros 21..     + mapa estatico y entes aparte: el mapa se pinta una vez y el heroe se dibuja encima
+//	cuadros  1        el mapa se pinta de verdad (las casillas todavia estan) y, al cerrarlo, se sueltan
+//	                  las casillas y el arena de bloques: entra el heroe (ver `soltarElMapaYEntrarElHeroe`)
+//	cuadros  2..      el mapa NO se repinta (soltado) y el heroe camina encima, con la memoria del lienzo
 //
-// La diferencia entre los dos tramos ES el numero de la tarjeta: el muro de los 818 ms y la palanca que lo
-// esquiva con un ente caminando.
+// El tramo A/B de 20 cuadros repintando el mapa con el heroe adentro que media DC-002.159 ya no existe: el
+// numero (818 ms de mapa por cuadro con un ente) esta medido en su evidencia, y aca el mapa no se puede volver
+// a pintar porque su memoria es justamente la que el heroe necesita.
 func (p *PantallaDelPueblo) aplicarElPlan159(target d2interface.Surface) {
 	// las tres de la presentacion (DC-002.157), prendidas desde el cuadro 1: aca no se miden, se usan
 	if palancas, hay := target.(palancasDePresentacion157); hay {
@@ -466,18 +570,6 @@ func (p *PantallaDelPueblo) aplicarElPlan159(target d2interface.Surface) {
 			palancas.ActivarPresentacionQuieta157(true)
 			p.quieta157 = true
 		}
-	}
-
-	// ---- el mapa: repintado hasta el cuadro 20, estatico desde el 21 ----
-	if estatico := p.cuadros >= desdeMapaEstatico157; estatico != p.mapaEstatico157 {
-		p.mapRenderer.ActivarMapaEstatico(estatico)
-
-		if !estatico {
-			p.mapRenderer.OlvidarElMapa157()
-		}
-
-		p.mapaEstatico157 = estatico
-		p.cerrarElTramo157("mapa-estatico", estatico)
 	}
 }
 

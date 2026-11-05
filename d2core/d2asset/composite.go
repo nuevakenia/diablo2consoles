@@ -318,7 +318,12 @@ func (c *Composite) createMode(animationMode animationMode, weaponClass string) 
 		if err == nil {
 			layer.SetPlaySpeed(mode.animationSpeed)
 			layer.PlayForward()
-			layer.SetShadow(cofLayer.Shadow != 0)
+
+			// DC-002.159b: la sombra del COF se puede apagar desde afuera (`UsarSombrasDelCompuesto`). En la
+			// consola el camino de la sombra -- escala + sesgo + brillo cero sobre la Surface del PVR -- mata el
+			// SH-4 en el primer cuadro del heroe (medido en el Gate 0: `Unhandled exception` adentro de
+			// `Surface.Render`, ver la evidencia de DC-002.159b). El ente sale igual, sin la mancha del piso.
+			layer.SetShadow(cofLayer.Shadow != 0 && sombrasDelCompuesto)
 
 			if err := layer.SetDirection(c.direction); err != nil {
 				return nil, err
@@ -408,3 +413,19 @@ func baseString(baseType d2enum.ObjectType) string {
 		return ""
 	}
 }
+
+// sombrasDelCompuesto (DC-002.159b): si las capas del COF que piden sombra (cofLayer.Shadow != 0) la dibujan.
+//
+// POR QUE SE PUEDE APAGAR. La sombra de un ente no es el ente: se pinta con escala (x1, y0.5), sesgo (0.5, 0) y
+// brillo cero, o sea el camino GENERAL de `d2core/d2render/pvr` (matriz invertida y cuenta por pixel). En la
+// consola ese camino mata el SH-4 en el primer cuadro del heroe del Gate 0 -- medido en DC-002.159b: la sonda de
+// `Composite.Render` muestra la capa que va a dibujar, los seis `Push*` de `renderShadow` pasan, y muere dentro
+// de `Surface.Render` (`Unhandled exception`, PC en datos, PR adentro de `runtime.mapassign`).
+//
+// Apagada, el compuesto dibuja las capas de cuerpo (que es lo que hacia falta ver) y el heroe queda sin la mancha
+// del piso. Prendida (el default, que es lo que ve la PC) no cambia nada.
+var sombrasDelCompuesto = true
+
+// UsarSombrasDelCompuesto prende o apaga las sombras del compuesto (DC-002.159b). La apaga el arranque de la
+// consola; en la PC queda prendida.
+func UsarSombrasDelCompuesto(prendidas bool) { sombrasDelCompuesto = prendidas }

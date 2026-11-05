@@ -262,8 +262,15 @@ func TamanoDS1(d *d2ds1.DS1) int {
 	return 4*celdas*bytesPorCeldaDS1 + len(d.Files)*32 + len(d.Objects)*20 + len(d.SubstitutionGroups)*20
 }
 
-// TamanoDCC es lo que ocupa un DCC en memoria: el archivo crudo (que el parser guarda) mas los pixeles
-// ya decodificados de cada direccion y de cada frame.
+// TamanoDCC es lo que ocupa un DCC en el MONTON DE GO: los pixeles ya decodificados de cada direccion y de
+// cada frame, mas la parte del crudo que el parser dejo en el monton de Go.
+//
+// DC-002.159b: NO se cuenta el bloque crudo de la carga perezosa (`TamanoDelArchivo`). Ese bloque lo pide
+// `loadFileParaDCC` aparte, con `malloc` del monton de C (fuera de los dos semiespacios), asi que no compite
+// con este presupuesto: lo mide `d2cMontonUsado`. Contarlo aca ademas lo cobraba dos veces y dejaba el cache
+// de dccs (512 KB) sin alcanzar para un solo modo del personaje: cada cuadro desalojaba y volvia a leer capas
+// -- medido en el Gate 0 con el heroe caminando (DC-002.159b), basura a lo loco y el recolector sin segmentos
+// de pila.
 func TamanoDCC(d *d2dcc.DCC) int {
 	total := 0
 

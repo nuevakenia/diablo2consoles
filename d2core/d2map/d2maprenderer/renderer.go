@@ -153,6 +153,12 @@ type MapRenderer struct {
 	// salto y el cuadro vuelve a los 818 ms de DC-002.157.
 	entesAparte159 bool
 
+	// ============================== EL MAPA SOLTADO (DC-002.159b) ==============================
+	// Ver `mapa_soltado_159.go`: cuando el que llama devuelve la memoria del mapa (las casillas del motor y
+	// el arena de bloques de los `.dt1`), el mapa del lienzo es el unico que hay: `puedeSaltarseElMapa157`
+	// devuelve verdadero siempre y el renderer no vuelve a pintar un mundo vacio encima.
+	mapaSoltado159 bool
+
 	*d2util.Logger
 }
 
