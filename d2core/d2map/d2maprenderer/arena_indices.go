@@ -503,6 +503,16 @@ func (mr *MapRenderer) pedirTrozoDeIndices(n int, cacheable bool) trozoDeIndices
 		return trozoDeIndices{contenedor: -1}
 	}
 
+	// 0. EL TECHO POR IMAGEN (DC-002.159i), ANTES DE PEDIR UN BYTE. Es el unico punto de la politica que puede
+	// garantizar que NINGUN camino de abajo (tramo, bloque nuevo, al vuelo, derrame) pida una imagen que no
+	// entra: los cuatro piden por aca. La que no entra se dice en el log (una vez, con nombre y tamano) y el
+	// cuadro sigue sin ella -- la consola no miente y no se muere.
+	if mr.sobreElTecho(n) {
+		// Las cuentas y el aviso los lleva `imagenRechazada` (una vez por imagen, con su clave): aca solo se
+		// corta el pedido antes de que alguno de los cuatro caminos de abajo toque el monton.
+		return trozoDeIndices{contenedor: contenedorNoEntra}
+	}
+
 	t := mr.tramo
 	if t == nil {
 		// el camino de la PC y el de la consola sin tramo: una asignacion por imagen, como siempre

@@ -332,8 +332,20 @@ func (mr *MapRenderer) soltarImagenDeLaCache(k uint32, im *imagenDeIndices) {
 // ES UNO SOLO Y SE PONE EN CERO ANTES DE CADA USO. El decodificador del `.dt1` escribe solo donde el tile pinta y
 // el indice 0 es el transparente, asi que el buffer tiene que llegar en cero igual que un `make`. Y es uno solo
 // porque la imagen se pinta EN EL ACTO (`RenderIndicesTintado` copia al lienzo): no hay dos al vuelo a la vez.
+//
+// DC-002.159i -- NO CRECE MAS ALLA DE LO DECLARADO. `ActivarComposicionAlVuelo(maxBytes)` declara el buffer de
+// trabajo, y antes este metodo lo AGRANDABA (`n + n/4`) cuando la imagen no entraba: con una imagen de 4,7 MB
+// eso es un pedido de 5,9 MB que en la consola no entra y mata la corrida (medido en DC-002.159h). Ahora, si la
+// imagen pasa el buffer declarado, NO hay buffer al vuelo: se devuelve nil, se cuenta (`vuelosRechazados`) y el
+// que llama sigue con la politica de siempre (el derrame, que con el techo por imagen tampoco puede ser enorme).
 func (mr *MapRenderer) bufferAlVuelo(n int) []byte {
 	if n <= 0 {
+		return nil
+	}
+
+	if mr.topeDelVuelo > 0 && n > mr.topeDelVuelo {
+		mr.vuelosRechazados++
+
 		return nil
 	}
 

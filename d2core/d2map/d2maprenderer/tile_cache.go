@@ -141,6 +141,15 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 		tileData[0].Width = defaultFloorTileWidth
 		tileData[0].Height = defaultFloorTileHeight
 	} else {
+		// DC-002.159i: LA VARIANTE TIENE QUE EXISTIR (ver `generateShadowCache`). Un `RandomIndex` fuera del
+		// `.dt1` aca no explota: lee memoria ajena y la decodifica como piso.
+		if int(tile.RandomIndex) >= len(tileOptions) {
+			mr.Warningf("MAPA159I: la variante %d del piso %d/%d se sale del .dt1 (trae %d): no se compone nada "+
+				"(DC-002.159i)", tile.RandomIndex, tile.Style, tile.Sequence, len(tileOptions))
+
+			return
+		}
+
 		if !tileOptions[0].MaterialFlags.Lava {
 			tileData = append(tileData, &tileOptions[tile.RandomIndex])
 		} else {
@@ -190,6 +199,24 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.Tile) {
 		// `cacheable` es falso para las animadas: arman varias imagenes en la MISMA llamada y el buffer al
 		// vuelo es uno solo (se pisarian entre ellas antes de pintarse).
 		trozo := mr.pedirTrozoDeIndices(int(tileData[i].Width*tileHeight), len(tileData) == 1)
+
+		// DC-002.159i (instrumento): que piso es el que pide una imagen enorme. Las del pueblo no pasan de
+		// 76.800 B (censo `sombra-159i`), asi que lo que pase de 80 KB es el pedido que no corresponde.
+		if n := int(tileData[i].Width * tileHeight); n > 80*1024 {
+			mr.Warningf("MAPA159I: PIDE piso estilo=%d sec=%d var=%d idx=%d opciones=%d w=%d h=%d n=%d "+
+				"Height=%d bloques=%d", tile.Style, tile.Sequence, tile.RandomIndex, tileIndex, len(tileOptions),
+				tileData[i].Width, tileHeight, n, tileData[i].Height, len(tileData[i].Blocks))
+		}
+
+		// DC-002.159i: la imagen no entra (techo por imagen). Se dice una vez y se sigue; sin este corte el
+		// decodificador escribiria sobre un buffer nil.
+		if trozo.indices == nil {
+			mr.imagenRechazada(claveDeCache(tile.Style, tile.Sequence, 0, tileIndex), "piso",
+				int(tileData[i].Width*tileHeight), int(tileData[i].Width), int(tileHeight))
+
+			continue
+		}
+
 		indexData := trozo.indices
 		d2dt1.DecodeTileGfxData(tileData[i].Blocks, &indexData, tileYOffset, tileData[i].Width)
 
@@ -223,6 +250,11 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 		}
 	}
 
+	// DC-002.159i: LA VARIANTE TIENE QUE EXISTIR. `RandomIndex` sale del `.ds1` y el `.dt1` del nivel puede traer
+	// menos variantes que las que el nivel pide (DC-002.109 midio el primer caso con la pieza izquierda de una
+	// esquina). Indexar a ciegas no da un panic en este binario: da MEMORIA AJENA leida como `d2dt1.Tile`, o sea un
+	// `Width`/`Height` de basura y un pedido de imagen que no es de ninguna imagen (los 4,7 MB de la evidencia de
+	// 159h: 160 x 29.611, que es un `Height` que no existe en ningun `.dt1` del pueblo). Se corta aca y se dice.
 	// DC-002.135: el pedazo `cacheTiles` (ver `generateFloorCache`).
 	tTiles := ahora135()
 
@@ -235,6 +267,13 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 	var tileData *d2dt1.Tile
 
 	if tileOptions == nil {
+		return
+	}
+
+	if int(tile.RandomIndex) >= len(tileOptions) {
+		mr.Warningf("MAPA159I: la variante %d de la sombra %d/%d se sale del .dt1 (trae %d): no se compone nada "+
+			"(DC-002.159i)", tile.RandomIndex, tile.Style, tile.Sequence, len(tileOptions))
+
 		return
 	}
 
@@ -267,6 +306,25 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.Tile) {
 	}
 
 	trozo := mr.pedirTrozoDeIndices(int(tileData.Width)*tileHeight, true)
+
+	// DC-002.159i (instrumento): que imagen es la que no entra. Solo se imprime la que pasa los 64 KB (el corte del
+	// objeto grande de libgodc), asi que no ensucia una corrida normal: la que importa es la de 4,7 MB.
+	if n := int(tileData.Width) * tileHeight; n > 64*1024 {
+		mr.Warningf("MAPA159I: PIDE sombra estilo=%d sec=%d var=%d opciones=%d w=%d h=%d n=%d YAdjust=%d",
+			tile.Style, tile.Sequence, tile.RandomIndex, len(tileOptions), tileData.Width, tileHeight, n,
+			tile.YAdjust)
+	}
+
+	// DC-002.159i: el techo por imagen (ver `limite_de_imagen_159i.go`). Es el pedido que tumbaba la corrida del
+	// Gate 0: una imagen de sombra de 4,7 MB no entra en la RAM de la consola. Se dice en el log y el cuadro
+	// sigue sin ella -- no se compone nada sobre un buffer que no existe.
+	if trozo.indices == nil {
+		mr.imagenRechazada(claveDeCache(tile.Style, tile.Sequence, int(d2enum.TileShadow), tile.RandomIndex),
+			"sombra", int(tileData.Width)*tileHeight, int(tileData.Width), tileHeight)
+
+		return
+	}
+
 	indexData := trozo.indices
 	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileData.Width)
 
@@ -316,6 +374,15 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 	var tileData *d2dt1.Tile
 
 	if tileOptions == nil {
+		return
+	}
+
+	// DC-002.159i: LA VARIANTE TIENE QUE EXISTIR (ver `generateShadowCache`). Aca el dato de basura se convierte
+	// en `realHeight` = 29.611 y el pedido de 4,7 MB que tumbo la corrida del Gate 0 en 159h.
+	if int(tile.RandomIndex) >= len(tileOptions) {
+		mr.Warningf("MAPA159I: la variante %d de la pared %d/%d/tipo %d se sale del .dt1 (trae %d): no se compone "+
+			"nada (DC-002.159i)", tile.RandomIndex, tile.Style, tile.Sequence, int(tile.Type), len(tileOptions))
+
 		return
 	}
 
@@ -386,6 +453,26 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 	}
 
 	trozo := mr.pedirTrozoDeIndices(int(tileSurfaceWidth*realHeight), true)
+
+	// DC-002.159i (instrumento): que pared es la que pide una imagen enorme. Solo pasa los 64 KB lo que no es una
+	// pared normal del pueblo (160x480 = 76.800 B es el techo legitimo), asi que se imprime SOLO lo que pase de
+	// 128 KB: es el pedido de 4,7 MB de la evidencia de 159h.
+	if n := int(tileSurfaceWidth * realHeight); n > 128*1024 {
+		mr.Warningf("MAPA159I: PIDE pared estilo=%d sec=%d tipo=%d var=%d opciones=%d w=%d h=%d n=%d "+
+			"Height=%d minY=%d YAdjust=%d bloques=%d", tile.Style, tile.Sequence, int(tile.Type),
+			tile.RandomIndex, len(tileOptions), tileSurfaceWidth, realHeight, n, tileData.Height, tileMinY,
+			tile.YAdjust, len(tileData.Blocks))
+	}
+
+	// DC-002.159i: el techo por imagen (ver `limite_de_imagen_159i.go`). Las paredes son las que mas se acercan al
+	// techo en el pueblo (160x480 = 76.800 B, la mas grande) y las que un dato roto del `.dt1` puede inflar sin
+	// limite: `realHeight` sale de los bloques del grafico.
+	if trozo.indices == nil {
+		mr.imagenRechazada(claveDeCache(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex), "pared",
+			int(tileSurfaceWidth*realHeight), tileSurfaceWidth, int(realHeight))
+
+		return
+	}
 
 	indexData := trozo.indices
 

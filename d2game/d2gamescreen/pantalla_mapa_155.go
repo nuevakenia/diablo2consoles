@@ -549,7 +549,14 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 		ln := p.NuevaLinea159f()
 		ln.Tx("CUADRO ").I(p.cuadros).Tx(" ms=").I(p.msDelCuadro).
 			Tx(" (primer cuadro ").I(p.msPrimerCuadro).Tx(" ms)")
+
+		// DC-002.159i: lo que el techo dejo afuera, para que la consola no mienta (0/0/0 = nada quedo afuera).
+		noEntran, bytesNoEntran, vuelosRechazados := p.mapRenderer.CensoDelLimite159i()
+		ln.Tx(" noEntran=").I(noEntran).Tx(" bytesNoEntran=").I(bytesNoEntran).
+			Tx(" vuelos=").I(vuelosRechazados)
+
 		ln.Enviar(p.Logger)
+
 		p.avisar("mapa:cuadro")
 	}
 

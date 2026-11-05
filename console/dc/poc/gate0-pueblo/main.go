@@ -134,6 +134,19 @@ const (
 	// es el de 80 KB del 113: la imagen mas grande de la cache del pueblo mide 71.680 B.
 	desalojoEnCuadros = 2
 	bufferDelVuelo    = 81920
+
+	// DC-002.159i: EL TECHO DE UNA IMAGEN DE LA CACHE DEL MAPA. Es la pared que faltaba: con el runtime sano, la
+	// corrida de 159h moria pidiendo UNA imagen de indices que no entra en la consola (4.737.760 B, y el buffer
+	// al vuelo creciendo a 5.922.200 B para servirla => `makeslice: too large` / `gc_external_alloc: OOM`), y
+	// ninguna de las dos palancas de arriba la ve venir: el desalojo y el al vuelo trabajan sobre imagenes que YA
+	// entraron.
+	//
+	// EL NUMERO ES MEDIDO, NO ELEGIDO. `console/dc/medidas/sombra-159i` censa las 277 imagenes que el pueblo pide
+	// de verdad (pisos, sombras y paredes, con las mismas cuentas de `tile_cache.go`): la mas grande es una pared
+	// de 160x480 = 76.800 B y NINGUNA pasa los 81.920. O sea que el techo no le quita nada al nivel: corta el
+	// pedido que no era de ninguna imagen y que tumbaba la corrida.
+	limiteDeImagen159i = 81920
+
 )
 
 // frase: lo que se imprime antes de cada etapa. Todo el log de esta corrida empieza con GATE0 para poder
@@ -315,6 +328,11 @@ func main() {
 			// y la composicion al vuelo arma lo que no entra en UN buffer de trabajo que se reusa.
 			d2maprenderer.ConDesalojoDeLaCache(desalojoEnCuadros),
 			d2maprenderer.ConComposicionAlVuelo(bufferDelVuelo),
+
+			// DC-002.159i: LA PARED QUE FALTABA. Una imagen de la cache que no entra en la consola (el pedido de
+			// 4.737.760 B que mataba la corrida de 159h) se dice en el log UNA vez y el cuadro sigue sin ella;
+			// sin este techo, el buffer al vuelo crece a `n + n/4` y el `make` es el que tumba el runtime.
+			d2maprenderer.ConLimiteDeImagen(limiteDeImagen159i),
 		},
 
 		Instrumento: instrumento,

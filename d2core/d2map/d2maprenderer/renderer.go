@@ -122,6 +122,25 @@ type MapRenderer struct {
 	bufferDelVuelo        []byte
 	crecimientosDelBuffer int
 
+	// topeDelVuelo (DC-002.159i): el buffer de trabajo NO crece mas alla de esto. Es el `maxBytes` que declaro
+	// `ActivarComposicionAlVuelo`; 0 = sin tope (crece como siempre, el camino de la PC y de los POCs del host).
+	topeDelVuelo int
+
+	// ============================== EL TECHO POR IMAGEN (DC-002.159i) ==============================
+	// Ver `limite_de_imagen_159i.go`: en la consola UNA imagen de la cache del mapa puede no entrar en la RAM
+	// (medido en DC-002.159h: 4.737.760 B de indices, y el buffer al vuelo creciendo por encima). Con el techo
+	// puesto, la que no entra se dice en el log UNA vez y no se pinta; el cuadro sigue. Cero = sin techo (la PC).
+	limiteDeImagen int
+
+	// noEntran: las claves de cache de las imagenes que el techo dejo afuera; el dibujado las pregunta antes de
+	// pedir nada (asi el cuadro no paga ni el `GetTiles` ni un aviso por cuadro).
+	noEntran map[uint32]bool
+
+	// las cuentas del rechazo, para el log de la consola y la evidencia
+	imagenesNoEntran int
+	bytesNoEntran    int
+	vuelosRechazados int
+
 	// cacheSinGetTiles (DC-002.135): con la cache en indices y la imagen YA armada, el tile no necesita los
 	// datos del `.dt1` para nada (ni para el `YAdjust`, que va guardado con la imagen), asi que se saltea el
 	// `mapEngine.GetTiles` que `generate*Cache` pedia SIEMPRE, acertara o no la cache. Es la palanca del A/B:
@@ -191,8 +210,12 @@ func (mr *MapRenderer) DesalojoEnCuadros() int { return mr.desalojoEnCuadros }
 
 // ActivarComposicionAlVuelo (DC-002.113b): cuando el tramo esta lleno, la imagen se compone sobre un buffer de
 // trabajo de hasta `maxBytes` B y se pinta sin cachearse. ADITIVA: sin llamarla, lo que no entra se derrama.
+//
+// DC-002.159i: `maxBytes` es ademas el TECHO del buffer -- no crece por encima de lo declarado. Con 0 (el camino de
+// antes) el buffer crece cuando la imagen no entra.
 func (mr *MapRenderer) ActivarComposicionAlVuelo(maxBytes int) {
 	mr.componerAlVuelo = true
+	mr.topeDelVuelo = maxBytes
 
 	if maxBytes > 0 && len(mr.bufferDelVuelo) < maxBytes {
 		mr.bufferDelVuelo = make([]byte, maxBytes)
@@ -808,6 +831,12 @@ func (mr *MapRenderer) renderTilePass3(tile *d2mapengine.MapTile, target d2inter
 }
 
 func (mr *MapRenderer) renderFloor(tile d2ds1.Tile, target d2interface.Surface, tileX, tileY int) {
+	// DC-002.159i: la imagen que el techo dejo afuera no se pide ni se avisa por cuadro (el log ya lo dijo). Las
+	// animadas quedan afuera de este atajo: su clave es el cuadro de la animacion, no el del tile.
+	if !tile.Animated && mr.noEntraLaImagen(claveDeCache(tile.Style, tile.Sequence, 0, tile.RandomIndex)) {
+		return
+	}
+
 	// DC-002.135: el cronometro del bloque de la CACHE (hipotesis (a) de la tarjeta).
 	tCache := ahora135()
 
@@ -901,6 +930,11 @@ func (mr *MapRenderer) pintarTile(target d2interface.Surface, img d2interface.Su
 
 func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2interface.Surface,
 	tileX, tileY, idx int, upper bool) {
+	// DC-002.159i: la imagen que el techo dejo afuera no se pide ni se avisa por cuadro (el log ya lo dijo).
+	if mr.noEntraLaImagen(claveDeCache(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex)) {
+		return
+	}
+
 	// DC-002.135: el bloque de la CACHE (ver `cronometro_135.go`).
 	tCache := ahora135()
 
@@ -994,6 +1028,12 @@ func (mr *MapRenderer) renderWall(tile d2ds1.Tile, viewport *Viewport, target d2
 // light map in the real game).
 func (mr *MapRenderer) renderRoof(tile d2ds1.Tile, viewport *Viewport, target d2interface.Surface,
 	tileX, tileY, idx int) {
+	// DC-002.159i: una imagen que el techo dejo afuera no se pide ni se avisa por cuadro (ver
+	// `limite_de_imagen_159i.go`); el log ya dijo cual es, una vez, cuando se rechazo.
+	if mr.noEntraLaImagen(claveDeCache(tile.Style, tile.Sequence, int(tile.Type), tile.RandomIndex)) {
+		return
+	}
+
 	// DC-002.135: el bloque de la CACHE.
 	tCache := ahora135()
 
@@ -1167,6 +1207,13 @@ func (mr *MapRenderer) renderLitEntity(target d2interface.Surface, e d2interface
 const shadowAlpha = 160.0 / 255.0
 
 func (mr *MapRenderer) renderShadow(tile d2ds1.Tile, target d2interface.Surface, tileX, tileY int) {
+	// DC-002.159i: la imagen que el techo dejo afuera no se pide ni se avisa por cuadro (el log ya lo dijo). Es
+	// el camino que la evidencia de DC-002.159h señalo como el que muere (`renderShadow` -> `asegurarImagen` ->
+	// `pedirTrozoDeIndices`), y el que hay que dejar barato cuando la imagen no entra: ni `GetTiles` ni aviso.
+	if mr.noEntraLaImagen(claveDeCache(tile.Style, tile.Sequence, int(d2enum.TileShadow), tile.RandomIndex)) {
+		return
+	}
+
 	mr.asegurarImagen(&tile, d2enum.TileShadow)
 
 	img := mr.getImageCacheRecord(tile.Style, tile.Sequence, 13, tile.RandomIndex)
