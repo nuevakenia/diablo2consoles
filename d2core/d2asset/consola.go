@@ -29,6 +29,7 @@ package d2asset
 // abajo): asi el AssetManager de consola y el arranque del motor prenden exactamente las mismas palancas.
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dcc"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2tbl"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2loader/asset/types"
@@ -89,7 +90,20 @@ func ArrancarComoConsola() {
 	// semiespacio de 1.835.008 B -- el recolector corria cinco veces seguidas y el SH-4 moria a los dos segundos
 	// de arrancar a caminar con `fatal error: stack_alloc: out of memory`. Ver dcc_animation.go.
 	UsarSuperficiesPorCuadro(true)
+
+	// DC-002.159e: EL TALLER DEL DECODIFICADOR. Decodificar una direccion de una capa del heroe pide al
+	// monton de 57.197 B por direccion (medido en la PC sobre los 8 `.dcc` del heroe: 7.321.288 B en 128
+	// direcciones) y de esos los pixeles que se quedan vivos son una fraccion: el resto son buffers de TRABAJO
+	// que el decodificador tira. En la consola esos bytes se quedan en el semiespacio hasta la recoleccion
+	// siguiente, y caminando se decodifica una direccion por capa y por giro. Con el taller (los mismos buffers
+	// pedidos una vez y reusados) la misma decodificacion pide 12.656 B por direccion y los pixeles salen
+	// IDENTICOS byte a byte (128 direcciones, misma huella). Ver d2dcc/taller_159e.go.
+	d2dcc.UsarElTallerDeDecodificacion159(true)
 }
+
+// TallerDeDecodificacion159 dice si el taller del decodificador de `.dcc` esta prendido (DC-002.159e). Es lo
+// que la linea de estado de la corrida imprime para que la evidencia no dependa de creer.
+func TallerDeDecodificacion159() bool { return d2dcc.TallerDeDecodificacion159() }
 
 // NuevoAssetManagerDeConsola arma el AssetManager de la consola: los ocho caches con los presupuestos
 // vigentes y una fuente MPQ por cada ruta que se le pasa (en el orden en que las recibe: el loader

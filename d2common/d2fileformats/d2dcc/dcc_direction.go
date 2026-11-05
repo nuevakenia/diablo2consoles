@@ -54,6 +54,12 @@ type DCCDirection struct {
 // CreateDCCDirection creates an instance of a DCCDirection.
 // nolint:funlen // no need to reduce
 func CreateDCCDirection(bm *d2datautils.BitMuncher, file *DCC) *DCCDirection {
+	// DC-002.159e: una direccion es la unidad de trabajo del taller (ver taller_159e.go). Aca se vuelve el
+	// cursor de las celdas al principio: las de la direccion anterior ya no las mira nadie.
+	if reusarElTaller159 {
+		abrirElTaller159()
+	}
+
 	// nolint:gomnd // constant
 	var crazyBitTable = []byte{0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 26, 28, 30, 32}
 
@@ -198,7 +204,7 @@ func (v *DCCDirection) generateFrames(pcd *d2datautils.BitMuncher) {
 		cell.LastHeight = -1
 	}
 
-	v.PixelData = pedirBytes(v.Box.Width * v.Box.Height)
+	v.PixelData = pedirLienzoDeTrabajo(v.Box.Width * v.Box.Height)
 	frameIndex := -1
 
 	for _, frame := range v.Frames {
@@ -313,14 +319,14 @@ func (v *DCCDirection) fillPixelBuffer(pcd, ec, pm, et, rp *d2datautils.BitMunch
 		totalDeCeldas += frame.HorizontalCellCount * frame.VerticalCellCount
 	}
 
-	v.PixelBuffer = pedirEntradas(totalDeCeldas)
+	v.PixelBuffer = pedirEntradasDeTrabajo(totalDeCeldas)
 
 	for i := range v.PixelBuffer {
 		v.PixelBuffer[i].Frame = -1
 		v.PixelBuffer[i].FrameCellIndex = -1
 	}
 
-	cellBuffer := make([]*DCCPixelBufferEntry, v.HorizontalCellCount*v.VerticalCellCount)
+	cellBuffer := pedirPunterosAEntradas(v.HorizontalCellCount * v.VerticalCellCount)
 	frameIndex := -1
 	pbIndex := -1
 
@@ -436,7 +442,7 @@ func (v *DCCDirection) calculateCells() {
 	v.HorizontalCellCount = 1 + (v.Box.Width-1)/cellsPerRow
 	v.VerticalCellCount = 1 + (v.Box.Height-1)/cellsPerRow
 	// Calculate the cell widths
-	cellWidths := make([]int, v.HorizontalCellCount)
+	cellWidths := pedirAnchos(v.HorizontalCellCount)
 	if v.HorizontalCellCount == 1 {
 		cellWidths[0] = v.Box.Width
 	} else {
@@ -449,7 +455,7 @@ func (v *DCCDirection) calculateCells() {
 	}
 	// Calculate the cell heights
 	// nolint:gomnd // constant
-	cellHeights := make([]int, v.VerticalCellCount)
+	cellHeights := pedirAltos(v.VerticalCellCount)
 	if v.VerticalCellCount == 1 {
 		cellHeights[0] = v.Box.Height
 	} else {
@@ -461,10 +467,10 @@ func (v *DCCDirection) calculateCells() {
 		cellHeights[v.VerticalCellCount-1] = v.Box.Height - (4 * (v.VerticalCellCount - 1))
 	}
 	// Set the cell widths and heights in the cell buffer
-	v.Cells = make([]*DCCCell, v.VerticalCellCount*v.HorizontalCellCount)
+	v.Cells = pedirPunterosACeldas(v.VerticalCellCount * v.HorizontalCellCount)
 	yOffset := 0
 
-	arena := pedirCeldas(v.VerticalCellCount * v.HorizontalCellCount)
+	arena := pedirCeldasDeTrabajo(v.VerticalCellCount * v.HorizontalCellCount)
 
 	for y := 0; y < v.VerticalCellCount; y++ {
 		xOffset := 0

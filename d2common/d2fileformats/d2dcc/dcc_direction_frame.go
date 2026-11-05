@@ -89,8 +89,8 @@ func (v *DCCDirectionFrame) recalculateCells(direction *DCCDirection) {
 			v.VerticalCellCount--
 		}
 	}
-	// Calculate the cell widths and heights
-	cellWidths := make([]int, v.HorizontalCellCount)
+	// Calculate the cell widths
+	cellWidths := pedirAnchos(v.HorizontalCellCount)
 	if v.HorizontalCellCount == 1 {
 		cellWidths[0] = v.Width
 	} else {
@@ -103,7 +103,7 @@ func (v *DCCDirectionFrame) recalculateCells(direction *DCCDirection) {
 		cellWidths[v.HorizontalCellCount-1] = v.Width - w - (4 * (v.HorizontalCellCount - 2))
 	}
 
-	cellHeights := make([]int, v.VerticalCellCount)
+	cellHeights := pedirAltos(v.VerticalCellCount)
 	if v.VerticalCellCount == 1 {
 		cellHeights[0] = v.Height
 	} else {
@@ -116,7 +116,7 @@ func (v *DCCDirectionFrame) recalculateCells(direction *DCCDirection) {
 		cellHeights[v.VerticalCellCount-1] = v.Height - h - (4 * (v.VerticalCellCount - 2))
 	}
 
-	v.Cells = pedirCeldas(v.HorizontalCellCount * v.VerticalCellCount)
+	v.Cells = pedirCeldasDeTrabajo(v.HorizontalCellCount * v.VerticalCellCount)
 	offsetY := v.Box.Top - direction.Box.Top
 
 	for y := 0; y < v.VerticalCellCount; y++ {

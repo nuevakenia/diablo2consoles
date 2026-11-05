@@ -67,7 +67,16 @@ const (
 	// numero de velocidad: la velocidad la pone el motor. Es cuanto camino se le pide de una vez, para que
 	// el `Step` tenga a donde ir mientras la tecla siga apretada (una celda de 5 subtiles se camina en
 	// ~0,5 s, asi que 3 celdas dan margen de sobra y el objetivo se renueva cada cuadro igual).
-	celdasPorDelante159 = 1.0
+	// EL OBJETIVO DEL PASO ES UN RUMBO, NO UNA META (DC-002.159e). Antes eran 1 celda por delante, y con el cuadro
+	// de la consola (~0,75 s) el ente LLEGABA al objetivo en pocos cuadros: al llegar, `atTarget()` daba true y
+	// `Player.GetAnimationMode()` devolvia `TN` (quieto) por un cuadro, y al cuadro siguiente `Avanzar` le ponia
+	// camino otra vez (`TW`). Cada uno de esos cambios de modo REHACE el compuesto entero
+	// (`Composite.createMode`: COF + las capas `.dcc` del modo), o sea ~250.000 B por cambio, y medido en el Gate 0
+	// (DC-002.159e) el caminar llegaba a 95 cambios en 345 cuadros: el recolector corriendo 5 veces por cuadro y
+	// el vivo pegado a 1,7 MB. Con 8 celdas por delante el objetivo no se alcanza dentro de un tramo del paseo
+	// (24 cuadros), el modo se queda en `TW` y el compuesto no se rehace: el ente camina igual, en la misma
+	// direccion, porque lo que manda es el rumbo.
+	celdasPorDelante159 = 8.0
 
 	// EL RECUADRO DEL BORRADO NO ES UNA CONSTANTE (DC-002.159c). Antes eran 160x160 fijos ("la caja del
 	// compuesto de la amazona son 60x76 medidos"): entraba el cuadro de parado, pero caminando las capas de las
@@ -528,7 +537,7 @@ func (h *HeroeDelGate0) Estado() string {
 
 	return fmt.Sprintf("celda=%.2f,%.2f pie=%d,%d dir=%d modo=%s camina=%v pasos=%d caja=%d,%d,%dx%d "+
 		"sup=%d/%dB sincaja=%d giros=%d decod=%d exp=%d/%dB borrados=%d noVolvieron=%d dibujos=%d dib=%d,%d "+
-		"pintados=%d cuadrosPintados=%d",
+		"pintados=%d cuadrosPintados=%d taller=%v",
 		pos.X()/subtilesPorCelda159, pos.Y()/subtilesPorCelda159, px, py,
 		h.direccion, h.jugador.GetAnimationMode().String(), h.caminando, h.pasos,
 		h.ultimaCaja[0], h.ultimaCaja[1], h.ultimaCaja[2], h.ultimaCaja[3],
@@ -536,5 +545,5 @@ func (h *HeroeDelGate0) Estado() string {
 		d2asset.GirosDelCompuesto159(), d2asset.DecodificacionesDeDireccion159(),
 		d2util.PedidosDeExpansion, d2util.BytesDeExpansion,
 		h.borrados159, h.noVolvieron159, h.dibujos159, dibX, dibY,
-		h.pintados159, h.cuadrosPintados159)
+		h.pintados159, h.cuadrosPintados159, d2asset.TallerDeDecodificacion159())
 }
