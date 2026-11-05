@@ -58,6 +58,15 @@ const (
 	shadowAdjustY    = 80
 )
 
+// losCuatroTiposDePared (DC-002.159j): izquierda, derecha y las dos mitades de la esquina norte. Es lo que el
+// renderer pide por casilla y lo que el censo de 159i no miraba.
+var losCuatroTiposDePared = []d2enum.TileType{
+	d2enum.TileLeftWall,
+	d2enum.TileRightWall,
+	d2enum.TileRightPartOfNorthCornerWall,
+	d2enum.TileLeftPartOfNorthCornerWall,
+}
+
 // imagen: una imagen que el renderer pediria, con su clave de cache y sus tamanos.
 type imagen struct {
 	que      string // "piso", "sombra" o "pared"
@@ -271,6 +280,47 @@ func correr(dir string, top int) error {
 				variant: int(w.RandomIndex), ancho: tileSurfaceWidth, alto: alto}, x, y)
 		}
 	}
+
+// ============================== DC-002.159j: LAS CUATRO FAMILIAS DE PARED ==============================
+//
+// El censo de arriba mira las paredes que el `.ds1` DECLARA en cada casilla, y en el pueblo eso es casi todo
+// `tipo=14`. El pedido que tumbo la corrida de DC-002.159h era de `tipo=1` -- que el `.ds1` tambien declara
+// (66 casillas) -- y lo que el renderer pide por casilla son cuatro tipos: izquierda, derecha y las dos
+// mitades de la esquina norte. Un censo que no los mire no puede ser el juez de "ninguna imagen pasa de X".
+//
+// La cuenta la hace EL MOTOR (`d2mapengine.CensoDeLasCuatroFamiliasDePared159j`), no este medidor: es el mismo
+// codigo que la consola corre en el arranque del pueblo (MAPA159J: CENSO 4 TIPOS EN LA CONSOLA), asi que los
+// dos numeros son el MISMO numero. El censo de arriba queda como estaba, comparable con la evidencia de 159i.
+cuatroFamilias := engine.CensoDeLasCuatroFamiliasDePared159j()
+
+fmt.Printf("SOMBRA159I: CENSO 4 TIPOS familias=%d imagenes=%d bytes=%d (%.2f MB)\n", cuatroFamilias.Familias,
+	cuatroFamilias.Imagenes, cuatroFamilias.Bytes, float64(cuatroFamilias.Bytes)/(1024*1024))
+
+for _, tipo := range []d2enum.TileType{d2enum.TileLeftWall, d2enum.TileRightWall,
+	d2enum.TileRightPartOfNorthCornerWall, d2enum.TileLeftPartOfNorthCornerWall} {
+	acc, hay := cuatroFamilias.PorTipo[int(tipo)]
+	if !hay {
+		continue
+	}
+
+	fmt.Printf("SOMBRA159I:   tipo=%2d %-32s imagenes=%3d bytes=%9d maxima=%6d B (%s)\n", int(tipo),
+		tipo.String(), acc.Imagenes, acc.Bytes, acc.Maxima, acc.Cual)
+}
+
+fmt.Printf("SOMBRA159I: la imagen mas grande de las cuatro familias: %d B (%s)\n", cuatroFamilias.Maxima,
+	cuatroFamilias.Cual)
+
+// la pared que delato el defecto, medida siempre: es el criterio 1 de la tarjeta
+fmt.Printf("SOMBRA159I: LA PARED TESTIGO estilo=0 sec=0 tipo=1 var=0: %s imagen=%d B\n", cuatroFamilias.Testigo,
+	cuatroFamilias.TestigoImagen)
+
+if cuatroFamilias.SobreTope == 0 {
+	fmt.Printf("SOMBRA159I: NINGUNA imagen de las cuatro familias pasa el buffer al vuelo (%d B)\n",
+		cuatroFamilias.Tope)
+} else {
+	fmt.Printf("SOMBRA159I: PASAN el buffer al vuelo (%d B): %d imagenes\n", cuatroFamilias.Tope,
+		cuatroFamilias.SobreTope)
+}
 
 	lista := make([]*imagen, 0, len(vistas))
 	total, porTipo := 0, map[string]int{}

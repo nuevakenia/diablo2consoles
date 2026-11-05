@@ -106,6 +106,10 @@ type PantallaDelPueblo struct {
 	archivo int
 
 	opciones     []d2maprenderer.Opcion
+	// DC-002.159j: el censo de las cuatro familias de pared se corre en la consola al terminar de componer el
+	// nivel (ver OnLoad). En esta pantalla va prendido: es la que corre en el Gate 0, y el censo es el juez de
+	// "ninguna imagen de pared pasa el buffer al vuelo".
+	censo159j    bool
 	conEntidades bool
 
 	// instrumento: lo llama la pantalla en cada etapa para que el arranque de la consola imprima el monton
@@ -173,6 +177,8 @@ func CreatePantallaDelPueblo(asset *d2asset.AssetManager, renderer d2interface.R
 		opciones:     opciones,
 		conEntidades: conEntidades,
 		instrumento:  instrumento,
+		// DC-002.159j: el censo de las cuatro familias de pared, en la consola
+		censo159j: true,
 	}
 
 	pantalla.Logger = d2util.NewLogger()
@@ -356,6 +362,26 @@ func (p *PantallaDelPueblo) OnLoad(loading d2screen.LoadingState) {
 	d2asset.SoltarPrestamoDeLecturaDeTiles()
 
 	p.avisar("mapa:prestamo-de-lectura-soltado")
+
+	// DC-002.159j: EL CENSO DE LAS CUATRO FAMILIAS DE PARED, CORRIDO EN LA CONSOLA. Es el juez que la tarjeta
+	// pide ("sin eso el censo no puede ser juez de 'ninguna imagen pasa de X'"): mide lo que el renderer pediria
+	// por casilla -- izquierda, derecha y las dos mitades de la esquina norte, para cada familia del nivel -- con
+	// los datos que tiene la consola, sin componer una sola imagen. Los numeros del host salen del MISMO codigo
+	// (`d2mapengine.CensoDeLasCuatroFamiliasDePared159j`, ver `console/dc/medidas/sombra-159i`).
+	if p.censo159j {
+		censo := p.engine.CensoDeLasCuatroFamiliasDePared159j()
+		p.Infof("MAPA159J: CENSO 4 TIPOS EN LA CONSOLA %s", censo.Linea159j())
+		p.Infof("MAPA159J: LA PARED TESTIGO estilo=0 sec=0 tipo=1 var=0: %s imagen=%d B (en 159i pedia 8394240 B)",
+			censo.Testigo, censo.TestigoImagen)
+
+		if censo.SobreTope == 0 {
+			p.Infof("MAPA159J: NINGUNA imagen de las cuatro familias pasa el buffer al vuelo (%d B)",
+				censo.Tope)
+		} else {
+			p.Errorf("MAPA159J: %d imagenes de las cuatro familias PASAN el buffer al vuelo (%d B)",
+				censo.SobreTope, censo.Tope)
+		}
+	}
 
 	p.pisos, p.paredes = censoDelPueblo(p.engine)
 

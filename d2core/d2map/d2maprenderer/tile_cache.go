@@ -423,6 +423,11 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.Tile) {
 	realHeight := d2math.MaxInt32(d2math.AbsInt32(tileData.Height), tileMaxY-tileMinY)
 	tileYOffset := -tileMinY
 
+	// DC-002.159j: si estos bloques no son los que se cargaron, el log lo dice con las dos versiones.
+	mr.avisarSiElTileNoEsElQueSeCargo159j(tile, tileMinY, tileMaxY, len(tileData.Blocks))
+	// DC-002.159j: la pared que delato el defecto (0/0/tipo 1) se dice una vez, ya compuesta.
+	mr.avisarLaParedTestigo159j(tile, tileMinY, tileMaxY, len(tileData.Blocks), realHeight)
+
 	if tile.Type == d2enum.TileRoof {
 		tile.YAdjust = -int(tileData.RoofHeight)
 	} else {

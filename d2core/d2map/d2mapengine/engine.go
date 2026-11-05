@@ -40,6 +40,8 @@ type MapEngine struct {
 	dt1Index      map[int64][]int32         // (style, sequence, type) -> indices into dt1TileData, ascending (see extendRank)
 	dt1Rank       []int                     // for every dt1TileData entry: its position among the tiles of its (style, sequence, type)
 	dt1KeyCount   map[int64]int             // tiles seen per (style, sequence, type) while filling dt1Rank
+	sellos159j    []Sello159j               // DC-002.159j: lo que tenia cada tile al cargarse (instrumento)
+	raizDeBloques [][]d2dt1.Block           // DC-002.159j: la rebanada `Blocks` de cada tile, en un arreglo que el recolector si recorre
 	objBlock      *ObjectCollision          // run-time collision of doors
 
 	gridPaths     bool        // PathFind uses d2path (see UseCollisionPaths)
@@ -354,6 +356,13 @@ func (m *MapEngine) ResetMapParaStamp(levelType d2enum.RegionIdType, width, heig
 	// punteros al arena, no al crudo). Se devuelve al monton de C antes de que el compositor y el arena del
 	// `.ds1` pidan lo suyo. Con la palanca por archivo -- `UsarScratchPorArchivo` -- cada archivo ya devolvio
 	// el suyo, asi que aca no queda nada y devuelve 0. En la PC no hace nada: no hay liberador instalado.
+	//
+	// DC-002.159j: el instrumento dice como quedo `dt1TileData` (semiespacio o monton externo) y cuantos sellos
+	// se guardaron: es el dato que explica por que los bloques de un tile pueden dejar de ser suyos.
+	if instrumentoSellos159j {
+		m.Infof("SELLOS159J: %s (sellos=%d)", m.EstadoDeLasTablasDeTiles159j(), m.EstadoDelosSellos159j())
+	}
+
 	if soltados := d2asset.SoltarPrestamoDeLecturaDeTiles(); soltados > 0 {
 		m.Debugf("scratch de lectura soltado con el nivel cargado: %d B", soltados)
 	}
@@ -439,6 +448,11 @@ func (m *MapEngine) resetMapBase(levelType d2enum.RegionIdType, width, height in
 	m.dt1Rank = m.dt1Rank[:0]
 	m.dt1Index = nil
 	m.dt1KeyCount = map[int64]int{}
+	// DC-002.159j: los sellos son del nivel que se tira, igual que `dt1TileData` (instrumento)
+	m.sellos159j = m.sellos159j[:0]
+	// DC-002.159j: la raiz de las rebanadas `Blocks` es del nivel (apunta a los bloques de los `.dt1` que se
+	// estan tirando); se rehace al cargar el nivel nuevo, igual que `dt1TileData`.
+	m.raizDeBloques = m.raizDeBloques[:0]
 	m.startOverride = nil
 	m.world = World{}
 	m.warpDest = nil
@@ -476,6 +490,10 @@ func (m *MapEngine) addDT1(fileName string) {
 	}
 
 	m.extendRank()
+	// DC-002.159j: la rebanada `Blocks` de cada tile, en un arreglo propio que el recolector SI recorre
+	// (`dt1TileData` es un bloque externo y su interior no se escanea: ver bloques_vivos_159j.go).
+	m.raizDeLosBloques(first)
+	m.sellar159j(first)
 	m.dt1Files = append(m.dt1Files, fileName)
 }
 
@@ -762,7 +780,7 @@ func (m *MapEngine) GetTiles(style, sequence int, tileType d2enum.TileType) []d2
 	if len(m.dt1Rank) == len(m.dt1TileData) && m.dt1Index != nil {
 		// indexed lookup: same tiles in the same (file, tile) order as the scan below
 		for _, idx := range m.dt1Index[claveDeTile(int32(style), int32(sequence), int32(tileType))] {
-			tiles = append(tiles, m.dt1TileData[idx])
+			tiles = append(tiles, m.tileConLosBloquesVivos(int(idx)))
 		}
 	} else {
 		for idx := range m.dt1TileData {
@@ -771,7 +789,7 @@ func (m *MapEngine) GetTiles(style, sequence int, tileType d2enum.TileType) []d2
 				continue
 			}
 
-			tiles = append(tiles, m.dt1TileData[idx])
+			tiles = append(tiles, m.tileConLosBloquesVivos(idx))
 		}
 	}
 
@@ -856,10 +874,18 @@ func (m *MapEngine) GenerateMap(regionType d2enum.RegionIdType, levelPreset, fil
 }
 
 // GetTileData returns the tile with the given style, sequence, tileType and index.
+//
+// DC-002.159j: el puntero que devuelve es el de la tabla, asi que antes de entregarlo se le repone la rebanada
+// `Blocks` desde la raiz (ver bloques_vivos_159j.go): el recolector corrige el puntero de la raiz cuando mueve
+// los bloques, no el de adentro de la tabla externa.
 func (m *MapEngine) GetTileData(style, sequence int, tileType d2enum.TileType, index byte) *d2dt1.Tile {
 	for idx := range m.dt1TileData {
 		if m.dt1TileData[idx].Style == int32(style) && m.dt1TileData[idx].Sequence == int32(sequence) &&
 			m.dt1TileData[idx].Type == int32(tileType) && m.dt1TileData[idx].RarityFrameIndex == int32(index) {
+			if idx < len(m.raizDeBloques) {
+				m.dt1TileData[idx].Blocks = m.raizDeBloques[idx]
+			}
+
 			return &m.dt1TileData[idx]
 		}
 	}

@@ -87,6 +87,8 @@ func (m *MapEngine) SoltarLasTablasDeTiles() (tiles, bytes int) {
 	m.dt1Rank = nil
 	m.dt1Index = nil
 	m.dt1KeyCount = nil
+	m.sellos159j = nil
+	m.raizDeBloques = nil
 
 	return tiles, bytes
 }

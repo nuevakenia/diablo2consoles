@@ -40,6 +40,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/maple"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2gamescreen"
@@ -237,6 +238,14 @@ func main() {
 	// El AssetManager del motor se arma DENTRO de `d2app.Create`, y los presupuestos de sus caches se congelan
 	// al armarlos: por eso esto va antes de Create y no despues.
 	d2asset.ArrancarComoConsola()
+
+	// DC-002.159j: EL SELLO DE LOS BLOQUES DE CADA TILE. La pared `estilo=0 sec=0 tipo=1` pide 8.394.240 B en
+	// la consola cuando su `.dt1` mide 288 de alto: el `Height` del tile esta bien y el `minY` de sus bloques no,
+	// o sea que la rebanada `Blocks` del tile apunta a memoria que ya no es suya. Con esto prendido el motor
+	// guarda, al cargar cada `.dt1`, lo que esa rebanada tenia (tamano, minY/maxY, direccion y una masa de los
+	// `Y`) en un arreglo PROPIO, y el renderer compara al componer la pared: la diferencia se escribe en el log
+	// con las dos versiones (ver d2core/d2map/d2mapengine/sellos_159j.go). Apagado no cambia nada del camino.
+	d2mapengine.ActivarSellosDeLosTiles159j(true)
 
 	// el `free` del monton de C para los tramos que la consola pide con malloc: sin esto, soltar un tramo lo
 	// devuelve al recolector de Go y el monton de C no lo recupera

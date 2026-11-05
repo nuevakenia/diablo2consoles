@@ -59,6 +59,12 @@ func (m *MapEngine) exactComponent(t ExactTile) (c d2ds1.Tile, dt *d2dt1.Tile, o
 
 	dt = &m.dt1TileData[g]
 
+	// DC-002.159j: la rebanada `Blocks` desde la raiz (ver bloques_vivos_159j.go): el recolector corrige el
+	// puntero de la raiz cuando mueve los bloques, no el de adentro de la tabla externa.
+	if g < len(m.raizDeBloques) {
+		dt.Blocks = m.raizDeBloques[g]
+	}
+
 	// the renderer and PrepareTile look a tile up as GetTiles(style, sequence,
 	// type)[RandomIndex]: this tile's position in that list
 	m.extendRank()
