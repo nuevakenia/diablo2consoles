@@ -472,6 +472,9 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 		p.aplicarElPlan157(target)
 	}
 
+	// DC-002.159d: el plan ya esta aplicado; lo que viene es el mapa.
+	MarcarFaseGC159d(faseMapa159d)
+
 	t0 := d2util.Now()
 
 	// cuantos repintados llevaba el renderer: el heroe necesita saber si este cuadro el mapa se pinto entero
@@ -482,6 +485,9 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 	ox, oy := d2display.ColumnOrigin()
 	target.PushTranslation(-ox, -oy)
 	p.mapRenderer.Render(target)
+
+	// DC-002.159d: el mapa ya esta pintado (o se salto); lo que viene es el heroe.
+	MarcarFaseGC159d(faseHeroe159d)
 
 	// ============================== DC-002.159b: SOLTAR EL MAPA, ENTRAR EL HEROE ==============================
 	// El cuadro 1 es el unico que pinta el mapa (con las casillas del motor y los bloques de los `.dt1`
@@ -535,6 +541,12 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 	if p.heroe != nil && p.cuadros%15 == 0 {
 		p.Infof("HEROE159 cuadro=%d %s saltos=%d repintados=%d", p.cuadros, p.heroe.Estado(),
 			p.mapRenderer.SaltosDelMapa157(), p.mapRenderer.RepintadosDelMapa157())
+	}
+
+	// DC-002.159d: LA BASURA POR CUADRO, por fase. Cada 15 cuadros, una linea (ver `gc_159d.go`): sin sonda
+	// (la PC) no imprime nada.
+	if linea, hay := CerrarElCuadroGC159d(); hay {
+		p.Infof("GC159D cuadro=%d %s", p.cuadros, linea)
 	}
 }
 
@@ -696,17 +708,35 @@ func promedio157(total, n int) int {
 // cache). La cruceta va PRIMERO: el motor mueve al ente en su `Advance`, asi que aca solo se le pide el
 // camino que va a caminar este cuadro.
 func (p *PantallaDelPueblo) Advance(elapsed float64) error {
+	// DC-002.159d: abre el cuadro para la sonda de la basura (no-op sin sonda: la PC).
+	AbrirElCuadroGC159d()
+
+	// DC-002.159d (SONDA DE CONTROL): 1 KB por cuadro que se tira al cuadro siguiente. Sirve para separar dos
+	// causas muy distintas de que el vivo crezca: que el recolector NO pueda llevarase lo que ya nadie apunta
+	// (en ese caso esto suma 1024 B/cuadro en la fase `control` de la linea GC159D), o que haya UNA estructura
+	// concreta que crece (en ese caso esto no mueve la aguja y hay que buscarla). Se apaga poniendo el tamano
+	// en 0 (`basuraDeControl159dBytes`).
+	if basuraDeControl159dBytes > 0 {
+		basuraDeControl159d = make([]byte, basuraDeControl159dBytes)
+	}
+
 	if p.heroe != nil {
 		p.heroe.Avanzar()
 	}
+
+	MarcarFaseGC159d(faseMotor159d)
 
 	if p.engine != nil {
 		p.engine.Advance(elapsed)
 	}
 
+	MarcarFaseGC159d(faseRenderer159d)
+
 	if p.mapRenderer != nil {
 		p.mapRenderer.Advance(elapsed)
 	}
+
+	MarcarFaseGC159d(fasePlan159d)
 
 	return nil
 }

@@ -77,17 +77,22 @@ func (p *paseo159) sentidoDeAhora() (sentido159, bool) {
 	}
 
 	tramo := (p.cuadro - cuadrosDeEspera159) / cuadrosPorTramo159
-	if tramo >= len(guion159) {
+	if tramo >= len(guion159)*vueltas159 {
 		return sentido159{}, false
 	}
 
-	return guion159[tramo], true
+	return guion159[tramo%len(guion159)], true
 }
 
 // cuadrosDeEspera159: los cuadros que se dejan pasar antes de la primera direccion. El cuadro 1 es el que
 // compone el pueblo y crea al heroe (~4 s medidos): apretar antes no rompe nada, pero el paseo arrancaria
 // escondido en la carga.
 const cuadrosDeEspera159 = 30
+
+// vueltas159: cuantas veces se recorre el guion. Una vuelta son 8 tramos de 24 cuadros = 192 cuadros de caminar,
+// y el criterio de DC-002.159d pide medir 200 cuadros caminando: con dos vueltas el heroe camina 384 cuadros y
+// vuelve al punto de partida (el guion es ida y vuelta por cada eje, asi que repetirlo no lo saca del lienzo).
+const vueltas159 = 2
 
 // IsKeyPressed: la cruceta del guion, o la del mando si el guion ya termino.
 func (p *paseo159) IsKeyPressed(tecla d2enum.Key) bool {

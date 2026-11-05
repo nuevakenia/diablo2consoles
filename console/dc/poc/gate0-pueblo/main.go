@@ -42,6 +42,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"
+	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2gamescreen"
 	ebiten "github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -116,6 +117,16 @@ const (
 	// el umbral del recolector: 95 % (el mismo del POC del juego, medido en DC-002.109: mas bajo, el
 	// recolector se lleva el pueblo a pedazos; mas alto, el semiespacio se llena de basura)
 	umbralDelRecolector = 95
+
+	// DC-002.159d: la SONDA DE CONTROL de la basura (ver `gc_159d.go`). Pide y tira esta cantidad de bytes por
+	// cuadro sin guardarlos en ningun lado: si el recolector se los lleva, el neto de la fase no se mueve; si no,
+	// el vivo crece a razon de estos bytes por cuadro. 1024 mientras se mide; 0 en la corrida buena.
+	//
+	// MEDIDO (DC-002.159d, 15 cuadros con 1024 B/cuadro): la fase `control` paso de 0 B/cuadro a 1032 B/cuadro.
+	// O sea: el recolector de libgodc NO se lleva lo que ya nadie apunta mientras esta corriendo la ronda -- el
+	// vivo sube con TODO lo que se pide y solo baja cuando recolecta. No hay una estructura que crezca: hay que
+	// pedir menos.
+	basuraDeControl159d = 0
 
 	// LA POLITICA CUANDO LOS 4 BLOQUES SE LLENAN (DC-002.156), las mismas dos palancas del POC de DC-002.113b:
 	// una imagen que no se uso en 2 cuadros se suelta y sus bytes vuelven al tramo, y lo que no entra se compone
@@ -234,6 +245,21 @@ func main() {
 		"scratchDeFuera=", d2asset.HayScratchDeFuera(),
 		"techoDelMonton=", int(d2cMontonTecho()))
 
+	// DC-002.159d: LA SONDA DE LA BASURA POR CUADRO. `runtime.ReadMemStats` de libgodc devuelve ceros (por eso
+	// el instrumento de 159c se saco), pero el recolector si dice lo suyo por `gc_stats`: los bytes usados del
+	// semiespacio y cuantas recolecciones hizo. La pantalla la muestrea en cada fase del cuadro y la imprime
+	// cada 15 cuadros (ver d2game/d2gamescreen/gc_159d.go). En la consola el unico que tiene el //extern es este
+	// main, asi que el puente se instala aca.
+	d2gamescreen.SondaDelRecolector159d = func() (usado, colecciones int) {
+		return d2cGcUsado(), d2cGcColecciones()
+	}
+
+	// DC-002.159d (SONDA DE CONTROL): los bytes que se piden y se tiran por cuadro, para saber si el recolector
+	// se lleva lo que ya nadie apunta. 0 = apagada (el camino de la corrida buena).
+	d2gamescreen.FijarBasuraDeControl159d(basuraDeControl159d)
+
+	println(frase, "sondaDelRecolector=instalada gcVivo=", d2cGcUsado(), "gcTotal=", d2cGcTotal())
+
 	// ============================== 2. EL MOTOR ==============================
 	app := d2app.Create("DC-002.155", "gate0-pueblo")
 
@@ -247,9 +273,9 @@ func main() {
 		Tablas: []string{d2resource.LevelType, d2resource.LevelPreset, d2resource.CharStats},
 
 		SinAnimData: !heroeEnElPueblo, // con el heroe el animdata se carga solo con las claves de la amazona
-		SinStrings:  true,  // el pueblo no dibuja texto
-		SinGui:      true,  // sin cursor ni pantalla de carga (3,15 MB de RGBA)
-		SinUi:       true,  // sin el sonido del boton (esta en d2sfx.mpq, que no va al disco)
+		SinStrings:  true,             // el pueblo no dibuja texto
+		SinGui:      true,             // sin cursor ni pantalla de carga (3,15 MB de RGBA)
+		SinUi:       true,             // sin el sonido del boton (esta en d2sfx.mpq, que no va al disco)
 
 		// DC-002.159: EL HEROE DEL MOTOR Y LA CRUCETA
 		Heroe:            heroeEnElPueblo,

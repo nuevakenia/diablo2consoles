@@ -69,7 +69,7 @@ PALANCA_UMBRAL_SIMBOLO=1000000
 #    OJO: la lista blanca es del BUILD DE LA CONSOLA. El binario de la PC (y los POC que no son el Gate 0)
 #    no la usan: sin `DC_GATE0=1` este archivo se comporta como siempre, byte por byte.
 PALANCA_GATE0_APP=(consola_gate0.go consola_156.go)
-PALANCA_GATE0_PANTALLAS=(pantalla_mapa_155.go prefijo_log_156.go heroe_159.go)
+PALANCA_GATE0_PANTALLAS=(pantalla_mapa_155.go prefijo_log_156.go heroe_159.go gc_159d.go)
 
 lookups_fuera_de_la_imagen() { [ "${DC_TABLA_LOOKUPS:-fuera}" = "fuera" ]; }
 
