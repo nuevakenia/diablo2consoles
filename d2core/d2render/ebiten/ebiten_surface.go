@@ -246,6 +246,15 @@ func (s *ebitenSurface) prepareColorM(opts *ebiten.DrawImageOptions, hsv bool) {
 
 	k := matrixKey{hsv: hsv, effect: st.effect, sat: st.saturation, bright: st.brightness}
 
+	if hsv {
+		// DC-002.159h: cuantas veces el cuadro PIDIO la matriz HSV. Es la cuenta que no depende de las
+		// caches (`matrixCache` atiende casi todas y `applyHSV` casi nunca se llama): si nadie pidiera HSV,
+		// la corrida de la consola pasaria igual y no probaria nada.
+		hsvMu.Lock()
+		hsvPedidas159h++
+		hsvMu.Unlock()
+	}
+
 	if st.color != nil {
 		k.r, k.g, k.b, k.a = st.color.RGBA()
 		k.hasColor = true
@@ -299,6 +308,16 @@ func (s *ebitenSurface) handleStateComposite(opts *ebiten.DrawImageOptions) {
 var (
 	hsvMu    sync.Mutex
 	hsvCache = map[[2]float64]ebiten.ColorM{}
+
+	// DC-002.159h: LAS CUENTAS DEL CAMINO HSV. En la consola este camino no es un detalle: hasta esta
+	// tarjeta moria el SH-4 (`runtime.mapassign` llamaba a un hasher que era DATO, ver la evidencia), y una
+	// corrida sin excepcion no prueba por si sola que el mapa se haya tocado -- si nadie pidiera la matriz
+	// HSV, la corrida tambien pasaria. Estas dos cuentas son la prueba positiva: cada acierto es una
+	// LECTURA del mapa y cada fallo es una ESCRITURA (`hsvCache[key] = m`), y las lee el puente
+	// `CuentasDelCaminoHSV159h` para que la linea `CUADRO` de la consola las imprima.
+	hsvAciertos159h uint64
+	hsvFallos159h   uint64
+	hsvPedidas159h  uint64
 )
 
 const hsvCacheMax = 256
@@ -329,6 +348,8 @@ func (s *ebitenSurface) applyHSV(opts *ebiten.DrawImageOptions) {
 		defer hsvMu.Unlock()
 
 		m, ok := tintHSVCache[ck]
+		cuentaElCaminoHSV159h(ok)
+
 		if !ok {
 			m = opts.ColorM
 			m.ChangeHSV(0, sat, bright)
@@ -351,6 +372,8 @@ func (s *ebitenSurface) applyHSV(opts *ebiten.DrawImageOptions) {
 	defer hsvMu.Unlock()
 
 	m, ok := hsvCache[key]
+	cuentaElCaminoHSV159h(ok)
+
 	if !ok {
 		m.ChangeHSV(0, sat, bright)
 
@@ -362,6 +385,36 @@ func (s *ebitenSurface) applyHSV(opts *ebiten.DrawImageOptions) {
 	}
 
 	opts.ColorM = m
+}
+
+// cuentaElCaminoHSV159h suma un acierto o un fallo del cache HSV (DC-002.159h). Se llama con `hsvMu`
+// tomado: el lock del cache es el mismo de las cuentas, asi que no hace falta otro.
+func cuentaElCaminoHSV159h(acierto bool) {
+	if acierto {
+		hsvAciertos159h++
+
+		return
+	}
+
+	hsvFallos159h++
+}
+
+// CuentasDelCaminoHSV159h devuelve (pedidas, aciertos, fallos) del camino HSV desde que arranco el
+// proceso (DC-002.159h):
+//
+//   - `pedidas`: dibujos que PIDIERON la matriz HSV (saturacion o brillo != 1). Es la cuenta que manda:
+//     la sombra del compuesto (brillo 0) la pide una vez por capa y por cuadro.
+//   - `aciertos` / `fallos`: lecturas y ESCRITURAS de `hsvCache`. Son pocas a proposito: `prepareColorM`
+//     memoiza en `matrixCache` por (color, saturacion, brillo, efecto), asi que `applyHSV` -- y con el el
+//     mapa -- se toca solo cuando aparece una combinacion nueva. Las dos operaciones que hasta esta
+//     tarjeta mataban el SH-4 son justamente esas (`runtime.mapassign` con el hasher en `.rodata`).
+//
+// En la consola las imprime la linea `CUADRO` por el puente de `d2gamescreen`. En la PC nadie las mira.
+func CuentasDelCaminoHSV159h() (pedidas, aciertos, fallos int) {
+	hsvMu.Lock()
+	defer hsvMu.Unlock()
+
+	return int(hsvPedidas159h), int(hsvAciertos159h), int(hsvFallos159h)
 }
 
 func (s *ebitenSurface) createDrawImageOptions() *ebiten.DrawImageOptions {

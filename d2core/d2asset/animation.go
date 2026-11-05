@@ -258,6 +258,11 @@ func renderElCuadro159f(target d2interface.Surface, frame animationFrame) {
 func (a *Animation) renderShadow(target d2interface.Surface) {
 	a.ensureSurfaces()
 
+	// DC-002.159h: cuantas sombras se dibujaron de verdad. Es la prueba de que el camino que pide la
+	// matriz HSV (brillo 0) se recorre: sin esta cuenta, "la corrida no murio" tambien seria cierto si la
+	// sombra no se dibujara nunca. Ver `SombrasDibujadas159h`.
+	sombrasDibujadas159h++
+
 	direction := a.directions[a.directionIndex]
 	frame := direction.frames[a.frameIndex]
 

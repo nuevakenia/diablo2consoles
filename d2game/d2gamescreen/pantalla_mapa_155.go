@@ -626,6 +626,16 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 		ln.Tx(" noEntran=").I(noEntran).Tx(" bytesNoEntran=").I(bytesNoEntran).
 			Tx(" vuelos=").I(vuelosRechazados)
 
+		// DC-002.159h: lo que se uso del camino HSV (`hsv=pedidas/aciertos/fallos`) y cuantas sombras del
+		// compuesto se dibujaron (`sombras=`). Es la prueba positiva de que la sombra pasa por la matriz --
+		// y de que paso por el mapa sin matar el SH-4 (ver hsv_159h.go). En la PC el puente es nil y los
+		// campos no salen.
+		if CuentasDelCaminoHSV159h != nil {
+			pedidasHSV, aciertosHSV, fallosHSV, sombrasHSV := CuentasDelCaminoHSV159h()
+			ln.Tx(" hsv=").I(pedidasHSV).Tx("/").I(aciertosHSV).Tx("/").I(fallosHSV)
+			ln.Tx(" sombras=").I(sombrasHSV)
+		}
+
 		ln.Enviar(p.Logger)
 
 		p.avisar("mapa:cuadro")

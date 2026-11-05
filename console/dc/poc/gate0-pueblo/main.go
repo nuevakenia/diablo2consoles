@@ -42,6 +42,7 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
+	renderEbiten "github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/ebiten"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/pvr"
 	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2gamescreen"
 	ebiten "github.com/hajimehoshi/ebiten/v2"
@@ -279,6 +280,17 @@ func main() {
 	// DC-002.159d (SONDA DE CONTROL): los bytes que se piden y se tiran por cuadro, para saber si el recolector
 	// se lleva lo que ya nadie apunta. 0 = apagada (el camino de la corrida buena).
 	d2gamescreen.FijarBasuraDeControl159d(basuraDeControl159d)
+
+	// DC-002.159h: las cuentas del cache HSV del renderer, para la linea `CUADRO` (`hsv=aciertos/fallos`).
+	// Es la prueba positiva de que la sombra del compuesto pasa por el mapa que hasta esta tarjeta mataba
+	// el SH-4; el mapa vive en d2core/d2render/ebiten y la pantalla no puede importarlo (el renderer es un
+	// parametro), asi que el puente se instala aca, igual que la sonda del recolector.
+	d2gamescreen.CuentasDelCaminoHSV159h = func() (pedidas, aciertos, fallos, sombras int) {
+		pedidas, aciertos, fallos = renderEbiten.CuentasDelCaminoHSV159h()
+		sombras = d2asset.SombrasDibujadas159h()
+
+		return pedidas, aciertos, fallos, sombras
+	}
 
 	// DC-002.159f: LAS MARCAS FINAS. La cuenta vive en la pantalla (`d2gamescreen/marcas_159f.go`), pero los
 	// paquetes que marcan no pueden importarla: cada uno deja su puente (`MarcaFina159f`) y aca se le suma la

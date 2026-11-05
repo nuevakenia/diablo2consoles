@@ -531,3 +531,13 @@ var sombrasDelCompuesto = true
 // UsarSombrasDelCompuesto prende o apaga las sombras del compuesto (DC-002.159b). La apaga el arranque de la
 // consola; en la PC queda prendida.
 func UsarSombrasDelCompuesto(prendidas bool) { sombrasDelCompuesto = prendidas }
+
+// sombrasDibujadas159h cuenta las sombras del compuesto dibujadas desde que arranco el proceso
+// (DC-002.159h). La incrementa `Animation.renderShadow`, que es el unico camino que apila brillo cero.
+var sombrasDibujadas159h int
+
+// SombrasDibujadas159h devuelve cuantas sombras del compuesto se dibujaron (DC-002.159h). En la consola
+// la imprime la linea `CUADRO` (`sombras=`): con las sombras prendidas crece una vez por capa y por
+// cuadro y con `UsarSombrasDelCompuesto(false)` queda en 0, que es la prueba de que el camino HSV de la
+// sombra se recorre o no se recorre -- no de que "no paso nada".
+func SombrasDibujadas159h() int { return sombrasDibujadas159h }
