@@ -15,7 +15,8 @@ package ebiten
 // shim entiende. El color se resuelve como en el backend PVR (`pvr.aRGBA`): si el que dibuja paso un
 // `color.RGBA` se usa tal cual (el alfa de las sombras es 160 y se lee derecho), y si paso otra
 // implementacion de `color.Color` se desmultiplica, porque `RGBA()` devuelve el color con el alfa ya
-// aplicado.
+// aplicado. Esa cuenta vive en `canalesDeIndices159o` (`resolver_color_159o.go`) y, desde DC-002.159o, se
+// hace al EMPUJAR el color y no al dibujar: aca solo se leen los ocho bits ya resueltos.
 //
 // EL ARCHIVO VA CON `//go:build dreamcast` Y ESO ES SOLO PARA EL `go build` DEL HOST (que asi lo saltea).
 // El build de la consola NO lee esa linea: arma la lista de fuentes por NOMBRE
@@ -23,8 +24,6 @@ package ebiten
 // que entra. Si algun dia se cambia de nombre, tiene que seguir sin sufijo de plataforma.
 
 import (
-	"image/color"
-
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 )
@@ -39,8 +38,11 @@ var _ interface {
 func (s *ebitenSurface) RenderIndicesTintado(indices []byte, ancho, alto int, paleta [][4]uint8) {
 	rojo, verde, azul, alfa := uint8(255), uint8(255), uint8(255), uint8(255)
 
-	if c := s.stateCurrent.color; c != nil {
-		rgba := comoRGBA(c)
+	// DC-002.159o: EL COLOR YA VIENE RESUELTO DEL `PushColor` (canales), asi que aca NO se despacha la interfaz.
+	// Este es el camino que pinta las casillas del pueblo, y es el que el mutador de la consola hizo saltar por la
+	// tabla de metodos (`Unhandled exception`, PC en `.rodata`, PR en esta funcion). Con el arreglo apagado se le
+	// pregunta a la interfaz `RGBA()` como antes, que es el camino que murio en DC-002.159m.
+	if rgba, hay := s.colorDeIndicesDelDibujo159o(); hay {
 		rojo, verde, azul, alfa = rgba.R, rgba.G, rgba.B, rgba.A
 	}
 
@@ -55,28 +57,6 @@ func (s *ebitenSurface) RenderIndicesTintado(indices []byte, ancho, alto int, pa
 // SuperficiesDeIndicesVacias: cuantas veces se pidio pintar indices y no entro ni un pixel. Es el
 // instrumento que separa "el renderer no dibujo" de "dibujo fuera del lienzo".
 var SuperficiesDeIndicesVacias int
-
-// comoRGBA: el color del estado en RGBA de 8 bits, con la misma regla que `pvr.aRGBA` (DC-002.101).
-func comoRGBA(c color.Color) color.RGBA {
-	switch v := c.(type) {
-	case color.RGBA:
-		return v
-	case color.NRGBA:
-		return color.RGBA{R: v.R, G: v.G, B: v.B, A: v.A}
-	}
-
-	r, g, b, a := c.RGBA()
-	if a == 0 {
-		return color.RGBA{}
-	}
-
-	return color.RGBA{
-		R: uint8(r * 255 / a),
-		G: uint8(g * 255 / a),
-		B: uint8(b * 255 / a),
-		A: uint8(a >> 8),
-	}
-}
 
 // ExpandirIndices expande los indices de 8 bits de un cuadro de animacion DIRECTAMENTE en el lienzo de esta
 // superficie. (`superficieConLienzo` de `d2core/d2asset/cuadro_paletizado.go`.)

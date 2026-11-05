@@ -1256,7 +1256,7 @@ func (mr *MapRenderer) renderShadow(tile d2ds1.Tile, target d2interface.Surface,
 	target.PushTranslation(mr.viewport.GetTranslationScreen())
 	defer target.Pop()
 
-	if mr.light.active() {
+	if mr.light.active() && !forzarCaminoDelTinte159o {
 		if indice != nil {
 			mr.Warningf("la cache en indices no pinta con la luz prendida (DC-002.101)")
 
@@ -1268,6 +1268,10 @@ func (mr *MapRenderer) renderShadow(tile d2ds1.Tile, target d2interface.Surface,
 
 		return
 	}
+
+	// DC-002.159o: la rama que ejercita el camino del tinte (ver `camino_del_tinte_159o.go`). Se cuenta siempre:
+	// con la palanca apagada esta rama es la de la luz apagada, que en el pueblo no se recorre.
+	sombrasPorElTinte159o++
 
 	target.PushColor(color.RGBA{R: 255, G: 255, B: 255, A: 160}) //nolint:gomnd // Not a magic number...
 	defer target.Pop()

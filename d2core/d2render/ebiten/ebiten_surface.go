@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"math"
 	"sync"
+	"unsafe"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -115,9 +116,34 @@ func (s *ebitenSurface) PushFilter(filter d2enum.Filter) {
 
 // PushColor pushes a color to the stat stack
 func (s *ebitenSurface) PushColor(c color.Color) {
+	// DC-002.159o (instrumento): si el que dibuja no empuja color y la palanca del tinte esta puesta, se empuja
+	// el color forzado (en la corrida del pueblo, el neutro: matriz identidad, mismos pixeles). Ver
+	// `resolver_color_159o.go`.
+	if c == nil && colorForzadoDelTinte159o != nil {
+		c = colorForzadoDelTinte159o
+	}
+
 	s.stateStack = append(s.stateStack, s.stateCurrent)
 	s.stateCurrent.color = c
+
+	// DC-002.159o: EL COLOR SE RESUELVE ACA, UNA VEZ. Es el unico momento en que la interfaz esta recien armada
+	// por el que llama; guardarla para preguntarle `RGBA()` al dibujar es lo que mataba el SH-4 en DC-002.159m.
+	// Con la palanca apagada no se resuelve nada y el dibujo despacha la interfaz, como antes (el mutador).
+	if colorAlEmpujar159o {
+		s.stateCurrent.canales = resolverCanales159o(c)
+	} else {
+		s.stateCurrent.canales = canalesDelColor159o{}
+	}
+
 	sondaDeColor159n(s, true, &s.stateCurrent.color) // DC-002.159n: la sonda del color (apagada sin gancho)
+
+	// DC-002.159o (MUTADOR en la consola): se escribe encima de las dos palabras de la interfaz DESPUES de que la
+	// sonda anote las buenas. Es lo que el recolector le dejaba a la superficie en DC-002.159m (una direccion del
+	// monton en el lugar de la tabla de metodos): el dibujo que despacha `RGBA()` muere en `colorToColorM`, el que
+	// usa los canales resueltos aca no la toca. Apagado no hace nada.
+	if venenoDelColor159o {
+		*(*[2]uintptr)(unsafe.Pointer(&s.stateCurrent.color)) = [2]uintptr{tablaDeMetodosPodrida159o, 0x8c3eaa1c}
+	}
 }
 
 // PushBrightness pushes a brightness value to the state stack
@@ -264,9 +290,11 @@ func (s *ebitenSurface) prepareColorM(opts *ebiten.DrawImageOptions, hsv bool) {
 		hsvMu.Unlock()
 	}
 
-	if !sondaDeColor159n(s, false, &st.color) && st.color != nil {
-		k.r, k.g, k.b, k.a = st.color.RGBA()
-		k.hasColor = true
+	if !sondaDeColor159n(s, false, &st.color) {
+		if r, g, b, a, hay := s.canalesDelColorDelDibujo159o(); hay {
+			k.r, k.g, k.b, k.a = r, g, b, a
+			k.hasColor = true
+		}
 	}
 
 	hsvMu.Lock()
@@ -346,11 +374,14 @@ var tintHSVCache = map[tintHSVKey]ebiten.ColorM{}
 func (s *ebitenSurface) applyHSV(opts *ebiten.DrawImageOptions) {
 	sat, bright := s.stateCurrent.saturation, s.stateCurrent.brightness
 
-	if s.stateCurrent.color != nil { // the matrix already holds the draw colour
+	// DC-002.159o: los canales del color ya estan resueltos (arreglo prendido) o se le preguntan a la interfaz
+	// (camino viejo). Es el mismo par de canales que antes salia de `s.stateCurrent.color.RGBA()`.
+	cr, cg, cb, ca, hayColor := s.canalesDelColorDelDibujo159o()
+
+	if hayColor { // the matrix already holds the draw colour
 		// ChangeHSV on a colour matrix allocates ~10 objects; the matrix is a pure function of
 		// (colour, saturation, brightness) and every lit shadow draws with the same few dozen
 		// light tints, so the result is memoised (same value, shared immutable matrix)
-		cr, cg, cb, ca := s.stateCurrent.color.RGBA()
 		ck := tintHSVKey{cr, cg, cb, ca, sat, bright}
 
 		hsvMu.Lock()
@@ -457,6 +488,11 @@ func (s *ebitenSurface) fillDrawImageOptions(opts *ebiten.DrawImageOptions) *ebi
 		// DC-002.159n: la sonda devuelve false cuando no hay nada que decir (sin color, o el color sano) y
 		// true cuando el color ya no es el que se empujo. En ese caso no se despacha por la tabla de metodos:
 		// el dibujo sale sin tinte y la corrida sigue, que es lo que se esta midiendo.
+	} else if colorAlEmpujar159o {
+		// DC-002.159o: los canales ya resueltos en `PushColor`. Aca no se despacha ninguna interfaz.
+		if s.stateCurrent.canales.listo {
+			opts.ColorM = s.colorMDeCanales159o(s.stateCurrent.canales)
+		}
 	} else if s.stateCurrent.color != nil {
 		opts.ColorM = s.colorToColorM(s.stateCurrent.color)
 	}

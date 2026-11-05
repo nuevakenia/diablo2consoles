@@ -112,7 +112,7 @@ func TestLaSondaDelColor159nNoTocaNadaSinGancho(t *testing.T) {
 	s.PushColor(color.RGBA{R: 200, G: 180, B: 120, A: 255})
 
 	sana := createEbitenSurface(nil, nil)
-	sana.stateCurrent.color = color.RGBA{R: 200, G: 180, B: 120, A: 255}
+	sana.fijarColorDeLaPrueba159o(color.RGBA{R: 200, G: 180, B: 120, A: 255})
 
 	got := s.createDrawImageOptions()
 	want := sana.createDrawImageOptions()

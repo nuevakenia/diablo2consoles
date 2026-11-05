@@ -240,6 +240,11 @@ func main() {
 	// al armarlos: por eso esto va antes de Create y no despues.
 	d2asset.ArrancarComoConsola()
 
+	// DC-002.159o: LAS PALANCAS DE ESTA TARJETA (ver `palancas_159o.go`): el camino del tinte forzado, el color
+	// neutro que lo ejerce miles de veces sin cambiar un pixel, EL ARREGLO (resolver el color al empujarlo) y la
+	// sonda. Van antes de `Create` para que el log diga con cual se corrio.
+	palancas159o()
+
 	// DC-002.159j: EL SELLO DE LOS BLOQUES DE CADA TILE. La pared `estilo=0 sec=0 tipo=1` pide 8.394.240 B en
 	// la consola cuando su `.dt1` mide 288 de alto: el `Height` del tile esta bien y el `minY` de sus bloques no,
 	// o sea que la rebanada `Blocks` del tile apunta a memoria que ya no es suya. Con esto prendido el motor

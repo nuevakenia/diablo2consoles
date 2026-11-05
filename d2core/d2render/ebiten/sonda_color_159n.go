@@ -32,14 +32,22 @@ package ebiten
 //
 // OJO CON EL REGISTRO: es un arreglo FIJO a proposito. Un `append` aca adentro pediria memoria, y una
 // recoleccion en medio de la comparacion devolveria direcciones nuevas justo cuando se las esta midiendo
-// (el instrumento cambiaria lo que mide). Con 64 ranuras alcanza: el Gate 0 crea 16 superficies.
-
+// (el instrumento cambiaria lo que mide).
+//
+// DC-002.159o: LAS RANURAS Y LA ACTUALIZACION. En DC-002.159n alcanzaban 64 porque en la corrida del pueblo se
+// empujaba color UNA vez; con el color neutro forzado empujan color las ~259 superficies que el pueblo dibuja en
+// el cuadro del mapa, asi que el registro se quedaba corto y las superficies que no entraban se informaban como
+// clase 3 (`sinRegistro`), que no es un defecto sino el instrumento saturado. Ahora son 1024 ranuras. Y la ranura
+// se ACTUALIZA en cada empujada: antes guardaba las palabras de la PRIMERA, asi que una superficie que empujara
+// dos colores distintos se informaba como clase 2 sin que nadie hubiera escrito encima de nada (medido en la
+// corrida 159o1: 25 "cambiaron" que eran exactamente eso).
 import (
 	"image/color"
 	"unsafe"
 )
 
-const hastaSondear159n = 64
+// hastaSondear159n: las ranuras del registro (DC-002.159o: eran 64, ver la cabecera).
+const hastaSondear159n = 1024
 
 // marcaDeSuperficie159n: la marca de vida que llevan las superficies (ver `marca159n` en `ebitenSurface`). El
 // valor es arbitrario; lo unico que importa es que no sea 0 (cero es "memoria que no toco nadie") y que no se
@@ -153,6 +161,12 @@ func sondaDeColor159n(s *ebitenSurface, empujado bool, clr *color.Color) bool {
 		parte.Antes = registroDeColor159n[ranura].palabras
 		parte.Cambiaron = parte.Antes != palabras
 		parte.Registro = uintptr(unsafe.Pointer(registroDeColor159n[ranura].sup))
+
+		// DC-002.159o: la ranura guarda las palabras de la ULTIMA empujada (ver la cabecera). Se actualiza aca,
+		// despues de leer las de antes, para que `Cambiaron` siga significando "no son las que se empujaron".
+		if empujado {
+			registroDeColor159n[ranura].palabras = palabras
+		}
 	} else if empujado && clr != nil && *clr != nil {
 		for i := 0; i < hastaSondear159n; i++ {
 			if !registroDeColor159n[i].usada {

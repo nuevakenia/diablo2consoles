@@ -28,7 +28,7 @@ func TestPrepareColorMMatchesDirectPath(t *testing.T) {
 			for _, h := range hsvs {
 				for _, hsv := range []bool{false, true} {
 					s := createEbitenSurface(nil, nil)
-					s.stateCurrent.color = c
+					s.fijarColorDeLaPrueba159o(c)
 					s.stateCurrent.effect = e
 					s.stateCurrent.saturation, s.stateCurrent.brightness = h[0], h[1]
 

@@ -18,4 +18,9 @@ type surfaceState struct {
 	effect         d2enum.DrawEffect
 	skewX, skewY   float64
 	scaleX, scaleY float64
+
+	// canales: DC-002.159o -- los cuatro canales del color, resueltos en `PushColor` (con la interfaz recien
+	// armada) para que el dibujo no tenga que despachar `color.Color.RGBA()`. `color` queda para el camino viejo
+	// (la palanca apagada) y para la sonda, que compara las dos palabras de la interfaz.
+	canales canalesDelColor159o
 }

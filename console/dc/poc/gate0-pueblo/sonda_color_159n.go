@@ -31,6 +31,7 @@ package main
 // porque la consola serie es lenta y el cuadro ya se muere de callar (DC-002.87b).
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
 	renderEbiten "github.com/OpenDiablo2/OpenDiablo2/d2core/d2render/ebiten"
 )
 
@@ -48,6 +49,14 @@ var (
 )
 
 func init() {
+	// DC-002.159o: la sonda se instala o no segun la palanca del build. Con la sonda puesta el que mide es el
+	// latido; sin ella el camino del dibujo despacha el color podrido y la corrida muere (el mutador de 159m).
+	if !sondaDelColor159n {
+		println("S159N-APAGADA el gancho no se instala (corrida sin sonda)")
+
+		return
+	}
+
 	renderEbiten.SondaDeColor159n = sondaDeColor159n
 
 	// DC-002.159n: la prueba de que este init corrio (y cuando). Sin esta linea, un "usos = 0" en el latido no
@@ -149,9 +158,14 @@ func LatidoDeLaSonda159n(cuadro int) {
 	puesto, llamadas, conColor, sinColor, marcaRota := renderEbiten.EstadoDeLaSonda159n()
 	sanos, fuera, cambiaron, sinRegistro := CuentasDeLaSonda159n()
 
+	// DC-002.159o: `tinteForzado` son las sombras del `.dt1` que se pintaron por la rama del `PushColor` de
+	// `renderShadow` (la palanca del camino). Sin este numero, `conColor` alto no distingue "el camino se ejercio"
+	// de "el color neutro entro por otro lado".
 	println("S159N-VIVA cuadro=", cuadro, "gancho=", puesto,
 		"llamadas=", int(llamadas), "conColor=", int(conColor), "sinColor=", int(sinColor),
 		"marcaRota=", int(marcaRota),
 		"usos=", usosSondados159n, "sanos=", sanos, "fuera=", fuera,
-		"cambiaron=", cambiaron, "sinRegistro=", sinRegistro)
+		"cambiaron=", cambiaron, "sinRegistro=", sinRegistro,
+		"tinteForzado=", int(d2maprenderer.SombrasPorElTinte159o()),
+		"colorAlEmpujar=", renderEbiten.ColorAlEmpujar159o())
 }
