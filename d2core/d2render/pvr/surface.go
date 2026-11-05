@@ -343,6 +343,19 @@ func (s *Surface) ExpandirIndices(indices []byte, paleta d2interface.Palette) {
 	}
 }
 
+// ExpandirIndicesRecorte159f: la version de `ExpandirIndices` para una superficie MAS GRANDE que el cuadro
+// (DC-002.159f): expande el cuadro de ancho x alto en la esquina de arriba a la izquierda del lienzo, fila por
+// fila, y deja el sobrante como estaba. Lo pide `d2asset.cargarCuadroEnSuperficie` cuando la animacion reusa
+// una superficie del tamano maximo.
+func (s *Surface) ExpandirIndicesRecorte159f(indices []byte, paleta d2interface.Palette, ancho, alto int) {
+	d2util.ImgIndexToRGBAEnRecorte159f(s.imagen.pixeles, indices, paleta, ancho, alto, s.imagen.ancho)
+
+	if s.renderer != nil {
+		s.renderer.expansionesDirectas++
+		s.renderer.bytesExpandidos += ancho * alto * 4
+	}
+}
+
 // Clear rellena el lienzo entero con el color.
 func (s *Surface) Clear(c color.Color) { s.imagen.Rellenar(aRGBA(c)) }
 
@@ -463,6 +476,23 @@ func (s *Surface) Render(sfc d2interface.Surface) {
 	}
 
 	copiarEn(s.imagen, otra.imagen, s.matriz(), s.ajuste(), sinForzar)
+}
+
+// RenderRecorte159f dibuja SOLO la region [0,ancho) x [0,alto) de otra superficie, en la posicion y con la
+// transformacion del estado actual.
+//
+// POR QUE EXISTE (DC-002.159f). Una animacion del heroe guarda todos sus cuadros en UNA superficie del tamano
+// maximo de la direccion, asi que el cuadro que se dibuja ocupa la esquina de arriba a la izquierda y el
+// sobrante es de otros cuadros (pixeles viejos): dibujarlo dejaria un borde fantasma. El recorte se hace LEYENDO
+// SOLO ESA REGION -- no arma un buffer temporal (`RenderSection` si lo arma, y ese buffer se pagaria por capa y
+// por cuadro).
+func (s *Surface) RenderRecorte159f(sfc d2interface.Surface, ancho, alto int) {
+	otra, ok := sfc.(*Surface)
+	if !ok || otra == nil {
+		return
+	}
+
+	copiarEnRecorte159f(s.imagen, otra.imagen, s.matriz(), s.ajuste(), sinForzar, ancho, alto)
 }
 
 // RenderSection dibuja la seccion `bound` de otra superficie.

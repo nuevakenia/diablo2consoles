@@ -258,6 +258,20 @@ func main() {
 	// se lleva lo que ya nadie apunta. 0 = apagada (el camino de la corrida buena).
 	d2gamescreen.FijarBasuraDeControl159d(basuraDeControl159d)
 
+	// DC-002.159f: LAS MARCAS FINAS. La cuenta vive en la pantalla (`d2gamescreen/marcas_159f.go`), pero los
+	// paquetes que marcan no pueden importarla: cada uno deja su puente (`MarcaFina159f`) y aca se le suma la
+	// BASE de su bloque de tramos. Con esto la linea `GC159D` parte `heroe`, `presente` y `plan` en las
+	// operaciones que los pagan.
+	d2asset.MarcaFina159f = func(id int) {
+		d2gamescreen.Marcar159f(d2gamescreen.MarcasAssetBase159f + id)
+	}
+	d2app.MarcaFina159f = func(id int) {
+		d2gamescreen.Marcar159f(d2gamescreen.MarcasAppBase159f + id)
+	}
+	ebiten.MarcaFina159f = func(id int) {
+		d2gamescreen.Marcar159f(d2gamescreen.MarcasEbitenBase159f + id)
+	}
+
 	println(frase, "sondaDelRecolector=instalada gcVivo=", d2cGcUsado(), "gcTotal=", d2cGcTotal())
 
 	// ============================== 2. EL MOTOR ==============================

@@ -498,8 +498,30 @@ const sinForzar modoMezcla = -1
 // pregunta, por cada uno, de donde venia en el origen: es la misma decision que tomó el shim (dibujo.go:15)
 // y por la misma razon -- al reves (recorrer el origen) quedan huecos cuando la figura se agranda.
 func copiarEn(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla) {
+	copiarEnRecorte159f(dst, origen, m, aj, forzado, origen.ancho, origen.alto)
+}
+
+// copiarEnRecorte159f: `copiarEn` pero leyendo SOLO la region [0,ancho) x [0,alto) del origen (DC-002.159f).
+//
+// PARA QUE. Una animacion reusa una superficie del tamano maximo de la direccion y el cuadro que se dibuja
+// ocupa su esquina de arriba a la izquierda: el sobrante es de otros cuadros y no se puede dibujar. El limite
+// entra en las MISMAS cuentas que ya hacia el bucle (las esquinas de origen y el descarte por `sxi >= ancho`),
+// asi que no hay ninguna rama por pixel de mas y no hace falta un buffer temporal con el recorte.
+func copiarEnRecorte159f(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla, ancho, alto int) {
 	if dst == nil || origen == nil || len(dst.pixeles) == 0 || len(origen.pixeles) == 0 {
 		return
+	}
+
+	if ancho <= 0 || alto <= 0 {
+		return
+	}
+
+	if ancho > origen.ancho {
+		ancho = origen.ancho
+	}
+
+	if alto > origen.alto {
+		alto = origen.alto
 	}
 
 	modo := aj.modo()
@@ -509,7 +531,7 @@ func copiarEn(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla) {
 
 	// EL CASO RAPIDO: solo mover. No hay cuenta por pixel (es lo que el motor hace casi siempre).
 	if m.esSoloTraslacion() && aj.neutro() {
-		copiarMovida(dst, origen, int(m.tx), int(m.ty), modo)
+		copiarMovida(dst, origen, int(m.tx), int(m.ty), modo, ancho, alto)
 		return
 	}
 
@@ -519,8 +541,8 @@ func copiarEn(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla) {
 	}
 
 	// la caja del destino que puede recibir algo: las CUATRO esquinas (con dos no alcanza si esta girada)
-	esquinasX := [4]float64{0, float64(origen.ancho), 0, float64(origen.ancho)}
-	esquinasY := [4]float64{0, 0, float64(origen.alto), float64(origen.alto)}
+	esquinasX := [4]float64{0, float64(ancho), 0, float64(ancho)}
+	esquinasY := [4]float64{0, 0, float64(alto), float64(alto)}
 
 	xmin, ymin := math.Inf(1), math.Inf(1)
 	xmax, ymax := math.Inf(-1), math.Inf(-1)
@@ -581,7 +603,7 @@ func copiarEn(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla) {
 			sxi := int(sx0 + ia*fx)
 			syi := int(sy0 + ic*fx)
 
-			if sxi < 0 || syi < 0 || sxi >= origen.ancho || syi >= origen.alto {
+			if sxi < 0 || syi < 0 || sxi >= ancho || syi >= alto {
 				continue
 			}
 
@@ -604,9 +626,12 @@ func ajusteNeutro() ajuste {
 
 // copiarMovida: el dibujado cuando la transformacion es SOLO MOVER. Se recorre la fila y se copia (misma
 // optimizacion y misma razon que el shim, dibujo.go:300).
-func copiarMovida(dst, origen *Imagen, dx, dy int, modo modoMezcla) {
+//
+// DC-002.159f: `ancho` y `alto` son la region del origen que se dibuja (el recorte del cuadro); la fila del
+// origen se recorre con SU ancho (`origen.ancho`), que es el paso de memoria, no el del recorte.
+func copiarMovida(dst, origen *Imagen, dx, dy int, modo modoMezcla, ancho, alto int) {
 	x0, y0 := dx, dy
-	x1, y1 := dx+origen.ancho, dy+origen.alto
+	x1, y1 := dx+ancho, dy+alto
 
 	if x0 < 0 {
 		x0 = 0

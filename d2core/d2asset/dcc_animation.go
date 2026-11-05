@@ -255,7 +255,16 @@ func (a *DCCAnimation) decode() error {
 func (a *DCCAnimation) decodeDirection(directionIndex int) error {
 	// DC-002.159c: la direccion puede estar sin decodificar en el `DCC` (carga perezosa, o porque se solto al
 	// cambiar de direccion). Se decodifica de los bytes del archivo, que el `DCC` conserva.
-	if err := a.dcc.DecodificarDireccion(directionIndex); err != nil {
+	//
+	// DC-002.159f: la decodificacion va marcada como tramo fino (`adDecod`): es una de las tres cosas caras
+	// que la fase `heroe` junta (ver marcas_159f.go).
+	marcarAsset159f(MarcaAssetDecod159f)
+
+	err := a.dcc.DecodificarDireccion(directionIndex)
+
+	marcarAsset159f(MarcaAssetResto159f)
+
+	if err != nil {
 		return err
 	}
 
@@ -344,9 +353,20 @@ func (a *DCCAnimation) armarLaSuperficieDelCuadro(directionIndex, frameIndex int
 		return nil
 	}
 
+	// DC-002.159f: de aca en adelante es el tramo `adSup` (armar y rellenar la superficie del cuadro). La
+	// decodificacion que va adentro vuelve a marcar `adSup` al terminar, y el final del tramo lo marca
+	// `adResto`: son tramos, no una pila (ver marcas_159f.go).
+	marcarAsset159f(MarcaAssetSup159f)
+
+	defer marcarAsset159f(MarcaAssetResto159f)
+
+	marcarAsset159f(MarcaAssetDecod159f)
+
 	if err := a.dcc.DecodificarDireccion(directionIndex); err != nil {
 		return err
 	}
+
+	marcarAsset159f(MarcaAssetSup159f)
 
 	frame := frames[frameIndex]
 	dccFrame := a.dcc.Directions[directionIndex].Frames[frameIndex]
@@ -366,17 +386,47 @@ func (a *DCCAnimation) armarLaSuperficieDelCuadro(directionIndex, frameIndex int
 		a.directions[a.superficieDireccion].frames[a.superficieCuadro].image = nil
 	}
 
+	// DC-002.159f: la superficie que se va a usar, y de que tamano.
+	//
+	// CON EL REUSO PRENDIDO (la consola), se pide con un margen del 25% sobre la caja del cuadro y se reusa
+	// mientras los cuadros ENTREN: antes se pedia una nueva cada vez que la caja no era identica a la que habia,
+	// y caminando cada giro cambia la caja (medido: 105 superficies en 390 cuadros, `sup=105/157.032 B`). El
+	// cuadro se carga en su esquina y el que dibuja RECORTA (`Animation.Render` -> `RenderRecorte159f`), asi que
+	// el sobrante no se pinta.
+	//
+	// CON EL REUSO APAGADO (la PC), una superficie EXACTA por caja, como estaba desde siempre: ahi el cuadro se
+	// dibuja con el tamano de la superficie y no hay recorte que valga.
 	superficie := a.superficieDelCuadro
-	if superficie == nil || a.superficieAncho != frame.width || a.superficieAlto != frame.height {
-		superficie = a.renderer.NewSurface(frame.width, frame.height)
-		a.superficieDelCuadro = superficie
-		a.superficieAncho, a.superficieAlto = frame.width, frame.height
 
-		contadorDeSuperficies159.creadas++
-		contadorDeSuperficies159.bytes += frame.width * frame.height * 4
+	necesitaNueva := superficie == nil
+	if !necesitaNueva {
+		if superficieReusada159f {
+			// OJO: se compara la CAJA del cuadro contra la superficie, no el pedido con margen contra la
+			// superficie. Con el margen en los dos lados, cada caja un poco mas grande pedia un 25% mas que la
+			// anterior y la superficie crecia sin freno (`sup=55/125.656 B`, medido: el doble de pedidos que
+			// comparando la caja).
+			necesitaNueva = frame.width > a.superficieAncho || frame.height > a.superficieAlto
+		} else {
+			necesitaNueva = a.superficieAncho != frame.width || a.superficieAlto != frame.height
+		}
 	}
 
-	cargarCuadroEnSuperficie(superficie, dccFrame.PixelData, a.palette)
+	if necesitaNueva {
+		ancho, alto := frame.width, frame.height
+
+		if superficieReusada159f {
+			ancho, alto = frame.width+frame.width/4, frame.height+frame.height/4
+		}
+
+		superficie = a.renderer.NewSurface(ancho, alto)
+		a.superficieDelCuadro = superficie
+		a.superficieAncho, a.superficieAlto = ancho, alto
+
+		contadorDeSuperficies159.creadas++
+		contadorDeSuperficies159.bytes += ancho * alto * 4
+	}
+
+	cargarCuadroEnSuperficie(superficie, dccFrame.PixelData, a.palette, frame.width, frame.height)
 
 	frames[frameIndex].image = superficie
 	a.superficieDireccion, a.superficieCuadro = directionIndex, frameIndex
@@ -412,7 +462,7 @@ func (a *DCCAnimation) createFrameSurface(directionIndex, frameIndex int) (d2int
 
 	// DC-002.85: la expansion va DIRECTO al lienzo de la superficie si el backend sabe hacerlo (consola);
 	// si no, queda el buffer intermedio de siempre (ver cuadro_paletizado.go).
-	cargarCuadroEnSuperficie(sfc, indexData, a.palette)
+	cargarCuadroEnSuperficie(sfc, indexData, a.palette, animFrame.width, animFrame.height)
 
 	return sfc, nil
 }

@@ -440,7 +440,10 @@ func (p *PantallaDelPueblo) soltarElMapaYEntrarElHeroe() {
 
 	p.heroe = heroe
 
-	p.Infof("HEROE159 LISTO %s", p.heroe.Estado())
+	ln := p.NuevaLinea159f()
+	ln.Tx("HEROE159 LISTO ")
+	p.heroe.Estado159f(ln)
+	ln.Enviar(p.Logger)
 	p.avisar("heroe:listo")
 
 	// DC-002.159b: una recoleccion EXPLICITA con el heroe ya adentro, antes de que empiece a dibujarse. Si el
@@ -474,6 +477,7 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 
 	// DC-002.159d: el plan ya esta aplicado; lo que viene es el mapa.
 	MarcarFaseGC159d(faseMapa159d)
+	Marcar159f(MarcaMapa159f)
 
 	t0 := d2util.Now()
 
@@ -488,6 +492,7 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 
 	// DC-002.159d: el mapa ya esta pintado (o se salto); lo que viene es el heroe.
 	MarcarFaseGC159d(faseHeroe159d)
+	Marcar159f(MarcaBorrado159f)
 
 	// ============================== DC-002.159b: SOLTAR EL MAPA, ENTRAR EL HEROE ==============================
 	// El cuadro 1 es el unico que pinta el mapa (con las casillas del motor y los bloques de los `.dt1`
@@ -517,6 +522,10 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 		}
 	}
 
+	// DC-002.159f: el cierre del cuadro (las lineas de estado y el tramo GC) es su propio tramo, y va partido:
+	// `cPop` (cerrar la pila de transformaciones y los ms), `cCuadro`, `cEstado` y `cTramo` son cada linea.
+	Marcar159f(MarcaCierre159f)
+
 	target.Pop()
 
 	p.msDelCuadro = p.msDesde(t0)
@@ -530,6 +539,8 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 		p.msPrimerCuadro = p.msDelCuadro
 	}
 
+	Marcar159f(MarcaCierreCuadro159f)
+
 	if p.cuadros == 1 || p.cuadros == 2 || p.cuadros == 11 || p.cuadros == 31 || p.cuadros == 60 ||
 		p.cuadros == 120 || p.cuadros == cuadrosQueSeInforman || (p.conHeroe && p.cuadros <= 8) {
 		p.Infof("CUADRO %d ms=%d (primer cuadro %d ms)", p.cuadros, p.msDelCuadro, p.msPrimerCuadro)
@@ -538,16 +549,35 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 
 	// el estado del heroe cada 15 cuadros: es la linea con la que se cruzan las capturas (posicion, direccion
 	// y modo de animacion). Con el heroe quieto la linea sale igual y no ensucia nada.
+	//
+	// DC-002.159f: ARMARLA y MANDARLA van marcadas por separado (cArmaEst / cEnviaEst): es la unica forma de
+	// saber si la basura de la linea esta en los datos o en el camino de escritura del logger.
+	Marcar159f(MarcaCierreEstado159f)
+
 	if p.heroe != nil && p.cuadros%15 == 0 {
-		p.Infof("HEROE159 cuadro=%d %s saltos=%d repintados=%d", p.cuadros, p.heroe.Estado(),
-			p.mapRenderer.SaltosDelMapa157(), p.mapRenderer.RepintadosDelMapa157())
+		Marcar159f(MarcaArmaEstado159f)
+
+		ln := p.NuevaLinea159f()
+		ln.Tx("HEROE159 cuadro=").I(p.cuadros).Tx(" ")
+		p.heroe.Estado159f(ln)
+		ln.Tx(" saltos=").I(p.mapRenderer.SaltosDelMapa157())
+		ln.Tx(" repintados=").I(p.mapRenderer.RepintadosDelMapa157())
+
+		Marcar159f(MarcaEnviaEstado159f)
+
+		ln.Enviar(p.Logger)
 	}
+
+	Marcar159f(MarcaCierreTramo159f)
 
 	// DC-002.159d: LA BASURA POR CUADRO, por fase. Cada 15 cuadros, una linea (ver `gc_159d.go`): sin sonda
 	// (la PC) no imprime nada.
-	if linea, hay := CerrarElCuadroGC159d(); hay {
-		p.Infof("GC159D cuadro=%d %s", p.cuadros, linea)
-	}
+	// DC-002.159f: la misma linea lleva al final las MARCAS FINAS del tramo (ver `marcas_159f.go`) y se arma
+	// sin `fmt` (`d2util.Linea159f`): las dos lineas del instrumento eran ~4,5 KB/cuadro de la basura que
+	// este instrumento mide.
+	EscribirElTramoGC159d(p.Logger, p.cuadros)
+
+	Marcar159f(MarcaCierre159f)
 }
 
 // aplicarElPlan159: el plan de la corrida de ESTA tarjeta (DC-002.159b). Es corto a proposito: la escalera de
@@ -711,6 +741,10 @@ func (p *PantallaDelPueblo) Advance(elapsed float64) error {
 	// DC-002.159d: abre el cuadro para la sonda de la basura (no-op sin sonda: la PC).
 	AbrirElCuadroGC159d()
 
+	// DC-002.159f: las marcas finas del cuadro (ver marcas_159f.go). Esta cierra el tramo de la presentacion
+	// del cuadro anterior, que es lo que la sonda de las fases llama `presente`.
+	Marcar159f(MarcaControl159f)
+
 	// DC-002.159d (SONDA DE CONTROL): 1 KB por cuadro que se tira al cuadro siguiente. Sirve para separar dos
 	// causas muy distintas de que el vivo crezca: que el recolector NO pueda llevarase lo que ya nadie apunta
 	// (en ese caso esto suma 1024 B/cuadro en la fase `control` de la linea GC159D), o que haya UNA estructura
@@ -725,12 +759,14 @@ func (p *PantallaDelPueblo) Advance(elapsed float64) error {
 	}
 
 	MarcarFaseGC159d(faseMotor159d)
+	Marcar159f(MarcaMotor159f)
 
 	if p.engine != nil {
 		p.engine.Advance(elapsed)
 	}
 
 	MarcarFaseGC159d(faseRenderer159d)
+	Marcar159f(MarcaRenderer159f)
 
 	if p.mapRenderer != nil {
 		p.mapRenderer.Advance(elapsed)

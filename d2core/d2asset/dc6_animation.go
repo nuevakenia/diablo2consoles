@@ -176,7 +176,7 @@ func (a *DC6Animation) createFrameSurface(directionIndex, frameIndex int) (d2int
 
 	// DC-002.85: la expansion va DIRECTO al lienzo de la superficie si el backend sabe hacerlo (consola);
 	// si no, queda el buffer intermedio de siempre (ver cuadro_paletizado.go).
-	cargarCuadroEnSuperficie(sfc, indexData, a.palette)
+	cargarCuadroEnSuperficie(sfc, indexData, a.palette, int(dc6Frame.Width), int(dc6Frame.Height))
 
 	return sfc, nil
 }

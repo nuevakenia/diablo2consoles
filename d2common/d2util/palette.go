@@ -74,3 +74,54 @@ func ImgIndexToRGBAEn(destino []byte, indexData []byte, palette d2interface.Pale
 		destino[j+3] = c.A()
 	}
 }
+
+// ImgIndexToRGBAEnRecorte159f expande un cuadro de `ancho` x `alto` indices DENTRO de un destino MAS ANCHO
+// (`anchoDestino`), sin pedir memoria propia.
+//
+// POR QUE EXISTE (DC-002.159f). La animacion del heroe reusa UNA superficie del tamano maximo de la direccion
+// para todos sus cuadros (antes pedia una superficie nueva cada vez que la caja del cuadro no entraba en la que
+// habia, y caminando eso es cada giro: 105 superficies por vuelta). Con la superficie mas grande que el cuadro,
+// la expansion tiene que escribir POR FILAS: `ImgIndexToRGBAEn` escribe el cuadro como un bloque contiguo y en
+// un lienzo mas ancho las filas quedarian corridas (el dibujo saldria en diagonal).
+//
+// LAS REGLAS DE LOS PIXELES SON LAS MISMAS (`ImgIndexToRGBAEn`, una sola definicion del mapeo): indice 0
+// transparente y el resto toma R,G,B,A de su color. Si el destino no entra, no se escribe nada.
+func ImgIndexToRGBAEnRecorte159f(destino, indices []byte, palette d2interface.Palette, ancho, alto, anchoDestino int) {
+	const bytesPerPixel = 4
+
+	if ancho <= 0 || alto <= 0 || anchoDestino < ancho || len(indices) < ancho*alto {
+		return
+	}
+
+	if len(destino) < anchoDestino*alto*bytesPerPixel {
+		return
+	}
+
+	for y := 0; y < alto; y++ {
+		fila := indices[y*ancho : (y+1)*ancho]
+		destinoFila := destino[y*anchoDestino*bytesPerPixel:]
+
+		for x := 0; x < ancho; x++ {
+			j := x * bytesPerPixel
+
+			if fila[x] == 0 {
+				destinoFila[j] = 0
+				destinoFila[j+1] = 0
+				destinoFila[j+2] = 0
+				destinoFila[j+3] = 0
+
+				continue
+			}
+
+			c, err := palette.GetColor(int(fila[x]))
+			if err != nil {
+				log.Print(err)
+			}
+
+			destinoFila[j] = c.R()
+			destinoFila[j+1] = c.G()
+			destinoFila[j+2] = c.B()
+			destinoFila[j+3] = c.A()
+		}
+	}
+}

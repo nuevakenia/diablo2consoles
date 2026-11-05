@@ -939,6 +939,11 @@ func RunGame(g Game) error {
 
 		// el estado del input del cuadro anterior pasa a ser "el anterior" (para las teclas que se
 		// acaban de soltar)
+		//
+		// DC-002.159f: la lectura del control y el cierre de las listas del cuadro anterior son tramos finos
+		// (ver marcas_159f.go): la fase `presente` de DC-002.159d los juntaba con la conversion y la subida.
+		marcarEbiten159f(MarcaEbitenLeerControl159f)
+
 		CerrarCuadro()
 
 		// Y LA ENTRADA SE LEE ACA, ENTRE CerrarCuadro Y Update, QUE ES EL UNICO LUGAR DONDE ANDA: si se
@@ -946,6 +951,8 @@ func RunGame(g Game) error {
 		// Update no veria ningun cambio -- o sea que "se apreto" (el flanco, lo que mueve los menus)
 		// nunca seria verdad. Y si se leyera despues de Update, el motor ya habria preguntado.
 		LeerControl()
+
+		marcarEbiten159f(MarcaEbitenResto159f)
 
 		tActualizar0 := d2cPvrUs()
 
@@ -980,6 +987,9 @@ func RunGame(g Game) error {
 		// cuadro del cuadro anterior, asi que no hay nada que convertir ni subir.
 		quieto := presentacionQuieta157 && escrituras157 == escriturasAntes
 
+		// DC-002.159f: la conversion, la subida y el pintado, cada una en su tramo (ver marcas_159f.go).
+		marcarEbiten159f(MarcaEbitenConvertir159f)
+
 		if !quieto {
 			var err error
 
@@ -999,6 +1009,8 @@ func RunGame(g Game) error {
 
 		t2 := d2cPvrUs()
 
+		marcarEbiten159f(MarcaEbitenSubir159f)
+
 		if !quieto {
 			if err := SubirVram(); err != nil {
 				kos.PvrListFinish()
@@ -1008,8 +1020,13 @@ func RunGame(g Game) error {
 		}
 
 		t3 := d2cPvrUs()
+
+		marcarEbiten159f(MarcaEbitenPintar159f)
+
 		PintarPantalla()
 		t4 := d2cPvrUs()
+
+		marcarEbiten159f(MarcaEbitenListas159f)
 
 		// el cuadro 11 (ya con todo caliente) se mide por dentro: cuanto tarda DIBUJAR, cuanto CONVERTIR,
 		// cuanto SUBIR a la VRAM y cuanto PINTAR. Son las partes de un cuadro y saber cual se lleva el

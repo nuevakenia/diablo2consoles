@@ -218,6 +218,49 @@ func (a *Animation) recuadroDelCuadro159() (izq, arriba, ancho, alto int) {
 	return izq, arriba, frame.width, frame.height
 }
 
+// superficieConRecorte159f: la parte de una Surface que sabe dibujar SOLO una region del origen (DC-002.159f).
+//
+// La cumple el backend de la consola (`d2core/d2render/pvr`: `Surface.RenderRecorte159f`, que lee el recorte sin
+// armar un buffer). La PC no la cumple y va por `RenderSection`, que ya esta en el contrato de `Surface`.
+type superficieConRecorte159f interface {
+	RenderRecorte159f(sfc d2interface.Surface, ancho, alto int)
+}
+
+// renderElCuadro159f dibuja el cuadro de la animacion en `target`, RECORTANDO si la superficie que lo guarda es
+// mas grande que la caja del cuadro.
+//
+// POR QUE (DC-002.159f). La animacion reusa UNA superficie del tamano maximo por animacion
+// (`DCCAnimation.armarLaSuperficieDelCuadro`): el cuadro ocupa su esquina de arriba a la izquierda y el resto son
+// pixeles de otros cuadros. Dibujar la superficie entera dejaria un borde fantasma del tamano de la caja mas
+// grande, asi que se dibuja el recorte.
+//
+// TRES CAMINOS, del mas barato al mas caro:
+//  1. la superficie mide exactamente lo que el cuadro: `Render`, como siempre (la PC, y la consola mientras la
+//     caja sea la mayor vista);
+//  2. el backend sabe recortar sin buffer (la consola): `RenderRecorte159f`;
+//  3. ningun backend mas lo necesita: el reuso lo prende SOLO `ArrancarComoConsola`
+//     (`UsarLaSuperficieReusada159`), asi que en la PC la superficie es del tamano exacto del cuadro y el
+//     recorte no se toca nunca. Por eso aca no hay rama de `RenderSection`: seria una rama que no corre y que
+//     mete codigo que el enlace no necesita.
+func renderElCuadro159f(target d2interface.Surface, frame animationFrame) {
+	recortador, sabeRecortar := target.(superficieConRecorte159f)
+
+	if frame.image == nil || !sabeRecortar {
+		target.Render(frame.image)
+
+		return
+	}
+
+	ancho, alto := frame.image.GetSize()
+	if ancho <= frame.width && alto <= frame.height {
+		target.Render(frame.image)
+
+		return
+	}
+
+	recortador.RenderRecorte159f(frame.image, frame.width, frame.height)
+}
+
 func (a *Animation) renderShadow(target d2interface.Surface) {
 	a.ensureSurfaces()
 
@@ -242,7 +285,7 @@ func (a *Animation) renderShadow(target d2interface.Surface) {
 	target.PushBrightness(zero)
 	defer target.Pop()
 
-	target.Render(frame.image)
+	renderElCuadro159f(target, frame)
 }
 
 // GetCurrentFrameSurface returns the surface for the current frame of the
@@ -273,7 +316,7 @@ func (a *Animation) Render(target d2interface.Surface) {
 	target.PushColor(a.colorMod)
 	defer target.Pop()
 
-	target.Render(frame.image)
+	renderElCuadro159f(target, frame)
 }
 
 // BindRenderer binds the given renderer to the animation so that it can initialize

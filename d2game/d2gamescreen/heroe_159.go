@@ -422,6 +422,11 @@ func (h *HeroeDelGate0) DibujarSobreElMapa(target d2interface.Surface, mapaRepin
 		return
 	}
 
+	// DC-002.159f: el tramo `borrado` (devolver el recuadro guardado), despues `guarda` (la caja, el buffer y
+	// la copia de lo de abajo) y despues `ente` (el compuesto entero). La fase `heroe` de DC-002.159d juntaba
+	// las tres y el numero no decia cual atacar (ver marcas_159f.go).
+	Marcar159f(MarcaBorrado159f)
+
 	if mapaRepintado {
 		h.hayCopia = false
 	} else if h.hayCopia {
@@ -435,6 +440,8 @@ func (h *HeroeDelGate0) DibujarSobreElMapa(target d2interface.Surface, mapaRepin
 			h.noVolvieron159++
 		}
 	}
+
+	Marcar159f(MarcaGuarda159f)
 
 	izq, arriba, ancho, alto, hayCaja := h.cajaDelCuadro()
 	if !hayCaja || ancho <= 0 || alto <= 0 {
@@ -469,7 +476,14 @@ func (h *HeroeDelGate0) DibujarSobreElMapa(target d2interface.Surface, mapaRepin
 	h.copiaX, h.copiaY, h.copiaAncho, h.copiaAlto = xc, yc, anchoC, altoC
 
 	h.dibujos159++
+
+	// DC-002.159f: el compuesto entero es el tramo `ente` (adentro, d2asset marca `adDecod` y `adSup`).
+	Marcar159f(MarcaEnte159f)
+
 	h.mapa.DibujarEnte159(target, h.jugador)
+
+	// del compuesto para afuera vuelve a `guarda`: lo unico que queda es el instrumento de los pixeles.
+	Marcar159f(MarcaGuarda159f)
 
 	// DC-002.159c (instrumento): cuantos pixeles del recuadro cambio el dibujo. Si esto es 0, el compuesto no
 	// pinto nada ahi (el sprite no esta donde dice el pie) y no hay fantasma que buscar.
@@ -529,21 +543,31 @@ func (h *HeroeDelGate0) volvioElRecuadro() bool {
 // los pies) y las SUPERFICIES DE CUADRO pedidas desde que arranco el proceso (`sup=cuantas/bytes`). La primera es
 // la prueba de que el recuadro del borrado cubre el cuadro de caminar; la segunda es la prueba de que la
 // superficie unica no se pide cuadro a cuadro.
-func (h *HeroeDelGate0) Estado() string {
+func (h *HeroeDelGate0) Estado159f(ln *d2util.Linea159f) {
 	pos := h.jugador.GetPosition()
 	px, py := h.PieDeLaPantalla()
 	superficies, bytes := d2asset.SuperficiesDeCuadro159()
 	dibX, dibY := h.mapa.UltimoDibujo159()
 
-	return fmt.Sprintf("celda=%.2f,%.2f pie=%d,%d dir=%d modo=%s camina=%v pasos=%d caja=%d,%d,%dx%d "+
-		"sup=%d/%dB sincaja=%d giros=%d decod=%d exp=%d/%dB borrados=%d noVolvieron=%d dibujos=%d dib=%d,%d "+
-		"pintados=%d cuadrosPintados=%d taller=%v",
-		pos.X()/subtilesPorCelda159, pos.Y()/subtilesPorCelda159, px, py,
-		h.direccion, h.jugador.GetAnimationMode().String(), h.caminando, h.pasos,
-		h.ultimaCaja[0], h.ultimaCaja[1], h.ultimaCaja[2], h.ultimaCaja[3],
-		superficies, bytes, h.sinCaja159,
-		d2asset.GirosDelCompuesto159(), d2asset.DecodificacionesDeDireccion159(),
-		d2util.PedidosDeExpansion, d2util.BytesDeExpansion,
-		h.borrados159, h.noVolvieron159, h.dibujos159, dibX, dibY,
-		h.pintados159, h.cuadrosPintados159, d2asset.TallerDeDecodificacion159())
+	ln.Tx("celda=").F2(pos.X()/subtilesPorCelda159).Tx(",").F2(pos.Y()/subtilesPorCelda159)
+	ln.Tx(" pie=").I(px).Tx(",").I(py)
+	ln.Tx(" dir=").I(h.direccion)
+	ln.Tx(" modo=").Tx(h.jugador.GetAnimationMode().String())
+	ln.Tx(" camina=").Si(h.caminando)
+	ln.Tx(" pasos=").I(h.pasos)
+	ln.Tx(" caja=").I(h.ultimaCaja[0]).Tx(",").I(h.ultimaCaja[1]).Tx(",").
+		I(h.ultimaCaja[2]).Tx("x").I(h.ultimaCaja[3])
+	ln.Tx(" sup=").I(superficies).Tx("/").B(bytes)
+	ln.Tx(" sincaja=").I(h.sinCaja159)
+	ln.Tx(" giros=").I(d2asset.GirosDelCompuesto159())
+	ln.Tx(" decod=").I(d2asset.DecodificacionesDeDireccion159())
+	ln.Tx(" exp=").I(d2util.PedidosDeExpansion).Tx("/").B(d2util.BytesDeExpansion)
+	ln.Tx(" borrados=").I(h.borrados159)
+	ln.Tx(" noVolvieron=").I(h.noVolvieron159)
+	ln.Tx(" dibujos=").I(h.dibujos159)
+	ln.Tx(" dib=").I(dibX).Tx(",").I(dibY)
+	ln.Tx(" pintados=").I(h.pintados159)
+	ln.Tx(" cuadrosPintados=").I(h.cuadrosPintados159)
+	ln.Tx(" taller=").Si(d2asset.TallerDeDecodificacion159())
+	ln.Tx(" reusa=").Si(d2asset.SuperficieReusada159())
 }

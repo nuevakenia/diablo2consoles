@@ -49,7 +49,7 @@ package d2gamescreen
 // `vivoMin` es el piso del semiespacio en el tramo: es el vivo real (lo que el recolector no pudo tirar), el
 // otro numero del criterio (< 1,2 MB de 1.835.008 B).
 
-import "fmt"
+import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 
 // SondaDelRecolector159d: (bytes usados del semiespacio, recolecciones hechas). La instala el arranque de la
 // consola (`console/dc/poc/gate0-pueblo/main.go`), que es el unico que tiene los `//extern` del shim del PVR.
@@ -190,12 +190,17 @@ func MarcarFaseGC159d(fase int) {
 	}
 }
 
-// CerrarElCuadroGC159d: termina el cuadro y, cada `cadaInformeGC159d`, devuelve la linea del tramo (y true).
-// El tramo se cierra en los dos casos: lo que cambia es si se imprime.
-func CerrarElCuadroGC159d() (string, bool) {
+// EscribirElTramoGC159d: termina el cuadro y, cada `cadaInformeGC159d` cuadros, IMPRIME la linea del tramo y
+// devuelve true.
+//
+// DC-002.159f: la linea se arma en el buffer del logger (`d2util.Linea159f`, ver linea_159f.go) y no con
+// `fmt.Sprintf` + concatenacion. Medido: la version vieja costaba ~2 KB de basura por linea, o sea ~136 B por
+// cuadro que se pagaban en la misma cuenta que este instrumento mide (la fase `presente` de DC-002.159d era,
+// en realidad, esta linea). Los numeros que informa y el formato son LOS MISMOS.
+func EscribirElTramoGC159d(l *d2util.Logger, cuadro int) bool {
 	h := &gc159d
 	if SondaDelRecolector159d == nil || !h.abierto {
-		return "", false
+		return false
 	}
 
 	acumular159d(h.fase)
@@ -205,7 +210,7 @@ func CerrarElCuadroGC159d() (string, bool) {
 	h.cuadrosTramo++
 
 	if h.cuadrosTramo < cadaInformeGC159d {
-		return "", false
+		return false
 	}
 
 	porCuadro := 0
@@ -213,27 +218,46 @@ func CerrarElCuadroGC159d() (string, bool) {
 		porCuadro = h.basuraTramo / h.cuadrosTramo
 	}
 
-	linea := fmt.Sprintf("tramo=%d asignado=%dB porCuadro=%dB col=%d vivoAhora=%dB vivoMin=%dB vivoMax=%dB",
-		h.cuadrosTramo, h.basuraTramo, porCuadro, h.colTramo, h.vivoAlCerrar, h.vivoMinTramo, h.vivoMaxTramo)
+	ln := l.NuevaLinea159f()
+
+	// DC-002.159f: armar y mandar, marcados por separado (cArmaTra / cEnviaTra).
+	Marcar159f(MarcaArmaTramo159f)
+
+	ln.Tx("GC159D cuadro=").I(cuadro)
+	ln.Tx(" tramo=").I(h.cuadrosTramo)
+	ln.Tx(" asignado=").B(h.basuraTramo)
+	ln.Tx(" porCuadro=").B(porCuadro)
+	ln.Tx(" col=").I(h.colTramo)
+	ln.Tx(" vivoAhora=").B(h.vivoAlCerrar)
+	ln.Tx(" vivoMin=").B(h.vivoMinTramo)
+	ln.Tx(" vivoMax=").B(h.vivoMaxTramo)
 
 	for i := 0; i < fases159d; i++ {
-		linea += fmt.Sprintf(" %s=%dB", nombresFases159d[i], h.basuraFase[i])
+		ln.Tx(" ").Tx(nombresFases159d[i]).Tx("=").B(h.basuraFase[i])
 	}
 
-	linea += fmt.Sprintf(" | corrida=%d basura=%dB col=%d", h.cuadrosTotales, h.basuraTotal, h.colTotal+h.colTramo)
+	ln.Tx(" | corrida=").I(h.cuadrosTotales).Tx(" basura=").B(h.basuraTotal).Tx(" col=").I(h.colTotal+h.colTramo)
 
 	// EL NETO POR FASE: bytes que QUEDARON por cuadro en cada fase (lo que crece). Si una fase retiene, aca
 	// se ve cual. Va con `n=` (las muestras sin recoleccion con las que se calculo).
-	linea += " | neto"
+	ln.Tx(" | neto")
 
 	for i := 0; i < fases159d; i++ {
 		if h.muestrasFase[i] == 0 {
 			continue
 		}
 
-		linea += fmt.Sprintf(" %s=%dB/c(n=%d)", nombresFases159d[i], h.netoFase[i]/h.muestrasFase[i],
-			h.muestrasFase[i])
+		ln.Tx(" ").Tx(nombresFases159d[i]).Tx("=").B(h.netoFase[i] / h.muestrasFase[i])
+		ln.Tx("/c(n=").I(h.muestrasFase[i]).Tx(")")
 	}
+
+	// DC-002.159f: las MARCAS FINAS del tramo, en la misma linea (ver marcas_159f.go).
+	ln.Tx(" | ")
+	MarcasEnLaLinea159f(ln)
+
+	Marcar159f(MarcaEnviaTramo159f)
+
+	ln.Enviar(l)
 
 	// el tramo que viene empieza de cero (el acumulado de la corrida sigue en `basuraTotal`)
 	h.cuadrosTramo = 0
@@ -246,5 +270,5 @@ func CerrarElCuadroGC159d() (string, bool) {
 	h.vivoMinTramo = 0
 	h.vivoMaxTramo = 0
 
-	return linea, true
+	return true
 }

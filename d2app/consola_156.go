@@ -446,11 +446,19 @@ func (a *App) advance() error {
 		return err
 	}
 
+	// DC-002.159f: las marcas finas de `plan` (la fase de DC-002.159d que junta estas cuatro Advances y el
+	// principio del Render). Sin puente instalado (la PC) no hacen nada.
+	marcarApp159f(MarcaAppUi159f)
+
 	a.ui.Advance(elapsed)
+
+	marcarApp159f(MarcaAppInput159f)
 
 	if err := a.input.Advance(elapsed, current); err != nil {
 		return err
 	}
+
+	marcarApp159f(MarcaAppGui159f)
 
 	if a.gui != nil {
 		if err := a.gui.Advance(elapsed); err != nil {
@@ -458,11 +466,15 @@ func (a *App) advance() error {
 		}
 	}
 
+	marcarApp159f(MarcaAppTerm159f)
+
 	if a.terminal != nil {
 		if err := a.terminal.Advance(elapsed); err != nil {
 			return err
 		}
 	}
+
+	marcarApp159f(MarcaAppResto159f)
 
 	return nil
 }
