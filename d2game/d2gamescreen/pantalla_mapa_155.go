@@ -543,7 +543,13 @@ func (p *PantallaDelPueblo) Render(target d2interface.Surface) {
 
 	if p.cuadros == 1 || p.cuadros == 2 || p.cuadros == 11 || p.cuadros == 31 || p.cuadros == 60 ||
 		p.cuadros == 120 || p.cuadros == cuadrosQueSeInforman || (p.conHeroe && p.cuadros <= 8) {
-		p.Infof("CUADRO %d ms=%d (primer cuadro %d ms)", p.cuadros, p.msDelCuadro, p.msPrimerCuadro)
+		// DC-002.159g: esta es la cuarta linea que pasa por `Infof` a `Linea159f` (las otras tres son las de 159f).
+		// Costaba 95 B/cuadro de basura -- ~2% del cuadro -- y el 100% era la escritura del logger
+		// (`fmt.Output` -> `builtinOutput` -> `print(string(p))`, una copia nueva del texto por escritura).
+		ln := p.NuevaLinea159f()
+		ln.Tx("CUADRO ").I(p.cuadros).Tx(" ms=").I(p.msDelCuadro).
+			Tx(" (primer cuadro ").I(p.msPrimerCuadro).Tx(" ms)")
+		ln.Enviar(p.Logger)
 		p.avisar("mapa:cuadro")
 	}
 

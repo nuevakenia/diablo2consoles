@@ -478,21 +478,27 @@ func (s *Surface) Render(sfc d2interface.Surface) {
 	copiarEn(s.imagen, otra.imagen, s.matriz(), s.ajuste(), sinForzar)
 }
 
-// RenderRecorte159f dibuja SOLO la region [0,ancho) x [0,alto) de otra superficie, en la posicion y con la
-// transformacion del estado actual.
+// RenderRecorte dibuja SOLO la region [0,ancho) x [0,alto) de otra superficie, en la posicion y con la
+// transformacion del estado actual. Es parte del CONTRATO desde DC-002.159g (ver `d2interface.Surface`).
 //
 // POR QUE EXISTE (DC-002.159f). Una animacion del heroe guarda todos sus cuadros en UNA superficie del tamano
 // maximo de la direccion, asi que el cuadro que se dibuja ocupa la esquina de arriba a la izquierda y el
 // sobrante es de otros cuadros (pixeles viejos): dibujarlo dejaria un borde fantasma. El recorte se hace LEYENDO
 // SOLO ESA REGION -- no arma un buffer temporal (`RenderSection` si lo arma, y ese buffer se pagaria por capa y
 // por cuadro).
-func (s *Surface) RenderRecorte159f(sfc d2interface.Surface, ancho, alto int) {
+//
+// POR QUE ES UN METODO DEL CONTRATO Y NO UNA INTERFAZ OPCIONAL (DC-002.159g, medido). En 159f esto se decidia
+// con una asercion de interfaz opcional (`target.(superficieConRecorte159f)`) y en este gccgo del sh4 la
+// asercion NO ACIERTA aunque el metodo exista en el tipo (`sh-elf-nm` lista `pvr.Surface.RenderRecorte159f` y
+// la consola contestaba `recorte=false`). Con el metodo en `d2interface.Surface` la llamada es despacho normal
+// de interfaz y no hay asercion que pueda fallar.
+func (s *Surface) RenderRecorte(sfc d2interface.Surface, ancho, alto int) {
 	otra, ok := sfc.(*Surface)
 	if !ok || otra == nil {
 		return
 	}
 
-	copiarEnRecorte159f(s.imagen, otra.imagen, s.matriz(), s.ajuste(), sinForzar, ancho, alto)
+	copiarEnRecorte(s.imagen, otra.imagen, s.matriz(), s.ajuste(), sinForzar, ancho, alto)
 }
 
 // RenderSection dibuja la seccion `bound` de otra superficie.

@@ -218,14 +218,6 @@ func (a *Animation) recuadroDelCuadro159() (izq, arriba, ancho, alto int) {
 	return izq, arriba, frame.width, frame.height
 }
 
-// superficieConRecorte159f: la parte de una Surface que sabe dibujar SOLO una region del origen (DC-002.159f).
-//
-// La cumple el backend de la consola (`d2core/d2render/pvr`: `Surface.RenderRecorte159f`, que lee el recorte sin
-// armar un buffer). La PC no la cumple y va por `RenderSection`, que ya esta en el contrato de `Surface`.
-type superficieConRecorte159f interface {
-	RenderRecorte159f(sfc d2interface.Surface, ancho, alto int)
-}
-
 // renderElCuadro159f dibuja el cuadro de la animacion en `target`, RECORTANDO si la superficie que lo guarda es
 // mas grande que la caja del cuadro.
 //
@@ -234,18 +226,18 @@ type superficieConRecorte159f interface {
 // pixeles de otros cuadros. Dibujar la superficie entera dejaria un borde fantasma del tamano de la caja mas
 // grande, asi que se dibuja el recorte.
 //
-// TRES CAMINOS, del mas barato al mas caro:
-//  1. la superficie mide exactamente lo que el cuadro: `Render`, como siempre (la PC, y la consola mientras la
-//     caja sea la mayor vista);
-//  2. el backend sabe recortar sin buffer (la consola): `RenderRecorte159f`;
-//  3. ningun backend mas lo necesita: el reuso lo prende SOLO `ArrancarComoConsola`
-//     (`UsarLaSuperficieReusada159`), asi que en la PC la superficie es del tamano exacto del cuadro y el
-//     recorte no se toca nunca. Por eso aca no hay rama de `RenderSection`: seria una rama que no corre y que
-//     mete codigo que el enlace no necesita.
+// DOS CAMINOS, y los dos son parte del CONTRATO (`d2interface.Surface`):
+//  1. la superficie mide exactamente lo que el cuadro (o menos): `Render`, como siempre (la PC, y la consola
+//     mientras la caja sea la mayor vista);
+//  2. la superficie es mas grande que el cuadro: `RenderRecorte`, que en la consola lee solo esa ventana sin
+//     armar buffer (DC-002.159g).
+//
+// POR QUE YA NO HAY ASERCION (DC-002.159g, medido). En 159f el camino 2 se elegia con una interfaz opcional
+// (`target.(superficieConRecorte159f)`) y en este gccgo del sh4 esa asercion NO ACIERTA aunque el metodo exista
+// en el tipo: la consola contestaba `recorte=false` y se dibujaba la superficie entera (borde fantasma medido en
+// las capturas). Con el metodo en el contrato la llamada es despacho normal de interfaz.
 func renderElCuadro159f(target d2interface.Surface, frame animationFrame) {
-	recortador, sabeRecortar := target.(superficieConRecorte159f)
-
-	if frame.image == nil || !sabeRecortar {
+	if frame.image == nil {
 		target.Render(frame.image)
 
 		return
@@ -258,7 +250,9 @@ func renderElCuadro159f(target d2interface.Surface, frame animationFrame) {
 		return
 	}
 
-	recortador.RenderRecorte159f(frame.image, frame.width, frame.height)
+	recortesDelCuadro159++
+
+	target.RenderRecorte(frame.image, frame.width, frame.height)
 }
 
 func (a *Animation) renderShadow(target d2interface.Surface) {

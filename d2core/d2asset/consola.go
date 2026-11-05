@@ -99,6 +99,13 @@ func ArrancarComoConsola() {
 	// pedidos una vez y reusados) la misma decodificacion pide 12.656 B por direccion y los pixeles salen
 	// IDENTICOS byte a byte (128 direcciones, misma huella). Ver d2dcc/taller_159e.go.
 	d2dcc.UsarElTallerDeDecodificacion159(true)
+
+	// DC-002.159g: y los cuadros de una animacion se guardan en UNA superficie del tamano maximo de la direccion
+	// (margen del 25% sobre la caja), recortando al dibujar (`Surface.RenderRecorte`, ya en el contrato). En 159f
+	// esto no se pudo entregar porque el recorte se decidia con una asercion de interfaz opcional que en este
+	// gccgo no acierta; medido entonces: `sup=105/157.032 B` -> `sup=15/36.180 B` y el tramo del heroe de 2.033 a
+	// 1.575 B/cuadro. Ver superficie_reusada_159f.go y animation.go.
+	UsarLaSuperficieReusada159(true)
 }
 
 // TallerDeDecodificacion159 dice si el taller del decodificador de `.dcc` esta prendido (DC-002.159e). Es lo

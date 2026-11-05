@@ -391,8 +391,8 @@ func (a *DCCAnimation) armarLaSuperficieDelCuadro(directionIndex, frameIndex int
 	// CON EL REUSO PRENDIDO (la consola), se pide con un margen del 25% sobre la caja del cuadro y se reusa
 	// mientras los cuadros ENTREN: antes se pedia una nueva cada vez que la caja no era identica a la que habia,
 	// y caminando cada giro cambia la caja (medido: 105 superficies en 390 cuadros, `sup=105/157.032 B`). El
-	// cuadro se carga en su esquina y el que dibuja RECORTA (`Animation.Render` -> `RenderRecorte159f`), asi que
-	// el sobrante no se pinta.
+	// cuadro se carga en su esquina y el que dibuja RECORTA (`Animation.Render` -> `Surface.RenderRecorte`, en el
+	// contrato desde DC-002.159g), asi que el sobrante no se pinta.
 	//
 	// CON EL REUSO APAGADO (la PC), una superficie EXACTA por caja, como estaba desde siempre: ahi el cuadro se
 	// dibuja con el tamano de la superficie y no hay recorte que valga.

@@ -570,4 +570,10 @@ func (h *HeroeDelGate0) Estado159f(ln *d2util.Linea159f) {
 	ln.Tx(" cuadrosPintados=").I(h.cuadrosPintados159)
 	ln.Tx(" taller=").Si(d2asset.TallerDeDecodificacion159())
 	ln.Tx(" reusa=").Si(d2asset.SuperficieReusada159())
+
+	// DC-002.159g: la prueba de que el recorte por el CONTRATO se hace de verdad: cuadros dibujados recortando
+	// (la superficie era mas grande que la caja) y cuadros cargados fila por fila (el camino que no escribe el
+	// bloque contiguo). Con el reuso prendido y los dos numeros en 0, el sobrante se esta dibujando.
+	recortes, cargas := d2asset.RecortesDelCuadro159()
+	ln.Tx(" rec=").I(recortes).Tx("/").I(cargas)
 }

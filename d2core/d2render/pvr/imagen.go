@@ -498,16 +498,16 @@ const sinForzar modoMezcla = -1
 // pregunta, por cada uno, de donde venia en el origen: es la misma decision que tomó el shim (dibujo.go:15)
 // y por la misma razon -- al reves (recorrer el origen) quedan huecos cuando la figura se agranda.
 func copiarEn(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla) {
-	copiarEnRecorte159f(dst, origen, m, aj, forzado, origen.ancho, origen.alto)
+	copiarEnRecorte(dst, origen, m, aj, forzado, origen.ancho, origen.alto)
 }
 
-// copiarEnRecorte159f: `copiarEn` pero leyendo SOLO la region [0,ancho) x [0,alto) del origen (DC-002.159f).
+// copiarEnRecorte: `copiarEn` pero leyendo SOLO la region [0,ancho) x [0,alto) del origen (DC-002.159f).
 //
 // PARA QUE. Una animacion reusa una superficie del tamano maximo de la direccion y el cuadro que se dibuja
 // ocupa su esquina de arriba a la izquierda: el sobrante es de otros cuadros y no se puede dibujar. El limite
 // entra en las MISMAS cuentas que ya hacia el bucle (las esquinas de origen y el descarte por `sxi >= ancho`),
 // asi que no hay ninguna rama por pixel de mas y no hace falta un buffer temporal con el recorte.
-func copiarEnRecorte159f(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla, ancho, alto int) {
+func copiarEnRecorte(dst, origen *Imagen, m matriz, aj ajuste, forzado modoMezcla, ancho, alto int) {
 	if dst == nil || origen == nil || len(dst.pixeles) == 0 || len(origen.pixeles) == 0 {
 		return
 	}

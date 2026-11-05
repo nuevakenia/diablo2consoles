@@ -26,10 +26,40 @@ var Dibujos int
 // matriz -- se pregunta una sola vez y se copia. Recorrerla en cada pixel multiplicaria un cuadro de
 // 640x480 por una cuenta de 16 numeros, para no cambiar nada.
 func (i *Image) DrawImage(src *Image, op *DrawImageOptions) {
+	if src == nil {
+		return
+	}
+
+	i.DrawImageVentana(src, src.ancho, src.alto, op)
+}
+
+// DrawImageVentana: `DrawImage` pero leyendo SOLO la ventana [0,ancho) x [0,alto) del origen (DC-002.159g).
+//
+// POR QUE EXISTE. El contrato `d2interface.Surface` tiene `RenderRecorte` (el recorte de la superficie reusada
+// del cuadro de animacion: una superficie por animacion con margen, el cuadro en su esquina). El camino de esta
+// consola es este shim, asi que el recorte tiene que hacerse ACA y sin buffer: `SubImage` arma una imagen nueva
+// (ancho*alto*4 bytes POR CAPA Y POR CUADRO) y el sentido de la superficie reusada es justamente no pedir nada.
+//
+// EL RESTO ES LO MISMO QUE `DrawImage`: mismo camino rapido para mover, misma cuenta general, mismo color.
+func (i *Image) DrawImageVentana(src *Image, ancho, alto int, op *DrawImageOptions) {
 	Dibujos++
 
 	if i == nil || src == nil || len(i.pixeles) == 0 || len(src.pixeles) == 0 {
 		return
+	}
+
+	// la ventana nunca puede ser mas grande que el origen: si lo fuera, se dibuja el origen entero (es lo que
+	// hace `Render`)
+	if ancho <= 0 || alto <= 0 {
+		return
+	}
+
+	if ancho > src.ancho {
+		ancho = src.ancho
+	}
+
+	if alto > src.alto {
+		alto = src.alto
 	}
 
 	contarEscritura157(i)
@@ -48,7 +78,7 @@ func (i *Image) DrawImage(src *Image, op *DrawImageOptions) {
 	// EL CASO RAPIDO, PRIMERO: si la transformacion es solo mover (el caso del motor casi siempre), no hay
 	// ninguna cuenta que hacer por pixel y el camino general es puro gasto. Ver copiarMovida.
 	if g.a1 == 0 && g.b == 0 && g.c == 0 && g.d1 == 0 && !usaColores {
-		copiarMovida(i, src, int(math.Floor(g.tx)), int(math.Floor(g.ty)), modo)
+		copiarMovidaVentana(i, src, int(math.Floor(g.tx)), int(math.Floor(g.ty)), modo, ancho, alto)
 		return
 	}
 
@@ -60,9 +90,9 @@ func (i *Image) DrawImage(src *Image, op *DrawImageOptions) {
 	inversa := g
 	inversa.Invert()
 
-	// la caja de la pantalla que puede recibir algo: las CUATRO esquinas de la imagen, pasadas por la
+	// la caja de la pantalla que puede recibir algo: las CUATRO esquinas de la VENTANA, pasadas por la
 	// matriz (con dos esquinas no alcanza si la figura esta girada: la caja real es mas grande)
-	esquinas := [4][2]float64{{0, 0}, {float64(src.ancho), 0}, {0, float64(src.alto)}, {float64(src.ancho), float64(src.alto)}}
+	esquinas := [4][2]float64{{0, 0}, {float64(ancho), 0}, {0, float64(alto)}, {float64(ancho), float64(alto)}}
 	xmin, ymin := math.Inf(1), math.Inf(1)
 	xmax, ymax := math.Inf(-1), math.Inf(-1)
 	for _, e := range esquinas {
@@ -130,7 +160,7 @@ func (i *Image) DrawImage(src *Image, op *DrawImageOptions) {
 			sxi := int(sx0 + ia1*fx)
 			syi := int(sy0 + ic*fx)
 
-			if sxi < 0 || syi < 0 || sxi >= src.ancho || syi >= src.alto {
+			if sxi < 0 || syi < 0 || sxi >= ancho || syi >= alto {
 				continue
 			}
 
@@ -310,14 +340,22 @@ func CentroDeMasaDePantalla() (int, int) { return Screen().CentroDeMasa() }
 // Aca no hay cuentas por pixel: se recorre la fila y se copia. Y cuando la fila es opaca y el modo es el de
 // siempre (poner encima), ni siquiera se mira pixel por pixel: se copia la fila entera de una.
 func copiarMovida(dst, src *Image, dx, dy int, modo CompositeMode) {
+	copiarMovidaVentana(dst, src, dx, dy, modo, src.ancho, src.alto)
+}
+
+// copiarMovidaVentana: `copiarMovida` pero copiando SOLO la ventana [0,ancho) x [0,alto) del origen
+// (DC-002.159g, el recorte de la superficie reusada). El paso de memoria de la fila sigue siendo el del origen
+// entero (`src.ancho`): la ventana recorta lo que se dibuja, no como esta guardado.
+func copiarMovidaVentana(dst, src *Image, dx, dy int, modo CompositeMode, ancho, alto int) {
 	x0 := dx
 	y0 := dy
-	x1 := dx + src.ancho
-	y1 := dy + src.alto
+	x1 := dx + ancho
+	y1 := dy + alto
 
 	if x0 < 0 {
 		x0 = 0
 	}
+
 	if y0 < 0 {
 		y0 = 0
 	}

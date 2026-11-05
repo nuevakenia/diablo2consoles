@@ -104,5 +104,32 @@ var _ interface {
 	ExpandirIndices(indices []byte, paleta d2interface.Palette)
 } = &ebitenSurface{}
 
+// ExpandirIndicesRecorte159f: la version de `ExpandirIndices` para un lienzo MAS GRANDE que el cuadro
+// (DC-002.159f, entregado en DC-002.159g). (`superficieConLienzoDeRecorte159f` de
+// `d2core/d2asset/cuadro_paletizado.go`.)
+//
+// POR QUE HACE FALTA. Con la superficie reusada del cuadro (una por animacion, con margen del 25%), el cuadro
+// que se carga ocupa la esquina de arriba a la izquierda de un lienzo mas ancho; `ExpandirIndices` escribe el
+// cuadro como un bloque CONTIGUO, asi que en un lienzo mas ancho las filas quedarian corridas (el sprite saldria
+// en diagonal). Esta version escribe fila por fila, con el paso del lienzo.
+//
+// SIN ESTO el defecto es invisible en los numeros y evidente en la captura: medido en DC-002.159g con
+// `cargas=0` en la linea de estado y el recorte de dibujo haciendo su trabajo (`rec=4.928`) mientras el sprite
+// salia con las filas corridas.
+func (s *ebitenSurface) ExpandirIndicesRecorte159f(indices []byte, paleta d2interface.Palette, ancho, alto int) {
+	if s == nil || s.image == nil || len(indices) == 0 {
+		return
+	}
+
+	anchoDelLienzo, _ := s.image.Size()
+
+	d2util.ImgIndexToRGBAEnRecorte159f(s.image.LienzoDePixeles(), indices, paleta, ancho, alto, anchoDelLienzo)
+}
+
+// static check: y tambien la parte que carga un cuadro MAS CHICO que el lienzo (la superficie reusada).
+var _ interface {
+	ExpandirIndicesRecorte159f(indices []byte, paleta d2interface.Palette, ancho, alto int)
+} = &ebitenSurface{}
+
 // la superficie sigue cumpliendo el contrato del motor
 var _ d2interface.Surface = &ebitenSurface{}

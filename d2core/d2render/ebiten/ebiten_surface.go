@@ -157,18 +157,54 @@ func (s *ebitenSurface) RenderSprite(sprite *d2ui.Sprite) {
 func (s *ebitenSurface) Render(sfc d2interface.Surface) {
 	opts := s.scratchDrawImageOptions()
 
-	s.prepareColorM(opts, s.stateCurrent.brightness != 1 || s.stateCurrent.saturation != 1)
+	s.prepareColorM(opts, s.pideHSV())
 
 	s.image.DrawImage(sfc.(*ebitenSurface).image, opts)
+}
+
+// pideHSV: si el estado del dibujado necesita la matriz HSV (saturacion o brillo distintos de 1).
+//
+// ES EL MISMO PREDICADO EN LOS TRES CAMINOS (Render, RenderSection, RenderRecorte). OJO: `RenderSection` decia
+// `brightness != 0`, o sea que con el brillo NORMAL (1) entraba al camino HSV -- y en la consola ese camino
+// revienta el SH-4 (medido en DC-002.159g: `mapAssignment` con la funcion de hash de `map[[2]float64]ColorM`
+// apuntando a datos, "PC en datos"). No se notaba porque `RenderSection` casi no se usa en el cuadro del pueblo.
+func (s *ebitenSurface) pideHSV() bool {
+	return s.stateCurrent.brightness != 1 || s.stateCurrent.saturation != 1
 }
 
 // Renders the section of the surface, given the bounds
 func (s *ebitenSurface) RenderSection(sfc d2interface.Surface, bound image.Rectangle) {
 	opts := s.scratchDrawImageOptions()
 
-	s.prepareColorM(opts, s.stateCurrent.brightness != 0)
+	s.prepareColorM(opts, s.pideHSV())
 
 	s.image.DrawImage(sfc.(*ebitenSurface).image.SubImage(bound).(*ebiten.Image), opts)
+}
+
+// RenderRecorte draws only the top-left `width` x `height` window of the given surface (DC-002.159g).
+//
+// POR QUE NO DELEGA EN `RenderSection`: `SubImage` arma una imagen nueva (ancho*alto*4 B) por capa y por cuadro,
+// y el sentido de la superficie reusada es no pedir memoria. El shim de la consola sabe dibujar una ventana del
+// origen sin buffer (`DrawImageVentana`), y es el mismo camino rapido que el `Render` de siempre.
+//
+// EN LA PC SIGUE SIENDO INERTE: el reuso lo prende SOLO el arranque de la consola (`d2asset.ArrancarComoConsola`),
+// asi que ahi cada cuadro tiene su superficie EXACTA y `width/height` nunca recortan nada.
+func (s *ebitenSurface) RenderRecorte(sfc d2interface.Surface, width, height int) {
+	otra, ok := sfc.(*ebitenSurface)
+	if !ok || otra == nil {
+		return
+	}
+
+	opts := s.scratchDrawImageOptions()
+
+	s.prepareColorM(opts, s.pideHSV())
+
+	// la consola dibuja la ventana sin buffer; la PC (que nunca llega aca) se queda con la subimagen
+	if dibujarVentana(s.image, otra.image, width, height, opts) {
+		return
+	}
+
+	s.image.DrawImage(otra.image.SubImage(image.Rect(0, 0, width, height)).(*ebiten.Image), opts)
 }
 
 // matrixKey identifies the colour matrix that applyHSV (when hsv) and handleStateEffect build from a

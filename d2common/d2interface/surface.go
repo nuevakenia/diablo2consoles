@@ -29,6 +29,10 @@ type Surface interface {
 	Render(surface Surface)
 	// Renders a section of the surface enclosed by bounds
 	RenderSection(surface Surface, bound image.Rectangle)
+	// RenderRecorte draws ONLY the region [0,width) x [0,height) of `surface`, in the position and with the
+	// state's transformation. Unlike RenderSection it does not build a temporary buffer: reads just that
+	// window of the origin (DC-002.159g -- the animation's reused surface).
+	RenderRecorte(surface Surface, width, height int)
 	ReplacePixels(pixels []byte)
 	Screenshot() *image.RGBA
 }

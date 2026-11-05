@@ -25,7 +25,14 @@ type superficieConLienzo interface {
 // sobrante queda como estaba. `ExpandirIndices` escribe el cuadro como un bloque contiguo, asi que en un
 // lienzo mas ancho las filas quedarian corridas; esta version escribe fila por fila.
 //
-// La cumple el backend de la consola. La PC no la necesita: ahi cada cuadro tiene su superficie exacta.
+// La cumplen los backends de la consola: `d2core/d2render/ebiten` (`indices_consola.go`, el shim del PVR, que
+// es el camino del Gate 0) y `d2core/d2render/pvr` (`surface.go`). La PC no la necesita: ahi cada cuadro tiene
+// su superficie exacta y la expansion escribe el bloque entero.
+//
+// OJO, MEDIDO EN DC-002.159g: si esta asercion NO acierta con la superficie reusada prendida, el cuadro se
+// escribe como bloque CONTIGUO en un lienzo mas ancho, las filas quedan corridas y el sprite sale en diagonal
+// (la captura lo muestra, los numeros no). El contador `rec=dibujos/cargas` de la linea de estado es la sonda:
+// con `reusa=true` y `cargas` en 0, esto no esta entrando.
 type superficieConLienzoDeRecorte159f interface {
 	ExpandirIndicesRecorte159f(indices []byte, paleta d2interface.Palette, ancho, alto int)
 }
@@ -45,6 +52,8 @@ func cargarCuadroEnSuperficie(sfc d2interface.Surface, indexData []byte, palette
 
 	if anchoLienzo > ancho || altoLienzo > alto {
 		if conRecorte, ok := sfc.(superficieConLienzoDeRecorte159f); ok {
+			cargasPorFilas159++
+
 			conRecorte.ExpandirIndicesRecorte159f(indexData, palette, ancho, alto)
 
 			return

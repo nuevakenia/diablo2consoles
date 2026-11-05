@@ -252,6 +252,13 @@ func (c *Cuadro) RenderSection(superficie d2interface.Surface, seccion image.Rec
 	}
 }
 
+// RenderRecorte: dibuja SOLO la ventana [0,ancho) x [0,alto) del origen, con la traslacion y el color del estado
+// (DC-002.159g). Es el metodo del contrato que usa la superficie reusada del cuadro de animacion; en el host las
+// superficies son exactas, asi que esto es `RenderSection` con el rectangulo de la ventana y nada mas.
+func (c *Cuadro) RenderRecorte(superficie d2interface.Surface, ancho, alto int) {
+	c.RenderSection(superficie, image.Rect(0, 0, ancho, alto))
+}
+
 // RenderIndicesTintado: dibuja indices de 8 bits con la MISMA cuenta que el backend PVR (DC-002.101): traslacion
 // del estado, color que multiplica y alfa source-over. Asi el cuadro del camino de indices se puede comparar
 // pixel a pixel contra el del camino RGBA.
