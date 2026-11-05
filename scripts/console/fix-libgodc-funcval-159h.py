@@ -108,6 +108,31 @@ def sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()[:16]
 
 
+# --estado: NO TOCA NADA. El 2026-11-05 correr este script con un argumento `--estado` que no entendia lo hizo
+# ejecutar la cadena entera y dejar el arbol a medias a mitad de otra medicion; ahora el estado se contesta y se
+# sale. Los pedazos que se miran son los tres del arreglo y los tres que la cadena se lleva.
+if "--estado" in sys.argv:
+    def hay(patron, archivo="runtime/map_dreamcast.h"):
+        ruta = pathlib.Path(LIB, archivo)
+        return patron in ruta.read_text() if ruta.exists() else False
+
+    piezas = [
+        ("este arreglo: el hasher resuelto (map_dreamcast.h)", "godc_codigo_gccgo", "runtime/map_dreamcast.h"),
+        ("este arreglo: la igualdad resuelta (map_dreamcast.c)", "godc_codigo_gccgo(keytype->__equalfn)", "runtime/map_dreamcast.c"),
+        ("este arreglo: el valor indirecto (map_dreamcast.c)", "MAPTYPE_INDIRECT_VALUE", "runtime/map_dreamcast.c"),
+        ("la cadena: la marca gc-vivo (DC-002.45/47)", 'godc_marca("gc-vivo"', "runtime/gc_copy.c"),
+        ("la cadena: el sensor fuera de RAM (DC-002.92)", "gc_tipo_en_imagen", "runtime/gc_copy.c"),
+        ("la cadena: la tabla de tipos (DC-002.146d)", "gc_tipos_tabla", "runtime/gc_copy.c"),
+        ("el semiespacio de la RAMA (1792 KB)", "#define GC_SEMISPACE_SIZE_KB 1792", "runtime/godc_config.h"),
+    ]
+    print(f"== estado de DC-002.159h en {LIB}")
+    for nombre, patron, archivo in piezas:
+        print(f"   {'PUESTO ' if hay(patron, archivo) else 'QUITADO'}  {nombre}")
+    a = pathlib.Path(LIB, "libgodc.a")
+    print(f"   libgodc.a: {a.stat().st_size} bytes, sha256 {sha(a)}" if a.exists() else "   libgodc.a: no esta")
+    sys.exit(0)
+
+
 print(f"== 1/4 el arbol pristino + los arreglos que ya existian (ABI, interfaces, GC {KB} KB y Store Queue)")
 if QUITAR:
     print("   --quitar: no se corre la cadena (solo se saca este arreglo)")
